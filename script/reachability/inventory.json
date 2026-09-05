@@ -1,8 +1,8 @@
 {
-  "generated": "a02e8bb",
-  "head": "a02e8bb",
+  "generated": "cd3cd0d",
+  "head": "cd3cd0d",
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3030,
+  "entry_points": 3052,
   "entry_packages": [
     ".",
     "bootid",
@@ -24,6 +24,7 @@
     "diagevent",
     "eligibility",
     "endpoint",
+    "endpoint/sqlitestore",
     "im",
     "im/subscription",
     "mdns",
@@ -46,9 +47,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2636,
-    "reachable": 1253,
-    "whitelisted": 1372,
+    "total_exported": 2652,
+    "reachable": 1268,
+    "whitelisted": 1373,
     "unreachable": 11
   },
   "by_package": [
@@ -6149,6 +6150,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_parity_test.go",
       "line": 401
+    },
+    {
+      "package": "internal/channelseam",
+      "identifier": "AnchorPeerCounter",
+      "reason": "assigned by secure/channel at init and read by bridge/seam.go:77; a function variable installed through a seam has no call edge the analyzer can follow",
+      "file": "internal/channelseam/channelseam.go",
+      "line": 40
     },
     {
       "package": "mdns",
