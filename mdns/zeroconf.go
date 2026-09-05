@@ -23,20 +23,39 @@ import (
 // the bridge by service-type instead of needing an explicit
 // `<ip> <port>` argument.
 //
-// Subtype records (e.g. `_L<discriminator>._sub._matterc._udp`) are
-// emitted as additional zeroconf services under the
-// `<subtype>._sub.<service-type>` synthesised name. The upstream
-// library lacks a first-class subtype API, but registering
-// independent servers per subtype produces the PTR records chip-tool
-// queries during `pairing onnetwork-long`. The duplication wastes
-// a small amount of bandwidth on Probe / Announce but is functionally
-// equivalent — chip-tool resolves the instance via SRV/TXT against
-// the primary registration regardless of which subtype matched.
+// Subtype records are NOT published on their own. A [Service] may
+// carry Subtypes (`_L<discriminator>`, `_S<short>`, `_CM`, `_V<vid>`
+// — Matter §4.3.1.4), but Publish forwards them only when a
+// [SubtypeResponder] has been attached: the loop that turns them into
+// `_<sub>._sub.<service>.local.` PTR mappings sits behind a
+// `z.responder != nil` guard, and with no responder the field is read,
+// dropped, and an empty subtype list recorded for the key. Nothing
+// fails and nothing logs — the primary record set goes out complete
+// and only the browse-by-filter form is missing, which is precisely
+// the form Apple Home and Google Home use to find a commissionable
+// bridge. A caller that wants subtypes on the wire must, in order:
+//
+//	r, err := mdns.NewSubtypeResponder(logger) // binds 224.0.0.251 / ff02::fb
+//	r.Start(ctx)                               // receive loops answer PTR queries
+//	zc.AttachSubtypeResponder(r)               // BEFORE the first Publish
+//	zc.Publish(ctx, svc)
+//
+// Attaching after a Publish leaves that publish's subtypes lost until
+// it is re-published; the mappings are handed over inside Publish, not
+// replayed on attach. Closing the advertiser closes the responder.
 //
 // One zeroconf.Server is held per published (instance, service-type)
-// pair plus one per subtype so Withdraw and Close can dismantle them
-// independently. The library handles re-probing on link changes; no
-// manual interface tracking required in v1.1.
+// pair — subtypes add none, since the side-car answers for them — so
+// Withdraw and Close dismantle each primary independently.
+//
+// The upstream library probes and announces once per Register and does
+// not re-announce afterwards, so a commissioner that missed the
+// announce window (late join, transient link loss, cache eviction past
+// TTL) never learns about the bridge. Re-announcement is this type's
+// job, not the library's: run [Zeroconf.StartReannounceLoop] for the
+// periodic cadence and call [Zeroconf.TriggerReannounce] on link
+// changes. Which host interfaces contribute A/AAAA records is likewise
+// decided here, by [Zeroconf.InterfaceFilter].
 type Zeroconf struct {
 	mu      sync.RWMutex
 	servers map[string]*zeroconf.Server

@@ -66,9 +66,12 @@ const perChunkStatusRespTimeout = 500 * time.Millisecond
 // session, looked up via [exchangeRouting.subTargets] (populated here on
 // successful Subscribe).
 //
-// Pass nil to revert to noop (Subscribe replies with empty
-// ReportData + a synthetic SubscriptionID=0 SubscribeResponse so
-// the message frame still parses on the controller side).
+// Pass nil to revert to noop. The initial ReportData is still built
+// and streamed in full — buildInitialReport runs off the dispatcher and
+// never consults the manager — but it carries HasSubscription=false and
+// SubscriptionID=0, and no report ever follows. The controller reads a
+// successful subscribe and a device that never changes, so treat an
+// unattached manager as a wiring defect rather than a degraded mode.
 func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 	b.mu.Lock()
 	b.subManager = m

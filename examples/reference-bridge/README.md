@@ -65,33 +65,36 @@ issued under its own CSA membership. See the repository README's
 
 ## Persistence: what it costs, and what breaks without it
 
-`endpoint.Store` is a port with **no production implementation in the
-module**. `endpointtest.NewFakeStore` is in-memory test scaffolding, so a
-third-party integrator has to write the real one — this example writes
-`sqliteEndpointStore` in `persist.go` (~90 lines).
+Endpoint numbers are the one piece of bridge state a controller caches and
+cannot be told to re-read: it keys its accessory list on the number. An
+in-memory store makes the example *run* and quietly makes it *wrong* across
+a restart — every commissioned controller loses every accessory, or worse,
+silently rebinds an accessory to a different device that inherited its
+number.
 
-That is not a detail. Endpoint numbers are the one piece of bridge state a
-controller caches and cannot be told to re-read: it keys its accessory list
-on the number. An in-memory store makes the example *run* and quietly makes
-it *wrong* across a restart — every commissioned controller loses every
-accessory, or worse, silently rebinds an accessory to a different device that
-inherited its number.
+So this example persists, and after the first version of it was written by
+hand, both halves it had to hand-write moved into the module:
 
-So this example persists, and the choice was made deliberately:
-
-- **SQLite, via `modernc.org/sqlite`.** That is already a direct requirement
-  of `go-fabric` itself, so using it here adds **no new dependency** to the
-  module — `go mod tidy -diff` stays clean. It is also what
-  `store.Store` (fabrics, NOCs, group keys, ACLs) needs anyway: that package
-  takes an already-migrated `*sql.DB` and never opens one.
-- **The host owns the DDL.** `store/testdata/schema.sql` documents the shape
-  the module's queries are written against, but it lives under `testdata/`,
-  so it can be read and never imported or embedded. `schemaDDL` in
-  `persist.go` is a hand-copy of it plus this host's own `matter_endpoints`
-  table. Two copies of one schema can drift; the module ships nothing that
-  would catch it.
-- **Numbers only ever advance.** `next_endpoint_id` in `matter_metadata` is a
-  high-water mark, and `RemoveEndpoint` never returns a number to the pool.
+- **`endpoint/sqlitestore` is the production `endpoint.Store`.**
+  `endpointtest.NewFakeStore` remains in-memory test scaffolding;
+  `sqlitestore.New(db)` is what a bridge runs on. Neither package imports a
+  driver — they take an already-open `*sql.DB` — so the host picks the
+  driver and the DSN. This one uses `modernc.org/sqlite`, already a direct
+  requirement of `go-fabric`, so persisting adds no new dependency.
+- **The module owns the DDL.** `store.Schema()` and `sqlitestore.Schema()`
+  return the embedded text each package's own queries are written against;
+  `Apply` runs it. `persist.go` calls both and writes no SQL, so a schema
+  change arrives with the dependency bump. A host with a migration tool
+  feeds the two scripts through that instead.
+- **Numbers only ever advance.** The high-water mark lives in
+  `matter_endpoint_allocation`, and `RemoveEndpoint` never returns a number
+  to the pool.
+- **Keys are plain strings here.** The fleet's `StableKey`s are
+  `endpoint.StringKey`, so the store's default decoding is correct. A host
+  with a composite key type must pass `sqlitestore.WithKeyDecoder`: without
+  it the assembler's garbage collection cannot match a listed key against a
+  live one and deletes every endpoint number on the first model-complete
+  assembly.
 
 Everything else is deliberately volatile: CASE sessions live in RAM (Matter
 treats them as such), and subscriptions are not re-armed at boot even though

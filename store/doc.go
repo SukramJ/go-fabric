@@ -5,10 +5,11 @@
 // fabrics, node identities (NOC chain + private key + IPK), group
 // keys, and access-control lists.
 //
-// The host owns the migration that creates these tables; the shape the
-// queries here are written against is spelled out in testdata/schema.sql.
 // This package is purely the typed access surface — it borrows an
-// already-migrated *sql.DB from whatever opened it.
+// already-migrated *sql.DB from whatever opened it and never opens one.
+// The DDL its queries are written against is embedded here and reachable
+// as [Schema]; a host either feeds that text through its own migration
+// tool or calls [Apply], but does not transcribe it.
 //
 // Persistence model (Matter Core Spec §11.18 / §11.2 / §11.2.10):
 //

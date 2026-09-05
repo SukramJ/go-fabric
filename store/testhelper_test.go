@@ -6,20 +6,13 @@ package store_test
 import (
 	"context"
 	"database/sql"
-	_ "embed"
 	"path/filepath"
 	"testing"
 
 	_ "modernc.org/sqlite"
-)
 
-// schemaDDL is the matter_* table shape this package's queries are written
-// against. The package takes an already-migrated database in production, so
-// this DDL is test-only; the file itself carries the note on the drift it
-// can develop against a host's own migrations.
-//
-//go:embed testdata/schema.sql
-var schemaDDL string
+	"github.com/SukramJ/go-fabric/store"
+)
 
 // connectionPragmas are the modernc.org/sqlite `_pragma` query parameters
 // applied to every connection the pool opens, not just the first.
@@ -36,6 +29,10 @@ const connectionPragmas = "_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&
 // openTestDB opens a fresh file-backed SQLite database in t's temp
 // directory with the matter_* schema already applied, and registers a
 // cleanup to close it. Tests share the schema text, never the data.
+//
+// It applies the schema through the exported [store.Apply], so these tests
+// stand on the same DDL a host gets rather than on a fixture beside it — the
+// arrangement that let a test fixture and a deployment's tables drift.
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "matter.db")
@@ -44,8 +41,8 @@ func openTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("open test db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if _, err := db.ExecContext(context.Background(), schemaDDL); err != nil {
-		t.Fatalf("apply test schema: %v", err)
+	if err := store.Apply(context.Background(), db); err != nil {
+		t.Fatalf("apply schema: %v", err)
 	}
 	return db
 }

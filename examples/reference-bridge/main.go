@@ -31,6 +31,7 @@ import (
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
@@ -122,7 +123,11 @@ func run() error {
 	}
 	defer func() { _ = db.Close() }()
 	credentials := store.New(db)
-	endpointStore := newEndpointStore(db)
+	// This host's source identities are plain strings (see the fleet), so
+	// the default endpoint.StringKey decoding is the right one. A host with
+	// a composite key type must pass sqlitestore.WithKeyDecoder — its
+	// documentation says what silently breaks otherwise.
+	endpointStore := sqlitestore.New(db)
 
 	// --- the fleet and its topology assembler --------------------------
 	assemblerCfg := endpoint.Config{

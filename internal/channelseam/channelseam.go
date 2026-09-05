@@ -36,4 +36,5 @@ package channelseam
 // Reports whether the window took counter as fresh. False means the type
 // assertion failed, or the window had already recorded that counter — the
 // session is not in the untouched post-handshake state this models.
+// fabric:reachable:reason="assigned by secure/channel at init and read by bridge/seam.go:77; a function variable installed through a seam has no call edge the analyzer can follow"
 var AnchorPeerCounter func(sess any, counter uint32) bool

@@ -19,8 +19,10 @@ var (
 
 // Advertiser is the runtime surface a bridge component holds onto.
 // Implementations vary in how they push records onto the wire — the
-// production [MulticastAdvertiser] sends multicast UDP responses on
-// 5353; tests use [Noop].
+// production [Zeroconf] registers each service with a responder that
+// probes, announces and answers on UDP/5353; [Noop] only records the
+// services in memory and puts nothing on the network, which is what
+// tests and the boot phase before the network stack is up want.
 type Advertiser interface {
 	// Publish announces (or re-announces) svc. Replaces an existing
 	// record with the same InstanceName + ServiceType.

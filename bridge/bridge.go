@@ -15,6 +15,97 @@
 // Lifecycle: [New] → [Start] → (optional) [Reassemble] → [Stop].
 // Start is idempotent (returns ErrAlreadyStarted on a second call).
 // Stop is idempotent and safe to call after a failed Start.
+//
+// # Bring-up sequence
+//
+// [New] takes only a store, a [Snapshotter], an [mdns.Advertiser] and
+// a [Config]; every other collaborator arrives through an Attach / Set
+// call afterwards. That keeps the constructor free of the daemon's
+// chicken-and-egg cycles (the operational session manager needs the
+// bridge's listener, the bridge needs the manager), at the cost of a
+// bridge that compiles, starts and serves while wired to nothing.
+//
+// It does not fail loudly when a collaborator is missing. [New] installs
+// a noop for each unattached port, so a half-wired bridge binds its UDP
+// socket, publishes its mDNS record and answers datagrams — it simply
+// answers them wrongly. The list below is therefore the actual
+// requirement, ordered as a host should call it, each entry stating what
+// a skip costs. Two failure modes recur and are not interchangeable:
+// *fails closed* means requests are refused, which is at least visible
+// as a denial on the controller; *silent* means the reply looks
+// well-formed and the missing behaviour never shows up as an error
+// anywhere.
+//
+// Before [Start] — these are read once at Start, or feed a component
+// Start constructs, so attaching them later has no effect until the
+// next [Reassemble] (or, for the ACK tracker, not at all on a bridge
+// that is already running):
+//
+//   - AttachACLLister — FAILS CLOSED. The lister reaches the dispatcher
+//     only in reassembleLocked, which Start runs. Without one,
+//     TopologyDispatcher.CheckACL denies every fabric-scoped request
+//     with UnsupportedAccess (endpoint/dispatcher.go:790-802): a bridge
+//     that pairs normally and then answers nothing. A deployment that
+//     means to run unguarded passes [endpoint.UnenforcedACL] — the
+//     explicit spelling of the same effect.
+//   - AttachSessionLookup — silent. The default noopSessionLookup misses
+//     on every id, so each encrypted datagram is dropped as
+//     ErrSessionMissing. CASE can complete and still carry no traffic.
+//   - AttachPaseHandlerProvider (or the singleton AttachPaseHandler) —
+//     fails closed. The noop returns ErrPaseHandlerMissing for all three
+//     PASE opcodes, so commissioning cannot begin. The provider wins
+//     when both are wired; prefer it, since the singleton serialises
+//     commissioners onto one handler.
+//   - AttachCaseHandlerProvider (or the singleton AttachCaseHandler) —
+//     fails closed via ErrCaseHandlerMissing. Use the provider: a
+//     singleton CaseAdapter sticks in Finished after the first Sigma3
+//     and rejects the parallel CASE sessions Apple Home opens from two
+//     addresses at once.
+//   - AttachAckTracker — silent, and wider than its name suggests. It
+//     also constructs the outbound reliability tracker, so without it
+//     sendReply never sets NeedsAck (reply.go:149,157): the bridge
+//     neither emits standalone ACKs nor retransmits its own reliable
+//     messages, and every reply degrades to best-effort UDP.
+//   - AttachSubscriptionManager — silent, and the most deceptive of the
+//     set. A Subscribe still returns the complete initial ReportData,
+//     but with HasSubscription=false and SubscriptionID=0, and no report
+//     ever follows; EmitEvent still appends to the event log and fans
+//     out to nobody. The controller sees a successful subscribe and a
+//     device that never changes.
+//   - AttachSessionRegistry — silent. Inbound CloseSession stops closing
+//     anything, [Stop] tears sessions down without the CloseSession
+//     farewell (leaving controllers on stale sessions after a restart),
+//     and the two reverse hooks this call self-wires — the graceful-close
+//     notifier and the mDNS reannounce trigger — are never installed.
+//
+// Cluster surface — order matters within this group, but not relative
+// to [Start]: attaching clusters republishes them onto the live
+// topology immediately as well as on the next [Reassemble]:
+//
+//   - AttachRootClusters, then AttachAggregatorClusters. Skipping either
+//     leaves that endpoint with no servers. A concrete-endpoint read
+//     then returns UnsupportedCluster, but a wildcard read — what a
+//     commissioner actually sends — silently skips the endpoint
+//     (endpoint/dispatcher.go:155-169), so the bridge reads as present
+//     and empty rather than broken.
+//   - AttachRootPartsListProvider and AttachAggregatorPartsListProvider
+//     MUST follow their AttachRootClusters / AttachAggregatorClusters
+//     call: each walks the already-attached slice for the Descriptor
+//     cluster (0x001D) and installs the provider on it. Called first, or
+//     with no Descriptor mounted, they return false and wire nothing —
+//     check the bool, because the only other symptom is a PartsList
+//     frozen at whatever the Descriptor was constructed with.
+//
+// Genuinely optional — a skip costs exactly the named feature:
+//
+//   - AttachCommissioningWindow stores the tracker for
+//     [Bridge.CommissioningWindow] to hand back; the bridge itself never
+//     reads it. Skipping it does not affect the mDNS commissionable
+//     record, which [Bridge.AnnounceCommissioning] publishes from its
+//     own argument.
+//   - AttachDiagnosticEvents makes [Bridge.DiagnosticEvents] non-empty.
+//   - SetOnReassembled, SetOnFabricAdded and SetOnFabricRemoved are
+//     nil-safe observer hooks.
 package bridge
 
 import (
@@ -899,11 +990,15 @@ func (b *Bridge) AttachACLLister(l endpoint.ACLLister) {
 	b.mu.Unlock()
 }
 
-// AttachCommissioningWindow wires the bridge-side
-// [CommissioningWindow] tracker. The bridge stores the reference for
-// future re-emit on Reassemble; callers should also attach the
+// AttachCommissioningWindow parks the bridge-side [CommissioningWindow]
+// tracker where [Bridge.CommissioningWindow] can hand it back. That is
+// the whole effect: no bridge path reads the field, and [Reassemble]
+// does not re-emit from it. Callers must therefore also attach the
 // AdministratorCommissioning cluster server (with the window as its
-// WindowController) to the root endpoint via [AttachRootClusters].
+// WindowController) to the root endpoint via [AttachRootClusters], and
+// drive the mDNS side through [Bridge.AnnounceCommissioning] /
+// [Bridge.WithdrawCommissioning], which take their parameters as
+// arguments rather than from this tracker.
 //
 // Pass nil to detach.
 func (b *Bridge) AttachCommissioningWindow(w *CommissioningWindow) {
