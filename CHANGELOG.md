@@ -119,3 +119,26 @@ long enough for a `v0.1.0` to mean something.
   of leaning on a formatting step in a `Makefile` this module does not have.
   Regenerating from the unchanged snapshot reproduces `clusters.go`,
   `devicetypes.go` and the `SchemaSnapshotSHA256` constant byte for byte.
+
+### Fixed
+
+- **A first pairing of the reference daemon timed out in operational
+  discovery.** The post-AddNOC hook rebuilt the CASE identity and published
+  nothing. Boot advertised an operational record for every fabric already in
+  the store, so restart-then-reconnect worked and hid the gap -- but a first
+  pairing never goes through that path. The commissioner finished PASE,
+  installed the fabric, then resolved
+  `<compressed>-<node>._matter._tcp` against a record that had never been
+  published, and spent its retry budget on a lookup that could not succeed.
+  The hook now advertises the fabric, keyed on the identity it just loaded so
+  the record and the CASE responder cannot name different nodes. Found by the
+  chip-tool guard on its first run, with its control leg green in the same
+  run.
+- **The reachability snapshot stamped itself with a revision it could not
+  know.** `inventory.json` carried `head` and `generated`, both the git
+  revision at generation time -- necessarily the parent of the commit that
+  carries the file. Against a check that compares the regenerated snapshot
+  byte-for-byte, that field goes stale on the next run no matter what the
+  code does, and it tells a reader the snapshot was measured one commit
+  earlier than it was. Both fields are gone; the commit holding the file is
+  its provenance.
