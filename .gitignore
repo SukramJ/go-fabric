@@ -2,3 +2,7 @@
 /bin/
 *.test
 *.out
+
+# IDE project state. GoLand writes .idea/ into any directory it opens; none
+# of it describes the module.
+.idea/

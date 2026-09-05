@@ -1,0 +1,116 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CGO_ENABLED: "0"
+  GO_VERSION: "1.26.6"
+  # The lint tools are pinned on purpose, and pinned to the same versions
+  # the reference daemon uses. A new lint release adds checks that are style
+  # decisions, and floating on @latest makes this gate report on the calendar
+  # rather than on the diff — main goes from green to red overnight on an
+  # unchanged tree.
+  #
+  # Bump deliberately: raise the version here, run the linter locally, and fix
+  # or justify whatever the new release finds in the same change. The gofumpt
+  # step below runs the standalone formatter, which is stricter than the one
+  # golangci-lint bundles, so check `gofumpt -l .` against GOFUMPT_VERSION too.
+  GOFUMPT_VERSION: "v0.10.0"
+  GOLANGCI_LINT_VERSION: "v2.13.0"
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # This module is a library — there is no binary to smoke-test, so
+      # compiling the whole package graph is the whole of the build leg.
+      - name: go build
+        run: go build ./...
+
+  vet:
+    name: vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Overlaps with the govet linter in the lint job, but runs even when a
+      # lint failure elsewhere in the config stops that job early, and vets
+      # the test files' build graph as the toolchain sees it.
+      - name: go vet
+        run: go vet ./...
+
+  test:
+    name: test (linux, race)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # The race detector is not optional for this module: it is a protocol
+      # stack whose session, subscription and MRP paths are concurrent by
+      # construction, and a data race there surfaces as an intermittent
+      # pairing failure in a controller nobody can attach a debugger to.
+      # -race requires cgo, so this one step overrides the module-wide
+      # CGO_ENABLED=0.
+      - name: go test (race)
+        env:
+          CGO_ENABLED: "1"
+        run: go test -race -count=1 ./...
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: gofumpt
+        run: |
+          go install mvdan.cc/gofumpt@${{ env.GOFUMPT_VERSION }}
+          diff=$(gofumpt -l .)
+          if [ -n "$diff" ]; then
+            echo "::error::gofumpt found unformatted files:"
+            echo "$diff"
+            exit 1
+          fi
+      # Install golangci-lint v2 from source with the Go toolchain set up
+      # above. The prebuilt binary ships built with an older Go and refuses
+      # to run against a module targeting a newer one; golangci-lint-action@v6
+      # installs a v1 binary that rejects this repo's v2 config
+      # (version/formatters/linters.default keys). A direct `go install` of
+      # the /v2/ module avoids both problems.
+      - name: golangci-lint
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
+          golangci-lint config verify
+          golangci-lint run --timeout=5m ./...
+      # Fail if go.mod/go.sum drift from `go mod tidy`, or if a checksum in
+      # go.sum does not match the module cache.
+      - name: go mod tidy + verify
+        run: |
+          go mod tidy -diff
+          go mod verify

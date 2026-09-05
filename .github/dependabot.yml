@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # The module's own Go dependencies. Five direct requires (filippo.io/nistec,
+  # github.com/grandcat/zeroconf, github.com/miekg/dns, golang.org/x/net,
+  # modernc.org/sqlite) plus their transitive set — see go.mod.
+  #
+  # Two of them are load-bearing for the licence position recorded in
+  # THIRD-PARTY-NOTICES.md, so a major bump gets its own PR rather than
+  # riding along in a group: a dependency that relicenses is a decision, not
+  # a version number.
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions (pinned by commit SHA; Dependabot bumps the SHA and
+  # keeps the `# vX` version comment in sync).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns: ["*"]

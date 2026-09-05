@@ -1,0 +1,44 @@
+# Changelog
+
+All notable changes to go-fabric are recorded in this file.
+The project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+The module carries its own version lane, independent of any host that embeds
+it. Nothing is tagged yet: the API has had one real caller, so consumers
+track a pseudo-version until the reference daemon has exercised the surface
+long enough for a `v0.1.0` to mean something.
+
+## [Unreleased]
+
+### Added
+
+- **The Matter bridge stack is a standalone module.** The subtree and its
+  port contracts left the host daemon they grew in and became
+  `github.com/SukramJ/go-fabric`, with its own dependency set: TLV codec,
+  Interaction Model, PASE/CASE session establishment, MRP over IPv6 UDP,
+  DNS-SD advertisement, the cluster servers a bridge needs, and the endpoint
+  assembler. The `contract` package is the seam: a host implements those
+  interfaces to expose its own devices as bridged endpoints and keeps
+  ownership of its device model, while this module owns the wire format.
+  Tests that reached into the host's device model, or read fixtures outside
+  the module, did not travel; the ones whose subject is the wire format did.
+- **Four commissioning security guards are back.** The NOC length cap, the
+  root-certificate subject check, the ACL cleanup on revert, and the
+  commissioning window's rejection of a PASE caller were lost in the
+  extraction — their subject moved and they did not, so they existed in
+  neither repository. They return as behavioural tests rather than the source
+  scans they were: the subject now sits in the same module as its test, so
+  the real handler is driven and the effect observed, where a scan could not
+  tell a check that runs from one that was moved after the action it
+  protects. Each carries a control (the 400-byte NOC, the untouched fabric
+  indices, the CASE leg), and each was observed failing before it was kept.
+- **A licence-header guard over the whole module.** Every `.go` file must
+  carry the SPDX identifier and the copyright line ahead of its package
+  clause. It reads the comment block before `package` rather than lines 1
+  and 2, because a build-constrained file opens with its build tag.
+- **CI, a pinned lint gate and dependency tracking.** Build, vet, race-enabled
+  tests and lint run on every push and pull request, with the Go, `gofumpt`
+  and `golangci-lint` versions pinned to the same values the reference daemon
+  uses. Dependabot tracks the module's Go dependencies and the SHA-pinned
+  actions.
