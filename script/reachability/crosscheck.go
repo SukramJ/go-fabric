@@ -50,13 +50,11 @@ type entry struct {
 
 // inventory mirrors the fields of inventory.json this tool reads.
 type inventory struct {
-	Head        string  `json:"head"`
 	Unreachable []entry `json:"unreachable"`
 }
 
 // result is the document written to crosscheck.json.
 type result struct {
-	Head            string  `json:"head"`
 	TotalCandidates int     `json:"total_candidates"`
 	FalsePositives  int     `json:"false_positives"`
 	Genuine         int     `json:"genuine"`
@@ -92,7 +90,7 @@ func main() {
 		}
 	}
 
-	out := result{Head: inv.Head, TotalCandidates: len(candidates)}
+	out := result{TotalCandidates: len(candidates)}
 	for _, c := range candidates {
 		if hasAnyMention(root, c) {
 			out.FalsePositives++

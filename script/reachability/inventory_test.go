@@ -87,7 +87,6 @@ type inventoryPackageSummary struct {
 // reachabilityInventory is the committed inventory document.
 type reachabilityInventory struct {
 	Generated   string                      `json:"generated"`
-	Head        string                      `json:"head"`
 	RootSet     string                      `json:"root_set"`
 	EntryPoints int                         `json:"entry_points"`
 	EntryPkgs   []string                    `json:"entry_packages"`
@@ -135,9 +134,6 @@ func TestReachabilityInventoryExists(t *testing.T) {
 	t.Parallel()
 	inv := loadReachabilityInventory(t)
 
-	if inv.Head == "" {
-		t.Error("head is empty")
-	}
 	if inv.RootSet == "" {
 		t.Error("root_set is empty — the inventory must say what it was measured against")
 	}
@@ -150,8 +146,8 @@ func TestReachabilityInventoryExists(t *testing.T) {
 	if len(inv.EntryPkgs) == 0 {
 		t.Error("entry_packages is empty")
 	}
-	t.Logf("head=%s entry_points=%d tested_packages=%d total_exported=%d unreached=%d whitelisted=%d",
-		inv.Head, inv.EntryPoints, len(inv.EntryPkgs),
+	t.Logf("entry_points=%d tested_packages=%d total_exported=%d unreached=%d whitelisted=%d",
+		inv.EntryPoints, len(inv.EntryPkgs),
 		inv.Summary.TotalExported, inv.Summary.Unreachable, inv.Summary.Whitelisted)
 }
 

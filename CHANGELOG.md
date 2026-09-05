@@ -13,6 +13,39 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **`endpoint/sqlitestore`, a production `endpoint.Store`.** The port shipped
+  with only `endpointtest.NewFakeStore` behind it, so every consumer had to
+  write the real one — and endpoint identity is the piece of bridge state
+  that must survive a restart, because a controller keys its accessory list
+  on the endpoint number and is never told to re-read it. The package takes
+  an already-open `*sql.DB` and imports no driver, and it is a separate
+  package on purpose: a host that brings its own store links none of it and
+  creates none of its tables. Its `WithKeyDecoder` option exists for a
+  failure the port made possible and nothing announced — the assembler
+  garbage-collects by comparing the keys a store *lists* against the keys the
+  live snapshot carried, as interface values, so a store that hands back
+  `endpoint.StringKey` to a host with a composite key type makes every live
+  row look vanished and deletes every endpoint number on the first
+  model-complete assembly. Both directions are pinned by a test through the
+  real assembler.
+- **`store.Schema()` / `store.Apply`, and the same pair on
+  `endpoint/sqlitestore`.** The DDL the store's queries are written against
+  lived under `store/testdata/`, where a host can read it and never import
+  it; the module's own example had transcribed 140 lines of it, and two
+  copies of one schema drift with nothing to catch it. The text is now
+  embedded in the package it belongs to and handed out, so a column added
+  here arrives with the dependency bump. Both scripts are idempotent, and
+  the store package's own tests apply them through the exported entry point
+  rather than through a fixture beside it.
+- **`sigma.DeriveOperationalIPK`.** Turning the raw `AddNOC.IPKValue` into
+  the operational IPK the CASE handshake keys on was documented in a doc
+  comment and implemented nowhere in the module, so each host reconstructed
+  a security-relevant HKDF derivation from prose. It is now exported next to
+  `ComputeDestinationID`, which consumes it, with every input cited to
+  matter.js and pinned by matter.js's own group-key test vector. The doc
+  comments that had described the raw value as `Identity.IPK` were wrong and
+  say the opposite now.
+
 - **Test-support packages, so a consumer's tests stop reimplementing the
   module's fakes and stop sending traffic to set up state.** The module's
   first external consumer — a scenario harness driving the bridge from
@@ -86,3 +119,26 @@ long enough for a `v0.1.0` to mean something.
   of leaning on a formatting step in a `Makefile` this module does not have.
   Regenerating from the unchanged snapshot reproduces `clusters.go`,
   `devicetypes.go` and the `SchemaSnapshotSHA256` constant byte for byte.
+
+### Fixed
+
+- **A first pairing of the reference daemon timed out in operational
+  discovery.** The post-AddNOC hook rebuilt the CASE identity and published
+  nothing. Boot advertised an operational record for every fabric already in
+  the store, so restart-then-reconnect worked and hid the gap -- but a first
+  pairing never goes through that path. The commissioner finished PASE,
+  installed the fabric, then resolved
+  `<compressed>-<node>._matter._tcp` against a record that had never been
+  published, and spent its retry budget on a lookup that could not succeed.
+  The hook now advertises the fabric, keyed on the identity it just loaded so
+  the record and the CASE responder cannot name different nodes. Found by the
+  chip-tool guard on its first run, with its control leg green in the same
+  run.
+- **The reachability snapshot stamped itself with a revision it could not
+  know.** `inventory.json` carried `head` and `generated`, both the git
+  revision at generation time -- necessarily the parent of the commit that
+  carries the file. Against a check that compares the regenerated snapshot
+  byte-for-byte, that field goes stale on the next run no matter what the
+  code does, and it tells a reader the snapshot was measured one commit
+  earlier than it was. Both fields are gone; the commit holding the file is
+  its provenance.

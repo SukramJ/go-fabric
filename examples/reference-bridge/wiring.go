@@ -7,9 +7,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/hkdf"
 	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -251,6 +249,22 @@ func (c *caseIdentities) current() *caseFabric {
 	return c.latest
 }
 
+// announceIdentity returns the DNS-SD identity of one loaded fabric: the
+// compressed fabric ID and node ID that name its operational
+// `<compressed>-<node>._matter._tcp` instance. Reporting it from the same
+// entry the CASE responder answers with is the point — announcing an
+// identity the responder does not hold advertises a bridge that cannot
+// complete the Sigma1 it just invited.
+func (c *caseIdentities) announceIdentity(fabricIndex uint8) (compressedID [8]byte, nodeID uint64, ok bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entry, ok := c.byIdx[fabricIndex]
+	if !ok || entry.identity == nil {
+		return compressedID, 0, false
+	}
+	return entry.identity.CompressedFabricID, entry.identity.NodeID, true
+}
+
 // load rebuilds the identity for one fabric from its persisted rows. Called
 // at boot for every already-installed fabric and again from
 // OperationalCredentials' OnFabricInstalled hook after each AddNOC.
@@ -271,7 +285,9 @@ func (c *caseIdentities) load(ctx context.Context, st *store.Store, fabricIndex 
 	if err != nil {
 		return fmt.Errorf("peer verifier %d: %w", fabricIndex, err)
 	}
-	opIPK, err := operationalIPK(identity.IPK, fabric.CompressedID)
+	// The stored IPK is the raw AddNOC.IPKValue; the handshake keys on the
+	// derived operational one.
+	opIPK, err := sigma.DeriveOperationalIPK(identity.IPK, fabric.CompressedID)
 	if err != nil {
 		return fmt.Errorf("operational ipk %d: %w", fabricIndex, err)
 	}
@@ -299,26 +315,6 @@ func (c *caseIdentities) load(ctx context.Context, st *store.Store, fabricIndex 
 		slog.Uint64("fabric_id", fabric.FabricID),
 		slog.Uint64("node_id", fabric.NodeID))
 	return nil
-}
-
-// operationalIPK derives the per-fabric operational IPK a Sigma destinationID
-// is keyed on.
-//
-// The module does not export this derivation, so a host has to write it: the
-// inputs are named in the doc comment of [sigma.ComputeDestinationID] —
-// HKDF-SHA256 over the raw IPK with salt = compressed fabric id and
-// info = "GroupKey v1.0", truncated to 16 bytes.
-func operationalIPK(rawIPK []byte, compressedFabricID [8]byte) ([16]byte, error) {
-	var out [16]byte
-	if len(rawIPK) != 16 {
-		return out, fmt.Errorf("raw IPK length %d, want 16", len(rawIPK))
-	}
-	derived, err := hkdf.Key(sha256.New, rawIPK, compressedFabricID[:], "GroupKey v1.0", 16)
-	if err != nil {
-		return out, fmt.Errorf("hkdf: %w", err)
-	}
-	copy(out[:], derived)
-	return out, nil
 }
 
 // --- security wiring ----------------------------------------------------

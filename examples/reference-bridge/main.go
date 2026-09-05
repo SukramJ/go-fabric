@@ -31,6 +31,7 @@ import (
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
@@ -122,7 +123,11 @@ func run() error {
 	}
 	defer func() { _ = db.Close() }()
 	credentials := store.New(db)
-	endpointStore := newEndpointStore(db)
+	// This host's source identities are plain strings (see the fleet), so
+	// the default endpoint.StringKey decoding is the right one. A host with
+	// a composite key type must pass sqlitestore.WithKeyDecoder — its
+	// documentation says what silently breaks otherwise.
+	endpointStore := sqlitestore.New(db)
 
 	// --- the fleet and its topology assembler --------------------------
 	assemblerCfg := endpoint.Config{
@@ -187,7 +192,25 @@ func run() error {
 		func(hookCtx context.Context, fabricIndex uint8, _, _ uint64, _ []byte) {
 			if err := caseIDs.load(hookCtx, credentials, fabricIndex); err != nil {
 				logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
+				return
 			}
+			// Publishing the operational record here is not an optimisation
+			// of the boot-time publish below -- it is the only publish a
+			// freshly commissioned fabric ever gets. The commissioner
+			// finishes AddNOC over PASE and immediately resolves
+			// `<compressed>-<node>._matter._tcp` to open its first CASE
+			// session; on a first pairing there was no such fabric at boot,
+			// so nothing has advertised it. Without this the pairing gets
+			// through PASE, installs the fabric, and then times out in
+			// operational discovery -- a failure that reads like a network
+			// fault and is not one.
+			compressedID, nodeID, ok := caseIDs.announceIdentity(fabricIndex)
+			if !ok {
+				logger.Warn("case.identity.announce_skipped",
+					slog.Int("fabric_index", int(fabricIndex)))
+				return
+			}
+			br.AnnounceFabric(hookCtx, compressedID, nodeID)
 		})
 	if err != nil {
 		return err

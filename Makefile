@@ -100,6 +100,41 @@ reachability-check: reachability ## regenerate, then fail if the committed snaps
 	}
 	$(GO) test -count=1 -run 'Reachab' ./script/reachability/
 
+# --- the real-commissioner guard ----------------------------------------
+#
+# The line below is the SINGLE SOURCE for the chip-tool build this module is
+# tested against: .github/workflows/chiptool.yml seds the 40-hex tag out of
+# this Makefile for both of its jobs, so the suite and its control leg can
+# never end up validating two different chip-tool builds, and a local
+# extraction gets the same one a CI run does.
+#
+# The tag is a connectedhomeip commit. Bump it deliberately — a new tag is a
+# new commissioner, which is exactly the thing this guard measures against.
+# Recent chip-cert-bins tags publish arm64-only manifests, which is why the
+# workflow runs on ubuntu-24.04-arm; an amd64 runner cannot pull the image.
+CHIP_CERT_BINS_IMAGE ?= connectedhomeip/chip-cert-bins:6feac778f196483b6355d35fc529f183b293b71f
+CHIPTOOL_BIN_DIR     ?= bin
+
+.PHONY: chiptool-extract
+chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into ./bin (~2.5 GiB pull)
+	@mkdir -p $(CHIPTOOL_BIN_DIR)
+	@# /root/chip-tool in the image is a symlink; /root/apps/chip-tool is the file.
+	docker create --name gofabric-chip-cert-bins $(CHIP_CERT_BINS_IMAGE)
+	docker cp gofabric-chip-cert-bins:/root/apps/chip-tool $(CHIPTOOL_BIN_DIR)/chip-tool
+	docker rm gofabric-chip-cert-bins
+	chmod +x $(CHIPTOOL_BIN_DIR)/chip-tool
+
+.PHONY: chiptool-build
+chiptool-build: ## build the reference daemon the chip-tool guard commissions
+	$(GO) build -o $(CHIPTOOL_BIN_DIR)/reference-bridge ./examples/reference-bridge
+
+.PHONY: chiptool-test
+chiptool-test: chiptool-build ## commission the reference daemon with chip-tool (Linux host + chip-tool required)
+	@# The suite skips itself when chip-tool is missing, which is the whole
+	@# story on macOS: chip-tool has no macOS host build. It fails loudly on a
+	@# missing daemon binary instead, which chiptool-build has just produced.
+	$(GO) test -tags=chiptool -count=1 -timeout=900s -v ./internal/chiptool/...
+
 .PHONY: fmt
 fmt: ## format with gofumpt
 	$(GOFUMPT) -w .

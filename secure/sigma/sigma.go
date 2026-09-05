@@ -116,7 +116,9 @@ type Identity struct {
 	// (see fabric.New).
 	CompressedFabricID [8]byte
 	// IPK is the 16-byte Operational Identity Protection Key for this
-	// fabric, supplied by the commissioner in AddNOC.IPKValue. Per
+	// fabric: [DeriveOperationalIPK] applied to the raw value the
+	// commissioner supplied in AddNOC.IPKValue, never that value
+	// itself. Per
 	// Matter Core §4.13.2.5 the IPK is the leading prefix of every
 	// CASE Sigma HKDF salt — without it the responder derives a
 	// different `S2K` than the initiator and Apple Home rejects
@@ -780,10 +782,11 @@ func MarshalSigma2Resume(s Sigma2Resume) []byte {
 //	                       (8-byte LE)   (8-byte LE)
 //	destinationID      = HMAC-SHA256(opIPK, destinationMessage)
 //
-// `opIPK` is the per-fabric operational IPK (HKDF of the raw IPK with
-// salt=compressedFabricID, info="GroupKey v1.0" — already derived by
-// the daemon and stored as `Identity.IPK`). `rootPublicKey` is the
-// 65-byte uncompressed P-256 fabric root key (`0x04 || X || Y`).
+// `opIPK` is the per-fabric operational IPK, NOT the raw AddNOC.IPKValue:
+// derive it with [DeriveOperationalIPK] and keep the result as
+// `Identity.IPK`. The raw value matches no fabric a commissioner ever
+// addresses. `rootPublicKey` is the 65-byte uncompressed P-256 fabric root
+// key (`0x04 || X || Y`).
 //
 // Used by [IdentityResolver] implementations to match an inbound
 // Sigma1.DestinationID against every installed fabric. Mirrors
