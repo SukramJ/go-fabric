@@ -88,7 +88,7 @@ type GeneralDiagnostics struct {
 	// via [SetPersistedCounters]. Runtime attributes (UpTime,
 	// TotalOperationalHours) change continuously but DataVersion is not bumped
 	// per-second — controllers that cache UpTime do not need sub-second
-	// invalidation. Satisfies [mattercontract.ClusterDataVersion].
+	// invalidation. Satisfies [contract.ClusterDataVersion].
 	// Mirrors chip's ember dirty-marking in
 	// src/app/clusters/general-diagnostics-server/.
 	dataVersion cluster.DataVersionTracker
@@ -97,7 +97,7 @@ type GeneralDiagnostics struct {
 	// via [SetMatterEventEmitter] + [SetEndpoint] so [EmitBootReason]
 	// can fire the §11.12.8.1 BootReason event.
 	endpoint uint16
-	emitter  mattercontract.EventEmitter
+	emitter  contract.EventEmitter
 }
 
 // BootReason values per Matter §11.12.5.4.
@@ -200,16 +200,16 @@ type BootReasonEvent struct {
 // event-receiver (emitter wiring) capability, the command-lister capability,
 // and MatterClusterDataVersion.
 var (
-	_ mattercontract.ClusterServer                 = (*GeneralDiagnostics)(nil)
-	_ mattercontract.ClusterAttributeLister        = (*GeneralDiagnostics)(nil)
-	_ mattercontract.ClusterEventLister            = (*GeneralDiagnostics)(nil)
-	_ mattercontract.EventReceiver                 = (*GeneralDiagnostics)(nil)
-	_ mattercontract.ClusterCommandLister          = (*GeneralDiagnostics)(nil)
-	_ mattercontract.ClusterDataVersion            = (*GeneralDiagnostics)(nil)
-	_ mattercontract.ClusterCommandInvokePrivilege = (*GeneralDiagnostics)(nil)
+	_ contract.ClusterServer                 = (*GeneralDiagnostics)(nil)
+	_ contract.ClusterAttributeLister        = (*GeneralDiagnostics)(nil)
+	_ contract.ClusterEventLister            = (*GeneralDiagnostics)(nil)
+	_ contract.EventReceiver                 = (*GeneralDiagnostics)(nil)
+	_ contract.ClusterCommandLister          = (*GeneralDiagnostics)(nil)
+	_ contract.ClusterDataVersion            = (*GeneralDiagnostics)(nil)
+	_ contract.ClusterCommandInvokePrivilege = (*GeneralDiagnostics)(nil)
 )
 
-// MatterDataVersion implements [mattercontract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion].
 // Returns the per-cluster monotonic counter seeded at construction.
 // Mirrors chip's ember dirty-marking in
 // src/app/clusters/general-diagnostics-server/ and matter.js behavior
@@ -218,10 +218,10 @@ func (g *GeneralDiagnostics) MatterDataVersion() uint32 {
 	return g.dataVersion.Current()
 }
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (g *GeneralDiagnostics) MatterClusterID() uint32 { return gendiagClusterID }
 
-// MinInvokePrivilege implements [mattercontract.ClusterCommandInvokePrivilege].
+// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege].
 // TestEventTrigger requires Manage (4) per Matter §11.12 (access "M").
 // Mirrors matter.js packages/model/src/standard/elements/
 // general-diagnostics.element.ts:90.
@@ -234,7 +234,7 @@ func (g *GeneralDiagnostics) MinInvokePrivilege(cmdID uint32) uint8 {
 	}
 }
 
-// MatterRead implements [mattercontract.ClusterServer].
+// MatterRead implements [contract.ClusterServer].
 func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
@@ -362,7 +362,7 @@ type TimeSnapshotResponse struct {
 	PosixTimeMs *uint64
 }
 
-// MatterAcceptedCommands implements [mattercontract.ClusterCommandLister].
+// MatterAcceptedCommands implements [contract.ClusterCommandLister].
 // Lists the command IDs the server handles via MatterInvoke.
 // Mirrors matter.js packages/model/src/standard/elements/
 // general-diagnostics.element.ts accepted commands.
@@ -377,7 +377,7 @@ func (g *GeneralDiagnostics) MatterAcceptedCommands() []uint32 {
 	}
 }
 
-// MatterGeneratedCommands implements [mattercontract.ClusterCommandLister].
+// MatterGeneratedCommands implements [contract.ClusterCommandLister].
 // Lists the response command IDs this server may emit.
 // Mirrors matter.js packages/model/src/standard/elements/
 // general-diagnostics.element.ts generated commands.
@@ -413,19 +413,19 @@ func (g *GeneralDiagnostics) MatterAttributes() []uint32 {
 	}
 }
 
-// MatterEvents implements [mattercontract.ClusterEventLister] so the
+// MatterEvents implements [contract.ClusterEventLister] so the
 // dispatcher synthesises the global EventList (0xFFFA) attribute
 // correctly for this cluster.
 func (g *GeneralDiagnostics) MatterEvents() []uint32 {
 	return []uint32{gendiagEventBootReason}
 }
 
-// SetMatterEventEmitter implements [mattercontract.EventReceiver].
+// SetMatterEventEmitter implements [contract.EventReceiver].
 // Called by the bridge during topology assembly so [EmitBootReason]
 // can fire the §11.12.8.1 BootReason event without the cluster holding
 // a direct reference to the bridge. Idempotent — re-wiring during
 // topology rebuild replaces the emitter cleanly.
-func (g *GeneralDiagnostics) SetMatterEventEmitter(emitter mattercontract.EventEmitter) {
+func (g *GeneralDiagnostics) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	g.mu.Lock()
 	g.emitter = emitter
 	g.mu.Unlock()
@@ -443,7 +443,7 @@ func (g *GeneralDiagnostics) SetEndpoint(endpoint uint16) {
 }
 
 // EmitBootReason fires the Matter §11.12.8.1 BootReason event (id
-// 0x0000, priority Critical) via the wired [mattercontract.EventEmitter].
+// 0x0000, priority Critical) via the wired [contract.EventEmitter].
 // No-op when the emitter has not been wired yet — the daemon calls this
 // once at startup after topology assembly. Mirrors matter.js
 // packages/node/src/behaviors/general-diagnostics/
@@ -464,7 +464,7 @@ func (g *GeneralDiagnostics) EmitBootReason() {
 		slog.Any("endpoint", endpoint), slog.Any("boot_reason", bootReason))
 	emitter.MatterEmitEvent(endpoint, gendiagClusterID, gendiagEventBootReason,
 		BootReasonEvent{BootReason: bootReason},
-		mattercontract.EventPriorityCritical)
+		contract.EventPriorityCritical)
 }
 
 // enumerateNetworkInterfaces walks net.Interfaces() and projects every

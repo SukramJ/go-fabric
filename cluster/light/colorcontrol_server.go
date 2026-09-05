@@ -5,7 +5,7 @@
 // for light device types (OnOffLight, DimmableLight, ColorTemperatureLight,
 // ExtendedColorLight). The servers in this package are thin, stateless
 // wrappers whose state is owned by the caller; they implement
-// [mattercontract.ClusterServer] and the optional lister interfaces so the
+// [contract.ClusterServer] and the optional lister interfaces so the
 // endpoint assembler can attach them without
 // knowing the device-specific model types.
 //
@@ -18,7 +18,7 @@
 // so it does not drive a device. It exists to pin the cluster's wire shape
 // and attribute surface against matter.js HEAD, and nothing in this module
 // mounts it. A host that needs live control mounts its own
-// [mattercontract.ClusterServer] on the endpoint instead.
+// [contract.ClusterServer] on the endpoint instead.
 package light
 
 import (

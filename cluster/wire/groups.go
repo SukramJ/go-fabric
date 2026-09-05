@@ -35,14 +35,14 @@ var errGroupsReadOnly = errors.New("matter: Groups cluster is a read-only stub")
 
 // Compile-time assertions.
 var (
-	_ mattercontract.ClusterServer          = Groups{}
-	_ mattercontract.ClusterAttributeLister = Groups{}
+	_ contract.ClusterServer          = Groups{}
+	_ contract.ClusterAttributeLister = Groups{}
 )
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (Groups) MatterClusterID() uint32 { return groupsClusterID }
 
-// MatterRead implements [mattercontract.ClusterServer]. Only the
+// MatterRead implements [contract.ClusterServer]. Only the
 // mandatory NameSupport bitmap8 + the global FeatureMap /
 // ClusterRevision are exposed.
 func (Groups) MatterRead(attrID uint32) (any, bool) {

@@ -214,7 +214,7 @@ func (a *AdministratorCommissioning) MatterClusterID() uint32 {
 	return matterClusterAdminCommissioning
 }
 
-// MinInvokePrivilege implements [mattercontract.ClusterCommandInvokePrivilege].
+// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege].
 // OpenCommissioningWindow, OpenBasicCommissioningWindow, and
 // RevokeCommissioning all require Administer (5) per Matter §11.19
 // (access "A T"). Mirrors matter.js
@@ -535,7 +535,7 @@ const (
 	pakeVerifierBytes        = 97     // spec §3.10.5 — fixed length
 )
 
-// MatterAcceptedCommands implements [mattercontract.ClusterCommandLister].
+// MatterAcceptedCommands implements [contract.ClusterCommandLister].
 // Lists the command IDs the server handles via MatterInvoke.
 // Mirrors matter.js packages/model/src/standard/elements/
 // administrator-commissioning.element.ts accepted commands.
@@ -549,7 +549,7 @@ func (a *AdministratorCommissioning) MatterAcceptedCommands() []uint32 {
 	}
 }
 
-// MatterGeneratedCommands implements [mattercontract.ClusterCommandLister].
+// MatterGeneratedCommands implements [contract.ClusterCommandLister].
 // AdministratorCommissioning has no generated response commands — all outcomes
 // are communicated via Matter StatusResponse.
 // Mirrors matter.js packages/model/src/standard/elements/
@@ -562,8 +562,8 @@ func (a *AdministratorCommissioning) MatterGeneratedCommands() []uint32 {
 // bridge's cluster-server contract, the attribute-lister capability,
 // and the command-lister capability.
 var (
-	_ mattercontract.ClusterServer                 = (*AdministratorCommissioning)(nil)
-	_ mattercontract.ClusterAttributeLister        = (*AdministratorCommissioning)(nil)
-	_ mattercontract.ClusterCommandLister          = (*AdministratorCommissioning)(nil)
-	_ mattercontract.ClusterCommandInvokePrivilege = (*AdministratorCommissioning)(nil)
+	_ contract.ClusterServer                 = (*AdministratorCommissioning)(nil)
+	_ contract.ClusterAttributeLister        = (*AdministratorCommissioning)(nil)
+	_ contract.ClusterCommandLister          = (*AdministratorCommissioning)(nil)
+	_ contract.ClusterCommandInvokePrivilege = (*AdministratorCommissioning)(nil)
 )

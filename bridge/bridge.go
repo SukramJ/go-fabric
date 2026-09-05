@@ -149,14 +149,14 @@ type Bridge struct {
 	// endpoint 0 (BasicInformation, GeneralCommissioning, …). Held on
 	// the bridge so [Bridge.Reassemble] can re-stamp them onto each
 	// freshly assembled root endpoint without the daemon re-attaching.
-	rootClusters []mattercontract.ClusterServer
+	rootClusters []contract.ClusterServer
 	// aggregatorClusters carry the cluster servers attached to the
 	// Aggregator endpoint (EP 1) — Descriptor (mandatory) + optional
 	// Identify. Apple-bridge topology fix: EP 1 hosts the
 	// Aggregator device type and its Descriptor.PartsList enumerates
 	// the bridged children. Mirrors matter.js's
 	// `examples/device-bridge-onoff/src/BridgedDevicesNode.ts`.
-	aggregatorClusters []mattercontract.ClusterServer
+	aggregatorClusters []contract.ClusterServer
 	sessions           SessionLookup
 	paseHandler        PaseHandler
 	paseProvider       PaseHandlerProvider // optional; wins over paseHandler when set
@@ -177,7 +177,7 @@ type Bridge struct {
 	subManager *subscription.Manager // optional; when set Subscribe is fully wired
 
 	// measurementUnsubscribers holds the unsubscribe closures returned
-	// by [mattercontract.ChangeNotifier.OnMatterValueChanged] for
+	// by [contract.ChangeNotifier.OnMatterValueChanged] for
 	// every bridged endpoint whose source pushes value changes. Called
 	// and cleared at the start of each reassemble + when a fresh
 	// subscription manager is attached, then re-populated by
@@ -613,8 +613,8 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	// aggregator set from after the paired
 	// [Bridge.AttachAggregatorClusters].
 	b.mu.RLock()
-	rootClusters := append([]mattercontract.ClusterServer(nil), b.rootClusters...)
-	aggregatorClusters := append([]mattercontract.ClusterServer(nil), b.aggregatorClusters...)
+	rootClusters := append([]contract.ClusterServer(nil), b.rootClusters...)
+	aggregatorClusters := append([]contract.ClusterServer(nil), b.aggregatorClusters...)
 	b.mu.RUnlock()
 	if root := topology.FindByID(0); root != nil && len(rootClusters) > 0 {
 		root.PublishClusterServers(rootClusters)
@@ -667,7 +667,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 		// ClusterServers resolves all three cases: the published set on
 		// the root / aggregator, the materialised set everywhere else.
 		for _, srv := range endpoint.ClusterServers(ep) {
-			recv, ok := srv.(mattercontract.EventReceiver)
+			recv, ok := srv.(contract.EventReceiver)
 			if !ok {
 				continue
 			}
@@ -681,7 +681,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 			// updates fan out as Matter events. The unsubscribe is
 			// retained so the next reassemble tears the hook down.
 			if !ep.IsRoot() {
-				if emitter, ok := srv.(mattercontract.SwitchEventEmitter); ok {
+				if emitter, ok := srv.(contract.SwitchEventEmitter); ok {
 					if subscriber, ok := ep.Measurement.(matterSwitchSubscribable); ok {
 						switchUnsubs = append(switchUnsubs, subscriber.WireMatterSwitchHandler(emitter))
 					}
@@ -813,7 +813,7 @@ type matterEndpointReceiver interface {
 // Action DP) that translates its CCU press updates into Matter §1.13
 // switch events.
 //
-// The parameter names [mattercontract.SwitchEventEmitter] — the shared
+// The parameter names [contract.SwitchEventEmitter] — the shared
 // port contract, which the model's own method signature names too (as
 // an alias). That sharing is the whole point: Go interface
 // satisfaction requires identical parameter types, so re-declaring an
@@ -828,7 +828,7 @@ type matterEndpointReceiver interface {
 // The returned unsubscribe closure is retained in
 // [Bridge.switchUnsubscribers] and drained on the next reassemble.
 type matterSwitchSubscribable interface {
-	WireMatterSwitchHandler(mattercontract.SwitchEventEmitter) func()
+	WireMatterSwitchHandler(contract.SwitchEventEmitter) func()
 }
 
 // SetOnFabricAdded wires the post-AddNOC hook. The bridge does not
@@ -932,8 +932,8 @@ func (b *Bridge) CommissioningWindow() *CommissioningWindow {
 // chip-tool that has already established a session and started
 // reading must see the cluster set without waiting for a topology
 // re-roll.
-func (b *Bridge) AttachRootClusters(servers []mattercontract.ClusterServer) {
-	cp := append([]mattercontract.ClusterServer(nil), servers...)
+func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
+	cp := append([]contract.ClusterServer(nil), servers...)
 	b.mu.Lock()
 	b.rootClusters = cp
 	if b.topology != nil {
@@ -982,8 +982,8 @@ func (b *Bridge) AttachRootPartsListProvider(provider func() []uint16) bool {
 // Pass nil to clear. Calling this after [Bridge.Start] swaps in the
 // new servers on the next [Bridge.Reassemble] and on the live topology
 // immediately.
-func (b *Bridge) AttachAggregatorClusters(servers []mattercontract.ClusterServer) {
-	cp := append([]mattercontract.ClusterServer(nil), servers...)
+func (b *Bridge) AttachAggregatorClusters(servers []contract.ClusterServer) {
+	cp := append([]contract.ClusterServer(nil), servers...)
 	b.mu.Lock()
 	b.aggregatorClusters = cp
 	if b.topology != nil {

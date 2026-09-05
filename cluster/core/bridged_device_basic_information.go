@@ -33,7 +33,7 @@ type BridgedDeviceBasicInformation struct {
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped after every successful state mutation (Reachable
 	// flip, NodeLabel write) so DataVersionFilter evaluation works.
-	// Satisfies [mattercontract.ClusterDataVersion].
+	// Satisfies [contract.ClusterDataVersion].
 	dataVersion cluster.DataVersionTracker
 
 	vendorName        string
@@ -64,7 +64,7 @@ type BridgedDeviceBasicInformation struct {
 	// information/BridgedDeviceBasicInformationServer.ts (state.reachable
 	// setter → events.reachableChanged.emit).
 	endpoint uint16
-	emitter  mattercontract.EventEmitter
+	emitter  contract.EventEmitter
 }
 
 // Cluster ID + revision per Matter §9.13.
@@ -246,15 +246,15 @@ func validateBridgedBasicInfoAttributes(cfg BridgedConfig, resolvedSerial string
 
 // Compile-time assertions.
 var (
-	_ mattercontract.ClusterServer      = (*BridgedDeviceBasicInformation)(nil)
-	_ mattercontract.ClusterDataVersion = (*BridgedDeviceBasicInformation)(nil)
-	_ mattercontract.ClusterEventLister = (*BridgedDeviceBasicInformation)(nil)
+	_ contract.ClusterServer      = (*BridgedDeviceBasicInformation)(nil)
+	_ contract.ClusterDataVersion = (*BridgedDeviceBasicInformation)(nil)
+	_ contract.ClusterEventLister = (*BridgedDeviceBasicInformation)(nil)
 )
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (b *BridgedDeviceBasicInformation) MatterClusterID() uint32 { return bridgedBasicInfoClusterID }
 
-// MatterDataVersion implements [mattercontract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion].
 // Returns the current per-cluster monotonic counter bumped after every
 // successful Reachable flip or NodeLabel write. Mirrors matter.js
 // BridgedDeviceBasicInformationServer.ts DataVersion tracking.
@@ -262,7 +262,7 @@ func (b *BridgedDeviceBasicInformation) MatterDataVersion() uint32 {
 	return b.dataVersion.Current()
 }
 
-// MatterRead implements [mattercontract.ClusterServer].
+// MatterRead implements [contract.ClusterServer].
 func (b *BridgedDeviceBasicInformation) MatterRead(attrID uint32) (any, bool) { //nolint:gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -413,14 +413,14 @@ func (b *BridgedDeviceBasicInformation) MatterReportable() []uint32 {
 	return []uint32{bridgedBasicInfoAttrReachable, bridgedBasicInfoAttrNodeLabel}
 }
 
-// MatterEvents implements [mattercontract.ClusterEventLister] so the
+// MatterEvents implements [contract.ClusterEventLister] so the
 // dispatcher synthesises the global EventList (0xFFFA) attribute correctly
 // for this cluster. ReachableChanged (0x0003) is the only event in this cluster.
 func (b *BridgedDeviceBasicInformation) MatterEvents() []uint32 {
 	return []uint32{bridgedBasicInfoEventReachableChanged}
 }
 
-// MatterAttributes implements [mattercontract.ClusterAttributeLister]
+// MatterAttributes implements [contract.ClusterAttributeLister]
 // so wildcard subscribe / read enumerates every attribute the cluster
 // exposes. Apple Home reads this set on every bridged endpoint to
 // build its HAP service map; missing attributes leave Apple's
@@ -490,7 +490,7 @@ func (b *BridgedDeviceBasicInformation) MatterAttributes() []uint32 {
 
 // SetReachable updates the reachable flag. Returns true when the
 // value changed. Emits the Matter §9.13.6 ReachableChanged event (id
-// 0x0003, priority Critical) on the bridge's [mattercontract.EventEmitter]
+// 0x0003, priority Critical) on the bridge's [contract.EventEmitter]
 // when it has been wired via [SetMatterEventEmitter] — mirrors
 // matter.js HEAD bridged-device-basic-information/Behavior.ts where
 // the reachable setter triggers events.reachableChanged.emit. Without
@@ -520,18 +520,18 @@ func (b *BridgedDeviceBasicInformation) SetReachable(reachable bool) (changed bo
 			emitter.MatterEmitEvent(endpoint, bridgedBasicInfoClusterID,
 				bridgedBasicInfoEventReachableChanged,
 				ReachableChangedEvent{ReachableNewValue: reachable},
-				mattercontract.EventPriorityInfo)
+				contract.EventPriorityInfo)
 		}
 	}
 	return changed
 }
 
-// SetMatterEventEmitter implements [mattercontract.EventReceiver].
+// SetMatterEventEmitter implements [contract.EventReceiver].
 // Called by the bridge during topology assembly so [SetReachable] can
 // fire the §9.13.6 ReachableChanged event without the cluster holding
 // a direct reference to the bridge. Idempotent — re-wiring during
 // topology rebuild replaces the emitter cleanly.
-func (b *BridgedDeviceBasicInformation) SetMatterEventEmitter(emitter mattercontract.EventEmitter) {
+func (b *BridgedDeviceBasicInformation) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	b.mu.Lock()
 	b.emitter = emitter
 	b.mu.Unlock()
@@ -552,4 +552,4 @@ func (b *BridgedDeviceBasicInformation) SetEndpoint(endpoint uint16) {
 // Compile-time assertion: BDBI participates in the same emitter wiring
 // as GenericSwitch, so the bridge's SetMatterEventEmitter loop in
 // bridge.go (the topology-assembly walk) auto-injects the emitter.
-var _ mattercontract.EventReceiver = (*BridgedDeviceBasicInformation)(nil)
+var _ contract.EventReceiver = (*BridgedDeviceBasicInformation)(nil)

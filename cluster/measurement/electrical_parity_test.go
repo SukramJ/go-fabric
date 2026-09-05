@@ -19,8 +19,8 @@ import (
 // per-cluster random init (Crypto.getRandomUint32, skip-zero).
 func TestParity_ElectricalEnergyMeasurement_DataVersion_NonZero(t *testing.T) {
 	t.Parallel()
-	src := fakeFloat{class: mattercontract.MeasurementEnergy, val: 100, obs: true}
-	var s mattercontract.ClusterServer = measurement.NewElectricalEnergyServer(src)
+	src := fakeFloat{class: contract.MeasurementEnergy, val: 100, obs: true}
+	var s contract.ClusterServer = measurement.NewElectricalEnergyServer(src)
 	dv, ok := s.(interface{ MatterDataVersion() uint32 })
 	if !ok {
 		t.Fatal("ElectricalEnergyServer does not implement MatterDataVersion")
@@ -37,8 +37,8 @@ func TestParity_ElectricalEnergyMeasurement_DataVersion_NonZero(t *testing.T) {
 // per-cluster random init.
 func TestParity_ElectricalPowerMeasurement_DataVersion_NonZero(t *testing.T) {
 	t.Parallel()
-	src := fakeFloat{class: mattercontract.MeasurementPower, val: 1500, obs: true}
-	var s mattercontract.ClusterServer = measurement.NewElectricalPowerServer(src)
+	src := fakeFloat{class: contract.MeasurementPower, val: 1500, obs: true}
+	var s contract.ClusterServer = measurement.NewElectricalPowerServer(src)
 	dv, ok := s.(interface{ MatterDataVersion() uint32 })
 	if !ok {
 		t.Fatal("ElectricalPowerServer does not implement MatterDataVersion")

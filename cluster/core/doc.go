@@ -9,7 +9,7 @@
 //
 // The endpoint assembler instantiates one of each as a fixed
 // "boilerplate" set on top of the DP-specific cluster servers
-// returned by [mattercontract.EndpointSource.MatterClusterServers].
+// returned by [contract.EndpointSource.MatterClusterServers].
 //
 // Cluster IDs:
 //

@@ -25,7 +25,7 @@ func TestIdentify_MatterAcceptedCommands_IncludesTriggerEffect(t *testing.T) {
 	id := core.NewIdentify()
 
 	// Ensure Identify satisfies MatterClusterCommandLister at compile time.
-	var _ mattercontract.ClusterCommandLister = id
+	var _ contract.ClusterCommandLister = id
 
 	cmds := id.MatterAcceptedCommands()
 	if len(cmds) == 0 {

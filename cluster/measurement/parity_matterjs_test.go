@@ -147,16 +147,16 @@ func TestParityMatterJS_PowerSourceMandatoryAttributes(t *testing.T) {
 type stubBoolSrc bool
 
 func (s stubBoolSrc) MatterBoolValue() (value, observed bool) { return bool(s), true }
-func (stubBoolSrc) MatterMeasurementClass() mattercontract.MeasurementClass {
-	return mattercontract.MeasurementBattery
+func (stubBoolSrc) MatterMeasurementClass() contract.MeasurementClass {
+	return contract.MeasurementBattery
 }
 
 // stubFloatSrc is a minimal MatterFloatMeasurementSource for tests.
 type stubFloatSrc float64
 
 func (s stubFloatSrc) MatterFloatValue() (value float64, observed bool) { return float64(s), true }
-func (stubFloatSrc) MatterMeasurementClass() mattercontract.MeasurementClass {
-	return mattercontract.MeasurementPower
+func (stubFloatSrc) MatterMeasurementClass() contract.MeasurementClass {
+	return contract.MeasurementPower
 }
 
 // featureBitsByCluster pins the FeatureMap bit index of every feature
@@ -222,8 +222,8 @@ func TestParityMatterJS_FeatureGatedAttributesMatchFeatureMap(t *testing.T) {
 	// A cluster server that also advertises its attribute set — the pair
 	// the dispatcher reads when it answers a wildcard read.
 	type listingServer interface {
-		mattercontract.ClusterServer
-		mattercontract.ClusterAttributeLister
+		contract.ClusterServer
+		contract.ClusterAttributeLister
 	}
 	cases := []struct {
 		name string

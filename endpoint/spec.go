@@ -67,15 +67,15 @@ type Spec struct {
 	// Source is the rich-model implementation of the endpoint's cluster
 	// surface. nil for measurement-only endpoints, which carry
 	// Measurement instead.
-	Source mattercontract.EndpointSource
+	Source contract.EndpointSource
 	// Measurement is set on sensor endpoints assembled from a
 	// measurement source. nil otherwise.
-	Measurement mattercontract.MeasurementSource
+	Measurement contract.MeasurementSource
 	// PowerSource carries a battery reading to be served by the
 	// PowerSource cluster (0x002F) on this endpoint. At most one
 	// endpoint per physical device sets it — see the assembly's
 	// power-source placement rule.
-	PowerSource mattercontract.MeasurementSource
+	PowerSource contract.MeasurementSource
 }
 
 // ComposeNodeLabel appends the parameter suffix to the base label and

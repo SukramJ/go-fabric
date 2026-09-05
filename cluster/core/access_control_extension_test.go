@@ -223,7 +223,7 @@ func TestAccessControl_ExtensionWriteEmitsExtensionChanged(t *testing.T) {
 		if ev.event != 0x0001 {
 			t.Errorf("event %d: event = 0x%04X, want 0x0001 (AccessControlExtensionChanged)", i, ev.event)
 		}
-		if ev.priority != mattercontract.EventPriorityInfo {
+		if ev.priority != contract.EventPriorityInfo {
 			t.Errorf("event %d: priority = %v, want Info", i, ev.priority)
 		}
 		payload, ok := ev.data.(core.AccessControlExtensionChangedEvent)

@@ -38,14 +38,14 @@ var errScenesStub = errors.New("matter: ScenesManagement is a read-only stub (HM
 
 // Compile-time assertions.
 var (
-	_ mattercontract.ClusterServer          = ScenesManagement{}
-	_ mattercontract.ClusterAttributeLister = ScenesManagement{}
+	_ contract.ClusterServer          = ScenesManagement{}
+	_ contract.ClusterAttributeLister = ScenesManagement{}
 )
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (ScenesManagement) MatterClusterID() uint32 { return scenesManagementClusterID }
 
-// MatterRead implements [mattercontract.ClusterServer].
+// MatterRead implements [contract.ClusterServer].
 func (ScenesManagement) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case scenesManagementAttrSceneTableSize:

@@ -70,14 +70,14 @@ func NewOTASoftwareUpdateRequestor() *OTASoftwareUpdateRequestor {
 // Compile-time assertions: OTASoftwareUpdateRequestor satisfies
 // MatterClusterServer and the attribute-lister capability.
 var (
-	_ mattercontract.ClusterServer          = (*OTASoftwareUpdateRequestor)(nil)
-	_ mattercontract.ClusterAttributeLister = (*OTASoftwareUpdateRequestor)(nil)
+	_ contract.ClusterServer          = (*OTASoftwareUpdateRequestor)(nil)
+	_ contract.ClusterAttributeLister = (*OTASoftwareUpdateRequestor)(nil)
 )
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (o *OTASoftwareUpdateRequestor) MatterClusterID() uint32 { return otaRequestorClusterID }
 
-// MatterRead implements [mattercontract.ClusterServer].
+// MatterRead implements [contract.ClusterServer].
 func (o *OTASoftwareUpdateRequestor) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case otaRequestorAttrDefaultOTAProviders:

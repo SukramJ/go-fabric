@@ -34,7 +34,7 @@ type NetworkCommissioning struct {
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped at construction so the initial version is a non-zero
 	// sentinel (prevents DataVersionFilter=0 false-positive cache hits).
-	// Satisfies [mattercontract.ClusterDataVersion]. Mirrors matter.js
+	// Satisfies [contract.ClusterDataVersion]. Mirrors matter.js
 	// NetworkCommissioning behavior layer auto-tracking and chip
 	// src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp
 	// ember dirty-marking mechanism.
@@ -128,14 +128,14 @@ func NewNetworkCommissioning(cfg NetworkCommissioningConfig) *NetworkCommissioni
 // MatterClusterServer, the attribute-lister capability, and
 // MatterClusterDataVersion.
 var (
-	_ mattercontract.ClusterServer                  = (*NetworkCommissioning)(nil)
-	_ mattercontract.ClusterAttributeLister         = (*NetworkCommissioning)(nil)
-	_ mattercontract.ClusterDataVersion             = (*NetworkCommissioning)(nil)
-	_ mattercontract.ClusterAttributeReadPrivilege  = (*NetworkCommissioning)(nil)
-	_ mattercontract.ClusterAttributeWritePrivilege = (*NetworkCommissioning)(nil)
+	_ contract.ClusterServer                  = (*NetworkCommissioning)(nil)
+	_ contract.ClusterAttributeLister         = (*NetworkCommissioning)(nil)
+	_ contract.ClusterDataVersion             = (*NetworkCommissioning)(nil)
+	_ contract.ClusterAttributeReadPrivilege  = (*NetworkCommissioning)(nil)
+	_ contract.ClusterAttributeWritePrivilege = (*NetworkCommissioning)(nil)
 )
 
-// MatterDataVersion implements [mattercontract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion].
 // Returns the per-cluster monotonic counter seeded at construction.
 // Mirrors matter.js NetworkCommissioning behavior layer DataVersion
 // tracking and chip's ember dirty-marking mechanism
@@ -144,10 +144,10 @@ func (n *NetworkCommissioning) MatterDataVersion() uint32 {
 	return n.dataVersion.Current()
 }
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (n *NetworkCommissioning) MatterClusterID() uint32 { return netcommClusterID }
 
-// MinReadPrivilege implements [mattercontract.ClusterAttributeReadPrivilege].
+// MinReadPrivilege implements [contract.ClusterAttributeReadPrivilege].
 // MaxNetworks / Networks / LastNetworkingStatus / LastNetworkId /
 // LastConnectErrorValue are all read-access "R A" (Administer) per Matter
 // §11.9 — a merely-View subject must not read them, nor have them streamed
@@ -168,7 +168,7 @@ func (n *NetworkCommissioning) MinReadPrivilege(attrID uint32) uint8 {
 	}
 }
 
-// MinWritePrivilege implements [mattercontract.ClusterAttributeWritePrivilege].
+// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege].
 // InterfaceEnabled (0x0004) requires Administer (5) per Matter §11.9
 // (access "RW VA"). Mirrors matter.js
 // packages/model/src/standard/elements/network-commissioning.element.ts:47.
@@ -181,7 +181,7 @@ func (n *NetworkCommissioning) MinWritePrivilege(attrID uint32) uint8 {
 	}
 }
 
-// MatterRead implements [mattercontract.ClusterServer].
+// MatterRead implements [contract.ClusterServer].
 func (n *NetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()

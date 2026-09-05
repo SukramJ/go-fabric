@@ -29,13 +29,13 @@ type fakeTempSource struct {
 }
 
 var (
-	_ mattercontract.MeasurementSource      = (*fakeTempSource)(nil)
-	_ mattercontract.FloatMeasurementSource = (*fakeTempSource)(nil)
-	_ mattercontract.ChangeNotifier         = (*fakeTempSource)(nil)
+	_ contract.MeasurementSource      = (*fakeTempSource)(nil)
+	_ contract.FloatMeasurementSource = (*fakeTempSource)(nil)
+	_ contract.ChangeNotifier         = (*fakeTempSource)(nil)
 )
 
-func (*fakeTempSource) MatterMeasurementClass() mattercontract.MeasurementClass {
-	return mattercontract.MeasurementTemperature
+func (*fakeTempSource) MatterMeasurementClass() contract.MeasurementClass {
+	return contract.MeasurementTemperature
 }
 
 func (s *fakeTempSource) MatterFloatValue() (float64, bool) {
@@ -61,18 +61,6 @@ func (s *fakeTempSource) OnMatterValueChanged(cb func()) func() {
 	}
 }
 
-// fire dispatches every live subscriber callback.
-func (s *fakeTempSource) fire() {
-	s.mu.Lock()
-	cbs := append([]func(){}, s.cbs...)
-	s.mu.Unlock()
-	for _, cb := range cbs {
-		if cb != nil {
-			cb()
-		}
-	}
-}
-
 // manyTempSensorsSnapshotter assembles n temperature-sensor endpoints on one
 // central. Thirty is chosen so the reportable-path count clears 100 — the
 // threshold above which one ReportData cannot fit a single datagram, which
@@ -86,7 +74,7 @@ func manyTempSensorsSnapshotter(n int) (Snapshotter, []*fakeTempSource) {
 		specs = append(specs, endpoint.Spec{
 			StableKey:      endpoint.StringKey(fmt.Sprintf("ccu1|MANYTMP|%d|measurement|ACTUAL_TEMPERATURE", i+1)),
 			DeviceAddress:  "MANYTMP",
-			DeviceType:     mattercontract.MeasurementClassDeviceType(mattercontract.MeasurementTemperature),
+			DeviceType:     contract.MeasurementClassDeviceType(contract.MeasurementTemperature),
 			FriendlyName:   fmt.Sprintf("Many-Temp %d", i+1),
 			ChannelAddress: fmt.Sprintf("MANYTMP:%d", i+1),
 			Measurement:    src,

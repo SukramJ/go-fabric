@@ -11,7 +11,7 @@
 // so it does not drive a device. It exists to pin the cluster's wire shape
 // and attribute surface against matter.js HEAD, and nothing in this module
 // mounts it. A host that needs live control mounts its own
-// [mattercontract.ClusterServer] on the endpoint instead.
+// [contract.ClusterServer] on the endpoint instead.
 package thermo
 
 import (
@@ -191,7 +191,7 @@ func (s *ThermostatServer) SetLocalTemperature(t *int16) {
 	s.mu.Unlock()
 }
 
-// MatterRead implements [mattercontract.ClusterServer].
+// MatterRead implements [contract.ClusterServer].
 // Feature-gated attributes return (nil, false) when their required feature
 // is absent — the IM dispatcher handles the UnsupportedAttribute response.
 func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) { //nolint:gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
@@ -582,8 +582,8 @@ func (thermoInvalidCommandErr) MatterStatusCode() im.StatusCode { return im.Stat
 
 // Compile-time assertions.
 var (
-	_ mattercontract.ClusterServer          = (*ThermostatServer)(nil)
-	_ mattercontract.ClusterAttributeLister = (*ThermostatServer)(nil)
-	_ im.StatusCodeError                    = thermoConstraintErr{}
-	_ im.StatusCodeError                    = thermoInvalidCommandErr{}
+	_ contract.ClusterServer          = (*ThermostatServer)(nil)
+	_ contract.ClusterAttributeLister = (*ThermostatServer)(nil)
+	_ im.StatusCodeError              = thermoConstraintErr{}
+	_ im.StatusCodeError              = thermoInvalidCommandErr{}
 )

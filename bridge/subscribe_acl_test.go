@@ -74,7 +74,7 @@ func newACLTestBridge(t *testing.T, fake *aclStoreFake) *Bridge {
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
 	}
-	b.AttachRootClusters([]mattercontract.ClusterServer{ac})
+	b.AttachRootClusters([]contract.ClusterServer{ac})
 	b.AttachACLLister(fake)
 	if err := b.Reassemble(context.Background()); err != nil {
 		t.Fatalf("Reassemble: %v", err)

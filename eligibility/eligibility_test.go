@@ -16,7 +16,7 @@ import (
 // Minimal fakes — no real model packages imported.
 // ---------------------------------------------------------------------------
 
-// fakeClusterServer implements mattercontract.ClusterServer.
+// fakeClusterServer implements contract.ClusterServer.
 type fakeClusterServer struct {
 	clusterID uint32
 }
@@ -35,23 +35,23 @@ func (f *fakeClusterServer) MatterInvoke(_ context.Context, _ uint32, _ any) (an
 }
 func (f *fakeClusterServer) MatterReportable() []uint32 { return nil }
 
-// fakeEndpointSource implements mattercontract.EndpointSource.
+// fakeEndpointSource implements contract.EndpointSource.
 type fakeEndpointSource struct {
 	deviceType uint16
-	clusters   []mattercontract.ClusterServer
+	clusters   []contract.ClusterServer
 }
 
 func (f *fakeEndpointSource) MatterDeviceType() uint16 { return f.deviceType }
-func (f *fakeEndpointSource) MatterClusterServers() []mattercontract.ClusterServer {
+func (f *fakeEndpointSource) MatterClusterServers() []contract.ClusterServer {
 	return f.clusters
 }
 
-// fakeMeasurementSource implements mattercontract.MeasurementSource.
+// fakeMeasurementSource implements contract.MeasurementSource.
 type fakeMeasurementSource struct {
-	class mattercontract.MeasurementClass
+	class contract.MeasurementClass
 }
 
-func (f *fakeMeasurementSource) MatterMeasurementClass() mattercontract.MeasurementClass {
+func (f *fakeMeasurementSource) MatterMeasurementClass() contract.MeasurementClass {
 	return f.class
 }
 
@@ -59,10 +59,10 @@ func (f *fakeMeasurementSource) MatterMeasurementClass() mattercontract.Measurem
 // MatterEligibilitySource. The latter overrides Classify's decision.
 type fakeEligibilitySource struct {
 	fakeEndpointSource
-	verdict mattercontract.EligibilityVerdict
+	verdict contract.EligibilityVerdict
 }
 
-func (f *fakeEligibilitySource) MatterEligibility() mattercontract.EligibilityVerdict {
+func (f *fakeEligibilitySource) MatterEligibility() contract.EligibilityVerdict {
 	return f.verdict
 }
 
@@ -77,7 +77,7 @@ func TestClassify_EndpointSource_Returns_Mappable(t *testing.T) {
 	t.Parallel()
 	src := &fakeEndpointSource{
 		deviceType: 0x010A,
-		clusters:   []mattercontract.ClusterServer{&fakeClusterServer{clusterID: 0x0006}},
+		clusters:   []contract.ClusterServer{&fakeClusterServer{clusterID: 0x0006}},
 	}
 	got := eligibility.Classify(src)
 	if got.State != eligibility.StateMappable {
@@ -93,7 +93,7 @@ func TestClassify_EndpointSource_Returns_Mappable(t *testing.T) {
 
 func TestClassify_MeasurementSource_NonNone_Returns_Mappable(t *testing.T) {
 	t.Parallel()
-	src := &fakeMeasurementSource{class: mattercontract.MeasurementTemperature}
+	src := &fakeMeasurementSource{class: contract.MeasurementTemperature}
 	got := eligibility.Classify(src)
 	if got.State != eligibility.StateMappable {
 		t.Errorf("expected Mappable, got %v (reason: %q)", got.State, got.Reason)
@@ -118,7 +118,7 @@ func TestClassify_EndpointSource_ZeroDeviceType_Returns_Unmappable(t *testing.T)
 	t.Parallel()
 	src := &fakeEndpointSource{
 		deviceType: 0,
-		clusters:   []mattercontract.ClusterServer{&fakeClusterServer{clusterID: 0x0006}},
+		clusters:   []contract.ClusterServer{&fakeClusterServer{clusterID: 0x0006}},
 	}
 	got := eligibility.Classify(src)
 	if got.State != eligibility.StateUnmappable {
@@ -140,7 +140,7 @@ func TestClassify_EndpointSource_NoClusters_Returns_Unmappable(t *testing.T) {
 
 func TestClassify_MeasurementSource_None_Returns_Unmappable(t *testing.T) {
 	t.Parallel()
-	src := &fakeMeasurementSource{class: mattercontract.MeasurementNone}
+	src := &fakeMeasurementSource{class: contract.MeasurementNone}
 	got := eligibility.Classify(src)
 	if got.State != eligibility.StateUnmappable {
 		t.Errorf("expected Unmappable for None class, got %v", got.State)
@@ -170,9 +170,9 @@ func TestClassify_EligibilitySourceOverride_Partial(t *testing.T) {
 	src := &fakeEligibilitySource{
 		fakeEndpointSource: fakeEndpointSource{
 			deviceType: 0x0302,
-			clusters:   []mattercontract.ClusterServer{&fakeClusterServer{clusterID: 0x0402}},
+			clusters:   []contract.ClusterServer{&fakeClusterServer{clusterID: 0x0402}},
 		},
-		verdict: mattercontract.EligibilityVerdict{
+		verdict: contract.EligibilityVerdict{
 			State:  eligibility.StatePartial,
 			Reason: "siren tones not mappable",
 		},
@@ -196,7 +196,7 @@ func TestDeriveMatterEligibility_CustomDP_Returns_ClusterIDs(t *testing.T) {
 	srv2 := &fakeClusterServer{clusterID: 0x0008}
 	src := &fakeEndpointSource{
 		deviceType: 0x0100,
-		clusters:   []mattercontract.ClusterServer{srv1, srv2},
+		clusters:   []contract.ClusterServer{srv1, srv2},
 	}
 	got := eligibility.DeriveMatterEligibility(src)
 	if got.State != eligibility.StateMappable {
@@ -212,13 +212,13 @@ func TestDeriveMatterEligibility_CustomDP_Returns_ClusterIDs(t *testing.T) {
 
 func TestDeriveMatterEligibility_MeasurementSource_UsesClassDeviceTypeAndClusterID(t *testing.T) {
 	t.Parallel()
-	src := &fakeMeasurementSource{class: mattercontract.MeasurementHumidity}
+	src := &fakeMeasurementSource{class: contract.MeasurementHumidity}
 	got := eligibility.DeriveMatterEligibility(src)
 	if got.State != eligibility.StateMappable {
 		t.Errorf("expected Mappable, got %v", got.State)
 	}
-	wantDT := mattercontract.MeasurementClassDeviceType(mattercontract.MeasurementHumidity)
-	wantCl := mattercontract.MeasurementClassClusterID(mattercontract.MeasurementHumidity)
+	wantDT := contract.MeasurementClassDeviceType(contract.MeasurementHumidity)
+	wantCl := contract.MeasurementClassClusterID(contract.MeasurementHumidity)
 	if got.DeviceType != wantDT {
 		t.Errorf("device type: got %d, want %d", got.DeviceType, wantDT)
 	}
@@ -234,7 +234,7 @@ func TestDeriveMatterEligibility_NilClusterServerSkipped(t *testing.T) {
 	t.Parallel()
 	src := &fakeEndpointSource{
 		deviceType: 0x0100,
-		clusters: []mattercontract.ClusterServer{
+		clusters: []contract.ClusterServer{
 			nil,                                   // nil server — must be skipped
 			&fakeClusterServer{clusterID: 0x0006}, // valid server
 		},

@@ -56,7 +56,7 @@ type Identify struct {
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped after every successful IdentifyTime write (via
 	// MatterWrite or MatterInvoke) so DataVersionFilter evaluation works.
-	// Satisfies [mattercontract.ClusterDataVersion].
+	// Satisfies [contract.ClusterDataVersion].
 	dataVersion cluster.DataVersionTracker
 
 	// Countdown-Timer state. Spec §1.2.5.1: "The IdentifyTime
@@ -124,21 +124,21 @@ func (i *Identify) Close() {
 
 // Compile-time assertions.
 var (
-	_ mattercontract.ClusterServer        = (*Identify)(nil)
-	_ mattercontract.ClusterDataVersion   = (*Identify)(nil)
-	_ mattercontract.ClusterCommandLister = (*Identify)(nil)
+	_ contract.ClusterServer        = (*Identify)(nil)
+	_ contract.ClusterDataVersion   = (*Identify)(nil)
+	_ contract.ClusterCommandLister = (*Identify)(nil)
 )
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (i *Identify) MatterClusterID() uint32 { return identifyClusterID }
 
-// MatterDataVersion implements [mattercontract.ClusterDataVersion].
+// MatterDataVersion implements [contract.ClusterDataVersion].
 // Returns the current per-cluster monotonic counter bumped after every
 // successful IdentifyTime write or Identify command dispatch.
 // Mirrors matter.js IdentifyServer.ts DataVersion tracking.
 func (i *Identify) MatterDataVersion() uint32 { return i.dataVersion.Current() }
 
-// MatterRead implements [mattercontract.ClusterServer].
+// MatterRead implements [contract.ClusterServer].
 func (i *Identify) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case identifyAttrTime:
@@ -208,13 +208,13 @@ func (i *Identify) MatterReportable() []uint32 {
 }
 
 // MatterAttributes implements
-// [mattercontract.ClusterAttributeLister] so wildcard subscribe /
+// [contract.ClusterAttributeLister] so wildcard subscribe /
 // read enumerates the full Identify surface.
 func (i *Identify) MatterAttributes() []uint32 {
 	return []uint32{identifyAttrTime, identifyAttrType}
 }
 
-// MatterAcceptedCommands implements [mattercontract.ClusterCommandLister].
+// MatterAcceptedCommands implements [contract.ClusterCommandLister].
 // Returns the command IDs handled by MatterInvoke so the dispatcher
 // populates AcceptedCommandList (0xFFF9) correctly. TriggerEffect (0x40)
 // is optional per spec but accepted as a visual no-op; including it here

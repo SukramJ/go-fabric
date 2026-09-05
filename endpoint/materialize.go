@@ -29,7 +29,7 @@ const matterDeviceTypeBridgedNode uint32 = 0x0013
 // endpoint. Three paths feed the result:
 //
 //  1. Custom-DP-backed endpoints (ep.Source != nil) ask the source
-//     directly via [mattercontract.EndpointSource.MatterClusterServers].
+//     directly via [contract.EndpointSource.MatterClusterServers].
 //  2. MomentarySwitch sources (ep.Measurement is a
 //     [wire.GenericSwitchSource]) get a [wire.GenericSwitch] cluster
 //     server constructed at materialise time so the cluster knows the
@@ -48,7 +48,7 @@ const matterDeviceTypeBridgedNode uint32 = 0x0013
 //
 // Result is a fresh slice on every call; callers may mutate or
 // append without affecting subsequent invocations.
-func ClusterServers(ep *Endpoint) []mattercontract.ClusterServer { //nolint:funlen // wire/dispatch table over many attribute/opcode cases
+func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // wire/dispatch table over many attribute/opcode cases
 	if ep == nil {
 		return nil
 	}
@@ -59,18 +59,18 @@ func ClusterServers(ep *Endpoint) []mattercontract.ClusterServer { //nolint:funl
 	// Source / measurement-driven cluster servers come first so the
 	// dispatcher's wildcard read enumerates them in the same order
 	// across calls.
-	var inner []mattercontract.ClusterServer
+	var inner []contract.ClusterServer
 	switch {
 	case ep.Source != nil:
-		inner = append([]mattercontract.ClusterServer(nil), ep.Source.MatterClusterServers()...)
+		inner = append([]contract.ClusterServer(nil), ep.Source.MatterClusterServers()...)
 	case ep.Measurement != nil:
 		class := ep.Measurement.MatterMeasurementClass()
 		// MomentarySwitch is event-driven and needs the endpoint ID
 		// at construction time so [wire.GenericSwitch.FireInitialPress]
 		// can address the right Matter address.
-		if class == mattercontract.MeasurementMomentarySwitch {
+		if class == contract.MeasurementMomentarySwitch {
 			if src, ok := ep.Measurement.(wire.GenericSwitchSource); ok {
-				inner = []mattercontract.ClusterServer{wire.NewGenericSwitch(ep.ID, src)}
+				inner = []contract.ClusterServer{wire.NewGenericSwitch(ep.ID, src)}
 			}
 		} else {
 			inner = measurement.FromMeasurementClass(class, ep.Measurement)
@@ -88,7 +88,7 @@ func ClusterServers(ep *Endpoint) []mattercontract.ClusterServer { //nolint:funl
 	// picked it. Appended after the endpoint's own clusters so the primary
 	// function stays first in the ServerList.
 	if ep.PowerSource != nil {
-		for _, s := range measurement.FromMeasurementClass(mattercontract.MeasurementBattery, ep.PowerSource) {
+		for _, s := range measurement.FromMeasurementClass(contract.MeasurementBattery, ep.PowerSource) {
 			if ps, ok := s.(*measurement.PowerSourceServer); ok {
 				ps.SetEndpoint(ep.ID)
 			}
@@ -220,7 +220,7 @@ func ClusterServers(ep *Endpoint) []mattercontract.ClusterServer { //nolint:funl
 		// NodeLabel / UniqueID validation fail safely — return inner
 		// only; Apple will still see the cluster surface but reject
 		// the topology, which is the same outcome as before this fix.
-		return append([]mattercontract.ClusterServer(nil), inner...)
+		return append([]contract.ClusterServer(nil), inner...)
 	}
 	// Stamp the endpoint id so SetReachable can address the §9.13.6
 	// ReachableChanged event to the right (endpoint, cluster, event)
@@ -289,7 +289,7 @@ func ClusterServers(ep *Endpoint) []mattercontract.ClusterServer { //nolint:funl
 	// would read 0 forever while a stray countdown goroutine ticked on.
 	identify := ep.identifyServer()
 
-	clusters := make([]mattercontract.ClusterServer, 0, len(inner)+1)
+	clusters := make([]contract.ClusterServer, 0, len(inner)+1)
 	clusters = append(clusters, identify)
 	clusters = append(clusters, inner...)
 
@@ -304,7 +304,7 @@ func ClusterServers(ep *Endpoint) []mattercontract.ClusterServer { //nolint:funl
 		return append(clusters, bridged)
 	}
 
-	out := make([]mattercontract.ClusterServer, 0, len(clusters)+2)
+	out := make([]contract.ClusterServer, 0, len(clusters)+2)
 	out = append(out, clusters...)
 	out = append(out, descriptor, bridged)
 
@@ -378,6 +378,11 @@ func renderSourceKey(key any) string {
 	switch k := key.(type) {
 	case nil:
 		return ""
+	// SourceKey is declared as nothing but fmt.Stringer, so this case
+	// also catches every plain Stringer — a separate one for that
+	// interface below would be unreachable. Reordering the cases would
+	// change which rendering a key with several shapes gets, and the
+	// rendered key is the persisted endpoint identity.
 	case SourceKey:
 		return k.String()
 	case interface {
@@ -385,8 +390,6 @@ func renderSourceKey(key any) string {
 		Address() string
 	}:
 		return k.Central() + ":" + k.Address()
-	case fmt.Stringer:
-		return k.String()
 	}
 	// Reflective fallback for shapes the type switch does not cover —
 	// fmt's %+v walks every exported field, which is exactly what the

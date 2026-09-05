@@ -60,11 +60,11 @@ func NewBinding() *Binding {
 // Compile-time assertions: Binding satisfies MatterClusterServer and
 // the attribute-lister capability.
 var (
-	_ mattercontract.ClusterServer          = (*Binding)(nil)
-	_ mattercontract.ClusterAttributeLister = (*Binding)(nil)
+	_ contract.ClusterServer          = (*Binding)(nil)
+	_ contract.ClusterAttributeLister = (*Binding)(nil)
 )
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (b *Binding) MatterClusterID() uint32 { return bindingClusterID }
 
 // MatterRead returns the bindings list under a copy.

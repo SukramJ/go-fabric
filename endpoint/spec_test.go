@@ -21,7 +21,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 )
 
-// specSource is a minimal [mattercontract.EndpointSource]: enough to
+// specSource is a minimal [contract.EndpointSource]: enough to
 // occupy an endpoint's Source slot, no cluster logic.
 type specSource struct {
 	deviceType uint16
@@ -29,7 +29,7 @@ type specSource struct {
 
 func (s specSource) MatterDeviceType() uint16 { return s.deviceType }
 
-func (s specSource) MatterClusterServers() []mattercontract.ClusterServer { return nil }
+func (s specSource) MatterClusterServers() []contract.ClusterServer { return nil }
 
 // specKey renders a source key the way a Homematic owner does. The
 // package treats it as opaque, so the shape only has to be distinct per

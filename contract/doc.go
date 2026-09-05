@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 SukramJ.
 
-// Package mattercontract holds the port contracts between a host's
+// Package contract holds the port contracts between a host's
 // domain model and the Matter bridge: the interfaces a data point
 // implements to materialise as a bridged endpoint, the cluster-server
 // surface the bridge dispatches through, and the measurement /
@@ -15,4 +15,4 @@
 // surface where that coupling is expensive.
 //
 // The symbols carry no Matter prefix — the package name already says it.
-package mattercontract
+package contract

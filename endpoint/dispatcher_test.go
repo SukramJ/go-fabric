@@ -19,7 +19,7 @@ import (
 // published cluster set — the shape [Bridge.AttachRootClusters] produces in
 // production. The set has to be published rather than assigned, so tests
 // cannot build it in a composite literal.
-func rootEndpointWith(servers ...mattercontract.ClusterServer) *Endpoint {
+func rootEndpointWith(servers ...contract.ClusterServer) *Endpoint {
 	ep := &Endpoint{ID: 0}
 	ep.PublishClusterServers(servers)
 	return ep
@@ -54,8 +54,8 @@ func (s *fakeServerFull) MatterInvoke(_ context.Context, _ uint32, _ any) (any, 
 }
 func (s *fakeServerFull) MatterReportable() []uint32 { return s.reportable }
 
-// Compile-time assertion: fakeServerFull satisfies mattercontract.ClusterServer.
-var _ mattercontract.ClusterServer = (*fakeServerFull)(nil)
+// Compile-time assertion: fakeServerFull satisfies contract.ClusterServer.
+var _ contract.ClusterServer = (*fakeServerFull)(nil)
 
 // --- fullSource ---
 
@@ -63,16 +63,16 @@ var _ mattercontract.ClusterServer = (*fakeServerFull)(nil)
 type fullSource struct{ servers []*fakeServerFull }
 
 func (f fullSource) MatterDeviceType() uint16 { return 0x010A }
-func (f fullSource) MatterClusterServers() []mattercontract.ClusterServer {
-	out := make([]mattercontract.ClusterServer, len(f.servers))
+func (f fullSource) MatterClusterServers() []contract.ClusterServer {
+	out := make([]contract.ClusterServer, len(f.servers))
 	for i, s := range f.servers {
 		out[i] = s
 	}
 	return out
 }
 
-// Compile-time assertion: fullSource satisfies mattercontract.EndpointSource.
-var _ mattercontract.EndpointSource = fullSource{}
+// Compile-time assertion: fullSource satisfies contract.EndpointSource.
+var _ contract.EndpointSource = fullSource{}
 
 // --- globalAttrServer ---
 
@@ -100,19 +100,19 @@ func (s *globalAttrServer) MatterInvoke(_ context.Context, _ uint32, _ any) (any
 }
 func (s *globalAttrServer) MatterReportable() []uint32 { return nil }
 
-// Compile-time assertion: globalAttrServer satisfies mattercontract.ClusterServer.
-var _ mattercontract.ClusterServer = (*globalAttrServer)(nil)
+// Compile-time assertion: globalAttrServer satisfies contract.ClusterServer.
+var _ contract.ClusterServer = (*globalAttrServer)(nil)
 
 // singleServerSource is a MatterEndpointSource backed by one globalAttrServer.
 type singleServerSource struct{ srv *globalAttrServer }
 
 func (f singleServerSource) MatterDeviceType() uint16 { return 0x010A }
-func (f singleServerSource) MatterClusterServers() []mattercontract.ClusterServer {
-	return []mattercontract.ClusterServer{f.srv}
+func (f singleServerSource) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{f.srv}
 }
 
-// Compile-time assertion: singleServerSource satisfies mattercontract.EndpointSource.
-var _ mattercontract.EndpointSource = singleServerSource{}
+// Compile-time assertion: singleServerSource satisfies contract.EndpointSource.
+var _ contract.EndpointSource = singleServerSource{}
 
 // --- topology helpers ---
 
@@ -409,14 +409,14 @@ func (s *listingAttrServer) MatterRead(attr uint32) (any, bool) {
 	return s.globalAttrServer.MatterRead(attr)
 }
 
-var _ mattercontract.ClusterAttributeLister = (*listingAttrServer)(nil)
+var _ contract.ClusterAttributeLister = (*listingAttrServer)(nil)
 
 // listingSource is a MatterEndpointSource backed by one listingAttrServer.
 type listingSource struct{ srv *listingAttrServer }
 
 func (f listingSource) MatterDeviceType() uint16 { return 0x010A }
-func (f listingSource) MatterClusterServers() []mattercontract.ClusterServer {
-	return []mattercontract.ClusterServer{f.srv}
+func (f listingSource) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{f.srv}
 }
 
 // TestRead_WildcardAttribute_ListerWithoutGlobalsStillGetsThem locks the
@@ -939,7 +939,7 @@ type commandListerServer struct {
 func (s *commandListerServer) MatterAcceptedCommands() []uint32  { return s.accepted }
 func (s *commandListerServer) MatterGeneratedCommands() []uint32 { return s.generated }
 
-var _ mattercontract.ClusterCommandLister = (*commandListerServer)(nil)
+var _ contract.ClusterCommandLister = (*commandListerServer)(nil)
 
 // TestSynthesizeGlobalRead_AcceptedCommandList_WithLister verifies that a
 // server implementing MatterClusterCommandLister returns its accepted-commands
@@ -1034,8 +1034,8 @@ func (s *dvServer) MatterReportable() []uint32 { return nil }
 func (s *dvServer) MatterDataVersion() uint32  { return s.ver }
 
 var (
-	_ mattercontract.ClusterServer      = (*dvServer)(nil)
-	_ mattercontract.ClusterDataVersion = (*dvServer)(nil)
+	_ contract.ClusterServer      = (*dvServer)(nil)
+	_ contract.ClusterDataVersion = (*dvServer)(nil)
 )
 
 // dvSource is a MatterEndpointSource that exposes a single dvServer.
@@ -1044,11 +1044,11 @@ type dvSource struct {
 }
 
 func (s dvSource) MatterDeviceType() uint16 { return 0x010A }
-func (s dvSource) MatterClusterServers() []mattercontract.ClusterServer {
-	return []mattercontract.ClusterServer{s.srv}
+func (s dvSource) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{s.srv}
 }
 
-var _ mattercontract.EndpointSource = dvSource{}
+var _ contract.EndpointSource = dvSource{}
 
 // TestClusterDataVersion_WithVersion verifies that a server implementing
 // MatterClusterDataVersion returns its version.
@@ -1100,8 +1100,8 @@ func (s *fabricScopedServer) MatterReadFiltered(_ context.Context, _ uint32) (an
 }
 
 var (
-	_ mattercontract.ClusterServer      = (*fabricScopedServer)(nil)
-	_ mattercontract.FabricScopedReader = (*fabricScopedServer)(nil)
+	_ contract.ClusterServer      = (*fabricScopedServer)(nil)
+	_ contract.FabricScopedReader = (*fabricScopedServer)(nil)
 )
 
 // TestReadOne_FabricScoped_NonNilValue exercises MatterReadFiltered with a

@@ -23,7 +23,7 @@ import (
 //   - 0xFFFC FeatureMap            (uint32)
 //   - 0xFFFD ClusterRevision       (uint16)
 //
-// Events (cluster-emitted via [mattercontract.EventEmitter]):
+// Events (cluster-emitted via [contract.EventEmitter]):
 //
 //   - 0x00 SwitchLatched          (LS feature)
 //   - 0x01 InitialPress           (MS / MSL / MSR / AS feature)
@@ -43,7 +43,7 @@ import (
 // optional [GenericSwitchPositionSource] capability), and HM events
 // arrive via [GenericSwitch.Fire*] methods fed from the model layer;
 // the cluster forwards them to the bridge-injected
-// [mattercontract.EventEmitter].
+// [contract.EventEmitter].
 const (
 	matterClusterGenericSwitch uint32 = 0x003B
 
@@ -120,13 +120,13 @@ type GenericSwitchPositionSource interface {
 }
 
 // GenericSwitch is the cluster-server. Implements
-// [mattercontract.ClusterServer] (read/write/invoke/reportable) and
-// [mattercontract.EventReceiver] (bridge injects emitter at
+// [contract.ClusterServer] (read/write/invoke/reportable) and
+// [contract.EventReceiver] (bridge injects emitter at
 // topology assembly).
 type GenericSwitch struct {
 	src      GenericSwitchSource
 	endpoint uint16
-	emitter  mattercontract.EventEmitter
+	emitter  contract.EventEmitter
 }
 
 // NewGenericSwitch wires the cluster-server against a model-side
@@ -139,10 +139,10 @@ func NewGenericSwitch(endpoint uint16, src GenericSwitchSource) *GenericSwitch {
 // MatterClusterID identifies the Switch cluster (0x003B).
 func (s *GenericSwitch) MatterClusterID() uint32 { return matterClusterGenericSwitch }
 
-// SetMatterEventEmitter implements [mattercontract.EventReceiver].
+// SetMatterEventEmitter implements [contract.EventReceiver].
 // Called by the bridge during topology assembly so the cluster can
 // fire events outside the request/response cycle.
-func (s *GenericSwitch) SetMatterEventEmitter(emitter mattercontract.EventEmitter) {
+func (s *GenericSwitch) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.emitter = emitter
 }
 
@@ -264,7 +264,7 @@ func (s *GenericSwitch) FireInitialPress(newPosition uint8) {
 	}
 	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventInitialPress,
 		switchInitialPressEvent{NewPosition: newPosition},
-		mattercontract.EventPriorityInfo)
+		contract.EventPriorityInfo)
 }
 
 // FireShortRelease emits the §1.13.6.3 ShortRelease event.
@@ -274,7 +274,7 @@ func (s *GenericSwitch) FireShortRelease(previousPosition uint8) {
 	}
 	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventShortRelease,
 		switchShortReleaseEvent{PreviousPosition: previousPosition},
-		mattercontract.EventPriorityInfo)
+		contract.EventPriorityInfo)
 }
 
 // FireLongPress emits the §1.13.6.2 LongPress event. No-op when the
@@ -286,7 +286,7 @@ func (s *GenericSwitch) FireLongPress(newPosition uint8) {
 	// Priority INFO per matter.js HEAD switch.element.ts:52.
 	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventLongPress,
 		switchLongPressEvent{NewPosition: newPosition},
-		mattercontract.EventPriorityInfo)
+		contract.EventPriorityInfo)
 }
 
 // FireLongRelease emits the §1.13.6.4 LongRelease event.
@@ -296,7 +296,7 @@ func (s *GenericSwitch) FireLongRelease(previousPosition uint8) {
 	}
 	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventLongRelease,
 		switchLongReleaseEvent{PreviousPosition: previousPosition},
-		mattercontract.EventPriorityInfo)
+		contract.EventPriorityInfo)
 }
 
 // switch{event}Event are the cluster-native event payload structs.
@@ -322,8 +322,8 @@ type switchLongReleaseEvent struct {
 // Compile-time assertions: GenericSwitch satisfies the bridge-side
 // dispatch interfaces and the attribute-lister and event-lister capabilities.
 var (
-	_ mattercontract.ClusterServer          = (*GenericSwitch)(nil)
-	_ mattercontract.EventReceiver          = (*GenericSwitch)(nil)
-	_ mattercontract.ClusterAttributeLister = (*GenericSwitch)(nil)
-	_ mattercontract.ClusterEventLister     = (*GenericSwitch)(nil)
+	_ contract.ClusterServer          = (*GenericSwitch)(nil)
+	_ contract.EventReceiver          = (*GenericSwitch)(nil)
+	_ contract.ClusterAttributeLister = (*GenericSwitch)(nil)
+	_ contract.ClusterEventLister     = (*GenericSwitch)(nil)
 )

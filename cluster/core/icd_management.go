@@ -40,14 +40,14 @@ const (
 func NewICDManagement() *ICDManagement { return &ICDManagement{} }
 
 var (
-	_ mattercontract.ClusterServer          = (*ICDManagement)(nil)
-	_ mattercontract.ClusterAttributeLister = (*ICDManagement)(nil)
+	_ contract.ClusterServer          = (*ICDManagement)(nil)
+	_ contract.ClusterAttributeLister = (*ICDManagement)(nil)
 )
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (i *ICDManagement) MatterClusterID() uint32 { return icdClusterID }
 
-// MatterRead implements [mattercontract.ClusterServer]. Values
+// MatterRead implements [contract.ClusterServer]. Values
 // signal "always-on, no idle" so commissioners that gate ICD-related
 // flows on these reads see the bridge as a non-ICD device.
 func (i *ICDManagement) MatterRead(attrID uint32) (any, bool) {
@@ -74,13 +74,13 @@ func (i *ICDManagement) MatterRead(attrID uint32) (any, bool) {
 	return nil, false
 }
 
-// MatterWrite implements [mattercontract.ClusterServer]. Attributes
+// MatterWrite implements [contract.ClusterServer]. Attributes
 // are read-only on the bridge.
 func (i *ICDManagement) MatterWrite(_ context.Context, attrID uint32, _ any) error {
 	return fmt.Errorf("matter: ICDManagement attribute 0x%04X is read-only", attrID)
 }
 
-// MatterInvoke implements [mattercontract.ClusterServer]. ICD
+// MatterInvoke implements [contract.ClusterServer]. ICD
 // commands (RegisterClient / UnregisterClient / StayActiveRequest)
 // all require feature flags we don't advertise.
 func (i *ICDManagement) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {

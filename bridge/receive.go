@@ -521,7 +521,7 @@ func (b *Bridge) NotifyDeviceReachable(scope, deviceAddress string, reachable bo
 			core.BridgedDeviceBasicInformationClusterID,
 			core.EventReachableChanged,
 			core.ReachableChangedEvent{ReachableNewValue: reachable},
-			mattercontract.EventPriorityInfo)
+			contract.EventPriorityInfo)
 		// Advance the endpoint-hosted BDBI DataVersion — the reachability
 		// flip is a cluster state change, so DataVersionFilters must miss
 		// afterwards (matter.js Datasource.ts:949).

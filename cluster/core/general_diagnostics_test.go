@@ -275,7 +275,7 @@ func TestGenDiag_EmitBootReason_FiresEvent(t *testing.T) {
 	if ev.event != 0x0003 {
 		t.Errorf("event = 0x%04X, want 0x0003 (BootReason)", ev.event)
 	}
-	if ev.priority != mattercontract.EventPriorityCritical {
+	if ev.priority != contract.EventPriorityCritical {
 		t.Errorf("priority = %v, want Critical", ev.priority)
 	}
 	payload, ok := ev.data.(core.BootReasonEvent)

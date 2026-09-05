@@ -117,15 +117,15 @@ func (d *DiagnosticLogs) SetBootEpoch(t time.Time) {
 // Compile-time assertions: DiagnosticLogs satisfies MatterClusterServer,
 // the attribute-lister capability, and the command-lister capability.
 var (
-	_ mattercontract.ClusterServer          = (*DiagnosticLogs)(nil)
-	_ mattercontract.ClusterAttributeLister = (*DiagnosticLogs)(nil)
-	_ mattercontract.ClusterCommandLister   = (*DiagnosticLogs)(nil)
+	_ contract.ClusterServer          = (*DiagnosticLogs)(nil)
+	_ contract.ClusterAttributeLister = (*DiagnosticLogs)(nil)
+	_ contract.ClusterCommandLister   = (*DiagnosticLogs)(nil)
 )
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (d *DiagnosticLogs) MatterClusterID() uint32 { return diaglogsClusterID }
 
-// MatterRead implements [mattercontract.ClusterServer]. The cluster
+// MatterRead implements [contract.ClusterServer]. The cluster
 // has no readable attributes other than the global ones.
 func (d *DiagnosticLogs) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
@@ -212,7 +212,7 @@ func decodeRetrieveLogsIntent(fields any) uint8 {
 	return IntentEndUserSupport
 }
 
-// MatterAcceptedCommands implements [mattercontract.ClusterCommandLister].
+// MatterAcceptedCommands implements [contract.ClusterCommandLister].
 // Lists the command IDs the server handles via MatterInvoke.
 // Mirrors matter.js packages/model/src/standard/elements/
 // diagnostic-logs.element.ts accepted commands.
@@ -222,7 +222,7 @@ func (d *DiagnosticLogs) MatterAcceptedCommands() []uint32 {
 	}
 }
 
-// MatterGeneratedCommands implements [mattercontract.ClusterCommandLister].
+// MatterGeneratedCommands implements [contract.ClusterCommandLister].
 // Lists the response command IDs this server may emit.
 // Mirrors matter.js packages/model/src/standard/elements/
 // diagnostic-logs.element.ts generated commands.

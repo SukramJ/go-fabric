@@ -76,9 +76,9 @@ func NewDescriptor(deviceTypes []DeviceTypeStruct, serverList, clientList []uint
 }
 
 // Compile-time assertion: Descriptor satisfies MatterClusterServer.
-var _ mattercontract.ClusterServer = (*Descriptor)(nil)
+var _ contract.ClusterServer = (*Descriptor)(nil)
 
-// MatterClusterID implements [mattercontract.ClusterServer].
+// MatterClusterID implements [contract.ClusterServer].
 func (d *Descriptor) MatterClusterID() uint32 { return descriptorClusterID }
 
 // MatterRead returns the static lists. PartsList is mutable when the
@@ -172,7 +172,7 @@ func (d *Descriptor) MatterReportable() []uint32 {
 	return []uint32{descriptorAttrPartsList}
 }
 
-// MatterAttributes implements [mattercontract.ClusterAttributeLister]
+// MatterAttributes implements [contract.ClusterAttributeLister]
 // so wildcard subscribe / read enumerates the full Descriptor surface.
 // Apple Home reads DeviceTypeList + ServerList + PartsList on every
 // endpoint to build the HAP topology — missing entries trigger
