@@ -1,0 +1,4 @@
+# Build output and local test artefacts.
+/bin/
+*.test
+*.out
