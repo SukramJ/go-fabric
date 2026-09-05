@@ -6,3 +6,9 @@
 # IDE project state. GoLand writes .idea/ into any directory it opens; none
 # of it describes the module.
 .idea/
+
+# Output of the two on-demand reachability companions, which are run by hand
+# while reading a finding. The inventory and summary next to them ARE committed
+# — the ratchet test reads the inventory, and CI diffs both.
+/script/reachability/crosscheck.json
+/script/reachability/whitelist-audit.md

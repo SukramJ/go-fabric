@@ -79,6 +79,29 @@ jobs:
           CGO_ENABLED: "1"
         run: make race
 
+  reachability:
+    name: reachability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Regenerates the inventory and fails on the two things a committed
+      # snapshot cannot catch by itself: a snapshot that no longer matches the
+      # tree, and an unreached-export count off its ratchet.
+      #
+      # The root set is this module's own tests. go-fabric is a library with no
+      # cmd/ tree, so there is no production entry point to seed from, and a
+      # production-only run would start from nothing and report the entire
+      # exported surface as dead. The question this leg answers instead is
+      # "which exported API does no test reach" — for a module built to be
+      # consumed from outside, that is the surface a host can break without
+      # anything here noticing.
+      - name: reachability
+        run: make reachability-check
+
   lint:
     name: lint
     runs-on: ubuntu-latest

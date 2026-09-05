@@ -80,6 +80,26 @@ fuzz: ## run every fuzz target for $(FUZZTIME) executions as a smoke test
 vuln: ## report known vulnerabilities on code paths this module actually calls
 	$(GOVULNCHECK) ./...
 
+.PHONY: reachability
+reachability: ## regenerate script/reachability/inventory.json — which exported API no test reaches
+	@# The root set is this module's own tests, not a production main: go-fabric
+	@# is a library and has none. See the package doc of script/reachability for
+	@# why a production-only run here would measure nothing.
+	$(GO) run ./script/reachability
+
+.PHONY: reachability-check
+reachability-check: reachability ## regenerate, then fail if the committed snapshot moved or is off its ratchet
+	@git diff --quiet -- script/reachability/inventory.json script/reachability/summary.md || { \
+		echo ""; \
+		echo "The committed reachability snapshot is stale: regenerating it changed the file."; \
+		echo "Run 'make reachability', read the diff, and commit it with the change that moved"; \
+		echo "it — adjusting reachabilityUnreachedRatchet in the same commit if the count moved."; \
+		echo ""; \
+		git --no-pager diff --stat -- script/reachability/; \
+		exit 1; \
+	}
+	$(GO) test -count=1 -run 'Reachab' ./script/reachability/
+
 .PHONY: fmt
 fmt: ## format with gofumpt
 	$(GOFUMPT) -w .
