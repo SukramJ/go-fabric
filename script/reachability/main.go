@@ -50,9 +50,13 @@
 //   - script/reachability/inventory.json — the full inventory
 //   - script/reachability/summary.md     — a human-readable summary
 //
-// Both are deterministic for a given tree: every slice is sorted by a stable key
-// and the "generated" marker is the git HEAD rather than a wall-clock timestamp,
-// so re-running at the same commit yields a byte-identical file.
+// Both are deterministic for a given tree: every slice is sorted by a stable key,
+// and neither file carries a timestamp or a git revision. That omission is the
+// point rather than an oversight — the snapshot is compared byte-for-byte against
+// the committed one, and a revision written into the file could only ever name the
+// commit before the one that carries it, so it would report a provenance that is
+// wrong by construction and leave the comparison permanently stale. The commit
+// holding the file is its provenance.
 //
 // # Whitelist
 //
@@ -78,7 +82,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -89,7 +92,6 @@ import (
 	"go/types"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -148,8 +150,6 @@ type Summary struct {
 
 // Inventory is the output document written to inventory.json.
 type Inventory struct {
-	Generated    string             `json:"generated"`
-	Head         string             `json:"head"`
 	RootSet      string             `json:"root_set"`
 	EntryPoints  int                `json:"entry_points"`
 	EntryPkgs    []string           `json:"entry_packages"`
@@ -260,8 +260,6 @@ func run(logger *slog.Logger, repoRoot, outPath, summaryPath string) error {
 	logger.Info("annotation whitelist loaded", "entries", len(whitelisted))
 
 	inv := classify(prog, ssaPkgs, absRoot, reachableFuncs, refs, whitelisted)
-	inv.Head = gitHead(absRoot)
-	inv.Generated = inv.Head
 	inv.RootSet = rootSetDescription
 	inv.EntryPoints = len(entryFuncs)
 	inv.EntryPkgs = entryPkgs
@@ -883,8 +881,6 @@ func printReport(inv Inventory) {
 // summaryTemplate is the markdown report rendered next to the JSON inventory.
 const summaryTemplate = `# Exported-API reachability summary
 
-HEAD: {{.Head}}
-
 Root set: {{.RootSet}}
 Entry points: {{.EntryPoints}} across {{len .EntryPkgs}} test packages.
 
@@ -925,7 +921,6 @@ Entry points: {{.EntryPoints}} across {{len .EntryPkgs}} test packages.
 // writeSummaryMD renders the markdown summary.
 func writeSummaryMD(path string, inv Inventory) error {
 	type templateData struct {
-		Head          string
 		RootSet       string
 		EntryPoints   int
 		EntryPkgs     []string
@@ -964,7 +959,7 @@ func writeSummaryMD(path string, inv Inventory) error {
 	defer func() { _ = f.Close() }()
 
 	return tmpl.Execute(f, templateData{
-		Head: inv.Head, RootSet: inv.RootSet,
+		RootSet:     inv.RootSet,
 		EntryPoints: inv.EntryPoints, EntryPkgs: inv.EntryPkgs,
 		Summary: inv.Summary, Top20Packages: top20,
 		Top50Funcs: funcs, ByPackage: inv.ByPackage,
@@ -1076,15 +1071,4 @@ func findWhitelistComment(f *ast.File, fset *token.FileSet, decl ast.Decl) (stri
 		}
 	}
 	return "", false
-}
-
-// gitHead reads the current short git revision, or "unknown".
-func gitHead(dir string) string {
-	cmd := exec.CommandContext(context.Background(), "git", "rev-parse", "--short", "HEAD")
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	if err != nil {
-		return "unknown"
-	}
-	return strings.TrimSpace(string(out))
 }

@@ -1,7 +1,5 @@
 # Exported-API reachability summary
 
-HEAD: cd3cd0d
-
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)
 Entry points: 3052 across 41 test packages.
 
