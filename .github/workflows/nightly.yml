@@ -1,0 +1,136 @@
+name: nightly
+
+# Work that is too slow, too platform-specific or too calendar-driven to sit
+# on the merge path. Nothing here is a required check; a red nightly is a
+# message to a person, not a blocked PR.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CGO_ENABLED: "0"
+  GO_VERSION: "1.26.6"
+
+jobs:
+  fuzz:
+    name: fuzz (extended)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # The module's fuzz targets sit on the Interaction Model decoders, which
+      # is where attacker-controlled bytes first become structs. 2000000x is a
+      # real overnight budget rather than a smoke: the targets sustain ~190k
+      # execs/sec on four cores, so the whole set is minutes, and the budget is
+      # iteration-based so a loaded runner takes longer instead of reporting a
+      # spurious deadline failure.
+      - name: extended fuzz
+        run: make fuzz FUZZTIME=2000000x FUZZ_TIMEOUT=600s
+
+  test-macos:
+    # Linux carries the race detector on every PR. macOS is the second
+    # platform this module is actually developed and consumed on, and it is
+    # the one whose networking stack differs where it matters here — IPv6
+    # UDP, multicast joins, interface enumeration for DNS-SD. It runs nightly
+    # rather than per-PR because the signal is a platform regression, which
+    # arrives on the calendar (a runner image bump) at least as often as it
+    # arrives in a diff.
+    name: test (macos-latest, race)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # make race sets CGO_ENABLED=1 itself; the race detector needs cgo.
+      - name: go test (race)
+        run: make race
+
+  vuln:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Deliberately unpinned, which is the inverse of the lint-tool argument
+      # in ci.yml: a newly published advisory SHOULD turn this red without a
+      # commit. That is also why it is nightly and not a PR check — its input
+      # is a database that moves on its own, so it does not belong on a gate
+      # that is supposed to report on the diff.
+      #
+      # govulncheck does reachability analysis: it fails only when a known
+      # vulnerability sits on a code path this module actually calls.
+      - name: install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: govulncheck
+        run: make vuln
+
+  matterjs-snapshot:
+    name: matter.js snapshot staleness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # parity/schema.json is an extract from a matter.js checkout, and it
+      # records the commit it came from: script/extract-from-matter-js.ts runs
+      # `git rev-parse HEAD` inside that checkout and stores it as
+      # matter.sourceCommit. That makes the staleness question answerable
+      # without cloning anything — compare the recorded commit against the
+      # remote's default-branch HEAD.
+      #
+      # Report-only, and it stays green when they differ. A newer matter.js
+      # commit is not a defect: most of them do not touch the model elements
+      # this snapshot extracts. What the summary buys is a standing answer to
+      # "how far back was the last refresh", which nobody can get from the
+      # repository alone. Refreshing is `make generate-matter-schema` plus
+      # `go generate ./schema/...`, which is a deliberate act with a diff to
+      # review — not something a workflow should do on a schedule.
+      - name: compare the pinned extract against matter.js HEAD
+        run: |
+          set -euo pipefail
+          read_field() {
+            python3 -c "import json,sys; print(json.load(open('parity/schema.json'))['matter'][sys.argv[1]])" "$1"
+          }
+          PINNED="$(read_field sourceCommit)"
+          REVISION="$(read_field revision)"
+          REMOTE="$(git ls-remote https://github.com/project-chip/matter.js HEAD | cut -f1 || true)"
+
+          {
+            echo "### matter.js schema snapshot"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Matter revision in the extract | \`${REVISION}\` |"
+            echo "| Extracted from matter.js commit | \`${PINNED}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$REMOTE" ]; then
+            echo "| matter.js default-branch HEAD | could not be read |" >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::could not reach github.com/project-chip/matter.js — staleness not determined"
+            exit 0
+          fi
+
+          echo "| matter.js default-branch HEAD | \`${REMOTE}\` |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PINNED" = "$REMOTE" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "The snapshot is current." >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo ""
+              echo "The snapshot predates matter.js HEAD. Whether anything the"
+              echo "extract covers has changed is only answerable by re-running"
+              echo "\`make generate-matter-schema\` against a fresh checkout and"
+              echo "reading the diff."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

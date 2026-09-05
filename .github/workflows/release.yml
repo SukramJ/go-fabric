@@ -1,0 +1,151 @@
+name: release
+
+# For a Go library the tag IS the version: there is no version file, no
+# constant to bump, no binary and no image. Everything downstream — the
+# module proxy, the checksum database, pkg.go.dev — reads the tagged source
+# tree on its own. So this workflow is only two things: guards that run
+# before the release exists, and the release note the tag carries.
+#
+# The guards matter more here than in an application repository, because a
+# published module version is immutable. Once proxy.golang.org has served
+# v1.2.3, that tree is what every consumer gets forever; retracting it is a
+# follow-up release, never an edit.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # create the GitHub release
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CGO_ENABLED: "0"
+  GO_VERSION: "1.26.6"
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history: the tag object and the changelog
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      # The module-version rules are not advisory: a tag the toolchain cannot
+      # parse is invisible to `go get`, and a v2+ tag on a module path without
+      # the matching /vN suffix resolves to nothing at all while looking
+      # entirely correct on the releases page. Both fail silently downstream,
+      # so they fail loudly here instead. The module path is read from the
+      # module itself rather than restated.
+      - name: verify the tag is a usable module version
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if ! printf '%s' "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::tag '${TAG}' is not a Go module version — expected vX.Y.Z or vX.Y.Z-prerelease"
+            exit 1
+          fi
+          MAJOR="${TAG#v}"
+          MAJOR="${MAJOR%%.*}"
+          MODPATH="$(go list -m)"
+          if [ "$MAJOR" -ge 2 ]; then
+            case "$MODPATH" in
+              */v"$MAJOR") ;;
+              *)
+                echo "::error::tag '${TAG}' is a v${MAJOR} release but the module path is '${MODPATH}'."
+                echo "::error::A major version >= 2 needs the matching '/v${MAJOR}' suffix in go.mod and in every import path."
+                exit 1
+                ;;
+            esac
+          else
+            case "$MODPATH" in
+              */v[0-9]*)
+                echo "::error::module path '${MODPATH}' carries a major-version suffix but the tag is '${TAG}'."
+                exit 1
+                ;;
+            esac
+          fi
+          {
+            echo "PRERELEASE="
+            echo "MODPATH=${MODPATH}"
+          } >> "$GITHUB_ENV"
+          case "$TAG" in
+            *-*) echo "PRERELEASE=--prerelease" >> "$GITHUB_ENV" ;;
+          esac
+          echo "tag ${TAG} is a valid version for module ${MODPATH}"
+
+      # A tagged tree that does not compile cannot be withdrawn, only
+      # superseded. This is cheaper than that. The race detector is not
+      # repeated: it ran on this commit through ci before the tag was cut,
+      # and a green race run does not become stale in the minutes since.
+      - name: build and test the tagged tree
+        run: |
+          make build
+          make vet
+          make test
+
+      # The release body is the curated CHANGELOG section, not a commit dump.
+      # The tag is vX.Y.Z and the changelog headers are Keep a Changelog
+      # "## [X.Y.Z] …", so strip the leading v and slice from that header to
+      # the next "## [". A missing section fails the release: shipping a
+      # version whose changelog nobody wrote is the thing this prevents.
+      - name: extract release notes from CHANGELOG.md
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (insec) exit
+              if (index($0, "## [" ver "]") == 1) { insec=1; next }
+            }
+            insec { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          # Trim leading blank lines.
+          sed -i -e '/./,$!d' RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "::error::No '## [${VERSION}]' section in CHANGELOG.md — add it in the release commit."
+            exit 1
+          fi
+          echo "Release notes for ${VERSION}:" >&2
+          cat RELEASE_NOTES.md >&2
+
+      # gh is preinstalled on the runner, so there is no third-party action to
+      # pin here. --verify-tag refuses to invent a tag if the ref went missing
+      # between the push and this step.
+      - name: create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file RELEASE_NOTES.md \
+            --verify-tag \
+            ${PRERELEASE}
+
+      # proxy.golang.org fetches a version the first time somebody asks for
+      # it. Asking here turns that into part of the release rather than a
+      # surprise for the first consumer, and it is the only end-to-end proof
+      # that the tag is fetchable and the checksum database accepts it.
+      # Non-blocking: the release is already published, and the proxy will
+      # serve the version on first request regardless.
+      - name: warm the module proxy
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          cd "$tmp"
+          go mod init release-smoke >/dev/null
+          if GOPROXY=https://proxy.golang.org,direct go get "${MODPATH}@${GITHUB_REF_NAME}"; then
+            echo "proxy.golang.org serves ${MODPATH}@${GITHUB_REF_NAME}"
+          else
+            echo "::warning::${MODPATH}@${GITHUB_REF_NAME} is not resolvable from proxy.golang.org yet; it will be on the first consumer request"
+          fi
