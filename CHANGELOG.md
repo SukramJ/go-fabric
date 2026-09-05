@@ -30,6 +30,15 @@ long enough for a `v0.1.0` to mean something.
   invisible outside the package. None of this widened the production API:
   the affordances reach the bridge through a module-internal seam, so an
   external module sees `bridgetest` and cannot reach what it stands on.
+  `EstablishSubscriptionTarget` leaves the *whole* post-handshake state: the
+  `SubscribeRequest` it stands in for also anchored the peer's inbound MRP
+  duplicate-detection window, and a secure session's window anchors with an
+  all-ones bitmap — so without the anchor the peer's next two messages had
+  to arrive in order or lose the earlier one to the duplicate path, which is
+  how the same consumer's StandaloneAck raced its own StatusResponse.
+  `SubscriptionTarget.PeerCounter` carries the counter that request would
+  have used, and a secure target must name it: nothing on the bridge side
+  can derive a counter from a handshake that never happened.
 - **`message.Header.SecurityFlags`.** The Security Flags byte is an input
   every caller of `channel.Session.Encrypt` / `Decrypt` has to supply
   alongside the header, and it was derivable only inside this module. It now

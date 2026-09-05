@@ -46,6 +46,24 @@ var CaptureSubTarget func(
 	fabricFiltered bool,
 ) bool
 
+// AnchorPeerCounter primes the inbound duplicate-detection window that
+// datagrams arriving from the peer are tested against, on the counter the
+// message that completed the handshake would have carried.
+//
+// Without it the window anchors on whichever of the peer's next two
+// messages lands first — and a secure session's window anchors with an
+// all-ones bitmap, so if they land out of order the earlier counter is
+// dropped as a duplicate.
+//
+// Which window that is follows the session: sessionID != 0 resolves the
+// secure session through the bridge's attached lookup and anchors the
+// window inside it; sessionID == 0 anchors the per-source unsecured window
+// keyed by peerNodeID.
+//
+// Reports false when b is not a bridge, no window is reachable for the
+// arguments, or the window had already recorded counter.
+var AnchorPeerCounter func(b any, sessionID uint16, peerNodeID uint64, counter uint32) bool
+
 // AckPumpTick runs one iteration of the bridge's ACK-pump tick — the due
 // StandaloneAcks, the outbound-reliable retransmits, and the timed-deadline
 // sweep — and reports how many StandaloneAck datagrams it emitted. Unlike

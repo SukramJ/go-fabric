@@ -41,6 +41,20 @@ var (
 	// bridge uses as "no subscription" and therefore never routes.
 	ErrNoSubscriptionID = errors.New("bridgetest: subscription id 0")
 
+	// ErrNoPeerCounter is returned when a [SubscriptionTarget] names a
+	// secure session but leaves PeerCounter at 0. See
+	// [SubscriptionTarget.PeerCounter] for why the value cannot be derived
+	// and why a secure target without it is only half-established.
+	ErrNoPeerCounter = errors.New("bridgetest: subscription target on a secure session has no peer counter")
+
+	// ErrPeerCounterNotAnchored is returned when the peer's receive window
+	// could not be anchored on [SubscriptionTarget.PeerCounter]: the target
+	// names a session the bridge cannot resolve, an unsecured target names
+	// no peer node id to key the window on, or the window had already
+	// recorded that counter — none of which is the untouched
+	// post-handshake state this models.
+	ErrPeerCounterNotAnchored = errors.New("bridgetest: peer receive window not anchored")
+
 	// ErrNotEstablished is returned when the bridge accepted the call but
 	// no route is in place afterwards.
 	ErrNotEstablished = errors.New("bridgetest: subscription target not established")
@@ -69,6 +83,30 @@ type SubscriptionTarget struct {
 	// legitimate value, so it cannot double as "absent".
 	PeerNodeID    uint64
 	HasPeerNodeID bool
+
+	// PeerCounter is the MRP message counter the SubscribeRequest itself
+	// would have carried, i.e. the last counter the peer consumed before
+	// the messages the test is about. Establishing the target anchors the
+	// peer's inbound duplicate-detection window on it.
+	//
+	// It has to come from the caller: the anchor is whatever counter the
+	// peer's own outbound counter had reached, and nothing on the bridge
+	// side can observe or derive that from a handshake that never happened.
+	//
+	// It matters because a secure session's window anchors with an all-ones
+	// bitmap — every counter below the first one it ever sees is a
+	// duplicate. An unanchored window therefore anchors on whichever of the
+	// peer's next two messages arrives first, and if they arrive out of
+	// order the earlier one is dropped. Required whenever SessionID is
+	// non-zero (see [ErrNoPeerCounter]).
+	//
+	// Optional for SessionID 0: unsecured traffic is deduplicated per
+	// source node id in a window whose bitmap starts empty, so a counter
+	// below the first one seen stays acceptable and nothing is lost by
+	// leaving the window unanchored. Setting it there anchors that
+	// per-source window anyway, and then needs HasPeerNodeID with a
+	// non-zero PeerNodeID to key on.
+	PeerCounter uint32
 
 	// FabricFiltered mirrors the SubscribeRequest's FabricFiltered flag.
 	// It is applied to every ongoing read, so a target that sets it
@@ -100,6 +138,14 @@ type SubscriptionTarget struct {
 //
 // The peer is recorded as the exchange initiator, which is what a
 // SubscribeRequest always makes it.
+//
+// A real SubscribeRequest does a second thing that is easy to miss: its
+// message counter anchors the peer's inbound duplicate-detection window. A
+// target that only carried the route would leave that window unanchored,
+// and the first two messages the peer sends afterwards would then have to
+// arrive in order or lose one to the duplicate path. So the anchor happens
+// here too, from [SubscriptionTarget.PeerCounter] — the one value of the
+// modelled handshake that the caller has to supply.
 func EstablishSubscriptionTarget(b *bridge.Bridge, subID uint32, target SubscriptionTarget) error {
 	switch {
 	case b == nil:
@@ -108,6 +154,24 @@ func EstablishSubscriptionTarget(b *bridge.Bridge, subID uint32, target Subscrip
 		return ErrNoSubscriptionID
 	case target.Peer == nil:
 		return ErrNoPeer
+	case target.SessionID != 0 && target.PeerCounter == 0:
+		return ErrNoPeerCounter
+	}
+
+	// Anchor before the route: on the wire the counter is consumed as the
+	// SubscribeRequest is decrypted, before anything is captured from it —
+	// and a failure here then leaves nothing half-established.
+	if target.PeerCounter != 0 {
+		// PeerNodeID keys the unsecured window only; it is meaningless
+		// unless HasPeerNodeID marks it as carried, and the secure path
+		// ignores it entirely (the session already knows its peer).
+		var peerNodeID uint64
+		if target.HasPeerNodeID {
+			peerNodeID = target.PeerNodeID
+		}
+		if !bridgeseam.AnchorPeerCounter(b, target.SessionID, peerNodeID, target.PeerCounter) {
+			return ErrPeerCounterNotAnchored
+		}
 	}
 
 	hdr := &message.Header{
