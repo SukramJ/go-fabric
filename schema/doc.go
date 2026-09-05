@@ -6,14 +6,17 @@
 // generated files clusters.go and devicetypes.go (maps keyed by uint32 ID);
 // this file adds the hand-written lookup helpers that wrap the maps.
 //
-// Source of truth: notes/parity/matter/matter-schema-snapshot.json,
-// itself regenerable from matter.js HEAD via:
-//
-//	python3 script/extract_matterjs_head.py
+// Source of truth: parity/schema.json — the same embedded snapshot every
+// parity test in this module reads, extracted from a matter.js HEAD checkout
+// by script/extract-from-matter-js.ts (usage block at the end of that file).
+// Refreshing the snapshot is a deliberate, manual step: a revision bump can
+// carry attribute, constraint and command changes that need review.
 //
 // After updating the snapshot, regenerate the Go code:
 //
-//	make generate-matter-schema
+//	go generate ./schema/...
 //
 // Mirrors matter.js HEAD `packages/model/src/standard/elements/*.element.ts`.
 package schema
+
+//go:generate go run ../script/generate_matter_schema.go

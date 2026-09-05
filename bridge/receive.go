@@ -482,7 +482,10 @@ func (b *Bridge) checkTimedGate(timedFlag bool, sessionID, exchangeID uint16) (i
 
 // NotifyDeviceReachable fires the §9.13.6 BridgedDeviceBasicInformation
 // ReachableChanged event for every bridged endpoint backed by the given
-// CCU device (centralName + deviceAddress) when its availability flips.
+// physical device (scope + deviceAddress) when its availability flips.
+// Both coordinates are the owner's own — see [endpoint.Snapshot.Scope]
+// and [endpoint.Spec.DeviceAddress] — so one device's several endpoints
+// are addressed together without this package knowing what a device is.
 //
 // The attribute itself self-heals — cluster servers are reconstructed
 // per dispatch and read dev.Available() live (see endpoint/materialize.go)
@@ -496,7 +499,7 @@ func (b *Bridge) checkTimedGate(timedFlag bool, sessionID, exchangeID uint16) (i
 // `reachable` triggers `events.reachableChanged.emit({ reachableNewValue })`.
 // We route the same event through the bridge's MatterEmitEvent pipeline,
 // addressed to each matching bridged endpoint.
-func (b *Bridge) NotifyDeviceReachable(centralName, deviceAddress string, reachable bool) {
+func (b *Bridge) NotifyDeviceReachable(scope, deviceAddress string, reachable bool) {
 	if b == nil {
 		return
 	}
@@ -509,7 +512,7 @@ func (b *Bridge) NotifyDeviceReachable(centralName, deviceAddress string, reacha
 		if ep == nil {
 			continue
 		}
-		if ep.SourceKey.CentralName != centralName || ep.SourceKey.DeviceAddress != deviceAddress {
+		if ep.Scope != scope || ep.DeviceAddress != deviceAddress {
 			continue
 		}
 		// Priority INFO, matching the cluster-side emitter and matter.js
@@ -541,7 +544,7 @@ func (b *Bridge) NotifyDeviceReachable(centralName, deviceAddress string, reacha
 		}
 		b.logger.Debug("matter.bridge.reachable_changed",
 			slog.Int("endpoint_id", int(ep.ID)),
-			slog.String("central", centralName),
+			slog.String("scope", scope),
 			slog.String("address", deviceAddress),
 			slog.Bool("reachable", reachable))
 	}

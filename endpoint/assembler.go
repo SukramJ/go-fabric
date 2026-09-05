@@ -10,8 +10,6 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
-
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // Config tunes the assembler. The zero value is *not* valid — at
@@ -40,16 +38,6 @@ func (c Config) Validate() error {
 	return nil
 }
 
-// Store is the subset of [store.Store] the assembler depends on.
-// Defined as an interface so tests substitute an in-memory fake
-// without standing up a SQLite database for every assembly run.
-type Store interface {
-	GetEndpoint(ctx context.Context, key store.EndpointKey) (store.EndpointRecord, error)
-	UpsertEndpointAssigning(ctx context.Context, rec store.EndpointRecord) (uint16, error)
-	ListEndpoints(ctx context.Context, centralName string) ([]store.EndpointRecord, error)
-	RemoveEndpoint(ctx context.Context, key store.EndpointKey) error
-}
-
 // Assembler turns snapshots of [Spec] values into a [Topology].
 // Multi-call-safe; concurrent calls serialise through the underlying
 // store transactions.
@@ -59,7 +47,7 @@ type Assembler struct {
 	logger *slog.Logger
 	// states owns the per-endpoint state that must outlive a single
 	// dispatch (DataVersion trackers, the Identify cluster server),
-	// keyed by the stable [store.EndpointKey]. It lives across every
+	// keyed by the stable [SourceKey]. It lives across every
 	// [Assembler.Assemble] so a bridged endpoint's DataVersion and
 	// running Identify survive reassembly — see
 	// [endpointStateRegistry] and [Endpoint.state].
@@ -95,9 +83,9 @@ func New(s Store, cfg Config, logger *slog.Logger) (*Assembler, error) {
 // sources (rows in the store with no matching snapshot entry) are
 // removed.
 //
-// Snapshots must have unique CentralName values; the assembler does
-// not deduplicate. The caller is expected to pass exactly one
-// snapshot per central.
+// Snapshots must have unique Scope values; the assembler does not
+// deduplicate. The caller is expected to pass exactly one snapshot per
+// scope.
 func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topology, error) {
 	// Apple-compatible three-tier topology (mirrors matter.js's
 	// `BridgedDevicesNode.ts`):
@@ -121,13 +109,13 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 		NodeLabel: a.cfg.NodeLabel,
 	}
 
-	seen := make(map[store.EndpointKey]struct{})
+	seen := make(map[SourceKey]struct{})
 	for _, snap := range snapshots {
-		if snap.CentralName == "" {
-			return nil, errors.New("endpoint: snapshot CentralName is required")
+		if snap.Scope == "" {
+			return nil, errors.New("endpoint: snapshot Scope is required")
 		}
 		for i := range snap.Endpoints {
-			ep, err := a.buildEndpoint(ctx, &snap.Endpoints[i])
+			ep, err := a.buildEndpoint(ctx, snap.Scope, &snap.Endpoints[i])
 			if err != nil {
 				return nil, err
 			}
@@ -180,8 +168,8 @@ const deviceTypeAggregator = 0x000E
 // buildEndpoint turns one [Spec] into the assembled endpoint:
 // it resolves the persisted endpoint id for the spec's stable key and
 // binds the per-identity state that has to survive a reassembly.
-func (a *Assembler) buildEndpoint(ctx context.Context, spec *Spec) (*Endpoint, error) {
-	id, err := a.assignOrReuseID(ctx, spec.StableKey, spec.DeviceType)
+func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec) (*Endpoint, error) {
+	id, err := a.assignOrReuseID(ctx, scope, spec.StableKey, spec.DeviceType)
 	if err != nil {
 		return nil, err
 	}
@@ -202,6 +190,8 @@ func (a *Assembler) buildEndpoint(ctx context.Context, spec *Spec) (*Endpoint, e
 		Measurement:    spec.Measurement,
 		PowerSource:    spec.PowerSource,
 		SourceKey:      spec.StableKey,
+		Scope:          scope,
+		DeviceAddress:  spec.DeviceAddress,
 		// Reuse the state bound to this stable source key so the
 		// endpoint's per-cluster version and Identify server survive
 		// reassembly.
@@ -218,13 +208,14 @@ func (a *Assembler) buildEndpoint(ctx context.Context, spec *Spec) (*Endpoint, e
 // assignOrReuseID looks up the existing endpoint_id for sourceKey;
 // allocates a fresh one otherwise. Updates device_type either way so
 // a profile change in the model side migrates cleanly.
-func (a *Assembler) assignOrReuseID(ctx context.Context, sourceKey store.EndpointKey, deviceType uint16) (uint16, error) {
+func (a *Assembler) assignOrReuseID(ctx context.Context, scope string, sourceKey SourceKey, deviceType uint16) (uint16, error) {
 	rec, err := a.store.GetEndpoint(ctx, sourceKey)
 	switch {
 	case err == nil:
 		// Already assigned — refresh device_type if it drifted.
 		if rec.DeviceType != deviceType {
 			rec.DeviceType = deviceType
+			rec.Scope = scope
 			if _, err := a.store.UpsertEndpointAssigning(ctx, rec); err != nil {
 				return 0, fmt.Errorf("endpoint: refresh device_type: %w", err)
 			}
@@ -232,8 +223,9 @@ func (a *Assembler) assignOrReuseID(ctx context.Context, sourceKey store.Endpoin
 		return rec.EndpointID, nil
 	case isNotFound(err):
 		// Allocate a fresh ID under a transaction.
-		id, err := a.store.UpsertEndpointAssigning(ctx, store.EndpointRecord{
+		id, err := a.store.UpsertEndpointAssigning(ctx, Record{
 			Key:        sourceKey,
+			Scope:      scope,
 			DeviceType: deviceType,
 		})
 		if err != nil {
@@ -261,7 +253,7 @@ func (a *Assembler) assignOrReuseID(ctx context.Context, sourceKey store.Endpoin
 // ServerEndpointStores.ts, assignNumber) and erases one only on
 // explicit endpoint deletion (packages/node/src/node/server/
 // ServerEndpointInitializer.ts, eraseDescendant).
-func (a *Assembler) gcVanished(ctx context.Context, snapshots []Snapshot, seen map[store.EndpointKey]struct{}) error {
+func (a *Assembler) gcVanished(ctx context.Context, snapshots []Snapshot, seen map[SourceKey]struct{}) error {
 	for _, snap := range snapshots {
 		if !snap.ModelComplete {
 			// The central has not finished its initial device load; an
@@ -270,11 +262,11 @@ func (a *Assembler) gcVanished(ctx context.Context, snapshots []Snapshot, seen m
 			// for the fleet.
 			a.logger.Debug(
 				"matter endpoint gc skipped: model incomplete",
-				slog.String("central", snap.CentralName),
+				slog.String("scope", snap.Scope),
 			)
 			continue
 		}
-		records, err := a.store.ListEndpoints(ctx, snap.CentralName)
+		records, err := a.store.ListEndpoints(ctx, snap.Scope)
 		if err != nil {
 			return fmt.Errorf("endpoint: gc list: %w", err)
 		}
@@ -287,11 +279,8 @@ func (a *Assembler) gcVanished(ctx context.Context, snapshots []Snapshot, seen m
 			}
 			a.logger.Debug(
 				"matter endpoint gc",
-				slog.String("central", rec.Key.CentralName),
-				slog.String("device", rec.Key.DeviceAddress),
-				slog.Int("channel", rec.Key.ChannelNo),
-				slog.String("dp_kind", string(rec.Key.DPKind)),
-				slog.String("dp_key", rec.Key.DPKey),
+				slog.String("scope", snap.Scope),
+				slog.String("source", rec.Key.String()),
 				slog.Int("endpoint_id", int(rec.EndpointID)),
 			)
 		}

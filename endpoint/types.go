@@ -9,27 +9,30 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/store"
 )
 
-// Snapshot is one central's contribution to a topology assembly: the
+// Snapshot is one scope's contribution to a topology assembly: the
 // endpoints it wants bridged, already described as flat
 // [Spec] values. The caller walks its own model to produce
 // them and passes the slice to [Assembler.Assemble].
 type Snapshot struct {
-	// CentralName scopes every endpoint produced from Endpoints to
-	// this central — required for multi-CCU correctness.
-	CentralName string
+	// Scope names the owner-side partition these endpoints come from —
+	// one controller, one site, one upstream hub. The assembler treats
+	// it as an opaque label: it garbage-collects persisted identities
+	// one scope at a time, so a partition that has not loaded yet
+	// cannot delete another's rows. An owner with a single partition
+	// may use any non-empty constant.
+	Scope string
 	// Endpoints describes every bridged endpoint this central
 	// contributes. nil-safe — an empty slice produces zero endpoints.
 	Endpoints []Spec
-	// ModelComplete reports whether this central's initial device load
+	// ModelComplete reports whether this scope's initial source load
 	// has finished, i.e. Endpoints is the authoritative full fleet
 	// rather than a boot-time (still-empty or partially loaded) view. The
 	// assembler only garbage-collects persisted endpoint-ID rows for
 	// model-complete snapshots: the topology is first assembled at
-	// daemon start, before the readiness-gated CCU device load, and a
-	// central that has not loaded yet must keep every persisted
+	// daemon start, before the readiness-gated source load, and a
+	// scope that has not loaded yet must keep every persisted
 	// endpoint number so its bridged endpoints reappear under their old
 	// IDs once the load completes. Mirrors matter.js, which reserves
 	// every persisted endpoint number at node initialization
@@ -104,9 +107,19 @@ type Endpoint struct {
 	// its own with no device type. nil on every other endpoint, and on
 	// mains-powered devices. Set by [attachPowerSource].
 	PowerSource mattercontract.MeasurementSource
-	// SourceKey is the persisted endpoint identity. Empty for the
-	// root endpoint.
-	SourceKey store.EndpointKey
+	// SourceKey is the persisted endpoint identity, rendered by the
+	// owner. Empty for the root and aggregator endpoints.
+	SourceKey SourceKey
+	// Scope is the [Snapshot.Scope] the endpoint was assembled from.
+	// Empty for the root and aggregator endpoints.
+	Scope string
+	// DeviceAddress is the address of the PHYSICAL device behind this
+	// endpoint, in the owner's own namespace. Several endpoints of one
+	// device share it, which is what lets a device-level signal —
+	// reachability above all — be fanned out to all of them
+	// ([Bridge.NotifyDeviceReachable]). Empty when the owner has no
+	// such notion, and on the root and aggregator endpoints.
+	DeviceAddress string
 
 	// BridgeVendorID / BridgeProductID carry the bridge-wide VID/PID
 	// the assembler copies from the topology. The bridged-endpoint
@@ -301,29 +314,29 @@ func (s *endpointState) close() {
 }
 
 // endpointStateRegistry maps a stable endpoint identity
-// ([store.EndpointKey]) to its [endpointState]. It is owned by the
+// ([SourceKey]) to its [endpointState]. It is owned by the
 // [Assembler] and lives across every [Assembler.Assemble], so a bridged
 // endpoint that persists through a reassembly reuses its existing state
 // (stable DataVersion, uninterrupted Identify) while a genuinely new
 // endpoint gets a fresh one (fresh random-seeded version).
-// [store.EndpointKey] is the natural key: it is the matter_endpoints
-// primary key — deterministic from the model-side
-// {central, device, channel, dp} identity (stable across reassembly for
-// the same source) and unique per source (two devices never collide). In
+// [SourceKey] is the natural key: it is the owner's persisted endpoint
+// identity — deterministic from the source (stable across reassembly
+// for the same one) and unique per source (two sources never
+// collide). In
 // memory only; a full daemon restart re-randomizes, which matches
 // matter.js re-seeding the Datasource version on reboot.
 type endpointStateRegistry struct {
 	mu     sync.Mutex
-	states map[store.EndpointKey]*endpointState
+	states map[SourceKey]*endpointState
 }
 
 func newEndpointStateRegistry() *endpointStateRegistry {
-	return &endpointStateRegistry{states: make(map[store.EndpointKey]*endpointState)}
+	return &endpointStateRegistry{states: make(map[SourceKey]*endpointState)}
 }
 
 // stateFor returns the state for key, creating it on first use. The
 // returned pointer is stable for key across the registry's lifetime.
-func (r *endpointStateRegistry) stateFor(key store.EndpointKey) *endpointState {
+func (r *endpointStateRegistry) stateFor(key SourceKey) *endpointState {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	s := r.states[key]
@@ -341,7 +354,7 @@ func (r *endpointStateRegistry) stateFor(key store.EndpointKey) *endpointState {
 // destroying the Datasource on endpoint removal — and stops its Identify
 // countdown, matching matter.js disposing the IdentifyServer behavior.
 // Bounds registry growth to the live topology.
-func (r *endpointStateRegistry) retain(keep map[store.EndpointKey]struct{}) {
+func (r *endpointStateRegistry) retain(keep map[SourceKey]struct{}) {
 	r.mu.Lock()
 	var dropped []*endpointState
 	for k, s := range r.states {

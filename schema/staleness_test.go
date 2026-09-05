@@ -193,9 +193,8 @@ func shortCommit(c string) string {
 
 // TestMatterJSSchemaStalenessAgainstLiveCheckout makes upstream schema
 // staleness visible. It compares the pinned per-cluster ClusterRevision
-// (schema.ClusterRevisions, generated from
-// notes/parity/matter/matter-schema-snapshot.json) against a live ../matter.js
-// checkout's element sources and reports every loom-used cluster whose
+// (schema.ClusterRevisions, generated from parity/schema.json) against a live
+// ../matter.js checkout's element sources and reports every loom-used cluster whose
 // revision has increased upstream — the drift the pin would otherwise hide.
 //
 // The snapshot bump (e.g. Matter 1.5.x -> 1.6.x) is a MANUAL decision: a
@@ -212,7 +211,7 @@ func shortCommit(c string) string {
 //     that checks out matter.js HEAD would run to raise a signal.
 //
 // Mirrors the extraction the parity snapshot performs in
-// notes/parity/matter/extract-from-matter-js.ts: the ClusterRevision (attribute
+// script/extract-from-matter-js.ts: the ClusterRevision (attribute
 // 0xFFFD) default in
 // ../matter.js/packages/model/src/standard/elements/*.element.ts.
 func TestMatterJSSchemaStalenessAgainstLiveCheckout(t *testing.T) {
@@ -277,8 +276,9 @@ func TestMatterJSSchemaStalenessAgainstLiveCheckout(t *testing.T) {
 	for _, d := range drifts {
 		fmt.Fprintf(&b, "  0x%04X %-40s pinned=%d  upstream=%d\n", d.id, d.name, d.pinned, d.upsts)
 	}
-	b.WriteString("Adopting the newer schema is a manual review: run `make generate-matter-schema` after " +
-		"deciding to bump, then reconcile the per-cluster revision constants and re-run the parity tests.")
+	b.WriteString("Adopting the newer schema is a manual review: refresh parity/schema.json and run " +
+		"`go generate ./schema/...` after deciding to bump, then reconcile the per-cluster revision " +
+		"constants and re-run the parity tests.")
 
 	if strings.TrimSpace(os.Getenv("OPENCCU_LOOM_MATTERJS_STALENESS_STRICT")) == "1" {
 		t.Fatalf("%s", b.String())

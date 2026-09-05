@@ -13,7 +13,6 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // rootEndpointWith builds the root endpoint (ID 0) carrying servers as its
@@ -1266,48 +1265,32 @@ func TestRenderSourceKey_Nil(t *testing.T) {
 	}
 }
 
-// TestRenderSourceKey_EndpointKey verifies concrete EndpointKey formatting.
-func TestRenderSourceKey_EndpointKey(t *testing.T) {
+// TestRenderSourceKey_SourceKey pins that the owner's rendering reaches
+// the UniqueID hash verbatim. Anything else here — trimming, re-quoting,
+// a %v detour — would silently re-fingerprint every already-paired
+// endpoint.
+func TestRenderSourceKey_SourceKey(t *testing.T) {
 	t.Parallel()
-	k := store.EndpointKey{
-		CentralName:   "ccu1",
-		DeviceAddress: "ABC001",
-		ChannelNo:     2,
-		DPKind:        store.DPKindCustom,
-		DPKey:         "STATE",
-	}
-	got := renderSourceKey(k)
-	if got == "" {
-		t.Error("expected non-empty string for EndpointKey")
-	}
-	// Should contain all key components.
-	for _, sub := range []string{"ccu1", "ABC001", "STATE"} {
-		if got == "" {
-			t.Errorf("renderSourceKey output missing %q", sub)
-		}
+	const want = "ccu1|ABC001|2|custom|STATE"
+	if got := renderSourceKey(StringKey(want)); got != want {
+		t.Errorf("renderSourceKey = %q, want %q", got, want)
 	}
 }
 
-// TestRenderSourceKey_EndpointKeyPointer verifies pointer EndpointKey formatting.
+// TestRenderSourceKey_EndpointKeyPointer verifies pointer SourceKey formatting.
 func TestRenderSourceKey_EndpointKeyPointer(t *testing.T) {
 	t.Parallel()
-	k := &store.EndpointKey{
-		CentralName:   "ccu1",
-		DeviceAddress: "DEV",
-		ChannelNo:     1,
-		DPKind:        store.DPKindCalculated,
-		DPKey:         "TEMP",
-	}
-	got := renderSourceKey(k)
-	if got == "" {
-		t.Error("expected non-empty string for *EndpointKey")
+	k := StringKey("ccu1|DEV|1|calculated|TEMP")
+	got := renderSourceKey(&k)
+	if got != k.String() {
+		t.Errorf("renderSourceKey(*SourceKey) = %q, want %q", got, k)
 	}
 }
 
 // TestRenderSourceKey_NilPointer verifies nil pointer returns empty.
 func TestRenderSourceKey_NilPointer(t *testing.T) {
 	t.Parallel()
-	var k *store.EndpointKey
+	var k SourceKey
 	if got := renderSourceKey(k); got != "" {
 		t.Errorf("nil pointer → %q, want empty", got)
 	}
@@ -1399,15 +1382,9 @@ func TestAssignOrReuseID_DeviceTypeDrift(t *testing.T) {
 	ctx := context.Background()
 	fs := newInternalFakeStore()
 
-	key := store.EndpointKey{
-		CentralName:   "c1",
-		DeviceAddress: "DEV",
-		ChannelNo:     1,
-		DPKind:        store.DPKindCustom,
-		DPKey:         "STATE",
-	}
+	const key = StringKey("c1|DEV|1|custom|STATE")
 	// Pre-seed with device type 0x0100.
-	_, _ = fs.UpsertEndpointAssigning(ctx, store.EndpointRecord{Key: key, DeviceType: 0x0100})
+	_, _ = fs.UpsertEndpointAssigning(ctx, Record{Key: key, Scope: "c1", DeviceType: 0x0100})
 
 	a := &Assembler{
 		store: fs,
@@ -1418,7 +1395,7 @@ func TestAssignOrReuseID_DeviceTypeDrift(t *testing.T) {
 		},
 	}
 	// Call with a new device type — should refresh without error.
-	id, err := a.assignOrReuseID(ctx, key, 0x0101)
+	id, err := a.assignOrReuseID(ctx, "c1", key, 0x0101)
 	if err != nil {
 		t.Fatalf("assignOrReuseID drift: %v", err)
 	}
@@ -1442,26 +1419,26 @@ func TestAssignOrReuseID_DeviceTypeDrift(t *testing.T) {
 // internalFakeStore is an in-memory Store implementation for white-box tests
 // that need direct access to Assembler internals.
 type internalFakeStore struct {
-	rows   map[store.EndpointKey]store.EndpointRecord
+	rows   map[SourceKey]Record
 	nextID uint16
 }
 
 func newInternalFakeStore() *internalFakeStore {
 	return &internalFakeStore{
-		rows:   make(map[store.EndpointKey]store.EndpointRecord),
+		rows:   make(map[SourceKey]Record),
 		nextID: 2,
 	}
 }
 
-func (s *internalFakeStore) GetEndpoint(_ context.Context, key store.EndpointKey) (store.EndpointRecord, error) {
+func (s *internalFakeStore) GetEndpoint(_ context.Context, key SourceKey) (Record, error) {
 	rec, ok := s.rows[key]
 	if !ok {
-		return store.EndpointRecord{}, store.ErrEndpointNotFound
+		return Record{}, ErrNotFound
 	}
 	return rec, nil
 }
 
-func (s *internalFakeStore) UpsertEndpointAssigning(_ context.Context, rec store.EndpointRecord) (uint16, error) {
+func (s *internalFakeStore) UpsertEndpointAssigning(_ context.Context, rec Record) (uint16, error) {
 	if rec.EndpointID == 0 {
 		rec.EndpointID = s.nextID
 		s.nextID++
@@ -1470,17 +1447,17 @@ func (s *internalFakeStore) UpsertEndpointAssigning(_ context.Context, rec store
 	return rec.EndpointID, nil
 }
 
-func (s *internalFakeStore) ListEndpoints(_ context.Context, centralName string) ([]store.EndpointRecord, error) {
-	var out []store.EndpointRecord
+func (s *internalFakeStore) ListEndpoints(_ context.Context, scope string) ([]Record, error) {
+	var out []Record
 	for _, rec := range s.rows {
-		if centralName == "" || rec.Key.CentralName == centralName {
+		if scope == "" || rec.Scope == scope {
 			out = append(out, rec)
 		}
 	}
 	return out, nil
 }
 
-func (s *internalFakeStore) RemoveEndpoint(_ context.Context, key store.EndpointKey) error {
+func (s *internalFakeStore) RemoveEndpoint(_ context.Context, key SourceKey) error {
 	delete(s.rows, key)
 	return nil
 }

@@ -13,7 +13,7 @@ package bridge
 import (
 	"context"
 
-	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/endpoint"
 )
 
 // FakeStore is an in-memory implementation of [endpoint.Store] for
@@ -21,7 +21,7 @@ import (
 // only carries enough state to satisfy the bridge's startup +
 // reassembly paths.
 type FakeStore struct {
-	rows   map[store.EndpointKey]store.EndpointRecord
+	rows   map[endpoint.SourceKey]endpoint.Record
 	nextID uint16
 }
 
@@ -30,22 +30,22 @@ type FakeStore struct {
 // Endpoint 1 is the aggregator; bridged endpoints start at 2).
 func NewFakeStore() *FakeStore {
 	return &FakeStore{
-		rows:   make(map[store.EndpointKey]store.EndpointRecord),
+		rows:   make(map[endpoint.SourceKey]endpoint.Record),
 		nextID: 2,
 	}
 }
 
 // GetEndpoint implements [endpoint.Store].
-func (s *FakeStore) GetEndpoint(_ context.Context, key store.EndpointKey) (store.EndpointRecord, error) {
+func (s *FakeStore) GetEndpoint(_ context.Context, key endpoint.SourceKey) (endpoint.Record, error) {
 	rec, ok := s.rows[key]
 	if !ok {
-		return store.EndpointRecord{}, store.ErrEndpointNotFound
+		return endpoint.Record{}, endpoint.ErrNotFound
 	}
 	return rec, nil
 }
 
 // UpsertEndpointAssigning implements [endpoint.Store].
-func (s *FakeStore) UpsertEndpointAssigning(_ context.Context, rec store.EndpointRecord) (uint16, error) {
+func (s *FakeStore) UpsertEndpointAssigning(_ context.Context, rec endpoint.Record) (uint16, error) {
 	if rec.EndpointID == 0 {
 		rec.EndpointID = s.nextID
 		s.nextID++
@@ -54,12 +54,12 @@ func (s *FakeStore) UpsertEndpointAssigning(_ context.Context, rec store.Endpoin
 	return rec.EndpointID, nil
 }
 
-// ListEndpoints implements [endpoint.Store]. An empty centralName
-// matches every row.
-func (s *FakeStore) ListEndpoints(_ context.Context, centralName string) ([]store.EndpointRecord, error) {
-	var out []store.EndpointRecord
+// ListEndpoints implements [endpoint.Store]. An empty scope matches
+// every row.
+func (s *FakeStore) ListEndpoints(_ context.Context, scope string) ([]endpoint.Record, error) {
+	var out []endpoint.Record
 	for _, rec := range s.rows {
-		if centralName == "" || rec.Key.CentralName == centralName {
+		if scope == "" || rec.Scope == scope {
 			out = append(out, rec)
 		}
 	}
@@ -67,7 +67,7 @@ func (s *FakeStore) ListEndpoints(_ context.Context, centralName string) ([]stor
 }
 
 // RemoveEndpoint implements [endpoint.Store].
-func (s *FakeStore) RemoveEndpoint(_ context.Context, key store.EndpointKey) error {
+func (s *FakeStore) RemoveEndpoint(_ context.Context, key endpoint.SourceKey) error {
 	delete(s.rows, key)
 	return nil
 }

@@ -7,13 +7,12 @@ import (
 	"errors"
 
 	"github.com/SukramJ/go-fabric/schema"
-	"github.com/SukramJ/go-fabric/store"
 )
 
-// isNotFound matches the [store.ErrEndpointNotFound] sentinel via
-// errors.Is. Wrapped to keep the assembler call sites concise.
+// isNotFound matches the [ErrNotFound] sentinel via errors.Is. Wrapped
+// to keep the assembler call sites concise.
 func isNotFound(err error) bool {
-	return errors.Is(err, store.ErrEndpointNotFound)
+	return errors.Is(err, ErrNotFound)
 }
 
 // deviceTypeRevision returns the Matter Application Cluster Library
@@ -21,8 +20,8 @@ func isNotFound(err error) bool {
 // the supplied primary device-type ID.
 //
 // The general case delegates to [schema.DeviceTypeRevision], which is
-// codegen'd from notes/parity/matter/matter-schema-snapshot.json via
-// `make generate-matter-schema`. This guarantees that matter.js HEAD
+// codegen'd from parity/schema.json via
+// `go generate ./schema/...`. This guarantees that matter.js HEAD
 // updates propagate automatically on the next codegen run without
 // requiring manual edits here.
 //

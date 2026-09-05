@@ -14,7 +14,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // matterDeviceTypeBridgedNode is the Matter Device Type ID for the
@@ -140,7 +139,7 @@ func ClusterServers(ep *Endpoint) []mattercontract.ClusterServer { //nolint:funl
 	// fabric-level UID) the way matter.js's own bridged-device pattern
 	// uses them.
 	productName := ""
-	address := ep.SourceKey.DeviceAddress
+	address := ep.DeviceAddress
 	if address != "" {
 		productName = address
 	}
@@ -241,7 +240,7 @@ func ClusterServers(ep *Endpoint) []mattercontract.ClusterServer { //nolint:funl
 	// BridgedNode revision is sourced from the codegen'd schema table
 	// (matter.js HEAD `bridged-node.element.ts`, currently 3). Using the
 	// lookup keeps the revision in lock-step with the next
-	// `make generate-matter-schema` run; a hardcoded constant would
+	// schema regeneration; a hardcoded constant would
 	// silently drift when matter.js bumps. Mirrors matter.js's
 	// `BridgedNodeDt.revision` indirection via `@matter/model`.
 	// DeviceTypeList order: PRIMARY device type FIRST, BridgedNode
@@ -342,9 +341,8 @@ func ClusterServers(ep *Endpoint) []mattercontract.ClusterServer { //nolint:funl
 //
 // Source order:
 //
-//  1. Concrete [store.EndpointKey] — render the full 5-tuple
-//     (CentralName + DeviceAddress + ChannelNo + DPKind + DPKey).
-//  2. A type that implements `Stringer` — use its String() form.
+//  1. A [SourceKey] — the owner's own rendering, used verbatim.
+//  2. Any other type that implements `Stringer` — use its String() form.
 //  3. A reflective fallback that walks any exported fields via
 //     fmt.Sprintf("%+v", key) so non-EndpointKey shapes still produce
 //     a deterministic, key-distinguishing string.
@@ -372,24 +370,16 @@ func uniqueIDFor(key any) string {
 }
 
 // renderSourceKey produces a deterministic, key-distinguishing string
-// representation. The concrete [store.EndpointKey] is checked first so
-// every field is included — the previous implementation relied on a
-// `Central()/Address()` interface that EndpointKey does not satisfy,
-// so every endpoint fell through to a literal default and Apple Home
-// rejected the duplicate-fingerprint topology.
+// representation. A [SourceKey] is used verbatim: the owner already
+// rendered every coordinate of the source into it, and re-deriving
+// anything here would change the fingerprint of an endpoint a controller
+// has already cached.
 func renderSourceKey(key any) string {
 	switch k := key.(type) {
 	case nil:
 		return ""
-	case store.EndpointKey:
-		return fmt.Sprintf("%s|%s|%d|%s|%s",
-			k.CentralName, k.DeviceAddress, k.ChannelNo, k.DPKind, k.DPKey)
-	case *store.EndpointKey:
-		if k == nil {
-			return ""
-		}
-		return fmt.Sprintf("%s|%s|%d|%s|%s",
-			k.CentralName, k.DeviceAddress, k.ChannelNo, k.DPKind, k.DPKey)
+	case SourceKey:
+		return k.String()
 	case interface {
 		Central() string
 		Address() string

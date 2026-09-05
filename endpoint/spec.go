@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // AvailabilityProbe reports whether the source behind a bridged
@@ -31,25 +30,31 @@ type AvailabilityProbe func() bool
 // It is deliberately flat and free of any device-model type. The
 // caller walks whatever tree it has, decides what deserves an
 // endpoint, resolves the operator-facing strings through its own
-// naming authority (see [NameResolver]) and hands the result over as
-// values. Everything the assembly then does — endpoint-id allocation
+// naming authority and hands the result over as values. Everything the assembly then does — endpoint-id allocation
 // and persistence, the three-tier root/aggregator scaffolding, the
 // per-endpoint state that must survive a reassembly, the cluster
 // surface — depends on nothing but the fields below.
 // loom:reachable:reason="constructed by the host adapter and consumed by Assemble in this package; a struct that only ever travels as a slice element has no construction site the analyzer follows"
 type Spec struct {
 	// StableKey identifies the source across reassemblies and daemon
-	// restarts. It is the matter_endpoints primary key, so it decides
-	// which persisted endpoint id the endpoint gets back, which
+	// restarts. It is the owner's persisted endpoint-identity key, so
+	// it decides which endpoint id the endpoint gets back, which
 	// per-endpoint state it reuses, and which UniqueID it publishes.
-	// Two specs must never share one key.
-	StableKey store.EndpointKey
+	// Two specs must never share one key. See [SourceKey] for the
+	// stability the rendering owes a paired controller.
+	StableKey SourceKey
+	// DeviceAddress names the physical device this endpoint belongs to,
+	// in the owner's own namespace. Carried through to
+	// [Endpoint.DeviceAddress], where it is what
+	// [Bridge.NotifyDeviceReachable] fans a device-level signal out
+	// over. Empty when the owner has no such notion.
+	DeviceAddress string
 	// DeviceType is the Matter Device Type ID the endpoint advertises
 	// as its primary type (e.g. 0x010A OnOffPlugInUnit).
 	DeviceType uint16
 	// FriendlyName is the finished BridgedDeviceBasicInformation
 	// NodeLabel. The assembly caps it at the Matter 32-byte maximum but
-	// never derives it — see [NameResolver].
+	// never derives it — naming is the owner's authority.
 	FriendlyName string
 	// ChannelAddress is the source's address in the owner's own
 	// namespace, carried through verbatim for diagnostics
@@ -71,31 +76,6 @@ type Spec struct {
 	// endpoint per physical device sets it — see the assembly's
 	// power-source placement rule.
 	PowerSource mattercontract.MeasurementSource
-}
-
-// NameResolver is the owner's naming authority for endpoint labels.
-//
-// Labels are never derived here. The name a device carries is a
-// product decision that every north-bound surface has to agree on, and
-// re-deriving it for Matter alone makes the same device show up under
-// two names in two places. The assembly therefore takes finished
-// strings and only applies the Matter-specific parts: composing the
-// parameter suffix onto the base label and capping the result at the
-// 32-byte NodeLabel maximum (Matter §9.13.6.5).
-//
-// Both methods are addressed by [store.EndpointKey], so an
-// implementation resolves them against its own model without the
-// assembly knowing what that model looks like.
-// loom:reachable:reason="implemented host-side and injected through the assembler config; interface satisfaction is invisible to the analyzer"
-type NameResolver interface {
-	// EndpointLabel returns the operator-facing base label of the
-	// source identified by key — before any parameter suffix and
-	// before the NodeLabel cap.
-	EndpointLabel(key store.EndpointKey) string
-	// ParameterLabel returns the operator-facing label of the
-	// parameter key names, or "" when that parameter is the source's
-	// primary one and therefore adds nothing to the base label.
-	ParameterLabel(key store.EndpointKey) string
 }
 
 // ComposeNodeLabel appends the parameter suffix to the base label and

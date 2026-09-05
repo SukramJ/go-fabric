@@ -2,6 +2,10 @@
 -- Copyright (C) 2026 SukramJ.
 --
 -- Test-only DDL for the matter_* tables this package reads and writes.
+-- Endpoint identity (matter_endpoints) and the exposure allowlist
+-- (matter_exposures) are deliberately absent: their key is the owner's
+-- source identity, so both tables and the code over them live host-side
+-- behind [endpoint.Store].
 -- The package itself takes an already-migrated *sql.DB and never creates a
 -- table, so the schema a host applies through its own migration tool is
 -- authoritative in production; this file exists so the package's tests can
@@ -108,28 +112,6 @@ CREATE TABLE matter_acl_entries (
 CREATE UNIQUE INDEX matter_acl_position
     ON matter_acl_entries(fabric_index, position);
 
--- matter_endpoints persists the (source-identity -> endpoint_id) mapping
--- so the same host data point receives the same Matter endpoint
--- identifier across restarts. Endpoint 0 is the root bridge endpoint and
--- is never in this table; bridged endpoints occupy 1..65534.
-CREATE TABLE matter_endpoints (
-    central_name    TEXT    NOT NULL,
-    device_address  TEXT    NOT NULL,
-    channel_no      INTEGER NOT NULL,
-    dp_kind         TEXT    NOT NULL CHECK(dp_kind IN ('custom','generic','calculated','combined','measurement')),
-    dp_key          TEXT    NOT NULL,
-    endpoint_id     INTEGER NOT NULL CHECK(endpoint_id BETWEEN 1 AND 65534),
-    device_type     INTEGER NOT NULL CHECK(device_type BETWEEN 0 AND 65535),
-    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY(central_name, device_address, channel_no, dp_kind, dp_key)
-);
-
--- endpoint_id is globally unique across the entire bridge (Matter
--- spec: a controller addresses endpoints by ID without disambiguation).
-CREATE UNIQUE INDEX matter_endpoints_id_unique
-    ON matter_endpoints(endpoint_id);
-
 -- matter_resumption persists CASE-resumption identifiers per Matter
 -- Core Spec §4.13.2.4. ResumptionID is the 16-byte token the bridge
 -- emits in Sigma2 so a returning peer can re-establish a session via
@@ -157,29 +139,6 @@ CREATE TABLE matter_resumption (
 -- look up by ID alone when the initiator's NodeID is unknown until
 -- decode.
 CREATE UNIQUE INDEX matter_resumption_id ON matter_resumption(resumption_id);
-
--- matter_exposures persists the operator-managed allowlist the endpoint
--- assembler consults at materialisation time. Default state is empty:
--- no rows means nothing is exposed, so the bridge cannot fail open.
-CREATE TABLE matter_exposures (
-    central_name    TEXT    NOT NULL,
-    device_address  TEXT    NOT NULL,
-    channel_no      INTEGER NOT NULL,
-    dp_kind         TEXT    NOT NULL CHECK(dp_kind IN ('custom','generic','calculated','combined','measurement')),
-    dp_key          TEXT    NOT NULL,
-    enabled         INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
-    friendly_name   TEXT    NOT NULL DEFAULT '',
-    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    actor           TEXT    NOT NULL DEFAULT '',
-    PRIMARY KEY(central_name, device_address, channel_no, dp_kind, dp_key)
-);
-
--- Fast-path lookup for the assembler's "is this central's source
--- enabled?" probe — avoids a full-table scan when one host has a few
--- hundred channels.
-CREATE INDEX matter_exposures_central
-    ON matter_exposures(central_name, enabled);
 
 -- matter_diagnostics persists the GeneralDiagnostics counters that need
 -- to survive restarts: RebootCount plus accumulated

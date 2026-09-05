@@ -42,3 +42,14 @@ long enough for a `v0.1.0` to mean something.
   and `golangci-lint` versions pinned to the same values the reference daemon
   uses. Dependabot tracks the module's Go dependencies and the SHA-pinned
   actions.
+- **The Matter schema pipeline arrived with the code it feeds.** The matter.js
+  extractor (`script/extract-from-matter-js.ts`) and the schema generator
+  (`script/generate_matter_schema.go`) followed `parity/schema.json` and
+  `schema/` out of the reference daemon, where the two halves had been sitting
+  in different repositories with a `cp` between them. The generator now reads
+  the embedded snapshot itself rather than a second copy of the extract, so
+  the constants it emits cannot describe bytes no parity test validates;
+  `go generate ./schema/...` drives it, and it gofmts its own output instead
+  of leaning on a formatting step in a `Makefile` this module does not have.
+  Regenerating from the unchanged snapshot reproduces `clusters.go`,
+  `devicetypes.go` and the `SchemaSnapshotSHA256` constant byte for byte.

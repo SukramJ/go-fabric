@@ -24,7 +24,6 @@ import (
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
-	matterstore "github.com/SukramJ/go-fabric/store"
 )
 
 // newReachabilityBridge builds a started bridge whose topology carries one
@@ -74,12 +73,11 @@ func newReachabilityBridge(t *testing.T, ep *endpointpkg.Endpoint) *Bridge {
 func TestNotifyDeviceReachable_FiresReachableChanged(t *testing.T) {
 	t.Parallel()
 	ep := &endpointpkg.Endpoint{
-		ID:         7,
-		DeviceType: 0x010A,
-		SourceKey: matterstore.EndpointKey{
-			CentralName:   "ccu-1",
-			DeviceAddress: "00021BE9957782",
-		},
+		ID:            7,
+		DeviceType:    0x010A,
+		SourceKey:     endpointpkg.StringKey("ccu-1|00021BE9957782|1|custom|STATE"),
+		Scope:         "ccu-1",
+		DeviceAddress: "00021BE9957782",
 	}
 	b := newReachabilityBridge(t, ep)
 
@@ -113,12 +111,11 @@ func TestNotifyDeviceReachable_FiresReachableChanged(t *testing.T) {
 func TestNotifyDeviceReachable_IgnoresNonMatchingDevice(t *testing.T) {
 	t.Parallel()
 	ep := &endpointpkg.Endpoint{
-		ID:         7,
-		DeviceType: 0x010A,
-		SourceKey: matterstore.EndpointKey{
-			CentralName:   "ccu-1",
-			DeviceAddress: "AAAA",
-		},
+		ID:            7,
+		DeviceType:    0x010A,
+		SourceKey:     endpointpkg.StringKey("ccu-1|AAAA|1|custom|STATE"),
+		Scope:         "ccu-1",
+		DeviceAddress: "AAAA",
 	}
 	b := newReachabilityBridge(t, ep)
 
@@ -160,12 +157,11 @@ func (s *reachAttrReporterSpy) report(_ context.Context, _ *subscription.Subscri
 func TestNotifyDeviceReachable_DirtiesReachableAttribute(t *testing.T) {
 	t.Parallel()
 	ep := &endpointpkg.Endpoint{
-		ID:         7,
-		DeviceType: 0x010A,
-		SourceKey: matterstore.EndpointKey{
-			CentralName:   "ccu-1",
-			DeviceAddress: "00021BE9957782",
-		},
+		ID:            7,
+		DeviceType:    0x010A,
+		SourceKey:     endpointpkg.StringKey("ccu-1|00021BE9957782|1|custom|STATE"),
+		Scope:         "ccu-1",
+		DeviceAddress: "00021BE9957782",
 	}
 	b := newReachabilityBridge(t, ep)
 

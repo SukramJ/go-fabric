@@ -29,7 +29,7 @@ func ClusterName(id uint32) (string, bool) {
 // This is the codegen'd counterpart of endpoint.deviceTypeRevision: callers
 // that need to advertise a device-type revision in Descriptor.DeviceTypeList
 // should prefer this function so updates to the matter.js snapshot propagate
-// automatically on the next `make generate-matter-schema` run.
+// automatically on the next `go generate ./schema/...` run.
 //
 // Mirrors matter.js packages/node/src/devices/<name>.ts revision fields.
 func DeviceTypeRevision(id uint32) (uint16, bool) {

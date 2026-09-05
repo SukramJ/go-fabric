@@ -5,42 +5,44 @@ package endpoint
 
 import (
 	"testing"
-
-	"github.com/SukramJ/go-fabric/store"
 )
 
-// TestUniqueIDFor_DistinctAcrossEndpointKeys is the regression guard
-// for the Apple Home pair-abort root cause — `uniqueIDFor`
-// previously fell back to one constant literal string for
-// every [store.EndpointKey] (the type switch only matched
-// `Stringer` / `Central()/Address()` interfaces, neither of which
-// EndpointKey satisfies). The result was every bridged endpoint sharing
+// TestUniqueIDFor_DistinctAcrossSourceKeys is the regression guard for
+// the Apple Home pair-abort root cause — `uniqueIDFor` once fell back to
+// one constant literal string for the concrete key type the assembler
+// actually carried, because the type switch only matched `Stringer` /
+// `Central()/Address()` interfaces and that type satisfied neither. The
+// result was every bridged endpoint sharing
 // `BridgedDeviceBasicInformation.UniqueID` and Apple's HAP service
 // mapper collapsing all five into a single HMAccessory. We assert here
-// that five concrete EndpointKey instances each hash to a distinct
+// that five distinct [SourceKey] values each hash to a distinct
 // 32-character hex value.
-func TestUniqueIDFor_DistinctAcrossEndpointKeys(t *testing.T) {
+//
+// The keys below are shaped the way a Homematic owner renders them; this
+// package never parses that shape, and the guard holds for any set of
+// distinct strings.
+func TestUniqueIDFor_DistinctAcrossSourceKeys(t *testing.T) {
 	t.Parallel()
-	keys := []store.EndpointKey{
-		{CentralName: "GoOtto", DeviceAddress: "000C9709AC8CAF", ChannelNo: 1, DPKind: store.DPKindGeneric, DPKey: ""},
-		{CentralName: "GoOtto", DeviceAddress: "000C9709AC8CB1", ChannelNo: 1, DPKind: store.DPKindGeneric, DPKey: ""},
-		{CentralName: "GoOtto", DeviceAddress: "000C9709AC8CD4", ChannelNo: 2, DPKind: store.DPKindGeneric, DPKey: ""},
-		{CentralName: "GoOtto", DeviceAddress: "00091569A38F49", ChannelNo: 1, DPKind: store.DPKindMeasurement, DPKey: "ILLUMINATION"},
-		{CentralName: "GoOtto", DeviceAddress: "000A1709AF4FC9", ChannelNo: 1, DPKind: store.DPKindGeneric, DPKey: ""},
+	keys := []StringKey{
+		"GoOtto|000C9709AC8CAF|1|generic|",
+		"GoOtto|000C9709AC8CB1|1|generic|",
+		"GoOtto|000C9709AC8CD4|2|generic|",
+		"GoOtto|00091569A38F49|1|measurement|ILLUMINATION",
+		"GoOtto|000A1709AF4FC9|1|generic|",
 	}
-	seen := make(map[string]store.EndpointKey, len(keys))
+	seen := make(map[string]StringKey, len(keys))
 	for _, k := range keys {
 		uid := uniqueIDFor(k)
 		if len(uid) != 32 {
-			t.Errorf("uniqueIDFor(%+v) returned %d hex chars, want 32: %q", k, len(uid), uid)
+			t.Errorf("uniqueIDFor(%q) returned %d hex chars, want 32: %q", k, len(uid), uid)
 		}
 		if prev, dup := seen[uid]; dup {
-			t.Errorf("collision: uniqueIDFor(%+v) and uniqueIDFor(%+v) both = %q", k, prev, uid)
+			t.Errorf("collision: uniqueIDFor(%q) and uniqueIDFor(%q) both = %q", k, prev, uid)
 		}
 		seen[uid] = k
 	}
 	if len(seen) != len(keys) {
-		t.Fatalf("only %d unique IDs from %d distinct EndpointKeys", len(seen), len(keys))
+		t.Fatalf("only %d unique IDs from %d distinct SourceKeys", len(seen), len(keys))
 	}
 }
 
@@ -49,13 +51,7 @@ func TestUniqueIDFor_DistinctAcrossEndpointKeys(t *testing.T) {
 // per-device identifier, and Apple Home pins HMAccessory state by it.
 func TestUniqueIDFor_StableAcrossInvocations(t *testing.T) {
 	t.Parallel()
-	key := store.EndpointKey{
-		CentralName:   "GoOtto",
-		DeviceAddress: "000C9709AC8CAF",
-		ChannelNo:     7,
-		DPKind:        store.DPKindGeneric,
-		DPKey:         "",
-	}
+	const key = StringKey("GoOtto|000C9709AC8CAF|7|generic|")
 	first := uniqueIDFor(key)
 	for i := range 16 {
 		got := uniqueIDFor(key)
@@ -65,55 +61,41 @@ func TestUniqueIDFor_StableAcrossInvocations(t *testing.T) {
 	}
 }
 
-// TestUniqueIDFor_PointerAndValueAgree guards the *EndpointKey vs
-// EndpointKey path through renderSourceKey — both shapes must produce
+// TestUniqueIDFor_PointerAndValueAgree guards the *SourceKey vs
+// SourceKey path through renderSourceKey — both shapes must produce
 // the same fingerprint or the bridge would expose two different
 // UniqueIDs depending on whether the assembler hands over a value or
 // a pointer.
 func TestUniqueIDFor_PointerAndValueAgree(t *testing.T) {
 	t.Parallel()
-	k := store.EndpointKey{
-		CentralName:   "GoOtto",
-		DeviceAddress: "000C9709AC8CAF",
-		ChannelNo:     1,
-		DPKind:        store.DPKindGeneric,
-		DPKey:         "",
-	}
+	k := StringKey("GoOtto|000C9709AC8CAF|1|generic|")
 	if uniqueIDFor(k) != uniqueIDFor(&k) {
 		t.Fatalf("uniqueIDFor(value) != uniqueIDFor(pointer): %q vs %q", uniqueIDFor(k), uniqueIDFor(&k))
 	}
 }
 
-// TestUniqueIDFor_FieldsActuallyMatter ensures every component of the
-// EndpointKey 5-tuple feeds into the hash — flipping any one field has
-// to produce a different fingerprint. Without this guarantee a key
-// renderer that only used a subset of the fields could regress us back
-// to the duplicate-fingerprint state we just fixed.
-func TestUniqueIDFor_FieldsActuallyMatter(t *testing.T) {
+// TestUniqueIDFor_UsesTheWholeKey ensures the hash reads the key end to
+// end. A renderer that truncated it — or hashed only a prefix — would
+// regress to the duplicate-fingerprint state this guard set was written
+// for, because owners render their coordinates in a fixed order and the
+// last one would stop counting.
+//
+// Whether the OWNER's key carries every coordinate of its own model is
+// the owner's guard to keep; this one only pins that nothing is dropped
+// on the way into the hash.
+func TestUniqueIDFor_UsesTheWholeKey(t *testing.T) {
 	t.Parallel()
-	base := store.EndpointKey{
-		CentralName:   "GoOtto",
-		DeviceAddress: "000C9709AC8CAF",
-		ChannelNo:     1,
-		DPKind:        store.DPKindGeneric,
-		DPKey:         "STATE",
-	}
+	const base = StringKey("GoOtto|000C9709AC8CAF|1|generic|STATE")
 	baseHash := uniqueIDFor(base)
-	mutators := []struct {
-		label string
-		mod   func(*store.EndpointKey)
-	}{
-		{"CentralName", func(k *store.EndpointKey) { k.CentralName = "OtherCcu" }},
-		{"DeviceAddress", func(k *store.EndpointKey) { k.DeviceAddress = "000C9709AC8CB1" }},
-		{"ChannelNo", func(k *store.EndpointKey) { k.ChannelNo = 2 }},
-		{"DPKind", func(k *store.EndpointKey) { k.DPKind = store.DPKindMeasurement }},
-		{"DPKey", func(k *store.EndpointKey) { k.DPKey = "DIFFERENT" }},
-	}
-	for _, m := range mutators {
-		mutated := base
-		m.mod(&mutated)
-		if uniqueIDFor(mutated) == baseHash {
-			t.Errorf("flipping %s did not change the UniqueID — that field is not feeding the hash", m.label)
+	for _, variant := range []StringKey{
+		"OtherCcu|000C9709AC8CAF|1|generic|STATE",
+		"GoOtto|000C9709AC8CB1|1|generic|STATE",
+		"GoOtto|000C9709AC8CAF|2|generic|STATE",
+		"GoOtto|000C9709AC8CAF|1|measurement|STATE",
+		"GoOtto|000C9709AC8CAF|1|generic|DIFFERENT",
+	} {
+		if uniqueIDFor(variant) == baseHash {
+			t.Errorf("%q hashes the same as %q — part of the key is not reaching the hash", variant, base)
 		}
 	}
 }

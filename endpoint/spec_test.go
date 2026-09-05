@@ -13,12 +13,12 @@ package endpoint_test
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // specSource is a minimal [mattercontract.EndpointSource]: enough to
@@ -31,14 +31,11 @@ func (s specSource) MatterDeviceType() uint16 { return s.deviceType }
 
 func (s specSource) MatterClusterServers() []mattercontract.ClusterServer { return nil }
 
-func specKey(central, addr string, channel int, key string) store.EndpointKey {
-	return store.EndpointKey{
-		CentralName:   central,
-		DeviceAddress: addr,
-		ChannelNo:     channel,
-		DPKind:        store.DPKindCustom,
-		DPKey:         key,
-	}
+// specKey renders a source key the way a Homematic owner does. The
+// package treats it as opaque, so the shape only has to be distinct per
+// source.
+func specKey(scope, addr string, channel int, key string) endpoint.SourceKey {
+	return endpoint.StringKey(fmt.Sprintf("%s|%s|%d|custom|%s", scope, addr, channel, key))
 }
 
 func specAssembler(t *testing.T) *endpoint.Assembler {
@@ -83,7 +80,7 @@ func TestAssembleFromSpecsBuildsThreeTierTopology(t *testing.T) {
 	}
 
 	top, err := specAssembler(t).Assemble(context.Background(), []endpoint.Snapshot{{
-		CentralName:   central,
+		Scope:         central,
 		Endpoints:     specs,
 		ModelComplete: true,
 	}})
@@ -157,7 +154,7 @@ func TestAssembleCapsNodeLabelFromSpec(t *testing.T) {
 	const overLong = "A name far longer than the Matter NodeLabel maximum"
 
 	top, err := specAssembler(t).Assemble(context.Background(), []endpoint.Snapshot{{
-		CentralName: central,
+		Scope: central,
 		Endpoints: []endpoint.Spec{{
 			StableKey:    specKey(central, "DEV0003", 1, "SWITCH"),
 			DeviceType:   0x010A,
@@ -202,13 +199,13 @@ func TestAssembleReusesEndpointIDsAcrossReassembly(t *testing.T) {
 	a := specAssembler(t)
 	ctx := context.Background()
 
-	before, err := a.Assemble(ctx, []endpoint.Snapshot{{CentralName: central, Endpoints: []endpoint.Spec{first}, ModelComplete: true}})
+	before, err := a.Assemble(ctx, []endpoint.Snapshot{{Scope: central, Endpoints: []endpoint.Spec{first}, ModelComplete: true}})
 	if err != nil {
 		t.Fatalf("Assemble (first): %v", err)
 	}
 	firstID := before.Bridged()[0].ID
 
-	after, err := a.Assemble(ctx, []endpoint.Snapshot{{CentralName: central, Endpoints: []endpoint.Spec{second, first}, ModelComplete: true}})
+	after, err := a.Assemble(ctx, []endpoint.Snapshot{{Scope: central, Endpoints: []endpoint.Spec{second, first}, ModelComplete: true}})
 	if err != nil {
 		t.Fatalf("Assemble (second): %v", err)
 	}
@@ -237,6 +234,6 @@ func TestAssembleRejectsUnnamedCentral(t *testing.T) {
 		}},
 	}})
 	if err == nil {
-		t.Fatal("Assemble accepted a snapshot with no CentralName, want an error")
+		t.Fatal("Assemble accepted a snapshot with no Scope, want an error")
 	}
 }

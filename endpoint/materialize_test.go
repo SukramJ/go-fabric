@@ -160,7 +160,7 @@ func TestClusterServersBothNilReturnsNil(t *testing.T) {
 // codegen'd schema table, NOT a hardcoded constant. Mirrors the V3.1
 // audit P1-6 fix: previously `materialize.go` had `Revision: 3`
 // hardcoded, which would silently desync the next time matter.js
-// bumps the bridged-node revision via `make generate-matter-schema`.
+// bumps the bridged-node revision and the schema is regenerated.
 // The lookup goes via `deviceTypeRevision(0x0013)` →
 // `schema.DeviceTypeRevision(0x13)`.
 func TestBridgedNodeRevisionFromSchema(t *testing.T) {

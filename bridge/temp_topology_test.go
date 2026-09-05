@@ -16,7 +16,6 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -85,13 +84,8 @@ func manyTempSensorsSnapshotter(n int) (Snapshotter, []*fakeTempSource) {
 		src := &fakeTempSource{value: float64(20 + i)}
 		sources = append(sources, src)
 		specs = append(specs, endpoint.Spec{
-			StableKey: store.EndpointKey{
-				CentralName:   "ccu1",
-				DeviceAddress: "MANYTMP",
-				ChannelNo:     i + 1,
-				DPKind:        store.DPKindMeasurement,
-				DPKey:         "ACTUAL_TEMPERATURE",
-			},
+			StableKey:      endpoint.StringKey(fmt.Sprintf("ccu1|MANYTMP|%d|measurement|ACTUAL_TEMPERATURE", i+1)),
+			DeviceAddress:  "MANYTMP",
 			DeviceType:     mattercontract.MeasurementClassDeviceType(mattercontract.MeasurementTemperature),
 			FriendlyName:   fmt.Sprintf("Many-Temp %d", i+1),
 			ChannelAddress: fmt.Sprintf("MANYTMP:%d", i+1),
@@ -108,7 +102,7 @@ func manyTempSensorsSnapshotter(n int) (Snapshotter, []*fakeTempSource) {
 			return nil, err
 		}
 		return asm.Assemble(ctx, []endpoint.Snapshot{{
-			CentralName:   "ccu1",
+			Scope:         "ccu1",
 			Endpoints:     specs,
 			ModelComplete: true,
 		}})

@@ -3,15 +3,19 @@
 
 // Package parity provides the matter.js HEAD schema snapshot to all
 // matter-side parity tests in one embed location. Mirrors matter.js
-// HEAD `packages/model/src/standard/elements/*.element.ts`; regenerable
-// via `notes/parity/matter/extract-from-matter-js.ts` (pipe stdout to
-// notes/parity/matter/matter-schema-snapshot.json, then copy here).
+// HEAD `packages/model/src/standard/elements/*.element.ts`.
 //
-// Sync note: parity/schema.json must be kept in
-// sync with notes/parity/matter/matter-schema-snapshot.json. After
-// regenerating the master file, copy it:
+// schema.json is the single copy of the extract in this module: the parity
+// tests read it through SchemaJSON, and script/generate_matter_schema.go
+// reads the same file to emit package schema's typed maps. Refresh it with
+// script/extract-from-matter-js.ts (usage block at the end of that file),
+// then run `go generate ./schema/...` — a snapshot refreshed without that
+// second step leaves the generated revision maps describing the old extract,
+// which schema.SchemaSnapshotSHA256 is there to catch.
 //
-//	cp notes/parity/matter/matter-schema-snapshot.json parity/schema.json
+// A host application may pin its own expected copy of these bytes to keep an
+// unintended schema change from arriving silently in a dependency bump; the
+// pin belongs to that repository, not here.
 package parity
 
 import _ "embed"

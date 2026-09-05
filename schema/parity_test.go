@@ -22,10 +22,11 @@ import (
 // (parity_matterjs_test.go under each cluster package, e.g.
 // cluster/core/parity_matterjs_test.go) are the
 // guard that reads the real constant for the clusters they cover; this
-// test only catches a matter.js HEAD schema-snapshot update
-// (`make generate-matter-schema`) that this table's codeRev values
-// were not updated to track. When matter.js bumps a revision:
-//  1. Run `make generate-matter-schema` — clusters.go is updated.
+// test only catches a matter.js HEAD schema-snapshot update that this
+// table's codeRev values were not updated to track. When matter.js bumps
+// a revision:
+//  1. Refresh parity/schema.json, then run `go generate ./schema/...` —
+//     clusters.go is updated.
 //  2. This test fails, naming the drifted cluster.
 //  3. Update the constant in the cluster source file, then update codeRev here.
 func TestParityCodeMatchesGeneratedSchema(t *testing.T) {
@@ -120,7 +121,7 @@ func TestParityCodeMatchesGeneratedSchema(t *testing.T) {
 	for _, c := range cases {
 		schemaRev, ok := schema.ClusterRevision(c.id)
 		if !ok {
-			t.Errorf("cluster 0x%04X (%s) not found in generated schema — refresh matter-schema-snapshot.json and run make generate-matter-schema",
+			t.Errorf("cluster 0x%04X (%s) not found in generated schema — refresh parity/schema.json and run `go generate ./schema/...`",
 				c.id, c.name)
 			continue
 		}

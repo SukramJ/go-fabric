@@ -23,10 +23,10 @@ import (
 // attribute set.
 //
 // Snapshot regeneration: run the producer at
-// `notes/parity/matter/extract-from-matter-js.ts` against an `@matter/model`
-// install and copy the JSON output into `testdata/`. The snapshot is
-// checked in so the tests run offline and lock the matter.js baseline
-// for code review.
+// `script/extract-from-matter-js.ts` against an `@matter/model` install and
+// land the JSON output on `parity/schema.json`, which this file reads through
+// parity.SchemaJSON(). The snapshot is checked in so the tests run offline and
+// lock the matter.js baseline for code review.
 
 type matterAttr struct {
 	ID          uint32 `json:"id"`
