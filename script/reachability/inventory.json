@@ -1,12 +1,13 @@
 {
-  "generated": "4873477",
-  "head": "4873477",
+  "generated": "a02e8bb",
+  "head": "a02e8bb",
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3023,
+  "entry_points": 3030,
   "entry_packages": [
     ".",
     "bootid",
     "bridge",
+    "bridge/bridgetest",
     "cluster",
     "cluster/closure",
     "cluster/core",
@@ -45,9 +46,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2621,
-    "reachable": 1241,
-    "whitelisted": 1369,
+    "total_exported": 2636,
+    "reachable": 1253,
+    "whitelisted": 1372,
     "unreachable": 11
   },
   "by_package": [
@@ -230,23 +231,23 @@
     {
       "package": "bridge",
       "identifier": "FakeStore",
-      "reason": "auto-whitelist:pattern=test-file",
+      "reason": "auto-whitelist:pattern=type-alias",
       "file": "bridge/fakestore_helpers_test.go",
-      "line": 23
+      "line": 17
     },
     {
       "package": "bridge",
       "identifier": "NewEmptySnapshotter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/empty_snapshotter_test.go",
-      "line": 40
+      "line": 18
     },
     {
       "package": "bridge",
       "identifier": "NewFakeStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fakestore_helpers_test.go",
-      "line": 31
+      "line": 20
     },
     {
       "package": "bridge",
@@ -5093,6 +5094,13 @@
       "line": 111
     },
     {
+      "package": "endpoint/endpointtest",
+      "identifier": "FakeStore",
+      "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
+      "file": "endpoint/endpointtest/endpointtest.go",
+      "line": 27
+    },
+    {
       "package": "im",
       "identifier": "TestAttributePathRoundTripConcrete",
       "reason": "auto-whitelist:pattern=test-file",
@@ -9374,63 +9382,63 @@
       "identifier": "TestHeaderAADIsRawReceivedBytes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 137
+      "line": 177
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderExtensionThenProtocolHeader",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 344
+      "line": 384
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderMessageExtensionLengthOverflow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 369
+      "line": 409
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderMessageExtensionRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 317
+      "line": 357
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderMessageExtensionTruncatedLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 384
+      "line": 424
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderRejectsControlMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 111
+      "line": 151
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderRejectsNonZeroVersion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 181
+      "line": 221
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderRejectsReservedDestSize",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 192
+      "line": 232
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderRejectsUnsupportedSessionType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 123
+      "line": 163
     },
     {
       "package": "transport/message",
@@ -9438,6 +9446,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
       "line": 15
+    },
+    {
+      "package": "transport/message",
+      "identifier": "TestHeaderSecurityFlagsAfterDecode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/message_test.go",
+      "line": 137
+    },
+    {
+      "package": "transport/message",
+      "identifier": "TestHeaderSecurityFlagsMatchesTheWireByte",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/message_test.go",
+      "line": 114
     },
     {
       "package": "transport/message",
@@ -9451,28 +9473,28 @@
       "identifier": "TestHeaderTruncatedDestGroup",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 475
+      "line": 515
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderTruncatedDestNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 461
+      "line": 501
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderTruncatedFlags",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 160
+      "line": 200
     },
     {
       "package": "transport/message",
       "identifier": "TestHeaderTruncatedSourceNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 169
+      "line": 209
     },
     {
       "package": "transport/message",
@@ -9493,77 +9515,77 @@
       "identifier": "TestProtocolHeaderRoundTripMinimum",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 205
+      "line": 245
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderSecuredExtensionLengthOverflow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 422
+      "line": 462
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderSecuredExtensionRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 395
+      "line": 435
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderTruncated",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 293
+      "line": 333
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderTruncatedAckCounter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 302
+      "line": 342
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderTruncatedProtocolIDAfterVendor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 449
+      "line": 489
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderTruncatedVendorID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 437
+      "line": 477
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderWithAckRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 227
+      "line": 267
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderWithSecuredExt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 490
+      "line": 530
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderWithVendorDecodesWireOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 279
+      "line": 319
     },
     {
       "package": "transport/message",
       "identifier": "TestProtocolHeaderWithVendorEncodesWireOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
-      "line": 268
+      "line": 308
     },
     {
       "package": "transport/mrp",

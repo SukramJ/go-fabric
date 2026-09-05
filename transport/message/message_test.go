@@ -105,6 +105,46 @@ func TestHeaderSecurityFlagsRoundTrip(t *testing.T) {
 	}
 }
 
+// TestHeaderSecurityFlagsMatchesTheWireByte pins the accessor to the byte
+// Marshal actually writes at offset 3. That equality is the whole contract:
+// a caller feeds the returned byte to the AEAD nonce for a frame whose
+// header went out through Marshal, so a derivation that drifted from the
+// encoder would surface as an authentication failure on the peer rather
+// than as anything visible on this side.
+func TestHeaderSecurityFlagsMatchesTheWireByte(t *testing.T) {
+	for _, h := range []Header{
+		{MessageCounter: 1},
+		{MessageCounter: 1, SessionType: SessionGroup},
+		{MessageCounter: 1, Privacy: true},
+		{MessageCounter: 1, Control: true},
+		{MessageCounter: 1, HasExtension: true, MessageExtension: []byte{0xAB}},
+		{
+			MessageCounter: 1, SessionType: SessionGroup, Privacy: true,
+			Control: true, HasExtension: true, MessageExtension: []byte{0xAB},
+		},
+	} {
+		if got, want := h.SecurityFlags(), h.Marshal()[3]; got != want {
+			t.Errorf("%+v: SecurityFlags() = 0x%02X, wire byte 3 = 0x%02X", h, got, want)
+		}
+	}
+}
+
+// TestHeaderSecurityFlagsAfterDecode — a header that came off the wire
+// reports the security-flags byte it was decoded from. Reserved bits 4-2
+// are out of scope on purpose: UnmarshalHeader does not retain them, which
+// is why [Header.AAD] rather than this accessor is what binds the exact
+// received bytes.
+func TestHeaderSecurityFlagsAfterDecode(t *testing.T) {
+	wire := Header{MessageCounter: 1, SessionType: SessionGroup, Privacy: true, HasExtension: true}.Marshal()
+	out, _, err := UnmarshalHeader(wire)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if got := out.SecurityFlags(); got != wire[3] {
+		t.Errorf("SecurityFlags() = 0x%02X, received byte = 0x%02X", got, wire[3])
+	}
+}
+
 // TestHeaderRejectsControlMessage — the Control (C) security-flag bit is
 // rejected on decode. Mirrors matter.js MessageCodec.ts decodeFixedHeader
 // ("Control Messages not supported").

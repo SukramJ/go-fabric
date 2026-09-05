@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -80,11 +81,7 @@ func manyTempSensorsSnapshotter(n int) (Snapshotter, []*fakeTempSource) {
 			Measurement:    src,
 		})
 	}
-	asm, err := endpoint.New(NewFakeStore(), endpoint.Config{
-		VendorID:  testAssemblerVendorID,
-		ProductID: testAssemblerProductID,
-		NodeLabel: testAssemblerNodeLabel,
-	}, nil)
+	asm, err := endpoint.New(NewFakeStore(), endpointtest.AssemblerConfig(), nil)
 	return func(ctx context.Context) (*endpoint.Topology, error) {
 		if err != nil {
 			return nil, err

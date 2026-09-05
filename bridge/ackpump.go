@@ -286,22 +286,36 @@ func (b *Bridge) runAckPump(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case now := <-ticker.C:
-			for _, obl := range tracker.Due(now) {
-				b.emitStandaloneAck(obl)
-			}
-			if outbound != nil {
-				b.tickOutboundReliable(outbound, now)
-			}
-			// A peer that abandons its timed interaction and then goes
-			// quiet never reaches the registration-site sweep, so the
-			// pump owns the idle case. Amortised to one Range per
-			// [timedSweepInterval], not one per tick.
-			if n := b.routing.maybeSweepExpiredTimedDeadlines(now); n > 0 {
-				b.logger.Debug("matter.im.timed.deadlines_reclaimed",
-					slog.Int("entries", n))
-			}
+			b.ackPumpTick(tracker, outbound, now)
 		}
 	}
+}
+
+// ackPumpTick performs the work of one pump iteration and reports how many
+// StandaloneAck datagrams it emitted. The trackers are parameters rather
+// than fields read here so [Bridge.runAckPump] keeps resolving them once at
+// pump start, while a caller that resolves them per call gets identical
+// behaviour from the same code — the alternative, a second copy of this
+// body for out-of-band callers, is exactly the copy that drifts.
+func (b *Bridge) ackPumpTick(tracker *mrp.AckTracker, outbound *outboundReliableTracker, now time.Time) int {
+	emitted := 0
+	if tracker != nil {
+		for _, obl := range tracker.Due(now) {
+			b.emitStandaloneAck(obl)
+			emitted++
+		}
+	}
+	if outbound != nil {
+		b.tickOutboundReliable(outbound, now)
+	}
+	// A peer that abandons its timed interaction and then goes quiet never
+	// reaches the registration-site sweep, so the pump owns the idle case.
+	// Amortised to one Range per [timedSweepInterval], not one per tick.
+	if n := b.routing.maybeSweepExpiredTimedDeadlines(now); n > 0 {
+		b.logger.Debug("matter.im.timed.deadlines_reclaimed",
+			slog.Int("entries", n))
+	}
+	return emitted
 }
 
 // tickOutboundReliable drives one Tick of the outbound-reliable

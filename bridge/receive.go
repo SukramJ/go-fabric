@@ -588,22 +588,12 @@ func protocolHeaderSize(p message.ProtocolHeader) int {
 	return size
 }
 
-// securityFlagsByte returns the Security-Flags byte associated with
-// hdr, reconstructed from the typed fields the message package
-// exposes. Mirrors the encode-side bit layout.
+// securityFlagsByte adapts [message.Header.SecurityFlags] to the pointer
+// receiver the receive / reply paths carry the header by. The bit layout
+// itself lives next to the encoder in the message package, so the byte fed
+// to the AEAD nonce and the byte written to the wire cannot drift apart.
 func securityFlagsByte(hdr *message.Header) uint8 {
-	var b uint8
-	b |= uint8(hdr.SessionType&0xFF) & 0x1F
-	if hdr.Privacy {
-		b |= 0x80
-	}
-	if hdr.Control {
-		b |= 0x40
-	}
-	if hdr.HasExtension {
-		b |= 0x20
-	}
-	return b
+	return hdr.SecurityFlags()
 }
 
 // srcString defends against nil src — the udp.Handler signature

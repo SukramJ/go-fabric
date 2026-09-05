@@ -172,17 +172,7 @@ func (h Header) Marshal() []byte {
 	buf = append(buf, flags)
 	buf = binary.LittleEndian.AppendUint16(buf, h.SessionID)
 
-	secFlags := byte(h.SessionType) & secFlagSessionTypeMask
-	if h.Privacy {
-		secFlags |= secFlagPrivacy
-	}
-	if h.Control {
-		secFlags |= secFlagControl
-	}
-	if h.HasExtension {
-		secFlags |= secFlagExtensions
-	}
-	buf = append(buf, secFlags)
+	buf = append(buf, h.SecurityFlags())
 	buf = binary.LittleEndian.AppendUint32(buf, h.MessageCounter)
 
 	if h.HasSourceNodeID {
@@ -200,6 +190,35 @@ func (h Header) Marshal() []byte {
 		buf = appendExtension(buf, h.MessageExtension)
 	}
 	return buf
+}
+
+// SecurityFlags returns the Security Flags byte (Core Spec §4.4.1.3) this
+// header encodes to — the same byte [Header.Marshal] writes at offset 3.
+//
+// It is exported because the byte is an input every caller of
+// channel.Session.Encrypt / Decrypt has to supply alongside the header: the
+// AEAD nonce is built from it, so a caller outside this package would
+// otherwise have to re-derive the bit layout from the typed fields and any
+// drift between the two derivations shows up as an authentication failure
+// rather than as a compile error.
+//
+// The byte is reconstructed from the typed fields, so the reserved bits 4-2
+// read back as zero even when the received frame set them: UnmarshalHeader
+// does not retain them. Where the exact received bytes matter — AEAD
+// additional authenticated data — use [Header.AAD], which returns
+// [Header.Raw] verbatim for a decoded header.
+func (h Header) SecurityFlags() uint8 {
+	secFlags := byte(h.SessionType) & secFlagSessionTypeMask
+	if h.Privacy {
+		secFlags |= secFlagPrivacy
+	}
+	if h.Control {
+		secFlags |= secFlagControl
+	}
+	if h.HasExtension {
+		secFlags |= secFlagExtensions
+	}
+	return secFlags
 }
 
 // AAD returns the additional authenticated data that binds this header

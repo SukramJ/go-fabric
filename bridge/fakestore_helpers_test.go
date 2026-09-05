@@ -3,71 +3,20 @@
 
 package bridge
 
-// Shared test fake for the [endpoint.Store] surface. Lives in
-// `package bridge` so both the white-box tests in this directory
-// (e.g. receive_test.go) and the black-box tests in `package
-// bridge_test` (bridge_test.go) can reuse it via the exported
-// constructor. The file name ends in `_test.go` so it never compiles
-// into the production binary.
+// The fake [endpoint.Store] itself lives in
+// [github.com/SukramJ/go-fabric/endpoint/endpointtest], where an external
+// consumer can reach it too. These names stay in `package bridge` so both
+// the white-box tests in this directory and the black-box tests in `package
+// bridge_test` keep using them unqualified, against one implementation.
 
 import (
-	"context"
-
-	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 )
 
-// FakeStore is an in-memory implementation of [endpoint.Store] for
-// bridge tests. It is concurrency-naive (callers must not race) and
-// only carries enough state to satisfy the bridge's startup +
-// reassembly paths.
-type FakeStore struct {
-	rows   map[endpoint.SourceKey]endpoint.Record
-	nextID uint16
-}
+// FakeStore is [endpointtest.FakeStore].
+type FakeStore = endpointtest.FakeStore
 
-// NewFakeStore returns a fresh FakeStore with an empty row map and
-// the next-id counter initialised at 2 (Endpoint 0 is the root,
-// Endpoint 1 is the aggregator; bridged endpoints start at 2).
+// NewFakeStore returns a fresh in-memory endpoint.Store fake.
 func NewFakeStore() *FakeStore {
-	return &FakeStore{
-		rows:   make(map[endpoint.SourceKey]endpoint.Record),
-		nextID: 2,
-	}
-}
-
-// GetEndpoint implements [endpoint.Store].
-func (s *FakeStore) GetEndpoint(_ context.Context, key endpoint.SourceKey) (endpoint.Record, error) {
-	rec, ok := s.rows[key]
-	if !ok {
-		return endpoint.Record{}, endpoint.ErrNotFound
-	}
-	return rec, nil
-}
-
-// UpsertEndpointAssigning implements [endpoint.Store].
-func (s *FakeStore) UpsertEndpointAssigning(_ context.Context, rec endpoint.Record) (uint16, error) {
-	if rec.EndpointID == 0 {
-		rec.EndpointID = s.nextID
-		s.nextID++
-	}
-	s.rows[rec.Key] = rec
-	return rec.EndpointID, nil
-}
-
-// ListEndpoints implements [endpoint.Store]. An empty scope matches
-// every row.
-func (s *FakeStore) ListEndpoints(_ context.Context, scope string) ([]endpoint.Record, error) {
-	var out []endpoint.Record
-	for _, rec := range s.rows {
-		if scope == "" || rec.Scope == scope {
-			out = append(out, rec)
-		}
-	}
-	return out, nil
-}
-
-// RemoveEndpoint implements [endpoint.Store].
-func (s *FakeStore) RemoveEndpoint(_ context.Context, key endpoint.SourceKey) error {
-	delete(s.rows, key)
-	return nil
+	return endpointtest.NewFakeStore()
 }

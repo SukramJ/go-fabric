@@ -13,6 +13,30 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **Test-support packages, so a consumer's tests stop reimplementing the
+  module's fakes and stop sending traffic to set up state.** The module's
+  first external consumer — a scenario harness driving the bridge from
+  another repository — hit four places where the public API was too narrow,
+  and one of its workarounds cost that repository a flaky CI job: with no way
+  to tell the bridge where a subscription's reports go, the harness issued a
+  real `SubscribeRequest` over the wire and read the id back, and on a loaded
+  machine that setup traffic landed inside the window the scenario then
+  measured. `bridge/bridgetest` closes it — `EstablishSubscriptionTarget`
+  registers the reply route directly, and `AckPumpTick` runs one whole pump
+  iteration (the outbound retransmits included, which `RunAckPumpOnce` does
+  not cover) rather than waiting out the pump goroutine's ticker.
+  `endpoint/endpointtest` carries the in-memory `endpoint.Store` and the
+  empty-fleet snapshotter that were stranded in `_test.go` files and so were
+  invisible outside the package. None of this widened the production API:
+  the affordances reach the bridge through a module-internal seam, so an
+  external module sees `bridgetest` and cannot reach what it stands on.
+- **`message.Header.SecurityFlags`.** The Security Flags byte is an input
+  every caller of `channel.Session.Encrypt` / `Decrypt` has to supply
+  alongside the header, and it was derivable only inside this module. It now
+  sits next to the encoder that writes it, so the byte fed to the AEAD nonce
+  and the byte written to the wire come from one derivation — the bridge's
+  private copy had already drifted in its session-type mask, harmlessly only
+  because decode rejects the values where the two disagreed.
 - **The Matter bridge stack is a standalone module.** The subtree and its
   port contracts left the host daemon they grew in and became
   `github.com/SukramJ/go-fabric`, with its own dependency set: TLV codec,
