@@ -13,6 +13,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	matterlock "github.com/SukramJ/go-fabric/cluster/lock"
 	mattermeasure "github.com/SukramJ/go-fabric/cluster/measurement"
+	mattermodeselect "github.com/SukramJ/go-fabric/cluster/modeselect"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -523,6 +524,24 @@ func EncodeSubscribeResponse(sr im.SubscribeResponse) ([]byte, error) {
 	return buf, nil
 }
 
+// boundedList trims a list attribute (or list field) to the entry
+// count its matter.js constraint names, warning when it has to. It is
+// the list-shaped twin of [tlv.Encoder.PutUTF8Bounded]: the bound
+// belongs at encode time because a host list longer than its
+// constraint is a wire violation a controller sees before anyone reads
+// the host's code. `what` names the constrained element in the log
+// line, which is the only place the trim is visible.
+func boundedList[T any](in []T, maxEntries int, what string) []T {
+	if len(in) <= maxEntries {
+		return in
+	}
+	slog.Warn("bridge: list attribute truncated to its constraint",
+		"attribute", what,
+		"entries", len(in),
+		"max_entries", maxEntries)
+	return in[:maxEntries]
+}
+
 // defaultAttributeValueWriter is the wire writer the bridge plugs
 // into [im.ReportData.MarshalTLV]. It type-switches on the
 // cluster-native Go value and emits the matching TLV element. Null
@@ -840,6 +859,44 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 			enc.StartStruct(tlv.AnonymousTag())
 			enc.PutOctets(tlv.ContextTag(1), e.Data)
 			enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))
+			_ = enc.EndContainer()
+		}
+		_ = enc.EndContainer()
+	case []mattermodeselect.ModeOptionStruct:
+		// ModeSelect.SupportedModes (0x0050:0x0002) — a list of
+		// ModeOptionStruct, the only list-of-struct attribute the
+		// bridge serves. Without a case of its own it fell to the
+		// `default:` branch and every read returned TLV null, so a
+		// controller saw a ModeSelect cluster with no modes to select.
+		//
+		// Field ids mirror matter.js mode-select-cluster.element.ts:61-69
+		// (Label 0x0 string max 64, Mode 0x1 uint8, SemanticTags 0x2
+		// list) and :55-59 for the entries (MfgCode 0x0 vendor-id →
+		// uint16, Value 0x1 uint16). SemanticTags is conformance M, so
+		// it is always written: an empty array says the mode is
+		// anonymous, an absent field says the struct is malformed.
+		//
+		// Both list bounds are applied here, the way Label's byte bound
+		// already is: SupportedModes carries constraint "max 255"
+		// (element :36) and SemanticTags "max 64" (element :66), so a
+		// host list longer than its constraint is trimmed rather than
+		// put on the wire for a controller to reject.
+		enc.StartArray(tag)
+		for _, opt := range boundedList(x, mattermodeselect.SupportedModesMaxEntries,
+			"ModeSelect.SupportedModes") {
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutUTF8Bounded(tlv.ContextTag(mattermodeselect.ModeOptionFieldLabel),
+				opt.Label, mattermodeselect.LabelMaxBytes)
+			enc.PutUint(tlv.ContextTag(mattermodeselect.ModeOptionFieldMode), uint64(opt.Mode))
+			enc.StartArray(tlv.ContextTag(mattermodeselect.ModeOptionFieldSemanticTags))
+			for _, st := range boundedList(opt.SemanticTags, mattermodeselect.SemanticTagsMaxEntries,
+				"ModeSelect.ModeOptionStruct.SemanticTags") {
+				enc.StartStruct(tlv.AnonymousTag())
+				enc.PutUint16(tlv.ContextTag(mattermodeselect.SemanticTagFieldMfgCode), st.MfgCode)
+				enc.PutUint16(tlv.ContextTag(mattermodeselect.SemanticTagFieldValue), st.Value)
+				_ = enc.EndContainer()
+			}
+			_ = enc.EndContainer()
 			_ = enc.EndContainer()
 		}
 		_ = enc.EndContainer()

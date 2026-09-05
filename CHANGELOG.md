@@ -13,6 +13,26 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **`cluster/valve` — ValveConfigurationAndControl (0x0081), the server behind
+  WaterValve 0x0042.** Serves the five attributes matter.js marks conformance M
+  (OpenDuration 0x0, DefaultOpenDuration 0x1, RemainingDuration 0x3,
+  CurrentState 0x4, TargetState 0x5) and handles Open 0x0 / Close 0x1. Every id
+  and conformance string is cited to
+  `valve-configuration-and-control.element.ts`; AutoCloseTime 0x2 is `"TS"` and
+  the level attributes are `"LVL"`, so neither is served while FeatureMap is 0
+  — an `Open` carrying TargetLevel is refused with ConstraintError rather than
+  silently ignored. It reaches a host through a narrow port instead of mutating
+  internal state: a host refusal does not become Success.
+- **`cluster/modeselect` — ModeSelect (0x0050), the server behind device type
+  0x0027.** Description 0x0, StandardNamespace 0x1, SupportedModes 0x2 and
+  CurrentMode 0x3 served from a host-supplied list, ChangeToMode 0x0 forwarded
+  to the host, and an unsupported mode answered with InvalidCommand. StartUpMode
+  and OnMode are absent and FeatureMap is 0, because DEPONOFF would make OnMode
+  mandatory. The wire writer gained the one case it was missing — a list of
+  structs — so SupportedModes can reach a controller at all, with the constraint
+  bounds (255 modes, 64 tags) applied at encode time rather than trusted from
+  the host.
+
 - **`endpoint/sqlitestore`, a production `endpoint.Store`.** The port shipped
   with only `endpointtest.NewFakeStore` behind it, so every consumer had to
   write the real one — and endpoint identity is the piece of bridge state

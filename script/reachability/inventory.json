@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3052,
+  "entry_points": 3081,
   "entry_packages": [
     ".",
     "bootid",
@@ -13,8 +13,10 @@
     "cluster/light",
     "cluster/lock",
     "cluster/measurement",
+    "cluster/modeselect",
     "cluster/onoff",
     "cluster/thermo",
+    "cluster/valve",
     "cluster/wire",
     "commissioning",
     "conformance",
@@ -45,9 +47,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2652,
-    "reachable": 1268,
-    "whitelisted": 1373,
+    "total_exported": 2701,
+    "reachable": 1314,
+    "whitelisted": 1376,
     "unreachable": 11
   },
   "by_package": [
@@ -1724,6 +1726,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
       "line": 127
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDefaultAttrWriter_ModeSelectEmptyList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/reply_modeselect_test.go",
+      "line": 231
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDefaultAttrWriter_ModeSelectListBounds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/reply_modeselect_test.go",
+      "line": 207
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDefaultAttrWriter_ModeSelectSupportedModes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/reply_modeselect_test.go",
+      "line": 156
     },
     {
       "package": "bridge",
