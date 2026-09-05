@@ -42,7 +42,7 @@ jobs:
       # This module is a library — there is no binary to smoke-test, so
       # compiling the whole package graph is the whole of the build leg.
       - name: go build
-        run: go build ./...
+        run: make build
 
   vet:
     name: vet
@@ -57,7 +57,7 @@ jobs:
       # lint failure elsewhere in the config stops that job early, and vets
       # the test files' build graph as the toolchain sees it.
       - name: go vet
-        run: go vet ./...
+        run: make vet
 
   test:
     name: test (linux, race)
@@ -77,7 +77,7 @@ jobs:
       - name: go test (race)
         env:
           CGO_ENABLED: "1"
-        run: go test -race -count=1 ./...
+        run: make race
 
   lint:
     name: lint
@@ -88,15 +88,8 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: gofumpt
-        run: |
-          go install mvdan.cc/gofumpt@${{ env.GOFUMPT_VERSION }}
-          diff=$(gofumpt -l .)
-          if [ -n "$diff" ]; then
-            echo "::error::gofumpt found unformatted files:"
-            echo "$diff"
-            exit 1
-          fi
+      - name: install pinned lint tooling
+        run: go install mvdan.cc/gofumpt@${{ env.GOFUMPT_VERSION }}
       # Install golangci-lint v2 from source with the Go toolchain set up
       # above. The prebuilt binary ships built with an older Go and refuses
       # to run against a module targeting a newer one; golangci-lint-action@v6
@@ -104,13 +97,11 @@ jobs:
       # (version/formatters/linters.default keys). A direct `go install` of
       # the /v2/ module avoids both problems.
       - name: golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
-          golangci-lint config verify
-          golangci-lint run --timeout=5m ./...
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${{ env.GOLANGCI_LINT_VERSION }}
+      # make lint runs the same gofumpt check, config verify, linter run and
+      # module-hygiene steps a contributor gets locally, so the two cannot
+      # drift apart. The versions above are the ones the Makefile pins.
+      - name: lint
+        run: make lint
       # Fail if go.mod/go.sum drift from `go mod tidy`, or if a checksum in
       # go.sum does not match the module cache.
-      - name: go mod tidy + verify
-        run: |
-          go mod tidy -diff
-          go mod verify
