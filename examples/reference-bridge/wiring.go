@@ -249,6 +249,22 @@ func (c *caseIdentities) current() *caseFabric {
 	return c.latest
 }
 
+// announceIdentity returns the DNS-SD identity of one loaded fabric: the
+// compressed fabric ID and node ID that name its operational
+// `<compressed>-<node>._matter._tcp` instance. Reporting it from the same
+// entry the CASE responder answers with is the point — announcing an
+// identity the responder does not hold advertises a bridge that cannot
+// complete the Sigma1 it just invited.
+func (c *caseIdentities) announceIdentity(fabricIndex uint8) (compressedID [8]byte, nodeID uint64, ok bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entry, ok := c.byIdx[fabricIndex]
+	if !ok || entry.identity == nil {
+		return compressedID, 0, false
+	}
+	return entry.identity.CompressedFabricID, entry.identity.NodeID, true
+}
+
 // load rebuilds the identity for one fabric from its persisted rows. Called
 // at boot for every already-installed fabric and again from
 // OperationalCredentials' OnFabricInstalled hook after each AddNOC.

@@ -192,7 +192,25 @@ func run() error {
 		func(hookCtx context.Context, fabricIndex uint8, _, _ uint64, _ []byte) {
 			if err := caseIDs.load(hookCtx, credentials, fabricIndex); err != nil {
 				logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
+				return
 			}
+			// Publishing the operational record here is not an optimisation
+			// of the boot-time publish below -- it is the only publish a
+			// freshly commissioned fabric ever gets. The commissioner
+			// finishes AddNOC over PASE and immediately resolves
+			// `<compressed>-<node>._matter._tcp` to open its first CASE
+			// session; on a first pairing there was no such fabric at boot,
+			// so nothing has advertised it. Without this the pairing gets
+			// through PASE, installs the fabric, and then times out in
+			// operational discovery -- a failure that reads like a network
+			// fault and is not one.
+			compressedID, nodeID, ok := caseIDs.announceIdentity(fabricIndex)
+			if !ok {
+				logger.Warn("case.identity.announce_skipped",
+					slog.Int("fabric_index", int(fabricIndex)))
+				return
+			}
+			br.AnnounceFabric(hookCtx, compressedID, nodeID)
 		})
 	if err != nil {
 		return err
