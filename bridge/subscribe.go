@@ -1061,9 +1061,30 @@ func (b *Bridge) resolveSessionFabric(sessionID uint16) uint8 {
 	}
 	b.mu.RLock()
 	sessions := b.sessions
+	acl := b.aclLister
 	b.mu.RUnlock()
+
 	resolver, ok := sessions.(SessionFabricResolver)
+	if ok {
+		// An adapter can carry FabricFor and still have no resolver behind
+		// it, in which case it answers (0, false) for everything.
+		if r, reports := sessions.(interface{ FabricResolutionWired() bool }); reports && !r.FabricResolutionWired() {
+			ok = false
+		}
+	}
 	if !ok {
+		// The bridge cannot name this session's fabric. Returning 0 would say
+		// "PASE, still commissioning", and CheckACL answers Success to that —
+		// so an unresolvable CASE session would be waved through with the
+		// access check never applied. Where no ACL is attached that is
+		// harmless (CheckACL denies everything operational anyway); where one
+		// is, it is the whole of the access control silently not happening.
+		//
+		// FabricIndexUnresolvable says "not known" instead, and CheckACL
+		// denies it.
+		if acl != nil {
+			return endpointpkg.FabricIndexUnresolvable
+		}
 		return 0
 	}
 	idx, _ := resolver.FabricFor(sessionID)
