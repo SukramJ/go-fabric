@@ -13,6 +13,26 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **A stated API-stability and deprecation policy, with a guard behind it.**
+  The module is on its own SemVer lane and nothing is tagged, so a consumer had
+  no way to know what it may depend on or how much warning a rename carries.
+  README.md now says which packages are public (measured against the real
+  `internal/` tree, not asserted), how a deprecation is marked, how long it
+  stays, and what pre-1.0 changes about that. Prose enforces nothing, so two
+  tests hold the policy to its word: a marker that does not open its paragraph
+  with `Deprecated: ` produces no SA1019 warning at any consumer and is
+  refused, and a deprecated identifier that appears nowhere in `CHANGELOG.md`
+  is refused too — the window only means something to someone told the clock
+  is running. Both pass vacuously today, because the module has deprecated
+  nothing, and say so out loud rather than looking asleep.
+- **One chip `Test_TC_` conformance case runs against the reference daemon.**
+  `Test_TC_OO_2_2` drives Off/On/Toggle with read-back, including both
+  idempotency cases, gated in CI like the other chip-tool jobs. Certification
+  stays a non-goal: the PICS file says in its own text that it is written only
+  as far as this case needs and is not a certification artefact. Running it
+  needs chip's Python runner, because chip-tool at the pinned commit registers
+  no `tests` command at all — that is recorded rather than worked around.
+
 - **Eleven new fuzz targets, over the five packages that parse bytes.** The
   module fuzzed only its four Interaction-Model decoders; everything else that
   turns wire bytes into structures was unfuzzed, including the two packages a
