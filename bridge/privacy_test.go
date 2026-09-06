@@ -66,9 +66,13 @@ func TestPrivacy_OutboundInboundRoundTrip(t *testing.T) {
 
 	// Build a Privacy-flagged datagram: 4-byte header prefix +
 	// 4-byte counter + 32 bytes body (16 ciphertext-ish + 16 MIC).
+	// Privacy is defined for group messages, so the header carries the
+	// group session type; a unicast frame with the P bit is dropped
+	// before any unmasking (see TestPrivacy_UnicastWithPBitIsDropped).
 	hdr := message.Header{
 		SessionID:      sessionID,
 		MessageCounter: 0xDEADBEEF,
+		SessionType:    message.SessionGroup,
 		Privacy:        true,
 	}
 	body := bytes.Repeat([]byte{0xCC}, 32)
@@ -432,16 +436,23 @@ func TestSendReply_PrivacyFlaggedRequestGetsMaskedReply(t *testing.T) {
 	}
 
 	// The peer unmasks with its own view of the session, then decrypts.
-	// Both only work when the bridge applied the mask.
-	peer := &Bridge{}
-	peer.sessions = sessionLookupFunc(func(id uint16) (*channel.Session, bool) {
-		if id == peerSessionID {
-			return peerSess, true
-		}
-		return nil, false
-	})
-	if err := peer.maybeUnmaskPrivacy(datagram); err != nil {
-		t.Fatalf("peer maybeUnmaskPrivacy: %v", err)
+	// Both only work when the bridge applied the mask. The unmask uses
+	// the channel primitives directly: the bridge's inbound gate drops
+	// unicast frames carrying P (matter.js ExchangeManager.ts:220-224),
+	// so this reply is only ever decodable by a peer that unmasks below
+	// the gate — which is what makes the P echo on unicast dead code in
+	// practice, and what this test pins about the masking itself.
+	peerPrivacyKey, err := peerSess.PeerPrivacyKey()
+	if err != nil {
+		t.Fatalf("PeerPrivacyKey: %v", err)
+	}
+	protectedEnd := privacyHeaderEnd(datagram)
+	mask, err := channel.PrivacyKeystream(peerPrivacyKey, peerSessionID, datagram[len(datagram)-16:], protectedEnd-4)
+	if err != nil {
+		t.Fatalf("PrivacyKeystream: %v", err)
+	}
+	if err := channel.ApplyPrivacyMask(mask, datagram[4:protectedEnd]); err != nil {
+		t.Fatalf("ApplyPrivacyMask: %v", err)
 	}
 	hdr, hdrLen, err := message.UnmarshalHeader(datagram)
 	if err != nil {
@@ -449,5 +460,79 @@ func TestSendReply_PrivacyFlaggedRequestGetsMaskedReply(t *testing.T) {
 	}
 	if _, _, err := peerSess.Decrypt(&hdr, datagram[3], datagram[hdrLen:]); err != nil {
 		t.Fatalf("peer Decrypt of the privacy-protected reply: %v", err)
+	}
+}
+
+// TestPrivacy_UnicastWithPBitIsDropped — privacy enhancements are defined
+// for group messages only; a unicast frame carrying the P bit is invalid
+// and is dropped rather than unmasked and handed to a unicast session.
+// Mirrors matter.js ExchangeManager.ts:220-224 and the chip SDK.
+func TestPrivacy_UnicastWithPBitIsDropped(t *testing.T) {
+	t.Parallel()
+	bridgeKey := bytes.Repeat([]byte{0xAA}, 16)
+	peerKey := bytes.Repeat([]byte{0xBB}, 16)
+	sess, err := channel.New(channel.Config{EncryptKey: bridgeKey, DecryptKey: peerKey, LocalNodeID: 1, PeerNodeID: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := &Bridge{}
+	b.sessions = sessionLookupFunc(func(uint16) (*channel.Session, bool) { return sess, true })
+	hdr := message.Header{SessionID: 0x1234, MessageCounter: 1, Privacy: true}
+	datagram := append(hdr.Marshal(), bytes.Repeat([]byte{0xCC}, 32)...)
+	if err := b.maybeUnmaskPrivacy(datagram); err == nil {
+		t.Fatal("unicast frame with the P bit was accepted; it must be dropped")
+	}
+}
+
+// TestPrivacy_RoundTripCoversSourceAndDestinationNodeIDs — with a Source
+// Node ID and a 64-bit Destination Node ID the protected region is 20
+// bytes. Masking only the first AES block left the last four bytes of
+// the destination id in the clear on send and obfuscated on receive;
+// the receiver then authenticated a header the sender never sent and
+// dropped the frame on the tag check. matter.js runs the CTR keystream
+// over the whole region (MessagePrivacy.ts:53-56).
+func TestPrivacy_RoundTripCoversSourceAndDestinationNodeIDs(t *testing.T) {
+	t.Parallel()
+	bridgeKey := bytes.Repeat([]byte{0xAA}, 16)
+	peerKey := bytes.Repeat([]byte{0xBB}, 16)
+	const sessionID uint16 = 0x4321
+	bridgeSess, err := channel.New(channel.Config{EncryptKey: bridgeKey, DecryptKey: peerKey, LocalNodeID: 1, PeerNodeID: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	peerSess, err := channel.New(channel.Config{EncryptKey: peerKey, DecryptKey: bridgeKey, LocalNodeID: 2, PeerNodeID: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hdr := message.Header{
+		SessionID:       sessionID,
+		MessageCounter:  0x01020304,
+		SessionType:     message.SessionGroup,
+		Privacy:         true,
+		HasSourceNodeID: true,
+		SourceNodeID:    0x1111_2222_3333_4444,
+		DestSize:        message.DestNodeID,
+		DestNodeID:      0x5555_6666_7777_8888,
+	}
+	datagram := append(hdr.Marshal(), bytes.Repeat([]byte{0xCC}, 32)...)
+	if got := privacyHeaderEnd(datagram); got != 24 {
+		t.Fatalf("privacyHeaderEnd = %d, want 24 (4 + counter 4 + source 8 + dest 8)", got)
+	}
+	original := append([]byte(nil), datagram[4:24]...)
+
+	if err := applyOutboundPrivacy(bridgeSess, sessionID, datagram); err != nil {
+		t.Fatalf("applyOutboundPrivacy: %v", err)
+	}
+	if bytes.Equal(datagram[20:24], original[16:20]) {
+		t.Fatal("outbound mask left the last four bytes of the destination node id in the clear")
+	}
+
+	b := &Bridge{}
+	b.sessions = sessionLookupFunc(func(id uint16) (*channel.Session, bool) { return peerSess, id == sessionID })
+	if err := b.maybeUnmaskPrivacy(datagram); err != nil {
+		t.Fatalf("maybeUnmaskPrivacy: %v", err)
+	}
+	if !bytes.Equal(datagram[4:24], original) {
+		t.Fatalf("20-byte region did not round-trip:\n got=%x\nwant=%x", datagram[4:24], original)
 	}
 }

@@ -85,9 +85,10 @@ type Manager struct {
 	nextID    uint32
 	onClosed  func(subID uint32)
 
-	stopOnce sync.Once
-	stopCh   chan struct{}
-	wg       sync.WaitGroup
+	startOnce sync.Once
+	stopOnce  sync.Once
+	stopCh    chan struct{}
+	wg        sync.WaitGroup
 }
 
 // SetEventReporter wires the optional event-drain hook. Pass nil to
@@ -186,8 +187,10 @@ func randomSubscriptionIDStart() uint32 {
 
 // Start launches the engine tick goroutine. Idempotent.
 func (m *Manager) Start(ctx context.Context) {
-	m.wg.Add(1)
-	go m.run(ctx)
+	m.startOnce.Do(func() {
+		m.wg.Add(1)
+		go m.run(ctx)
+	})
 }
 
 // Stop terminates the engine and waits for it to drain. Idempotent.

@@ -551,6 +551,8 @@ func NewResponder(identity *Identity, verifier PeerVerifier, sessionID uint16) *
 // non-nil and Sigma1 carries tags 6+7, [Responder.ProcessSigma1WithResume]
 // attempts Sigma2_Resume before falling through to Full Sigma.
 func (r *Responder) SetResumptionStore(s ResumptionStore) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.resumptionStore = s
 }
 
@@ -598,6 +600,8 @@ func (r *Responder) SetSessionIDRenewer(fn func(previous uint16) (uint16, bool))
 // Mirrors matter.js packages/protocol/src/session/case/CaseServer.ts:258-264.
 // Pass nil to detach.
 func (r *Responder) SetSessionParameters(p *SessionParameters) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.sessionParams = p
 }
 

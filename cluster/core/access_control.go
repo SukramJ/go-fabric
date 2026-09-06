@@ -479,13 +479,16 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// Limit failures → ResourceExhausted; semantic failures →
 		// ConstraintError (both via the dispatcher's `writeErrorStatus`
 		// substring matching).
-		fabricACLs := 0
-		for _, e := range entries {
-			if e.FabricIndex == fabric || e.FabricIndex == 0 {
-				fabricACLs++
-			}
-		}
-		if fabricACLs > int(accessControlEntriesPerFabricLimit) {
+		// Every entry in the list is persisted under the writer's fabric
+		// (the stamp below), so every entry counts against the writer's
+		// per-fabric limit — the FabricIndex a client puts on the wire is
+		// raw input, not a scope. matter.js reaches the same count through
+		// its fabric-scoped write machinery, which has already stamped the
+		// accessing fabric before AccessControlServer.ts:186-189 filters on
+		// it; counting the client's own value here instead let a list of
+		// entries tagged with a foreign index pass the limit and then be
+		// stored, all of them, on the writer's fabric.
+		if fabricACLs := len(entries); fabricACLs > int(accessControlEntriesPerFabricLimit) {
 			return fmt.Errorf("matter: AccessControl.ACL write: resource exhausted: AccessControlEntriesPerFabric=%d > limit=%d", fabricACLs, accessControlEntriesPerFabricLimit)
 		}
 		for i, e := range entries {

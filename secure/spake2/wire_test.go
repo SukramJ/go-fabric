@@ -421,8 +421,8 @@ func TestPBKDFParamResponse_MarshalWithMRPParams(t *testing.T) {
 	initRand := random32()
 	respRand := bytes.Repeat([]byte{0xAB}, spake2.PBKDFRandomSize)
 	salt := bytes.Repeat([]byte{0x55}, spake2.PBKDFMinSaltSize)
-	idleMs := uint16(500)
-	activeMs := uint16(300)
+	idleMs := uint32(500)
+	activeMs := uint32(300)
 	thresholdMs := uint16(4000)
 	resp := spake2.PBKDFParamResponse{
 		InitiatorRandom:    initRand,
@@ -464,7 +464,7 @@ func TestPBKDFParamResponse_MarshalWithPartialMRPParams(t *testing.T) {
 	t.Parallel()
 	initRand := random32()
 	respRand := bytes.Repeat([]byte{0xCC}, spake2.PBKDFRandomSize)
-	idleMs := uint16(200)
+	idleMs := uint32(200)
 	resp := spake2.PBKDFParamResponse{
 		InitiatorRandom:    initRand,
 		ResponderRandom:    respRand,

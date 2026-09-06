@@ -101,7 +101,7 @@ func TestPaseAdapter_EmitsResponderMRPParams(t *testing.T) {
 	a := NewPaseAdapter(nil)
 	a.SetPBKDFParams(1000, []byte("SPAKE2P Key Salt"), 1)
 	a.randomSource = func() [spake2.PBKDFRandomSize]byte { return [spake2.PBKDFRandomSize]byte{0x11} }
-	idle, active, thresh := uint16(500), uint16(300), uint16(4000)
+	idle, active, thresh := uint32(500), uint32(300), uint16(4000)
 	a.SetResponderMRPParams(&spake2.MRPParameters{
 		IdleRetransTimeoutMs:   &idle,
 		ActiveRetransTimeoutMs: &active,

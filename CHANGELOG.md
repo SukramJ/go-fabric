@@ -11,6 +11,54 @@ long enough for a `v0.1.0` to mean something.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The per-fabric ACL cap counted the FabricIndex the client sent, then
+  stored every entry on the writer's fabric.** `AccessControl.ACL` writes
+  filtered the count to entries whose FabricIndex matched the writer's (or
+  was zero) before checking `AccessControlEntriesPerFabric`, and then stamped
+  the writer's fabric on every entry it persisted — so a list of twenty
+  entries tagged with a foreign index passed the limit of four and all twenty
+  landed on the writer's fabric, while the attribute kept reporting four. The
+  count is now the list as stored. matter.js reaches the same number because
+  its fabric-scoped write machinery stamps the accessing fabric before
+  `AccessControlServer.ts` filters on it.
+- **Privacy masking covered only the first AES block of the protected
+  header; the region is 20 bytes when both node ids are present.** Counter,
+  Source Node ID and a 64-bit Destination Node ID are 4 + 8 + 8 bytes, and
+  matter.js runs the CTR keystream over all of them
+  (`MessagePrivacy.ts:53-56`). Capping the mask at 16 bytes left the tail of
+  the destination id in the clear on send and obfuscated on receive, and the
+  AEAD tag then failed on whichever side had unmasked the wrong bytes.
+  `channel.PrivacyKeystream` now yields as many blocks as the region needs.
+  Alongside it, a unicast frame carrying the P bit is dropped rather than
+  unmasked — privacy enhancements are defined for group messages, and
+  matter.js (`ExchangeManager.ts:220-224`) and the chip SDK both drop the
+  unicast case.
+- **The AEAD nonce used a Security Flags byte rebuilt from typed fields.**
+  Reserved bits 4-2 of a received frame were dropped on decode and read back
+  as zero, so a peer that set one would fail the tag check on every frame
+  while matter.js decoded it (it keeps the raw byte for exactly this use,
+  `MessageCodec.ts:45`). `Header.NonceSecurityFlags` returns the byte as
+  received for a decoded header.
+- **The nonce node id came from the header's Source Node ID when present,
+  not from the session.** matter.js and chip build the nonce from the peer id
+  the session was established with (`NodeSession.ts:187`); reading it off the
+  header made a mismatched label fail the tag and a matching one partly
+  sender-chosen. `Session.Decrypt` uses the session's peer id unconditionally.
+- **PASE session parameters decoded the two retransmit timeouts into 16
+  bits.** `idleInterval` and `activeInterval` are `TlvUInt32` in matter.js
+  `PaseMessages.ts` — and `uint32` on this module's own CASE path — so a
+  commissioner advertising 100 000 ms was paced at 34 464 ms. Both fields of
+  `spake2.MRPParameters` are `uint32` now; `ActiveThresholdTimeMs` stays
+  `uint16` as the schema declares it.
+- **`sigma.Responder.SetResumptionStore` and `SetSessionParameters` wrote
+  without the responder lock** that every handshake path reads under, unlike
+  the two sibling setters. Both take it now.
+- **`subscription.Manager.Start` said "Idempotent" and was not** — every call
+  launched another engine goroutine, doubling every tick and heartbeat. A
+  `sync.Once` makes the doc true.
+
 ### Added
 
 - **`MeasurementContext` — a host-registered measurement kind can now express
