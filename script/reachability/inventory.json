@@ -26,6 +26,7 @@
     "eligibility",
     "endpoint",
     "endpoint/sqlitestore",
+    "examples/reference-bridge",
     "im",
     "im/subscription",
     "mdns",
@@ -49,9 +50,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2760,
+    "total_exported": 2759,
     "reachable": 1348,
-    "whitelisted": 1402,
+    "whitelisted": 1401,
     "unreachable": 10
   },
   "by_package": [
@@ -223,21 +224,14 @@
       "identifier": "BenchmarkBuildInitialReportWildcard",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bench_test.go",
-      "line": 82
+      "line": 81
     },
     {
       "package": "bridge",
       "identifier": "BenchmarkEncodeReportData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bench_test.go",
-      "line": 112
-    },
-    {
-      "package": "bridge",
-      "identifier": "FakeStore",
-      "reason": "auto-whitelist:pattern=type-alias",
-      "file": "bridge/fakestore_helpers_test.go",
-      "line": 17
+      "line": 111
     },
     {
       "package": "bridge",
@@ -245,13 +239,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/empty_snapshotter_test.go",
       "line": 18
-    },
-    {
-      "package": "bridge",
-      "identifier": "NewFakeStore",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/fakestore_helpers_test.go",
-      "line": 20
     },
     {
       "package": "bridge",
@@ -265,7 +252,7 @@
       "identifier": "TestAckPump_AttachAckTrackerAlsoSetsAckHandler",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 601
+      "line": 600
     },
     {
       "package": "bridge",
@@ -286,14 +273,14 @@
       "identifier": "TestAckPump_ExpediteDuplicateAck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 527
+      "line": 526
     },
     {
       "package": "bridge",
       "identifier": "TestAckPump_ExpediteDuplicateAck_UnknownObligationNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
-      "line": 585
+      "line": 584
     },
     {
       "package": "bridge",
@@ -356,14 +343,14 @@
       "identifier": "TestAnnounceCommissioning_NoopAdvertiser_LogsNotAdvertised",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 360
+      "line": 359
     },
     {
       "package": "bridge",
       "identifier": "TestAnnounceCommissioning_RealAdvertiser_LogsPublished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 388
+      "line": 387
     },
     {
       "package": "bridge",
@@ -377,14 +364,14 @@
       "identifier": "TestAnnounceFabric_NoopAdvertiser_LogsNotAdvertised",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 416
+      "line": 415
     },
     {
       "package": "bridge",
       "identifier": "TestAnnounceFabric_RealAdvertiser_LogsPublished",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 437
+      "line": 436
     },
     {
       "package": "bridge",
@@ -440,7 +427,7 @@
       "identifier": "TestAttachAggregatorClusters_WithStartedBridge_TopologyPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 566
+      "line": 565
     },
     {
       "package": "bridge",
@@ -475,14 +462,14 @@
       "identifier": "TestAttachRootClusters_WithStartedBridge_TopologyPath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 555
+      "line": 554
     },
     {
       "package": "bridge",
       "identifier": "TestAttachSessionLookup_NilRevertsToNoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 293
+      "line": 292
     },
     {
       "package": "bridge",
@@ -559,14 +546,14 @@
       "identifier": "TestBridge_EmitEvent_EventLogNumberConsistency",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/eventlog_test.go",
-      "line": 84
+      "line": 83
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_EventLog_NotNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/eventlog_test.go",
-      "line": 267
+      "line": 265
     },
     {
       "package": "bridge",
@@ -636,14 +623,14 @@
       "identifier": "TestBridge_ReadEvent_ReturnsBufferedEvents",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/eventlog_test.go",
-      "line": 129
+      "line": 127
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_ReadRequest_ParsesEventRequests",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/eventlog_test.go",
-      "line": 207
+      "line": 205
     },
     {
       "package": "bridge",
@@ -699,14 +686,14 @@
       "identifier": "TestCaptureSubTarget_SkipsZeroOrNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 615
+      "line": 614
     },
     {
       "package": "bridge",
       "identifier": "TestCaptureSubTarget_StoresMetadata",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 573
+      "line": 572
     },
     {
       "package": "bridge",
@@ -972,35 +959,35 @@
       "identifier": "TestCheckTimedGate_ExpiredDeadlineRejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 494
+      "line": 493
     },
     {
       "package": "bridge",
       "identifier": "TestCheckTimedGate_TimedFlagWithoutPriorRejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 479
+      "line": 478
     },
     {
       "package": "bridge",
       "identifier": "TestCheckTimedGate_UntimedRequestNoPriorProceeds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 445
+      "line": 444
     },
     {
       "package": "bridge",
       "identifier": "TestCheckTimedGate_UntimedRequestWithPriorRejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 460
+      "line": 459
     },
     {
       "package": "bridge",
       "identifier": "TestCheckTimedGate_ValidDeadlineProceeds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 514
+      "line": 513
     },
     {
       "package": "bridge",
@@ -2484,84 +2471,84 @@
       "identifier": "TestDispatch_IMInvalidOpcode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 405
+      "line": 404
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_IMReadRoutes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 315
+      "line": 314
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_IMResponseOpcodeIsUnsupported",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 330
+      "line": 329
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_IMSubscribeReplies",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 358
+      "line": 357
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_NilSrcDoesNotPanic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 168
+      "line": 167
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_NoDispatcherDropsSilently",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 422
+      "line": 421
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_SecureChannelOpcode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 183
+      "line": 182
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_SessionMissingSurfaces",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 276
+      "line": 275
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_TooShortBuffer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 157
+      "line": 156
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_UnknownProtocolID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 201
+      "line": 200
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_VendorIDZeroStillRoutesNormally",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 254
+      "line": 253
     },
     {
       "package": "bridge",
       "identifier": "TestDispatch_VendorQualifiedProtocolCollisionRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 223
+      "line": 222
     },
     {
       "package": "bridge",
@@ -2631,14 +2618,14 @@
       "identifier": "TestEndpointCount_NilTopology_ReturnsZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 469
+      "line": 468
     },
     {
       "package": "bridge",
       "identifier": "TestEndpointCount_StartedBridgeWithoutSources_IsZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 481
+      "line": 480
     },
     {
       "package": "bridge",
@@ -2687,7 +2674,7 @@
       "identifier": "TestForgetSigma1Replied_ClearsEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 219
+      "line": 218
     },
     {
       "package": "bridge",
@@ -2701,7 +2688,7 @@
       "identifier": "TestHandleDatagram_TooShortDoesNotPanic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 542
+      "line": 541
     },
     {
       "package": "bridge",
@@ -2757,14 +2744,14 @@
       "identifier": "TestHandlerContext_NilCtx_ReturnsBackground",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 517
+      "line": 516
     },
     {
       "package": "bridge",
       "identifier": "TestHandlerContext_StartedBridge_ReturnsNonNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 528
+      "line": 527
     },
     {
       "package": "bridge",
@@ -2778,7 +2765,7 @@
       "identifier": "TestInboundCloseSessionStatusReport_DropsTimedDeadlines",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/timed_deadline_reclamation_test.go",
-      "line": 142
+      "line": 141
     },
     {
       "package": "bridge",
@@ -2827,7 +2814,7 @@
       "identifier": "TestMatterEmitEvent_IsAliasOfEmitEvent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 457
+      "line": 456
     },
     {
       "package": "bridge",
@@ -2890,21 +2877,21 @@
       "identifier": "TestNotifyDeviceReachable_DirtiesReachableAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 157
+      "line": 156
     },
     {
       "package": "bridge",
       "identifier": "TestNotifyDeviceReachable_FiresReachableChanged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 73
+      "line": 72
     },
     {
       "package": "bridge",
       "identifier": "TestNotifyDeviceReachable_IgnoresNonMatchingDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 111
+      "line": 110
     },
     {
       "package": "bridge",
@@ -3240,7 +3227,7 @@
       "identifier": "TestPerExchangeCaseProvider_EvictHookForgetsSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 251
+      "line": 249
     },
     {
       "package": "bridge",
@@ -3555,28 +3542,28 @@
       "identifier": "TestReplyTimedStatus_NilSrc_DoesNotPanic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 493
+      "line": 492
     },
     {
       "package": "bridge",
       "identifier": "TestReplyTimedStatus_WithSrc_DoesNotPanic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
-      "line": 505
+      "line": 504
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscriptionChunksAnOversizedOngoingReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 211
+      "line": 210
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscriptionEventsChunksAnOversizedReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 266
+      "line": 265
     },
     {
       "package": "bridge",
@@ -4122,7 +4109,7 @@
       "identifier": "TestTimedRequest_SessionScopeIsolation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 535
+      "line": 534
     },
     {
       "package": "bridge",
@@ -5173,6 +5160,13 @@
       "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
       "file": "endpoint/endpointtest/endpointtest.go",
       "line": 27
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_test.go",
+      "line": 46
     },
     {
       "package": "im",

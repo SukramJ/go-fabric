@@ -451,7 +451,7 @@ func (c *countingAdvertiser) publishes() int {
 func TestTriggerSessionReannounce_RepublishesActiveRecords(t *testing.T) {
 	t.Parallel()
 	adv := &countingAdvertiser{Noop: mdns.NewNoop()}
-	b, err := New(NewFakeStore(), wbEmptySnapshotter, adv, Config{
+	b, err := New(wbEmptySnapshotter, adv, Config{
 		Listen: ":0", VendorID: 0x1234, ProductID: 0x5678, NodeLabel: "reannounce-test",
 	}, nil)
 	if err != nil {

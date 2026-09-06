@@ -13,6 +13,16 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **The reference daemon mounts the three cluster servers that had no host.**
+  `cluster/valve`, `cluster/modeselect` and `cluster/levelcontrol` shipped with
+  no endpoint anywhere mounting them, so their subscription paths were
+  exercised only through collaborations a test constructed itself — a
+  bracketing test by this project's own definition, recorded rather than
+  hidden when they landed. A WaterValve, a ModeSelect device and a Speaker now
+  sit in the example fleet behind fake devices that hold real state, and the
+  guard that could not be written before exists: a device-side change reaching
+  a subscriber through a **mounted** endpoint.
+
 - **A stated API-stability and deprecation policy, with a guard behind it.**
   The module is on its own SemVer lane and nothing is tagged, so a consumer had
   no way to know what it may depend on or how much warning a rename carries.
@@ -199,6 +209,44 @@ long enough for a `v0.1.0` to mean something.
   of leaning on a formatting step in a `Makefile` this module does not have.
   Regenerating from the unchanged snapshot reproduces `clusters.go`,
   `devicetypes.go` and the `SchemaSnapshotSHA256` constant byte for byte.
+
+### Removed
+
+- **`bridge.New` no longer takes an `endpoint.Store`.** The signature is now
+  `New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger
+  *slog.Logger)`. The store was stored on the `Bridge` and read by nothing —
+  the bridge consumes a fully assembled topology through the `Snapshotter` and
+  never looks an endpoint record up itself, so the parameter asked every host
+  for a collaborator the package had no use for and made the constructor read
+  as though the bridge owned endpoint persistence. There is no replacement,
+  because there was nothing to replace: a host still needs a store, and still
+  passes it to the `endpoint` assembler behind its snapshotter, exactly as
+  before.
+
+  **Upgrading requires a source change**: delete the first argument at every
+  `bridge.New` call site. `bridge.New(store, snap, adv, cfg, logger)` becomes
+  `bridge.New(snap, adv, cfg, logger)`; the store variable stays where it is,
+  feeding the assembler. Nothing else moves, and a missed call site is a
+  compile error rather than a behaviour change. The error string
+  `"bridge: store is required"` is gone with the nil check that produced it.
+
+  This ships without a deprecation window. A parameter cannot carry a
+  `Deprecated:` marker that `staticcheck` would ever warn on, so honouring the
+  window would mean shipping a second constructor for two minor releases; the
+  module is at `v0` with nothing tagged, where README.md's API-stability
+  section says `main` is the only consumable version and may break in any
+  commit. What that state does not excuse is an unannounced break, which is
+  what this entry is.
+
+### Removed
+
+- **`bridge.New`'s `store` parameter.** Nothing read it: the field was
+  assigned and never used, which a compiler probe confirmed rather than a
+  grep. Removing it is a breaking change to a v0 API, so it is announced here
+  with the call-site edit rather than left for a consumer to discover at build
+  time — the module's stated policy allows the break before `v0.1.0` but not
+  an unannounced one. A parameter cannot carry a `Deprecated:` marker, so the
+  window the policy describes does not apply and this entry stands in for it.
 
 ### Fixed
 

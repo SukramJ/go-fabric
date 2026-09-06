@@ -11,7 +11,7 @@
 //     sigma1Replied dedupe map cannot leak.
 //
 // Lives in package bridge so it can reach the unexported sigma1Replied map
-// and the in-package test helpers (NewFakeStore, wbEmptySnapshotter).
+// and the in-package test helper wbEmptySnapshotter.
 package bridge
 
 import (
@@ -31,7 +31,6 @@ import (
 func newReachabilityBridge(t *testing.T, ep *endpointpkg.Endpoint) *Bridge {
 	t.Helper()
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		nil,
 		Config{
@@ -219,7 +218,6 @@ func TestNotifyDeviceReachable_DirtiesReachableAttribute(t *testing.T) {
 func TestForgetSigma1Replied_ClearsEntry(t *testing.T) {
 	t.Parallel()
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		nil,
 		Config{Listen: ":0", VendorID: 0x1, ProductID: 0x1, NodeLabel: "evict-test"},
@@ -251,7 +249,6 @@ func TestForgetSigma1Replied_ClearsEntry(t *testing.T) {
 func TestPerExchangeCaseProvider_EvictHookForgetsSigma1(t *testing.T) {
 	t.Parallel()
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		nil,
 		Config{Listen: ":0", VendorID: 0x1, ProductID: 0x1, NodeLabel: "evict-hook-test"},

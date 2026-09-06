@@ -81,7 +81,6 @@ func reportDataChunkInfo(body []byte) (reports int, more bool, err error) {
 func newStartedBridgeWithSnapshotter(t *testing.T, snap Snapshotter) *Bridge {
 	t.Helper()
 	b, err := New(
-		NewFakeStore(),
 		snap,
 		nil,
 		Config{

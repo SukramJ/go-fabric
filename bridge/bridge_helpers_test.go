@@ -337,7 +337,6 @@ func newBridgeWithAdvertiser(t *testing.T, advertiser mdns.Advertiser, buf *byte
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(buf, nil))
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		advertiser,
 		Config{

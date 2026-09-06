@@ -489,7 +489,6 @@ func TestTickOutboundReliable_NilListener(t *testing.T) {
 	t.Parallel()
 	// Build an unstarted bridge — listener is nil.
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		nil,
 		Config{

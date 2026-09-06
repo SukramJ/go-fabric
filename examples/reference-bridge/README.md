@@ -40,10 +40,19 @@ Startup prints the pairing information on stdout:
 | --- | --- | --- |
 | 2 | OnOffLight `0x0100` | `demoLight`, a `contract.EndpointSource` with a hand-written OnOff (`0x0006`) cluster server |
 | 3 | TemperatureSensor `0x0302` | `demoThermometer`, a `contract.FloatMeasurementSource` — no cluster code at all; the assembler picks the cluster from the declared measurement class |
+| 4 | WaterValve `0x0042` | `demoValve`, the host port behind the library's `cluster/valve` server (ValveConfigurationAndControl `0x0081`) |
+| 5 | ModeSelect `0x0027` | `demoSelector`, the host port behind `cluster/modeselect` (ModeSelect `0x0050`) |
+| 6 | Speaker `0x0022` | `demoSpeaker`, the host port behind `cluster/levelcontrol` (LevelControl `0x0008`), with the OnOff cluster its "with On/Off" commands drive |
 
-The two are deliberately different shapes. A device with commands has to
-implement `contract.ClusterServer` itself; a read-only measurement does not,
-and the difference in what the host has to write is large.
+The shapes are deliberately different. A device with commands has to serve
+`contract.ClusterServer` itself; a read-only measurement does not, and the
+difference in what the host has to write is large. The last three write no
+cluster code either: the library carries the server, and the device
+implements only that server's narrow host port — the shape a consumer with a
+cluster the library already models is meant to reach for.
+
+Endpoint numbers are the assembler's to assign and are shown here as they
+come out of an empty store; nothing reads them back as constants.
 
 ## This is a TEST identity
 

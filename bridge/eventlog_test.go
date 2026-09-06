@@ -24,7 +24,6 @@ import (
 func TestBridge_EmitEvent_AppendsToLog(t *testing.T) {
 	t.Parallel()
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		nil, // noop advertiser
 		Config{
@@ -84,7 +83,6 @@ func TestBridge_EmitEvent_AppendsToLog(t *testing.T) {
 func TestBridge_EmitEvent_EventLogNumberConsistency(t *testing.T) {
 	t.Parallel()
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		nil,
 		Config{
@@ -267,7 +265,6 @@ func TestBridge_ReadRequest_ParsesEventRequests(t *testing.T) {
 func TestBridge_EventLog_NotNil(t *testing.T) {
 	t.Parallel()
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		nil,
 		Config{

@@ -46,7 +46,6 @@ var (
 func newBenchBridge(tb testing.TB, snap Snapshotter) *Bridge {
 	tb.Helper()
 	b, err := New(
-		NewFakeStore(),
 		snap,
 		nil,
 		Config{

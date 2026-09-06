@@ -9,9 +9,13 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 )
@@ -20,6 +24,86 @@ import (
 // persisted endpoint identities one scope at a time; a host with one
 // partition may use any non-empty constant.
 const scope = "demo"
+
+// Matter device types the fleet's command-driven devices advertise. Only
+// the ids are written here — the revision each endpoint publishes is read
+// from the generated matter.js snapshot by the assembler, so a schema
+// regeneration moves it without an edit on this side.
+const (
+	// deviceTypeWaterValve is WaterValve (matter.js
+	// packages/model/src/standard/elements/water-valve.element.ts:13). Its
+	// mandatory server clusters are Identify — which the assembler mounts on
+	// every bridged endpoint — and ValveConfigurationAndControl (:18-19),
+	// which is what [demoValve] serves.
+	deviceTypeWaterValve uint16 = 0x0042
+	// deviceTypeModeSelect is ModeSelect (mode-select-device.element.ts:12),
+	// whose one required server cluster is the ModeSelect cluster itself
+	// (:18).
+	deviceTypeModeSelect uint16 = 0x0027
+	// deviceTypeSpeaker is Speaker (speaker.element.ts:12): OnOff and
+	// LevelControl, both conformance M and neither carrying a feature
+	// requirement (:18-19).
+	//
+	// It is the device type this module's LevelControl server fits.
+	// DimmableLight would be the more obvious host and is the wrong one: it
+	// requires the LT (Lighting) feature on both OnOff and LevelControl
+	// (dimmable-light.element.ts:19-33), and cluster/levelcontrol
+	// deliberately implements neither LT-gated attribute — advertising that
+	// device type would promise a surface the endpoint does not serve.
+	deviceTypeSpeaker uint16 = 0x0022
+)
+
+// --- the change-notification fan-out the devices share -------------------
+
+// notifier is the host half of [contract.ChangeNotifier]: a device fires it
+// once its own state has moved, and the bridge — which subscribed to every
+// endpoint source at mount time — marks that endpoint's reportable
+// attribute paths dirty, so the next subscription tick ships the new value.
+//
+// A device that changes state without firing it stays invisible to a
+// subscribed controller until the controller reads again, which is what
+// makes this the load-bearing half of a bridged device rather than a
+// convenience.
+type notifier struct {
+	cbMu sync.Mutex
+	cbs  map[uint64]func()
+	next uint64
+}
+
+// OnMatterValueChanged implements [contract.ChangeNotifier].
+func (n *notifier) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	if cb == nil {
+		return func() {}
+	}
+	n.cbMu.Lock()
+	if n.cbs == nil {
+		n.cbs = make(map[uint64]func())
+	}
+	id := n.next
+	n.next++
+	n.cbs[id] = cb
+	n.cbMu.Unlock()
+	return func() {
+		n.cbMu.Lock()
+		delete(n.cbs, id)
+		n.cbMu.Unlock()
+	}
+}
+
+// notify fans the change out. The callbacks run outside the lock, and every
+// caller below releases its own device lock first: a callback re-enters the
+// bridge, which reads the endpoint's attributes back out of the same device.
+func (n *notifier) notify() {
+	n.cbMu.Lock()
+	cbs := make([]func(), 0, len(n.cbs))
+	for _, cb := range n.cbs {
+		cbs = append(cbs, cb)
+	}
+	n.cbMu.Unlock()
+	for _, cb := range cbs {
+		cb()
+	}
+}
 
 // --- device 1: an on/off light ------------------------------------------
 
@@ -43,30 +127,49 @@ func (d *demoLight) MatterDeviceType() uint16 { return onoff.DeviceTypeOnOffLigh
 // adds Descriptor and BridgedDeviceBasicInformation itself; only the
 // device-specific surface comes from here.
 func (d *demoLight) MatterClusterServers() []contract.ClusterServer {
-	return []contract.ClusterServer{&onOffServer{light: d}}
+	return []contract.ClusterServer{&onOffServer{dev: d, logMessage: "light.set"}}
 }
 
-func (d *demoLight) set(on bool) {
+// deviceName implements [onOffDevice].
+func (d *demoLight) deviceName() string { return d.name }
+
+// setOn implements [onOffDevice].
+func (d *demoLight) setOn(on bool) {
 	d.mu.Lock()
 	d.on = on
 	d.mu.Unlock()
 }
 
-func (d *demoLight) state() bool {
+// isOn implements [onOffDevice].
+func (d *demoLight) isOn() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.on
 }
 
-// onOffServer projects [demoLight] onto the OnOff cluster (0x0006).
+// onOffDevice is the narrow port [onOffServer] drives: a device with a
+// boolean on/off state that can name itself in a log line. Two devices in
+// this fleet have one — the light, and the speaker whose LevelControl is
+// coupled to it — so the server takes the port rather than either of them.
+type onOffDevice interface {
+	deviceName() string
+	isOn() bool
+	setOn(on bool)
+}
+
+// onOffServer projects an [onOffDevice] onto the OnOff cluster (0x0006).
 //
 // Ids, the feature bit and the revision all come from the module's onoff
 // package rather than being written out here — the revision in particular is
 // read from the generated matter.js snapshot, so a schema regeneration moves
 // it without an edit on this side.
 type onOffServer struct {
-	light   *demoLight
-	version contract.DataVersionTracker
+	dev onOffDevice
+	// logMessage is the slog message [onOffServer.apply] emits. Each device
+	// kind names its own, so a reader of the daemon log can tell which
+	// device was driven when more than one serves this cluster.
+	logMessage string
+	version    contract.DataVersionTracker
 }
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -80,10 +183,10 @@ func (s *onOffServer) MatterClusterID() uint32 { return onoff.ClusterID }
 func (s *onOffServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case onoff.AttrOnOff:
-		return s.light.state(), true
+		return s.dev.isOn(), true
 	case cluster.AttrGlobalFeatureMap:
-		// No LT: this light supports plain On/Off/Toggle and none of the
-		// LT-gated timing attributes below.
+		// No LT: these devices support plain On/Off/Toggle and none of the
+		// LT-gated timing attributes.
 		return uint32(0), true
 	case cluster.AttrGlobalClusterRevision:
 		return uint32(onoff.Revision()), true
@@ -107,7 +210,7 @@ func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any,
 	case onoff.CmdOff:
 		s.apply(false)
 	case onoff.CmdToggle:
-		s.apply(!s.light.state())
+		s.apply(!s.dev.isOn())
 	default:
 		return nil, fmt.Errorf("onoff: unsupported command %#x", cmdID)
 	}
@@ -118,9 +221,9 @@ func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any,
 // controller's DataVersionFilter misses and the next report carries the new
 // value.
 func (s *onOffServer) apply(on bool) {
-	s.light.set(on)
+	s.dev.setOn(on)
 	s.version.Bump()
-	slog.Info("light.set", slog.String("device", s.light.name), slog.Bool("on", on))
+	slog.Info(s.logMessage, slog.String("device", s.dev.deviceName()), slog.Bool("on", on))
 }
 
 // MatterReportable implements [contract.ClusterServer].
@@ -170,6 +273,614 @@ func (t *demoThermometer) MatterFloatValue() (float64, bool) {
 	return t.celsius, true
 }
 
+// --- device 3: an irrigation valve --------------------------------------
+
+// demoValve is a hand-built stand-in for a garden irrigation valve: a
+// motorised head that is either open or closed, plus the timer that ends a
+// timed opening.
+//
+// What the model does and does not claim:
+//
+//   - The head has no travel time. Open and Close take effect at once, so
+//     CurrentState never reads Transitioning, and TargetState reports "no
+//     target set" (a TLV null) rather than a position the head is still
+//     travelling to.
+//   - The timer is real but lazy. A timed opening stores its deadline, and
+//     the valve finds itself closed on the first read after it. Nothing in
+//     this process wakes at the deadline, so a subscriber learns of a
+//     self-close on its next read rather than from a report — a device with
+//     a clock of its own would fire [notifier.notify] instead.
+type demoValve struct {
+	name string
+	notifier
+	// version is held by the device, not by the cluster server, because the
+	// assembler rebuilds the server on every reassembly and a version that
+	// restarted with it would go backwards.
+	//
+	// On a bridged endpoint a controller never sees this counter:
+	// endpoint/dispatcher.go:38-42 answers from the ENDPOINT's version for
+	// anything that is not the root or the aggregator, and that one is bumped
+	// by the subscription manager (bridge/subscribe.go:997). So the tracker
+	// passed here is inert on the path this daemon actually uses. It is
+	// wired anyway because the server's contract asks for one and a host that
+	// mounts the same server on a root endpoint would need it — but nothing
+	// here depends on its value, and a reader should not go looking for the
+	// effect.
+	version cluster.DataVersionTracker
+
+	mu    sync.Mutex
+	state valve.State
+	// openFor is the duration of the current opening; nil means the valve is
+	// closed, or open until something closes it.
+	openFor *uint32
+	// closesAt is the deadline of a timed opening; the zero time means there
+	// is none.
+	closesAt    time.Time
+	defaultOpen *uint32
+}
+
+// Compile-time assertions: the device is the endpoint source, the host port
+// of the ValveConfigurationAndControl server, and its own change notifier.
+var (
+	_ contract.EndpointSource = (*demoValve)(nil)
+	_ contract.ChangeNotifier = (*demoValve)(nil)
+	_ valve.StateSource       = (*demoValve)(nil)
+)
+
+// newDemoValve returns a closed valve whose default opening lasts
+// defaultOpenSeconds — the duration an Open command carrying no OpenDuration
+// field applies.
+func newDemoValve(name string, defaultOpenSeconds uint32) *demoValve {
+	seconds := defaultOpenSeconds
+	return &demoValve{name: name, state: valve.StateClosed, defaultOpen: &seconds}
+}
+
+// MatterDeviceType implements [contract.EndpointSource].
+func (v *demoValve) MatterDeviceType() uint16 { return deviceTypeWaterValve }
+
+// MatterClusterServers implements [contract.EndpointSource]. The device is
+// the server's narrow port: every attribute the cluster answers is read back
+// out of it, and both commands land on it.
+func (v *demoValve) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{valve.NewServer(valve.Config{
+		Source:      v,
+		DataVersion: &v.version,
+	})}
+}
+
+// expireLocked applies a lapsed opening deadline. Caller holds v.mu.
+func (v *demoValve) expireLocked(now time.Time) {
+	if v.state != valve.StateOpen || v.closesAt.IsZero() || now.Before(v.closesAt) {
+		return
+	}
+	v.state = valve.StateClosed
+	v.openFor = nil
+	v.closesAt = time.Time{}
+}
+
+// CurrentState implements [valve.StateSource]. The head has no travel time,
+// so the state is always known and never Transitioning.
+func (v *demoValve) CurrentState() (valve.State, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.expireLocked(time.Now())
+	return v.state, true
+}
+
+// TargetState implements [valve.StateSource]. A move completes inside the
+// command that started it, so no target is ever outstanding — which the
+// cluster reports as null, the spec's reading for "no target is set because
+// the change is done".
+func (v *demoValve) TargetState() (valve.State, bool) { return valve.StateClosed, false }
+
+// OpenDuration implements [valve.StateSource]. Null while the valve is
+// closed, and null for an indefinite opening — the spec's own meaning for
+// the attribute rather than an unknown value.
+func (v *demoValve) OpenDuration() (uint32, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.expireLocked(time.Now())
+	if v.state != valve.StateOpen || v.openFor == nil {
+		return 0, false
+	}
+	return *v.openFor, true
+}
+
+// RemainingDuration implements [valve.StateSource]. Null unless a timed
+// opening is running.
+func (v *demoValve) RemainingDuration() (uint32, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	now := time.Now()
+	v.expireLocked(now)
+	if v.state != valve.StateOpen || v.closesAt.IsZero() {
+		return 0, false
+	}
+	return secondsUntil(v.closesAt.Sub(now)), true
+}
+
+// DefaultOpenDuration implements [valve.StateSource].
+func (v *demoValve) DefaultOpenDuration() (uint32, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.defaultOpen == nil {
+		return 0, false
+	}
+	return *v.defaultOpen, true
+}
+
+// SetDefaultOpenDuration implements [valve.StateSource]. Nothing is fanned
+// out: DefaultOpenDuration is not a reportable attribute, and the cluster
+// server bumps the DataVersion for the write itself.
+func (v *demoValve) SetDefaultOpenDuration(_ context.Context, seconds *uint32) error {
+	v.mu.Lock()
+	v.defaultOpen = copyUint32(seconds)
+	v.mu.Unlock()
+	slog.Info("valve.default_open_duration", slog.String("device", v.name),
+		slog.Any("seconds", seconds))
+	return nil
+}
+
+// Open implements [valve.StateSource]. An absent OpenDuration field means
+// "use DefaultOpenDuration"; a present null means "stay open until something
+// closes me", which is why the two are kept apart rather than folded.
+func (v *demoValve) Open(_ context.Context, req valve.OpenRequest) error {
+	v.mu.Lock()
+	duration := v.defaultOpen
+	if req.HasOpenDuration {
+		duration = req.OpenDuration
+	}
+	v.state = valve.StateOpen
+	v.openFor = copyUint32(duration)
+	if duration != nil {
+		v.closesAt = time.Now().Add(time.Duration(*duration) * time.Second)
+	} else {
+		v.closesAt = time.Time{}
+	}
+	v.mu.Unlock()
+	slog.Info("valve.open", slog.String("device", v.name), slog.Any("seconds", duration))
+	v.notify()
+	return nil
+}
+
+// Close implements [valve.StateSource].
+func (v *demoValve) Close(context.Context) error {
+	v.mu.Lock()
+	v.state = valve.StateClosed
+	v.openFor = nil
+	v.closesAt = time.Time{}
+	v.mu.Unlock()
+	slog.Info("valve.close", slog.String("device", v.name))
+	v.notify()
+	return nil
+}
+
+// reportFromDevice applies a position the valve reported by itself — the
+// manual lever on the head, or its own local timer — as opposed to one a
+// Matter command asked for. A real host drives this from its southbound
+// event stream; this example has no southbound bus, so the only caller is
+// the fleet's own test, where it stands for a change that starts at the
+// device rather than at a controller.
+func (v *demoValve) reportFromDevice(state valve.State) {
+	v.mu.Lock()
+	v.state = state
+	if state != valve.StateOpen {
+		v.openFor = nil
+		v.closesAt = time.Time{}
+	}
+	v.mu.Unlock()
+	slog.Info("valve.reported", slog.String("device", v.name), slog.Int("state", int(state)))
+	v.notify()
+}
+
+// secondsUntil renders a remaining duration as whole seconds, rounding up so
+// a valve that is still open never reports zero seconds left.
+func secondsUntil(d time.Duration) uint32 {
+	if d <= 0 {
+		return 0
+	}
+	// The attribute is a uint32 count of seconds, so the ceiling is that
+	// type's maximum expressed as a duration.
+	const ceiling = time.Duration(^uint32(0))
+	seconds := (d + time.Second - 1) / time.Second
+	if seconds > ceiling {
+		return ^uint32(0)
+	}
+	return uint32(seconds) //nolint:gosec // clamped against the uint32 maximum on the line above
+}
+
+// copyUint32 copies a nullable value so a device never aliases a pointer its
+// caller still owns.
+func copyUint32(v *uint32) *uint32 {
+	if v == nil {
+		return nil
+	}
+	out := *v
+	return &out
+}
+
+// --- device 4: a mode selector ------------------------------------------
+
+// demoSelector is a hand-built stand-in for a coffee machine's brew-strength
+// knob: a characteristic with three labelled positions and nothing in
+// between them, which is the case ModeSelect exists for.
+//
+// The knob's position is the whole of the device state. The mode list is
+// fixed for the lifetime of the device, which is what the cluster's quality
+// F on Description, StandardNamespace and SupportedModes asks for.
+type demoSelector struct {
+	name        string
+	description string
+	notifier
+	// version is held by the device for the reason given on [demoValve].
+	version cluster.DataVersionTracker
+
+	// modes is immutable after construction, so it needs no lock.
+	modes []modeselect.ModeOptionStruct
+
+	mu      sync.Mutex
+	current uint8
+}
+
+// Compile-time assertions.
+var (
+	_ contract.EndpointSource = (*demoSelector)(nil)
+	_ contract.ChangeNotifier = (*demoSelector)(nil)
+	_ modeselect.ModeSource   = (*demoSelector)(nil)
+)
+
+// Brew-strength positions of [demoSelector]. The values are this host's own
+// — ModeSelect leaves the numbering to the device — and they are what a
+// ChangeToMode command carries.
+const (
+	brewMild   uint8 = 0
+	brewNormal uint8 = 1
+	brewStrong uint8 = 2
+)
+
+// newDemoSelector returns a selector parked on [brewNormal].
+func newDemoSelector(name string) *demoSelector {
+	return &demoSelector{
+		name:        name,
+		description: "Brew strength",
+		modes: []modeselect.ModeOptionStruct{
+			// SemanticTags is conformance M, so every option carries the
+			// field; leaving it empty is how an option says it has no tag a
+			// client could act on without reading the label. No standard
+			// namespace covers brew strength, so there is nothing honest to
+			// put in it here.
+			{Label: "Mild", Mode: brewMild},
+			{Label: "Normal", Mode: brewNormal},
+			{Label: "Strong", Mode: brewStrong},
+		},
+		current: brewNormal,
+	}
+}
+
+// MatterDeviceType implements [contract.EndpointSource].
+func (s *demoSelector) MatterDeviceType() uint16 { return deviceTypeModeSelect }
+
+// MatterClusterServers implements [contract.EndpointSource].
+func (s *demoSelector) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{modeselect.NewServer(modeselect.Config{
+		Source:      s,
+		DataVersion: &s.version,
+	})}
+}
+
+// ModeDescription implements [modeselect.ModeSource].
+func (s *demoSelector) ModeDescription() string { return s.description }
+
+// ModeNamespace implements [modeselect.ModeSource]. No standard namespace
+// describes brew strength, so StandardNamespace reads null.
+func (s *demoSelector) ModeNamespace() (uint8, bool) { return 0, false }
+
+// SupportedModes implements [modeselect.ModeSource]. The server deep-copies
+// what it is given, so handing out the fixed slice cannot leak host state.
+func (s *demoSelector) SupportedModes() []modeselect.ModeOptionStruct { return s.modes }
+
+// CurrentMode implements [modeselect.ModeSource].
+func (s *demoSelector) CurrentMode() uint8 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.current
+}
+
+// ChangeToMode implements [modeselect.ModeSource]. The server has already
+// refused any mode outside SupportedModes, so what arrives here turns the
+// knob.
+func (s *demoSelector) ChangeToMode(_ context.Context, newMode uint8) error {
+	s.mu.Lock()
+	s.current = newMode
+	s.mu.Unlock()
+	slog.Info("selector.set", slog.String("device", s.name), slog.Int("mode", int(newMode)))
+	s.notify()
+	return nil
+}
+
+// reportFromDevice applies a position someone turned the knob to by hand.
+// Like [demoValve.reportFromDevice] it stands in for the southbound event a
+// real host would forward, and the fleet's test is its caller. An unknown
+// mode is refused rather than stored: the device cannot be in a position its
+// own mode list does not have.
+func (s *demoSelector) reportFromDevice(mode uint8) error {
+	if !s.supports(mode) {
+		return fmt.Errorf("selector %s: mode %d is not one of its positions", s.name, mode)
+	}
+	s.mu.Lock()
+	s.current = mode
+	s.mu.Unlock()
+	slog.Info("selector.reported", slog.String("device", s.name), slog.Int("mode", int(mode)))
+	s.notify()
+	return nil
+}
+
+// supports reports whether mode is one of the knob's positions.
+func (s *demoSelector) supports(mode uint8) bool {
+	for _, opt := range s.modes {
+		if opt.Mode == mode {
+			return true
+		}
+	}
+	return false
+}
+
+// --- device 5: a powered speaker ----------------------------------------
+
+// demoSpeaker is a hand-built stand-in for a powered speaker: a volume on a
+// continuous scale, plus the on/off state its LevelControl is coupled to.
+// Both clusters are mounted on the one endpoint, which is what makes the
+// coupling real rather than declared — the "with On/Off" commands drive an
+// OnOff cluster a controller can read back.
+//
+// What the model does and does not claim:
+//
+//   - There is no travel time and no transition. A Move arrives at the end
+//     of its direction and a Step lands on its target inside the command, so
+//     TransitionTime and Rate are validated by the cluster and then not
+//     honoured here, and nothing is ever in flight for Stop to halt. Stop
+//     reports success over a speaker that was already at rest — the truth
+//     for this model, not a stand-in for a halt that did not happen.
+//   - A plain (non-On/Off) command issued while the speaker is off runs only
+//     when the effective Options bitmap sets ExecuteIfOff. A gated-out
+//     command changes nothing and reports success, which is what the spec
+//     asks of it.
+type demoSpeaker struct {
+	name string
+	notifier
+	// version is held by the device for the reason given on [demoValve].
+	version cluster.DataVersionTracker
+
+	mu      sync.Mutex
+	on      bool
+	level   uint8
+	options uint8
+	// onLevel is the level the speaker returns to when its OnOff cluster
+	// turns it on; nil is the spec's "OnLevel has no effect".
+	onLevel *uint8
+}
+
+// Compile-time assertions.
+var (
+	_ contract.EndpointSource  = (*demoSpeaker)(nil)
+	_ contract.ChangeNotifier  = (*demoSpeaker)(nil)
+	_ levelcontrol.LevelSource = (*demoSpeaker)(nil)
+	_ onOffDevice              = (*demoSpeaker)(nil)
+)
+
+// newDemoSpeaker returns a speaker that is off, at the given volume.
+func newDemoSpeaker(name string, level uint8) *demoSpeaker {
+	return &demoSpeaker{name: name, level: level}
+}
+
+// MatterDeviceType implements [contract.EndpointSource].
+func (s *demoSpeaker) MatterDeviceType() uint16 { return deviceTypeSpeaker }
+
+// MatterClusterServers implements [contract.EndpointSource]. Speaker
+// requires both clusters, and both are served from this one device.
+func (s *demoSpeaker) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{
+		&onOffServer{dev: s, logMessage: "speaker.set"},
+		levelcontrol.NewServer(levelcontrol.Config{
+			Source:      s,
+			DataVersion: &s.version,
+		}),
+	}
+}
+
+// deviceName implements [onOffDevice].
+func (s *demoSpeaker) deviceName() string { return s.name }
+
+// isOn implements [onOffDevice].
+func (s *demoSpeaker) isOn() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.on
+}
+
+// setOn implements [onOffDevice]. Turning the speaker on restores OnLevel
+// when one is configured — the coupling the LevelControl attribute
+// describes, applied where the two clusters actually meet.
+func (s *demoSpeaker) setOn(on bool) {
+	s.mu.Lock()
+	s.on = on
+	if on && s.onLevel != nil {
+		s.level = *s.onLevel
+	}
+	s.mu.Unlock()
+	s.notify()
+}
+
+// CurrentLevel implements [levelcontrol.LevelSource]. The level is always
+// known: this device answers for itself rather than caching a reading taken
+// somewhere else.
+func (s *demoSpeaker) CurrentLevel() (uint8, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.level, true
+}
+
+// Options implements [levelcontrol.LevelSource].
+func (s *demoSpeaker) Options() uint8 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.options
+}
+
+// OnLevel implements [levelcontrol.LevelSource].
+func (s *demoSpeaker) OnLevel() (uint8, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.onLevel == nil {
+		return 0, false
+	}
+	return *s.onLevel, true
+}
+
+// SetOptions implements [levelcontrol.LevelSource]. The server has already
+// refused a bitmap carrying a bit the advertised FeatureMap does not cover.
+func (s *demoSpeaker) SetOptions(_ context.Context, options uint8) error {
+	s.mu.Lock()
+	s.options = options
+	s.mu.Unlock()
+	slog.Info("speaker.options", slog.String("device", s.name), slog.Int("options", int(options)))
+	return nil
+}
+
+// SetOnLevel implements [levelcontrol.LevelSource]. A nil level is the
+// spec's null: the on-level has no effect.
+func (s *demoSpeaker) SetOnLevel(_ context.Context, level *uint8) error {
+	s.mu.Lock()
+	if level == nil {
+		s.onLevel = nil
+	} else {
+		v := *level
+		s.onLevel = &v
+	}
+	s.mu.Unlock()
+	slog.Info("speaker.on_level", slog.String("device", s.name), slog.Any("level", level))
+	return nil
+}
+
+// MoveToLevel implements [levelcontrol.LevelSource].
+func (s *demoSpeaker) MoveToLevel(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
+	if !s.executes(req.OptionsMask, req.OptionsOverride) {
+		return nil
+	}
+	s.applyLevel(req.Level, false)
+	return nil
+}
+
+// MoveToLevelWithOnOff implements [levelcontrol.LevelSource].
+func (s *demoSpeaker) MoveToLevelWithOnOff(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
+	s.applyLevel(req.Level, true)
+	return nil
+}
+
+// Move implements [levelcontrol.LevelSource]. With no travel time the move
+// arrives at the end of its direction inside the command.
+func (s *demoSpeaker) Move(_ context.Context, req levelcontrol.MoveRequest) error {
+	if !s.executes(req.OptionsMask, req.OptionsOverride) {
+		return nil
+	}
+	s.applyLevel(moveTarget(req.MoveMode), false)
+	return nil
+}
+
+// MoveWithOnOff implements [levelcontrol.LevelSource].
+func (s *demoSpeaker) MoveWithOnOff(_ context.Context, req levelcontrol.MoveRequest) error {
+	s.applyLevel(moveTarget(req.MoveMode), true)
+	return nil
+}
+
+// Step implements [levelcontrol.LevelSource].
+func (s *demoSpeaker) Step(_ context.Context, req levelcontrol.StepRequest) error {
+	if !s.executes(req.OptionsMask, req.OptionsOverride) {
+		return nil
+	}
+	s.applyLevel(s.steppedLevel(req), false)
+	return nil
+}
+
+// StepWithOnOff implements [levelcontrol.LevelSource].
+func (s *demoSpeaker) StepWithOnOff(_ context.Context, req levelcontrol.StepRequest) error {
+	s.applyLevel(s.steppedLevel(req), true)
+	return nil
+}
+
+// Stop implements [levelcontrol.LevelSource]. See the type doc: this model
+// never has a move in flight to halt.
+func (s *demoSpeaker) Stop(context.Context, levelcontrol.StopRequest) error { return nil }
+
+// StopWithOnOff implements [levelcontrol.LevelSource].
+func (s *demoSpeaker) StopWithOnOff(context.Context, levelcontrol.StopRequest) error { return nil }
+
+// reportFromDevice applies a volume the speaker moved to by itself — its own
+// front-panel dial. Like the same method on the other two devices it stands
+// in for a southbound event, and the fleet's test is its caller.
+func (s *demoSpeaker) reportFromDevice(level uint8) {
+	s.mu.Lock()
+	s.level = level
+	s.mu.Unlock()
+	slog.Info("speaker.reported", slog.String("device", s.name), slog.Int("level", int(level)))
+	s.notify()
+}
+
+// executes applies the ExecuteIfOff gate the plain commands carry. It lives
+// here rather than in the cluster server because the gate reads the OnOff
+// attribute of another cluster on the endpoint, which a single-cluster
+// server cannot see (matter.js LevelControlServer.ts:729-736
+// #optionsAllowExecution). The bitmap arithmetic is the cluster's, so it
+// comes from [levelcontrol.EffectiveOptions] rather than being restated.
+func (s *demoSpeaker) executes(mask, override uint8) bool {
+	if s.isOn() {
+		return true
+	}
+	return levelcontrol.EffectiveOptions(s.Options(), mask, override)&levelcontrol.OptionExecuteIfOff != 0
+}
+
+// applyLevel moves the speaker to level. withOnOff drives the on/off state
+// along with it: the minimum level turns the speaker off, anything above it
+// turns it on.
+func (s *demoSpeaker) applyLevel(level uint8, withOnOff bool) {
+	s.mu.Lock()
+	s.level = level
+	if withOnOff {
+		s.on = level > levelcontrol.LevelMin
+	}
+	on := s.on
+	s.mu.Unlock()
+	slog.Info("speaker.level", slog.String("device", s.name),
+		slog.Int("level", int(level)), slog.Bool("on", on))
+	s.notify()
+}
+
+// steppedLevel resolves a Step command against the current level, clamped to
+// the cluster's own bounds.
+func (s *demoSpeaker) steppedLevel(req levelcontrol.StepRequest) uint8 {
+	s.mu.Lock()
+	current := s.level
+	s.mu.Unlock()
+	if req.StepMode == levelcontrol.StepModeUp {
+		if uint16(current)+uint16(req.StepSize) > uint16(levelcontrol.LevelMax) {
+			return levelcontrol.LevelMax
+		}
+		return current + req.StepSize
+	}
+	if req.StepSize > current-levelcontrol.LevelMin {
+		return levelcontrol.LevelMin
+	}
+	return current - req.StepSize
+}
+
+// moveTarget is where a Move ends on a device with no travel time.
+func moveTarget(moveMode uint8) uint8 {
+	if moveMode == levelcontrol.MoveModeUp {
+		return levelcontrol.LevelMax
+	}
+	return levelcontrol.LevelMin
+}
+
 // --- the fleet ----------------------------------------------------------
 
 // fleet is the hard-coded device list this daemon bridges, plus the
@@ -177,6 +888,9 @@ func (t *demoThermometer) MatterFloatValue() (float64, bool) {
 type fleet struct {
 	light       *demoLight
 	thermometer *demoThermometer
+	valve       *demoValve
+	selector    *demoSelector
+	speaker     *demoSpeaker
 	assembler   *endpoint.Assembler
 }
 
@@ -188,13 +902,16 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 	return &fleet{
 		light:       newDemoLight("Desk Lamp"),
 		thermometer: newDemoThermometer(21.5),
+		valve:       newDemoValve("Garden Tap", 600),
+		selector:    newDemoSelector("Coffee Machine"),
+		speaker:     newDemoSpeaker("Kitchen Speaker", 120),
 		assembler:   asm,
 	}, nil
 }
 
 // snapshotter is what the bridge calls at Start and on every Reassemble. It
-// walks this host's model — here, two hard-coded devices — describes each as
-// a flat [endpoint.Spec], and hands the assembled topology back.
+// walks this host's model — here, five hard-coded devices — describes each
+// as a flat [endpoint.Spec], and hands the assembled topology back.
 //
 // StableKey is the load-bearing field: it decides which endpoint number the
 // device gets back after a restart, so it must render byte-for-byte
@@ -216,6 +933,30 @@ func (f *fleet) snapshotter(ctx context.Context) (*endpoint.Topology, error) {
 			DeviceType:     contract.MeasurementClassDeviceType(contract.MeasurementTemperature),
 			FriendlyName:   "Study Thermometer",
 			Measurement:    f.thermometer,
+		},
+		{
+			StableKey:      endpoint.StringKey("demo:valve:1"),
+			DeviceAddress:  "demo-valve-1",
+			ChannelAddress: "demo-valve-1:0",
+			DeviceType:     deviceTypeWaterValve,
+			FriendlyName:   f.valve.name,
+			Source:         f.valve,
+		},
+		{
+			StableKey:      endpoint.StringKey("demo:selector:1"),
+			DeviceAddress:  "demo-selector-1",
+			ChannelAddress: "demo-selector-1:0",
+			DeviceType:     deviceTypeModeSelect,
+			FriendlyName:   f.selector.name,
+			Source:         f.selector,
+		},
+		{
+			StableKey:      endpoint.StringKey("demo:speaker:1"),
+			DeviceAddress:  "demo-speaker-1",
+			ChannelAddress: "demo-speaker-1:0",
+			DeviceType:     deviceTypeSpeaker,
+			FriendlyName:   f.speaker.name,
+			Source:         f.speaker,
 		},
 	}
 	return f.assembler.Assemble(ctx, []endpoint.Snapshot{{
