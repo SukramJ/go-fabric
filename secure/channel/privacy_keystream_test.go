@@ -82,3 +82,29 @@ func TestApplyPrivacyMask_RejectsRegionLongerThanKeystream(t *testing.T) {
 		t.Fatal("a 20-byte region with a 16-byte keystream must be rejected")
 	}
 }
+
+// TestPrivacyKeystream_RejectsBadInputs — the keystream refuses the same
+// inputs PrivacyMask refuses (short key, short MIC) plus a negative
+// length, and a zero length still yields one whole block so a caller
+// can never receive an empty mask.
+func TestPrivacyKeystream_RejectsBadInputs(t *testing.T) {
+	t.Parallel()
+	key := bytes.Repeat([]byte{0x2A}, channel.PrivacyKeySize)
+	mic := bytes.Repeat([]byte{0x5A}, 16)
+	if _, err := channel.PrivacyKeystream(key[:8], 1, mic, 16); err == nil {
+		t.Error("short key accepted")
+	}
+	if _, err := channel.PrivacyKeystream(key, 1, mic[:8], 16); err == nil {
+		t.Error("short MIC accepted")
+	}
+	if _, err := channel.PrivacyKeystream(key, 1, mic, -1); err == nil {
+		t.Error("negative length accepted")
+	}
+	stream, err := channel.PrivacyKeystream(key, 1, mic, 0)
+	if err != nil {
+		t.Fatalf("zero length: %v", err)
+	}
+	if len(stream) != channel.PrivacyKeySize {
+		t.Errorf("zero length yielded %d bytes, want one block of %d", len(stream), channel.PrivacyKeySize)
+	}
+}

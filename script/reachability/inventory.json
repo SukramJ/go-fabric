@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3149,
+  "entry_points": 3159,
   "entry_packages": [
     ".",
     "bootid",
@@ -50,9 +50,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2763,
-    "reachable": 1349,
-    "whitelisted": 1404,
+    "total_exported": 2768,
+    "reachable": 1350,
+    "whitelisted": 1408,
     "unreachable": 10
   },
   "by_package": [
@@ -385,21 +385,21 @@
       "identifier": "TestApplyOutboundPrivacy_ClosedSession_ReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 291
+      "line": 295
     },
     {
       "package": "bridge",
       "identifier": "TestApplyOutboundPrivacy_NoPrivacyBit_NonNilSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 262
+      "line": 266
     },
     {
       "package": "bridge",
       "identifier": "TestApplyOutboundPrivacy_TooShortForMIC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 237
+      "line": 241
     },
     {
       "package": "bridge",
@@ -2821,14 +2821,14 @@
       "identifier": "TestMaybeUnmaskPrivacy_ClosedSession_ReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 317
+      "line": 321
     },
     {
       "package": "bridge",
       "identifier": "TestMaybeUnmaskPrivacy_TooShortForMIC_AfterSessionResolve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 354
+      "line": 358
     },
     {
       "package": "bridge",
@@ -3360,49 +3360,49 @@
       "identifier": "TestPrivacyHeaderEnd_ClampedToLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 223
+      "line": 227
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_Dest16bit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 211
+      "line": 215
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_Dest64bit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 200
+      "line": 204
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_NoNodeIDs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 178
+      "line": 182
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_TooShort",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 167
+      "line": 171
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacyHeaderEnd_WithSourceNodeID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 189
+      "line": 193
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacy_NoSessionLookup_ReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 118
+      "line": 122
     },
     {
       "package": "bridge",
@@ -3423,21 +3423,35 @@
       "identifier": "TestPrivacy_PASESessionIDRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 149
+      "line": 153
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPrivacy_RoundTripCoversSourceAndDestinationNodeIDs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/privacy_test.go",
+      "line": 494
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacy_SessionNotFound_ReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 132
+      "line": 136
     },
     {
       "package": "bridge",
       "identifier": "TestPrivacy_TooShortBuffer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 108
+      "line": 112
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPrivacy_UnicastWithPBitIsDropped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/privacy_test.go",
+      "line": 470
     },
     {
       "package": "bridge",
@@ -3906,7 +3920,7 @@
       "identifier": "TestSendReply_PrivacyFlaggedRequestGetsMaskedReply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
-      "line": 393
+      "line": 397
     },
     {
       "package": "bridge",
@@ -7137,6 +7151,13 @@
     },
     {
       "package": "secure/channel",
+      "identifier": "TestDecryptNonceUsesTheSessionPeerNotTheHeaderSourceNodeID",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/channel/session_nonce_test.go",
+      "line": 21
+    },
+    {
+      "package": "secure/channel",
       "identifier": "TestDerivePrivacyKeyDeterministic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/channel/privacy_extra_test.go",
@@ -9724,6 +9745,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/message/message_test.go",
       "line": 40
+    },
+    {
+      "package": "transport/message",
+      "identifier": "TestNonceSecurityFlagsKeepsReservedWireBits",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/nonce_flags_test.go",
+      "line": 15
     },
     {
       "package": "transport/message",
