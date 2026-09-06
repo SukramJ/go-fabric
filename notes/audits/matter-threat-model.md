@@ -1,0 +1,511 @@
+# Matter threat model — go-fabric
+
+> **Why this file is not beside `README.md`.** Everything at the module root is
+> part of the published surface a consumer reads before depending on go-fabric.
+> This document is the opposite: a working record of where the security
+> properties are enforced, what they assume, and where they stop — including
+> entries that are unresolved. It belongs in a working-notes tree
+> (`notes/audits/`) so the root stays a description of what the module *is*,
+> and so a later audit has somewhere to land next to this one rather than
+> competing with the README for the reader's trust.
+
+---
+
+## Scope and method
+
+The module is a Matter **node/bridge** implementation: it accepts PASE and CASE
+handshakes, serves the interaction model, and persists fabrics, identities,
+ACLs and group keys. It is not a commissioner.
+
+Every claim below is anchored to a `path:line` that was read. Claims that could
+not be settled from the tree are marked **NOT VERIFIED** in those words rather
+than closed with a plausible answer.
+
+Two structural facts govern the whole document:
+
+1. **go-fabric is a library.** Several enforcement points are *optional
+   capabilities* the host wires. Where a capability is absent, this document
+   states what the code then does — because "the host will wire it" is an
+   assumption, not a control.
+2. **The store is handed in.** `store.New(db *sql.DB)` (`store/store.go:21`)
+   takes an already-open database. File location, permissions and at-rest
+   encryption are entirely outside this module.
+
+---
+
+## 1. PASE passcode brute-force budget
+
+### What limits an attacker's attempts
+
+| Control | Value | Where |
+| --- | --- | --- |
+| Failures before lockout | 20 | `bridge/securechannel.go:480` (`paseMaxErrors`) |
+| First lockout duration | 15 min | `bridge/securechannel.go:519` |
+| Backoff | doubles per consecutive lockout, capped at 4 h | `bridge/securechannel.go:617-633` |
+| Concurrent handshakes | exactly one | `bridge/securechannel.go:536-547` (`claimPaseInFlight`) |
+| Abandoned-handshake timeout | 60 s | `bridge/securechannel.go:496` |
+| Per-source dedup windows | 256 | `bridge/securechannel.go:489` |
+
+The counter is incremented only on a *genuine* pairing failure — a decode
+failure or a SPAKE2+ confirmation mismatch. Missing-handler and state-replay
+conditions are excluded (`bridge/securechannel.go:706-747`); the increment sits
+at `:747`.
+
+### What happens when the budget is exhausted
+
+`recordPaseFailure` (`:567`) fires exactly once, on the transition to 20:
+
+1. `engagePaseLockout` (`:617`) sets `paseLockoutUntil`, bumps the backoff
+   streak, and **resets the failure counter to 0** — from that point the
+   cooldown, not the counter, is what keeps PASE closed.
+2. The open commissioning window is revoked.
+3. Every subsequent `PBKDFParamRequest` / `Pake1` / `Pake3` is dropped before
+   dispatch by the `paseLockedOut()` gate at `bridge/securechannel.go:321`.
+
+The lockout expires on its own (`paseLockedOut`, `:645`) and is cleared
+immediately when a fresh acceptor is installed (`resetPaseFailures`, `:664`).
+The one exception — the cap's own `RevokeWindow` re-attaching the acceptor and
+thereby unlocking itself microseconds later — is guarded by
+`preserveLockoutOnReset` (`:594-599`, honoured at `:672`).
+
+### Passcode space
+
+`commissioning/pase.go:70` rejects passcodes outside `1..99999998`;
+`:73` pins PBKDF2 iterations to `1000..100000` and `:76` the salt to 16–32
+bytes. `secure/setup/setup.go:275` (`IsValidSetupPIN`) additionally rejects the
+trivial PINs listed at `:257`. Confirmation is compared with
+`subtle.ConstantTimeCompare` (`secure/spake2/spake2.go:412`, `:543`).
+
+**Effective budget: 20 guesses per 15 minutes (80/h) against a ~10^8 space, and
+the rate halves with every further lockout.**
+
+### The assumption this rests on
+
+That the attacker must *guess*. Every control here is a rate limit; none of
+them is a secret. If the passcode leaks — printed label photographed, QR code
+shared, a host that ships a fixed passcode across a product line — the whole
+section is irrelevant, because the attacker needs one attempt, not 20.
+
+### What the attacker must already have
+
+Only IP reachability to the bridge's Matter UDP port. Nothing else: PASE is
+answered on the unsecured session type before any authentication exists.
+
+### What is NOT defended against
+
+- **Pairing denial of service.** The counter is a single bridge-wide atomic
+  (`b.paseFailures`, incremented at `:568`), not per source address. Twenty
+  malformed `Pake1` datagrams from any LAN host disable pairing for 15 minutes,
+  then 30, then 60. The design chose this knowingly (`:498-517`), and the
+  operator's way out is to open a new pairing window. **For an
+  *uncommissioned* bridge there is no admin to open one**, so the only recovery
+  is a daemon restart — the sustained-attack cost to the attacker is a few
+  packets per quarter hour.
+- **A passcode acceptor that outlives the window.** `dispatchPase` is reached
+  whenever a handler is attached; the switch at `bridge/securechannel.go:320`
+  checks only the lockout, never whether a commissioning window is open. The
+  reference host attaches the provider once at boot
+  (`examples/reference-bridge/wiring.go:412`). So an uncommissioned bridge
+  answers PASE from its configured passcode indefinitely. This is a deliberate
+  divergence from matter.js (whose `PaseServer` dies with the window) and it is
+  precisely why the lockout had to be invented.
+- **Offline attack on a captured handshake.** Not applicable to SPAKE2+ by
+  construction, but note the iteration count is as low as 1000
+  (`commissioning/pase.go:73`) if the host chooses it — that is the spec floor,
+  not a hardened value.
+- **Timing side channels outside the confirmation compare.** The tag compare is
+  constant-time; the surrounding decode paths were not analysed for timing.
+  **NOT VERIFIED.**
+
+---
+
+## 2. Fail-safe abuse
+
+### The window
+
+`ArmFailSafe` is handled at `cluster/core/general_commissioning.go:491`.
+Defaults: single-arm max 900 s (`:207`), cumulative max 900 s (`:213`). A PASE
+session that completes Pake3 gets a 60-second window armed automatically
+without asking (`AutoArmOnPaseEstablished`, `:866`).
+
+### What an attacker can do inside an armed window
+
+Holding a session that armed the fail-safe, the caller may invoke the
+fabric-mutating OpCreds commands — `CSRRequest`, `AddTrustedRootCertificate`,
+`AddNOC`, `UpdateNOC` — each of which is otherwise rejected with
+`FailsafeRequired` (`cluster/core/operational_credentials.go:504-510`; the
+armed-checks at `:1208`, `:1336`, `:1701`, `:1949`). In practice: install a
+fabric on the bridge, with its ACLs and group keys.
+
+Three ownership rules bound this:
+
+- A CASE session may not arm while a commissioning window is open for another
+  admin and nothing is yet armed (`:520-525`) → `BusyWithOtherAdmin`.
+- Once armed by a fabric, only that fabric may re-arm **or disarm** (`:535`).
+  This is what stops fabric B from disarming fabric A's window mid-flow and
+  rolling back A's pending NOC.
+- `CommissioningComplete` is refused over PASE, refused with no armed
+  fail-safe, and refused when the requesting fabric differs from the arming
+  fabric (`:718-734`).
+
+### What the expiry path rolls back
+
+`watchFailSafeExpiry` (`:641`) disarms, zeroes the Breadcrumb (`:659`), resets
+the cumulative cap, and fires `onFailSafeExpired`. Wired to
+`OperationalCredentials.OnFailSafeExpiry` (`:486`) that means:
+
+- all pending commissioning state cleared — pending private key, trust root,
+  CSR nonce/session, `nocWasInvoked` (`clearPendingState`, `:440`);
+- if `AddNOC` had already completed, `revertAddNOC` (`:2077`) deletes the
+  fabric's ACL entries (`:2082`), its group keys (`:2083`), and the fabric row
+  itself (`:2084`).
+
+A disarm (`ExpiryLengthSeconds == 0`, `:542`) runs the **same** revert path, so
+an early disarm cannot leak a half-installed NOC.
+
+### The assumption this rests on
+
+That the fail-safe timer actually fires. It is a per-arm goroutine
+(`go g.watchFailSafeExpiry`, `:617`) whose `select` also returns on
+`ctx.Done()` (`:646-650`) — the context is the *invoke* context of the
+`ArmFailSafe` command. If a host cancels that context when the command
+completes rather than at shutdown, the watcher returns without reverting and
+the armed state is never cleaned up by the timer. Whether any host does this
+is **NOT VERIFIED**; the reference bridge was not traced through to its invoke
+context lifetime.
+
+### What the attacker must already have
+
+Either a completed PASE handshake (which needs the passcode, and which
+auto-arms a 60 s window at `:866` before the commissioner asks for anything),
+or an established CASE session on a fabric.
+
+### What is NOT defended against
+
+- **`SetRegulatoryConfig` is not reverted.** `g.regulatoryConfig` is written at
+  `cluster/core/general_commissioning.go:690` and appears nowhere else as an
+  assignment except construction (`:219`) — verified by grepping the identifier
+  across the tree. The fail-safe expiry path does not restore it. Regulatory
+  config is low-impact for an Ethernet-only bridge, but the asymmetry with the
+  spec's revert semantics is real.
+- **Fail-safe armed over PASE has no owner.** A PASE arm records
+  `failSafeFabricIndex = 0`. `CommissioningComplete`'s ownership check is
+  `g.failSafeFabricIndex != 0 && sessFabric != ...` (`:730`) — so when the
+  window was armed over PASE, **any** CASE fabric can complete it.
+- **The 60-second auto-arm is not attacker-gated beyond PASE itself.** Anyone
+  who completes PASE gets an armed window without sending a command.
+- **Window-open denial.** A CASE session on fabric A can hold an armed
+  fail-safe for up to the cumulative cap; while armed, `OpenWindow` is refused
+  by the `FailSafeChecker` guard (`bridge/commissioning_window.go:319`). A
+  hostile-but-authorized admin can therefore block other admins from opening a
+  commissioning window for the cap duration.
+
+---
+
+## 3. Fabric isolation
+
+### Where the fabric index comes from
+
+This is the load-bearing point of the whole model, and it is worth stating
+plainly: **the fabric index is never read from the wire.** The receive path
+resolves a session by `Header.SessionID` (`bridge/receive.go:288`), decrypts
+under that session's keys (`:310`), and only then asks the session table which
+fabric that session belongs to (`resolveSessionFabric`,
+`bridge/subscribe.go:1058`). The result is stamped into the request context
+(`bridge/receive_dispatch.go:139/141` for reads, `:293/295` writes, `:419/421`
+invokes) and every fabric-scoped cluster reads it back via
+`im.FabricFilterFromContext`.
+
+The binding to that index is made at CASE establishment:
+
+- Sigma1's `DestinationID` is an HMAC over the fabric IPK, root public key,
+  fabric id and node id; the responder resolves *which* identity to answer with
+  by matching it (`secure/sigma/protocol.go:953`).
+- Sigma3 checks the peer NOC's fabric-id against the responder's
+  (`secure/sigma/protocol.go:1129-1137`), and — the ordering comment at
+  `:1139-1146` is the important part — nothing lifted out of the peer
+  certificate reaches responder state until `verifyTranscript` (`:1147`) proves
+  the sender owns it.
+
+### Where isolation is enforced
+
+- **Reads/writes/invokes:** `TopologyDispatcher.CheckACL`
+  (`endpoint/dispatcher.go:790`). It fails closed on every non-grant path,
+  including "no ACL source wired at all" (`:794-802`).
+- **Fabric-scoped attribute projection:** `AccessControl.MatterReadFiltered`
+  serves only the requesting fabric's entries (`cluster/core/access_control.go:382-398`).
+- **Subject matching:** an ACE's `Subjects` list is matched by exact
+  operational node id or by CAT (`aclSubjectMatches`, `endpoint/dispatcher.go:851`).
+- **Group sessions cannot read:** Read/Subscribe/Timed over a group session are
+  rejected before dispatch (`bridge/im_gate.go:45-50`), so a multicast Read
+  cannot enumerate the attribute tree.
+
+### The assumption this rests on
+
+**That the host wired the fabric resolver.** `resolveSessionFabric` returns `0`
+when the session lookup does not implement `SessionFabricResolver`
+(`bridge/subscribe.go:1065-1068`), and `OperationalSessionLookup.FabricFor`
+returns `(0, false)` when built without the closure
+(`bridge/handlers.go:821-826`). Fabric index `0` means PASE — and
+`CheckACL` returns **`StatusSuccess` unconditionally** for fabric 0
+(`endpoint/dispatcher.go:791-792`).
+
+So a host that wires `NewOperationalSessionLookup(...)` and forgets
+`.WithFabricResolver(...)` gets a bridge where **every authenticated CASE
+session bypasses the ACL entirely**, silently, with no error and no log. The
+reference wiring gets it right and even says so in a comment
+(`examples/reference-bridge/wiring.go:352-353`); nothing enforces it. This is
+the single highest-value finding in this document.
+
+### What the attacker must already have
+
+To reach the ACL gate at all: a completed CASE handshake, which requires a NOC
+signed by a root the bridge trusts, on a fabric whose id matches, plus the
+fabric IPK. That is a high bar. The realistic attacker here is therefore
+**another legitimate fabric** — a second admin on a multi-admin bridge — not an
+outsider.
+
+### What is NOT defended against
+
+- **A PASE session bypasses all ACLs for its lifetime.** By design
+  (commissioning must work before any ACL exists), but note the consequence in
+  §4 below.
+- **`AdoptFabricIndex` has no production caller.** Grepping the identifier
+  across the tree outside `secure/operational/` and tests returns nothing. So
+  after `AddNOC`, the PASE session that installed the fabric keeps fabric index
+  0 — i.e. keeps its ACL bypass — until it is closed. Whether hosts are
+  expected to call it is a documented capability
+  (`secure/operational/manager.go:752-770`); that no in-tree caller does is a
+  measurement, not a verdict.
+- **A missing subject resolver degrades, silently, to wildcard-only matching.**
+  `resolveSessionSubject` returns `(0, nil)` when unwired
+  (`bridge/subscribe.go:1081-1090`); `aclSubjectMatches` then matches only ACEs
+  with an empty `Subjects` list (`endpoint/dispatcher.go:852`, and the
+  `subjectNodeID != 0` guard at `:865`). That direction fails closed, which is
+  the right way round — but it is a behaviour change no one is told about.
+- **The Sigma3 fabric-id check is conditional on an optional interface.**
+  `if extractor, ok := r.verifier.(PeerFabricIDExtractor); ok`
+  (`secure/sigma/protocol.go:1129`). A host supplying its own verifier that does
+  not implement it loses the check with no diagnostic. The module's own
+  `mattercert.Verifier` implements all three extractors
+  (`secure/mattercert/verify.go:189`, `:214`, `:237`).
+- **Cross-fabric resource exhaustion.** Session-table and subscription quotas
+  were not analysed here. **NOT VERIFIED.**
+
+---
+
+## 4. Group-key handling
+
+### Where the keys live
+
+Epoch keys arrive by `KeySetWrite` and are persisted verbatim into
+`matter_group_keys` — three `(EpochKey, EpochStartTime)` pairs per key set,
+scoped by `(fabric_index, group_key_set_id)` (`store/groupkeys.go:28-38`,
+upsert at `:42`). Each key is exactly 16 bytes, enforced at
+`cluster/core/group_key_management.go:549-552`.
+
+They are stored **in the clear**. The sibling comment on the operational
+private key states the position outright: *"Persisted as-is; at-rest encryption
+is the operator's responsibility"* (`store/identity.go:25-27`). The same
+applies to the fabric IPK stored in the same row (`store/identity.go:29-31`).
+
+### How they are derived
+
+Two distinct derivations:
+
+- **Operational IPK** — `DeriveOperationalIPK`
+  (`secure/sigma/ipk.go:64`): `HKDF-SHA256(ikm = raw AddNOC IPKValue,
+  salt = compressedFabricID, info = "GroupKey v1.0", L = 16)`. Every input is
+  cited to matter.js HEAD in the doc comment rather than to spec prose. This
+  value is the leading prefix of every CASE Sigma HKDF salt
+  (`secure/sigma/protocol.go:250`, `:298`, `:316`).
+- **Group session keys from epoch keys** — **not implemented in this module.**
+  Grepping `GroupSecurityInfo`, `DeriveOperationalIPK` and `SessionGroup`
+  across the tree finds no production consumer that turns a stored epoch key
+  into an encryption key. `SessionGroup` appears in exactly three
+  non-test places: the constant (`transport/message/message.go:57`), the
+  header-validation allow-list (`:263`), and the IM gate that rejects group
+  reads (`bridge/im_gate.go:45`). The only decrypt path is
+  `lookup.Lookup(hdr.SessionID)` (`bridge/receive.go:288`), which resolves
+  unicast sessions.
+
+### What their compromise costs
+
+Split the answer, because the two halves differ sharply:
+
+- **Inside go-fabric: little.** No code path uses a stored epoch key to
+  encrypt, decrypt or authenticate anything. Reading `matter_group_keys` gives
+  an attacker no access to this bridge that reading the same file's
+  `matter_node_identities` table has not already given them far more of.
+- **Outside go-fabric: the fabric's whole group plane.** Epoch keys are
+  *fabric-wide* secrets shared with every node in the group. Their compromise
+  lets an attacker forge and decrypt group (multicast) traffic against **other**
+  vendors' nodes on that fabric — nodes that do implement group messaging.
+  go-fabric is a custodian of a secret whose blast radius is entirely off-box.
+
+That asymmetry is the point: the cost of losing these keys is not measured on
+the machine that lost them.
+
+### The assumption this rests on
+
+That the database file is protected by the host — filesystem permissions,
+full-disk encryption, or a host-supplied encrypted `*sql.DB`. `store.New`
+(`store/store.go:21`) accepts whatever it is handed and sets no policy.
+
+### What the attacker must already have
+
+To *write* group keys: `Administer` privilege on the fabric
+(`cluster/core/group_key_management.go:172-176`). To *read* them: filesystem
+access to the database, because the wire never returns them — `KeySetRead`
+deliberately omits the `EpochKey*` fields per §11.2.10.6.3
+(`cluster/core/group_key_management.go:651-653`).
+
+### What is NOT defended against
+
+- **Anything with read access to the database file.** Group epoch keys,
+  per-fabric IPKs and operational private keys are all plaintext in the same
+  SQLite file. No key wrapping, no OS keychain, no separation between the
+  key material and the rest of the model.
+- **A PASE session writing group keys, if the host wires
+  `SetCurrentFabric`.** `MatterInvoke` derives the fabric from the IM context
+  and falls back to `g.currentFabric` when that is 0
+  (`cluster/core/group_key_management.go:414-418`). Today that fallback is inert
+  — `SetCurrentFabric` has no production caller anywhere in the tree (verified
+  by grep; the code says so itself at `:331` and `:408`). If a host ever wires
+  it, a PASE session would resolve to that fabric, and because PASE bypasses
+  `CheckACL` (`endpoint/dispatcher.go:791`) the `Administer` requirement above
+  would not apply. The safety here is the absence of a caller, not a check.
+- **Key rotation and epoch-start enforcement at use time.** The write path
+  validates epoch ordering (`:520-530`); nothing consumes `EpochStartTime` to
+  retire a key, because nothing consumes the keys at all.
+- **Deletion is not shredding.** `RemoveGroupKeySet` / `RemoveGroupKeysByFabric`
+  (`store/groupkeys.go:120`, `:134`) issue SQL `DELETE`s. Whether the bytes
+  survive in the SQLite file or WAL afterwards is **NOT VERIFIED** — and no
+  `VACUUM` or secure-delete pragma appears in `store/schema.sql`.
+
+---
+
+## 5. `//nolint` inventory under `secure/`
+
+67 directives total: **15 in production files, 52 in `_test.go` files.**
+
+The lint config matters for reading these. `.golangci.yaml:92-101` excludes
+`contextcheck`, `errcheck`, `funlen`, `gocognit`, `gocyclo`, `gosec`, `noctx`
+and `unparam` on `path: _test\.go`. `staticcheck` is **not** in that list.
+
+### 5.1 Production directives — confirmed specific and true
+
+| Site | Suppresses | Justification checked against the code |
+| --- | --- | --- |
+| `secure/aesccm/aesccm.go:79` | `gocritic` appendAssign | True. `out := append(dst, plaintext...)` is then CTR-crypted at `:80` and the tag appended at `:82`; assigning back to `dst` would discard it. |
+| `secure/aesccm/aesccm.go:136` | `gosec` G115 `uint16(len(plaintext))` | True **and enforced**. `Seal` rejects `> 0xFFFF` at `:74`; `Open` rejects the same at `:98-99`. Both callers of `cbcMAC` are covered. |
+| `secure/setup/setup.go:207` | `gosec` G115 `'0'+check` | True. `check` is `verhoeffTableInv[c]`, a `[10]int{0,4,3,2,1,5,6,7,8,9}` at `:236`; every element is 0..9. |
+| `secure/mattercert/tbs_der.go:284` | `staticcheck` SA1019 `elliptic.Unmarshal` | True. Raw uncompressed-point decode; the `x == nil` off-curve check at `:285` is the reason the deprecated API is used rather than `crypto/ecdh`. |
+| `secure/sigma/sigma.go:897` | `staticcheck` SA1019 `elliptic.Unmarshal` | True, and the surrounding doc comment (`:888-892`) explains why the standalone check exists alongside `ecdh.NewPublicKey`. |
+| `secure/sigma/protocol.go:241` | `errorlint` | True. `fmt.Errorf("%w: %v", ErrInvalidPoint, err)` is a deliberate double-wrap: the sentinel stays matchable, the ecdh detail stays readable. |
+| `secure/sigma/protocol.go:696` | `nilerr` | True and unusually well argued — `:690-695` explains that a resumption-store lookup failure deliberately falls through to Full Sigma rather than failing CASE. |
+| `secure/sigma/protocol.go:881` | `funlen` | True. `processSigma1Locked` is a single-purpose crypto path; `funlen` is set to 100 lines / 60 statements (`.golangci.yaml:43-45`). |
+| `secure/sigma/protocol.go:968` | `errorlint` | Same pattern as `:241`. True. |
+
+### 5.2 Production directives that are vague, or true only under an unstated condition
+
+Listed for a reviewer's judgement. None of these is asserted to be a defect;
+each is a justification that a reader cannot check from the text alone.
+
+1. **`secure/aesccm/aesccm.go:147`** — *"G115: Matter AAD never exceeds 0xFEFF"*.
+   Unlike its sibling at `:136`, this bound is **not enforced anywhere in
+   `aesccm`**: neither `Seal` nor `Open` inspects `len(aad)`. It holds only
+   because the sole caller passes a marshalled Matter message header
+   (`secure/channel/session.go:211`, `:216`, `:260`), which is bounded by the
+   datagram. The justification states a property of the *caller* as if it were
+   a property of this function.
+2. **`secure/mattercert/tbs_der.go:47`** — *"matterSecs is uint64; sum cannot
+   overflow int64 for any plausible input"*. `matterSecs` is
+   `Certificate.NotBefore/NotAfter`, decoded straight from wire TLV
+   (`secure/mattercert/decode.go:265-268`). It is attacker-controlled. Decode
+   validation only checks `NotAfter > NotBefore` (`:401`), not a magnitude
+   bound. "Any plausible input" is the wrong frame for a certificate field; the
+   honest justification names the resulting behaviour for a hostile value.
+3. **`secure/mattercert/verify.go:312`** — *"unix-epoch fits in uint64 for
+   centuries"*. True for any clock after 1970. For a clock set before 1970,
+   `Unix()` is negative and the conversion wraps to a huge `uint64`; the
+   comparison at `:315` then passes and `:321` rejects the certificate as
+   expired. The outcome is fail-closed, which is fine — but the justification
+   does not mention the case, so a reviewer cannot tell whether it was
+   considered.
+4. **`secure/attestation/builder.go:10` and `:63`** — *"SubjectKeyIdentifier
+   derivation per RFC 5280; not security-relevant"*. Accurate as to SHA-1's
+   role (identifier derivation, not integrity), and `:57-60` explains that
+   Apple's commissioner byte-compares AKI against this SKID. The phrase "not
+   security-relevant" is broader than what was verified; "not used for
+   integrity or authentication" would be checkable.
+5. **`secure/attestation/builder.go:62`** — *"matter.js / chip-tool
+   compatibility"*. The thinnest of the production justifications: it names a
+   motive, not what SA1019 is being suppressed for. Compare `sigma.go:897`,
+   which says *"required for raw point decode"* on the same deprecated call.
+6. **`see #20` appears in 7 justifications** (`aesccm.go:136`, `:147`,
+   `setup.go:207`, `tbs_der.go:47`, `verify.go:312`, `builder.go:10`, `:63`).
+   Grepping every Markdown file in the module for `#20` returns nothing. A
+   reviewer working from a clone has no way to resolve the reference. Whatever
+   `#20` records, the checkable half of the justification has to survive in the
+   comment.
+
+### 5.3 Test-file directives
+
+**45 × `staticcheck`, 7 × `gosec`.**
+
+- **The 7 `gosec` directives suppress nothing.** `gosec` is already excluded on
+  `_test.go` by `.golangci.yaml:92-101`. Sites:
+  `secure/setup/setup_test.go:257`, `:290`;
+  `secure/mattercert/verify_test.go:219`;
+  `secure/sigma/responder_reset_test.go:27`;
+  `secure/attestation/testpaa_test.go:68`;
+  `secure/operational/manager_test.go:1164`, `:1223`.
+  They are harmless, and they are also misleading: they read as though a
+  reviewer weighed a real finding.
+- **The 45 `staticcheck` directives are load-bearing** (staticcheck is not
+  excluded in tests). Nearly all sit on `elliptic.Marshal` in P-256 fixture
+  helpers. Justification quality splits three ways:
+  - **25 are the bare string `// SA1019`** — the error code repeated back, with
+    no reason. All in `secure/mattercert/verify_test.go` (from `:836` onward).
+  - **5 say only `// SA1019: test fixture`**
+    (`secure/case_server_parity_test.go:55`;
+    `secure/mattercert/decode_test.go:151`;
+    `secure/sigma/sigma_test.go:42`, `sigma_marshal_test.go:447`, `:675`,
+    `responder_sigma3_test.go:47`) — a category, not a reason.
+  - **The rest are specific and good**, and are the model the others should
+    follow: `secure/pase_server_parity_test.go:79` names the matter.js fixture
+    and the 65-byte uncompressed encoding the wire carries;
+    `secure/attestation/testpaa_test.go:53` and `:93` each explain why
+    `crypto/ecdh` has no equivalent (`:93`: no "is the private scalar set"
+    predicate).
+
+Since all 45 suppress the same deprecation on the same call for the same
+reason, the reviewer's decision is probably one decision, not 45: either a
+single documented fixture helper that carries the directive once, or a
+`staticcheck` exclusion for `_test.go` alongside the seven linters already
+excluded there. Which one is the caller's call, not this document's.
+
+---
+
+## 6. Consolidated NOT VERIFIED list
+
+Stated in these words because each is a question a reader might otherwise
+assume was answered:
+
+1. Whether any host cancels the `ArmFailSafe` invoke context before the
+   fail-safe deadline, which would make `watchFailSafeExpiry` return without
+   reverting (`cluster/core/general_commissioning.go:646-650`).
+2. Whether the PASE decode paths outside the constant-time confirmation compare
+   leak timing usable for passcode recovery.
+3. Session-table and subscription quota behaviour under cross-fabric
+   exhaustion.
+4. Whether deleted group-key and identity rows are recoverable from the SQLite
+   file or WAL after `DELETE` (no `VACUUM` / secure-delete pragma in
+   `store/schema.sql`).
+5. Whether CASE (Sigma1) has a flood limit comparable to the PASE cap. A
+   `session_miss_burst` path exists (`bridge/session_miss_burst.go`) but was not
+   analysed.
+6. Attestation / DAC chain verification policy — whether a PAA trust store is
+   enforced, and what happens when it is empty. Out of scope for the four
+   assigned areas; not read.
