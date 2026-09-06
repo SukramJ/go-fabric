@@ -115,7 +115,7 @@
       "package": "cluster/core",
       "identifier": "SignVidVerificationResponse",
       "file": "cluster/core/operational_credentials.go",
-      "line": 928,
+      "line": 951,
       "kind": "type"
     },
     {

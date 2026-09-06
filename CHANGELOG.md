@@ -202,6 +202,19 @@ long enough for a `v0.1.0` to mean something.
 
 ### Fixed
 
+- **A fail-safe armed over PASE could be completed by any already-commissioned
+  fabric.** A PASE arm stamps fabric index 0 because PASE has no fabric, and
+  the ownership check read `failSafeFabricIndex != 0 && …` — so that 0 meant
+  "anyone may complete this". An already-authorised controller on another
+  fabric could send `CommissioningComplete` into a window it had not opened,
+  aborting the admin who did and committing half-installed state without the
+  expiry rollback running. Both references keep plain equality here and stay
+  correct because AddNOC re-stamps the context onto the fabric it installed
+  (Matter §11.18.6.16); this module now does the same, so the check is
+  equality and a first pairing still completes. Guarded in both directions:
+  the hijack is refused, and the legitimate PASE-arm-then-CASE-complete
+  sequence still works.
+
 - **A bridge that attaches an ACL it cannot enforce now refuses to start.**
   `CheckACL` answers Success for fabric index 0, which means "PASE, no fabric
   yet" and is correct while commissioning. But `resolveSessionFabric` returns

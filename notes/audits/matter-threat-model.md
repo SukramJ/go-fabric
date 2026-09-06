@@ -97,10 +97,21 @@ answered on the unsecured session type before any authentication exists.
   (`b.paseFailures`, incremented at `:568`), not per source address. Twenty
   malformed `Pake1` datagrams from any LAN host disable pairing for 15 minutes,
   then 30, then 60. The design chose this knowingly (`:498-517`), and the
-  operator's way out is to open a new pairing window. **For an
-  *uncommissioned* bridge there is no admin to open one**, so the only recovery
-  is a daemon restart — the sustained-attack cost to the attacker is a few
-  packets per quarter hour.
+  operator's way out is to open a new pairing window.
+  **Corrected after verification: an earlier version of this section claimed
+  the only recovery is a daemon restart. That is wrong, and this document
+  contradicted itself — the cooldown expires unattended
+  (`paseLockedOut`, `bridge/securechannel.go:645-649`), which the section above
+  already says and `TestBridge_PaseLockoutExpiresOnItsOwn` already pins.**
+  The counter being device-wide rather than per-peer is also not a divergence:
+  matter.js keys it per `PaseServer` with no source component
+  (`packages/protocol/src/session/pase/PaseServer.ts:42,:96,:107`) and chip
+  keeps one `mFailedCommissioningAttempts`
+  (`src/app/server/CommissioningWindowManager.cpp:44,:161`). Both end *worse*
+  than this implementation: at the cap they stop PASE for good rather than for
+  a cooldown. The denial-of-service surface is real and shared with both gold
+  standards; a per-source budget would diverge from them and buy nothing,
+  because the source address is unauthenticated and spoofable at this stage.
 - **A passcode acceptor that outlives the window.** `dispatchPase` is reached
   whenever a handler is attached; the switch at `bridge/securechannel.go:320`
   checks only the lockout, never whether a commissioning window is open. The
@@ -186,9 +197,25 @@ or an established CASE session on a fabric.
   `cluster/core/general_commissioning.go:690` and appears nowhere else as an
   assignment except construction (`:219`) — verified by grepping the identifier
   across the tree. The fail-safe expiry path does not restore it. Regulatory
-  config is low-impact for an Ethernet-only bridge, but the asymmetry with the
-  spec's revert semantics is real.
-- **Fail-safe armed over PASE has no owner.** A PASE arm records
+  config is low-impact for an Ethernet-only bridge.
+  **Corrected after verification: this is not a divergence.** The specification
+  puts a non-fabric-scoped rollback at RECOMMENDED, not mandatory, and neither
+  gold standard does it. matter.js enumerates the fail-safe rollback steps 1–8
+  and leaves step 9 — *"Optionally … it is RECOMMENDED that the Node rollback
+  the state of all non fabric-scoped data"* — as a TODO
+  (`packages/protocol/src/common/FailsafeContext.ts:284-330`), and its server
+  restores only the NetworkCommissioning networks and the breadcrumb
+  (`ServerNodeFailsafeContext.ts`). chip's `src/app/FailSafeContext.cpp` carries
+  no regulatory handling at all. Recorded as a known gap at RECOMMENDED tier
+  rather than as a defect.
+- **~~Fail-safe armed over PASE has no owner.~~ FIXED — this was the one
+  finding of the four that survived verification, and it is closed.** AddNOC
+  now re-stamps the window onto the fabric it installed
+  (`OpcredsConfig.RearmFailSafeForFabric`, Matter §11.18.6.16), which is what
+  both references do and what lets the ownership check below be plain
+  equality. The description that follows is the state before that change,
+  kept because it explains why the check reads the way it does now.
+- **~~(historical)~~ Fail-safe armed over PASE has no owner.** A PASE arm records
   `failSafeFabricIndex = 0`. `CommissioningComplete`'s ownership check is
   `g.failSafeFabricIndex != 0 && sessFabric != ...` (`:730`) — so when the
   window was armed over PASE, **any** CASE fabric can complete it.
@@ -207,7 +234,26 @@ or an established CASE session on a fabric.
 ### Where the fabric index comes from
 
 This is the load-bearing point of the whole model, and it is worth stating
-plainly: **the fabric index is never read from the wire.** The receive path
+plainly: **the fabric index of a fabric-scoped element is never read from the
+wire.**
+
+That qualifier is load-bearing, and an earlier version of this section omitted
+it — which produced a false finding against `RemoveFabric`. Matter distinguishes
+the two cases by access class on the same cluster: `UpdateFabricLabel` (0x9) is
+`access: "F A"`, fabric-scoped, and takes its index from the session;
+`RemoveFabric` (0xa) is `access: "A"` with `FabricIndex` a **mandatory request
+field**, constraint `"1 to 254"`
+(matter.js `packages/model/src/standard/elements/operational-credentials.element.ts:120-124`
+and `:127-130`). Both references read it off the wire deliberately — matter.js
+`OperationalCredentialsServer.ts:395-398` against
+`this.context.session.associatedFabric` two methods above, and chip
+`OperationalCredentialsCluster.cpp:817-862`, whose post-step treats removing
+*another* fabric as the normal case. The gate there is privilege, not scope:
+Administer (5), enforced at `endpoint/dispatcher.go:754-767`. An
+admin-privileged fabric removing another is the spec-sanctioned multi-admin
+model.
+
+For everything that IS fabric-scoped, the invariant holds: The receive path
 resolves a session by `Header.SessionID` (`bridge/receive.go:288`), decrypts
 under that session's keys (`:310`), and only then asks the session table which
 fabric that session belongs to (`resolveSessionFabric`,
