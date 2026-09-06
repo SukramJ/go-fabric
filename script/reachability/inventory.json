@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3106,
+  "entry_points": 3136,
   "entry_packages": [
     ".",
     "bootid",
@@ -31,6 +31,7 @@
     "mdns",
     "parity",
     "schema",
+    "script/coverfloor",
     "script/reachability",
     "secure",
     "secure/aesccm",
@@ -48,10 +49,10 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2740,
-    "reachable": 1346,
-    "whitelisted": 1383,
-    "unreachable": 11
+    "total_exported": 2759,
+    "reachable": 1347,
+    "whitelisted": 1402,
+    "unreachable": 10
   },
   "by_package": [
     {
@@ -83,12 +84,6 @@
       "unreachable_funcs": 1,
       "unreachable_types": 0,
       "unreachable_other": 1
-    },
-    {
-      "package": "secure/setup",
-      "unreachable_funcs": 1,
-      "unreachable_types": 0,
-      "unreachable_other": 0
     },
     {
       "package": "cluster/core",
@@ -180,13 +175,6 @@
       "kind": "var"
     },
     {
-      "package": "secure/setup",
-      "identifier": "IsValidSetupPIN",
-      "file": "secure/setup/setup.go",
-      "line": 275,
-      "kind": "func"
-    },
-    {
       "package": "secure/sigma",
       "identifier": "ErrResumptionMICInvalid",
       "file": "secure/sigma/sigma.go",
@@ -229,6 +217,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bootid/bootid_test.go",
       "line": 71
+    },
+    {
+      "package": "bridge",
+      "identifier": "BenchmarkBuildInitialReportWildcard",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bench_test.go",
+      "line": 82
+    },
+    {
+      "package": "bridge",
+      "identifier": "BenchmarkEncodeReportData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bench_test.go",
+      "line": 112
     },
     {
       "package": "bridge",
@@ -7092,6 +7094,27 @@
     },
     {
       "package": "secure/channel",
+      "identifier": "FuzzPrivacyMask",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/channel/fuzz_session_test.go",
+      "line": 130
+    },
+    {
+      "package": "secure/channel",
+      "identifier": "FuzzSessionDecrypt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/channel/fuzz_session_test.go",
+      "line": 43
+    },
+    {
+      "package": "secure/channel",
+      "identifier": "FuzzSessionEncryptDecryptRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/channel/fuzz_session_test.go",
+      "line": 89
+    },
+    {
+      "package": "secure/channel",
       "identifier": "TestCloseDropsCipherReferences",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/channel/session_test.go",
@@ -7229,6 +7252,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/channel/session_test.go",
       "line": 125
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "FuzzDecode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/fuzz_decode_test.go",
+      "line": 45
     },
     {
       "package": "secure/mattercert",
@@ -7537,6 +7567,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_idle_reaper_test.go",
       "line": 116
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "FuzzIsValidSetupPIN",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/fuzz_setup_test.go",
+      "line": 131
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "FuzzManualCode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/fuzz_setup_test.go",
+      "line": 88
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "FuzzQRCode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/fuzz_setup_test.go",
+      "line": 34
     },
     {
       "package": "secure/setup",
@@ -8555,6 +8606,41 @@
     },
     {
       "package": "tlv",
+      "identifier": "BenchmarkDecodeReportChunk",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/bench_test.go",
+      "line": 106
+    },
+    {
+      "package": "tlv",
+      "identifier": "BenchmarkEncodeReportChunk",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/bench_test.go",
+      "line": 88
+    },
+    {
+      "package": "tlv",
+      "identifier": "BenchmarkValidateReportChunk",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/bench_test.go",
+      "line": 132
+    },
+    {
+      "package": "tlv",
+      "identifier": "FuzzDecoderNext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/fuzz_codec_test.go",
+      "line": 30
+    },
+    {
+      "package": "tlv",
+      "identifier": "FuzzEncodeDecodeRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/fuzz_codec_test.go",
+      "line": 91
+    },
+    {
+      "package": "tlv",
       "identifier": "TestCodecParity_AnyEmptyArray",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/codec_parity_test.go",
@@ -9455,6 +9541,41 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/strict_validate_test.go",
       "line": 96
+    },
+    {
+      "package": "transport/message",
+      "identifier": "BenchmarkMarshalHeader",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/bench_test.go",
+      "line": 96
+    },
+    {
+      "package": "transport/message",
+      "identifier": "BenchmarkUnmarshalHeader",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/bench_test.go",
+      "line": 62
+    },
+    {
+      "package": "transport/message",
+      "identifier": "BenchmarkUnmarshalProtocolHeader",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/bench_test.go",
+      "line": 78
+    },
+    {
+      "package": "transport/message",
+      "identifier": "FuzzUnmarshalHeader",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/fuzz_message_test.go",
+      "line": 27
+    },
+    {
+      "package": "transport/message",
+      "identifier": "FuzzUnmarshalProtocolHeader",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/message/fuzz_message_test.go",
+      "line": 80
     },
     {
       "package": "transport/message",

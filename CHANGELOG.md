@@ -13,6 +13,24 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **Eleven new fuzz targets, over the five packages that parse bytes.** The
+  module fuzzed only its four Interaction-Model decoders; everything else that
+  turns wire bytes into structures was unfuzzed, including the two packages a
+  commissioner reaches *before* anything is trusted — DER certificate parsing
+  in `secure/mattercert` and the setup-payload surface in `secure/setup`. Seeds
+  come from each package's own tests rather than being invented, so they are
+  known-good, and each target carries deliberately malformed variants. None
+  found a crash. Where an encoder exists the target asserts a round-trip; none
+  asserts a specific error for malformed input, which is not the property.
+- **Ten benchmarks and a per-package coverage floor.** Both were absent
+  entirely. The benchmarks cover the paths a running bridge repeats — TLV
+  encode/decode and validate, inbound datagram decode, initial-report
+  construction, endpoint assembly — and each says in its doc comment why that
+  path was chosen. `script/coverfloor` compares `go test -cover` against a
+  table with a reason per row; floors sit below each package's measured
+  coverage so the gate ratchets against regression rather than failing on day
+  one.
+
 - **`cluster/levelcontrol` — a host-agnostic LevelControl server (0x0008).** Speaker
   0x0022 mandates OnOff and LevelControl servers, and this module had neither
   a LevelControl server nor a way to build one: `cluster/wire` carried command

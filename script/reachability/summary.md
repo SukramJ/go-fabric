@@ -1,16 +1,16 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)
-Entry points: 3106 across 44 test packages.
+Entry points: 3136 across 45 test packages.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 2740 |
-| Reached by a test | 1346 |
-| Whitelisted | 1383 |
-| **Unreached** | **11** |
+| Total exported | 2759 |
+| Reached by a test | 1347 |
+| Whitelisted | 1402 |
+| **Unreached** | **10** |
 
 ## Top-20 packages by unreached exported identifiers
 
@@ -21,7 +21,6 @@ Entry points: 3106 across 44 test packages.
 | endpoint | 1 | 0 | 0 |
 | mdns | 1 | 0 | 0 |
 | schema | 1 | 0 | 1 |
-| secure/setup | 1 | 0 | 0 |
 | cluster/core | 0 | 1 | 0 |
 | secure/attestation | 0 | 0 | 1 |
 | secure/channel | 0 | 0 | 1 |
@@ -36,7 +35,6 @@ Entry points: 3106 across 44 test packages.
 | endpoint | ComposeNodeLabel | endpoint/spec.go | 88 |
 | mdns | DeriveUniqueIDFromIdentity | mdns/rotating_id.go | 117 |
 | schema | DeviceTypeAllowsServerCluster | schema/lookup.go | 65 |
-| secure/setup | IsValidSetupPIN | secure/setup/setup.go | 275 |
 
 ## Full by-package breakdown
 
@@ -47,7 +45,6 @@ Entry points: 3106 across 44 test packages.
 | endpoint | 1 | 0 | 0 |
 | mdns | 1 | 0 | 0 |
 | schema | 1 | 0 | 1 |
-| secure/setup | 1 | 0 | 0 |
 | cluster/core | 0 | 1 | 0 |
 | secure/attestation | 0 | 0 | 1 |
 | secure/channel | 0 | 0 | 1 |
