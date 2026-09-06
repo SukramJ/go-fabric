@@ -751,6 +751,10 @@ func DeviceTypeName(id uint16) string {
 		return "Generic Switch"
 	case 0x0015:
 		return "Contact Sensor"
+	case 0x0022:
+		return "Speaker"
+	case 0x0027:
+		return "Mode Select"
 	case 0x002C:
 		return "Air Quality Sensor"
 	case 0x0043:
