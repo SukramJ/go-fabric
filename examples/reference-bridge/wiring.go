@@ -111,6 +111,12 @@ func buildRootClusters(
 		// wrong identity, or none.
 		OnFabricInstalled: onFabricInstalled,
 		IsFailSafeArmed:   generalCom.FailSafeArmed,
+		// Matter §11.18.6.16 requires a successful AddNOC to re-arm the
+		// fail-safe onto the fabric it installed. Without this the window
+		// stays owned by fabric 0 — the value a PASE arm stamps — and
+		// CommissioningComplete refuses it, so the first pairing never
+		// finishes. The chip-tool suite is what notices.
+		RearmFailSafeForFabric: generalCom.SetCurrentFabric,
 	})
 	if err != nil {
 		return nil, refs, fmt.Errorf("operational credentials: %w", err)

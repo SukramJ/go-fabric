@@ -64,7 +64,10 @@ type OperationalCredentials struct {
 	cdBytes             []byte            // Certification Declaration (CMS-signed)
 	attestationChalleng []byte            // current session AttestationChallenge for sig binding
 	onFabricInstalled   func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
-	onFabricRemoved     func(ctx context.Context, fabricIndex uint8)
+	// rearmFailSafeForFabric re-stamps the armed fail-safe with the fabric
+	// AddNOC installed; see [OpcredsConfig.RearmFailSafeForFabric].
+	rearmFailSafeForFabric func(fabricIndex uint8)
+	onFabricRemoved        func(ctx context.Context, fabricIndex uint8)
 
 	// pendingCSRSessionID is the session ID that issued the pending
 	// CSRRequest. Set in handleCSRRequest; checked in handleAddNOC to
@@ -355,6 +358,25 @@ type OpcredsConfig struct {
 	// Status::FailsafeRequired)`.
 	// When nil, the guard is skipped (test setups + legacy callers).
 	IsFailSafeArmed func() bool
+	// RearmFailSafeForFabric re-stamps the armed fail-safe with the fabric
+	// AddNOC just installed. Bound to
+	// [GeneralCommissioning.SetCurrentFabric].
+	//
+	// Matter §11.18.6.16: "Successful operation of [AddNOC] SHALL also re-arm
+	// the fail-safe in such a way that the new fabric is the failsafe fabric."
+	// Both references do it inside the cluster — chip
+	// OperationalCredentialsCluster.cpp:526 SetAddNocCommandInvoked and
+	// matter.js FailsafeContext.ts:263-271 — and both can therefore keep
+	// CommissioningComplete's ownership check as plain equality.
+	//
+	// Without the re-stamp that check has to tolerate a fail-safe armed over
+	// PASE, which carries fabric 0, and that tolerance is what let any
+	// already-authorised CASE fabric complete somebody else's commissioning.
+	//
+	// When nil the re-stamp does not happen and a PASE-armed window stays
+	// owned by fabric 0, which CommissioningComplete refuses. A host that
+	// commissions must wire this.
+	RearmFailSafeForFabric func(fabricIndex uint8)
 	// OnFabricUpdated fires after a successful UpdateNOC has persisted
 	// the new operational certificate. The daemon wires this hook to
 	// abort all CASE sessions for the updated fabric (except the
@@ -394,18 +416,19 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 		cfg.SupportedFabrics = 254
 	}
 	return &OperationalCredentials{
-		store:             s,
-		supportedFabrics:  cfg.SupportedFabrics,
-		devAttestKey:      cfg.DACPrivateKey,
-		dacBytes:          append([]byte(nil), cfg.DAC...),
-		paiBytes:          append([]byte(nil), cfg.PAI...),
-		cdBytes:           append([]byte(nil), cfg.CertificationDeclaration...),
-		onFabricInstalled: cfg.OnFabricInstalled,
-		onFabricRemoved:   cfg.OnFabricRemoved,
-		onFabricUpdated:   cfg.OnFabricUpdated,
-		onMDNSReannounce:  cfg.OnMDNSReannounce,
-		onFabricWithdraw:  cfg.OnFabricWithdraw,
-		isFailSafeArmed:   cfg.IsFailSafeArmed,
+		store:                  s,
+		supportedFabrics:       cfg.SupportedFabrics,
+		devAttestKey:           cfg.DACPrivateKey,
+		dacBytes:               append([]byte(nil), cfg.DAC...),
+		paiBytes:               append([]byte(nil), cfg.PAI...),
+		cdBytes:                append([]byte(nil), cfg.CertificationDeclaration...),
+		onFabricInstalled:      cfg.OnFabricInstalled,
+		rearmFailSafeForFabric: cfg.RearmFailSafeForFabric,
+		onFabricRemoved:        cfg.OnFabricRemoved,
+		onFabricUpdated:        cfg.OnFabricUpdated,
+		onMDNSReannounce:       cfg.OnMDNSReannounce,
+		onFabricWithdraw:       cfg.OnFabricWithdraw,
+		isFailSafeArmed:        cfg.IsFailSafeArmed,
 	}, nil
 }
 
@@ -1606,7 +1629,17 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	o.pendingCSRForUpdate = false
 	o.currentFabric = idx
 	hook := o.onFabricInstalled
+	rearm := o.rearmFailSafeForFabric
 	o.mu.Unlock()
+
+	// Re-arm the fail-safe onto the fabric just installed, before anything
+	// else observes the new state (Matter §11.18.6.16). This is what lets
+	// CommissioningComplete's ownership check be plain equality: the window
+	// was armed over PASE as fabric 0, and from here it belongs to this
+	// fabric and to no other.
+	if rearm != nil {
+		rearm(idx)
+	}
 
 	// Bump DataVersion after successful AddNOC — fabric list changed.
 	// Must happen AFTER all store writes succeed (AddFabric + UpsertIdentity + ReplaceACL).

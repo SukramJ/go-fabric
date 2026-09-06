@@ -727,7 +727,24 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 			DebugText: "fail-safe not armed",
 		}, nil
 	}
-	if g.failSafeFabricIndex != 0 && sessFabric != g.failSafeFabricIndex {
+	// Plain equality, as both references have it — chip
+	// FailSafeContext.h:92-96 MatchesFabricIndex, matter.js
+	// GeneralCommissioningServer.ts:242-247, where an undefined associated
+	// fabric never matches.
+	//
+	// This used to read `g.failSafeFabricIndex != 0 && ...`, tolerating a
+	// window armed over PASE (which stamps fabric 0) so that a first pairing
+	// could complete over CASE. The cost was that ANY already-authorised
+	// fabric could complete a window it did not open — aborting a peer
+	// admin's commissioning and committing half-installed state without the
+	// expiry rollback ever running.
+	//
+	// The references avoid that tolerance because AddNOC re-stamps the
+	// context onto the fabric it installed. This module does that now too
+	// (OpcredsConfig.RearmFailSafeForFabric), so equality is correct here and
+	// a first pairing still completes: by the time CommissioningComplete
+	// arrives, the window belongs to the fabric AddNOC created.
+	if sessFabric != g.failSafeFabricIndex {
 		return CommissioningCompleteResponse{
 			ErrorCode: CommissioningErrorInvalidAuthentication,
 			DebugText: fmt.Sprintf("session fabric %d != failsafe fabric %d", sessFabric, g.failSafeFabricIndex),
