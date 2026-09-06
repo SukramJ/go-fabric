@@ -1,0 +1,60 @@
+name: matter.js pin
+
+# This module is a semantic port of matter.js pinned at one commit:
+# parity/schema.json records it as matter.sourceCommit, and every parity test
+# plus the generated schema/ package is true against that revision and no
+# other. Nothing in the repository can see the pin expire — the schema parity
+# test compares two in-repo copies of the same extract, so it stays green
+# however old the extract gets. This job is the only thing that looks upstream.
+#
+# Not on pull_request, and deliberately so: the measurement depends on the
+# network and on the state of somebody else's default branch, so it can go red
+# for a reason no contributor's diff caused and no contributor's diff can fix.
+# A gate like that on the merge path teaches people to ignore red.
+#
+# Weekly rather than nightly: the quantity it measures moves about three
+# commits a month (see script/matterjs-pin-distance.sh), so a daily run
+# re-reports the same number six days out of seven, and a daily red is a
+# notification people filter. Nightly is for work that can change overnight.
+
+on:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pin-distance:
+    name: pin distance to matter.js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # A blobless, unchecked-out clone: the measurement reads commit and tree
+      # history only, never file contents, and this fetches ~11 MB against a
+      # full clone's several hundred. Not a shallow clone — `--depth` would
+      # truncate the history the pin sits in, and the distance to a commit the
+      # clone cannot see is unmeasurable, which a naive count would render as
+      # zero. Not a submodule and nothing vendored: this is a measurement of
+      # upstream's current state, not a dependency of the build.
+      #
+      # matter-js/matter.js is the current canonical location; the older
+      # project-chip/matter.js path still redirects here.
+      - name: clone matter.js history
+        run: |
+          git clone --filter=blob:none --no-checkout --quiet \
+            https://github.com/matter-js/matter.js.git "${RUNNER_TEMP}/matter.js"
+
+      # The check itself is three git invocations and one JSON field read, so
+      # it is a shell script rather than a Go program under script/ — it needs
+      # no toolchain, and it stays out of this module's package graph and its
+      # build, vet, coverage and reachability gates.
+      #
+      # Exit codes: 0 within threshold, 1 over it, 2 when the measurement could
+      # not be performed at all (an unreadable pin, a pin that is not on
+      # upstream's default branch). Two is a failure on purpose — a check that
+      # could not run must not be reported as a check that passed.
+      - name: measure the pin's distance from matter.js HEAD
+        run: bash script/matterjs-pin-distance.sh "${RUNNER_TEMP}/matter.js"
