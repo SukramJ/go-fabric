@@ -35,8 +35,19 @@ name: chiptool
 # arm64-only manifests for every recent tag, so an amd64 runner cannot pull
 # the image, and QEMU emulation is far too slow for the PASE crypto.
 #
-# Not a per-PR gate — chip-tool runs are slow and the image pull is ~2.5 GiB.
-# Nightly, a `needs-chiptool` label, and manual dispatch.
+# Not a blanket per-PR gate — chip-tool runs are slow and the image pull is
+# ~2.5 GiB. It runs nightly, on manual dispatch, on the `needs-chiptool` label,
+# and automatically whenever a pull request touches Go code.
+#
+# That last trigger is wider here than in a consuming daemon, and deliberately
+# so: this module IS the Matter stack, so almost any change to it can move
+# commissioning. A path list would be a list of nearly every directory, which
+# is a filter that reads as one and is not. Documentation, the changelog and
+# the notes tree do not start it; anything the binary is built from does.
+#
+# The commissioner suite is the only check here that runs a real controller
+# against a real daemon. It found the reference bridge shipping un-pairable
+# when nothing else did, and a label is a thing a human has to remember.
 
 on:
   schedule:
@@ -59,12 +70,61 @@ env:
   GO_VERSION: "1.26.6"
 
 jobs:
+  # Decides whether this pull request touches anything that can move
+  # commissioning. A shell diff rather than a pinned third-party
+  # paths-filter action: the rule is one grep, and an action would be one
+  # more supply-chain edge for a boolean.
+  #
+  # Non-pull_request events short-circuit to false — schedule and dispatch
+  # already run everything through the conditions below, and asking about a
+  # diff there would compare unrelated commits.
+  changes:
+    name: code touched
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "not a pull request -- the event's own condition decides"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$BASE" "$HEAD")
+          echo "changed files:"; echo "$changed" | sed 's/^/  /'
+          # Anything the binary is built from, plus this workflow so a change
+          # to it is tested by it. Everything else -- markdown, the notes
+          # tree, the changelog -- leaves the suite to the label.
+          if echo "$changed" | grep -Eq \
+            -e '\.go$' \
+            -e '^go\.(mod|sum)$' \
+            -e '^\.github/workflows/chiptool\.yml$' \
+            -e '^internal/chiptool/'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "-> commissioner suite runs without a label"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "-> no Go code touched; suite runs only if labelled"
+          fi
+
   chiptool:
     name: chip-tool commissions the reference daemon
+    needs: changes
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'needs-chiptool')
+      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.code == 'true' 
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
@@ -149,10 +209,12 @@ jobs:
 
   chiptool-control:
     name: chip-tool control leg (CHIP app, no go-fabric)
+    needs: changes
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'needs-chiptool')
+      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.code == 'true' 
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     steps:
@@ -285,10 +347,12 @@ jobs:
 
   chiptool-conformance:
     name: chip certification cases against the reference daemon
+    needs: changes
     if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'needs-chiptool')
+      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.code == 'true' 
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     steps:
