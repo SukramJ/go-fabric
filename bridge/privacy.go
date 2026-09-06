@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/secure/channel"
+	"github.com/SukramJ/go-fabric/transport/message"
 )
 
 // privacyMICSuffix is the trailing-MIC byte count that participates
@@ -16,10 +17,14 @@ import (
 // local so this file's intent stays self-contained.
 const privacyMICSuffix = channel.PrivacyMICSuffixSize
 
-// secFlagPrivacyBit mirrors transport/message.secFlagPrivacy. Re-
-// declared here so the bridge layer doesn't need to import the
-// transport package's unexported constants.
-const secFlagPrivacyBit = 0x80
+// secFlagPrivacyBit and secFlagSessionTypeBits mirror the transport
+// package's unexported Security Flags layout (P bit 7, session type in
+// bits 1-0). Re-declared here so the bridge layer can inspect a still-
+// masked frame without decoding it.
+const (
+	secFlagPrivacyBit      = 0x80
+	secFlagSessionTypeBits = 0x03
+)
 
 // maybeUnmaskPrivacy applies the Matter §4.7.3.1 inbound privacy
 // unmask to buf in place when the inbound datagram carries the P
@@ -35,11 +40,18 @@ const secFlagPrivacyBit = 0x80
 //	byte 4..   MessageCounter (4) + optional Source/Dest NodeIDs (0/2/8/10/16)
 //	last 16    AES-CCM MIC (after ciphertext body)
 //
-// Privacy mask covers bytes 4..min(end-of-header, 4+16). The
-// AES-ECB block input is `BE16(SessionID) || MIC[len-14:]`.
+// The privacy mask covers bytes 4..end-of-header — the whole
+// counter + node-id region, up to 20 bytes — with the AES-CTR
+// keystream [channel.PrivacyKeystream] derives from the session's
+// privacy key, the SessionID and the frame's MIC.
 //
-// SessionID==0 (PASE pre-fabric) MUST NOT carry the P bit per
-// Matter spec; we surface an error if a peer sends one.
+// Privacy enhancements are only defined for group messages (Matter
+// §4.9 applies them to group sessions). A unicast frame carrying the P
+// bit is invalid and is dropped — matter.js ExchangeManager.ts:220-224
+// and the chip SDK do the same — rather than unmasked and handed to a
+// unicast session. SessionID==0 (PASE pre-fabric) likewise MUST NOT
+// carry the P bit; both are reported as errors so the caller drops the
+// datagram.
 func (b *Bridge) maybeUnmaskPrivacy(buf []byte) error {
 	if len(buf) < 4 {
 		// Too short — caller's UnmarshalHeader will fail with a
@@ -53,6 +65,9 @@ func (b *Bridge) maybeUnmaskPrivacy(buf []byte) error {
 	sessionID := binary.LittleEndian.Uint16(buf[1:3])
 	if sessionID == 0 {
 		return errors.New("privacy: P bit set on SessionID=0 (PASE) — spec violation")
+	}
+	if message.SessionType(secFlags&secFlagSessionTypeBits) != message.SessionGroup {
+		return errors.New("privacy: P bit set on a unicast message — dropped (privacy is defined for group messages only)")
 	}
 
 	b.mu.RLock()
@@ -76,22 +91,18 @@ func (b *Bridge) maybeUnmaskPrivacy(buf []byte) error {
 	if len(buf) < 4+privacyMICSuffix {
 		return fmt.Errorf("privacy: datagram too short (%d bytes) for MIC tail", len(buf))
 	}
-	mic := buf[len(buf)-16:] // 16-byte MIC; the IV uses the last 14 of those
-	mask, err := channel.PrivacyMask(privacyKey, sessionID, mic)
-	if err != nil {
-		return fmt.Errorf("privacy: mask derive: %w", err)
-	}
+	mic := buf[len(buf)-16:] // 16-byte MIC; the nonce uses its last 11 bytes
 
-	// Mask the protected suffix of the message header. Cap at the
-	// 16-byte AES block size and at the actual remaining header
-	// length (excluding the MIC, which is body-tail).
+	// Unmask the whole protected suffix of the message header (the
+	// MIC is body-tail and stays outside it).
 	hdrEnd := privacyHeaderEnd(buf)
 	if hdrEnd <= 4 {
 		return nil // header has no protected portion (only flags + sessionID)
 	}
 	protected := buf[4:hdrEnd]
-	if len(protected) > 16 {
-		protected = protected[:16]
+	mask, err := channel.PrivacyKeystream(privacyKey, sessionID, mic, len(protected))
+	if err != nil {
+		return fmt.Errorf("privacy: mask derive: %w", err)
 	}
 	return channel.ApplyPrivacyMask(mask, protected)
 }
@@ -148,17 +159,14 @@ func applyOutboundPrivacy(sess *channel.Session, sessionID uint16, datagram []by
 		return fmt.Errorf("privacy outbound: derive key: %w", err)
 	}
 	mic := datagram[len(datagram)-16:]
-	mask, err := channel.PrivacyMask(privacyKey, sessionID, mic)
-	if err != nil {
-		return fmt.Errorf("privacy outbound: mask derive: %w", err)
-	}
 	hdrEnd := privacyHeaderEnd(datagram)
 	if hdrEnd <= 4 {
 		return nil
 	}
 	protected := datagram[4:hdrEnd]
-	if len(protected) > 16 {
-		protected = protected[:16]
+	mask, err := channel.PrivacyKeystream(privacyKey, sessionID, mic, len(protected))
+	if err != nil {
+		return fmt.Errorf("privacy outbound: mask derive: %w", err)
 	}
 	return channel.ApplyPrivacyMask(mask, protected)
 }

@@ -588,12 +588,14 @@ func protocolHeaderSize(p message.ProtocolHeader) int {
 	return size
 }
 
-// securityFlagsByte adapts [message.Header.SecurityFlags] to the pointer
-// receiver the receive / reply paths carry the header by. The bit layout
-// itself lives next to the encoder in the message package, so the byte fed
-// to the AEAD nonce and the byte written to the wire cannot drift apart.
+// securityFlagsByte returns the Security Flags byte the AEAD nonce is
+// built from: the byte as received for a decoded header, the byte
+// Marshal writes for one built in memory (see
+// [message.Header.NonceSecurityFlags]). The encoder itself lives next
+// to the decoder in the message package, so the byte fed to the nonce
+// and the byte written to the wire cannot drift apart.
 func securityFlagsByte(hdr *message.Header) uint8 {
-	return hdr.SecurityFlags()
+	return hdr.NonceSecurityFlags()
 }
 
 // srcString defends against nil src — the udp.Handler signature

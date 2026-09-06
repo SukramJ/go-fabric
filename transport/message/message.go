@@ -221,6 +221,24 @@ func (h Header) SecurityFlags() uint8 {
 	return secFlags
 }
 
+// NonceSecurityFlags returns the Security Flags byte that feeds the AEAD
+// nonce (Core Spec §4.7.1.1: nonce[0] is the Security Flags byte as
+// received). For a header decoded off the wire that is the exact byte
+// the peer sent, reserved bits included — the peer built its nonce from
+// that byte, and re-deriving it from the typed fields would zero bits
+// 4-2 and fail the tag for any frame that set one. matter.js keeps the
+// raw byte for the same reason (packages/protocol/src/codec/
+// MessageCodec.ts:45 "The SecurityFlags as pure data field to be used
+// as nonce"; NodeSession.ts:187). A header built in memory has no wire
+// byte and encodes to [Header.SecurityFlags], which is what its
+// Marshal writes, so the two stay consistent for outbound frames.
+func (h Header) NonceSecurityFlags() uint8 {
+	if len(h.Raw) > 3 {
+		return h.Raw[3]
+	}
+	return h.SecurityFlags()
+}
+
 // AAD returns the additional authenticated data that binds this header
 // to its AEAD tag. When the header came off the wire ([Header.Raw]
 // populated by UnmarshalHeader) the exact received bytes are returned;

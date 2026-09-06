@@ -240,13 +240,14 @@ func (s *Session) Decrypt(header *message.Header, secFlags uint8, ciphertext []b
 	if s.closed.Load() {
 		return nil, false, ErrSessionInactive
 	}
-	srcNode := header.SourceNodeID
-	if !header.HasSourceNodeID {
-		// Inbound packets in a unicast session SHOULD carry a source
-		// node ID; if absent, fall back to the configured peer.
-		srcNode = s.peerNodeID
-	}
-	nonce := buildNonce(secFlags, header.MessageCounter, srcNode)
+	// The nonce node id is the peer id the session was established
+	// with — never a value read off the header. Secure unicast omits
+	// the Source Node ID on the wire, and a frame that does carry one
+	// still has to authenticate under the session's own identity, or
+	// the nonce becomes partly sender-chosen. Mirrors matter.js
+	// NodeSession.ts:187 (generateNonce with this.#peerNodeId) and chip
+	// CryptoContext::BuildNonce fed from session->GetPeerNodeId().
+	nonce := buildNonce(secFlags, header.MessageCounter, s.peerNodeID)
 	// Authenticate the exact raw received header bytes, not a re-encoded
 	// copy — a reserved wire bit that does not round-trip through Marshal
 	// must not change the AAD. Mirrors matter.js authenticating the raw

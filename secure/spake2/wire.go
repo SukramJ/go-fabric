@@ -337,9 +337,14 @@ type PBKDFParamResponse struct {
 // independently optional — a nil leaves the corresponding TLV tag
 // absent on the wire so the peer falls back to its own defaults
 // (Matter §4.12.8).
+//
+// The two retransmit timeouts are uint32 on the wire and the active
+// threshold is uint16 — matter.js PaseMessages.ts:25-29 declares
+// idleInterval / activeInterval as TlvUInt32 and activeThreshold as
+// TlvUInt16, the same widths sigma.SessionParameters carries for CASE.
 type MRPParameters struct {
-	IdleRetransTimeoutMs   *uint16
-	ActiveRetransTimeoutMs *uint16
+	IdleRetransTimeoutMs   *uint32
+	ActiveRetransTimeoutMs *uint32
 	ActiveThresholdTimeMs  *uint16
 }
 
@@ -533,10 +538,10 @@ func decodeMRPParameters(dec *tlv.Decoder) (MRPParameters, error) {
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case tagMRPParamsIdleRetransTimeoutMs:
-			v := uint16(el.Uint & 0xFFFF)
+			v := uint32(el.Uint & 0xFFFFFFFF)
 			p.IdleRetransTimeoutMs = &v
 		case tagMRPParamsActiveRetransTimeoutMs:
-			v := uint16(el.Uint & 0xFFFF)
+			v := uint32(el.Uint & 0xFFFFFFFF)
 			p.ActiveRetransTimeoutMs = &v
 		case tagMRPParamsActiveThresholdTimeMs:
 			v := uint16(el.Uint & 0xFFFF)

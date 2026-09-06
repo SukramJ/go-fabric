@@ -101,32 +101,61 @@ func DerivePrivacyKey(sessionKey []byte) ([]byte, error) {
 // SessionID is encoded big-endian in the nonce — the one place in the
 // Matter wire protocol where a multi-byte integer is not little-endian.
 func PrivacyMask(privacyKey []byte, sessionID uint16, mic []byte) ([]byte, error) {
+	return PrivacyKeystream(privacyKey, sessionID, mic, PrivacyKeySize)
+}
+
+// PrivacyKeystream returns the AES-CTR keystream [PrivacyMask] describes,
+// long enough to cover n bytes: as many whole counter blocks as n needs
+// (at least one), counter values 1, 2, … in the AES-CCM counter-block
+// layout. [ApplyPrivacyMask] XORs only as far as the region reaches.
+//
+// The protected region is not bounded by one block: with both a Source
+// Node ID and a 64-bit Destination Node ID present it is 20 bytes
+// (counter 4 + source 8 + destination 8), and matter.js runs the CTR
+// cipher over the whole region and slices to its length
+// (packages/protocol/src/codec/MessagePrivacy.ts:53-56 obfuscate).
+// Masking only the first block leaves the tail of the destination id
+// obfuscated on receive and in the clear on send, and the AEAD tag
+// check then fails on whichever side unmasked the wrong bytes.
+func PrivacyKeystream(privacyKey []byte, sessionID uint16, mic []byte, n int) ([]byte, error) {
 	if len(privacyKey) != PrivacyKeySize {
 		return nil, fmt.Errorf("%w: privacy key got %d", ErrPrivacyKeySource, len(privacyKey))
 	}
 	if len(mic) < privacyMICLength {
 		return nil, fmt.Errorf("%w: got %d", ErrPrivacyMICShort, len(mic))
 	}
+	if n < 0 {
+		return nil, fmt.Errorf("channel: privacy keystream length %d is negative", n)
+	}
 	tag := mic[len(mic)-privacyMICLength:]
 	cipher, err := aes.NewCipher(privacyKey)
 	if err != nil {
 		return nil, fmt.Errorf("channel: privacy cipher: %w", err)
 	}
-	// counter block: 0x01 || SessionID(BE) || MIC[5:16] || 0x0001.
+	// counter block: 0x01 || SessionID(BE) || MIC[5:16] || counter(BE16).
 	block := make([]byte, PrivacyKeySize)
 	block[0] = privacyCTRFlags
 	binary.BigEndian.PutUint16(block[1:3], sessionID)
 	copy(block[3:1+PrivacyNonceSize], tag[privacyMICLength-privacyNonceMICBytes:])
-	block[PrivacyKeySize-1] = 0x01 // low byte of the big-endian CCM counter (value 1)
-	mask := make([]byte, PrivacyKeySize)
-	cipher.Encrypt(mask, block)
-	return mask, nil
+	blocks := (n + PrivacyKeySize - 1) / PrivacyKeySize
+	if blocks == 0 {
+		blocks = 1
+	}
+	stream := make([]byte, blocks*PrivacyKeySize)
+	for i := range blocks {
+		//nolint:gosec // i+1 ≤ 2 in practice; the region is at most 20 bytes
+		binary.BigEndian.PutUint16(block[PrivacyKeySize-2:], uint16(i+1))
+		cipher.Encrypt(stream[i*PrivacyKeySize:], block)
+	}
+	return stream, nil
 }
 
 // ApplyPrivacyMask XORs mask byte-by-byte over headerSlice in place.
-// headerSlice must not exceed [PrivacyKeySize] bytes — Matter spec
-// §4.4.3.1 sizes the privacy-protected header portion to fit within
-// one AES block. Returns an error when the slice is over-sized.
+// mask must carry at least one AES block (the output of [PrivacyMask]
+// or a [PrivacyKeystream] at least as long as headerSlice); a slice
+// longer than the keystream is an error, because the bytes past the
+// end would otherwise stay masked while the caller believes the whole
+// region was handled.
 //
 // The caller is responsible for selecting the correct slice: per
 // Spec §4.4.1.1 + §4.4.3.1, the privacy-protected portion is the
@@ -137,13 +166,13 @@ func PrivacyMask(privacyKey []byte, sessionID uint16, mic []byte) ([]byte, error
 // Privacy mode is XOR-symmetric: the same call recovers the
 // plaintext when applied to a previously-masked slice.
 func ApplyPrivacyMask(mask, headerSlice []byte) error {
-	if len(mask) != PrivacyKeySize {
-		return fmt.Errorf("channel: privacy mask must be %d bytes, got %d",
+	if len(mask) < PrivacyKeySize {
+		return fmt.Errorf("channel: privacy mask must be at least %d bytes, got %d",
 			PrivacyKeySize, len(mask))
 	}
-	if len(headerSlice) > PrivacyKeySize {
-		return fmt.Errorf("channel: privacy slice exceeds %d bytes (got %d) — Spec §4.4.3.1 limits the protected portion to one AES block",
-			PrivacyKeySize, len(headerSlice))
+	if len(headerSlice) > len(mask) {
+		return fmt.Errorf("channel: privacy slice (%d bytes) exceeds the keystream (%d bytes)",
+			len(headerSlice), len(mask))
 	}
 	for i := range headerSlice {
 		headerSlice[i] ^= mask[i]
