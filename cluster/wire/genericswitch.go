@@ -136,6 +136,14 @@ func NewGenericSwitch(endpoint uint16, src GenericSwitchSource) *GenericSwitch {
 	return &GenericSwitch{src: src, endpoint: endpoint}
 }
 
+// Endpoint returns the endpoint this switch addresses its events to.
+//
+// Exported so a caller can verify the id it supplied actually arrived: the
+// endpoint is captured at construction and used only when an event fires, so
+// a materialiser that dropped it would go unnoticed until a press event was
+// delivered to the wrong Matter path.
+func (s *GenericSwitch) Endpoint() uint16 { return s.endpoint }
+
 // MatterClusterID identifies the Switch cluster (0x003B).
 func (s *GenericSwitch) MatterClusterID() uint32 { return matterClusterGenericSwitch }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/SukramJ/go-fabric/bootid"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -30,25 +29,21 @@ const matterDeviceTypeBridgedNode uint32 = 0x0013
 //
 //  1. Custom-DP-backed endpoints (ep.Source != nil) ask the source
 //     directly via [contract.EndpointSource.MatterClusterServers].
-//  2. MomentarySwitch sources (ep.Measurement is a
-//     [wire.GenericSwitchSource]) get a [wire.GenericSwitch] cluster
-//     server constructed at materialise time so the cluster knows the
-//     endpoint ID for event emission.
-//  3. Other standalone-sensor endpoints (ep.Measurement != nil)
-//     consult the [measurement.FromMeasurementClass] materializer,
-//     which looks the measurement class up in the kind registry and runs
-//     the materialiser registered for it against the source DP. A kind a
+//  2. Standalone-sensor endpoints (ep.Measurement != nil) consult the
+//     [measurement.FromMeasurementClass] materializer, which looks the
+//     measurement class up in the kind registry and runs the
+//     materialiser registered for it against the source DP. A kind a
 //     host added via [contract.RegisterMeasurementKind] takes this same
 //     path, so its clusters mount exactly like a built-in's.
 //
-// Path 2 and the battery re-entry further down name built-in classes
-// literally, because both need something a
-// [contract.MeasurementMaterializer] is not given: the endpoint id — at
-// construction time for the GenericSwitch event address, and
-// post-construction for PowerSource's EndpointList. A host-registered
-// kind therefore reaches path 3 and nothing else: it can be a standalone
-// sensor, but it cannot be an event source or ride on another endpoint
-// the way a battery does.
+// This function names no measurement class: every one of them, built-in
+// and host-registered alike, is a registry entry reached through path 2.
+// The [contract.MeasurementContext] passed along carries the endpoint
+// id, which is what a kind needs to be an event source (GenericSwitch
+// captures it at construction) or to ride on the endpoint it powers
+// (PowerSource's EndpointList names it). Both shapes were special cases
+// here for exactly as long as the materialiser signature could not
+// express them.
 //
 // The root endpoint (ep.IsRoot()) and the Aggregator (ep.IsAggregator())
 // return the set the daemon published via
@@ -70,41 +65,22 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// Source / measurement-driven cluster servers come first so the
 	// dispatcher's wildcard read enumerates them in the same order
 	// across calls.
+	mc := contract.MeasurementContext{EndpointID: ep.ID}
 	var inner []contract.ClusterServer
 	switch {
 	case ep.Source != nil:
 		inner = append([]contract.ClusterServer(nil), ep.Source.MatterClusterServers()...)
 	case ep.Measurement != nil:
-		class := ep.Measurement.MatterMeasurementClass()
-		// MomentarySwitch is event-driven and needs the endpoint ID
-		// at construction time so [wire.GenericSwitch.FireInitialPress]
-		// can address the right Matter address.
-		if class == contract.MeasurementMomentarySwitch {
-			if src, ok := ep.Measurement.(wire.GenericSwitchSource); ok {
-				inner = []contract.ClusterServer{wire.NewGenericSwitch(ep.ID, src)}
-			}
-		} else {
-			inner = measurement.FromMeasurementClass(class, ep.Measurement)
-			// PowerSource.EndpointList (§11.7.6.20) must name the endpoint
-			// the power source feeds; stamp it post-construction, like the
-			// other endpoint-aware servers (BasicInformation, …).
-			for _, s := range inner {
-				if ps, ok := s.(*measurement.PowerSourceServer); ok {
-					ps.SetEndpoint(ep.ID)
-				}
-			}
-		}
+		inner = measurement.FromMeasurementClass(
+			ep.Measurement.MatterMeasurementClass(), ep.Measurement, mc,
+		)
 	}
 	// The device's battery rides on this endpoint when attachPowerSource
 	// picked it. Appended after the endpoint's own clusters so the primary
 	// function stays first in the ServerList.
 	if ep.PowerSource != nil {
-		for _, s := range measurement.FromMeasurementClass(contract.MeasurementBattery, ep.PowerSource) {
-			if ps, ok := s.(*measurement.PowerSourceServer); ok {
-				ps.SetEndpoint(ep.ID)
-			}
-			inner = append(inner, s)
-		}
+		inner = append(inner,
+			measurement.FromMeasurementClass(contract.MeasurementBattery, ep.PowerSource, mc)...)
 	}
 
 	if len(inner) == 0 {

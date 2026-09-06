@@ -39,7 +39,13 @@ func newTestIdentity(t *testing.T, nodeID, fabricID uint64, ipk [16]byte) *Ident
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	noc := elliptic.Marshal(elliptic.P256(), priv.X, priv.Y) //nolint:staticcheck // SA1019: test fixture
+	// newTestVerifier parses this NOC back with
+	// ecdsa.ParseUncompressedPublicKey; PublicKey.Bytes produces exactly
+	// the encoding that call accepts, so no deprecated elliptic.Marshal.
+	noc, err := priv.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("PublicKey.Bytes: %v", err)
+	}
 	id := &Identity{
 		NOC:        noc,
 		ICAC:       nil,

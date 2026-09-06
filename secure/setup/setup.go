@@ -204,7 +204,11 @@ func ManualCode(discriminator uint16, passcode uint32) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return tenDigits + string(rune('0'+check)), nil //nolint:gosec // G115: check is a Verhoeff digit 0..9; '0'+check is 48..57, well within valid rune range; see #20
+	// G115 (int -> rune) is suppressed because check is a table lookup,
+	// not an arithmetic result: verhoeffCheck returns verhoeffTableInv[c],
+	// and every element of that array is a decimal digit 0..9, so
+	// '0'+check stays inside 48..57.
+	return tenDigits + string(rune('0'+check)), nil //nolint:gosec // G115: see above.
 }
 
 // verhoeffTable_d, verhoeffTable_p, verhoeffTable_inv are the permutation,

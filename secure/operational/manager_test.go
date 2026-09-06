@@ -1161,7 +1161,7 @@ func TestManager_ConcurrentOpenCloseGet(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			e, err := m.OpenFromSigma(uint8(idx%5+1), uint64(idx), uint64(idx+100), keys) //nolint:gosec // G115: idx bounded by goroutines constant; conversion is safe
+			e, err := m.OpenFromSigma(uint8(idx%5+1), uint64(idx), uint64(idx+100), keys)
 			if err != nil {
 				return // session exhausted is theoretically possible but won't happen here
 			}
@@ -1220,7 +1220,7 @@ func TestEntry_FabricIndex_RaceAgainstAdopt(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := range 500 {
-			_ = m.AdoptFabricIndex(e.SessionID, uint8(i%8+1)) //nolint:gosec // G115: bounded by loop constant
+			_ = m.AdoptFabricIndex(e.SessionID, uint8(i%8+1))
 		}
 	}()
 	wg.Wait()

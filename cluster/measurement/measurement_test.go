@@ -9,10 +9,20 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
 // --- fakes ---
+
+// fakeSwitch is a momentary press source: it satisfies
+// cluster/wire's GenericSwitchSource by method set alone, which is all
+// the materialiser asserts.
+type fakeSwitch struct{}
+
+func (fakeSwitch) MatterSwitchPositions() uint8 { return 2 }
+
+func (fakeSwitch) MatterSwitchSupportsLongPress() bool { return false }
 
 type fakeFloat struct {
 	class contract.MeasurementClass
@@ -578,7 +588,7 @@ func TestOccupancyServerPIRDelayNotAdvertised(t *testing.T) {
 func TestFromMeasurementClassTemperature(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementTemperature, val: 20.0, obs: true}
-	servers := measurement.FromMeasurementClass(contract.MeasurementTemperature, src)
+	servers := measurement.FromMeasurementClass(contract.MeasurementTemperature, src, contract.MeasurementContext{})
 	if len(servers) != 1 {
 		t.Fatalf("want 1 server, got %d", len(servers))
 	}
@@ -591,7 +601,7 @@ func TestFromMeasurementClassTemperature(t *testing.T) {
 func TestFromMeasurementClassHumidity(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementHumidity, val: 50.0, obs: true}
-	servers := measurement.FromMeasurementClass(contract.MeasurementHumidity, src)
+	servers := measurement.FromMeasurementClass(contract.MeasurementHumidity, src, contract.MeasurementContext{})
 	if len(servers) != 1 {
 		t.Fatalf("want 1 server, got %d", len(servers))
 	}
@@ -604,7 +614,7 @@ func TestFromMeasurementClassHumidity(t *testing.T) {
 func TestFromMeasurementClassIlluminance(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementIlluminance, val: 500.0, obs: true}
-	servers := measurement.FromMeasurementClass(contract.MeasurementIlluminance, src)
+	servers := measurement.FromMeasurementClass(contract.MeasurementIlluminance, src, contract.MeasurementContext{})
 	if len(servers) != 1 {
 		t.Fatalf("want 1 server, got %d", len(servers))
 	}
@@ -617,7 +627,7 @@ func TestFromMeasurementClassIlluminance(t *testing.T) {
 func TestFromMeasurementClassPressure(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementPressure, val: 1013.0, obs: true}
-	servers := measurement.FromMeasurementClass(contract.MeasurementPressure, src)
+	servers := measurement.FromMeasurementClass(contract.MeasurementPressure, src, contract.MeasurementContext{})
 	if len(servers) != 1 {
 		t.Fatalf("want 1 server, got %d", len(servers))
 	}
@@ -630,7 +640,7 @@ func TestFromMeasurementClassPressure(t *testing.T) {
 func TestFromMeasurementClassContact(t *testing.T) {
 	t.Parallel()
 	src := fakeBool{class: contract.MeasurementContact, val: true, obs: true}
-	servers := measurement.FromMeasurementClass(contract.MeasurementContact, src)
+	servers := measurement.FromMeasurementClass(contract.MeasurementContact, src, contract.MeasurementContext{})
 	if len(servers) != 1 {
 		t.Fatalf("want 1 server, got %d", len(servers))
 	}
@@ -643,7 +653,7 @@ func TestFromMeasurementClassContact(t *testing.T) {
 func TestFromMeasurementClassLeak(t *testing.T) {
 	t.Parallel()
 	src := fakeBool{class: contract.MeasurementLeak, val: false, obs: true}
-	servers := measurement.FromMeasurementClass(contract.MeasurementLeak, src)
+	servers := measurement.FromMeasurementClass(contract.MeasurementLeak, src, contract.MeasurementContext{})
 	if len(servers) != 1 {
 		t.Fatalf("want 1 server, got %d", len(servers))
 	}
@@ -656,7 +666,7 @@ func TestFromMeasurementClassLeak(t *testing.T) {
 func TestFromMeasurementClassOccupancy(t *testing.T) {
 	t.Parallel()
 	src := fakeBool{class: contract.MeasurementOccupancy, val: true, obs: true}
-	servers := measurement.FromMeasurementClass(contract.MeasurementOccupancy, src)
+	servers := measurement.FromMeasurementClass(contract.MeasurementOccupancy, src, contract.MeasurementContext{})
 	if len(servers) != 1 {
 		t.Fatalf("want 1 server, got %d", len(servers))
 	}
@@ -677,7 +687,7 @@ func TestFromMeasurementClassOccupancy(t *testing.T) {
 func TestFromMeasurementClassBattery_FloatSource(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementBattery, val: 80.0, obs: true}
-	servers := measurement.FromMeasurementClass(contract.MeasurementBattery, src)
+	servers := measurement.FromMeasurementClass(contract.MeasurementBattery, src, contract.MeasurementContext{})
 	if len(servers) != 1 {
 		t.Fatalf("want 1 server for Battery class with a float source, got %d", len(servers))
 	}
@@ -697,7 +707,7 @@ func TestFromMeasurementClassBattery_FloatSource(t *testing.T) {
 func TestFromMeasurementClassNoneReturnsNil(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementNone, val: 0.0, obs: true}
-	servers := measurement.FromMeasurementClass(contract.MeasurementNone, src)
+	servers := measurement.FromMeasurementClass(contract.MeasurementNone, src, contract.MeasurementContext{})
 	if servers != nil {
 		t.Errorf("want nil for None class, got %v", servers)
 	}
@@ -709,13 +719,13 @@ func TestFromMeasurementClassWrongTypedSourceReturnsNil(t *testing.T) {
 
 	// fakeFloat passed for Contact class (which expects MatterBoolMeasurementSource) → nil.
 	floatSrc := fakeFloat{class: contract.MeasurementContact, val: 1.0, obs: true}
-	if got := measurement.FromMeasurementClass(contract.MeasurementContact, floatSrc); got != nil {
+	if got := measurement.FromMeasurementClass(contract.MeasurementContact, floatSrc, contract.MeasurementContext{}); got != nil {
 		t.Errorf("float src for Contact: want nil, got %v", got)
 	}
 
 	// fakeBool passed for Temperature class (which expects MatterFloatMeasurementSource) → nil.
 	boolSrc := fakeBool{class: contract.MeasurementTemperature, val: true, obs: true}
-	if got := measurement.FromMeasurementClass(contract.MeasurementTemperature, boolSrc); got != nil {
+	if got := measurement.FromMeasurementClass(contract.MeasurementTemperature, boolSrc, contract.MeasurementContext{}); got != nil {
 		t.Errorf("bool src for Temperature: want nil, got %v", got)
 	}
 }
@@ -742,7 +752,7 @@ func TestFromMeasurementClassAirQualityMountsMandatoryCluster(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			src := fakeFloat{class: tc.class, val: 400.0, obs: true}
-			servers := measurement.FromMeasurementClass(tc.class, src)
+			servers := measurement.FromMeasurementClass(tc.class, src, contract.MeasurementContext{})
 
 			got := make(map[uint32]bool, len(servers))
 			for _, s := range servers {
@@ -1410,7 +1420,7 @@ func TestFromMeasurementClassP2Coverage(t *testing.T) {
 	for _, r := range rows {
 		t.Run(r.name, func(t *testing.T) {
 			t.Parallel()
-			servers := measurement.FromMeasurementClass(r.class, r.src)
+			servers := measurement.FromMeasurementClass(r.class, r.src, contract.MeasurementContext{})
 			if r.wantNil {
 				if servers != nil {
 					t.Errorf("want nil, got %v (len=%d)", servers, len(servers))
@@ -2141,7 +2151,7 @@ func TestTemperatureServer_MatterAttributes_NonEmpty(t *testing.T) {
 func TestFromMeasurementClass_Temperature(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementTemperature, val: 20, obs: true}
-	got := measurement.FromMeasurementClass(contract.MeasurementTemperature, src)
+	got := measurement.FromMeasurementClass(contract.MeasurementTemperature, src, contract.MeasurementContext{})
 	if len(got) == 0 {
 		t.Error("FromMeasurementClass(Temperature): want non-empty")
 	}
@@ -2150,7 +2160,7 @@ func TestFromMeasurementClass_Temperature(t *testing.T) {
 func TestFromMeasurementClass_Humidity(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementHumidity, val: 50, obs: true}
-	got := measurement.FromMeasurementClass(contract.MeasurementHumidity, src)
+	got := measurement.FromMeasurementClass(contract.MeasurementHumidity, src, contract.MeasurementContext{})
 	if len(got) == 0 {
 		t.Error("FromMeasurementClass(Humidity): want non-empty")
 	}
@@ -2159,7 +2169,7 @@ func TestFromMeasurementClass_Humidity(t *testing.T) {
 func TestFromMeasurementClass_Illuminance(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementIlluminance, val: 100, obs: true}
-	got := measurement.FromMeasurementClass(contract.MeasurementIlluminance, src)
+	got := measurement.FromMeasurementClass(contract.MeasurementIlluminance, src, contract.MeasurementContext{})
 	if len(got) == 0 {
 		t.Error("FromMeasurementClass(Illuminance): want non-empty")
 	}
@@ -2168,7 +2178,7 @@ func TestFromMeasurementClass_Illuminance(t *testing.T) {
 func TestFromMeasurementClass_Pressure(t *testing.T) {
 	t.Parallel()
 	src := fakeFloat{class: contract.MeasurementPressure, val: 1013, obs: true}
-	got := measurement.FromMeasurementClass(contract.MeasurementPressure, src)
+	got := measurement.FromMeasurementClass(contract.MeasurementPressure, src, contract.MeasurementContext{})
 	if len(got) == 0 {
 		t.Error("FromMeasurementClass(Pressure): want non-empty")
 	}
@@ -2177,7 +2187,7 @@ func TestFromMeasurementClass_Pressure(t *testing.T) {
 func TestFromMeasurementClass_Contact(t *testing.T) {
 	t.Parallel()
 	src := fakeBool{class: contract.MeasurementContact, val: true, obs: true}
-	got := measurement.FromMeasurementClass(contract.MeasurementContact, src)
+	got := measurement.FromMeasurementClass(contract.MeasurementContact, src, contract.MeasurementContext{})
 	if len(got) == 0 {
 		t.Error("FromMeasurementClass(Contact): want non-empty")
 	}
@@ -2186,7 +2196,7 @@ func TestFromMeasurementClass_Contact(t *testing.T) {
 func TestFromMeasurementClass_Leak(t *testing.T) {
 	t.Parallel()
 	src := fakeBool{class: contract.MeasurementLeak, val: false, obs: true}
-	got := measurement.FromMeasurementClass(contract.MeasurementLeak, src)
+	got := measurement.FromMeasurementClass(contract.MeasurementLeak, src, contract.MeasurementContext{})
 	if len(got) == 0 {
 		t.Error("FromMeasurementClass(Leak): want non-empty")
 	}
@@ -2195,7 +2205,7 @@ func TestFromMeasurementClass_Leak(t *testing.T) {
 func TestFromMeasurementClass_Occupancy(t *testing.T) {
 	t.Parallel()
 	src := fakeBool{class: contract.MeasurementOccupancy, val: false, obs: true}
-	got := measurement.FromMeasurementClass(contract.MeasurementOccupancy, src)
+	got := measurement.FromMeasurementClass(contract.MeasurementOccupancy, src, contract.MeasurementContext{})
 	if len(got) == 0 {
 		t.Error("FromMeasurementClass(Occupancy): want non-empty")
 	}
@@ -2204,7 +2214,7 @@ func TestFromMeasurementClass_Occupancy(t *testing.T) {
 func TestFromMeasurementClass_Battery(t *testing.T) {
 	t.Parallel()
 	src := fakeBool{class: contract.MeasurementBattery, val: false, obs: true}
-	got := measurement.FromMeasurementClass(contract.MeasurementBattery, src)
+	got := measurement.FromMeasurementClass(contract.MeasurementBattery, src, contract.MeasurementContext{})
 	if len(got) == 0 {
 		t.Error("FromMeasurementClass(Battery): want non-empty")
 	}
@@ -2212,17 +2222,45 @@ func TestFromMeasurementClass_Battery(t *testing.T) {
 
 func TestFromMeasurementClass_None_ReturnsNil(t *testing.T) {
 	t.Parallel()
-	got := measurement.FromMeasurementClass(contract.MeasurementNone, nil)
+	got := measurement.FromMeasurementClass(contract.MeasurementNone, nil, contract.MeasurementContext{})
 	if len(got) != 0 {
 		t.Errorf("FromMeasurementClass(None): want nil, got %v", got)
 	}
 }
 
-func TestFromMeasurementClass_MomentarySwitch_ReturnsNil(t *testing.T) {
+func TestFromMeasurementClass_MomentarySwitch_NonSwitchSourceReturnsNil(t *testing.T) {
 	t.Parallel()
-	got := measurement.FromMeasurementClass(contract.MeasurementMomentarySwitch, nil)
+	got := measurement.FromMeasurementClass(contract.MeasurementMomentarySwitch, nil, contract.MeasurementContext{})
 	if len(got) != 0 {
-		t.Errorf("FromMeasurementClass(MomentarySwitch): want nil, got %v", got)
+		t.Errorf("FromMeasurementClass(MomentarySwitch, nil): want nil, got %v", got)
+	}
+}
+
+// TestFromMeasurementClass_MomentarySwitch_MountsTheSwitchCluster is the
+// positive half: the class used to have no materialiser at all and was
+// built by the endpoint assembler instead, so the registry is the only
+// place that can now answer for it.
+func TestFromMeasurementClass_MomentarySwitch_MountsTheSwitchCluster(t *testing.T) {
+	t.Parallel()
+	got := measurement.FromMeasurementClass(
+		contract.MeasurementMomentarySwitch, fakeSwitch{}, contract.MeasurementContext{EndpointID: 7},
+	)
+	if len(got) != 1 {
+		t.Fatalf("FromMeasurementClass(MomentarySwitch, switch source) = %v, want one server", got)
+	}
+	// The endpoint id is the whole reason MomentarySwitch takes a context:
+	// wire.NewGenericSwitch needs it AT CONSTRUCTION so FireInitialPress can
+	// address a Matter path. Passing it and never asserting it would leave
+	// the one thing this refactor exists for unguarded.
+	if sw, ok := got[0].(*wire.GenericSwitch); ok {
+		if ep := sw.Endpoint(); ep != 7 {
+			t.Errorf("generic switch endpoint = %d, want 7 — the materialiser dropped the context", ep)
+		}
+	} else {
+		t.Fatalf("server type %T, want *wire.GenericSwitch", got[0])
+	}
+	if id := got[0].MatterClusterID(); id != 0x003B {
+		t.Errorf("cluster = 0x%04X, want 0x003B (Switch)", id)
 	}
 }
 
@@ -2231,7 +2269,7 @@ func TestFromMeasurementClass_WrongType_ReturnsNil(t *testing.T) {
 	t.Parallel()
 	// Passing a fakeBool (BoolMeasurementSource) for a float class.
 	src := fakeBool{class: contract.MeasurementTemperature}
-	got := measurement.FromMeasurementClass(contract.MeasurementTemperature, src)
+	got := measurement.FromMeasurementClass(contract.MeasurementTemperature, src, contract.MeasurementContext{})
 	if len(got) != 0 {
 		t.Errorf("FromMeasurementClass(Temperature, boolSrc): want nil, got %v", got)
 	}

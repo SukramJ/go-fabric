@@ -39,12 +39,15 @@ var hostFlowClass = contract.RegisterMeasurementKind(contract.MeasurementKind{
 	Name:       "Flow",
 	DeviceType: hostFlowDeviceType,
 	ClusterID:  hostFlowClusterID,
-	Materialize: func(src any) []contract.ClusterServer {
+	Materialize: func(src any, mc contract.MeasurementContext) []contract.ClusterServer {
 		f, ok := src.(contract.FloatMeasurementSource)
 		if !ok {
 			return nil
 		}
-		return []contract.ClusterServer{&hostFlowServer{src: f}}
+		// The endpoint id is taken at CONSTRUCTION, which is the shape
+		// the library's own GenericSwitch needs and the shape a host
+		// could not express while the materialiser saw only the source.
+		return []contract.ClusterServer{&hostFlowServer{src: f, endpoint: mc.EndpointID}}
 	},
 })
 
@@ -59,9 +62,13 @@ func (s *hostFlowSource) MatterMeasurementClass() contract.MeasurementClass { re
 func (s *hostFlowSource) MatterFloatValue() (float64, bool) { return s.value, true }
 
 // hostFlowServer is the host's cluster server, written against
-// [contract.ClusterServer] alone.
+// [contract.ClusterServer] alone. It keeps the endpoint id its
+// materialiser was handed, standing in for every host cluster that has
+// to address a Matter path of its own — an event source, or a cluster
+// whose attributes name the endpoint they belong to.
 type hostFlowServer struct {
-	src contract.FloatMeasurementSource
+	src      contract.FloatMeasurementSource
+	endpoint uint16
 }
 
 func (s *hostFlowServer) MatterClusterID() uint32 { return hostFlowClusterID }
@@ -158,5 +165,70 @@ func TestHostRegisteredMeasurementKindMaterialisesAnEndpoint(t *testing.T) {
 	got, ok := flow.MatterRead(hostFlowMeasuredValue)
 	if !ok || got != uint16(42) {
 		t.Errorf("MeasuredValue = %v, %v; want 42, true — the mounted server is not reading the host source", got, ok)
+	}
+}
+
+// TestHostRegisteredMeasurementKindReceivesTheEndpointID is the second
+// milestone: the kind is registered from outside the library, and the
+// server the assembler mounts for it knows which endpoint it lives on.
+//
+// The id has to arrive through [contract.MeasurementContext] at
+// materialise time, not from a later stamp: [endpoint.ClusterServers]
+// rebuilds the whole set on every dispatch, so anything written onto a
+// server after that call is discarded with it. That is why the two
+// library shapes that need the id — GenericSwitch's event address and
+// PowerSource's EndpointList — were hard-coded in the assembler until
+// the signature could carry it.
+//
+// Asserting equality with ep.ID rather than a literal keeps the test
+// honest about what it measures; the separate zero check is what makes
+// the equality mean something, since a materialiser that ignored the
+// context entirely would also read 0 on both sides.
+func TestHostRegisteredMeasurementKindReceivesTheEndpointID(t *testing.T) {
+	t.Parallel()
+
+	assembler, err := endpoint.New(endpointtest.NewFakeStore(), endpoint.Config{
+		VendorID:  0xFFF1,
+		ProductID: 0x8001,
+		NodeLabel: "Host Bridge",
+	}, nil)
+	if err != nil {
+		t.Fatalf("endpoint.New: %v", err)
+	}
+	topology, err := assembler.Assemble(context.Background(), []endpoint.Snapshot{{
+		Scope:         "host",
+		ModelComplete: true,
+		Endpoints: []endpoint.Spec{{
+			StableKey:    endpoint.StringKey("host:flow-endpointed"),
+			DeviceType:   contract.MeasurementClassDeviceType(hostFlowClass),
+			FriendlyName: "Addressed Flow",
+			Measurement:  &hostFlowSource{value: 1.0},
+		}},
+	}})
+	if err != nil {
+		t.Fatalf("Assemble: %v", err)
+	}
+
+	bridged := topology.Bridged()
+	if len(bridged) != 1 {
+		t.Fatalf("assembled %d bridged endpoints, want 1", len(bridged))
+	}
+	ep := bridged[0]
+	if ep.ID == 0 {
+		t.Fatal("bridged endpoint id is 0; the equality below would hold for a materialiser that ignored the context")
+	}
+
+	var flow *hostFlowServer
+	for _, srv := range endpoint.ClusterServers(ep) {
+		if got, ok := srv.(*hostFlowServer); ok {
+			flow = got
+			break
+		}
+	}
+	if flow == nil {
+		t.Fatalf("no cluster 0x%04X on the bridged endpoint", hostFlowClusterID)
+	}
+	if flow.endpoint != ep.ID {
+		t.Errorf("host server endpoint = %d, want %d — the materialiser was not given the endpoint it is mounted on", flow.endpoint, ep.ID)
 	}
 }

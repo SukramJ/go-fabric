@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3141,
+  "entry_points": 3146,
   "entry_packages": [
     ".",
     "bootid",
@@ -50,9 +50,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2759,
-    "reachable": 1348,
-    "whitelisted": 1401,
+    "total_exported": 2763,
+    "reachable": 1349,
+    "whitelisted": 1404,
     "unreachable": 10
   },
   "by_package": [
@@ -123,14 +123,14 @@
       "package": "cluster/measurement",
       "identifier": "CelsiusToInt16",
       "file": "cluster/measurement/measurement.go",
-      "line": 1727,
+      "line": 1732,
       "kind": "func"
     },
     {
       "package": "contract",
       "identifier": "DeviceTypeName",
       "file": "contract/matter.go",
-      "line": 744,
+      "line": 762,
       "kind": "func"
     },
     {
@@ -4312,21 +4312,21 @@
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 926
+      "line": 931
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 918
+      "line": 923
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1662
+      "line": 1667
     },
     {
       "package": "cluster/measurement",
@@ -7256,108 +7256,129 @@
     },
     {
       "package": "secure/mattercert",
+      "identifier": "TestCheckValidityAcceptsOrdinaryBounds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/verify_validity_internal_test.go",
+      "line": 62
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestCheckValidityRejectsAWrappingNotAfter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/verify_validity_internal_test.go",
+      "line": 47
+    },
+    {
+      "package": "secure/mattercert",
+      "identifier": "TestCheckValidityRejectsAWrappingNotBefore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/mattercert/verify_validity_internal_test.go",
+      "line": 23
+    },
+    {
+      "package": "secure/mattercert",
       "identifier": "TestDecode_IsICA",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 297
+      "line": 306
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_IsNOC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 316
+      "line": 325
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_IsRoot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 275
+      "line": 284
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_MissingSignature",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 242
+      "line": 251
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_NonStructureTop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 205
+      "line": 215
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_PublicKeyAbsentOrEmptyRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 436
+      "line": 451
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_PublicKeyECDSA_NonP256Curve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 370
+      "line": 379
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_PublicKeyECDSA_OffCurvePoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 381
+      "line": 390
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_PublicKeyECDSA_ValidKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 407
+      "line": 416
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_SerialNumber21OctetsAccepted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 339
+      "line": 348
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_SerialNumber22OctetsRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 359
+      "line": 368
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_SignatureWrongLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 253
+      "line": 262
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_TruncatedInput",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 197
+      "line": 207
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_UnsupportedSigAlgo",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 264
+      "line": 273
     },
     {
       "package": "secure/mattercert",
       "identifier": "TestDecode_ValidNOCSubjectFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/mattercert/decode_test.go",
-      "line": 217
+      "line": 227
     },
     {
       "package": "secure/mattercert",
@@ -7735,7 +7756,7 @@
       "identifier": "TestComputeDestinationID_Deterministic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 445
+      "line": 451
     },
     {
       "package": "secure/sigma",
@@ -7819,21 +7840,21 @@
       "identifier": "TestProcessSigma1ConcurrentReplayDeterministic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 360
+      "line": 366
     },
     {
       "package": "secure/sigma",
       "identifier": "TestProcessSigma2BeforeSigma1Fails",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 273
+      "line": 279
     },
     {
       "package": "secure/sigma",
       "identifier": "TestProcessSigma3BeforeSigma1Fails",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 283
+      "line": 289
     },
     {
       "package": "secure/sigma",
@@ -7868,49 +7889,49 @@
       "identifier": "TestResponderResetForNewSigma1_ClearsPeerCATs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/responder_reset_test.go",
-      "line": 54
+      "line": 53
     },
     {
       "package": "secure/sigma",
       "identifier": "TestResponderResetForNewSigma1_RenewsSessionID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/responder_reset_test.go",
-      "line": 82
+      "line": 81
     },
     {
       "package": "secure/sigma",
       "identifier": "TestResponderSigma1Replay_KeepsSessionID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/responder_reset_test.go",
-      "line": 117
+      "line": 116
     },
     {
       "package": "secure/sigma",
       "identifier": "TestResponderSigma3FailureEndsHandshakeUntilNewSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/responder_sigma3_test.go",
-      "line": 136
+      "line": 140
     },
     {
       "package": "secure/sigma",
       "identifier": "TestResponderSigma3SignatureFailureCommitsNoPeerIdentity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/responder_sigma3_test.go",
-      "line": 86
+      "line": 90
     },
     {
       "package": "secure/sigma",
       "identifier": "TestResponder_MultiFabric_NoMatchFallsBack",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 557
+      "line": 563
     },
     {
       "package": "secure/sigma",
       "identifier": "TestResponder_MultiFabric_PicksByDestinationID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 494
+      "line": 500
     },
     {
       "package": "secure/sigma",
@@ -7973,14 +7994,14 @@
       "identifier": "TestRoundTripDerivesMatchingKeys",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 70
+      "line": 76
     },
     {
       "package": "secure/sigma",
       "identifier": "TestSessionKeysHiddenBeforeFinish",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 295
+      "line": 301
     },
     {
       "package": "secure/sigma",
@@ -8036,42 +8057,42 @@
       "identifier": "TestSigma1RejectsBadEphPoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 179
+      "line": 185
     },
     {
       "package": "secure/sigma",
       "identifier": "TestSigma3WithTamperedEncryptedRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 156
+      "line": 162
     },
     {
       "package": "secure/sigma",
       "identifier": "TestSigmaDecoder_Next_NonContextTag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 496
+      "line": 501
     },
     {
       "package": "secure/sigma",
       "identifier": "TestSigmaDecoder_OpenStruct_NonContainer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 468
+      "line": 473
     },
     {
       "package": "secure/sigma",
       "identifier": "TestSigmaDecoder_OpenStruct_TruncatedInput",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 482
+      "line": 487
     },
     {
       "package": "secure/sigma",
       "identifier": "TestSigmaDecoder_SkipContainer_Nested",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 526
+      "line": 531
     },
     {
       "package": "secure/sigma",
@@ -8169,35 +8190,35 @@
       "identifier": "TestSignatureRoundTripsBitExact",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 310
+      "line": 316
     },
     {
       "package": "secure/sigma",
       "identifier": "TestStateMachineGuards",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 260
+      "line": 266
     },
     {
       "package": "secure/sigma",
       "identifier": "TestTamperedResponderEphPubKeyRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 134
+      "line": 140
     },
     {
       "package": "secure/sigma",
       "identifier": "TestTamperedSigma2EncryptedRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 116
+      "line": 122
     },
     {
       "package": "secure/sigma",
       "identifier": "TestUnmarshalAppleSigma1Stub",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 686
+      "line": 691
     },
     {
       "package": "secure/sigma",
@@ -8260,7 +8281,7 @@
       "identifier": "TestUnmarshalSigma1_ResumptionTagsAllOrNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 204
+      "line": 210
     },
     {
       "package": "secure/sigma",
@@ -8302,7 +8323,7 @@
       "identifier": "TestUnmarshalSigma3_UnknownContainerTag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 621
+      "line": 626
     },
     {
       "package": "secure/sigma",
@@ -8316,7 +8337,7 @@
       "identifier": "TestUnmarshalTBE2_UnknownContainerTag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 573
+      "line": 578
     },
     {
       "package": "secure/sigma",
@@ -8330,7 +8351,7 @@
       "identifier": "TestUnmarshalTBE3_UnknownContainerTag",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 598
+      "line": 603
     },
     {
       "package": "secure/sigma",
@@ -8344,7 +8365,7 @@
       "identifier": "TestValidatePoint_OffCurve",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 647
+      "line": 652
     },
     {
       "package": "secure/sigma",
@@ -8358,14 +8379,14 @@
       "identifier": "TestValidatePoint_WrongLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
-      "line": 455
+      "line": 460
     },
     {
       "package": "secure/sigma",
       "identifier": "TestVerifyTranscriptRejectsBadLength",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_test.go",
-      "line": 338
+      "line": 344
     },
     {
       "package": "secure/spake2",

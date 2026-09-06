@@ -142,13 +142,23 @@ type certOptions struct {
 	omitSignature      bool
 }
 
+// makeValidPubKey returns a fresh P-256 public key in the 65-byte
+// uncompressed SEC 1 §2.3.3 encoding a Matter certificate's ec-pub-key
+// field carries. ecdsa.PublicKey.Bytes emits exactly what
+// ecdsa.ParseUncompressedPublicKey — the call Decode itself makes —
+// accepts, so the fixture does not need the deprecated
+// elliptic.Marshal.
 func makeValidPubKey(t *testing.T) []byte {
 	t.Helper()
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	return elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019: elliptic.Marshal is the canonical raw-point encoding for Matter TLV test fixtures
+	pub, err := priv.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("PublicKey.Bytes: %v", err)
+	}
+	return pub
 }
 
 // makeRootCertOpts returns options for a Root CA cert (Subject carries
@@ -218,8 +228,7 @@ func TestDecode_ValidNOCSubjectFields(t *testing.T) {
 	t.Parallel()
 	// NOC Subject: tag 17 (matter-node-id=0xDEAD) + tag 21 (matter-fabric-id=0xBEEF).
 	opts := makeNOCOpts()
-	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	opts.pubKey = elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019: elliptic.Marshal is canonical for Matter TLV raw-point fixtures
+	opts.pubKey = makeValidPubKey(t)
 	raw := buildTestCert(t, opts)
 	cert, err := Decode(raw)
 	if err != nil {
@@ -407,8 +416,14 @@ func TestDecode_PublicKeyECDSA_OffCurvePoint(t *testing.T) {
 func TestDecode_PublicKeyECDSA_ValidKey(t *testing.T) {
 	t.Parallel()
 	opts := makeRootCertOpts()
-	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	opts.pubKey = elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019: elliptic.Marshal is canonical for Matter TLV raw-point fixtures
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	opts.pubKey, err = priv.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("PublicKey.Bytes: %v", err)
+	}
 	raw := buildTestCert(t, opts)
 	cert, err := Decode(raw)
 	if err != nil {

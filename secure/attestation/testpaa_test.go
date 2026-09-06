@@ -65,7 +65,7 @@ func TestTestPAAFFF1SKID_DerivedFromPublicKey(t *testing.T) {
 	// embedded public key.
 	pub := append([]byte{0x04}, TestPAAFFF1PrivateKey.X.Bytes()...)
 	pub = append(pub, TestPAAFFF1PrivateKey.Y.Bytes()...)
-	sum := sha1.Sum(pub) //nolint:gosec // SKID derivation only, not security
+	sum := sha1.Sum(pub)
 	if !bytes.Equal(sum[:], TestPAAFFF1SKID) {
 		t.Errorf("embedded SKID does not match SHA1(pubkey): got %s, want %s",
 			hex.EncodeToString(TestPAAFFF1SKID), hex.EncodeToString(sum[:]))

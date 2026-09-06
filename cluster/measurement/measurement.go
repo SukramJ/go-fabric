@@ -860,8 +860,13 @@ func (s *OccupancySensingServer) MatterAttributes() []uint32 {
 // nil when src is not the right typed flavour for class (e.g. a
 // FloatMeasurementSource for an Occupancy class) and when the class has
 // no measurement-cluster materialisation of its own (None, Power,
-// Energy, MomentarySwitch — see [contract.SetMeasurementMaterializer]
-// for why each of the four is left empty).
+// Energy — see [contract.SetMeasurementMaterializer] for why each of
+// the three is left empty).
+//
+// mc carries the endpoint the servers are being mounted on. It is a
+// required argument rather than an optional one because a kind that
+// needs the id has no other way to learn it — the servers are rebuilt
+// on every dispatch, so nothing stamped after this call survives.
 //
 // The dispatch is a registry lookup, not a switch over the built-in
 // constants: a host-registered kind
@@ -870,12 +875,12 @@ func (s *OccupancySensingServer) MatterAttributes() []uint32 {
 // classifier's "exposable" verdict backed by an endpoint the bridge can
 // actually build. The built-in half of that registry is installed by
 // this package's init below.
-func FromMeasurementClass(class contract.MeasurementClass, src any) []contract.ClusterServer {
+func FromMeasurementClass(class contract.MeasurementClass, src any, mc contract.MeasurementContext) []contract.ClusterServer {
 	materialize, ok := contract.MeasurementMaterializerFor(class)
 	if !ok {
 		return nil
 	}
-	return materialize(src)
+	return materialize(src, mc)
 }
 
 // --- ElectricalPowerMeasurement (0x0090) ------------------------------

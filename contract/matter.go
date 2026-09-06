@@ -284,14 +284,34 @@ const measurementClassBuiltinEnd = MeasurementElectrical + 1
 // is not the shape this kind reads; the assembler then mounts nothing
 // for it rather than advertising an unreadable cluster.
 //
-// The endpoint id is deliberately not a parameter. Every cluster server
-// the built-in constructors produce reads its value from src alone; the
-// two that need to know their endpoint (PowerSource's EndpointList, the
-// GenericSwitch event address) are stamped by the assembler after
-// construction and stay library-side. Widening this signature is what a
-// host-defined kind of that shape would require — see the endpoint
-// assembler's [github.com/SukramJ/go-fabric/endpoint.ClusterServers].
-type MeasurementMaterializer func(src any) []ClusterServer
+// mc carries what the kind needs beyond the source — today the id of
+// the endpoint the servers are being mounted on. A kind that does not
+// care ignores it; the two built-in shapes that do are described on
+// [MeasurementContext].
+type MeasurementMaterializer func(src any, mc MeasurementContext) []ClusterServer
+
+// MeasurementContext carries what a materialiser needs beyond the
+// source. Today that is the endpoint id, and the two built-in kinds
+// that need it need it at different moments: GenericSwitch captures it
+// at construction, because its press events address a Matter path, and
+// PowerSource takes it post-construction, because EndpointList
+// (Matter §11.7.6.20) must name the endpoint the power source feeds.
+// Both moments are available to a host kind, because the materialiser
+// owns the construction.
+//
+// It is a struct rather than a bare uint16 on purpose: this is what a
+// host binds to. A second thing a materialiser needs is then a new
+// field, source-compatible with every materialiser already written
+// against this type — where a second parameter would break all of them.
+// Before v0.1.0 that difference is nothing; after it, it is a
+// deprecation cycle.
+type MeasurementContext struct {
+	// EndpointID is the id of the endpoint the returned cluster servers
+	// are mounted on. It is the same value the assembler stamps onto
+	// the endpoint-aware library clusters, so a server built here
+	// addresses events to the endpoint it actually lives on.
+	EndpointID uint16
+}
 
 // MeasurementKind describes what one measurement class materialises as.
 // It carries exactly the two answers the bridge and the eligibility
@@ -389,7 +409,7 @@ func MeasurementKindFor(class MeasurementClass) (kind MeasurementKind, ok bool) 
 // MeasurementMaterializerFor returns the materialiser registered for a
 // class. ok is false for an unregistered class and for a built-in that
 // has no cluster surface of its own — see
-// [SetMeasurementMaterializer] for which four those are — and the
+// [SetMeasurementMaterializer] for which three those are — and the
 // cluster layer turns that into "mount nothing".
 func MeasurementMaterializerFor(class MeasurementClass) (m MeasurementMaterializer, ok bool) {
 	kind, found := MeasurementKindFor(class)
@@ -410,12 +430,10 @@ func MeasurementMaterializerFor(class MeasurementClass) (m MeasurementMaterializ
 // need it — they carry their materialiser into
 // [RegisterMeasurementKind].
 //
-// Four built-ins are deliberately left without one, and the lookups
+// Three built-ins are deliberately left without one, and the lookups
 // report them as having none: MeasurementNone has no Matter projection
-// by design, MeasurementMomentarySwitch projects via the event-driven
-// GenericSwitch path rather than a measurement cluster, and
-// MeasurementPower / MeasurementEnergy are folded into one
-// MeasurementElectrical group before an endpoint is built.
+// by design, and MeasurementPower / MeasurementEnergy are folded into
+// one MeasurementElectrical group before an endpoint is built.
 //
 // Panics for a nil materialiser and for a class outside the built-in
 // range: both mean the caller is wiring something this seam does not
