@@ -146,7 +146,16 @@ func TestChiptoolTriggerCoversEveryBuiltDirectory(t *testing.T) {
 //
 // `synchronize` alone would cover it eventually — the next push to the branch
 // fires one — but "eventually" means the first review happens with no
-// commissioner run behind it.
+// commissioner run behind it, and a pull request merged as opened gets no run
+// at all.
+//
+// `reopened` is here for the same reason and is the one this guard used to
+// miss while the workflow already declared it: reopening a closed pull request
+// fires `reopened` alone, so without it a branch that was closed and reopened
+// — routine when a rebase goes sideways — runs unguarded until someone pushes
+// again. An event the workflow declares but no test names can be dropped in a
+// tidy-up with nothing going red, which is how the whole list came to be
+// missing `opened` in the first place.
 //
 // Read textually rather than through a YAML parser: this module has no YAML
 // dependency and adding one to read four words would cost more than it
@@ -166,7 +175,7 @@ func TestChiptoolTriggerFiresOnAFreshPullRequest(t *testing.T) {
 	}
 	have := strings.Split(strings.ReplaceAll(string(m[1]), " ", ""), ",")
 
-	for _, want := range []string{"opened", "synchronize", "labeled"} {
+	for _, want := range []string{"opened", "labeled", "synchronize", "reopened"} {
 		found := false
 		for _, h := range have {
 			if h == want {
