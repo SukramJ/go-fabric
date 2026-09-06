@@ -24,7 +24,6 @@ func (c *catsVerifier) PeerCATsFromNOC(_ []byte) ([]uint32, error) { return c.ca
 func runHandshakeAgainst(t *testing.T, responder *Responder, ipk [16]byte, fabricID, initNodeID uint64) Sigma2 {
 	t.Helper()
 	initID := newTestIdentity(t, initNodeID, fabricID, ipk)
-	//nolint:gosec // G115: test-only node id fits the destination fixture byte
 	initiator := NewInitiator(initID, testVerifier{}, 0x1001, [32]byte{byte(initNodeID)})
 	s1, err := initiator.GenerateSigma1()
 	if err != nil {

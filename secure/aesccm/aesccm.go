@@ -133,18 +133,28 @@ func (c *CCM) cbcMAC(nonce, plaintext, aad []byte) []byte {
 	b0 := make([]byte, blockSize)
 	b0[0] = flags
 	copy(b0[1:1+NonceSize], nonce)
-	binary.BigEndian.PutUint16(b0[1+NonceSize:], uint16(len(plaintext))) //nolint:gosec // G115: plaintext-length capped to 2^16-1 by Seal/Open; see #20
+	binary.BigEndian.PutUint16(b0[1+NonceSize:], uint16(len(plaintext))) //nolint:gosec // G115: cbcMAC has exactly two callers and each rejects an over-long message before reaching here — Seal on len(plaintext) > 0xFFFF, Open on len(sealed)-TagSize > 0xFFFF.
 
 	state := make([]byte, blockSize)
 	c.block.Encrypt(state, b0)
 
 	if hasAAD {
-		// AAD prefix: 2-byte big-endian length (we never exceed
-		// 0xFEFF in Matter framing — larger values use the 6-byte
-		// extended encoding which we don't implement because Matter
-		// never uses it).
+		// AAD prefix: 2-byte big-endian length. RFC 3610 §2.2 switches
+		// to a 6-byte extended encoding at 0xFF00 and up, which we do
+		// not implement because Matter never reaches it.
+		//
+		// That ceiling is a property of the callers, not of this
+		// function — nothing here inspects len(aad). Of the two
+		// packages using aesccm, secure/sigma always passes a nil AAD,
+		// and secure/channel passes a Matter message header: outbound
+		// the marshalled header, at most 24 bytes because no production
+		// path fills MessageExtension; inbound the header slice of a
+		// datagram, bounded by the UDP listener's read buffer. A caller
+		// that ever passed more would truncate the length prefix mod
+		// 2^16 and produce a CBC-MAC no conformant peer can reproduce —
+		// an authentication failure, not a silent acceptance.
 		aadBlock := make([]byte, 0, len(aad)+2)
-		aadBlock = binary.BigEndian.AppendUint16(aadBlock, uint16(len(aad))) //nolint:gosec // G115: Matter AAD never exceeds 0xFEFF; see #20
+		aadBlock = binary.BigEndian.AppendUint16(aadBlock, uint16(len(aad))) //nolint:gosec // G115: see the caller-side bound above.
 		aadBlock = append(aadBlock, aad...)
 		state = cbcMacBlocks(c.block, state, aadBlock)
 	}

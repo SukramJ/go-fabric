@@ -1,15 +1,15 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)
-Entry points: 3141 across 46 test packages.
+Entry points: 3146 across 46 test packages.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 2759 |
-| Reached by a test | 1348 |
-| Whitelisted | 1401 |
+| Total exported | 2763 |
+| Reached by a test | 1349 |
+| Whitelisted | 1404 |
 | **Unreached** | **10** |
 
 ## Top-20 packages by unreached exported identifiers
@@ -30,8 +30,8 @@ Entry points: 3141 across 46 test packages.
 
 | Package | Identifier | File | Line |
 |---|---|---|---|
-| cluster/measurement | CelsiusToInt16 | cluster/measurement/measurement.go | 1727 |
-| contract | DeviceTypeName | contract/matter.go | 744 |
+| cluster/measurement | CelsiusToInt16 | cluster/measurement/measurement.go | 1732 |
+| contract | DeviceTypeName | contract/matter.go | 762 |
 | endpoint | ComposeNodeLabel | endpoint/spec.go | 88 |
 | mdns | DeriveUniqueIDFromIdentity | mdns/rotating_id.go | 117 |
 | schema | DeviceTypeAllowsServerCluster | schema/lookup.go | 65 |

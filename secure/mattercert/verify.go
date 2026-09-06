@@ -308,16 +308,49 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 // covers v.now. NotBefore / NotAfter are Matter-epoch seconds (offsets
 // from 2000-01-01T00:00:00Z per §6.5.1.5); convert to Unix seconds
 // before comparing against the wall clock.
+//
+// The comparison runs in uint64 because the certificate fields are
+// unsigned, and both conversions are checked: adding the epoch to a
+// field close to 2^64 wraps to a small number, and an unchecked wrap is
+// an ACCEPTANCE, not a rejection. Measured: NotBefore = 2^64-1001 wraps
+// to 946683799, which every real clock is past, so the window test
+// passes — and with NotAfter == 0 nothing else constrains it, because
+// decode.go's ordering check only fires when NotAfter is non-zero. That
+// certificate was accepted on an ordinary clock.
+//
+// A clock set before 1970 wraps `now` the same way and is the reason the
+// conversion of Unix() is annotated rather than checked: there the
+// comparisons part company, and a certificate carrying a NotAfter is
+// still rejected as expired.
+// matterToUnixSeconds converts Matter-epoch seconds (§6.5.1.5) to Unix
+// seconds, reporting false when the addition would wrap. A wrapped value
+// is smaller than what it stands for, so it would pass a window test it
+// should fail — the failure direction that matters for an acceptance
+// check.
+func matterToUnixSeconds(matterSecs uint64) (uint64, bool) {
+	const epoch = uint64(matterEpochUTCSeconds)
+	if matterSecs > ^uint64(0)-epoch {
+		return 0, false
+	}
+	return matterSecs + epoch, true
+}
+
 func (v *Verifier) checkValidity(c *Certificate) error {
-	now := uint64(v.now.Now().Unix()) //nolint:gosec // unix-epoch fits in uint64 for centuries; see #20
-	notBeforeUnix := c.NotBefore + uint64(matterEpochUTCSeconds)
+	now := uint64(v.now.Now().Unix()) //nolint:gosec // G115: negative only for a pre-1970 clock; the doc comment above states what that does to each comparison.
+	notBeforeUnix, ok := matterToUnixSeconds(c.NotBefore)
+	if !ok {
+		return fmt.Errorf("%w: NotBefore=%d does not name a representable time", ErrMalformed, c.NotBefore)
+	}
 	if now < notBeforeUnix {
 		return fmt.Errorf("%w: now=%d < NotBefore=%d", ErrExpired, now, notBeforeUnix)
 	}
 	// NotAfter == 0 means "no expiry" (Matter convention for very
 	// long-lived RCACs); honor it as never-expiring.
 	if c.NotAfter != 0 {
-		notAfterUnix := c.NotAfter + uint64(matterEpochUTCSeconds)
+		notAfterUnix, ok := matterToUnixSeconds(c.NotAfter)
+		if !ok {
+			return fmt.Errorf("%w: NotAfter=%d does not name a representable time", ErrMalformed, c.NotAfter)
+		}
 		if now > notAfterUnix {
 			return fmt.Errorf("%w: now=%d > NotAfter=%d", ErrExpired, now, notAfterUnix)
 		}

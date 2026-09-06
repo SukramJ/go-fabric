@@ -44,7 +44,11 @@ func newTestNOC(t *testing.T) []byte {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	return elliptic.Marshal(elliptic.P256(), priv.X, priv.Y) //nolint:staticcheck // SA1019: test fixture
+	noc, err := priv.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("PublicKey.Bytes: %v", err)
+	}
+	return noc
 }
 
 // forgeSigma3 seals a TBE3 carrying noc plus an all-zero signature

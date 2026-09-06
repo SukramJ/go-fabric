@@ -13,20 +13,26 @@ package measurement
 //
 // Each entry below is the arm the FromMeasurementClass switch used to
 // carry, moved verbatim so a built-in class materialises exactly what it
-// always did. Four classes get no entry at all, and
+// always did. Three classes get no entry at all, and
 // [contract.MeasurementMaterializerFor] then reports them as having
 // none, which the assembler renders as "mount nothing":
 //
 //   - MeasurementNone has no Matter projection by design.
-//   - MeasurementMomentarySwitch (Switch 0x003B) is event-driven, not
-//     attribute-driven — its projection is cluster/wire's GenericSwitch,
-//     which needs the endpoint id at construction time and is therefore
-//     built by the endpoint assembler, not from a source alone.
 //   - MeasurementPower / MeasurementEnergy are per-parameter classes
 //     that the host folds into one ElectricalGroup and dispatches as
 //     MeasurementElectrical; neither builds an endpoint of its own.
+//
+// Two of the entries need the endpoint id, which they take from the
+// [contract.MeasurementContext] the assembler passes in: MomentarySwitch
+// at construction and Battery straight after it. They are registered
+// here like every other built-in precisely so that nothing about their
+// shape is library-only — a host kind reaches the same context through
+// the same seam.
 
-import "github.com/SukramJ/go-fabric/contract"
+import (
+	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
+)
 
 func init() {
 	contract.SetMeasurementMaterializer(contract.MeasurementTemperature, floatServer(
@@ -71,6 +77,7 @@ func init() {
 
 	contract.SetMeasurementMaterializer(contract.MeasurementBattery, powerSourceServers)
 	contract.SetMeasurementMaterializer(contract.MeasurementElectrical, electricalSensorServers)
+	contract.SetMeasurementMaterializer(contract.MeasurementMomentarySwitch, genericSwitchServers)
 }
 
 // floatServer adapts a single-server constructor over
@@ -79,7 +86,7 @@ func init() {
 // interface says whether it can be read at all, and only both together
 // make an endpoint honest.
 func floatServer(build func(contract.FloatMeasurementSource) contract.ClusterServer) contract.MeasurementMaterializer {
-	return func(src any) []contract.ClusterServer {
+	return func(src any, _ contract.MeasurementContext) []contract.ClusterServer {
 		f, ok := src.(contract.FloatMeasurementSource)
 		if !ok {
 			return nil
@@ -90,7 +97,7 @@ func floatServer(build func(contract.FloatMeasurementSource) contract.ClusterSer
 
 // boolServer is floatServer's counterpart for the boolean classes.
 func boolServer(build func(contract.BoolMeasurementSource) contract.ClusterServer) contract.MeasurementMaterializer {
-	return func(src any) []contract.ClusterServer {
+	return func(src any, _ contract.MeasurementContext) []contract.ClusterServer {
 		b, ok := src.(contract.BoolMeasurementSource)
 		if !ok {
 			return nil
@@ -104,7 +111,7 @@ func boolServer(build func(contract.BoolMeasurementSource) contract.ClusterServe
 // preserves it, and the AirQuality cluster is the one the device type
 // requires.
 func airQualityServers(class contract.MeasurementClass, build func(contract.FloatMeasurementSource) contract.ClusterServer) contract.MeasurementMaterializer {
-	return func(src any) []contract.ClusterServer {
+	return func(src any, _ contract.MeasurementContext) []contract.ClusterServer {
 		f, ok := src.(contract.FloatMeasurementSource)
 		if !ok {
 			return nil
@@ -113,9 +120,12 @@ func airQualityServers(class contract.MeasurementClass, build func(contract.Floa
 	}
 }
 
-// powerSourceServers materialises PowerSource (0x002F). The resulting
-// server is attached to a host endpoint by the caller — a battery has no
-// endpoint of its own, it rides on the endpoint of the device it powers.
+// powerSourceServers materialises PowerSource (0x002F). A battery has no
+// endpoint of its own — it rides on the endpoint of the device it
+// powers, and mc.EndpointID names that endpoint. EndpointList (Matter
+// §11.7.6.20) must report it, so the id is stamped here, immediately
+// after construction: the assembler rebuilds these servers on every
+// dispatch, so a stamp applied further out would not survive.
 //
 // Two source shapes project onto PowerSource: a LOWBAT bool
 // (BatChargeLevel) or a derived battery-percentage float (e.g. an
@@ -123,14 +133,36 @@ func airQualityServers(class contract.MeasurementClass, build func(contract.Floa
 // order because both interfaces are structurally possible on a source
 // that also implements other measurement surfaces; a bool source is the
 // more specific and more common signal.
-func powerSourceServers(src any) []contract.ClusterServer {
-	if b, ok := src.(contract.BoolMeasurementSource); ok {
-		return []contract.ClusterServer{NewPowerSourceServer(b)}
+func powerSourceServers(src any, mc contract.MeasurementContext) []contract.ClusterServer {
+	var ps *PowerSourceServer
+	switch s := src.(type) {
+	case contract.BoolMeasurementSource:
+		ps = NewPowerSourceServer(s)
+	case contract.FloatMeasurementSource:
+		ps = NewPowerSourceServerFromFloat(s)
+	default:
+		return nil
 	}
-	if f, ok := src.(contract.FloatMeasurementSource); ok {
-		return []contract.ClusterServer{NewPowerSourceServerFromFloat(f)}
+	ps.SetEndpoint(mc.EndpointID)
+	return []contract.ClusterServer{ps}
+}
+
+// genericSwitchServers materialises Switch (0x003B) for a momentary
+// press source. Unlike every other built-in it needs mc.EndpointID at
+// construction rather than after it: [wire.GenericSwitch] emits events,
+// and a Matter event carries the endpoint as its routing key, so the
+// cluster must know the endpoint before it can fire its first press.
+//
+// The source shape is cluster/wire's, not one of the value-reading
+// interfaces the other built-ins assert, because this cluster is
+// event-driven rather than attribute-driven: it reports positions and
+// long-press capability, and the readings arrive as Fire* calls.
+func genericSwitchServers(src any, mc contract.MeasurementContext) []contract.ClusterServer {
+	s, ok := src.(wire.GenericSwitchSource)
+	if !ok {
+		return nil
 	}
-	return nil
+	return []contract.ClusterServer{wire.NewGenericSwitch(mc.EndpointID, s)}
 }
 
 // electricalSensorServers materialises the ElectricalSensor endpoint's
@@ -139,7 +171,7 @@ func powerSourceServers(src any) []contract.ClusterServer {
 // ElectricalEnergyMeasurement joins only when the channel actually
 // reports a counter, since conformance O.a+ requires at least one of the
 // two measurement clusters, not both.
-func electricalSensorServers(src any) []contract.ClusterServer {
+func electricalSensorServers(src any, _ contract.MeasurementContext) []contract.ClusterServer {
 	r, ok := src.(ElectricalReadingsSource)
 	if !ok {
 		return nil

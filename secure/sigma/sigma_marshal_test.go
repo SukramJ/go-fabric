@@ -444,7 +444,12 @@ func TestValidatePoint_ValidPoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	pub := elliptic.Marshal(elliptic.P256(), priv.X, priv.Y) //nolint:staticcheck // SA1019: test fixture
+	// validatePoint consumes the 65-byte uncompressed encoding, which
+	// PublicKey.Bytes emits without the deprecated elliptic.Marshal.
+	pub, err := priv.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("PublicKey.Bytes: %v", err)
+	}
 	if err := validatePoint(pub); err != nil {
 		t.Fatalf("validatePoint on a real P-256 point: %v", err)
 	}
@@ -672,7 +677,7 @@ func newECDHKey(t *testing.T) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return elliptic.Marshal(elliptic.P256(), priv.X, priv.Y), nil //nolint:staticcheck // SA1019: test fixture
+	return priv.PublicKey.Bytes()
 }
 
 // =============================================================================

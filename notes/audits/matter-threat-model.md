@@ -433,125 +433,66 @@ deliberately omits the `EpochKey*` fields per §11.2.10.6.3
 
 ## 5. `//nolint` inventory under `secure/`
 
-67 directives total: **15 in production files, 52 in `_test.go` files.**
+**Rewritten after the inventory was acted on.** It found 67 directives — 15 in
+production files, 52 in tests — and named six production ones as vague or
+unsupported plus a `see #20` reference appearing in seven comments. All of that
+has been resolved; the counts below are the state after, and the sections that
+listed the old ones are gone rather than kept as a record of work already done.
+
+**21 directives remain: 15 in production, 6 in tests.** 46 were removed.
 
 The lint config matters for reading these. `.golangci.yaml:92-101` excludes
 `contextcheck`, `errcheck`, `funlen`, `gocognit`, `gocyclo`, `gosec`, `noctx`
 and `unparam` on `path: _test\.go`. `staticcheck` is **not** in that list.
 
-### 5.1 Production directives — confirmed specific and true
+### 5.1 What the cleanup found
 
-| Site | Suppresses | Justification checked against the code |
-| --- | --- | --- |
-| `secure/aesccm/aesccm.go:79` | `gocritic` appendAssign | True. `out := append(dst, plaintext...)` is then CTR-crypted at `:80` and the tag appended at `:82`; assigning back to `dst` would discard it. |
-| `secure/aesccm/aesccm.go:136` | `gosec` G115 `uint16(len(plaintext))` | True **and enforced**. `Seal` rejects `> 0xFFFF` at `:74`; `Open` rejects the same at `:98-99`. Both callers of `cbcMAC` are covered. |
-| `secure/setup/setup.go:207` | `gosec` G115 `'0'+check` | True. `check` is `verhoeffTableInv[c]`, a `[10]int{0,4,3,2,1,5,6,7,8,9}` at `:236`; every element is 0..9. |
-| `secure/mattercert/tbs_der.go:284` | `staticcheck` SA1019 `elliptic.Unmarshal` | True. Raw uncompressed-point decode; the `x == nil` off-curve check at `:285` is the reason the deprecated API is used rather than `crypto/ecdh`. |
-| `secure/sigma/sigma.go:897` | `staticcheck` SA1019 `elliptic.Unmarshal` | True, and the surrounding doc comment (`:888-892`) explains why the standalone check exists alongside `ecdh.NewPublicKey`. |
-| `secure/sigma/protocol.go:241` | `errorlint` | True. `fmt.Errorf("%w: %v", ErrInvalidPoint, err)` is a deliberate double-wrap: the sentinel stays matchable, the ecdh detail stays readable. |
-| `secure/sigma/protocol.go:696` | `nilerr` | True and unusually well argued — `:690-695` explains that a resumption-store lookup failure deliberately falls through to Full Sigma rather than failing CASE. |
-| `secure/sigma/protocol.go:881` | `funlen` | True. `processSigma1Locked` is a single-purpose crypto path; `funlen` is set to 100 lines / 60 statements (`.golangci.yaml:43-45`). |
-| `secure/sigma/protocol.go:968` | `errorlint` | Same pattern as `:241`. True. |
+Two thirds of the directives suppressed nothing at all:
 
-### 5.2 Production directives that are vague, or true only under an unstated condition
+- **Seven `gosec` directives in test files.** The config already excludes
+  `gosec` there, so each one was decoration. That is worse than harmless: a
+  reader who learns that `//nolint` often means nothing stops reading them, and
+  the one that hides something real goes with the rest.
+- **39 `SA1019` directives on `elliptic.Marshal`.** The deprecation was real;
+  the suppression was the wrong answer. The call sites moved to
+  `ecdsa.PublicKey.Bytes`, which is the exact inverse of the
+  `ecdsa.ParseUncompressedPublicKey` the decoder already uses, and the
+  directives went with them.
 
-Listed for a reviewer's judgement. None of these is asserted to be a defect;
-each is a justification that a reader cannot check from the text alone.
+**`see #20` resolved to a tracking issue in the repository this code was
+extracted from.** Dead here. All seven pointers were replaced with the
+substance they were pointing at — a reference a reader cannot follow is worse
+than no reference, because it looks like due diligence.
 
-1. **`secure/aesccm/aesccm.go:147`** — *"G115: Matter AAD never exceeds 0xFEFF"*.
-   Unlike its sibling at `:136`, this bound is **not enforced anywhere in
-   `aesccm`**: neither `Seal` nor `Open` inspects `len(aad)`. It holds only
-   because the sole caller passes a marshalled Matter message header
-   (`secure/channel/session.go:211`, `:216`, `:260`), which is bounded by the
-   datagram. The justification states a property of the *caller* as if it were
-   a property of this function.
-2. **`secure/mattercert/tbs_der.go:47`** — *"matterSecs is uint64; sum cannot
-   overflow int64 for any plausible input"*. `matterSecs` is
-   `Certificate.NotBefore/NotAfter`, decoded straight from wire TLV
-   (`secure/mattercert/decode.go:265-268`). It is attacker-controlled. Decode
-   validation only checks `NotAfter > NotBefore` (`:401`), not a magnitude
-   bound. "Any plausible input" is the wrong frame for a certificate field; the
-   honest justification names the resulting behaviour for a hostile value.
-3. **`secure/mattercert/verify.go:312`** — *"unix-epoch fits in uint64 for
-   centuries"*. True for any clock after 1970. For a clock set before 1970,
-   `Unix()` is negative and the conversion wraps to a huge `uint64`; the
-   comparison at `:315` then passes and `:321` rejects the certificate as
-   expired. The outcome is fail-closed, which is fine — but the justification
-   does not mention the case, so a reviewer cannot tell whether it was
-   considered.
-4. **`secure/attestation/builder.go:10` and `:63`** — *"SubjectKeyIdentifier
-   derivation per RFC 5280; not security-relevant"*. Accurate as to SHA-1's
-   role (identifier derivation, not integrity), and `:57-60` explains that
-   Apple's commissioner byte-compares AKI against this SKID. The phrase "not
-   security-relevant" is broader than what was verified; "not used for
-   integrity or authentication" would be checkable.
-5. **`secure/attestation/builder.go:62`** — *"matter.js / chip-tool
-   compatibility"*. The thinnest of the production justifications: it names a
-   motive, not what SA1019 is being suppressed for. Compare `sigma.go:897`,
-   which says *"required for raw point decode"* on the same deprecated call.
-6. **`see #20` appears in 7 justifications** (`aesccm.go:136`, `:147`,
-   `setup.go:207`, `tbs_der.go:47`, `verify.go:312`, `builder.go:10`, `:63`).
-   Grepping every Markdown file in the module for `#20` returns nothing. A
-   reviewer working from a clone has no way to resolve the reference. Whatever
-   `#20` records, the checkable half of the justification has to survive in the
-   comment.
+### 5.2 What the vague ones were hiding
 
-### 5.3 Test-file directives
+Four of the six named production directives turned out to suppress something
+worth stating precisely, and one of them was hiding a defect.
 
-**45 × `staticcheck`, 7 × `gosec`.**
+`verify.go`'s G115 suppression covered a `uint64` conversion of `Unix()`. Writing
+down what the wrap actually does surfaced a **second, worse case that needed no
+exotic clock**: `NotBefore + matterEpochUTCSeconds` overflows for a field close
+to 2^64, wrapping to a small number that every real clock is past. With
+`NotAfter == 0` — the long-lived RCAC convention — `decode.go`'s ordering check
+does not fire either, so **a certificate with a nonsense NotBefore was accepted
+on an ordinary clock**. Measured: `NotBefore = 2^64-1001` becomes 946683799.
 
-- **The 7 `gosec` directives suppress nothing.** `gosec` is already excluded on
-  `_test.go` by `.golangci.yaml:92-101`. Sites:
-  `secure/setup/setup_test.go:257`, `:290`;
-  `secure/mattercert/verify_test.go:219`;
-  `secure/sigma/responder_reset_test.go:27`;
-  `secure/attestation/testpaa_test.go:68`;
-  `secure/operational/manager_test.go:1164`, `:1223`.
-  They are harmless, and they are also misleading: they read as though a
-  reviewer weighed a real finding.
-- **The 45 `staticcheck` directives are load-bearing** (staticcheck is not
-  excluded in tests). Nearly all sit on `elliptic.Marshal` in P-256 fixture
-  helpers. Justification quality splits three ways:
-  - **25 are the bare string `// SA1019`** — the error code repeated back, with
-    no reason. All in `secure/mattercert/verify_test.go` (from `:836` onward).
-  - **5 say only `// SA1019: test fixture`**
-    (`secure/case_server_parity_test.go:55`;
-    `secure/mattercert/decode_test.go:151`;
-    `secure/sigma/sigma_test.go:42`, `sigma_marshal_test.go:447`, `:675`,
-    `responder_sigma3_test.go:47`) — a category, not a reason.
-  - **The rest are specific and good**, and are the model the others should
-    follow: `secure/pase_server_parity_test.go:79` names the matter.js fixture
-    and the 65-byte uncompressed encoding the wire carries;
-    `secure/attestation/testpaa_test.go:53` and `:93` each explain why
-    `crypto/ecdh` has no equivalent (`:93`: no "is the private scalar set"
-    predicate).
+Both conversions are checked now (`matterToUnixSeconds`), and three tests pin
+it, including the negative control that an ordinary never-expiring certificate
+still verifies. The pre-1970 clock case remains annotated rather than checked,
+because there the comparisons part company in the safe direction: a certificate
+carrying a NotAfter is still rejected as expired.
 
-Since all 45 suppress the same deprecation on the same call for the same
-reason, the reviewer's decision is probably one decision, not 45: either a
-single documented fixture helper that carries the directive once, or a
-`staticcheck` exclusion for `_test.go` alongside the seven linters already
-excluded there. Which one is the caller's call, not this document's.
+The other three — `aesccm.go`'s two length conversions, `tbs_der.go`'s
+timestamp conversion, `builder.go`'s legacy hash — are warranted, and their
+comments now name what bounds the value and what happens if that bound is ever
+wrong, rather than asserting safety.
 
----
+### 5.3 What is not guarded
 
-## 6. Consolidated NOT VERIFIED list
-
-Stated in these words because each is a question a reader might otherwise
-assume was answered:
-
-1. Whether any host cancels the `ArmFailSafe` invoke context before the
-   fail-safe deadline, which would make `watchFailSafeExpiry` return without
-   reverting (`cluster/core/general_commissioning.go:646-650`).
-2. Whether the PASE decode paths outside the constant-time confirmation compare
-   leak timing usable for passcode recovery.
-3. Session-table and subscription quota behaviour under cross-fabric
-   exhaustion.
-4. Whether deleted group-key and identity rows are recoverable from the SQLite
-   file or WAL after `DELETE` (no `VACUUM` / secure-delete pragma in
-   `store/schema.sql`).
-5. Whether CASE (Sigma1) has a flood limit comparable to the PASE cap. A
-   `session_miss_burst` path exists (`bridge/session_miss_burst.go`) but was not
-   analysed.
-6. Attestation / DAC chain verification policy — whether a PAA trust store is
-   enforced, and what happens when it is empty. Out of scope for the four
-   assigned areas; not read.
+`nolintlint` is not enabled, so nothing stops a future directive from being as
+vague as the ones removed here. That is a deliberate gap rather than an
+oversight: the linter's own check for unexplained directives would fire on
+every one of the 15 that remain, all of which carry explanations it cannot
+read. Re-examining them is a review task, and this section is where the last
+one was written down.

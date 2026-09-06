@@ -92,7 +92,7 @@ func TestRegisterMeasurementKindIsAnsweredByBothLookups(t *testing.T) {
 		Name:        "Soil Moisture",
 		DeviceType:  0x0307,
 		ClusterID:   0x0405,
-		Materialize: func(any) []contract.ClusterServer { return nil },
+		Materialize: func(any, contract.MeasurementContext) []contract.ClusterServer { return nil },
 	}
 	class := contract.RegisterMeasurementKind(want)
 
@@ -125,7 +125,7 @@ func TestRegisterMeasurementKindDuplicateMintsASecondClass(t *testing.T) {
 		Name:        "Noise Level",
 		DeviceType:  0x002C,
 		ClusterID:   0x040D,
-		Materialize: func(any) []contract.ClusterServer { return nil },
+		Materialize: func(any, contract.MeasurementContext) []contract.ClusterServer { return nil },
 	}
 	first := contract.RegisterMeasurementKind(kind)
 	second := contract.RegisterMeasurementKind(kind)
@@ -162,7 +162,7 @@ func TestRegisterMeasurementKindConcurrent(t *testing.T) {
 			kind := contract.MeasurementKind{
 				Name:        "Concurrent",
 				ClusterID:   uint32(0x1000 + i),
-				Materialize: func(any) []contract.ClusterServer { return nil },
+				Materialize: func(any, contract.MeasurementContext) []contract.ClusterServer { return nil },
 			}
 			class := contract.RegisterMeasurementKind(kind)
 			mu.Lock()
@@ -236,6 +236,6 @@ func TestSetMeasurementMaterializerRejectsANonBuiltinClass(t *testing.T) {
 	}()
 	contract.SetMeasurementMaterializer(
 		contract.MeasurementClass(1<<20),
-		func(any) []contract.ClusterServer { return nil },
+		func(any, contract.MeasurementContext) []contract.ClusterServer { return nil },
 	)
 }

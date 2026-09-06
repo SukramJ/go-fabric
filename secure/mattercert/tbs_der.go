@@ -44,7 +44,18 @@ func matterEpochToTime(matterSecs uint64) time.Time {
 		// 5280 §4.1.2.5).
 		return time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
 	}
-	//nolint:gosec // matterSecs is uint64; sum cannot overflow int64 for any plausible input; see #20
+	// matterSecs comes straight off the wire — Decode stores the TLV
+	// integer unchanged and bounds only the ordering of NotBefore /
+	// NotAfter, not their magnitude — so this addition is reachable with
+	// an attacker-chosen value and can overflow int64. The conversion is
+	// suppressed rather than range-checked because every wrapped result
+	// is fail-closed downstream: a value near 2^63 lands on a year
+	// encoding/asn1 refuses to encode, so asn1.Marshal in [TBSToDER]
+	// returns an error, and a value that wraps onto a representable date
+	// only changes the DER bytes verifySignature hashes, which makes the
+	// issuer signature fail to verify. Validity is never decided here —
+	// checkValidity (verify.go) compares the raw uint64 fields.
+	//nolint:gosec // G115: see above; the overflow is reachable but cannot widen acceptance.
 	return time.Unix(matterEpochUTCSeconds+int64(matterSecs), 0).UTC()
 }
 

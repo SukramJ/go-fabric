@@ -52,7 +52,14 @@ func newCaseIdentity(t *testing.T, nodeID, fabricID uint64, ipk [16]byte) *sigma
 	if err != nil {
 		t.Fatalf("newCaseIdentity: %v", err)
 	}
-	noc := elliptic.Marshal(elliptic.P256(), priv.X, priv.Y) //nolint:staticcheck // SA1019: test fixture
+	// The NOC fixture is the bare 65-byte uncompressed P-256 point that
+	// caseTestVerifier parses back with ecdsa.ParseUncompressedPublicKey
+	// above; PublicKey.Bytes is that call's exact inverse, so the
+	// deprecated elliptic.Marshal is not needed here.
+	noc, err := priv.PublicKey.Bytes()
+	if err != nil {
+		t.Fatalf("newCaseIdentity: PublicKey.Bytes: %v", err)
+	}
 	return &sigma.Identity{NOC: noc, PrivateKey: priv, NodeID: nodeID, FabricID: fabricID, IPK: ipk}
 }
 

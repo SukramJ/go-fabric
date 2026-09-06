@@ -207,16 +207,34 @@ func buildSignedCert(t *testing.T, opts verifyTestCertOpts, priv *ecdsa.PrivateK
 	return raw
 }
 
+// marshalPub encodes priv's public point the way a Matter certificate
+// carries it: the 65-byte uncompressed SEC 1 §2.3.3 form that
+// [Certificate]'s ec-pub-key field is validated against (decode.go
+// rejects any length but 65 and any prefix but 0x04).
+//
+// ecdsa.PublicKey.Bytes is the non-deprecated counterpart of the
+// ecdsa.ParseUncompressedPublicKey the decoder itself uses, and emits
+// the identical encoding — so no fixture in this file needs the older
+// elliptic.Marshal, which Go now marks deprecated. Bytes only errors on
+// an unsupported
+// curve or an invalid key, neither of which a freshly generated P-256
+// key can be.
 func marshalPub(priv *ecdsa.PrivateKey) []byte {
-	return elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019: canonical raw-point encoding for Matter TLV test fixtures
+	pub, err := priv.PublicKey.Bytes()
+	if err != nil {
+		// Unreachable for a P-256 key from ecdsa.GenerateKey; a fixture
+		// helper without a *testing.T cannot report it any other way.
+		panic("mattercert test fixture: PublicKey.Bytes: " + err.Error())
+	}
+	return pub
 }
 
 // nowEpoch returns the current time in Matter-epoch seconds (offsets
 // from 2000-01-01T00:00:00Z per §6.5.1.5) for use as cert
 // NotBefore / NotAfter values in tests.
 func nowEpoch() uint64 {
-	const matterEpochUnix = 946684800                  // 2000-01-01T00:00:00Z
-	return uint64(time.Now().Unix() - matterEpochUnix) //nolint:gosec // G115: matter-epoch offset always non-negative for current real time
+	const matterEpochUnix = 946684800 // 2000-01-01T00:00:00Z
+	return uint64(time.Now().Unix() - matterEpochUnix)
 }
 
 // ---- Test helpers ----
@@ -554,7 +572,7 @@ func TestVerifyAndExtractPubKey_ChainBroken(t *testing.T) {
 // extension (serverAuth=1, clientAuth=2).
 func buildCertWithExtensions(t *testing.T, priv *ecdsa.PrivateKey) []byte {
 	t.Helper()
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // elliptic.Marshal is deprecated in Go 1.25 but crypto/ecdh requires key type migration; kept for Matter TLV wire format compatibility
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -630,7 +648,7 @@ func TestDecode_NotAfterBeforeNotBefore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // elliptic.Marshal is deprecated in Go 1.25 but crypto/ecdh requires key type migration; kept for Matter TLV wire format compatibility
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -768,7 +786,7 @@ func TestVerifier_PeerNodeIDFromNOC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // elliptic.Marshal is deprecated in Go 1.25 but crypto/ecdh requires key type migration; kept for Matter TLV wire format compatibility
+	pub := marshalPub(priv)
 
 	// Build a minimal NOC-shaped cert (HasNodeID + HasFabricID in subject).
 	nocRaw := buildSignedCert(t, verifyTestCertOpts{
@@ -805,7 +823,7 @@ func TestVerifier_PeerNodeIDFromNOC(t *testing.T) {
 func TestVerifier_PeerNodeIDFromNOC_MissingNodeID(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // elliptic.Marshal is deprecated in Go 1.25 but crypto/ecdh requires key type migration; kept for Matter TLV wire format compatibility
+	pub := marshalPub(priv)
 
 	// Build a cert with NodeID absent.
 	nocRaw := buildSignedCert(t, verifyTestCertOpts{
@@ -833,7 +851,7 @@ func TestDecode_WrongSigAlgo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -877,7 +895,7 @@ func TestDecode_WrongSigAlgo(t *testing.T) {
 func TestDecode_WrongPubKeyAlgo(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -962,7 +980,7 @@ func TestDecode_WrongPubKeyLength(t *testing.T) {
 func TestDecode_BasicConstraintsNotContainer(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1008,7 +1026,7 @@ func TestDecode_BasicConstraintsNotContainer(t *testing.T) {
 func TestDecode_ExtendedKeyUsageNotContainer(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1059,7 +1077,7 @@ func TestDecode_UnknownContainerFieldSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	// Build a cert with an unknown context tag (99) that is a container.
 	enc := tlv.NewEncoder()
@@ -1121,7 +1139,7 @@ func TestTBSToDER_OffCurvePubKey(t *testing.T) {
 	// the normal Decode path (validateMandatory checks the 65-byte prefix
 	// but not curve membership), so we construct a Certificate directly.
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 	raw := buildCertWithExtensions(t, priv)
 	cert, err := mattercert.Decode(raw)
 	if err != nil {
@@ -1274,7 +1292,7 @@ func TestVerifyAndExtractPubKey_WrongSigLength(t *testing.T) {
 func TestDecode_SubjectKeyIDEmpty(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1320,7 +1338,7 @@ func TestDecode_SubjectKeyIDEmpty(t *testing.T) {
 func TestDecode_AuthorityKeyIDEmpty(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1393,7 +1411,7 @@ func TestBuildDN_FallbackOrder(t *testing.T) {
 	if err := enc.EndContainer(); err != nil {
 		t.Fatalf("subject end: %v", err)
 	}
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 	enc.PutUint(tlv.ContextTag(7), mattercert.PubKeyAlgoEC)
 	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	enc.PutOctets(tlv.ContextTag(9), pub)
@@ -1473,7 +1491,7 @@ func TestCheckValidity_NotYetValid(t *testing.T) {
 func TestDecode_BasicConstraintsNonContextTag(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1525,7 +1543,7 @@ func TestDecode_BasicConstraintsNonContextTag(t *testing.T) {
 func TestDecode_BasicConstraintsUnknownContainer(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1584,7 +1602,7 @@ func TestDecode_BasicConstraintsUnknownContainer(t *testing.T) {
 func TestDecode_ExtensionsUnknownContainer(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1635,7 +1653,7 @@ func TestDecode_ExtensionsUnknownContainer(t *testing.T) {
 func TestNewVerifier_NilClockUsesSystemTime(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 	_, err := mattercert.NewVerifier(pub, nil)
 	if err != nil {
 		t.Fatalf("NewVerifier with nil clock: %v", err)
@@ -1729,7 +1747,7 @@ func TestVerifyAndExtractPubKey_OffCurvePubKeyInNOC(t *testing.T) {
 func TestTBSToDER_FallbackOrder_HasICACID(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	// Build a cert with ICAC ID in the issuer.
 	enc := tlv.NewEncoder()
@@ -1788,7 +1806,7 @@ func TestTBSToDER_FallbackOrder_HasICACID(t *testing.T) {
 func TestTBSToDER_FallbackOrder_HasFabricIDAndCAT(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1846,7 +1864,7 @@ func TestTBSToDER_FallbackOrder_HasFabricIDAndCAT(t *testing.T) {
 func TestPeerNodeIDFromNOC_DecodeError(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	v, err := mattercert.NewVerifier(pub, mattercert.FixedTime{T: time.Now()})
 	if err != nil {
@@ -1864,7 +1882,7 @@ func TestPeerNodeIDFromNOC_DecodeError(t *testing.T) {
 func TestDecodeDN_NonContextTagInIssuer(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1909,7 +1927,7 @@ func TestDecodeDN_NonContextTagInIssuer(t *testing.T) {
 func TestDecodeDN_UnknownContainerInIssuer(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -1965,7 +1983,7 @@ func TestDecodeDN_UnknownContainerInIssuer(t *testing.T) {
 func TestAssignField_SerialNumberNotOctetString(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -2037,7 +2055,7 @@ func TestBuildTBS_ZeroSerial(t *testing.T) {
 func TestEncodeKeyUsageBits_ZeroFlags(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -2213,7 +2231,7 @@ func TestBuildExtensions_BadFutureExtension(t *testing.T) {
 func TestDecodeExtensions_NonContextTag(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -2259,7 +2277,7 @@ func TestDecodeExtensions_NonContextTag(t *testing.T) {
 func TestValidateMandatory_EmptySerial(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	enc := tlv.NewEncoder()
 	enc.StartStruct(tlv.AnonymousTag())
@@ -2378,7 +2396,7 @@ func TestSkipContainer_TruncatedPayload(t *testing.T) {
 func TestDecodeUint8Array_TruncatedPayload(t *testing.T) {
 	t.Parallel()
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	// Build a cert up to the EKU array start using the encoder, then
 	// splice the array-open byte without a matching close. We do this by
@@ -2451,7 +2469,7 @@ func TestDecodeUint8Array_TruncatedPayload(t *testing.T) {
 // but never closed, causing decodeUint8Array to hit io.EOF.
 func buildCertEKUTruncated(t *testing.T, priv *ecdsa.PrivateKey) []byte {
 	t.Helper()
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	// Build a complete valid cert, then replace its extension list bytes with
 	// a truncated EKU array open marker. We do this by building the bytes up
@@ -2523,7 +2541,7 @@ func TestDecodeBasicConstraints_TruncatedPayload(t *testing.T) {
 // the basic-constraints struct (context tag 1 inside extensions).
 func buildCertBCTruncated(t *testing.T, priv *ecdsa.PrivateKey) []byte {
 	t.Helper()
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // SA1019
+	pub := marshalPub(priv)
 
 	buf := make([]byte, 0, 35+len(pub)+2+2)
 	buf = append(
@@ -2581,7 +2599,7 @@ func TestTBSToDER_CASEAuthTag(t *testing.T) {
 	enc.PutUint(tlv.ContextTag(7), mattercert.PubKeyAlgoEC)
 	enc.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	pub := elliptic.Marshal(elliptic.P256(), priv.PublicKey.X, priv.PublicKey.Y) //nolint:staticcheck // elliptic.Marshal is deprecated in Go 1.25 but crypto/ecdh requires key type migration; kept for Matter TLV wire format compatibility
+	pub := marshalPub(priv)
 	enc.PutOctets(tlv.ContextTag(9), pub)
 	// Extensions (empty)
 	enc.StartList(tlv.ContextTag(10))

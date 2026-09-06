@@ -254,7 +254,7 @@ func TestManualCode_Length(t *testing.T) {
 		{0, 1},
 	}
 	for _, tc := range cases {
-		disc, pass := uint16(tc[0]), tc[1] //nolint:gosec // G115: tc[0] is a test discriminator value bounded to 12-bit range by test design
+		disc, pass := uint16(tc[0]), tc[1]
 		mc, err := ManualCode(disc, pass)
 		if err != nil {
 			t.Errorf("ManualCode(%#x, %d): unexpected error: %v", disc, pass, err)
@@ -287,7 +287,7 @@ func TestManualCode_Deterministic(t *testing.T) {
 		{0, 1},
 	}
 	for _, tc := range pairs {
-		disc, pass := uint16(tc[0]), tc[1] //nolint:gosec // G115: tc[0] is a test discriminator value bounded to 12-bit range by test design
+		disc, pass := uint16(tc[0]), tc[1]
 		a, err := ManualCode(disc, pass)
 		if err != nil {
 			t.Fatalf("ManualCode(%#x, %d): %v", disc, pass, err)

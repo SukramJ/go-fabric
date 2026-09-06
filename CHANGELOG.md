@@ -13,6 +13,17 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **`MeasurementContext` — a host-registered measurement kind can now express
+  every shape the library can.** The materialiser signature carried only the
+  source, so the two built-ins that need the endpoint id — the generic switch,
+  which takes it at construction because event delivery addresses a Matter
+  path, and PowerSource, which must name the endpoint it feeds (§11.7.6.20) —
+  had to stay hard-coded in `endpoint/materialize.go`. Both are ordinary
+  registered materialisers now, and that file names no measurement class at
+  all. The context is a struct rather than a bare id on purpose: adding a field
+  later is source-compatible, where adding a parameter after `v0.1.0` would
+  cost a deprecation cycle.
+
 - **The reference daemon mounts the three cluster servers that had no host.**
   `cluster/valve`, `cluster/modeselect` and `cluster/levelcontrol` shipped with
   no endpoint anywhere mounting them, so their subscription paths were
@@ -249,6 +260,17 @@ long enough for a `v0.1.0` to mean something.
   window the policy describes does not apply and this entry stands in for it.
 
 ### Fixed
+
+- **A certificate whose `NotBefore` overflows the epoch conversion was
+  accepted.** `NotBefore` and `NotAfter` are Matter-epoch seconds and reaching
+  Unix time adds the epoch; a field close to 2^64 wraps that addition to a
+  small number, and a small number is one every real clock is already past — so
+  the validity window passed. With `NotAfter == 0`, the long-lived RCAC
+  convention, `decode.go`'s ordering check does not fire either, leaving nothing
+  else to catch it. Measured: `NotBefore = 2^64-1001` becomes 946683799, and
+  the certificate verified on an ordinary clock — no exotic device state
+  required. Both conversions are checked now. Found by writing down what a
+  `//nolint` was actually suppressing.
 
 - **A fail-safe armed over PASE could be completed by any already-commissioned
   fabric.** A PASE arm stamps fabric index 0 because PASE has no fabric, and

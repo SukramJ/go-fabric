@@ -16,8 +16,8 @@ import (
 // table in contract's own kind test, which sees none of them because it
 // does not import this package.
 //
-// The four classes marked false are empty on purpose and each for its
-// own reason (see the file comment in materializers.go); the twelve
+// The three classes marked false are empty on purpose and each for its
+// own reason (see the file comment in materializers.go); the thirteen
 // marked true are the ones a bridged endpoint's cluster surface comes
 // from. A class flipping either way changes what a bridged device
 // advertises on the wire, which is never a refactor.
@@ -43,7 +43,7 @@ func TestBuiltinMaterializersAreInstalled(t *testing.T) {
 		{"Battery", contract.MeasurementBattery, true},
 		{"Power", contract.MeasurementPower, false},
 		{"Energy", contract.MeasurementEnergy, false},
-		{"MomentarySwitch", contract.MeasurementMomentarySwitch, false},
+		{"MomentarySwitch", contract.MeasurementMomentarySwitch, true},
 		{"Electrical", contract.MeasurementElectrical, true},
 	}
 
@@ -69,14 +69,14 @@ func TestFromMeasurementClassRunsAHostRegisteredKind(t *testing.T) {
 		Name:       "Registry Dispatch",
 		DeviceType: 0x0306,
 		ClusterID:  0x0404,
-		Materialize: func(src any) []contract.ClusterServer {
+		Materialize: func(src any, _ contract.MeasurementContext) []contract.ClusterServer {
 			want.src = src
 			return []contract.ClusterServer{want}
 		},
 	})
 
 	src := struct{}{}
-	got := measurement.FromMeasurementClass(class, src)
+	got := measurement.FromMeasurementClass(class, src, contract.MeasurementContext{})
 	if len(got) != 1 || got[0] != want {
 		t.Fatalf("FromMeasurementClass(host class) = %v, want the registered kind's own server", got)
 	}

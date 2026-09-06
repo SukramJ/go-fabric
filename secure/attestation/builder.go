@@ -7,7 +7,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha1" //nolint:gosec // SubjectKeyIdentifier derivation per RFC 5280; not security-relevant; see #20
+	"crypto/sha1" //nolint:gosec // G505: blocklisted import; the SKID derivation in computeSKID is the only use and states why SHA-1 is not ours to choose.
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -58,9 +58,29 @@ var oidCommonName = asn1.ObjectIdentifier{2, 5, 4, 3}
 // public key per the SHA-1(uncompressed point) convention used by
 // chip-tool / matter.js. Apple's commissioner verifies the AKI on the
 // child certificate matches this SKID byte-for-byte.
+//
+// The exact bytes are fixed by chip's certificate generator, which
+// hashes the P256PublicKey's raw uncompressed point
+// (connectedhomeip/src/credentials/GenerateChipX509Cert.cpp:103
+// EncodeSubjectKeyIdentifierExtension, and :75 for the matching AKI).
+// Both suppressions below keep this an exact reproduction of that
+// input.
 func computeSKID(pub *ecdsa.PublicKey) []byte {
-	raw := elliptic.Marshal(pub.Curve, pub.X, pub.Y) //nolint:staticcheck // matter.js / chip-tool compatibility
-	sum := sha1.Sum(raw)                             //nolint:gosec // SKID derivation per RFC 5280; see #20
+	// SA1019 (elliptic.Marshal deprecated since Go 1.21) is suppressed
+	// because the hash input has to be the bare 65-byte uncompressed
+	// point, not a key object. The non-deprecated spelling,
+	// pub.Bytes(), returns bytes plus an error that this signature has
+	// nowhere to put, so replacing it is a caller-visible change rather
+	// than a comment fix.
+	raw := elliptic.Marshal(pub.Curve, pub.X, pub.Y) //nolint:staticcheck // SA1019: see above.
+	// G401 (weak primitive) is suppressed because SHA-1 is used here to
+	// derive an identifier, not to sign, MAC or detect tampering:
+	// nothing downstream relies on it being collision-resistant. Nor is
+	// the algorithm ours to pick — RFC 5280 §4.2.1.2 method (1)
+	// prescribes it, and a commissioner byte-compares the child
+	// certificate's AKI against this value, so any other hash makes the
+	// chain unverifiable.
+	sum := sha1.Sum(raw) //nolint:gosec // G401: see above.
 	return sum[:]
 }
 
