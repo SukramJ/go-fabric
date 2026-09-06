@@ -94,7 +94,6 @@ func TestDispatchTimedRequest_ReclaimsExpiredDeadlines(t *testing.T) {
 func TestBridgeStart_AckPumpReclaimsExpiredTimedDeadlines(t *testing.T) {
 	t.Parallel()
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		mdns.NewNoop(),
 		Config{

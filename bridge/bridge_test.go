@@ -47,7 +47,6 @@ func (c *countingSnapshotter) snap(ctx context.Context) (*endpoint.Topology, err
 func newTestBridge(t *testing.T) *bridge.Bridge {
 	t.Helper()
 	b, err := bridge.New(
-		bridge.NewFakeStore(),
 		emptySnapshotter,
 		mdns.NewNoop(),
 		bridge.Config{
@@ -66,23 +65,10 @@ func newTestBridge(t *testing.T) *bridge.Bridge {
 
 // ─── validation tests ─────────────────────────────────────────────────
 
-// TestNew_RejectsNilStore verifies that New returns an error when store is nil.
-func TestNew_RejectsNilStore(t *testing.T) {
-	t.Parallel()
-	_, err := bridge.New(nil, emptySnapshotter, mdns.NewNoop(), bridge.Config{
-		VendorID:  1,
-		ProductID: 2,
-		NodeLabel: "x",
-	}, nil)
-	if err == nil {
-		t.Fatal("expected non-nil error for nil store, got nil")
-	}
-}
-
 // TestNew_RejectsNilSnapshotter verifies that New returns an error when snap is nil.
 func TestNew_RejectsNilSnapshotter(t *testing.T) {
 	t.Parallel()
-	_, err := bridge.New(bridge.NewFakeStore(), nil, mdns.NewNoop(), bridge.Config{
+	_, err := bridge.New(nil, mdns.NewNoop(), bridge.Config{
 		VendorID:  1,
 		ProductID: 2,
 		NodeLabel: "x",
@@ -95,7 +81,7 @@ func TestNew_RejectsNilSnapshotter(t *testing.T) {
 // TestNew_RejectsZeroVendorID verifies that New returns an error mentioning VendorID when VendorID is 0.
 func TestNew_RejectsZeroVendorID(t *testing.T) {
 	t.Parallel()
-	_, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, mdns.NewNoop(), bridge.Config{
+	_, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{
 		VendorID:  0,
 		ProductID: 2,
 		NodeLabel: "x",
@@ -111,7 +97,7 @@ func TestNew_RejectsZeroVendorID(t *testing.T) {
 // TestNew_RejectsZeroProductID verifies that New returns an error when ProductID is 0.
 func TestNew_RejectsZeroProductID(t *testing.T) {
 	t.Parallel()
-	_, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, mdns.NewNoop(), bridge.Config{
+	_, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{
 		VendorID:  1,
 		ProductID: 0,
 		NodeLabel: "x",
@@ -124,7 +110,7 @@ func TestNew_RejectsZeroProductID(t *testing.T) {
 // TestNew_RejectsEmptyNodeLabel verifies that New returns an error when NodeLabel is empty.
 func TestNew_RejectsEmptyNodeLabel(t *testing.T) {
 	t.Parallel()
-	_, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, mdns.NewNoop(), bridge.Config{
+	_, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{
 		VendorID:  1,
 		ProductID: 2,
 		NodeLabel: "",
@@ -137,7 +123,7 @@ func TestNew_RejectsEmptyNodeLabel(t *testing.T) {
 // TestNew_NilAdvertiserOK verifies that New succeeds with a nil advertiser and Start works.
 func TestNew_NilAdvertiserOK(t *testing.T) {
 	t.Parallel()
-	b, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, nil, bridge.Config{
+	b, err := bridge.New(emptySnapshotter, nil, bridge.Config{
 		Listen:    ":0",
 		VendorID:  0x1234,
 		ProductID: 0x5678,
@@ -163,7 +149,7 @@ func TestNew_NilAdvertiserOK(t *testing.T) {
 // TestNew_NilLoggerOK verifies that New succeeds when logger is nil.
 func TestNew_NilLoggerOK(t *testing.T) {
 	t.Parallel()
-	_, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, mdns.NewNoop(), bridge.Config{
+	_, err := bridge.New(emptySnapshotter, mdns.NewNoop(), bridge.Config{
 		VendorID:  1,
 		ProductID: 2,
 		NodeLabel: "x",
@@ -265,7 +251,7 @@ func TestStart_TwiceReturnsAlreadyStarted(t *testing.T) {
 func TestStart_DefersOperationalRecord(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
-	b, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, noop, bridge.Config{
+	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
 		Listen:    ":0",
 		VendorID:  0x1234,
 		ProductID: 0x5678,
@@ -313,7 +299,7 @@ func TestReassemble_BeforeStartReturnsErrNotStarted(t *testing.T) {
 func TestReassemble_InvokesSnapshotterAgain(t *testing.T) {
 	t.Parallel()
 	cs := &countingSnapshotter{}
-	b, err := bridge.New(bridge.NewFakeStore(), cs.snap, mdns.NewNoop(), bridge.Config{
+	b, err := bridge.New(cs.snap, mdns.NewNoop(), bridge.Config{
 		Listen:    ":0",
 		VendorID:  0x1234,
 		ProductID: 0x5678,
@@ -362,7 +348,7 @@ func TestReassemble_InvokesSnapshotterAgain(t *testing.T) {
 func TestStop_IsIdempotent(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
-	b, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, noop, bridge.Config{
+	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
 		Listen:    ":0",
 		VendorID:  0x1234,
 		ProductID: 0x5678,

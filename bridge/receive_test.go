@@ -57,7 +57,6 @@ func wbEmptySnapshotter(ctx context.Context) (*endpoint.Topology, error) {
 func newStartedBridge(t *testing.T) *Bridge {
 	t.Helper()
 	b, err := New(
-		NewFakeStore(),
 		wbEmptySnapshotter,
 		mdns.NewNoop(),
 		Config{

@@ -35,7 +35,7 @@ func activeOperationalInstances(noop *mdns.Noop) map[string]bool {
 func TestWithdrawFabric_RemovesAnnouncedOperationalRecord(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
-	b, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, noop, bridge.Config{
+	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
 		Listen:    ":0",
 		VendorID:  0x1234,
 		ProductID: 0x5678,
@@ -82,7 +82,7 @@ func TestWithdrawFabric_RemovesAnnouncedOperationalRecord(t *testing.T) {
 func TestWithdrawFabric_NeverAnnounced_NoPanic(t *testing.T) {
 	t.Parallel()
 	noop := mdns.NewNoop()
-	b, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, noop, bridge.Config{
+	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
 		Listen:    ":0",
 		VendorID:  0x1234,
 		ProductID: 0x5678,

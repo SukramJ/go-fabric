@@ -4,9 +4,10 @@
 // Command reference-bridge is a runnable Matter bridge assembled only from
 // go-fabric's public API.
 //
-// It bridges a small hard-coded fleet — one on/off light and one temperature
-// sensor — over mDNS, accepts a commissioner over PASE, and serves reads,
-// writes and commands over the operational CASE session that follows. It
+// It bridges a small hard-coded fleet — an on/off light, a temperature
+// sensor, an irrigation valve, a mode selector and a powered speaker — over
+// mDNS, accepts a commissioner over PASE, and serves reads, writes and
+// commands over the operational CASE session that follows. It
 // exists as the module's second consumer: everything it does, a third-party
 // host has to be able to do from the outside, and anything it cannot reach
 // without an internal is a defect in the seam rather than in the example.
@@ -162,7 +163,7 @@ func run() error {
 		}
 		advertiser = zc
 	}
-	br, err := matterbridge.New(endpointStore, devices.snapshotter, advertiser, matterbridge.Config{
+	br, err := matterbridge.New(devices.snapshotter, advertiser, matterbridge.Config{
 		Listen:        *listen,
 		VendorID:      identity.vendorID,
 		ProductID:     identity.productID,

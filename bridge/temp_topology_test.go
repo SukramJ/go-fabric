@@ -81,7 +81,7 @@ func manyTempSensorsSnapshotter(n int) (Snapshotter, []*fakeTempSource) {
 			Measurement:    src,
 		})
 	}
-	asm, err := endpoint.New(NewFakeStore(), endpointtest.AssemblerConfig(), nil)
+	asm, err := endpoint.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
 	return func(ctx context.Context) (*endpoint.Topology, error) {
 		if err != nil {
 			return nil, err

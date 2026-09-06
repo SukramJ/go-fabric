@@ -54,7 +54,7 @@ func advertisedPort(t *testing.T, noop *mdns.Noop, serviceType string) uint16 {
 // with a second Matter bridge on the same host.
 func startEphemeralBridge(t *testing.T, noop *mdns.Noop) *bridge.Bridge {
 	t.Helper()
-	b, err := bridge.New(bridge.NewFakeStore(), emptySnapshotter, noop, bridge.Config{
+	b, err := bridge.New(emptySnapshotter, noop, bridge.Config{
 		Listen:    ":0",
 		VendorID:  0x1234,
 		ProductID: 0x5678,

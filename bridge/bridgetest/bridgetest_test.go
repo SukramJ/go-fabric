@@ -24,7 +24,6 @@ import (
 func newBridge(t *testing.T) *bridge.Bridge {
 	t.Helper()
 	b, err := bridge.New(
-		endpointtest.NewFakeStore(),
 		endpointtest.NewEmptySnapshotter(),
 		mdns.NewNoop(),
 		bridge.Config{

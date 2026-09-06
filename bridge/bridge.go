@@ -18,8 +18,8 @@
 //
 // # Bring-up sequence
 //
-// [New] takes only a store, a [Snapshotter], an [mdns.Advertiser] and
-// a [Config]; every other collaborator arrives through an Attach / Set
+// [New] takes only a [Snapshotter], an [mdns.Advertiser] and a
+// [Config]; every other collaborator arrives through an Attach / Set
 // call afterwards. That keeps the constructor free of the daemon's
 // chicken-and-egg cycles (the operational session manager needs the
 // bridge's listener, the bridge needs the manager), at the cost of a
@@ -224,8 +224,12 @@ func (c Config) validate() error {
 // topology / dispatcher pair is swapped atomically on [Reassemble]
 // so in-flight IM dispatches see a consistent view.
 type Bridge struct {
-	cfg         Config
-	store       endpoint.Store
+	cfg Config
+	// There is deliberately no endpoint.Store here. The bridge consumes an
+	// assembled topology through [Snapshotter] and never reads endpoint
+	// records itself; the store belongs to whoever builds that topology
+	// (typically an endpoint assembler the host owns). A field held here
+	// would be a collaborator that looks wired and is never called.
 	aclLister   endpoint.ACLLister // ACL source for the dispatcher's CheckACL; nil denies every operational request
 	snapshotter Snapshotter
 	logger      *slog.Logger
@@ -513,16 +517,18 @@ type Bridge struct {
 	sessionPeerAddrs sync.Map
 }
 
-// New constructs a Bridge. The store and snapshotter are required;
-// when advertiser is nil the bridge falls back to [mdns.NewNoop],
-// useful for tests and headless boot phases. When logger is nil the
-// bridge uses [slog.Default].
+// New constructs a Bridge. The snapshotter is required; when advertiser
+// is nil the bridge falls back to [mdns.NewNoop], useful for tests and
+// headless boot phases. When logger is nil the bridge uses
+// [slog.Default].
+//
+// It takes no [endpoint.Store]: the topology arrives fully assembled
+// from snap, so the bridge has nothing to look up. A host still needs a
+// store — to build that topology — but it passes it to its assembler,
+// not here.
 //
 // New does NOT touch the network — call [Start] for that.
-func New(s endpoint.Store, snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.Logger) (*Bridge, error) {
-	if s == nil {
-		return nil, errors.New("bridge: store is required")
-	}
+func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.Logger) (*Bridge, error) {
 	if snap == nil {
 		return nil, errors.New("bridge: snapshotter is required")
 	}
@@ -541,7 +547,6 @@ func New(s endpoint.Store, snap Snapshotter, advertiser mdns.Advertiser, cfg Con
 
 	br := &Bridge{
 		cfg:           cfg,
-		store:         s,
 		snapshotter:   snap,
 		logger:        logger.With(slog.String("subsystem", "matter.bridge")),
 		advertiser:    advertiser,

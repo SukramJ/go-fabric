@@ -80,7 +80,6 @@ func TestBridge_EmitFabricRemoved_NilHook_NoPanic(t *testing.T) {
 func TestBridge_SetOnReassembled_CalledAfterReassemble(t *testing.T) {
 	t.Parallel()
 	b, err := bridge.New(
-		bridge.NewFakeStore(),
 		emptySnapshotter,
 		mdns.NewNoop(),
 		bridge.Config{
