@@ -133,3 +133,50 @@ func TestChiptoolTriggerCoversEveryBuiltDirectory(t *testing.T) {
 		}
 	}
 }
+
+// TestChiptoolTriggerFiresOnAFreshPullRequest pins the event list, which the
+// pattern tests above cannot see.
+//
+// A pull request fires `opened` and nothing else when it is created. Without
+// that type the workflow does not start at all on the one event every pull
+// request begins with — so the changes job never runs, the suite never starts,
+// and no pattern inside it matters. That is not hypothetical: the change that
+// introduced the automatic trigger shipped without `opened` and failed to
+// trigger itself, which is how it was found.
+//
+// `synchronize` alone would cover it eventually — the next push to the branch
+// fires one — but "eventually" means the first review happens with no
+// commissioner run behind it.
+//
+// Read textually rather than through a YAML parser: this module has no YAML
+// dependency and adding one to read four words would cost more than it
+// explains.
+func TestChiptoolTriggerFiresOnAFreshPullRequest(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile(chiptoolWorkflowPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", chiptoolWorkflowPath, err)
+	}
+	m := regexp.MustCompile(`(?m)^\s*types:\s*\[([^\]]*)\]`).FindSubmatch(raw)
+	if m == nil {
+		t.Fatalf("%s carries no `types: [...]` list under pull_request — either it stopped "+
+			"triggering on pull requests, or it was rewritten in a shape this guard cannot read",
+			chiptoolWorkflowPath)
+	}
+	have := strings.Split(strings.ReplaceAll(string(m[1]), " ", ""), ",")
+
+	for _, want := range []string{"opened", "synchronize", "labeled"} {
+		found := false
+		for _, h := range have {
+			if h == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("pull_request types %v is missing %q — without it the workflow does not start "+
+				"on that event, and every pattern inside it is moot", have, want)
+		}
+	}
+}

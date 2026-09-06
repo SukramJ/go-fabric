@@ -55,7 +55,11 @@ on:
     # for runner capacity at the same minute.
     - cron: "47 3 * * *"
   pull_request:
-    types: [labeled, synchronize, reopened]
+    # `opened` is load-bearing and was missing: a freshly opened pull request
+    # fires only that event, so without it the changes job below never ran on
+    # the one event every pull request begins with. Found by this workflow's
+    # own change failing to trigger itself.
+    types: [opened, labeled, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
