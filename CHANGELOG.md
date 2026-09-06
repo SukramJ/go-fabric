@@ -13,6 +13,28 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **`cluster/levelcontrol` — a host-agnostic LevelControl server (0x0008).** Speaker
+  0x0022 mandates OnOff and LevelControl servers, and this module had neither
+  a LevelControl server nor a way to build one: `cluster/wire` carried command
+  decoders only. Serves exactly the three conformance-M attributes
+  (CurrentLevel 0x0, Options 0xf, OnLevel 0x11) and all eight M commands. The
+  four `WithOnOff` variants get their own port methods rather than a flag on a
+  shared request — a bool a host forgets to read compiles fine and turns "turn
+  it on and set the level" into "set the level while it stays off".
+- **The measurement-kind set is open: a host can register one without editing
+  this module.** It was a closed enum answered by switches, so every new
+  measurement meant a library change. `RegisterMeasurementKind` now takes a
+  descriptor carrying the device type, the cluster id and the materialiser
+  that builds the servers, and refuses one without a materialiser — a registry
+  able to advertise what it cannot build is the defect, so it is made
+  impossible rather than documented. The sixteen built-ins keep their exact
+  values and behaviour; their materialisers moved verbatim into
+  `cluster/measurement` and install themselves through the same seam idiom the
+  module already uses, so `contract` gains no dependency. What a registered
+  kind cannot yet express is stated in `endpoint/materialize.go`: the two
+  shapes that need the endpoint id at construction — the generic switch and
+  the battery re-entry — stay library-only.
+
 - **`cluster/valve` — ValveConfigurationAndControl (0x0081), the server behind
   WaterValve 0x0042.** Serves the five attributes matter.js marks conformance M
   (OpenDuration 0x0, DefaultOpenDuration 0x1, RemainingDuration 0x3,
