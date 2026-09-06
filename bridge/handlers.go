@@ -816,6 +816,20 @@ func (l *OperationalSessionLookup) Lookup(sessionID uint16) (*channel.Session, b
 	return l.get(sessionID)
 }
 
+// FabricResolutionWired reports whether a fabric-resolver closure was
+// actually supplied.
+//
+// Implementing [SessionFabricResolver] is not the same as being able to
+// resolve: this adapter carries the method unconditionally, so a type
+// assertion says nothing about whether [WithFabricResolver] was ever called.
+// Without it every FabricFor answers (0, false), CheckACL reads that 0 as
+// "PASE, still commissioning" and waves the request through -- so the shape
+// that passes a type check is exactly the shape that bypasses access control.
+// Bridge.Start asks this question instead of asking the type system.
+func (l *OperationalSessionLookup) FabricResolutionWired() bool {
+	return l != nil && l.fabricFor != nil
+}
+
 // FabricFor implements [SessionFabricResolver]. Returns (0, false)
 // when the adapter was built without a fabric resolver closure.
 func (l *OperationalSessionLookup) FabricFor(sessionID uint16) (uint8, bool) {

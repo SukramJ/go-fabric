@@ -605,6 +605,17 @@ func (b *Bridge) Start(ctx context.Context) error {
 	// state. A host that attaches no ACL is unaffected: CheckACL denies
 	// everything operational for it already.
 	if b.aclLister != nil {
+		// Two questions, because implementing the interface is not the same
+		// as being able to answer it: an adapter can carry FabricFor
+		// unconditionally and still have no resolver behind it, which is the
+		// likelier mistake by far -- it passes every type check.
+		if r, ok := b.sessions.(interface{ FabricResolutionWired() bool }); ok && !r.FabricResolutionWired() {
+			return fmt.Errorf("bridge: an ACL lister is attached and the session lookup (%T) implements "+
+				"SessionFabricResolver but was built without a fabric-resolver closure, so every "+
+				"FabricFor answers (0, false) and every CASE session passes the access check as if it "+
+				"were still commissioning: supply the resolver, or attach no ACL lister to deny "+
+				"operational requests outright", b.sessions)
+		}
 		if _, ok := b.sessions.(SessionFabricResolver); !ok {
 			return fmt.Errorf("bridge: an ACL lister is attached but the session lookup does not "+
 				"implement SessionFabricResolver (%T), so every CASE session would resolve to fabric 0 "+

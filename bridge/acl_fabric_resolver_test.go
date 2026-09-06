@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/bridge"
+
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -78,6 +80,50 @@ func TestStartAcceptsAnACLItCanEnforce(t *testing.T) {
 
 	if err := b.Start(context.Background()); err != nil {
 		t.Fatalf("Start refused a correctly wired ACL: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Stop(context.Background()) })
+}
+
+// TestStartRefusesTheAdapterWithoutItsResolver is the case a type assertion
+// cannot see, and the likelier mistake of the two: OperationalSessionLookup
+// carries FabricFor unconditionally, so it satisfies SessionFabricResolver
+// whether or not WithFabricResolver was ever called. Built without it, every
+// FabricFor answers (0, false), CheckACL reads the 0 as "still commissioning"
+// and the ACL is never applied — while every type check in the program says
+// the bridge is correctly wired.
+func TestStartRefusesTheAdapterWithoutItsResolver(t *testing.T) {
+	t.Parallel()
+
+	b := newTestBridge(t)
+	b.AttachACLLister(emptyACL{})
+	// The adapter as a host gets it from the constructor, with no resolver.
+	b.AttachSessionLookup(bridge.NewOperationalSessionLookup(
+		func(uint16) (*channel.Session, bool) { return nil, false },
+	))
+
+	err := b.Start(context.Background())
+	if err == nil {
+		_ = b.Stop(context.Background())
+		t.Fatal("Start accepted the standard session adapter built without WithFabricResolver — " +
+			"it satisfies SessionFabricResolver by type and resolves nothing, so the ACL is silently unenforced")
+	}
+	if !strings.Contains(err.Error(), "fabric-resolver closure") {
+		t.Errorf("the error does not name the missing closure, so it points at the wrong fix: %v", err)
+	}
+}
+
+// TestStartAcceptsTheAdapterWithItsResolver is that case's control.
+func TestStartAcceptsTheAdapterWithItsResolver(t *testing.T) {
+	t.Parallel()
+
+	b := newTestBridge(t)
+	b.AttachACLLister(emptyACL{})
+	b.AttachSessionLookup(bridge.NewOperationalSessionLookup(
+		func(uint16) (*channel.Session, bool) { return nil, false },
+	).WithFabricResolver(func(uint16) (uint8, bool) { return 1, true }))
+
+	if err := b.Start(context.Background()); err != nil {
+		t.Fatalf("Start refused the adapter with its resolver supplied: %v", err)
 	}
 	t.Cleanup(func() { _ = b.Stop(context.Background()) })
 }
