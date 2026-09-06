@@ -6,6 +6,7 @@ package contract
 import (
 	"context"
 	"fmt"
+	"sync"
 )
 
 // EndpointSource is implemented by Custom DPs that materialise
@@ -231,12 +232,21 @@ type ClusterCommandInvokePrivilege interface {
 // publish time. The model layer computes this once at materialisation
 // from the same parameter classifier that already drives MQTT payload
 // routing; the bridge consumes it.
+//
+// The set is open: the constants below are the kinds this library
+// ships with, and [RegisterMeasurementKind] adds host-defined ones
+// that the same lookups answer for. The type stays a plain integer
+// because hosts compare and store class values.
 type MeasurementClass int
 
 // MeasurementClass values. Each constant corresponds to the
 // Matter cluster the DP projects to. [MeasurementNone] opts the
 // DP out of the Matter surface entirely (used for opaque-string
 // sensors, weather data without a Matter cluster, etc.).
+//
+// The numeric values are part of the contract — hosts persist them —
+// so a new built-in is appended, never inserted, and
+// [RegisterMeasurementKind] hands out values above the whole block.
 const (
 	MeasurementNone            MeasurementClass = iota
 	MeasurementTemperature                      // 0x0402 TemperatureMeasurement
@@ -255,6 +265,231 @@ const (
 	MeasurementMomentarySwitch                  // 0x003B Switch (Generic Switch endpoint)
 	MeasurementElectrical                       // 0x0090 + 0x0091 + 0x009C (ElectricalSensor endpoint)
 )
+
+// measurementClassBuiltinEnd is one past the last built-in class, and
+// the first class [RegisterMeasurementKind] hands out. Keeping the two
+// ranges apart is what lets the constants above keep their numeric
+// values while the set stays open.
+const measurementClassBuiltinEnd = MeasurementElectrical + 1
+
+// MeasurementMaterializer builds the cluster server(s) that carry one
+// source's readings for a measurement kind — the same job the library's
+// own constructors do for the built-in classes.
+//
+// src is the source the endpoint was assembled from. It is untyped
+// because each kind decides for itself which read surface it needs: the
+// built-ins assert [FloatMeasurementSource], [BoolMeasurementSource] or
+// a consolidated readings group, and a host kind asserts whatever its
+// own model exposes. Returning nil is the honest answer for a src that
+// is not the shape this kind reads; the assembler then mounts nothing
+// for it rather than advertising an unreadable cluster.
+//
+// The endpoint id is deliberately not a parameter. Every cluster server
+// the built-in constructors produce reads its value from src alone; the
+// two that need to know their endpoint (PowerSource's EndpointList, the
+// GenericSwitch event address) are stamped by the assembler after
+// construction and stay library-side. Widening this signature is what a
+// host-defined kind of that shape would require — see the endpoint
+// assembler's [github.com/SukramJ/go-fabric/endpoint.ClusterServers].
+type MeasurementMaterializer func(src any) []ClusterServer
+
+// MeasurementKind describes what one measurement class materialises as.
+// It carries exactly the two answers the bridge and the eligibility
+// classifier ask of every class, the function that turns a source into
+// the cluster surface behind those answers, and a name to render it by.
+//
+// Zero is a meaningful answer for both ids: DeviceType 0 means the kind
+// has no standalone device type and rides on a host endpoint instead
+// (the way PowerSource rides on the endpoint of the device it powers),
+// and ClusterID 0 means it projects to no cluster at all, which the
+// eligibility classifier reads as Unmappable.
+type MeasurementKind struct {
+	// Name is the operator-facing label for the kind. It is not an
+	// identifier: the registry neither indexes nor deduplicates by it.
+	Name string
+	// DeviceType is the standalone Matter Device Type ID that wraps the
+	// kind when it is materialised as its own sensor endpoint, or 0
+	// when it has no standalone counterpart.
+	DeviceType uint16
+	// ClusterID is the Matter cluster the kind projects to, or 0 when
+	// it projects to none. A kind that mounts several clusters names
+	// the headline one here, so a verdict has a single id to report.
+	ClusterID uint32
+	// Materialize builds the cluster surface this kind advertises.
+	// [RegisterMeasurementKind] refuses a kind without one: a class the
+	// registry can name but not build is reported as exposable by the
+	// eligibility classifier and then quietly yields no endpoint, which
+	// is a worse failure than never having been registerable at all.
+	Materialize MeasurementMaterializer
+}
+
+// The measurement-kind registry. Seeded with the built-ins so that a
+// lookup has one path for both halves of the open set, and guarded
+// because registration may happen from several host init functions
+// whose order nobody controls.
+var (
+	measurementKindsMu   sync.RWMutex
+	measurementKinds     = builtinMeasurementKinds()
+	nextMeasurementClass = measurementClassBuiltinEnd
+)
+
+// RegisterMeasurementKind adds a host-defined measurement kind and
+// returns the [MeasurementClass] that stands for it. The class is
+// allocated above the built-in range, so it can never collide with one
+// of the constants above, and [MeasurementKindFor],
+// [MeasurementClassDeviceType] and [MeasurementClassClusterID] answer
+// for it from the moment this returns.
+//
+// Every call mints a new class, including one whose descriptor equals
+// an already-registered one: the class is the identity, the descriptor
+// only what that class answers with. Registering the same kind twice
+// therefore yields two distinct classes that answer alike — not a
+// shared class, not an error — so a host keeps the value it got back
+// rather than re-deriving it from the descriptor.
+//
+// Registration is start-up-time state: the intended caller is a host's
+// wiring, before the bridge serves its first read. Registering while
+// the bridge runs is safe as far as the registry goes — this function
+// and every lookup may be called concurrently — but a class that
+// appears after materialisation reaches no endpoint, because
+// materialisation has already run.
+//
+// A kind whose Materialize is nil panics rather than returning a class.
+// The registry's answers are operator-facing — the eligibility
+// classifier turns a registered kind into "this source is exposable" —
+// so a kind that cannot build its clusters would advertise an exposure
+// the bridge silently fails to deliver. That is a wiring mistake with a
+// single call site, decidable the moment the host makes the call, which
+// is the same category this module already panics for (tlv/encode.go's
+// unsupported width, mdns/rotating_id.go's short unique id); an error
+// return would let start-up continue with a registry that lies.
+func RegisterMeasurementKind(kind MeasurementKind) MeasurementClass {
+	if kind.Materialize == nil {
+		panic("matter: RegisterMeasurementKind: kind " + kind.Name + " has no Materialize; a kind the registry can name but not build advertises an exposure the bridge cannot deliver")
+	}
+	measurementKindsMu.Lock()
+	defer measurementKindsMu.Unlock()
+	class := nextMeasurementClass
+	nextMeasurementClass++
+	measurementKinds[class] = kind
+	return class
+}
+
+// MeasurementKindFor returns the descriptor registered for a class.
+// ok is false for a class that is neither a built-in nor the result of
+// a [RegisterMeasurementKind] call; callers that only want one of the
+// ids read that as "no Matter projection" and use zero.
+func MeasurementKindFor(class MeasurementClass) (kind MeasurementKind, ok bool) {
+	measurementKindsMu.RLock()
+	defer measurementKindsMu.RUnlock()
+	kind, ok = measurementKinds[class]
+	return kind, ok
+}
+
+// MeasurementMaterializerFor returns the materialiser registered for a
+// class. ok is false for an unregistered class and for a built-in that
+// has no cluster surface of its own — see
+// [SetMeasurementMaterializer] for which four those are — and the
+// cluster layer turns that into "mount nothing".
+func MeasurementMaterializerFor(class MeasurementClass) (m MeasurementMaterializer, ok bool) {
+	kind, found := MeasurementKindFor(class)
+	if !found || kind.Materialize == nil {
+		return nil, false
+	}
+	return kind.Materialize, true
+}
+
+// SetMeasurementMaterializer completes one of the built-in classes
+// declared above with the function that builds its clusters.
+//
+// It exists because the dependency runs one way: the constructors for
+// those clusters live in
+// [github.com/SukramJ/go-fabric/cluster/measurement], which imports this
+// package, so the built-in half of the registry is filled in from there
+// at init time instead of being declared here. Host-defined kinds never
+// need it — they carry their materialiser into
+// [RegisterMeasurementKind].
+//
+// Four built-ins are deliberately left without one, and the lookups
+// report them as having none: MeasurementNone has no Matter projection
+// by design, MeasurementMomentarySwitch projects via the event-driven
+// GenericSwitch path rather than a measurement cluster, and
+// MeasurementPower / MeasurementEnergy are folded into one
+// MeasurementElectrical group before an endpoint is built.
+//
+// Panics for a nil materialiser and for a class outside the built-in
+// range: both mean the caller is wiring something this seam does not
+// describe, and both are decidable at the call site.
+func SetMeasurementMaterializer(class MeasurementClass, m MeasurementMaterializer) {
+	if m == nil {
+		panic("matter: SetMeasurementMaterializer: nil materializer")
+	}
+	if class < 0 || class >= measurementClassBuiltinEnd {
+		panic(fmt.Sprintf("matter: SetMeasurementMaterializer: class %d is not a built-in; host kinds carry their materializer through RegisterMeasurementKind", class))
+	}
+	measurementKindsMu.Lock()
+	defer measurementKindsMu.Unlock()
+	kind := measurementKinds[class]
+	kind.Materialize = m
+	measurementKinds[class] = kind
+}
+
+// builtinMeasurementKinds is the library's own half of the registry:
+// one entry per constant above, each reproducing the answer that class
+// has always given.
+func builtinMeasurementKinds() map[MeasurementClass]MeasurementKind {
+	return map[MeasurementClass]MeasurementKind{
+		// None opts the DP out entirely, so both ids stay zero and the
+		// eligibility classifier stops before it ever asks.
+		MeasurementNone:        {Name: "None"},
+		MeasurementTemperature: {Name: "Temperature", DeviceType: 0x0302, ClusterID: 0x0402},
+		MeasurementHumidity:    {Name: "Humidity", DeviceType: 0x0307, ClusterID: 0x0405},
+		MeasurementIlluminance: {Name: "Illuminance", DeviceType: 0x0106, ClusterID: 0x0400},
+		MeasurementPressure:    {Name: "Pressure", DeviceType: 0x0305, ClusterID: 0x0403},
+		// The three concentration kinds share the AirQualitySensor
+		// device type (0x002C) and differ only in their cluster.
+		MeasurementCO2:       {Name: "Carbon Dioxide", DeviceType: 0x002C, ClusterID: 0x040D},
+		MeasurementPM25:      {Name: "PM2.5", DeviceType: 0x002C, ClusterID: 0x042A},
+		MeasurementPM10:      {Name: "PM10", DeviceType: 0x002C, ClusterID: 0x042D},
+		MeasurementOccupancy: {Name: "Occupancy", DeviceType: 0x0107, ClusterID: 0x0406},
+		MeasurementContact:   {Name: "Contact", DeviceType: 0x0015, ClusterID: 0x0045},
+		// Leak deliberately materialises as ContactSensor (0x0015)
+		// instead of the dedicated WaterLeakDetector (0x0043, a
+		// Matter-1.3-introduced detector type; matter.js
+		// packages/model/src/standard/elements/water-leak-detector.element.ts).
+		// Ecosystem ceiling: Amazon Alexa's bridge support predates the
+		// detector device types, and a single endpoint advertising
+		// 0x0043 renders the whole bridged node unresponsive there.
+		// Wire shape mirrors matter.js
+		// packages/model/src/standard/elements/contact-sensor.element.ts
+		// (device type 0x15, mandatory BooleanState 0x45 server).
+		// Polarity is non-inverted alarm semantics: the model's boolean
+		// passes through verbatim, so a detected leak reports
+		// StateValue=true (which ContactSensor renders as
+		// "closed/contact" per cluster §1.7.5.1, matter.js
+		// packages/model/src/standard/resources/boolean-state.resource.ts)
+		// and dry reports StateValue=false ("open/no contact").
+		// Divergence from matter.js device-type selection is recorded
+		// in notes/parity/by_design.md.
+		MeasurementLeak: {Name: "Leak", DeviceType: 0x0015, ClusterID: 0x0045},
+		// Battery, Power and Energy have no standalone device type:
+		// PowerSource rides on the bridged endpoint of the device it
+		// powers, which BridgedNode (0x0013) specifies for it, and the
+		// per-parameter Power / Energy kinds are folded into an
+		// ElectricalGroup before an endpoint is built.
+		MeasurementBattery:         {Name: "Battery", ClusterID: 0x002F},
+		MeasurementPower:           {Name: "Power", ClusterID: 0x0090},
+		MeasurementEnergy:          {Name: "Energy", ClusterID: 0x0091},
+		MeasurementMomentarySwitch: {Name: "Momentary Switch", DeviceType: 0x000F, ClusterID: 0x003B},
+		// The Device Library's carrier for ElectricalPowerMeasurement +
+		// ElectricalEnergyMeasurement, with PowerTopology mandatory
+		// alongside them (matter.js electrical-sensor.element.ts). The
+		// group mounts three clusters; ClusterID names the headline one
+		// so a verdict has a single id to report, and the full set is
+		// built by measurement.FromMeasurementClass.
+		MeasurementElectrical: {Name: "Electrical", DeviceType: 0x0510, ClusterID: 0x0090},
+	}
+}
 
 // ElectricalReadings is the typed read surface of a consolidated
 // electrical measurement group. One CCU channel reports POWER, VOLTAGE,
@@ -465,64 +700,21 @@ type EligibilitySource interface {
 // MeasurementClassDeviceType returns the standalone Matter
 // Device Type (uint16) that best wraps the given measurement class
 // when the source is materialised as its own sensor endpoint. Zero
-// for `MeasurementNone` and any value with no standalone
-// device-type counterpart (Battery / Power / Energy roll up to a
-// host endpoint instead).
+// for `MeasurementNone`, for any kind with no standalone device-type
+// counterpart (Battery / Power / Energy roll up to a host endpoint
+// instead), and for a class that was never registered.
 //
 // Single source of truth for the measurement-class → device-type
 // mapping; both the assembler's standalone-endpoint path and the
-// eligibility classifier's verdict-derivation read through here.
+// eligibility classifier's verdict-derivation read through here. The
+// answers live in the registry [RegisterMeasurementKind] writes to, so
+// a host-registered kind is answered for exactly like a built-in.
 func MeasurementClassDeviceType(class MeasurementClass) uint16 {
-	switch class {
-	case MeasurementTemperature:
-		return 0x0302 // TemperatureSensor
-	case MeasurementHumidity:
-		return 0x0307 // HumiditySensor
-	case MeasurementIlluminance:
-		return 0x0106 // LightSensor
-	case MeasurementPressure:
-		return 0x0305 // PressureSensor
-	case MeasurementCO2, MeasurementPM25, MeasurementPM10:
-		return 0x002C // AirQualitySensor
-	case MeasurementOccupancy:
-		return 0x0107 // OccupancySensor
-	case MeasurementContact, MeasurementLeak:
-		// Leak deliberately materialises as ContactSensor (0x0015)
-		// instead of the dedicated WaterLeakDetector (0x0043, a
-		// Matter-1.3-introduced detector type; matter.js
-		// packages/model/src/standard/elements/water-leak-detector.element.ts).
-		// Ecosystem ceiling: Amazon Alexa's bridge support predates the
-		// detector device types, and a single endpoint advertising
-		// 0x0043 renders the whole bridged node unresponsive there.
-		// Wire shape mirrors matter.js
-		// packages/model/src/standard/elements/contact-sensor.element.ts
-		// (device type 0x15, mandatory BooleanState 0x45 server).
-		// Polarity is non-inverted alarm semantics: the model's boolean
-		// passes through verbatim, so a detected leak reports
-		// StateValue=true (which ContactSensor renders as
-		// "closed/contact" per cluster §1.7.5.1, matter.js
-		// packages/model/src/standard/resources/boolean-state.resource.ts)
-		// and dry reports StateValue=false ("open/no contact").
-		// Divergence from matter.js device-type selection is recorded
-		// in notes/parity/by_design.md.
-		return 0x0015 // ContactSensor
-	case MeasurementMomentarySwitch:
-		return 0x000F // GenericSwitch
-	case MeasurementElectrical:
-		// The Device Library's carrier for ElectricalPowerMeasurement +
-		// ElectricalEnergyMeasurement, with PowerTopology mandatory
-		// alongside them (matter.js electrical-sensor.element.ts). The
-		// per-parameter Power / Energy classes below never reach an
-		// endpoint of their own: the assembler consolidates them into one
-		// ElectricalGroup, exactly as it does for press parameters.
-		return 0x0510 // ElectricalSensor
-	default:
-		// Battery, and the per-parameter Power / Energy classes that the
-		// assembler folds into an ElectricalGroup before an endpoint is
-		// built. PowerSource rides on the bridged endpoint of the device
-		// it powers, which BridgedNode (0x0013) specifies for it.
+	kind, ok := MeasurementKindFor(class)
+	if !ok {
 		return 0
 	}
+	return kind.DeviceType
 }
 
 // DeviceTypeName returns the operator-facing name for a Matter
@@ -559,6 +751,10 @@ func DeviceTypeName(id uint16) string {
 		return "Generic Switch"
 	case 0x0015:
 		return "Contact Sensor"
+	case 0x0022:
+		return "Speaker"
+	case 0x0027:
+		return "Mode Select"
 	case 0x002C:
 		return "Air Quality Sensor"
 	case 0x0043:
@@ -604,41 +800,13 @@ func DeviceTypeName(id uint16) string {
 
 // MeasurementClassClusterID returns the cluster ID the given
 // measurement class projects to. Counterpart to
-// [MeasurementClassDeviceType] for the cluster slot.
+// [MeasurementClassDeviceType] for the cluster slot, reading the same
+// registry, and zero for a class that projects to no cluster or was
+// never registered.
 func MeasurementClassClusterID(class MeasurementClass) uint32 {
-	switch class {
-	case MeasurementTemperature:
-		return 0x0402
-	case MeasurementHumidity:
-		return 0x0405
-	case MeasurementIlluminance:
-		return 0x0400
-	case MeasurementPressure:
-		return 0x0403
-	case MeasurementCO2:
-		return 0x040D
-	case MeasurementPM25:
-		return 0x042A
-	case MeasurementPM10:
-		return 0x042D
-	case MeasurementOccupancy:
-		return 0x0406
-	case MeasurementContact, MeasurementLeak:
-		return 0x0045 // BooleanState
-	case MeasurementBattery:
-		return 0x002F // PowerSource
-	case MeasurementPower:
-		return 0x0090 // ElectricalPowerMeasurement
-	case MeasurementEnergy:
-		return 0x0091 // ElectricalEnergyMeasurement
-	case MeasurementMomentarySwitch:
-		return 0x003B // Switch (GenericSwitch's cluster)
-	case MeasurementElectrical:
-		// The group mounts three clusters; this names the headline one so
-		// eligibility.Classify has a single id to report. The full set is
-		// built by measurement.FromMeasurementClass.
-		return 0x0090 // ElectricalPowerMeasurement
-	default:
+	kind, ok := MeasurementKindFor(class)
+	if !ok {
 		return 0
 	}
+	return kind.ClusterID
 }

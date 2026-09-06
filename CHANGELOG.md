@@ -13,6 +13,48 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **`cluster/levelcontrol` — a host-agnostic LevelControl server (0x0008).** Speaker
+  0x0022 mandates OnOff and LevelControl servers, and this module had neither
+  a LevelControl server nor a way to build one: `cluster/wire` carried command
+  decoders only. Serves exactly the three conformance-M attributes
+  (CurrentLevel 0x0, Options 0xf, OnLevel 0x11) and all eight M commands. The
+  four `WithOnOff` variants get their own port methods rather than a flag on a
+  shared request — a bool a host forgets to read compiles fine and turns "turn
+  it on and set the level" into "set the level while it stays off".
+- **The measurement-kind set is open: a host can register one without editing
+  this module.** It was a closed enum answered by switches, so every new
+  measurement meant a library change. `RegisterMeasurementKind` now takes a
+  descriptor carrying the device type, the cluster id and the materialiser
+  that builds the servers, and refuses one without a materialiser — a registry
+  able to advertise what it cannot build is the defect, so it is made
+  impossible rather than documented. The sixteen built-ins keep their exact
+  values and behaviour; their materialisers moved verbatim into
+  `cluster/measurement` and install themselves through the same seam idiom the
+  module already uses, so `contract` gains no dependency. What a registered
+  kind cannot yet express is stated in `endpoint/materialize.go`: the two
+  shapes that need the endpoint id at construction — the generic switch and
+  the battery re-entry — stay library-only.
+
+- **`cluster/valve` — ValveConfigurationAndControl (0x0081), the server behind
+  WaterValve 0x0042.** Serves the five attributes matter.js marks conformance M
+  (OpenDuration 0x0, DefaultOpenDuration 0x1, RemainingDuration 0x3,
+  CurrentState 0x4, TargetState 0x5) and handles Open 0x0 / Close 0x1. Every id
+  and conformance string is cited to
+  `valve-configuration-and-control.element.ts`; AutoCloseTime 0x2 is `"TS"` and
+  the level attributes are `"LVL"`, so neither is served while FeatureMap is 0
+  — an `Open` carrying TargetLevel is refused with ConstraintError rather than
+  silently ignored. It reaches a host through a narrow port instead of mutating
+  internal state: a host refusal does not become Success.
+- **`cluster/modeselect` — ModeSelect (0x0050), the server behind device type
+  0x0027.** Description 0x0, StandardNamespace 0x1, SupportedModes 0x2 and
+  CurrentMode 0x3 served from a host-supplied list, ChangeToMode 0x0 forwarded
+  to the host, and an unsupported mode answered with InvalidCommand. StartUpMode
+  and OnMode are absent and FeatureMap is 0, because DEPONOFF would make OnMode
+  mandatory. The wire writer gained the one case it was missing — a list of
+  structs — so SupportedModes can reach a controller at all, with the constraint
+  bounds (255 modes, 64 tags) applied at encode time rather than trusted from
+  the host.
+
 - **`endpoint/sqlitestore`, a production `endpoint.Store`.** The port shipped
   with only `endpointtest.NewFakeStore` behind it, so every consumer had to
   write the real one — and endpoint identity is the piece of bridge state

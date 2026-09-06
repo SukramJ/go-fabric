@@ -858,118 +858,24 @@ func (s *OccupancySensingServer) MatterAttributes() []uint32 {
 // FromMeasurementClass returns the cluster server(s) that match the
 // given measurement class, wrapping src as the value source. Returns
 // nil when src is not the right typed flavour for class (e.g. a
-// MatterFloatMeasurementSource for an Occupancy class) or when class
-// is one that has no measurement-cluster materialisation (None,
-// Power, Energy, MomentarySwitch).
+// FloatMeasurementSource for an Occupancy class) and when the class has
+// no measurement-cluster materialisation of its own (None, Power,
+// Energy, MomentarySwitch — see [contract.SetMeasurementMaterializer]
+// for why each of the four is left empty).
 //
-// The air-quality classes (CO2 / PM2.5 / PM10) return two servers: the
-// concentration cluster plus [AirQualityServer], which the
-// AirQualitySensor device type mandates while listing every
-// concentration cluster as optional.
-//
-// Power / Energy host-cluster materialisation: when a Custom DP
-// (typically a switch.Switch on a HmIP-PSM) advertises a Power /
-// Energy MatterMeasurementClass alongside its OnOff cluster, the
-// materializer DOES return a cluster server for it. The Custom DP
-// attaches the resulting server to its host endpoint; the bridge
-// does NOT spin up a standalone sensor endpoint for these classes
-// (Matter Device Library §11.4 expects ElectricalPowerMeasurement
-// to ride on the same endpoint as the OnOff/PlugInUnit).
-//
-// MomentarySwitch (Switch 0x003B) is event-driven, not
-// attribute-driven — its projection lives in
-// `cluster/wire/genericswitch.go::GenericSwitch` and wires to the
-// bridge's MatterEventEmitter (Subscribe ongoing-pump for events,
-// Matter §10.6.6). The materializer here returns nil for that class
-// so the endpoint assembler delegates to the GenericSwitch path
-// instead of building a measurement cluster.
-//
-// PowerSource (Battery) IS materialised here when the source carries
-// a Bool LOWBAT signal — the resulting cluster server must be
-// attached to the host endpoint by the caller (typical: a
-// custom-DP's MatterClusterServers() rolls it up).
+// The dispatch is a registry lookup, not a switch over the built-in
+// constants: a host-registered kind
+// ([contract.RegisterMeasurementKind]) reaches its own materialiser
+// through exactly this call, which is what keeps the eligibility
+// classifier's "exposable" verdict backed by an endpoint the bridge can
+// actually build. The built-in half of that registry is installed by
+// this package's init below.
 func FromMeasurementClass(class contract.MeasurementClass, src any) []contract.ClusterServer {
-	switch class {
-	case contract.MeasurementTemperature:
-		if f, ok := src.(contract.FloatMeasurementSource); ok {
-			return []contract.ClusterServer{NewTemperatureServer(f)}
-		}
-	case contract.MeasurementHumidity:
-		if f, ok := src.(contract.FloatMeasurementSource); ok {
-			return []contract.ClusterServer{NewHumidityServer(f)}
-		}
-	case contract.MeasurementIlluminance:
-		if f, ok := src.(contract.FloatMeasurementSource); ok {
-			return []contract.ClusterServer{NewIlluminanceServer(f)}
-		}
-	case contract.MeasurementPressure:
-		if f, ok := src.(contract.FloatMeasurementSource); ok {
-			return []contract.ClusterServer{NewPressureServer(f)}
-		}
-	case contract.MeasurementCO2:
-		if f, ok := src.(contract.FloatMeasurementSource); ok {
-			return []contract.ClusterServer{NewAirQualityServer(class, f), NewCO2ConcentrationServer(f)}
-		}
-	case contract.MeasurementPM25:
-		if f, ok := src.(contract.FloatMeasurementSource); ok {
-			return []contract.ClusterServer{NewAirQualityServer(class, f), NewPM25ConcentrationServer(f)}
-		}
-	case contract.MeasurementPM10:
-		if f, ok := src.(contract.FloatMeasurementSource); ok {
-			return []contract.ClusterServer{NewAirQualityServer(class, f), NewPM10ConcentrationServer(f)}
-		}
-	case contract.MeasurementContact, contract.MeasurementLeak:
-		if b, ok := src.(contract.BoolMeasurementSource); ok {
-			return []contract.ClusterServer{NewBooleanStateServer(b)}
-		}
-	case contract.MeasurementOccupancy:
-		if b, ok := src.(contract.BoolMeasurementSource); ok {
-			return []contract.ClusterServer{NewOccupancySensingServer(b)}
-		}
-	case contract.MeasurementBattery:
-		// Two source shapes project onto PowerSource: a LOWBAT bool
-		// (BatChargeLevel) or a derived battery-percentage float (e.g.
-		// OperatingVoltageLevelSensor — BatPercentRemaining). Checked in
-		// this order because both interfaces are structurally possible
-		// on a source that also implements other measurement surfaces;
-		// a bool source is the more specific / more common HM signal.
-		if b, ok := src.(contract.BoolMeasurementSource); ok {
-			return []contract.ClusterServer{NewPowerSourceServer(b)}
-		}
-		if f, ok := src.(contract.FloatMeasurementSource); ok {
-			return []contract.ClusterServer{NewPowerSourceServerFromFloat(f)}
-		}
-	case contract.MeasurementElectrical:
-		// The ElectricalSensor endpoint's full surface. PowerTopology is
-		// mandatory for the device type, so it ships whether or not the
-		// device has anything topological to say; ElectricalEnergyMeasurement
-		// joins only when the channel actually reports a counter, since
-		// conformance O.a+ requires at least one of the two measurement
-		// clusters, not both.
-		r, ok := src.(ElectricalReadingsSource)
-		if !ok {
-			return nil
-		}
-		servers := []contract.ClusterServer{
-			NewElectricalPowerServerFromReadings(r),
-			NewPowerTopologyServer(),
-		}
-		if r.HasEnergy() {
-			servers = append(servers, NewElectricalEnergyServer(energyOf{r}))
-		}
-		return servers
-	case contract.MeasurementPower, contract.MeasurementEnergy:
-		// Per-parameter classes never build an endpoint of their own: the
-		// assembler folds them into one [generic.ElectricalGroup] and
-		// dispatches that as MatterMeasurementElectrical above. Reaching here
-		// means a caller bypassed the consolidation.
+	materialize, ok := contract.MeasurementMaterializerFor(class)
+	if !ok {
 		return nil
-	case contract.MeasurementNone, contract.MeasurementMomentarySwitch:
-		// None has no cluster projection by design; MomentarySwitch
-		// projects via the GenericSwitch event path in
-		// cluster/wire/genericswitch.go, not via a measurement cluster.
 	}
-	return nil
+	return materialize(src)
 }
 
 // --- ElectricalPowerMeasurement (0x0090) ------------------------------
@@ -1008,6 +914,7 @@ func NewElectricalPowerServer(src contract.FloatMeasurementSource) *ElectricalPo
 // NewElectricalPowerServerFromReadings wraps a consolidated electrical group,
 // so all four ElectricalPowerMeasurement readings the CCU provides reach the
 // cluster instead of only ActivePower.
+// fabric:reachable:reason="called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow"
 func NewElectricalPowerServerFromReadings(r ElectricalReadingsSource) *ElectricalPowerServer {
 	return &ElectricalPowerServer{src: r, readings: r}
 }
@@ -1015,6 +922,7 @@ func NewElectricalPowerServerFromReadings(r ElectricalReadingsSource) *Electrica
 // ElectricalReadingsSource is a consolidated electrical group: the typed
 // multi-attribute surface plus the single-value surface every measurement
 // source carries (which reports the group's headline reading, active power).
+// fabric:reachable:reason="called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow"
 type ElectricalReadingsSource interface {
 	contract.ElectricalReadings
 	contract.FloatMeasurementSource
@@ -1750,6 +1658,7 @@ type PowerTopologyServer struct {
 var _ contract.ClusterDataVersion = (*PowerTopologyServer)(nil)
 
 // NewPowerTopologyServer returns the NODE-topology server.
+// fabric:reachable:reason="called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow"
 func NewPowerTopologyServer() *PowerTopologyServer { return &PowerTopologyServer{} }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].

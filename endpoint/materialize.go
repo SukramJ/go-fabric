@@ -36,8 +36,19 @@ const matterDeviceTypeBridgedNode uint32 = 0x0013
 //     endpoint ID for event emission.
 //  3. Other standalone-sensor endpoints (ep.Measurement != nil)
 //     consult the [measurement.FromMeasurementClass] materializer,
-//     which maps the measurement class enum to a concrete read-only
-//     cluster server wired against the source DP.
+//     which looks the measurement class up in the kind registry and runs
+//     the materialiser registered for it against the source DP. A kind a
+//     host added via [contract.RegisterMeasurementKind] takes this same
+//     path, so its clusters mount exactly like a built-in's.
+//
+// Path 2 and the battery re-entry further down name built-in classes
+// literally, because both need something a
+// [contract.MeasurementMaterializer] is not given: the endpoint id — at
+// construction time for the GenericSwitch event address, and
+// post-construction for PowerSource's EndpointList. A host-registered
+// kind therefore reaches path 3 and nothing else: it can be a standalone
+// sensor, but it cannot be an event source or ride on another endpoint
+// the way a battery does.
 //
 // The root endpoint (ep.IsRoot()) and the Aggregator (ep.IsAggregator())
 // return the set the daemon published via
