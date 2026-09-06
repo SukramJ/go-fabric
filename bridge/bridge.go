@@ -585,6 +585,35 @@ func (b *Bridge) Start(ctx context.Context) error {
 		}
 	}()
 
+	// --- Access control can only be enforced if fabrics can be named ---
+	//
+	// CheckACL treats fabric index 0 as "PASE, no fabric yet" and answers
+	// Success, because during commissioning there is no fabric to check
+	// against (endpoint/dispatcher.go). resolveSessionFabric returns that
+	// same 0 when the session lookup does not implement
+	// SessionFabricResolver -- so a host that attaches an ACL but no
+	// resolver gets index 0 for *every* session, including CASE ones, and
+	// every operational request is waved through as if it were still
+	// commissioning. No error, no log, no failed request: exactly the
+	// requests the AccessControl entries exist to gate.
+	//
+	// The neighbouring branch in CheckACL already fails closed when there is
+	// no ACL source at all, on the reasoning that a dispatcher which cannot
+	// tell an authorised controller from any other node must not answer.
+	// This is the same situation one layer out, so it gets the same answer,
+	// at start-up where it is a wiring mistake rather than a silent runtime
+	// state. A host that attaches no ACL is unaffected: CheckACL denies
+	// everything operational for it already.
+	if b.aclLister != nil {
+		if _, ok := b.sessions.(SessionFabricResolver); !ok {
+			return fmt.Errorf("bridge: an ACL lister is attached but the session lookup does not "+
+				"implement SessionFabricResolver (%T), so every CASE session would resolve to fabric 0 "+
+				"and pass the access check as if it were still commissioning: attach a session registry "+
+				"that can name a session's fabric, or attach no ACL lister to deny operational requests "+
+				"outright", b.sessions)
+		}
+	}
+
 	// --- Topology assembly ---
 	if err := b.reassembleLocked(ctx); err != nil {
 		return fmt.Errorf("bridge: initial topology: %w", err)

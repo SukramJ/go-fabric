@@ -182,6 +182,20 @@ long enough for a `v0.1.0` to mean something.
 
 ### Fixed
 
+- **A bridge that attaches an ACL it cannot enforce now refuses to start.**
+  `CheckACL` answers Success for fabric index 0, which means "PASE, no fabric
+  yet" and is correct while commissioning. But `resolveSessionFabric` returns
+  that same 0 when the session lookup does not implement
+  `SessionFabricResolver` — so a host that wired an ACL and a lookup without
+  that capability had *every* CASE session resolve to 0, and every operational
+  request passed the access check as though the device were still being
+  commissioned. Nothing failed and nothing logged; the AccessControl entries
+  were simply never applied. The neighbouring branch in `CheckACL` already
+  fails closed when there is no ACL source at all, on the same reasoning, so
+  this is that answer one layer out — at start-up, where it is a wiring
+  mistake rather than a silent runtime state. A host that attaches no ACL is
+  unaffected. Found by writing the threat model, not by review.
+
 - **A first pairing of the reference daemon timed out in operational
   discovery.** The post-AddNOC hook rebuilt the CASE identity and published
   nothing. Boot advertised an operational record for every fabric already in
