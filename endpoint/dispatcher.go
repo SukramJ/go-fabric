@@ -769,6 +769,17 @@ func (d *TopologyDispatcher) MinInvokePrivilege(endpoint uint16, clusterID, cmdI
 	return 3
 }
 
+// FabricIndexUnresolvable marks a session whose fabric the bridge could not
+// determine. Matter constrains a fabric index to "1 to 254" (matter.js
+// packages/model/src/standard/elements/operational-credentials.element.ts:129,
+// and three further declarations), so 255 can never collide with a real one,
+// and 0 is already spoken for as "PASE, no fabric yet".
+//
+// The distinction is load-bearing: 0 means the request legitimately has no
+// fabric and [TopologyDispatcher.CheckACL] answers Success; 255 means the
+// bridge does not know which fabric asked, and CheckACL denies.
+const FabricIndexUnresolvable uint8 = 255
+
 // CheckACL implements [im.ACLChecker] (Matter §9.10). It grants the request
 // when the requesting fabric holds a CASE ACL entry whose subject covers
 // (subjectNodeID, subjectCATs), whose target covers (endpoint, clusterID),
