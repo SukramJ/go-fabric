@@ -1,0 +1,36 @@
+# PICS for the reference daemon in examples/reference-bridge, as read by the
+# chip YAML test runner (matter_yamltests PICSChecker).
+#
+# THIS IS NOT A CERTIFICATION ARTEFACT. Certification is a non-goal for this
+# module. The file exists so a handful of chip Test_TC_* cases can be used as
+# a regression harness, and it therefore declares only the items those cases
+# actually reference. Everything else is deliberately absent: the checker
+# treats an undeclared item as 0 (matter/yamltests/pics_checker.py,
+# __evaluate_sub_expression -- "if a PICS item is not defined, it is |false|"),
+# so absence is a silent skip, never a failure. A real PICS would have to
+# enumerate the whole cluster surface and be signed off against a device; this
+# one grows one line at a time, when a case that needs the line is added.
+#
+# Every value below was read off the reference daemon's own OnOff server
+# (examples/reference-bridge/fleet.go, onOffServer) rather than assumed:
+#
+#   MatterRead            answers OnOff (0x0000), FeatureMap and
+#                         ClusterRevision, and nothing else
+#   MatterAttributes      [0x0000]
+#   MatterAcceptedCommands [Off 0x00, On 0x01, Toggle 0x02]
+#   FeatureMap            0 -- the LT (Lighting) bit is NOT advertised, so the
+#                         0x40xx attributes and the 0x4x commands do not exist
+#                         on this device and their PICS items stay off.
+
+# --- OnOff, server side, on the bridged light endpoint ------------------
+OO.S=1
+OO.S.A0000=1
+OO.S.C00.Rsp=1
+OO.S.C01.Rsp=1
+OO.S.C02.Rsp=1
+
+# The LT feature and everything conditional on it. Spelled out as 0 rather
+# than omitted, because "the daemon does not implement this" is a fact worth
+# reading in the file; the four 0x40xx attributes and the three LT commands
+# are left undeclared and default to 0.
+OO.S.F00=0

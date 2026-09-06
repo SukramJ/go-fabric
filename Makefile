@@ -27,6 +27,20 @@ GOLANGCI_LINT_VERSION ?= v2.13.0
 FUZZTIME     ?= 100000x
 FUZZ_TIMEOUT ?= 120s
 
+# Benchmark budgets. BENCHTIME is what a contributor measuring a change
+# should use; BENCH_SMOKE_TIME is the CI leg's, which only proves every
+# benchmark still builds, still finds its fixture and still completes — a
+# benchmark nobody runs rots exactly like a test nobody runs, except that it
+# fails silently at the moment somebody finally needs a number from it.
+BENCHTIME        ?= 1s
+BENCH_SMOKE_TIME ?= 10x
+
+# Where `make cover` / `make cover-check` leave the per-package coverage
+# report the floor checker reads. The name ends in .out so .gitignore's
+# existing `*.out` rule keeps it out of the tree — the floors themselves are
+# committed (script/coverfloor/floors.go), the measurement never is.
+COVER_REPORT ?= coverage.out
+
 .DEFAULT_GOAL := help
 
 .PHONY: help
@@ -55,6 +69,28 @@ test: ## run the test suite
 .PHONY: race
 race: ## run the test suite under the race detector (needs CGO)
 	CGO_ENABLED=1 $(GO) test -race -count=1 ./...
+
+.PHONY: cover
+cover: ## run the suite with per-package statement coverage
+	$(GO) test -count=1 -cover ./... 2>&1 | tee $(COVER_REPORT)
+
+.PHONY: cover-check
+cover-check: ## regenerate the coverage report, then fail on a package below its floor
+	@# Two steps rather than one pipeline: `sh` has no pipefail, so a failing
+	@# `go test` on the left of a pipe would be masked by the checker's own
+	@# exit status. The checker refuses a report carrying FAIL lines for the
+	@# same reason — coverage from a run that did not finish is not a
+	@# measurement, and ratcheting against it would bake in a partial number.
+	$(GO) test -count=1 -cover ./... > $(COVER_REPORT) 2>&1 || { cat $(COVER_REPORT); exit 1; }
+	$(GO) run ./script/coverfloor -report $(COVER_REPORT)
+
+.PHONY: bench
+bench: ## run every benchmark at $(BENCHTIME)
+	$(GO) test -run '^$$' -bench . -benchtime $(BENCHTIME) ./...
+
+.PHONY: bench-smoke
+bench-smoke: ## run every benchmark for $(BENCH_SMOKE_TIME) iterations — a build-and-run check, not a measurement
+	$(GO) test -run '^$$' -bench . -benchtime $(BENCH_SMOKE_TIME) ./...
 
 .PHONY: fuzz
 fuzz: ## run every fuzz target for $(FUZZTIME) executions as a smoke test
@@ -164,4 +200,4 @@ generate-matter-schema: ## regenerate parity/schema.json + schema/ from a matter
 	$(GOFUMPT) -w schema/
 
 .PHONY: ci
-ci: build vet test lint ## everything the pipeline runs
+ci: build vet test lint cover-check ## everything the pipeline runs

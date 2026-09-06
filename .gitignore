@@ -12,3 +12,7 @@
 # — the ratchet test reads the inventory, and CI diffs both.
 /script/reachability/crosscheck.json
 /script/reachability/whitelist-audit.md
+
+# Python bytecode from the chip conformance runner's test fixtures.
+__pycache__/
+*.pyc

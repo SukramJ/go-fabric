@@ -13,6 +13,44 @@ long enough for a `v0.1.0` to mean something.
 
 ### Added
 
+- **A stated API-stability and deprecation policy, with a guard behind it.**
+  The module is on its own SemVer lane and nothing is tagged, so a consumer had
+  no way to know what it may depend on or how much warning a rename carries.
+  README.md now says which packages are public (measured against the real
+  `internal/` tree, not asserted), how a deprecation is marked, how long it
+  stays, and what pre-1.0 changes about that. Prose enforces nothing, so two
+  tests hold the policy to its word: a marker that does not open its paragraph
+  with `Deprecated: ` produces no SA1019 warning at any consumer and is
+  refused, and a deprecated identifier that appears nowhere in `CHANGELOG.md`
+  is refused too — the window only means something to someone told the clock
+  is running. Both pass vacuously today, because the module has deprecated
+  nothing, and say so out loud rather than looking asleep.
+- **One chip `Test_TC_` conformance case runs against the reference daemon.**
+  `Test_TC_OO_2_2` drives Off/On/Toggle with read-back, including both
+  idempotency cases, gated in CI like the other chip-tool jobs. Certification
+  stays a non-goal: the PICS file says in its own text that it is written only
+  as far as this case needs and is not a certification artefact. Running it
+  needs chip's Python runner, because chip-tool at the pinned commit registers
+  no `tests` command at all — that is recorded rather than worked around.
+
+- **Eleven new fuzz targets, over the five packages that parse bytes.** The
+  module fuzzed only its four Interaction-Model decoders; everything else that
+  turns wire bytes into structures was unfuzzed, including the two packages a
+  commissioner reaches *before* anything is trusted — DER certificate parsing
+  in `secure/mattercert` and the setup-payload surface in `secure/setup`. Seeds
+  come from each package's own tests rather than being invented, so they are
+  known-good, and each target carries deliberately malformed variants. None
+  found a crash. Where an encoder exists the target asserts a round-trip; none
+  asserts a specific error for malformed input, which is not the property.
+- **Ten benchmarks and a per-package coverage floor.** Both were absent
+  entirely. The benchmarks cover the paths a running bridge repeats — TLV
+  encode/decode and validate, inbound datagram decode, initial-report
+  construction, endpoint assembly — and each says in its doc comment why that
+  path was chosen. `script/coverfloor` compares `go test -cover` against a
+  table with a reason per row; floors sit below each package's measured
+  coverage so the gate ratchets against regression rather than failing on day
+  one.
+
 - **`cluster/levelcontrol` — a host-agnostic LevelControl server (0x0008).** Speaker
   0x0022 mandates OnOff and LevelControl servers, and this module had neither
   a LevelControl server nor a way to build one: `cluster/wire` carried command
@@ -163,6 +201,20 @@ long enough for a `v0.1.0` to mean something.
   `devicetypes.go` and the `SchemaSnapshotSHA256` constant byte for byte.
 
 ### Fixed
+
+- **A bridge that attaches an ACL it cannot enforce now refuses to start.**
+  `CheckACL` answers Success for fabric index 0, which means "PASE, no fabric
+  yet" and is correct while commissioning. But `resolveSessionFabric` returns
+  that same 0 when the session lookup does not implement
+  `SessionFabricResolver` — so a host that wired an ACL and a lookup without
+  that capability had *every* CASE session resolve to 0, and every operational
+  request passed the access check as though the device were still being
+  commissioned. Nothing failed and nothing logged; the AccessControl entries
+  were simply never applied. The neighbouring branch in `CheckACL` already
+  fails closed when there is no ACL source at all, on the same reasoning, so
+  this is that answer one layer out — at start-up, where it is a wiring
+  mistake rather than a silent runtime state. A host that attaches no ACL is
+  unaffected. Found by writing the threat model, not by review.
 
 - **A first pairing of the reference daemon timed out in operational
   discovery.** The post-AddNOC hook rebuilt the CASE identity and published

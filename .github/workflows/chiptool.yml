@@ -10,7 +10,7 @@ name: chiptool
 # multicast, so this cannot run on a developer machine here. GitHub's Linux
 # runners can, which is why the guard lives in CI and nowhere else.
 #
-# Two jobs, and the second is the point:
+# Three jobs, and the second is the point:
 #
 #   - chiptool: the Go suite (`make chiptool-test`, build tag `chiptool`)
 #     against a runner-native chip-tool extracted from the pinned
@@ -24,6 +24,12 @@ name: chiptool
 #     avahi/dbus, network). Without it, every red run starts with the same
 #     hour of ruling the environment out — and a guard whose failures are
 #     uninterpretable gets ignored, which is worse than not having one.
+#   - chiptool-conformance: cases from the CSA's own certification suite
+#     (the Test_TC_* YAML files) run against the reference daemon by the
+#     chip runner, out of a sparse connectedhomeip checkout at the SAME pin.
+#     CERTIFICATION IS A NON-GOAL — these are borrowed as regression cases,
+#     and the PICS file this job feeds the runner is written only as far as
+#     those cases need it. See internal/chiptool/conformance_test.go.
 #
 # Both jobs run on ubuntu-24.04-arm: Docker Hub's chip-cert-bins publishes
 # arm64-only manifests for every recent tag, so an amd64 runner cannot pull
@@ -275,4 +281,149 @@ jobs:
             ~/chip-control/app.log
             ~/chip-control/pair.log
             ~/chip-control/read.log
+          if-no-files-found: ignore
+
+  chiptool-conformance:
+    name: chip certification cases against the reference daemon
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'needs-chiptool')
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      # Same single source as the other two jobs.
+      - name: resolve chip-tool pin
+        id: pin
+        run: |
+          pin=$(sed -n 's|^CHIP_CERT_BINS_IMAGE[^=]*=[[:space:]]*connectedhomeip/chip-cert-bins:\([0-9a-f]\{40\}\).*|\1|p' Makefile)
+          if [ -z "$pin" ]; then
+            echo "::error::chip-cert-bins pin not found in Makefile (CHIP_CERT_BINS_IMAGE)"
+            exit 1
+          fi
+          echo "pin=$pin" >> "$GITHUB_OUTPUT"
+
+      # The cases, the cluster definitions they are parsed against, the PICS
+      # semantics and the commissioner all have to come from ONE commit, so
+      # this checks out connectedhomeip at the very commit the chip-tool image
+      # is built from. The Go test asserts that too (requireChipRoot compares
+      # this checkout's HEAD against the Makefile pin) rather than trusting
+      # the workflow to have got it right.
+      #
+      # Sparse, because the full tree is several GiB and four directories are
+      # enough: the YAML suites, the ZCL cluster definitions the parser reads,
+      # the chipyaml runner itself, and the two Python packages it needs.
+      - name: check out connectedhomeip at the pin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: project-chip/connectedhomeip
+          ref: ${{ steps.pin.outputs.pin }}
+          path: chip
+          fetch-depth: 1
+          sparse-checkout: |
+            scripts/py_matter_idl
+            scripts/py_matter_yamltests
+            scripts/tests
+            src/app/tests/suites
+            src/app/zap-templates/zcl/data-model/chip
+
+      - name: cache chip-tool binary
+        id: chiptool-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/chiptool-bin
+          key: chiptool-bin-${{ steps.pin.outputs.pin }}
+
+      - name: extract chip-tool from chip-cert-bins
+        if: steps.chiptool-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$HOME/.cache/chiptool-bin"
+          docker create --name chip-cert-bins "connectedhomeip/chip-cert-bins:${{ steps.pin.outputs.pin }}"
+          docker cp chip-cert-bins:/root/apps/chip-tool "$HOME/.cache/chiptool-bin/chip-tool"
+          docker rm chip-cert-bins
+          chmod +x "$HOME/.cache/chiptool-bin/chip-tool"
+
+      # Identical to the other jobs — the YAML runner drives the same binary
+      # and therefore needs the same host stack, including a RUNNING avahi for
+      # the operational discovery that follows AddNOC.
+      - name: install chip-tool runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libavahi-client-dev libdbus-1-dev libglib2.0-dev \
+            libevent-dev libssl-dev libpcsclite-dev avahi-daemon
+          sudo systemctl start avahi-daemon
+          systemctl is-active dbus avahi-daemon
+
+      # The extra check over the other jobs: the YAML runner does not shell
+      # out per step, it talks to `chip-tool interactive server` over a
+      # websocket. That subcommand only exists when the binary was built with
+      # CONFIG_USE_INTERACTIVE_MODE (examples/chip-tool/commands/interactive/
+      # Commands.h). A build without it fails much later, as a websocket that
+      # never accepts a connection.
+      - name: chip-tool sanity
+        run: |
+          bin="$HOME/.cache/chiptool-bin/chip-tool"
+          if ldd "$bin" | grep "not found"; then
+            echo "::error::chip-tool has unresolved shared libraries (see ldd output above)"
+            exit 1
+          fi
+          ("$bin" || true) 2>&1 | grep -qi "usage" \
+            || { echo "::error::chip-tool did not print its usage banner"; exit 1; }
+          ("$bin" interactive || true) 2>&1 | tee /tmp/interactive.txt | head -n 20
+          grep -q "server" /tmp/interactive.txt \
+            || { echo "::error::this chip-tool has no 'interactive server' subcommand; the YAML runner cannot drive it"; exit 1; }
+
+      # matter-yamltests and matter-idl are installed FROM THE CHECKOUT, not
+      # from PyPI: a released wheel would float against the pinned commit and
+      # silently parse the cases with a different vocabulary. click and
+      # diskcache are the only two further imports the runner needs outside a
+      # full CHIP bootstrap — click for chiptool.py's own command line,
+      # diskcache for scripts/tests/chipyaml/paths_finder.py. Both were found
+      # by running the runner and reading the ImportError, not by copying
+      # scripts/tests/requirements.txt, which also pulls the bluez and
+      # pigweed-side machinery none of this touches.
+      - name: install the chip YAML runner
+        run: |
+          python3 -m venv "$HOME/chipyaml-venv"
+          "$HOME/chipyaml-venv/bin/pip" install --disable-pip-version-check \
+            ./chip/scripts/py_matter_idl ./chip/scripts/py_matter_yamltests click diskcache
+          "$HOME/chipyaml-venv/bin/python" -c "import matter.yamltests, matter.idl, click, diskcache; print('runner ok')"
+
+      - name: build the reference daemon
+        run: make chiptool-build
+
+      # The suite skips itself if either input is missing, so both are passed
+      # explicitly and the run is checked for the skip afterwards: a
+      # conformance job that silently skips is worth less than no job.
+      - name: chip certification cases
+        env:
+          GOFABRIC_CHIPTOOL_BIN: /home/runner/.cache/chiptool-bin/chip-tool
+          GOFABRIC_CHIP_ROOT: ${{ github.workspace }}/chip
+          GOFABRIC_CHIPYAML_PYTHON: /home/runner/chipyaml-venv/bin/python
+        run: |
+          set -o pipefail
+          go test -tags=chiptool -count=1 -timeout=1800s -v \
+            -run '^TestChipToolRunsChipConformanceCases$' ./internal/chiptool/... 2>&1 | tee /tmp/conformance.log
+          if grep -q -- "--- SKIP: TestChipToolRunsChipConformanceCases" /tmp/conformance.log; then
+            echo "::error::the conformance test skipped itself; its inputs were not wired"
+            exit 1
+          fi
+          if ! grep -q -- "--- PASS: TestChipToolRunsChipConformanceCases" /tmp/conformance.log; then
+            echo "::error::no PASS line for the conformance test"
+            exit 1
+          fi
+
+      - name: upload conformance logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: chiptool-conformance-logs
+          path: /tmp/conformance.log
           if-no-files-found: ignore

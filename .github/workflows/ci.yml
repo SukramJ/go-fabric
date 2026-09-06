@@ -79,6 +79,45 @@ jobs:
           CGO_ENABLED: "1"
         run: make race
 
+  coverage:
+    name: coverage floor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Per-package statement coverage against the floors in
+      # script/coverfloor/floors.go. Per package rather than one module-wide
+      # number on purpose: a single total hides a package losing fifteen
+      # points behind every other package's statements, and that drift is the
+      # only thing a coverage gate on an already well-tested module can
+      # usefully detect.
+      #
+      # It runs the suite a second time (the test job runs it under -race,
+      # which cannot also carry the coverage instrumentation this reads), so
+      # it is its own job rather than a step appended to that one.
+      - name: coverage floor
+        run: make cover-check
+
+  bench:
+    name: bench (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Ten iterations per benchmark: this leg measures nothing — a shared
+      # runner's numbers are not comparable between runs — it proves the
+      # benchmarks still build, still find their fixtures and still complete.
+      # Without it a benchmark rots unnoticed until the day somebody needs a
+      # number from it, which is the day they least want to debug a fixture.
+      - name: go test -bench
+        run: make bench-smoke
+
   reachability:
     name: reachability
     runs-on: ubuntu-latest

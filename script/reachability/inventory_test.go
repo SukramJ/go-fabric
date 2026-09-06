@@ -48,7 +48,10 @@ import (
 // down: the module carries zero fabric:reachable annotations, so every one of
 // the 11 is a measurement rather than an unrefuted assertion. Writing a test
 // that reaches any of them lowers this constant by one.
-const reachabilityUnreachedRatchet = 11
+// Lowered 11 -> 10 when secure/setup gained a fuzz target: IsValidSetupPIN
+// had no test caller at all, which is a thing worth knowing about a function
+// that classifies a setup passcode.
+const reachabilityUnreachedRatchet = 10
 
 // inventoryWhitelistEntry mirrors one whitelist row of inventory.json.
 type inventoryWhitelistEntry struct {
