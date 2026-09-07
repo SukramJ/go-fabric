@@ -234,18 +234,24 @@ func (wr WriteResponse) MarshalTLV(enc *tlv.Encoder) {
 // before each write path is dispatched, at the location the path resolves
 // to. The required privilege for a plain Write is Operate (3) per Matter
 // §9.10.4.4, raised per attribute by [AttributeWritePrivilegeProvider].
-// fabricIndex is extracted via [FabricFilterFromContext]; fabricIndex==0
-// (PASE) bypasses the ACL check.
+// fabricIndex is extracted via [FabricFilterFromContext]; a PASE session
+// bypasses the ACL check — fabricIndex==0 before AddNOC, and
+// [IsPASEFromContext] after it, mirroring matter.js
+// packages/protocol/src/interaction/FabricAccessControl.ts:189-191, which
+// keys the implicit Administer grant on the session's auth mode.
 func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse {
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
+	pase := IsPASEFromContext(ctx)
 	aclChecker, hasACL := d.(ACLChecker)
 	privProvider, hasPrivProvider := d.(AttributeWritePrivilegeProvider)
 	authWriter, hasAuthWriter := d.(AuthorizingWriter)
 	dvReader, hasDV := d.(DataVersionReader)
-	// PASE (fabricIndex==0) skips ACL: commissioning writes arrive before
-	// the fabric's ACL entry exists.
-	aclActive := hasACL && fabricIndex != 0
+	// PASE skips ACL: commissioning writes arrive before the fabric's ACL
+	// entry exists, and the commissioner keeps writing (AccessControl.ACL
+	// above all) over the same PASE channel after AddNOC adopted it onto
+	// the new fabric — hence the auth-mode term alongside fabricIndex==0.
+	aclActive := hasACL && !pase && fabricIndex != 0
 
 	// writePrivilege returns the minimum privilege needed to write the
 	// given resolved (endpoint, cluster, attribute). Falls back to

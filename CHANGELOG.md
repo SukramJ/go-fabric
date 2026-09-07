@@ -13,6 +13,20 @@ long enough for a `v0.1.0` to mean something.
 
 ### Fixed
 
+- **A commissioner lost its implicit Administer grant the moment AddNOC
+  succeeded.** The IM ACL gates keyed the PASE bypass on `FabricIndex == 0`,
+  but AddNOC adopts the commissioner's PASE session onto the new fabric, so
+  every follow-up over that channel — the ACL write Apple sends next,
+  GroupKeySetWrite, AccessControl event reads, an ongoing subscription — was
+  evaluated as fabric N with subject node-id 0 and answered
+  UnsupportedAccess. The grant is now keyed on the session's auth mode as
+  matter.js does (`FabricAccessControl.ts:189-191`): `im.WithAuthModePASE`
+  / `im.IsPASEFromContext`, `EventReadAuthorizer.PASE`,
+  `operational.Entry.IsPASE`, and the bridge stamps it from a
+  `SessionPASEResolver` — wire it with
+  `OperationalSessionLookup.WithPASEResolver` (the reference bridge does).
+  Unwired, behaviour stays fail-safe: no grant, as before.
+
 - **Ongoing event reports were sent on the commissioner's closed Subscribe
   exchange.** Attribute reports had moved to a bridge-initiated exchange for
   exactly this failure; event reports still went out with `Initiator=false`

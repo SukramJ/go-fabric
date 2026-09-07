@@ -415,13 +415,21 @@ func (rep AttributeReport) marshal(enc *tlv.Encoder, valueWriter AttributeValueW
 // all named) that is denied returns an AttributeStatusIB carrying
 // UnsupportedAccess (0x7e); a WILDCARD-expanded result that is denied is
 // SILENTLY OMITTED — a wildcard read discloses only authorized paths (Matter
-// §8.4.3.2). PASE sessions (fabricIndex==0) bypass the check — commissioning
-// reads must succeed before the fabric's ACL entry exists. Mirrors matter.js
+// §8.4.3.2). PASE sessions bypass the check — commissioning reads must
+// succeed before the fabric's ACL entry exists, and keep succeeding after
+// AddNOC adopted the session onto the new fabric (matter.js
+// packages/protocol/src/interaction/FabricAccessControl.ts:189-191 keys the
+// implicit Administer grant on the auth mode, not on the fabric), so the
+// bypass fires on fabricIndex==0 OR [IsPASEFromContext]. Mirrors matter.js
 // packages/protocol/src/action/server/AttributeReadResponse.ts:238-274
 // (addConcrete → error status) and readAttributeForWildcard (bare return).
 func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) ReportData {
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
+	// A PASE session keeps its implicit Administer grant after AddNOC
+	// adopted it onto the new fabric, so the gate is keyed on the auth
+	// mode as well as on the fabric.
+	pase := IsPASEFromContext(ctx)
 	aclChecker, hasACL := d.(ACLChecker)
 	privProvider, hasPrivProvider := d.(AttributeReadPrivilegeProvider)
 
@@ -458,9 +466,10 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 			// packages/protocol/src/action/server/AttributeReadResponse.ts:
 			// 238-274 — each resolved location is authorized with the resolved
 			// attribute's readLevel AFTER path resolution. PASE
-			// (fabricIndex==0) bypasses — commissioning reads must succeed
-			// pre-AddNOC.
-			if hasACL && fabricIndex != 0 {
+			// bypasses — commissioning reads must succeed pre-AddNOC, and
+			// after it while the commissioner still drives the same PASE
+			// channel.
+			if hasACL && !pase && fabricIndex != 0 {
 				priv := readPrivilege(r.Path.Endpoint, r.Path.Cluster, r.Path.Attribute)
 				if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, r.Path.Endpoint, r.Path.Cluster, priv); !status.IsSuccess() {
 					if concretePath {
@@ -654,11 +663,16 @@ const matterAccessControlClusterID uint32 = 0x001F
 // event reads and subscriptions, mirroring the (fabricIndex, subject, CATs)
 // tuple the attribute read path threads through [HandleReadRequest]. A zero
 // FabricIndex marks a PASE / pre-commissioning session (ACL not yet
-// applicable); a nil Checker disables enforcement (fail-open, matching the
-// attribute path's "dispatcher without ACLChecker" fallback).
+// applicable); PASE marks the same session after AddNOC adopted it onto the
+// new fabric — the implicit Administer grant is keyed on the auth mode
+// (matter.js packages/protocol/src/interaction/FabricAccessControl.ts:189-191),
+// so a FabricIndex alone no longer identifies the commissioning channel. A nil
+// Checker disables enforcement (fail-open, matching the attribute path's
+// "dispatcher without ACLChecker" fallback).
 type EventReadAuthorizer struct {
 	Checker       ACLChecker
 	FabricIndex   uint8
+	PASE          bool
 	SubjectNodeID uint64
 	SubjectCATs   []uint32
 }
@@ -667,7 +681,8 @@ type EventReadAuthorizer struct {
 // read and drops fabric-sensitive records that belong to another fabric.
 // Denied paths/records are SILENTLY OMITTED — a wildcard event read discloses
 // only authorized events (Matter §8.4.3.2), never an error status. A PASE
-// session (FabricIndex==0) or a nil Checker returns every event unchanged.
+// session (FabricIndex==0, or PASE / [IsPASEFromContext] once AddNOC adopted
+// it onto a fabric) or a nil Checker returns every event unchanged.
 //
 // (a) ACL gate: each event is gated at its read privilege — View by default,
 //
@@ -682,7 +697,7 @@ type EventReadAuthorizer struct {
 //	accessing fabric is never disclosed. Mirrors EventReadResponse.ts
 //	#readAllowedEvents (payload.fabricIndex !== accessingFabricIndex → skip).
 func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events []EventReport) []EventReport {
-	if auth.FabricIndex == 0 || auth.Checker == nil {
+	if auth.FabricIndex == 0 || auth.PASE || IsPASEFromContext(ctx) || auth.Checker == nil {
 		return append([]EventReport(nil), events...)
 	}
 	out := make([]EventReport, 0, len(events))

@@ -184,6 +184,10 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 	readSubjectNodeID, readSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	readCtx := im.WithFabricFilter(ctx, req.FabricFiltered, readFabricIndex)
 	readCtx = im.WithSubject(readCtx, readSubjectNodeID, readSubjectCATs)
+	readPASE := b.resolveSessionPASE(requestHdr.SessionID)
+	if readPASE {
+		readCtx = im.WithAuthModePASE(readCtx)
+	}
 	report := im.HandleReadRequest(readCtx, dispatcher, req)
 	// Evaluate EventRequests against the persistent event log so
 	// chip-tool `read-event-by-id` and Apple MTRDevice liveness
@@ -198,7 +202,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 	// §8.4.3.2 / §9.10.7.1). Mirrors matter.js EventReadResponse.ts
 	// #readAllowedEvents.
 	if len(req.EventRequests) > 0 {
-		auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readSubjectNodeID, readSubjectCATs)
+		auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
 		report.EventReports = im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(req, b.eventLog))
 	}
 	// Diagnostic: show what we returned per path.
@@ -365,6 +369,12 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 	writeSubjectNodeID, writeSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	writeCtx := im.WithFabricFilter(ctx, false, writeFabricIndex)
 	writeCtx = im.WithSubject(writeCtx, writeSubjectNodeID, writeSubjectCATs)
+	// The ACL write Apple sends right after AddNOC still travels the PASE
+	// channel; without this stamp it is evaluated as fabric N / node-id 0
+	// and denied.
+	if b.resolveSessionPASE(requestHdr.SessionID) {
+		writeCtx = im.WithAuthModePASE(writeCtx)
+	}
 	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
 	// initiator opts out of the WriteResponse the server MUST
@@ -491,6 +501,9 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 	invokeSubjectNodeID, invokeSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	invokeCtx := im.WithFabricFilter(ctx, false, invokeFabricIndex)
 	invokeCtx = im.WithSubject(invokeCtx, invokeSubjectNodeID, invokeSubjectCATs)
+	if b.resolveSessionPASE(requestHdr.SessionID) {
+		invokeCtx = im.WithAuthModePASE(invokeCtx)
+	}
 	// Stamp the operational session ID so
 	// OperationalCredentials.handleAddNOC can verify it matches
 	// the session that issued the CSRRequest (matter.js

@@ -401,12 +401,15 @@ func (ent InvokeResponseEntry) marshal(enc *tlv.Encoder, fieldsWriter CommandFie
 // privilege for a plain Invoke is Operate (3) per Matter §9.10.4.4;
 // individual cluster servers may enforce additional Manage/Admin gates
 // internally for sensitive commands such as RemoveFabric. fabricIndex
-// is extracted via [FabricFilterFromContext]; fabricIndex==0 (PASE)
-// bypasses the ACL check so commissioning invokes (ArmFailSafe,
-// CommissioningComplete) arrive before the fabric's ACL entry exists.
+// is extracted via [FabricFilterFromContext]; a PASE session bypasses
+// the ACL check so commissioning invokes (ArmFailSafe,
+// CommissioningComplete) arrive before the fabric's ACL entry exists —
+// fabricIndex==0 before AddNOC, [IsPASEFromContext] after it adopted the
+// session onto the new fabric.
 func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) InvokeResponse {
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
+	pase := IsPASEFromContext(ctx)
 	aclChecker, hasACL := d.(ACLChecker)
 	privProvider, hasPrivProvider := d.(CommandInvokePrivilegeProvider)
 
@@ -430,13 +433,17 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	// dispatch layer via [InvokeResponse.HasCommandData] per Matter §8.8.3.2.1), not the
 	// value of this wire field — so it stays at its zero value here.
 	for _, inv := range req.Invokes {
-		// ACL gate. PASE (fabricIndex==0) skips ACL: commissioning
-		// invokes arrive before the fabric's ACL entry exists. The
+		// ACL gate. PASE skips ACL: commissioning invokes arrive before
+		// the fabric's ACL entry exists (fabricIndex==0) and continue
+		// over the same PASE channel after AddNOC adopted it onto the
+		// new fabric ([IsPASEFromContext]) — matter.js
+		// packages/protocol/src/interaction/FabricAccessControl.ts:189-191
+		// keys the implicit Administer grant on the auth mode. The
 		// required privilege is per-command (RemoveFabric,
 		// OpenCommissioningWindow, … → Administer) rather than a flat
 		// Operate, so an Operate-only subject cannot invoke an
 		// administrative command.
-		if hasACL && fabricIndex != 0 {
+		if hasACL && !pase && fabricIndex != 0 {
 			if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, inv.Path.Endpoint, inv.Path.Cluster, invokePrivilege(inv)); !status.IsSuccess() {
 				ir.Responses = append(ir.Responses, InvokeResponseEntry{
 					Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},

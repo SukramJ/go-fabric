@@ -396,6 +396,21 @@ func (e *Entry) FabricIndex() uint8 {
 	return v
 }
 
+// IsPASE reports whether this session was established via the PASE
+// handshake. The marker is independent of [Entry.FabricIndex]: after
+// AddNOC, [Manager.AdoptFabricIndex] rewrites the fabric while the
+// session stays a PASE session, so the two answers deliberately
+// disagree for the commissioning channel. The bridge reads this to
+// stamp [im.WithAuthModePASE] onto inbound requests, which keeps the
+// implicit Administer grant matter.js keys on the auth mode
+// (packages/protocol/src/interaction/FabricAccessControl.ts:189-191).
+func (e *Entry) IsPASE() bool {
+	e.mu.Lock()
+	v := e.isPase
+	e.mu.Unlock()
+	return v
+}
+
 // setFabricIndex rewrites the fabric this session belongs to. Only
 // [Manager.AdoptFabricIndex] calls this — kept unexported so the
 // rewrite always goes through the manager's documented contract.

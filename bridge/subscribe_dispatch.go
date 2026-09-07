@@ -122,7 +122,7 @@ func (b *Bridge) buildInitialReport(
 		matched += len(req.EventRequests)
 		_, subFabricIndex := im.FabricFilterFromContext(subCtx)
 		subSubjectNodeID, subSubjectCATs := im.SubjectFromContext(subCtx)
-		auth := b.eventReadAuthorizer(dispatcher, subFabricIndex, subSubjectNodeID, subSubjectCATs)
+		auth := b.eventReadAuthorizer(dispatcher, subFabricIndex, im.IsPASEFromContext(subCtx), subSubjectNodeID, subSubjectCATs)
 		initialReport.EventReports = im.AuthorizeEventReports(subCtx, auth, raw)
 	}
 	// Sort reports by (endpoint, cluster, attribute) ascending. Apple

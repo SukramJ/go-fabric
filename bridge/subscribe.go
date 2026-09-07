@@ -156,6 +156,11 @@ type subTarget struct {
 	subjectNodeID  uint64
 	subjectCATs    []uint32
 	fabricFiltered bool
+	// pase records that the subscription was established over a PASE
+	// session, so ongoing reports keep the commissioning channel's
+	// implicit Administer grant even after AddNOC adopted the session
+	// onto a fabric and fabricIndex stopped being 0.
+	pase bool
 }
 
 // SubscriptionReporter returns the [subscription.Reporter] closure the
@@ -192,16 +197,19 @@ func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 
 // eventReadAuthorizer builds the ACL + fabric-sensitive gate for event reads
 // and subscriptions from the requesting session's identity, using dispatcher's
-// optional [im.ACLChecker]. A PASE session (fabricIndex==0) or a dispatcher
-// without an ACLChecker fails open inside [im.AuthorizeEventReports]. Shared by
+// optional [im.ACLChecker]. A PASE session (fabricIndex==0 before AddNOC,
+// pase==true after it adopted the session onto the new fabric) or a
+// dispatcher without an ACLChecker fails open inside
+// [im.AuthorizeEventReports]. Shared by
 // the plain event read (receive_dispatch), the Subscribe-Initial priming report
 // (subscribe_dispatch), and the ongoing event fan-out (authorizedEventReports)
 // so all three enforce identical event authorization.
-func (b *Bridge) eventReadAuthorizer(dispatcher im.Dispatcher, fabricIndex uint8, subjectNodeID uint64, subjectCATs []uint32) im.EventReadAuthorizer {
+func (b *Bridge) eventReadAuthorizer(dispatcher im.Dispatcher, fabricIndex uint8, pase bool, subjectNodeID uint64, subjectCATs []uint32) im.EventReadAuthorizer {
 	checker, _ := dispatcher.(im.ACLChecker)
 	return im.EventReadAuthorizer{
 		Checker:       checker,
 		FabricIndex:   fabricIndex,
+		PASE:          pase,
 		SubjectNodeID: subjectNodeID,
 		SubjectCATs:   subjectCATs,
 	}
@@ -218,7 +226,7 @@ func (b *Bridge) eventReadAuthorizer(dispatcher im.Dispatcher, fabricIndex uint8
 // fabric-sensitive record, so the fabric-sensitive drop is applied here too.
 // Closes the event half of the subscribe-path ACL bypass.
 func (b *Bridge) authorizedEventReports(ctx context.Context, target subTarget, events []im.EventReport) []im.EventReport {
-	auth := b.eventReadAuthorizer(b.Dispatcher(), target.fabricIndex, target.subjectNodeID, target.subjectCATs)
+	auth := b.eventReadAuthorizer(b.Dispatcher(), target.fabricIndex, target.pase, target.subjectNodeID, target.subjectCATs)
 	return im.AuthorizeEventReports(ctx, auth, events)
 }
 
@@ -336,10 +344,12 @@ func (b *Bridge) MatterEmitEvent(endpoint uint16, cluster, event uint32, data an
 
 // readAuthorizedResults runs dispatcher.Read for path and returns only
 // the results the requesting subject (carried in ctx via
-// [im.WithFabricFilter] / [im.WithSubject]) is authorized to read,
-// mirroring the per-result ACL gate in [im.HandleReadRequest]. A PASE
-// session (fabricIndex==0) or a dispatcher without an [im.ACLChecker]
-// returns every result unchanged.
+// [im.WithFabricFilter] / [im.WithSubject] / [im.WithAuthModePASE]) is
+// authorized to read, mirroring the per-result ACL gate in
+// [im.HandleReadRequest]. A PASE session — fabricIndex==0 before AddNOC,
+// [im.IsPASEFromContext] after it adopted the session onto the new fabric
+// — or a dispatcher without an [im.ACLChecker] returns every result
+// unchanged.
 //
 // This closes the subscribe-path ACL bypass: unlike HandleReadRequest,
 // the subscription read paths (initial + ongoing) call dispatcher.Read
@@ -353,8 +363,8 @@ func (b *Bridge) MatterEmitEvent(endpoint uint16, cluster, event uint32, data an
 func (b *Bridge) readAuthorizedResults(ctx context.Context, dispatcher im.Dispatcher, path im.ConcreteAttributePath) []im.ReadResult {
 	results := dispatcher.Read(ctx, path)
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
-	if fabricIndex == 0 {
-		return results // PASE / commissioning — ACL not yet applicable
+	if fabricIndex == 0 || im.IsPASEFromContext(ctx) {
+		return results // PASE — commissioning channel, implicit Administer
 	}
 	aclChecker, hasACL := dispatcher.(im.ACLChecker)
 	if !hasACL {
@@ -399,6 +409,9 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 	// initial read applies in handleSubscribeRequest.
 	readCtx := im.WithFabricFilter(ctx, target.fabricFiltered, target.fabricIndex)
 	readCtx = im.WithSubject(readCtx, target.subjectNodeID, target.subjectCATs)
+	if target.pase {
+		readCtx = im.WithAuthModePASE(readCtx)
+	}
 
 	report := im.ReportData{
 		HasSubscription: true,
@@ -634,6 +647,7 @@ func (b *Bridge) captureSubTarget(subID uint32, src *net.UDPAddr, requestHdr *me
 		subjectNodeID:       subjectNodeID,
 		subjectCATs:         subjectCATs,
 		fabricFiltered:      fabricFiltered,
+		pase:                b.resolveSessionPASE(requestHdr.SessionID),
 	})
 }
 
@@ -899,6 +913,9 @@ func (b *Bridge) handleSubscribeRequest(
 	subSubjectNodeID, subSubjectCATs := b.resolveSessionSubject(requestHdr.SessionID)
 	subCtx := im.WithFabricFilter(ctx, req.FabricFiltered, subFabricIndex)
 	subCtx = im.WithSubject(subCtx, subSubjectNodeID, subSubjectCATs)
+	if b.resolveSessionPASE(requestHdr.SessionID) {
+		subCtx = im.WithAuthModePASE(subCtx)
+	}
 
 	initialReport, matchedPaths := b.buildInitialReport(subCtx, dispatcher, req)
 	// A Subscribe whose (possibly wildcard) paths match zero attributes
@@ -1228,4 +1245,30 @@ func (b *Bridge) resolveSessionSubject(sessionID uint16) (nodeID uint64, cats []
 	}
 	nodeID, cats, _ = resolver.SubjectFor(sessionID)
 	return nodeID, cats
+}
+
+// resolveSessionPASE reports whether sessionID was established over
+// PASE, or false when the lookup does not implement
+// [SessionPASEResolver] or the session is unknown. The receive pipeline
+// stamps the answer via [im.WithAuthModePASE] so the IM ACL gates keep
+// the commissioning channel's implicit Administer grant after AddNOC
+// adopted the session onto the new fabric — matter.js
+// packages/protocol/src/interaction/FabricAccessControl.ts:189-191 keys
+// that grant on the auth mode, not on the fabric.
+//
+// sessionID==0 is the unencrypted / pre-session path, which the
+// fabricIndex==0 bypass already covers.
+func (b *Bridge) resolveSessionPASE(sessionID uint16) bool {
+	if sessionID == 0 {
+		return false
+	}
+	b.mu.RLock()
+	sessions := b.sessions
+	b.mu.RUnlock()
+	resolver, ok := sessions.(SessionPASEResolver)
+	if !ok {
+		return false
+	}
+	pase, _ := resolver.IsPASE(sessionID)
+	return pase
 }
