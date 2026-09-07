@@ -326,19 +326,47 @@ func TestGKM_WriteGroupKeyMap(t *testing.T) {
 	}
 }
 
-func TestGKM_WriteGroupKeyMap_CrossFabric(t *testing.T) {
+// TestGKM_WriteGroupKeyMap_StampsTheAccessingFabric pins that the
+// FabricIndex a client puts on a GroupKeyMapStruct is raw input, not a
+// scope: the write lands on the accessing fabric whatever the wire said.
+//
+// matter.js injects the accessing fabric into every fabric-scoped struct
+// before the behaviour sees it
+// (packages/protocol/src/action/server/AttributeWriteResponse.ts:461-467
+// "We always inject the current fabricIndex for writes", overwriting via
+// packages/types/src/tlv/TlvObject.ts:306-310), and
+// GroupKeyManagementServer.ts:181-236 #validateGroupKeyMap never
+// compares an entry's fabricIndex with the session. AccessControl in this
+// package stamps the writer's fabric for the same reason
+// (access_control.go MatterWrite). A chip-derived controller omits the
+// field (decoded as 0) or echoes whatever it last read; rejecting either
+// fails the whole write with InvalidCommand.
+func TestGKM_WriteGroupKeyMap_StampsTheAccessingFabric(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
 	gkm.SetCurrentFabric(1)
 	ctx := context.Background()
 
-	// Entry with FabricIndex != currentFabric → error.
 	mappings := []core.GroupKeyMapStruct{
-		{GroupID: 100, GroupKeySetID: 1, FabricIndex: 2}, // cross-fabric
+		{GroupID: 100, GroupKeySetID: 1, FabricIndex: 2}, // foreign index on the wire
+		{GroupID: 200, GroupKeySetID: 1, FabricIndex: 0}, // field omitted on the wire
 	}
-	err := gkm.MatterWrite(ctx, 0x0000, mappings)
-	if err == nil {
-		t.Fatal("expected error for cross-fabric GroupKeyMap write, got nil")
+	if err := gkm.MatterWrite(ctx, 0x0000, mappings); err != nil {
+		t.Fatalf("MatterWrite GroupKeyMap with client-supplied FabricIndex: %v", err)
+	}
+
+	v, ok := gkm.MatterRead(0x0000)
+	if !ok {
+		t.Fatal("GroupKeyMap: ok=false after write")
+	}
+	got := v.([]core.GroupKeyMapStruct)
+	if len(got) != 2 {
+		t.Fatalf("GroupKeyMap len=%d, want 2 (both entries stored on the accessing fabric)", len(got))
+	}
+	for _, m := range got {
+		if m.FabricIndex != 1 {
+			t.Errorf("GroupID %d stored with FabricIndex %d, want 1 (the accessing fabric)", m.GroupID, m.FabricIndex)
+		}
 	}
 }
 

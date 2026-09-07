@@ -554,13 +554,15 @@ func TestResponder_MultiFabric_PicksByDestinationID(t *testing.T) {
 	_ = fIdx // FabricIndex left at 0 in this test fixture; production stamps it on Identity.
 }
 
-// TestResponder_MultiFabric_NoMatchFallsBack asserts that a Sigma1
-// whose DestinationID matches NO installed fabric falls back to the
-// responder's constructor-time identity (single-fabric / test path).
-// Production resolvers should treat the miss as "no shared trust
-// roots" and reject, but the protocol layer keeps the fallback so
-// single-fabric flows aren't broken by an over-eager resolver.
-func TestResponder_MultiFabric_NoMatchFallsBack(t *testing.T) {
+// TestResponder_MultiFabric_NoMatchIsRefused asserts that a Sigma1 whose
+// DestinationID matches NO installed fabric is refused with
+// [ErrNoSharedTrustRoots] before any key material is generated — the
+// initiator addressed a fabric this node does not hold, so no Sigma2 it
+// could open exists. Mirrors matter.js CaseServer.ts:239 (throws before
+// createKeyPair) and :88-90 (StatusReport NoSharedTrustRoots). The
+// fallback to the constructor-time identity that stood here answered a
+// full ECDH/ECDSA/AES round to every stray Sigma1 on the LAN.
+func TestResponder_MultiFabric_NoMatchIsRefused(t *testing.T) {
 	t.Parallel()
 	ipk := fabricIPK()
 	idDefault := newTestIdentity(t, 0xCCCC, 5, ipk)
@@ -576,22 +578,17 @@ func TestResponder_MultiFabric_NoMatchFallsBack(t *testing.T) {
 	resp := NewResponder(idDefault, verifier, 0x3001)
 	resp.SetIdentityResolver(resolver)
 
-	// Drive a real Sigma1 from a matching initiator so the message
-	// parses cleanly. The DestinationID is whatever the initiator
-	// stamps; the resolver returns false, fallback kicks in.
 	init := NewInitiator(idDefault, verifier, 0x4001, [RandomSize]byte{1, 2, 3})
 	sigma1, err := init.GenerateSigma1()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := resp.ProcessSigma1(sigma1); err != nil {
-		t.Fatalf("ProcessSigma1: %v", err)
+	_, err = resp.ProcessSigma1(sigma1)
+	if !errors.Is(err, ErrNoSharedTrustRoots) {
+		t.Fatalf("ProcessSigma1 on a resolver miss = %v, want ErrNoSharedTrustRoots", err)
 	}
-	_, nodeID, ok := resp.SessionIdentity()
-	if !ok {
-		t.Fatal("SessionIdentity ok=false")
-	}
-	if nodeID != idDefault.NodeID {
-		t.Errorf("fallback identity nodeID=0x%x, want 0x%x", nodeID, idDefault.NodeID)
+	// Nothing was derived: a Sigma3 on this exchange has no handshake to complete.
+	if err := resp.ProcessSigma3(nil); !errors.Is(err, ErrSessionState) {
+		t.Fatalf("Sigma3 after a refused Sigma1 = %v, want ErrSessionState", err)
 	}
 }

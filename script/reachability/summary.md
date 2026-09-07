@@ -1,16 +1,16 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)
-Entry points: 3159 across 46 test packages.
+Entry points: 3240 across 46 test packages.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 2768 |
-| Reached by a test | 1350 |
-| Whitelisted | 1408 |
-| **Unreached** | **10** |
+| Total exported | 2809 |
+| Reached by a test | 1357 |
+| Whitelisted | 1443 |
+| **Unreached** | **9** |
 
 ## Top-20 packages by unreached exported identifiers
 
@@ -19,11 +19,10 @@ Entry points: 3159 across 46 test packages.
 | cluster/measurement | 1 | 0 | 0 |
 | contract | 1 | 0 | 0 |
 | endpoint | 1 | 0 | 0 |
-| mdns | 1 | 0 | 0 |
 | schema | 1 | 0 | 1 |
 | cluster/core | 0 | 1 | 0 |
-| secure/attestation | 0 | 0 | 1 |
 | secure/channel | 0 | 0 | 1 |
+| secure/mattercert | 0 | 0 | 1 |
 | secure/sigma | 0 | 0 | 1 |
 
 ## First 50 unreached functions
@@ -33,7 +32,6 @@ Entry points: 3159 across 46 test packages.
 | cluster/measurement | CelsiusToInt16 | cluster/measurement/measurement.go | 1732 |
 | contract | DeviceTypeName | contract/matter.go | 762 |
 | endpoint | ComposeNodeLabel | endpoint/spec.go | 88 |
-| mdns | DeriveUniqueIDFromIdentity | mdns/rotating_id.go | 117 |
 | schema | DeviceTypeAllowsServerCluster | schema/lookup.go | 65 |
 
 ## Full by-package breakdown
@@ -43,9 +41,8 @@ Entry points: 3159 across 46 test packages.
 | cluster/measurement | 1 | 0 | 0 |
 | contract | 1 | 0 | 0 |
 | endpoint | 1 | 0 | 0 |
-| mdns | 1 | 0 | 0 |
 | schema | 1 | 0 | 1 |
 | cluster/core | 0 | 1 | 0 |
-| secure/attestation | 0 | 0 | 1 |
 | secure/channel | 0 | 0 | 1 |
+| secure/mattercert | 0 | 0 | 1 |
 | secure/sigma | 0 | 0 | 1 |

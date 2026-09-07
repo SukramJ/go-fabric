@@ -20,7 +20,6 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -259,23 +258,9 @@ func run() error {
 	}()
 
 	// The two PartsList providers are what let a controller walk root →
-	// aggregator → bridged devices. They are attached after the cluster sets
-	// because they install onto the Descriptor inside each set.
-	if !br.AttachRootPartsListProvider(func() []uint16 { return []uint16{1} }) {
-		return errors.New("root Descriptor missing: PartsList provider could not be attached")
-	}
-	if !br.AttachAggregatorPartsListProvider(func() []uint16 {
-		topology := br.Topology()
-		if topology == nil {
-			return nil
-		}
-		ids := make([]uint16, 0, len(topology.Bridged()))
-		for _, ep := range topology.Bridged() {
-			ids = append(ids, ep.ID)
-		}
-		return ids
-	}) {
-		return errors.New("aggregator Descriptor missing: PartsList provider could not be attached")
+	// aggregator → bridged devices.
+	if err := attachPartsListProviders(br); err != nil {
+		return err
 	}
 
 	// Fabrics installed in a previous run: rebuild each one's CASE identity

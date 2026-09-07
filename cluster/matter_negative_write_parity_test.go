@@ -207,7 +207,10 @@ func TestNegativeInvokeParity(t *testing.T) {
 	cases := []negativeInvokeCase{
 		{
 			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:158-166
-			// setpointRaiseLower — mode=Heat(1) without HEAT feature → InvalidCommand.
+			// setpointRaiseLower — mode=Heat without HEAT feature → InvalidCommand.
+			// Heat is 0x0 per SetpointRaiseLowerModeEnum
+			// (thermostat-cluster.element.ts:511); the payload is the bridge's
+			// tag-map shape (field 0 Mode, field 1 Amount, element :322-323).
 			name: "Thermostat/SetpointRaiseLower mode=Heat without HEAT feature → InvalidCommand",
 			build: func() interface {
 				MatterInvoke(context.Context, uint32, any) (any, error)
@@ -215,7 +218,7 @@ func TestNegativeInvokeParity(t *testing.T) {
 				return newCoolOnlyServer()
 			},
 			cmdID:      0x00, // SetpointRaiseLower
-			fields:     map[string]any{"mode": uint8(1), "amount": int8(5)},
+			fields:     map[uint8]any{0: uint64(wire.ThermostatSetpointModeHeat), 1: int64(5)},
 			wantStatus: im.StatusInvalidCommand,
 		},
 		{

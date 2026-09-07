@@ -365,3 +365,64 @@ func TestClosureControlNoAttributeIsWritable(t *testing.T) {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+// TestClosureControlMoveToAcceptsTheBridgeTagMap pins the shape a real
+// controller's MoveTo arrives in. The bridge has no typed decoder for
+// ClosureControl, so its generic salvage path (bridge/fields_reader.go
+// decodeGenericTagMap) hands the server a map keyed by context tag with
+// unsigned integers surfaced as uint64. A server that only accepts the
+// typed struct answers every MoveTo from chip-tool or Apple Home with
+// Failure while its own struct-driven tests stay green.
+func TestClosureControlMoveToAcceptsTheBridgeTagMap(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		fields map[uint8]any
+		want   clusterwire.ClosureTargetPosition
+	}{
+		{
+			"position only",
+			map[uint8]any{0: uint64(clusterwire.ClosureTargetPositionMoveToFullyOpen)},
+			clusterwire.ClosureTargetPositionMoveToFullyOpen,
+		},
+		{
+			"position with explicit null latch",
+			map[uint8]any{0: uint64(clusterwire.ClosureTargetPositionMoveToVentilationPosition), 1: nil},
+			clusterwire.ClosureTargetPositionMoveToVentilationPosition,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h := &recordingHandlers{}
+			s := closure.NewControlServer(h.config())
+
+			_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, tc.fields)
+			if err != nil {
+				t.Fatalf("MoveTo(map[uint8]any): %v", err)
+			}
+			if len(h.moved) != 1 || h.moved[0] != tc.want {
+				t.Fatalf("handler saw %v, want [%v]", h.moved, tc.want)
+			}
+		})
+	}
+}
+
+// TestClosureControlMoveToTagMapWithoutAnyFieldIsMalformed pins that an
+// empty tag map (what the generic decoder returns for an empty command
+// structure) is refused the same way the TLV decoder refuses it: the
+// "O.a+" conformance makes at least one field mandatory.
+func TestClosureControlMoveToTagMapWithoutAnyFieldIsMalformed(t *testing.T) {
+	t.Parallel()
+	h := &recordingHandlers{}
+	s := closure.NewControlServer(h.config())
+
+	var empty map[uint8]any
+	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, empty)
+	if !errors.Is(err, clusterwire.ErrClosureControlMalformed) {
+		t.Fatalf("MoveTo(empty map) error = %v, want ErrClosureControlMalformed", err)
+	}
+	if len(h.moved) != 0 {
+		t.Fatalf("handler moved %v for an empty request", h.moved)
+	}
+}

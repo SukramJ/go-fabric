@@ -41,6 +41,8 @@ const InteractionModelRevision uint8 = 13
 var (
 	// ErrInvalidTimedRequest is returned for malformed TimedRequests.
 	ErrInvalidTimedRequest = errors.New("im: invalid TimedRequest")
+	// ErrInvalidStatusResponse is returned for malformed StatusResponses.
+	ErrInvalidStatusResponse = errors.New("im: invalid StatusResponse")
 )
 
 // TimedRequest is the in-memory form of a TimedRequestMessage. The
@@ -93,11 +95,65 @@ func UnmarshalTimedRequestTLV(dec *tlv.Decoder) (TimedRequest, error) {
 
 // StatusResponse is the in-memory form of a StatusResponseMessage.
 // The bridge emits it as the reply to a TimedRequest (always
-// Success), and could in principle emit one for any inbound
-// IM-action error condition — the IM Read/Write/Invoke handlers
-// instead embed status into their dedicated response shapes today.
+// Success) and as the top-level rejection of a malformed action; it
+// receives one from the controller after every ReportData chunk and
+// every ongoing subscription report (Matter §8.6.2), where the carried
+// status decides whether the interaction may continue.
 type StatusResponse struct {
 	Status StatusCode
+}
+
+// UnmarshalStatusResponseTLV parses a StatusResponseMessage TLV
+// payload. Mirrors matter.js TlvStatusResponse decoding in
+// packages/protocol/src/interaction/InteractionMessenger.ts:183-196
+// (throwIfErrorStatusMessage), which reads the status of every inbound
+// StatusResponse before deciding whether the exchange goes on.
+func UnmarshalStatusResponseTLV(dec *tlv.Decoder) (StatusResponse, error) {
+	var sr StatusResponse
+	open, err := dec.Next()
+	if err != nil {
+		return sr, fmt.Errorf("%w: top: %w", ErrInvalidStatusResponse, err)
+	}
+	if !open.IsContainer || open.Type != tlv.TypeStructure {
+		return sr, fmt.Errorf("%w: top must be Structure", ErrInvalidStatusResponse)
+	}
+	seenStatus := false
+	for {
+		el, err := dec.Next()
+		if err != nil {
+			return sr, fmt.Errorf("%w: %w", ErrInvalidStatusResponse, err)
+		}
+		if el.IsEndContainer {
+			break
+		}
+		if el.Tag.Kind != tlv.TagKindContext {
+			if el.IsContainer {
+				if err := skipContainer(dec); err != nil {
+					return sr, fmt.Errorf("%w: %w", ErrInvalidStatusResponse, err)
+				}
+			}
+			continue
+		}
+		switch uint8(el.Tag.Number & 0xFF) {
+		case tagStatusResponseStatus:
+			if el.Uint > 0xFF {
+				return sr, fmt.Errorf("%w: status %d exceeds uint8", ErrInvalidStatusResponse, el.Uint)
+			}
+			sr.Status = StatusCode(el.Uint)
+			seenStatus = true
+		default:
+			// InteractionModelRevision and unknown fields: informational.
+			if el.IsContainer {
+				if err := skipContainer(dec); err != nil {
+					return sr, fmt.Errorf("%w: %w", ErrInvalidStatusResponse, err)
+				}
+			}
+		}
+	}
+	if !seenStatus {
+		return sr, fmt.Errorf("%w: missing Status", ErrInvalidStatusResponse)
+	}
+	return sr, nil
 }
 
 // MarshalTLV encodes sr at the top level (anonymous tag).

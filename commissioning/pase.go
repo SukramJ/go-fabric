@@ -119,49 +119,62 @@ func (r *PASEResponder) HandlePake3(pake3 []byte) error {
 
 // Session derives the AES-CCM session keys and constructs a
 // [channel.Session]. Must be called only after HandlePake3 returned
-// nil. The returned session has separate I→R and R→I keys derived
-// from the PASE shared secret per Matter §4.13.2.5.
+// nil. The responder encrypts with R2I and decrypts with I2R — the
+// same orientation [secure/operational.Manager.OpenFromPase] gives the
+// running bridge, and the one matter.js PaseServer.ts:184-192 hands to
+// NodeSession.ts:76-86 (`isInitiator: false`).
 func (r *PASEResponder) Session() (*channel.Session, error) {
 	if !r.finished {
 		return nil, ErrPASEStateMismatch
 	}
-	shared := r.verifier.SharedSecret()
-	if len(shared) == 0 {
-		return nil, errors.New("commissioning: PASE shared secret unavailable")
-	}
-	encKey, decKey, err := derivePASESessionKeys(shared)
+	keys, err := r.sessionKeys()
 	if err != nil {
 		return nil, err
 	}
 	return channel.New(channel.Config{
-		EncryptKey:  encKey,
-		DecryptKey:  decKey,
+		EncryptKey:  keys.r2i,
+		DecryptKey:  keys.i2r,
 		LocalNodeID: r.cfg.LocalNodeID,
 		PeerNodeID:  r.cfg.PeerNodeID,
 	})
 }
 
 // AttestationChallenge returns the 16-byte attestation challenge for
-// downstream Attestation / CSR signing.
+// downstream Attestation / CSR signing. It is the third slice of the
+// same HKDF output the session keys come from, not a derivation of its
+// own: a challenge from a second HKDF with its own info string is one
+// no commissioner reproduces, and every AttestationResponse / NOCSRResponse
+// signed with it fails the commissioner's check.
 func (r *PASEResponder) AttestationChallenge() ([]byte, error) {
 	if !r.finished {
 		return nil, ErrPASEStateMismatch
 	}
-	shared := r.verifier.SharedSecret()
-	out, err := hkdf.Key(sha256.New, shared, nil, "AttestationChallenge", 16)
+	keys, err := r.sessionKeys()
 	if err != nil {
-		return nil, fmt.Errorf("commissioning: attestation challenge derive: %w", err)
+		return nil, err
 	}
-	return out, nil
+	return keys.challenge, nil
 }
 
-// derivePASESessionKeys derives I2RKey || R2IKey via HKDF-Expand on
-// the SPAKE2+ Ke. Matter §4.13.2.5 specifies a 32-byte output split
-// into two 16-byte AES-CCM keys.
-func derivePASESessionKeys(shared []byte) (i2r, r2i []byte, err error) {
-	out, err := hkdf.Key(sha256.New, shared, nil, "SessionKeys", 32)
-	if err != nil {
-		return nil, nil, fmt.Errorf("commissioning: PASE key derive: %w", err)
+// paseKeys is the split of the single 48-byte PASE key block.
+type paseKeys struct {
+	i2r, r2i, challenge []byte
+}
+
+// sessionKeys runs the one PASE key schedule of Matter §4.13.2.5 /
+// §4.13.4.2: HKDF-SHA256(IKM=Ke, salt="", info="SessionKeys", L=48),
+// split into I2RKey (16) || R2IKey (16) || AttestationChallenge (16).
+// Mirrors matter.js NodeSession.ts:76-86 (`createHkdfKey(sharedSecret,
+// salt, SESSION_KEYS_INFO, 16*3)`, `attestationKey = keys.slice(32, 48)`)
+// and this module's secure/operational OpenFromPase.
+func (r *PASEResponder) sessionKeys() (paseKeys, error) {
+	shared := r.verifier.SharedSecret()
+	if len(shared) == 0 {
+		return paseKeys{}, errors.New("commissioning: PASE shared secret unavailable")
 	}
-	return out[:16], out[16:], nil
+	out, err := hkdf.Key(sha256.New, shared, nil, "SessionKeys", 48)
+	if err != nil {
+		return paseKeys{}, fmt.Errorf("commissioning: PASE key derive: %w", err)
+	}
+	return paseKeys{i2r: out[0:16], r2i: out[16:32], challenge: out[32:48]}, nil
 }

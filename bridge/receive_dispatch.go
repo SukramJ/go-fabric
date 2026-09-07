@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -15,8 +16,23 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
+	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
+
+// errChunkRejected is returned by a chunk loop when the peer answered a
+// ReportData chunk with an error StatusResponse; the interaction is
+// abandoned, exactly as matter.js's waitForSuccess throws
+// (packages/protocol/src/interaction/InteractionMessenger.ts:183-196).
+var errChunkRejected = errors.New("receive: peer rejected ReportData chunk")
+
+// errChunkUnanswered is returned by a chunk loop when the peer never
+// answered a ReportData chunk within the exchange timeout. matter.js
+// aborts the interaction on that timeout (MessageExchange.ts:829-858
+// PeerMessageMissingError); continuing would stream every remaining
+// chunk to a peer that is not listening, holding the dispatch slot for
+// the whole report.
+var errChunkUnanswered = errors.New("receive: peer did not answer ReportData chunk")
 
 // absorbStatusResponse handles an inbound StatusResponse opcode.
 // StatusResponse is the spec-mandated ACK for a ReportData /
@@ -28,7 +44,22 @@ import (
 // retransmits its previous request indefinitely after pairing,
 // which Apple eventually surfaces as "device added" → immediate
 // disconnect.
-func (b *Bridge) absorbStatusResponse(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader) error {
+func (b *Bridge) absorbStatusResponse(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
+	// Decode the carried status: the peer's answer is only a go-ahead
+	// when it is Success. matter.js reads it on every inbound
+	// StatusResponse (InteractionMessenger.ts:183-196
+	// throwIfErrorStatusMessage) and throws on anything else; an
+	// undecodable one is treated as Failure so the waiting interaction
+	// stops rather than carries on blind.
+	status := im.StatusFailure
+	if sr, err := im.UnmarshalStatusResponseTLV(tlv.NewDecoder(payload)); err != nil {
+		b.logger.Warn("matter.rx.im.status_decode",
+			slog.String("src", srcString(src)),
+			slog.Int("exchange", int(proto.ExchangeID)),
+			slog.String("err", err.Error()))
+	} else {
+		status = sr.Status
+	}
 	// Do NOT call dischargeOwedAck here. The previous code did
 	// — the rationale "we just piggyback-acked on an outbound reply"
 	// is correct for *request* opcodes that immediately produce a
@@ -52,10 +83,21 @@ func (b *Bridge) absorbStatusResponse(src *net.UDPAddr, requestHdr *message.Head
 	// fires past Apple's state-machine and
 	// `ProcessSubscribeResponse` never triggers (Run 19 of the
 	// Apple-pair-diagnose cycle).
-	b.signalStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.signalStatusResponseRX(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, status)
+	// An error status answering an ongoing subscription report — a
+	// bridge-initiated exchange, so the peer speaks as the responder —
+	// means the peer no longer honours the subscription
+	// (InvalidSubscription) or could not process the report (Failure).
+	// matter.js ServerSubscription.ts:866-876 closes the subscription on
+	// either; nothing else ever would, because the report itself was
+	// MRP-acked and the reply refreshes the session's activity.
+	if !status.IsSuccess() && !proto.Initiator {
+		b.closeSubscriptionByExchange(requestHdr.SessionID, proto.ExchangeID, status)
+	}
 	b.logger.Debug("matter.rx.im.status_ack",
 		slog.String("src", srcString(src)),
-		slog.Int("exchange", int(proto.ExchangeID)))
+		slog.Int("exchange", int(proto.ExchangeID)),
+		slog.String("status", status.String()))
 	return nil
 }
 
@@ -115,10 +157,12 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 	}
 	// Reject illegal paths up front (wildcard cluster + concrete non-global
 	// attribute, or wildcard cluster + concrete event) with a top-level
-	// InvalidAction StatusResponse. Mirrors matter.js InteractionServer.ts
-	// validateReadPaths (#3926, Matter §8.4.3.2).
-	if im.ValidateReadPaths(req.AttributeRequests, req.EventRequests) != im.StatusSuccess {
-		body, err := EncodeStatusResponse(im.StatusResponse{Status: im.StatusInvalidAction})
+	// InvalidAction StatusResponse, and a request beyond the path ceiling
+	// with PathsExhausted. Mirrors matter.js InteractionServer.ts
+	// validateReadPaths (#3926, Matter §8.4.3.2) and the MAX_READ_PATHS
+	// check that follows it (:366-369).
+	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
+		body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
 		if err != nil {
 			debugReplyError(b.logger, "encode_read_path_reject", src, err)
 			return err
@@ -195,13 +239,13 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 		// A chunk carrying SuppressResponse=true (only the terminal chunk
 		// of a plain Read — see [im.HandleReadRequest]) expects nothing but
 		// a Standalone MRP-Ack, so the controller never emits an IM
-		// StatusResponse for it; waiting would just burn perChunkStatusRespTimeout.
+		// StatusResponse for it; waiting would only run out the exchange timeout.
 		// Mirrors matter.js
 		// packages/protocol/src/interaction/InteractionMessenger.ts:679,701
 		// (`suppressResponse` chunk → `expectAckOnly: true`, no StatusResponse
 		// wait). Reliable delivery of the final chunk is still guaranteed by
 		// sendReplyReliable's MRP retransmit + the post-loop dischargeOwedAck.
-		var waitCh <-chan struct{}
+		var waitCh <-chan im.StatusCode
 		if !chunk.SuppressResponse {
 			waitCh = b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 		}
@@ -222,17 +266,8 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 			return err
 		}
 		if waitCh != nil {
-			select {
-			case <-waitCh:
-				b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-			case <-time.After(perChunkStatusRespTimeout):
-				b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-				b.logger.Debug("matter.tx.read.chunk_ack_timeout",
-					slog.String("src", srcString(src)),
-					slog.Int("chunk", i),
-					slog.Int("exchange", int(proto.ExchangeID)),
-					slog.Bool("final", !chunk.MoreChunkedMessages),
-					slog.String("timeout", perChunkStatusRespTimeout.String()))
+			if err := b.awaitChunkStatusResponse(waitCh, "read", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
+				return err
 			}
 		}
 		b.logger.Debug("matter.rx.im.read.chunk",
@@ -248,6 +283,42 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 		slog.Int("attribute_reports", len(report.Reports)),
 		slog.Int("chunks", len(chunks)))
 	return nil
+}
+
+// awaitChunkStatusResponse blocks until the peer answers the chunk just
+// sent on (session, exchange) with an IM StatusResponse, then decides
+// whether the chunk loop may go on. Mirrors matter.js
+// InteractionMessenger.ts:719-721 sendDataReportMessage →
+// waitForSuccess: a non-Success status or a missing answer aborts the
+// interaction — the caller returns the error and sends nothing more on
+// the exchange. op names the loop for the log line ("read" /
+// "subscribe").
+func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string, src *net.UDPAddr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
+	timeout := b.chunkStatusResponseTimeout(sessionID)
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case status := <-waitCh:
+		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
+		if status.IsSuccess() {
+			return nil
+		}
+		b.logger.Debug("matter.tx."+op+".chunk_rejected",
+			slog.String("src", srcString(src)),
+			slog.Int("chunk", chunkIdx),
+			slog.Int("exchange", int(exchangeID)),
+			slog.String("status", status.String()))
+		return fmt.Errorf("%w: %s", errChunkRejected, status.String())
+	case <-timer.C:
+		b.disarmStatusResponseWait(sessionID, exchangeID, initiator)
+		b.logger.Debug("matter.tx."+op+".chunk_ack_timeout",
+			slog.String("src", srcString(src)),
+			slog.Int("chunk", chunkIdx),
+			slog.Int("exchange", int(exchangeID)),
+			slog.Bool("final", !chunk.MoreChunkedMessages),
+			slog.String("timeout", timeout.String()))
+		return fmt.Errorf("%w: exchange %d chunk %d after %s", errChunkUnanswered, exchangeID, chunkIdx, timeout)
+	}
 }
 
 // dispatchWriteRequest handles a decoded WriteRequest. The TLV decode and

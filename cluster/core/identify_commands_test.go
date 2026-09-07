@@ -376,3 +376,26 @@ func TestCoreClustersRejectUnknownCommandsWithTypedStatus(t *testing.T) {
 		}
 	}
 }
+
+// TestIdentify_InvokeIdentifyCommandWithBridgeTagMap pins the payload
+// shape a real controller's Identify arrives in. Cluster 0x0003 has no
+// typed decoder in the bridge, so its generic salvage path hands over
+// map[uint8]any{0: uint64(IdentifyTime)} (bridge/fields_reader.go
+// decodeGenericTagMap). A server that cannot read that shape stores 0,
+// never starts the countdown, and a controller reading IdentifyTime
+// back after Identify(30) sees 0.
+func TestIdentify_InvokeIdentifyCommandWithBridgeTagMap(t *testing.T) {
+	t.Parallel()
+	id := core.NewIdentify()
+	t.Cleanup(id.Close)
+	if _, err := id.MatterInvoke(context.Background(), 0x00, map[uint8]any{0: uint64(30)}); err != nil {
+		t.Fatalf("MatterInvoke Identify(map[uint8]any): %v", err)
+	}
+	v, ok := id.MatterRead(0x0000)
+	if !ok {
+		t.Fatal("IdentifyTime: ok=false")
+	}
+	if got := v.(uint16); got != 30 {
+		t.Fatalf("IdentifyTime after Identify(30) = %d, want 30", got)
+	}
+}

@@ -11,12 +11,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/secure/attestation"
@@ -128,6 +130,17 @@ func buildRootClusters(
 	// aborted one, and an expiring window must roll that state back.
 	generalCom.SetOnFailSafeArmed(func(context.Context, uint8) { opCreds.ClearPendingState() })
 	generalCom.SetOnFailSafeExpired(opCreds.OnFailSafeExpiry)
+	// A successful CommissioningComplete drops that state too. AddNOC keeps
+	// the installed fabric's index pending so an expiry before Complete can
+	// revert the half-paired fabric; Complete only disarms the window and
+	// leaves the index behind. PASE stays reachable here for the process
+	// lifetime, and the auto-arm that follows every Pake3 fires no
+	// OnFailSafeArmed — so the next attempt that lapses without an
+	// ArmFailSafe would revert the fabric the controller already committed:
+	// ACL, group keys and the fabric row gone. Mirrors chip
+	// FailSafeContext::Reset() on the success path of
+	// CommissioningWindowManager::OnCommissioningComplete.
+	generalCom.SetOnCommissioningComplete(func(context.Context, uint8) { opCreds.ClearPendingState() })
 
 	accessControl, err := mattercore.NewAccessControl(st)
 	if err != nil {
@@ -164,6 +177,50 @@ func buildRootClusters(
 	}
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
 	return servers, refs, nil
+}
+
+// attachPartsListProviders installs the two live PartsList providers once
+// the bridge is up. They are attached after the cluster sets because they
+// install onto the Descriptor inside each set.
+//
+// Both lists are full-family: the root names every endpoint below it, the
+// aggregator names every bridged endpoint. RootNode and Aggregator both
+// carry `composition: "full-family"` (matter.js
+// packages/model/src/standard/elements/root-node.element.ts:17,
+// aggregator.element.ts:17), which DescriptorServer.ts `#updatePartsList`
+// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:212-220)
+// renders as every descendant rather than the direct children. A root
+// PartsList of [1] alone is the tree shape; Apple Home reads the root's
+// list after CommissioningComplete and ends the add on it.
+func attachPartsListProviders(br *matterbridge.Bridge) error {
+	if !br.AttachRootPartsListProvider(func() []uint16 {
+		return endpointIDs(br, func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() })
+	}) {
+		return errors.New("root Descriptor missing: PartsList provider could not be attached")
+	}
+	if !br.AttachAggregatorPartsListProvider(func() []uint16 {
+		return endpointIDs(br, func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() && !ep.IsAggregator() })
+	}) {
+		return errors.New("aggregator Descriptor missing: PartsList provider could not be attached")
+	}
+	return nil
+}
+
+// endpointIDs returns the ids of the live topology's endpoints that pass
+// keep, ascending. Nil before the first assembly.
+func endpointIDs(br *matterbridge.Bridge, keep func(*endpoint.Endpoint) bool) []uint16 {
+	topology := br.Topology()
+	if topology == nil {
+		return nil
+	}
+	ids := make([]uint16, 0, len(topology.Endpoints))
+	for _, ep := range topology.Endpoints {
+		if ep != nil && keep(ep) {
+			ids = append(ids, ep.ID)
+		}
+	}
+	slices.Sort(ids)
+	return ids
 }
 
 // buildAggregatorClusters constructs endpoint 1, the Aggregator.

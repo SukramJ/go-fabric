@@ -83,6 +83,40 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 	return decodeGenericTagMap(dec)
 }
 
+// fieldConstraintError is the typed reject for a command field whose
+// wire value does not fit the field's schema type. It carries
+// ConstraintError so [im.HandleInvokeRequest] answers the command with
+// a CommandStatusIB instead of executing a truncated value — matter.js
+// validates every request against its TlvSchema before the invoker runs
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:446-448)
+// and TlvNumber.ts:151-156 validateBoundaries throws a ValidationError,
+// whose default code is Status.ConstraintError
+// (packages/types/src/common/ValidationError.ts:16-22).
+type fieldConstraintError struct{ msg string }
+
+func (e fieldConstraintError) Error() string { return e.msg }
+
+// MatterStatusCode implements [im.StatusCodeError].
+func (fieldConstraintError) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
+
+// fieldUint8 narrows el to a uint8 field, rejecting a wider wire value
+// (matter.js TlvUInt8, TlvNumber.ts:270-275: max UINT8_MAX).
+func fieldUint8(cmd, field string, el tlv.Element) (uint8, error) {
+	if el.Uint > 0xFF {
+		return 0, fieldConstraintError{fmt.Sprintf("%s: %s %d > uint8 max", cmd, field, el.Uint)}
+	}
+	return uint8(el.Uint), nil
+}
+
+// fieldUint16 narrows el to a uint16 field, rejecting a wider wire value
+// (matter.js TlvUInt16, TlvNumber.ts:277-282: max UINT16_MAX).
+func fieldUint16(cmd, field string, el tlv.Element) (uint16, error) {
+	if el.Uint > 0xFFFF {
+		return 0, fieldConstraintError{fmt.Sprintf("%s: %s %d > uint16 max", cmd, field, el.Uint)}
+	}
+	return uint16(el.Uint), nil
+}
+
 // decodeMoveToLevelRequest reads LevelControl.MoveToLevel /
 // MoveToLevelWithOnOff fields (Matter §1.6.7.1). Tags: [0] uint8
 // Level, [1] uint16 TransitionTime (nullable), [2] bitmap8
@@ -106,19 +140,25 @@ func decodeMoveToLevelRequest(dec *tlv.Decoder) (wire.MoveToLevelRequest, error)
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			if el.Uint > 0xFF {
-				return req, fmt.Errorf("MoveToLevel: Level %d > uint8 max", el.Uint)
+			if req.Level, err = fieldUint8("MoveToLevel", "Level", el); err != nil {
+				return req, err
 			}
-			req.Level = uint8(el.Uint & 0xFF)
 		case 1:
 			if !el.IsNull {
-				v := uint16(el.Uint & 0xFFFF)
+				v, err := fieldUint16("MoveToLevel", "TransitionTime", el)
+				if err != nil {
+					return req, err
+				}
 				req.TransitionTime = &v
 			}
 		case 2:
-			req.OptionsMask = uint8(el.Uint & 0xFF)
+			if req.OptionsMask, err = fieldUint8("MoveToLevel", "OptionsMask", el); err != nil {
+				return req, err
+			}
 		case 3:
-			req.OptionsOverride = uint8(el.Uint & 0xFF)
+			if req.OptionsOverride, err = fieldUint8("MoveToLevel", "OptionsOverride", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }
@@ -140,11 +180,17 @@ func decodeMoveToHueFields(dec *tlv.Decoder) (wire.MoveToHueRequest, error) {
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			req.Hue = uint8(el.Uint & 0xFF)
+			if req.Hue, err = fieldUint8("MoveToHue", "Hue", el); err != nil {
+				return req, err
+			}
 		case 1:
-			req.Direction = uint8(el.Uint & 0xFF)
+			if req.Direction, err = fieldUint8("MoveToHue", "Direction", el); err != nil {
+				return req, err
+			}
 		case 2:
-			req.TransitionTime = uint16(el.Uint & 0xFFFF)
+			if req.TransitionTime, err = fieldUint16("MoveToHue", "TransitionTime", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }
@@ -166,9 +212,13 @@ func decodeMoveToSaturationFields(dec *tlv.Decoder) (wire.MoveToSaturationReques
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			req.Saturation = uint8(el.Uint & 0xFF)
+			if req.Saturation, err = fieldUint8("MoveToSaturation", "Saturation", el); err != nil {
+				return req, err
+			}
 		case 1:
-			req.TransitionTime = uint16(el.Uint & 0xFFFF)
+			if req.TransitionTime, err = fieldUint16("MoveToSaturation", "TransitionTime", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }
@@ -191,11 +241,17 @@ func decodeMoveToHueAndSaturationFields(dec *tlv.Decoder) (wire.MoveToHueAndSatu
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			req.Hue = uint8(el.Uint & 0xFF)
+			if req.Hue, err = fieldUint8("MoveToHueAndSaturation", "Hue", el); err != nil {
+				return req, err
+			}
 		case 1:
-			req.Saturation = uint8(el.Uint & 0xFF)
+			if req.Saturation, err = fieldUint8("MoveToHueAndSaturation", "Saturation", el); err != nil {
+				return req, err
+			}
 		case 2:
-			req.TransitionTime = uint16(el.Uint & 0xFFFF)
+			if req.TransitionTime, err = fieldUint16("MoveToHueAndSaturation", "TransitionTime", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }
@@ -218,9 +274,13 @@ func decodeMoveToColorTemperatureFields(dec *tlv.Decoder) (wire.MoveToColorTempe
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			req.ColorTemperatureMireds = uint16(el.Uint & 0xFFFF)
+			if req.ColorTemperatureMireds, err = fieldUint16("MoveToColorTemperature", "ColorTemperatureMireds", el); err != nil {
+				return req, err
+			}
 		case 1:
-			req.TransitionTime = uint16(el.Uint & 0xFFFF)
+			if req.TransitionTime, err = fieldUint16("MoveToColorTemperature", "TransitionTime", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }
@@ -291,7 +351,9 @@ func decodeArmFailSafeRequest(dec *tlv.Decoder) (mattercore.ArmFailSafeRequest, 
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			req.ExpiryLengthSeconds = uint16(el.Uint & 0xFFFF)
+			if req.ExpiryLengthSeconds, err = fieldUint16("ArmFailSafe", "ExpiryLengthSeconds", el); err != nil {
+				return req, err
+			}
 		case 1:
 			req.Breadcrumb = el.Uint
 		}
@@ -316,7 +378,9 @@ func decodeSetRegulatoryConfigRequest(dec *tlv.Decoder) (mattercore.SetRegulator
 		}
 		switch uint8(el.Tag.Number & 0xFF) {
 		case 0:
-			req.NewRegulatoryConfig = uint8(el.Uint & 0xFF)
+			if req.NewRegulatoryConfig, err = fieldUint8("SetRegulatoryConfig", "NewRegulatoryConfig", el); err != nil {
+				return req, err
+			}
 		case 1:
 			// CountryCode is a `TlvUTF8String` (char-string[2] per
 			// §11.10.7.4). TLV decoder lands UTF8 in `el.String`,
@@ -384,7 +448,9 @@ func decodeCertificateChainRequest(dec *tlv.Decoder) (mattercore.CertificateChai
 			continue
 		}
 		if uint8(el.Tag.Number&0xFF) == 0 {
-			req.CertificateType = uint8(el.Uint & 0xFF)
+			if req.CertificateType, err = fieldUint8("CertificateChainRequest", "CertificateType", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }
@@ -439,7 +505,9 @@ func decodeAddNOCRequest(dec *tlv.Decoder) (mattercore.AddNOCRequest, error) {
 		case 3:
 			req.CaseAdminSubject = el.Uint
 		case 4:
-			req.AdminVendorID = uint16(el.Uint & 0xFFFF)
+			if req.AdminVendorID, err = fieldUint16("AddNOC", "AdminVendorID", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }
@@ -516,7 +584,9 @@ func decodeRemoveFabricRequest(dec *tlv.Decoder) (mattercore.RemoveFabricRequest
 			continue
 		}
 		if uint8(el.Tag.Number&0xFF) == 0 {
-			req.FabricIndex = uint8(el.Uint & 0xFF)
+			if req.FabricIndex, err = fieldUint8("RemoveFabric", "FabricIndex", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }

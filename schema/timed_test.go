@@ -34,6 +34,9 @@ func TestIsTimedInvoke(t *testing.T) {
 		{"DoorLock/UnlockDoor", 0x0101, 0x01, true},
 		{"DoorLock/UnboltDoor", 0x0101, 0x27, true},
 		{"DoorLock/UnknownCommand", 0x0101, 0x02, false},
+		{"ClosureControl/Stop", 0x0104, 0x0, false},
+		{"ClosureControl/MoveTo", 0x0104, 0x1, true},
+		{"ClosureControl/Calibrate", 0x0104, 0x2, true},
 		{"OnOff/On", 0x0006, 0x0, false},
 		{"BasicInformation/Command0", 0x0028, 0x0, false},
 	}
@@ -146,6 +149,18 @@ func TestTimedInvokeParity(t *testing.T) {
 			file:      "door-lock-cluster.element.ts",
 			want:      map[uint32]struct{}{0x00: {}, 0x01: {}, 0x27: {}},
 			idRange:   0x30,
+		},
+		{
+			// MoveTo is "O T" (closure-control.element.ts:78) and Calibrate
+			// "M T" (:84); Stop (:75) is plain "O". cluster/closure serves
+			// MoveTo, so an untimed MoveTo must answer NEEDS_TIMED_INTERACTION
+			// rather than drive the actuator.
+			name:         "ClosureControl",
+			clusterID:    0x0104,
+			file:         "closure-control.element.ts",
+			want:         map[uint32]struct{}{0x1: {}, 0x2: {}},
+			idRange:      0x10,
+			fullCoverage: true,
 		},
 	}
 

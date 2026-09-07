@@ -13,6 +13,79 @@ long enough for a `v0.1.0` to mean something.
 
 ### Fixed
 
+- **Ongoing event reports were sent on the commissioner's closed Subscribe
+  exchange.** Attribute reports had moved to a bridge-initiated exchange for
+  exactly this failure; event reports still went out with `Initiator=false`
+  on the peer's Subscribe exchange, which a matter.js controller acks and
+  discards (`ExchangeManager.ts:411-418`). Reproduced live with chip-tool.
+  Event reports now take the same bridge-initiated path.
+- **A Sigma1 addressed at a fabric this node does not hold is refused with
+  NoSharedTrustRoots** before any key material is generated
+  (`sigma.ErrNoSharedTrustRoots`; matter.js `CaseServer.ts:88-90,239`).
+  The responder used to fall back to its constructor-time identity and
+  answer a full ECDH/ECDSA/AES round with a Sigma2 the peer could never open.
+- **The CASE adapter's once-only gate armed wrong in both directions:** an
+  idempotent Sigma1 replay re-armed it (a Sigma3 retransmit then displaced
+  the live session), and a second resume handshake on a live adapter never
+  installed its keys. The responder takes a fresh session id for a resume
+  after a completed handshake, and the adapter fires its callback for every
+  resume that yields a new id.
+- **Operational-certificate validity is no longer enforced against the raw
+  wall clock.** matter.js only warns on a NotBefore in the future and never
+  checks NotAfter (`OperationalBase.ts:82-89`, LKGT pending); a bridge whose
+  clock is behind the commissioner's refused AddNOC and every later CASE.
+- **The NOC/ICAC chain verifier enforces the structural predicates of
+  matter.js `Noc.ts` / `Icac.ts`:** NOC not a CA, keyUsage digitalSignature,
+  EKU serverAuth/clientAuth, 20-byte SKID, operational node id, non-zero
+  fabric id, ≤3 CATs with non-zero version; ICAC a CA with keyCertSign|cRLSign,
+  no EKU, no CATs; ICAC fabric id equal to the NOC's; 400-byte TLV cap on the
+  Sigma path. An ICAC minted for fabric A could previously issue a NOC for
+  fabric B under the same root.
+- **The test attestation chain is rooted at the VID-less CSA test PAA**, as
+  matter.js's own generator does (`AttestationCertificateManager.ts:38-44`).
+  Rooted at the FFF1 PAA, every `vendor_id != 0xFFF1` failed the PAA-VID vs
+  PAI-VID check (`DeviceAttestationValidator.ts:328-334`).
+- **`ClosureControl.MoveTo` accepted only a typed struct** and refused the
+  tag map the bridge decodes every command into — no controller could drive
+  a bridged garage. The server accepts the wire shape like valve/modeselect.
+- WindowCovering: ConfigStatus advertised LiftMovementReversed instead of
+  LiftPositionAware and FeatureMap/ClusterRevision were unserved. Thermostat
+  SetpointRaiseLower inverted the Mode enum and read a payload shape the
+  bridge never produces. Identify stored IdentifyTime=0 for every Identify.
+  GroupKeyMap writes stamp the accessing fabric instead of rejecting.
+  DiagnosticLogs timestamps are Matter-epoch / system-time microseconds.
+  `timedInvokePaths` lists ClosureControl MoveTo/Calibrate as timed.
+- Subscriptions report to the peer's current source address instead of the
+  one frozen at Subscribe time; a StatusResponse of InvalidSubscription or
+  Failure ends the subscription; Read/Subscribe responses are bounded (path
+  count, materialised size, duplicate paths coalesced) and an unanswered
+  chunk aborts the read after matter.js's `maxPeerResponseTime`; over-wide
+  integers in command fields are rejected with ConstraintError instead of
+  truncated.
+- reference-bridge: a stale pending fabric index survived
+  CommissioningComplete and reverted the committed fabric on the next
+  fail-safe expiry; the root PartsList named only the aggregator; the light
+  endpoints mount Groups/ScenesManagement and OnOff advertises LT with a
+  timed-on/delayed-off port of `OnOffServer.ts`.
+- The exported commissioning package derived AttestationChallenge from a
+  second HKDF and swapped I2R/R2I; it now runs the one key schedule of
+  §4.13.2.5 like `secure/operational`.
+- `mdns.Diagnose` no longer flags every 172.16.0.0/12 LAN as
+  container-internal (only Docker's 172.17.0.0/16 default); the subtype
+  announcer's `AfterFunc` no longer races `Close`.
+- `parity/schema.json` is re-extracted from the matter.js commit it records
+  (previously it carried the pre-discriminator (tag,id) collapse — RootNode,
+  the switch/controller device types and Pump/WaterValve lost mandatory
+  server-cluster requirements).
+
+### Deprecated
+
+- `mrp.Retransmitter` / `mrp.NewRetransmitter`: no consumer exists;
+  production reliability is `bridge/outbound_reliable.go`. Removed after one
+  deprecation window.
+
+### Fixed
+
 - **The per-fabric ACL cap counted the FabricIndex the client sent, then
   stored every entry on the writer's fabric.** `AccessControl.ACL` writes
   filtered the count to entries whose FabricIndex matched the writer's (or

@@ -503,10 +503,13 @@ type Bridge struct {
 
 	// sessionPeerAddrs remembers the last authenticated UDP source
 	// address per secure session (sessionID → *net.UDPAddr), fed by
-	// the Secure-Channel receive router. The outbound CloseSession
-	// sender routes on it; matter.js keeps the equivalent association
-	// on the session itself via its MessageChannel
-	// (packages/protocol/src/session/Session.ts, `get channel()`).
+	// the receive pipeline for every datagram that decrypts under the
+	// session. The outbound CloseSession sender and the ongoing
+	// subscription reporters route on it; matter.js keeps the
+	// equivalent association on the session itself via its
+	// MessageChannel (packages/protocol/src/session/Session.ts,
+	// `get channel()`) and refreshes it from inbound traffic
+	// (ExchangeManager.ts:400-405).
 	// Entries are dropped on an inbound CloseSession and on every
 	// graceful close the operational manager notifies. Teardown paths
 	// that skip that notifier (fabric removal, NOC rotation, manager
@@ -515,6 +518,26 @@ type Bridge struct {
 	// overwrites it on its first authenticated datagram, so the map
 	// stays bounded and cannot outlive a reuse.
 	sessionPeerAddrs sync.Map
+
+	// reportExchangeOwner maps the bridge-initiated exchange an ongoing
+	// subscription report currently rides ([mrp.ExchangeKey] with
+	// Initiator=true, the bridge's role) to the owning subscription ID,
+	// so the peer's IM StatusResponse on that exchange can be attributed
+	// back to the subscription. subReportExchange is the reverse map
+	// (subID → key) that keeps the table at one entry per live
+	// subscription: a new report replaces the previous exchange, and
+	// every reap path drops both halves. matter.js keeps the same
+	// association as ServerSubscription.#currentSendExchange.
+	//
+	// map[mrp.ExchangeKey]uint32 / map[uint32]mrp.ExchangeKey
+	reportExchangeOwner sync.Map
+	subReportExchange   sync.Map
+
+	// chunkStatusResponseTimeoutOverride pins the per-chunk
+	// StatusResponse wait bound ([Bridge.chunkStatusResponseTimeout])
+	// for tests that must not sit through the derived MRP worst case;
+	// zero (production) derives it.
+	chunkStatusResponseTimeoutOverride time.Duration
 }
 
 // New constructs a Bridge. The snapshotter is required; when advertiser

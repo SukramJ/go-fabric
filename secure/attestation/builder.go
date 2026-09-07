@@ -113,7 +113,18 @@ func BuildTestChain(vid, pid uint16) (*Chain, error) {
 		return nil, fmt.Errorf("dac keygen: %w", err)
 	}
 
-	paaCert, err := x509.ParseCertificate(TestPAAFFF1Cert)
+	// The PAI is rooted at the VID-less CSA test PAA, never at the
+	// VID-0xFFF1 one: the attestation validator compares the PAA's
+	// subject VID with the PAI's when the PAA carries one (matter.js
+	// DeviceAttestationValidator.ts:328-334 VendorIdMismatch, Matter
+	// §6.2.3.1 step 4), so a PAI whose subject VID is the operator's
+	// vendor id under the FFF1 PAA fails attestation for every
+	// vendor_id != 0xFFF1 — exactly the value a production operator is
+	// told to set. matter.js's own device-side generator roots every PAI
+	// at the NoVID PAA for this reason (AttestationCertificateManager.ts:
+	// 38-44 #paaKeyPair / #paaKeyIdentifier, :121-123 issuer without
+	// vendorId, :136-139 signed by the NoVID key).
+	paaCert, err := x509.ParseCertificate(TestPAANoVIDCert)
 	if err != nil {
 		return nil, fmt.Errorf("parse PAA: %w", err)
 	}
@@ -139,10 +150,10 @@ func BuildTestChain(vid, pid uint16) (*Chain, error) {
 		MaxPathLen:            0,
 		MaxPathLenZero:        true,
 		SubjectKeyId:          paiSKID,
-		AuthorityKeyId:        TestPAAFFF1SKID,
+		AuthorityKeyId:        TestPAANoVIDSKID,
 		SignatureAlgorithm:    x509.ECDSAWithSHA256,
 	}
-	paiDER, err := x509.CreateCertificate(rand.Reader, paiTmpl, paaCert, &paiKey.PublicKey, TestPAAFFF1PrivateKey)
+	paiDER, err := x509.CreateCertificate(rand.Reader, paiTmpl, paaCert, &paiKey.PublicKey, TestPAANoVIDPrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("pai sign: %w", err)
 	}

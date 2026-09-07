@@ -26,7 +26,15 @@ import (
 // coverage job (make coverage runs without -race), so behavioural
 // coverage is preserved — only the -race path skips them. Remove this
 // guard once the mDNS dependency is bumped to a race-free release/fork.
+//
+// Set GO_FABRIC_MDNS_RACE=1 to run the package under the detector anyway.
+// That is how the responder's own lifecycle races are proven: the tests
+// that need it build socket-backed responders without touching
+// grandcat/zeroconf, so the upstream race stays out of the picture.
 func TestMain(m *testing.M) {
+	if os.Getenv("GO_FABRIC_MDNS_RACE") != "" {
+		os.Exit(m.Run())
+	}
 	fmt.Fprintln(os.Stderr,
 		"mdns: skipped under -race (grandcat/zeroconf v1.0.0 internal Shutdown/recv race); "+
 			"run without -race for full coverage")

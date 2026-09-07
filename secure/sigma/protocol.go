@@ -652,6 +652,18 @@ func (r *Responder) ProcessSigma1WithResume(sigma1Bytes []byte) (Sigma1ProcessRe
 	if r.resumptionStore != nil &&
 		len(sigma1.ResumptionID) == ResumptionIDSize &&
 		len(sigma1.InitiatorResumeMIC) == ResumptionIDSize {
+		// A resume that lands on a responder which already completed a
+		// handshake is a second session on this exchange: the id it
+		// announced is occupied by the session the first handshake
+		// established, and announcing it again would hand the peer a
+		// slot whose keys are the old ones. Take a fresh id first, as
+		// the full path does for its second handshake and as matter.js
+		// CaseServer.ts:173 does per Sigma1 (getNextAvailableSessionId).
+		if r.state == responderStateFinished && r.sessionIDRenewer != nil {
+			if next, ok := r.sessionIDRenewer(r.sessionID); ok {
+				r.sessionID = next
+			}
+		}
 		result, ok, resumeErr := r.tryResume(sigma1)
 		if resumeErr != nil {
 			// Crypto / KDF failure on an otherwise matching resumption
@@ -947,17 +959,23 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (Sigma2, error) { //
 	// HMAC(opIPK, random||rootPub||fabricID||nodeID) tells us which
 	// fabric the initiator is addressing. The daemon-side resolver
 	// iterates every persisted fabric, computes the candidate
-	// destinationID, and returns the matching identity. A miss falls
-	// back to the constructor-time identity (single-fabric / test
-	// path); production callers should treat the miss as "no shared
-	// trust roots" and reject the exchange, but we keep the fallback
-	// here so the per-exchange CaseAdapter can still process Sigma1
-	// during the brief pre-AddNOC window when only one fabric exists.
+	// destinationID, and returns the matching identity. A miss is a
+	// refusal: the initiator addressed a fabric this node does not
+	// hold, so no Sigma2 it could decrypt exists, and answering one
+	// under the constructor-time identity costs a full ECDH/ECDSA/AES
+	// round per datagram for a reply the peer only ever fails to open.
+	// Mirrors matter.js CaseServer.ts:239 (findFabricFromDestinationId
+	// throws before any key generation) and :88-90 (StatusReport
+	// NoSharedTrustRoots). A responder without a resolver keeps its
+	// single constructor-time identity (single-fabric / test path).
 	if r.identityResolver != nil {
-		if id, ver, ok := r.identityResolver.ResolveSigma1Destination(sigma1.DestinationID, sigma1.InitiatorRandom); ok {
-			r.identity = id
-			r.verifier = ver
+		id, ver, ok := r.identityResolver.ResolveSigma1Destination(sigma1.DestinationID, sigma1.InitiatorRandom)
+		if !ok {
+			r.state = responderStateFailed
+			return Sigma2{}, ErrNoSharedTrustRoots
 		}
+		r.identity = id
+		r.verifier = ver
 	}
 	r.sigma1Bytes = append([]byte(nil), sigma1Bytes...)
 	r.initEphPub = append([]byte(nil), sigma1.InitiatorEphPubKey...)

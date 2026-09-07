@@ -35,6 +35,14 @@ var timedInvokePaths = map[uint32]map[uint32]struct{}{
 		0x01: {}, // UnlockDoor
 		0x27: {}, // UnboltDoor
 	},
+	// ClosureControl (0x0104) — MoveTo is "O T", Calibrate "M T"; Stop is
+	// plain "O". cluster/closure serves MoveTo, so an untimed MoveTo has
+	// to answer NEEDS_TIMED_INTERACTION instead of driving the actuator.
+	// ../matter.js/packages/model/src/standard/elements/closure-control.element.ts:78,84
+	0x0104: {
+		0x1: {}, // MoveTo
+		0x2: {}, // Calibrate
+	},
 }
 
 // IsTimedInvoke reports whether the (cluster, command) pair is timed-required

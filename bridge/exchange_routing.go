@@ -110,7 +110,8 @@ type exchangeRouting struct {
 	// StatusResponse branch), and torn down by the caller's
 	// [Bridge.disarmStatusResponseWait] on timeout / completion.
 	//
-	// map[mrp.ExchangeKey]chan struct{}
+	// map[mrp.ExchangeKey]chan im.StatusCode (buffered 1, carries the
+	// status the peer answered with)
 	statusResponseWaits sync.Map
 }
 

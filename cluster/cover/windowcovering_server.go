@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -26,6 +27,10 @@ import (
 // ClusterRevision is the WindowCovering cluster revision this server
 // implements. Matched against matter.js HEAD window-covering.element.ts.
 const ClusterRevision uint16 = 8
+
+// goToLiftPercentageFieldValue is the LiftPercent100thsValue context tag
+// (window-covering-cluster.element.ts:95, id 0x0).
+const goToLiftPercentageFieldValue uint8 = 0
 
 // Config carries the initial state and type-specific attributes for a
 // [WindowCoveringServer].
@@ -93,8 +98,7 @@ func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
 	case wire.WindowCoveringAttrType:
 		return s.wcType, true
 	case wire.WindowCoveringAttrConfigStatus:
-		// 0x05 = Operational | LiftPositionAware.
-		return uint8(0x05), true
+		return configStatusOperational | configStatusLiftPositionAware, true
 	case wire.WindowCoveringAttrCurrentPositionLiftPercentage:
 		// Deprecated uint8 field (0x0008); return scaled-down value for
 		// backward compatibility with Matter 1.0 controllers.
@@ -111,10 +115,33 @@ func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
 		return s.wcMode, true
 	case wire.WindowCoveringAttrSafetyStatus:
 		return uint16(0), true
+	case cluster.AttrGlobalFeatureMap:
+		// The dispatcher synthesises only the list-valued globals; a
+		// server that leaves FeatureMap and ClusterRevision to it answers
+		// UnsupportedAttribute on every wildcard read.
+		return s.featureMap, true
+	case cluster.AttrGlobalClusterRevision:
+		return ClusterRevision, true
 	default:
 		return nil, false
 	}
 }
+
+// ConfigStatusBitmap bit positions, from the datatype's per-field
+// constraint in matter.js
+// packages/model/src/standard/elements/window-covering-cluster.element.ts:109-116.
+// The bits are read from the element file, not counted from the field
+// order: OnlineReserved (bit 1, conformance D) and LiftMovementReversed
+// (bit 2) sit between the two this server sets.
+//
+// matter.js WindowCoveringServer.ts:121-125 initialize() sets Operational
+// and, for a position-aware lift, LiftPositionAware; LiftMovementReversed
+// is only ever derived from Mode.MotorDirectionReversed
+// (WindowCoveringServer.ts:189), which this server never sets.
+const (
+	configStatusOperational       uint8 = 1 << 0 // constraint "0", element :110
+	configStatusLiftPositionAware uint8 = 1 << 3 // constraint "3", element :113
+)
 
 // windowCoveringConstraintErr is a typed [im.StatusCodeError] for
 // writes that violate the "max 10000" constraint on percent100ths attributes.
@@ -209,16 +236,38 @@ func (s *WindowCoveringServer) MatterAttributes() []uint32 {
 	}
 }
 
-// extractPercent100ths pulls a uint16 percent100ths value from the
-// GoToLiftPercentage command fields. The bridge may deliver a bare
-// uint16 or a map with a "percent" key. Values > 10000 are rejected
-// with ConstraintError per matter.js window-covering-cluster.element.ts:72
-// constraint "max 10000" on liftPercent100thsValue.
+// extractPercent100ths pulls the LiftPercent100thsValue (field 0,
+// window-covering-cluster.element.ts:95) out of the GoToLiftPercentage
+// command fields. The bridge has no typed decoder for this cluster, so a
+// real invocation arrives as the tag-keyed map its generic salvage path
+// produces (bridge/fields_reader.go decodeGenericTagMap) with the value as
+// uint64; a host that decodes the command itself may pass
+// [wire.GoToLiftPercentageRequest], and the bare uint16 and the
+// "percent"-keyed map stay accepted for direct callers. Values > 10000
+// are rejected with ConstraintError per
+// window-covering-cluster.element.ts:72 constraint "max 10000".
 func extractPercent100ths(fields any) (uint16, error) {
 	var pct uint16
 	switch v := fields.(type) {
 	case uint16:
 		pct = v
+	case wire.GoToLiftPercentageRequest:
+		pct = v.LiftPercent100thsValue
+	case *wire.GoToLiftPercentageRequest:
+		if v == nil {
+			return 0, errors.New("windowcovering: GoToLiftPercentage carried no fields")
+		}
+		pct = v.LiftPercent100thsValue
+	case map[uint8]any:
+		raw, ok := v[goToLiftPercentageFieldValue]
+		if !ok {
+			return 0, errors.New("windowcovering: GoToLiftPercentage missing LiftPercent100thsValue (field 0)")
+		}
+		n, isUint := raw.(uint64)
+		if !isUint || n > math.MaxUint16 {
+			return 0, fmt.Errorf("windowcovering: GoToLiftPercentage LiftPercent100thsValue %v (%T) is not a uint16", raw, raw)
+		}
+		pct = uint16(n)
 	case map[string]any:
 		raw, ok := v["percent"]
 		if !ok {
@@ -230,7 +279,7 @@ func extractPercent100ths(fields any) (uint16, error) {
 			return 0, fmt.Errorf("windowcovering: GoToLiftPercentage percent expected uint16, got %T", raw)
 		}
 	default:
-		return 0, fmt.Errorf("windowcovering: GoToLiftPercentage expected uint16 or map[string]any, got %T", fields)
+		return 0, fmt.Errorf("windowcovering: GoToLiftPercentage expected map[uint8]any, wire.GoToLiftPercentageRequest, uint16 or map[string]any, got %T", fields)
 	}
 	// Constraint max 10000 per matter.js window-covering-cluster.element.ts:72.
 	if pct > 10000 {

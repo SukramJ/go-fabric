@@ -11,11 +11,18 @@ import (
 )
 
 // TestParity_WindowCovering_ConfigStatus_Bitmap verifies that
-// ConfigStatus (0x0007) advertises bit 0 (Operational) and bit 2
-// (LiftPositionAware) — the minimum bitmap for a position-aware
-// lift-only cover. Mirrors matter.js
-// packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:
-// configStatus initial value 0x05 when LF+PA_LF features are active.
+// ConfigStatus (0x0007) advertises Operational and LiftPositionAware —
+// the bitmap matter.js derives for a position-aware lift-only cover
+// (packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:121-125
+// sets operational and liftPositionAware in initialize()) — and does not
+// claim LiftMovementReversed, which matter.js only sets from
+// Mode.MotorDirectionReversed (WindowCoveringServer.ts:189).
+//
+// Bit positions come from the ConfigStatusBitmap datatype in
+// packages/model/src/standard/elements/window-covering-cluster.element.ts:109-116:
+// Operational constraint "0", OnlineReserved "1", LiftMovementReversed "2",
+// LiftPositionAware "3". Bits are sparse-by-name here, so they are read
+// from the element file rather than counted from the field order.
 func TestParity_WindowCovering_ConfigStatus_Bitmap(t *testing.T) {
 	t.Parallel()
 	srv := cover.NewWindowCoveringServer(cover.Config{
@@ -30,11 +37,15 @@ func TestParity_WindowCovering_ConfigStatus_Bitmap(t *testing.T) {
 	}
 	got := v.(uint8)
 	const (
-		bitOperational   uint8 = 1 << 0 // bit 0 per Matter §5.3.6.7
-		bitLiftPosAware  uint8 = 1 << 2 // bit 2
-		wantConfigStatus       = bitOperational | bitLiftPosAware
+		bitOperational          uint8 = 1 << 0 // window-covering-cluster.element.ts:110 constraint "0"
+		bitLiftMovementReversed uint8 = 1 << 2 // window-covering-cluster.element.ts:112 constraint "2"
+		bitLiftPosAware         uint8 = 1 << 3 // window-covering-cluster.element.ts:113 constraint "3"
+		wantConfigStatus              = bitOperational | bitLiftPosAware
 	)
-	if got&wantConfigStatus != wantConfigStatus {
-		t.Errorf("ConfigStatus = 0x%02X, want bits 0x%02X set", got, wantConfigStatus)
+	if got != wantConfigStatus {
+		t.Errorf("ConfigStatus = 0x%02X, want 0x%02X (Operational | LiftPositionAware)", got, wantConfigStatus)
+	}
+	if got&bitLiftMovementReversed != 0 {
+		t.Errorf("ConfigStatus = 0x%02X claims LiftMovementReversed (bit 2); matter.js sets that only from Mode.MotorDirectionReversed", got)
 	}
 }
