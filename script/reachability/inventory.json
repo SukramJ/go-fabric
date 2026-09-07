@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3240,
+  "entry_points": 3249,
   "entry_packages": [
     ".",
     "bootid",
@@ -50,9 +50,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2809,
-    "reachable": 1357,
-    "whitelisted": 1443,
+    "total_exported": 2820,
+    "reachable": 1360,
+    "whitelisted": 1451,
     "unreachable": 9
   },
   "by_package": [
@@ -2945,6 +2945,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestOperationalSessionLookupPASEResolver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_resolver_test.go",
+      "line": 12
+    },
+    {
+      "package": "bridge",
       "identifier": "TestOperationalSessionLookup_ActivityMarkers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/session_activity_test.go",
@@ -3544,6 +3551,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handlers_extra_test.go",
       "line": 104
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReadAuthorizedResults_AdoptedPASEKeepsAdminister",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_adopted_subscribe_acl_test.go",
+      "line": 21
     },
     {
       "package": "bridge",
@@ -4695,6 +4709,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestCheckACL_AdoptedPASESessionKeepsAdminister",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/pase_adopted_fabric_acl_test.go",
+      "line": 23
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestClusterDataVersion_WithVersion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
@@ -5325,6 +5346,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestAuthorizeEventReports_AdoptedPASESessionKeepsAdminister",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/event_authorization_test.go",
+      "line": 213
+    },
+    {
+      "package": "im",
       "identifier": "TestAuthorizeEventReports_FabricSensitiveCrossFabricDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_authorization_test.go",
@@ -5864,6 +5892,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestIsPASEFromContextDefaultsFalse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/pase_authmode_acl_test.go",
+      "line": 130
+    },
+    {
+      "package": "im",
       "identifier": "TestMatchDataVersionFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/dataversion_test.go",
@@ -5917,6 +5952,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/timed_status_test.go",
       "line": 142
+    },
+    {
+      "package": "im",
+      "identifier": "TestPASEAdoptedSessionKeepsAdministerOnInvoke",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/pase_authmode_acl_test.go",
+      "line": 107
+    },
+    {
+      "package": "im",
+      "identifier": "TestPASEAdoptedSessionKeepsAdministerOnRead",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/pase_authmode_acl_test.go",
+      "line": 61
+    },
+    {
+      "package": "im",
+      "identifier": "TestPASEAdoptedSessionKeepsAdministerOnWrite",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/pase_authmode_acl_test.go",
+      "line": 84
     },
     {
       "package": "im",

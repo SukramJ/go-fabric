@@ -434,6 +434,12 @@ func wireSecurity(
 			return 0, nil, false
 		}
 		return entry.Session.PeerNodeID(), entry.Session.PeerCATs(), true
+	}).WithPASEResolver(func(id uint16) (bool, bool) {
+		entry, err := sessions.Get(id)
+		if err != nil || entry == nil {
+			return false, false
+		}
+		return entry.IsPASE(), true
 	}).WithActivityMarkers(
 		func(id uint16) {
 			if e, err := sessions.Get(id); err == nil && e != nil {

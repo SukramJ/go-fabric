@@ -771,6 +771,7 @@ type OperationalSessionLookup struct {
 	get         func(sessionID uint16) (*channel.Session, bool)
 	fabricFor   func(sessionID uint16) (uint8, bool)
 	subjectFor  func(sessionID uint16) (uint64, []uint32, bool)
+	paseFor     func(sessionID uint16) (bool, bool)
 	intervalFor func(sessionID uint16, now time.Time) (time.Duration, bool)
 	markRx      func(sessionID uint16)
 	markTx      func(sessionID uint16)
@@ -827,6 +828,21 @@ type SessionActivityMarker interface {
 // Subjects list is empty (the fabric-wide wildcard).
 type SessionSubjectResolver interface {
 	SubjectFor(sessionID uint16) (nodeID uint64, cats []uint32, ok bool)
+}
+
+// SessionPASEResolver is an optional capability a [SessionLookup] can
+// implement so the bridge can tell whether a session was established
+// over PASE. It cannot be inferred from the FabricIndex: AddNOC adopts
+// the commissioner's PASE session onto the freshly built fabric
+// (matter.js packages/node/src/behaviors/operational-credentials/
+// OperationalCredentialsServer.ts:266-270 `session.fabric = fabric`),
+// after which the session reports a non-zero fabric while still being
+// PASE and still carrying the implicit Administer grant
+// (FabricAccessControl.ts:189-191). Returning (_, false) signals
+// "session not known" — the request is then evaluated by the ordinary
+// ACL path, never handed Administer.
+type SessionPASEResolver interface {
+	IsPASE(sessionID uint16) (pase, ok bool)
 }
 
 // NewOperationalSessionLookup builds the adapter. The `get` closure
@@ -930,6 +946,31 @@ func (l *OperationalSessionLookup) SubjectFor(sessionID uint16) (nodeID uint64, 
 		return 0, nil, false
 	}
 	return l.subjectFor(sessionID)
+}
+
+// WithPASEResolver wires the optional IsPASE side of the adapter. Pass
+// a closure returning `(entry.IsPASE(), true)` for known sessions and
+// `(false, false)` for unknown ones — typically
+// `operational.Entry.IsPASE`. Returns the receiver so callers can
+// chain. Without it every IsPASE answers (false, false) and a PASE
+// session adopted onto a fabric by AddNOC loses its implicit Administer
+// grant on the next request.
+func (l *OperationalSessionLookup) WithPASEResolver(paseFor func(sessionID uint16) (bool, bool)) *OperationalSessionLookup {
+	if l == nil {
+		return nil
+	}
+	l.paseFor = paseFor
+	return l
+}
+
+// IsPASE implements [SessionPASEResolver]. Returns (false, false) when
+// the adapter was built without a PASE resolver closure or the session
+// is unknown.
+func (l *OperationalSessionLookup) IsPASE(sessionID uint16) (pase, ok bool) {
+	if l == nil || l.paseFor == nil {
+		return false, false
+	}
+	return l.paseFor(sessionID)
 }
 
 // WithActivityMarkers wires the optional [SessionActivityMarker] side of

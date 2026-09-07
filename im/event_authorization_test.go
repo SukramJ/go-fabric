@@ -203,3 +203,28 @@ func TestEventPayloadFabricIndex(t *testing.T) {
 		})
 	}
 }
+
+// TestAuthorizeEventReports_AdoptedPASESessionKeepsAdminister verifies that a
+// PASE session AddNOC adopted onto fabric 2 (FabricIndex != 0, PASE set —
+// either on the authorizer or stamped into ctx) keeps the commissioning
+// channel's implicit Administer grant: the AccessControl event of fabric 1
+// is disclosed although the ACL grants nothing on fabric 2. The CASE
+// negative control (same fabric, no PASE marker) is denied.
+func TestAuthorizeEventReports_AdoptedPASESessionKeepsAdminister(t *testing.T) {
+	t.Parallel()
+	in := []EventReport{acEventReport(1), plainEventReport()}
+	checker := fakeEventACL{allowFabric: 1, maxPriv: 5} // nothing on fabric 2
+
+	got := AuthorizeEventReports(context.Background(), EventReadAuthorizer{Checker: checker, FabricIndex: 2, PASE: true}, in)
+	if len(got) != 2 {
+		t.Fatalf("adopted PASE (authorizer flag): want 2 events, got %d", len(got))
+	}
+	got = AuthorizeEventReports(WithAuthModePASE(context.Background()), EventReadAuthorizer{Checker: checker, FabricIndex: 2}, in)
+	if len(got) != 2 {
+		t.Fatalf("adopted PASE (ctx stamp): want 2 events, got %d", len(got))
+	}
+	got = AuthorizeEventReports(context.Background(), EventReadAuthorizer{Checker: checker, FabricIndex: 2}, in)
+	if len(got) != 0 {
+		t.Fatalf("CASE on fabric 2 without grant (negative control): want 0 events, got %d", len(got))
+	}
+}

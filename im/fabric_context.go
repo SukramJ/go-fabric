@@ -86,3 +86,43 @@ func SubjectFromContext(ctx context.Context) (nodeID uint64, cats []uint32) {
 	}
 	return v.nodeID, v.cats
 }
+
+// authModePASEContext marks a request as arriving over a PASE
+// (commissioning) session. It is carried separately from the
+// FabricIndex because the two stop agreeing the moment AddNOC
+// succeeds: OperationalCredentials associates the freshly built fabric
+// with the very PASE session that issued the command
+// (matter.js packages/node/src/behaviors/operational-credentials/
+// OperationalCredentialsServer.ts:266-270 `session.fabric = fabric`),
+// so from then on the session reports a non-zero FabricIndex while
+// still being a PASE session.
+type authModePASEContext struct{}
+
+type authModePASECtxKey struct{}
+
+// WithAuthModePASE stamps "this request arrived over a PASE session"
+// into ctx. The IM ACL gates read it via [IsPASEFromContext] and grant
+// the implicit Administer privilege the commissioning channel carries,
+// independent of the session's FabricIndex.
+//
+// Mirrors matter.js packages/protocol/src/interaction/
+// FabricAccessControl.ts:189-191 — `subjectDesc.authMode ===
+// AccessControl.AccessControlEntryAuthMode.Pase &&
+// subjectDesc.isCommissioning` grants AccessLevel.Administer before any
+// ACL entry is consulted. Keying that grant on `fabricIndex == 0`
+// instead loses it at AddNOC, and the default `[CaseAdminSubject]` ACE
+// never covers subject node-id 0 — so every follow-up ACL write,
+// GroupKeySetWrite or other Administer command a commissioner sends
+// over the same PASE channel would answer UnsupportedAccess.
+func WithAuthModePASE(ctx context.Context) context.Context {
+	return context.WithValue(ctx, authModePASECtxKey{}, authModePASEContext{})
+}
+
+// IsPASEFromContext reports whether the request arrived over a PASE
+// session, as stamped by [WithAuthModePASE]. Returns false when no
+// auth mode is present — the safe default, which leaves the request to
+// the ordinary ACL evaluation rather than handing it Administer.
+func IsPASEFromContext(ctx context.Context) bool {
+	_, ok := ctx.Value(authModePASECtxKey{}).(authModePASEContext)
+	return ok
+}

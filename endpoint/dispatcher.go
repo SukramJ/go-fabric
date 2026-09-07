@@ -784,8 +784,17 @@ const FabricIndexUnresolvable uint8 = 255
 // when the requesting fabric holds a CASE ACL entry whose subject covers
 // (subjectNodeID, subjectCATs), whose target covers (endpoint, clusterID),
 // and whose privilege is at least requiredPrivilege; otherwise it returns
-// UnsupportedAccess (0x7e). PASE sessions (fabricIndex 0) are already
-// bypassed by the IM gate before this is called.
+// UnsupportedAccess (0x7e). PASE sessions are already bypassed by the IM
+// gate before this is called; the same grant is repeated here so a direct
+// caller cannot lose it. It is keyed on the session's AUTH MODE as well as
+// on fabricIndex 0, because AddNOC adopts the commissioner's PASE session
+// onto the new fabric (matter.js OperationalCredentialsServer.ts:266-270
+// `session.fabric = fabric`) while the implicit Administer grant stays
+// (FabricAccessControl.ts:189-191 `authMode === Pase && isCommissioning`).
+// Without the auth-mode term every post-AddNOC ACL write, GroupKeySetWrite
+// or other Administer command over that channel is evaluated as fabric N
+// with subject node-id 0, which the default `[CaseAdminSubject]` ACE never
+// matches — UnsupportedAccess.
 //
 // Every path that is not an explicit grant denies, including the one where
 // no ACL source is wired at all — see [TopologyDispatcher.SetACLLister].
@@ -799,8 +808,8 @@ const FabricIndexUnresolvable uint8 = 255
 // 0xFFFF'FFFD'0000'0000..0xFFFF'FFFD'FFFF'FFFF) match via
 // [matchesCATSubject] against the requester's CAT set.
 func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, subjectNodeID uint64, subjectCATs []uint32, endpoint uint16, clusterID uint32, requiredPrivilege uint8) im.StatusCode {
-	if fabricIndex == 0 {
-		return im.StatusSuccess // PASE / no fabric — commissioning
+	if fabricIndex == 0 || im.IsPASEFromContext(ctx) {
+		return im.StatusSuccess // PASE — commissioning channel, implicit Administer
 	}
 	if d == nil || d.acl == nil {
 		// Fail closed. A dispatcher without an ACL source cannot tell an
