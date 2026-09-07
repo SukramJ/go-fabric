@@ -169,10 +169,23 @@ func (r *SubtypeResponder) Announce() {
 // unsolicited mDNS response and fans it out over every
 // multicast-capable interface on both address families. ttl 0 turns
 // the packet into a goodbye.
+//
+// The send runs under lifecycleMu: [Zeroconf.announceSubtypes] schedules a
+// second Announce a full second after Publish, untracked by the WaitGroup,
+// and [SubtypeResponder.Close] nils pc4 / pc6 under that same lock. Reading
+// the handles unlocked here raced that write — the closing advertiser could
+// pull the conn out from under a fan-out already past its nil check. The
+// receive loops never come through here (they reply via writeMulticastV4/V6
+// and are waited for inside Close), so holding the lock cannot deadlock.
 func (r *SubtypeResponder) multicastPTRs(ptrs map[string]string, ttl uint32) {
 	out, err := packSubtypePTRs(ptrs, ttl)
 	if err != nil {
 		r.logger.Debug("matter.mdns.subtype.announce_pack_err", slog.String("err", err.Error()))
+		return
+	}
+	r.lifecycleMu.Lock()
+	defer r.lifecycleMu.Unlock()
+	if r.closed {
 		return
 	}
 	if r.pc4 != nil {

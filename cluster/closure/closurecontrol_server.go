@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -293,9 +294,11 @@ func (s *ControlServer) checkPositionSupported(p wire.ClosureTargetPosition) err
 	return nil
 }
 
-// moveToRequest normalises the decoded command payload the bridge hands
-// over. It accepts the decoded struct and the raw TLV both, mirroring the
-// WindowCovering server's tolerance for either shape.
+// moveToRequest normalises the command payload the bridge hands over.
+// The bridge has no typed decoder for this cluster, so a real invocation
+// arrives as the tag-keyed map its generic salvage path produces
+// (bridge/fields_reader.go decodeGenericTagMap); a host that decodes the
+// command itself may pass [wire.MoveToRequest] or the raw TLV.
 func moveToRequest(fields any) (wire.MoveToRequest, error) {
 	switch v := fields.(type) {
 	case wire.MoveToRequest:
@@ -307,11 +310,60 @@ func moveToRequest(fields any) (wire.MoveToRequest, error) {
 		return *v, nil
 	case []byte:
 		return wire.DecodeClosureMoveTo(v)
+	case map[uint8]any:
+		return moveToRequestFromTagMap(v)
 	default:
 		return wire.MoveToRequest{}, fmt.Errorf(
-			"closurecontrol: MoveTo expected wire.MoveToRequest or []byte, got %T", fields,
+			"closurecontrol: MoveTo expected wire.MoveToRequest, map[uint8]any or []byte, got %T", fields,
 		)
 	}
+}
+
+// MoveTo field tags (closure-control.element.ts:79-81).
+const (
+	moveToFieldPosition uint8 = 0
+	moveToFieldLatch    uint8 = 1
+	moveToFieldSpeed    uint8 = 2
+)
+
+// moveToRequestFromTagMap reads the three "O.a+" MoveTo fields out of the
+// generic tag map. Unsigned TLV integers surface as uint64 and an explicit
+// null keeps its tag with a nil value (decodeGenericTagMap), which counts
+// as absent here — the same reading [wire.DecodeClosureMoveTo] gives a
+// null element. A map carrying none of the three fields is malformed for
+// the same reason the TLV decoder says so: at least one is mandatory.
+func moveToRequestFromTagMap(m map[uint8]any) (wire.MoveToRequest, error) {
+	var req wire.MoveToRequest
+	if raw, present := m[moveToFieldPosition]; present && raw != nil {
+		// TargetPositionEnum is enum8: a wider value is a malformed field,
+		// not a large position.
+		n, ok := raw.(uint64)
+		if !ok || n > math.MaxUint8 {
+			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+		}
+		pos := wire.ClosureTargetPosition(n)
+		req.Position = &pos
+	}
+	if raw, present := m[moveToFieldLatch]; present && raw != nil {
+		latch, ok := raw.(bool)
+		if !ok {
+			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+		}
+		req.Latch = &latch
+	}
+	if raw, present := m[moveToFieldSpeed]; present && raw != nil {
+		// ThreeLevelAutoEnum is enum8; same reasoning as Position.
+		n, ok := raw.(uint64)
+		if !ok || n > math.MaxUint8 {
+			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+		}
+		speed := uint8(n)
+		req.Speed = &speed
+	}
+	if req.Position == nil && req.Latch == nil && req.Speed == nil {
+		return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+	}
+	return req, nil
 }
 
 // MatterReportable lists the attributes that change at runtime and need

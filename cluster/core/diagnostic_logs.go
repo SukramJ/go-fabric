@@ -82,15 +82,32 @@ const (
 
 // RetrieveLogsResponse mirrors the response shape (Matter §11.11.7.2).
 type RetrieveLogsResponse struct {
-	Status        uint8
-	LogContent    []byte
-	UTCTimeStamp  uint64
+	Status     uint8
+	LogContent []byte
+	// UTCTimeStamp is epoch-us (diagnostic-logs.element.ts:36):
+	// microseconds since the Matter epoch 2000-01-01T00:00:00Z, the same
+	// unit TimeSynchronization.UTCTime reports.
+	UTCTimeStamp uint64
+	// TimeSinceBoot is systime-us (diagnostic-logs.element.ts:37):
+	// microseconds since the boot epoch.
 	TimeSinceBoot uint64
+}
+
+// matterEpochMicros converts a wall-clock instant to Matter epoch-us
+// (§A.2: epoch 2000-01-01 00:00:00 UTC, 946684800 s after the Unix
+// epoch). A pre-epoch host clock yields 0 rather than wrapping.
+func matterEpochMicros(t time.Time) uint64 {
+	const matterEpochOffsetSec int64 = 946684800
+	micros := t.UnixMicro() - matterEpochOffsetSec*1_000_000
+	if micros < 0 {
+		return 0
+	}
+	return uint64(micros)
 }
 
 // NewDiagnosticLogs returns a cluster server with the boot epoch
 // stamped to "now" — the TimeSinceBoot field on responses tracks
-// nanoseconds since this point. Operators that need a precise boot
+// microseconds since this point. Operators that need a precise boot
 // epoch can override it via [DiagnosticLogs.SetBootEpoch].
 func NewDiagnosticLogs() *DiagnosticLogs {
 	return &DiagnosticLogs{bootEpoch: time.Now()}
@@ -162,8 +179,8 @@ func (d *DiagnosticLogs) MatterInvoke(ctx context.Context, cmdID uint32, fields 
 	resp := RetrieveLogsResponse{
 		Status:        LogStatusNoLogs,
 		LogContent:    []byte{},
-		UTCTimeStamp:  uint64(time.Now().UnixNano()),               //nolint:gosec // wall clock; uint64 wide enough until year 2554; see #20
-		TimeSinceBoot: uint64(time.Since(bootEpoch).Nanoseconds()), //nolint:gosec // monotonic-ish; uint64 wide enough; see #20
+		UTCTimeStamp:  matterEpochMicros(time.Now()),
+		TimeSinceBoot: uint64(time.Since(bootEpoch).Microseconds()), //nolint:gosec // systime-us; uint64 wide enough; see #20
 	}
 
 	if provider == nil {

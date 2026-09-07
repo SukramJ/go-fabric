@@ -202,9 +202,15 @@ func TestDiagLogs_SetBootEpoch(t *testing.T) {
 		t.Fatalf("MatterInvoke: %v", err)
 	}
 	r := resp.(core.RetrieveLogsResponse)
-	// TimeSinceBoot should reflect the ~5 s offset (at least 4 s in practice).
-	if r.TimeSinceBoot < uint64(4*time.Second) {
-		t.Fatalf("TimeSinceBoot = %d ns, want >= 4s (boot epoch shifted)", r.TimeSinceBoot)
+	// TimeSinceBoot is systime-us (diagnostic-logs.element.ts:37): the
+	// ~5 s offset must read as microseconds — at least 4 s and well under
+	// a minute. A nanosecond value is a thousand times too large and
+	// trips the upper bound.
+	if r.TimeSinceBoot < uint64(4*time.Second/time.Microsecond) {
+		t.Fatalf("TimeSinceBoot = %d us, want >= 4s (boot epoch shifted)", r.TimeSinceBoot)
+	}
+	if r.TimeSinceBoot > uint64(time.Minute/time.Microsecond) {
+		t.Fatalf("TimeSinceBoot = %d, want < 60s in microseconds (systime-us) — a nanosecond value is 1000x too large", r.TimeSinceBoot)
 	}
 }
 
@@ -292,5 +298,32 @@ func TestDiagLogs_MatterAttributesIsEmpty(t *testing.T) {
 	list := d.MatterAttributes()
 	if len(list) != 0 {
 		t.Fatalf("MatterAttributes() = %v, want nil/empty (globals only)", list)
+	}
+}
+
+// TestDiagLogs_UTCTimeStampIsMatterEpochMicros pins the units of
+// RetrieveLogsResponse.UTCTimeStamp: epoch-us per
+// diagnostic-logs.element.ts:36, i.e. microseconds since the Matter epoch
+// 2000-01-01T00:00:00Z — the same conversion TimeSynchronization.UTCTime
+// uses in this package. A Unix-epoch nanosecond value is on the wrong
+// epoch and 1000x too large.
+func TestDiagLogs_UTCTimeStampIsMatterEpochMicros(t *testing.T) {
+	t.Parallel()
+	d := core.NewDiagnosticLogs()
+	before := time.Now()
+	resp, err := d.MatterInvoke(context.Background(), 0x00, nil)
+	if err != nil {
+		t.Fatalf("MatterInvoke: %v", err)
+	}
+	after := time.Now()
+	r := resp.(core.RetrieveLogsResponse)
+
+	// Matter epoch offset from Unix: 30 years + 7 leap days = 946684800 s
+	// (Matter §A.2, as in time_synchronization.go).
+	const matterEpochOffsetSec int64 = 946684800
+	lo := uint64(before.UnixMicro() - matterEpochOffsetSec*1_000_000)
+	hi := uint64(after.UnixMicro() - matterEpochOffsetSec*1_000_000)
+	if r.UTCTimeStamp < lo || r.UTCTimeStamp > hi {
+		t.Fatalf("UTCTimeStamp = %d, want Matter-epoch microseconds in [%d, %d]", r.UTCTimeStamp, lo, hi)
 	}
 }

@@ -123,6 +123,15 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src *net.UDPAddr) err
 	if err != nil {
 		return err
 	}
+	// Remember where the peer of this secure session speaks from. The
+	// datagram authenticated under the session key, so src is the peer's
+	// current address; ongoing subscription reports and the CloseSession
+	// farewell route on it. matter.js adopts the newest inbound address
+	// on the session's channel — "the new message wins"
+	// (packages/protocol/src/protocol/ExchangeManager.ts:400-405).
+	if hdr.SessionID != 0 && src != nil {
+		b.sessionPeerAddrs.Store(hdr.SessionID, src)
+	}
 	if len(plain) == 0 {
 		// No body after decrypt — every well-formed datagram carries
 		// at least a protocol header, so an empty plaintext means the
@@ -378,7 +387,7 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHd
 	case imGateProceed:
 		// fall through to decode + dispatch below
 	case imGateAbsorbStatusResp:
-		return b.absorbStatusResponse(src, requestHdr, proto)
+		return b.absorbStatusResponse(src, requestHdr, proto, payload)
 	case imGateRejectUnsupported:
 		return b.rejectUnsupportedOpcode(src, proto)
 	case imGateRejectGroupSession:

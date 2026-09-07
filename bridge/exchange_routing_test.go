@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -114,17 +115,17 @@ func TestExchangeRouting_StatusResponseWaitsSwap(t *testing.T) {
 	var r exchangeRouting
 	key := mrp.ExchangeKey{SessionID: 4, ExchangeID: 9}
 
-	first := make(chan struct{})
+	first := make(chan im.StatusCode, 1)
 	if _, loaded := r.statusResponseWaits.Swap(key, first); loaded {
 		t.Fatal("first arm: unexpectedly loaded a prior entry")
 	}
 
-	second := make(chan struct{})
+	second := make(chan im.StatusCode, 1)
 	prev, loaded := r.statusResponseWaits.Swap(key, second)
 	if !loaded {
 		t.Fatal("second arm: expected to observe the first channel")
 	}
-	if prevCh, ok := prev.(chan struct{}); !ok || prevCh != first {
+	if prevCh, ok := prev.(chan im.StatusCode); !ok || prevCh != first {
 		t.Errorf("swapped-out value = %v, want the first channel", prev)
 	}
 
@@ -132,7 +133,7 @@ func TestExchangeRouting_StatusResponseWaitsSwap(t *testing.T) {
 	if !ok {
 		t.Fatal("LoadAndDelete: entry missing after second arm")
 	}
-	if ch, ok := raw.(chan struct{}); !ok || ch != second {
+	if ch, ok := raw.(chan im.StatusCode); !ok || ch != second {
 		t.Error("LoadAndDelete returned the wrong channel")
 	}
 

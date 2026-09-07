@@ -46,7 +46,9 @@ func (b *Bridge) buildInitialReport(
 		Reports:         nil,
 	}
 	matched := 0
-	for _, path := range req.AttributeRequests {
+	// A repeated AttributePathIB expands to the same results again;
+	// read each distinct path once (see [im.DedupAttributePaths]).
+	for _, path := range im.DedupAttributePaths(req.AttributeRequests) {
 		// Authorize each result against the requesting subject (subCtx
 		// carries fabric + subject from handleSubscribeRequest). Without
 		// this the Subscribe-Initial would leak fabric-sensitive
@@ -357,12 +359,11 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 	// Apple's state-machine collapsed into a path where
 	// `ProcessSubscribeResponse` never triggered (Run 19 of the Apple-pair-diagnose cycle).
 	//
-	// 2 s timeout per chunk is generous — matter.js's observed round-
-	// trip is sub-millisecond. On timeout we fall through and ship the
-	// next chunk anyway; the underlying MRP layer keeps the wire
-	// reliable even if Apple skips a StatusResponse (matter.js test
-	// commissioners do, and the burst-mode path stayed functional for
-	// them — only Apple's strict per-chunk state-machine cares).
+	// The per-chunk wait is bounded by the exchange timeout
+	// ([Bridge.chunkStatusResponseTimeout]); matter.js's observed round-
+	// trip is sub-millisecond. A chunk that is never answered aborts the
+	// Subscribe instead of releasing the next chunk to a peer that is not
+	// listening.
 	for i, chunk := range chunks {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
@@ -433,17 +434,13 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 		// remained in `Subscribing`. Keep the wait unconditional on all
 		// chunks including final — the `final` flag in the timeout log is
 		// diagnostic only.
-		select {
-		case <-waitCh:
-			b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-		case <-time.After(perChunkStatusRespTimeout):
-			b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
-			b.logger.Debug("matter.tx.subscribe.chunk_ack_timeout",
-				slog.String("src", srcString(src)),
-				slog.Int("chunk", i),
-				slog.Int("exchange", int(proto.ExchangeID)),
-				slog.Bool("final", !chunk.MoreChunkedMessages),
-				slog.String("timeout", perChunkStatusRespTimeout.String()))
+		//
+		// An error status or a missing answer aborts the Subscribe: the
+		// peer is not consuming the priming report, and matter.js's
+		// waitForSuccess throws in both cases (InteractionMessenger.ts:721,
+		// MessageExchange.ts:850-858).
+		if err := b.awaitChunkStatusResponse(waitCh, "subscribe", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
+			return err
 		}
 
 		b.logger.Debug("matter.rx.im.subscribe.chunk",

@@ -445,8 +445,12 @@ type stubFabricIndexResolver struct {
 	fabricIndex uint8
 }
 
-func (stubFabricIndexResolver) ResolveSigma1Destination(_ [32]byte, _ [RandomSize]byte) (*Identity, PeerVerifier, bool) {
-	return nil, nil, false
+// ResolveSigma1Destination answers with the stub's identity: the tests
+// using this stub exercise the resume-time fabric lookup, and a Full Sigma
+// fall-through must still find a fabric — a miss here is a refusal
+// (ErrNoSharedTrustRoots), not a fall-back.
+func (s stubFabricIndexResolver) ResolveSigma1Destination(_ [32]byte, _ [RandomSize]byte) (*Identity, PeerVerifier, bool) {
+	return s.identity, s.verifier, true
 }
 
 func (s stubFabricIndexResolver) ResolveFabricIndex(fabricIndex uint8) (*Identity, PeerVerifier, bool) {
@@ -546,10 +550,13 @@ func TestSigma_Resume_FabricIndexResolver_MissFallsToFullSigma(t *testing.T) {
 // stubIdentityOnlyResolver implements [IdentityResolver] but
 // deliberately NOT [FabricIndexResolver] — the single-fabric / legacy
 // resolver shape that predates the resume-time fabric lookup.
-type stubIdentityOnlyResolver struct{}
+type stubIdentityOnlyResolver struct {
+	identity *Identity
+	verifier PeerVerifier
+}
 
-func (stubIdentityOnlyResolver) ResolveSigma1Destination(_ [32]byte, _ [RandomSize]byte) (*Identity, PeerVerifier, bool) {
-	return nil, nil, false
+func (s stubIdentityOnlyResolver) ResolveSigma1Destination(_ [32]byte, _ [RandomSize]byte) (*Identity, PeerVerifier, bool) {
+	return s.identity, s.verifier, true
 }
 
 // TestSigma_Resume_IdentityResolverWithoutFabricLookup_KeepsBaseline
@@ -570,7 +577,7 @@ func TestSigma_Resume_IdentityResolverWithoutFabricLookup_KeepsBaseline(t *testi
 	v := testVerifier{}
 	responder := NewResponder(respID, v, 0x2001)
 	responder.SetResumptionStore(store)
-	responder.SetIdentityResolver(stubIdentityOnlyResolver{})
+	responder.SetIdentityResolver(stubIdentityOnlyResolver{identity: respID, verifier: v})
 
 	result, err := responder.ProcessSigma1WithResume(sigma1Bytes)
 	if err != nil {

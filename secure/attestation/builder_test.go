@@ -17,7 +17,7 @@ func TestBuildTestChain_RoundTrip(t *testing.T) {
 		t.Fatalf("BuildTestChain: %v", err)
 	}
 
-	paaCert, err := x509.ParseCertificate(TestPAAFFF1Cert)
+	paaCert, err := x509.ParseCertificate(TestPAANoVIDCert)
 	if err != nil {
 		t.Fatalf("parse PAA: %v", err)
 	}
@@ -134,4 +134,39 @@ func extractVIDPID(t *testing.T, names []pkix.AttributeTypeAndValue) (vid, pid s
 		}
 	}
 	return vid, pid
+}
+
+// TestBuildTestChain_VendorIDOtherThanFFF1IsRootedAtTheVIDLessPAA pins the
+// chain shape the attestation validator accepts for an operator vendor id:
+// the PAI carries the operator's VID, and its issuer is the VID-less CSA
+// test PAA (matter.js AttestationCertificateManager.ts:38-44,121-139), so
+// the PAA-VID-vs-PAI-VID comparison (DeviceAttestationValidator.ts:328-334)
+// has nothing to mismatch. Rooted at the FFF1 PAA, every vendor_id other
+// than 0xFFF1 failed attestation.
+func TestBuildTestChain_VendorIDOtherThanFFF1IsRootedAtTheVIDLessPAA(t *testing.T) {
+	t.Parallel()
+	chain, err := BuildTestChain(0x1234, 0x8001)
+	if err != nil {
+		t.Fatalf("BuildTestChain: %v", err)
+	}
+	pai, err := x509.ParseCertificate(chain.PAI)
+	if err != nil {
+		t.Fatalf("parse PAI: %v", err)
+	}
+	if vid, _ := extractVIDPID(t, pai.Subject.Names); vid != "1234" {
+		t.Fatalf("PAI subject VID = %q, want the operator's 1234", vid)
+	}
+	paa, err := x509.ParseCertificate(TestPAANoVIDCert)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(pai.AuthorityKeyId, paa.SubjectKeyId) {
+		t.Fatalf("PAI AKID %x is not the VID-less test PAA's SKID %x", pai.AuthorityKeyId, paa.SubjectKeyId)
+	}
+	if paaVID, _ := extractVIDPID(t, paa.Subject.Names); paaVID != "" {
+		t.Fatalf("issuing PAA carries VID %q; the validator would compare it with the PAI's", paaVID)
+	}
+	if err := pai.CheckSignatureFrom(paa); err != nil {
+		t.Fatalf("PAI is not signed by the VID-less PAA: %v", err)
+	}
 }

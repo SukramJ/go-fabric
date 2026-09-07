@@ -51,7 +51,7 @@ import (
 // Lowered 11 -> 10 when secure/setup gained a fuzz target: IsValidSetupPIN
 // had no test caller at all, which is a thing worth knowing about a function
 // that classifies a setup passcode.
-const reachabilityUnreachedRatchet = 10
+const reachabilityUnreachedRatchet = 9
 
 // inventoryWhitelistEntry mirrors one whitelist row of inventory.json.
 type inventoryWhitelistEntry struct {

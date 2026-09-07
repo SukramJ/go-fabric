@@ -299,10 +299,12 @@ func (b *Bridge) dispatchSecureChannel(src *net.UDPAddr, requestHdr *message.Hea
 
 	// Remember the authenticated peer address per secure session
 	// (Secure-Channel datagrams reach this router only after the
-	// decrypt in receive.go succeeds). The graceful CloseSession
-	// StatusReport sender routes on it — matter.js keeps the same
-	// association on the session itself via its MessageChannel
-	// (packages/protocol/src/session/Session.ts, `get channel()`).
+	// decrypt in receive.go succeeds). [Bridge.dispatch] records the
+	// same for every decrypted datagram, IM included; this store keeps
+	// the router self-contained for callers that enter it directly.
+	// matter.js keeps the association on the session itself via its
+	// MessageChannel (packages/protocol/src/session/Session.ts,
+	// `get channel()`).
 	if requestHdr.SessionID != 0 && src != nil {
 		b.sessionPeerAddrs.Store(requestHdr.SessionID, src)
 	}
@@ -819,20 +821,15 @@ func (b *Bridge) handleCase(
 		// yet). Mirrors chip CASESession.cpp error-path StatusReport
 		// emission on Sigma-reject paths.
 		if !isStateReject && !errors.Is(err, ErrCaseHandlerMissing) {
-			// Map the error to the most appropriate Secure-Channel
-			// protocol code. Malformed payloads (decode errors, bad
-			// ephemeral key) use InvalidParameter; everything else
-			// (unknown destination, signature verify) uses
-			// NoSharedTrustRoots which chip sends for any unresolvable
-			// fabric identity.
-			protocolCode := mrp.SCStatusProtocolNoSharedTrustRoots
-			if errors.Is(err, sigma.ErrInvalidPoint) {
-				protocolCode = mrp.SCStatusProtocolInvalidParameter
-			}
+			// Map the error to the Secure-Channel protocol code: a
+			// Sigma1 addressing no fabric this node holds is
+			// NoSharedTrustRoots, every other failure (decode error,
+			// bad ephemeral key, signature verify) InvalidParameter —
+			// matter.js CaseServer.ts:88-95.
 			body := mrp.EncodeStatusReport(
 				mrp.SCStatusGeneralFailure,
 				uint32(mrp.SecureChannelProtocolID),
-				protocolCode,
+				caseFailureProtocolCode(err),
 				nil,
 			)
 			if sendErr := b.sendReply(src, requestHdr, proto, mrp.SCOpcodeStatusReport, body); sendErr != nil {

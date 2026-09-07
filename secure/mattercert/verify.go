@@ -256,6 +256,12 @@ func (v *Verifier) PeerCATsFromNOC(noc []byte) ([]uint32, error) {
 // layer; this method preserves the more specific error inside the
 // returned wrapper for diagnostics.
 func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, error) {
+	if len(noc) > MaxOperationalCertTLVBytes {
+		return nil, fmt.Errorf("%w: NOC is %d bytes, over the %d-byte cap", ErrMalformed, len(noc), MaxOperationalCertTLVBytes)
+	}
+	if len(icac) > MaxOperationalCertTLVBytes {
+		return nil, fmt.Errorf("%w: ICAC is %d bytes, over the %d-byte cap", ErrMalformed, len(icac), MaxOperationalCertTLVBytes)
+	}
 	nocCert, err := Decode(noc)
 	if err != nil {
 		return nil, fmt.Errorf("noc: %w", err)
@@ -264,6 +270,9 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		return nil, fmt.Errorf("%w: cert is not a NOC", ErrMalformed)
 	}
 	if err := v.checkValidity(nocCert); err != nil {
+		return nil, fmt.Errorf("noc: %w", err)
+	}
+	if err := checkNOCShape(nocCert); err != nil {
 		return nil, fmt.Errorf("noc: %w", err)
 	}
 
@@ -277,6 +286,9 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 			return nil, fmt.Errorf("%w: cert is not an ICAC", ErrMalformed)
 		}
 		if err := v.checkValidity(icacCert); err != nil {
+			return nil, fmt.Errorf("icac: %w", err)
+		}
+		if err := checkICACShape(icacCert, nocCert); err != nil {
 			return nil, fmt.Errorf("icac: %w", err)
 		}
 		// ICAC must be signed by the root.
@@ -304,55 +316,150 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 	return nocCert.PublicKeyECDSA()
 }
 
-// checkValidity confirms the certificate's NotBefore/NotAfter window
-// covers v.now. NotBefore / NotAfter are Matter-epoch seconds (offsets
-// from 2000-01-01T00:00:00Z per §6.5.1.5); convert to Unix seconds
-// before comparing against the wall clock.
-//
-// The comparison runs in uint64 because the certificate fields are
-// unsigned, and both conversions are checked: adding the epoch to a
-// field close to 2^64 wraps to a small number, and an unchecked wrap is
-// an ACCEPTANCE, not a rejection. Measured: NotBefore = 2^64-1001 wraps
-// to 946683799, which every real clock is past, so the window test
-// passes — and with NotAfter == 0 nothing else constrains it, because
-// decode.go's ordering check only fires when NotAfter is non-zero. That
-// certificate was accepted on an ordinary clock.
-//
-// A clock set before 1970 wraps `now` the same way and is the reason the
-// conversion of Unix() is annotated rather than checked: there the
-// comparisons part company, and a certificate carrying a NotAfter is
-// still rejected as expired.
-// matterToUnixSeconds converts Matter-epoch seconds (§6.5.1.5) to Unix
-// seconds, reporting false when the addition would wrap. A wrapped value
-// is smaller than what it stands for, so it would pass a window test it
-// should fail — the failure direction that matters for an acceptance
-// check.
-func matterToUnixSeconds(matterSecs uint64) (uint64, bool) {
-	const epoch = uint64(matterEpochUTCSeconds)
-	if matterSecs > ^uint64(0)-epoch {
-		return 0, false
+// MaxOperationalCertTLVBytes caps a Matter operational certificate (NOC,
+// ICAC, RCAC) in its TLV form — §6.1.3; mirrors matter.js
+// OperationalBase.ts:19 MAX_TLV_BYTES.
+const MaxOperationalCertTLVBytes = 400
+
+// Operational node ids occupy 0x0000_0000_0000_0001 ..
+// 0xFFFF_FFEF_FFFF_FFFF (§2.5.5); mirrors matter.js NodeId.isOperationalNodeId.
+const maxOperationalNodeID = 0xFFFF_FFEF_FFFF_FFFF
+
+// keyUsage bits as the Matter TLV cert carries them (RFC 5280 bit
+// positions in a little-endian uint16 — matter.js ExtensionKeyUsageSchema).
+const (
+	keyUsageDigitalSignature   uint16 = 1 << 0
+	keyUsageKeyCertSign        uint16 = 1 << 5
+	keyUsageCRLSign            uint16 = 1 << 6
+	extendedKeyUsageServerAuth uint8  = 1
+	extendedKeyUsageClientAuth uint8  = 2
+	maxCASEAuthTags                   = 3
+)
+
+// checkNOCShape applies the structural predicates a NOC must satisfy
+// beyond carrying a node id and a fabric id. Mirrors matter.js
+// packages/protocol/src/certificate/kinds/Noc.ts (validateFields + verify):
+// not a CA, only the four operational identifiers in the subject, an
+// operational node id, a non-zero fabric id, at most three CATs each with
+// a non-zero version, keyUsage digitalSignature, extendedKeyUsage carrying
+// serverAuth or clientAuth, and a 20-byte subjectKeyIdentifier. Every one
+// of them is what keeps a cryptographically valid certificate from
+// standing in for an identity it does not name.
+func checkNOCShape(c *Certificate) error {
+	if c.Subject.HasICACID || c.Subject.HasRCACID {
+		return fmt.Errorf("%w: NOC subject must not carry an ICAC-ID or RCAC-ID", ErrMalformed)
 	}
-	return matterSecs + epoch, true
+	if c.Subject.MatterNodeID == 0 || c.Subject.MatterNodeID > maxOperationalNodeID {
+		return fmt.Errorf("%w: NOC node id 0x%016X is not an operational node id", ErrMalformed, c.Subject.MatterNodeID)
+	}
+	if c.Subject.MatterFabricID == 0 {
+		return fmt.Errorf("%w: NOC fabric id must not be 0", ErrMalformed)
+	}
+	if len(c.Subject.CASEAuthTags) > maxCASEAuthTags {
+		return fmt.Errorf("%w: NOC carries %d CATs, at most %d allowed", ErrMalformed, len(c.Subject.CASEAuthTags), maxCASEAuthTags)
+	}
+	seen := make(map[uint32]struct{}, len(c.Subject.CASEAuthTags))
+	for _, cat := range c.Subject.CASEAuthTags {
+		if cat&0xFFFF == 0 {
+			return fmt.Errorf("%w: CAT 0x%08X has version 0", ErrMalformed, cat)
+		}
+		id := cat >> 16
+		if _, dup := seen[id]; dup {
+			return fmt.Errorf("%w: CAT identifier 0x%04X appears twice", ErrMalformed, id)
+		}
+		seen[id] = struct{}{}
+	}
+	ext := c.Extensions
+	if ext.HasBasicConstraints && ext.BasicConstraintsIsCA {
+		return fmt.Errorf("%w: NOC must not be a CA", ErrMalformed)
+	}
+	if !ext.HasKeyUsage || ext.KeyUsage&keyUsageDigitalSignature == 0 {
+		return fmt.Errorf("%w: NOC keyUsage must carry digitalSignature", ErrMalformed)
+	}
+	if !ext.HasExtendedKeyUsage || !hasEKU(ext.ExtendedKeyUsage, extendedKeyUsageServerAuth, extendedKeyUsageClientAuth) {
+		return fmt.Errorf("%w: NOC extendedKeyUsage must carry serverAuth or clientAuth", ErrMalformed)
+	}
+	if !ext.HasSubjectKeyID || len(ext.SubjectKeyID) != 20 {
+		return fmt.Errorf("%w: NOC subjectKeyIdentifier must be 160 bit", ErrMalformed)
+	}
+	return nil
+}
+
+// checkICACShape applies the ICAC predicates of matter.js Icac.ts
+// (validateFields + verify): a CA with keyCertSign and cRLSign (optionally
+// digitalSignature), no extendedKeyUsage, no node id, no CATs, a non-zero
+// fabric id when it carries one, and — the predicate with teeth — a fabric
+// id equal to the NOC's when both carry one. Without that last check an
+// ICAC minted for fabric A could issue a NOC for fabric B under the same
+// root, and the responder would open the session on B.
+func checkICACShape(icac, noc *Certificate) error {
+	if icac.Subject.HasRCACID {
+		return fmt.Errorf("%w: ICAC subject must not carry an RCAC-ID", ErrMalformed)
+	}
+	if len(icac.Subject.CASEAuthTags) > 0 {
+		return fmt.Errorf("%w: ICAC must not carry CATs", ErrMalformed)
+	}
+	if icac.Subject.HasFabricID {
+		if icac.Subject.MatterFabricID == 0 {
+			return fmt.Errorf("%w: ICAC fabric id must not be 0", ErrMalformed)
+		}
+		if noc.Subject.HasFabricID && icac.Subject.MatterFabricID != noc.Subject.MatterFabricID {
+			return fmt.Errorf("%w: ICAC fabric id 0x%016X does not match NOC fabric id 0x%016X",
+				ErrChainBroken, icac.Subject.MatterFabricID, noc.Subject.MatterFabricID)
+		}
+	}
+	ext := icac.Extensions
+	if !ext.HasBasicConstraints || !ext.BasicConstraintsIsCA {
+		return fmt.Errorf("%w: ICAC must be a CA", ErrMalformed)
+	}
+	if !ext.HasKeyUsage || ext.KeyUsage&^keyUsageDigitalSignature != keyUsageKeyCertSign|keyUsageCRLSign {
+		return fmt.Errorf("%w: ICAC keyUsage must be keyCertSign and cRLSign (optionally digitalSignature), got %#04x", ErrMalformed, ext.KeyUsage)
+	}
+	if ext.HasExtendedKeyUsage && len(ext.ExtendedKeyUsage) > 0 {
+		return fmt.Errorf("%w: ICAC must not carry an extendedKeyUsage", ErrMalformed)
+	}
+	if !ext.HasSubjectKeyID || len(ext.SubjectKeyID) != 20 {
+		return fmt.Errorf("%w: ICAC subjectKeyIdentifier must be 160 bit", ErrMalformed)
+	}
+	return nil
+}
+
+func hasEKU(list []uint8, wanted ...uint8) bool {
+	for _, have := range list {
+		for _, w := range wanted {
+			if have == w {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkValidity confirms the certificate's NotBefore/NotAfter fields name
+// representable times. It does NOT reject on the wall clock: matter.js
+// OperationalBase.ts:82-89 only warns when notBefore lies in the future
+// and never checks notAfter ("TODO: implement real checks when we add
+// Last known Good UTC time"), and its own CA backdates every NOC by a
+// year for the same reason — a bridge whose clock is behind the
+// commissioner's (an RTC-less board before its first NTP sync, or a
+// controller that mints the NOC with NotBefore = its own now) must not
+// refuse AddNOC and every later CASE until the clock catches up. The
+// spec's answer is Last-Known-Good-Time (§11.18.5); until that exists the
+// gold standard's behaviour is the one to mirror. NotBefore / NotAfter
+// are Matter-epoch seconds (offsets from 2000-01-01T00:00:00Z per
+// §6.5.1.5).
+func matterTimeRepresentable(matterSecs uint64) bool {
+	const epoch = uint64(matterEpochUTCSeconds)
+	return matterSecs <= ^uint64(0)-epoch
 }
 
 func (v *Verifier) checkValidity(c *Certificate) error {
-	now := uint64(v.now.Now().Unix()) //nolint:gosec // G115: negative only for a pre-1970 clock; the doc comment above states what that does to each comparison.
-	notBeforeUnix, ok := matterToUnixSeconds(c.NotBefore)
-	if !ok {
+	if !matterTimeRepresentable(c.NotBefore) {
 		return fmt.Errorf("%w: NotBefore=%d does not name a representable time", ErrMalformed, c.NotBefore)
 	}
-	if now < notBeforeUnix {
-		return fmt.Errorf("%w: now=%d < NotBefore=%d", ErrExpired, now, notBeforeUnix)
-	}
-	// NotAfter == 0 means "no expiry" (Matter convention for very
-	// long-lived RCACs); honor it as never-expiring.
 	if c.NotAfter != 0 {
-		notAfterUnix, ok := matterToUnixSeconds(c.NotAfter)
-		if !ok {
+		if !matterTimeRepresentable(c.NotAfter) {
 			return fmt.Errorf("%w: NotAfter=%d does not name a representable time", ErrMalformed, c.NotAfter)
-		}
-		if now > notAfterUnix {
-			return fmt.Errorf("%w: now=%d > NotAfter=%d", ErrExpired, now, notAfterUnix)
 		}
 	}
 	return nil

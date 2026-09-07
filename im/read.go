@@ -437,7 +437,7 @@ func HandleReadRequest(ctx context.Context, d Dispatcher, req ReadRequest) Repor
 	}
 
 	var rd ReportData
-	for _, path := range req.AttributeRequests {
+	for _, path := range DedupAttributePaths(req.AttributeRequests) {
 		// A fully-concrete path (endpoint + cluster + attribute all named)
 		// returns an explicit AttributeStatusIB(UnsupportedAccess) on ACL
 		// denial; a wildcard path silently omits the results the subject may
@@ -753,6 +753,15 @@ func eventPayloadFabricIndex(payload any) (uint8, bool) {
 	}
 }
 
+// MaxReadPaths is the hard acceptance ceiling for paths (attribute and
+// event paths counted together) in a single Read or Subscribe
+// interaction. Mirrors matter.js
+// packages/node/src/node/server/InteractionServer.ts:79-80
+// (MAX_READ_PATHS / MAX_SUBSCRIBE_PATHS = 10 000, the upper bound of the
+// CapabilityMinimaStruct field constraints); a request beyond it is
+// answered with PathsExhausted (:366-369, :600-604).
+const MaxReadPaths = 10_000
+
 // isGlobalAttributeID reports whether attrID is a universal global attribute
 // (0xFFF8-0xFFFD): GeneratedCommandList, AcceptedCommandList, EventList,
 // AttributeList, FeatureMap, ClusterRevision. These are legal on a
@@ -765,10 +774,13 @@ func isGlobalAttributeID(attrID uint32) bool {
 // Subscribe: a wildcard cluster (HasCluster == false) combined with a concrete
 // non-global attribute, or with a concrete event, is illegal — the whole action
 // must be rejected up front with InvalidAction rather than silently expanded.
-// Returns StatusInvalidAction on the first offending path, else StatusSuccess.
-// Mirrors matter.js packages/node/src/node/server/InteractionServer.ts
-// validateReadAttributesPath / validateReadEventPath (#3926). Callers (the read
-// and subscribe dispatchers) run this before building any report.
+// Returns StatusInvalidAction on the first offending path, StatusPathsExhausted
+// when the request names more than [MaxReadPaths] paths in total, else
+// StatusSuccess. Mirrors matter.js packages/node/src/node/server/InteractionServer.ts
+// validateReadAttributesPath / validateReadEventPath (#3926) followed by the
+// path-count ceiling (:362-369, :600-604) — in that order. Callers (the read
+// and subscribe dispatchers) run this before building any report and answer
+// with the returned status.
 func ValidateReadPaths(attrs []ConcreteAttributePath, events []ConcreteEventPath) StatusCode {
 	for _, p := range attrs {
 		if !p.HasCluster && p.HasAttribute && !isGlobalAttributeID(p.Attribute) {
@@ -780,5 +792,34 @@ func ValidateReadPaths(attrs []ConcreteAttributePath, events []ConcreteEventPath
 			return StatusInvalidAction
 		}
 	}
+	if len(attrs)+len(events) > MaxReadPaths {
+		return StatusPathsExhausted
+	}
 	return StatusSuccess
+}
+
+// DedupAttributePaths returns paths with every repeat of an earlier
+// AttributePathIB removed, first occurrence first. A repeated path
+// expands to exactly the results the first one did, so reading it again
+// only duplicates the report; dropping it bounds the materialised report
+// by the node's own attribute count rather than by how many copies of a
+// path fit into one request. Returns the input slice when nothing
+// repeats.
+func DedupAttributePaths(paths []ConcreteAttributePath) []ConcreteAttributePath {
+	if len(paths) < 2 {
+		return paths
+	}
+	seen := make(map[ConcreteAttributePath]struct{}, len(paths))
+	out := make([]ConcreteAttributePath, 0, len(paths))
+	for _, p := range paths {
+		if _, dup := seen[p]; dup {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	if len(out) == len(paths) {
+		return paths
+	}
+	return out
 }

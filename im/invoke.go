@@ -69,6 +69,14 @@ type CommandInvocation struct {
 	Fields        any // cluster-native struct produced by [CommandFieldsReader]
 	CommandRef    uint16
 	HasCommandRef bool
+	// DecodeStatus is non-Success when the [CommandFieldsReader] rejected
+	// the command's fields with a typed [StatusCodeError] (a value outside
+	// its schema type, for instance). Fields is nil then, and
+	// [HandleInvokeRequest] answers the command with that status instead
+	// of invoking it — the per-command outcome matter.js produces when
+	// requestTlv.validate throws (packages/protocol/src/action/server/
+	// CommandInvokeResponse.ts:446-448, :472-496).
+	DecodeStatus StatusCode
 }
 
 // CommandFieldsReader extracts the cluster-native fields struct from
@@ -194,7 +202,22 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 			}
 			f, err := fieldsReader(inv.Path, dec, el)
 			if err != nil {
-				return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+				// A typed reject is a per-command outcome, not a malformed
+				// request: drain the rest of the fields container so the
+				// remaining commands of the batch still decode, and carry
+				// the status to the dispatcher.
+				var sce StatusCodeError
+				if !errors.As(err, &sce) || sce.MatterStatusCode().IsSuccess() {
+					return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+				}
+				if el.IsContainer {
+					if err := skipContainer(dec); err != nil {
+						return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
+					}
+				}
+				inv.Fields = nil
+				inv.DecodeStatus = sce.MatterStatusCode()
+				continue
 			}
 			inv.Fields = f
 		case tagCmdDataRef:
@@ -424,6 +447,20 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 				})
 				continue
 			}
+		}
+		// Fields the reader rejected never reach the cluster server: the
+		// command owes the status the reader attached (ConstraintError for
+		// an out-of-range value), the way matter.js answers a failed
+		// requestTlv.validate (CommandInvokeResponse.ts:472-496).
+		if !inv.DecodeStatus.IsSuccess() {
+			ir.Responses = append(ir.Responses, InvokeResponseEntry{
+				Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
+				CommandRef:    inv.CommandRef,
+				HasCommandRef: inv.HasCommandRef,
+				IsStatus:      true,
+				Status:        StatusIB{Status: inv.DecodeStatus},
+			})
+			continue
 		}
 		res := d.Invoke(ctx, inv.Path, inv.Fields)
 		ent := InvokeResponseEntry{

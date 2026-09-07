@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -490,8 +491,20 @@ type CaseAdapter struct {
 	// every retransmit — registering the SAME operational session
 	// multiple times in `OpenFromSigmaWithID` and confusing Apple's
 	// session table. Reset on `SetResponder` so a fresh CASE
-	// handshake (post-AddNOC identity swap) gets a clean trigger.
+	// handshake (post-AddNOC identity swap) gets a clean trigger, and
+	// on a Sigma1 that restarts the handshake — but not on the
+	// responder's idempotent Sigma1 replay, which restarts nothing.
 	established bool
+	// establishedSessionID is the responder session id the last
+	// onEstablished registered. A resume that announces a different id
+	// is a new session whose keys must be installed even though the
+	// gate is already closed (the responder takes a fresh id for a
+	// resume on a finished handshake, matter.js CaseServer.ts:173).
+	establishedSessionID uint16
+	// lastSigma2 is the Sigma2 wire reply of the current handshake, so
+	// a Sigma1 that yields the same bytes is recognised as the
+	// responder's idempotent replay rather than a restart.
+	lastSigma2 []byte
 }
 
 // CaseSessionEstablished fires after a successful Sigma3 verification.
@@ -516,6 +529,8 @@ func (a *CaseAdapter) SetResponder(r *sigma.Responder) {
 	a.mu.Lock()
 	a.responder = r
 	a.established = false
+	a.establishedSessionID = 0
+	a.lastSigma2 = nil
 	a.mu.Unlock()
 }
 
@@ -554,11 +569,15 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 		// chip CASESession.cpp sends a SecureChannel StatusReport on every
 		// Sigma failure so the commissioner learns the round was actively
 		// rejected and stops MRP-retransmitting. Without this report Apple
-		// retries for ~30 s before logging a timeout.
+		// retries for ~30 s before logging a timeout. A Sigma1 addressing
+		// a fabric this node does not hold earns NoSharedTrustRoots;
+		// everything else is InvalidParameter — matter.js CaseServer.ts:
+		// 88-95 (FabricNotFoundError → NoSharedTrustRoots, else
+		// InvalidParam).
 		body := mrp.EncodeStatusReport(
 			mrp.SCStatusGeneralFailure,
 			uint32(mrp.SecureChannelProtocolID),
-			mrp.SCStatusProtocolInvalidParameter,
+			caseFailureProtocolCode(err),
 			nil,
 		)
 		return mrp.SCOpcodeStatusReport, body, nil //nolint:nilerr // Sigma1 failure is converted to a StatusReport wire frame; the caller receives nil err by design
@@ -575,11 +594,18 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 			slog.Int("len", len(out)),
 			slog.String("hex_first128", hex.EncodeToString(peekBytes(out, 128))))
 
+		// Every resume that yields a session id the adapter has not
+		// registered installs its keys: the first one on a fresh adapter,
+		// and any later one for which the responder took a fresh id (a
+		// resume on a finished handshake). A resume re-announcing the id
+		// already established is the MRP replay case and stays quiet.
+		sessionID := r.SessionID()
 		a.mu.Lock()
-		firstEstablish := !a.established
+		install := !a.established || sessionID != a.establishedSessionID
 		a.established = true
+		a.establishedSessionID = sessionID
 		a.mu.Unlock()
-		if firstEstablish && a.onEstablished != nil {
+		if install && a.onEstablished != nil {
 			// The callback's second argument is the PEER's session id
 			// (Sigma1.initiatorSessionID) — the id the initiator expects
 			// stamped into Header.SessionID of every outbound packet.
@@ -595,17 +621,37 @@ func (a *CaseAdapter) ProcessSigma1(payload []byte) (opcode uint8, respPayload [
 	}
 
 	// Full Sigma path — reset established so the Sigma3 completion
-	// fires onEstablished correctly even if a prior resume attempt
-	// on this adapter had already set it to true.
+	// fires onEstablished correctly even if a prior handshake or resume
+	// on this adapter had already set it to true. Only a Sigma1 that
+	// restarted the handshake counts: the responder answers an MRP
+	// retransmit of the same Sigma1 with its cached Sigma2
+	// (secure/sigma/protocol.go processSigma1Locked, mirroring matter.js
+	// CaseServer.ts onSigma1), and reopening the gate there would let
+	// the Sigma3 retransmit that follows re-register the session and
+	// displace the live one.
+	out := result.Sigma2.Marshal()
 	a.mu.Lock()
-	a.established = false
+	if !bytes.Equal(out, a.lastSigma2) {
+		a.established = false
+		a.lastSigma2 = out
+	}
 	a.mu.Unlock()
 
-	out := result.Sigma2.Marshal()
 	slog.Default().Debug("matter.tx.sigma2.wire",
 		slog.Int("len", len(out)),
 		slog.String("hex_first128", hex.EncodeToString(peekBytes(out, 128))))
 	return mrp.SCOpcodeSigma2, out, nil
+}
+
+// caseFailureProtocolCode maps a CASE handshake failure to the
+// Secure-Channel protocol code the StatusReport carries: a Sigma1 that
+// addresses no fabric this node holds is NoSharedTrustRoots, any other
+// failure InvalidParameter. Mirrors matter.js CaseServer.ts:88-95.
+func caseFailureProtocolCode(err error) uint16 {
+	if errors.Is(err, sigma.ErrNoSharedTrustRoots) {
+		return mrp.SCStatusProtocolNoSharedTrustRoots
+	}
+	return mrp.SCStatusProtocolInvalidParameter
 }
 
 func peekBytes(b []byte, n int) []byte {
@@ -650,6 +696,7 @@ func (a *CaseAdapter) ProcessSigma3(payload []byte) (opcode uint8, respPayload [
 	a.mu.Lock()
 	firstEstablish := !a.established
 	a.established = true
+	a.establishedSessionID = r.SessionID()
 	a.mu.Unlock()
 	if firstEstablish && a.onEstablished != nil {
 		keys, ok := r.SessionKeys()

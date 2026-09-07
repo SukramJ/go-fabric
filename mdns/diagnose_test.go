@@ -78,7 +78,7 @@ func TestDiagnoseFindsTheSilentPairingFailures(t *testing.T) {
 			name: "only a container-internal address",
 			services: []Service{func() Service {
 				s := healthy
-				s.Addresses = []net.IP{net.ParseIP("172.18.0.4")}
+				s.Addresses = []net.IP{net.ParseIP("172.17.0.4")}
 				return s
 			}()},
 			wantCode: "container_internal_address",
@@ -160,28 +160,39 @@ func TestDiagnoseKeepsQuietOnAHealthyAdvertisement(t *testing.T) {
 // TestDiagnoseTreatsALANAddressAsRoutable guards the check that would
 // otherwise fire on every deployment: a LAN address is private but
 // perfectly reachable, and flagging it would drown the container case
-// this exists for.
+// this exists for. 172.16.x and 172.18.x are in the list on purpose:
+// they sit inside 172.16.0.0/12, which is where Docker carves user
+// networks from — and also where ordinary LANs live. Only docker0's
+// fixed default subnet (172.17.0.0/16) is pinned as a container signal.
 func TestDiagnoseTreatsALANAddressAsRoutable(t *testing.T) {
 	t.Parallel()
 
-	for _, addr := range []string{"192.168.1.40", "10.0.0.5", "172.16.4.29"} {
+	for _, addr := range []string{"192.168.1.40", "10.0.0.5", "172.16.4.29", "172.18.4.29", "172.31.200.7"} {
 		findings := Diagnose([]Service{{
 			InstanceName: "x",
 			ServiceType:  ServiceTypeOperational,
 			Port:         5540,
 			Addresses:    []net.IP{net.ParseIP("fe80::1"), net.ParseIP(addr)},
 		}})
-		if addr == "172.16.4.29" {
-			// Documented as part of Docker's default pool, so it is
-			// expected to be flagged — pinned so the boundary is a
-			// decision rather than an accident.
-			if !hasCode(findings, "container_internal_address") {
-				t.Errorf("%s: want the documented container range to be flagged", addr)
-			}
-			continue
-		}
 		if hasCode(findings, "container_internal_address") {
 			t.Errorf("%s was flagged as container-internal, but it is an ordinary LAN address", addr)
 		}
+	}
+}
+
+// TestDiagnoseFlagsDocker0DefaultSubnet pins the one range that still
+// counts as a container signal, so the boundary is a decision rather
+// than an accident.
+func TestDiagnoseFlagsDocker0DefaultSubnet(t *testing.T) {
+	t.Parallel()
+
+	findings := Diagnose([]Service{{
+		InstanceName: "x",
+		ServiceType:  ServiceTypeOperational,
+		Port:         5540,
+		Addresses:    []net.IP{net.ParseIP("172.17.0.2")},
+	}})
+	if !hasCode(findings, "container_internal_address") {
+		t.Errorf("172.17.0.2: want docker0's default subnet flagged, got %v", codes(findings))
 	}
 }

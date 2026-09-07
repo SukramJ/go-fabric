@@ -274,6 +274,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x0035, // ThreadNetworkDiagnostics ([Thread])
 		0x0036, // WiFiNetworkDiagnostics ([WiFi])
 		0x0037, // EthernetNetworkDiagnostics ([Ethernet])
+		0x0038, // TimeSynchronization (TimeSyncCond, TimeSyncWithClientCond, TimeSyncWithNTPCCond, TimeSyncWithTZCond, TLSClientCond, TLSCertificatesCond, O)
 		0x003C, // AdministratorCommissioning (M)
 		0x003E, // OperationalCredentials (M)
 		0x003F, // GroupKeyManagement (M)
@@ -391,6 +392,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x0003, // Identify (O)
 		0x001D, // Descriptor (-)
 		0x0060, // OperationalState (O)
+		0x0404, // FlowMeasurement (O)
 	},
 	0x0041: { // WaterFreezeDetector
 		0x0003, // Identify (M)
@@ -402,6 +404,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x0003, // Identify (M)
 		0x001D, // Descriptor (-)
 		0x0081, // ValveConfigurationAndControl (M)
+		0x0404, // FlowMeasurement (O)
 	},
 	0x0043: { // WaterLeakDetector
 		0x0003, // Identify (M)
@@ -555,12 +558,15 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x0062, // ScenesManagement (M)
 	},
 	0x0103: { // OnOffLightSwitch
+		0x0003, // Identify (M)
 		0x001D, // Descriptor (-)
 	},
 	0x0104: { // DimmerSwitch
+		0x0003, // Identify (M)
 		0x001D, // Descriptor (-)
 	},
 	0x0105: { // ColorDimmerSwitch
+		0x0003, // Identify (M)
 		0x001D, // Descriptor (-)
 	},
 	0x0106: { // LightSensor
@@ -634,12 +640,16 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x001D, // Descriptor (-)
 		0x0551, // CameraAvStreamManagement (M)
 		0x0552, // CameraAvSettingsUserLevelManagement (O)
+		0x0553, // WebRtcTransportProvider (M)
+		0x0554, // WebRtcTransportRequestor (M)
 	},
 	0x0141: { // AudioDoorbell
 		0x0003, // Identify (M)
 		0x001D, // Descriptor (-)
 		0x003B, // Switch (M)
 		0x0551, // CameraAvStreamManagement (M)
+		0x0553, // WebRtcTransportProvider (M)
+		0x0554, // WebRtcTransportRequestor (O)
 		0x0555, // PushAvStreamTransport (O)
 	},
 	0x0142: { // Camera
@@ -649,6 +659,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x0550, // ZoneManagement (O)
 		0x0551, // CameraAvStreamManagement (M)
 		0x0552, // CameraAvSettingsUserLevelManagement (O)
+		0x0553, // WebRtcTransportProvider (M)
 		0x0554, // WebRtcTransportRequestor (O)
 		0x0555, // PushAvStreamTransport (O)
 	},
@@ -687,6 +698,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x0102, // WindowCovering (M)
 	},
 	0x0203: { // WindowCoveringController
+		0x0003, // Identify (O)
 		0x001D, // Descriptor (-)
 	},
 	0x0230: { // Closure
@@ -723,8 +735,12 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x001D, // Descriptor (-)
 		0x0062, // ScenesManagement (O)
 		0x0200, // PumpConfigurationAndControl (M)
+		0x0402, // TemperatureMeasurement (O)
+		0x0403, // PressureMeasurement (O)
+		0x0404, // FlowMeasurement (O)
 	},
 	0x0304: { // PumpController
+		0x0003, // Identify (M)
 		0x001D, // Descriptor (-)
 	},
 	0x0305: { // PressureSensor
@@ -799,9 +815,11 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x0B07, // CommodityMetering (P, M)
 	},
 	0x0840: { // ControlBridge
+		0x0003, // Identify (M)
 		0x001D, // Descriptor (-)
 	},
 	0x0850: { // OnOffSensor
+		0x0003, // Identify (M)
 		0x001D, // Descriptor (-)
 	},
 }

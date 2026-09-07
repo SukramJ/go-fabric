@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // Errors surfaced by the unsolicited-IM send path. They are logged
@@ -32,24 +33,43 @@ var (
 	ErrUnsolicitedEncrypt = errors.New("bridge: unsolicited send: encrypt")
 )
 
-// perChunkStatusRespTimeout caps how long Subscribe-initial AND
-// Read-response chunk loops wait for Apple's IM:StatusResponse on
-// each chunk before falling through to the next chunk. matter.js's
-// InteractionMessenger acks every chunk on the IM layer; without the
-// wait go-fabric burst-fires all chunks and Apple's MTRDevice
-// `ProcessReadResponse` / `ProcessSubscribeResponse` state machines
-// drop late chunks. Subscribe requires the same per-chunk wait as the
-// Read path.
+// chunkStatusResponseExpectedProcessing and chunkStatusResponseBuffer
+// are the two fixed terms of matter.js's maximum peer response time
+// (packages/protocol/src/protocol/MRP.ts:55 DEFAULT_EXPECTED_PROCESSING_TIME,
+// :61 PEER_RESPONSE_TIME_BUFFER); the third term is the summed MRP
+// retransmission backoff, see [Bridge.chunkStatusResponseTimeout].
+const (
+	chunkStatusResponseExpectedProcessing = 2 * time.Second
+	chunkStatusResponseBuffer             = 5 * time.Second
+)
+
+// chunkStatusResponseTimeout bounds how long a chunk loop (Subscribe-
+// Initial and Read-response) waits for the peer's IM StatusResponse on
+// one ReportData chunk before abandoning the interaction. Mirrors
+// matter.js MRP.maxPeerResponseTimeOf for a UDP/MRP session
+// (packages/protocol/src/protocol/MRP.ts:79-120): the worst-case time
+// until the peer received the last MRP retransmission — every backoff
+// interval summed with maximum jitter (:198-224 maxResponseTimeOf) —
+// plus the default expected processing time and the response buffer.
+// The base interval is the peer's advertised one when the session
+// lookup can resolve it, else the spec idle default.
 //
-// Matches matter.js InteractionMessenger.ts:742 default
-// (`Millis(500)`). A 2-second value left the 10-chunk Subscribe-Initial
-// taking ~10s — Apple's HMMTRAccessoryServer fires "Rebuilding HAP
-// Services from MTRDevice cache" 50ms after CASESessionSanityCheckPassed
-// without waiting for the cache to prime, hits "No enumeration/topology
-// dictionary", and releases the fabric after ~15s. With 500ms per chunk
-// the full Subscribe-Initial completes in ~2.5s and Apple's cache is
-// primed before the HAP rebuild even begins.
-const perChunkStatusRespTimeout = 500 * time.Millisecond
+// A test may pin the bound through chunkStatusResponseTimeoutOverride;
+// zero means derive it.
+func (b *Bridge) chunkStatusResponseTimeout(sessionID uint16) time.Duration {
+	if b.chunkStatusResponseTimeoutOverride > 0 {
+		return b.chunkStatusResponseTimeoutOverride
+	}
+	base := b.outboundBaseInterval(sessionID, time.Now())
+	if base <= 0 {
+		base = mrp.SessionIdleIntervalDefault
+	}
+	var backoff time.Duration
+	for n := 0; n <= mrp.MaxRetransmissions; n++ {
+		backoff += mrp.BackoffDuration(base, n, func() float64 { return 1 })
+	}
+	return backoff + chunkStatusResponseExpectedProcessing + chunkStatusResponseBuffer
+}
 
 // AttachSubscriptionManager wires the subscription manager that
 // powers IM Subscribe. When set, inbound SubscribeRequest datagrams
@@ -94,6 +114,7 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 func (b *Bridge) releaseSubscriptionRouting(subID uint32) {
 	b.routing.subTargets.Delete(subID)
 	b.subSendErrorCount.Delete(subID)
+	b.forgetReportExchange(subID)
 	// reportCounterOwner is keyed by (session, counter), so the owning
 	// subscription is only visible in the value — a scan is the only
 	// way to reclaim the in-flight report counters of a subscription
@@ -234,7 +255,15 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		EventReports:    authorizedEvents,
 	}
 
-	counters, err := b.sendReportChunks(target, report)
+	// Same bridge-initiated exchange as the attribute path: the
+	// commissioner closed its Subscribe exchange when the
+	// SubscribeResponse landed, and a report sent there with
+	// Initiator=false is an unsolicited message on an unknown exchange —
+	// matter.js answers it with a standalone ack and drops it
+	// (ExchangeManager.ts:411-418), which the MRP layer here would then
+	// mistake for delivery. Ongoing server reports are always fresh
+	// server-initiated exchanges (ServerSubscription.ts:823).
+	counters, freshExch, err := b.sendInitiatedReport(target, report)
 	if err != nil {
 		b.noteSubscriptionSendError(sub.ID, "event_report", err)
 		return
@@ -243,9 +272,11 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	for _, counter := range counters {
 		b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), sub.ID)
 	}
+	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
 	b.logger.Debug("matter.tx.subscribe.event_report",
 		slog.Int("subscription_id", int(sub.ID)),
-		slog.Int("events", len(events)))
+		slog.Int("events", len(events)),
+		slog.Int("exchange_id", int(freshExch)))
 }
 
 // EmitEvent is the bridge-side [contract.EventEmitter]
@@ -410,6 +441,7 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 	for _, counter := range counters {
 		b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), sub.ID)
 	}
+	b.rememberReportExchange(sub.ID, target.sessionID, freshExch)
 	b.logger.Debug("matter.tx.subscribe.report",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("paths", len(paths)),
@@ -460,6 +492,7 @@ func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
 	// from the manager so the engine stops ticking a dead subscription.
 	b.routing.subTargets.Delete(subID)
 	b.subSendErrorCount.Delete(subID)
+	b.forgetReportExchange(subID)
 	if m := b.subscriptionManagerLocked(); m != nil {
 		_ = m.Close(subID) // ErrNotFound is fine — racing with peer or ACK-pump Close
 	}
@@ -488,6 +521,7 @@ func (b *Bridge) closeSubscriptionByCounter(sessionID uint16, counter uint32) {
 	}
 	b.routing.subTargets.Delete(subID)
 	b.subSendErrorCount.Delete(subID)
+	b.forgetReportExchange(subID)
 	if m := b.subscriptionManagerLocked(); m != nil {
 		_ = m.Close(subID) // ErrNotFound is fine — racing with peer Close
 	}
@@ -495,6 +529,64 @@ func (b *Bridge) closeSubscriptionByCounter(sessionID uint16, counter uint32) {
 		b.logger.Info("matter.subscribe.peer_unreachable",
 			slog.Int("subscription_id", int(subID)),
 			slog.String("hint", "max retransmissions reached; subscription reaped"))
+	}
+}
+
+// rememberReportExchange records that subID's latest ongoing report
+// rides the bridge-initiated exchange (sessionID, exchangeID), replacing
+// the record of the previous report so the table holds one entry per
+// live subscription. Consulted by [Bridge.closeSubscriptionByExchange]
+// when the peer answers on that exchange.
+func (b *Bridge) rememberReportExchange(subID uint32, sessionID, exchangeID uint16) {
+	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true}
+	if prev, loaded := b.subReportExchange.Swap(subID, key); loaded {
+		if prevKey, ok := prev.(mrp.ExchangeKey); ok {
+			b.reportExchangeOwner.Delete(prevKey)
+		}
+	}
+	b.reportExchangeOwner.Store(key, subID)
+}
+
+// forgetReportExchange drops both halves of subID's report-exchange
+// record. Every reap path calls it so a reused exchange id can never be
+// attributed to a subscription that is already gone.
+func (b *Bridge) forgetReportExchange(subID uint32) {
+	if prev, loaded := b.subReportExchange.LoadAndDelete(subID); loaded {
+		if prevKey, ok := prev.(mrp.ExchangeKey); ok {
+			b.reportExchangeOwner.Delete(prevKey)
+		}
+	}
+}
+
+// closeSubscriptionByExchange ends the subscription whose latest ongoing
+// report rode the bridge-initiated exchange (sessionID, exchangeID),
+// because the peer answered that report with the error status given.
+// A report exchange nobody remembers (an initial-report chunk, a
+// timed-request reply, a subscription already reaped) is ignored.
+// Mirrors matter.js ServerSubscription.ts:866-876: InvalidSubscription
+// and Failure mark the subscription terminated, and #closeFromUpdate
+// cancels it for any error status.
+func (b *Bridge) closeSubscriptionByExchange(sessionID, exchangeID uint16, status im.StatusCode) {
+	raw, ok := b.reportExchangeOwner.Load(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true})
+	if !ok {
+		return
+	}
+	subID, ok := raw.(uint32)
+	if !ok || subID == 0 {
+		return
+	}
+	b.routing.subTargets.Delete(subID)
+	b.subSendErrorCount.Delete(subID)
+	b.forgetReportExchange(subID)
+	if m := b.subscriptionManagerLocked(); m != nil {
+		_ = m.Close(subID) // ErrNotFound is fine — racing with peer Close
+	}
+	if b.logger != nil {
+		b.logger.Info("matter.subscribe.peer_rejected",
+			slog.Int("subscription_id", int(subID)),
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.String("status", status.String()),
+			slog.String("hint", "peer answered an ongoing report with an error status; subscription closed"))
 	}
 }
 
@@ -661,14 +753,12 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 
 	// sendUnsolicitedIM is the low-level primitive that ships an IM
 	// datagram on whichever exchange the caller has prepared in `target`.
-	// sendReportChunks is the caller, and the target it hands down
-	// carries one of two semantics:
-	//   - reportSubscriptionEvents stays on the peer-opened Subscribe
-	//     exchange (target.peerInitiator=true → Initiator=false).
-	//   - sendInitiatedReport forges a fresh bridge-opened exchange
-	//     (target.peerInitiator=false → Initiator=true) for ongoing
-	//     attribute reports. See sendInitiatedReport's doc for the Apple
-	//     HMOutlet projection background.
+	// sendReportChunks is the caller; both ongoing reporters (attributes
+	// and events) reach it through sendInitiatedReport, which forges a
+	// fresh bridge-opened exchange (target.peerInitiator=false →
+	// Initiator=true). A target with peerInitiator=true would answer on
+	// the peer-opened exchange instead — only meaningful while that
+	// exchange is still open on the peer's side.
 	respProto := message.ProtocolHeader{
 		Initiator:  !target.peerInitiator, // caller picks via target.peerInitiator
 		Opcode:     opcode,
@@ -719,14 +809,38 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 		datagram = append(respHdr.Marshal(), enc.Ciphertext...)
 	}
 
-	if err := listener.Send(target.src, datagram); err != nil {
+	// Route to the address the peer most recently used on this session,
+	// not the one frozen into the target at Subscribe time: a controller
+	// whose source address rotates mid-session keeps authenticating from
+	// the new one, and matter.js adopts it ("the new message wins",
+	// ExchangeManager.ts:400-405) before routing reports through the
+	// session's current channel (ServerSubscription.ts:823).
+	dest := b.currentPeerAddr(target.sessionID, target.src)
+	if err := listener.Send(dest, datagram); err != nil {
 		return 0, err
 	}
 	if tracker != nil && respProto.NeedsAck {
-		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, target.src, time.Now())
+		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, time.Now())
 		return counter, nil
 	}
 	return 0, nil
+}
+
+// currentPeerAddr returns the last authenticated source address seen on
+// sessionID, falling back to fallback when none was recorded (session 0
+// has no authenticated peer, and a test may plant a target without any
+// inbound traffic). The record is written by the receive pipeline for
+// every datagram that decrypts under the session.
+func (b *Bridge) currentPeerAddr(sessionID uint16, fallback *net.UDPAddr) *net.UDPAddr {
+	if sessionID == 0 {
+		return fallback
+	}
+	if raw, ok := b.sessionPeerAddrs.Load(sessionID); ok {
+		if addr, ok := raw.(*net.UDPAddr); ok && addr != nil {
+			return addr
+		}
+	}
+	return fallback
 }
 
 // handleSubscribeRequest is the Subscribe-opcode branch of the IM
@@ -758,11 +872,13 @@ func (b *Bridge) handleSubscribeRequest(
 
 	// Reject illegal paths up front with a top-level InvalidAction
 	// StatusResponse (wildcard cluster + concrete non-global attribute, or
-	// wildcard cluster + concrete event) before building any report. Mirrors
+	// wildcard cluster + concrete event), and a request beyond the path
+	// ceiling with PathsExhausted, before building any report. Mirrors
 	// matter.js InteractionServer.ts validateReadPaths (#3926, Matter
-	// §8.4.3.2), which gates Read and Subscribe through the same check.
-	if im.ValidateReadPaths(req.AttributeRequests, req.EventRequests) != im.StatusSuccess {
-		return b.rejectSubscribeInvalidAction(src, requestHdr, proto, "path")
+	// §8.4.3.2), which gates Read and Subscribe through the same check,
+	// and the MAX_SUBSCRIBE_PATHS check that follows it (:600-604).
+	if status := im.ValidateReadPaths(req.AttributeRequests, req.EventRequests); status != im.StatusSuccess {
+		return b.rejectSubscribeStatus(src, requestHdr, proto, "path", status)
 	}
 
 	// A Subscribe naming no attribute and no event paths at all is

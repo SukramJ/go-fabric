@@ -28,31 +28,62 @@ import (
 	"github.com/SukramJ/go-fabric/transport/message"
 )
 
-// readSubscribeOpcode reads one datagram off peerConn and returns its
-// IM opcode. On a StatusResponse it also logs the decoded status code
-// so a misrouted-to-rejection failure is diagnosable from the test
-// output without a second run.
-func readSubscribeOpcode(t *testing.T, peerConn *net.UDPConn) uint8 {
+// answerReportChunks does what a real controller does with each
+// Subscribe-Initial ReportData chunk: it answers with an IM
+// StatusResponse(Success). Since the chunk loop abandons the
+// interaction when a chunk goes unanswered (matter.js
+// InteractionMessenger.ts:719-721 waitForSuccess →
+// MessageExchange.ts:829-858), a peer that only reads never reaches the
+// SubscribeResponse — so the reader and the request must run
+// concurrently. The returned channel carries the opcodes the peer saw,
+// in order, and closes when the peer's read deadline expires.
+//
+// The wait is keyed on the outbound datagram's own (session, exchange,
+// Initiator) triple, which is exactly what sendReplyOpts stamps
+// (reply.go:153) and what armStatusResponseWait registers.
+func answerReportChunks(b *Bridge, peerConn *net.UDPConn) <-chan uint8 {
+	opcodes := make(chan uint8, 8)
+	go func() {
+		defer close(opcodes)
+		for {
+			_ = peerConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			rbuf := make([]byte, 1500)
+			n, _, err := peerConn.ReadFromUDP(rbuf)
+			if err != nil {
+				return
+			}
+			got := rbuf[:n]
+			hdr, hdrLen, err := message.UnmarshalHeader(got)
+			if err != nil {
+				return
+			}
+			rproto, _, err := message.UnmarshalProtocolHeader(got[hdrLen:])
+			if err != nil {
+				return
+			}
+			opcodes <- rproto.Opcode
+			if rproto.Opcode == im.OpcodeReportData {
+				b.signalStatusResponseRX(hdr.SessionID, rproto.ExchangeID, rproto.Initiator, im.StatusSuccess)
+			}
+		}
+	}()
+	return opcodes
+}
+
+// nextSubscribeOpcode takes the next opcode the peer observed, failing
+// the test when none arrives.
+func nextSubscribeOpcode(t *testing.T, opcodes <-chan uint8) uint8 {
 	t.Helper()
-	_ = peerConn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	rbuf := make([]byte, 1500)
-	n, _, err := peerConn.ReadFromUDP(rbuf)
-	if err != nil {
-		t.Fatalf("ReadFromUDP: %v", err)
+	select {
+	case op, ok := <-opcodes:
+		if !ok {
+			t.Fatal("peer saw no further datagram before its read deadline")
+		}
+		return op
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for the next datagram")
+		return 0
 	}
-	got := rbuf[:n]
-	_, hdrLen, err := message.UnmarshalHeader(got)
-	if err != nil {
-		t.Fatalf("UnmarshalHeader: %v", err)
-	}
-	rproto, protoLen, err := message.UnmarshalProtocolHeader(got[hdrLen:])
-	if err != nil {
-		t.Fatalf("UnmarshalProtocolHeader: %v", err)
-	}
-	if rproto.Opcode == im.OpcodeStatusResponse {
-		t.Logf("readSubscribeOpcode: got StatusResponse, status=%v", decodeStatusResponseCode(t, got[hdrLen+protoLen:]))
-	}
-	return rproto.Opcode
 }
 
 // TestHandleSubscribeRequest_MatchingPath_EstablishesAndReplies is the
@@ -78,15 +109,18 @@ func TestHandleSubscribeRequest_MatchingPath_EstablishesAndReplies(t *testing.T)
 		MaxIntervalCeiling: 60,
 	}
 
-	if err := b.handleSubscribeRequest(context.Background(), peerAddr, hdr, proto, req); err != nil {
-		t.Fatalf("handleSubscribeRequest: %v", err)
-	}
+	opcodes := answerReportChunks(b, peerConn)
+	done := make(chan error, 1)
+	go func() { done <- b.handleSubscribeRequest(context.Background(), peerAddr, hdr, proto, req) }()
 
-	if op := readSubscribeOpcode(t, peerConn); op != im.OpcodeReportData {
+	if op := nextSubscribeOpcode(t, opcodes); op != im.OpcodeReportData {
 		t.Fatalf("first reply opcode = 0x%02X, want ReportData (0x%02X)", op, im.OpcodeReportData)
 	}
-	if op := readSubscribeOpcode(t, peerConn); op != im.OpcodeSubscribeResponse {
+	if op := nextSubscribeOpcode(t, opcodes); op != im.OpcodeSubscribeResponse {
 		t.Fatalf("second reply opcode = 0x%02X, want SubscribeResponse (0x%02X)", op, im.OpcodeSubscribeResponse)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("handleSubscribeRequest: %v", err)
 	}
 	if n := mgr.Active(); n != 1 {
 		t.Errorf("mgr.Active() = %d, want 1 — a Subscribe matching a real path must register", n)
@@ -149,20 +183,23 @@ func TestHandleSubscribeRequest_DataVersionFilterFullSuppression_StillEstablishe
 		MaxIntervalCeiling: 60,
 	}
 
-	if err := b.handleSubscribeRequest(context.Background(), peerAddr, hdr, proto, req); err != nil {
-		t.Fatalf("handleSubscribeRequest: %v", err)
-	}
+	opcodes := answerReportChunks(b, peerConn)
+	done := make(chan error, 1)
+	go func() { done <- b.handleSubscribeRequest(context.Background(), peerAddr, hdr, proto, req) }()
 
 	// Must still be ReportData (suppressed to zero AttributeReports) then
 	// SubscribeResponse — NOT StatusResponse(InvalidAction). If
 	// buildInitialReport's matched count were computed AFTER suppression
 	// instead of before, this all-cached re-subscribe would misfire into
 	// rejectSubscribeInvalidAction here.
-	if op := readSubscribeOpcode(t, peerConn); op != im.OpcodeReportData {
+	if op := nextSubscribeOpcode(t, opcodes); op != im.OpcodeReportData {
 		t.Fatalf("first reply opcode = 0x%02X, want ReportData (0x%02X) — an all-cached re-subscribe must still establish", op, im.OpcodeReportData)
 	}
-	if op := readSubscribeOpcode(t, peerConn); op != im.OpcodeSubscribeResponse {
+	if op := nextSubscribeOpcode(t, opcodes); op != im.OpcodeSubscribeResponse {
 		t.Fatalf("second reply opcode = 0x%02X, want SubscribeResponse (0x%02X)", op, im.OpcodeSubscribeResponse)
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("handleSubscribeRequest: %v", err)
 	}
 	if n := mgr.Active(); n != 1 {
 		t.Errorf("mgr.Active() = %d, want 1 — a fully-suppressed but matched Subscribe must still register", n)

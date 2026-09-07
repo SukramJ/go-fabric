@@ -4,6 +4,7 @@
 package mattercert_test
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -35,8 +36,66 @@ type verifyTestCertOpts struct {
 	subjectNodeID      uint64
 	subjectHasFabricID bool
 	subjectFabricID    uint64
+	subjectCATs        []uint32
 	// key
 	pubKey []byte
+	// extensions — zero values take the spec shape for the subject kind
+	// (see putTestExtensions); set explicitly to build a malformed cert.
+	noExtensions bool
+	extIsCA      *bool
+	extKeyUsage  *uint16
+	extEKU       []uint8
+	extSKID      []byte
+}
+
+// putTestExtensions writes tag 10 the way a real operational cert carries
+// it (matter.js CertificateAuthority.ts): NOC → not a CA, keyUsage
+// digitalSignature, EKU serverAuth+clientAuth, 20-byte SKID; ICAC / RCAC
+// → CA, keyUsage keyCertSign|cRLSign, 20-byte SKID. Explicit opts fields
+// override the shape so tests can build the malformed variants.
+func putTestExtensions(t *testing.T, e *tlv.Encoder, opts verifyTestCertOpts) {
+	t.Helper()
+	e.StartList(tlv.ContextTag(10))
+	if !opts.noExtensions {
+		isCA := !opts.subjectHasNodeID
+		if opts.extIsCA != nil {
+			isCA = *opts.extIsCA
+		}
+		keyUsage := uint16(0x0001)
+		if isCA {
+			keyUsage = 0x0060
+		}
+		if opts.extKeyUsage != nil {
+			keyUsage = *opts.extKeyUsage
+		}
+		e.StartStruct(tlv.ContextTag(1))
+		e.PutBool(tlv.ContextTag(1), isCA)
+		if err := e.EndContainer(); err != nil {
+			t.Fatalf("EndContainer basic-constraints: %v", err)
+		}
+		e.PutUint(tlv.ContextTag(2), uint64(keyUsage))
+		eku := opts.extEKU
+		if eku == nil && !isCA {
+			eku = []uint8{1, 2}
+		}
+		if len(eku) > 0 {
+			e.StartArray(tlv.ContextTag(3))
+			for _, v := range eku {
+				e.PutUint(tlv.AnonymousTag(), uint64(v))
+			}
+			if err := e.EndContainer(); err != nil {
+				t.Fatalf("EndContainer eku: %v", err)
+			}
+		}
+		skid := opts.extSKID
+		if skid == nil {
+			skid = bytes.Repeat([]byte{0x5A}, 20)
+		}
+		e.PutOctets(tlv.ContextTag(4), skid)
+	}
+	if err := e.EndContainer(); err != nil {
+		t.Fatalf("EndContainer extensions: %v", err)
+	}
 }
 
 // buildMinimalCert constructs a Matter cert TLV with the given options
@@ -78,6 +137,9 @@ func buildTBSCert(t *testing.T, opts verifyTestCertOpts) []byte {
 	if opts.subjectHasFabricID {
 		e.PutUint(tlv.ContextTag(21), opts.subjectFabricID)
 	}
+	for _, cat := range opts.subjectCATs {
+		e.PutUint(tlv.ContextTag(22), uint64(cat))
+	}
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer subject: %v", err)
 	}
@@ -86,10 +148,7 @@ func buildTBSCert(t *testing.T, opts verifyTestCertOpts) []byte {
 	e.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	e.PutOctets(tlv.ContextTag(9), opts.pubKey)
 
-	e.StartList(tlv.ContextTag(10)) // Extensions
-	if err := e.EndContainer(); err != nil {
-		t.Fatalf("EndContainer extensions: %v", err)
-	}
+	putTestExtensions(t, e, opts)
 
 	// No signature field for TBS
 	if err := e.EndContainer(); err != nil {
@@ -182,6 +241,9 @@ func buildSignedCert(t *testing.T, opts verifyTestCertOpts, priv *ecdsa.PrivateK
 	if opts.subjectHasFabricID {
 		e.PutUint(tlv.ContextTag(21), opts.subjectFabricID)
 	}
+	for _, cat := range opts.subjectCATs {
+		e.PutUint(tlv.ContextTag(22), uint64(cat))
+	}
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer subject2: %v", err)
 	}
@@ -190,10 +252,7 @@ func buildSignedCert(t *testing.T, opts verifyTestCertOpts, priv *ecdsa.PrivateK
 	e.PutUint(tlv.ContextTag(8), mattercert.CurvePrime256v1)
 	e.PutOctets(tlv.ContextTag(9), opts.pubKey)
 
-	e.StartList(tlv.ContextTag(10))
-	if err := e.EndContainer(); err != nil {
-		t.Fatalf("EndContainer extensions2: %v", err)
-	}
+	putTestExtensions(t, e, opts)
 
 	e.PutOctets(tlv.ContextTag(11), sig)
 
@@ -505,8 +564,8 @@ func TestVerifyAndExtractPubKey_Expired(t *testing.T) {
 		t.Fatalf("NewVerifier: %v", err)
 	}
 	_, err = v.VerifyAndExtractPubKey(nocRaw, nil)
-	if !errors.Is(err, mattercert.ErrExpired) {
-		t.Fatalf("expected ErrExpired, got %v", err)
+	if err != nil {
+		t.Fatalf("an expired NOC must be accepted — matter.js never checks notAfter (OperationalBase.ts:82-89, LKGT pending): %v", err)
 	}
 }
 
@@ -1441,8 +1500,12 @@ func TestBuildDN_FallbackOrder(t *testing.T) {
 	}
 }
 
-// TestCheckValidity_NotYetValid verifies that a cert whose NotBefore is in
-// the future returns ErrExpired (the "now < NotBefore" path).
+// TestCheckValidity_NotYetValid pins the gold standard's tolerance: a cert
+// whose NotBefore lies in the future is accepted, because matter.js
+// OperationalBase.ts:82-89 only warns on it (its CA backdates NOCs by a
+// year for exactly the clock-skew case) and never checks notAfter. A
+// bridge whose clock is behind the commissioner's must not refuse AddNOC
+// and every later CASE until the clock catches up.
 func TestCheckValidity_NotYetValid(t *testing.T) {
 	t.Parallel()
 	rootPriv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -1479,9 +1542,8 @@ func TestCheckValidity_NotYetValid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewVerifier: %v", err)
 	}
-	_, err = v.VerifyAndExtractPubKey(nocRaw, nil)
-	if !errors.Is(err, mattercert.ErrExpired) {
-		t.Fatalf("err = %v, want ErrExpired (not yet valid)", err)
+	if _, err = v.VerifyAndExtractPubKey(nocRaw, nil); err != nil {
+		t.Fatalf("a NOC with NotBefore in the future must be accepted (matter.js warns only): %v", err)
 	}
 }
 
@@ -2198,8 +2260,8 @@ func TestVerifyAndExtractPubKey_ICAC_Expired(t *testing.T) {
 		t.Fatalf("NewVerifier: %v", err)
 	}
 	_, err = v.VerifyAndExtractPubKey(nocRaw, icacRaw)
-	if !errors.Is(err, mattercert.ErrExpired) {
-		t.Fatalf("err = %v, want ErrExpired for expired ICAC", err)
+	if err != nil {
+		t.Fatalf("an expired ICAC must be accepted — matter.js never checks notAfter (OperationalBase.ts:82-89, LKGT pending): %v", err)
 	}
 }
 

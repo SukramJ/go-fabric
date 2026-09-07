@@ -4,6 +4,7 @@
 package core_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -302,24 +303,7 @@ func buildCoreTestTBSForSubject(t *testing.T, pub []byte, isRoot bool, fabricID,
 	e.PutUint(tlv.ContextTag(8), testCurvePrime256v1) // curve
 	e.PutOctets(tlv.ContextTag(9), pub)               // public key
 
-	// Extensions (tag 10). RCAC certificates require KeyUsage and
-	// BasicConstraints so ValidateRCAC passes. NOC certs carry no
-	// extensions (empty list); ValidateRCAC is not called on NOCs.
-	e.StartList(tlv.ContextTag(10))
-	if isRoot {
-		// BasicConstraints (extTag=1): isCA=true (tag 1), pathLen=1 (tag 2).
-		e.StartStruct(tlv.ContextTag(1))
-		e.PutBool(tlv.ContextTag(1), true) // isCA
-		e.PutUint(tlv.ContextTag(2), 1)    // pathLen = 1
-		if err := e.EndContainer(); err != nil {
-			t.Fatalf("EndContainer basicConstraints: %v", err)
-		}
-		// KeyUsage (extTag=2): keyCertSign (bit 5 = 0x20) | cRLSign (bit 6 = 0x40).
-		e.PutUint(tlv.ContextTag(2), uint64(0x60))
-	}
-	if err := e.EndContainer(); err != nil {
-		t.Fatalf("EndContainer ext: %v", err)
-	}
+	putCoreTestExtensions(t, e, isRoot)
 
 	if err := e.EndContainer(); err != nil {
 		t.Fatalf("EndContainer top: %v", err)
@@ -329,6 +313,42 @@ func buildCoreTestTBSForSubject(t *testing.T, pub []byte, isRoot bool, fabricID,
 		t.Fatalf("Bytes: %v", err)
 	}
 	return raw
+}
+
+// putCoreTestExtensions writes tag 10 in the shape a real operational
+// certificate carries (matter.js CertificateAuthority.ts): the RCAC is a CA
+// with keyCertSign|cRLSign; the NOC is not a CA, has keyUsage
+// digitalSignature, EKU serverAuth+clientAuth and a 20-byte SKID — the
+// predicates mattercert.VerifyAndExtractPubKey enforces on AddNOC. Both
+// cert builders in this file use it so the signed TBS and the re-emitted
+// certificate carry identical bytes.
+func putCoreTestExtensions(t *testing.T, e *tlv.Encoder, isRoot bool) {
+	t.Helper()
+	e.StartList(tlv.ContextTag(10))
+	e.StartStruct(tlv.ContextTag(1))
+	e.PutBool(tlv.ContextTag(1), isRoot) // isCA
+	if isRoot {
+		e.PutUint(tlv.ContextTag(2), 1) // pathLen = 1
+	}
+	if err := e.EndContainer(); err != nil {
+		t.Fatalf("EndContainer basicConstraints: %v", err)
+	}
+	if isRoot {
+		// KeyUsage (extTag=2): keyCertSign (bit 5 = 0x20) | cRLSign (bit 6 = 0x40).
+		e.PutUint(tlv.ContextTag(2), uint64(0x60))
+	} else {
+		e.PutUint(tlv.ContextTag(2), uint64(0x01)) // digitalSignature
+		e.StartArray(tlv.ContextTag(3))            // EKU: serverAuth, clientAuth
+		e.PutUint(tlv.AnonymousTag(), 1)
+		e.PutUint(tlv.AnonymousTag(), 2)
+		if err := e.EndContainer(); err != nil {
+			t.Fatalf("EndContainer eku: %v", err)
+		}
+	}
+	e.PutOctets(tlv.ContextTag(4), bytes.Repeat([]byte{0x5A}, 20)) // SKID
+	if err := e.EndContainer(); err != nil {
+		t.Fatalf("EndContainer ext: %v", err)
+	}
 }
 
 func buildCoreSignedCert(t *testing.T, priv *ecdsa.PrivateKey, isRoot bool, signerPriv *ecdsa.PrivateKey) []byte {
@@ -423,19 +443,7 @@ func buildCoreSignedCertForSubject(t *testing.T, pub []byte, isRoot bool, signer
 	e.PutUint(tlv.ContextTag(8), testCurvePrime256v1)
 	e.PutOctets(tlv.ContextTag(9), pub)
 
-	e.StartList(tlv.ContextTag(10))
-	if isRoot {
-		e.StartStruct(tlv.ContextTag(1))
-		e.PutBool(tlv.ContextTag(1), true)
-		e.PutUint(tlv.ContextTag(2), 1)
-		if err := e.EndContainer(); err != nil {
-			t.Fatalf("EndContainer basicConstraints2: %v", err)
-		}
-		e.PutUint(tlv.ContextTag(2), uint64(0x60))
-	}
-	if err := e.EndContainer(); err != nil {
-		t.Fatalf("EndContainer ext2: %v", err)
-	}
+	putCoreTestExtensions(t, e, isRoot)
 
 	e.PutOctets(tlv.ContextTag(11), sig)
 

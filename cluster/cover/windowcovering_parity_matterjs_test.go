@@ -6,9 +6,11 @@ package cover_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -413,5 +415,85 @@ func TestWindowCoveringServer_MatterReportable(t *testing.T) {
 
 	if !has(clusterwire.WindowCoveringAttrOperationalStatus) {
 		t.Error("MatterReportable missing OperationalStatus (0x000A)")
+	}
+}
+
+// TestParityMatterJS_WindowCoveringServesGlobalAttributes pins that the
+// server answers FeatureMap (0xFFFC) and ClusterRevision (0xFFFD) itself.
+// The dispatcher synthesises only the list-valued globals
+// (endpoint/dispatcher.go synthesizeGlobalRead), so a server that leaves
+// these two to it answers UnsupportedAttribute on every wildcard read —
+// the sibling reference servers (cluster/valve, cluster/modeselect) serve
+// both. The revision is the one pinned against matter.js HEAD by
+// TestParityMatterJS_WindowCoveringClusterRevision.
+func TestParityMatterJS_WindowCoveringServesGlobalAttributes(t *testing.T) {
+	t.Parallel()
+
+	schema := loadSchema(t)
+	js, ok := clusterEntry(schema, clusterwire.WindowCoveringClusterID)
+	if !ok {
+		t.Fatalf("matter.js schema has no cluster 0x%04X (WindowCovering)", clusterwire.WindowCoveringClusterID)
+	}
+
+	const featureMap uint32 = 0x05 // LF (bit 0) + PA_LF (bit 2), window-covering-cluster.element.ts:15,17
+	srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: featureMap})
+
+	v, ok := srv.MatterRead(cluster.AttrGlobalFeatureMap)
+	if !ok {
+		t.Fatal("FeatureMap (0xFFFC): ok=false — the dispatcher does not synthesise it, so the read answers UnsupportedAttribute")
+	}
+	if got, isU32 := v.(uint32); !isU32 || got != featureMap {
+		t.Errorf("FeatureMap = %v (%T), want uint32 0x%02X", v, v, featureMap)
+	}
+
+	v, ok = srv.MatterRead(cluster.AttrGlobalClusterRevision)
+	if !ok {
+		t.Fatal("ClusterRevision (0xFFFD): ok=false — the dispatcher does not synthesise it, so the read answers UnsupportedAttribute")
+	}
+	if got, isU16 := v.(uint16); !isU16 || got != js.Revision {
+		t.Errorf("ClusterRevision = %v (%T), want uint16 %d (matter.js HEAD)", v, v, js.Revision)
+	}
+}
+
+// TestParityMatterJS_WindowCoveringGoToLiftPercentageAcceptsTheBridgeTagMap
+// pins the payload shape a real controller's GoToLiftPercentage arrives
+// in: the bridge has no typed decoder for cluster 0x0102, so its generic
+// salvage path hands over map[uint8]any with field 0
+// (LiftPercent100thsValue, window-covering-cluster.element.ts:95) as a
+// uint64. The typed [clusterwire.GoToLiftPercentageRequest] stays
+// accepted for hosts that decode the command themselves.
+func TestParityMatterJS_WindowCoveringGoToLiftPercentageAcceptsTheBridgeTagMap(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		fields any
+	}{
+		{"bridge tag map", map[uint8]any{0: uint64(2500)}},
+		{"typed request", clusterwire.GoToLiftPercentageRequest{LiftPercent100thsValue: 2500}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0x05})
+			if _, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdGoToLiftPercentage, tc.fields); err != nil {
+				t.Fatalf("GoToLiftPercentage(%T): %v", tc.fields, err)
+			}
+			v, ok := srv.MatterRead(clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths)
+			if !ok {
+				t.Fatal("TargetPositionLiftPercent100ths: ok=false")
+			}
+			if got := v.(uint16); got != 2500 {
+				t.Errorf("TargetPositionLiftPercent100ths = %d, want 2500", got)
+			}
+		})
+	}
+
+	// The constraint still bites through the tag map.
+	srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0x05})
+	_, err := srv.MatterInvoke(context.Background(), clusterwire.WindowCoveringCmdGoToLiftPercentage, map[uint8]any{0: uint64(10001)})
+	var sc im.StatusCodeError
+	if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusConstraintError {
+		t.Fatalf("GoToLiftPercentage(10001 via tag map) error = %v, want ConstraintError", err)
 	}
 }

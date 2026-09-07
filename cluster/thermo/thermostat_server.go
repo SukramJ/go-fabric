@@ -18,9 +18,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -389,42 +391,27 @@ func abs16(x int16) int16 {
 }
 
 // handleSetpointRaiseLower implements the SetpointRaiseLower command per
-// matter.js ThermostatServer.ts:setpointRaiseLower (lines 157-242).
+// matter.js ThermostatServer.ts:setpointRaiseLower (lines 186-233).
 // mode=Heat without HEAT feature → InvalidCommand; mode=Cool without COOL
 // feature → InvalidCommand; otherwise apply amount*10 delta, clamped to limits.
+//
+// Mode values are SetpointRaiseLowerModeEnum
+// (thermostat-cluster.element.ts:510-514): Heat 0x0, Cool 0x1, Both 0x2 —
+// the [wire.ThermostatSetpointModeHeat] family, never bare literals.
 func (s *ThermostatServer) handleSetpointRaiseLower(fields any) error { //nolint:funlen // single-purpose setpoint command handler with many mode/feature branches
-	// Decode fields: expect map[string]any with "mode" (uint8) and "amount" (int8).
-	m, ok := fields.(map[string]any)
-	if !ok {
-		// Bare nil or untyped call with no fields: treat as Both mode, amount 0.
-		return nil
+	req, err := setpointRaiseLowerRequest(fields)
+	if err != nil {
+		return err
 	}
-	var mode uint8
-	var amount int8
-	if rawMode, has := m["mode"]; has {
-		switch v := rawMode.(type) {
-		case uint8:
-			mode = v
-		case int:
-			mode = uint8(v) //nolint:gosec // field bound 0-2 by spec; see #20
-		}
-	}
-	if rawAmt, has := m["amount"]; has {
-		switch v := rawAmt.(type) {
-		case int8:
-			amount = v
-		case int:
-			amount = int8(v) //nolint:gosec // field is signed byte by spec; see #20
-		}
-	}
+	mode, amount := req.Mode, req.Amount
 
-	// matter.js ThermostatServer.ts:158-166: reject Heat/Cool modes when feature absent.
+	// matter.js ThermostatServer.ts:186-196: reject Heat/Cool modes when feature absent.
 	switch mode {
-	case 1: // Heat
+	case wire.ThermostatSetpointModeHeat:
 		if s.features&ThermostatFeatureHEAT == 0 {
 			return thermoInvalidCommandErr{"thermostat: SetpointRaiseLower mode=Heat requires HEAT feature"}
 		}
-	case 2: // Cool
+	case wire.ThermostatSetpointModeCool:
 		if s.features&ThermostatFeatureCOOL == 0 {
 			return thermoInvalidCommandErr{"thermostat: SetpointRaiseLower mode=Cool requires COOL feature"}
 		}
@@ -457,7 +444,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(fields any) error { //nolint
 	}
 
 	switch mode {
-	case 0: // Both
+	case wire.ThermostatSetpointModeBoth:
 		heat := s.features&ThermostatFeatureHEAT != 0
 		cool := s.features&ThermostatFeatureCOOL != 0
 		switch {
@@ -466,7 +453,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(fields any) error { //nolint
 			// setpoint's overshoot past its limit, then subtract the more
 			// limiting overshoot from BOTH setpoints so their spacing is
 			// kept. Clamping each independently would skew the deadband.
-			// matter.js ThermostatServer.ts:170-189.
+			// matter.js ThermostatServer.ts:202-219.
 			desiredCool := s.occupCool + delta
 			coolLimit := desiredCool - clampCool(desiredCool)
 			desiredHeat := s.occupHeat + delta
@@ -487,14 +474,89 @@ func (s *ThermostatServer) handleSetpointRaiseLower(fields any) error { //nolint
 		default: // heating-only (matter.js falls through to the heating setpoint)
 			s.occupHeat = clampHeat(s.occupHeat + delta)
 		}
-	case 1: // Heat
+	case wire.ThermostatSetpointModeHeat:
 		s.occupHeat = clampHeat(s.occupHeat + delta)
-	case 2: // Cool
+	case wire.ThermostatSetpointModeCool:
 		s.occupCool = clampCool(s.occupCool + delta)
 	default:
 		return thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower unsupported mode %d", mode)}
 	}
 	return nil
+}
+
+// SetpointRaiseLower field tags (thermostat-cluster.element.ts:322-323).
+const (
+	setpointRaiseLowerFieldMode   uint8 = 0
+	setpointRaiseLowerFieldAmount uint8 = 1
+)
+
+// setpointRaiseLowerRequest normalises the command payload the bridge
+// hands over. The bridge has no typed decoder for this cluster, so a
+// real invocation arrives as the tag-keyed map its generic salvage path
+// produces (bridge/fields_reader.go decodeGenericTagMap: unsigned as
+// uint64, signed as int64); a host that decodes the command itself may
+// pass [wire.SetpointRaiseLowerRequest] or the raw TLV. The "mode" /
+// "amount" string-keyed map stays accepted for direct callers.
+//
+// Both fields are conformance M (element :322-323), so a payload without
+// Mode is refused rather than acknowledged as a no-op.
+func setpointRaiseLowerRequest(fields any) (wire.SetpointRaiseLowerRequest, error) {
+	switch v := fields.(type) {
+	case wire.SetpointRaiseLowerRequest:
+		return v, nil
+	case *wire.SetpointRaiseLowerRequest:
+		if v == nil {
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower carried no fields"}
+		}
+		return *v, nil
+	case []byte:
+		req, err := wire.DecodeSetpointRaiseLower(v)
+		if err != nil {
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower: %v", err)}
+		}
+		return req, nil
+	case map[uint8]any:
+		rawMode, ok := v[setpointRaiseLowerFieldMode]
+		if !ok {
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Mode field"}
+		}
+		mode, ok := cluster.AsUint8(rawMode)
+		if !ok {
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower Mode is %T, want an enum8", rawMode)}
+		}
+		rawAmount, ok := v[setpointRaiseLowerFieldAmount]
+		if !ok {
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Amount field"}
+		}
+		amount, ok := cluster.AsInt16(rawAmount)
+		if !ok || amount < math.MinInt8 || amount > math.MaxInt8 {
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower Amount %v (%T) is not an int8", rawAmount, rawAmount)}
+		}
+		return wire.SetpointRaiseLowerRequest{Mode: mode, Amount: int8(amount)}, nil
+	case map[string]any:
+		var req wire.SetpointRaiseLowerRequest
+		rawMode, has := v["mode"]
+		if !has {
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower is missing the mandatory Mode field"}
+		}
+		mode, ok := cluster.AsUint8(rawMode)
+		if !ok {
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower mode is %T, want an enum8", rawMode)}
+		}
+		req.Mode = mode
+		if rawAmount, has := v["amount"]; has {
+			amount, ok := cluster.AsInt16(rawAmount)
+			if !ok || amount < math.MinInt8 || amount > math.MaxInt8 {
+				return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower amount %v (%T) is not an int8", rawAmount, rawAmount)}
+			}
+			req.Amount = int8(amount)
+		}
+		return req, nil
+	default:
+		return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{
+			fmt.Sprintf("thermostat: SetpointRaiseLower expected wire.SetpointRaiseLowerRequest, map[uint8]any or []byte, got %T", fields),
+		}
+	}
 }
 
 // controlSequenceOfOperation derives the ControlSequenceOfOperationEnum

@@ -59,8 +59,10 @@ func BackoffDuration(base time.Duration, transmission int, rand01 func() float64
 	return time.Duration(float64(base) * MRPBackoffMargin * factor * jitter)
 }
 
-// ErrMaxRetransmissionsReached is returned by [Retransmitter.Tick] for
-// every entry whose retry count has exceeded [MaxRetransmissions].
+// ErrMaxRetransmissionsReached reports a reliable message whose retry
+// count has exceeded [MaxRetransmissions]. The bridge's outbound tracker
+// surfaces it to the peer-facing paths; [Retransmitter.Tick] returns it
+// per abandoned entry.
 var ErrMaxRetransmissionsReached = errors.New("mrp: max retransmissions reached")
 
 // pending captures one in-flight reliable message awaiting an ACK.
@@ -80,13 +82,26 @@ type pending struct {
 type SendFunc func(payload []byte) error
 
 // Retransmitter tracks reliable messages and re-emits them after the
-// configured backoff schedule. The unit-test surface drives time
-// progress explicitly via [Tick(now)], so the package itself does not
-// own a goroutine — the UDP loop wakes the retransmitter when its
-// next-due deadline elapses.
+// configured backoff schedule. It owns no goroutine: the caller drives
+// time explicitly through [Retransmitter.Tick].
+//
+// Nothing in this module constructs one. The bridge keeps its own
+// per-session tracker (bridge/outbound_reliable.go) and takes only
+// [BackoffDuration], [MaxRetransmissions] and [ErrMaxRetransmissionsReached]
+// from this package. The type is kept as public API under the module's
+// deprecation policy (README.md, "API stability"); a consumer that adopts
+// it must run one instance per session, because entries are keyed by the
+// message counter alone and counters are seeded per session
+// (Matter §4.5.4) — two sessions sharing a Retransmitter would overwrite
+// and acknowledge each other's entries.
+//
+// Deprecated: nothing in this module or in the reference daemon constructs a
+// Retransmitter — production reliability lives in bridge/outbound_reliable.go,
+// which uses only [BackoffDuration]. It is kept for one deprecation window and
+// removed afterwards; do not build on it.
 type Retransmitter struct {
 	mu      sync.Mutex
-	entries map[uint32]*pending // keyed on message counter
+	entries map[uint32]*pending // keyed on message counter; one session per instance
 	send    SendFunc
 	rng     *rand.Rand
 }
@@ -100,6 +115,8 @@ type Retransmitter struct {
 // regardless of jitter predictability), so a math/rand/v2 PCG is
 // appropriate here. crypto/rand-strength sources are reserved for
 // session-key material under [..]/secure.
+//
+// Deprecated: see [Retransmitter].
 func NewRetransmitter(send SendFunc, rng *rand.Rand) *Retransmitter {
 	if rng == nil {
 		rng = rand.New(rand.NewPCG(0xCAFEBABE, 0xDEADBEEF)) //nolint:gosec // G404: jitter only — see doc comment; see #20

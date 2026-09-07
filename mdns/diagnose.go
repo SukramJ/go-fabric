@@ -197,25 +197,24 @@ func diagnoseAddresses(svc *Service, name string) []Finding {
 	return out
 }
 
-// isContainerInternal reports whether ip is in a range a container
-// runtime hands out for its own bridge networks. It deliberately does
-// not treat every RFC1918 address as suspect: a LAN is private too, and
-// flagging it would make the check useless in exactly the deployments
-// where it matters.
+// isContainerInternal reports whether ip is in the one range a container
+// runtime is known to hand out by default: Docker's `docker0` bridge,
+// 172.17.0.0/16 (dockerd's fixed default when `bip` is unset). It
+// deliberately does not treat every RFC1918 address as suspect: a LAN is
+// private too, and flagging it would make the check useless in exactly the
+// deployments where it matters.
+//
+// The wider 172.16.0.0/12 is not a container signal. Docker's
+// `default-address-pools` carve user networks out of it — but so do home
+// and office LANs (a bridge on 172.18.x.x is an ordinary deployment), and
+// the same pool also spans 192.168.0.0/16, which this check has never
+// flagged. An address alone cannot tell the two apart; the interface-name
+// filter ([Zeroconf.InterfaceFilter]) is what keeps user-network bridges
+// out of the announcement, and it works by name, not by range.
 func isContainerInternal(ip net.IP) bool {
 	v4 := ip.To4()
 	if v4 == nil {
 		return false
 	}
-	switch {
-	// Docker's default bridge and its default address pool.
-	case v4[0] == 172 && v4[1] >= 17 && v4[1] <= 31:
-		return true
-	// Docker's default `docker0` subnet when configured from the
-	// documented default pool.
-	case v4[0] == 172 && v4[1] == 16:
-		return true
-	default:
-		return false
-	}
+	return v4[0] == 172 && v4[1] == 17
 }

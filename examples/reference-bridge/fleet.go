@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/valve"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 )
@@ -126,8 +127,17 @@ func (d *demoLight) MatterDeviceType() uint16 { return onoff.DeviceTypeOnOffLigh
 // MatterClusterServers implements [contract.EndpointSource]. The assembler
 // adds Descriptor and BridgedDeviceBasicInformation itself; only the
 // device-specific surface comes from here.
+//
+// OnOffLight mandates three clusters besides Identify (on-off-light.element.ts:
+// Groups :22, OnOff with LIGHTING :24-25, ScenesManagement :36). Groups and
+// ScenesManagement are the module's stubs; the light has no group or scene
+// table, and the stubs advertise exactly that.
 func (d *demoLight) MatterClusterServers() []contract.ClusterServer {
-	return []contract.ClusterServer{&onOffServer{dev: d, logMessage: "light.set"}}
+	return []contract.ClusterServer{
+		&onOffServer{dev: d, logMessage: "light.set", lt: newLightingState()},
+		wire.Groups{},
+		wire.ScenesManagement{},
+	}
 }
 
 // deviceName implements [onOffDevice].
@@ -163,6 +173,14 @@ type onOffDevice interface {
 // package rather than being written out here — the revision in particular is
 // read from the generated matter.js snapshot, so a schema regeneration moves
 // it without an edit on this side.
+//
+// With a non-nil [lightingState] the server advertises the LT (Lighting)
+// feature and serves what LT makes mandatory: GlobalSceneControl, OnTime,
+// OffWaitTime, StartUpOnOff and the OffWithEffect / OnWithRecallGlobalScene
+// / OnWithTimedOff commands (on-off.element.ts:30-36, :41-51). The light
+// needs it — OnOffLight marks LIGHTING "M" (on-off-light.element.ts:24-25);
+// the speaker does not (speaker.element.ts:18 requires OnOff, no feature)
+// and runs without.
 type onOffServer struct {
 	dev onOffDevice
 	// logMessage is the slog message [onOffServer.apply] emits. Each device
@@ -170,6 +188,8 @@ type onOffServer struct {
 	// device was driven when more than one serves this cluster.
 	logMessage string
 	version    contract.DataVersionTracker
+	// lt is nil for a server without the Lighting feature.
+	lt *lightingState
 }
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -185,36 +205,248 @@ func (s *onOffServer) MatterRead(attrID uint32) (any, bool) {
 	case onoff.AttrOnOff:
 		return s.dev.isOn(), true
 	case cluster.AttrGlobalFeatureMap:
-		// No LT: these devices support plain On/Off/Toggle and none of the
-		// LT-gated timing attributes.
+		if s.lt != nil {
+			return onoff.FeatureLighting, true
+		}
+		// No LT: plain On/Off/Toggle and none of the LT-gated timing
+		// attributes.
 		return uint32(0), true
 	case cluster.AttrGlobalClusterRevision:
 		return uint32(onoff.Revision()), true
+	}
+	if s.lt == nil {
+		return nil, false
+	}
+	s.lt.mu.Lock()
+	defer s.lt.mu.Unlock()
+	switch attrID {
+	case onoff.AttrGlobalSceneControl:
+		return s.lt.globalSceneControl, true
+	case onoff.AttrOnTime:
+		return s.lt.onTime, true
+	case onoff.AttrOffWaitTime:
+		return s.lt.offWaitTime, true
+	case onoff.AttrStartUpOnOff:
+		// Nullable; null is "keep the last state". (nil, true) encodes the
+		// TLV null. The value is stored and reported but never applied:
+		// matter.js OnOffServer.ts:33-36 skips the start-up transition on
+		// an endpoint owned by an Aggregator, which every endpoint here is.
+		if s.lt.startUpOnOff == nil {
+			return nil, true
+		}
+		return *s.lt.startUpOnOff, true
 	default:
 		return nil, false
 	}
 }
 
-// MatterWrite implements [contract.ClusterServer]. OnOff is command-driven;
-// the attribute itself is read-only per Matter §1.5.6.
-func (s *onOffServer) MatterWrite(context.Context, uint32, any) error {
-	return errors.New("onoff: attribute is read-only")
+// MatterWrite implements [contract.ClusterServer]. OnOff itself is
+// command-driven and read-only per Matter §1.5.6; the three LT attributes
+// are writable (on-off.element.ts:31-36).
+func (s *onOffServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	if s.lt == nil {
+		return errors.New("onoff: attribute is read-only")
+	}
+	switch attrID {
+	case onoff.AttrOnTime, onoff.AttrOffWaitTime:
+		v, ok := asUint16(value)
+		if !ok {
+			return fmt.Errorf("onoff: attribute %#06x expects uint16, got %T", attrID, value)
+		}
+		s.lt.mu.Lock()
+		if attrID == onoff.AttrOnTime {
+			s.lt.onTime = v
+		} else {
+			s.lt.offWaitTime = v
+		}
+		// A write only ends an active countdown parked at 0 or the 0xFFFF
+		// hold; it never starts one — matter.js OnOffServer.ts
+		// #stopHeldTimer.
+		if s.dev.isOn() {
+			if s.lt.timedOn != nil && (s.lt.onTime == 0 || s.lt.onTime == 0xFFFF) {
+				s.lt.stopTimedOn()
+			}
+		} else if s.lt.delayedOff != nil && (s.lt.offWaitTime == 0 || s.lt.offWaitTime == 0xFFFF) {
+			s.lt.stopDelayedOff()
+		}
+		s.lt.mu.Unlock()
+		s.version.Bump()
+		return nil
+	case onoff.AttrStartUpOnOff:
+		var next *uint8
+		if value != nil {
+			v, ok := cluster.AsUint8(value)
+			if !ok || v > onoffStartUpOnOffToggle {
+				return fmt.Errorf("onoff: StartUpOnOff expects 0..2 or null, got %v", value)
+			}
+			next = &v
+		}
+		s.lt.mu.Lock()
+		s.lt.startUpOnOff = next
+		s.lt.mu.Unlock()
+		s.version.Bump()
+		return nil
+	default:
+		return errors.New("onoff: attribute is read-only")
+	}
 }
 
-// MatterInvoke implements [contract.ClusterServer]. All three commands are
+// onoffStartUpOnOffToggle is the largest StartUpOnOffEnum value
+// (on-off.element.ts: Off=0, On=1, Toggle=2).
+const onoffStartUpOnOffToggle uint8 = 2
+
+// MatterInvoke implements [contract.ClusterServer]. Every command is
 // status-only, so the response is nil.
-func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
+func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) (any, error) {
+	if s.lt == nil {
+		switch cmdID {
+		case onoff.CmdOn:
+			s.apply(true)
+		case onoff.CmdOff:
+			s.apply(false)
+		case onoff.CmdToggle:
+			s.apply(!s.dev.isOn())
+		default:
+			return nil, fmt.Errorf("onoff: unsupported command %#x", cmdID)
+		}
+		return nil, nil
+	}
+	s.lt.mu.Lock()
+	defer s.lt.mu.Unlock()
 	switch cmdID {
 	case onoff.CmdOn:
-		s.apply(true)
+		s.on()
 	case onoff.CmdOff:
-		s.apply(false)
+		s.off()
 	case onoff.CmdToggle:
-		s.apply(!s.dev.isOn())
+		if s.dev.isOn() {
+			s.off()
+		} else {
+			s.on()
+		}
+	case onoff.CmdOffWithEffect:
+		// The effect is ignored, as matter.js OnOffServer.ts offWithEffect
+		// does; there is no scene table here to store the global scene in.
+		s.lt.globalSceneControl = false
+		s.off()
+	case onoff.CmdOnWithRecallGlobalScene:
+		if s.lt.globalSceneControl {
+			return nil, nil
+		}
+		s.lt.globalSceneControl = true
+		if s.lt.onTime == 0 {
+			s.lt.offWaitTime = 0
+		}
+		s.on()
+	case onoff.CmdOnWithTimedOff:
+		control, onTime, offWaitTime, err := onWithTimedOffFields(fields)
+		if err != nil {
+			return nil, err
+		}
+		s.onWithTimedOff(control, onTime, offWaitTime)
 	default:
 		return nil, fmt.Errorf("onoff: unsupported command %#x", cmdID)
 	}
 	return nil, nil
+}
+
+// on is the LT-aware On. Caller holds s.lt.mu. Mirrors matter.js
+// OnOffServer.ts on(): GlobalSceneControl is set, and OffWaitTime is kept
+// through a timed-on phase but cleared when no OnTime runs.
+func (s *onOffServer) on() {
+	s.apply(true)
+	s.lt.globalSceneControl = true
+	if s.lt.onTime == 0 {
+		s.lt.stopDelayedOff()
+		s.lt.offWaitTime = 0
+	}
+}
+
+// off is the LT-aware Off. Caller holds s.lt.mu. Mirrors matter.js
+// OnOffServer.ts off(): the timed-on countdown ends, and an OffWaitTime
+// above zero (and below the 0xFFFF hold) enters the delayed-off guard
+// period of spec §1.5.7.6.4.
+func (s *onOffServer) off() {
+	s.apply(false)
+	s.lt.stopTimedOn()
+	s.lt.onTime = 0
+	if s.lt.offWaitTime > 0 && s.lt.offWaitTime != 0xFFFF && s.lt.delayedOff == nil {
+		s.lt.startDelayedOff(s.delayedOffTick)
+	}
+}
+
+// onWithTimedOff is matter.js OnOffServer.ts onWithTimedOff. Caller holds
+// s.lt.mu.
+func (s *onOffServer) onWithTimedOff(control uint8, onTime, offWaitTime uint16) {
+	const acceptOnlyWhenOn = 0x01
+	on := s.dev.isOn()
+	if control&acceptOnlyWhenOn != 0 && !on {
+		return
+	}
+	if s.lt.offWaitTime > 0 && !on {
+		// Delayed-off guard: the device stays off; the request may only
+		// shorten the remaining wait.
+		s.lt.offWaitTime = min(offWaitTime, s.lt.offWaitTime)
+		if s.lt.delayedOff == nil && s.lt.offWaitTime > 0 && s.lt.offWaitTime != 0xFFFF {
+			s.lt.startDelayedOff(s.delayedOffTick)
+		}
+		return
+	}
+	s.lt.onTime = max(onTime, s.lt.onTime)
+	s.lt.offWaitTime = offWaitTime
+	// 0xFFFF holds indefinitely (spec §1.5.8): no countdown.
+	if s.lt.onTime != 0 && s.lt.onTime != 0xFFFF {
+		s.lt.startTimedOn(s.timedOnTick)
+	} else {
+		s.lt.stopTimedOn()
+	}
+	s.on()
+}
+
+// timedOnTick runs every 100 ms while a timed-on phase counts down —
+// matter.js OnOffServer.ts #timedOnTick. OnTime is in tenths of a second.
+func (s *onOffServer) timedOnTick() {
+	s.lt.mu.Lock()
+	defer s.lt.mu.Unlock()
+	if s.lt.timedOn == nil {
+		return // stopped between the fire and the lock
+	}
+	if s.lt.onTime == 0xFFFF {
+		s.lt.stopTimedOn()
+		return
+	}
+	if s.lt.onTime <= 1 {
+		s.lt.onTime = 0
+		s.lt.stopTimedOn()
+		s.lt.offWaitTime = 0
+		s.off()
+		return
+	}
+	s.lt.onTime--
+	s.version.Bump()
+	s.lt.timedOn.Reset(lightingTick)
+}
+
+// delayedOffTick runs every 100 ms through the delayed-off guard —
+// matter.js OnOffServer.ts #delayedOffTick.
+func (s *onOffServer) delayedOffTick() {
+	s.lt.mu.Lock()
+	defer s.lt.mu.Unlock()
+	if s.lt.delayedOff == nil {
+		return
+	}
+	if s.lt.offWaitTime == 0xFFFF {
+		s.lt.stopDelayedOff()
+		return
+	}
+	if s.lt.offWaitTime <= 1 {
+		s.lt.offWaitTime = 0
+		s.lt.stopDelayedOff()
+	} else {
+		s.lt.offWaitTime--
+		s.lt.delayedOff.Reset(lightingTick)
+	}
+	s.version.Bump()
 }
 
 // apply drives the device and bumps the cluster's DataVersion, so a
@@ -227,14 +459,27 @@ func (s *onOffServer) apply(on bool) {
 }
 
 // MatterReportable implements [contract.ClusterServer].
-func (s *onOffServer) MatterReportable() []uint32 { return []uint32{onoff.AttrOnOff} }
+func (s *onOffServer) MatterReportable() []uint32 {
+	if s.lt != nil {
+		return []uint32{onoff.AttrOnOff, onoff.AttrGlobalSceneControl, onoff.AttrOnTime, onoff.AttrOffWaitTime}
+	}
+	return []uint32{onoff.AttrOnOff}
+}
 
 // MatterAttributes implements [contract.ClusterAttributeLister] so a
 // wildcard read enumerates OnOff rather than only the globals.
-func (s *onOffServer) MatterAttributes() []uint32 { return []uint32{onoff.AttrOnOff} }
+func (s *onOffServer) MatterAttributes() []uint32 {
+	if s.lt != nil {
+		return onoff.LightingAttributes()
+	}
+	return []uint32{onoff.AttrOnOff}
+}
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
 func (s *onOffServer) MatterAcceptedCommands() []uint32 {
+	if s.lt != nil {
+		return onoff.LightingCommands()
+	}
 	return []uint32{onoff.CmdOff, onoff.CmdOn, onoff.CmdToggle}
 }
 
@@ -244,6 +489,119 @@ func (s *onOffServer) MatterGeneratedCommands() []uint32 { return []uint32{} }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *onOffServer) MatterDataVersion() uint32 { return s.version.Current() }
+
+// lightingTick is the countdown period of the two LT timers: OnTime and
+// OffWaitTime count tenths of a second (matter.js OnOffServer.ts
+// `Time.getPeriodicTimer("Timed on", Millis(100), …)`).
+const lightingTick = 100 * time.Millisecond
+
+// lightingState is the OnOff cluster's LT-feature state plus the two
+// countdowns of matter.js OnOffServer.ts. An idle light owns no goroutine:
+// each countdown is a time.AfterFunc that re-arms itself per tick and is
+// nil when not running.
+type lightingState struct {
+	mu                 sync.Mutex
+	globalSceneControl bool
+	onTime             uint16
+	offWaitTime        uint16
+	startUpOnOff       *uint8
+	timedOn            *time.Timer
+	delayedOff         *time.Timer
+}
+
+// newLightingState returns the LT defaults: GlobalSceneControl true, no
+// countdown, StartUpOnOff null (on-off.element.ts:30-36 defaults).
+func newLightingState() *lightingState { return &lightingState{globalSceneControl: true} }
+
+func (l *lightingState) startTimedOn(tick func()) {
+	if l.timedOn == nil {
+		l.timedOn = time.AfterFunc(lightingTick, tick)
+	}
+}
+
+func (l *lightingState) stopTimedOn() {
+	if l.timedOn != nil {
+		l.timedOn.Stop()
+		l.timedOn = nil
+	}
+}
+
+func (l *lightingState) startDelayedOff(tick func()) {
+	if l.delayedOff == nil {
+		l.delayedOff = time.AfterFunc(lightingTick, tick)
+	}
+}
+
+func (l *lightingState) stopDelayedOff() {
+	if l.delayedOff != nil {
+		l.delayedOff.Stop()
+		l.delayedOff = nil
+	}
+}
+
+// onWithTimedOffFields pulls OnWithTimedOff's three fields out of the
+// bridge-decoded payload, tags per on-off.element.ts:52-55: [0]
+// OnOffControl (bitmap8), [1] OnTime (uint16), [2] OffWaitTime (uint16).
+// The bridge hands command fields over as a tag-keyed map; an absent field
+// reads as 0.
+func onWithTimedOffFields(fields any) (control uint8, onTime, offWaitTime uint16, err error) {
+	m, ok := fields.(map[uint8]any)
+	if !ok {
+		if fields == nil {
+			return 0, 0, 0, nil
+		}
+		return 0, 0, 0, fmt.Errorf("onoff: OnWithTimedOff expects tagged fields, got %T", fields)
+	}
+	if raw, present := m[0]; present {
+		if control, ok = cluster.AsUint8(raw); !ok {
+			return 0, 0, 0, fmt.Errorf("onoff: OnWithTimedOff OnOffControl expects bitmap8, got %T", raw)
+		}
+	}
+	if raw, present := m[1]; present {
+		if onTime, ok = asUint16(raw); !ok {
+			return 0, 0, 0, fmt.Errorf("onoff: OnWithTimedOff OnTime expects uint16, got %T", raw)
+		}
+	}
+	if raw, present := m[2]; present {
+		if offWaitTime, ok = asUint16(raw); !ok {
+			return 0, 0, 0, fmt.Errorf("onoff: OnWithTimedOff OffWaitTime expects uint16, got %T", raw)
+		}
+	}
+	return control, onTime, offWaitTime, nil
+}
+
+// asUint16 accepts the integer widths the TLV decoder produces for a
+// uint16 field.
+func asUint16(v any) (uint16, bool) {
+	switch n := v.(type) {
+	case uint16:
+		return n, true
+	case uint8:
+		return uint16(n), true
+	case uint32:
+		if n > 0xFFFF {
+			return 0, false
+		}
+		return uint16(n), true
+	case uint64:
+		if n > 0xFFFF {
+			return 0, false
+		}
+		return uint16(n), true
+	case int:
+		if n < 0 || n > 0xFFFF {
+			return 0, false
+		}
+		return uint16(n), true
+	case int64:
+		if n < 0 || n > 0xFFFF {
+			return 0, false
+		}
+		return uint16(n), true
+	default:
+		return 0, false
+	}
+}
 
 // --- device 2: a temperature sensor -------------------------------------
 

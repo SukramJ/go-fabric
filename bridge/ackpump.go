@@ -10,6 +10,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -210,19 +211,22 @@ func (b *Bridge) expediteDuplicateAck(sessionID, exchangeID uint16, initiator bo
 // exit path so a delayed StatusResponse cannot panic on a closed
 // channel.
 //
-// Returns a freshly-allocated channel that is closed exactly once
-// by [Bridge.signalStatusResponseRX] when the StatusResponse lands.
-// Keyed on (session, exchange) so a StatusResponse from another
-// controller sharing the exchange ID cannot release this waiter.
-func (b *Bridge) armStatusResponseWait(sessionID, exchangeID uint16, initiator bool) <-chan struct{} {
-	ch := make(chan struct{})
+// Returns a freshly-allocated channel that receives the carried
+// status and is then closed exactly once by
+// [Bridge.signalStatusResponseRX] when the StatusResponse lands; a
+// receive that yields the zero value on a closed channel means the
+// wait was disarmed without an answer. Keyed on (session, exchange) so
+// a StatusResponse from another controller sharing the exchange ID
+// cannot release this waiter.
+func (b *Bridge) armStatusResponseWait(sessionID, exchangeID uint16, initiator bool) <-chan im.StatusCode {
+	ch := make(chan im.StatusCode, 1)
 	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}
 	if prev, loaded := b.routing.statusResponseWaits.Swap(key, ch); loaded {
 		// Pathological: caller armed a second waiter on the same
 		// exchange without disarming the first. Close the orphan
 		// channel so a goroutine blocked on it unblocks (interpreting
 		// the close as "moved on"); the new wait wins.
-		if prevCh, ok := prev.(chan struct{}); ok {
+		if prevCh, ok := prev.(chan im.StatusCode); ok {
 			safeClose(prevCh)
 		}
 	}
@@ -238,7 +242,7 @@ func (b *Bridge) armStatusResponseWait(sessionID, exchangeID uint16, initiator b
 func (b *Bridge) disarmStatusResponseWait(sessionID, exchangeID uint16, initiator bool) {
 	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}
 	if v, loaded := b.routing.statusResponseWaits.LoadAndDelete(key); loaded {
-		if ch, ok := v.(chan struct{}); ok {
+		if ch, ok := v.(chan im.StatusCode); ok {
 			safeClose(ch)
 		}
 	}
@@ -247,21 +251,33 @@ func (b *Bridge) disarmStatusResponseWait(sessionID, exchangeID uint16, initiato
 // signalStatusResponseRX is the IM-dispatcher hook into the wait
 // machinery: when handleIMOpcode sees an inbound IM:StatusResponse
 // for the (session, exchange) pair, it calls this so any goroutine
-// inside the chunk-streaming loop unblocks. Safe to call when no
-// wait is registered — no-op.
-func (b *Bridge) signalStatusResponseRX(sessionID, exchangeID uint16, initiator bool) {
+// inside the chunk-streaming loop unblocks and learns the status the
+// peer answered with. Safe to call when no wait is registered — no-op.
+func (b *Bridge) signalStatusResponseRX(sessionID, exchangeID uint16, initiator bool, status im.StatusCode) {
 	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: initiator}
 	if v, loaded := b.routing.statusResponseWaits.LoadAndDelete(key); loaded {
-		if ch, ok := v.(chan struct{}); ok {
-			safeClose(ch)
+		if ch, ok := v.(chan im.StatusCode); ok {
+			safeSendAndClose(ch, status)
 		}
 	}
 }
 
+// safeSendAndClose hands status to the waiter and closes the channel,
+// recovering from "send on closed channel" / "close of closed channel"
+// panics. Belt-and-suspenders for the rendezvous channel lifecycle
+// when arm/disarm/signal races.
+func safeSendAndClose(ch chan im.StatusCode, status im.StatusCode) {
+	defer func() { _ = recover() }()
+	select {
+	case ch <- status:
+	default:
+	}
+	close(ch)
+}
+
 // safeClose closes a channel and recovers from "close of closed
-// channel" / "close of nil channel" panics. Belt-and-suspenders for
-// the rendezvous channel lifecycle when arm/disarm/signal races.
-func safeClose(ch chan struct{}) {
+// channel" / "close of nil channel" panics.
+func safeClose(ch chan im.StatusCode) {
 	defer func() { _ = recover() }()
 	close(ch)
 }

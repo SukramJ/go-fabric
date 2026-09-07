@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 )
 
 func newHeatCool() *thermo.ThermostatServer {
@@ -160,7 +161,7 @@ func invokeSetpointRaiseLower(t *testing.T, srv *thermo.ThermostatServer, mode u
 	_, err := srv.MatterInvoke(
 		context.Background(),
 		0x00,
-		map[string]any{"mode": mode, "amount": amount},
+		clusterwire.SetpointRaiseLowerRequest{Mode: mode, Amount: amount},
 	)
 	if err != nil {
 		t.Fatalf("SetpointRaiseLower(mode=%d, amount=%d): %v", mode, amount, err)
@@ -189,7 +190,7 @@ func TestSetpointRaiseLower_Both_NoClamp(t *testing.T) {
 	srv := newHeatCool()
 
 	// amount=3 → delta=30; 2000+30=2030 (within 700-3000), 2600+30=2630 (within 1600-3200)
-	invokeSetpointRaiseLower(t, srv, 0, 3)
+	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 3)
 
 	gotHeat := readSetpoint(t, srv, 0x0012, "OccupiedHeatingSetpoint")
 	gotCool := readSetpoint(t, srv, 0x0011, "OccupiedCoolingSetpoint")
@@ -237,7 +238,7 @@ func TestSetpointRaiseLower_Both_HeatingLimited(t *testing.T) {
 	srv := thermo.NewThermostatServer(cfg)
 
 	// amount=+12 → delta=+120; heating overshoots by 20, cooling has room
-	invokeSetpointRaiseLower(t, srv, 0, 12)
+	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 12)
 
 	gotHeat := readSetpoint(t, srv, 0x0012, "OccupiedHeatingSetpoint")
 	gotCool := readSetpoint(t, srv, 0x0011, "OccupiedCoolingSetpoint")
@@ -287,7 +288,7 @@ func TestSetpointRaiseLower_Both_CoolingLimited(t *testing.T) {
 	srv := thermo.NewThermostatServer(cfg)
 
 	// amount=+12 → delta=+120; cooling overshoots by 20, heating has room
-	invokeSetpointRaiseLower(t, srv, 0, 12)
+	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 12)
 
 	gotHeat := readSetpoint(t, srv, 0x0012, "OccupiedHeatingSetpoint")
 	gotCool := readSetpoint(t, srv, 0x0011, "OccupiedCoolingSetpoint")

@@ -346,11 +346,18 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 	// fabric's list. Entries the controller left out are unbound, so the
 	// write has to delete them — keeping them would make a read
 	// contradict the controller's own write it just acknowledged.
-	for _, m := range list {
-		if m.FabricIndex != fabric {
-			return fmt.Errorf("%w: cross-fabric write rejected", errGroupKeyMgmtInvalidArg)
-		}
-	}
+	//
+	// The FabricIndex a client puts on an entry is raw input, not a
+	// scope: every entry is stamped with the accessing fabric below, the
+	// way AccessControl.MatterWrite stamps ACL entries. matter.js injects
+	// the session's fabric into every fabric-scoped struct before the
+	// behaviour sees it (packages/protocol/src/action/server/
+	// AttributeWriteResponse.ts:461-467, overwriting via
+	// packages/types/src/tlv/TlvObject.ts:306-310), and
+	// GroupKeyManagementServer.ts:181-236 #validateGroupKeyMap never
+	// compares an entry's fabricIndex with the session — so a controller
+	// that omits the field (decoded as 0) or echoes a stale value gets
+	// its write applied, not refused.
 	existing, err := g.store.ListGroupKeyMappings(ctx, fabric)
 	if err != nil {
 		return fmt.Errorf("matter: GroupKeyMap write: list current bindings: %w", err)

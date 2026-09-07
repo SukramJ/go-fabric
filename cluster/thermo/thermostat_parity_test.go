@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -190,19 +191,26 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerInvalidCommand(t *testing.T
 	t.Parallel()
 
 	ctx := context.Background()
+	// Mode values come from SetpointRaiseLowerModeEnum in matter.js
+	// packages/model/src/standard/elements/thermostat-cluster.element.ts:510-514:
+	// Heat 0x0, Cool 0x1, Both 0x2 — the constants in cluster/wire pin them.
 	cases := []struct {
 		name string
 		srv  *thermo.ThermostatServer
-		mode int // 1=Heat, 2=Cool
+		mode uint8
 	}{
-		{"cool-only forbids mode=Heat(1)", newCoolOnly(), 1},
-		{"heat-only forbids mode=Cool(2)", newHeatOnly(), 2},
+		{"cool-only forbids mode=Heat(0)", newCoolOnly(), clusterwire.ThermostatSetpointModeHeat},
+		{"heat-only forbids mode=Cool(1)", newHeatOnly(), clusterwire.ThermostatSetpointModeCool},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			fields := map[string]any{"mode": uint8(tc.mode), "amount": int8(10)}
+			// The bridge's generic salvage path shape: field 0 Mode, field
+			// 1 Amount (thermostat-cluster.element.ts:322-323), unsigned as
+			// uint64 and signed as int64 (bridge/fields_reader.go
+			// decodeGenericTagMap).
+			fields := map[uint8]any{0: uint64(tc.mode), 1: int64(10)}
 			_, err := tc.srv.MatterInvoke(ctx, 0x00, fields)
 			if err == nil {
 				t.Fatal("expected InvalidCommand, got nil")
@@ -225,8 +233,9 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerAppliesDelta(t *testing.T) 
 	t.Parallel()
 	ctx := context.Background()
 	srv := newHeatOnly() // initial occupHeat = 2000
-	// mode=1 (Heat), amount=5 → delta = 5*10 = 50 → new = 2050
-	fields := map[string]any{"mode": uint8(1), "amount": int8(5)}
+	// mode=Heat (0x0, thermostat-cluster.element.ts:511), amount=5 →
+	// delta = 5*10 = 50 → new = 2050. Bridge tag-map shape.
+	fields := map[uint8]any{0: uint64(clusterwire.ThermostatSetpointModeHeat), 1: int64(5)}
 	if _, err := srv.MatterInvoke(ctx, 0x00, fields); err != nil {
 		t.Fatalf("SetpointRaiseLower: %v", err)
 	}
@@ -243,13 +252,99 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerClampsToLimits(t *testing.T
 	t.Parallel()
 	ctx := context.Background()
 	srv := newHeatOnly() // maxHeat = 3000, initial = 2000
-	// amount=200 → delta=2000 → 2000+2000=4000 > 3000 → clamped to 3000
-	fields := map[string]any{"mode": uint8(1), "amount": int8(100)}
+	// amount=100 → delta=1000 → 2000+1000=3000; with mode=Heat (0x0)
+	// this is the boundary, so drive further with a second call that
+	// must clamp: 3000+1000=4000 > 3000 → 3000.
+	fields := map[uint8]any{0: uint64(clusterwire.ThermostatSetpointModeHeat), 1: int64(100)}
+	if _, err := srv.MatterInvoke(ctx, 0x00, fields); err != nil {
+		t.Fatalf("SetpointRaiseLower clamp (first): %v", err)
+	}
 	if _, err := srv.MatterInvoke(ctx, 0x00, fields); err != nil {
 		t.Fatalf("SetpointRaiseLower clamp: %v", err)
 	}
 	v, _ := srv.MatterRead(0x0012)
 	if v.(int16) != 3000 {
 		t.Errorf("OccupiedHeatingSetpoint clamped = %d, want 3000", v.(int16))
+	}
+}
+
+// TestParityMatterJS_Thermostat_SetpointRaiseLowerModeEnum pins the mode
+// dispatch against SetpointRaiseLowerModeEnum
+// (thermostat-cluster.element.ts:510-514: Heat 0x0, Cool 0x1, Both 0x2)
+// and matter.js ThermostatServer.ts:201-233 (Both moves both setpoints,
+// Heat only the heating one, Cool only the cooling one). A handler that
+// reads 0 as Both and 1 as Heat answers Success while moving the wrong
+// setpoint, which no status code reveals.
+func TestParityMatterJS_Thermostat_SetpointRaiseLowerModeEnum(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	cases := []struct {
+		name     string
+		mode     uint8
+		wantHeat int16
+		wantCool int16
+	}{
+		{"Heat moves only the heating setpoint", clusterwire.ThermostatSetpointModeHeat, 2030, 2600},
+		{"Cool moves only the cooling setpoint", clusterwire.ThermostatSetpointModeCool, 2000, 2630},
+		{"Both moves both setpoints", clusterwire.ThermostatSetpointModeBoth, 2030, 2630},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv := newHeatCool() // heat 2000, cool 2600
+			fields := map[uint8]any{0: uint64(tc.mode), 1: int64(3)}
+			if _, err := srv.MatterInvoke(ctx, 0x00, fields); err != nil {
+				t.Fatalf("SetpointRaiseLower(mode=%d): %v", tc.mode, err)
+			}
+			heat, _ := srv.MatterRead(0x0012)
+			cool, _ := srv.MatterRead(0x0011)
+			if heat.(int16) != tc.wantHeat || cool.(int16) != tc.wantCool {
+				t.Errorf("mode=%d: heat=%d cool=%d, want heat=%d cool=%d",
+					tc.mode, heat.(int16), cool.(int16), tc.wantHeat, tc.wantCool)
+			}
+		})
+	}
+}
+
+// TestParityMatterJS_Thermostat_SetpointRaiseLowerAcceptsEveryPayloadShape
+// pins that the typed request (a host decoding the command itself) and
+// the bridge tag map land on the same setpoint.
+func TestParityMatterJS_Thermostat_SetpointRaiseLowerAcceptsEveryPayloadShape(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	shapes := []struct {
+		name   string
+		fields any
+	}{
+		{"typed request", clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeHeat, Amount: 5}},
+		{"typed request pointer", &clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeHeat, Amount: 5}},
+		{"bridge tag map", map[uint8]any{0: uint64(clusterwire.ThermostatSetpointModeHeat), 1: int64(5)}},
+	}
+	for _, tc := range shapes {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv := newHeatOnly()
+			if _, err := srv.MatterInvoke(ctx, 0x00, tc.fields); err != nil {
+				t.Fatalf("SetpointRaiseLower(%T): %v", tc.fields, err)
+			}
+			v, _ := srv.MatterRead(0x0012)
+			if v.(int16) != 2050 {
+				t.Errorf("OccupiedHeatingSetpoint = %d, want 2050", v.(int16))
+			}
+		})
+	}
+}
+
+// TestParityMatterJS_Thermostat_SetpointRaiseLowerWithoutModeIsRefused
+// pins that a request without the mandatory Mode field
+// (thermostat-cluster.element.ts:322 conformance "M") is an error, not a
+// silent Success that leaves every setpoint where it was.
+func TestParityMatterJS_Thermostat_SetpointRaiseLowerWithoutModeIsRefused(t *testing.T) {
+	t.Parallel()
+	srv := newHeatOnly()
+	var empty map[uint8]any
+	if _, err := srv.MatterInvoke(context.Background(), 0x00, empty); err == nil {
+		t.Fatal("SetpointRaiseLower(empty tag map) = Success, want an error for the missing mandatory Mode")
 	}
 }

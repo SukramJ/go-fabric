@@ -5,6 +5,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -264,15 +265,26 @@ func (i *Identify) maybeStartCountdown() {
 	}()
 }
 
+// identifyFieldIdentifyTime is the Identify command's IdentifyTime
+// context tag (identify.element.ts, Identify command field id 0x0).
+const identifyFieldIdentifyTime uint8 = 0
+
 // coerceUint16 best-effort reads a uint16 out of TLV-decoded values.
-// IdentifyTime arrives as either a bare uint64 / uint32 / uint16 (when
-// the IM layer decoded the scalar without a cluster-aware fields
-// reader) or as a `struct { IdentifyTime uint16 }` (when a future
-// type-aware decoder lands). Unrecognised shapes coerce to 0, which
-// is the spec's "clear identify" semantic — safer than rejecting the
-// command outright.
+// The bridge has no typed decoder for this cluster, so a real Identify
+// arrives as the tag-keyed map its generic salvage path produces
+// (bridge/fields_reader.go decodeGenericTagMap) with IdentifyTime under
+// tag 0 as a uint64; a bare uint64 / uint32 / uint16 is what a host that
+// decoded the scalar itself hands over. Unrecognised shapes coerce to 0,
+// which is the spec's "clear identify" semantic — safer than rejecting
+// the command outright.
 func coerceUint16(v any) (uint16, error) {
 	switch x := v.(type) {
+	case map[uint8]any:
+		raw, ok := x[identifyFieldIdentifyTime]
+		if !ok {
+			return 0, errors.New("identify: missing the IdentifyTime field")
+		}
+		return coerceUint16(raw)
 	case uint16:
 		return x, nil
 	case uint32:

@@ -76,6 +76,12 @@ var (
 	ErrUnauthenticated = errors.New("sigma: encrypted payload authentication failed")
 	// ErrSessionState surfaces when methods are invoked out of order.
 	ErrSessionState = errors.New("sigma: invalid session state")
+	// ErrNoSharedTrustRoots is returned when a Sigma1's DestinationID
+	// addresses no fabric this node holds. The transport answers it with
+	// StatusReport(SecureChannel, NoSharedTrustRoots) before any key
+	// material is generated — mirrors matter.js CaseServer.ts:88-90 and
+	// :239 (FabricNotFoundError thrown ahead of createKeyPair).
+	ErrNoSharedTrustRoots = errors.New("sigma: no shared trust roots for the addressed fabric")
 	// ErrResumptionMICInvalid is returned when the initiatorResumeMIC in
 	// Sigma1 fails AES-CCM verification against the KDFSR1 key derived
 	// from the resumption record's shared secret. The responder MUST
@@ -260,6 +266,12 @@ func (s Sigma1) Marshal() []byte {
 	enc.putUint(2, uint64(s.InitiatorSessionID))
 	enc.putOctets(3, s.DestinationID[:])
 	enc.putOctets(4, s.InitiatorEphPubKey)
+	// Optional initiator session parameters (tag 5): the MRP hints the
+	// responder copies onto the operational entry. Emitted when set, in
+	// tag order ahead of the resumption pair.
+	if s.InitiatorSessionParams != nil {
+		s.InitiatorSessionParams.encode(enc, 5)
+	}
 	// Optional resumption fields (tags 6 + 7) — emitted asymmetrically
 	// only when set. The decoder enforces the all-or-nothing pairing
 	// rule (chip CASESession.cpp:2438-2449); tests rely on this

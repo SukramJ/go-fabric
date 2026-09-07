@@ -79,7 +79,7 @@ func TestSignalStatusResponseRX_NoPendingWait_IsNoop(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
 	// No wait is registered — must not panic.
-	b.signalStatusResponseRX(0, 7, true)
+	b.signalStatusResponseRX(0, 7, true, im.StatusSuccess)
 }
 
 func TestSignalStatusResponseRX_ClosesChannel(t *testing.T) {
@@ -89,14 +89,19 @@ func TestSignalStatusResponseRX_ClosesChannel(t *testing.T) {
 		sess = uint16(1)
 		exch = uint16(42)
 	)
-	ch := make(chan struct{})
+	ch := make(chan im.StatusCode, 1)
 	b.routing.statusResponseWaits.Store(mrp.ExchangeKey{SessionID: sess, ExchangeID: exch, Initiator: true}, ch)
-	b.signalStatusResponseRX(sess, exch, true)
-	// The channel should be closed.
+	b.signalStatusResponseRX(sess, exch, true, im.StatusInvalidSubscription)
+	// The channel should carry the status and be closed.
 	select {
-	case <-ch:
-		// OK — channel closed.
+	case status, open := <-ch:
+		if !open || status != im.StatusInvalidSubscription {
+			t.Errorf("waiter received (%v, open=%v), want the signalled status InvalidSubscription", status, open)
+		}
 	default:
+		t.Error("signalStatusResponseRX did not release the registered channel")
+	}
+	if _, open := <-ch; open {
 		t.Error("signalStatusResponseRX did not close the registered channel")
 	}
 	// Entry should be deleted from the map.
@@ -112,11 +117,11 @@ func TestSignalStatusResponseRX_IdempotentOnClosedChannel(t *testing.T) {
 		sess = uint16(1)
 		exch = uint16(55)
 	)
-	ch := make(chan struct{})
+	ch := make(chan im.StatusCode, 1)
 	close(ch) // already closed
 	b.routing.statusResponseWaits.Store(mrp.ExchangeKey{SessionID: sess, ExchangeID: exch, Initiator: true}, ch)
 	// Must not panic despite closed channel.
-	b.signalStatusResponseRX(sess, exch, true)
+	b.signalStatusResponseRX(sess, exch, true, im.StatusSuccess)
 }
 
 // TestStatusResponseWait_SessionScopedExchangeCollision verifies that two
@@ -134,7 +139,7 @@ func TestStatusResponseWait_SessionScopedExchangeCollision(t *testing.T) {
 
 	// A StatusResponse for a different session on the same exchange ID
 	// must not release the waiter.
-	b.signalStatusResponseRX(20, exch, true)
+	b.signalStatusResponseRX(20, exch, true, im.StatusSuccess)
 	select {
 	case <-waitCh:
 		t.Fatal("waitCh closed after signal for an unrelated session; want still open")
@@ -143,7 +148,7 @@ func TestStatusResponseWait_SessionScopedExchangeCollision(t *testing.T) {
 	}
 
 	// The StatusResponse for the actual owning session releases it.
-	b.signalStatusResponseRX(10, exch, true)
+	b.signalStatusResponseRX(10, exch, true, im.StatusSuccess)
 	select {
 	case <-waitCh:
 		// OK — closed.
