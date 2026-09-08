@@ -27,6 +27,20 @@ logos. See [`licenses/NOTICE-matter.js.txt`](./licenses/NOTICE-matter.js.txt),
 reproduced from matter.js, which states the same terms for the project this
 one is ported from.
 
+## Documentation
+
+| | |
+| --- | --- |
+| [`docs/feature-scope.md`](./docs/feature-scope.md) | What this module does today, package by package — and the scope boundaries that are decisions rather than backlog. |
+| [`docs/matterjs-comparison.md`](./docs/matterjs-comparison.md) | Feature-by-feature against matter.js, with a verdict on whether each gap is worth closing here. |
+| [`docs/matter-parity-contract.md`](./docs/matter-parity-contract.md) | What parity means and which standing guards enforce it. Read before your first change. |
+| [`docs/matter-ecosystem-observations.md`](./docs/matter-ecosystem-observations.md) | What Apple Home, Google Home and Alexa were actually observed to do. |
+| [`docs/adr/`](./docs/adr) | Architecture decision records. |
+| [`notes/parity/by_design.md`](./notes/parity/by_design.md) | The catalogue of intentional divergences from matter.js. |
+| [`notes/parity/matter_behaviour_findings.md`](./notes/parity/matter_behaviour_findings.md) | Known behaviour gaps that are *not* intentional, as scoped fix packages. |
+| [`notes/reference/matter-conformance.md`](./notes/reference/matter-conformance.md) | Which tests run, when, and what gates on them. |
+| [`notes/audits/matter-threat-model.md`](./notes/audits/matter-threat-model.md) | Threat model for the responder role. |
+
 ## API stability
 
 The module carries its own SemVer lane, independent of any host that embeds
