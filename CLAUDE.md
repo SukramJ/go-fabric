@@ -1,16 +1,15 @@
-# CLAUDE.md — Matter side of OpenCCU-Loom
+# CLAUDE.md — go-fabric
 
-This file is loaded when you touch `internal/north/matter/` (and the
-related `bridge/`, `endpoint/`, `im/`, `tlv/`, `secure/` trees). The
-repo-wide rules live in the root [`CLAUDE.md`](../../../CLAUDE.md).
+This file governs everything in this module. It began life as the Matter
+chapter of OpenCCU-Loom's own `CLAUDE.md`, back when this code lived there as
+`internal/north/matter/`; the paths have been rewritten to this module's root
+and the rules are unchanged.
 
 ## matter.js is the gold standard
 
-> **Hard rule for everything under `internal/north/matter/`,
-> `internal/north/matter/cluster/`, `internal/north/matter/bridge/`,
-> `internal/north/matter/endpoint/`, `internal/north/matter/im/`,
-> `internal/north/matter/tlv/`, `internal/north/matter/secure/` and
-> any other Matter-side code:** the gold standard is
+> **Hard rule for every package in this module — `cluster/`, `bridge/`,
+> `endpoint/`, `im/`, `tlv/`, `secure/`, `transport/`, `mdns/`,
+> `commissioning/`, `store/` and the rest:** the gold standard is
 > [`matter.js`](https://github.com/matter-js/matter.js) HEAD.
 > Apache-2.0 — MIT-compatible — and the most production-tested
 > open reference stack. It is **not** certified: its own README states
@@ -93,7 +92,7 @@ function it mirrors in a comment + the contract it enforces.
    verbatim from matter.js.
 5. **Behavioral-parity contract + standing guards.** Ongoing Matter
    parity is held by the build- and test-time guards catalogued in
-   [`docs/matter-parity-contract.md`](../../../docs/matter-parity-contract.md)
+   [`docs/matter-parity-contract.md`](./docs/matter-parity-contract.md)
    — schema parity tests, the behavioural negative-write parity table,
    wire-codec fixtures, wiring-capability pins, and the `by_design.md`
    divergence catalogue — not by periodically regenerated audit reports.
