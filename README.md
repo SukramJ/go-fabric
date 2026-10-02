@@ -105,15 +105,12 @@ they are only ever *acted on* in a minor one.
 
 ### Pre-1.0
 
-The module is at `v0` and **nothing is tagged yet**, so this section is
-honest about two different states.
+The module is at `v0`; `v0.1.0` is its first tag. Before it, `main` was the
+only consumable version and could break in any commit, which is why consumers
+tracked a pseudo-version. `main` is still consumable the same way — see
+`CONTRIBUTING.md` — but a tagged version is what a consumer should pin.
 
-Until `v0.1.0` is tagged, `main` is the only consumable version and it can
-break in any commit. Consumers track a pseudo-version; `CONTRIBUTING.md` says
-to treat `main` accordingly, and that stands.
-
-From the first tag onwards, SemVer permits a `v0` module to break on any
-minor bump. This module does not use that permission as a default. The window
+SemVer permits a `v0` module to break on any minor bump. This module does not use that permission as a default. The window
 above applies at `v0` exactly as it would at `v1`: a breaking change is a
 minor bump, never a patch, and wherever the old identifier can be kept
 working it is kept working for the full window.

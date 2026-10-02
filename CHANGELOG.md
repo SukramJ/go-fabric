@@ -5,11 +5,18 @@ The project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 The module carries its own version lane, independent of any host that embeds
-it. Nothing is tagged yet: the API has had one real caller, so consumers
-track a pseudo-version until the reference daemon has exercised the surface
-long enough for a `v0.1.0` to mean something.
+it. `v0.1.0` is its first tag; everything before it was consumed as a
+pseudo-version of `main`.
 
 ## [Unreleased]
+
+## [0.1.0] — 2026-10-02
+
+The first tagged release. It is the state of `main` the reference daemon
+already consumes as a pseudo-version, so moving from that pseudo-version to
+`v0.1.0` requires no source change. The entries below record what reached
+`main` before the first tag, including the deprecations and removals a
+consumer of an older pseudo-version should read.
 
 ### Changed
 
