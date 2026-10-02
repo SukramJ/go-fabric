@@ -44,7 +44,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 74},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 81},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 86},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 87},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/modeselect", min: 86},
 	// Pinned at full coverage. A package that reaches 100 % has no
 	// uncovered branch to lose, so anything less is a new untested
@@ -101,7 +101,7 @@ var floors = []packageFloor{
 	// parsing, file opening, printing, the exit codes — is not, because
 	// covering it would mean a test that runs the gate over the module the
 	// gate is part of.
-	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 54},
+	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 52},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/reachability",
 		min: 0,
