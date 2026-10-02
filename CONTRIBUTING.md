@@ -91,7 +91,9 @@ decision, not a convenience:
 
 ## Versioning
 
-The module has an independent SemVer lane. It is not tagged yet — consumers
-track a pseudo-version, which means a merge to `main` is immediately
-consumable by anyone who runs `go get github.com/SukramJ/go-fabric@main`.
-Treat `main` accordingly.
+The module has an independent SemVer lane; `v0.1.0` is its first tag. A
+merge to `main` is still immediately consumable by anyone who runs
+`go get github.com/SukramJ/go-fabric@main`, so treat `main` accordingly. A
+release is a commit that turns `## [Unreleased]` into a dated
+`## [x.y.z]` section, followed by the `vx.y.z` tag on that commit; the
+release workflow refuses a tag without its CHANGELOG section.
