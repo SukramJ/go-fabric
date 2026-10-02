@@ -8,6 +8,7 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
@@ -1226,44 +1227,44 @@ func TestStart_ContextCancel_RunGoroutineEnds(t *testing.T) {
 }
 
 func TestStart_TickLoop_ReporterFires(t *testing.T) {
-	// Not t.Parallel() — depends on real timer behaviour; keep isolated.
-	ch := make(chan reporterCall, 8)
-	cfg := subscription.Config{
-		TickInterval:              10 * time.Millisecond,
-		MinIntervalFloorSeconds:   1,
-		MaxIntervalCeilingSeconds: 0, // will be defaulted to 3600 — override explicitly
-	}
-	// Use a very low MaxIntervalCeiling so the keep-alive fires quickly.
-	// Override via MaxIntervalCeilingSeconds requires a non-zero value;
-	// set it to 1 (minimum meaningful value) via a custom config.
-	cfg2 := subscription.Config{
-		TickInterval:              10 * time.Millisecond,
-		MaxIntervalCeilingSeconds: 1,
-		MinIntervalFloorSeconds:   1,
-	}
-	_ = cfg // unused; use cfg2 below
-	m := newManager(cfg2, chanReporter(ch))
+	synctest.Test(t, func(t *testing.T) {
+		ch := make(chan reporterCall, 8)
+		const tick = 10 * time.Millisecond
+		m := newManager(subscription.Config{
+			TickInterval:              tick,
+			MaxIntervalCeilingSeconds: 1,
+			MinIntervalFloorSeconds:   1,
+		}, chanReporter(ch))
 
-	args := defaultArgs()
-	args.MinIntervalFloor = 1
-	args.MaxIntervalCeiling = 1
-	_, err := m.Subscribe(args)
-	if err != nil {
-		t.Fatalf("Subscribe: %v", err)
-	}
+		args := defaultArgs()
+		args.MinIntervalFloor = 1
+		args.MaxIntervalCeiling = 1
+		if _, err := m.Subscribe(args); err != nil {
+			t.Fatalf("Subscribe: %v", err)
+		}
 
-	ctx := context.Background()
-	m.Start(ctx)
-	defer m.Stop()
+		m.Start(context.Background())
+		defer m.Stop()
 
-	// Wait for at least one keep-alive to fire (MaxIntervalCeiling = 1 s,
-	// TickInterval = 10 ms → should fire well within 3 s).
-	select {
-	case <-ch:
-		// success
-	case <-time.After(3 * time.Second):
-		t.Fatal("Reporter not called via Start tick loop within 3 s")
-	}
+		// With MaxIntervalCeiling = 1 s the heartbeat cadence is
+		// max(floor, 0.8 s) = 1 s from the admission stamp, and the engine
+		// reports once now-lastReport >= 1 s. The tick one interval before
+		// the deadline must stay silent, the tick at the deadline must fire.
+		time.Sleep(time.Second - tick)
+		synctest.Wait()
+		select {
+		case <-ch:
+			t.Fatal("Reporter called before the heartbeat deadline")
+		default:
+		}
+		time.Sleep(tick)
+		synctest.Wait()
+		select {
+		case <-ch:
+		default:
+			t.Fatal("Reporter not called by the Start tick loop at the heartbeat deadline")
+		}
+	})
 }
 
 // ---- CloseEndpoint ----

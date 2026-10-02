@@ -6,6 +6,7 @@ package core_test
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -137,58 +138,62 @@ func TestOpcreds_OnFailSafeExpiry_IdempotentOnCleanState(t *testing.T) {
 // end-to-end wiring: GeneralCommissioning fires OnFailSafeExpiry on the
 // OperationalCredentials instance when the FailSafe timer expires.
 func TestOpcreds_OnFailSafeExpiry_WiredViaGeneralCommissioning(t *testing.T) {
-	// Not t.Parallel() — depends on wall-clock timer (1 s window).
-	rootRaw, _, _ := buildTestNOCAndRoot(t)
+	synctest.Test(t, func(t *testing.T) {
+		rootRaw, _, _ := buildTestNOCAndRoot(t)
 
-	oc, _ := opcredsWithFakeStore(t)
-	oc.SetIsFailSafeArmed(func() bool { return true })
+		oc, _ := opcredsWithFakeStore(t)
+		oc.SetIsFailSafeArmed(func() bool { return true })
 
-	gc, err := core.NewGeneralCommissioning(core.GeneralCommissioningConfig{
-		LocationCapability: core.RegulatoryIndoorOutdoor,
-		FailSafeMaxSeconds: 600,
-	})
-	if err != nil {
-		t.Fatalf("NewGeneralCommissioning: %v", err)
-	}
-
-	// Wire expiry → OpCreds cleanup.
-	gc.SetOnFailSafeExpired(func(ctx context.Context, fabricIndex uint8) {
-		oc.OnFailSafeExpiry(ctx, fabricIndex)
-	})
-
-	ctx := context.Background()
-
-	// Arm with a 1-second window.
-	_, armErr := gc.MatterInvoke(ctx, 0x00,
-		core.ArmFailSafeRequest{ExpiryLengthSeconds: 1})
-	if armErr != nil {
-		t.Fatalf("ArmFailSafe: %v", armErr)
-	}
-
-	// Install a trusted root while the window is armed.
-	_, err = oc.MatterInvoke(ctx, 0x0B,
-		core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw})
-	if err != nil {
-		t.Fatalf("AddTrustedRootCertificate: %v", err)
-	}
-
-	// Verify pending root is present.
-	raw, _ := oc.MatterRead(0x0004)
-	if roots := raw.([][]byte); len(roots) == 0 {
-		t.Fatal("expected pending root before expiry")
-	}
-
-	// Wait for the FailSafe timer to fire (≤ 3 s).
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		time.Sleep(100 * time.Millisecond)
-		raw, _ = oc.MatterRead(0x0004)
-		roots := raw.([][]byte)
-		if len(roots) == 0 {
-			return // success: expiry hook cleared the pending root
+		gc, err := core.NewGeneralCommissioning(core.GeneralCommissioningConfig{
+			LocationCapability: core.RegulatoryIndoorOutdoor,
+			FailSafeMaxSeconds: 600,
+		})
+		if err != nil {
+			t.Fatalf("NewGeneralCommissioning: %v", err)
 		}
-	}
-	t.Fatal("pending trust root not cleared after FailSafe expiry (3 s timeout)")
+
+		// Wire expiry → OpCreds cleanup.
+		gc.SetOnFailSafeExpired(func(ctx context.Context, fabricIndex uint8) {
+			oc.OnFailSafeExpiry(ctx, fabricIndex)
+		})
+
+		ctx := context.Background()
+
+		// Arm with a 1-second window.
+		_, armErr := gc.MatterInvoke(ctx, 0x00,
+			core.ArmFailSafeRequest{ExpiryLengthSeconds: 1})
+		if armErr != nil {
+			t.Fatalf("ArmFailSafe: %v", armErr)
+		}
+
+		// Install a trusted root while the window is armed.
+		_, err = oc.MatterInvoke(ctx, 0x0B,
+			core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw})
+		if err != nil {
+			t.Fatalf("AddTrustedRootCertificate: %v", err)
+		}
+
+		pendingRoots := func() int {
+			raw, _ := oc.MatterRead(0x0004)
+			return len(raw.([][]byte))
+		}
+		if pendingRoots() == 0 {
+			t.Fatal("expected pending root before expiry")
+		}
+
+		// One nanosecond short of the window the pending root must survive;
+		// at the deadline the watcher fires the hook and clears it.
+		time.Sleep(time.Second - time.Nanosecond)
+		synctest.Wait()
+		if pendingRoots() == 0 {
+			t.Fatal("pending root cleared before the FailSafe window expired")
+		}
+		time.Sleep(time.Nanosecond)
+		synctest.Wait()
+		if n := pendingRoots(); n != 0 {
+			t.Fatalf("pending trust root not cleared after FailSafe expiry: %d left", n)
+		}
+	})
 }
 
 // TestOpcreds_OnFailSafeExpiry_AllowsNocCycleAfterExpiry verifies that
