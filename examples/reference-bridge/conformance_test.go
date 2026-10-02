@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -154,34 +155,45 @@ func mandatoryServerClusters(t *testing.T) map[uint32][]uint32 {
 // onWithTimedOff / #timedOnTick.
 func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 	t.Parallel()
-	light := newDemoLight("timed")
-	var srv *onOffServer
-	for _, s := range light.MatterClusterServers() {
-		if o, ok := s.(*onOffServer); ok {
-			srv = o
+	synctest.Test(t, func(t *testing.T) {
+		light := newDemoLight("timed")
+		var srv *onOffServer
+		for _, s := range light.MatterClusterServers() {
+			if o, ok := s.(*onOffServer); ok {
+				srv = o
+			}
 		}
-	}
-	if srv == nil {
-		t.Fatal("the light mounts no onOffServer")
-	}
-	if _, err := srv.MatterInvoke(context.Background(), onoff.CmdOnWithTimedOff,
-		map[uint8]any{0: uint8(0), 1: uint16(3), 2: uint16(0)}); err != nil {
-		t.Fatalf("OnWithTimedOff: %v", err)
-	}
-	if !light.isOn() {
-		t.Fatal("OnWithTimedOff left the light off")
-	}
-	if v, _ := srv.MatterRead(onoff.AttrOnTime); v != uint16(3) {
-		t.Fatalf("OnTime right after OnWithTimedOff = %v, want 3", v)
-	}
-	deadline := time.Now().Add(3 * time.Second)
-	for light.isOn() {
-		if time.Now().After(deadline) {
-			t.Fatal("the light is still on 3 s after OnWithTimedOff(OnTime=3 tenths)")
+		if srv == nil {
+			t.Fatal("the light mounts no onOffServer")
 		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	if v, _ := srv.MatterRead(onoff.AttrOnTime); v != uint16(0) {
-		t.Errorf("OnTime after the countdown = %v, want 0", v)
-	}
+		if _, err := srv.MatterInvoke(context.Background(), onoff.CmdOnWithTimedOff,
+			map[uint8]any{0: uint8(0), 1: uint16(3), 2: uint16(0)}); err != nil {
+			t.Fatalf("OnWithTimedOff: %v", err)
+		}
+		if !light.isOn() {
+			t.Fatal("OnWithTimedOff left the light off")
+		}
+		if v, _ := srv.MatterRead(onoff.AttrOnTime); v != uint16(3) {
+			t.Fatalf("OnTime right after OnWithTimedOff = %v, want 3", v)
+		}
+		// OnTime counts down once per lightingTick (3 -> 2 -> 1) and the
+		// tick that finds OnTime <= 1 turns the light off, so the light is
+		// still on one nanosecond before the third tick and off at it.
+		time.Sleep(3*lightingTick - time.Nanosecond)
+		synctest.Wait()
+		if !light.isOn() {
+			t.Fatal("the light turned off before the OnTime countdown elapsed")
+		}
+		if v, _ := srv.MatterRead(onoff.AttrOnTime); v != uint16(1) {
+			t.Fatalf("OnTime one nanosecond before the last tick = %v, want 1", v)
+		}
+		time.Sleep(time.Nanosecond)
+		synctest.Wait()
+		if light.isOn() {
+			t.Fatal("the light is still on after OnWithTimedOff(OnTime=3 tenths) elapsed")
+		}
+		if v, _ := srv.MatterRead(onoff.AttrOnTime); v != uint16(0) {
+			t.Errorf("OnTime after the countdown = %v, want 0", v)
+		}
+	})
 }

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -25,6 +26,31 @@ func newGencomm(t *testing.T, cfg core.GeneralCommissioningConfig) *core.General
 		t.Fatalf("NewGeneralCommissioning: %v", err)
 	}
 	return gc
+}
+
+// awaitFailSafeExpiryHook runs inside a synctest bubble after a fail-safe was
+// armed with a window of the given length. It pins both sides of the expiry:
+// the watcher has not fired one nanosecond before the deadline and has
+// fired once the clock reaches it (the watcher's own comparison is
+// !expiresAt.After(now), so the deadline itself counts as expired).
+func awaitFailSafeExpiryHook(t *testing.T, window time.Duration, fired <-chan uint8) uint8 {
+	t.Helper()
+	time.Sleep(window - time.Nanosecond)
+	synctest.Wait()
+	select {
+	case idx := <-fired:
+		t.Fatalf("expiry hook fired one nanosecond before the deadline (fabricIndex=%d)", idx)
+	default:
+	}
+	time.Sleep(time.Nanosecond)
+	synctest.Wait()
+	select {
+	case idx := <-fired:
+		return idx
+	default:
+		t.Fatal("expiry hook not called at the deadline")
+		return 0
+	}
 }
 
 func defaultGencomm(t *testing.T) *core.GeneralCommissioning {
@@ -289,38 +315,34 @@ func TestGencomm_ArmFailSafe_SetsBreadcrumb(t *testing.T) {
 }
 
 func TestGencomm_ArmFailSafe_OnExpired_Hook(t *testing.T) {
-	// Not t.Parallel() because this test is time-sensitive.
-	const fabricIndex = uint8(3)
-	called := make(chan uint8, 1)
+	synctest.Test(t, func(t *testing.T) {
+		const fabricIndex = uint8(3)
+		called := make(chan uint8, 1)
 
-	gc := newGencomm(t, core.GeneralCommissioningConfig{
-		LocationCapability: core.RegulatoryIndoor,
-		FailSafeMaxSeconds: 600,
-		OnFailSafeExpired: func(_ context.Context, idx uint8) {
-			called <- idx
-		},
-	})
+		gc := newGencomm(t, core.GeneralCommissioningConfig{
+			LocationCapability: core.RegulatoryIndoor,
+			FailSafeMaxSeconds: 600,
+			OnFailSafeExpired: func(_ context.Context, idx uint8) {
+				called <- idx
+			},
+		})
 
-	// Pass fabricIndex via context so handleArmFailSafe captures it as
-	// failSafeFabricIndex and the expiry hook fires with the right fabric.
-	ctx := im.WithFabricFilter(context.Background(), false, fabricIndex)
-	resp, err := gc.MatterInvoke(ctx, 0x00,
-		core.ArmFailSafeRequest{ExpiryLengthSeconds: 1, Breadcrumb: 0})
-	if err != nil {
-		t.Fatalf("ArmFailSafe: %v", err)
-	}
-	if resp.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
-		t.Fatalf("ErrorCode != OK")
-	}
+		// Pass fabricIndex via context so handleArmFailSafe captures it as
+		// failSafeFabricIndex and the expiry hook fires with the right fabric.
+		ctx := im.WithFabricFilter(context.Background(), false, fabricIndex)
+		resp, err := gc.MatterInvoke(ctx, 0x00,
+			core.ArmFailSafeRequest{ExpiryLengthSeconds: 1, Breadcrumb: 0})
+		if err != nil {
+			t.Fatalf("ArmFailSafe: %v", err)
+		}
+		if resp.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
+			t.Fatalf("ErrorCode != OK")
+		}
 
-	select {
-	case idx := <-called:
-		if idx != fabricIndex {
+		if idx := awaitFailSafeExpiryHook(t, time.Second, called); idx != fabricIndex {
 			t.Fatalf("hook called with fabricIndex=%d, want %d", idx, fabricIndex)
 		}
-	case <-time.After(3 * time.Second):
-		t.Fatal("OnFailSafeExpired hook was not called within 3s")
-	}
+	})
 }
 
 // TestGencomm_ArmFailSafe_DisarmFiresRevertHook verifies that an
@@ -403,37 +425,37 @@ func TestGencomm_ArmFailSafe_DisarmUnarmedDoesNotFireHook(t *testing.T) {
 // during NewGeneralCommissioning bootstrap; the override must be the
 // one that fires at expiry time.
 func TestGencomm_SetOnFailSafeExpired_OverridesConstructorHook(t *testing.T) {
-	const fabricIndex = uint8(5)
-	original := make(chan uint8, 1)
-	override := make(chan uint8, 1)
+	synctest.Test(t, func(t *testing.T) {
+		const fabricIndex = uint8(5)
+		original := make(chan uint8, 1)
+		override := make(chan uint8, 1)
 
-	gc := newGencomm(t, core.GeneralCommissioningConfig{
-		LocationCapability: core.RegulatoryIndoor,
-		FailSafeMaxSeconds: 600,
-		OnFailSafeExpired: func(_ context.Context, idx uint8) {
-			original <- idx
-		},
-	})
-	gc.SetOnFailSafeExpired(func(_ context.Context, idx uint8) {
-		override <- idx
-	})
+		gc := newGencomm(t, core.GeneralCommissioningConfig{
+			LocationCapability: core.RegulatoryIndoor,
+			FailSafeMaxSeconds: 600,
+			OnFailSafeExpired: func(_ context.Context, idx uint8) {
+				original <- idx
+			},
+		})
+		gc.SetOnFailSafeExpired(func(_ context.Context, idx uint8) {
+			override <- idx
+		})
 
-	ctx := im.WithFabricFilter(context.Background(), false, fabricIndex)
-	if _, err := gc.MatterInvoke(ctx, 0x00,
-		core.ArmFailSafeRequest{ExpiryLengthSeconds: 1}); err != nil {
-		t.Fatalf("ArmFailSafe: %v", err)
-	}
+		ctx := im.WithFabricFilter(context.Background(), false, fabricIndex)
+		if _, err := gc.MatterInvoke(ctx, 0x00,
+			core.ArmFailSafeRequest{ExpiryLengthSeconds: 1}); err != nil {
+			t.Fatalf("ArmFailSafe: %v", err)
+		}
 
-	select {
-	case got := <-override:
-		if got != fabricIndex {
+		if got := awaitFailSafeExpiryHook(t, time.Second, override); got != fabricIndex {
 			t.Fatalf("override hook fabricIndex=%d, want %d", got, fabricIndex)
 		}
-	case <-original:
-		t.Fatal("original constructor hook fired; override should win")
-	case <-time.After(3 * time.Second):
-		t.Fatal("override hook not called within 3s")
-	}
+		select {
+		case <-original:
+			t.Fatal("original constructor hook fired; override should win")
+		default:
+		}
+	})
 }
 
 // TestGencomm_SetOnFailSafeExpired_NilHookAtArmStillExpires covers the
@@ -442,31 +464,28 @@ func TestGencomm_SetOnFailSafeExpired_OverridesConstructorHook(t *testing.T) {
 // invoked with a nil OnFailSafeExpired, the setter must enable the
 // watcher.
 func TestGencomm_SetOnFailSafeExpired_NilAtConstruction(t *testing.T) {
-	const fabricIndex = uint8(9)
-	fired := make(chan uint8, 1)
+	synctest.Test(t, func(t *testing.T) {
+		const fabricIndex = uint8(9)
+		fired := make(chan uint8, 1)
 
-	gc := newGencomm(t, core.GeneralCommissioningConfig{
-		LocationCapability: core.RegulatoryIndoor,
-		FailSafeMaxSeconds: 600,
-	})
-	gc.SetOnFailSafeExpired(func(_ context.Context, idx uint8) {
-		fired <- idx
-	})
+		gc := newGencomm(t, core.GeneralCommissioningConfig{
+			LocationCapability: core.RegulatoryIndoor,
+			FailSafeMaxSeconds: 600,
+		})
+		gc.SetOnFailSafeExpired(func(_ context.Context, idx uint8) {
+			fired <- idx
+		})
 
-	ctx := im.WithFabricFilter(context.Background(), false, fabricIndex)
-	if _, err := gc.MatterInvoke(ctx, 0x00,
-		core.ArmFailSafeRequest{ExpiryLengthSeconds: 1}); err != nil {
-		t.Fatalf("ArmFailSafe: %v", err)
-	}
+		ctx := im.WithFabricFilter(context.Background(), false, fabricIndex)
+		if _, err := gc.MatterInvoke(ctx, 0x00,
+			core.ArmFailSafeRequest{ExpiryLengthSeconds: 1}); err != nil {
+			t.Fatalf("ArmFailSafe: %v", err)
+		}
 
-	select {
-	case got := <-fired:
-		if got != fabricIndex {
+		if got := awaitFailSafeExpiryHook(t, time.Second, fired); got != fabricIndex {
 			t.Fatalf("hook fabricIndex=%d, want %d", got, fabricIndex)
 		}
-	case <-time.After(3 * time.Second):
-		t.Fatal("hook installed via SetOnFailSafeExpired did not fire")
-	}
+	})
 }
 
 func TestGencomm_ArmFailSafe_ReArm_ExtendsWindow(t *testing.T) {
@@ -502,58 +521,60 @@ func TestGencomm_ArmFailSafe_ReArm_ExtendsWindow(t *testing.T) {
 }
 
 func TestGencomm_ArmFailSafe_FabricFromContext_HookArg(t *testing.T) {
-	// Not t.Parallel() — time-sensitive.
-	const fabricIndex = uint8(7)
-	called := make(chan uint8, 1)
+	synctest.Test(t, func(t *testing.T) {
+		const fabricIndex = uint8(7)
+		called := make(chan uint8, 1)
 
-	gc := newGencomm(t, core.GeneralCommissioningConfig{
-		LocationCapability: core.RegulatoryIndoor,
-		FailSafeMaxSeconds: 600,
-		OnFailSafeExpired: func(_ context.Context, idx uint8) {
-			called <- idx
-		},
-	})
+		gc := newGencomm(t, core.GeneralCommissioningConfig{
+			LocationCapability: core.RegulatoryIndoor,
+			FailSafeMaxSeconds: 600,
+			OnFailSafeExpired: func(_ context.Context, idx uint8) {
+				called <- idx
+			},
+		})
 
-	// FabricIndex is conveyed through the context (as in production).
-	ctx := im.WithFabricFilter(context.Background(), false, fabricIndex)
-	_, err := gc.MatterInvoke(ctx, 0x00,
-		core.ArmFailSafeRequest{ExpiryLengthSeconds: 1})
-	if err != nil {
-		t.Fatalf("ArmFailSafe: %v", err)
-	}
+		// FabricIndex is conveyed through the context (as in production).
+		ctx := im.WithFabricFilter(context.Background(), false, fabricIndex)
+		_, err := gc.MatterInvoke(ctx, 0x00,
+			core.ArmFailSafeRequest{ExpiryLengthSeconds: 1})
+		if err != nil {
+			t.Fatalf("ArmFailSafe: %v", err)
+		}
 
-	select {
-	case got := <-called:
-		if got != fabricIndex {
+		if got := awaitFailSafeExpiryHook(t, time.Second, called); got != fabricIndex {
 			t.Fatalf("hook fabricIndex=%d, want %d", got, fabricIndex)
 		}
-	case <-time.After(3 * time.Second):
-		t.Fatal("OnFailSafeExpired not called within 3s")
-	}
+	})
 }
 
 func TestGencomm_FailSafeArmed_ReturnsFalseAfterWindowExpired(t *testing.T) {
 	t.Parallel()
-	gc := newGencomm(t, core.GeneralCommissioningConfig{
-		LocationCapability: core.RegulatoryIndoor,
-		FailSafeMaxSeconds: 600,
+	synctest.Test(t, func(t *testing.T) {
+		gc := newGencomm(t, core.GeneralCommissioningConfig{
+			LocationCapability: core.RegulatoryIndoor,
+			FailSafeMaxSeconds: 600,
+		})
+		// Arm with a 1-second window.
+		_, err := gc.MatterInvoke(context.Background(), 0x00,
+			core.ArmFailSafeRequest{ExpiryLengthSeconds: 1})
+		if err != nil {
+			t.Fatalf("ArmFailSafe: %v", err)
+		}
+		if !gc.FailSafeArmed() {
+			t.Fatal("FailSafeArmed = false immediately after arm")
+		}
+		// FailSafeArmed compares the clock itself, so no watcher is needed.
+		// It reports armed while expiresAt.After(now) holds, so the deadline
+		// itself is already expired.
+		time.Sleep(time.Second - time.Nanosecond)
+		if !gc.FailSafeArmed() {
+			t.Fatal("FailSafeArmed = false one nanosecond before the deadline")
+		}
+		time.Sleep(time.Nanosecond)
+		if gc.FailSafeArmed() {
+			t.Fatal("FailSafeArmed = true at the deadline")
+		}
 	})
-	// Arm with a 1-second window.
-	_, err := gc.MatterInvoke(context.Background(), 0x00,
-		core.ArmFailSafeRequest{ExpiryLengthSeconds: 1})
-	if err != nil {
-		t.Fatalf("ArmFailSafe: %v", err)
-	}
-	if !gc.FailSafeArmed() {
-		t.Fatal("FailSafeArmed = false immediately after arm")
-	}
-	// Wait for window to expire.
-	time.Sleep(1100 * time.Millisecond)
-	// FailSafeArmed checks time internally; must report false without
-	// a watcher reset.
-	if gc.FailSafeArmed() {
-		t.Fatal("FailSafeArmed = true after window expired")
-	}
 }
 
 // TestGencomm_CommissioningComplete_AcceptsAfterSetCurrentFabricReArm
