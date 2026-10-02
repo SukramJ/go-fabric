@@ -11,6 +11,7 @@ import (
 	"context"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
@@ -243,6 +244,10 @@ func TestRegisterSubscription_KeepSubscriptionsTrue_BothSurvive(t *testing.T) {
 func TestStreamInitialReportChunks_EmptyReport_NoSend(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
+	// No peer answers the chunk; bound the StatusResponse wait the way
+	// read_limits_test.go does instead of sitting out the full MRP-derived
+	// exchange timeout.
+	b.chunkStatusResponseTimeoutOverride = 200 * time.Millisecond
 	// A fresh started bridge has a listener, but an empty ReportData produces
 	// exactly one chunk (MoreChunkedMessages=false, zero reports) whose
 	// EncodeReportData call should still succeed.  Accept either nil or a send
