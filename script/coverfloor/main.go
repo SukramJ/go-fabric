@@ -203,7 +203,7 @@ func parseReport(r io.Reader) ([]measurement, error) {
 // packageOf returns the module package named on a report line, or "" when
 // the line names none.
 func packageOf(line string) string {
-	for _, f := range strings.Fields(line) {
+	for f := range strings.FieldsSeq(line) {
 		if f == modulePath || strings.HasPrefix(f, modulePath+"/") {
 			return f
 		}

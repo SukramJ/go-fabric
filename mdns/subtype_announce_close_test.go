@@ -45,11 +45,9 @@ func TestSubtypeResponderAnnounceDuringCloseIsSynchronised(t *testing.T) {
 	r.AddSubtype("_L3840._sub._matterc._udp.local", "inst._matterc._udp.local")
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		r.Announce()
-	}()
+	})
 	if err := r.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}

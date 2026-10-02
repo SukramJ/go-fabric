@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"time"
 )
 
@@ -426,10 +427,8 @@ func checkICACShape(icac, noc *Certificate) error {
 
 func hasEKU(list []uint8, wanted ...uint8) bool {
 	for _, have := range list {
-		for _, w := range wanted {
-			if have == w {
-				return true
-			}
+		if slices.Contains(wanted, have) {
+			return true
 		}
 	}
 	return false

@@ -4,7 +4,6 @@
 package mdns
 
 import (
-	"context"
 	"log/slog"
 	"os"
 	"testing"
@@ -27,8 +26,7 @@ func TestManualSubtypeRepro(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSubtypeResponder: %v", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	r.Start(ctx)
 	z.AttachSubtypeResponder(r)
 	defer func() { _ = z.Close() }()

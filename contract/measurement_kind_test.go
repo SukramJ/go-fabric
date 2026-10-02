@@ -156,9 +156,7 @@ func TestRegisterMeasurementKindConcurrent(t *testing.T) {
 		classes = make(map[contract.MeasurementClass]contract.MeasurementKind, registrations)
 	)
 	for i := range registrations {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			kind := contract.MeasurementKind{
 				Name:        "Concurrent",
 				ClusterID:   uint32(0x1000 + i),
@@ -168,7 +166,7 @@ func TestRegisterMeasurementKindConcurrent(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
 			classes[class] = kind
-		}()
+		})
 	}
 	wg.Wait()
 

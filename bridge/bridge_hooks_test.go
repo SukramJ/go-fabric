@@ -214,7 +214,7 @@ func TestBridge_AttachRootClusters_WithDescriptor_ReturnsTrue(t *testing.T) {
 	t.Parallel()
 	b := newTestBridge(t)
 	desc := &fakeDescriptor{
-		fakeMatterClusterServer: fakeMatterClusterServer{id: 0x001D},
+		id: 0x001D,
 	}
 	b.AttachRootClusters([]contract.ClusterServer{desc})
 	if !b.AttachRootPartsListProvider(func() []uint16 { return []uint16{2, 3} }) {
@@ -239,7 +239,7 @@ func TestBridge_AttachAggregatorClusters_WithDescriptor_ReturnsTrue(t *testing.T
 	t.Parallel()
 	b := newTestBridge(t)
 	desc := &fakeDescriptor{
-		fakeMatterClusterServer: fakeMatterClusterServer{id: 0x001D},
+		id: 0x001D,
 	}
 	b.AttachAggregatorClusters([]contract.ClusterServer{desc})
 	if !b.AttachAggregatorPartsListProvider(func() []uint16 { return []uint16{2} }) {
@@ -254,7 +254,7 @@ func TestBridge_AttachRootClusters_NilClearsServers(t *testing.T) {
 	t.Parallel()
 	b := newTestBridge(t)
 	desc := &fakeDescriptor{
-		fakeMatterClusterServer: fakeMatterClusterServer{id: 0x001D},
+		id: 0x001D,
 	}
 	b.AttachRootClusters([]contract.ClusterServer{desc})
 	b.AttachRootClusters(nil)

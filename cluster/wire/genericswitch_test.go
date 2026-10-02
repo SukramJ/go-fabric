@@ -130,7 +130,7 @@ func (f *fakePositionedSwitchSource) MatterSwitchCurrentPosition() uint8 { retur
 func TestGenericSwitch_Read_CurrentPosition_LiveFromPositionSource(t *testing.T) {
 	t.Parallel()
 	src := &fakePositionedSwitchSource{
-		fakeGenericSwitchSource: fakeGenericSwitchSource{positions: 2, supportsLong: true},
+		positions: 2, supportsLong: true,
 	}
 	gs := wire.NewGenericSwitch(1, src)
 

@@ -40,10 +40,6 @@ func (h *recordingHandlers) config() closure.Config {
 	}
 }
 
-func targetPtr(p clusterwire.ClosureTargetPosition) *clusterwire.ClosureTargetPosition { return &p }
-
-func currentPtr(p clusterwire.ClosureCurrentPosition) *clusterwire.ClosureCurrentPosition { return &p }
-
 // readOverallCurrent reads attribute 0x0003 as its struct.
 func readOverallCurrent(t *testing.T, s *closure.ControlServer) *clusterwire.ClosureOverallCurrentState {
 	t.Helper()
@@ -117,7 +113,7 @@ func TestClosureControlMoveToForwardsAndRecordsTheTarget(t *testing.T) {
 			s := closure.NewControlServer(h.config())
 
 			_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
-				clusterwire.MoveToRequest{Position: targetPtr(tc.target)})
+				clusterwire.MoveToRequest{Position: new(tc.target)})
 			if err != nil {
 				t.Fatalf("MoveTo: %v", err)
 			}
@@ -144,7 +140,7 @@ func TestClosureControlMoveToRejectsAPositionOutsideTheFeatureSet(t *testing.T) 
 	s := closure.NewControlServer(h.config())
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
-		clusterwire.MoveToRequest{Position: targetPtr(clusterwire.ClosureTargetPositionMoveToPedestrianPosition)})
+		clusterwire.MoveToRequest{Position: new(clusterwire.ClosureTargetPositionMoveToPedestrianPosition)})
 	if err == nil {
 		t.Fatal("MoveTo to an unadvertised position must be refused")
 	}
@@ -168,7 +164,7 @@ func TestClosureControlMoveToKeepsTheTargetUnchangedWhenTheDeviceRefuses(t *test
 	s := closure.NewControlServer(h.config())
 
 	_, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
-		clusterwire.MoveToRequest{Position: targetPtr(clusterwire.ClosureTargetPositionMoveToFullyOpen)})
+		clusterwire.MoveToRequest{Position: new(clusterwire.ClosureTargetPositionMoveToFullyOpen)})
 	if err == nil {
 		t.Fatal("MoveTo must report the device's refusal")
 	}
@@ -204,7 +200,7 @@ func TestClosureControlStopClearsTheTarget(t *testing.T) {
 	s := closure.NewControlServer(h.config())
 
 	if _, err := s.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo,
-		clusterwire.MoveToRequest{Position: targetPtr(clusterwire.ClosureTargetPositionMoveToFullyOpen)}); err != nil {
+		clusterwire.MoveToRequest{Position: new(clusterwire.ClosureTargetPositionMoveToFullyOpen)}); err != nil {
 		t.Fatalf("MoveTo: %v", err)
 	}
 	if got := readOverallTarget(t, s); got.Position == nil {
@@ -250,9 +246,9 @@ func TestClosureControlSecureStateTracksFullyClosed(t *testing.T) {
 		pos        *clusterwire.ClosureCurrentPosition
 		wantSecure *bool
 	}{
-		{"fully closed secures", currentPtr(clusterwire.ClosureCurrentPositionFullyClosed), boolPtr(true)},
-		{"fully open does not", currentPtr(clusterwire.ClosureCurrentPositionFullyOpened), boolPtr(false)},
-		{"ventilation does not", currentPtr(clusterwire.ClosureCurrentPositionOpenedForVentilation), boolPtr(false)},
+		{"fully closed secures", new(clusterwire.ClosureCurrentPositionFullyClosed), new(true)},
+		{"fully open does not", new(clusterwire.ClosureCurrentPositionFullyOpened), new(false)},
+		{"ventilation does not", new(clusterwire.ClosureCurrentPositionOpenedForVentilation), new(false)},
 		{"unknown position is null", nil, nil},
 	}
 	for _, tc := range cases {
@@ -288,7 +284,7 @@ func TestClosureControlUnknownPositionIsNotMotion(t *testing.T) {
 	t.Parallel()
 	s := closure.NewControlServer(closure.Config{})
 
-	s.SetCurrentPosition(currentPtr(clusterwire.ClosureCurrentPositionFullyClosed))
+	s.SetCurrentPosition(new(clusterwire.ClosureCurrentPositionFullyClosed))
 	s.SetMainState(clusterwire.ClosureMainStateStopped)
 	s.SetCurrentPosition(nil)
 
@@ -363,8 +359,6 @@ func TestClosureControlNoAttributeIsWritable(t *testing.T) {
 		}
 	}
 }
-
-func boolPtr(b bool) *bool { return &b }
 
 // TestClosureControlMoveToAcceptsTheBridgeTagMap pins the shape a real
 // controller's MoveTo arrives in. The bridge has no typed decoder for
