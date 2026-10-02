@@ -11,6 +11,11 @@ long enough for a `v0.1.0` to mean something.
 
 ## [Unreleased]
 
+### Changed
+
+- **Requires Go 1.27.1.** `go.mod` targets Go 1.27.1 and every CI workflow
+  builds with it; a consumer module has to be on Go 1.27 or newer.
+
 ### Fixed
 
 - **A commissioner lost its implicit Administer grant the moment AddNOC

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"strings"
 	"sync"
@@ -155,9 +156,7 @@ func (r *SubtypeResponder) Announce() {
 	}
 	r.mu.RLock()
 	snapshot := make(map[string]string, len(r.mappings))
-	for q, target := range r.mappings {
-		snapshot[q] = target
-	}
+	maps.Copy(snapshot, r.mappings)
 	r.mu.RUnlock()
 	if len(snapshot) == 0 {
 		return

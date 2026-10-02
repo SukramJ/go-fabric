@@ -4,6 +4,7 @@
 package im
 
 import (
+	"slices"
 	"sync"
 	"time"
 )
@@ -224,8 +225,8 @@ func (l *EventLog) harvestLocked() {
 		EventPriorityDebug: len(l.occurrences),
 	}
 	counted := map[EventPriority]int{}
-	for i := len(l.occurrences) - 1; i >= 0; i-- {
-		p := l.occurrences[i].Priority
+	for i, v := range slices.Backward(l.occurrences) {
+		p := v.Priority
 		floor, guarded := floors[p]
 		if !guarded || counted[p] >= floor {
 			continue

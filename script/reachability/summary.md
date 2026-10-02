@@ -32,7 +32,7 @@ Entry points: 3249 across 46 test packages.
 | cluster/measurement | CelsiusToInt16 | cluster/measurement/measurement.go | 1732 |
 | contract | DeviceTypeName | contract/matter.go | 762 |
 | endpoint | ComposeNodeLabel | endpoint/spec.go | 88 |
-| schema | DeviceTypeAllowsServerCluster | schema/lookup.go | 65 |
+| schema | DeviceTypeAllowsServerCluster | schema/lookup.go | 67 |
 
 ## Full by-package breakdown
 

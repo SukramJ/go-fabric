@@ -5,6 +5,7 @@ package endpoint
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/contract"
@@ -51,12 +52,7 @@ func (s recordingSource) MatterClusterServers() []contract.ClusterServer {
 var _ contract.EndpointSource = recordingSource{}
 
 func recordedWrite(calls []uint32, attr uint32) bool {
-	for _, a := range calls {
-		if a == attr {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(calls, attr)
 }
 
 // TestWrite_ConcreteReadOnlyAttributeRejected verifies a concrete

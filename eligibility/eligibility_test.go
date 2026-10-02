@@ -168,10 +168,8 @@ func TestClassify_EligibilitySourceOverride_Partial(t *testing.T) {
 	// Mappable) AND MatterEligibilitySource (which returns Partial).
 	// MatterEligibilitySource must win.
 	src := &fakeEligibilitySource{
-		fakeEndpointSource: fakeEndpointSource{
-			deviceType: 0x0302,
-			clusters:   []contract.ClusterServer{&fakeClusterServer{clusterID: 0x0402}},
-		},
+		deviceType: 0x0302,
+		clusters:   []contract.ClusterServer{&fakeClusterServer{clusterID: 0x0402}},
 		verdict: contract.EligibilityVerdict{
 			State:  eligibility.StatePartial,
 			Reason: "siren tones not mappable",

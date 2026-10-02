@@ -26,7 +26,7 @@ go test ./...
 
 Prerequisites:
 
-- Go 1.26+ (`go.mod` pins the language version; CI installs the same
+- Go 1.27+ (`go.mod` pins the language version; CI installs the same
   toolchain it declares).
 - `gofumpt` and `golangci-lint` **v2** — a v1 binary rejects this repo's
   v2-format `.golangci.yaml`. Install the versions CI pins, which are the

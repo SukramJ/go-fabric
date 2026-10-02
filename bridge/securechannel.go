@@ -522,15 +522,6 @@ const (
 	paseLockoutMaxCooldown = 4 * time.Hour
 )
 
-// now reads the wall clock through [Bridge.nowFn] so the PASE lockout
-// cooldown is testable without sleeping. Production leaves nowFn nil.
-func (b *Bridge) now() time.Time {
-	if b.nowFn != nil {
-		return b.nowFn()
-	}
-	return time.Now()
-}
-
 // claimPaseInFlight attempts to claim the single-active-PASE slot for
 // exchangeID. Returns true when the claim succeeds: the slot was idle,
 // expired, or already owned by the SAME exchange (PBKDFParamRequest
@@ -628,7 +619,7 @@ func (b *Bridge) engagePaseLockout() time.Duration {
 		cooldown *= 2
 	}
 	cooldown = min(cooldown, paseLockoutMaxCooldown)
-	b.paseLockoutUntil = b.now().Add(cooldown)
+	b.paseLockoutUntil = time.Now().Add(cooldown)
 	b.paseFailures.Store(0)
 	return cooldown
 }
@@ -648,7 +639,7 @@ func (b *Bridge) paseLockedOut() bool {
 	b.mu.RLock()
 	until := b.paseLockoutUntil
 	b.mu.RUnlock()
-	return !until.IsZero() && b.now().Before(until)
+	return !until.IsZero() && time.Now().Before(until)
 }
 
 // resetPaseFailures clears the per-window PASE state — the failure counter,

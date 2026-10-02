@@ -14,12 +14,32 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
+
+// newUnstartedBridge builds a bridge without starting its transport. The
+// lockout bookkeeping needs no listener, and the receive loop of a started
+// bridge blocks in a UDP read, which never counts as durably blocked: a
+// synctest bubble around it could not advance its clock.
+func newUnstartedBridge(t *testing.T) *Bridge {
+	t.Helper()
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{
+		Listen:    ":0",
+		VendorID:  0x1234,
+		ProductID: 0x5678,
+		NodeLabel: "wb-test",
+	}, nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	return b
+}
 
 // openedWindow attaches a fresh CommissioningWindow to b and opens it,
 // returning the window for status assertions.
@@ -176,42 +196,42 @@ func TestBridge_PaseLockedOutAtCap(t *testing.T) {
 // paseLockedOut() is false right after the cap and this test fails.
 func TestBridge_PaseLockout_SurvivesInternalRestore(t *testing.T) {
 	t.Parallel()
-	b := newStartedBridge(t)
-	now := time.Now()
-	b.nowFn = func() time.Time { return now }
+	synctest.Test(t, func(t *testing.T) {
+		b := newUnstartedBridge(t)
 
-	// The configured acceptor the restore closure re-attaches — the shape
-	// of matter_verifier_installer.go's restore, which calls
-	// bridge.AttachPaseHandler(configured) on window close.
-	configured := NewPaseAdapterWithFactory(newVerifierFactory(t, nil))
-	configured.SetPBKDFParams(failureCountTestIterations, failureCountTestSalt(), 1)
-	b.AttachPaseHandler(configured)
+		// The configured acceptor the restore closure re-attaches — the shape
+		// of matter_verifier_installer.go's restore, which calls
+		// bridge.AttachPaseHandler(configured) on window close.
+		configured := NewPaseAdapterWithFactory(newVerifierFactory(t, nil))
+		configured.SetPBKDFParams(failureCountTestIterations, failureCountTestSalt(), 1)
+		b.AttachPaseHandler(configured)
 
-	w := openedWindow(t, b)
-	if !w.setRestore(func() { b.AttachPaseHandler(configured) }) {
-		t.Fatal("setRestore: window unexpectedly closed")
-	}
+		w := openedWindow(t, b)
+		if !w.setRestore(func() { b.AttachPaseHandler(configured) }) {
+			t.Fatal("setRestore: window unexpectedly closed")
+		}
 
-	for range paseMaxErrors {
-		b.recordPaseFailure()
-	}
+		for range paseMaxErrors {
+			b.recordPaseFailure()
+		}
 
-	if !b.paseLockedOut() {
-		t.Fatal("paseLockedOut = false after the cap fired with a restore closure registered; the internal restore cleared the lockout it had just engaged, so guessing continues at full rate")
-	}
-	// The window is revoked; the lockout, not the (now closed) window, is
-	// what holds PASE shut.
-	if got := w.CurrentWindow().Status; got != wire.WindowStatusClosed {
-		t.Errorf("window Status = %v, want Closed (revoked by the cap)", got)
-	}
-	// The backoff streak must survive too — a streak reset to 0 by the
-	// restore would restart the doubling from the base cooldown forever.
-	b.mu.RLock()
-	streak := b.paseLockoutStreak
-	b.mu.RUnlock()
-	if streak != 1 {
-		t.Errorf("paseLockoutStreak = %d after the cap, want 1 (the restore reset the backoff)", streak)
-	}
+		if !b.paseLockedOut() {
+			t.Fatal("paseLockedOut = false after the cap fired with a restore closure registered; the internal restore cleared the lockout it had just engaged, so guessing continues at full rate")
+		}
+		// The window is revoked; the lockout, not the (now closed) window, is
+		// what holds PASE shut.
+		if got := w.CurrentWindow().Status; got != wire.WindowStatusClosed {
+			t.Errorf("window Status = %v, want Closed (revoked by the cap)", got)
+		}
+		// The backoff streak must survive too — a streak reset to 0 by the
+		// restore would restart the doubling from the base cooldown forever.
+		b.mu.RLock()
+		streak := b.paseLockoutStreak
+		b.mu.RUnlock()
+		if streak != 1 {
+			t.Errorf("paseLockoutStreak = %d after the cap, want 1 (the restore reset the backoff)", streak)
+		}
+	})
 }
 
 // TestBridge_PaseInFlightSlotReleasedOnPake1Failure pins that a handshake
@@ -250,31 +270,31 @@ func TestBridge_PaseInFlightSlotReleasedOnPake1Failure(t *testing.T) {
 // datagrams.
 func TestBridge_PaseLockoutExpiresOnItsOwn(t *testing.T) {
 	t.Parallel()
-	b := newStartedBridge(t)
-	now := time.Now()
-	b.nowFn = func() time.Time { return now }
+	synctest.Test(t, func(t *testing.T) {
+		b := newUnstartedBridge(t)
 
-	for range paseMaxErrors {
-		b.recordPaseFailure()
-	}
-	if !b.paseLockedOut() {
-		t.Fatal("paseLockedOut = false at the cap; PASE would keep accepting guesses")
-	}
+		for range paseMaxErrors {
+			b.recordPaseFailure()
+		}
+		if !b.paseLockedOut() {
+			t.Fatal("paseLockedOut = false at the cap; PASE would keep accepting guesses")
+		}
 
-	// Just before the cooldown ends PASE is still refused …
-	now = now.Add(paseLockoutCooldown - time.Second)
-	if !b.paseLockedOut() {
-		t.Fatal("lockout lifted before the cooldown expired")
-	}
-	// … and once it has passed the bridge answers PASE again without any
-	// operator action.
-	now = now.Add(2 * time.Second)
-	if b.paseLockedOut() {
-		t.Fatal("PASE still locked out after the cooldown expired — an unauthenticated peer can disable pairing permanently")
-	}
-	if got := b.paseFailures.Load(); got != 0 {
-		t.Errorf("paseFailures = %d after the lockout expired, want 0 — the next window of guesses must start from a full budget", got)
-	}
+		// One nanosecond before the cooldown ends PASE is still refused …
+		time.Sleep(paseLockoutCooldown - time.Nanosecond)
+		if !b.paseLockedOut() {
+			t.Fatal("lockout lifted before the cooldown expired")
+		}
+		// … and the moment it has passed the bridge answers PASE again
+		// without any operator action.
+		time.Sleep(time.Nanosecond)
+		if b.paseLockedOut() {
+			t.Fatal("PASE still locked out after the cooldown expired — an unauthenticated peer can disable pairing permanently")
+		}
+		if got := b.paseFailures.Load(); got != 0 {
+			t.Errorf("paseFailures = %d after the lockout expired, want 0 — the next window of guesses must start from a full budget", got)
+		}
+	})
 }
 
 // TestBridge_PaseLockoutBacksOffOnRepeatedCaps pins the doubling backoff:
@@ -283,47 +303,47 @@ func TestBridge_PaseLockoutExpiresOnItsOwn(t *testing.T) {
 // short enough for an operator who simply mistyped the code.
 func TestBridge_PaseLockoutBacksOffOnRepeatedCaps(t *testing.T) {
 	t.Parallel()
-	b := newStartedBridge(t)
-	now := time.Now()
-	b.nowFn = func() time.Time { return now }
+	synctest.Test(t, func(t *testing.T) {
+		b := newUnstartedBridge(t)
 
-	trip := func() time.Duration {
-		t.Helper()
-		start := now
-		for range paseMaxErrors {
-			b.recordPaseFailure()
+		trip := func() time.Duration {
+			t.Helper()
+			start := time.Now()
+			for range paseMaxErrors {
+				b.recordPaseFailure()
+			}
+			b.mu.RLock()
+			until := b.paseLockoutUntil
+			b.mu.RUnlock()
+			return until.Sub(start)
 		}
-		b.mu.RLock()
-		until := b.paseLockoutUntil
-		b.mu.RUnlock()
-		return until.Sub(start)
-	}
 
-	if got := trip(); got != paseLockoutCooldown {
-		t.Errorf("first lockout = %v, want %v", got, paseLockoutCooldown)
-	}
-	now = now.Add(paseLockoutCooldown)
-	if got := trip(); got != 2*paseLockoutCooldown {
-		t.Errorf("second lockout = %v, want %v", got, 2*paseLockoutCooldown)
-	}
-	// Run the streak far past the ceiling; the cooldown must not grow
-	// without bound.
-	for range 20 {
-		now = now.Add(paseLockoutMaxCooldown)
-		_ = trip()
-	}
-	now = now.Add(paseLockoutMaxCooldown)
-	if got := trip(); got != paseLockoutMaxCooldown {
-		t.Errorf("lockout after a long streak = %v, want the ceiling %v", got, paseLockoutMaxCooldown)
-	}
+		if got := trip(); got != paseLockoutCooldown {
+			t.Errorf("first lockout = %v, want %v", got, paseLockoutCooldown)
+		}
+		time.Sleep(paseLockoutCooldown)
+		if got := trip(); got != 2*paseLockoutCooldown {
+			t.Errorf("second lockout = %v, want %v", got, 2*paseLockoutCooldown)
+		}
+		// Run the streak far past the ceiling; the cooldown must not grow
+		// without bound.
+		for range 20 {
+			time.Sleep(paseLockoutMaxCooldown)
+			_ = trip()
+		}
+		time.Sleep(paseLockoutMaxCooldown)
+		if got := trip(); got != paseLockoutMaxCooldown {
+			t.Errorf("lockout after a long streak = %v, want the ceiling %v", got, paseLockoutMaxCooldown)
+		}
 
-	// Opening a pairing window (a fresh acceptor) clears both the refusal
-	// and the accumulated backoff.
-	b.AttachPaseHandler(nil)
-	if b.paseLockedOut() {
-		t.Fatal("paseLockedOut still true after a fresh acceptor was installed; the operator has no way back")
-	}
-	if got := trip(); got != paseLockoutCooldown {
-		t.Errorf("lockout after an operator intervention = %v, want the base cooldown %v", got, paseLockoutCooldown)
-	}
+		// Opening a pairing window (a fresh acceptor) clears both the refusal
+		// and the accumulated backoff.
+		b.AttachPaseHandler(nil)
+		if b.paseLockedOut() {
+			t.Fatal("paseLockedOut still true after a fresh acceptor was installed; the operator has no way back")
+		}
+		if got := trip(); got != paseLockoutCooldown {
+			t.Errorf("lockout after an operator intervention = %v, want the base cooldown %v", got, paseLockoutCooldown)
+		}
+	})
 }

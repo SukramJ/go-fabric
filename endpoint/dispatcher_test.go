@@ -431,7 +431,7 @@ func (f listingSource) MatterClusterServers() []contract.ClusterServer {
 func TestRead_WildcardAttribute_ListerWithoutGlobalsStillGetsThem(t *testing.T) {
 	t.Parallel()
 	srv := &listingAttrServer{
-		globalAttrServer: globalAttrServer{id: 0x0006},
+		id: 0x0006,
 		// Cluster-specific attributes only; NO global IDs.
 		attrs: []uint32{0x0000, 0x4001},
 	}
@@ -467,7 +467,7 @@ func TestRead_WildcardAttribute_ListerWithoutGlobalsStillGetsThem(t *testing.T) 
 func TestRead_WildcardAttribute_ListerExpands(t *testing.T) {
 	t.Parallel()
 	srv := &listingAttrServer{
-		globalAttrServer: globalAttrServer{id: 0x0006},
+		id: 0x0006,
 		// Include 0xFFFC (FeatureMap) on purpose — the dispatcher must
 		// dedupe globals so we don't get two FeatureMap results.
 		attrs: []uint32{0x4001, 0x0000, cluster.AttrGlobalFeatureMap},
@@ -947,9 +947,9 @@ var _ contract.ClusterCommandLister = (*commandListerServer)(nil)
 func TestSynthesizeGlobalRead_AcceptedCommandList_WithLister(t *testing.T) {
 	t.Parallel()
 	srv := &commandListerServer{
-		fakeServerFull: fakeServerFull{id: 0x0006, readOK: false},
-		accepted:       []uint32{0x00, 0x01, 0x02},
-		generated:      []uint32{0x03},
+		id: 0x0006, readOK: false,
+		accepted:  []uint32{0x00, 0x01, 0x02},
+		generated: []uint32{0x03},
 	}
 	r := readOne(context.Background(), nil, srv, makeConcretePath(2, 0x0006, cluster.AttrGlobalAcceptedCommandList))
 	if r.Status != im.StatusSuccess {
@@ -969,9 +969,9 @@ func TestSynthesizeGlobalRead_AcceptedCommandList_WithLister(t *testing.T) {
 func TestSynthesizeGlobalRead_GeneratedCommandList_WithLister(t *testing.T) {
 	t.Parallel()
 	srv := &commandListerServer{
-		fakeServerFull: fakeServerFull{id: 0x0006, readOK: false},
-		accepted:       []uint32{0x00},
-		generated:      []uint32{0x10, 0x11},
+		id: 0x0006, readOK: false,
+		accepted:  []uint32{0x00},
+		generated: []uint32{0x10, 0x11},
 	}
 	r := readOne(context.Background(), nil, srv, makeConcretePath(2, 0x0006, cluster.AttrGlobalGeneratedCommandList))
 	if r.Status != im.StatusSuccess {

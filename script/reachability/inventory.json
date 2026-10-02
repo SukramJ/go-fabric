@@ -138,7 +138,7 @@
       "package": "schema",
       "identifier": "DeviceTypeAllowsServerCluster",
       "file": "schema/lookup.go",
-      "line": 65,
+      "line": 67,
       "kind": "func"
     },
     {
@@ -159,7 +159,7 @@
       "package": "secure/mattercert",
       "identifier": "ErrExpired",
       "file": "secure/mattercert/verify.go",
-      "line": 61,
+      "line": 62,
       "kind": "var"
     },
     {
@@ -547,63 +547,63 @@
       "identifier": "TestBridge_PaseFailures_BelowCapKeepsWindowOpen",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 61
+      "line": 81
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_NoWindowIsNilSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 102
+      "line": 122
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_ResetGivesFreshBudget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 80
+      "line": 100
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_RevokesWindowAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 45
+      "line": 65
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseInFlightSlotReleasedOnPake1Failure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 223
+      "line": 243
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockedOutAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 120
+      "line": 140
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutBacksOffOnRepeatedCaps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 284
+      "line": 304
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutExpiresOnItsOwn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 251
+      "line": 271
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockout_SurvivesInternalRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 177
+      "line": 197
     },
     {
       "package": "bridge",
@@ -652,21 +652,21 @@
       "identifier": "TestBuildInitialReport_EmptyRequest_EmptyReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 25
+      "line": 26
     },
     {
       "package": "bridge",
       "identifier": "TestBuildInitialReport_EventOnlyEmptyLog_Establishes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 104
+      "line": 105
     },
     {
       "package": "bridge",
       "identifier": "TestBuildInitialReport_SortOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 54
+      "line": 55
     },
     {
       "package": "bridge",
@@ -3613,14 +3613,14 @@
       "identifier": "TestRegisterSubscription_KeepSubscriptionsTrue_BothSurvive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 182
+      "line": 183
     },
     {
       "package": "bridge",
       "identifier": "TestRegisterSubscription_NoManager_ReturnsZeroSubID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 147
+      "line": 148
     },
     {
       "package": "bridge",
@@ -4173,14 +4173,14 @@
       "identifier": "TestStreamInitialReportChunks_ChunkBudgetSplit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 269
+      "line": 274
     },
     {
       "package": "bridge",
       "identifier": "TestStreamInitialReportChunks_EmptyReport_NoSend",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 243
+      "line": 244
     },
     {
       "package": "bridge",
@@ -5181,14 +5181,14 @@
       "identifier": "TestWrite_ConcreteReadOnlyAttributeRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_gate_test.go",
-      "line": 67
+      "line": 63
     },
     {
       "package": "endpoint",
       "identifier": "TestWrite_ConcreteWritableAttributeProceeds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_gate_test.go",
-      "line": 88
+      "line": 84
     },
     {
       "package": "endpoint",
@@ -5272,14 +5272,14 @@
       "identifier": "TestWrite_WildcardEndpointSkipsReadOnlyAttributeSilently",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_gate_test.go",
-      "line": 153
+      "line": 149
     },
     {
       "package": "endpoint",
       "identifier": "TestWrite_WildcardSkipsReadOnlyAttribute",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_gate_test.go",
-      "line": 111
+      "line": 107
     },
     {
       "package": "endpoint/endpointtest",
@@ -5678,7 +5678,7 @@
       "identifier": "TestHandleReadRequest_ACL_CASEAllowed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_parity_test.go",
-      "line": 474
+      "line": 472
     },
     {
       "package": "im",
@@ -5692,7 +5692,7 @@
       "identifier": "TestHandleReadRequest_ACL_PASEBypass",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_parity_test.go",
-      "line": 505
+      "line": 501
     },
     {
       "package": "im",
@@ -6791,7 +6791,7 @@
       "identifier": "TestManualSubtypeRepro",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/subtype_responder_manual_test.go",
-      "line": 19
+      "line": 18
     },
     {
       "package": "mdns",

@@ -3,6 +3,8 @@
 
 package schema
 
+import "slices"
+
 // ClusterRevision returns the matter.js HEAD revision for the given cluster
 // id, or (0, false) if the cluster is not present in the snapshot.
 //
@@ -67,10 +69,8 @@ func DeviceTypeAllowsServerCluster(deviceType, clusterID uint32) (allowed, known
 	if !ok {
 		return false, false
 	}
-	for _, id := range ids {
-		if id == clusterID {
-			return true, true
-		}
+	if slices.Contains(ids, clusterID) {
+		return true, true
 	}
 	return false, true
 }

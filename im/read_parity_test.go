@@ -442,10 +442,8 @@ var (
 func TestHandleReadRequest_ACL_CASEDenied(t *testing.T) {
 	t.Parallel()
 	d := &aclDispatcher{
-		fakeDispatcher: fakeDispatcher{
-			readVal:  AttributeValue{Value: true},
-			readStat: StatusSuccess,
-		},
+		readVal:        AttributeValue{Value: true},
+		readStat:       StatusSuccess,
 		allowedCluster: 0x0006, // only OnOff is allowed
 	}
 	// Request cluster 0x0300 (ColorControl) — denied by the fake ACL.
@@ -474,10 +472,8 @@ func TestHandleReadRequest_ACL_CASEDenied(t *testing.T) {
 func TestHandleReadRequest_ACL_CASEAllowed(t *testing.T) {
 	t.Parallel()
 	d := &aclDispatcher{
-		fakeDispatcher: fakeDispatcher{
-			readVal:  AttributeValue{Value: true},
-			readStat: StatusSuccess,
-		},
+		readVal:        AttributeValue{Value: true},
+		readStat:       StatusSuccess,
 		allowedCluster: 0x0006,
 	}
 	req := ReadRequest{
@@ -505,10 +501,8 @@ func TestHandleReadRequest_ACL_CASEAllowed(t *testing.T) {
 func TestHandleReadRequest_ACL_PASEBypass(t *testing.T) {
 	t.Parallel()
 	d := &aclDispatcher{
-		fakeDispatcher: fakeDispatcher{
-			readVal:  AttributeValue{Value: uint8(42)},
-			readStat: StatusSuccess,
-		},
+		readVal:        AttributeValue{Value: uint8(42)},
+		readStat:       StatusSuccess,
 		allowedCluster: 0, // deny everything under ACL
 	}
 	req := ReadRequest{

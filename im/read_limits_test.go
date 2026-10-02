@@ -64,7 +64,7 @@ func (d *countingDispatcher) Read(ctx context.Context, p ConcreteAttributePath) 
 // by how many times a peer can fit the path into one datagram.
 func TestHandleReadRequest_IdenticalPathsAreReadOnce(t *testing.T) {
 	t.Parallel()
-	d := &countingDispatcher{fakeDispatcher: fakeDispatcher{readVal: AttributeValue{Value: true}}}
+	d := &countingDispatcher{readVal: AttributeValue{Value: true}}
 	req := ReadRequest{AttributeRequests: wildcardPaths(50)}
 	rd := HandleReadRequest(context.Background(), d, req)
 	if d.reads != 1 {

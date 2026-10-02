@@ -396,12 +396,6 @@ type Bridge struct {
 	// leaves the flag clear and still starts with a clean budget.
 	preserveLockoutOnReset atomic.Bool
 
-	// nowFn is the wall-clock seam for the PASE lockout bookkeeping.
-	// Nil (the production value) means [time.Now]; tests replace it
-	// before any traffic is dispatched so the cooldown can be crossed
-	// without sleeping. See [Bridge.now].
-	nowFn func() time.Time
-
 	// paseInFlightExchange / paseInFlightSince implement the
 	// single-active-PASE invariant (Matter §4.13.1): while one PASE
 	// handshake is in progress the bridge SHALL NOT accept another —

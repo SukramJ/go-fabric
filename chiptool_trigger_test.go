@@ -6,6 +6,7 @@ package fabric_test
 import (
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -176,13 +177,7 @@ func TestChiptoolTriggerFiresOnAFreshPullRequest(t *testing.T) {
 	have := strings.Split(strings.ReplaceAll(string(m[1]), " ", ""), ",")
 
 	for _, want := range []string{"opened", "labeled", "synchronize", "reopened"} {
-		found := false
-		for _, h := range have {
-			if h == want {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(have, want)
 		if !found {
 			t.Errorf("pull_request types %v is missing %q — without it the workflow does not start "+
 				"on that event, and every pattern inside it is moot", have, want)

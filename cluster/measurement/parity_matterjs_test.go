@@ -196,7 +196,7 @@ func mandatoryUnderFeatureMap(conformance string, bits map[string]uint32, fm uin
 		return false, false
 	}
 	required = true
-	for _, name := range strings.Split(term, "&") {
+	for name := range strings.SplitSeq(term, "&") {
 		bit, known := bits[strings.TrimSpace(name)]
 		if !known {
 			return false, false

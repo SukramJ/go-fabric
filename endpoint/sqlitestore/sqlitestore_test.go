@@ -212,9 +212,7 @@ func TestConcurrentAssignmentsAreDistinct(t *testing.T) {
 		ids = make(map[uint16]string, n)
 	)
 	for i := range n {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			key := fmt.Sprintf("src:%d", i)
 			id, err := s.UpsertEndpointAssigning(context.Background(), endpoint.Record{
 				Key: endpoint.StringKey(key), Scope: "scope", DeviceType: 0x0100,
@@ -229,7 +227,7 @@ func TestConcurrentAssignmentsAreDistinct(t *testing.T) {
 				t.Errorf("endpoint %d handed to both %s and %s", id, other, key)
 			}
 			ids[id] = key
-		}()
+		})
 	}
 	wg.Wait()
 	if len(ids) != n {

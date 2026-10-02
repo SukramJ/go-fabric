@@ -1,6 +1,6 @@
 module github.com/SukramJ/go-fabric
 
-go 1.26.6
+go 1.27.1
 
 require (
 	filippo.io/nistec v0.0.4
