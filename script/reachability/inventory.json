@@ -5293,7 +5293,7 @@
       "identifier": "TestBridgedEndpointsMeetTheirDeviceTypeConformance",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 39
+      "line": 40
     },
     {
       "package": "examples/reference-bridge",
@@ -5314,7 +5314,7 @@
       "identifier": "TestOnWithTimedOffCountsDownAndTurnsTheLightOff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 155
+      "line": 156
     },
     {
       "package": "examples/reference-bridge",
