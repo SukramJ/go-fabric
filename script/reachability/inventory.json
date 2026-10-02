@@ -547,63 +547,63 @@
       "identifier": "TestBridge_PaseFailures_BelowCapKeepsWindowOpen",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 61
+      "line": 81
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_NoWindowIsNilSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 102
+      "line": 122
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_ResetGivesFreshBudget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 80
+      "line": 100
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_RevokesWindowAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 45
+      "line": 65
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseInFlightSlotReleasedOnPake1Failure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 223
+      "line": 243
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockedOutAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 120
+      "line": 140
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutBacksOffOnRepeatedCaps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 284
+      "line": 304
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutExpiresOnItsOwn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 251
+      "line": 271
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockout_SurvivesInternalRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 177
+      "line": 197
     },
     {
       "package": "bridge",
@@ -652,21 +652,21 @@
       "identifier": "TestBuildInitialReport_EmptyRequest_EmptyReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 25
+      "line": 26
     },
     {
       "package": "bridge",
       "identifier": "TestBuildInitialReport_EventOnlyEmptyLog_Establishes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 104
+      "line": 105
     },
     {
       "package": "bridge",
       "identifier": "TestBuildInitialReport_SortOrder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 54
+      "line": 55
     },
     {
       "package": "bridge",
@@ -3613,14 +3613,14 @@
       "identifier": "TestRegisterSubscription_KeepSubscriptionsTrue_BothSurvive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 182
+      "line": 183
     },
     {
       "package": "bridge",
       "identifier": "TestRegisterSubscription_NoManager_ReturnsZeroSubID",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 147
+      "line": 148
     },
     {
       "package": "bridge",
@@ -4173,14 +4173,14 @@
       "identifier": "TestStreamInitialReportChunks_ChunkBudgetSplit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 269
+      "line": 274
     },
     {
       "package": "bridge",
       "identifier": "TestStreamInitialReportChunks_EmptyReport_NoSend",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
-      "line": 243
+      "line": 244
     },
     {
       "package": "bridge",
