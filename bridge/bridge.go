@@ -77,6 +77,15 @@
 //     farewell (leaving controllers on stale sessions after a restart),
 //     and the two reverse hooks this call self-wires — the graceful-close
 //     notifier and the mDNS reannounce trigger — are never installed.
+//   - AttachSubscriptionStore — silent. Start loads the previous run's
+//     subscriptions from it and clears it; each subscription of a CASE
+//     session is written when it becomes active and deleted when it is
+//     terminated (docs/adr/0008). Without one nothing survives a restart:
+//     every controller waits out its own subscription liveness timeout
+//     before it re-subscribes, and the device looks unresponsive for that
+//     long. *store.Store satisfies the port. SetSubscriptionPersistence
+//     (false) switches recording and re-establishment off altogether —
+//     matter.js's `persistenceEnabled`; on by default.
 //
 // Cluster surface — order matters within this group, but not relative
 // to [Start]: attaching clusters republishes them onto the live
@@ -103,6 +112,16 @@
 //     reads it. Skipping it does not affect the mDNS commissionable
 //     record, which [Bridge.AnnounceCommissioning] publishes from its
 //     own argument.
+//   - AttachCaseInitiatorProvider and AttachOperationalResolver, then a
+//     call to [Bridge.ReestablishFormerSubscriptions] once the host's CASE
+//     identities are loaded (before it announces its operational
+//     records) — silent. Together they re-establish the former
+//     subscriptions under their old ids: the bridge resolves each
+//     controller's operational instance, opens CASE to it as the
+//     initiator, and re-sends the priming report. A skipped piece drops
+//     every former subscription; the controllers then recover through
+//     their liveness timeout, as without a store. This narrow initiator
+//     is the only one in the module (docs/adr/0008).
 //   - AttachDiagnosticEvents makes [Bridge.DiagnosticEvents] non-empty.
 //   - SetOnReassembled, SetOnFabricAdded and SetOnFabricRemoved are
 //     nil-safe observer hooks.
@@ -527,6 +546,11 @@ type Bridge struct {
 	reportExchangeOwner sync.Map
 	subReportExchange   sync.Map
 
+	// resumption holds subscription persistence and the re-establishment
+	// of former subscriptions after a restart (docs/adr/0008). See
+	// subscription_persistence.go and subscription_reestablish.go.
+	resumption resumptionState
+
 	// chunkStatusResponseTimeoutOverride pins the per-chunk
 	// StatusResponse wait bound ([Bridge.chunkStatusResponseTimeout])
 	// for tests that must not sit through the derived MRP worst case;
@@ -629,6 +653,14 @@ func (b *Bridge) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("bridge: udp: %w", err)
 	}
+
+	// The previous run's subscriptions become the former ones before any
+	// subscription of this run can be established — the serve loop below
+	// is what admits the first — and only once nothing can fail Start any
+	// more, so a failed Start leaves the store untouched. Mirrors matter.js
+	// ServerNetworkRuntime running SubscriptionsServer.beginRun ahead of
+	// installing the InteractionServer.
+	b.beginSubscriptionRun()
 
 	serveCtx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -993,6 +1025,8 @@ func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
 // closure. Forwards to whatever closure the daemon wired via
 // [SetOnFabricRemoved]; nil-safe.
 func (b *Bridge) EmitFabricRemoved(fabricIndex uint8) {
+	// A removed fabric's subscriptions can never be re-established.
+	b.forgetFabricSubscriptions(fabricIndex)
 	b.mu.RLock()
 	hook := b.onFabricRemoved
 	b.mu.RUnlock()
@@ -1159,6 +1193,12 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		b.mu.Unlock()
 		return nil
 	}
+	// Going offline loses the buffered events, as a real restart does; the
+	// numbering continues. Without this the priming report of a
+	// subscription re-established after Stop/Start replays the former
+	// run's events (matter.js #4594: EventsBehavior clears a volatile
+	// store when the node goes offline).
+	b.eventLog.DropBuffered()
 	listener := b.listener
 	cancel := b.serveCancel
 	done := b.serveDone
