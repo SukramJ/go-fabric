@@ -571,9 +571,27 @@ func (m *Manager) ReleaseID(id uint16) {
 // so the IM dispatcher's ACL gate can match CAT-bearing ACEs (Matter
 // §9.10.5.6). Pass nil when the peer NOC carried no CATs.
 func (m *Manager) OpenFromSigmaWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
+	return m.openFromSigma(id, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, false)
+}
+
+// OpenFromSigmaAsInitiatorWithID is [Manager.OpenFromSigmaWithID] for a
+// session this node opened as the CASE initiator: it encrypts with the
+// I2R key and decrypts with R2I. The only initiator in this module
+// re-establishes former subscriptions after a restart (docs/adr/0008);
+// matter.js creates the same session from CaseClient.ts:#doPair with
+// `isInitiator: true`.
+func (m *Manager) OpenFromSigmaAsInitiatorWithID(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys) (*Entry, error) {
+	return m.openFromSigma(id, fabricIndex, localNodeID, peerNodeID, peerSessionID, peerCATs, keys, true)
+}
+
+func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerNodeID uint64, peerSessionID uint16, peerCATs []uint32, keys sigma.SessionKeys, initiator bool) (*Entry, error) {
+	encryptKey, decryptKey := keys.R2IKey[:], keys.I2RKey[:]
+	if initiator {
+		encryptKey, decryptKey = keys.I2RKey[:], keys.R2IKey[:]
+	}
 	sess, err := channel.New(channel.Config{
-		EncryptKey:    keys.R2IKey[:],
-		DecryptKey:    keys.I2RKey[:],
+		EncryptKey:    encryptKey,
+		DecryptKey:    decryptKey,
 		LocalNodeID:   localNodeID,
 		PeerNodeID:    peerNodeID,
 		PeerCATs:      peerCATs,

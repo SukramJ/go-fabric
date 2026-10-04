@@ -1224,6 +1224,24 @@ work when the bridge exposes a timed-quality attribute or targets large
 controller fleets, respectively.
 (Re-audit 2026-05-31, findings F3 / F4.)
 
+### BD-Matter-CaseInitiatorPeerCATs — the CASE initiator takes the responder's CATs from its NOC
+
+matter.js `packages/protocol/src/session/case/CaseClient.ts:#doPair` gives a
+fully handshaken initiator session the CATs it was *configured* with, falling
+back to the resumption record's — on the subscription re-establishment path
+(`SubscriptionsServer.reestablishFormerSubscriptions` → `peer.connect`) that
+is none on a full handshake. go-fabric's initiator (`secure/sigma/initiator.go`,
+`Initiator.processSigma2`) lifts the responder's CATs out of its NOC once the
+transcript signature authenticated it, as chip's `CASESession::HandleSigma2`
+does and as Matter §6.6.2.1.2 defines a subject's CATs.
+
+By design. The session the device opens is one the controller can reuse for
+its own requests, and the ACL gate matches CAT subjects from the session.
+Taking them from the NOC is what the responder side already does
+(`Responder.verifySigma3Locked`); leaving them empty would deny a
+CAT-scoped controller on the one session that exists right after a restart.
+Pinned by `TestPeerInitiator_FullHandshakeAgainstResponder`.
+
 ---
 
 ## Removed (built, tested, never wired)
