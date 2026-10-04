@@ -22,6 +22,28 @@ pseudo-version of `main`.
   addresses to join. `OperationalKey`, `SessionID`, `PrivacyKey` and
   `MulticastAddress` are the derivations, pinned against matter.js by
   fixtures in `groups/testdata/group-crypto-fixtures.json`.
+- **Group messages are received and routed**, as matter.js does it
+  (`SessionManager.groupSessionFromPacket`, `GroupSession.decode`,
+  `InteractionServer` on a group session, `ServerGroupNetworking`). A group
+  message is authenticated through the node's group state, checked against
+  the per-key, per-sender counter window, and a group Invoke or a
+  SuppressResponse Write runs on every member endpoint of the group where a
+  Group access control entry grants the privilege — never answered, never
+  acknowledged; anything that fails a check is dropped silently. The bridge
+  joins the IPv6 multicast address of every group with a member endpoint
+  (`FF35:0040:FD<FabricID>00:<GroupID>`) on all multicast-capable
+  interfaces, follows membership changes, retries a failed join every 30 s
+  and leaves the addresses on Stop; GroupTable changes reach subscribers,
+  and a removed fabric's groups are forgotten.
+  - `bridge`: `GroupMessaging`, `AttachGroupMessaging` (noop default: every
+    group message dropped; see the package doc).
+  - `im`: `GroupSubject`, `WithGroupSubject`, `GroupSubjectFromContext`,
+    `HandleGroupInvokeRequest`, `HandleGroupWriteRequest`,
+    `AuthorizingInvoker`, `CommandAuthorizer`.
+  - `endpoint`: `TopologyDispatcher.InvokeAuthorized`; `CheckACL` evaluates
+    a request carrying a Group subject under the Group auth mode.
+  - `transport/udp`: `Listener.JoinGroup`, `Listener.LeaveGroup`,
+    `ErrNoMulticastInterface`.
 - **A real Groups server (0x0004)**, mirroring matter.js `GroupsServer`
   ([ADR 0009](docs/adr/0009-groups-and-group-messaging.md), superseding
   ADR 0004). `core.Groups` answers AddGroup, ViewGroup, GetGroupMembership,
@@ -136,6 +158,10 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- **An AccessControl Group entry could not be written.** The validator
+  accepted only Group Node IDs (0xFFFF_FFFF_FFFF_FFxx) as Group subjects;
+  the subject of a Group entry is a Group ID, 0x0001..0xFFFF, as matter.js
+  validates it and as a group message's subject carries it.
 - **GroupKeyManagement worked only through typed Go calls.** The bridge had
   no wire codec for KeySetWrite / KeySetRead / KeySetRemove /
   KeySetReadAllIndices, so a controller's command reached the server as a

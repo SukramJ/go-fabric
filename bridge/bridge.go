@@ -105,6 +105,18 @@
 //     check the bool, because the only other symptom is a PartsList
 //     frozen at whatever the Descriptor was constructed with.
 //
+// Group communication — needed by any node with a Groups server, which
+// a node with lights or plugs has:
+//
+//   - AttachGroupMessaging — fails closed, silently. Pass the
+//     *groups.Manager GroupKeyManagement and the assembler
+//     (endpoint.Config.Groups) were given. Without it every group message
+//     is dropped, no multicast group is joined, a fabric removal leaves
+//     the group state behind and GroupTable changes reach no subscriber;
+//     since a group message is never answered, a controller sees a group
+//     command that did nothing. Attach before or after Start; the
+//     memberships are joined once both the port and the socket exist.
+//
 // Genuinely optional — a skip costs exactly the named feature:
 //
 //   - AttachCommissioningWindow stores the tracker for
@@ -289,6 +301,17 @@ type Bridge struct {
 	// path behind the bridge's topology lock.
 	diagEvents atomic.Pointer[diagevent.Ring]
 	subManager *subscription.Manager // optional; when set Subscribe is fully wired
+
+	// groupMessaging authenticates group messages and names the
+	// multicast groups to join; noop until AttachGroupMessaging.
+	groupMessaging GroupMessaging
+	// groupNetMu serialises the multicast-membership reconciler over
+	// groupMember (the started socket), groupJoined (addresses joined)
+	// and groupJoinRetry (the pending retry after a failed join).
+	groupNetMu     sync.Mutex
+	groupMember    multicastMember
+	groupJoined    map[string]net.IP
+	groupJoinRetry *time.Timer
 
 	// measurementUnsubscribers holds the unsubscribe closures returned
 	// by [contract.ChangeNotifier.OnMatterValueChanged] for
@@ -587,16 +610,17 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 	}
 
 	br := &Bridge{
-		cfg:           cfg,
-		snapshotter:   snap,
-		logger:        logger.With(slog.String("subsystem", "matter.bridge")),
-		advertiser:    advertiser,
-		sessions:      noopSessionLookup{},
-		paseHandler:   noopPaseHandler{},
-		caseHandler:   noopCaseHandler{},
-		ackHandler:    noopAckHandler{},
-		eventLog:      im.NewEventLog(),
-		sigma1Replied: make(map[uint16][32]byte),
+		cfg:            cfg,
+		snapshotter:    snap,
+		logger:         logger.With(slog.String("subsystem", "matter.bridge")),
+		advertiser:     advertiser,
+		sessions:       noopSessionLookup{},
+		paseHandler:    noopPaseHandler{},
+		caseHandler:    noopCaseHandler{},
+		ackHandler:     noopAckHandler{},
+		groupMessaging: noopGroupMessaging{},
+		eventLog:       im.NewEventLog(),
+		sigma1Replied:  make(map[uint16][32]byte),
 	}
 	return br, nil
 }
@@ -700,6 +724,10 @@ func (b *Bridge) Start(ctx context.Context) error {
 		b.pumpDone = pumpDone
 		b.mu.Unlock()
 	}
+
+	// Join the multicast group of every group with a member endpoint, and
+	// follow membership changes from here on (ServerGroupNetworking).
+	b.startGroupNetworking(listener)
 
 	b.logger.Info(
 		"matter.bridge.started",
@@ -1027,6 +1055,9 @@ func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
 func (b *Bridge) EmitFabricRemoved(fabricIndex uint8) {
 	// A removed fabric's subscriptions can never be re-established.
 	b.forgetFabricSubscriptions(fabricIndex)
+	// Its groups go with it: keys, group table, reception state and the
+	// multicast memberships only it used.
+	b.groupMessagingPort().ForgetFabric(fabricIndex)
 	b.mu.RLock()
 	hook := b.onFabricRemoved
 	b.mu.RUnlock()
@@ -1217,6 +1248,9 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// concurrent Start cannot CAS-claim before we've cleared the
 	// per-instance state above.
 	b.startClaim.Store(false)
+
+	// Leave the multicast groups while the socket is still open.
+	b.stopGroupNetworking()
 
 	// Cancel first so the serve loop unwinds; Close as belt-and-braces
 	// in case the listener wraps the context-cancel in its own way.

@@ -187,6 +187,14 @@ func run() error {
 	// operational request rather than allowing them. The stored ACL is what
 	// a commissioner writes during AddNOC, so this is the production wiring.
 	br.AttachACLLister(credentials)
+	// Group messages: authenticated through the node's group state, routed
+	// to the member endpoints, and received on the multicast address of
+	// every group with a member endpoint. Restore the persisted groups first
+	// so their addresses are joined when the bridge starts.
+	if err := groupState.Load(ctx); err != nil {
+		return fmt.Errorf("group state: %w", err)
+	}
+	br.AttachGroupMessaging(groupState)
 	// A bounded trace of the moments that explain a failed pairing. Attached
 	// before Start because the first of those moments is the first
 	// commissioner datagram.
@@ -240,10 +248,9 @@ func run() error {
 		iterations: *iterations,
 	}, logger)
 	// A removed fabric takes its persisted subscriptions with it.
-	// Its groups go with it: the store's cascade dropped the rows, the
-	// group state forgets the keys, the table and the reception state.
+	// Its groups go with it too: EmitFabricRemoved hands the fabric to the
+	// attached group messaging.
 	refs.opCreds.SetOnFabricRemoved(func(_ context.Context, fabricIndex uint8) {
-		groupState.ForgetFabric(fabricIndex)
 		br.EmitFabricRemoved(fabricIndex) //nolint:contextcheck // EmitFabricRemoved takes no ctx; its store delete runs on its own bounded timeout
 	})
 

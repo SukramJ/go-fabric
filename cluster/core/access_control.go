@@ -530,9 +530,9 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 					}
 				}
 				if e.AuthMode == accessControlAuthModeGroup {
-					// Group subjects: 0xFFFF_FFFF_FFFF_FF00 .. 0xFFFF_FFFF_FFFF_FFFF.
+					// Group subjects: a Group ID, 0x0001 .. 0xFFFF.
 					if !aclIsValidGroupSubject(subj) {
-						return fmt.Errorf("matter: AccessControl.ACL[%d].Subjects[%d] write: constraint error: Group subject 0x%016X out of group node ID range", i, j, subj)
+						return fmt.Errorf("matter: AccessControl.ACL[%d].Subjects[%d] write: constraint error: Group subject 0x%016X is not a group id", i, j, subj)
 					}
 				}
 			}
@@ -864,11 +864,16 @@ func aclIsValidDeviceTypeID(id uint32) bool {
 }
 
 // aclIsValidGroupSubject reports whether id is valid as a Group-AuthMode ACL
-// subject. Valid: Group Node ID range 0xFFFF_FFFF_FFFF_FF00 ..
-// 0xFFFF_FFFF_FFFF_FFFF. Mirrors chip
-// src/access/AccessControl.cpp:735 IsValidGroupNodeId guard.
+// subject: a Group ID, 0x0001..0xFFFF. The subject of a Group entry is the
+// group id the message is addressed to (Matter §9.10.5.6), which is also
+// what a group message's Incoming Subject Descriptor carries. Mirrors
+// matter.js AccessControlServer.ts (#validateAccessControlListChanges:
+// `GroupId(Number(subject)) === GroupId.NO_GROUP_ID` → ConstraintError,
+// and GroupId() refuses a value beyond 0xFFFF) and
+// FabricAccessControl #getIsdFromMessage (`isd.subjects.push(subject.id)`
+// for a group subject).
 func aclIsValidGroupSubject(id uint64) bool {
-	return id >= 0xFFFF_FFFF_FFFF_FF00
+	return id >= 0x0001 && id <= 0xFFFF
 }
 
 // validateAccessControlExtensionData reports whether data decodes as a

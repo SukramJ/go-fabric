@@ -87,6 +87,14 @@ func (b *Bridge) AttachSessionLookup(lookup SessionLookup) {
 // a real UDP listener. Returns the first error encountered for
 // observability; the UDP handler discards it after logging.
 func (b *Bridge) dispatch(ctx context.Context, buf []byte, src *net.UDPAddr) error {
+	// A group message is authenticated under an operational group key,
+	// not a session: it takes its own path before any unicast handling
+	// (matter.js ExchangeManager #receiveMessage branches on the session
+	// type the same way). maybeUnmaskPrivacy below therefore only ever
+	// sees unicast frames, where it drops one carrying the P bit.
+	if isGroupDatagram(buf) {
+		return b.dispatchGroupMessage(ctx, buf, src)
+	}
 	// Privacy unmask: when Security Flags carries the P bit, the
 	// header bytes from offset 4 onwards (MessageCounter + optional
 	// NodeIDs) are XOR-masked with an AES-ECB-derived key (Matter

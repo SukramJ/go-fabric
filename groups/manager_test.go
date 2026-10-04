@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -382,4 +383,41 @@ func TestKeySetWithoutUsableEpochKeyIsSkipped(t *testing.T) {
 	if _, err := deriveKeySet(store.GroupKeySet{GroupKeySetID: 6}, testCompressed); err == nil {
 		t.Fatal("a key set without epoch keys derived")
 	}
+}
+
+// TestConcurrentDecodeAndChanges runs the receive path against membership
+// and key changes at once; under -race it pins the locking.
+func TestConcurrentDecodeAndChanges(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	m, st := newTestManager(t)
+	op, sid := opKeyOf(t, 0xA1)
+	datagrams := make([][][]byte, 4)
+	for w := range datagrams {
+		for i := range 50 {
+			datagrams[w] = append(datagrams[w], sealGroup(t, op, sid, 0x0101, uint64(w+1), uint32(i+1), true, []byte("x")))
+		}
+	}
+	var wg sync.WaitGroup
+	for w := range datagrams {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, d := range datagrams[w] {
+				_, _ = m.Decode(ctx, d)
+			}
+		}()
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := range 50 {
+			_ = m.AddEndpointForGroup(ctx, 1, 0x0101, uint16(2+i%3), "")
+			_, _ = m.RemoveEndpoint(ctx, 1, uint16(2+i%3), 0x0101, false)
+			st.putKeySet(1, store.GroupKeySet{GroupKeySetID: 0x10, EpochKey0: epochKeyOf(0xA1), EpochStart0: 1})
+			_ = m.Reload(ctx, 1)
+			_, _ = m.Memberships(ctx)
+		}
+	}()
+	wg.Wait()
 }
