@@ -367,19 +367,6 @@ are the behaviour the new pin implies and this module does not have yet.
   - The group-message outcome events SessionManager emits for
     GroupcastTesting (NoAvailableKey, FailedAuth, MessageReplay, Success with
     the access outcome) — see `BD-Matter-GroupcastTestingEvents`.
-## Groups (ADR 0009) — open items
-
-Gaps left by the Groups server and group-message reception of
-[ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md).
-
-- **A reverted AddNOC leaves group state in memory.** `revertAddNOC` removes
-  the fabric's rows (the cascade takes the group table along) without telling
-  `groups.Manager`, which keeps a loaded fabric's keys until the next
-  `ForgetFabric`. Only reachable when a controller provisions groups before
-  CommissioningComplete and the fail-safe then expires; the fabric index is
-  not reused immediately (monotonic allocation). Fix package: route the
-  revert through `OperationalCredentials.NotifyFabricRemoved` /
-  `Bridge.EmitFabricRemoved` like the other removal surfaces.
 
 ---
 

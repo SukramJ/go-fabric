@@ -202,6 +202,14 @@ pseudo-version of `main`.
   `OperationalCredentials.Fabrics` / `NOCs` already did. Adds
   `groups.Manager.Fabrics`.
 
+- **A fail-safe revert of AddNOC left the fabric's group state loaded.**
+  The revert removes a fabric the way RemoveFabric does (core§11.9.7.2
+  step 6, matter.js `FailsafeContext.rollback`), so it now runs
+  `OperationalCredentials.NotifyFabricRemoved` and the `OnFabricRemoved`
+  hook as well — a host that hands that hook to `Bridge.EmitFabricRemoved`
+  forgets the reverted fabric's keys, group table, subscriptions and
+  multicast memberships.
+
 ### Deprecated
 
 - `wire.Groups`, the read-only Groups stub: group membership is stack state
