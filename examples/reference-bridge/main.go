@@ -229,6 +229,10 @@ func run() error {
 		salt:       []byte(*salt),
 		iterations: *iterations,
 	}, logger)
+	// A removed fabric takes its persisted subscriptions with it.
+	refs.opCreds.SetOnFabricRemoved(func(_ context.Context, fabricIndex uint8) {
+		br.EmitFabricRemoved(fabricIndex)
+	})
 
 	// Event numbers must not restart at zero across a reboot: a controller
 	// filters event reads on the last number it saw, so a reset makes it
@@ -266,11 +270,22 @@ func run() error {
 	// Fabrics installed in a previous run: rebuild each one's CASE identity
 	// and re-publish its operational record, so a controller that paired
 	// before this restart reconnects instead of being told to pair again.
-	for _, fabric := range listFabrics(ctx, credentials, logger) {
+	fabrics := listFabrics(ctx, credentials, logger)
+	loaded := fabrics[:0]
+	for _, fabric := range fabrics {
 		if err := caseIDs.load(ctx, credentials, fabric.FabricIndex); err != nil {
 			logger.Warn("case.identity.boot_load_failed", slog.String("err", err.Error()))
 			continue
 		}
+		loaded = append(loaded, fabric)
+	}
+	// With the identities back, resume the subscriptions the controllers
+	// held before the restart, under their old ids — before announcing, as
+	// matter.js re-establishes ahead of entering operational mode. Bounded
+	// at two seconds per controller; a controller that cannot be reached
+	// recovers on its own, as it would have without this.
+	br.ReestablishFormerSubscriptions(ctx)
+	for _, fabric := range loaded {
 		br.AnnounceFabric(ctx, fabric.CompressedID, fabric.NodeID)
 	}
 

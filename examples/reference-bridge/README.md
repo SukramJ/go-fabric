@@ -105,10 +105,14 @@ hand, both halves it had to hand-write moved into the module:
   live one and deletes every endpoint number on the first model-complete
   assembly.
 
-Everything else is deliberately volatile: CASE sessions live in RAM (Matter
-treats them as such), and subscriptions are not re-armed at boot even though
-the `matter_persistent_subscriptions` table exists — a controller re-subscribes
-after a restart.
+Subscriptions persist too (`docs/adr/0008`, as matter.js does): each CASE
+subscription is recorded in `matter_server_subscriptions` while it is active.
+After a restart `main` loads the CASE identities, then calls
+`Bridge.ReestablishFormerSubscriptions`: the bridge resolves each controller
+over mDNS, opens CASE to it as the initiator and re-sends the priming report
+under the old subscription id, so the controller carries on without
+re-subscribing. A controller it cannot reach within two seconds recovers on
+its own. CASE sessions themselves stay volatile — Matter treats them so.
 
 Delete `reference-bridge.db` to factory-reset.
 
@@ -121,12 +125,13 @@ one omits, listed so the omission is not mistaken for "not needed":
   only. A `KeySetWrite` that rotates the IPK carries up to three epoch keys in
   `GroupKeySetID=0`, and a correct bridge tries every one when matching an
   inbound `Sigma1.DestinationID`.
-- **CASE resumption.** `sigma.Responder.SetResumptionStore` is not wired, so
-  every reconnect runs a full Sigma1–3 handshake instead of the one-round-trip
-  resume.
-- **Fabric teardown.** `RemoveFabric` persists, but no session, subscription
-  or resumption record is evicted, and the operational mDNS record is not
-  withdrawn.
+- **CASE resumption as responder.** `sigma.Responder.SetResumptionStore` is
+  not wired, so every controller reconnect runs a full Sigma1–3 handshake
+  instead of the one-round-trip resume. (The initiator that re-establishes
+  subscriptions does offer a stored record and stores the new one.)
+- **Fabric teardown.** `RemoveFabric` persists and drops the fabric's
+  persisted subscriptions, but no session, live subscription or resumption
+  record is evicted, and the operational mDNS record is not withdrawn.
 - **AdministratorCommissioning (`0x003C`)** and a runtime commissioning
   window. The window here is open for the process lifetime with a fixed
   passcode; there is no `OpenCommissioningWindow` path and no

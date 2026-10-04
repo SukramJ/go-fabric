@@ -13,6 +13,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -22,6 +23,7 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/attestation"
+	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -164,4 +166,26 @@ func partsList(t *testing.T, ep *endpoint.Endpoint) []uint16 {
 	}
 	t.Fatalf("endpoint %d mounts no Descriptor", ep.ID)
 	return nil
+}
+
+// TestCaseInitiatorProviderNeedsALoadedIdentity: the provider the bridge
+// dials former-subscription peers with refuses a fabric whose CASE
+// identity is not loaded, and leaves no session id reserved behind.
+func TestCaseInitiatorProviderNeedsALoadedIdentity(t *testing.T) {
+	ctx := context.Background()
+	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	st := store.New(db)
+	sessions := operational.NewManager(st)
+	before := sessions.Occupancy()
+	provider := caseInitiatorProvider(st, sessions, newCaseIdentities(slog.Default()), slog.Default())
+	if init, err := provider(1, 0xC0FFEE); err == nil || init != nil {
+		t.Fatalf("provider(unknown fabric) = %v, %v; want an error", init, err)
+	}
+	if after := sessions.Occupancy(); after != before {
+		t.Fatalf("session table occupancy %+v → %+v: a refused initiation must not reserve an id", before, after)
+	}
 }
