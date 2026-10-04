@@ -4,7 +4,6 @@
 package alarm_test
 
 import (
-	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -12,80 +11,23 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/contract"
-	matterparity "github.com/SukramJ/go-fabric/parity"
+	"github.com/SukramJ/go-fabric/internal/paritytest"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
 // The SmokeCoAlarm entry of parity/schema.json, the matter.js HEAD pin.
 type (
-	snapElement struct {
-		ID          uint32 `json:"id"`
-		Name        string `json:"name"`
-		Conformance string `json:"conformance"`
-		Access      string `json:"access"`
-		Priority    string `json:"priority"`
-		Response    string `json:"response"`
-	}
-	snapFeature struct {
-		Name string `json:"name"`
-		Bit  uint32 `json:"bit"`
-	}
-	snapCluster struct {
-		ID         uint32        `json:"id"`
-		Revision   uint16        `json:"revision"`
-		Attributes []snapElement `json:"attributes"`
-		Commands   []snapElement `json:"commands"`
-		Events     []snapElement `json:"events"`
-		Features   []snapFeature `json:"features"`
-	}
+	snapElement = paritytest.Element
+	snapCluster = paritytest.Cluster
 )
 
 func smokeSnapshot(t *testing.T) snapCluster {
 	t.Helper()
-	var s struct {
-		Clusters []snapCluster `json:"clusters"`
-	}
-	if err := json.Unmarshal(matterparity.SchemaJSON(), &s); err != nil {
-		t.Fatalf("unmarshal schema snapshot: %v", err)
-	}
-	for _, c := range s.Clusters {
-		if c.ID == alarm.ClusterID {
-			return c
-		}
-	}
-	t.Fatalf("matter.js schema has no SmokeCoAlarm (0x%04X)", alarm.ClusterID)
-	return snapCluster{}
+	return paritytest.ClusterSnapshot(t, alarm.ClusterID)
 }
 
-// conformance decides whether a matter.js conformance expression makes
-// an element mandatory or permitted for the given feature names. It
-// models the forms the cluster uses: "M", "O", "O.a+", a feature name,
-// "[feature]", and "[Rev >= vN]" (optional at the shipped revision).
-// Comma-separated terms are alternatives tried in order, as matter.js
-// Conformance evaluates them.
-func conformance(expr string, features map[string]bool) (required, allowed bool) {
-	for term := range strings.SplitSeq(expr, ",") {
-		term = strings.TrimSpace(term)
-		optional := strings.HasPrefix(term, "[") && strings.HasSuffix(term, "]")
-		if optional {
-			term = strings.TrimSpace(term[1 : len(term)-1])
-		}
-		if i := strings.Index(term, "."); i >= 0 {
-			term = term[:i]
-		}
-		switch {
-		case term == "M":
-			return !optional, true
-		case term == "O":
-			return false, true
-		case strings.HasPrefix(term, "Rev"):
-			return false, true
-		case features[term]:
-			return !optional, true
-		}
-	}
-	return false, false
-}
+// conformance is the shared matter.js conformance evaluator.
+var conformance = paritytest.Conformance
 
 func featureNames(f alarm.Feature) map[string]bool {
 	return map[string]bool{

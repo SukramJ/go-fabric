@@ -98,6 +98,7 @@ var floors = []packageFloor{
 		min: 0,
 		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
 	},
+	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 76},
