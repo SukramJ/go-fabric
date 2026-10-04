@@ -372,14 +372,6 @@ are the behaviour the new pin implies and this module does not have yet.
 Gaps left by the Groups server and group-message reception of
 [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md).
 
-- **A GroupKeyMap entry needs an existing key set.** `matter_group_key_map`
-  carries a foreign key to `matter_group_keys`, so a GroupKeyMap write naming
-  a key set not yet written fails with Failure. matter.js accepts it and
-  leaves the check commented out because certification tests write the map
-  first (`GroupKeyManagementServer.ts:#validateGroupKeyMap`). Fix package: a
-  schema migration dropping that foreign key (the store applies
-  `IF NOT EXISTS` DDL, so an existing table needs an explicit rebuild), and a
-  GroupKeyMap entry whose key set is missing simply authenticates nothing.
 - **Unfiltered GroupKeyMap / GroupTable reads return only the accessing
   fabric's entries.** matter.js answers a read with `isFabricFiltered=false`
   with every fabric's entries, fabric-sensitive fields omitted for the others.

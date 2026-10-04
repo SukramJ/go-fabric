@@ -115,26 +115,54 @@ ORDER BY group_key_set_id ASC`, fabricIndex)
 	return out, nil
 }
 
-// RemoveGroupKeySet deletes one key-set. CASCADE wipes any
-// matter_group_key_map rows that referenced it.
+// RemoveGroupKeySet deletes one key-set together with the GroupKeyMap
+// entries of the same fabric that name it, in one transaction. Mirrors
+// matter.js GroupKeyManagementServer.keySetRemove, which filters those
+// entries out of groupKeyMap (core§11.2.7.4.1). The map carries no foreign
+// key to the key sets (an entry may name a set not written yet), so the
+// removal is explicit rather than a cascade.
 func (s *Store) RemoveGroupKeySet(ctx context.Context, fabricIndex uint8, groupKeySetID uint16) error {
-	if _, err := s.db.ExecContext(ctx, `
+	return s.inTx(ctx, "remove group key set", func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `
+DELETE FROM matter_group_key_map WHERE fabric_index = ? AND group_key_set_id = ?`,
+			fabricIndex, groupKeySetID); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `
 DELETE FROM matter_group_keys WHERE fabric_index = ? AND group_key_set_id = ?`,
-		fabricIndex, groupKeySetID); err != nil {
-		return fmt.Errorf("matter store: remove group key set: %w", err)
-	}
-	return nil
+			fabricIndex, groupKeySetID)
+		return err
+	})
 }
 
-// RemoveGroupKeysByFabric deletes all key-sets for fabricIndex. Called
-// in the AddNOC failure rollback path after the fabric row exists but a
-// subsequent step fails, so no orphaned key material persists for a
-// fabric that never completed commissioning. The group-key-map rows
-// cascade-delete when the key-set rows are removed (FK constraint).
+// RemoveGroupKeysByFabric deletes all key-sets and GroupKeyMap entries
+// for fabricIndex. Called in the AddNOC failure rollback path after the
+// fabric row exists but a subsequent step fails, so no orphaned key
+// material persists for a fabric that never completed commissioning.
 func (s *Store) RemoveGroupKeysByFabric(ctx context.Context, fabricIndex uint8) error {
-	if _, err := s.db.ExecContext(ctx, `
-DELETE FROM matter_group_keys WHERE fabric_index = ?`, fabricIndex); err != nil {
-		return fmt.Errorf("matter store: remove group keys by fabric: %w", err)
+	return s.inTx(ctx, "remove group keys by fabric", func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `
+DELETE FROM matter_group_key_map WHERE fabric_index = ?`, fabricIndex); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `
+DELETE FROM matter_group_keys WHERE fabric_index = ?`, fabricIndex)
+		return err
+	})
+}
+
+// inTx runs fn in one transaction, wrapping a failure with op.
+func (s *Store) inTx(ctx context.Context, op string, fn func(*sql.Tx) error) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("matter store: %s: %w", op, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := fn(tx); err != nil {
+		return fmt.Errorf("matter store: %s: %w", op, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("matter store: %s: %w", op, err)
 	}
 	return nil
 }
@@ -148,7 +176,8 @@ type GroupKeyMapping struct {
 }
 
 // SetGroupKeyMapping upserts a GroupID → GroupKeySetID binding for
-// fabricIndex. The fabric and group-key-set must already exist (FK).
+// fabricIndex. The fabric must exist (FK); the key set need not — see the
+// matter_group_key_map comment in schema.sql.
 func (s *Store) SetGroupKeyMapping(ctx context.Context, m GroupKeyMapping) error {
 	if _, err := s.db.ExecContext(ctx, `
 INSERT INTO matter_group_key_map (fabric_index, group_id, group_key_set_id)

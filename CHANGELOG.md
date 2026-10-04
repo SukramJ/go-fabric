@@ -183,6 +183,17 @@ pseudo-version of `main`.
   GroupId, ConstraintError for a duplicate and ResourceExhausted beyond
   MaxGroupsPerFabric.
 
+- **A GroupKeyMap entry naming a key set not written yet failed with
+  Failure.** `matter_group_key_map` carried a foreign key into
+  `matter_group_keys`; matter.js accepts the write
+  (`GroupKeyManagementServer.ts #validateGroupKeyMap`) and the entry
+  authenticates nothing until the set exists. The constraint is gone:
+  `store.Upgrade` (run by `store.Apply`) rebuilds an existing table without
+  it, and `RemoveGroupKeySet` / `RemoveGroupKeysByFabric` now drop the
+  GroupKeyMap entries naming the removed sets explicitly. A host that feeds
+  `store.Schema()` through its own migration tool calls `store.Upgrade`
+  once after it.
+
 ### Deprecated
 
 - `wire.Groups`, the read-only Groups stub: group membership is stack state

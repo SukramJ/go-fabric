@@ -84,14 +84,22 @@ CREATE TABLE IF NOT EXISTS matter_group_keys (
 
 -- matter_group_key_map binds GroupID -> GroupKeySetID per fabric
 -- (Matter §11.2.10.4 GroupKeyMap attribute).
+--
+-- group_key_set_id deliberately carries no foreign key to
+-- matter_group_keys: a GroupKeyMap entry may name a key set that is not
+-- written yet. matter.js accepts such a write and leaves the existence
+-- check commented out because certification tests write the map first
+-- (GroupKeyManagementServer.ts #validateGroupKeyMap); an entry whose key
+-- set is missing authenticates nothing. KeySetRemove drops the entries
+-- that name the removed set explicitly (store.RemoveGroupKeySet). A
+-- database created with the earlier foreign key is rebuilt by
+-- store.Upgrade, which store.Apply runs.
 CREATE TABLE IF NOT EXISTS matter_group_key_map (
     fabric_index        INTEGER NOT NULL,
     group_id            INTEGER NOT NULL CHECK(group_id BETWEEN 0 AND 65535),
     group_key_set_id    INTEGER NOT NULL,
     PRIMARY KEY(fabric_index, group_id),
-    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE,
-    FOREIGN KEY(fabric_index, group_key_set_id)
-        REFERENCES matter_group_keys(fabric_index, group_key_set_id) ON DELETE CASCADE
+    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
 
 -- matter_group_table persists the group membership of this node's

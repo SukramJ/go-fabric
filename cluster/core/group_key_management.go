@@ -838,9 +838,10 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 	if err := g.store.RemoveGroupKeySet(ctx, fabric, req.GroupKeySetID); err != nil {
 		return nil, fmt.Errorf("matter: KeySetRemove: %w", err)
 	}
-	// Bump DataVersion after a successful KeySetRemove. The store's
-	// cascade has dropped the GroupKeyMap entries that referred to the
-	// key set (core§11.2.7.4.1; matter.js keySetRemove filters them out).
+	// Bump DataVersion after a successful KeySetRemove. The store has
+	// dropped the fabric's GroupKeyMap entries that referred to the key
+	// set in the same transaction (core§11.2.7.4.1; matter.js keySetRemove
+	// filters them out of groupKeyMap).
 	g.dataVersion.Bump()
 	return nil, g.syncGroups(ctx, fabric)
 }

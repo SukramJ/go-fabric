@@ -217,6 +217,13 @@ func (f *fakeStore) RemoveGroupKeySet(_ context.Context, fabricIndex uint8, grou
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	delete(f.groupKeys, gksKey(fabricIndex, groupKeySetID))
+	// Mirror store.RemoveGroupKeySet: the fabric's GroupKeyMap entries
+	// naming the removed set go with it.
+	for k, m := range f.groupMaps {
+		if k[0] == uint64(fabricIndex) && m.GroupKeySetID == groupKeySetID {
+			delete(f.groupMaps, k)
+		}
+	}
 	return nil
 }
 
