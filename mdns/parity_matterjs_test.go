@@ -26,6 +26,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/mdns"
@@ -207,4 +208,42 @@ func buildGoodbyeTestService(t *testing.T) mdns.Service {
 		SessionIdleInterval:   5000,
 		SessionActiveInterval: 300,
 	})
+}
+
+// TestParityMatterJS_OperationalInstanceQName pins the operational instance
+// name the subscription re-establishment path queries to matter.js
+// packages/protocol/src/mdns/MdnsConsts.ts:getOperationalDeviceQname —
+// `${hex.fixed(globalId,16).toUpperCase()}-${hex.fixed(nodeId,16).toUpperCase()}._matter._tcp.local`
+// — and to the name this module advertises for the same identity.
+func TestParityMatterJS_OperationalInstanceQName(t *testing.T) {
+	t.Parallel()
+	cfid := [8]byte{0x87, 0xE1, 0xB0, 0x04, 0xE2, 0x35, 0xA1, 0x30}
+	const node = uint64(0x0000_0000_0000_0A0B)
+	const want = "87E1B004E235A130-0000000000000A0B._matter._tcp.local."
+	if got := mdns.OperationalInstanceQName(cfid, node); got != want {
+		t.Fatalf("qname = %q, want %q", got, want)
+	}
+	svc := mdns.BuildOperationalService(mdns.OperationalServiceConfig{CompressedFabricID: cfid, NodeID: node, Port: 5540})
+	if svc.FQDN() != want {
+		t.Fatalf("advertised FQDN %q differs from the queried name %q", svc.FQDN(), want)
+	}
+}
+
+// TestParityMatterJS_AddressSelectionPreference pins
+// packages/general/src/net/ServerAddress.ts:SelectionPreference —
+// IPV6_LINK_LOCAL < IPV6_ULA < IPV6 < IPV4.
+func TestParityMatterJS_AddressSelectionPreference(t *testing.T) {
+	t.Parallel()
+	for ip, want := range map[string]int{
+		"fe80::1":     0,
+		"fd12::1":     1,
+		"fc00::1":     1,
+		"2001:db8::1": 2,
+		"192.168.0.1": 3,
+	} {
+		addr := netip.MustParseAddr(ip)
+		if got := mdns.SelectionPreference(addr); got != want {
+			t.Errorf("SelectionPreference(%s) = %d, want %d", ip, got, want)
+		}
+	}
 }
