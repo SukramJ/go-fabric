@@ -11,7 +11,8 @@
 //
 //   groupcast
 //           Groupcast (0x0065) command payloads, the Membership,
-//           AccessControl.AuxiliaryAcl, Acl and Extension attribute values
+//           AccessControl.AuxiliaryAcl, Acl and Extension and the
+//           GroupKeyManagement GroupTable / GroupKeyMap attribute values
 //           (as a non-fabric-filtered read encodes them), and the
 //           GroupcastTesting / AuxiliaryAccessUpdated event payloads, as
 //           TlvOfModel(element) encodes them.
@@ -237,6 +238,20 @@ function groupcastFixtures() {
     const extensionUnfiltered = [{ data: "1718", fabricIndex: 1 }, { fabricIndex: 2 }];
     record("extension_unfiltered", acl, "attributes", "Extension", extensionUnfiltered,
         extensionUnfiltered.map((e) => (e.data ? { ...e, data: bytesOf(e.data) } : e)));
+
+    // GroupKeyManagement.GroupTable and GroupKeyMap: small ids next to
+    // two-byte ones, so a fixed-width writer shows.
+    const gkm = model.GroupKeyManagement;
+    const groupTable = [
+        { groupId: 7, endpoints: [1, 2, 0x0300], groupName: "Kitchen", fabricIndex: 1 },
+        { groupId: 0x0101, endpoints: [], groupName: "", fabricIndex: 2 },
+    ];
+    record("group_table", gkm, "attributes", "GroupTable", groupTable, groupTable);
+    const groupKeyMap = [
+        { groupId: 7, groupKeySetId: 1, fabricIndex: 1 },
+        { groupId: 0x0101, groupKeySetId: 0x0102, fabricIndex: 2 },
+    ];
+    record("group_key_map", gkm, "attributes", "GroupKeyMap", groupKeyMap, groupKeyMap);
 
 
     // Events.

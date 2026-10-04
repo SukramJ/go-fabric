@@ -984,12 +984,14 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 	case []mattercore.GroupKeyMapStruct:
 		// GroupKeyManagement.GroupKeyMap (Matter §11.2.10.5.1).
 		// fabric-sensitive list of struct{ GroupId u16, GroupKeySetId
-		// u16, FabricIndex u8 }.
+		// u16, FabricIndex u8 }. Every integer at its smallest width,
+		// as matter.js's TlvUInt16 writes it (pinned by the
+		// group_key_map fixture in testdata/groupcast-wire-fixtures.json).
 		enc.StartArray(tag)
 		for _, m := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutUint16(tlv.ContextTag(1), m.GroupID)
-			enc.PutUint16(tlv.ContextTag(2), m.GroupKeySetID)
+			enc.PutUint(tlv.ContextTag(1), uint64(m.GroupID))
+			enc.PutUint(tlv.ContextTag(2), uint64(m.GroupKeySetID))
 			enc.PutUint(tlv.ContextTag(254), uint64(m.FabricIndex))
 			_ = enc.EndContainer()
 		}
@@ -997,14 +999,16 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 	case []mattercore.GroupInfoMapStruct:
 		// GroupKeyManagement.GroupTable (Matter §11.2.10.5.2).
 		// fabric-sensitive list of struct{ GroupId u16, Endpoints
-		// list<u16>, GroupName string, FabricIndex u8 }.
+		// list<u16>, GroupName string, FabricIndex u8 }, every integer
+		// at its smallest width as matter.js writes it (group_table
+		// fixture).
 		enc.StartArray(tag)
 		for _, m := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutUint16(tlv.ContextTag(1), m.GroupID)
+			enc.PutUint(tlv.ContextTag(1), uint64(m.GroupID))
 			enc.StartArray(tlv.ContextTag(2))
 			for _, ep := range m.Endpoints {
-				enc.PutUint16(tlv.AnonymousTag(), ep)
+				enc.PutUint(tlv.AnonymousTag(), uint64(ep))
 			}
 			_ = enc.EndContainer()
 			enc.PutUTF8(tlv.ContextTag(3), m.GroupName)

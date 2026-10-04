@@ -345,12 +345,6 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   flows exercised so far read the ACL only over CASE; fix package: the
   `fabricIndex == 0` branch of `core.AccessControl.MatterReadFiltered`,
   with a PASE-session read test.
-- **GroupKeyManagement.GroupTable writes its endpoint ids as 2-byte
-  integers.** matter.js writes the smallest width (`TlvUInt16` with a
-  minimal-length writer), as the Groupcast Membership encoder here now does;
-  both are valid TLV and every decoder accepts either. Fix package: `PutUint`
-  in the `[]GroupInfoMapStruct` case of `bridge/reply.go` plus a GroupTable
-  fixture in `generate-group-fixtures.ts`.
 
 ## Application cluster servers — open items
 

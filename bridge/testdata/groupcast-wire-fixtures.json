@@ -252,6 +252,50 @@
     "bytesHex": "1615300102171824fe01181524fe021818"
   },
   {
+    "label": "group_table",
+    "kind": "attributes",
+    "cluster": 63,
+    "element": "GroupTable",
+    "fixture": [
+      {
+        "groupId": 7,
+        "endpoints": [
+          1,
+          2,
+          768
+        ],
+        "groupName": "Kitchen",
+        "fabricIndex": 1
+      },
+      {
+        "groupId": 257,
+        "endpoints": [],
+        "groupName": "",
+        "fabricIndex": 2
+      }
+    ],
+    "bytesHex": "1615240107360204010402050003182c03074b69746368656e24fe011815250101013602182c030024fe021818"
+  },
+  {
+    "label": "group_key_map",
+    "kind": "attributes",
+    "cluster": 63,
+    "element": "GroupKeyMap",
+    "fixture": [
+      {
+        "groupId": 7,
+        "groupKeySetId": 1,
+        "fabricIndex": 1
+      },
+      {
+        "groupId": 257,
+        "groupKeySetId": 258,
+        "fabricIndex": 2
+      }
+    ],
+    "bytesHex": "161524010724020124fe011815250101012502020124fe021818"
+  },
+  {
     "label": "groupcast_testing_event_success",
     "kind": "events",
     "cluster": 101,

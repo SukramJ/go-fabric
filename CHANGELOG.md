@@ -248,6 +248,10 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- GroupKeyManagement GroupTable and GroupKeyMap write GroupId,
+  GroupKeySetId and the endpoint ids at their smallest TLV width, as
+  matter.js's `TlvUInt16` does, instead of always two bytes (both are valid
+  TLV; pinned against matter.js in `bridge/testdata/groupcast-wire-fixtures.json`).
 - **AccessControl Acl and Extension answered a non-fabric-filtered read with
   the accessing fabric's entries only.** They now return every fabric's
   entries, as matter.js does (`ListManager` filters a fabric-scoped list
