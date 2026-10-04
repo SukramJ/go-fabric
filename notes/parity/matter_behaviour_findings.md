@@ -320,53 +320,38 @@ device-type revisions, SpecificationVersion, DataModelRevision, IM revision,
 Thermostat access strings) were followed in the same change; the items below
 are the behaviour the new pin implies and this module does not have yet.
 
-- **Groupcast (0x0065) on the root endpoint, with the AccessControl Auxiliary
-  ACL (AUX).** The 1.6.1 device library makes the Root Node condition
-  `GroupcastListenerCond` mandatory for the light and plug types this module
-  advertises: OnOffLight rev 4 and OnOffPlugInUnit rev 5 require it outright
-  (`conformance: "M"`), DimmableLight rev 4, ColorTemperatureLight rev 5 and
-  ExtendedColorLight rev 5 through `Rev >= v4`/`Rev >= v5` — true at the
-  revision now advertised (`on-off-light.element.ts`, `dimmable-light.element.ts`,
-  `color-temperature-light.element.ts`, `extended-color-light.element.ts`,
-  `on-off-plug-in-unit.element.ts`). Thermostat rev 7 requires it when
-  `Active`, WindowCovering rev 7 `Active, O`, SmokeCoAlarm rev 2 `O`. Under
-  the condition, RootNode rev 5 requires the Groupcast server (LN feature) and
-  the AccessControl AUX feature (`root-node.element.ts`). matter.js's default
-  `ServerNode.RootEndpoint` installs `GroupcastServer.with("Listener",
-  "Sender", "PerGroup")` and `AccessControlServer.with("Extension",
-  "Auxiliary")` (`packages/node/src/node/ServerNode.ts:287-291`); the root
-  this module assembles corresponds to `ServerNode.RootEndpointWithoutGroupcast`,
-  which matter.js documents as non-conformant to 1.6.1 for a node with a Groups
-  server on any endpoint (`ServerNode.ts:266-270`).
+The item this section opened with — Groupcast (0x0065) on the root with the
+AccessControl Auxiliary ACL, which the 1.6.1 device library requires for the
+light and plug types (RootNode `GroupcastListenerCond`) — is built:
+[ADR 0010](../../docs/adr/0010-groupcast-and-auxiliary-acl.md), with Listener
+and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
 
-  Groups and group-message reception, which Groupcast builds on, exist since
-  [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md). What remains
-  is Groupcast itself, deliberately not mounted in part:
-  - `GroupcastServer.ts` commands JoinGroup (group id 1..0xFFF7, Admin for
-    `key` / `useAuxiliaryAcl`, endpoint validation, per-fabric limit
-    `floor(maxMembershipCount/2)` and MaxMcastAddrCount, `replaceEndpoints`,
-    sender-only memberships), LeaveGroup (GroupID 0 applies to every group,
-    0d30528a), UpdateGroupKey, ConfigureAuxiliaryAcl, GroupcastTesting; the
-    attributes Membership (derived from GroupKeyManagement groupTable /
-    groupKeyMap plus the persisted groupProperties), MaxMembershipCount 44,
-    MaxMcastAddrCount 44, UsedMcastAddrCount, FabricUnderTest; the
-    GroupcastTesting event.
-  - GroupKeyManagement hooks Groupcast drives:
-    `createKeySetForGroupcast` (EpochStartTime0 = 1),
-    `validateKeySetId`, and the multicast address policy per group —
-    `FabricGroups.setGroupMulticastPolicy` with the IANA `FF05::FA` address
-    (`Groups.ts` IANA_GROUPCAST_MULTICAST_ADDRESS) — which
-    `groups.Manager.Memberships` and the bridge's reconciler would have to
-    follow.
-  - AccessControl AUX: the `AuxiliaryAcl` attribute and
-    `AuxiliaryAccessUpdated` event fed by Groupcast's provider
-    (`AccessControlServer.ts` registerAuxAclProvider / #auxiliaryAclFor),
-    `auxiliaryType` on synthesized entries, and the exclusion of
-    endpoint 0 from a Group entry's wildcard target while AUX is enabled
-    (`FabricAccessControl.ts`).
-  - The group-message outcome events SessionManager emits for
-    GroupcastTesting (NoAvailableKey, FailedAuth, MessageReplay, Success with
-    the access outcome) — see `BD-Matter-GroupcastTestingEvents`.
+- **Groupcast has not met a real controller.** The evidence is the in-process
+  end-to-end test (`bridge/groupcast_e2e_test.go`) and the wire fixtures
+  matter.js produced (`bridge/testdata/groupcast-wire-fixtures.json`).
+  Unverified controller-side assumptions: that a controller provisions a
+  1.6.1 node through Groupcast JoinGroup (rather than KeySetWrite /
+  GroupKeyMap / AddGroup) and sends on FF05::FA for IanaAddr; that it relies
+  on `UseAuxiliaryAcl` instead of writing a Group ACL entry; and that
+  chip-tool's `groupcast` commands encode the optional fields as matter.js
+  does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
+  multicast `onoff toggle`, `groupcast leave-group`).
+- **AccessControl ACL and Extension answer an unfiltered read with the
+  accessing fabric's entries only.** matter.js returns every fabric's
+  entries on a read with `isFabricFiltered=false`, the fabric-sensitive
+  fields of the others' withheld (`ListManager` createProxy,
+  `StructManager` mayRead). `core.AccessControl.MatterReadFiltered` scopes
+  both to the accessing fabric regardless of the flag; the new AuxiliaryAcl
+  attribute already follows matter.js. Harmless for the controllers seen so
+  far, which read fabric-filtered. Fix package: the AuxiliaryAcl read's
+  redaction, applied to `[]AccessControlEntryStruct` and
+  `[]AccessControlExtensionEntry`.
+- **GroupKeyManagement.GroupTable writes its endpoint ids as 2-byte
+  integers.** matter.js writes the smallest width (`TlvUInt16` with a
+  minimal-length writer), as the Groupcast Membership encoder here now does;
+  both are valid TLV and every decoder accepts either. Fix package: `PutUint`
+  in the `[]GroupInfoMapStruct` case of `bridge/reply.go` plus a GroupTable
+  fixture in `generate-group-fixtures.ts`.
 
 ---
 

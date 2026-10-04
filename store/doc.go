@@ -22,7 +22,10 @@
 //   - GroupKeySet (matter_group_keys) — per (fabric, group_key_set_id).
 //     Up to three EpochKey/EpochStart pairs per spec.
 //   - GroupKeyMap (matter_group_key_map) — binds GroupID →
-//     GroupKeySetID per fabric.
+//     GroupKeySetID per fabric; the key set need not exist yet.
+//   - GroupTable (matter_group_table) — the endpoints of each group.
+//   - Groupcast groups (matter_groupcast_groups) — the Groupcast
+//     cluster's per-group multicast policy and auxiliary-ACL flag.
 //   - ACL (matter_acl_entries) — per-fabric ordered list of ACEs.
 //     Subjects and Targets ride as JSON because the access path is
 //     always "load whole ACL for fabric".

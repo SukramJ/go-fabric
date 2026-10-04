@@ -1221,15 +1221,53 @@ persisting an order column for it. Pinned by
 
 ---
 
-### BD-Matter-GroupcastTestingEvents — no group-message outcome events
+### BD-Matter-GroupcastNoSender — Groupcast advertises Listener and PerGroup, not Sender
 
-matter.js's `SessionManager` emits a group-message event for every received
-group message — NoAvailableKey, FailedAuth, MessageReplay, Success with the
-access outcome — which only `GroupcastServer`'s GroupcastTesting consumes.
-go-fabric emits none: without the Groupcast server there is no consumer, and
-the outcomes stay in debug logs (`matter.rx.group.*`). Retires with the
-Groupcast server (see the 1.6.1 open items in
-`matter_behaviour_findings.md`).
+matter.js's default root installs `GroupcastServer.with("Listener", "Sender",
+"PerGroup")` (`packages/node/src/node/ServerNode.ts`). go-fabric's
+`core.Groupcast` advertises Listener and PerGroup (FeatureMap 0x05). The
+Sender feature obliges a node to keep memberships for groups it sends to —
+JoinGroup with an empty endpoint list, LeaveGroup keeping an emptied group as
+sender-only (`GroupcastServer.ts #leave`, `retainedSenderOnly`),
+EnableSenderTesting — and to originate group messages for them (matter.js
+`4ad47150`, group bindings that send). This node originates none
+(`BD-Matter-GroupReceiveOnly`), so it would advertise memberships that do
+nothing. Without Sender the server behaves as matter.js's Listener-only
+server: an empty endpoint list answers ConstraintError ("Empty endpoint list
+requires Sender feature"), a group losing its last endpoint is removed, and
+EnableSenderTesting (conformance SD) answers ConstraintError. RootNode needs
+the Sender condition only for switch / controller device types
+(`GroupcastSenderCond`, conformance O), which no bridge of this module
+advertises. Retires with `BD-Matter-GroupReceiveOnly`.
+[ADR 0010](../../docs/adr/0010-groupcast-and-auxiliary-acl.md). Pinned by
+`TestGroupcastAndAuxiliarySurfaceMatchSchema` and the "no endpoints" case of
+`TestGroupcastJoinGroupParityMatterJS`.
+
+---
+
+### BD-Matter-GroupcastListOrder — Membership and unfiltered group lists in id order
+
+matter.js keeps Groupcast Membership in the order `#deriveMembership` meets
+the groups (groupProperties first, then the group table, each in insertion
+order) and an unfiltered GroupKeyMap / GroupTable read in its state arrays'
+insertion order across fabrics. go-fabric derives Membership on read and
+lists every one of these by fabric index, then group id. The lists are sets
+on the wire — each entry carries its own GroupId and FabricIndex — and
+keeping insertion order would mean persisting an order column, as for
+`BD-Matter-KeySetReadAllIndicesOrder`.
+
+---
+
+### BD-Matter-AuxiliaryAccessAdminNode — AuxiliaryAccessUpdated names the acting node
+
+matter.js fills AuxiliaryAccessUpdated.AdminNodeID from the accessing
+fabric's `rootNodeId` — the CaseAdminSubject AddNOC recorded
+(`AccessControlServer.ts #adminDataFromSession`). go-fabric names the CASE
+subject of the request that changed the auxiliary entries
+(`core.adminNodeIDOf`), null for PASE or a change without a request. It does
+not persist the CaseAdminSubject per fabric, and for the usual single
+administrator the two are the same node; the field is nullable, and
+AccessControlEntryChanged here reports null altogether.
 
 ---
 

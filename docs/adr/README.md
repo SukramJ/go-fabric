@@ -14,7 +14,8 @@ an oversight to the next reader — including choices to *not* do something.
 | [0006](./0006-subscribe-dispatch-seam.md) | Cohesive sub-helpers out of `handleSubscribeRequest` | accepted |
 | [0007](./0007-chiptool-send-receive-matrix.md) | Hermetic per-type send/receive suite against chip-tool | accepted |
 | [0008](./0008-subscription-resumption.md) | Persist server subscriptions and re-establish them after restart, with a CASE initiator scoped to that alone | accepted |
-| [0009](./0009-groups-and-group-messaging.md) | A real Groups server and group message reception, with membership as stack state; Groupcast deferred | accepted |
+| [0009](./0009-groups-and-group-messaging.md) | A real Groups server and group message reception, with membership as stack state; Groupcast deferred to 0010 | accepted |
+| [0010](./0010-groupcast-and-auxiliary-acl.md) | Groupcast (Listener, PerGroup) and the AccessControl Auxiliary ACL on the root, on the ADR 0009 group state; no Sender | accepted |
 
 ## Provenance
 

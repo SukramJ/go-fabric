@@ -5,7 +5,12 @@
 // for every fabric, the group key sets in derived form (operational group
 // keys, privacy keys, group session ids), the GroupKeyMap that binds a
 // group to a key set, the group table that names the local endpoints of
-// each group, and the replay-protection state of received group messages.
+// each group, the Groupcast cluster's per-group properties (multicast
+// address policy, auxiliary-ACL flag), and the replay-protection state of
+// received group messages. From these it derives what matter.js's
+// GroupcastServer derives: the Groupcast Membership list, the multicast
+// address of each group (the shared FF05::FA for the IanaAddr policy) and
+// the auxiliary access control entries.
 //
 // It is the Go counterpart of matter.js packages/protocol/src/groups
 // (FabricGroups, Groups, KeySets, MessagingState) together with the

@@ -12,6 +12,50 @@ pseudo-version of `main`.
 
 ### Added
 
+- **Groupcast (0x0065) and the AccessControl Auxiliary ACL on the root**, as
+  matter.js's default `ServerNode.RootEndpoint` installs them and Matter
+  1.6.1 requires them of a node with lights or plugs
+  ([ADR 0010](docs/adr/0010-groupcast-and-auxiliary-acl.md)).
+  `core.Groupcast` answers JoinGroup (key creation through
+  GroupKeyManagement, Administer for a key or UseAuxiliaryAcl, the
+  per-fabric and total membership limits, ReplaceEndpoints, IanaAddr /
+  PerGroup multicast policy), LeaveGroup (GroupID 0 applies its Endpoints
+  to every group of the fabric), UpdateGroupKey, ConfigureAuxiliaryAcl and
+  GroupcastTesting (60 s by default; every received group message's outcome
+  becomes a GroupcastTesting event meanwhile), with Membership derived from
+  the shared group state. It advertises Listener and PerGroup, not Sender:
+  this node sends no group message (`BD-Matter-GroupcastNoSender`).
+  `NewGroupcast` turns on AccessControl's Auxiliary feature — the
+  AuxiliaryAcl attribute, the AuxiliaryAccessUpdated event, and an ACL
+  write carrying AuxiliaryType refused with Failure. An IanaAddr group is
+  received on FF05::FA. The reference bridge mounts it.
+  - `cluster/core`: `Groupcast`, `NewGroupcast`, `GroupcastConfig`,
+    `GroupcastClusterID`, `JoinGroupRequest`, `LeaveGroupRequest`,
+    `LeaveGroupResponse`, `UpdateGroupKeyRequest`,
+    `ConfigureAuxiliaryACLRequest`, `GroupcastTestingRequest`,
+    `GroupcastMembershipStruct`, `GroupcastTestingEvent`,
+    `AuxiliaryACLSource`, `AccessControlAuxiliaryEntryStruct`,
+    `AuxiliaryAccessUpdatedEvent`, `AccessControlAuxiliaryTypeSystem`,
+    `AccessControlAuxiliaryTypeGroupcast`, and
+    `AccessControlEntryStruct.AuxiliaryType`.
+  - `bridge`: `AttachAuxiliaryACL` (nil default: the auxiliary grants are
+    not enforced — fails closed); `GroupMessaging.ReportGroupMessage`; a
+    root cluster server implementing `contract.ChangeNotifier` now reaches
+    subscribers.
+  - `endpoint`: `AuxiliaryACLLister`, `TopologyDispatcher.SetAuxiliaryACL`.
+  - `im`: `AuthorityAt`, `WithAuthority`, `AuthorityFunc` (the in-command
+    access check matter.js calls `session.authorityAt`),
+    `HandleGroupInvoke`, `GroupInvokeReport`.
+  - `groups`: `GroupProperties`, `GroupcastMembership`,
+    `Manager.GroupcastMemberships`, `SetGroupProperties`,
+    `RemoveGroupProperties`, `MulticastAddressFor`, `AuxiliaryACL`,
+    `OnGroupcastChanged`, `OnGroupMessage`, `ReportGroupMessage`,
+    `GroupMessageEvent`, `NoKeyError`, `IANAGroupcastAddress`,
+    `PolicyIanaAddr`, `PolicyPerGroup`, `DefaultMcastAddrPolicy`,
+    `UnmappedKeySetID`, the `TestResult*` values; `Store` gains the three
+    Groupcast-group methods.
+  - `store`: the `matter_groupcast_groups` table and `GroupcastGroup`,
+    `UpsertGroupcastGroup`, `RemoveGroupcastGroup`, `ListGroupcastGroups`.
 - **Package `groups`: the node's operational group state**, the Go
   counterpart of matter.js `packages/protocol/src/groups` and the receive
   half of `GroupSession`. `groups.Manager` holds, per fabric, the key sets
@@ -137,9 +181,9 @@ pseudo-version of `main`.
     PiHeatingDemand and Occupied/UnoccupiedSetbackMin/Max is answered
     UNSUPPORTED_WRITE: the 1.6.1 snapshot gives them access `R V`.
 
-  Not yet followed: Matter 1.6.1 requires a Groupcast server and the
-  AccessControl Auxiliary ACL on the root of a node with lights or plugs.
-  Recorded in `notes/parity/matter_behaviour_findings.md`.
+  Matter 1.6.1 also requires a Groupcast server and the AccessControl
+  Auxiliary ACL on the root of a node with lights or plugs — see the
+  Groupcast entry above.
 
 - `Bridge.Stop` drops the buffered events (the numbering continues), as a
   process restart does: the priming report of a subscription re-established

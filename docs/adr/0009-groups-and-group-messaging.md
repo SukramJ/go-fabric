@@ -3,6 +3,8 @@
 - **Status**: Accepted
 - **Date**: 2026-10-04
 - **Supersedes**: [ADR 0004 — Groups stays a stub](./0004-groups-cluster-stays-stub.md)
+- **Followed by**: [ADR 0010 — Groupcast and the Auxiliary ACL](./0010-groupcast-and-auxiliary-acl.md),
+  which builds what the section "What is not built" below deferred
 - **Related**:
   [`../matterjs-comparison.md`](../matterjs-comparison.md) §2 / §5,
   [`../../notes/parity/by_design.md`](../../notes/parity/by_design.md)
@@ -61,7 +63,8 @@ describe.
 
 ## What is not built
 
-- **Groupcast (0x0065) and the AccessControl Auxiliary ACL.** matter.js's
+- **Groupcast (0x0065) and the AccessControl Auxiliary ACL** — built since
+  [ADR 0010](./0010-groupcast-and-auxiliary-acl.md). At the time: matter.js's
   default `ServerNode.RootEndpoint` installs both; this module's root still
   corresponds to `RootEndpointWithoutGroupcast`. Groupcast is a cluster of its
   own weight — derived membership with sender-only groups, key creation

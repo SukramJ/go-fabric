@@ -93,9 +93,12 @@ advertises it: `BasicInformation.SpecificationVersion` 0x01060100,
 `DataModelRevision` 21, Interaction Model revision 12 on every IM message.
 `ClusterRevision` values come from the matter.js extract, never by hand.
 Matter 1.6.1 also makes a Groupcast server and the Auxiliary ACL on the root
-mandatory for nodes with lights or plugs; this module does not provide them
-yet (see `notes/parity/matter_behaviour_findings.md`, "Matter 1.6.1 pin").
-Groups and group-message reception, which Groupcast builds on, are in place.
+mandatory for nodes with lights or plugs. Both are built
+([ADR 0010](./adr/0010-groupcast-and-auxiliary-acl.md)): `core.Groupcast` with
+the Listener and PerGroup features — not Sender, since the node sends no group
+message — on the same group state as Groups and GroupKeyManagement, and
+AccessControl's AuxiliaryAcl / AuxiliaryAccessUpdated, which the bridge
+enforces through `Bridge.AttachAuxiliaryACL`.
 
 ## Device types
 
