@@ -26,6 +26,8 @@ import (
 // application test skips them.
 var applianceClusters = []uint32{
 	clusterwire.OperationalStateClusterID, clusterwire.RvcOperationalStateClusterID,
+	clusterwire.LaundryWasherModeClusterID, clusterwire.RvcRunModeClusterID,
+	clusterwire.RvcCleanModeClusterID, clusterwire.DishwasherModeClusterID,
 }
 
 type applianceFixture struct {
@@ -39,15 +41,23 @@ type applianceFixture struct {
 
 func loadApplianceFixtures(t *testing.T, clusters ...uint32) []applianceFixture {
 	t.Helper()
-	var all []applianceFixture
-	if err := json.Unmarshal(applicationWireFixturesJSON, &all); err != nil {
-		t.Fatal(err)
-	}
+	all := loadApplianceFixturesForFuzz(t)
 	out := slices.DeleteFunc(all, func(f applianceFixture) bool { return !slices.Contains(clusters, f.Cluster) })
 	if len(out) == 0 {
 		t.Fatalf("no fixtures for clusters %v", clusters)
 	}
 	return out
+}
+
+// loadApplianceFixturesForFuzz reads every application fixture with its
+// fixture value raw.
+func loadApplianceFixturesForFuzz(tb testing.TB) []applianceFixture {
+	tb.Helper()
+	var all []applianceFixture
+	if err := json.Unmarshal(applicationWireFixturesJSON, &all); err != nil {
+		tb.Fatal(err)
+	}
+	return all
 }
 
 // encodeCommandResponse runs v through the production command-fields
@@ -160,5 +170,58 @@ func mustUnmarshal(t *testing.T, raw json.RawMessage, v any) {
 	t.Helper()
 	if err := json.Unmarshal(raw, v); err != nil {
 		t.Fatalf("fixture: %v", err)
+	}
+}
+
+func TestModeBasePayloadsMatchMatterJS(t *testing.T) {
+	t.Parallel()
+	for _, f := range loadApplianceFixtures(t, clusterwire.LaundryWasherModeClusterID, clusterwire.RvcRunModeClusterID,
+		clusterwire.RvcCleanModeClusterID, clusterwire.DishwasherModeClusterID) {
+		t.Run(f.Label, func(t *testing.T) {
+			t.Parallel()
+			switch f.Kind + "/" + f.Element {
+			case "commands/ChangeToMode":
+				var fx struct {
+					NewMode uint8 `json:"newMode"`
+				}
+				mustUnmarshal(t, f.Fixture, &fx)
+				got, ok := decodeCommandFields(t, f.Cluster, clusterwire.ModeBaseCmdChangeToMode, f.BytesHex).(clusterwire.ChangeToModeRequest)
+				if !ok || got.NewMode != fx.NewMode {
+					t.Fatalf("decoded %+v, want NewMode %d", got, fx.NewMode)
+				}
+			case "commands/ChangeToModeResponse":
+				var fx struct {
+					Status     uint8  `json:"status"`
+					StatusText string `json:"statusText"`
+				}
+				mustUnmarshal(t, f.Fixture, &fx)
+				if enc := encodeCommandResponse(t, clusterwire.ChangeToModeResponse{Status: fx.Status, StatusText: fx.StatusText}); enc != f.BytesHex {
+					t.Fatalf("encoded %s\n  matter.js %s", enc, f.BytesHex)
+				}
+			case "attributes/SupportedModes":
+				var fx []struct {
+					Label    string `json:"label"`
+					Mode     uint8  `json:"mode"`
+					ModeTags []struct {
+						MfgCode *uint16 `json:"mfgCode"`
+						Value   uint16  `json:"value"`
+					} `json:"modeTags"`
+				}
+				mustUnmarshal(t, f.Fixture, &fx)
+				var modes []clusterwire.ModeOptionStruct
+				for _, m := range fx {
+					opt := clusterwire.ModeOptionStruct{Label: m.Label, Mode: m.Mode}
+					for _, tg := range m.ModeTags {
+						opt.ModeTags = append(opt.ModeTags, clusterwire.ModeTagStruct{MfgCode: tg.MfgCode, Value: tg.Value})
+					}
+					modes = append(modes, opt)
+				}
+				if enc := encodeValue(t, modes); enc != f.BytesHex {
+					t.Fatalf("encoded %s\n  matter.js %s", enc, f.BytesHex)
+				}
+			default:
+				t.Fatalf("unhandled fixture %s %s", f.Kind, f.Element)
+			}
+		})
 	}
 }

@@ -68,6 +68,10 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 		if path.Command == wire.FanControlCmdStep {
 			return decodeFanStepRequest(dec)
 		}
+	case wire.LaundryWasherModeClusterID, wire.RvcRunModeClusterID, wire.RvcCleanModeClusterID, wire.DishwasherModeClusterID:
+		if path.Command == wire.ModeBaseCmdChangeToMode {
+			return decodeChangeToModeRequest(dec)
+		}
 	case 0x0008: // LevelControl
 		switch path.Command {
 		case 0x00, 0x04: // MoveToLevel, MoveToLevelWithOnOff
@@ -660,6 +664,8 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 		ent.Path.Command = 0x02
 	case wire.OperationalCommandResponse:
 		ent.Path.Command = wire.OperationalStateCmdOperationalCommandResponse
+	case wire.ChangeToModeResponse:
+		ent.Path.Command = wire.ModeBaseCmdChangeToModeResponse
 	}
 	// Unknown response types (status-only commands wrapped) leave
 	// the path alone — the writer emits an empty struct + the

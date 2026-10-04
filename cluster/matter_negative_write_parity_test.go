@@ -31,6 +31,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/fan"
+	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
@@ -151,6 +152,25 @@ func newOpStateServer(rvc bool) *opstate.Server {
 		build, cmds = opstate.NewRvcServer, opstate.CommandPause|opstate.CommandResume|opstate.CommandGoHome
 	}
 	srv, err := build(opstate.Config{Handler: opstateHost{}, Commands: cmds, States: states, State: opstate.StateRunning})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
+// modeHost accepts every mode change.
+type modeHost struct{}
+
+func (modeHost) ChangeToMode(context.Context, uint8) (modebase.Status, string, error) {
+	return modebase.StatusSuccess, "", nil
+}
+
+// newDishwasherModeServer is a DishwasherMode with Normal (0) and Heavy (1).
+func newDishwasherModeServer() *modebase.Server {
+	srv, err := modebase.NewDishwasherMode(modebase.Config{Changer: modeHost{}, SupportedModes: []modebase.ModeOption{
+		{Label: "Normal", Mode: 0, Tags: []modebase.ModeTag{{Value: modebase.DishwasherTagNormal}}},
+		{Label: "Heavy", Mode: 1, Tags: []modebase.ModeTag{{Value: modebase.DishwasherTagHeavy}}},
+	}})
 	if err != nil {
 		panic(err)
 	}
@@ -458,6 +478,31 @@ func TestNegativeWriteParity(t *testing.T) {
 			value:      map[uint8]any{0: uint64(0)},
 			wantStatus: im.StatusUnsupportedWrite,
 		},
+		{
+			// mode-base.element.ts:34 — CurrentMode is "R V".
+			name: "DishwasherMode/CurrentMode write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newDishwasherModeServer()
+			},
+			attrID:     modebase.AttrCurrentMode,
+			value:      uint64(1),
+			wantStatus: im.StatusUnsupportedWrite,
+		},
+		{
+			// dishwasher-mode.element.ts — StartUpMode is "X": not an
+			// attribute of the server.
+			name: "DishwasherMode/StartUpMode write → UnsupportedAttribute",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newDishwasherModeServer()
+			},
+			attrID:     0x0002,
+			value:      uint64(1),
+			wantStatus: im.StatusUnsupportedAttribute,
+		},
 	}
 
 	ctx := context.Background()
@@ -572,6 +617,19 @@ func TestNegativeInvokeParity(t *testing.T) {
 			cmdID:      opstate.CmdStart,
 			wantStatus: im.StatusUnsupportedCommand,
 		},
+		{
+			// mode-base.element.ts:49 — NewMode is mandatory; a request the
+			// schema does not decode is InvalidCommand.
+			name: "DishwasherMode/ChangeToMode without NewMode → InvalidCommand",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return newDishwasherModeServer()
+			},
+			cmdID:      modebase.CmdChangeToMode,
+			fields:     map[uint8]any{},
+			wantStatus: im.StatusInvalidCommand,
+		},
 	}
 
 	ctx := context.Background()
@@ -685,6 +743,18 @@ func TestPositiveWriteControlApplicationClusters(t *testing.T) {
 // matter.js accepts are not rejected by Loom.
 func TestPositiveInvokeControl(t *testing.T) {
 	t.Parallel()
+
+	t.Run("DishwasherMode/ChangeToMode Heavy answered Success", func(t *testing.T) {
+		t.Parallel()
+		srv := newDishwasherModeServer()
+		resp, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, wire.ChangeToModeRequest{NewMode: 1})
+		if err != nil || resp.(wire.ChangeToModeResponse).Status != 0 {
+			t.Fatalf("ChangeToMode 1: %+v, %v", resp, err)
+		}
+		if v, _ := srv.MatterRead(modebase.AttrCurrentMode); v != uint8(1) {
+			t.Errorf("CurrentMode = %v", v)
+		}
+	})
 
 	t.Run("RvcOperationalState/GoHome while Running answered NoError", func(t *testing.T) {
 		t.Parallel()

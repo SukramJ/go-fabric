@@ -74,6 +74,27 @@ func encodeApplicationValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 		putElapsed(enc, tlv.ContextTag(1), x.TotalOperationalTime)
 		putElapsed(enc, tlv.ContextTag(2), x.PausedTime)
 		_ = enc.EndContainer()
+	case []clusterwire.ModeOptionStruct:
+		// ModeBase SupportedModes: [0] Label, [1] Mode, [2] ModeTags of
+		// {[0] MfgCode (optional), [1] Value} (mode-base.element.ts:57-71).
+		enc.StartArray(tag)
+		for _, m := range x {
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutUTF8(tlv.ContextTag(0), m.Label)
+			enc.PutUint(tlv.ContextTag(1), uint64(m.Mode))
+			enc.StartArray(tlv.ContextTag(2))
+			for _, t := range m.ModeTags {
+				enc.StartStruct(tlv.AnonymousTag())
+				if t.MfgCode != nil {
+					enc.PutUint(tlv.ContextTag(0), uint64(*t.MfgCode))
+				}
+				enc.PutUint(tlv.ContextTag(1), uint64(t.Value))
+				_ = enc.EndContainer()
+			}
+			_ = enc.EndContainer()
+			_ = enc.EndContainer()
+		}
+		_ = enc.EndContainer()
 	case clusterwire.SwitchInitialPressEvent:
 		// Switch InitialPress / LongPress: [0] NewPosition uint8;
 		// ShortRelease / LongRelease: [0] PreviousPosition uint8.
@@ -136,6 +157,13 @@ func encodeApplicationResponse(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 		// (operational-state.element.ts:74-80).
 		enc.StartStruct(tag)
 		encodeErrorState(enc, tlv.ContextTag(0), x.CommandResponseState)
+		_ = enc.EndContainer()
+	case clusterwire.ChangeToModeResponse:
+		// ChangeToModeResponse: [0] Status, [1] StatusText
+		// (mode-base.element.ts:52-56).
+		enc.StartStruct(tag)
+		enc.PutUint(tlv.ContextTag(0), uint64(x.Status))
+		enc.PutUTF8(tlv.ContextTag(1), x.StatusText)
 		_ = enc.EndContainer()
 	default:
 		return false

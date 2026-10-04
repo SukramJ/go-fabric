@@ -115,6 +115,28 @@ function fixtures() {
     record("opstate_operational_error", ops, "attributes", "OperationalError",
         { errorStateId: 0x81, errorStateLabel: "Lid", errorStateDetails: "open" });
     record("opstate_phase_list", ops, "attributes", "PhaseList", ["pre-soak", "rinse", "spin"]);
+
+    // The ModeBase derivations: ChangeToMode, its response as
+    // ModeUtils.assertModeChange and a device answer it, SupportedModes.
+    const run = model.RvcRunMode;
+    const clean = model.RvcCleanMode;
+    const laundry = model.LaundryWasherMode;
+    const dish = model.DishwasherMode;
+    record("mode_change_to_mode", run, "commands", "ChangeToMode", { newMode: 1 });
+    record("mode_change_to_mode_max", laundry, "commands", "ChangeToMode", { newMode: 255 });
+    record("mode_response_success", run, "commands", "ChangeToModeResponse", { status: 0, statusText: "" });
+    record("mode_response_unsupported", dish, "commands", "ChangeToModeResponse", { status: 1, statusText: "Unsupported mode: 9" });
+    record("mode_response_stuck", run, "commands", "ChangeToModeResponse", { status: 0x41, statusText: "Stuck under the sofa" });
+    record("mode_response_cleaning", clean, "commands", "ChangeToModeResponse", { status: 0x40, statusText: "" });
+    record("mode_run_supported", run, "attributes", "SupportedModes", [
+        { label: "Idle", mode: 0, modeTags: [{ value: 0x4000 }] },
+        { label: "Cleaning", mode: 1, modeTags: [{ value: 0x4001 }] },
+        { label: "Quiet clean", mode: 2, modeTags: [{ value: 0x4001 }, { value: 2 }, { mfgCode: 0xfff1, value: 0x8000 }] },
+    ]);
+    record("mode_laundry_supported", laundry, "attributes", "SupportedModes", [
+        { label: "Normal", mode: 0, modeTags: [{ value: 0x4000 }] },
+        { label: "Delicate", mode: 7, modeTags: [{ value: 0x4001 }, { value: 4 }] },
+    ]);
     return out;
 }
 

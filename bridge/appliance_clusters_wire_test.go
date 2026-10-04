@@ -17,7 +17,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
+	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
@@ -169,7 +171,7 @@ func TestRvcOperationalStateOverTheWire(t *testing.T) {
 		t.Fatal(err)
 	}
 	dev.srv = srv
-	h := newAppHarness(t, appDevice{deviceType: opstate.DeviceTypeRoboticVacuumCleaner, servers: []contract.ClusterServer{srv, hostRunMode{}}})
+	h := newAppHarness(t, appDevice{deviceType: opstate.DeviceTypeRoboticVacuumCleaner, servers: []contract.ClusterServer{srv, newRunMode(t, &modeDevice{})}})
 	ep := h.endpoints[opstate.DeviceTypeRoboticVacuumCleaner]
 	const cl = opstate.ClusterIDRvcOperationalState
 
@@ -203,15 +205,157 @@ func TestRvcOperationalStateOverTheWire(t *testing.T) {
 	}
 }
 
-// hostRunMode stands in for the RvcRunMode server RoboticVacuumCleaner
-// mandates, until a test mounts the real one.
-type hostRunMode struct{}
+// modeDevice is a host's mode-switching device: it accepts every mode
+// unless refuse is set.
+type modeDevice struct {
+	mu     sync.Mutex
+	refuse modebase.Status
+	asked  []uint8
+}
 
-func (hostRunMode) MatterClusterID() uint32                                { return 0x0054 }
-func (hostRunMode) MatterRead(attrID uint32) (any, bool)                   { return uint8(0), attrID == 1 }
-func (hostRunMode) MatterWrite(context.Context, uint32, any) error         { return nil }
-func (hostRunMode) MatterInvoke(context.Context, uint32, any) (any, error) { return nil, nil }
-func (hostRunMode) MatterReportable() []uint32                             { return []uint32{1} }
+func (d *modeDevice) ChangeToMode(_ context.Context, mode uint8) (modebase.Status, string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.asked = append(d.asked, mode)
+	if d.refuse != modebase.StatusSuccess {
+		return d.refuse, "dust bin missing", nil
+	}
+	return modebase.StatusSuccess, "", nil
+}
+
+func newRunMode(t *testing.T, d *modeDevice) *modebase.Server {
+	t.Helper()
+	srv, err := modebase.NewRvcRunMode(modebase.Config{
+		Changer: d,
+		SupportedModes: []modebase.ModeOption{
+			{Label: "Idle", Mode: 0, Tags: []modebase.ModeTag{{Value: modebase.RvcRunTagIdle}}},
+			{Label: "Cleaning", Mode: 1, Tags: []modebase.ModeTag{{Value: modebase.RvcRunTagCleaning}}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return srv
+}
+
+// changeToMode invokes ChangeToMode and returns the response's Status and
+// StatusText.
+func (h *appHarness) changeToMode(t *testing.T, ep uint16, clusterID uint32, mode uint8) (uint64, string) {
+	t.Helper()
+	id, fields, status, isStatus := invokeResult(t, h.invoke(ep, clusterID, modebase.CmdChangeToMode, func(enc *tlv.Encoder) {
+		enc.PutUint(tlv.ContextTag(0), uint64(mode))
+	}))
+	if isStatus || id != modebase.CmdChangeToModeResponse {
+		t.Fatalf("ChangeToMode answered command 0x%02X / status %v, want ChangeToModeResponse", id, status)
+	}
+	return fields.mustChild(t, 0).El.Uint, fields.mustChild(t, 1).El.String
+}
+
+func TestModeBaseOverTheWire(t *testing.T) {
+	t.Parallel()
+	runDev, cleanDev := &modeDevice{}, &modeDevice{}
+	run := newRunMode(t, runDev)
+	clean, err := modebase.NewRvcCleanMode(modebase.Config{
+		Changer: cleanDev, Features: modebase.FeatureDirectModeChange, CurrentMode: 1,
+		SupportedModes: []modebase.ModeOption{
+			{Label: "Vacuum", Mode: 1, Tags: []modebase.ModeTag{{Value: modebase.RvcCleanTagVacuum}}},
+			{Label: "Vacuum, then mop", Mode: 2, Tags: []modebase.ModeTag{{Value: modebase.RvcCleanTagVacuumThenMop}, {Value: modebase.RvcCleanTagMop}}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rvc, err := opstate.NewRvcServer(opstate.Config{
+		States:     []opstate.StateEntry{{ID: opstate.StateStopped}, {ID: opstate.StateError}, {ID: opstate.StateDocked}},
+		DeviceType: opstate.DeviceTypeRoboticVacuumCleaner,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newAppHarness(t, appDevice{deviceType: opstate.DeviceTypeRoboticVacuumCleaner, servers: []contract.ClusterServer{rvc, run, clean}})
+	ep := h.endpoints[opstate.DeviceTypeRoboticVacuumCleaner]
+
+	modes, _, _ := h.readAttribute(ep, modebase.ClusterIDRvcCleanMode, modebase.AttrSupportedModes)
+	if len(modes.Children) != 2 || modes.Children[1].mustChild(t, 0).El.String != "Vacuum, then mop" ||
+		len(modes.Children[1].mustChild(t, 2).Children) != 2 {
+		t.Errorf("SupportedModes = %+v", modes)
+	}
+	if fm, _, _ := h.readAttribute(ep, modebase.ClusterIDRvcCleanMode, 0xFFFC); fm.El.Uint != 1<<20 {
+		t.Errorf("RvcCleanMode FeatureMap = 0x%X", fm.El.Uint)
+	}
+
+	// RvcRunMode: an accepted change moves CurrentMode.
+	if st, text := h.changeToMode(t, ep, modebase.ClusterIDRvcRunMode, 1); st != 0 || text != "" {
+		t.Errorf("ChangeToMode 1 = %d %q", st, text)
+	}
+	if v, _, _ := h.readAttribute(ep, modebase.ClusterIDRvcRunMode, modebase.AttrCurrentMode); v.El.Uint != 1 {
+		t.Errorf("CurrentMode = %d", v.El.Uint)
+	}
+	// An unsupported mode never reaches the device.
+	if st, text := h.changeToMode(t, ep, modebase.ClusterIDRvcRunMode, 5); st != uint64(modebase.StatusUnsupportedMode) || text != "Unsupported mode: 5" {
+		t.Errorf("ChangeToMode 5 = %d %q", st, text)
+	}
+	// The device refuses with an RvcRunMode status.
+	runDev.mu.Lock()
+	runDev.refuse = modebase.StatusDustBinMissing
+	runDev.mu.Unlock()
+	if st, text := h.changeToMode(t, ep, modebase.ClusterIDRvcRunMode, 0); st != uint64(modebase.StatusDustBinMissing) || text != "dust bin missing" {
+		t.Errorf("refused ChangeToMode = %d %q", st, text)
+	}
+	if len(runDev.asked) != 2 {
+		t.Errorf("device asked %v", runDev.asked)
+	}
+	// Malformed requests.
+	if _, _, status, _ := invokeResult(t, h.invoke(ep, modebase.ClusterIDRvcRunMode, modebase.CmdChangeToMode, nil)); status != im.StatusInvalidCommand {
+		t.Errorf("ChangeToMode without NewMode = %v", status)
+	}
+	if _, _, status, _ := invokeResult(t, h.invoke(ep, modebase.ClusterIDRvcRunMode, modebase.CmdChangeToMode, func(enc *tlv.Encoder) {
+		enc.PutUint16(tlv.ContextTag(0), 0x100)
+	})); status != im.StatusConstraintError {
+		t.Errorf("ChangeToMode 0x100 = %v", status)
+	}
+	if _, _, status, _ := invokeResult(t, h.invoke(ep, modebase.ClusterIDRvcRunMode, modebase.CmdChangeToMode, func(enc *tlv.Encoder) {
+		enc.PutUTF8(tlv.ContextTag(0), "idle")
+	})); status != im.StatusInvalidCommand {
+		t.Errorf("ChangeToMode \"idle\" = %v", status)
+	}
+	if st := h.writeAttribute(ep, modebase.ClusterIDRvcRunMode, modebase.AttrCurrentMode, func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.PutUint(tag, 0)
+	}); st != uint64(im.StatusUnsupportedWrite) {
+		t.Errorf("CurrentMode write status 0x%02X", st)
+	}
+}
+
+// TestLaundryWasherModeOverTheWire mounts LaundryWasherMode next to the
+// washer's OperationalState and changes its mode.
+func TestLaundryWasherModeOverTheWire(t *testing.T) {
+	t.Parallel()
+	dev := &modeDevice{}
+	mode, err := modebase.NewLaundryWasherMode(modebase.Config{
+		Changer: dev,
+		SupportedModes: []modebase.ModeOption{
+			{Label: "Normal", Mode: 0, Tags: []modebase.ModeTag{{Value: modebase.LaundryTagNormal}}},
+			{Label: "Whites", Mode: 3, Tags: []modebase.ModeTag{{Value: modebase.LaundryTagWhites}, {Value: modebase.TagMax}}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := opstate.NewServer(opstate.Config{
+		States: []opstate.StateEntry{{ID: opstate.StateStopped}, {ID: opstate.StateError}}, DeviceType: opstate.DeviceTypeLaundryDryer,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newAppHarness(t, appDevice{deviceType: opstate.DeviceTypeLaundryDryer, servers: []contract.ClusterServer{state, mode}})
+	ep := h.endpoints[opstate.DeviceTypeLaundryDryer]
+	if st, _ := h.changeToMode(t, ep, clusterwire.LaundryWasherModeClusterID, 3); st != 0 {
+		t.Errorf("ChangeToMode 3 = %d", st)
+	}
+	if v, _, _ := h.readAttribute(ep, clusterwire.LaundryWasherModeClusterID, modebase.AttrCurrentMode); v.El.Uint != 3 {
+		t.Errorf("CurrentMode = %d", v.El.Uint)
+	}
+}
 
 // TestOperationalStateChangesReachASubscriber: a state change the host
 // makes through the server marks exactly the attributes that moved dirty,

@@ -420,5 +420,142 @@
       "spin"
     ],
     "bytesHex": "160c087072652d736f616b0c0572696e73650c047370696e18"
+  },
+  {
+    "label": "mode_change_to_mode",
+    "kind": "commands",
+    "cluster": 84,
+    "element": "ChangeToMode",
+    "fixture": {
+      "newMode": 1
+    },
+    "bytesHex": "1524000118"
+  },
+  {
+    "label": "mode_change_to_mode_max",
+    "kind": "commands",
+    "cluster": 81,
+    "element": "ChangeToMode",
+    "fixture": {
+      "newMode": 255
+    },
+    "bytesHex": "152400ff18"
+  },
+  {
+    "label": "mode_response_success",
+    "kind": "commands",
+    "cluster": 84,
+    "element": "ChangeToModeResponse",
+    "fixture": {
+      "status": 0,
+      "statusText": ""
+    },
+    "bytesHex": "152400002c010018"
+  },
+  {
+    "label": "mode_response_unsupported",
+    "kind": "commands",
+    "cluster": 89,
+    "element": "ChangeToModeResponse",
+    "fixture": {
+      "status": 1,
+      "statusText": "Unsupported mode: 9"
+    },
+    "bytesHex": "152400012c0113556e737570706f72746564206d6f64653a203918"
+  },
+  {
+    "label": "mode_response_stuck",
+    "kind": "commands",
+    "cluster": 84,
+    "element": "ChangeToModeResponse",
+    "fixture": {
+      "status": 65,
+      "statusText": "Stuck under the sofa"
+    },
+    "bytesHex": "152400412c0114537475636b20756e6465722074686520736f666118"
+  },
+  {
+    "label": "mode_response_cleaning",
+    "kind": "commands",
+    "cluster": 85,
+    "element": "ChangeToModeResponse",
+    "fixture": {
+      "status": 64,
+      "statusText": ""
+    },
+    "bytesHex": "152400402c010018"
+  },
+  {
+    "label": "mode_run_supported",
+    "kind": "attributes",
+    "cluster": 84,
+    "element": "SupportedModes",
+    "fixture": [
+      {
+        "label": "Idle",
+        "mode": 0,
+        "modeTags": [
+          {
+            "value": 16384
+          }
+        ]
+      },
+      {
+        "label": "Cleaning",
+        "mode": 1,
+        "modeTags": [
+          {
+            "value": 16385
+          }
+        ]
+      },
+      {
+        "label": "Quiet clean",
+        "mode": 2,
+        "modeTags": [
+          {
+            "value": 16385
+          },
+          {
+            "value": 2
+          },
+          {
+            "mfgCode": 65521,
+            "value": 32768
+          }
+        ]
+      }
+    ],
+    "bytesHex": "16152c000449646c6524010036021525010040181818152c0008436c65616e696e6724010136021525010140181818152c000b517569657420636c65616e24010236021525010140181524010218152500f1ff2501008018181818"
+  },
+  {
+    "label": "mode_laundry_supported",
+    "kind": "attributes",
+    "cluster": 81,
+    "element": "SupportedModes",
+    "fixture": [
+      {
+        "label": "Normal",
+        "mode": 0,
+        "modeTags": [
+          {
+            "value": 16384
+          }
+        ]
+      },
+      {
+        "label": "Delicate",
+        "mode": 7,
+        "modeTags": [
+          {
+            "value": 16385
+          },
+          {
+            "value": 4
+          }
+        ]
+      }
+    ],
+    "bytesHex": "16152c00064e6f726d616c24010036021525010040181818152c000844656c696361746524010736021525010140181524010418181818"
   }
 ]

@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/fan"
+	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/contract"
@@ -166,6 +167,41 @@ func applianceServer(dt uint16) contract.ClusterServer {
 	return srv
 }
 
+// modeChanger is a host's mode port.
+type modeChanger struct{}
+
+func (modeChanger) ChangeToMode(context.Context, uint8) (modebase.Status, string, error) {
+	return modebase.StatusSuccess, "", nil
+}
+
+// rvcServers is what a robotic vacuum cleaner host supplies: the
+// mandatory RvcOperationalState and RvcRunMode, and the optional
+// RvcCleanMode.
+func rvcServers() []contract.ClusterServer {
+	state, err := opstate.NewRvcServer(opstate.Config{
+		States:     []opstate.StateEntry{{ID: opstate.StateStopped}, {ID: opstate.StateError}, {ID: opstate.StateDocked}},
+		DeviceType: opstate.DeviceTypeRoboticVacuumCleaner,
+	})
+	if err != nil {
+		panic(err)
+	}
+	run, err := modebase.NewRvcRunMode(modebase.Config{Changer: modeChanger{}, SupportedModes: []modebase.ModeOption{
+		{Label: "Idle", Mode: 0, Tags: []modebase.ModeTag{{Value: modebase.RvcRunTagIdle}}},
+		{Label: "Cleaning", Mode: 1, Tags: []modebase.ModeTag{{Value: modebase.RvcRunTagCleaning}}},
+	}})
+	if err != nil {
+		panic(err)
+	}
+	clean, err := modebase.NewRvcCleanMode(modebase.Config{Changer: modeChanger{}, SupportedModes: []modebase.ModeOption{
+		{Label: "Vacuum", Mode: 0, Tags: []modebase.ModeTag{{Value: modebase.RvcCleanTagVacuum}}},
+		{Label: "Mop", Mode: 1, Tags: []modebase.ModeTag{{Value: modebase.RvcCleanTagMop}}},
+	}})
+	if err != nil {
+		panic(err)
+	}
+	return []contract.ClusterServer{state, run, clean}
+}
+
 func applicationDeviceCases() []applicationDeviceCase {
 	smoke, err := alarm.NewServer(alarm.Config{Source: smokeReading{}, Features: alarm.FeatureSmokeAlarm | alarm.FeatureCOAlarm})
 	if err != nil {
@@ -208,6 +244,12 @@ func applicationDeviceCases() []applicationDeviceCase {
 		}},
 		{name: "Dishwasher", deviceType: opstate.DeviceTypeDishwasher, source: deviceTypeSource{
 			dt: opstate.DeviceTypeDishwasher, servers: []contract.ClusterServer{applianceServer(opstate.DeviceTypeDishwasher)},
+		}},
+		// RoboticVacuumCleaner mandates Identify (the assembler's),
+		// RvcRunMode and RvcOperationalState; RvcCleanMode is optional and
+		// ServiceArea is not built.
+		{name: "RoboticVacuumCleaner", deviceType: opstate.DeviceTypeRoboticVacuumCleaner, source: deviceTypeSource{
+			dt: opstate.DeviceTypeRoboticVacuumCleaner, servers: rvcServers(),
 		}},
 	}
 }
