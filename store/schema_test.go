@@ -34,6 +34,7 @@ func TestSchemaCreatesEveryTableThePackageQueries(t *testing.T) {
 		"matter_metadata",
 		"matter_settings",
 		"matter_persistent_subscriptions",
+		"matter_server_subscriptions",
 	} {
 		if !strings.Contains(ddl, "CREATE TABLE IF NOT EXISTS "+table) {
 			t.Errorf("Schema() does not create %s", table)

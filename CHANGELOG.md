@@ -46,6 +46,14 @@ pseudo-version of `main`.
 - `im.StatusUnreportableAttr` (0x8c) and `im.StatusNoUpstreamSubscription`
   (0xc5): Matter 1.6.1 removed both codes and matter.js dropped them from its
   status table. No replacement; removal permissible in v0.3.0.
+- The never-wired `store` subscription API — `PersistentSubscriptionRecord`,
+  `ErrPersistentSubscriptionNotFound`, `SavePersistentSubscription`,
+  `LoadPersistentSubscriptions`, `DeletePersistentSubscription`,
+  `DeletePersistentSubscriptionsByFabric`, `GetPersistentSubscription`,
+  `PersistentSubscriptionIntervals`, `MarshalIntervals`, `UnmarshalIntervals`
+  — and its `matter_persistent_subscriptions` table. Nothing ever wrote or
+  read it. Replaced by `Store.SaveServerSubscription` and its siblings on the
+  new `matter_server_subscriptions` table; removal permissible in v0.3.0.
 
 ## [0.1.0] — 2026-10-02
 

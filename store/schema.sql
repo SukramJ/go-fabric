@@ -181,16 +181,10 @@ CREATE TABLE IF NOT EXISTS matter_settings (
     value TEXT NOT NULL
 );
 
--- matter_persistent_subscriptions stores active subscriptions that
--- survive a restart. On boot the bridge re-arms every row as an in-memory
--- subscription so controllers that had active subscriptions before the
--- restart receive ongoing reports without re-subscribing, per Matter 1.4
--- §10.6.9.
---
--- paths_json holds a JSON array of ConcreteAttributePath objects
--- (serialised with the same field names as the Go struct so the store
--- layer decodes without a custom mapper). intervals_json holds
--- {"min":N,"max":N} for the negotiated cadence.
+-- matter_persistent_subscriptions is the deprecated first attempt at
+-- subscription persistence. Nothing in this module writes or reads it; it
+-- is still created so a host that pinned the old store API keeps working
+-- through the deprecation window. matter_server_subscriptions replaces it.
 CREATE TABLE IF NOT EXISTS matter_persistent_subscriptions (
     id                  INTEGER  PRIMARY KEY AUTOINCREMENT,
     fabric_index        INTEGER  NOT NULL,
@@ -205,3 +199,21 @@ CREATE TABLE IF NOT EXISTS matter_persistent_subscriptions (
 -- on fabric-removal teardown.
 CREATE INDEX IF NOT EXISTS matter_persistent_subscriptions_fabric
     ON matter_persistent_subscriptions(fabric_index);
+
+-- matter_server_subscriptions holds the server subscriptions of CASE
+-- sessions that are active right now, so they can be re-established
+-- under their old SubscriptionId after a restart (docs/adr/0008, mirroring
+-- matter.js SubscriptionsServer). One row per SubscriptionId; payload is
+-- the im/subscription.PeerSubscription encoding and is opaque to this
+-- package. The bridge clears the table when it loads it at start-up and
+-- writes back each subscription that becomes active again.
+CREATE TABLE IF NOT EXISTS matter_server_subscriptions (
+    subscription_id     INTEGER  PRIMARY KEY,
+    fabric_index        INTEGER  NOT NULL,
+    peer_node_id        BLOB     NOT NULL,
+    payload             BLOB     NOT NULL,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS matter_server_subscriptions_fabric
+    ON matter_server_subscriptions(fabric_index);

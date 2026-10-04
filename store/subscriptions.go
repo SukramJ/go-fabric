@@ -24,6 +24,10 @@ import (
 // Wiring it needs a producer at subscription establishment, a consumer at
 // daemon start, and a delete on both teardown and fabric removal; until all
 // four exist, treat rows here as inert.
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 type PersistentSubscriptionRecord struct {
 	// ID is the auto-assigned row key; zero on insert (assigned by the DB).
 	ID int64
@@ -41,10 +45,18 @@ type PersistentSubscriptionRecord struct {
 }
 
 // ErrPersistentSubscriptionNotFound is returned when a lookup misses.
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 var ErrPersistentSubscriptionNotFound = errors.New("matter store: persistent subscription not found")
 
 // SavePersistentSubscription inserts one row and returns the assigned ID.
 // See [PersistentSubscriptionRecord] — nothing calls this yet.
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 func (s *Store) SavePersistentSubscription(ctx context.Context, rec PersistentSubscriptionRecord) (int64, error) {
 	res, err := s.db.ExecContext(
 		ctx, `
@@ -70,6 +82,10 @@ VALUES (?, ?, ?, ?)`,
 // matter_persistent_subscriptions in ascending id order, so a re-arm loop
 // would process them deterministically.  No daemon-start path calls this —
 // see [PersistentSubscriptionRecord].
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 func (s *Store) LoadPersistentSubscriptions(ctx context.Context) ([]PersistentSubscriptionRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 SELECT id, fabric_index, node_id, paths_json, intervals_json
@@ -110,6 +126,10 @@ ORDER BY id ASC`)
 // DeletePersistentSubscription removes a single row by ID.  Idempotent —
 // no error if the row is already gone.  No subscription-teardown path calls
 // this — see [PersistentSubscriptionRecord].
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 func (s *Store) DeletePersistentSubscription(ctx context.Context, id int64) error {
 	_, err := s.db.ExecContext(ctx, `
 DELETE FROM matter_persistent_subscriptions WHERE id = ?`, id)
@@ -123,6 +143,10 @@ DELETE FROM matter_persistent_subscriptions WHERE id = ?`, id)
 // The fabric-removal fan-out does not call this — see
 // [PersistentSubscriptionRecord]; rows cannot accumulate today because
 // nothing writes any.
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 func (s *Store) DeletePersistentSubscriptionsByFabric(ctx context.Context, fabricIndex uint8) error {
 	_, err := s.db.ExecContext(ctx, `
 DELETE FROM matter_persistent_subscriptions WHERE fabric_index = ?`, fabricIndex)
@@ -134,6 +158,10 @@ DELETE FROM matter_persistent_subscriptions WHERE fabric_index = ?`, fabricIndex
 
 // GetPersistentSubscription returns a single row by ID.
 // Returns ErrPersistentSubscriptionNotFound when the row does not exist.
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 func (s *Store) GetPersistentSubscription(ctx context.Context, id int64) (PersistentSubscriptionRecord, error) {
 	var (
 		rec      PersistentSubscriptionRecord
@@ -159,6 +187,10 @@ FROM matter_persistent_subscriptions WHERE id = ?`, id).
 // PersistentSubscriptionIntervals is the JSON shape of IntervalsJSON.
 // Using a dedicated struct makes the marshal/unmarshal round-trip
 // explicit and avoids map[string]any ambiguity.
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 type PersistentSubscriptionIntervals struct {
 	// Min is the negotiated MinIntervalFloor in seconds.
 	Min uint16 `json:"min"`
@@ -168,6 +200,10 @@ type PersistentSubscriptionIntervals struct {
 
 // MarshalIntervals serialises a cadence pair to the JSON string stored in
 // IntervalsJSON.  Helper so callers don't have to import encoding/json.
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 func MarshalIntervals(minVal, maxVal uint16) (string, error) {
 	b, err := json.Marshal(PersistentSubscriptionIntervals{Min: minVal, Max: maxVal})
 	if err != nil {
@@ -177,6 +213,10 @@ func MarshalIntervals(minVal, maxVal uint16) (string, error) {
 }
 
 // UnmarshalIntervals deserialises the string produced by MarshalIntervals.
+//
+// Deprecated: nothing in this module writes or reads this table; server
+// subscription persistence lives in matter_server_subscriptions behind
+// [Store.SaveServerSubscription] and its siblings (docs/adr/0008).
 func UnmarshalIntervals(s string) (PersistentSubscriptionIntervals, error) {
 	var v PersistentSubscriptionIntervals
 	if err := json.Unmarshal([]byte(s), &v); err != nil {
