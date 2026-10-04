@@ -95,5 +95,119 @@
       ]
     },
     "bytesHex": "153600040005a1010502011818"
+  },
+  {
+    "label": "groups_add_group",
+    "cluster": 4,
+    "command": "AddGroup",
+    "fixture": {
+      "groupId": 257,
+      "groupName": "Kitchen"
+    },
+    "bytesHex": "15250001012c01074b69746368656e18"
+  },
+  {
+    "label": "groups_add_group_if_identifying",
+    "cluster": 4,
+    "command": "AddGroupIfIdentifying",
+    "fixture": {
+      "groupId": 65279,
+      "groupName": ""
+    },
+    "bytesHex": "152500fffe2c010018"
+  },
+  {
+    "label": "groups_view_group",
+    "cluster": 4,
+    "command": "ViewGroup",
+    "fixture": {
+      "groupId": 514
+    },
+    "bytesHex": "152500020218"
+  },
+  {
+    "label": "groups_get_group_membership",
+    "cluster": 4,
+    "command": "GetGroupMembership",
+    "fixture": {
+      "groupList": [
+        257,
+        7
+      ]
+    },
+    "bytesHex": "15360005010104071818"
+  },
+  {
+    "label": "groups_get_group_membership_all",
+    "cluster": 4,
+    "command": "GetGroupMembership",
+    "fixture": {
+      "groupList": []
+    },
+    "bytesHex": "1536001818"
+  },
+  {
+    "label": "groups_remove_group",
+    "cluster": 4,
+    "command": "RemoveGroup",
+    "fixture": {
+      "groupId": 771
+    },
+    "bytesHex": "152500030318"
+  },
+  {
+    "label": "groups_add_group_response",
+    "cluster": 4,
+    "command": "AddGroupResponse",
+    "fixture": {
+      "status": 0,
+      "groupId": 257
+    },
+    "bytesHex": "152400002501010118"
+  },
+  {
+    "label": "groups_view_group_response",
+    "cluster": 4,
+    "command": "ViewGroupResponse",
+    "fixture": {
+      "status": 0,
+      "groupId": 257,
+      "groupName": "Kitchen"
+    },
+    "bytesHex": "15240000250101012c02074b69746368656e18"
+  },
+  {
+    "label": "groups_view_group_response_not_found",
+    "cluster": 4,
+    "command": "ViewGroupResponse",
+    "fixture": {
+      "status": 139,
+      "groupId": 514,
+      "groupName": ""
+    },
+    "bytesHex": "1524008b250102022c020018"
+  },
+  {
+    "label": "groups_get_group_membership_response",
+    "cluster": 4,
+    "command": "GetGroupMembershipResponse",
+    "fixture": {
+      "capacity": 252,
+      "groupList": [
+        257,
+        258
+      ]
+    },
+    "bytesHex": "152400fc36010501010502011818"
+  },
+  {
+    "label": "groups_remove_group_response",
+    "cluster": 4,
+    "command": "RemoveGroupResponse",
+    "fixture": {
+      "status": 139,
+      "groupId": 771
+    },
+    "bytesHex": "1524008b2501030318"
   }
 ]

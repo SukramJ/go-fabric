@@ -143,3 +143,23 @@ func TestClusterRevision_Unknown(t *testing.T) {
 		t.Errorf("ClusterRevision(unknown) = %d, want 0", rev)
 	}
 }
+
+func TestDeviceTypeRequiresServerCluster(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		dt, cluster uint32
+		want        bool
+	}{
+		{0x0100, 0x0004, true},  // OnOffLight requires Groups (on-off-light.element.ts: M)
+		{0x010A, 0x0004, true},  // OnOffPlugInUnit requires Groups
+		{0x0202, 0x0004, false}, // WindowCovering: Groups is "Active, O"
+		{0x0301, 0x0004, false}, // Thermostat: Groups is "Active"
+		{0x0302, 0x0004, false}, // TemperatureSensor has no Groups
+		{0xFFFF, 0x0004, false}, // unknown device type
+	}
+	for _, c := range cases {
+		if got := DeviceTypeRequiresServerCluster(c.dt, c.cluster); got != c.want {
+			t.Errorf("DeviceTypeRequiresServerCluster(0x%04X, 0x%04X) = %v, want %v", c.dt, c.cluster, got, c.want)
+		}
+	}
+}

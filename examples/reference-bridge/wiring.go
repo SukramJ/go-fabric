@@ -19,6 +19,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/schema"
@@ -68,6 +69,7 @@ type rootRefs struct {
 func buildRootClusters(
 	identity bridgeIdentity,
 	st *store.Store,
+	groupState *groups.Manager,
 	chain *attestation.Chain,
 	onFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte),
 ) ([]contract.ClusterServer, rootRefs, error) {
@@ -147,7 +149,9 @@ func buildRootClusters(
 	if err != nil {
 		return nil, refs, fmt.Errorf("access control: %w", err)
 	}
-	groupKeys, err := mattercore.NewGroupKeyManagement(st, mattercore.GroupKeyMgmtConfig{})
+	// GroupKeyManagement keeps the group state current and serves its
+	// GroupTable; without it no group message could be authenticated.
+	groupKeys, err := mattercore.NewGroupKeyManagement(st, mattercore.GroupKeyMgmtConfig{Groups: groupState})
 	if err != nil {
 		return nil, refs, fmt.Errorf("group key management: %w", err)
 	}

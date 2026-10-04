@@ -171,9 +171,62 @@ func TestGroupCommandPayloadsMatchMatterJS(t *testing.T) {
 	}
 }
 
-// checkGroupsFixture is the hook for fixtures this file does not cover
-// itself; none are expected yet.
+// groupsFixtureFields is the union of the Groups payload fields.
+type groupsFixtureFields struct {
+	GroupID   uint16   `json:"groupId"`
+	GroupName string   `json:"groupName"`
+	GroupList []uint16 `json:"groupList"`
+	Status    uint8    `json:"status"`
+	Capacity  uint8    `json:"capacity"`
+}
+
+// checkGroupsFixture covers the Groups (0x0004) payloads: requests decode
+// to the fixture's fields, responses encode to matter.js's bytes.
 func checkGroupsFixture(t *testing.T, f groupWireFixture) {
 	t.Helper()
-	t.Fatalf("fixture %s: no parity check for command %s", f.Label, f.Command)
+	var fx groupsFixtureFields
+	if err := json.Unmarshal(f.Fixture, &fx); err != nil {
+		t.Fatal(err)
+	}
+	decoded := func(cmd uint32) any { return decodeCommandFields(t, mattercore.GroupsClusterID, cmd, f.BytesHex) }
+	encoded := func(v any) {
+		t.Helper()
+		if got := encodeCommandFields(t, v); got != f.BytesHex {
+			t.Fatalf("encoded %s\n  matter.js %s", got, f.BytesHex)
+		}
+	}
+	status := im.StatusCode(fx.Status)
+	switch f.Command {
+	case "AddGroup":
+		if got := decoded(0x00); got != (mattercore.AddGroupRequest{GroupID: fx.GroupID, GroupName: fx.GroupName}) {
+			t.Fatalf("decoded %+v", got)
+		}
+	case "AddGroupIfIdentifying":
+		if got := decoded(0x05); got != (mattercore.AddGroupIfIdentifyingRequest{GroupID: fx.GroupID, GroupName: fx.GroupName}) {
+			t.Fatalf("decoded %+v", got)
+		}
+	case "ViewGroup":
+		if got := decoded(0x01); got != (mattercore.ViewGroupRequest{GroupID: fx.GroupID}) {
+			t.Fatalf("decoded %+v", got)
+		}
+	case "RemoveGroup":
+		if got := decoded(0x03); got != (mattercore.RemoveGroupRequest{GroupID: fx.GroupID}) {
+			t.Fatalf("decoded %+v", got)
+		}
+	case "GetGroupMembership":
+		got, ok := decoded(0x02).(mattercore.GetGroupMembershipRequest)
+		if !ok || !slices.Equal(got.GroupList, fx.GroupList) || got.GroupList == nil {
+			t.Fatalf("decoded %+v", got)
+		}
+	case "AddGroupResponse":
+		encoded(mattercore.AddGroupResponse{Status: status, GroupID: fx.GroupID})
+	case "ViewGroupResponse":
+		encoded(mattercore.ViewGroupResponse{Status: status, GroupID: fx.GroupID, GroupName: fx.GroupName})
+	case "GetGroupMembershipResponse":
+		encoded(mattercore.GetGroupMembershipResponse{Capacity: fx.Capacity, GroupList: fx.GroupList})
+	case "RemoveGroupResponse":
+		encoded(mattercore.RemoveGroupResponse{Status: status, GroupID: fx.GroupID})
+	default:
+		t.Fatalf("fixture %s: no parity check for command %s", f.Label, f.Command)
+	}
 }

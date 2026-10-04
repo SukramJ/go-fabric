@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -26,6 +27,12 @@ import (
 // through the store, every write commits to it.
 type GroupKeyManagement struct {
 	store GroupStoreFacade
+
+	// groups is the operational group state this cluster keeps current —
+	// matter.js's GroupKeyManagementServer drives `fabric.groups` the same
+	// way (setFromGroupKeySet, removeGroupKeySet, groupKeyIdMap). nil
+	// leaves the cluster a pure store facade with an empty GroupTable.
+	groups *groups.Manager
 
 	mu                    sync.RWMutex
 	currentFabric         uint8
@@ -111,6 +118,12 @@ var _ im.StatusCodeError = groupKeyExhaustedErr{}
 type GroupKeyMgmtConfig struct {
 	MaxGroupsPerFabric    uint16
 	MaxGroupKeysPerFabric uint16
+	// Groups is the node's operational group state. When set, every key
+	// set and GroupKeyMap change is applied to it, its MaxGroupsPerFabric
+	// cap follows this cluster's attribute, and GroupTable is read from
+	// it. A node with a Groups server must set it — without it the group
+	// table stays empty and no group message can be authenticated.
+	Groups *groups.Manager
 }
 
 // matter.js defaults — see GroupKeyManagementServer.ts:615-616 (the
@@ -134,6 +147,7 @@ func NewGroupKeyManagement(s GroupStoreFacade, cfg GroupKeyMgmtConfig) (*GroupKe
 	}
 	g := &GroupKeyManagement{
 		store:                 s,
+		groups:                cfg.Groups,
 		maxGroupsPerFabric:    cfg.MaxGroupsPerFabric,
 		maxGroupKeysPerFabric: cfg.MaxGroupKeysPerFabric,
 	}
@@ -141,7 +155,29 @@ func NewGroupKeyManagement(s GroupStoreFacade, cfg GroupKeyMgmtConfig) (*GroupKe
 	// DataVersionFilter=0 does not produce a false-positive cache hit on
 	// the first read.
 	g.dataVersion.Bump()
+	if g.groups != nil {
+		// The cap AddGroup enforces is this cluster's attribute
+		// (matter.js addEndpointForGroup reads state.maxGroupsPerFabric),
+		// and a membership change is a GroupTable change.
+		g.groups.SetMaxGroupsPerFabric(int(cfg.MaxGroupsPerFabric))
+		g.groups.OnGroupTableChanged(func(uint8) { g.dataVersion.Bump() })
+	}
 	return g, nil
+}
+
+// syncGroups applies a committed key set / GroupKeyMap change to the
+// operational group state. Mirrors the fabric.groups calls of matter.js
+// GroupKeyManagementServer (keySetWrite → setFromGroupKeySet,
+// keySetRemove → removeGroupKeySet, #updateGroupKeyMap →
+// groupKeyIdMap).
+func (g *GroupKeyManagement) syncGroups(ctx context.Context, fabric uint8) error {
+	if g.groups == nil {
+		return nil
+	}
+	if err := g.groups.Reload(ctx, fabric); err != nil {
+		return fmt.Errorf("matter: GroupKeyManagement: refresh group state: %w", err)
+	}
+	return nil
 }
 
 // Compile-time assertions.
@@ -275,11 +311,30 @@ func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint3
 		}
 		return out, true
 	case groupKeyMgmtAttrGroupTable:
-		// Endpoints + GroupName persistence is not yet wired —
-		// returning empty list is spec-compliant when no groups have
-		// been added. Stufe 7 (subscription state machine) ties this
-		// into the Groups cluster; v1.1 ships with empty group table.
-		return []GroupInfoMapStruct{}, true
+		// The group table the Groups servers maintain, for the requesting
+		// fabric. Mirrors matter.js GroupKeyManagementServer state
+		// `groupTable` (addEndpointForGroup / removeEndpoint).
+		if g.groups == nil {
+			return []GroupInfoMapStruct{}, true
+		}
+		_, fabric := im.FabricFilterFromContext(ctx)
+		if fabric == 0 {
+			g.mu.RLock()
+			fabric = g.currentFabric
+			g.mu.RUnlock()
+		}
+		if fabric == 0 {
+			return []GroupInfoMapStruct{}, true
+		}
+		table, err := g.groups.GroupTable(ctx, fabric)
+		if err != nil {
+			return nil, false
+		}
+		out := make([]GroupInfoMapStruct, 0, len(table))
+		for _, e := range table {
+			out = append(out, GroupInfoMapStruct{GroupID: e.GroupID, Endpoints: e.Endpoints, GroupName: e.GroupName, FabricIndex: fabric})
+		}
+		return out, true
 	case groupKeyMgmtAttrMaxGroupsPerFabric:
 		g.mu.RLock()
 		v := g.maxGroupsPerFabric
@@ -403,7 +458,7 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 	// Bump DataVersion after a successful GroupKeyMap mutation so
 	// DataVersionFilter evaluation correctly detects the cluster changed.
 	g.dataVersion.Bump()
-	return nil
+	return g.syncGroups(ctx, fabric)
 }
 
 // gkmStatusError is a GroupKeyManagement rejection that carries the exact
@@ -695,7 +750,7 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	// Bump DataVersion after a successful KeySetWrite so DataVersionFilter
 	// evaluation correctly detects the cluster changed.
 	g.dataVersion.Bump()
-	return nil, nil
+	return nil, g.syncGroups(ctx, fabric)
 }
 
 // enforceKeySetBudget rejects ADDING a new key-set id once the
@@ -783,9 +838,11 @@ func (g *GroupKeyManagement) handleKeySetRemove(ctx context.Context, fabric uint
 	if err := g.store.RemoveGroupKeySet(ctx, fabric, req.GroupKeySetID); err != nil {
 		return nil, fmt.Errorf("matter: KeySetRemove: %w", err)
 	}
-	// Bump DataVersion after a successful KeySetRemove.
+	// Bump DataVersion after a successful KeySetRemove. The store's
+	// cascade has dropped the GroupKeyMap entries that referred to the
+	// key set (core§11.2.7.4.1; matter.js keySetRemove filters them out).
 	g.dataVersion.Bump()
-	return nil, nil
+	return nil, g.syncGroups(ctx, fabric)
 }
 
 func (g *GroupKeyManagement) handleKeySetReadAllIndices(ctx context.Context, fabric uint8) (any, error) {

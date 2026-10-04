@@ -32,6 +32,7 @@ import (
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
@@ -128,12 +129,21 @@ func run() error {
 	// a composite key type must pass sqlitestore.WithKeyDecoder — its
 	// documentation says what silently breaks otherwise.
 	endpointStore := sqlitestore.New(db)
+	// The node's group state: key sets, GroupKeyMap and group table of
+	// every fabric. GroupKeyManagement writes it, every Groups server the
+	// assembler mounts reads and changes it, and the bridge receives group
+	// messages through it. One instance for all three.
+	groupState, err := groups.NewManager(credentials, logger)
+	if err != nil {
+		return fmt.Errorf("group state: %w", err)
+	}
 
 	// --- the fleet and its topology assembler --------------------------
 	assemblerCfg := endpoint.Config{
 		VendorID:  identity.vendorID,
 		ProductID: identity.productID,
 		NodeLabel: identity.nodeLabel,
+		Groups:    groupState,
 	}
 	devices, err := newFleet(endpointStore, assemblerCfg, logger)
 	if err != nil {
@@ -188,7 +198,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("attestation chain: %w", err)
 	}
-	rootServers, refs, err := buildRootClusters(identity, credentials, chain,
+	rootServers, refs, err := buildRootClusters(identity, credentials, groupState, chain,
 		func(hookCtx context.Context, fabricIndex uint8, _, _ uint64, _ []byte) {
 			if err := caseIDs.load(hookCtx, credentials, fabricIndex); err != nil {
 				logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
@@ -230,7 +240,10 @@ func run() error {
 		iterations: *iterations,
 	}, logger)
 	// A removed fabric takes its persisted subscriptions with it.
+	// Its groups go with it: the store's cascade dropped the rows, the
+	// group state forgets the keys, the table and the reception state.
 	refs.opCreds.SetOnFabricRemoved(func(_ context.Context, fabricIndex uint8) {
+		groupState.ForgetFabric(fabricIndex)
 		br.EmitFabricRemoved(fabricIndex) //nolint:contextcheck // EmitFabricRemoved takes no ctx; its store delete runs on its own bounded timeout
 	})
 

@@ -131,21 +131,40 @@ type secureHarness struct {
 	exchangeID uint16
 }
 
+// harnessFabricID / harnessCompressedID identify the harness fabric.
+const harnessFabricID uint64 = 0x0000_0000_0000_0FAB
+
+var harnessCompressedID = [8]byte{0x87, 0xE1, 0xB0, 0x04, 0xE2, 0x35, 0xA1, 0x30}
+
 // newSecureHarness starts a bridge with root clusters built by roots (given
 // the store and the installed fabric index), wires the store as the ACL
 // lister and installs the CASE session.
 func newSecureHarness(t *testing.T, snap Snapshotter, roots func(st *store.Store, fabric uint8) []contract.ClusterServer) *secureHarness {
 	t.Helper()
-	st := openHarnessStore(t)
-	fabric := addHarnessFabric(t, st, 0x0000_0000_0000_0FAB, [8]byte{0x87, 0xE1, 0xB0, 0x04, 0xE2, 0x35, 0xA1, 0x30})
+	return newSecureHarnessWith(t, func(st *store.Store, fabric uint8) (Snapshotter, []contract.ClusterServer) {
+		var servers []contract.ClusterServer
+		if roots != nil {
+			servers = roots(st, fabric)
+		}
+		return snap, servers
+	})
+}
 
+// newSecureHarnessWith is newSecureHarness for a setup that needs the
+// store before it can build its topology (a group state, say).
+func newSecureHarnessWith(t *testing.T, setup func(st *store.Store, fabric uint8) (Snapshotter, []contract.ClusterServer)) *secureHarness {
+	t.Helper()
+	st := openHarnessStore(t)
+	fabric := addHarnessFabric(t, st, harnessFabricID, harnessCompressedID)
+
+	snap, roots := setup(st, fabric)
 	if snap == nil {
 		snap = wbEmptySnapshotter
 	}
 	b := newStartedBridgeWithSnapshotter(t, snap)
 	b.AttachACLLister(st)
 	if roots != nil {
-		b.AttachRootClusters(roots(st, fabric))
+		b.AttachRootClusters(roots)
 	}
 	if err := b.Reassemble(context.Background()); err != nil {
 		t.Fatalf("Reassemble: %v", err)

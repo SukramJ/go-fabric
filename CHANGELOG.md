@@ -22,6 +22,29 @@ pseudo-version of `main`.
   addresses to join. `OperationalKey`, `SessionID`, `PrivacyKey` and
   `MulticastAddress` are the derivations, pinned against matter.js by
   fixtures in `groups/testdata/group-crypto-fixtures.json`.
+- **A real Groups server (0x0004)**, mirroring matter.js `GroupsServer`
+  ([ADR 0009](docs/adr/0009-groups-and-group-messaging.md), superseding
+  ADR 0004). `core.Groups` answers AddGroup, ViewGroup, GetGroupMembership,
+  RemoveGroup, RemoveAllGroups and AddGroupIfIdentifying with matter.js's
+  statuses (ConstraintError for GroupId 0 or a name over 16 characters,
+  UnsupportedAccess for a group without a GroupKeyMap entry,
+  ResourceExhausted beyond MaxGroupsPerFabric, NotFound), advertises the
+  GroupNames feature, and keeps membership in the shared `groups.Manager`,
+  persisted in the store. `GroupKeyManagement.GroupTable` now serves that
+  membership. Group membership is stack state: with
+  `endpoint.Config.Groups` set, the assembler mounts the server on every
+  bridged endpoint whose device type mandates Groups and replaces a Groups
+  server a source supplies itself.
+  - `cluster/core`: `Groups`, `NewGroups`, `GroupsClusterID`, the request
+    and response types `AddGroupRequest` / `AddGroupResponse`,
+    `ViewGroupRequest` / `ViewGroupResponse`, `GetGroupMembershipRequest` /
+    `GetGroupMembershipResponse`, `RemoveGroupRequest` /
+    `RemoveGroupResponse`, `AddGroupIfIdentifyingRequest`, and
+    `GroupKeyMgmtConfig.Groups`.
+  - `endpoint`: `Config.Groups`.
+  - `schema`: `DeviceTypeMandatoryServerClusters` (generated) and
+    `DeviceTypeRequiresServerCluster`.
+  - `groups`: `Manager.OnGroupTableChanged`.
 - `store`: the `matter_group_table` table and `GroupTableEntry`,
   `UpsertGroupTableEntry`, `RemoveGroupTableEntry`, `ListGroupTable`. A host
   that migrates the schema itself picks the table up from `store.Schema()`.
@@ -136,6 +159,10 @@ pseudo-version of `main`.
 
 ### Deprecated
 
+- `wire.Groups`, the read-only Groups stub: group membership is stack state
+  now, and the assembler mounts the real server where a device type
+  mandates Groups (replacing the stub where a source still supplies it).
+  Removal permissible in v0.3.0.
 - `im.StatusUnreportableAttr` (0x8c) and `im.StatusNoUpstreamSubscription`
   (0xc5): Matter 1.6.1 removed both codes and matter.js dropped them from its
   status table. No replacement; removal permissible in v0.3.0.

@@ -258,6 +258,34 @@ func writeDeviceTypesFile(dts []snapshotDeviceType) error {
 		}
 		buf.WriteString("\t},\n")
 	}
+	buf.WriteString("}\n\n")
+
+	// DeviceTypeMandatoryServerClusters
+	buf.WriteString("// DeviceTypeMandatoryServerClusters maps every device-type ID to the server\n")
+	buf.WriteString("// clusters the Matter Device Library makes unconditionally mandatory for it\n")
+	buf.WriteString("// (conformance exactly M) — the set matter.js mounts by default for a device\n")
+	buf.WriteString("// type (its `requirements.server.mandatory`). A cluster whose conformance\n")
+	buf.WriteString("// carries a condition, a feature or a revision gate is absent: whether it\n")
+	buf.WriteString("// applies is the projection's decision, not the schema's.\n")
+	buf.WriteString("//\n")
+	buf.WriteString("// Generated from parity/schema.json.\n")
+	buf.WriteString("var DeviceTypeMandatoryServerClusters = map[uint32][]uint32{\n")
+	for _, dt := range dts {
+		var ids []snapshotRequirement
+		for _, r := range serverClusterIDs(dt) {
+			if strings.TrimSpace(r.Conformance) == "M" {
+				ids = append(ids, r)
+			}
+		}
+		if len(ids) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", dt.ID, dt.Name)
+		for _, r := range ids {
+			fmt.Fprintf(&buf, "\t\t0x%04X, // %s\n", r.ID, r.Name)
+		}
+		buf.WriteString("\t},\n")
+	}
 	buf.WriteString("}\n")
 
 	return writeIfChanged(devicetypesFile, buf.Bytes())

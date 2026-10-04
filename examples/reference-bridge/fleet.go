@@ -129,13 +129,14 @@ func (d *demoLight) MatterDeviceType() uint16 { return onoff.DeviceTypeOnOffLigh
 // device-specific surface comes from here.
 //
 // OnOffLight mandates three clusters besides Identify (on-off-light.element.ts:
-// Groups :22, OnOff with LIGHTING :24-25, ScenesManagement :36). Groups and
-// ScenesManagement are the module's stubs; the light has no group or scene
-// table, and the stubs advertise exactly that.
+// Groups :22, OnOff with LIGHTING :24-25, ScenesManagement :36). Groups is not
+// the device's to supply: group membership is stack state, and the assembler
+// mounts the real Groups server on every endpoint whose device type mandates
+// it (endpoint.Config.Groups). ScenesManagement stays the module's stub; the
+// light has no scene table, and the stub advertises exactly that.
 func (d *demoLight) MatterClusterServers() []contract.ClusterServer {
 	return []contract.ClusterServer{
 		&onOffServer{dev: d, logMessage: "light.set", lt: newLightingState()},
-		wire.Groups{},
 		wire.ScenesManagement{},
 	}
 }

@@ -20,6 +20,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -30,9 +31,11 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint drives one
@@ -162,10 +165,22 @@ func startFleetBridge(t *testing.T) (*fleet, *matterbridge.Bridge) {
 	t.Helper()
 	logger := slog.New(slog.DiscardHandler)
 
+	// The group state main() hands the assembler: Groups is stack state,
+	// mounted by the assembler wherever a device type mandates it.
+	db, err := openDB(context.Background(), filepath.Join(t.TempDir(), "fleet.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	groupState, err := groups.NewManager(store.New(db), logger)
+	if err != nil {
+		t.Fatalf("groups.NewManager: %v", err)
+	}
 	f, err := newFleet(endpointtest.NewFakeStore(), endpoint.Config{
 		VendorID:  testVendorID,
 		ProductID: testProductID,
 		NodeLabel: "fleet-test",
+		Groups:    groupState,
 	}, logger)
 	if err != nil {
 		t.Fatalf("newFleet: %v", err)

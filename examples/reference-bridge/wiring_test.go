@@ -21,6 +21,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/operational"
@@ -42,7 +43,12 @@ func testRootClusters(t *testing.T) (servers []contract.ClusterServer, refs root
 		t.Fatalf("BuildTestChain: %v", err)
 	}
 	identity := bridgeIdentity{vendorID: testVendorID, productID: testProductID, nodeLabel: "wiring-test", serialNumber: "TEST-0001"}
-	servers, refs, err = buildRootClusters(identity, store.New(db), chain,
+	st := store.New(db)
+	groupState, err := groups.NewManager(st, nil)
+	if err != nil {
+		t.Fatalf("groups.NewManager: %v", err)
+	}
+	servers, refs, err = buildRootClusters(identity, st, groupState, chain,
 		func(context.Context, uint8, uint64, uint64, []byte) {})
 	if err != nil {
 		t.Fatalf("buildRootClusters: %v", err)

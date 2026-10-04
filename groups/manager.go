@@ -108,8 +108,9 @@ type Manager struct {
 	receptionMu sync.Mutex
 	reception   map[string]map[uint64]*mrp.Window
 
-	observersMu sync.Mutex
-	observers   []func()
+	observersMu    sync.Mutex
+	observers      []func()
+	tableObservers []func(fabricIndex uint8)
 }
 
 // NewManager returns a manager over st. logger may be nil.
@@ -163,12 +164,35 @@ func (m *Manager) OnMembershipChanged(fn func()) {
 	m.observersMu.Unlock()
 }
 
+// OnGroupTableChanged registers fn to run after a fabric's group table
+// changed — a group added or removed, an endpoint joining or leaving, a
+// name changing. It is the change signal of GroupKeyManagement.GroupTable
+// (matter.js reports the attribute from its reactive state). fn runs
+// synchronously, outside the manager's locks.
+func (m *Manager) OnGroupTableChanged(fn func(fabricIndex uint8)) {
+	if fn == nil {
+		return
+	}
+	m.observersMu.Lock()
+	m.tableObservers = append(m.tableObservers, fn)
+	m.observersMu.Unlock()
+}
+
 func (m *Manager) notify() {
 	m.observersMu.Lock()
 	obs := slices.Clone(m.observers)
 	m.observersMu.Unlock()
 	for _, fn := range obs {
 		fn()
+	}
+}
+
+func (m *Manager) notifyTable(fabricIndex uint8) {
+	m.observersMu.Lock()
+	obs := slices.Clone(m.tableObservers)
+	m.observersMu.Unlock()
+	for _, fn := range obs {
+		fn(fabricIndex)
 	}
 }
 
@@ -445,6 +469,7 @@ func (m *Manager) AddEndpointForGroup(ctx context.Context, fabricIndex uint8, gr
 	m.logger.Info("groups.endpoint_added",
 		slog.Int("fabric_index", int(fabricIndex)), slog.Int("group_id", int(groupID)),
 		slog.Int("endpoint", int(endpoint)), slog.String("name", name))
+	m.notifyTable(fabricIndex)
 	if !exists {
 		m.notify()
 	}
@@ -499,6 +524,9 @@ func (m *Manager) RemoveEndpoint(ctx context.Context, fabricIndex uint8, endpoin
 		f.table[id] = &TableEntry{GroupID: id, GroupName: e.GroupName, Endpoints: rest}
 	}
 	m.mu.Unlock()
+	if existing {
+		m.notifyTable(fabricIndex)
+	}
 	if removed {
 		m.notify()
 	}

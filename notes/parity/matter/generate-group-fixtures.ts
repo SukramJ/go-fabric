@@ -117,6 +117,14 @@ function wireFixtures() {
     record("keyset_read_all_indices_response", gkm, "KeySetReadAllIndicesResponse",
         { groupKeySetIds: [0, 0x01a1, 0x0102] }, { groupKeySetIds: [0, 0x01a1, 0x0102] });
 
+    // Groups (0x0004) requests.
+    record("groups_add_group", groups, "AddGroup", { groupId: 0x0101, groupName: "Kitchen" }, { groupId: 0x0101, groupName: "Kitchen" });
+    record("groups_add_group_if_identifying", groups, "AddGroupIfIdentifying", { groupId: 0xfeff, groupName: "" }, { groupId: 0xfeff, groupName: "" });
+    record("groups_view_group", groups, "ViewGroup", { groupId: 0x0202 }, { groupId: 0x0202 });
+    record("groups_get_group_membership", groups, "GetGroupMembership", { groupList: [0x0101, 7] }, { groupList: [0x0101, 7] });
+    record("groups_get_group_membership_all", groups, "GetGroupMembership", { groupList: [] }, { groupList: [] });
+    record("groups_remove_group", groups, "RemoveGroup", { groupId: 0x0303 }, { groupId: 0x0303 });
+
     // Groups (0x0004) responses, as GroupsServer returns them.
     record("groups_add_group_response", groups, "AddGroupResponse", { status: 0, groupId: 0x0101 }, { status: 0, groupId: 0x0101 });
     record("groups_view_group_response", groups, "ViewGroupResponse",

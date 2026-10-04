@@ -1320,6 +1320,9 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
 		_ = enc.EndContainer()
 		_ = enc.EndContainer()
 	default:
+		if encodeGroupsResponse(enc, tag, v) {
+			return
+		}
 		// Status-only command — emit empty struct as the TLV
 		// placeholder chip-tool's status-only decoder accepts.
 		enc.StartStruct(tag)

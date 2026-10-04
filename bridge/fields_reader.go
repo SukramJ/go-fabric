@@ -56,6 +56,21 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 		case 0x0B:
 			return decodeAddTrustedRootCertificateRequest(dec)
 		}
+	case mattercore.GroupsClusterID:
+		switch path.Command {
+		case 0x00:
+			return decodeAddGroupRequest(dec)
+		case 0x01:
+			return decodeViewGroupRequest(dec)
+		case 0x02:
+			return decodeGetGroupMembershipRequest(dec)
+		case 0x03:
+			return decodeRemoveGroupRequest(dec)
+		case 0x04: // RemoveAllGroups carries no fields
+			return decodeKeySetReadAllIndicesRequest(dec)
+		case 0x05:
+			return decodeAddGroupIfIdentifyingRequest(dec)
+		}
 	case 0x003F: // GroupKeyManagement
 		switch path.Command {
 		case 0x00:

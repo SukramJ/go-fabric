@@ -13,6 +13,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // matterDeviceTypeBridgedNode is the Matter Device Type ID for the
@@ -89,6 +90,9 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		// would be malformed but we must not panic mid-dispatch.
 		return nil
 	}
+	// Group membership is stack state: the stack's Groups server goes
+	// first, ahead of the source's own clusters (see mountGroups).
+	inner = mountGroups(ep, ep.identifyServer(), inner)
 
 	// Spec §9.5 + §9.13: every bridged endpoint MUST advertise both
 	// the Descriptor cluster (DeviceTypeList containing BridgedNode +
@@ -386,4 +390,41 @@ func renderSourceKey(key any) string {
 		return ""
 	}
 	return s
+}
+
+// mountGroups places the stack's Groups server on a bridged endpoint that
+// has the node's group state: on every endpoint whose device type
+// mandates Groups, and in place of any Groups server the source supplied
+// itself. Group membership is stack state — matter.js mounts GroupsServer
+// for every device type whose requirements make Groups mandatory
+// (packages/node/src/devices/<name>.ts) and keeps the membership in the
+// root's GroupKeyManagementServer — so a source has no say in it. The
+// server sits first in the returned slice, right after Identify in the
+// endpoint's cluster order. Without group state the source's set is
+// returned unchanged.
+func mountGroups(ep *Endpoint, identify *mattercore.Identify, inner []contract.ClusterServer) []contract.ClusterServer {
+	if ep.groups == nil {
+		return inner
+	}
+	supplied := false
+	kept := make([]contract.ClusterServer, 0, len(inner)+1)
+	for _, srv := range inner {
+		if srv != nil && srv.MatterClusterID() == mattercore.GroupsClusterID {
+			supplied = true
+			continue
+		}
+		kept = append(kept, srv)
+	}
+	if !supplied && !schema.DeviceTypeRequiresServerCluster(uint32(ep.DeviceType), mattercore.GroupsClusterID) {
+		return inner
+	}
+	srv, err := mattercore.NewGroups(ep.ID, ep.groups, func() uint16 {
+		v, _ := identify.MatterRead(0x0000) // IdentifyTime
+		t, _ := v.(uint16)
+		return t
+	})
+	if err != nil {
+		return inner
+	}
+	return append([]contract.ClusterServer{srv}, kept...)
 }

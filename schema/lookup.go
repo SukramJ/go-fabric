@@ -74,3 +74,13 @@ func DeviceTypeAllowsServerCluster(deviceType, clusterID uint32) (allowed, known
 	}
 	return false, true
 }
+
+// DeviceTypeRequiresServerCluster reports whether the Matter Device Library
+// makes clusterID an unconditionally mandatory server cluster of
+// deviceType (conformance M) — a cluster matter.js mounts on every
+// endpoint of that type by default (packages/node/src/devices/<name>.ts,
+// `requirements.server.mandatory`). An unknown device type requires
+// nothing.
+func DeviceTypeRequiresServerCluster(deviceType, clusterID uint32) bool {
+	return slices.Contains(DeviceTypeMandatoryServerClusters[deviceType], clusterID)
+}

@@ -31,6 +31,7 @@ type fakeStore struct {
 	groupKeys map[[2]uint64]mstore.GroupKeySet     // key: [fabric, gks-id]
 	groupMaps map[[2]uint64]mstore.GroupKeyMapping // key: [fabric, group-id]
 	acls      map[uint8][]mstore.ACLEntry          // key: fabric
+	table     map[[2]uint64]mstore.GroupTableEntry // key: [fabric, group-id]
 }
 
 func newFakeStore() *fakeStore {
@@ -41,6 +42,7 @@ func newFakeStore() *fakeStore {
 		groupKeys: make(map[[2]uint64]mstore.GroupKeySet),
 		groupMaps: make(map[[2]uint64]mstore.GroupKeyMapping),
 		acls:      make(map[uint8][]mstore.ACLEntry),
+		table:     make(map[[2]uint64]mstore.GroupTableEntry),
 	}
 }
 
@@ -237,6 +239,33 @@ func (f *fakeStore) ListGroupKeyMappings(_ context.Context, fabricIndex uint8) (
 	defer f.mu.RUnlock()
 	var out []mstore.GroupKeyMapping
 	for k, v := range f.groupMaps {
+		if k[0] == uint64(fabricIndex) {
+			out = append(out, v)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeStore) UpsertGroupTableEntry(_ context.Context, e mstore.GroupTableEntry) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	e.Endpoints = append([]uint16(nil), e.Endpoints...)
+	f.table[gmKey(e.FabricIndex, e.GroupID)] = e
+	return nil
+}
+
+func (f *fakeStore) RemoveGroupTableEntry(_ context.Context, fabricIndex uint8, groupID uint16) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.table, gmKey(fabricIndex, groupID))
+	return nil
+}
+
+func (f *fakeStore) ListGroupTable(_ context.Context, fabricIndex uint8) ([]mstore.GroupTableEntry, error) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	var out []mstore.GroupTableEntry
+	for k, v := range f.table {
 		if k[0] == uint64(fabricIndex) {
 			out = append(out, v)
 		}

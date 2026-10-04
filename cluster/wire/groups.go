@@ -13,13 +13,16 @@ import (
 )
 
 // Groups is a minimal stub for the Matter Groups cluster (0x0004).
-// Mandatory on every OnOffLight, DimmableLight, and OnOffPlugInUnit
-// device-type per matter.js packages/node/src/devices/. HM has no
-// group-management concept; this stub advertises NameSupport=0 and
-// rejects all writes / commands.
+// It advertises the GroupNames bit and rejects all writes / commands.
 //
 // Mirrors matter.js packages/model/src/standard/elements/
 // groups.element.ts — ClusterRevision = 4 (HEAD @matter/model 0.16.11).
+//
+// Deprecated: group membership is stack state. Configure
+// endpoint.Config.Groups and the assembler mounts the real
+// [github.com/SukramJ/go-fabric/cluster/core.Groups] server on every
+// endpoint whose device type mandates it — replacing this stub where a
+// source still supplies it (docs/adr/0009). Removal permissible in v0.3.0.
 type Groups struct{}
 
 // Cluster ID + revision per matter.js HEAD.

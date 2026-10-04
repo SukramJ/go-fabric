@@ -65,9 +65,15 @@ func TestMembershipFollowsAddAndRemove(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	m, st := newTestManager(t)
-	var changes atomic.Int32
+	var changes, tableChanges atomic.Int32
 	m.OnMembershipChanged(func() { changes.Add(1) })
 	m.OnMembershipChanged(nil) // ignored
+	m.OnGroupTableChanged(func(idx uint8) {
+		if idx == 1 {
+			tableChanges.Add(1)
+		}
+	})
+	m.OnGroupTableChanged(nil) // ignored
 
 	if err := m.AddEndpointForGroup(ctx, 1, 0x0101, 3, "Kitchen"); err != nil {
 		t.Fatal(err)
@@ -113,6 +119,11 @@ func TestMembershipFollowsAddAndRemove(t *testing.T) {
 	}
 	if got := changes.Load(); got != 2 {
 		t.Fatalf("membership notifications = %d, want 2", got)
+	}
+	// Every table mutation is announced: three adds, two removals; the
+	// removal of a non-member changes nothing.
+	if got := tableChanges.Load(); got != 5 {
+		t.Fatalf("group table notifications = %d, want 5", got)
 	}
 	if ms, _ := m.Memberships(ctx); len(ms) != 0 {
 		t.Fatalf("memberships after removal = %+v", ms)

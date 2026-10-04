@@ -115,13 +115,13 @@ func decodeKeySetRemoveRequest(dec *tlv.Decoder) (mattercore.KeySetRemoveRequest
 	return mattercore.KeySetRemoveRequest{GroupKeySetID: id}, err
 }
 
-// decodeKeySetReadAllIndicesRequest drains KeySetReadAllIndices (Matter
-// §11.2.7.5). Its one field, DoNotUse, has conformance X: there is
-// nothing to read, and a stray field is ignored the way matter.js's
-// schema decode ignores an unknown tag.
+// decodeKeySetReadAllIndicesRequest drains a command without fields:
+// KeySetReadAllIndices (Matter §11.2.7.5, whose one field DoNotUse has
+// conformance X) and Groups RemoveAllGroups. A stray field is ignored the
+// way matter.js's schema decode ignores an unknown tag.
 func decodeKeySetReadAllIndicesRequest(dec *tlv.Decoder) (any, error) {
 	if err := drainContainer(dec); err != nil {
-		return nil, fmt.Errorf("KeySetReadAllIndices: %w", err)
+		return nil, fmt.Errorf("fieldless command: %w", err)
 	}
 	return nil, nil
 }
