@@ -298,7 +298,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | L8-D03 | matter.js `AdministratorCommissioningServer.ts:283-290` — 48-h extended window when `FabricCount == 0`; chip `CommissioningWindowManager.cpp:313-325` — `MaxCommissioningTimeout()` extends to 48 h for uncommissioned nodes | `bridge/commissioning_window.go` — `OpenWindowParams.IsUncommissioned` flag enables the 172800 s (48 h) cap via `commissioningWindowMaxSecUncommissioned` | Implemented (C-P2-4): the constant `commissioningWindowMaxSecUncommissioned = 172800` is wired into `OpenWindow`; the daemon must set `IsUncommissioned: fabricStore.Count() == 0` before calling OpenWindow. Default (IsUncommissioned=false) retains the 900-s cap. Wiring the fabric-count query into the commissioning-window open path is a daemon-side follow-up. |
 | L9-D9 | AccessControl.MatterReadFiltered + UpdateFabricLabel + UpdateNOC fabric resolution | `cluster/core/operational_credentials.go:252-286, 1058-1065, 1003-1008` | Confirmed correct by audit 2026-05-12 (L9-D9): Bug M + Bug P fixes are wire-correct; all three paths use `im.FabricFilterFromContext` with `currentFabric` fallback. No action required. Drift L9-D9 (LOW, confirmed ✓). |
 | BD-Matter-Dispatcher-StringHeuristic | matter.js `InteractionServer.ts` and chip `WriteHandler.cpp` / `CommandHandler.cpp` map typed errors via `StatusCodeError` / `MatterClusterStatusError` interfaces only | `endpoint/dispatcher.go::writeErrorStatus` / `invokeErrorStatus` (lines ~447-509) keep a string-contains fallback for "read-only", "unknown attribute", "constraint", "resource exhausted", "unknown command", "invalid command argument" | The 2026-05-19 chip-audit drift M-DRIFT-02 / L4-D03 is a **defense-in-depth** entry: every production cluster server already returns typed errors that implement `im.StatusCodeError` (verified via `grep -rn 'errors.New(' cluster/` — zero hits in production paths; the matches in `tests/` and `endpoint/*_test.go` are intentional fake-server fixtures). The string heuristic survives so legacy fakes keep working; removing it would only break tests, not production wire behaviour. New cluster code is expected to return typed errors via the `StatusCodeError` pattern. |
-| BD-Matter-Groups-Already-Mounted | chip + matter.js mandate Groups (0x0004) + ScenesManagement (0x0062) on every OnOff-mapped device-type (OnOffPlugInUnit 0x010A, OnOffLight 0x0100) | go-fabric mounts both stub servers on `Switch` (`internal/model/custom/switch/matter.go:74-75`), `Light` (both dimmable and non-dimmable branches in `internal/model/custom/light/matter.go:114-115, 120-121`), `Siren` (`internal/model/custom/siren/matter.go:131-132`), and the generic-DP OnOff projection (`internal/model/generic/switch_matter.go::MatterClusterServers`) | Audit drift L2-D01-NEW is a **false positive** for the custom-DP projections. The generic-DP projection — the assembler's Path 1, taken for any channel with a writable STATE and no custom-DP wrapper — was the one exception and mounted OnOff alone while still advertising OnOffPlugInUnit; it now mounts both stubs and advertises the mandatory LT feature with its four attributes and three commands. Climate / Cover / Lock correctly have no Groups attachment (non-OnOff device types). |
+| BD-Matter-Groups-Already-Mounted | chip + matter.js mandate Groups (0x0004) + ScenesManagement (0x0062) on every OnOff-mapped device-type (OnOffPlugInUnit 0x010A, OnOffLight 0x0100) | Since [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md) the assembler mounts the real Groups server itself wherever a device type mandates it (`endpoint.Config.Groups`) and replaces a host-supplied Groups stub; the host still supplies the ScenesManagement stub. The record below is the reference host's former wiring: it mounted both stub servers on `Switch` (`internal/model/custom/switch/matter.go:74-75`), `Light` (both dimmable and non-dimmable branches in `internal/model/custom/light/matter.go:114-115, 120-121`), `Siren` (`internal/model/custom/siren/matter.go:131-132`), and the generic-DP OnOff projection (`internal/model/generic/switch_matter.go::MatterClusterServers`) | Audit drift L2-D01-NEW is a **false positive** for the custom-DP projections. The generic-DP projection — the assembler's Path 1, taken for any channel with a writable STATE and no custom-DP wrapper — was the one exception and mounted OnOff alone while still advertising OnOffPlugInUnit; it now mounts both stubs and advertises the mandatory LT feature with its four attributes and three commands. Climate / Cover / Lock correctly have no Groups attachment (non-OnOff device types). |
 
 | BD-Matter-TimeSync-NotMounted | matter.js `packages/node/src/endpoints/root.ts:215` lists TimeSynchronization (0x0038) as `optional` on RootNode | `cmd/openccu-loom/daemon_matter.go::buildRootClusters` — not mounted by default; operator-mountable via `north.matter.enable_time_sync` (default off, 0.15.0) | TimeSynchronization is optional on a Matter-Bridge; home-assistant-matter-bridge omits it, and Apple's HAP mapper may reject unexpected clusters on the RootNode device-type. The cluster implementation exists (`cluster/core/time_synchronization.go`); since 0.15.0 it is mounted only behind the default-off `north.matter.enable_time_sync` opt-in (operators who need a time-sync surface, re-pair afterwards). Status (2026-06): flag-gated mount available; default remains off. (M-P2-03 documented as by-design.) |
 | BD-Matter-Actions-NotMounted | chip bridge-app mounts Actions (0x0025) on the Aggregator endpoint for the TC-BR test plan | `cmd/openccu-loom/daemon_matter.go::buildAggregatorClusters` — Actions intentionally not mounted (only Identify 0x0003 + Descriptor 0x001D are mounted; the SetServerListProvider comment names 0x0025 as the deliberate omission) | go-fabric has no scene/action surface to model via Actions. Identify (0x0003) is already mounted; Actions will be added if bridge-app TC-BR conformance is required. Status (2026-06): still intentionally not mounted (no use-case). (C-P2-1 documented as by-design.) |
@@ -324,7 +324,7 @@ The following entries reflect clusters where go-fabric follows matter.js HEAD (t
 
 ### L00 Schema Audit — cluster-stub design choices (2026-05-12)
 
-- **L00-BD-Groups** Groups/ScenesManagement as stubs — HM has no group/scene concept; go-fabric's Groups and ScenesManagement cluster servers return empty collections and reject all writes. Presence is mandated by Matter device-type requirements (OnOff Light, Dimmable Light, etc.), not feature preference. matter.js `packages/node/src/behaviors/groups/GroupsServer.ts` / `packages/node/src/behaviors/scenes-management/`. Reason: no Homematic CCU-side primitive to map to; stubs satisfy the device-type conformance requirement without exposing broken functionality.
+- **L00-BD-Groups** ScenesManagement as a stub — the ScenesManagement cluster server returns an empty scene table and rejects all writes. Presence is mandated by Matter device-type requirements (OnOff Light, Dimmable Light, etc.), not feature preference. matter.js `packages/node/src/behaviors/scenes-management/`. Reason: no scene store; the stub satisfies the device-type conformance requirement without exposing broken functionality. Groups is no longer part of this entry: it is a real server since [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md).
 - **L00-BD-OnOffDefault** OnOff default-false on unobserved state — matter.js `OnOffServer.ts` defaults `onOff` to `false` when the underlying DP has not yet reported; go-fabric mirrors this rather than returning null (which matter.js also documents as not spec-nullable for the OnOff attribute). Reason: spec-aligned default; null would be a schema violation.
 - **L00-BD-BoolStateEvent** BooleanState no StateChangeEvent — StateChangeEvent (event id 0x0) has conformance `"O"` in matter.js `packages/model/src/standard/elements/boolean-state.element.ts`; go-fabric omits it because HM push events are handled via DP value changes, not a dedicated state-change event mechanism. Reason: optional event, no HM-side equivalent event source.
 
@@ -498,7 +498,7 @@ Re-enable when Apple iOS ships Matter 1.4 SDK schema. No code change needed.
 matter.js ref: `packages/protocol/src/interaction/InteractionServer.ts`.
 chip ref: `src/app/clusters/*/` Attribute::kEventList.
 
-**L2-D04 — OnOffLight/OnOffPlugInUnit: Groups + ScenesManagement stubs present; chip bridge-app omits them (by-design).**
+**L2-D04 — OnOffLight/OnOffPlugInUnit: Groups + ScenesManagement present; chip bridge-app omits them (by-design).** Groups is the real server since ADR 0009; ScenesManagement is still the stub.
 matter.js `packages/node/src/devices/on-off-light.ts` and `on-off-plug-in-unit.ts` list
 Groups (0x0004) and ScenesManagement (0x0062) as mandatory. go-fabric's
 `internal/model/custom/switch/matter.go:74-86` returns them from `MatterClusterServers()`,
@@ -808,16 +808,6 @@ attribute code defect. Marked dependent on L4-D03 (Subscribe-Initial delivery)
 and L10-D02 (IM-revision field guard). Will re-test as part of the L4/L10
 implementation wave.
 
-**L9-NEW-7 — GroupKeyManagement.GroupTable always empty (by-design, v1.1).**
-Matter §11.2.7.5 `GroupTable` (attr 0x0001) lists all multicast group memberships
-for the node. go-fabric v1.0 does not implement group multicast — there are no
-multicast group entries to report. chip `src/app/clusters/group-key-mgmt-server/
-group-key-mgmt-server.cpp` returns the entries from `GroupDataProvider`; in
-go-fabric `GroupKeyManagement.MatterRead` returns `[]GroupEntry{}` for attr 0x0001.
-Apple Home does not emit an error for an empty GroupTable during commissioning or
-normal operation. Implementation deferred to v1.1 when group multicast is added.
-No interop impact for the bridge-only v1.0 use-case.
-
 ### Open audit hooks
 
 | Audit | Status | Source of truth |
@@ -877,14 +867,6 @@ No interop impact for the bridge-only v1.0 use-case.
 **Go path:** `cluster/wire/scenes_management.go`.
 
 **Rationale:** HomeMatic has no scene concept. ScenesManagement (0x0062) is mounted as a mandatory stub on OnOff device types (per Matter device-type conformance). The stub correctly returns `SceneTableSize=0` and rejects AddScene / RemoveScene / StoreScene / RecallScene with `UnsupportedCommand`. This is the same pattern as the matter.js `ScenesManagementBehavior` when no store backend is wired. Full implementation would require a scene store (new SQLite migration) and a HM-side trigger mapping — out of scope for 0.1.0.
-
----
-
-### BD-Matter-P2-D19 — Groups stub returns NameSupport=0x80 / rejects writes with UnsupportedCommand
-
-**Go path:** `cluster/wire/groups.go`.
-
-**Rationale:** HomeMatic has no group concept. Groups (0x0004) is mounted as a mandatory stub on OnOff device types. The stub returns `NameSupport=0x80` (bit 7 set, GroupNames mandatory per matter.js `groups.element.ts:31`) and rejects AddGroup / RemoveGroup / AddGroupIfIdentifying with IM StatusCode `UnsupportedCommand` (0x81). The 0x81 code is produced by the bridge dispatcher's string-heuristic (`invokeErrorStatus` in `endpoint/dispatcher.go`) when the error message contains "no commands"; `MatterInvoke` includes that sentinel so Apple Home and Google Home receive the correct status. Apple Home, Google Home, and chip-tool all tolerate a Groups stub that rejects commands — this is the same surface that matter.js's default `GroupsBehavior` exposes when no membership provider is wired. Full implementation requires a group-membership store and coordination with the GroupKeyManagement cluster; deferred to a future release.
 
 ---
 
@@ -1211,6 +1193,43 @@ Taking them from the NOC is what the responder side already does
 (`Responder.verifySigma3Locked`); leaving them empty would deny a
 CAT-scoped controller on the one session that exists right after a restart.
 Pinned by `TestPeerInitiator_FullHandshakeAgainstResponder`.
+
+---
+
+### BD-Matter-GroupReceiveOnly — group messages are received, never sent
+
+matter.js sends group messages too: `GroupSession.create` opens an outbound
+group session, and a node-global group data message counter (seeded from the
+legacy per-key counters by `MessagingState.legacyGroupDataCounterMax`) numbers
+them. go-fabric only receives them (`groups.Manager.Decode`,
+`Bridge.dispatchGroupMessage`) and keeps no group data counter. Reason: a node
+sends group messages only as a controller or a binding client, and the
+controller role is a scope decision (`docs/matterjs-comparison.md`).
+Retires if a sending role is ever in scope.
+
+---
+
+### BD-Matter-KeySetReadAllIndicesOrder — key set ids listed in id order
+
+matter.js `GroupKeyManagementServer.keySetReadAllIndices` lists key set 0
+first and the written key sets in the order they were first written (its
+state array). go-fabric lists key set 0 first and the rest in ascending id
+order, the order the store returns them. The list is a set on the wire — no
+controller reads meaning into the order — and keeping write order would mean
+persisting an order column for it. Pinned by
+`TestGroupKeyManagementParityMatterJS` (key set 0 leading, membership only).
+
+---
+
+### BD-Matter-GroupcastTestingEvents — no group-message outcome events
+
+matter.js's `SessionManager` emits a group-message event for every received
+group message — NoAvailableKey, FailedAuth, MessageReplay, Success with the
+access outcome — which only `GroupcastServer`'s GroupcastTesting consumes.
+go-fabric emits none: without the Groupcast server there is no consumer, and
+the outcomes stay in debug logs (`matter.rx.group.*`). Retires with the
+Groupcast server (see the 1.6.1 open items in
+`matter_behaviour_findings.md`).
 
 ---
 

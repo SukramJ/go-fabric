@@ -9,11 +9,12 @@ an oversight to the next reader — including choices to *not* do something.
 | [0001](./0001-matter-commissioning-bring-up.md) | Matter wire-protocol design rules from chip-tool bring-up | accepted |
 | [0002](./0002-im-opcode-dispatch-seam.md) | A testable gate + per-opcode seam in `handleIMOpcode` | accepted |
 | [0003](./0003-sigma-resume-extraction.md) | Sigma resumption extraction: already satisfied (finding corrected) | accepted, no code change |
-| [0004](./0004-groups-cluster-stays-stub.md) | Groups stays a stub — a deliberate, matter.js-conformant divergence | rejected (the proposal, not the stub) |
+| [0004](./0004-groups-cluster-stays-stub.md) | Groups stays a stub — a deliberate, matter.js-conformant divergence | superseded by 0009 |
 | [0005](./0005-bridge-decomposition.md) | Defer the `Bridge` CommissioningSession / IMEngine facade split | accepted, deferred with a plan |
 | [0006](./0006-subscribe-dispatch-seam.md) | Cohesive sub-helpers out of `handleSubscribeRequest` | accepted |
 | [0007](./0007-chiptool-send-receive-matrix.md) | Hermetic per-type send/receive suite against chip-tool | accepted |
 | [0008](./0008-subscription-resumption.md) | Persist server subscriptions and re-establish them after restart, with a CASE initiator scoped to that alone | accepted |
+| [0009](./0009-groups-and-group-messaging.md) | A real Groups server and group message reception, with membership as stack state; Groupcast deferred | accepted |
 
 ## Provenance
 

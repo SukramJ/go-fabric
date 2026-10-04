@@ -49,7 +49,7 @@ matter.js HEAD as checked out at `../matter.js`.
 | BLE / BTP (`protocol/src/ble`, `packages/nodejs-ble`) | — | ○ | **No** | Declared non-goal. BLE commissioning pulls a platform radio stack (BlueZ/CoreBluetooth) into a library whose only other OS dependency is a UDP socket, and it exists to solve a problem a LAN-attached bridge does not have: getting network credentials onto a device that has none. |
 | TCP transport (`protocol/src/transport/tcp`) | — | ○ | **Low** | Matter 1.4's large-payload path. It matters for BDX-heavy features (OTA images, diagnostic log downloads, camera streams) — none of which are in scope. Revisit only if BDX lands. |
 | Thread border-router client (`packages/thread-br-client`, `thread-network-*`) | — | ○ | **No** | The host is on Ethernet/Wi-Fi already; `NetworkCommissioning` advertises the Ethernet feature. |
-| Group (multicast) messaging (`protocol/src/groups`, `groupcast` behavior) | group *sessions* are recognised and correctly rejected for Read/Subscribe/Timed per §8.5.7 (`bridge/im_gate.go`); `GroupKeyManagement` + key store present; no Groupcast (0x0065) server, no AccessControl Auxiliary ACL | ◐ | **Med** | A controller that groups endpoints for synchronised commands (a whole-room "off") sends over a group session. Today those writes/invokes have no delivery path. It is the largest genuinely device-side protocol gap in this table. Since Matter 1.6.1 it is also a conformance gap: OnOffLight rev 4, OnOffPlugInUnit rev 5 and the dimmable/colour light revisions require a Groupcast listener on the root, which matter.js's default `ServerNode.RootEndpoint` installs. Wants a host with a group primitive to be worth building — see [ADR 0004](./adr/0004-groups-cluster-stays-stub.md). |
+| Group (multicast) messaging (`protocol/src/groups`, `GroupSession`, `ServerGroupNetworking`, `groupcast` behavior) | [`groups`](../groups) authenticates group messages (privacy, AES-CCM, per-key per-sender rollover window); `bridge` routes a group Invoke / SuppressResponse Write to the member endpoints under the Group ACL auth mode, answers nothing, and joins / leaves the per-group multicast addresses on the UDP socket ([ADR 0009](./adr/0009-groups-and-group-messaging.md)). Read/Subscribe/Timed over a group are still dropped per §8.5.7. No Groupcast (0x0065) server, no AccessControl Auxiliary ACL, no group sending | ◐ | **Med** | Reception is complete and pinned against messages matter.js sealed; it has not met a real controller yet. What remains is Groupcast, which Matter 1.6.1 makes a conformance requirement for OnOffLight rev 4, OnOffPlugInUnit rev 5 and the dimmable/colour light revisions — matter.js's default `ServerNode.RootEndpoint` installs it. The parts are listed in `notes/parity/matter_behaviour_findings.md` ("Matter 1.6.1 pin"). Sending stays out of scope with the controller role. |
 
 ## 3. Session and security
 
@@ -91,7 +91,8 @@ actually mounts. The schema for all of them is present here (in `parity/` and
 | System / commissioning (BasicInformation, GeneralCommissioning, OperationalCredentials, NetworkCommissioning, AccessControl, GroupKeyManagement, Descriptor, Binding, Identify, …) | ✅ | [`cluster/core`](../cluster/core) | ✅ | — | Complete for the bridge role. |
 | Actuation (OnOff, LevelControl, ColorControl, WindowCovering, DoorLock, Thermostat, ValveConfigurationAndControl, ModeSelect, ClosureControl) | ✅ | [`cluster/`](../cluster) | ✅ | — | The device surface a home bridge exposes. |
 | Sensing (Temperature, Humidity, Illuminance, Pressure, Occupancy, BooleanState, AirQuality, CO₂/PM2.5/PM10, PowerSource, Electrical Power/Energy) | ✅ | [`cluster/measurement`](../cluster/measurement) | ✅ | — | |
-| Groups (0x0004), ScenesManagement (0x0062) | full servers | stubs: empty collections, writes rejected | ◐ | **Med** | Presence is mandated by device-type conformance; backing them needs a host-side group/scene primitive. [ADR 0004](./adr/0004-groups-cluster-stays-stub.md). |
+| Groups (0x0004) | full server | full server ([`core.Groups`](../cluster/core/groups.go)), membership as stack state in `groups.Manager`, persisted; mounted by the assembler where the device type mandates it | ✅ | — | [ADR 0009](./adr/0009-groups-and-group-messaging.md). Groupcast adoption (rev 5 INVALID_IN_STATE paths) is inert in matter.js's default server too. |
+| ScenesManagement (0x0062) | full server | stub: empty scene table, writes rejected | ◐ | **Low** | Presence is mandated by device-type conformance; a scene store is its own feature. `BD-Matter-P2-D18`. |
 | ICDManagement | full, incl. check-in sender (`protocol/src/icd`) | attributes 0x0000–0x0002 | ◐ | **Low** | `BD-chip-ICD-Attrs-0x3-0x5`. A mains-powered bridge is not an intermittently-connected device; the cluster is mounted for conformance, not for behaviour. |
 | DiagnosticLogs | full, with BDX transfer | responds, but never initiates a BDX transfer | ◐ | **Low** | `BD-chip-DiagLogs-NoBDX`. Needs BDX (and realistically TCP) to be worth more. |
 | OTA Software Update **Requestor** | ✅ | `cluster/core/ota_software_update_requestor.go` | ✅ | — | |
@@ -141,13 +142,19 @@ are not re-opened by accident:
 
 In rough order of value to a real bridge:
 
-1. **Group multicast delivery** (§2) — the only protocol-level gap a controller
-   can actually walk into today. Needs a host with a group primitive to be
-   worth it, which also unblocks turning the Groups stub into a server.
-2. **Per-attribute timed-write enforcement** (§4) — the schema already knows
+1. **Groupcast (0x0065) and the AccessControl Auxiliary ACL** (§2) — the
+   Matter 1.6.1 conformance gap for nodes with lights or plugs. Groups and
+   group-message reception are in place to build it on
+   ([ADR 0009](./adr/0009-groups-and-group-messaging.md)).
+2. **Prove group messaging against a real controller** (§2) — chip-tool's
+   `groups` / `groupkeymanagement` commands and a multicast `onoff toggle` in a
+   `internal/chiptool` leg would pin the controller-side assumptions (ACL
+   group subjects, privacy on, the multicast address) the in-process test
+   rests on.
+3. **Per-attribute timed-write enforcement** (§4) — the schema already knows
    which attributes require it (`schema/timed.go`); the enforcement point is
    the missing half.
-3. **Prove subscription re-establishment against a real controller** (§4) —
+4. **Prove subscription re-establishment against a real controller** (§4) —
    built and tested in-process ([ADR 0008](./adr/0008-subscription-resumption.md));
    a chip-tool restart leg in `internal/chiptool` would pin the
    controller-side assumptions it rests on.

@@ -24,7 +24,7 @@ Scope boundaries are deliberate and are not "not yet":
 | [`tlv/`](../tlv) | Matter TLV codec (Core Spec §A.7): all tag forms, all primitive types, structures / arrays / lists | Byte-pinned against matter.js fixtures (`tlv/testdata/`) |
 | [`transport/message`](../transport/message) | Matter message framing, headers, exchange metadata | |
 | [`transport/mrp`](../transport/mrp) | Message Reliability Protocol: retransmission, acknowledgement, duplicate detection, receive window | |
-| [`transport/udp`](../transport/udp) | UDP over IPv6, including multicast-zone handling | IPv6 operational transport; no TCP, no BTP |
+| [`transport/udp`](../transport/udp) | UDP over IPv6, including multicast-zone handling and joining / leaving IPv6 multicast groups on the operational socket | IPv6 operational transport; no TCP, no BTP |
 | [`im/`](../im) | Interaction Model §10.6: Read, Write, Invoke, Subscribe, Timed Request/Action, StatusIB, path wildcards, event log + event filters, data-version filtering, batched invoke, chunked reports, subscriptions persisted and re-established under their old id after a restart | `im/subscription` holds the subscription engine, report cadence and the persisted form (`PeerSubscription`, `Manager.Restore`); `bridge` drives re-establishment ([ADR 0008](./adr/0008-subscription-resumption.md)) |
 | [`secure/spake2`](../secure/spake2), [`secure/sigma`](../secure/sigma) | PASE (Spake2+) and CASE (Sigma1/2/3), including Sigma2Resume session resumption; a CASE initiator (`NewPeerInitiator`) for re-establishing subscriptions | The initiator is scoped by ADR 0008 |
 | [`secure/channel`](../secure/channel) | Session keys, nonce handling, message privacy / encryption | |
@@ -34,7 +34,8 @@ Scope boundaries are deliberate and are not "not yet":
 | [`secure/operational`](../secure/operational) | Operational session manager: fabric-scoped sessions, eviction, idle reaping | |
 | [`commissioning/`](../commissioning) | The commissionee state machine: PASE → attestation → CSR → AddNOC → CASE handover | |
 | [`mdns/`](../mdns) | DNS-SD §4.3: `_matter._tcp` operational and `_matterc._udp` commissionable records, subtype PTRs, rotating device identifier, re-announce loop, interface filtering; resolution of one peer's operational instance (`OperationalResolver`) | Pure-Go, Matter-only — not a general mDNS stack and not a browser |
-| [`store/`](../store) | SQLite persistence: fabrics, NOCs, ACLs, group keys, CASE resumption records, server subscriptions, settings, diagnostics | |
+| [`groups/`](../groups) | Operational group state per fabric: operational group keys, group session ids and privacy keys derived from the GroupKeyManagement key sets, the GroupKeyMap, the group table (which endpoints are in which group), the per-sender replay windows; authenticates a received group message and names the multicast addresses to join | Receive only — no group sending (no controller role). Pinned against keys and messages matter.js produced ([ADR 0009](./adr/0009-groups-and-group-messaging.md)) |
+| [`store/`](../store) | SQLite persistence: fabrics, NOCs, ACLs, group keys and the group table, CASE resumption records, server subscriptions, settings, diagnostics | |
 | [`bootid/`](../bootid) | Process-lifetime UniqueID salt (rotation off by default) | |
 
 ## Data model
@@ -55,7 +56,7 @@ System clusters, on the root or on every bridged endpoint
 
 AccessControl · BasicInformation · Binding · BridgedDeviceBasicInformation ·
 Descriptor · DiagnosticLogs · GeneralCommissioning · GeneralDiagnostics ·
-GroupKeyManagement · IcdManagement · Identify · NetworkCommissioning ·
+GroupKeyManagement · Groups · IcdManagement · Identify · NetworkCommissioning ·
 OperationalCredentials · OtaSoftwareUpdateRequestor · TimeSynchronization.
 AccessRestriction (0x002B) is a constant and an integration point only — the
 Managed Aggregator use case is out of scope.
@@ -74,12 +75,17 @@ Application clusters, grouped by the device surface they serve:
 | [`cluster/valve`](../cluster/valve) | ValveConfigurationAndControl (0x0081) |
 | [`cluster/modeselect`](../cluster/modeselect) | ModeSelect (0x0050) |
 | [`cluster/measurement`](../cluster/measurement) | Temperature (0x0402) · RelativeHumidity (0x0405) · Illuminance (0x0400) · Pressure (0x0403) · BooleanState (0x0045) · OccupancySensing (0x0406) · AirQuality (0x005B) · CO₂ (0x040D) · PM2.5 (0x042A) · PM10 (0x042D) · PowerSource (0x002F) · ElectricalPowerMeasurement (0x0090) · ElectricalEnergyMeasurement (0x0091) |
-| [`cluster/wire`](../cluster/wire) | Wire-format types and encoders for AdministratorCommissioning, Switch (Generic Switch), Groups, ScenesManagement, Schedules, and the command payloads of the servers above |
+| [`cluster/wire`](../cluster/wire) | Wire-format types and encoders for AdministratorCommissioning, Switch (Generic Switch), ScenesManagement, Schedules, the deprecated Groups stub, and the command payloads of the servers above |
 
-Groups (0x0004) and ScenesManagement (0x0062) are **deliberate stubs**: their
-presence is mandated by device-type conformance, and a bridge whose host has no
-group or scene primitive has nothing to back them with. See
-[ADR 0004](./adr/0004-groups-cluster-stays-stub.md).
+Groups (0x0004) is a **real server** ([`cluster/core`](../cluster/core)):
+group membership is stack state held by [`groups`](../groups), the assembler
+mounts the server on every bridged endpoint whose device type mandates Groups,
+and the bridge receives group messages — authenticated under the fabric's
+group keys, routed to the member endpoints, never answered — on the multicast
+address of every group with a member endpoint. See
+[ADR 0009](./adr/0009-groups-and-group-messaging.md). ScenesManagement (0x0062)
+stays a **deliberate stub**: its presence is mandated by device-type
+conformance, and a scene store is a feature of its own.
 
 All cluster implementations target Matter Core Specification 1.6.1 — the
 revision of the matter.js HEAD extract in `parity/schema.json` — and the node
@@ -89,6 +95,7 @@ advertises it: `BasicInformation.SpecificationVersion` 0x01060100,
 Matter 1.6.1 also makes a Groupcast server and the Auxiliary ACL on the root
 mandatory for nodes with lights or plugs; this module does not provide them
 yet (see `notes/parity/matter_behaviour_findings.md`, "Matter 1.6.1 pin").
+Groups and group-message reception, which Groupcast builds on, are in place.
 
 ## Device types
 

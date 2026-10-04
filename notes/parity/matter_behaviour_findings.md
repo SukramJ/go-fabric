@@ -332,19 +332,68 @@ are the behaviour the new pin implies and this module does not have yet.
   `Active`, WindowCovering rev 7 `Active, O`, SmokeCoAlarm rev 2 `O`. Under
   the condition, RootNode rev 5 requires the Groupcast server (LN feature) and
   the AccessControl AUX feature (`root-node.element.ts`). matter.js's default
-  `ServerNode.RootEndpoint` installs `GroupcastServer` and
-  `AccessControlServer.with("Extension", "Auxiliary")`
-  (`packages/node/src/node/ServerNode.ts:287-291`); the root this module
-  assembles corresponds to `ServerNode.RootEndpointWithoutGroupcast`, which
-  matter.js documents as non-conformant to 1.6.1 for a node with a Groups
-  server on any endpoint (`ServerNode.ts:266-270`) — and the bridged light and
-  plug endpoints mount the Groups stub. Fix package: a Groupcast cluster server
-  (`packages/node/src/behaviors/groupcast/GroupcastServer.ts`), the AUX
-  feature with `AuxiliaryAcl` / `AuxiliaryAccessUpdated` and the EP0 group
-  wildcard exclusion (`AccessControlServer.ts`), and group message reception.
-  Deferred: it is the group-messaging work this module has kept out of scope
-  so far (see [ADR 0004](../../docs/adr/0004-groups-cluster-stays-stub.md)),
-  not a schema follow-up.
+  `ServerNode.RootEndpoint` installs `GroupcastServer.with("Listener",
+  "Sender", "PerGroup")` and `AccessControlServer.with("Extension",
+  "Auxiliary")` (`packages/node/src/node/ServerNode.ts:287-291`); the root
+  this module assembles corresponds to `ServerNode.RootEndpointWithoutGroupcast`,
+  which matter.js documents as non-conformant to 1.6.1 for a node with a Groups
+  server on any endpoint (`ServerNode.ts:266-270`).
+
+  Groups and group-message reception, which Groupcast builds on, exist since
+  [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md). What remains
+  is Groupcast itself, deliberately not mounted in part:
+  - `GroupcastServer.ts` commands JoinGroup (group id 1..0xFFF7, Admin for
+    `key` / `useAuxiliaryAcl`, endpoint validation, per-fabric limit
+    `floor(maxMembershipCount/2)` and MaxMcastAddrCount, `replaceEndpoints`,
+    sender-only memberships), LeaveGroup (GroupID 0 applies to every group,
+    0d30528a), UpdateGroupKey, ConfigureAuxiliaryAcl, GroupcastTesting; the
+    attributes Membership (derived from GroupKeyManagement groupTable /
+    groupKeyMap plus the persisted groupProperties), MaxMembershipCount 44,
+    MaxMcastAddrCount 44, UsedMcastAddrCount, FabricUnderTest; the
+    GroupcastTesting event.
+  - GroupKeyManagement hooks Groupcast drives:
+    `createKeySetForGroupcast` (EpochStartTime0 = 1),
+    `validateKeySetId`, and the multicast address policy per group —
+    `FabricGroups.setGroupMulticastPolicy` with the IANA `FF05::FA` address
+    (`Groups.ts` IANA_GROUPCAST_MULTICAST_ADDRESS) — which
+    `groups.Manager.Memberships` and the bridge's reconciler would have to
+    follow.
+  - AccessControl AUX: the `AuxiliaryAcl` attribute and
+    `AuxiliaryAccessUpdated` event fed by Groupcast's provider
+    (`AccessControlServer.ts` registerAuxAclProvider / #auxiliaryAclFor),
+    `auxiliaryType` on synthesized entries, and the exclusion of
+    endpoint 0 from a Group entry's wildcard target while AUX is enabled
+    (`FabricAccessControl.ts`).
+  - The group-message outcome events SessionManager emits for
+    GroupcastTesting (NoAvailableKey, FailedAuth, MessageReplay, Success with
+    the access outcome) — see `BD-Matter-GroupcastTestingEvents`.
+## Groups (ADR 0009) — open items
+
+Gaps left by the Groups server and group-message reception of
+[ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md).
+
+- **A GroupKeyMap entry needs an existing key set.** `matter_group_key_map`
+  carries a foreign key to `matter_group_keys`, so a GroupKeyMap write naming
+  a key set not yet written fails with Failure. matter.js accepts it and
+  leaves the check commented out because certification tests write the map
+  first (`GroupKeyManagementServer.ts:#validateGroupKeyMap`). Fix package: a
+  schema migration dropping that foreign key (the store applies
+  `IF NOT EXISTS` DDL, so an existing table needs an explicit rebuild), and a
+  GroupKeyMap entry whose key set is missing simply authenticates nothing.
+- **Unfiltered GroupKeyMap / GroupTable reads return only the accessing
+  fabric's entries.** matter.js answers a read with `isFabricFiltered=false`
+  with every fabric's entries, fabric-sensitive fields omitted for the others.
+  go-fabric scopes both attributes to the accessing fabric regardless of the
+  flag (`core.GroupKeyManagement.matterReadWithCtx`). Harmless for the
+  controllers seen so far, which read fabric-filtered.
+- **A reverted AddNOC leaves group state in memory.** `revertAddNOC` removes
+  the fabric's rows (the cascade takes the group table along) without telling
+  `groups.Manager`, which keeps a loaded fabric's keys until the next
+  `ForgetFabric`. Only reachable when a controller provisions groups before
+  CommissioningComplete and the fail-safe then expires; the fabric index is
+  not reused immediately (monotonic allocation). Fix package: route the
+  revert through `OperationalCredentials.NotifyFabricRemoved` /
+  `Bridge.EmitFabricRemoved` like the other removal surfaces.
 
 ---
 

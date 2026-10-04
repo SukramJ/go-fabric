@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/store"
@@ -182,3 +183,35 @@ func (s *oneEndpointStore) ListEndpoints(context.Context, string) ([]Record, err
 }
 
 func (s *oneEndpointStore) RemoveEndpoint(context.Context, SourceKey) error { return nil }
+
+// TestScenesStubStaysBesideTheGroupsServer pins the ScenesManagement stub's
+// place next to the real Groups server. matter.js couples the two only
+// through RemoveGroup / RemoveAllGroups, which drop the group's scenes
+// (GroupsServer → ScenesManagementServer.removeScenesForGroupOnFabric);
+// the stub keeps no scenes (SceneTableSize 0, FabricSceneInfo empty), so
+// there is nothing to drop and the stub is mounted unchanged.
+func TestScenesStubStaysBesideTheGroupsServer(t *testing.T) {
+	t.Parallel()
+	mgr, _ := groups.NewManager(nopGroupStore{}, nil)
+	ep := &Endpoint{
+		ID: 7, DeviceType: 0x0100, FriendlyName: "Lamp", SourceKey: StringKey("lamp"),
+		Source: deviceTypeSource{dt: 0x0100, servers: []contract.ClusterServer{fakeServer{id: 0x0006}, wire.ScenesManagement{}}},
+		groups: mgr,
+	}
+	servers := ClusterServers(ep)
+	if n, stack := countCluster(servers, mattercore.GroupsClusterID); n != 1 || !stack {
+		t.Fatal("no stack Groups server")
+	}
+	var scenes contract.ClusterServer
+	for _, s := range servers {
+		if s.MatterClusterID() == 0x0062 {
+			scenes = s
+		}
+	}
+	if scenes == nil {
+		t.Fatal("the ScenesManagement stub was dropped")
+	}
+	if v, _ := scenes.MatterRead(0x0001); v != uint16(0) {
+		t.Fatalf("SceneTableSize = %v, want 0", v)
+	}
+}

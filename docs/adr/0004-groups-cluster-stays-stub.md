@@ -6,7 +6,10 @@
 > module's root; the decision itself is unchanged.
 
 
-- **Status**: rejected
+- **Status**: rejected — superseded by
+  [ADR 0009](./0009-groups-and-group-messaging.md) (2026-10-04), which builds
+  the real Groups server and group message reception as matter.js does.
+  Kept as the record of why the stub stood until then.
 - **Date**: 2026-06-15
 - **Related**:
   `notes/parity/by_design.md` (BD-Matter-P2-D19, L00-BD-Groups),
