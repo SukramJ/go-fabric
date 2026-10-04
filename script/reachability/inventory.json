@@ -1,21 +1,24 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3379,
+  "entry_points": 3443,
   "entry_packages": [
     ".",
     "bootid",
     "bridge",
     "bridge/bridgetest",
     "cluster",
+    "cluster/alarm",
     "cluster/closure",
     "cluster/core",
     "cluster/cover",
+    "cluster/fan",
     "cluster/levelcontrol",
     "cluster/light",
     "cluster/lock",
     "cluster/measurement",
     "cluster/modeselect",
     "cluster/onoff",
+    "cluster/pump",
     "cluster/thermo",
     "cluster/valve",
     "cluster/wire",
@@ -51,10 +54,10 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 3031,
-    "reachable": 1470,
-    "whitelisted": 1552,
-    "unreachable": 9
+    "total_exported": 3313,
+    "reachable": 1738,
+    "whitelisted": 1569,
+    "unreachable": 6
   },
   "by_package": [
     {
@@ -64,22 +67,10 @@
       "unreachable_other": 0
     },
     {
-      "package": "contract",
-      "unreachable_funcs": 1,
-      "unreachable_types": 0,
-      "unreachable_other": 0
-    },
-    {
       "package": "endpoint",
       "unreachable_funcs": 1,
       "unreachable_types": 0,
       "unreachable_other": 0
-    },
-    {
-      "package": "schema",
-      "unreachable_funcs": 1,
-      "unreachable_types": 0,
-      "unreachable_other": 1
     },
     {
       "package": "cluster/core",
@@ -118,14 +109,7 @@
       "package": "cluster/measurement",
       "identifier": "CelsiusToInt16",
       "file": "cluster/measurement/measurement.go",
-      "line": 1732,
-      "kind": "func"
-    },
-    {
-      "package": "contract",
-      "identifier": "DeviceTypeName",
-      "file": "contract/matter.go",
-      "line": 762,
+      "line": 1733,
       "kind": "func"
     },
     {
@@ -134,20 +118,6 @@
       "file": "endpoint/spec.go",
       "line": 88,
       "kind": "func"
-    },
-    {
-      "package": "schema",
-      "identifier": "DeviceTypeAllowsServerCluster",
-      "file": "schema/lookup.go",
-      "line": 67,
-      "kind": "func"
-    },
-    {
-      "package": "schema",
-      "identifier": "DeviceTypeServerClusters",
-      "file": "schema/devicetypes.go",
-      "line": 215,
-      "kind": "var"
     },
     {
       "package": "secure/channel",
@@ -220,6 +190,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bench_test.go",
       "line": 111
+    },
+    {
+      "package": "bridge",
+      "identifier": "FuzzFanStepFieldsReader",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fuzz_fan_fields_test.go",
+      "line": 20
     },
     {
       "package": "bridge",
@@ -381,6 +358,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/timed_conformance_test.go",
       "line": 29
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestApplicationPayloadsMatchMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/application_parity_matterjs_test.go",
+      "line": 42
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestApplicationValueWriterEncodesEventPayloads",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/application_clusters_wire_test.go",
+      "line": 266
     },
     {
       "package": "bridge",
@@ -2715,6 +2706,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestFanControlOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/application_clusters_wire_test.go",
+      "line": 324
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestFanStepDecoderRejectsMalformedFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/application_clusters_wire_test.go",
+      "line": 406
+    },
+    {
+      "package": "bridge",
       "identifier": "TestForgetSigma1Replied_ClearsEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
@@ -3688,6 +3693,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestPumpOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/application_clusters_wire_test.go",
+      "line": 488
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRandPBKDFRandom_NonZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handlers_extra_test.go",
@@ -4262,6 +4274,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSmokeCoAlarmOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/application_clusters_wire_test.go",
+      "line": 187
+    },
+    {
+      "package": "bridge",
       "identifier": "TestStartHealthProbe_BoundReportsHealthy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/health_probe_test.go",
@@ -4527,6 +4546,13 @@
       "line": 8
     },
     {
+      "package": "cluster",
+      "identifier": "TestAsUintMaxChecksRangeInsteadOfWrapping",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/coerce_test.go",
+      "line": 30
+    },
+    {
       "package": "cluster/core",
       "identifier": "TestBasicInfoSerialFromUniqueID_Long",
       "reason": "auto-whitelist:pattern=test-file",
@@ -4636,35 +4662,91 @@
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 931
+      "line": 932
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 923
+      "line": 924
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1667
+      "line": 1668
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestFlowClassMaterialisesTheFlowServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/flow_test.go",
+      "line": 112
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestFlowServerIsReadOnlyAndCommandless",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/flow_test.go",
+      "line": 101
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestFlowServerMeasuredValueScalesAndClamps",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/flow_test.go",
+      "line": 28
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestFlowServerStaticAttributesAndGlobals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/flow_test.go",
+      "line": 71
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestFlowServerUnobservedAndNilSourceReadNull",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/flow_test.go",
+      "line": 58
     },
     {
       "package": "cluster/measurement",
       "identifier": "TestParityMatterJS_ConcentrationClustersShareRevision",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/parity_matterjs_test.go",
-      "line": 281
+      "line": 282
     },
     {
       "package": "cluster/measurement",
       "identifier": "TestParityMatterJS_FeatureGatedAttributesMatchFeatureMap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/parity_matterjs_test.go",
-      "line": 219
+      "line": 220
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestParityMatterJS_FlowMeasurementConstraints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/flow_parity_matterjs_test.go",
+      "line": 114
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestParityMatterJS_FlowMeasurementSurface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/flow_parity_matterjs_test.go",
+      "line": 59
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestParityMatterJS_FlowSensorDeviceType",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/flow_parity_matterjs_test.go",
+      "line": 156
     },
     {
       "package": "cluster/measurement",
@@ -4678,7 +4760,7 @@
       "identifier": "TestParityMatterJS_PowerSourceMandatoryAttributes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/parity_matterjs_test.go",
-      "line": 113
+      "line": 114
     },
     {
       "package": "cluster/wire",
@@ -4896,6 +4978,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_acl_test.go",
       "line": 271
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestApplicationDeviceTypesMountTheirMandatoryClusterSet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/application_device_types_test.go",
+      "line": 191
     },
     {
       "package": "endpoint",

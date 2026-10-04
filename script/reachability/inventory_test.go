@@ -51,7 +51,11 @@ import (
 // Lowered 11 -> 10 when secure/setup gained a fuzz target: IsValidSetupPIN
 // had no test caller at all, which is a thing worth knowing about a function
 // that classifies a setup passcode.
-const reachabilityUnreachedRatchet = 9
+// Lowered 9 -> 6 with the application cluster servers: their device-type
+// tests read contract.DeviceTypeName and schema.DeviceTypeAllowsServerCluster
+// (and with it the server-cluster table it consults), which no test had
+// reached before.
+const reachabilityUnreachedRatchet = 6
 
 // inventoryWhitelistEntry mirrors one whitelist row of inventory.json.
 type inventoryWhitelistEntry struct {
