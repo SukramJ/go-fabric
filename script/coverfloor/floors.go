@@ -42,6 +42,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 81},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/core", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 87},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/fan", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 74},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 81},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 86},

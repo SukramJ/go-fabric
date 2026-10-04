@@ -64,6 +64,10 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 		if fields, ok, err := groupcastFieldsReader(path, dec); ok {
 			return fields, err
 		}
+	case wire.FanControlClusterID:
+		if path.Command == wire.FanControlCmdStep {
+			return decodeFanStepRequest(dec)
+		}
 	case 0x0008: // LevelControl
 		switch path.Command {
 		case 0x00, 0x04: // MoveToLevel, MoveToLevelWithOnOff

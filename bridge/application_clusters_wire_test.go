@@ -13,11 +13,13 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
 
 	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
+	matterfan "github.com/SukramJ/go-fabric/cluster/fan"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -278,5 +280,177 @@ func TestApplicationValueWriterEncodesEventPayloads(t *testing.T) {
 	n = encode(matteralarm.AlarmSeverityEvent{AlarmSeverityLevel: matteralarm.AlarmWarning})
 	if n.El.Type != tlv.TypeStructure || len(n.Children) != 1 || n.mustChild(t, 0).El.Uint != 1 {
 		t.Errorf("AlarmSeverityEvent = %+v, want {0: 1}", n)
+	}
+}
+
+// fanDevice is a host fan with a 0..4 speed range.
+type fanDevice struct {
+	mu      sync.Mutex
+	st      matterfan.State
+	applied []matterfan.Settings
+}
+
+func (d *fanDevice) FanState() matterfan.State {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.st
+}
+
+func (d *fanDevice) ApplyFanSettings(_ context.Context, s matterfan.Settings) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.applied = append(d.applied, s)
+	if s.FanMode != nil {
+		d.st.FanMode = *s.FanMode
+	}
+	if p := s.PercentSetting; p != nil {
+		d.st.PercentSetting = nil
+		if !p.Null {
+			v := p.Value
+			d.st.PercentSetting = &v
+		}
+	}
+	if v := s.SpeedSetting; v != nil {
+		d.st.SpeedSetting = nil
+		if !v.Null {
+			n := v.Value
+			d.st.SpeedSetting = &n
+		}
+	}
+	return nil
+}
+
+func TestFanControlOverTheWire(t *testing.T) {
+	t.Parallel()
+	dev := &fanDevice{}
+	srv, err := matterfan.NewServer(matterfan.Config{
+		Source:   dev,
+		Features: matterfan.FeatureMultiSpeed | matterfan.FeatureAuto | matterfan.FeatureStep,
+		Sequence: matterfan.SequenceOffLowMedHighAuto, SpeedMax: 4,
+		DeviceType: matterfan.DeviceTypeFan,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newAppHarness(t, appDevice{deviceType: matterfan.DeviceTypeFan, servers: []contract.ClusterServer{srv}})
+	ep := h.endpoints[matterfan.DeviceTypeFan]
+
+	// PercentSetting 50 → SpeedSetting ceil(4 × 0.5) = 2, read back.
+	if st := h.writeAttribute(ep, matterfan.ClusterID, matterfan.AttrPercentSetting, func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.PutUint(tag, 50)
+	}); st != 0 {
+		t.Fatalf("PercentSetting write status 0x%02X", st)
+	}
+	if data, _, _ := h.readAttribute(ep, matterfan.ClusterID, matterfan.AttrSpeedSetting); data.El.Uint != 2 {
+		t.Errorf("SpeedSetting after PercentSetting 50 = %d, want 2", data.El.Uint)
+	}
+	// A null PercentSetting write succeeds and changes nothing.
+	n := len(dev.applied)
+	if st := h.writeAttribute(ep, matterfan.ClusterID, matterfan.AttrPercentSetting, func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.PutNull(tag)
+	}); st != 0 || len(dev.applied) != n {
+		t.Errorf("null PercentSetting write status 0x%02X, applied %d → %d", st, n, len(dev.applied))
+	}
+	// FanMode Auto → both settings null on the wire.
+	if st := h.writeAttribute(ep, matterfan.ClusterID, matterfan.AttrFanMode, func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.PutUint(tag, uint64(matterfan.FanModeAuto))
+	}); st != 0 {
+		t.Fatalf("FanMode write status 0x%02X", st)
+	}
+	if data, _, _ := h.readAttribute(ep, matterfan.ClusterID, matterfan.AttrPercentSetting); !data.El.IsNull {
+		t.Errorf("PercentSetting in Auto = %+v, want null", data.El)
+	}
+	// Out-of-range writes.
+	if st := h.writeAttribute(ep, matterfan.ClusterID, matterfan.AttrSpeedSetting, func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.PutUint(tag, 5)
+	}); st != uint64(im.StatusConstraintError) {
+		t.Errorf("SpeedSetting 5 > SpeedMax status 0x%02X", st)
+	}
+	if st := h.writeAttribute(ep, matterfan.ClusterID, matterfan.AttrSpeedMax, func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.PutUint(tag, 3)
+	}); st != uint64(im.StatusUnsupportedWrite) {
+		t.Errorf("SpeedMax write status 0x%02X, want UnsupportedWrite", st)
+	}
+
+	// Step crosses the wire with its fields decoded: Decrease from speed
+	// 0 with Wrap and LowestOff wraps to SpeedMax.
+	dev.mu.Lock()
+	dev.st.SpeedSetting = new(uint8)
+	dev.mu.Unlock()
+	if _, _, status, isStatus := invokeResult(t, h.invoke(ep, matterfan.ClusterID, matterfan.CmdStep, func(enc *tlv.Encoder) {
+		enc.PutUint(tlv.ContextTag(0), uint64(matterfan.StepDecrease))
+		enc.PutBool(tlv.ContextTag(1), true)
+	})); !isStatus || status != im.StatusSuccess {
+		t.Fatalf("Step = %v", status)
+	}
+	if data, _, _ := h.readAttribute(ep, matterfan.ClusterID, matterfan.AttrSpeedSetting); data.El.Uint != 4 {
+		t.Errorf("SpeedSetting after a wrapping Step down = %d, want 4", data.El.Uint)
+	}
+	// A Step without its mandatory Direction: InvalidCommand.
+	if _, _, status, _ := invokeResult(t, h.invoke(ep, matterfan.ClusterID, matterfan.CmdStep, func(enc *tlv.Encoder) {
+		enc.PutBool(tlv.ContextTag(1), true)
+	})); status != im.StatusInvalidCommand {
+		t.Errorf("Step without Direction = %v, want InvalidCommand", status)
+	}
+	// An undefined Direction: ConstraintError.
+	if _, _, status, _ := invokeResult(t, h.invoke(ep, matterfan.ClusterID, matterfan.CmdStep, func(enc *tlv.Encoder) {
+		enc.PutUint(tlv.ContextTag(0), 2)
+	})); status != im.StatusConstraintError {
+		t.Errorf("Step Direction 2 = %v, want ConstraintError", status)
+	}
+}
+
+// TestFanStepDecoderRejectsMalformedFields covers the decoder's own
+// rejections, which a controller can reach with any payload.
+func TestFanStepDecoderRejectsMalformedFields(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		fields func(enc *tlv.Encoder)
+		want   im.StatusCode
+	}{
+		{"direction not an integer", func(enc *tlv.Encoder) { enc.PutUTF8(tlv.ContextTag(0), "up") }, im.StatusInvalidCommand},
+		{"direction wider than enum8", func(enc *tlv.Encoder) { enc.PutUint16(tlv.ContextTag(0), 0x100) }, im.StatusConstraintError},
+		{"wrap not a bool", func(enc *tlv.Encoder) {
+			enc.PutUint(tlv.ContextTag(0), 0)
+			enc.PutUint(tlv.ContextTag(1), 1)
+		}, im.StatusInvalidCommand},
+		{"lowestOff a struct", func(enc *tlv.Encoder) {
+			enc.PutUint(tlv.ContextTag(0), 0)
+			enc.StartStruct(tlv.ContextTag(2))
+			_ = enc.EndContainer()
+		}, im.StatusInvalidCommand},
+	}
+	for _, tc := range cases {
+		enc := tlv.NewEncoder()
+		enc.StartStruct(tlv.AnonymousTag())
+		tc.fields(enc)
+		_ = enc.EndContainer()
+		b, err := enc.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		dec := tlv.NewDecoder(b)
+		open, _ := dec.Next()
+		_, err = commandFieldsReader(im.ConcreteCommandPath{Cluster: clusterwire.FanControlClusterID, Command: clusterwire.FanControlCmdStep}, dec, open)
+		var sce im.StatusCodeError
+		if !errors.As(err, &sce) || sce.MatterStatusCode() != tc.want {
+			t.Errorf("%s: err = %v, want %v", tc.name, err, tc.want)
+		}
+	}
+	// Unknown context and non-context fields are skipped.
+	enc := tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutUint(tlv.ContextTag(0), 1)
+	enc.StartArray(tlv.ContextTag(9))
+	_ = enc.EndContainer()
+	enc.PutUint(tlv.FullyQualifiedTag(0xFFF1, 1, 1), 3)
+	_ = enc.EndContainer()
+	b, _ := enc.Bytes()
+	dec := tlv.NewDecoder(b)
+	open, _ := dec.Next()
+	got, err := commandFieldsReader(im.ConcreteCommandPath{Cluster: clusterwire.FanControlClusterID, Command: clusterwire.FanControlCmdStep}, dec, open)
+	if err != nil || got != (clusterwire.FanStepRequest{Direction: 1, LowestOff: true}) {
+		t.Errorf("Step with extra fields = %+v, %v", got, err)
 	}
 }

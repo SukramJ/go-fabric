@@ -165,6 +165,10 @@ func TestAttributeWritable(t *testing.T) {
 		{"SmokeCoAlarm/ExpressedState read-only", 0x005C, 0x0000, false, true},
 		// SmokeCoAlarm.SmokeSensitivityLevel (0x000B, "RW VM") — writable.
 		{"SmokeCoAlarm/SmokeSensitivityLevel writable", 0x005C, 0x000B, true, false},
+		// FanControl.PercentCurrent (0x0003, "R V") — read-only.
+		{"FanControl/PercentCurrent read-only", 0x0202, 0x0003, false, true},
+		// FanControl.PercentSetting (0x0002, "RW VO") — writable.
+		{"FanControl/PercentSetting writable", 0x0202, 0x0002, true, false},
 		// Cluster the bridge does not expose → unknown, treated writable.
 		{"unknown cluster", 0xBEEF, 0x0000, true, false},
 		// Global attribute (no access string) → not tracked.

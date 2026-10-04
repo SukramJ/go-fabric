@@ -778,12 +778,18 @@ func DeviceTypeName(id uint16) string {
 		return "Speaker"
 	case 0x0027:
 		return "Mode Select"
+	case 0x002B:
+		return "Fan"
 	case 0x002C:
 		return "Air Quality Sensor"
+	case 0x002D:
+		return "Air Purifier"
 	case 0x0043:
 		return "Water Leak Detector"
 	case 0x0076:
 		return "Smoke / CO Alarm"
+	case 0x007A:
+		return "Extractor Hood"
 	case 0x0100:
 		return "On/Off Light"
 	case 0x0101:

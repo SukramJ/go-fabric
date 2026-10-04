@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/fan"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/schema"
@@ -129,6 +130,20 @@ type smokeReading struct{}
 
 func (smokeReading) SmokeCOState() alarm.State { return alarm.State{} }
 
+// fanReading is a host fan's port.
+type fanReading struct{}
+
+func (fanReading) FanState() fan.State                                  { return fan.State{} }
+func (fanReading) ApplyFanSettings(context.Context, fan.Settings) error { return nil }
+
+func fanServer(dt uint16) contract.ClusterServer {
+	srv, err := fan.NewServer(fan.Config{Source: fanReading{}, Sequence: fan.SequenceOffLowMedHigh, DeviceType: dt})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
 func applicationDeviceCases() []applicationDeviceCase {
 	smoke, err := alarm.NewServer(alarm.Config{Source: smokeReading{}, Features: alarm.FeatureSmokeAlarm | alarm.FeatureCOAlarm})
 	if err != nil {
@@ -138,6 +153,19 @@ func applicationDeviceCases() []applicationDeviceCase {
 		{name: "FlowSensor", deviceType: 0x0306, measurement: flowReading{}},
 		{name: "SmokeCoAlarm", deviceType: alarm.DeviceTypeSmokeCoAlarm, source: deviceTypeSource{
 			dt: alarm.DeviceTypeSmokeCoAlarm, servers: []contract.ClusterServer{smoke},
+		}},
+		// Fan mandates Groups, which the assembler mounts from the
+		// node's group state; the host supplies FanControl alone.
+		{name: "Fan", deviceType: fan.DeviceTypeFan, source: deviceTypeSource{
+			dt: fan.DeviceTypeFan, servers: []contract.ClusterServer{fanServer(fan.DeviceTypeFan)},
+		}},
+		// AirPurifier's HEPA / activated-carbon filter monitoring and
+		// ExtractorHood's are optional and not built here.
+		{name: "AirPurifier", deviceType: fan.DeviceTypeAirPurifier, source: deviceTypeSource{
+			dt: fan.DeviceTypeAirPurifier, servers: []contract.ClusterServer{fanServer(fan.DeviceTypeAirPurifier)},
+		}},
+		{name: "ExtractorHood", deviceType: fan.DeviceTypeExtractorHood, source: deviceTypeSource{
+			dt: fan.DeviceTypeExtractorHood, servers: []contract.ClusterServer{fanServer(fan.DeviceTypeExtractorHood)},
 		}},
 	}
 }

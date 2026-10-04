@@ -1,6 +1,6 @@
 # Wire-fixture generators
 
-Two Node scripts that run *inside a built matter.js checkout* and print the
+Node scripts that run *inside a built matter.js checkout* and print the
 byte-level output of matter.js's own encoders as JSON. The Go parity tests
 compare this module's encoders against those bytes, so a wire-shape drift
 fails a test instead of failing a controller.
@@ -11,6 +11,7 @@ fails a test instead of failing a controller.
 | `generate-im-wire-fixtures.ts` | IM-message-level wire bytes (ReportData, StatusResponse, …) | [`im/testdata/im-wire-fixtures.json`](../../../im/testdata/im-wire-fixtures.json) → `im/wire_fixtures_parity_test.go` |
 | `generate-group-fixtures.ts crypto` | Operational group key, group session id, privacy key, multicast address and complete sealed group messages (`FabricGroups`, `KeySets`, `MessagePrivacy`, `GroupSession.encode`) | [`groups/testdata/group-crypto-fixtures.json`](../../../groups/testdata/group-crypto-fixtures.json) → `groups/parity_matterjs_test.go` |
 | `generate-group-fixtures.ts wire` | GroupKeyManagement / Groups command payloads (`TlvOfModel(command)`) | [`bridge/testdata/group-wire-fixtures.json`](../../../bridge/testdata/group-wire-fixtures.json) → `bridge/groups_parity_matterjs_test.go` |
+| `generate-application-fixtures.ts` | FanControl Step request payloads and the SmokeCoAlarm / PumpConfigurationAndControl event payloads (`TlvOfModel(element)`) | [`bridge/testdata/application-wire-fixtures.json`](../../../bridge/testdata/application-wire-fixtures.json) → `bridge/application_parity_matterjs_test.go` |
 | `generate-group-fixtures.ts groupcast` | Groupcast command payloads, the Membership and AccessControl.AuxiliaryAcl values, the GroupcastTesting / AuxiliaryAccessUpdated events (`TlvOfModel(element)`) | [`bridge/testdata/groupcast-wire-fixtures.json`](../../../bridge/testdata/groupcast-wire-fixtures.json) → `bridge/groupcast_parity_matterjs_test.go` |
 
 The `testdata/` copies are the **masters**: the tests read them, nothing reads
@@ -39,6 +40,9 @@ node "$GO_FABRIC"/notes/parity/matter/generate-group-fixtures.ts wire > /tmp/gw.
 
 node "$GO_FABRIC"/notes/parity/matter/generate-group-fixtures.ts groupcast > /tmp/gcw.json \
     && mv /tmp/gcw.json "$GO_FABRIC"/bridge/testdata/groupcast-wire-fixtures.json
+
+node "$GO_FABRIC"/notes/parity/matter/generate-application-fixtures.ts > /tmp/app.json \
+    && mv /tmp/app.json "$GO_FABRIC"/bridge/testdata/application-wire-fixtures.json
 
 node "$GO_FABRIC"/notes/parity/matter/generate-group-fixtures.ts crypto > /tmp/gc.json \
     && mv /tmp/gc.json "$GO_FABRIC"/groups/testdata/group-crypto-fixtures.json

@@ -30,6 +30,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
+	"github.com/SukramJ/go-fabric/cluster/fan"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -85,6 +86,45 @@ func newSmokeAlarmServer() *alarm.Server {
 		Source:   &smokeAlarmSource{st: alarm.State{SmokeSensitivityLevel: alarm.SensitivityStandard}},
 		Features: alarm.FeatureSmokeAlarm,
 		Optional: alarm.OptionalSmokeSensitivityLevel,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
+// fanSource is a FanControl host that accepts every change.
+type fanSource struct{ st fan.State }
+
+func (f *fanSource) FanState() fan.State { return f.st }
+
+func (f *fanSource) ApplyFanSettings(_ context.Context, s fan.Settings) error {
+	if s.FanMode != nil {
+		f.st.FanMode = *s.FanMode
+	}
+	if p := s.PercentSetting; p != nil && !p.Null {
+		f.st.PercentSetting = &p.Value
+	}
+	if v := s.SpeedSetting; v != nil && !v.Null {
+		f.st.SpeedSetting = &v.Value
+	}
+	return nil
+}
+
+func (f *fanSource) SetRockSetting(_ context.Context, r fan.RockBitmap) error {
+	f.st.RockSetting = r
+	return nil
+}
+
+// newFanServer is a fan without Auto (sequence OffLowHigh), with four
+// speeds, rocking left-right only, and the Step command.
+func newFanServer() *fan.Server {
+	srv, err := fan.NewServer(fan.Config{
+		Source:      &fanSource{},
+		Features:    fan.FeatureMultiSpeed | fan.FeatureRocking | fan.FeatureStep,
+		Sequence:    fan.SequenceOffLowHigh,
+		SpeedMax:    4,
+		RockSupport: fan.RockLeftRight,
 	})
 	if err != nil {
 		panic(err)
@@ -185,6 +225,83 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
+			// matter.js fan-control.element.ts:106 — FanModeEnum Auto has
+			// conformance "AUT"; matter.js rejects a member whose
+			// conformance fails with ConstraintError
+			// (EnumValueConformanceError, protocol/src/action/errors.ts).
+			name: "FanControl/FanMode=Auto without AUT → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrFanMode,
+			value:      uint64(fan.FanModeAuto),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.resource.ts:48-51 + :62-63 — Medium is offered
+			// only by sequences 0 and 2; any other value is CONSTRAINT_ERROR.
+			name: "FanControl/FanMode=Medium on OffLowHigh → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrFanMode,
+			value:      uint64(fan.FanModeMedium),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.element.ts:39 — PercentSetting "max 100".
+			name: "FanControl/PercentSetting=101 → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrPercentSetting,
+			value:      uint64(101),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.element.ts:48 — SpeedSetting "max speedMax".
+			name: "FanControl/SpeedSetting > SpeedMax → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrSpeedSetting,
+			value:      uint64(5),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.resource.ts:162-164 — a RockSetting bit not in
+			// RockSupport is CONSTRAINT_ERROR.
+			name: "FanControl/RockSetting outside RockSupport → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrRockSetting,
+			value:      uint64(fan.RockUpDown),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.element.ts:41 — PercentCurrent is access "R V".
+			name: "FanControl/PercentCurrent write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrPercentCurrent,
+			value:      uint64(10),
+			wantStatus: im.StatusUnsupportedWrite,
+		},
+		{
 			// matter.js smoke-co-alarm-cluster.element.ts:44 + :82-87 —
 			// SmokeSensitivityLevel is a SensitivityEnum (High 0, Standard
 			// 1, Low 2); an enum write outside its values fails matter.js
@@ -257,6 +374,20 @@ func TestNegativeInvokeParity(t *testing.T) {
 	t.Parallel()
 
 	cases := []negativeInvokeCase{
+		{
+			// matter.js fan-control.element.ts:71 + :88-92 — Direction is a
+			// StepDirectionEnum (Increase 0, Decrease 1); an undefined
+			// member is UnknownEnumValueError, ConstraintError.
+			name: "FanControl/Step Direction=2 → ConstraintError",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return newFanServer()
+			},
+			cmdID:      fan.CmdStep,
+			fields:     wire.FanStepRequest{Direction: 2},
+			wantStatus: im.StatusConstraintError,
+		},
 		{
 			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:158-166
 			// setpointRaiseLower — mode=Heat without HEAT feature → InvalidCommand.
@@ -356,6 +487,20 @@ func TestPositiveWriteControl(t *testing.T) {
 // boundaries of the application clusters' writable attributes.
 func TestPositiveWriteControlApplicationClusters(t *testing.T) {
 	t.Parallel()
+
+	t.Run("FanControl/PercentSetting == 100 and SpeedSetting == SpeedMax accepted", func(t *testing.T) {
+		t.Parallel()
+		srv := newFanServer()
+		if err := srv.MatterWrite(context.Background(), fan.AttrPercentSetting, uint64(100)); err != nil {
+			t.Fatalf("PercentSetting 100: %v", err)
+		}
+		if err := srv.MatterWrite(context.Background(), fan.AttrSpeedSetting, uint64(4)); err != nil {
+			t.Fatalf("SpeedSetting 4 (SpeedMax): %v", err)
+		}
+		if v, _ := srv.MatterRead(fan.AttrPercentSetting); v != uint8(100) {
+			t.Errorf("PercentSetting after SpeedSetting=SpeedMax = %v, want 100 (speed rule)", v)
+		}
+	})
 
 	t.Run("SmokeCoAlarm/SmokeSensitivityLevel == Low(2) accepted", func(t *testing.T) {
 		t.Parallel()

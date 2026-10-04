@@ -1,0 +1,166 @@
+[
+  {
+    "label": "step_increase_minimal",
+    "kind": "commands",
+    "cluster": 514,
+    "element": "Step",
+    "fixture": {
+      "direction": 0
+    },
+    "bytesHex": "1524000018"
+  },
+  {
+    "label": "step_decrease_wrap",
+    "kind": "commands",
+    "cluster": 514,
+    "element": "Step",
+    "fixture": {
+      "direction": 1,
+      "wrap": true
+    },
+    "bytesHex": "15240001290118"
+  },
+  {
+    "label": "step_full",
+    "kind": "commands",
+    "cluster": 514,
+    "element": "Step",
+    "fixture": {
+      "direction": 0,
+      "wrap": false,
+      "lowestOff": false
+    },
+    "bytesHex": "152400002801280218"
+  },
+  {
+    "label": "step_lowest_off_only",
+    "kind": "commands",
+    "cluster": 514,
+    "element": "Step",
+    "fixture": {
+      "direction": 1,
+      "lowestOff": true
+    },
+    "bytesHex": "15240001290218"
+  },
+  {
+    "label": "smoke_SmokeAlarm",
+    "kind": "events",
+    "cluster": 92,
+    "element": "SmokeAlarm",
+    "fixture": {
+      "alarmSeverityLevel": 2
+    },
+    "bytesHex": "1524000218"
+  },
+  {
+    "label": "smoke_CoAlarm",
+    "kind": "events",
+    "cluster": 92,
+    "element": "CoAlarm",
+    "fixture": {
+      "alarmSeverityLevel": 1
+    },
+    "bytesHex": "1524000118"
+  },
+  {
+    "label": "smoke_LowBattery",
+    "kind": "events",
+    "cluster": 92,
+    "element": "LowBattery",
+    "fixture": {
+      "alarmSeverityLevel": 1
+    },
+    "bytesHex": "1524000118"
+  },
+  {
+    "label": "smoke_InterconnectSmokeAlarm",
+    "kind": "events",
+    "cluster": 92,
+    "element": "InterconnectSmokeAlarm",
+    "fixture": {
+      "alarmSeverityLevel": 2
+    },
+    "bytesHex": "1524000218"
+  },
+  {
+    "label": "smoke_InterconnectCoAlarm",
+    "kind": "events",
+    "cluster": 92,
+    "element": "InterconnectCoAlarm",
+    "fixture": {
+      "alarmSeverityLevel": 1
+    },
+    "bytesHex": "1524000118"
+  },
+  {
+    "label": "smoke_HardwareFault",
+    "kind": "events",
+    "cluster": 92,
+    "element": "HardwareFault",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "smoke_EndOfService",
+    "kind": "events",
+    "cluster": 92,
+    "element": "EndOfService",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "smoke_SelfTestComplete",
+    "kind": "events",
+    "cluster": 92,
+    "element": "SelfTestComplete",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "smoke_AlarmMuted",
+    "kind": "events",
+    "cluster": 92,
+    "element": "AlarmMuted",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "smoke_MuteEnded",
+    "kind": "events",
+    "cluster": 92,
+    "element": "MuteEnded",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "smoke_AllClear",
+    "kind": "events",
+    "cluster": 92,
+    "element": "AllClear",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "pump_SupplyVoltageLow",
+    "kind": "events",
+    "cluster": 512,
+    "element": "SupplyVoltageLow",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "pump_DryRunning",
+    "kind": "events",
+    "cluster": 512,
+    "element": "DryRunning",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "pump_PumpBlocked",
+    "kind": "events",
+    "cluster": 512,
+    "element": "PumpBlocked",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "pump_TurbineOperation",
+    "kind": "events",
+    "cluster": 512,
+    "element": "TurbineOperation",
+    "bytesHex": "1518"
+  }
+]
