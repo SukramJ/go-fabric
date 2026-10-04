@@ -132,7 +132,7 @@ func (s *memStore) mapGroup(idx uint8, gid, ksID uint16) {
 // the Security Flags naming a group session (with P when privacy is on),
 // the AEAD nonce from the Security Flags, the counter and the source node
 // id, and the privacy obfuscation of the header past the Security Flags.
-func sealGroup(t *testing.T, opKey []byte, sessionID, groupID uint16, source uint64, counter uint32, privacy bool, plain []byte) []byte {
+func sealGroup(t testing.TB, opKey []byte, sessionID, groupID uint16, source uint64, counter uint32, privacy bool, plain []byte) []byte {
 	t.Helper()
 	hdr := message.Header{
 		SessionID: sessionID, MessageCounter: counter,
