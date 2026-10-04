@@ -159,6 +159,8 @@ func TestAttributeWritable(t *testing.T) {
 		{"DoorLock/LockState read-only", 0x0101, 0x0000, false, true},
 		// DoorLock.OperatingMode (0x0025, "R[W] VM") — optional-write ⇒ writable.
 		{"DoorLock/OperatingMode writable", 0x0101, 0x0025, true, false},
+		// FlowMeasurement.MeasuredValue (0x0000, "R V") — read-only.
+		{"FlowMeasurement/MeasuredValue read-only", 0x0404, 0x0000, false, true},
 		// Cluster the bridge does not expose → unknown, treated writable.
 		{"unknown cluster", 0xBEEF, 0x0000, true, false},
 		// Global attribute (no access string) → not tracked.

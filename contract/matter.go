@@ -264,13 +264,14 @@ const (
 	MeasurementEnergy                           // 0x0091 ElectricalEnergyMeasurement
 	MeasurementMomentarySwitch                  // 0x003B Switch (Generic Switch endpoint)
 	MeasurementElectrical                       // 0x0090 + 0x0091 + 0x009C (ElectricalSensor endpoint)
+	MeasurementFlow                             // 0x0404 FlowMeasurement (FlowSensor endpoint)
 )
 
 // measurementClassBuiltinEnd is one past the last built-in class, and
 // the first class [RegisterMeasurementKind] hands out. Keeping the two
 // ranges apart is what lets the constants above keep their numeric
 // values while the set stays open.
-const measurementClassBuiltinEnd = MeasurementElectrical + 1
+const measurementClassBuiltinEnd = MeasurementFlow + 1
 
 // MeasurementMaterializer builds the cluster server(s) that carry one
 // source's readings for a measurement kind — the same job the library's
@@ -506,6 +507,9 @@ func builtinMeasurementKinds() map[MeasurementClass]MeasurementKind {
 		// so a verdict has a single id to report, and the full set is
 		// built by measurement.FromMeasurementClass.
 		MeasurementElectrical: {Name: "Electrical", DeviceType: 0x0510, ClusterID: 0x0090},
+		// FlowSensor (0x0306) mandates Identify plus FlowMeasurement
+		// (0x0404) and nothing else (matter.js flow-sensor.element.ts).
+		MeasurementFlow: {Name: "Flow", DeviceType: 0x0306, ClusterID: 0x0404},
 	}
 }
 
@@ -554,12 +558,13 @@ type MeasurementSource interface {
 
 // FloatMeasurementSource is the typed read surface for scalar
 // measurement classes (Temperature, Humidity, Illuminance, Pressure,
-// CO2, PM2.5, PM10). Implemented by Generic.Sensor[float64] and the
+// CO2, PM2.5, PM10, Flow). Implemented by Generic.Sensor[float64] and the
 // equivalent calculated-DP types.
 //
 // MatterFloatValue returns the current observed value in the model's
 // native unit (°C for temperature, % RH for humidity, lux for
-// illuminance, hPa for pressure, ppm for CO2, µg/m³ for particulates).
+// illuminance, hPa for pressure, ppm for CO2, µg/m³ for particulates,
+// m³/h for flow).
 // `observed` is false when no measurement has been received yet — the
 // bridge maps that to a Matter-spec NULL response (e.g. -32768 sentinel
 // for nullable int16 attributes).
@@ -805,6 +810,8 @@ func DeviceTypeName(id uint16) string {
 		return "Temperature Sensor"
 	case 0x0305:
 		return "Pressure Sensor"
+	case 0x0306:
+		return "Flow Sensor"
 	case 0x0307:
 		return "Humidity Sensor"
 	case 0x0510:

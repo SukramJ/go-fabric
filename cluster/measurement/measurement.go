@@ -3,7 +3,7 @@
 
 // Package measurement contains generic, Source-driven cluster server
 // implementations for the read-only Matter measurement clusters
-// (Temperature, Humidity, Illuminance, Pressure, BooleanState,
+// (Temperature, Humidity, Illuminance, Pressure, Flow, BooleanState,
 // OccupancySensing, AirQuality). They project a typed measurement source
 // from the host's rich-model layer
 // onto Matter wire format without depending on any specific source
@@ -34,6 +34,7 @@ const (
 	ClusterHumidityMeasurement    uint32 = 0x0405
 	ClusterIlluminanceMeasurement uint32 = 0x0400
 	ClusterPressureMeasurement    uint32 = 0x0403
+	ClusterFlowMeasurement        uint32 = 0x0404
 	ClusterBooleanState           uint32 = 0x0045
 	ClusterOccupancySensing       uint32 = 0x0406
 	ClusterAirQuality             uint32 = 0x005B // mandatory on AirQualitySensor (0x002C)

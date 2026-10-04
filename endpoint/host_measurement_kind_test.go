@@ -22,10 +22,13 @@ import (
 )
 
 // The host's own Matter projection: Flow Sensor (device type 0x0306)
-// carrying FlowMeasurement (cluster 0x0404). Neither is modelled by this
-// library, which is the point — the kind is registered from out here,
-// with the cluster server the host wrote, and nothing in contract,
-// cluster/measurement or endpoint knows it exists.
+// carrying FlowMeasurement (cluster 0x0404). The library now ships a
+// built-in kind for the same pair (contract.MeasurementFlow), which does
+// not matter here and is part of the point: the kind below is a separate
+// class, registered from out here with the cluster server the host
+// wrote, and nothing in contract, cluster/measurement or endpoint knows
+// it exists — a host may project a reading its own way even where a
+// built-in would also fit.
 const (
 	hostFlowDeviceType uint16 = 0x0306
 	hostFlowClusterID  uint32 = 0x0404
