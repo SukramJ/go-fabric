@@ -176,11 +176,11 @@ const (
 	// AUX, access "R F A", quality C) and accessControlEventAuxiliary
 	// AccessUpdated its change event (0x0003). The Auxiliary feature is
 	// FeatureMap bit 2. Mirrors access-control.element.ts.
-	accessControlAttrAuxiliaryACL         uint32 = 0x0007
-	accessControlEventAuxiliaryAccessUpd  uint32 = 0x0003
-	accessControlFeatureExtension         uint32 = 0x1
-	accessControlFeatureAuxiliary         uint32 = 0x4
-	accessControlAuxiliaryACLMaxEntries          = 2000
+	accessControlAttrAuxiliaryACL        uint32 = 0x0007
+	accessControlEventAuxiliaryAccessUpd uint32 = 0x0003
+	accessControlFeatureExtension        uint32 = 0x1
+	accessControlFeatureAuxiliary        uint32 = 0x4
+	accessControlAuxiliaryACLMaxEntries         = 2000
 )
 
 // ChangeType constants for [AccessControlEntryChangedEvent], mirroring
@@ -234,10 +234,10 @@ type AccessControlExtensionChangedEvent struct {
 // Field order matches the wire-encoded TLV tags so the default
 // attribute writer can emit it via reflection.
 type AccessControlEntryStruct struct {
-	Privilege   uint8             // 1=View, 2=ProxyView, 3=Operate, 4=Manage, 5=Administer
-	AuthMode    uint8             // 1=PASE, 2=CASE, 3=Group
-	Subjects    []uint64          // nullable; nil ⇒ matches every subject
-	Targets     []ACLTargetStruct // nullable; nil ⇒ matches every cluster/endpoint/device-type
+	Privilege uint8             // 1=View, 2=ProxyView, 3=Operate, 4=Manage, 5=Administer
+	AuthMode  uint8             // 1=PASE, 2=CASE, 3=Group
+	Subjects  []uint64          // nullable; nil ⇒ matches every subject
+	Targets   []ACLTargetStruct // nullable; nil ⇒ matches every cluster/endpoint/device-type
 	// AuxiliaryType is field 5 as a write carried it. A controller may
 	// not set it — the ACL write refuses an entry that does — and a stored
 	// entry never has one.

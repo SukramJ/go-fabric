@@ -517,6 +517,63 @@ func memberOf(ms []groups.GroupcastMembership, fabric uint8, groupID uint16) (gr
 // whose key store a failed transaction does not roll back — a key set it
 // already created.
 func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRequest) error {
+	if err := g.validateJoin(ctx, req); err != nil {
+		return err
+	}
+	policy := groups.PolicyIanaAddr
+	if req.McastAddrPolicy != nil {
+		policy = *req.McastAddrPolicy
+	}
+	ms, err := g.groups.GroupcastMemberships(ctx)
+	if err != nil {
+		return fmt.Errorf("matter: Groupcast.JoinGroup: %w", err)
+	}
+	existing, isMember := memberOf(ms, fabric, req.GroupID)
+	if err := checkJoinCapacity(ms, fabric, req.GroupID, isMember, policy); err != nil {
+		return err
+	}
+
+	if err := g.applyKeySet(ctx, fabric, req.KeySetID, req.Key); err != nil {
+		return err
+	}
+
+	// The group table must take a new group and GroupKeyMap the binding;
+	// both refusals are known before anything changes.
+	table, err := g.groups.GroupTable(ctx, fabric)
+	if err != nil {
+		return fmt.Errorf("matter: Groupcast.JoinGroup: %w", err)
+	}
+	name, inTable := "", false
+	for _, e := range table {
+		if e.GroupID == req.GroupID {
+			name, inTable = e.GroupName, true
+		}
+	}
+	if !inTable && len(table) >= g.groups.MaxGroupsPerFabric() {
+		return groupcastErr(im.StatusResourceExhausted, "Too many groups for fabric %d, maximum is %d", fabric, g.groups.MaxGroupsPerFabric())
+	}
+	if err := g.gkm.checkGroupKeyMapping(ctx, fabric, req.GroupID); err != nil {
+		return err
+	}
+
+	if err := g.mirrorEndpoints(ctx, fabric, req, existing.Endpoints, name); err != nil {
+		return err
+	}
+	if err := g.gkm.setGroupKeyMapping(ctx, fabric, req.GroupID, req.KeySetID); err != nil {
+		return err
+	}
+	if err := g.groups.SetGroupProperties(ctx, fabric, req.GroupID, &policy, req.UseAuxiliaryACL); err != nil {
+		return g.groupStateErr("JoinGroup", err)
+	}
+	return nil
+}
+
+// validateJoin applies the model constraints and the request checks of
+// JoinGroup in matter.js's order: GroupId and KeySetId "min 1", Key "16",
+// the MulticastAddrPolicyEnum values, then the GroupId range, Administer
+// for a key or UseAuxiliaryAcl, the endpoint ids, and — without the Sender
+// feature — a non-empty endpoint list.
+func (g *Groupcast) validateJoin(ctx context.Context, req JoinGroupRequest) error {
 	if req.GroupID < 1 || req.KeySetID < 1 || (req.Key != nil && len(req.Key) != groupcastKeyLength) {
 		return groupcastErr(im.StatusConstraintError, "JoinGroup: GroupId and KeySetId must be at least 1, Key 16 bytes")
 	}
@@ -536,20 +593,16 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 			return groupcastErr(im.StatusUnsupportedEndpoint, "Endpoint %d is invalid", ep)
 		}
 	}
-	// Without the Sender feature a membership needs an endpoint.
 	if len(req.Endpoints) == 0 {
 		return groupcastErr(im.StatusConstraintError, "Empty endpoint list requires Sender feature")
 	}
-	policy := groups.PolicyIanaAddr
-	if req.McastAddrPolicy != nil {
-		policy = *req.McastAddrPolicy
-	}
+	return nil
+}
 
-	ms, err := g.groups.GroupcastMemberships(ctx)
-	if err != nil {
-		return fmt.Errorf("matter: Groupcast.JoinGroup: %w", err)
-	}
-	existing, isMember := memberOf(ms, fabric, req.GroupID)
+// checkJoinCapacity applies the membership limits — per fabric
+// floor(MaxMembershipCount/2), in total MaxMembershipCount, for a new group
+// only — and MaxMcastAddrCount for the address the join would use.
+func checkJoinCapacity(ms []groups.GroupcastMembership, fabric uint8, groupID uint16, isMember bool, policy uint8) error {
 	if !isMember {
 		perFabric := 0
 		for _, m := range ms {
@@ -565,61 +618,36 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 		}
 	}
 	projected := slices.DeleteFunc(slices.Clone(ms), func(m groups.GroupcastMembership) bool {
-		return m.FabricIndex == fabric && m.GroupID == req.GroupID
+		return m.FabricIndex == fabric && m.GroupID == groupID
 	})
 	projected = append(projected, groups.GroupcastMembership{McastAddrPolicy: policy})
 	if n := usedMcastAddrCount(projected); n > groupcastMaxMcastAddrCount && n > usedMcastAddrCount(ms) {
 		return groupcastErr(im.StatusResourceExhausted, "MaxMcastAddrCount limit reached")
 	}
+	return nil
+}
 
-	if err := g.applyKeySet(ctx, fabric, req.KeySetID, req.Key); err != nil {
-		return err
-	}
-
-	// The group table must take a new group and GroupKeyMap the binding;
-	// both refusals are known before anything changes.
-	table, err := g.groups.GroupTable(ctx, fabric)
-	if err != nil {
-		return fmt.Errorf("matter: Groupcast.JoinGroup: %w", err)
-	}
-	inTable := slices.ContainsFunc(table, func(e groups.TableEntry) bool { return e.GroupID == req.GroupID })
-	if !inTable && len(table) >= g.groups.MaxGroupsPerFabric() {
-		return groupcastErr(im.StatusResourceExhausted, "Too many groups for fabric %d, maximum is %d", fabric, g.groups.MaxGroupsPerFabric())
-	}
-	if err := g.gkm.checkGroupKeyMapping(ctx, fabric, req.GroupID); err != nil {
-		return err
-	}
-
-	// Listener: mirror the endpoints into the group table. The new
-	// endpoints join before the dropped ones leave, so a replace never
-	// empties the group on the way (which would prune its properties).
-	name := ""
-	for _, e := range table {
-		if e.GroupID == req.GroupID {
-			name = e.GroupName
-		}
-	}
-	replace := req.ReplaceEndpoints != nil && *req.ReplaceEndpoints
+// mirrorEndpoints writes the Listener's endpoints into the group table:
+// merged with the current ones, or replacing them with ReplaceEndpoints.
+// The new endpoints join before the dropped ones leave, so a replace never
+// empties the group on the way (which would prune its properties); the end
+// state is the one matter.js's remove-then-add produces.
+func (g *Groupcast) mirrorEndpoints(ctx context.Context, fabric uint8, req JoinGroupRequest, current []uint16, name string) error {
 	for _, ep := range req.Endpoints {
 		if err := g.groups.AddEndpointForGroup(ctx, fabric, req.GroupID, ep, name); err != nil {
 			return g.groupStateErr("JoinGroup", err)
 		}
 	}
-	if replace {
-		for _, ep := range existing.Endpoints {
-			if slices.Contains(req.Endpoints, ep) {
-				continue
-			}
-			if _, err := g.groups.RemoveEndpoint(ctx, fabric, ep, req.GroupID, false); err != nil {
-				return g.groupStateErr("JoinGroup", err)
-			}
+	if req.ReplaceEndpoints == nil || !*req.ReplaceEndpoints {
+		return nil
+	}
+	for _, ep := range current {
+		if slices.Contains(req.Endpoints, ep) {
+			continue
 		}
-	}
-	if err := g.gkm.setGroupKeyMapping(ctx, fabric, req.GroupID, req.KeySetID); err != nil {
-		return err
-	}
-	if err := g.groups.SetGroupProperties(ctx, fabric, req.GroupID, &policy, req.UseAuxiliaryACL); err != nil {
-		return g.groupStateErr("JoinGroup", err)
+		if _, err := g.groups.RemoveEndpoint(ctx, fabric, ep, req.GroupID, false); err != nil {
+			return g.groupStateErr("JoinGroup", err)
+		}
 	}
 	return nil
 }
@@ -703,8 +731,10 @@ func (g *Groupcast) leaveGroup(ctx context.Context, fabric uint8, req LeaveGroup
 // properties (no Sender feature to keep it sender-only). Mirrors matter.js
 // GroupcastServer #leave.
 func (g *Groupcast) leave(ctx context.Context, fabric uint8, entry groups.GroupcastMembership, req LeaveGroupRequest) ([]uint16, error) {
-	var removed []uint16
-	entryRemoved := false
+	var (
+		removed      []uint16
+		entryRemoved bool
+	)
 	if !req.HasEndpoints {
 		removed = slices.Clone(entry.Endpoints)
 		entryRemoved = true

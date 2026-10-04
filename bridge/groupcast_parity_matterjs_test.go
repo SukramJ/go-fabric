@@ -160,7 +160,7 @@ func checkGroupcastAttributeFixture(t *testing.T, f groupcastWireFixture) {
 		if err := json.Unmarshal(f.Fixture, &fx); err != nil {
 			t.Fatal(err)
 		}
-		var v []mattercore.GroupcastMembershipStruct
+		v := make([]mattercore.GroupcastMembershipStruct, 0, len(fx))
 		for _, m := range fx {
 			v = append(v, mattercore.GroupcastMembershipStruct{
 				GroupID: m.GroupID, Endpoints: m.Endpoints, KeySetID: m.KeySetID,
@@ -184,7 +184,7 @@ func checkGroupcastAttributeFixture(t *testing.T, f groupcastWireFixture) {
 		if err := json.Unmarshal(f.Fixture, &fx); err != nil {
 			t.Fatal(err)
 		}
-		var v []mattercore.AccessControlAuxiliaryEntryStruct
+		v := make([]mattercore.AccessControlAuxiliaryEntryStruct, 0, len(fx))
 		for _, e := range fx {
 			entry := mattercore.AccessControlAuxiliaryEntryStruct{Entry: mattercore.AccessControlEntryStruct{FabricIndex: e.FabricIndex}}
 			if e.AuxiliaryType == nil {

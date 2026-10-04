@@ -18,7 +18,7 @@ import (
 // GroupStoreFacade ones, so the cluster cannot enumerate fabrics through it.
 type keyStoreOnly struct{ core.GroupStoreFacade }
 
-func gkmFabricsOf(t *testing.T, gkm *core.GroupKeyManagement, ctx context.Context, attr uint32) []uint8 {
+func gkmFabricsOf(ctx context.Context, t *testing.T, gkm *core.GroupKeyManagement, attr uint32) []uint8 {
 	t.Helper()
 	v, ok := gkm.MatterReadFiltered(ctx, attr)
 	if !ok {
@@ -73,13 +73,13 @@ func TestGKMUnfilteredReadsParityMatterJS(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, attr := range []uint32{0x0000, 0x0001} {
-			if got := gkmFabricsOf(t, gkm, im.WithFabricFilter(ctx, true, 2), attr); !slices.Equal(got, []uint8{2}) {
+			if got := gkmFabricsOf(im.WithFabricFilter(ctx, true, 2), t, gkm, attr); !slices.Equal(got, []uint8{2}) {
 				t.Errorf("%s: attribute %d fabric-filtered = %v, want [2]", name, attr, got)
 			}
-			if got := gkmFabricsOf(t, gkm, im.WithFabricFilter(ctx, false, 2), attr); !slices.Equal(got, []uint8{1, 2}) {
+			if got := gkmFabricsOf(im.WithFabricFilter(ctx, false, 2), t, gkm, attr); !slices.Equal(got, []uint8{1, 2}) {
 				t.Errorf("%s: attribute %d unfiltered = %v, want [1 2]", name, attr, got)
 			}
-			if got := gkmFabricsOf(t, gkm, im.WithFabricFilter(ctx, true, 0), attr); len(got) != 0 {
+			if got := gkmFabricsOf(im.WithFabricFilter(ctx, true, 0), t, gkm, attr); len(got) != 0 {
 				t.Errorf("%s: attribute %d fabric-filtered without an accessing fabric = %v, want none", name, attr, got)
 			}
 		}
@@ -90,10 +90,10 @@ func TestGKMUnfilteredReadsParityMatterJS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := gkmFabricsOf(t, bare, im.WithFabricFilter(ctx, false, 1), 0x0000); !slices.Equal(got, []uint8{1}) {
+	if got := gkmFabricsOf(im.WithFabricFilter(ctx, false, 1), t, bare, 0x0000); !slices.Equal(got, []uint8{1}) {
 		t.Errorf("unfiltered without an enumerator = %v, want [1]", got)
 	}
-	if got := gkmFabricsOf(t, bare, im.WithFabricFilter(ctx, false, 0), 0x0000); len(got) != 0 {
+	if got := gkmFabricsOf(im.WithFabricFilter(ctx, false, 0), t, bare, 0x0000); len(got) != 0 {
 		t.Errorf("unfiltered without an enumerator or a fabric = %v, want none", got)
 	}
 }

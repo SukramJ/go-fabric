@@ -40,10 +40,10 @@ type gcRecordingEmitter struct {
 	events []gcEvent
 }
 
-func (r *gcRecordingEmitter) MatterEmitEvent(_ uint16, cluster, event uint32, data any, _ contract.EventPriority) {
+func (r *gcRecordingEmitter) MatterEmitEvent(_ uint16, clusterID, event uint32, data any, _ contract.EventPriority) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.events = append(r.events, gcEvent{cluster, event, data})
+	r.events = append(r.events, gcEvent{clusterID, event, data})
 }
 
 func (r *gcRecordingEmitter) take() []gcEvent {
@@ -114,7 +114,7 @@ func newGCFixture(t *testing.T, fabrics int) *gcFixture {
 }
 
 // as is a CASE request of fabric holding privilege on the Groupcast server.
-func as(fabric uint8, privilege uint8) context.Context {
+func as(fabric, privilege uint8) context.Context {
 	ctx := im.WithSubject(im.WithFabricFilter(context.Background(), true, fabric), gcAdminNode, nil)
 	return im.WithAuthority(ctx, func(_ uint16, _ uint32, need uint8) im.StatusCode {
 		if need <= privilege {
@@ -146,7 +146,7 @@ func boolp(v bool) *bool    { return &v }
 func u8p(v uint8) *uint8    { return &v }
 func u16p(v uint16) *uint16 { return &v }
 
-func (f *gcFixture) join(t *testing.T, ctx context.Context, req core.JoinGroupRequest) {
+func (f *gcFixture) join(ctx context.Context, t *testing.T, req core.JoinGroupRequest) {
 	t.Helper()
 	if _, st := f.invoke(ctx, 0x00, req); st != im.StatusSuccess {
 		t.Fatalf("JoinGroup %+v: %v", req, st)
@@ -179,7 +179,7 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 	t.Run("adds a membership entry on the IANA address with its key", func(t *testing.T) {
 		t.Parallel()
 		f := newGCFixture(t, 1)
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey, McastAddrPolicy: u8p(groups.PolicyIanaAddr)})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey, McastAddrPolicy: u8p(groups.PolicyIanaAddr)})
 		m, ok := f.memberOf(t, 1, 1)
 		if !ok || *m.KeySetID != 1 || m.McastAddrPolicy != groups.PolicyIanaAddr || !slices.Equal(m.Endpoints, []uint16{3}) || m.HasAuxiliaryACL {
 			t.Fatalf("membership = %+v", m)
@@ -199,8 +199,8 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 	t.Run("McastAddrPolicy defaults to IanaAddr; PerGroup uses the group address", func(t *testing.T) {
 		t.Parallel()
 		f := newGCFixture(t, 1)
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{3}, KeySetID: 1, McastAddrPolicy: u8p(groups.PolicyPerGroup)})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{3}, KeySetID: 1, McastAddrPolicy: u8p(groups.PolicyPerGroup)})
 		if m, _ := f.memberOf(t, 1, 1); m.McastAddrPolicy != groups.PolicyIanaAddr {
 			t.Errorf("omitted policy = %d, want IanaAddr", m.McastAddrPolicy)
 		}
@@ -243,7 +243,7 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 		if _, st := f.invoke(admin, 0x00, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 99}); st != im.StatusNotFound {
 			t.Errorf("missing key set: %v, want NotFound", st)
 		}
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
 		if _, st := f.invoke(admin, 0x00, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey}); st != im.StatusAlreadyExists {
 			t.Errorf("existing key set with a key: %v, want AlreadyExists", st)
 		}
@@ -256,11 +256,11 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 		if _, st := f.invoke(manage, 0x00, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey}); st != im.StatusUnsupportedAccess {
 			t.Errorf("key at Manage: %v, want UnsupportedAccess", st)
 		}
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
 		if _, st := f.invoke(manage, 0x00, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{3}, KeySetID: 1, UseAuxiliaryACL: boolp(false)}); st != im.StatusUnsupportedAccess {
 			t.Errorf("UseAuxiliaryAcl at Manage: %v, want UnsupportedAccess", st)
 		}
-		f.join(t, manage, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{3}, KeySetID: 1})
+		f.join(manage, t, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{3}, KeySetID: 1})
 		if _, st := f.invoke(im.WithFabricFilter(context.Background(), true, 1), 0x00, core.JoinGroupRequest{GroupID: 3, Endpoints: []uint16{3}, KeySetID: 2, Key: testKey}); st != im.StatusUnsupportedAccess {
 			t.Errorf("no access check at all: %v, want UnsupportedAccess", st)
 		}
@@ -272,17 +272,17 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 	t.Run("merges endpoints, or replaces them with ReplaceEndpoints", func(t *testing.T) {
 		t.Parallel()
 		f := newGCFixture(t, 1)
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3, 4}, KeySetID: 1, Key: testKey, UseAuxiliaryACL: boolp(true)})
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{5}, KeySetID: 1})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3, 4}, KeySetID: 1, Key: testKey, UseAuxiliaryACL: boolp(true)})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{5}, KeySetID: 1})
 		if m, _ := f.memberOf(t, 1, 1); !slices.Equal(m.Endpoints, []uint16{3, 4, 5}) || !m.HasAuxiliaryACL {
 			t.Fatalf("merge = %+v (a plain re-join must keep HasAuxiliaryAcl)", m)
 		}
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{6, 4}, KeySetID: 1, ReplaceEndpoints: boolp(true)})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{6, 4}, KeySetID: 1, ReplaceEndpoints: boolp(true)})
 		m, _ := f.memberOf(t, 1, 1)
 		if !slices.Equal(m.Endpoints, []uint16{4, 6}) || !m.HasAuxiliaryACL {
 			t.Errorf("replace = %+v, want [4 6] with the flag kept", m)
 		}
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{7}, KeySetID: 1, ReplaceEndpoints: boolp(true)})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{7}, KeySetID: 1, ReplaceEndpoints: boolp(true)})
 		if m, _ := f.memberOf(t, 1, 1); !slices.Equal(m.Endpoints, []uint16{7}) || !m.HasAuxiliaryACL {
 			t.Errorf("a disjoint replace = %+v, want [7] with the flag kept", m)
 		}
@@ -293,9 +293,9 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 		f := newGCFixture(t, 3)
 		for fabric := uint8(1); fabric <= 2; fabric++ {
 			ctx := as(fabric, 5)
-			f.join(t, ctx, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
+			f.join(ctx, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
 			for gid := uint16(2); gid <= 22; gid++ {
-				f.join(t, ctx, core.JoinGroupRequest{GroupID: gid, Endpoints: []uint16{3}, KeySetID: 1})
+				f.join(ctx, t, core.JoinGroupRequest{GroupID: gid, Endpoints: []uint16{3}, KeySetID: 1})
 			}
 		}
 		if _, st := f.invoke(as(1, 5), 0x00, core.JoinGroupRequest{GroupID: 23, Endpoints: []uint16{3}, KeySetID: 1}); st != im.StatusResourceExhausted {
@@ -307,7 +307,7 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 		if _, err := f.fs.GetGroupKeySet(context.Background(), 3, 1); !errors.Is(err, mstore.ErrGroupKeySetNotFound) {
 			t.Error("the refused join installed its key")
 		}
-		f.join(t, as(1, 5), core.JoinGroupRequest{GroupID: 22, Endpoints: []uint16{4}, KeySetID: 1})
+		f.join(as(1, 5), t, core.JoinGroupRequest{GroupID: 22, Endpoints: []uint16{4}, KeySetID: 1})
 	})
 
 	t.Run("a group id outside the application range fails the GroupKeyMap binding", func(t *testing.T) {
@@ -328,8 +328,8 @@ func TestGroupcastLeaveGroupParityMatterJS(t *testing.T) {
 	setup := func(t *testing.T) *gcFixture {
 		t.Helper()
 		f := newGCFixture(t, 1)
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3, 4}, KeySetID: 1, Key: testKey, UseAuxiliaryACL: boolp(true)})
-		f.join(t, admin, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{3, 5}, KeySetID: 1})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3, 4}, KeySetID: 1, Key: testKey, UseAuxiliaryACL: boolp(true)})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{3, 5}, KeySetID: 1})
 		return f
 	}
 
@@ -416,7 +416,7 @@ func TestGroupcastUpdateKeyAndAuxiliaryACLParityMatterJS(t *testing.T) {
 	t.Parallel()
 	admin := as(1, 5)
 	f := newGCFixture(t, 1)
-	f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
+	f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
 
 	if _, st := f.invoke(admin, 0x03, core.UpdateGroupKeyRequest{GroupID: 1, KeySetID: 2, Key: testKey}); st != im.StatusSuccess {
 		t.Fatalf("UpdateGroupKey: %v", st)
@@ -478,7 +478,7 @@ func TestGroupcastTestingParityMatterJS(t *testing.T) {
 	t.Parallel()
 	admin := as(1, 5)
 	f := newGCFixture(t, 2)
-	f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey, McastAddrPolicy: u8p(groups.PolicyPerGroup)})
+	f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey, McastAddrPolicy: u8p(groups.PolicyPerGroup)})
 	var notified int
 	unsub := f.gc.OnMatterValueChanged(func() { notified++ })
 	defer unsub()
@@ -584,7 +584,7 @@ func TestGroupcastAuxiliaryACLParityMatterJS(t *testing.T) {
 	}
 
 	f.emitter.take()
-	f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3, 4, 5, 6, 7}, KeySetID: 1, Key: testKey, UseAuxiliaryACL: boolp(true)})
+	f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3, 4, 5, 6, 7}, KeySetID: 1, Key: testKey, UseAuxiliaryACL: boolp(true)})
 	evs := f.emitter.take()
 	var updates []core.AuxiliaryAccessUpdatedEvent
 	for _, e := range evs {
@@ -623,7 +623,7 @@ func TestGroupcastAuxiliaryACLParityMatterJS(t *testing.T) {
 	}
 
 	// An unchanged command emits nothing; a LeaveGroup one event.
-	f.join(t, admin, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1})
+	f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1})
 	if evs := f.emitter.take(); len(evs) != 0 {
 		t.Errorf("an unchanged aux ACL emitted %+v", evs)
 	}
@@ -646,8 +646,8 @@ func TestGroupcastAuxiliaryACLParityMatterJS(t *testing.T) {
 func TestGroupcastMembershipReadsAndSurfaceParityMatterJS(t *testing.T) {
 	t.Parallel()
 	f := newGCFixture(t, 2)
-	f.join(t, as(1, 5), core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
-	f.join(t, as(2, 5), core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{4}, KeySetID: 1, Key: testKey})
+	f.join(as(1, 5), t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey})
+	f.join(as(2, 5), t, core.JoinGroupRequest{GroupID: 2, Endpoints: []uint16{4}, KeySetID: 1, Key: testKey})
 	ctx := context.Background()
 
 	read := func(filtered bool, fabric uint8) []core.GroupcastMembershipStruct {

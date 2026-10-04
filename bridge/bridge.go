@@ -271,10 +271,10 @@ type Bridge struct {
 	// records itself; the store belongs to whoever builds that topology
 	// (typically an endpoint assembler the host owns). A field held here
 	// would be a collaborator that looks wired and is never called.
-	aclLister   endpoint.ACLLister // ACL source for the dispatcher's CheckACL; nil denies every operational request
+	aclLister endpoint.ACLLister // ACL source for the dispatcher's CheckACL; nil denies every operational request
 	// auxACL supplies the AccessControl Auxiliary feature's entries to
 	// the dispatcher; nil keeps the feature off. See AttachAuxiliaryACL.
-	auxACL endpoint.AuxiliaryACLLister
+	auxACL      endpoint.AuxiliaryACLLister
 	snapshotter Snapshotter
 	logger      *slog.Logger
 	advertiser  mdns.Advertiser

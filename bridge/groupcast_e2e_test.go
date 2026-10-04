@@ -25,10 +25,10 @@ import (
 )
 
 // groupcastTestingEvents returns the GroupcastTesting events the bridge
-// logged after number min.
-func (gh *groupsHarness) groupcastTestingEvents(min uint64) []mattercore.GroupcastTestingEvent {
+// logged from number from on.
+func (gh *groupsHarness) groupcastTestingEvents(from uint64) []mattercore.GroupcastTestingEvent {
 	var out []mattercore.GroupcastTestingEvent
-	for _, rec := range gh.bridge.EventLog().Query(0, gcCluster, 0, min) {
+	for _, rec := range gh.bridge.EventLog().Query(0, gcCluster, 0, from) {
 		if ev, ok := rec.Payload.(mattercore.GroupcastTestingEvent); ok {
 			out = append(out, ev)
 		}
