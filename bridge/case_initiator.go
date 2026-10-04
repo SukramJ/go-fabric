@@ -49,9 +49,9 @@ type CaseInitiation struct {
 	CompressedFabricID [8]byte
 	// OnEstablished registers the session under Initiator.SessionID()
 	// (secure/operational.Manager.OpenFromSigmaAsInitiatorWithID) and may
-	// persist the new resumption record. Returning an error abandons the
-	// session.
-	OnEstablished func(result sigma.InitiatorResult) error
+	// persist the new resumption record. ctx is the handshake's. Returning
+	// an error abandons the session.
+	OnEstablished func(ctx context.Context, result sigma.InitiatorResult) error
 	// OnAbandoned, optional, releases what the provider reserved — the
 	// local session id — when the handshake does not complete.
 	OnAbandoned func()
@@ -59,8 +59,8 @@ type CaseInitiation struct {
 
 // CaseInitiatorProvider prepares a CASE handshake towards peerNodeID on the
 // fabric at fabricIndex. It is consulted only to re-establish former
-// subscriptions.
-type CaseInitiatorProvider func(fabricIndex uint8, peerNodeID uint64) (*CaseInitiation, error)
+// subscriptions; ctx bounds the attempt.
+type CaseInitiatorProvider func(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*CaseInitiation, error)
 
 // OperationalResolver finds the addresses of a peer's operational instance
 // (`<CompressedFabricID>-<NodeID>._matter._tcp.local`), most desirable
@@ -119,7 +119,7 @@ func (b *Bridge) connectPeer(ctx context.Context, fabricIndex uint8, peerNodeID 
 		return peerLink{}, ErrOperationalResolverMissing
 	}
 
-	init, err := provider(fabricIndex, peerNodeID)
+	init, err := provider(ctx, fabricIndex, peerNodeID)
 	if err != nil {
 		return peerLink{}, fmt.Errorf("bridge: prepare CASE: %w", err)
 	}
@@ -136,7 +136,7 @@ func (b *Bridge) connectPeer(ctx context.Context, fabricIndex uint8, peerNodeID 
 		if i > 0 {
 			// An initiator runs one handshake; each further address gets
 			// a fresh one.
-			if init, err = provider(fabricIndex, peerNodeID); err != nil || init == nil || init.Initiator == nil {
+			if init, err = provider(ctx, fabricIndex, peerNodeID); err != nil || init == nil || init.Initiator == nil {
 				break
 			}
 		}
@@ -297,7 +297,7 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 		return 0, errors.New("bridge: CASE initiator finished without a result")
 	}
 	if init.OnEstablished != nil {
-		if err := init.OnEstablished(result); err != nil {
+		if err := init.OnEstablished(ctx, result); err != nil {
 			return 0, fmt.Errorf("bridge: register initiated session: %w", err)
 		}
 	}

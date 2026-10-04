@@ -231,7 +231,7 @@ func run() error {
 	}, logger)
 	// A removed fabric takes its persisted subscriptions with it.
 	refs.opCreds.SetOnFabricRemoved(func(_ context.Context, fabricIndex uint8) {
-		br.EmitFabricRemoved(fabricIndex)
+		br.EmitFabricRemoved(fabricIndex) //nolint:contextcheck // EmitFabricRemoved takes no ctx; its store delete runs on its own bounded timeout
 	})
 
 	// Event numbers must not restart at zero across a reboot: a controller

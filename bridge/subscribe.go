@@ -970,7 +970,7 @@ func (b *Bridge) handleSubscribeRequest(
 	// restart (matter.js SubscriptionsServer.#addSubscription, fired when
 	// InteractionServer activates the subscription after its
 	// SubscribeResponse).
-	b.persistSubscription(subID)
+	b.persistSubscription(ctx, subID)
 	return nil
 }
 

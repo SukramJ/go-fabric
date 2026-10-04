@@ -112,7 +112,7 @@ func TestOperationalResolver_ResolvesFromOneResponseInPreferenceOrder(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got []string
+	got := make([]string, 0, len(addrs))
 	for _, a := range addrs {
 		got = append(got, a.String())
 	}

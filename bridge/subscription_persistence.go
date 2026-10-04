@@ -171,7 +171,11 @@ func (b *Bridge) FormerSubscriptionCount() int {
 // a CASE session becomes active (SessionsBehavior skips PASE sessions).
 // The identity is the session's — fabric and peer node — not the request
 // header's, which carries no source node id on a secure session.
-func (b *Bridge) persistSubscription(subID uint32) {
+//
+// ctx is the caller's; the store write outlives its cancellation (an
+// established subscription is recorded even if the request that made it
+// is done) but is bounded by subscriptionStoreTimeout.
+func (b *Bridge) persistSubscription(ctx context.Context, subID uint32) {
 	m := b.subscriptionManagerLocked()
 	if m == nil || subID == 0 {
 		return
@@ -205,9 +209,9 @@ func (b *Bridge) persistSubscription(subID uint32) {
 		b.logger.Warn("matter.subscription.persist.encode", slog.String("err", err.Error()))
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), subscriptionStoreTimeout)
+	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), subscriptionStoreTimeout)
 	defer cancel()
-	if err := b.resumption.storeLocked().SaveServerSubscription(ctx, rec.SubscriptionID, rec.FabricIndex, rec.PeerNodeID, payload); err != nil {
+	if err := b.resumption.storeLocked().SaveServerSubscription(saveCtx, rec.SubscriptionID, rec.FabricIndex, rec.PeerNodeID, payload); err != nil {
 		b.logger.Warn("matter.subscription.persist.save",
 			slog.Int("subscription_id", int(subID)),
 			slog.String("err", err.Error()))

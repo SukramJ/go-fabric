@@ -577,8 +577,8 @@ func (r staticResolver) ResolveOperational(_ context.Context, cfid [8]byte, _ ui
 	return []*net.UDPAddr{r.addr}, nil
 }
 
-func resumeInitiatorProvider(t *testing.T, fab resumeFabric, sessions *operational.Manager) CaseInitiatorProvider {
-	return func(fabricIndex uint8, peerNodeID uint64) (*CaseInitiation, error) {
+func resumeInitiatorProvider(fab resumeFabric, sessions *operational.Manager) CaseInitiatorProvider {
+	return func(_ context.Context, fabricIndex uint8, peerNodeID uint64) (*CaseInitiation, error) {
 		sid, err := sessions.AllocateID()
 		if err != nil {
 			return nil, err
@@ -593,7 +593,7 @@ func resumeInitiatorProvider(t *testing.T, fab resumeFabric, sessions *operation
 		return &CaseInitiation{
 			Initiator:          ini,
 			CompressedFabricID: fab.cfid,
-			OnEstablished: func(res sigma.InitiatorResult) error {
+			OnEstablished: func(_ context.Context, res sigma.InitiatorResult) error {
 				_, err := sessions.OpenFromSigmaAsInitiatorWithID(sid, fabricIndex, resumeDeviceNode, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
 				return err
 			},
@@ -695,7 +695,7 @@ func runRestartEndToEnd(t *testing.T, withMRP bool) {
 	resolverCalls := make(chan [8]byte, 2)
 	run2 := startResumeDevice(t, st, func(br *Bridge, sessions *operational.Manager) {
 		mrpWiring(br)
-		br.AttachCaseInitiatorProvider(resumeInitiatorProvider(t, fab, sessions))
+		br.AttachCaseInitiatorProvider(resumeInitiatorProvider(fab, sessions))
 		br.AttachOperationalResolver(staticResolver{addr: ctrl.addr, calls: resolverCalls})
 	})
 	ctrl.setBridge(run2.addr(t))
@@ -757,7 +757,7 @@ func TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord(t *testing.T) 
 	ctrl.answer = im.StatusInvalidSubscription
 	ctrl.mu.Unlock()
 	run2 := startResumeDevice(t, st, func(br *Bridge, sessions *operational.Manager) {
-		br.AttachCaseInitiatorProvider(resumeInitiatorProvider(t, fab, sessions))
+		br.AttachCaseInitiatorProvider(resumeInitiatorProvider(fab, sessions))
 		br.AttachOperationalResolver(staticResolver{addr: ctrl.addr})
 	})
 	ctrl.setBridge(run2.addr(t))
@@ -817,7 +817,7 @@ func TestSubscriptionResumption_PeerThatSubscribesIsSkipped(t *testing.T) {
 	ctrl := newFakeController(t, fab)
 	dialled := make(chan struct{}, 1)
 	dev := startResumeDevice(t, st, func(br *Bridge, _ *operational.Manager) {
-		br.AttachCaseInitiatorProvider(func(uint8, uint64) (*CaseInitiation, error) {
+		br.AttachCaseInitiatorProvider(func(context.Context, uint8, uint64) (*CaseInitiation, error) {
 			dialled <- struct{}{}
 			return nil, errors.New("must not be reached")
 		})
@@ -870,7 +870,8 @@ func TestSubscriptionResumption_DisabledRecordsNothing(t *testing.T) {
 	}
 }
 
-// TestSubscriptionResumption_FabricRemovalForgetsRows.
+// TestSubscriptionResumption_FabricRemovalForgetsRows: removing a fabric
+// deletes its persisted subscriptions at once.
 func TestSubscriptionResumption_FabricRemovalForgetsRows(t *testing.T) {
 	fab := newResumeFabric(t)
 	st := newMemSubscriptionStore()
@@ -935,7 +936,7 @@ func TestSubscriptionResumption_SilentPeerStopsThatPeersLoop(t *testing.T) {
 	ctrl.mu.Unlock()
 	dev := startResumeDevice(t, st, func(br *Bridge, sessions *operational.Manager) {
 		br.chunkStatusResponseTimeoutOverride = 200 * time.Millisecond
-		br.AttachCaseInitiatorProvider(resumeInitiatorProvider(t, fab, sessions))
+		br.AttachCaseInitiatorProvider(resumeInitiatorProvider(fab, sessions))
 		br.AttachOperationalResolver(staticResolver{addr: ctrl.addr})
 	})
 	ctrl.setBridge(dev.addr(t))

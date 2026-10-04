@@ -524,7 +524,7 @@ func wireSecurity(
 // one. A completed handshake registers the session and stores the new
 // resumption record, as matter.js does after every pair.
 func caseInitiatorProvider(st *store.Store, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger) matterbridge.CaseInitiatorProvider {
-	return func(fabricIndex uint8, peerNodeID uint64) (*matterbridge.CaseInitiation, error) {
+	return func(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*matterbridge.CaseInitiation, error) {
 		fabric, ok := ids.forFabric(fabricIndex)
 		if !ok {
 			return nil, fmt.Errorf("no CASE identity loaded for fabric %d", fabricIndex)
@@ -534,7 +534,7 @@ func caseInitiatorProvider(st *store.Store, sessions *operational.Manager, ids *
 			return nil, fmt.Errorf("allocate CASE session id: %w", err)
 		}
 		var resumption *sigma.ResumptionRecord
-		if rec, rerr := st.GetResumptionByPeer(context.Background(), fabricIndex, peerNodeID); rerr == nil {
+		if rec, rerr := st.GetResumptionByPeer(ctx, fabricIndex, peerNodeID); rerr == nil {
 			resumption = &sigma.ResumptionRecord{
 				SharedSecret: rec.SharedSecret,
 				ResumptionID: rec.ResumptionID,
@@ -559,7 +559,7 @@ func caseInitiatorProvider(st *store.Store, sessions *operational.Manager, ids *
 		return &matterbridge.CaseInitiation{
 			Initiator:          initiator,
 			CompressedFabricID: fabric.identity.CompressedFabricID,
-			OnEstablished: func(res sigma.InitiatorResult) error {
+			OnEstablished: func(ctx context.Context, res sigma.InitiatorResult) error {
 				entry, err := sessions.OpenFromSigmaAsInitiatorWithID(sessionID, fabricIndex, localNodeID, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
 				if err != nil {
 					return err
@@ -567,7 +567,7 @@ func caseInitiatorProvider(st *store.Store, sessions *operational.Manager, ids *
 				if p := res.PeerSessionParams; p != nil {
 					entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
 				}
-				if err := sessions.PersistResumption(context.Background(), fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
+				if err := sessions.PersistResumption(ctx, fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
 					logger.Debug("case.initiator.resumption_persist", slog.String("err", err.Error()))
 				}
 				return nil

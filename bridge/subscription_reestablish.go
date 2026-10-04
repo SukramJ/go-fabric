@@ -288,7 +288,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 		slog.Int("session_id", int(link.sessionID)),
 		slog.Int("max_interval", int(sub.MaxIntervalCeiling)),
 		slog.Duration("send_interval", sub.SendInterval()))
-	b.persistSubscription(sub.ID)
+	b.persistSubscription(ctx, sub.ID)
 	return nil
 }
 

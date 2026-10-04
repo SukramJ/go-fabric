@@ -4208,7 +4208,7 @@
       "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 874
+      "line": 875
     },
     {
       "package": "bridge",
@@ -4222,7 +4222,7 @@
       "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 891
+      "line": 892
     },
     {
       "package": "bridge",
@@ -4250,7 +4250,7 @@
       "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 917
+      "line": 918
     },
     {
       "package": "bridge",
