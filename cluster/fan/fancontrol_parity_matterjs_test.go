@@ -19,8 +19,8 @@ import (
 
 // The FanControl entry of parity/schema.json, the matter.js HEAD pin.
 type (
-	snapElement = paritytest.Element
-	snapCluster = paritytest.Cluster
+	snapElement = *paritytest.Element
+	snapCluster = *paritytest.Cluster
 )
 
 func fanSnapshot(t *testing.T) snapCluster {

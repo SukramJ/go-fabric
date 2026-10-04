@@ -4,7 +4,6 @@
 package modebase_test
 
 import (
-	"fmt"
 	"slices"
 	"testing"
 
@@ -182,24 +181,28 @@ func TestParityMatterJS_ModeBaseDeviceTypes(t *testing.T) {
 // against mode-base.element.ts and the derivations' datatypes.
 func TestParityMatterJS_ModeBaseEnumValues(t *testing.T) {
 	t.Parallel()
-	got := fmt.Sprint([]uint16{
+	tagValues := []uint16{
 		modebase.TagAuto, modebase.TagQuick, modebase.TagQuiet, modebase.TagLowNoise, modebase.TagLowEnergy,
 		modebase.TagVacation, modebase.TagMin, modebase.TagMax, modebase.TagNight, modebase.TagDay,
 		modebase.LaundryTagNormal, modebase.LaundryTagDelicate, modebase.LaundryTagHeavy, modebase.LaundryTagWhites,
 		modebase.DishwasherTagNormal, modebase.DishwasherTagHeavy, modebase.DishwasherTagLight,
 		modebase.RvcRunTagIdle, modebase.RvcRunTagCleaning, modebase.RvcRunTagMapping,
 		modebase.RvcCleanTagDeepClean, modebase.RvcCleanTagVacuum, modebase.RvcCleanTagMop, modebase.RvcCleanTagVacuumThenMop,
-	})
-	if want := "[0 1 2 3 4 5 6 7 8 9 16384 16385 16386 16387 16384 16385 16386 16384 16385 16386 16384 16385 16386 16387]"; got != want {
-		t.Errorf("ModeTag values %s", got)
 	}
-	got = fmt.Sprint([]modebase.Status{
+	wantTags := []uint16{
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0x4000, 0x4001, 0x4002, 0x4003, 0x4000, 0x4001, 0x4002,
+		0x4000, 0x4001, 0x4002, 0x4000, 0x4001, 0x4002, 0x4003,
+	}
+	if !slices.Equal(tagValues, wantTags) {
+		t.Errorf("ModeTag values %v, want %v", tagValues, wantTags)
+	}
+	statuses := []modebase.Status{
 		modebase.StatusSuccess, modebase.StatusUnsupportedMode, modebase.StatusGenericFailure, modebase.StatusInvalidInMode,
 		modebase.StatusCleaningInProgress, modebase.StatusStuck, modebase.StatusDustBinMissing, modebase.StatusDustBinFull,
 		modebase.StatusWaterTankEmpty, modebase.StatusWaterTankMissing, modebase.StatusWaterTankLidOpen,
 		modebase.StatusMopCleaningPadMissing, modebase.StatusBatteryLow,
-	})
-	if want := "[0 1 2 3 64 65 66 67 68 69 70 71 72]"; got != want {
-		t.Errorf("ModeChangeStatus values %s", got)
+	}
+	if want := []modebase.Status{0, 1, 2, 3, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48}; !slices.Equal(statuses, want) {
+		t.Errorf("ModeChangeStatus values %v, want %v", statuses, want)
 	}
 }

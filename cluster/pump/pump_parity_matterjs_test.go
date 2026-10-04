@@ -18,10 +18,7 @@ import (
 
 // The PumpConfigurationAndControl entry of parity/schema.json, the
 // matter.js HEAD pin.
-type (
-	snapElement = paritytest.Element
-	snapCluster = paritytest.Cluster
-)
+type snapCluster = *paritytest.Cluster
 
 func pumpSnapshot(t *testing.T) snapCluster {
 	t.Helper()

@@ -44,62 +44,63 @@ type Feature struct {
 	Bit         uint32 `json:"bit"`
 }
 
-// Cluster is one cluster entry of the snapshot.
+// Cluster is one cluster entry of the snapshot. The element lists hold
+// pointers, so a range over them does not copy each element.
 type Cluster struct {
-	ID         uint32    `json:"id"`
-	Name       string    `json:"name"`
-	Revision   uint16    `json:"revision"`
-	Attributes []Element `json:"attributes"`
-	Commands   []Element `json:"commands"`
-	Events     []Element `json:"events"`
-	Features   []Feature `json:"features"`
+	ID         uint32     `json:"id"`
+	Name       string     `json:"name"`
+	Revision   uint16     `json:"revision"`
+	Attributes []*Element `json:"attributes"`
+	Commands   []*Element `json:"commands"`
+	Events     []*Element `json:"events"`
+	Features   []Feature  `json:"features"`
 }
 
-// Attribute returns the attribute named name, or fails t.
-func (c Cluster) Attribute(t testing.TB, name string) Element {
-	t.Helper()
-	return find(t, c, "attribute", c.Attributes, name)
+// Attribute returns the attribute named name, or fails tb.
+func (c *Cluster) Attribute(tb testing.TB, name string) *Element {
+	tb.Helper()
+	return find(tb, c, "attribute", c.Attributes, name)
 }
 
-// Command returns the command named name, or fails t.
-func (c Cluster) Command(t testing.TB, name string) Element {
-	t.Helper()
-	return find(t, c, "command", c.Commands, name)
+// Command returns the command named name, or fails tb.
+func (c *Cluster) Command(tb testing.TB, name string) *Element {
+	tb.Helper()
+	return find(tb, c, "command", c.Commands, name)
 }
 
-// Event returns the event named name, or fails t.
-func (c Cluster) Event(t testing.TB, name string) Element {
-	t.Helper()
-	return find(t, c, "event", c.Events, name)
+// Event returns the event named name, or fails tb.
+func (c *Cluster) Event(tb testing.TB, name string) *Element {
+	tb.Helper()
+	return find(tb, c, "event", c.Events, name)
 }
 
-func find(t testing.TB, c Cluster, kind string, list []Element, name string) Element {
-	t.Helper()
+func find(tb testing.TB, c *Cluster, kind string, list []*Element, name string) *Element {
+	tb.Helper()
 	for _, e := range list {
 		if e.Name == name {
 			return e
 		}
 	}
-	t.Fatalf("matter.js %s (0x%04X) has no %s %s", c.Name, c.ID, kind, name)
-	return Element{}
+	tb.Fatalf("matter.js %s (0x%04X) has no %s %s", c.Name, c.ID, kind, name)
+	return &Element{}
 }
 
-// ClusterSnapshot returns the snapshot entry of cluster id, or fails t.
-func ClusterSnapshot(t testing.TB, id uint32) Cluster {
-	t.Helper()
+// ClusterSnapshot returns the snapshot entry of cluster id, or fails tb.
+func ClusterSnapshot(tb testing.TB, id uint32) *Cluster {
+	tb.Helper()
 	var s struct {
-		Clusters []Cluster `json:"clusters"`
+		Clusters []*Cluster `json:"clusters"`
 	}
 	if err := json.Unmarshal(matterparity.SchemaJSON(), &s); err != nil {
-		t.Fatalf("unmarshal schema snapshot: %v", err)
+		tb.Fatalf("unmarshal schema snapshot: %v", err)
 	}
 	for _, c := range s.Clusters {
 		if c.ID == id {
 			return c
 		}
 	}
-	t.Fatalf("the matter.js schema snapshot has no cluster 0x%04X", id)
-	return Cluster{}
+	tb.Fatalf("the matter.js schema snapshot has no cluster 0x%04X", id)
+	return &Cluster{}
 }
 
 // Conformance decides whether a matter.js conformance expression makes an

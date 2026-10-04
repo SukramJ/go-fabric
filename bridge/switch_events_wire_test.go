@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -116,7 +117,7 @@ func TestSwitchPressEventsMatchMatterJSOverTheWire(t *testing.T) {
 // and value — the wire shape, width included, without the outer tag.
 func sameTLV(a, b tlvNode) bool {
 	if a.El.Type != b.El.Type || a.El.IsNull != b.El.IsNull || a.El.Bool != b.El.Bool || a.El.Uint != b.El.Uint ||
-		a.El.Int != b.El.Int || a.El.String != b.El.String || string(a.El.Octets) != string(b.El.Octets) ||
+		a.El.Int != b.El.Int || a.El.String != b.El.String || !bytes.Equal(a.El.Octets, b.El.Octets) ||
 		len(a.Children) != len(b.Children) {
 		return false
 	}

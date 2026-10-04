@@ -240,13 +240,13 @@ func newRunMode(t *testing.T, d *modeDevice) *modebase.Server {
 
 // changeToMode invokes ChangeToMode and returns the response's Status and
 // StatusText.
-func (h *appHarness) changeToMode(t *testing.T, ep uint16, clusterID uint32, mode uint8) (uint64, string) {
+func (h *appHarness) changeToMode(t *testing.T, ep uint16, clusterID uint32, mode uint8) (status uint64, text string) {
 	t.Helper()
-	id, fields, status, isStatus := invokeResult(t, h.invoke(ep, clusterID, modebase.CmdChangeToMode, func(enc *tlv.Encoder) {
+	id, fields, imStatus, isStatus := invokeResult(t, h.invoke(ep, clusterID, modebase.CmdChangeToMode, func(enc *tlv.Encoder) {
 		enc.PutUint(tlv.ContextTag(0), uint64(mode))
 	}))
 	if isStatus || id != modebase.CmdChangeToModeResponse {
-		t.Fatalf("ChangeToMode answered command 0x%02X / status %v, want ChangeToModeResponse", id, status)
+		t.Fatalf("ChangeToMode answered command 0x%02X / status %v, want ChangeToModeResponse", id, imStatus)
 	}
 	return fields.mustChild(t, 0).El.Uint, fields.mustChild(t, 1).El.String
 }

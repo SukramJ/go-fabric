@@ -4,7 +4,6 @@
 package opstate_test
 
 import (
-	"fmt"
 	"slices"
 	"testing"
 
@@ -191,7 +190,7 @@ func TestParityMatterJS_OperationalStateEventsAndPriorities(t *testing.T) {
 	if err := srv.EmitOperationCompletion(opstate.OperationCompletion{}); err != nil {
 		t.Fatal(err)
 	}
-	var ids []uint32
+	ids := make([]uint32, 0, len(js.Events))
 	for _, e := range js.Events {
 		ids = append(ids, e.ID)
 		want := contract.EventPriorityInfo
@@ -260,8 +259,8 @@ func TestParityMatterJS_OperationalStateEnumValues(t *testing.T) {
 		opstate.StateSeekingCharger, opstate.StateCharging, opstate.StateDocked, opstate.StateEmptyingDustBin,
 		opstate.StateCleaningMop, opstate.StateFillingWaterTank, opstate.StateUpdatingMaps,
 	}
-	if got := fmt.Sprint(states); got != "[0 1 2 3 64 65 66 67 68 69 70]" {
-		t.Errorf("OperationalStateEnum %s", got)
+	if want := []opstate.State{0, 1, 2, 3, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46}; !slices.Equal(states, want) {
+		t.Errorf("OperationalStateEnum %v, want %v", states, want)
 	}
 	errs := []opstate.ErrorID{
 		opstate.ErrorNoError, opstate.ErrorUnableToStartOrResume, opstate.ErrorUnableToCompleteOperation,
@@ -271,7 +270,11 @@ func TestParityMatterJS_OperationalStateEnumValues(t *testing.T) {
 		opstate.ErrorCannotReachTargetArea, opstate.ErrorDirtyWaterTankFull, opstate.ErrorDirtyWaterTankMissing,
 		opstate.ErrorWheelsJammed, opstate.ErrorBrushJammed, opstate.ErrorNavigationSensorObscured,
 	}
-	if got := fmt.Sprint(errs); got != "[0 1 2 3 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78]" {
-		t.Errorf("ErrorStateEnum %s", got)
+	want := []opstate.ErrorID{0, 1, 2, 3}
+	for id := opstate.ErrorID(0x40); id <= 0x4E; id++ {
+		want = append(want, id)
+	}
+	if !slices.Equal(errs, want) {
+		t.Errorf("ErrorStateEnum %v, want %v", errs, want)
 	}
 }

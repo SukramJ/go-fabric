@@ -786,78 +786,52 @@ func MeasurementClassDeviceType(class MeasurementClass) uint16 {
 // existence of each type come from that generated table, never from a
 // reading of the specification.
 func DeviceTypeName(id uint16) string {
-	switch id {
-	case 0:
+	if id == 0 {
 		return ""
-	case 0x000A:
-		return "Door Lock"
-	case 0x000F:
-		return "Generic Switch"
-	case 0x0015:
-		return "Contact Sensor"
-	case 0x0022:
-		return "Speaker"
-	case 0x0027:
-		return "Mode Select"
-	case 0x002B:
-		return "Fan"
-	case 0x002C:
-		return "Air Quality Sensor"
-	case 0x002D:
-		return "Air Purifier"
-	case 0x0043:
-		return "Water Leak Detector"
-	case 0x0073:
-		return "Laundry Washer"
-	case 0x0074:
-		return "Robotic Vacuum Cleaner"
-	case 0x0075:
-		return "Dishwasher"
-	case 0x0076:
-		return "Smoke / CO Alarm"
-	case 0x007A:
-		return "Extractor Hood"
-	case 0x007C:
-		return "Laundry Dryer"
-	case 0x0100:
-		return "On/Off Light"
-	case 0x0101:
-		return "Dimmable Light"
-	case 0x0106:
-		return "Light Sensor"
-	case 0x0107:
-		return "Occupancy Sensor"
-	case 0x010A:
-		return "On/Off Plug-in Unit"
-	case 0x010C:
-		return "Color Temperature Light"
-	case 0x010D:
-		return "Extended Color Light"
-	case 0x0202:
-		return "Window Covering"
-	case 0x0230:
-		// Advertised by cover.Garage. matter.js HEAD names it
-		// "Closure" (schema/devicetypes.go, 0x0230).
-		return "Closure"
-	case 0x0301:
-		return "Thermostat"
-	case 0x0302:
-		return "Temperature Sensor"
-	case 0x0303:
-		return "Pump"
-	case 0x0305:
-		return "Pressure Sensor"
-	case 0x0306:
-		return "Flow Sensor"
-	case 0x0307:
-		return "Humidity Sensor"
-	case 0x0510:
-		// Advertised by MeasurementElectrical. matter.js HEAD
-		// names it "ElectricalSensor" (schema/devicetypes.go, 0x0510).
-		return "Electrical Sensor"
-	default:
-		return fmt.Sprintf("0x%04X", id)
 	}
+	if name, ok := deviceTypeNames[id]; ok {
+		return name
+	}
+	return fmt.Sprintf("0x%04X", id)
+}
+
+// deviceTypeNames holds the labels [DeviceTypeName] returns.
+var deviceTypeNames = map[uint16]string{
+	0x000A: "Door Lock",
+	0x000F: "Generic Switch",
+	0x0015: "Contact Sensor",
+	0x0022: "Speaker",
+	0x0027: "Mode Select",
+	0x002B: "Fan",
+	0x002C: "Air Quality Sensor",
+	0x002D: "Air Purifier",
+	0x0043: "Water Leak Detector",
+	0x0073: "Laundry Washer",
+	0x0074: "Robotic Vacuum Cleaner",
+	0x0075: "Dishwasher",
+	0x0076: "Smoke / CO Alarm",
+	0x007A: "Extractor Hood",
+	0x007C: "Laundry Dryer",
+	0x0100: "On/Off Light",
+	0x0101: "Dimmable Light",
+	0x0106: "Light Sensor",
+	0x0107: "Occupancy Sensor",
+	0x010A: "On/Off Plug-in Unit",
+	0x010C: "Color Temperature Light",
+	0x010D: "Extended Color Light",
+	0x0202: "Window Covering",
+	// Advertised by cover.Garage. matter.js HEAD names it
+	// "Closure" (schema/devicetypes.go, 0x0230).
+	0x0230: "Closure",
+	0x0301: "Thermostat",
+	0x0302: "Temperature Sensor",
+	0x0303: "Pump",
+	0x0305: "Pressure Sensor",
+	0x0306: "Flow Sensor",
+	0x0307: "Humidity Sensor",
+	// Advertised by MeasurementElectrical. matter.js HEAD
+	// names it "ElectricalSensor" (schema/devicetypes.go, 0x0510).
+	0x0510: "Electrical Sensor",
 }
 
 // MeasurementClassClusterID returns the cluster ID the given

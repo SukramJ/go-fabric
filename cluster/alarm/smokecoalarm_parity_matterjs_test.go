@@ -17,8 +17,8 @@ import (
 
 // The SmokeCoAlarm entry of parity/schema.json, the matter.js HEAD pin.
 type (
-	snapElement = paritytest.Element
-	snapCluster = paritytest.Cluster
+	snapElement = *paritytest.Element
+	snapCluster = *paritytest.Cluster
 )
 
 func smokeSnapshot(t *testing.T) snapCluster {
@@ -44,7 +44,7 @@ func byName(t *testing.T, elems []snapElement, name string) snapElement {
 		}
 	}
 	t.Fatalf("matter.js SmokeCoAlarm has no element %q", name)
-	return snapElement{}
+	return nil
 }
 
 func TestParityMatterJS_SmokeCoAlarmRevisionAndIDs(t *testing.T) {

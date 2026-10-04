@@ -58,7 +58,8 @@ func TestAccessControlUnfilteredReadsRedactOtherFabrics(t *testing.T) {
 			t.Errorf("attribute 0x%04X fabric-filtered: fabrics %v, want only %d", attr, fabricIndexesOf(t, filtered), h.fabric)
 		}
 		all := aclRead(t, h, attr, false)
-		want := []uint64{uint64(h.fabric)}
+		want := make([]uint64, 1, len(all.Children))
+		want[0] = uint64(h.fabric)
 		for range len(all.Children) - 1 {
 			want = append(want, uint64(other))
 		}

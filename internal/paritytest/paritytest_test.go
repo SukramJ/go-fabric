@@ -70,10 +70,10 @@ func TestLookupsFailOnUnknownNames(t *testing.T) {
 	t.Parallel()
 	c := ClusterSnapshot(t, 0x0060)
 	for name, lookup := range map[string]func(testing.TB){
-		"attribute": func(tb testing.TB) { c.Attribute(tb, "Nope") },
-		"command":   func(tb testing.TB) { c.Command(tb, "Nope") },
-		"event":     func(tb testing.TB) { c.Event(tb, "Nope") },
-		"cluster":   func(tb testing.TB) { ClusterSnapshot(tb, 0xFFFF_0000) },
+		"attribute": func(tb testing.TB) { tb.Helper(); c.Attribute(tb, "Nope") },
+		"command":   func(tb testing.TB) { tb.Helper(); c.Command(tb, "Nope") },
+		"event":     func(tb testing.TB) { tb.Helper(); c.Event(tb, "Nope") },
+		"cluster":   func(tb testing.TB) { tb.Helper(); ClusterSnapshot(tb, 0xFFFF_0000) },
 	} {
 		rec := &fatalRecorder{TB: t}
 		lookup(rec)

@@ -208,7 +208,7 @@ func TestModeBasePayloadsMatchMatterJS(t *testing.T) {
 					} `json:"modeTags"`
 				}
 				mustUnmarshal(t, f.Fixture, &fx)
-				var modes []clusterwire.ModeOptionStruct
+				modes := make([]clusterwire.ModeOptionStruct, 0, len(fx))
 				for _, m := range fx {
 					opt := clusterwire.ModeOptionStruct{Label: m.Label, Mode: m.Mode}
 					for _, tg := range m.ModeTags {

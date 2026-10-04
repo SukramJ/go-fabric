@@ -4518,7 +4518,7 @@
       "identifier": "TestSwitchPressEventsMatchMatterJSOverTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/switch_events_wire_test.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "bridge",

@@ -35,6 +35,28 @@ func encodeApplicationValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 		enc.StartStruct(tag)
 		enc.PutUint(tlv.ContextTag(0), uint64(x.AlarmSeverityLevel))
 		_ = enc.EndContainer()
+	case clusterwire.SwitchInitialPressEvent:
+		// Switch InitialPress / LongPress: [0] NewPosition uint8;
+		// ShortRelease / LongRelease: [0] PreviousPosition uint8.
+		// matter.js switch.element.ts.
+		encodeSwitchPosition(enc, tag, x.NewPosition)
+	case clusterwire.SwitchLongPressEvent:
+		encodeSwitchPosition(enc, tag, x.NewPosition)
+	case clusterwire.SwitchShortReleaseEvent:
+		encodeSwitchPosition(enc, tag, x.PreviousPosition)
+	case clusterwire.SwitchLongReleaseEvent:
+		encodeSwitchPosition(enc, tag, x.PreviousPosition)
+	default:
+		return encodeApplianceValue(enc, tag, v)
+	}
+	return true
+}
+
+// encodeApplianceValue writes the attribute and event values of the
+// appliance servers (cluster/opstate, cluster/modebase); it reports false
+// for a value it does not know.
+func encodeApplianceValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
+	switch x := v.(type) {
 	case []string:
 		// A list of strings: OperationalState.PhaseList (a null list is
 		// a nil value and never reaches here).
@@ -95,17 +117,6 @@ func encodeApplicationValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 			_ = enc.EndContainer()
 		}
 		_ = enc.EndContainer()
-	case clusterwire.SwitchInitialPressEvent:
-		// Switch InitialPress / LongPress: [0] NewPosition uint8;
-		// ShortRelease / LongRelease: [0] PreviousPosition uint8.
-		// matter.js switch.element.ts.
-		encodeSwitchPosition(enc, tag, x.NewPosition)
-	case clusterwire.SwitchLongPressEvent:
-		encodeSwitchPosition(enc, tag, x.NewPosition)
-	case clusterwire.SwitchShortReleaseEvent:
-		encodeSwitchPosition(enc, tag, x.PreviousPosition)
-	case clusterwire.SwitchLongReleaseEvent:
-		encodeSwitchPosition(enc, tag, x.PreviousPosition)
 	default:
 		return false
 	}
