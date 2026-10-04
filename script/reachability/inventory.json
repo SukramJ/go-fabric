@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3291,
+  "entry_points": 3336,
   "entry_packages": [
     ".",
     "bootid",
@@ -27,6 +27,7 @@
     "endpoint",
     "endpoint/sqlitestore",
     "examples/reference-bridge",
+    "groups",
     "im",
     "im/subscription",
     "mdns",
@@ -50,9 +51,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2882,
-    "reachable": 1385,
-    "whitelisted": 1488,
+    "total_exported": 2965,
+    "reachable": 1430,
+    "whitelisted": 1526,
     "unreachable": 9
   },
   "by_package": [
@@ -2707,6 +2708,69 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestGroupCommandPayloadsMatchMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/groups_parity_matterjs_test.go",
+      "line": 126
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupJoinFailureIsRetried",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/group_messaging_e2e_test.go",
+      "line": 449
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupKeyManagementCommandsOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/groupkeys_wire_test.go",
+      "line": 70
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupKeyManagementMalformedPayloadsOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/groupkeys_wire_test.go",
+      "line": 141
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupMessageArrivesOverRealMulticast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/group_messaging_e2e_test.go",
+      "line": 482
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupMessagesAreDroppedWithoutGroupMessaging",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/group_messaging_e2e_test.go",
+      "line": 428
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupMessagingEndToEnd",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/group_messaging_e2e_test.go",
+      "line": 234
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupsCommandsOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/groups_wire_test.go",
+      "line": 61
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGroupsMalformedPayloadsOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/groups_wire_test.go",
+      "line": 126
+    },
+    {
+      "package": "bridge",
       "identifier": "TestHandleCase_ErrorMapsToSecureChannelStatusCode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/case_adapter_gate_test.go",
@@ -4758,6 +4822,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestAssemblerStampsGroupState",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/groups_mount_test.go",
+      "line": 139
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestAssignOrReuseID_DeviceTypeDrift",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
@@ -4769,6 +4840,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/materialize_test.go",
       "line": 166
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestCheckACLForAGroupMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/dispatcher_group_test.go",
+      "line": 24
     },
     {
       "package": "endpoint",
@@ -4884,6 +4962,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestGroupsServerIsMountedWhereTheDeviceTypeMandatesIt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/groups_mount_test.go",
+      "line": 77
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestHandleInvokeRequest_AdministerPrivilegeNotBlockedByGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
@@ -4930,6 +5015,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
       "line": 431
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestInvokeAuthorizedExpandsToHostingEndpoints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/dispatcher_group_test.go",
+      "line": 82
     },
     {
       "package": "endpoint",
@@ -5150,6 +5242,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestScenesStubStaysBesideTheGroupsServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/groups_mount_test.go",
+      "line": 195
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestSynthesizeGlobalRead_AcceptedCommandList_WithLister",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
@@ -5363,21 +5462,21 @@
       "identifier": "TestCaseInitiatorProviderNeedsALoadedIdentity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 174
+      "line": 180
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 61
+      "line": 67
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 46
+      "line": 49
     },
     {
       "package": "examples/reference-bridge",
@@ -5391,7 +5490,112 @@
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 106
+      "line": 112
+    },
+    {
+      "package": "groups",
+      "identifier": "FuzzDecode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/fuzz_decode_test.go",
+      "line": 16
+    },
+    {
+      "package": "groups",
+      "identifier": "TestAddEndpointForGroupHonoursMaxGroupsPerFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 134
+    },
+    {
+      "package": "groups",
+      "identifier": "TestConcurrentDecodeAndChanges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 390
+    },
+    {
+      "package": "groups",
+      "identifier": "TestDecodeRejections",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 237
+    },
+    {
+      "package": "groups",
+      "identifier": "TestDecodeReportsAnInvalidMapping",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 291
+    },
+    {
+      "package": "groups",
+      "identifier": "TestDecodeRoutesAMappedGroupMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 213
+    },
+    {
+      "package": "groups",
+      "identifier": "TestForgetFabricDropsItsGroups",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 350
+    },
+    {
+      "package": "groups",
+      "identifier": "TestGroupCryptoMatchesMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/parity_matterjs_test.go",
+      "line": 65
+    },
+    {
+      "package": "groups",
+      "identifier": "TestKeySetWithoutUsableEpochKeyIsSkipped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 372
+    },
+    {
+      "package": "groups",
+      "identifier": "TestMembershipFollowsAddAndRemove",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 65
+    },
+    {
+      "package": "groups",
+      "identifier": "TestMembershipSurvivesARestart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 157
+    },
+    {
+      "package": "groups",
+      "identifier": "TestNewManagerRequiresStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 51
+    },
+    {
+      "package": "groups",
+      "identifier": "TestOperationalKeyRejectsShortEpochKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 58
+    },
+    {
+      "package": "groups",
+      "identifier": "TestReplayWindowPerSenderAndKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 311
+    },
+    {
+      "package": "groups",
+      "identifier": "TestStoreFailuresSurface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 182
     },
     {
       "package": "im",
@@ -5689,6 +5893,27 @@
     },
     {
       "package": "im",
+      "identifier": "TestGroupInteractionsFailClosed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/group_parity_matterjs_test.go",
+      "line": 174
+    },
+    {
+      "package": "im",
+      "identifier": "TestGroupInvokeParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/group_parity_matterjs_test.go",
+      "line": 108
+    },
+    {
+      "package": "im",
+      "identifier": "TestGroupWriteParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/group_parity_matterjs_test.go",
+      "line": 204
+    },
+    {
+      "package": "im",
       "identifier": "TestHandleInvokeRequestFailureProducesStatusIB",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/im_test.go",
@@ -5917,6 +6142,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_parity_test.go",
       "line": 206
+    },
+    {
+      "package": "im",
+      "identifier": "TestInvokeRequest_ConsumedContainerRejectIsNotDrainedTwice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_decode_status_test.go",
+      "line": 138
     },
     {
       "package": "im",
@@ -7359,6 +7591,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "schema/schema_lookup_test.go",
       "line": 89
+    },
+    {
+      "package": "schema",
+      "identifier": "TestDeviceTypeRequiresServerCluster",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "schema/schema_lookup_test.go",
+      "line": 147
     },
     {
       "package": "schema",
@@ -10519,6 +10758,13 @@
     },
     {
       "package": "transport/mrp",
+      "identifier": "TestWindowEncryptedRollover",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/mrp/window_test.go",
+      "line": 175
+    },
+    {
+      "package": "transport/mrp",
       "identifier": "TestWindowTracksFullThirtyTwoCounters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/window_test.go",
@@ -10537,6 +10783,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
       "line": 167
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestJoinAndLeaveGroupOnLiveInterfaces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/multicast_test.go",
+      "line": 50
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestJoinGroupRejectsNonMulticastAndClosedListeners",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/multicast_test.go",
+      "line": 12
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestJoinGroupWithoutInterfaces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/multicast_test.go",
+      "line": 30
     },
     {
       "package": "transport/udp",

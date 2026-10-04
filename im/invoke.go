@@ -106,17 +106,15 @@ type CommandFieldsReader func(path ConcreteCommandPath, dec *tlv.Decoder, el tlv
 // FieldsContainerConsumed is implemented by a [CommandFieldsReader] reject
 // returned after the reader consumed the fields container's EndContainer.
 type FieldsContainerConsumed interface {
+	error
 	FieldsContainerConsumed() bool
 }
 
 // fieldsContainerConsumed reports whether err says the reader already
 // consumed the fields container.
 func fieldsContainerConsumed(err error) bool {
-	var c interface {
-		error
-		FieldsContainerConsumed
-	}
-	return errors.As(err, &c) && c.FieldsContainerConsumed()
+	c, ok := errors.AsType[FieldsContainerConsumed](err)
+	return ok && c.FieldsContainerConsumed()
 }
 
 // UnmarshalInvokeRequestTLV decodes an InvokeRequestMessage.
