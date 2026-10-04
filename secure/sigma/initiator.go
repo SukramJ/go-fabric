@@ -97,9 +97,11 @@ type InitiatorConfig struct {
 	// Identity is this node's operational identity on the shared fabric.
 	Identity *Identity
 	// Verifier checks the responder's NOC chain back to the fabric root.
-	// If it also implements [PeerNodeIDExtractor], [PeerFabricIDExtractor]
-	// or [PeerCATsExtractor], the responder's NOC is bound to PeerNodeID
-	// and Identity.FabricID, and its CATs are lifted for the session.
+	// It must also implement [PeerNodeIDExtractor] and
+	// [PeerFabricIDExtractor] — [NewPeerInitiator] refuses a verifier that
+	// does not — so the responder's NOC is bound to PeerNodeID and
+	// Identity.FabricID. If it implements [PeerCATsExtractor], the
+	// responder's CATs are lifted for the session.
 	Verifier PeerVerifier
 	// SessionID is the local session id announced in Sigma1.
 	SessionID uint16
@@ -128,6 +130,16 @@ func NewPeerInitiator(cfg InitiatorConfig) (*Initiator, error) {
 	}
 	if len(cfg.RootPublicKey) == 0 {
 		return nil, errors.New("sigma: initiator needs the fabric root public key")
+	}
+	// Fail closed: without both extractors the responder's NOC could not
+	// be bound to the peer this initiator set out to reach, and any node
+	// of the fabric could answer in its place. matter.js CaseClient.ts:
+	// #doPair performs both checks unconditionally.
+	if _, ok := cfg.Verifier.(PeerNodeIDExtractor); !ok {
+		return nil, errors.New("sigma: initiator's peer verifier must implement PeerNodeIDExtractor")
+	}
+	if _, ok := cfg.Verifier.(PeerFabricIDExtractor); !ok {
+		return nil, errors.New("sigma: initiator's peer verifier must implement PeerFabricIDExtractor")
 	}
 	i := &Initiator{
 		identity:      cfg.Identity,

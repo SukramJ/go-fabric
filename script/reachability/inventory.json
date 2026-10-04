@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3290,
+  "entry_points": 3291,
   "entry_packages": [
     ".",
     "bootid",
@@ -50,9 +50,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2881,
+    "total_exported": 2882,
     "reachable": 1385,
-    "whitelisted": 1487,
+    "whitelisted": 1488,
     "unreachable": 9
   },
   "by_package": [
@@ -4201,63 +4201,63 @@
       "identifier": "TestSubscriptionResumption_DisabledRecordsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 857
+      "line": 867
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 875
+      "line": 885
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 746
+      "line": 756
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 892
+      "line": 902
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerThatSubscribesIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 814
+      "line": 824
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 660
+      "line": 670
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEndWithMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 668
+      "line": 678
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 918
+      "line": 928
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_UnreachablePeerIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 779
+      "line": 789
     },
     {
       "package": "bridge",
@@ -8286,6 +8286,13 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "TestNewPeerInitiator_RefusesVerifierWithoutIdentityBinding",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 372
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "TestNewPeerInitiator_RequiresIdentityVerifierAndRoot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/initiator_test.go",
@@ -8856,7 +8863,7 @@
       "identifier": "TestUnmarshalSigma2_RejectsMissingFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/initiator_test.go",
-      "line": 366
+      "line": 381
     },
     {
       "package": "secure/sigma",

@@ -363,6 +363,21 @@ func TestNewPeerInitiator_RequiresIdentityVerifierAndRoot(t *testing.T) {
 	}
 }
 
+// bareVerifier verifies a chain but cannot bind the NOC to a node or fabric.
+type bareVerifier struct{ PeerVerifier }
+
+// A peer initiator must be able to bind the responder's NOC to the node and
+// fabric it dials (matter.js CaseClient.ts:#doPair checks both
+// unconditionally); a verifier that cannot is refused, not silently trusted.
+func TestNewPeerInitiator_RefusesVerifierWithoutIdentityBinding(t *testing.T) {
+	t.Parallel()
+	f := newPeerFixture(t)
+	cfg := InitiatorConfig{Identity: f.device, Verifier: bareVerifier{f.verifier}, RootPublicKey: f.root}
+	if _, err := NewPeerInitiator(cfg); err == nil {
+		t.Fatal("verifier without node-id / fabric-id extractors: want an error")
+	}
+}
+
 func TestUnmarshalSigma2_RejectsMissingFields(t *testing.T) {
 	t.Parallel()
 	enc := sigmaTLVEncoder()

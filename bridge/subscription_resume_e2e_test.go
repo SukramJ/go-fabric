@@ -124,6 +124,15 @@ func (v resumeVerifier) PeerNodeIDFromNOC(noc []byte) (uint64, error) {
 	return id, nil
 }
 
+// PeerFabricIDFromNOC places every known NOC on the test fabric, so the
+// initiator's fail-closed fabric binding has something to check.
+func (v resumeVerifier) PeerFabricIDFromNOC(noc []byte) (uint64, error) {
+	if _, ok := v.nodes[string(noc)]; !ok {
+		return 0, errors.New("unknown noc")
+	}
+	return resumeFabricID, nil
+}
+
 // resumeFabric is the shared fabric of device and controller.
 type resumeFabric struct {
 	ipk        [16]byte
@@ -136,6 +145,7 @@ type resumeFabric struct {
 
 const (
 	resumeFabricIndex  = 1
+	resumeFabricID     = uint64(0xFAB1)
 	resumeDeviceNode   = uint64(0xD0D0D0D0)
 	resumeCtrlNode     = uint64(0xC0C0C0C0)
 	resumeDeviceSIDRun = uint16(0x0101)
@@ -158,8 +168,8 @@ func newResumeFabric(t *testing.T) resumeFabric {
 		ipk:        ipk,
 		root:       root,
 		cfid:       [8]byte{1, 2, 3, 4, 5, 6, 7, 8},
-		device:     newCaseTestIdentity(t, resumeDeviceNode, 0xFAB1, ipk),
-		controller: newCaseTestIdentity(t, resumeCtrlNode, 0xFAB1, ipk),
+		device:     newCaseTestIdentity(t, resumeDeviceNode, resumeFabricID, ipk),
+		controller: newCaseTestIdentity(t, resumeCtrlNode, resumeFabricID, ipk),
 	}
 	f.verifier = resumeVerifier{nodes: map[string]uint64{
 		string(f.device.NOC):     resumeDeviceNode,
