@@ -248,6 +248,16 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- **AccessControl Acl and Extension answered a non-fabric-filtered read with
+  the accessing fabric's entries only.** They now return every fabric's
+  entries, as matter.js does (`ListManager` filters a fabric-scoped list
+  only on a fabric-filtered read): the accessing fabric's whole, another
+  fabric's with its fabric-sensitive fields — Privilege, AuthMode,
+  Subjects, Targets; Data — withheld, so such an entry carries FabricIndex
+  alone (`StructManager` / `AccessControl.mayRead`). Reading either still
+  needs Administer. `core.AccessControlEntryStruct.Redacted` and
+  `core.AccessControlExtensionEntry.Redacted` mark such an entry; matter.js
+  encodings are pinned in `bridge/testdata/groupcast-wire-fixtures.json`.
 - **Switch press events went out without their position.** InitialPress,
   LongPress, ShortRelease and LongRelease carried TLV null in the EventDataIB
   Data slot: their payload types were unexported, so the bridge's value

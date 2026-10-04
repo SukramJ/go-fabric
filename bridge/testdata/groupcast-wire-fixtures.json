@@ -196,6 +196,62 @@
     "bytesHex": "16152401032402033603050101183604153400240102340218153400250100033402181824050124fe01181524fe021818"
   },
   {
+    "label": "acl_unfiltered",
+    "kind": "attributes",
+    "cluster": 31,
+    "element": "Acl",
+    "fixture": [
+      {
+        "privilege": 5,
+        "authMode": 2,
+        "subjects": [
+          "0x1122334455667788",
+          "0xfffffffd00010001"
+        ],
+        "targets": null,
+        "fabricIndex": 1
+      },
+      {
+        "privilege": 3,
+        "authMode": 3,
+        "subjects": null,
+        "targets": [
+          {
+            "cluster": 6,
+            "endpoint": null,
+            "deviceType": null
+          },
+          {
+            "cluster": null,
+            "endpoint": 2,
+            "deviceType": 256
+          }
+        ],
+        "fabricIndex": 1
+      },
+      {
+        "fabricIndex": 2
+      }
+    ],
+    "bytesHex": "161524010524020236030788776655443322110701000100fdffffff18340424fe0118152401032402033403360415240006340134021815340024010225020001181824fe01181524fe021818"
+  },
+  {
+    "label": "extension_unfiltered",
+    "kind": "attributes",
+    "cluster": 31,
+    "element": "Extension",
+    "fixture": [
+      {
+        "data": "1718",
+        "fabricIndex": 1
+      },
+      {
+        "fabricIndex": 2
+      }
+    ],
+    "bytesHex": "1615300102171824fe01181524fe021818"
+  },
+  {
     "label": "groupcast_testing_event_success",
     "kind": "events",
     "cluster": 101,

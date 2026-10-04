@@ -692,9 +692,18 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// returning `null` (the previous default-writer fall-through)
 		// surfaces as ACCESS_DENIED on every follow-up read and Apple
 		// tears the fabric down via RemoveFabric.
+		// An entry another fabric owns, on a non-fabric-filtered read,
+		// carries FabricIndex alone: fields 1-5 are fabric-sensitive
+		// (access-control.element.ts, access "S"), withheld as matter.js
+		// StructManager mayRead withholds them.
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
+			if e.Redacted {
+				enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))
+				_ = enc.EndContainer()
+				continue
+			}
 			encodeACLEntryFields(enc, e)
 			if e.AuxiliaryType != nil {
 				enc.PutUint(tlv.ContextTag(5), uint64(*e.AuxiliaryType))
@@ -862,10 +871,14 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// without this case every read/subscribe of 0x001F:0x0001 fell
 		// through to `default:` and returned TLV null regardless of
 		// what AccessControl.MatterWrite had stored.
+		// Data is fabric-sensitive: another fabric's entry on an
+		// unfiltered read carries FabricIndex alone.
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutOctets(tlv.ContextTag(1), e.Data)
+			if !e.Redacted {
+				enc.PutOctets(tlv.ContextTag(1), e.Data)
+			}
 			enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))
 			_ = enc.EndContainer()
 		}

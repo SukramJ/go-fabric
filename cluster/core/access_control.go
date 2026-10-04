@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -122,6 +123,10 @@ type AuxiliaryAccessUpdatedEvent struct {
 type AccessControlExtensionEntry struct {
 	Data        []byte
 	FabricIndex uint8
+	// Redacted marks another fabric's entry on a non-fabric-filtered
+	// read: Data is fabric-sensitive ("S", access-control.element.ts
+	// AccessControlExtensionStruct) and is left out.
+	Redacted bool
 }
 
 // ACLStoreFacade is the subset of [store.Store] this cluster reads
@@ -243,6 +248,11 @@ type AccessControlEntryStruct struct {
 	// entry never has one.
 	AuxiliaryType *uint8
 	FabricIndex   uint8
+	// Redacted marks another fabric's entry on a non-fabric-filtered
+	// read: it goes out with its FabricIndex alone, every other field
+	// being fabric-sensitive (access-control.element.ts
+	// AccessControlEntryStruct, access "S").
+	Redacted bool
 }
 
 // ACLTargetStruct mirrors §9.10.4.5.
@@ -428,6 +438,9 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // list as "this subject has no Administer privilege" and tears the
 // fabric down via RemoveFabric.
 //
+// A non-fabric-filtered read returns every fabric's entries, another
+// fabric's redacted to its FabricIndex (see unfilteredFabrics).
+//
 // Mirrors matter.js packages/node/src/behaviors/access-control/
 // AccessControlServer.ts: every read of `acl` and `extension` consults
 // the FabricFilter from the IM context. The non-fabric-scoped attributes
@@ -439,55 +452,86 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 		filtered, fabricIndex := im.FabricFilterFromContext(ctx)
 		return a.auxiliaryACLRead(ctx, filtered, fabricIndex, false)
 	}
-	if attrID == accessControlAttrExtension {
-		_, fabricIndex := im.FabricFilterFromContext(ctx)
-		if fabricIndex == 0 {
-			return a.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
-		}
-		a.mu.RLock()
-		exts := a.extensions[fabricIndex]
-		a.mu.RUnlock()
-		if len(exts) == 0 {
-			return []AccessControlExtensionEntry{}, true
-		}
-		out := make([]AccessControlExtensionEntry, len(exts))
-		copy(out, exts)
-		return out, true
-	}
-	if attrID != accessControlAttrACL {
+	if attrID != accessControlAttrACL && attrID != accessControlAttrExtension {
 		return a.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
 	}
-	_, fabricIndex := im.FabricFilterFromContext(ctx)
+	filtered, fabricIndex := im.FabricFilterFromContext(ctx)
 	if fabricIndex == 0 {
 		// PASE (pre-AddNOC) or no FabricFilter set: fall through to
 		// MatterRead which uses a.currentFabric (the last write target).
 		return a.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
 	}
-	entries, err := a.store.ListACL(ctx, fabricIndex)
-	if err != nil {
-		return nil, false
-	}
-	out := make([]AccessControlEntryStruct, 0, len(entries))
-	for _, e := range entries {
-		ace := AccessControlEntryStruct{
-			Privilege:   uint8(e.Privilege),
-			AuthMode:    uint8(e.AuthMode),
-			Subjects:    append([]uint64(nil), e.Subjects...),
-			FabricIndex: e.FabricIndex,
+	fabrics := []uint8{fabricIndex}
+	if !filtered {
+		var err error
+		if fabrics, err = a.unfilteredFabrics(ctx, fabricIndex); err != nil {
+			return nil, false
 		}
-		if len(e.Targets) > 0 {
-			ace.Targets = make([]ACLTargetStruct, 0, len(e.Targets))
-			for _, t := range e.Targets {
-				ace.Targets = append(ace.Targets, ACLTargetStruct{
-					Cluster:    t.Cluster,
-					Endpoint:   t.Endpoint,
-					DeviceType: t.DeviceType,
-				})
+	}
+	if attrID == accessControlAttrExtension {
+		out := []AccessControlExtensionEntry{}
+		a.mu.RLock()
+		for _, fabric := range fabrics {
+			for _, e := range a.extensions[fabric] {
+				e.Redacted = fabric != fabricIndex
+				if e.Redacted {
+					e.Data = nil
+				}
+				out = append(out, e)
 			}
 		}
-		out = append(out, ace)
+		a.mu.RUnlock()
+		return out, true
+	}
+	out := []AccessControlEntryStruct{}
+	for _, fabric := range fabrics {
+		entries, err := a.store.ListACL(ctx, fabric)
+		if err != nil {
+			return nil, false
+		}
+		for _, e := range entries {
+			if fabric != fabricIndex {
+				out = append(out, AccessControlEntryStruct{FabricIndex: e.FabricIndex, Redacted: true})
+				continue
+			}
+			out = append(out, aclEntryStruct(e))
+		}
 	}
 	return out, true
+}
+
+// unfilteredFabrics lists the fabrics a non-fabric-filtered read of Acl or
+// Extension covers: every fabric the store knows, in index order, the
+// accessing one included. Acl and Extension are fabric-scoped ("F") but
+// not fabric-sensitive lists, so matter.js ListManager createProxy filters
+// them only for `session.fabricFiltered` — an unfiltered read sees every
+// fabric's entries — while StructManager hides each entry's
+// fabric-sensitive fields ("S": Privilege, AuthMode, Subjects, Targets,
+// AuxiliaryType; Data) from a session whose fabric does not own the entry
+// (protocol/src/action/server/AccessControl.ts mayRead), and
+// InteractionMessenger encodes the entry without them. A store that
+// cannot enumerate fabrics leaves the accessing one, as before.
+func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) ([]uint8, error) {
+	lister, ok := a.store.(fabricLister)
+	if !ok {
+		return []uint8{accessing}, nil
+	}
+	recs, err := lister.ListFabrics(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("matter: AccessControl: list fabrics: %w", err)
+	}
+	out := make([]uint8, 0, len(recs)+1)
+	for _, r := range recs {
+		out = append(out, r.FabricIndex)
+	}
+	a.mu.RLock()
+	for fabric := range a.extensions {
+		out = append(out, fabric)
+	}
+	a.mu.RUnlock()
+	out = append(out, accessing)
+	slices.Sort(out)
+	return slices.Compact(out), nil
 }
 
 // MatterWrite handles writes to the cluster's writable attributes.

@@ -10,8 +10,9 @@
 //           Master: bridge/testdata/group-wire-fixtures.json
 //
 //   groupcast
-//           Groupcast (0x0065) command payloads, the Membership and
-//           AccessControl.AuxiliaryAcl attribute values, and the
+//           Groupcast (0x0065) command payloads, the Membership,
+//           AccessControl.AuxiliaryAcl, Acl and Extension attribute values
+//           (as a non-fabric-filtered read encodes them), and the
 //           GroupcastTesting / AuxiliaryAccessUpdated event payloads, as
 //           TlvOfModel(element) encodes them.
 //           Master: bridge/testdata/groupcast-wire-fixtures.json
@@ -216,6 +217,27 @@ function groupcastFixtures() {
     ];
     record("auxiliary_acl", acl, "attributes", "AuxiliaryAcl", auxAcl,
         auxAcl.map((e) => (e.subjects ? { ...e, subjects: e.subjects.map(BigInt) } : e)));
+
+    // AccessControl.Acl and Extension on a non-fabric-filtered read: every
+    // fabric's entries, the accessing fabric's whole and another fabric's
+    // with its fabric-sensitive fields (Privilege, AuthMode, Subjects,
+    // Targets; Data) withheld (ListManager createProxy, StructManager
+    // mayRead), encoded as InteractionMessenger encodes such a read.
+    const aclUnfiltered = [
+        { privilege: 5, authMode: 2, subjects: ["0x1122334455667788", "0xfffffffd00010001"], targets: null, fabricIndex: 1 },
+        {
+            privilege: 3, authMode: 3, subjects: null,
+            targets: [{ cluster: 6, endpoint: null, deviceType: null }, { cluster: null, endpoint: 2, deviceType: 0x0100 }],
+            fabricIndex: 1,
+        },
+        { fabricIndex: 2 },
+    ];
+    record("acl_unfiltered", acl, "attributes", "Acl", aclUnfiltered,
+        aclUnfiltered.map((e) => (e.subjects ? { ...e, subjects: e.subjects.map(BigInt) } : e)));
+    const extensionUnfiltered = [{ data: "1718", fabricIndex: 1 }, { fabricIndex: 2 }];
+    record("extension_unfiltered", acl, "attributes", "Extension", extensionUnfiltered,
+        extensionUnfiltered.map((e) => (e.data ? { ...e, data: bytesOf(e.data) } : e)));
+
 
     // Events.
     const testing = {

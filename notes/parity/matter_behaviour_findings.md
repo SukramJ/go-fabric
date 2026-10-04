@@ -336,16 +336,15 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   chip-tool's `groupcast` commands encode the optional fields as matter.js
   does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
   multicast `onoff toggle`, `groupcast leave-group`).
-- **AccessControl ACL and Extension answer an unfiltered read with the
-  accessing fabric's entries only.** matter.js returns every fabric's
-  entries on a read with `isFabricFiltered=false`, the fabric-sensitive
-  fields of the others' withheld (`ListManager` createProxy,
-  `StructManager` mayRead). `core.AccessControl.MatterReadFiltered` scopes
-  both to the accessing fabric regardless of the flag; the new AuxiliaryAcl
-  attribute already follows matter.js. Harmless for the controllers seen so
-  far, which read fabric-filtered. Fix package: the AuxiliaryAcl read's
-  redaction, applied to `[]AccessControlEntryStruct` and
-  `[]AccessControlExtensionEntry`.
+- **AccessControl Acl / Extension read without an accessing fabric.** A
+  read on a session that has no fabric yet (PASE before AddNOC, FabricIndex
+  0) still answers with the entries of the fabric the last ACL write
+  targeted, whole. matter.js answers such a session's unfiltered read with
+  every entry redacted (`AccessControl.ts` mayRead: no `session.fabric`)
+  and its filtered read with no entry. Kept because the commissioning
+  flows exercised so far read the ACL only over CASE; fix package: the
+  `fabricIndex == 0` branch of `core.AccessControl.MatterReadFiltered`,
+  with a PASE-session read test.
 - **GroupKeyManagement.GroupTable writes its endpoint ids as 2-byte
   integers.** matter.js writes the smallest width (`TlvUInt16` with a
   minimal-length writer), as the Groupcast Membership encoder here now does;
