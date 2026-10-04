@@ -6,6 +6,7 @@ package core_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -37,8 +38,8 @@ func TestGKM_ClusterRevision(t *testing.T) {
 	if !ok {
 		t.Fatal("ClusterRevision: ok=false")
 	}
-	if v.(uint16) != 3 {
-		t.Fatalf("ClusterRevision = %v, want 3", v)
+	if v.(uint16) != 4 {
+		t.Fatalf("ClusterRevision = %v, want 4 (Matter 1.6.1)", v)
 	}
 }
 
@@ -835,8 +836,13 @@ func TestGroupKeyMgmt_MatterReportable(t *testing.T) {
 	t.Parallel()
 	gkm := newGKM(t)
 	list := gkm.MatterReportable()
-	if len(list) == 0 {
-		t.Fatal("MatterReportable() is empty")
+	if !slices.Contains(list, uint32(0x0001)) {
+		t.Errorf("MatterReportable() = %v, missing GroupTable (0x0001)", list)
+	}
+	// GroupKeyMap carries quality "N C" since cluster revision 4 (Matter
+	// 1.6.1): changesOmitted, so matter.js never reports its changes.
+	if slices.Contains(list, uint32(0x0000)) {
+		t.Errorf("MatterReportable() = %v, lists GroupKeyMap (0x0000), a changesOmitted attribute", list)
 	}
 }
 

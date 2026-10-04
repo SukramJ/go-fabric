@@ -1118,7 +1118,7 @@ The same reasoning covers the sibling MRP keys **SII and SAI** on both the opera
 
 ### BD-Matter-InteractionModelRevision — go-fabric emits interactionModelRevision on every IM response
 
-matter.js HEAD commit `47e7f2f78` (`#3751`, 2026-05-17) marks `interactionModelRevision` (tag 0xFF) as `TlvOptionalField` in 10 IM message schemas. go-fabric emits this field on every response (`im/subscribe.go:37-41`, `MatterInteractionModelRevision = 13`).
+matter.js HEAD commit `47e7f2f78` (`#3751`, 2026-05-17) marks `interactionModelRevision` (tag 0xFF) as `TlvOptionalField` in 10 IM message schemas. go-fabric emits this field on every response (`im/subscribe.go:37-41`, `MatterInteractionModelRevision = 12`, matter.js `Specification.INTERACTION_MODEL_REVISION`).
 
 This is by design: matter.js' own send-path (`TlvDataReportForSend`, `TlvInvokeResponseForSend`) continues to emit the field. Apple Home fails silently when expected fields are absent. Emitting the field unconditionally matches both the prior spec requirement and the actual matter.js wire output; removing it would risk silent Apple Home pairing regressions. No code change is planned.
 

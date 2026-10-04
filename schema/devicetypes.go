@@ -12,7 +12,7 @@ package schema
 // parity/schema.json.
 var DeviceTypeRevisions = map[uint32]uint16{
 	0x000A: 4, // DoorLock
-	0x000B: 3, // DoorLockController
+	0x000B: 4, // DoorLockController
 	0x000E: 2, // Aggregator
 	0x000F: 3, // GenericSwitch
 	0x0011: 1, // PowerSource
@@ -20,7 +20,7 @@ var DeviceTypeRevisions = map[uint32]uint16{
 	0x0013: 3, // BridgedNode
 	0x0014: 1, // OtaProvider
 	0x0015: 2, // ContactSensor
-	0x0016: 4, // RootNode
+	0x0016: 5, // RootNode
 	0x0017: 1, // SolarPower
 	0x0018: 2, // BatteryStorage
 	0x0019: 1, // SecondaryNetworkInterface
@@ -31,9 +31,9 @@ var DeviceTypeRevisions = map[uint32]uint16{
 	0x0028: 2, // BasicVideoPlayer
 	0x0029: 2, // CastingVideoClient
 	0x002A: 2, // VideoRemoteControl
-	0x002B: 4, // Fan
+	0x002B: 5, // Fan
 	0x002C: 1, // AirQualitySensor
-	0x002D: 2, // AirPurifier
+	0x002D: 3, // AirPurifier
 	0x0040: 1, // IrrigationSystem
 	0x0041: 2, // WaterFreezeDetector
 	0x0042: 1, // WaterValve
@@ -42,11 +42,11 @@ var DeviceTypeRevisions = map[uint32]uint16{
 	0x0045: 1, // SoilSensor
 	0x0070: 3, // Refrigerator
 	0x0071: 6, // TemperatureControlledCabinet
-	0x0072: 3, // RoomAirConditioner
+	0x0072: 4, // RoomAirConditioner
 	0x0073: 2, // LaundryWasher
 	0x0074: 4, // RoboticVacuumCleaner
 	0x0075: 2, // Dishwasher
-	0x0076: 1, // SmokeCoAlarm
+	0x0076: 2, // SmokeCoAlarm
 	0x0077: 2, // CookSurface
 	0x0078: 1, // Cooktop
 	0x0079: 2, // MicrowaveOven
@@ -55,19 +55,19 @@ var DeviceTypeRevisions = map[uint32]uint16{
 	0x007C: 2, // LaundryDryer
 	0x0090: 2, // NetworkInfrastructureManager
 	0x0091: 2, // ThreadBorderRouter
-	0x0100: 3, // OnOffLight
-	0x0101: 3, // DimmableLight
-	0x0103: 3, // OnOffLightSwitch
-	0x0104: 3, // DimmerSwitch
-	0x0105: 3, // ColorDimmerSwitch
+	0x0100: 4, // OnOffLight
+	0x0101: 4, // DimmableLight
+	0x0103: 4, // OnOffLightSwitch
+	0x0104: 4, // DimmerSwitch
+	0x0105: 4, // ColorDimmerSwitch
 	0x0106: 4, // LightSensor
 	0x0107: 4, // OccupancySensor
-	0x010A: 4, // OnOffPlugInUnit
-	0x010B: 5, // DimmablePlugInUnit
-	0x010C: 4, // ColorTemperatureLight
-	0x010D: 4, // ExtendedColorLight
-	0x010F: 2, // MountedOnOffControl
-	0x0110: 2, // MountedDimmableLoadControl
+	0x010A: 5, // OnOffPlugInUnit
+	0x010B: 6, // DimmablePlugInUnit
+	0x010C: 5, // ColorTemperatureLight
+	0x010D: 5, // ExtendedColorLight
+	0x010F: 3, // MountedOnOffControl
+	0x0110: 3, // MountedDimmableLoadControl
 	0x0130: 1, // JointFabricAdministrator
 	0x0140: 2, // Intercom
 	0x0141: 2, // AudioDoorbell
@@ -75,23 +75,23 @@ var DeviceTypeRevisions = map[uint32]uint16{
 	0x0143: 1, // VideoDoorbell
 	0x0144: 1, // FloodlightCamera
 	0x0145: 1, // SnapshotCamera
-	0x0146: 1, // Chime
+	0x0146: 2, // Chime
 	0x0147: 1, // CameraController
 	0x0148: 2, // Doorbell
-	0x0202: 6, // WindowCovering
-	0x0203: 4, // WindowCoveringController
+	0x0202: 7, // WindowCovering
+	0x0203: 5, // WindowCoveringController
 	0x0230: 1, // Closure
 	0x0231: 1, // ClosurePanel
-	0x023E: 1, // ClosureController
-	0x0301: 6, // Thermostat
+	0x023E: 2, // ClosureController
+	0x0301: 7, // Thermostat
 	0x0302: 3, // TemperatureSensor
-	0x0303: 3, // Pump
-	0x0304: 4, // PumpController
+	0x0303: 4, // Pump
+	0x0304: 5, // PumpController
 	0x0305: 3, // PressureSensor
 	0x0306: 3, // FlowSensor
 	0x0307: 3, // HumiditySensor
 	0x0309: 1, // HeatPump
-	0x030A: 1, // ThermostatController
+	0x030A: 2, // ThermostatController
 	0x050C: 2, // EnergyEvse
 	0x050D: 3, // DeviceEnergyManagement
 	0x050F: 1, // WaterHeater
@@ -100,8 +100,8 @@ var DeviceTypeRevisions = map[uint32]uint16{
 	0x0512: 1, // MeterReferencePoint
 	0x0513: 1, // ElectricalEnergyTariff
 	0x0514: 1, // ElectricalMeter
-	0x0840: 3, // ControlBridge
-	0x0850: 3, // OnOffSensor
+	0x0840: 4, // ControlBridge
+	0x0850: 4, // OnOffSensor
 }
 
 // DeviceTypeNames maps every device-type ID to its canonical matter.js name.
@@ -274,13 +274,14 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x0035, // ThreadNetworkDiagnostics ([Thread])
 		0x0036, // WiFiNetworkDiagnostics ([WiFi])
 		0x0037, // EthernetNetworkDiagnostics ([Ethernet])
-		0x0038, // TimeSynchronization (TimeSyncCond, TimeSyncWithClientCond, TimeSyncWithNTPCCond, TimeSyncWithTZCond, TLSClientCond, TLSCertificatesCond, O)
+		0x0038, // TimeSynchronization (TimeSyncCond, TimeSyncWithClientCond, TimeSyncWithNtpcCond, TimeSyncWithTzCond, TlsClientCond, TlsCertificatesCond, O)
 		0x003C, // AdministratorCommissioning (M)
 		0x003E, // OperationalCredentials (M)
 		0x003F, // GroupKeyManagement (M)
-		0x0046, // IcdManagement (SIT | LIT)
-		0x0801, // TlsCertificateManagement (TLSCertificatesCond, O)
-		0x0802, // TlsClientManagement (TLSClientCond, O)
+		0x0046, // IcdManagement (Sit | Lit)
+		0x0065, // Groupcast (GroupcastListenerCond, GroupcastSenderCond, O)
+		0x0801, // TlsCertificateManagement (TlsCertificatesCond, O)
+		0x0802, // TlsClientManagement (TlsClientCond, O)
 	},
 	0x0017: { // SolarPower
 		0x0003, // Identify (O)
@@ -305,7 +306,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 	0x0023: { // CastingVideoPlayer
 		0x0006, // OnOff (M)
 		0x001D, // Descriptor (-)
-		0x0097, // Messages (O)
+		0x0097, // Messages ([Rev >= v2])
 		0x0503, // WakeOnLan (O)
 		0x0504, // Channel (O)
 		0x0505, // TargetNavigator (O)
@@ -317,7 +318,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x050B, // AudioOutput (O)
 		0x050C, // ApplicationLauncher (ContentAppPlatform)
 		0x050E, // AccountLogin (O)
-		0x050F, // ContentControl (P, O)
+		0x050F, // ContentControl (P, [Rev >= v2])
 	},
 	0x0024: { // ContentApp
 		0x001D, // Descriptor (-)
@@ -337,7 +338,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 	0x0028: { // BasicVideoPlayer
 		0x0006, // OnOff (M)
 		0x001D, // Descriptor (-)
-		0x0097, // Messages (O)
+		0x0097, // Messages ([Rev >= v2])
 		0x0503, // WakeOnLan (O)
 		0x0504, // Channel (O)
 		0x0505, // TargetNavigator (O)
@@ -346,7 +347,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 		0x0508, // LowPower (O)
 		0x0509, // KeypadInput (M)
 		0x050B, // AudioOutput (O)
-		0x050F, // ContentControl (P, O)
+		0x050F, // ContentControl (P, [Rev >= v2])
 	},
 	0x0029: { // CastingVideoClient
 		0x001D, // Descriptor (-)
@@ -775,7 +776,7 @@ var DeviceTypeServerClusters = map[uint32][]uint32{
 	0x050D: { // DeviceEnergyManagement
 		0x001D, // Descriptor (-)
 		0x0098, // DeviceEnergyManagement (M)
-		0x009F, // DeviceEnergyManagementMode (ControllableESA, O)
+		0x009F, // DeviceEnergyManagementMode (ControllableEsa, O)
 	},
 	0x050F: { // WaterHeater
 		0x0003, // Identify (O)

@@ -6,7 +6,7 @@ pinned here. The authoritative Matter revision is whatever
 (`revision`, `specificationVersion`, `sourceCommit`) — it moves with every
 snapshot refresh (`make generate-matter-schema`, see
 [`CLAUDE.md`](../../CLAUDE.md)), so a number written into this page goes stale
-within a release. At the time of writing the snapshot pins revision 1.6.0.
+within a release. At the time of writing the snapshot pins revision 1.6.1.
 **Related:** [OpenCCU-Loom ADR 0012](https://github.com/SukramJ/openccu-loom/blob/main/docs/adr/0012-matter-pure-go-implementation.md),
 [`conformance/`](../../conformance)
 

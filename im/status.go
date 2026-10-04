@@ -62,26 +62,39 @@ type StatusCode uint8
 
 // StatusCode values.
 const (
-	StatusSuccess                StatusCode = 0x00
-	StatusFailure                StatusCode = 0x01
-	StatusInvalidSubscription    StatusCode = 0x7d
-	StatusUnsupportedAccess      StatusCode = 0x7e
-	StatusUnsupportedEndpoint    StatusCode = 0x7f
-	StatusInvalidAction          StatusCode = 0x80
-	StatusUnsupportedCommand     StatusCode = 0x81
-	StatusInvalidCommand         StatusCode = 0x85
-	StatusUnsupportedAttribute   StatusCode = 0x86
-	StatusConstraintError        StatusCode = 0x87
-	StatusUnsupportedWrite       StatusCode = 0x88
-	StatusResourceExhausted      StatusCode = 0x89
-	StatusNotFound               StatusCode = 0x8b
-	StatusUnreportableAttr       StatusCode = 0x8c
-	StatusInvalidDataType        StatusCode = 0x8d
-	StatusUnsupportedRead        StatusCode = 0x8f
-	StatusDataVersionMismatch    StatusCode = 0x92
-	StatusTimeout                StatusCode = 0x94
-	StatusBusy                   StatusCode = 0x9c
-	StatusUnsupportedCluster     StatusCode = 0xc3
+	StatusSuccess              StatusCode = 0x00
+	StatusFailure              StatusCode = 0x01
+	StatusInvalidSubscription  StatusCode = 0x7d
+	StatusUnsupportedAccess    StatusCode = 0x7e
+	StatusUnsupportedEndpoint  StatusCode = 0x7f
+	StatusInvalidAction        StatusCode = 0x80
+	StatusUnsupportedCommand   StatusCode = 0x81
+	StatusInvalidCommand       StatusCode = 0x85
+	StatusUnsupportedAttribute StatusCode = 0x86
+	StatusConstraintError      StatusCode = 0x87
+	StatusUnsupportedWrite     StatusCode = 0x88
+	StatusResourceExhausted    StatusCode = 0x89
+	StatusNotFound             StatusCode = 0x8b
+	// StatusUnreportableAttr is the former UNREPORTABLE_ATTRIBUTE code.
+	//
+	// Deprecated: Matter 1.6.1 removed 0x8c from the status table, and
+	// matter.js HEAD dropped it from packages/types/src/globals/Status.ts
+	// (commit 3e4c88b8). Nothing in this module emits it. There is no
+	// replacement; removal is permissible in v0.3.0.
+	StatusUnreportableAttr    StatusCode = 0x8c
+	StatusInvalidDataType     StatusCode = 0x8d
+	StatusUnsupportedRead     StatusCode = 0x8f
+	StatusDataVersionMismatch StatusCode = 0x92
+	StatusTimeout             StatusCode = 0x94
+	StatusBusy                StatusCode = 0x9c
+	StatusUnsupportedCluster  StatusCode = 0xc3
+	// StatusNoUpstreamSubscription is the former NO_UPSTREAM_SUBSCRIPTION
+	// code.
+	//
+	// Deprecated: Matter 1.6.1 removed 0xc5 from the status table, and
+	// matter.js HEAD dropped it from packages/types/src/globals/Status.ts
+	// (commit 3e4c88b8). Nothing in this module emits it. There is no
+	// replacement; removal is permissible in v0.3.0.
 	StatusNoUpstreamSubscription StatusCode = 0xc5
 	StatusNeedsTimedInteraction  StatusCode = 0xc6
 	StatusUnsupportedEvent       StatusCode = 0xc7

@@ -22,7 +22,7 @@ import (
 )
 
 // BasicInformation implements the Matter BasicInformation cluster
-// (0x0028) per Matter Core Specification 1.5.1 §11.1. Mandatory on
+// (0x0028) per Matter Core Specification 1.6.1 §11.1. Mandatory on
 // the Root endpoint (0). Identifies the bridge to commissioners:
 // vendor / product / hardware / firmware metadata, plus user-writable
 // NodeLabel and Location.
@@ -30,7 +30,7 @@ import (
 // Two new mandatory attributes since the Matter 1.3 baseline:
 //
 //   - SpecificationVersion (1.0+ but value bumped per spec release) —
-//     advertised as 0x01050100 (Matter 1.5.1.0).
+//     advertised as 0x01060100 (Matter 1.6.1.0, [cluster.SpecificationVersion]).
 //   - ConfigurationVersion (1.5 mandatory) — opaque uint32 the
 //     manufacturer increments when the meta-state of the device
 //     changes meaningfully (e.g. firmware update changes endpoint
@@ -167,7 +167,7 @@ var errBasicInfoUnknown = errors.New("matter: BasicInformation unknown / read-on
 // the Matter BasicInformation attributes; non-empty values pass
 // through to the cluster as-is.
 type Config struct {
-	DataModelRevision  uint16 // Matter §11.1.5.1 — 1.5.1 = 19 (matter.js HEAD Specification.ts:67)
+	DataModelRevision  uint16 // Matter §11.1.5.1 — 0 selects 21, the 1.6.x value (matter.js HEAD Specification.ts DATA_MODEL_REVISION)
 	VendorName         string
 	VendorID           uint16
 	ProductName        string
@@ -233,14 +233,14 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 	dmr := cfg.DataModelRevision
 	if dmr == 0 {
 		// matter.js HEAD `packages/model/src/common/Specification.ts`:
-		// `DATA_MODEL_REVISION = 19`. The previous baseline 18 stamped
-		// the bridge with Matter 1.5.0 data-model revision while
-		// `SpecificationVersion` already advertised 1.5.1 — a
-		// pre-publication Apple Home build flagged the mismatch as
-		// `BasicInformation.DataModelRevision != SpecificationVersion's
-		// implied DataModelRevision` in some HAP-service mapper paths.
-		// Keep the constant in lock-step with matter.js HEAD.
-		dmr = 19
+		// `DATA_MODEL_REVISION = 21` (Matter 1.6.x), applied as the
+		// default by BasicInformationServer.ts:initialize
+		// (`setDefault("dataModelRevision", …)`). It must move in
+		// lock-step with SpecificationVersion: a pre-publication Apple
+		// Home build flagged a mismatch as `BasicInformation.
+		// DataModelRevision != SpecificationVersion's implied
+		// DataModelRevision` in some HAP-service mapper paths.
+		dmr = 21
 	}
 	maxPaths := cfg.MaxPathsPerInvoke
 	if maxPaths == 0 {

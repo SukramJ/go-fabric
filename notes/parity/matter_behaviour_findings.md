@@ -312,6 +312,57 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 
 ---
 
+## Matter 1.6.1 pin — open items
+
+Raised when `parity/schema.json` moved from matter.js `f07365a8` (Matter 1.6.0)
+to `85cf6647` (Matter 1.6.1). The schema-level numbers (cluster and
+device-type revisions, SpecificationVersion, DataModelRevision, IM revision,
+Thermostat access strings) were followed in the same change; the items below
+are the behaviour the new pin implies and this module does not have yet.
+
+- **Groupcast (0x0065) on the root endpoint, with the AccessControl Auxiliary
+  ACL (AUX).** The 1.6.1 device library makes the Root Node condition
+  `GroupcastListenerCond` mandatory for the light and plug types this module
+  advertises: OnOffLight rev 4 and OnOffPlugInUnit rev 5 require it outright
+  (`conformance: "M"`), DimmableLight rev 4, ColorTemperatureLight rev 5 and
+  ExtendedColorLight rev 5 through `Rev >= v4`/`Rev >= v5` — true at the
+  revision now advertised (`on-off-light.element.ts`, `dimmable-light.element.ts`,
+  `color-temperature-light.element.ts`, `extended-color-light.element.ts`,
+  `on-off-plug-in-unit.element.ts`). Thermostat rev 7 requires it when
+  `Active`, WindowCovering rev 7 `Active, O`, SmokeCoAlarm rev 2 `O`. Under
+  the condition, RootNode rev 5 requires the Groupcast server (LN feature) and
+  the AccessControl AUX feature (`root-node.element.ts`). matter.js's default
+  `ServerNode.RootEndpoint` installs `GroupcastServer` and
+  `AccessControlServer.with("Extension", "Auxiliary")`
+  (`packages/node/src/node/ServerNode.ts:287-291`); the root this module
+  assembles corresponds to `ServerNode.RootEndpointWithoutGroupcast`, which
+  matter.js documents as non-conformant to 1.6.1 for a node with a Groups
+  server on any endpoint (`ServerNode.ts:266-270`) — and the bridged light and
+  plug endpoints mount the Groups stub. Fix package: a Groupcast cluster server
+  (`packages/node/src/behaviors/groupcast/GroupcastServer.ts`), the AUX
+  feature with `AuxiliaryAcl` / `AuxiliaryAccessUpdated` and the EP0 group
+  wildcard exclusion (`AccessControlServer.ts`), and group message reception.
+  Deferred: it is the group-messaging work this module has kept out of scope
+  so far (see [ADR 0004](../../docs/adr/0004-groups-cluster-stays-stub.md)),
+  not a schema follow-up.
+- **GroupKeyManagement commands have no wire codec.** `bridge/fields_reader.go`
+  has no case for cluster 0x003F, so KeySetWrite / KeySetRead / KeySetRemove /
+  KeySetReadAllIndices reach `GroupKeyManagement.MatterInvoke` as the
+  tag-keyed `map[uint8]any` fallback, fail the `KeySetWriteRequest` /
+  `KeySetReadRequest` type assertion and answer an error; `bridge/reply.go`
+  has no encoder for `KeySetReadResponse` / `KeySetReadAllIndicesResponse`
+  either. The cluster logic is tested only through typed Go calls. matter.js
+  HEAD also changed the behaviour behind it in `452d6f5c`: KeySetWrite accepts
+  any `GroupKeyMulticastPolicy` and does not store it (previously anything but
+  PerGroupID was InvalidCommand), and KeySetRead reports
+  `GroupKeyMulticastPolicy = PerGroupID` (field 8) while the model defines the
+  field (`GroupKeyManagementServer.ts:keySetWrite`, `keySetRead`). Fix
+  package: TLV decoders for the four request payloads (GroupKeySetStruct
+  fields 0-8), encoders for the two responses including field 8, and a wire
+  test per command.
+
+---
+
 ## Tier 3 — LOW
 
 Fixed-width integer encodes exceed the sanctioned SubscriptionID/DataVersion workaround family-wide, and the provenance comments misstate matter.js (`tlv/encode.go:119`); invalid UTF-8 preserved on decode (`tlv/decode.go:201`); maxPathsPerInvoke unenforced and Invoke SuppressResponse ignored (`im/invoke.go:307`); CSRRequest lacks the post-NOC ConstraintError guard; CaseAdminSubject CAT version 0 accepted (`cluster/core/operational_credentials.go:1831`); unfiltered NOCs read returns other fabrics' cert bytes; advertised port ignores the effective bind port (`bridge/bridge.go:1168`); ephemeral PASE provider leaks a reaper goroutine per close (`cmd/openccu-loom/matter_ephemeral_provider.go:164`); encrypted receive window permits rollover (`transport/mrp/window.go:88`); negative-write parity guards pin unmounted implementations (`cluster/matter_negative_write_parity_test.go:231`).

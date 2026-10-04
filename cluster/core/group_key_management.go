@@ -17,7 +17,7 @@ import (
 )
 
 // GroupKeyManagement implements the Matter GroupKeyManagement cluster
-// (0x003F) per Matter Core Specification 1.5.1 §11.2.10. Mandatory on
+// (0x003F) per Matter Core Specification 1.6.1 §11.2.10 (cluster revision 4). Mandatory on
 // the Root endpoint; fabric-scoped attributes (GroupKeyMap,
 // GroupTable) are filtered to the requesting fabric by the IM layer
 // before the cluster sees them.
@@ -56,7 +56,7 @@ type GroupStoreFacade interface {
 // Cluster ID + revision per Matter §11.2.10.
 const (
 	groupKeyMgmtClusterID       uint32 = 0x003F
-	groupKeyMgmtClusterRevision uint16 = 3 // matter.js HEAD group-key-management.element.ts:20 default=3
+	groupKeyMgmtClusterRevision uint16 = 4 // matter.js HEAD group-key-management.element.ts:20 default=4 (Matter 1.6.1)
 
 	groupKeyMgmtAttrGroupKeyMap           uint32 = 0x0000
 	groupKeyMgmtAttrGroupTable            uint32 = 0x0001
@@ -443,8 +443,18 @@ func (g *GroupKeyManagement) MatterInvoke(ctx context.Context, cmdID uint32, fie
 }
 
 // MatterReportable lists subscribe-able attributes.
+//
+// GroupKeyMap is absent: since cluster revision 4 (Matter 1.6.1) it
+// carries quality "N C" (group-key-management.element.ts GroupKeyMap),
+// and "C" (changesOmitted) means a change to it is never reported to a
+// subscriber. Mirrors matter.js packages/node/src/behavior/internal/
+// ServerBehaviorBacking.ts:#configureEventSuppression, which suppresses
+// change broadcasts for every changesOmitted attribute, and
+// packages/node/src/node/integration/ProtocolService.ts:addCluster, which
+// leaves such attributes out of the attrsChanged set. The attribute stays
+// readable; a controller sees a new value on its next read.
 func (g *GroupKeyManagement) MatterReportable() []uint32 {
-	return []uint32{groupKeyMgmtAttrGroupKeyMap, groupKeyMgmtAttrGroupTable}
+	return []uint32{groupKeyMgmtAttrGroupTable}
 }
 
 // MatterAttributes implements [contract.ClusterAttributeLister]

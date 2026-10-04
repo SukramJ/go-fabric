@@ -3,7 +3,7 @@
 
 // Package core hosts the Matter cluster servers that every bridge
 // endpoint (or the root endpoint specifically) mandates per Matter
-// Core Specification 1.5.1. These clusters carry no DP-specific
+// Core Specification 1.6.1. These clusters carry no DP-specific
 // semantics — they describe the bridge itself or the bridged-device
 // metadata.
 //
@@ -30,7 +30,7 @@
 // PowerSource (0x002F) for bridged battery endpoints lives in the
 // measurement package (measurement.PowerSourceServer), not here.
 //
-// All revisions match Matter 1.5.1. Updates require synchronised
+// All revisions match Matter 1.6.1 (matter.js HEAD). Updates require synchronised
 // changes in the model-layer revision constants under
 // a host's own device projections.
 package core

@@ -1,10 +1,10 @@
 {
   "matter": {
-    "revision": "1.6.0",
-    "specificationVersion": 17170432,
+    "revision": "1.6.1",
+    "specificationVersion": 17170688,
     "interactionModelRevision": 12,
     "dataModelRevision": 21,
-    "sourceCommit": "f07365a8d62fbfb8b03e5c65386dc0b72b4fe782"
+    "sourceCommit": "85cf66472b02763fe3b9c736ebab443b999a95a1"
   },
   "deviceTypes": [
     {
@@ -48,7 +48,7 @@
       "id": 11,
       "name": "DoorLockController",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 4,
@@ -284,7 +284,7 @@
       "id": 22,
       "name": "RootNode",
       "classification": "node",
-      "revision": 4,
+      "revision": 5,
       "requirements": [
         {
           "id": 17,
@@ -391,7 +391,7 @@
           "id": 56,
           "name": "TimeSynchronization",
           "element": "serverCluster",
-          "conformance": "TimeSyncCond, TimeSyncWithClientCond, TimeSyncWithNTPCCond, TimeSyncWithTZCond, TLSClientCond, TLSCertificatesCond, O"
+          "conformance": "TimeSyncCond, TimeSyncWithClientCond, TimeSyncWithNtpcCond, TimeSyncWithTzCond, TlsClientCond, TlsCertificatesCond, O"
         },
         {
           "id": 60,
@@ -415,19 +415,25 @@
           "id": 70,
           "name": "IcdManagement",
           "element": "serverCluster",
-          "conformance": "SIT | LIT"
+          "conformance": "Sit | Lit"
+        },
+        {
+          "id": 101,
+          "name": "Groupcast",
+          "element": "serverCluster",
+          "conformance": "GroupcastListenerCond, GroupcastSenderCond, O"
         },
         {
           "id": 2049,
           "name": "TlsCertificateManagement",
           "element": "serverCluster",
-          "conformance": "TLSCertificatesCond, O"
+          "conformance": "TlsCertificatesCond, O"
         },
         {
           "id": 2050,
           "name": "TlsClientManagement",
           "element": "serverCluster",
-          "conformance": "TLSClientCond, O"
+          "conformance": "TlsClientCond, O"
         }
       ]
     },
@@ -606,7 +612,7 @@
           "id": 151,
           "name": "Messages",
           "element": "serverCluster",
-          "conformance": "O"
+          "conformance": "[Rev >= v2]"
         },
         {
           "id": 1283,
@@ -678,7 +684,7 @@
           "id": 1295,
           "name": "ContentControl",
           "element": "serverCluster",
-          "conformance": "P, O"
+          "conformance": "P, [Rev >= v2]"
         }
       ]
     },
@@ -789,7 +795,7 @@
           "id": 151,
           "name": "Messages",
           "element": "serverCluster",
-          "conformance": "O"
+          "conformance": "[Rev >= v2]"
         },
         {
           "id": 1283,
@@ -843,7 +849,7 @@
           "id": 1295,
           "name": "ContentControl",
           "element": "serverCluster",
-          "conformance": "P, O"
+          "conformance": "P, [Rev >= v2]"
         }
       ]
     },
@@ -1063,7 +1069,7 @@
       "id": 43,
       "name": "Fan",
       "classification": "simple",
-      "revision": 4,
+      "revision": 5,
       "requirements": [
         {
           "id": 3,
@@ -1203,7 +1209,7 @@
       "id": 45,
       "name": "AirPurifier",
       "classification": "simple",
-      "revision": 2,
+      "revision": 3,
       "requirements": [
         {
           "id": 3,
@@ -1572,7 +1578,7 @@
       "id": 114,
       "name": "RoomAirConditioner",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 3,
@@ -1804,7 +1810,7 @@
       "id": 118,
       "name": "SmokeCoAlarm",
       "classification": "simple",
-      "revision": 1,
+      "revision": 2,
       "requirements": [
         {
           "id": 3,
@@ -2167,7 +2173,7 @@
       "id": 256,
       "name": "OnOffLight",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 3,
@@ -2216,7 +2222,7 @@
       "id": 257,
       "name": "DimmableLight",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 3,
@@ -2265,7 +2271,7 @@
       "id": 259,
       "name": "OnOffLightSwitch",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 3,
@@ -2308,7 +2314,7 @@
       "id": 260,
       "name": "DimmerSwitch",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 3,
@@ -2357,7 +2363,7 @@
       "id": 261,
       "name": "ColorDimmerSwitch",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 3,
@@ -2468,7 +2474,7 @@
       "id": 266,
       "name": "OnOffPlugInUnit",
       "classification": "simple",
-      "revision": 4,
+      "revision": 5,
       "requirements": [
         {
           "id": 3,
@@ -2517,7 +2523,7 @@
       "id": 267,
       "name": "DimmablePlugInUnit",
       "classification": "simple",
-      "revision": 5,
+      "revision": 6,
       "requirements": [
         {
           "id": 3,
@@ -2566,7 +2572,7 @@
       "id": 268,
       "name": "ColorTemperatureLight",
       "classification": "simple",
-      "revision": 4,
+      "revision": 5,
       "requirements": [
         {
           "id": 3,
@@ -2621,7 +2627,7 @@
       "id": 269,
       "name": "ExtendedColorLight",
       "classification": "simple",
-      "revision": 4,
+      "revision": 5,
       "requirements": [
         {
           "id": 3,
@@ -2676,7 +2682,7 @@
       "id": 271,
       "name": "MountedOnOffControl",
       "classification": "simple",
-      "revision": 2,
+      "revision": 3,
       "requirements": [
         {
           "id": 3,
@@ -2725,7 +2731,7 @@
       "id": 272,
       "name": "MountedDimmableLoadControl",
       "classification": "simple",
-      "revision": 2,
+      "revision": 3,
       "requirements": [
         {
           "id": 3,
@@ -3111,7 +3117,7 @@
       "id": 326,
       "name": "Chime",
       "classification": "simple",
-      "revision": 1,
+      "revision": 2,
       "requirements": [
         {
           "id": 3,
@@ -3123,6 +3129,12 @@
           "id": 29,
           "name": "Descriptor",
           "element": "serverCluster"
+        },
+        {
+          "id": 34,
+          "name": "Speaker",
+          "element": "deviceType",
+          "conformance": "O"
         },
         {
           "id": 1366,
@@ -3246,7 +3258,7 @@
       "id": 514,
       "name": "WindowCovering",
       "classification": "simple",
-      "revision": 6,
+      "revision": 7,
       "requirements": [
         {
           "id": 3,
@@ -3289,7 +3301,7 @@
       "id": 515,
       "name": "WindowCoveringController",
       "classification": "simple",
-      "revision": 4,
+      "revision": 5,
       "requirements": [
         {
           "id": 3,
@@ -3412,7 +3424,7 @@
       "id": 574,
       "name": "ClosureController",
       "classification": "simple",
-      "revision": 1,
+      "revision": 2,
       "requirements": [
         {
           "id": 3,
@@ -3443,7 +3455,7 @@
       "id": 769,
       "name": "Thermostat",
       "classification": "simple",
-      "revision": 6,
+      "revision": 7,
       "requirements": [
         {
           "id": 3,
@@ -3508,7 +3520,7 @@
           "id": 1073,
           "name": "AmbientContextSensing",
           "element": "clientCluster",
-          "conformance": "P, O"
+          "conformance": "P, [Rev >= v6]"
         }
       ]
     },
@@ -3547,7 +3559,7 @@
       "id": 771,
       "name": "Pump",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 3,
@@ -3638,7 +3650,7 @@
       "id": 772,
       "name": "PumpController",
       "classification": "simple",
-      "revision": 4,
+      "revision": 5,
       "requirements": [
         {
           "id": 3,
@@ -3847,7 +3859,7 @@
       "id": 778,
       "name": "ThermostatController",
       "classification": "simple",
-      "revision": 1,
+      "revision": 2,
       "requirements": [
         {
           "id": 3,
@@ -3956,7 +3968,7 @@
           "id": 159,
           "name": "DeviceEnergyManagementMode",
           "element": "serverCluster",
-          "conformance": "ControllableESA, O"
+          "conformance": "ControllableEsa, O"
         },
         {
           "id": 160,
@@ -4216,7 +4228,7 @@
       "id": 2112,
       "name": "ControlBridge",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 3,
@@ -4283,7 +4295,7 @@
       "id": 2128,
       "name": "OnOffSensor",
       "classification": "simple",
-      "revision": 3,
+      "revision": 4,
       "requirements": [
         {
           "id": 3,
@@ -4483,6 +4495,7 @@
       "features": [
         {
           "name": "GN",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -5008,7 +5021,7 @@
           "id": 7,
           "name": "AuxiliaryAcl",
           "type": "list",
-          "conformance": "P, AUX",
+          "conformance": "AUX",
           "access": "R F A",
           "constraint": "max 2000",
           "quality": "C"
@@ -5063,7 +5076,7 @@
           "id": 3,
           "name": "AuxiliaryAccessUpdated",
           "priority": "info",
-          "conformance": "P, AUX"
+          "conformance": "AUX"
         }
       ],
       "features": [
@@ -5079,7 +5092,7 @@
         },
         {
           "name": "AUX",
-          "conformance": "P, desc",
+          "conformance": "desc",
           "bit": 2
         }
       ]
@@ -5626,7 +5639,7 @@
           "type": "string",
           "conformance": "M",
           "access": "RW VM",
-          "constraint": "in SupportedLocales",
+          "constraint": "in supportedLocales",
           "quality": "N"
         },
         {
@@ -5669,7 +5682,7 @@
           "type": "CalendarTypeEnum",
           "conformance": "CALFMT",
           "access": "RW VM",
-          "constraint": "in SupportedCalendarTypes",
+          "constraint": "in supportedCalendarTypes",
           "quality": "N"
         },
         {
@@ -5698,6 +5711,7 @@
       "features": [
         {
           "name": "CALFMT",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -5742,6 +5756,7 @@
       "features": [
         {
           "name": "TEMP",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -6765,6 +6780,7 @@
       "features": [
         {
           "name": "WTRMRK",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -7385,18 +7401,22 @@
       "features": [
         {
           "name": "PKTCNT",
+          "conformance": "O",
           "bit": 0
         },
         {
           "name": "ERRCNT",
+          "conformance": "O",
           "bit": 1
         },
         {
           "name": "MLECNT",
+          "conformance": "O",
           "bit": 2
         },
         {
           "name": "MACCNT",
+          "conformance": "O",
           "bit": 3
         }
       ]
@@ -7570,10 +7590,12 @@
       "features": [
         {
           "name": "PKTCNT",
+          "conformance": "O",
           "bit": 0
         },
         {
           "name": "ERRCNT",
+          "conformance": "O",
           "bit": 1
         }
       ]
@@ -7690,10 +7712,12 @@
       "features": [
         {
           "name": "PKTCNT",
+          "conformance": "O",
           "bit": 0
         },
         {
           "name": "ERRCNT",
+          "conformance": "O",
           "bit": 1
         }
       ]
@@ -7920,18 +7944,22 @@
       "features": [
         {
           "name": "TZ",
+          "conformance": "O",
           "bit": 0
         },
         {
           "name": "NTPC",
+          "conformance": "O",
           "bit": 1
         },
         {
           "name": "NTPS",
+          "conformance": "O",
           "bit": 2
         },
         {
           "name": "TSC",
+          "conformance": "O",
           "bit": 3
         }
       ]
@@ -8314,6 +8342,7 @@
       "features": [
         {
           "name": "BC",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -8492,7 +8521,7 @@
     {
       "id": 63,
       "name": "GroupKeyManagement",
-      "revision": 3,
+      "revision": 4,
       "featureMap": 0,
       "attributes": [
         {
@@ -8502,7 +8531,7 @@
           "conformance": "M",
           "access": "RW F VM",
           "constraint": "desc",
-          "quality": "N",
+          "quality": "N C",
           "default": []
         },
         {
@@ -8551,7 +8580,7 @@
           "id": 65533,
           "name": "ClusterRevision",
           "type": "ClusterRevision",
-          "default": 3
+          "default": 4
         }
       ],
       "commands": [
@@ -9160,6 +9189,7 @@
       "features": [
         {
           "name": "DEPONOFF",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -10062,6 +10092,7 @@
       "features": [
         {
           "name": "RESET",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -10820,7 +10851,7 @@
           "id": 0,
           "name": "Membership",
           "type": "list",
-          "conformance": "P, M",
+          "conformance": "M",
           "access": "R F V",
           "constraint": "desc",
           "quality": "N"
@@ -10829,7 +10860,7 @@
           "id": 1,
           "name": "MaxMembershipCount",
           "type": "uint16",
-          "conformance": "P, M",
+          "conformance": "M",
           "access": "R V",
           "constraint": "min 10",
           "quality": "F"
@@ -10838,7 +10869,7 @@
           "id": 2,
           "name": "MaxMcastAddrCount",
           "type": "uint16",
-          "conformance": "P, M",
+          "conformance": "M",
           "access": "R V",
           "constraint": "min 1",
           "quality": "F"
@@ -10847,7 +10878,7 @@
           "id": 3,
           "name": "UsedMcastAddrCount",
           "type": "uint16",
-          "conformance": "P, M",
+          "conformance": "M",
           "access": "R V",
           "quality": "F"
         },
@@ -10855,7 +10886,7 @@
           "id": 4,
           "name": "FabricUnderTest",
           "type": "fabric-idx",
-          "conformance": "P, M",
+          "conformance": "M",
           "access": "R V"
         },
         {
@@ -10875,41 +10906,41 @@
           "id": 0,
           "name": "JoinGroup",
           "direction": "request",
-          "conformance": "P, M",
+          "conformance": "M",
           "response": "status"
         },
         {
           "id": 1,
           "name": "LeaveGroup",
           "direction": "request",
-          "conformance": "P, M",
+          "conformance": "M",
           "response": "LeaveGroupResponse"
         },
         {
           "id": 2,
           "name": "LeaveGroupResponse",
           "direction": "response",
-          "conformance": "P, M"
+          "conformance": "M"
         },
         {
           "id": 3,
           "name": "UpdateGroupKey",
           "direction": "request",
-          "conformance": "P, M",
+          "conformance": "M",
           "response": "status"
         },
         {
           "id": 4,
           "name": "ConfigureAuxiliaryAcl",
           "direction": "request",
-          "conformance": "P, LN",
+          "conformance": "LN",
           "response": "status"
         },
         {
           "id": 5,
           "name": "GroupcastTesting",
           "direction": "request",
-          "conformance": "P, M",
+          "conformance": "M",
           "response": "status"
         }
       ],
@@ -10918,23 +10949,23 @@
           "id": 0,
           "name": "GroupcastTesting",
           "priority": "info",
-          "conformance": "P, M"
+          "conformance": "M"
         }
       ],
       "features": [
         {
           "name": "LN",
-          "conformance": "P, O.a+",
+          "conformance": "O.a+",
           "bit": 0
         },
         {
           "name": "SD",
-          "conformance": "P, O.a+",
+          "conformance": "O.a+",
           "bit": 1
         },
         {
           "name": "PGA",
-          "conformance": "P, O",
+          "conformance": "O",
           "bit": 2
         }
       ]
@@ -12083,7 +12114,7 @@
         },
         {
           "id": 1,
-          "name": "ActiveMessageIDs",
+          "name": "ActiveMessageIds",
           "type": "list",
           "conformance": "M",
           "access": "R V",
@@ -14428,14 +14459,17 @@
       "features": [
         {
           "name": "SELRUN",
+          "conformance": "O",
           "bit": 0
         },
         {
           "name": "PROG",
+          "conformance": "O",
           "bit": 1
         },
         {
           "name": "MAPS",
+          "conformance": "O",
           "bit": 2
         }
       ]
@@ -14903,17 +14937,25 @@
         {
           "id": 7,
           "name": "PiCoolingDemand",
-          "conformance": "D"
+          "type": "uint8",
+          "conformance": "D",
+          "access": "R V",
+          "constraint": "0 to 100"
         },
         {
           "id": 8,
           "name": "PiHeatingDemand",
-          "conformance": "D"
+          "type": "uint8",
+          "conformance": "D",
+          "access": "R V",
+          "constraint": "0 to 100"
         },
         {
           "id": 9,
           "name": "HvacSystemTypeConfiguration",
-          "conformance": "D"
+          "type": "HVACSystemTypeBitmap",
+          "conformance": "D",
+          "access": "R[W] VM"
         },
         {
           "id": 16,
@@ -15103,7 +15145,10 @@
         {
           "id": 37,
           "name": "ThermostatProgrammingOperationMode",
-          "conformance": "D"
+          "type": "ProgrammingOperationModeBitmap",
+          "conformance": "D",
+          "access": "RW VM",
+          "constraint": "desc"
         },
         {
           "id": 41,
@@ -15141,32 +15186,56 @@
         {
           "id": 52,
           "name": "OccupiedSetback",
-          "conformance": "D"
+          "type": "UnsignedTemperature",
+          "conformance": "D",
+          "access": "RW VM",
+          "constraint": "occupiedSetbackMin to occupiedSetbackMax",
+          "quality": "X N"
         },
         {
           "id": 53,
           "name": "OccupiedSetbackMin",
-          "conformance": "D"
+          "type": "UnsignedTemperature",
+          "conformance": "D",
+          "access": "R V",
+          "constraint": "max occupiedSetbackMax",
+          "quality": "X F"
         },
         {
           "id": 54,
           "name": "OccupiedSetbackMax",
-          "conformance": "D"
+          "type": "UnsignedTemperature",
+          "conformance": "D",
+          "access": "R V",
+          "constraint": "occupiedSetbackMin to 254",
+          "quality": "X F"
         },
         {
           "id": 55,
           "name": "UnoccupiedSetback",
-          "conformance": "D"
+          "type": "UnsignedTemperature",
+          "conformance": "D",
+          "access": "RW VM",
+          "constraint": "unoccupiedSetbackMin to unoccupiedSetbackMax",
+          "quality": "X N"
         },
         {
           "id": 56,
           "name": "UnoccupiedSetbackMin",
-          "conformance": "D"
+          "type": "UnsignedTemperature",
+          "conformance": "D",
+          "access": "R V",
+          "constraint": "max unoccupiedSetbackMax",
+          "quality": "X F"
         },
         {
           "id": 57,
           "name": "UnoccupiedSetbackMax",
-          "conformance": "D"
+          "type": "UnsignedTemperature",
+          "conformance": "D",
+          "access": "R V",
+          "constraint": "unoccupiedSetbackMin to 254",
+          "quality": "X F"
         },
         {
           "id": 58,
@@ -15865,7 +15934,7 @@
           "id": 17,
           "name": "Primary1X",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 0",
+          "conformance": "NumberOfPrimaries > 0, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15874,7 +15943,7 @@
           "id": 18,
           "name": "Primary1Y",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 0",
+          "conformance": "NumberOfPrimaries > 0, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15883,7 +15952,7 @@
           "id": 19,
           "name": "Primary1Intensity",
           "type": "uint8",
-          "conformance": "NumberOfPrimaries > 0",
+          "conformance": "NumberOfPrimaries > 0, O",
           "access": "R V",
           "quality": "X F"
         },
@@ -15891,7 +15960,7 @@
           "id": 21,
           "name": "Primary2X",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 1",
+          "conformance": "NumberOfPrimaries > 1, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15900,7 +15969,7 @@
           "id": 22,
           "name": "Primary2Y",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 1",
+          "conformance": "NumberOfPrimaries > 1, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15909,7 +15978,7 @@
           "id": 23,
           "name": "Primary2Intensity",
           "type": "uint8",
-          "conformance": "NumberOfPrimaries > 1",
+          "conformance": "NumberOfPrimaries > 1, O",
           "access": "R V",
           "quality": "X F"
         },
@@ -15917,7 +15986,7 @@
           "id": 25,
           "name": "Primary3X",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 2",
+          "conformance": "NumberOfPrimaries > 2, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15926,7 +15995,7 @@
           "id": 26,
           "name": "Primary3Y",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 2",
+          "conformance": "NumberOfPrimaries > 2, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15935,7 +16004,7 @@
           "id": 27,
           "name": "Primary3Intensity",
           "type": "uint8",
-          "conformance": "NumberOfPrimaries > 2",
+          "conformance": "NumberOfPrimaries > 2, O",
           "access": "R V",
           "quality": "X F"
         },
@@ -15943,7 +16012,7 @@
           "id": 32,
           "name": "Primary4X",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 3",
+          "conformance": "NumberOfPrimaries > 3, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15952,7 +16021,7 @@
           "id": 33,
           "name": "Primary4Y",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 3",
+          "conformance": "NumberOfPrimaries > 3, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15961,7 +16030,7 @@
           "id": 34,
           "name": "Primary4Intensity",
           "type": "uint8",
-          "conformance": "NumberOfPrimaries > 3",
+          "conformance": "NumberOfPrimaries > 3, O",
           "access": "R V",
           "quality": "X F"
         },
@@ -15969,7 +16038,7 @@
           "id": 36,
           "name": "Primary5X",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 4",
+          "conformance": "NumberOfPrimaries > 4, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15978,7 +16047,7 @@
           "id": 37,
           "name": "Primary5Y",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 4",
+          "conformance": "NumberOfPrimaries > 4, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -15987,7 +16056,7 @@
           "id": 38,
           "name": "Primary5Intensity",
           "type": "uint8",
-          "conformance": "NumberOfPrimaries > 4",
+          "conformance": "NumberOfPrimaries > 4, O",
           "access": "R V",
           "quality": "X F"
         },
@@ -15995,7 +16064,7 @@
           "id": 40,
           "name": "Primary6X",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 5",
+          "conformance": "NumberOfPrimaries > 5, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -16004,7 +16073,7 @@
           "id": 41,
           "name": "Primary6Y",
           "type": "uint16",
-          "conformance": "NumberOfPrimaries > 5",
+          "conformance": "NumberOfPrimaries > 5, O",
           "access": "R V",
           "constraint": "max 65279",
           "quality": "F"
@@ -16013,7 +16082,7 @@
           "id": 42,
           "name": "Primary6Intensity",
           "type": "uint8",
-          "conformance": "NumberOfPrimaries > 5",
+          "conformance": "NumberOfPrimaries > 5, O",
           "access": "R V",
           "quality": "X F"
         },
@@ -16188,7 +16257,7 @@
           "id": 16397,
           "name": "CoupleColorTempToLevelMinMireds",
           "type": "uint16",
-          "conformance": "CT & ColorTemperatureMireds",
+          "conformance": "CT",
           "access": "R V",
           "constraint": "colorTempPhysicalMinMireds to colorTemperatureMireds"
         },
@@ -16196,7 +16265,7 @@
           "id": 16400,
           "name": "StartUpColorTemperatureMireds",
           "type": "uint16",
-          "conformance": "CT & ColorTemperatureMireds",
+          "conformance": "CT",
           "access": "RW VM",
           "constraint": "1 to 65279",
           "quality": "X N"
@@ -16985,7 +17054,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -17130,7 +17198,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -17275,7 +17342,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -17420,7 +17486,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -17565,7 +17630,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -17710,7 +17774,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -17855,7 +17918,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -18000,7 +18062,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -18145,7 +18206,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -18290,7 +18350,6 @@
           "type": "single",
           "conformance": "[MEA]",
           "access": "R V",
-          "constraint": "ms",
           "quality": "F"
         },
         {
@@ -18428,7 +18487,7 @@
           "id": 3,
           "name": "AmbientContextType",
           "type": "list",
-          "conformance": "P, HA, OI, AUD",
+          "conformance": "P, HA | OI | AUD",
           "access": "R V",
           "constraint": "1 to simultaneousDetectionLimit"
         },
@@ -18436,13 +18495,13 @@
           "id": 4,
           "name": "AmbientContextTypeSupported",
           "type": "list",
-          "conformance": "P, HA, OI, AUD",
+          "conformance": "P, HA | OI | AUD",
           "access": "R V",
           "constraint": "max 50"
         },
         {
           "id": 5,
-          "name": "ObjectCountReached",
+          "name": "ObjectCountThresholdReached",
           "type": "bool",
           "conformance": "P, OC & OI",
           "access": "R V"
@@ -18462,15 +18521,16 @@
           "conformance": "P, [OC & OI]",
           "access": "R V",
           "constraint": "min 1",
-          "default": null
+          "default": 0
         },
         {
           "id": 8,
           "name": "SimultaneousDetectionLimit",
           "type": "uint8",
           "conformance": "P, M",
-          "access": "RW",
-          "constraint": "max 10"
+          "access": "R V",
+          "constraint": "1 to 10",
+          "quality": "F"
         },
         {
           "id": 9,
@@ -18515,13 +18575,13 @@
           "id": 0,
           "name": "AmbientContextDetectStarted",
           "priority": "info",
-          "conformance": "P, HA, OI, AUD, OC & OI"
+          "conformance": "P, HA | OI | AUD | OC & OI"
         },
         {
           "id": 1,
           "name": "AmbientContextDetectEnded",
           "priority": "info",
-          "conformance": "P, HA, OI, AUD, OC & OI"
+          "conformance": "P, HA | OI | AUD | OC & OI"
         }
       ],
       "features": [
@@ -18924,18 +18984,22 @@
       "features": [
         {
           "name": "CL",
+          "conformance": "O",
           "bit": 0
         },
         {
           "name": "LI",
+          "conformance": "O",
           "bit": 1
         },
         {
           "name": "EG",
+          "conformance": "O",
           "bit": 2
         },
         {
           "name": "RP",
+          "conformance": "O",
           "bit": 3
         }
       ]
@@ -19236,22 +19300,27 @@
       "features": [
         {
           "name": "AS",
+          "conformance": "O",
           "bit": 0
         },
         {
           "name": "VS",
+          "conformance": "O",
           "bit": 1
         },
         {
           "name": "TT",
+          "conformance": "O",
           "bit": 2
         },
         {
           "name": "AT",
+          "conformance": "O",
           "bit": 3
         },
         {
           "name": "AA",
+          "conformance": "O",
           "bit": 4
         }
       ]
@@ -19322,6 +19391,7 @@
       "features": [
         {
           "name": "NU",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -19388,14 +19458,17 @@
       "features": [
         {
           "name": "NV",
+          "conformance": "O",
           "bit": 0
         },
         {
           "name": "LK",
+          "conformance": "O",
           "bit": 1
         },
         {
           "name": "NK",
+          "conformance": "O",
           "bit": 2
         }
       ]
@@ -19540,6 +19613,7 @@
       "features": [
         {
           "name": "NU",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -19613,6 +19687,7 @@
       "features": [
         {
           "name": "AP",
+          "conformance": "O",
           "bit": 0
         }
       ]
@@ -19991,34 +20066,42 @@
       "features": [
         {
           "name": "ST",
+          "conformance": "O",
           "bit": 0
         },
         {
           "name": "PM",
+          "conformance": "O",
           "bit": 1
         },
         {
           "name": "BU",
+          "conformance": "O",
           "bit": 2
         },
         {
           "name": "OCR",
+          "conformance": "O",
           "bit": 3
         },
         {
           "name": "SCR",
+          "conformance": "O",
           "bit": 4
         },
         {
           "name": "BC",
+          "conformance": "O",
           "bit": 5
         },
         {
           "name": "BA",
+          "conformance": "O",
           "bit": 6
         },
         {
           "name": "BTW",
+          "conformance": "O",
           "bit": 7
         }
       ]
@@ -21839,7 +21922,7 @@
           "name": "AdministratorFabricIndex",
           "type": "fabric-idx",
           "conformance": "M",
-          "access": "A",
+          "access": "R A",
           "constraint": "1 to 254",
           "quality": "X"
         },

@@ -432,31 +432,31 @@ func TestParityMatterJS_DeviceTypeRevisions(t *testing.T) {
 		revision uint16
 	}{
 		// Root endpoint primary types.
-		// RootNode (0x0016) revision is 4 in matter.js HEAD. Production
-		// paths in daemon.go use schema.DeviceTypeRevisions[0x0016] = 4.
+		// RootNode (0x0016) revision is 5 in matter.js HEAD (Matter 1.6.1).
+		// Production paths use schema.DeviceTypeRevisions[0x0016] = 5.
 		// This entry tracks matter.js HEAD truth; the schema codegen
 		// (endpoint/helpers.go) uses it directly.
-		{0x0016, "RootNode", 4},
+		{0x0016, "RootNode", 5},
 		{0x000E, "Aggregator", 2},
 		// Bridged endpoint primary types — matches helpers.go::deviceTypeRevision.
 		{0x0013, "BridgedNode", 3},
 		{0x0015, "ContactSensor", 2},
 		{0x0043, "WaterLeakDetector", 2},
 		{0x002C, "AirQualitySensor", 1},
-		{0x0076, "SmokeCoAlarm", 1},
+		{0x0076, "SmokeCoAlarm", 2},
 		{0x0106, "LightSensor", 4},
 		{0x0107, "OccupancySensor", 4},
 		{0x0302, "TemperatureSensor", 3},
 		{0x0305, "PressureSensor", 3},
 		{0x0307, "HumiditySensor", 3},
 		{0x000F, "GenericSwitch", 3},
-		{0x0100, "OnOffLight", 3},
-		{0x0101, "DimmableLight", 3},
-		{0x010A, "OnOffPlugInUnit", 4},
-		{0x010C, "ColorTemperatureLight", 4},
-		{0x010D, "ExtendedColorLight", 4},
-		{0x0202, "WindowCovering", 6},
-		{0x0301, "Thermostat", 6},
+		{0x0100, "OnOffLight", 4},
+		{0x0101, "DimmableLight", 4},
+		{0x010A, "OnOffPlugInUnit", 5},
+		{0x010C, "ColorTemperatureLight", 5},
+		{0x010D, "ExtendedColorLight", 5},
+		{0x0202, "WindowCovering", 7},
+		{0x0301, "Thermostat", 7},
 		{0x000A, "DoorLock", 4},
 	}
 	for _, c := range cases {

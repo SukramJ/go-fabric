@@ -10,6 +10,43 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- **Matter 1.6.1.** `parity/schema.json` is re-extracted from matter.js
+  `85cf6647` (Matter 1.6.1; previously `f07365a8`, 1.6.0) and `schema/` is
+  regenerated from it. This is a matter.js parity correction and bypasses the
+  deprecation window for the values below:
+  - `cluster.SpecificationVersion` is `0x01060100` (was `0x01050100`), and
+    `core.BasicInformation` defaults `DataModelRevision` to 21 (was 19) —
+    matter.js `Specification.SPECIFICATION_VERSION` / `DATA_MODEL_REVISION`.
+  - `im.MatterInteractionModelRevision` and `im.InteractionModelRevision` are
+    12 (were 13), the revision matter.js stamps on every IM message
+    (`Specification.INTERACTION_MODEL_REVISION`, capped below 13 because
+    revision 13's only delta is provisional). Every IM response's tag `0xFF`
+    changes byte; the IM wire fixtures were regenerated with the generator
+    reading the value from matter.js instead of a literal.
+  - GroupKeyManagement advertises ClusterRevision 4 (was 3). Its GroupKeyMap
+    carries quality `C` (changes omitted), so `MatterReportable` no longer
+    lists it.
+  - Advertised device-type revisions follow the snapshot through
+    `schema.DeviceTypeRevision`: RootNode 5, OnOffLight 4, DimmableLight 4,
+    OnOffPlugInUnit 5, DimmablePlugInUnit 6, ColorTemperatureLight 5,
+    ExtendedColorLight 5, WindowCovering 7, Thermostat 7, SmokeCoAlarm 2,
+    among others.
+  - A write to the deprecated Thermostat attributes PiCoolingDemand,
+    PiHeatingDemand and Occupied/UnoccupiedSetbackMin/Max is answered
+    UNSUPPORTED_WRITE: the 1.6.1 snapshot gives them access `R V`.
+
+  Not yet followed: Matter 1.6.1 requires a Groupcast server and the
+  AccessControl Auxiliary ACL on the root of a node with lights or plugs.
+  Recorded in `notes/parity/matter_behaviour_findings.md`.
+
+### Deprecated
+
+- `im.StatusUnreportableAttr` (0x8c) and `im.StatusNoUpstreamSubscription`
+  (0xc5): Matter 1.6.1 removed both codes and matter.js dropped them from its
+  status table. No replacement; removal permissible in v0.3.0.
+
 ## [0.1.0] — 2026-10-02
 
 The first tagged release. It is the state of `main` the reference daemon

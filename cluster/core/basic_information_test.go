@@ -96,8 +96,8 @@ func TestBasicInfo_DefaultDataModelRevision(t *testing.T) {
 	if !ok {
 		t.Fatal("DataModelRevision: ok=false")
 	}
-	if v.(uint16) != 19 {
-		t.Fatalf("DataModelRevision = %v, want 19", v)
+	if v.(uint16) != 21 {
+		t.Fatalf("DataModelRevision = %v, want 21 (Matter 1.6.x)", v)
 	}
 }
 

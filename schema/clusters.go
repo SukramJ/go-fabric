@@ -40,7 +40,7 @@ var ClusterRevisions = map[uint32]uint16{
 	0x003B: 2,  // Switch
 	0x003C: 1,  // AdministratorCommissioning
 	0x003E: 2,  // OperationalCredentials
-	0x003F: 3,  // GroupKeyManagement
+	0x003F: 4,  // GroupKeyManagement
 	0x0040: 1,  // FixedLabel
 	0x0041: 1,  // UserLabel
 	0x0045: 3,  // BooleanState

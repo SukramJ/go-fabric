@@ -19,7 +19,8 @@
 //     core-package variant was a duplicate and was removed (see
 //     notes/parity/by_design.md, "Removed" table).
 //
-// All cluster implementations target Matter Core Specification 1.5.1.
+// All cluster implementations target Matter Core Specification 1.6.1
+// (the matter.js HEAD pin in parity/schema.json).
 // ClusterRevision constants in this package are authoritative; the
 // rich-model `MatterClusterServer` projections under
 // a host mounts on its own types mirror them.

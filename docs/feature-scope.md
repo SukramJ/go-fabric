@@ -81,8 +81,14 @@ presence is mandated by device-type conformance, and a bridge whose host has no
 group or scene primitive has nothing to back them with. See
 [ADR 0004](./adr/0004-groups-cluster-stays-stub.md).
 
-All cluster implementations target Matter Core Specification 1.5.1;
+All cluster implementations target Matter Core Specification 1.6.1 — the
+revision of the matter.js HEAD extract in `parity/schema.json` — and the node
+advertises it: `BasicInformation.SpecificationVersion` 0x01060100,
+`DataModelRevision` 21, Interaction Model revision 12 on every IM message.
 `ClusterRevision` values come from the matter.js extract, never by hand.
+Matter 1.6.1 also makes a Groupcast server and the Auxiliary ACL on the root
+mandatory for nodes with lights or plugs; this module does not provide them
+yet (see `notes/parity/matter_behaviour_findings.md`, "Matter 1.6.1 pin").
 
 ## Device types
 

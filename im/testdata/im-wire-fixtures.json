@@ -6,9 +6,9 @@
     "fixture": {
       "suppressResponse": false,
       "attributeReports": [],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15360118280424ff0d18"
+    "bytesHex": "15360118280424ff0c18"
   },
   {
     "label": "report_data_keepalive_no_subid",
@@ -16,9 +16,9 @@
     "type": "ReportData",
     "fixture": {
       "suppressResponse": true,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15290424ff0d18",
+    "bytesHex": "15290424ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "matter.js omits attributeReports when undefined; Go always emits an empty array"
   },
@@ -29,9 +29,9 @@
     "fixture": {
       "subscriptionId": 5,
       "suppressResponse": true,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15240005290424ff0d18",
+    "bytesHex": "15240005290424ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "matter.js omits attributeReports when undefined; Go always emits an empty array"
   },
@@ -43,9 +43,9 @@
       "subscriptionId": 42,
       "suppressResponse": false,
       "attributeReports": [],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1524002a360118280424ff0d18",
+    "bytesHex": "1524002a360118280424ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go uses PutUint32 for SubscriptionId (always 4-byte); matter.js TlvUInt32 magnitude-encodes small values. Apple Home requires fixed-width."
   },
@@ -58,9 +58,9 @@
       "suppressResponse": false,
       "attributeReports": [],
       "moreChunkedMessages": true,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1524002a3601182903280424ff0d18",
+    "bytesHex": "1524002a3601182903280424ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go uses PutUint32 for SubscriptionId (always 4-byte); matter.js TlvUInt32 magnitude-encodes small values."
   },
@@ -72,9 +72,9 @@
       "suppressResponse": false,
       "attributeReports": [],
       "moreChunkedMessages": true,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "153601182903280424ff0d18"
+    "bytesHex": "153601182903280424ff0c18"
   },
   {
     "label": "report_data_event_only",
@@ -84,9 +84,9 @@
       "subscriptionId": 99,
       "suppressResponse": false,
       "eventReports": [],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15240063360218280424ff0d18",
+    "bytesHex": "15240063360218280424ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go uses PutUint32 for SubscriptionId (always 4-byte); matter.js TlvUInt32 magnitude-encodes small values."
   },
@@ -97,9 +97,9 @@
     "fixture": {
       "subscriptionId": 7,
       "suppressResponse": true,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15240007290424ff0d18",
+    "bytesHex": "15240007290424ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "matter.js omits attributeReports when undefined; Go always emits an empty array"
   },
@@ -112,9 +112,9 @@
       "minIntervalFloorSeconds": 0,
       "maxIntervalCeilingSeconds": 60,
       "isFabricFiltered": false,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15290024010024023c280724ff0d18",
+    "bytesHex": "15290024010024023c280724ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision; matter.js uses TlvOptionalField for both"
   },
@@ -127,9 +127,9 @@
       "minIntervalFloorSeconds": 0,
       "maxIntervalCeilingSeconds": 30,
       "isFabricFiltered": false,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15280024010024021e280724ff0d18",
+    "bytesHex": "15280024010024021e280724ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision; matter.js uses TlvOptionalField for both"
   },
@@ -149,9 +149,9 @@
         }
       ],
       "isFabricFiltered": true,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15280024010124021e3603172402012403062404001818290724ff0d18",
+    "bytesHex": "15280024010124021e3603172402012403062404001818290724ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go SubscribeRequest.MarshalTLV omits interactionModelRevision; matter.js emits it"
   },
@@ -171,9 +171,9 @@
         }
       ],
       "isFabricFiltered": false,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15290024010024023c3604172401012402062403001818280724ff0d18",
+    "bytesHex": "15290024010024023c3604172401012402062403001818280724ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision"
   },
@@ -195,9 +195,9 @@
           "dataVersion": 100
         }
       ],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15280024010024021e2807360815370024010124020618240164181824ff0d18",
+    "bytesHex": "15280024010024021e2807360815370024010124020618240164181824ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision"
   },
@@ -208,9 +208,9 @@
     "fixture": {
       "subscriptionId": 1,
       "maxInterval": 30,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1524000124021e24ff0d18",
+    "bytesHex": "1524000124021e24ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go uses PutUint32/PutUint16 (fixed-width); matter.js TlvUInt32/UInt16 magnitude-encodes. Spec requires fixed-width; chip-tool and Apple reject magnitude-encoded subId/maxInterval."
   },
@@ -221,9 +221,9 @@
     "fixture": {
       "subscriptionId": 305419896,
       "maxInterval": 120,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1526007856341224027824ff0d18",
+    "bytesHex": "1526007856341224027824ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go uses PutUint32/PutUint16 (fixed-width); matter.js TlvUInt32/UInt16 magnitude-encodes."
   },
@@ -233,9 +233,9 @@
     "type": "StatusResponse",
     "fixture": {
       "status": 0,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1524000024ff0d18"
+    "bytesHex": "1524000024ff0c18"
   },
   {
     "label": "status_resp_unsupported_attribute",
@@ -243,9 +243,9 @@
     "type": "StatusResponse",
     "fixture": {
       "status": 134,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1524008624ff0d18"
+    "bytesHex": "1524008624ff0c18"
   },
   {
     "label": "status_resp_unsupported_cluster",
@@ -253,9 +253,9 @@
     "type": "StatusResponse",
     "fixture": {
       "status": 195,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "152400c324ff0d18"
+    "bytesHex": "152400c324ff0c18"
   },
   {
     "label": "status_resp_failure",
@@ -263,9 +263,9 @@
     "type": "StatusResponse",
     "fixture": {
       "status": 1,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1524000124ff0d18"
+    "bytesHex": "1524000124ff0c18"
   },
   {
     "label": "status_resp_invalid_action",
@@ -273,9 +273,9 @@
     "type": "StatusResponse",
     "fixture": {
       "status": 128,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1524008024ff0d18"
+    "bytesHex": "1524008024ff0c18"
   },
   {
     "label": "status_resp_busy",
@@ -283,9 +283,9 @@
     "type": "StatusResponse",
     "fixture": {
       "status": 156,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1524009c24ff0d18"
+    "bytesHex": "1524009c24ff0c18"
   },
   {
     "label": "read_req_minimal",
@@ -293,9 +293,9 @@
     "type": "ReadRequest",
     "fixture": {
       "isFabricFiltered": false,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15280324ff0d18",
+    "bytesHex": "15280324ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go ReadRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision"
   },
@@ -312,9 +312,9 @@
         }
       ],
       "isFabricFiltered": false,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "153600172402012403062404001818280324ff0d18",
+    "bytesHex": "153600172402012403062404001818280324ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go ReadRequest.MarshalTLV omits interactionModelRevision; matter.js emits it"
   },
@@ -327,9 +327,9 @@
         {}
       ],
       "isFabricFiltered": false,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "153600171818280324ff0d18",
+    "bytesHex": "153600171818280324ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go ReadRequest.MarshalTLV omits interactionModelRevision; matter.js emits it"
   },
@@ -346,9 +346,9 @@
         }
       ],
       "isFabricFiltered": true,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1536001724020024031f2404001818290324ff0d18",
+    "bytesHex": "1536001724020024031f2404001818290324ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go ReadRequest.MarshalTLV omits interactionModelRevision; matter.js emits it"
   },
@@ -365,9 +365,9 @@
         }
       ],
       "isFabricFiltered": false,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "153601172401012402062403001818280324ff0d18",
+    "bytesHex": "153601172401012402062403001818280324ff0c18",
     "byDesignDivergence": true,
     "byDesignNote": "Go ReadRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision"
   },
@@ -394,11 +394,11 @@
           ]
         }
       ],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1528013602153701240201240306240400182902181824ff0d18",
+    "bytesHex": "1528013602153701240201240306240400182902181824ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "WriteRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "WriteRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   },
   {
     "label": "write_req_timed",
@@ -423,11 +423,11 @@
           ]
         }
       ],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1529013602153701240201240306240400182902181824ff0d18",
+    "bytesHex": "1529013602153701240201240306240400182902181824ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "WriteRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "WriteRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   },
   {
     "label": "write_req_suppress_response",
@@ -453,11 +453,11 @@
           ]
         }
       ],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15290028013602153701240201240306240400182902181824ff0d18",
+    "bytesHex": "15290028013602153701240201240306240400182902181824ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "WriteRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "WriteRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   },
   {
     "label": "write_resp_success_single",
@@ -476,9 +476,9 @@
           }
         }
       ],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15360015370024020124030624040018350124000018181824ff0d18"
+    "bytesHex": "15360015370024020124030624040018350124000018181824ff0c18"
   },
   {
     "label": "write_resp_empty",
@@ -486,9 +486,9 @@
     "type": "WriteResponse",
     "fixture": {
       "writeResponses": [],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1536001824ff0d18"
+    "bytesHex": "1536001824ff0c18"
   },
   {
     "label": "write_resp_error_single",
@@ -507,9 +507,9 @@
           }
         }
       ],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15360015370024020124030624046318350124008618181824ff0d18"
+    "bytesHex": "15360015370024020124030624046318350124008618181824ff0c18"
   },
   {
     "label": "invoke_req_not_timed_not_suppressed",
@@ -528,11 +528,11 @@
           "commandFields": []
         }
       ],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1528002801360215370024000124010624020018181824ff0d18",
+    "bytesHex": "1528002801360215370024000124010624020018181824ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "InvokeRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "InvokeRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   },
   {
     "label": "invoke_req_timed",
@@ -551,11 +551,11 @@
           "commandFields": []
         }
       ],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "152800290136021537002400012501010124020018181824ff0d18",
+    "bytesHex": "152800290136021537002400012501010124020018181824ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "InvokeRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "InvokeRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   },
   {
     "label": "invoke_req_suppress_response",
@@ -574,11 +574,11 @@
           "commandFields": []
         }
       ],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1529002801360215370024000024010324020018181824ff0d18",
+    "bytesHex": "1529002801360215370024000024010324020018181824ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "InvokeRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "InvokeRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   },
   {
     "label": "invoke_req_empty_requests",
@@ -588,11 +588,11 @@
       "suppressResponse": false,
       "timedRequest": false,
       "invokeRequests": [],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "152800280136021824ff0d18",
+    "bytesHex": "152800280136021824ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "InvokeRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "InvokeRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   },
   {
     "label": "invoke_resp_empty_success",
@@ -601,9 +601,9 @@
     "fixture": {
       "suppressResponse": false,
       "invokeResponses": [],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15280036011824ff0d18"
+    "bytesHex": "15280036011824ff0c18"
   },
   {
     "label": "invoke_resp_suppress_true",
@@ -612,9 +612,9 @@
     "fixture": {
       "suppressResponse": true,
       "invokeResponses": [],
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "15290036011824ff0d18"
+    "bytesHex": "15290036011824ff0c18"
   },
   {
     "label": "timed_req_short",
@@ -622,11 +622,11 @@
     "type": "TimedRequest",
     "fixture": {
       "timeout": 6000,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "152500701724ff0d18",
+    "bytesHex": "152500701724ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "TimedRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "TimedRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   },
   {
     "label": "timed_req_max",
@@ -634,11 +634,11 @@
     "type": "TimedRequest",
     "fixture": {
       "timeout": 65535,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "152500ffff24ff0d18",
+    "bytesHex": "152500ffff24ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "TimedRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "TimedRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   },
   {
     "label": "timed_req_minimal",
@@ -646,10 +646,10 @@
     "type": "TimedRequest",
     "fixture": {
       "timeout": 1,
-      "interactionModelRevision": 13
+      "interactionModelRevision": 12
     },
-    "bytesHex": "1524000124ff0d18",
+    "bytesHex": "1524000124ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "TimedRequest is decode-only in openccu-loom (bridge receives, never sends); no MarshalTLV to test"
+    "byDesignNote": "TimedRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
   }
 ]
