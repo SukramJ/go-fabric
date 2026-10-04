@@ -13,14 +13,15 @@ an oversight to the next reader — including choices to *not* do something.
 | [0005](./0005-bridge-decomposition.md) | Defer the `Bridge` CommissioningSession / IMEngine facade split | accepted, deferred with a plan |
 | [0006](./0006-subscribe-dispatch-seam.md) | Cohesive sub-helpers out of `handleSubscribeRequest` | accepted |
 | [0007](./0007-chiptool-send-receive-matrix.md) | Hermetic per-type send/receive suite against chip-tool | accepted |
+| [0008](./0008-subscription-resumption.md) | Persist server subscriptions and re-establish them after restart, with a CASE initiator scoped to that alone | accepted |
 
 ## Provenance
 
-All seven were recorded in
+ADRs 0001–0007 were recorded in
 [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom/tree/main/docs/adr) while
 the Matter stack still lived there as `internal/north/matter/`, and moved here
 with the stack. They were renumbered into this module's own sequence; each file
-names the OpenCCU-Loom number it carried. Decisions that are about *projecting a
+names the OpenCCU-Loom number it carried. ADR 0008 onwards were written here. Decisions that are about *projecting a
 device model onto Matter* — which HomeMatic device becomes which device type,
 how many endpoints a physical device gets — stayed there, because that is the
 host's decision, not this module's.
