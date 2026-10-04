@@ -109,7 +109,8 @@ Where the data model comes from:
 Everything outside `internal/` is public API, including `bridge/bridgetest`
 and `endpoint/endpointtest` — see `README.md` §API stability for the
 deprecation window before you rename anything. `internal/` holds only the
-one-way test seams (`bridgeseam`, `channelseam`) and the chip-tool suite.
+one-way test seams (`bridgeseam`, `channelseam`), the shared parity-test
+support (`paritytest`) and the chip-tool suite.
 
 Scope boundaries that are decisions, not backlog — do not "fix" them:
 no controller/commissioner role, no Bluetooth, no Thread, no CSA
