@@ -99,6 +99,73 @@ fan, and a host that had to re-derive it would differ from the next host.
 Validation that matter.js's generated behavior does perform — types, enum
 membership, "max 100", "max speedMax", bitmap bits — is mirrored as such.
 
+### BD-Matter-OperationalStateRulesInServer — command answers and state-list rules the specification text adds to OperationalStateServer
+
+matter.js `OperationalStateServer` / `RvcOperationalStateServer`
+(`packages/node/src/behaviors/operational-state/OperationalStateServer.ts`,
+`.../rvc-operational-state/RvcOperationalStateServer.ts`) keep the state
+consistent through reactors and implement no command; the device that
+subclasses them calls `OperationalStateUtils.assertPause` /
+`assertRvcPause` / `assertResume` / `assertRvcResume` / `assertRvcGoHome`
+and moves the state. [`cluster/opstate`](../../cluster/opstate) mirrors the
+reactors and the Utils checks as code and hands every command that passes
+them to the host's `CommandHandler`. On top it applies, from
+`operational-state.resource.ts` / `rvc-operational-state.resource.ts`:
+
+- A command that finds the device in its target state — Pause while
+  Paused, Stop while Stopped, Start or Resume while Running, GoHome while
+  SeekingCharger — answers NoError and does not reach the host ("respond
+  with … NoError but take no further action", :176, :213, :241, :266;
+  GoHome).
+- OperationalStateList must contain the state each supported command
+  leads to (Paused, Running, Stopped, SeekingCharger), "at a minimum, …
+  the set of states matching the commands that are also supported"
+  (:98-99); the initial state must be listed (:106-107); no state is
+  listed twice, and a reserved (undefined, non-manufacturer) id is
+  refused.
+- OperationalStateList is fixed at construction. matter.js lets a device
+  replace it at run time; no appliance seen so far changes its state set,
+  and a fixed list keeps every OperationalState assertion stable.
+- The state the device ends up in after a successful command is the
+  host's to set, as in matter.js; the server does not guess it.
+
+CountdownTime's "Q" reporting is matter.js's own (QuietEvent, at most one
+report a second, at once to or from null) — the specification's fuller
+list of reportable changes is not implemented by either.
+
+**Rationale.** As for SmokeCoAlarm: the rules are the same for every
+appliance, and a host should not re-derive them. The wire surface is
+matter.js's, pinned in `bridge/testdata/application-wire-fixtures.json`.
+
+### BD-Matter-ModeBaseRulesInServer — ModeBase tag rules from the specification, and ChangeToMode decided by the device
+
+matter.js's mode servers (`RvcRunModeServer.ts`, `RvcCleanModeServer.ts`,
+`LaundryWasherModeServer.ts`, `DishwasherModeServer.ts`, with
+`mode-base/ModeUtils.ts`) check labels and mode values for duplicates and
+each derivation's required tags, and their default `changeToMode` sets
+CurrentMode to any supported mode. [`cluster/modebase`](../../cluster/modebase)
+mirrors those checks as code and differs in two respects:
+
+- **Spec-text checks at construction** (`mode-base.resource.ts`,
+  SupportedModes and ModeOptionStruct.ModeTags): the tags of one mode are
+  distinct, no two modes carry the same set of tags (order-independent),
+  and every mode has at least one standard tag (one without MfgCode).
+- **ChangeToMode is the device's**: a supported mode other than the
+  current one goes to the host's `ModeChanger`, which may refuse with
+  GenericFailure, InvalidInMode, a derivation status (Stuck, BatteryLow,
+  CleaningInProgress, …) or a product-specific status (0x80 and above, see
+  the findings register); only Success moves CurrentMode. matter.js's
+  default accepts every supported mode — a bridged device has to be asked.
+  A host answering UnsupportedMode (the server's own verdict) or an
+  undefined status gets FAILURE; StatusText is cut to its "max 64" bytes.
+
+DIRECTMODECH is advertised as configured; its rule (InvalidInMode while
+the RVC is not in an Idle mode) involves RvcRunMode's state and is the
+host's to apply in its `ModeChanger`, as matter.js leaves it to the device.
+
+**Rationale.** A bridge cannot accept a mode change on the device's behalf;
+the tag rules are the specification's and the same for every host.
+
 ### BD-Matter-ClosureWithoutTagList — the Closure endpoint omits the TAGLIST feature its device type marks mandatory
 
 A garage drive projects as the Closure device type (0x0230) carrying

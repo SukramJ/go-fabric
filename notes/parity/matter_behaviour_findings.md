@@ -348,10 +348,11 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
 
 ## Application cluster servers — open items
 
-Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump` and
-FlowMeasurement. `../connectedhomeip` was not checked out when they were
-written, so the two rule sets below that matter.js does not carry were
-taken from memory of connectedhomeip and are unverified:
+Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
+FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
+`../connectedhomeip` was not checked out when they were written, so the
+rules below that matter.js does not carry and that were taken from memory
+of connectedhomeip are marked unverified:
 
 - **FanControl percent / speed formulas and the On / Smart mapping.**
   `ceil(SpeedMax × p / 100)`, `floor(s × 100 / SpeedMax)`, On → High,
@@ -375,11 +376,41 @@ taken from memory of connectedhomeip and are unverified:
   PowerSource (with its schema revision) to DeviceTypeList when
   `ep.PowerSource` is set, and assert it in
   `endpoint/application_device_types_test.go`.
+- **ModeBase DIRECTMODECH bit and product-specific statuses.**
+  `modebase.FeatureDirectModeChange` is bit 20, as matter.js's
+  `rvc-run-mode.element.ts` / `rvc-clean-mode.element.ts` give it
+  (constraint "20") and `parity/schema.json` pins it; connectedhomeip is
+  recalled — not read — to define it as 0x10000 (bit 16). Likewise the
+  ModeChangeStatus range a host may use for a product-specific failure is
+  taken to start at 0x80, from memory of the specification's range table
+  that matter.js does not carry. Fix package: read
+  `src/app/clusters/mode-base-server/` and the RVC Run Mode feature table;
+  if the bit differs, raise it against matter.js before changing the
+  constant here; narrow `modebase.Server.validHostStatus` if the range does.
+- **DIRECTMODECH is advertised, not enforced.** Without it a RvcRunMode /
+  RvcCleanMode change while the run mode is not Idle must answer
+  InvalidInMode (`rvc-run-mode.resource.ts`, `rvc-clean-mode.resource.ts`).
+  The server leaves that to the host's `ModeChanger`; matter.js does not
+  enforce it either. Fix package: a cross-cluster check would need the
+  RvcRunMode server to be visible to RvcCleanMode; decide with a host that
+  needs it.
+- **CountdownTime reportability.** The server reports CountdownTime as
+  matter.js does (QuietEvent: at once to or from null, otherwise at most
+  once a second). The specification's list — report on a change caused by
+  CurrentPhase / OperationalState, on 0 ↔ non-zero, on increases and on
+  changes not due to the passage of time; never for the plain countdown —
+  is not implemented here or in matter.js
+  (RvcOperationalStateServer's own comment says so).
 - **Not built:** HepaFilterMonitoring (0x0071) and
   ActivatedCarbonFilterMonitoring (0x0072), optional on AirPurifier and
   ExtractorHood; Pump's optional LevelControl / ScenesManagement /
   measurement servers beyond FlowMeasurement; SmokeCoAlarm's optional
-  CarbonMonoxideConcentrationMeasurement (0x040C).
+  CarbonMonoxideConcentrationMeasurement (0x040C); the appliance types'
+  optional LaundryWasherControls (0x0053), LaundryDryerControls (0x004A),
+  DishwasherAlarm (0x005D), TemperatureControl (0x0056), DeadFront OnOff
+  and RVC ServiceArea (0x0150); the microwave-oven clusters and
+  OvenCavityOperationalState (0x0048), which no target device type
+  mandates.
 
 ---
 

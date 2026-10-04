@@ -18,6 +18,49 @@ pseudo-version of `main`.
   subscribers — independently of the host source's `ChangeNotifier`. It
   lets a server hold a "Q" (quieter) attribute out of change reporting
   until its own rule reports it, as matter.js's `QuietEvent` does.
+- **Appliance cluster servers for laundry washers, laundry dryers,
+  dishwashers and robotic vacuum cleaners.** Each server holds its
+  cluster state the way matter.js's behavior does; the host moves it
+  through setters that enforce matter.js's reactors and answers the
+  commands the server could not decide itself. Changes are reported per
+  attribute through `contract.AttributeChangeNotifier`. Every command,
+  response, event and structured attribute crosses the real wire path in
+  `bridge` tests and is pinned against matter.js encodings
+  (`bridge/testdata/application-wire-fixtures.json`).
+  - `cluster/opstate` — OperationalState (0x0060) and RvcOperationalState
+    (0x0061): `Server`, `NewServer`, `NewRvcServer`, `Config`,
+    `CommandHandler`, `Command*`, `State*`, `Error*`, `StateEntry`,
+    `ErrorState`, `OperationCompletion`, the setters
+    (`SetOperationalState`, `SetOperationalError`, `SetPhaseList`,
+    `SetCurrentPhase`, `SetCountdownTime`), `EmitOperationCompletion`,
+    `Revision` / `RvcRevision` and the device-type constants. Pause /
+    Resume / GoHome follow matter.js's OperationalStateUtils; the
+    "already in that state" answers and the command-state list rule are
+    specification text (`BD-Matter-OperationalStateRulesInServer`).
+    CountdownTime is reported as matter.js reports a quieter attribute.
+  - `cluster/modebase` — `NewLaundryWasherMode`, `NewRvcRunMode`,
+    `NewRvcCleanMode`, `NewDishwasherMode` on one `Server`: `Config`,
+    `ModeChanger`, `ModeOption`, `ModeTag`, `Status*`, the tag constants,
+    `FeatureDirectModeChange`, `SetCurrentMode`. SupportedModes is checked
+    as matter.js's mode servers check it, plus the ModeBase tag rules of
+    the specification (`BD-Matter-ModeBaseRulesInServer`); a ChangeToMode
+    other than UnsupportedMode / the current mode is the device's.
+  - `cluster` — `AttributeChanges` (the listener set behind
+    `contract.AttributeChangeNotifier`) and `Quieter` (matter.js's
+    QuietEvent throttle for a "Q" attribute).
+  - `cluster/wire` — the OperationalState and ModeBase wire types
+    (`OperationalStateStruct`, `ErrorStateStruct`,
+    `OperationalCommandResponse`, `OperationalErrorEvent`,
+    `OperationCompletionEvent`, `ElapsedS`, `ModeOptionStruct`,
+    `ModeTagStruct`, `ChangeToModeRequest`, `ChangeToModeResponse`) and
+    their ids.
+  - `contract.DeviceTypeName` names Laundry Washer, Robotic Vacuum
+    Cleaner, Dishwasher and Laundry Dryer; `schema` knows the read-only
+    attributes of OperationalState and RvcOperationalState.
+  - Not built (none is mandatory for the four device types): the
+    microwave-oven clusters, OvenCavityOperationalState, ServiceArea,
+    LaundryWasherControls, LaundryDryerControls, DishwasherAlarm,
+    TemperatureControl.
 - **Application cluster servers for smoke / CO alarms, fans, air purifiers,
   extractor hoods, pumps and flow sensors.** Each owns no device state: the
   host reports a snapshot through a port of the server's package and

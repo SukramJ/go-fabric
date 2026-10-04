@@ -77,6 +77,8 @@ Application clusters, grouped by the device surface they serve:
 | [`cluster/fan`](../cluster/fan) | FanControl (0x0202) — all six features, the FanMode / PercentSetting / SpeedSetting coupling, Step |
 | [`cluster/pump`](../cluster/pump) | PumpConfigurationAndControl (0x0200) — all seven features, host-raised alarm events |
 | [`cluster/alarm`](../cluster/alarm) | SmokeCoAlarm (0x005C) — SMOKE / CO, derived ExpressedState, SelfTestRequest, all eleven events |
+| [`cluster/opstate`](../cluster/opstate) | OperationalState (0x0060) · RvcOperationalState (0x0061) — server-held state with matter.js's reactors, Pause / Stop / Start / Resume / GoHome checked as OperationalStateUtils checks them, both events, CountdownTime reported as a quieter ("Q") attribute |
+| [`cluster/modebase`](../cluster/modebase) | LaundryWasherMode (0x0051) · RvcRunMode (0x0054) · RvcCleanMode (0x0055) · DishwasherMode (0x0059) — one ModeBase server, SupportedModes validation with each derivation's required tags, ChangeToMode / ChangeToModeResponse |
 | [`cluster/measurement`](../cluster/measurement) | Temperature (0x0402) · RelativeHumidity (0x0405) · Illuminance (0x0400) · Pressure (0x0403) · Flow (0x0404) · BooleanState (0x0045) · OccupancySensing (0x0406) · AirQuality (0x005B) · CO₂ (0x040D) · PM2.5 (0x042A) · PM10 (0x042D) · PowerSource (0x002F) · ElectricalPowerMeasurement (0x0090) · ElectricalEnergyMeasurement (0x0091) |
 | [`cluster/wire`](../cluster/wire) | Wire-format types and encoders for AdministratorCommissioning, Switch (Generic Switch), ScenesManagement, Schedules, the deprecated Groups stub, and the command payloads of the servers above |
 
@@ -127,6 +129,15 @@ from the host — `endpoint/application_device_types_test.go`):
 | ExtractorHood 0x007A | `fan.Server` without RCK / WND / DIR | HEPA / activated-carbon filter monitoring |
 | Pump 0x0303 | `pump.Server` plus the host's own OnOff server | LevelControl, ScenesManagement, the measurement servers |
 | FlowSensor 0x0306 | a `contract.MeasurementFlow` source | — |
+| LaundryWasher 0x0073 | `opstate.NewServer` (OperationCompletion is mandatory and declared for it); optionally `modebase.NewLaundryWasherMode` | LaundryWasherControls, TemperatureControl, OnOff (DeadFront) |
+| LaundryDryer 0x007C | `opstate.NewServer`; optionally `modebase.NewLaundryWasherMode` | LaundryDryerControls, TemperatureControl, OnOff (DeadFront) |
+| Dishwasher 0x0075 | `opstate.NewServer`; optionally `modebase.NewDishwasherMode` | DishwasherAlarm, TemperatureControl, OnOff (DeadFront) |
+| RoboticVacuumCleaner 0x0074 | `opstate.NewRvcServer` and `modebase.NewRvcRunMode`; optionally `modebase.NewRvcCleanMode` | ServiceArea |
+
+Not built in the appliance pass, because none of the four device types
+mandates them: the microwave-oven clusters, OvenCavityOperationalState,
+ServiceArea, LaundryWasherControls, LaundryDryerControls, DishwasherAlarm
+and TemperatureControl.
 
 ## Operations and testing
 
