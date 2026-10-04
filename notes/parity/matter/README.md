@@ -9,6 +9,7 @@ fails a test instead of failing a controller.
 | --- | --- | --- |
 | `generate-tlv-wire-fixtures.ts` | Low-level TLV primitive wire bytes (uint, bool, string, tags) | [`tlv/testdata/tlv-wire-fixtures.json`](../../../tlv/testdata/tlv-wire-fixtures.json) → `tlv/parity_matterjs_test.go` |
 | `generate-im-wire-fixtures.ts` | IM-message-level wire bytes (ReportData, StatusResponse, …) | [`im/testdata/im-wire-fixtures.json`](../../../im/testdata/im-wire-fixtures.json) → `im/wire_fixtures_parity_test.go` |
+| `generate-group-fixtures.ts crypto` | Operational group key, group session id, privacy key, multicast address and complete sealed group messages (`FabricGroups`, `KeySets`, `MessagePrivacy`, `GroupSession.encode`) | [`groups/testdata/group-crypto-fixtures.json`](../../../groups/testdata/group-crypto-fixtures.json) → `groups/parity_matterjs_test.go` |
 | `generate-group-fixtures.ts wire` | GroupKeyManagement / Groups command payloads (`TlvOfModel(command)`) | [`bridge/testdata/group-wire-fixtures.json`](../../../bridge/testdata/group-wire-fixtures.json) → `bridge/groups_parity_matterjs_test.go` |
 
 The `testdata/` copies are the **masters**: the tests read them, nothing reads
@@ -34,9 +35,12 @@ node "$GO_FABRIC"/notes/parity/matter/generate-im-wire-fixtures.ts > /tmp/im.jso
 
 node "$GO_FABRIC"/notes/parity/matter/generate-group-fixtures.ts wire > /tmp/gw.json \
     && mv /tmp/gw.json "$GO_FABRIC"/bridge/testdata/group-wire-fixtures.json
+
+node "$GO_FABRIC"/notes/parity/matter/generate-group-fixtures.ts crypto > /tmp/gc.json \
+    && mv /tmp/gc.json "$GO_FABRIC"/groups/testdata/group-crypto-fixtures.json
 ```
 
-Then run `go test ./tlv/... ./im/... ./bridge/...` from this module's root.
+Then run `go test ./tlv/... ./im/... ./bridge/... ./groups/...` from this module's root.
 
 **A changed byte is a review decision, not a formatting update.** The whole
 point of the fixtures is that this module's output is pinned; a diff here says

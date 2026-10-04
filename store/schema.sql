@@ -94,6 +94,23 @@ CREATE TABLE IF NOT EXISTS matter_group_key_map (
         REFERENCES matter_group_keys(fabric_index, group_key_set_id) ON DELETE CASCADE
 );
 
+-- matter_group_table persists the group membership of this node's
+-- endpoints per fabric — the GroupKeyManagement GroupTable attribute
+-- (Matter §11.2.6.2, GroupInfoMapStruct) that the Groups cluster's
+-- AddGroup / RemoveGroup maintain. endpoints_json is the ordered endpoint
+-- list as a JSON array. Mirrors matter.js GroupKeyManagementServer state
+-- `groupTable`, which is persisted (packages/node/src/behaviors/
+-- group-key-management/GroupKeyManagementServer.ts addEndpointForGroup /
+-- removeEndpoint).
+CREATE TABLE IF NOT EXISTS matter_group_table (
+    fabric_index        INTEGER NOT NULL,
+    group_id            INTEGER NOT NULL CHECK(group_id BETWEEN 1 AND 65535),
+    group_name          TEXT    NOT NULL DEFAULT '',
+    endpoints_json      TEXT    NOT NULL,
+    PRIMARY KEY(fabric_index, group_id),
+    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
+);
+
 -- matter_acl_entries persists the per-fabric AccessControl list
 -- (Matter §11.2.12). Subjects + Targets are JSON-encoded inline because
 -- they are short list-of-records and the access path is always

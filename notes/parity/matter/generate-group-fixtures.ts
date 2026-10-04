@@ -33,6 +33,9 @@ const general = mod("general");
 const model = mod("model");
 const types = mod("types");
 
+// matter.js logs to stdout; keep the JSON clean.
+general.Logger.level = "error";
+
 const hex = (b) => Buffer.from(b).toString("hex");
 
 // Epoch-us values are unix-based inside matter.js; TlvEpochUs subtracts the
@@ -127,8 +130,96 @@ function wireFixtures() {
     return out;
 }
 
+// A fabric object with exactly the members FabricGroups and GroupSession
+// read: identity and crypto. The IPK only seeds key set 0, which no group
+// message can use.
+function fakeFabric(crypto, f) {
+    return {
+        fabricIndex: 1,
+        fabricId: BigInt(f.fabricId),
+        nodeId: BigInt(f.sourceNodeId),
+        globalId: BigInt("0x" + f.compressedFabricId),
+        crypto,
+        identityProtectionKey: new Uint8Array(16),
+        operationalIdentityProtectionKey: new Uint8Array(16),
+        addSession() {},
+    };
+}
+
 async function cryptoFixtures() {
-    throw new Error("crypto fixtures: see the crypto section below");
+    const protocol = mod("protocol");
+    const nodejs = mod("nodejs");
+    const crypto = new nodejs.NodeJsCrypto();
+
+    const inputs = [
+        {
+            label: "kitchen_privacy",
+            fabricId: "0x0000000000000fab", compressedFabricId: "87e1b004e235a130", sourceNodeId: "0x000000000001b669",
+            keySetId: 0x01a1, epochKey: "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf", groupId: 0x0101,
+            counter: 0x01020304, exchangeId: 0x0055, privacy: true,
+            // InvokeRequest: OnOff.Toggle on a wildcard endpoint.
+            opcode: 0x08, payload: "1528002801360215370024010625020624030218181824ff0c18",
+        },
+        {
+            label: "kitchen_no_privacy",
+            fabricId: "0x0000000000000fab", compressedFabricId: "87e1b004e235a130", sourceNodeId: "0x000000000001b669",
+            keySetId: 0x01a1, epochKey: "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf", groupId: 0x0101,
+            counter: 0xfffffffe, exchangeId: 0x0056, privacy: false,
+            opcode: 0x08, payload: "1528002801360215370024010625020624030218181824ff0c18",
+        },
+        {
+            label: "other_fabric_large_ids",
+            fabricId: "0xfedcba9876543210", compressedFabricId: "0123456789abcdef", sourceNodeId: "0x1122334455667788",
+            keySetId: 0x0102, epochKey: "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf", groupId: 0xfeff,
+            counter: 7, exchangeId: 0x1234, privacy: true,
+            opcode: 0x06, payload: "15283d003e00",
+        },
+    ];
+
+    const out = [];
+    for (const f of inputs) {
+        const fabric = fakeFabric(crypto, f);
+        const groups = new protocol.FabricGroups(fabric);
+        fabric.groups = groups;
+        await groups.setFromGroupKeySet({
+            groupKeySetId: f.keySetId, groupKeySecurityPolicy: 0,
+            epochKey0: Buffer.from(f.epochKey, "hex"), epochStartTime0: epoch(1),
+            epochKey1: null, epochStartTime1: null, epochKey2: null, epochStartTime2: null,
+        });
+        const ks = groups.keySets.forId(f.keySetId);
+        groups.groupKeyIdMap = new Map([[f.groupId, f.keySetId]]);
+
+        const session = new protocol.GroupSession({
+            id: ks.groupSessionId0, fabric, keySetId: f.keySetId,
+            peerNodeId: types.NodeId(0xffffffffffff0000n | BigInt(f.groupId)),
+            operationalGroupKey: ks.operationalEpochKey0, operationalPrivacyKey: ks.operationalPrivacyKey0,
+            multicastAddress: groups.multicastAddressFor(f.groupId),
+        });
+        const message = {
+            packetHeader: {
+                sessionId: ks.groupSessionId0, sessionType: 1, messageId: f.counter,
+                sourceNodeId: BigInt(f.sourceNodeId), destGroupId: f.groupId,
+                hasPrivacyEnhancements: f.privacy, isControlMessage: false, hasMessageExtensions: false,
+            },
+            payloadHeader: {
+                exchangeId: f.exchangeId, protocolId: 1, messageType: f.opcode, isInitiatorMessage: true,
+                requiresAck: false, ackedMessageId: undefined, hasSecuredExtension: false,
+            },
+            payload: Buffer.from(f.payload, "hex"),
+        };
+        const plaintext = protocol.MessageCodec.encodePayload(message).applicationPayload;
+        const datagram = protocol.MessageCodec.encodePacket(session.encode(message));
+        out.push({
+            ...f,
+            operationalKey: hex(ks.operationalEpochKey0),
+            groupSessionId: ks.groupSessionId0,
+            privacyKey: hex(ks.operationalPrivacyKey0),
+            multicastAddress: groups.multicastAddressFor(f.groupId),
+            plaintext: hex(plaintext),
+            datagram: hex(datagram),
+        });
+    }
+    return out;
 }
 
 async function main() {

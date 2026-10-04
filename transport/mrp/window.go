@@ -57,6 +57,9 @@ type Window struct {
 	bitmap        uint32 // bit i set ⇒ counter (max-(i+1)) was received
 	primed        bool   // false until the first counter is recorded
 	rollover      bool   // true ⇒ fold distances at ±windowSize; false ⇒ plain subtraction
+	// encRollover selects the encrypted-with-rollover fold (±2^31) of
+	// [NewWindowEncryptedRollover]; it takes precedence over rollover.
+	encRollover bool
 }
 
 // NewWindow returns a fresh rollover duplicate-detection window for
@@ -70,6 +73,22 @@ func NewWindow() *Window { return &Window{rollover: true, initialBitmap: 0} }
 // one seen is ever accepted, matching matter.js
 // MessageReceptionStateEncryptedWithoutRollover.
 func NewWindowNoRollover() *Window { return &Window{rollover: false, initialBitmap: ^uint32(0)} }
+
+// NewWindowEncryptedRollover returns a fresh window for group messages:
+// encrypted, so the bitmap anchors full and nothing below the first
+// counter seen is accepted, but free-running with rollover, so a counter
+// up to 2^31 ahead of the maximum (modulo 2^32) is new and anything further
+// is behind. Mirrors matter.js MessageReceptionStateEncryptedWithRollover
+// (packages/protocol/src/protocol/MessageReceptionState.ts), the state
+// MessagingState.receptionStateFor keeps per operational group key and
+// source node (packages/protocol/src/groups/MessagingState.ts).
+func NewWindowEncryptedRollover() *Window {
+	return &Window{encRollover: true, initialBitmap: ^uint32(0)}
+}
+
+// maxCounterIncrease2pow31 is matter.js MAX_COUNTER_INCREASE_2POW31, the
+// half-range that splits "ahead" from "behind" for a rolling counter.
+const maxCounterIncrease2pow31 = int64(1) << 31
 
 // diff computes the signed distance between counter c and the current
 // max.
@@ -89,6 +108,16 @@ func NewWindowNoRollover() *Window { return &Window{rollover: false, initialBitm
 // forward jump.
 func (w *Window) diff(c uint32) int64 {
 	d := int64(c) - int64(w.max)
+	if w.encRollover {
+		// MessageReceptionStateEncryptedWithRollover.calculateDiff.
+		switch {
+		case d > 0 && d >= maxCounterIncrease2pow31:
+			d -= maxCounter32 + 1
+		case d < 0 && d < -maxCounterIncrease2pow31:
+			d += maxCounter32 + 1
+		}
+		return d
+	}
 	if !w.rollover {
 		return d
 	}

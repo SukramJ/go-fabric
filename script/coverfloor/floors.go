@@ -56,6 +56,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
 	// The module's lowest measured package by a wide margin. contract is
 	// the host-facing interface vocabulary, and much of what is uncovered
 	// are the default implementations and kind-registry helpers a host

@@ -12,6 +12,22 @@ pseudo-version of `main`.
 
 ### Added
 
+- **Package `groups`: the node's operational group state**, the Go
+  counterpart of matter.js `packages/protocol/src/groups` and the receive
+  half of `GroupSession`. `groups.Manager` holds, per fabric, the key sets
+  in derived form, the GroupKeyMap, the group table and the per-sender
+  replay windows; `Decode` authenticates a group message (privacy
+  deobfuscation, AES-CCM, the encrypted-with-rollover counter window) and
+  returns it with its Group subject; `Memberships` names the multicast
+  addresses to join. `OperationalKey`, `SessionID`, `PrivacyKey` and
+  `MulticastAddress` are the derivations, pinned against matter.js by
+  fixtures in `groups/testdata/group-crypto-fixtures.json`.
+- `store`: the `matter_group_table` table and `GroupTableEntry`,
+  `UpsertGroupTableEntry`, `RemoveGroupTableEntry`, `ListGroupTable`. A host
+  that migrates the schema itself picks the table up from `store.Schema()`.
+- `transport/mrp`: `NewWindowEncryptedRollover`, matter.js
+  `MessageReceptionStateEncryptedWithRollover`.
+
 - **Subscriptions survive a restart**, as in matter.js
   (`SubscriptionsServer`; [ADR 0008](docs/adr/0008-subscription-resumption.md)).
   Each subscription of a CASE session is recorded while it is active and
