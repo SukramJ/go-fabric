@@ -1258,6 +1258,9 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		enc.PutUint(tlv.ContextTag(254), uint64(x.FabricIndex))
 		_ = enc.EndContainer()
 	default:
+		if encodeApplicationValue(enc, tag, v.Value) {
+			return
+		}
 		// Cluster server returned a Go value the writer does not
 		// handle (e.g. a struct or list). Emit null so the reply still
 		// parses on the controller side; the cluster server should

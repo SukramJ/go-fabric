@@ -38,6 +38,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/bridge", min: 84},
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/alarm", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 81},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/core", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 87},

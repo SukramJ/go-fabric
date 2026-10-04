@@ -28,6 +28,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/cluster/wire"
@@ -66,6 +67,29 @@ func newWindowCoveringServer() *cover.WindowCoveringServer {
 		EndProductType: 0,
 		FeatureMap:     0x05, // LF (bit 0) + PA_LF (bit 2)
 	})
+}
+
+// smokeAlarmSource is a SmokeCoAlarm host that accepts every sensitivity
+// write and remembers the level.
+type smokeAlarmSource struct{ st alarm.State }
+
+func (s *smokeAlarmSource) SmokeCOState() alarm.State { return s.st }
+
+func (s *smokeAlarmSource) SetSmokeSensitivityLevel(_ context.Context, level alarm.Sensitivity) error {
+	s.st.SmokeSensitivityLevel = level
+	return nil
+}
+
+func newSmokeAlarmServer() *alarm.Server {
+	srv, err := alarm.NewServer(alarm.Config{
+		Source:   &smokeAlarmSource{st: alarm.State{SmokeSensitivityLevel: alarm.SensitivityStandard}},
+		Features: alarm.FeatureSmokeAlarm,
+		Optional: alarm.OptionalSmokeSensitivityLevel,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return srv
 }
 
 // ── negative write cases ─────────────────────────────────────────────────────
@@ -159,6 +183,34 @@ func TestNegativeWriteParity(t *testing.T) {
 			attrID:     wire.WindowCoveringAttrMode, // 0x0017
 			value:      uint8(16),
 			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// matter.js smoke-co-alarm-cluster.element.ts:44 + :82-87 —
+			// SmokeSensitivityLevel is a SensitivityEnum (High 0, Standard
+			// 1, Low 2); an enum write outside its values fails matter.js
+			// TlvEnum validation with ConstraintError.
+			name: "SmokeCoAlarm/SmokeSensitivityLevel=3 → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newSmokeAlarmServer()
+			},
+			attrID:     alarm.AttrSmokeSensitivityLevel,
+			value:      uint64(3),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// smoke-co-alarm-cluster.element.ts:28 — ExpressedState is
+			// access "R V".
+			name: "SmokeCoAlarm/ExpressedState write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newSmokeAlarmServer()
+			},
+			attrID:     alarm.AttrExpressedState,
+			value:      uint64(0),
+			wantStatus: im.StatusUnsupportedWrite,
 		},
 	}
 
@@ -296,6 +348,23 @@ func TestPositiveWriteControl(t *testing.T) {
 		}
 		if v.(uint8) != 15 {
 			t.Errorf("Mode = %d, want 15", v.(uint8))
+		}
+	})
+}
+
+// TestPositiveWriteControlApplicationClusters holds the accepted
+// boundaries of the application clusters' writable attributes.
+func TestPositiveWriteControlApplicationClusters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("SmokeCoAlarm/SmokeSensitivityLevel == Low(2) accepted", func(t *testing.T) {
+		t.Parallel()
+		srv := newSmokeAlarmServer()
+		if err := srv.MatterWrite(context.Background(), alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityLow)); err != nil {
+			t.Fatalf("write Low: %v", err)
+		}
+		if v, _ := srv.MatterRead(alarm.AttrSmokeSensitivityLevel); v != uint8(alarm.SensitivityLow) {
+			t.Errorf("SmokeSensitivityLevel = %v, want 2", v)
 		}
 	})
 }

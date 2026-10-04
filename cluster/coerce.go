@@ -62,3 +62,38 @@ func AsInt16(v any) (int16, bool) {
 	}
 	return int16(n), true //nolint:gosec // intentional narrowing of a native-width write value; see #20
 }
+
+// AsUintMax coerces a decoded write value to an unsigned integer no
+// larger than maxValue, rejecting — rather than wrapping — a negative
+// value, a value above maxValue and a non-integer. It is the checked
+// counterpart of [AsUint8] for the attributes whose type width or
+// constraint a write must respect: matter.js validates a written number
+// against the attribute's TLV type bounds before any behavior runs
+// (packages/types/src/tlv/TlvNumber.ts validateBoundaries) and answers
+// ConstraintError on a miss, so a cluster server that narrowed
+// silently would accept 256 as 0.
+func AsUintMax(v any, maxValue uint64) (uint64, bool) {
+	var n uint64
+	switch x := v.(type) {
+	case uint8:
+		n = uint64(x)
+	case uint16:
+		n = uint64(x)
+	case uint32:
+		n = uint64(x)
+	case uint64:
+		n = x
+	case int, int8, int16, int32, int64:
+		i, _ := writeInt(x)
+		if i < 0 {
+			return 0, false
+		}
+		n = uint64(i)
+	default:
+		return 0, false
+	}
+	if n > maxValue {
+		return 0, false
+	}
+	return n, true
+}

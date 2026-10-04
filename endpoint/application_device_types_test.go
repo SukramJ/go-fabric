@@ -8,6 +8,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/alarm"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
@@ -123,9 +124,21 @@ func assertMandatoryClusterSet(t *testing.T, ep *Endpoint, deviceType uint16) {
 	}
 }
 
+// smokeReading is a host smoke/CO alarm's state port.
+type smokeReading struct{}
+
+func (smokeReading) SmokeCOState() alarm.State { return alarm.State{} }
+
 func applicationDeviceCases() []applicationDeviceCase {
+	smoke, err := alarm.NewServer(alarm.Config{Source: smokeReading{}, Features: alarm.FeatureSmokeAlarm | alarm.FeatureCOAlarm})
+	if err != nil {
+		panic(err)
+	}
 	return []applicationDeviceCase{
 		{name: "FlowSensor", deviceType: 0x0306, measurement: flowReading{}},
+		{name: "SmokeCoAlarm", deviceType: alarm.DeviceTypeSmokeCoAlarm, source: deviceTypeSource{
+			dt: alarm.DeviceTypeSmokeCoAlarm, servers: []contract.ClusterServer{smoke},
+		}},
 	}
 }
 
