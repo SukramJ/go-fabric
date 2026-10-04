@@ -9,7 +9,7 @@ Scope boundaries are deliberate and are not "not yet":
 
 | Non-goal | Why |
 | --- | --- |
-| **Controller / commissioner role** | This module answers commissioning, it does not drive it. No `PairDevice`, no controller-side CASE initiation, no OTA provider. |
+| **Controller / commissioner role** | This module answers commissioning, it does not drive it. No `PairDevice`, no OTA provider, no reading or invoking on other nodes. The one CASE *initiator* in the module re-establishes former subscriptions after a restart and reaches nothing else ([ADR 0008](./adr/0008-subscription-resumption.md)). |
 | **Bluetooth (BLE) commissioning** | On-network (DNS-SD) commissioning only. BLE would pull a platform-specific radio stack into a library that otherwise needs a UDP socket. |
 | **Thread / Wi-Fi network commissioning** | `NetworkCommissioning` presents the Ethernet/IP feature only — the host is already on the network. |
 | **CSA certification** | Borrowed `Test_TC_*` cases are used as regression tests. Certification is not pursued and nothing here may be described as certified. |
@@ -25,16 +25,16 @@ Scope boundaries are deliberate and are not "not yet":
 | [`transport/message`](../transport/message) | Matter message framing, headers, exchange metadata | |
 | [`transport/mrp`](../transport/mrp) | Message Reliability Protocol: retransmission, acknowledgement, duplicate detection, receive window | |
 | [`transport/udp`](../transport/udp) | UDP over IPv6, including multicast-zone handling | IPv6 operational transport; no TCP, no BTP |
-| [`im/`](../im) | Interaction Model §10.6: Read, Write, Invoke, Subscribe, Timed Request/Action, StatusIB, path wildcards, event log + event filters, data-version filtering, batched invoke, chunked reports | `im/subscription` holds the subscription engine and report cadence |
-| [`secure/spake2`](../secure/spake2), [`secure/sigma`](../secure/sigma) | PASE (Spake2+) and CASE (Sigma1/2/3), including Sigma2Resume session resumption | |
+| [`im/`](../im) | Interaction Model §10.6: Read, Write, Invoke, Subscribe, Timed Request/Action, StatusIB, path wildcards, event log + event filters, data-version filtering, batched invoke, chunked reports, subscriptions persisted and re-established under their old id after a restart | `im/subscription` holds the subscription engine, report cadence and the persisted form (`PeerSubscription`, `Manager.Restore`); `bridge` drives re-establishment ([ADR 0008](./adr/0008-subscription-resumption.md)) |
+| [`secure/spake2`](../secure/spake2), [`secure/sigma`](../secure/sigma) | PASE (Spake2+) and CASE (Sigma1/2/3), including Sigma2Resume session resumption; a CASE initiator (`NewPeerInitiator`) for re-establishing subscriptions | The initiator is scoped by ADR 0008 |
 | [`secure/channel`](../secure/channel) | Session keys, nonce handling, message privacy / encryption | |
 | [`secure/aesccm`](../secure/aesccm) | AES-CCM primitive | |
 | [`secure/mattercert`](../secure/mattercert) | Matter-TLV certificate decode (NOC chain) | X.509 DER lives in `secure/attestation` |
 | [`secure/attestation`](../secure/attestation) | DAC / PAI / PAA chain validation, Certification Declaration, test PAA | |
 | [`secure/operational`](../secure/operational) | Operational session manager: fabric-scoped sessions, eviction, idle reaping | |
 | [`commissioning/`](../commissioning) | The commissionee state machine: PASE → attestation → CSR → AddNOC → CASE handover | |
-| [`mdns/`](../mdns) | DNS-SD §4.3: `_matter._tcp` operational and `_matterc._udp` commissionable records, subtype PTRs, rotating device identifier, re-announce loop, interface filtering | Pure-Go, Matter-only — not a general mDNS stack |
-| [`store/`](../store) | SQLite persistence: fabrics, NOCs, ACLs, group keys, CASE resumption records, settings, diagnostics | |
+| [`mdns/`](../mdns) | DNS-SD §4.3: `_matter._tcp` operational and `_matterc._udp` commissionable records, subtype PTRs, rotating device identifier, re-announce loop, interface filtering; resolution of one peer's operational instance (`OperationalResolver`) | Pure-Go, Matter-only — not a general mDNS stack and not a browser |
+| [`store/`](../store) | SQLite persistence: fabrics, NOCs, ACLs, group keys, CASE resumption records, server subscriptions, settings, diagnostics | |
 | [`bootid/`](../bootid) | Process-lifetime UniqueID salt (rotation off by default) | |
 
 ## Data model

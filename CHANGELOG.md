@@ -10,6 +10,45 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- **Subscriptions survive a restart**, as in matter.js
+  (`SubscriptionsServer`; [ADR 0008](docs/adr/0008-subscription-resumption.md)).
+  Each subscription of a CASE session is recorded while it is active and
+  forgotten when it is terminated; after a restart the bridge resolves the
+  controller, opens a CASE session to it as the initiator, and re-sends the
+  priming report under the old subscription id, so the controller carries on
+  instead of waiting out its liveness timeout. On by default.
+  - `bridge`: `SubscriptionStore`, `AttachSubscriptionStore`,
+    `SetSubscriptionPersistence`, `SubscriptionPersistenceEnabled`,
+    `FormerSubscriptionCount`, `ReestablishFormerSubscriptions` /
+    `ReestablishResult`, `CaseInitiation`, `CaseInitiatorProvider`,
+    `AttachCaseInitiatorProvider`, `OperationalResolver`,
+    `AttachOperationalResolver`, and the errors `ErrCaseInitiatorMissing`,
+    `ErrOperationalResolverMissing`, `ErrCaseRejected`. Each port defaults to
+    a noop; the package doc lists what a skip costs.
+  - `im/subscription`: `PeerSubscription`, `MarshalPeerSubscription`,
+    `UnmarshalPeerSubscription`, `Manager.Restore`, `Manager.Release`,
+    `Manager.SetOnSubscriptionTerminated`, `Subscription.PeerSubscription`,
+    `Subscription.SendInterval`, `ReestablishTimeout`, `ErrIDInUse`.
+  - `secure/sigma`: a CASE initiator towards a peer on the node's own fabric —
+    `NewPeerInitiator` / `InitiatorConfig`, `Initiator.ProcessSigma2Bytes`,
+    `Initiator.ProcessSigma2Resume`, `Initiator.Result` / `InitiatorResult`,
+    `UnmarshalSigma2`, `UnmarshalSigma2Resume`, `ErrPeerIdentityMismatch`,
+    `ErrUnexpectedSigma2Resume`. It exists for re-establishing subscriptions
+    only; the module still has no controller role.
+  - `secure/operational`: `Manager.OpenFromSigmaAsInitiatorWithID`.
+  - `mdns`: `OperationalResolver` / `NewOperationalResolver`,
+    `OperationalInstanceQName`, `SelectionPreference`,
+    `ErrOperationalNotResolved` — resolution of one peer's operational
+    instance, not a browser.
+  - `store`: the `matter_server_subscriptions` table and
+    `SaveServerSubscription`, `DeleteServerSubscription`,
+    `DeleteServerSubscriptionsByFabric`, `LoadServerSubscriptions`,
+    `ClearServerSubscriptions`; `*store.Store` satisfies
+    `bridge.SubscriptionStore`.
+  - `im`: `EventLog.DropBuffered`.
+
 ### Changed
 
 - **Matter 1.6.1.** `parity/schema.json` is re-extracted from matter.js
@@ -40,6 +79,21 @@ pseudo-version of `main`.
   Not yet followed: Matter 1.6.1 requires a Groupcast server and the
   AccessControl Auxiliary ACL on the root of a node with lights or plugs.
   Recorded in `notes/parity/matter_behaviour_findings.md`.
+
+- `Bridge.Stop` drops the buffered events (the numbering continues), as a
+  process restart does: the priming report of a subscription re-established
+  after an in-process Stop/Start no longer replays the former run's events
+  (matter.js #4594).
+- A `KeepSubscriptions=false` subscribe over CASE now cancels the peer's
+  subscriptions on all of its sessions, matching on the session's peer node —
+  matter.js matches `session.peerAddress`. It used to fall back to the
+  request's own session because a secure header carries no source node id.
+- `subscription.Manager.CloseSession` and `CloseFabricExcept` close
+  subscriptions without terminating them; `Close`, `ClosePeer`,
+  `CloseEndpoint`, `CloseFabric` and a replace-on-resubscribe terminate them.
+  Only the latter fire the new terminated hook.
+- `sigma.Initiator` is safe for concurrent use and refuses further input after
+  a failed Sigma2.
 
 ### Deprecated
 

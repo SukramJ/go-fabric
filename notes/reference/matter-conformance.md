@@ -116,11 +116,10 @@ be durable it has to be written down somewhere.
   commission other nodes.
 - **Certification is a non-goal.** The CSA cases in job 3 are regression
   cases, not a certification run.
-- **Subscription resumption across a host restart is not wired.**
-  `store/subscriptions.go` carries the `matter_persistent_subscriptions`
-  table, but no part of the subscription lifecycle writes or reads it, so a
-  restart drops every subscription and controllers re-subscribe once CASE is
-  re-established (`BD-Matter-SubscriptionResumption-Deferred` in
-  [`by_design.md`](../parity/by_design.md)). CASE *session* resumption
-  (Sigma2Resume) is a different mechanism and **is** implemented, in
+- **Subscriptions survive a host restart.** CASE subscriptions are recorded
+  in `matter_server_subscriptions` while active and re-established under
+  their old id after a restart, over a CASE session the device opens to the
+  controller ([ADR 0008](../../docs/adr/0008-subscription-resumption.md)).
+  The controller side of that path is not covered by this suite yet. CASE
+  *session* resumption (Sigma2Resume) is a different mechanism, in
   `secure/sigma`.

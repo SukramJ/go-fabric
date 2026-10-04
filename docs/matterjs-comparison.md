@@ -57,6 +57,7 @@ matter.js HEAD as checked out at `../matter.js`.
 | --- | --- | --- | --- | --- |
 | PASE (Spake2+) responder | `secure/spake2`, `commissioning/pase.go` | ✅ | — | |
 | CASE (Sigma1/2/3) responder + Sigma2Resume | `secure/sigma`, `store/resumption.go` | ✅ | — | Resumption is persisted and survives a restart. |
+| CASE initiator (`CaseClient`) | `secure/sigma.NewPeerInitiator`, `bridge/case_initiator.go` | ◐ | — | Only for re-establishing former subscriptions, as matter.js's server node uses it ([ADR 0008](./adr/0008-subscription-resumption.md)); offers resumption with a stored record. Not a controller role. |
 | Session parameters (Matter 1.3+ `TlvSessionParameters`) | full struct on the CASE path; PASE emits the legacy MRP triplet only | ◐ | **Low** | `BD-Matter-PASE-SessionParametersLegacy`. Only a commissioner-initiator's values pass through that decode, and real commissioners stay inside the legacy ranges. |
 | DAC / PAI / PAA validation, Certification Declaration | `secure/attestation` | ✅ | — | |
 | Matter-TLV certificate codec | `secure/mattercert` | ✅ | — | |
@@ -75,7 +76,7 @@ matter.js HEAD as checked out at `../matter.js`.
 | Data-version filtering | `cluster/dataversion.go`, `im/` | ✅ | — | |
 | Event log, event filters, fabric-scoped events | `im/eventlog.go`, `im/event_filter.go` | ✅ | — | Buffer is sized at a tenth of matter.js's, deliberately (`BD-Matter-EventBufferSizing`). |
 | Batched invoke | `im/invoke.go` | ✅ | — | |
-| Subscription resumption across restart (§10.6.9) | table exists in `store/subscriptions.go`, nothing reads or writes it | ○ | **Med** | `BD-Matter-SubscriptionResumption-Deferred`. Survivable — controllers re-subscribe once CASE is back — but it costs a burst of re-subscribes on every restart. Cheap to finish: a producer, a consumer, and two delete paths. |
+| Subscription persistence + re-establishment after restart (`SubscriptionsServer`, `InteractionServer.establishFormerSubscription`) | `bridge` (`AttachSubscriptionStore`, `ReestablishFormerSubscriptions`), `im/subscription` (`PeerSubscription`, `Manager.Restore`), `store/server_subscriptions.go`, `secure/sigma` initiator, `mdns.OperationalResolver` | ✅ | — | [ADR 0008](./adr/0008-subscription-resumption.md). Mirrors matter.js: CASE subscriptions recorded while active, forgotten when terminated, re-established after a restart under their old id over a CASE session the device opens (2 s per peer, block-list for peers that subscribe meanwhile). On by default; `SetSubscriptionPersistence(false)` is `persistenceEnabled = false`. Not yet exercised against a real controller in CI. |
 | Subscription quota / eviction per fabric | — | ○ | **Low** | A bridge on a home LAN does not meet the fabric counts the quota protects against. |
 
 ## 5. Clusters
@@ -127,7 +128,11 @@ Three of the ○ rows above are decisions, not backlog. Restating them so they
 are not re-opened by accident:
 
 1. **No controller / commissioner role.** `go-fabric` is a responder. It does
-   not discover, commission or drive other nodes.
+   not discover, commission or drive other nodes. The one exception is
+   bounded and on record: to re-establish its former subscriptions after a
+   restart, the device resolves the controller that held them and opens a
+   CASE session to it as the initiator — what matter.js's server node does —
+   and nothing else ([ADR 0008](./adr/0008-subscription-resumption.md)).
 2. **No Bluetooth.** Commissioning is on-network (DNS-SD) only.
 3. **No CSA certification.** The borrowed `Test_TC_*` cases are regression
    tests. Nothing built on this module may be described as certified.
@@ -136,14 +141,16 @@ are not re-opened by accident:
 
 In rough order of value to a real bridge:
 
-1. **Finish subscription resumption** (§4) — small, well-understood, and it
-   removes a re-subscribe storm from every restart.
-2. **Group multicast delivery** (§2) — the only protocol-level gap a controller
+1. **Group multicast delivery** (§2) — the only protocol-level gap a controller
    can actually walk into today. Needs a host with a group primitive to be
    worth it, which also unblocks turning the Groups stub into a server.
-3. **Per-attribute timed-write enforcement** (§4) — the schema already knows
+2. **Per-attribute timed-write enforcement** (§4) — the schema already knows
    which attributes require it (`schema/timed.go`); the enforcement point is
    the missing half.
+3. **Prove subscription re-establishment against a real controller** (§4) —
+   built and tested in-process ([ADR 0008](./adr/0008-subscription-resumption.md));
+   a chip-tool restart leg in `internal/chiptool` would pin the
+   controller-side assumptions it rests on.
 
 Everything else in this document is either deliberately out of scope or worth
 doing only when a specific consumer asks for it.
