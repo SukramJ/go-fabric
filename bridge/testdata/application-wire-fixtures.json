@@ -162,5 +162,45 @@
     "cluster": 512,
     "element": "TurbineOperation",
     "bytesHex": "1518"
+  },
+  {
+    "label": "switch_InitialPress",
+    "kind": "events",
+    "cluster": 59,
+    "element": "InitialPress",
+    "fixture": {
+      "newPosition": 1
+    },
+    "bytesHex": "1524000118"
+  },
+  {
+    "label": "switch_LongPress",
+    "kind": "events",
+    "cluster": 59,
+    "element": "LongPress",
+    "fixture": {
+      "newPosition": 1
+    },
+    "bytesHex": "1524000118"
+  },
+  {
+    "label": "switch_ShortRelease",
+    "kind": "events",
+    "cluster": 59,
+    "element": "ShortRelease",
+    "fixture": {
+      "previousPosition": 1
+    },
+    "bytesHex": "1524000118"
+  },
+  {
+    "label": "switch_LongRelease",
+    "kind": "events",
+    "cluster": 59,
+    "element": "LongRelease",
+    "fixture": {
+      "previousPosition": 0
+    },
+    "bytesHex": "1524000018"
   }
 ]

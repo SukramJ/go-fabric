@@ -55,9 +55,8 @@ pseudo-version of `main`.
     PumpConfigurationAndControl and FlowMeasurement.
   - Not built, all optional: HEPA / activated-carbon filter monitoring, and
     the optional measurement / level / scene servers of these device types.
-    Open items (unverified connectedhomeip-derived formulas, the PowerSource
-    device-type entry SmokeCoAlarm requires, and a pre-existing Switch event
-    payload that encodes as null) are in
+    Open items (unverified connectedhomeip-derived formulas and the
+    PowerSource device-type entry SmokeCoAlarm requires) are in
     `notes/parity/matter_behaviour_findings.md`.
 - **Groupcast (0x0065) and the AccessControl Auxiliary ACL on the root**, as
   matter.js's default `ServerNode.RootEndpoint` installs them and Matter
@@ -249,6 +248,15 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- **Switch press events went out without their position.** InitialPress,
+  LongPress, ShortRelease and LongRelease carried TLV null in the EventDataIB
+  Data slot: their payload types were unexported, so the bridge's value
+  writer had no case for them. They are now `wire.SwitchInitialPressEvent`,
+  `wire.SwitchLongPressEvent`, `wire.SwitchShortReleaseEvent` and
+  `wire.SwitchLongReleaseEvent`, encoded as matter.js encodes them
+  (`{0: position}`, pinned in `bridge/testdata/application-wire-fixtures.json`
+  and checked through the event-read path). MultiPressOngoing /
+  MultiPressComplete are unaffected: the server does not advertise MSM.
 - **An AccessControl Group entry could not be written.** The validator
   accepted only Group Node IDs (0xFFFF_FFFF_FFFF_FFxx) as Group subjects;
   the subject of a Group entry is a Group ID, 0x0001..0xFFFF, as matter.js

@@ -1,8 +1,9 @@
 // Generates wire fixtures for the application cluster servers
-// (cluster/alarm, cluster/fan, cluster/pump) from the matter.js
-// checkout's own encoders: the FanControl Step request payloads the
-// bridge decodes, and the SmokeCoAlarm / PumpConfigurationAndControl
-// event payloads its value writer encodes — each as matter.js's
+// (cluster/alarm, cluster/fan, cluster/pump) and the Switch press events
+// from the matter.js checkout's own encoders: the FanControl Step request
+// payloads the bridge decodes, and the SmokeCoAlarm /
+// PumpConfigurationAndControl / Switch event payloads its value writer
+// encodes — each as matter.js's
 // TlvOfModel(element) encodes it, the schema the interaction server
 // decodes requests and encodes events with
 // (packages/node/src/node/integration/ProtocolService.ts).
@@ -67,6 +68,13 @@ function fixtures() {
     for (const name of ["SupplyVoltageLow", "DryRunning", "PumpBlocked", "TurbineOperation"]) {
         record(`pump_${name}`, pump, "events", name, undefined);
     }
+
+    // Switch: the four press events the GenericSwitch server emits.
+    const sw = model.Switch;
+    record("switch_InitialPress", sw, "events", "InitialPress", { newPosition: 1 });
+    record("switch_LongPress", sw, "events", "LongPress", { newPosition: 1 });
+    record("switch_ShortRelease", sw, "events", "ShortRelease", { previousPosition: 1 });
+    record("switch_LongRelease", sw, "events", "LongRelease", { previousPosition: 0 });
     return out;
 }
 

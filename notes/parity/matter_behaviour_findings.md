@@ -382,15 +382,6 @@ taken from memory of connectedhomeip and are unverified:
   PowerSource (with its schema revision) to DeviceTypeList when
   `ep.PowerSource` is set, and assert it in
   `endpoint/application_device_types_test.go`.
-- **Switch (0x003B) event payloads encode as TLV null.** Found while
-  pinning the new event payloads: `wire.GenericSwitch.Fire*` emits the
-  unexported `switch*Event` structs, which `bridge/reply.go`'s value
-  writer has no case for, so InitialPress / ShortRelease / LongPress /
-  LongRelease carry `null` (0x14) in the EventDataIB Data slot instead of
-  `{0: position}`. Pre-existing, not touched here. Fix package: export the
-  payload types (or give them an encoder the writer can reach), add the
-  cases, and a matter.js fixture for each event alongside
-  `bridge/testdata/application-wire-fixtures.json`.
 - **Not built:** HepaFilterMonitoring (0x0071) and
   ActivatedCarbonFilterMonitoring (0x0072), optional on AirPurifier and
   ExtractorHood; Pump's optional LevelControl / ScenesManagement /
