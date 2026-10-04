@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3378,
+  "entry_points": 3379,
   "entry_packages": [
     ".",
     "bootid",
@@ -51,9 +51,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 3030,
+    "total_exported": 3031,
     "reachable": 1470,
-    "whitelisted": 1551,
+    "whitelisted": 1552,
     "unreachable": 9
   },
   "by_package": [
@@ -220,6 +220,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bench_test.go",
       "line": 111
+    },
+    {
+      "package": "bridge",
+      "identifier": "FuzzGroupcastFieldsReader",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fuzz_groupcast_fields_test.go",
+      "line": 20
     },
     {
       "package": "bridge",
