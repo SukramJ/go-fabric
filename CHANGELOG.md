@@ -12,6 +12,12 @@ pseudo-version of `main`.
 
 ### Added
 
+- `contract.AttributeChangeNotifier`: a bridged cluster server that keeps
+  its own attribute state names the attributes that moved, and the bridge
+  advances the cluster's DataVersion and marks just those dirty for
+  subscribers — independently of the host source's `ChangeNotifier`. It
+  lets a server hold a "Q" (quieter) attribute out of change reporting
+  until its own rule reports it, as matter.js's `QuietEvent` does.
 - **Application cluster servers for smoke / CO alarms, fans, air purifiers,
   extractor hoods, pumps and flow sensors.** Each owns no device state: the
   host reports a snapshot through a port of the server's package and

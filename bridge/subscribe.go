@@ -1046,6 +1046,7 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 	}
 	mgr := b.subManager
 	b.wireRootNotifiersLocked(mgr)
+	b.wireAttributeNotifiersLocked(mgr)
 	var (
 		examined, notifierOK, withPaths int
 		sourceSeen, measurementSeen     int
@@ -1176,6 +1177,46 @@ func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
 			unsub = func() {}
 		}
 		b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+	}
+}
+
+// wireAttributeNotifiersLocked subscribes every bridged cluster server
+// that implements [contract.AttributeChangeNotifier] — the servers that
+// keep their own attribute state, such as cluster/opstate and
+// cluster/modebase — independently of whether the endpoint's source has a
+// notifier of its own. On a fire the cluster's endpoint-hosted DataVersion
+// advances once, before the named attributes are marked dirty, so the
+// report carries the post-change version (matter.js Datasource.ts
+// advanceVersion, then broadcastChanges for the changed properties only).
+// Caller holds b.mu.
+func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
+	for _, ep := range b.topology.Endpoints {
+		if ep == nil || ep.IsRoot() || ep.IsAggregator() {
+			continue
+		}
+		for _, srv := range endpointpkg.ClusterServers(ep) {
+			notifier, ok := srv.(contract.AttributeChangeNotifier)
+			if !ok {
+				continue
+			}
+			clusterID := srv.MatterClusterID()
+			unsub := notifier.OnMatterAttributesChanged(func(attrIDs []uint32) {
+				if len(attrIDs) == 0 {
+					return
+				}
+				ep.BumpClusterDataVersion(clusterID)
+				for _, attr := range attrIDs {
+					mgr.OnAttributeChanged(im.ConcreteAttributePath{
+						Endpoint: ep.ID, Cluster: clusterID, Attribute: attr,
+						HasEndpoint: true, HasCluster: true, HasAttribute: true,
+					})
+				}
+			})
+			if unsub == nil {
+				unsub = func() {}
+			}
+			b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+		}
 	}
 }
 

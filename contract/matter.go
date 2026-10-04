@@ -616,6 +616,27 @@ type ChangeNotifier interface {
 	OnMatterValueChanged(cb func()) (unsubscribe func())
 }
 
+// AttributeChangeNotifier is the optional capability of a [ClusterServer]
+// that holds its attribute state itself, as a matter.js behavior does,
+// and therefore knows exactly which of its attributes moved. The bridge
+// subscribes to it at reassembly for every bridged endpoint: on a fire it
+// advances the endpoint-hosted DataVersion of the server's cluster and
+// marks the named attributes — and only those — dirty for every
+// subscription that covers them.
+//
+// Unlike [ChangeNotifier], which a host's source fires and which marks
+// every reportable attribute of its cluster dirty, this one lets a server
+// keep an attribute out of change reporting until its own rule says it
+// changed — a "Q" (quieter) attribute such as OperationalState
+// CountdownTime. Mirrors matter.js Datasource onChange, which reports
+// the properties that changed, and ServerBehaviorBacking, which reports a
+// quieter property only when its QuietEvent emits.
+//
+// Returns an unsubscribe closure; calling it more than once is a no-op.
+type AttributeChangeNotifier interface {
+	OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func())
+}
+
 // EventPriority mirrors the Matter §10.6.6.1 priority enum.
 type EventPriority uint8
 
