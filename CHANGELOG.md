@@ -12,6 +12,53 @@ pseudo-version of `main`.
 
 ### Added
 
+- **Application cluster servers for smoke / CO alarms, fans, air purifiers,
+  extractor hoods, pumps and flow sensors.** Each owns no device state: the
+  host reports a snapshot through a port of the server's package and
+  receives validated writes; the Matter-side rules — conformance, enum and
+  range checks, coupling, status codes, events, FeatureMap / AttributeList /
+  AcceptedCommandList / EventList, revisions from the generated schema —
+  live in the server. Every new command, write and event crosses the real
+  wire path in `bridge` tests, and the Step request and event payloads are
+  pinned against matter.js encodings
+  (`bridge/testdata/application-wire-fixtures.json`,
+  `notes/parity/matter/generate-application-fixtures.ts`).
+  - `cluster/alarm` — SmokeCoAlarm (0x005C) for device type 0x0076:
+    `Server`, `NewServer`, `Config`, `State`, `StateSource`, `SelfTester`,
+    `SensitivitySetter`, `Feature*`, `Optional*`, the enum types,
+    `DefaultExpressedStatePriority`, `Server.ExpressedStateOf`,
+    `Server.Refresh` (emits the specified events between two snapshots),
+    `AlarmSeverityEvent`. SelfTestRequest answers BUSY while alarming or
+    testing (`BD-Matter-SmokeCoAlarmRulesInServer`).
+  - `cluster/fan` — FanControl (0x0202) for Fan 0x002B, AirPurifier 0x002D
+    and ExtractorHood 0x007A: `Server`, `NewServer`, `Config`, `State`,
+    `Settings`, `Setting`, `StateSource`, `RockSetter`, `WindSetter`,
+    `AirflowDirectionSetter`, `Stepper`, `ErrInvalidInState`, `Feature*`
+    and the enum / bitmap types. FanMode, PercentSetting and SpeedSetting
+    writes resolve into one coupled `Settings`; Step has a default when the
+    host has no `Stepper` (`BD-Matter-FanControlCouplingInServer`).
+  - `cluster/pump` — PumpConfigurationAndControl (0x0200) for Pump 0x0303:
+    `Server`, `NewServer`, `Config`, `Limits`, `State`, `StateSource`,
+    `ControlModeSetter`, `RunningHoursSetter`, `EnergyConsumedSetter`,
+    `Server.Emit` for the seventeen alarm events, `Feature*`, `Optional*`
+    and the enum types. Pump's mandatory OnOff stays the host's.
+  - `cluster/measurement` — `FlowServer` / `NewFlowServer` / `FlowRevision`
+    for FlowMeasurement (0x0404); `contract.MeasurementFlow` (FlowSensor
+    0x0306) is a new built-in measurement class. It is appended after
+    `MeasurementElectrical`, so a host-registered class now starts one
+    value higher.
+  - `cluster/wire` — `FanControlClusterID`, `FanControlCmdStep`,
+    `FanStepRequest` and its field tags, `FieldlessEvent`; `cluster` —
+    `AsUintMax`, a narrowing that rejects instead of wrapping.
+  - `contract.DeviceTypeName` names Fan, Air Purifier, Extractor Hood, Pump
+    and Flow Sensor; `schema` knows the read-only attributes of FanControl,
+    PumpConfigurationAndControl and FlowMeasurement.
+  - Not built, all optional: HEPA / activated-carbon filter monitoring, and
+    the optional measurement / level / scene servers of these device types.
+    Open items (unverified connectedhomeip-derived formulas, the PowerSource
+    device-type entry SmokeCoAlarm requires, and a pre-existing Switch event
+    payload that encodes as null) are in
+    `notes/parity/matter_behaviour_findings.md`.
 - **Groupcast (0x0065) and the AccessControl Auxiliary ACL on the root**, as
   matter.js's default `ServerNode.RootEndpoint` installs them and Matter
   1.6.1 requires them of a node with lights or plugs

@@ -33,6 +33,72 @@ left verbatim rather than re-translated after the fact.
 
 ---
 
+### BD-Matter-SmokeCoAlarmRulesInServer — ExpressedState, the self-test gate and the events are derived by the server
+
+matter.js `SmokeCoAlarmServer`
+(`packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts:19-43`)
+seeds the initial state and nothing else: which condition ExpressedState
+shows, refusing SelfTestRequest while alarming, and emitting the eleven
+events are left to the application that subclasses it.
+[`cluster/alarm`](../../cluster/alarm) does all three, from the
+specification text matter.js carries in
+`packages/model/src/standard/resources/smoke-co-alarm-cluster.resource.ts`:
+
+- **ExpressedState** is derived from the host's snapshot through a
+  priority order (`DefaultExpressedStatePriority`, overridable per host,
+  since the resource says the order is the manufacturer's, :27-30);
+  `State.Inoperative` takes precedence. The default order is the one
+  connectedhomeip's smoke-co-alarm example application passes to
+  `SetExpressedStateByPriority` — recalled, not read from a checkout (see
+  the findings register).
+- **SelfTestRequest** answers BUSY while ExpressedState is SmokeAlarm,
+  CoAlarm, Testing, InterconnectSmoke or InterconnectCO (:201-204) and
+  only then reaches the host's `SelfTester`. A source without one leaves
+  the optional command out of AcceptedCommandList, which is what matter.js
+  does for an optional command it was given no implementation for.
+- **Events** are the difference between two snapshots (`Server.Refresh`),
+  one rule per event as the resource words it (:124-195), at the
+  element's priorities. The baseline before the first Refresh is
+  matter.js's initial state.
+
+**Rationale.** In a bridge the application is the host, whose device model
+knows nothing about Matter's event rules; spreading them across every host
+would produce a different reading of the same specification per host. The
+wire surface is unchanged against matter.js — same attributes, same event
+payloads (pinned against matter.js encodings in
+`bridge/testdata/application-wire-fixtures.json`).
+
+### BD-Matter-FanControlCouplingInServer — FanMode / PercentSetting / SpeedSetting coupling and a default Step
+
+matter.js `FanControlServer`
+(`packages/node/src/behaviors/fan-control/FanControlServer.ts:13-19`) only
+defaults FanMode to Off. [`cluster/fan`](../../cluster/fan) resolves every
+speed-oriented write into one `fan.Settings` before the host sees it:
+
+- FanMode Off → PercentSetting 0 / SpeedSetting 0; Auto → both null
+  (`fan-control.resource.ts:82-84`, :120-122); Low / Medium / High leave
+  both to the device's own mode mapping (nil fields), because the
+  percentage a mode means is the manufacturer's.
+- PercentSetting p → SpeedSetting ceil(SpeedMax × p / 100); SpeedSetting s
+  → PercentSetting floor(s × 100 / SpeedMax); either at 0 → FanMode Off.
+  The resource refers to "Percent Rules" (§4.4.6.3.1) and "Speed Rules"
+  (§4.4.6.6.1) without carrying them; the formulas are connectedhomeip's
+  `fan-control-server.cpp`, recalled rather than read (findings register).
+- A null PercentSetting / SpeedSetting write succeeds and changes nothing
+  (:86-87, :126); a FanMode the FanModeSequence does not offer is
+  CONSTRAINT_ERROR (:48-51, :62-63); the deprecated On maps to High and
+  Smart to Auto or High, as connectedhomeip does.
+- Step goes to a host `Stepper` when there is one; otherwise the server
+  steps one unit of SpeedSetting (MultiSpeed) or one rung of the
+  sequence's speed modes, honouring Wrap and LowestOff. The resource calls
+  the interpretation "implementation specific" (:214-215); the mode ladder
+  is its own example (:219-224).
+
+**Rationale.** Same as for SmokeCoAlarm: the coupling is identical for every
+fan, and a host that had to re-derive it would differ from the next host.
+Validation that matter.js's generated behavior does perform — types, enum
+membership, "max 100", "max speedMax", bitmap bits — is mirrored as such.
+
 ### BD-Matter-ClosureWithoutTagList — the Closure endpoint omits the TAGLIST feature its device type marks mandatory
 
 A garage drive projects as the Closure device type (0x0230) carrying

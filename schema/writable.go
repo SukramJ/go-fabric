@@ -27,7 +27,8 @@ package schema
 // this table provides the same verdict schema-side. It is scoped to the
 // clusters the bridge exposes (core clusters plus OnOff/LevelControl/
 // ColorControl/Groups, WindowCovering, DoorLock, Thermostat, GenericSwitch,
-// and the measurement clusters) so it stays bounded. Every entry is derived
+// SmokeCoAlarm, FanControl, PumpConfigurationAndControl, and the measurement
+// clusters) so it stays bounded. Every entry is derived
 // from the per-attribute `access` strings in
 // parity/schema.json (the matter.js HEAD pin);
 // TestReadOnlyAttributeParity reloads that snapshot and fails if any entry

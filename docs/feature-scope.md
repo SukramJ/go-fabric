@@ -74,7 +74,10 @@ Application clusters, grouped by the device surface they serve:
 | [`cluster/thermo`](../cluster/thermo) | Thermostat (0x0201) |
 | [`cluster/valve`](../cluster/valve) | ValveConfigurationAndControl (0x0081) |
 | [`cluster/modeselect`](../cluster/modeselect) | ModeSelect (0x0050) |
-| [`cluster/measurement`](../cluster/measurement) | Temperature (0x0402) · RelativeHumidity (0x0405) · Illuminance (0x0400) · Pressure (0x0403) · BooleanState (0x0045) · OccupancySensing (0x0406) · AirQuality (0x005B) · CO₂ (0x040D) · PM2.5 (0x042A) · PM10 (0x042D) · PowerSource (0x002F) · ElectricalPowerMeasurement (0x0090) · ElectricalEnergyMeasurement (0x0091) |
+| [`cluster/fan`](../cluster/fan) | FanControl (0x0202) — all six features, the FanMode / PercentSetting / SpeedSetting coupling, Step |
+| [`cluster/pump`](../cluster/pump) | PumpConfigurationAndControl (0x0200) — all seven features, host-raised alarm events |
+| [`cluster/alarm`](../cluster/alarm) | SmokeCoAlarm (0x005C) — SMOKE / CO, derived ExpressedState, SelfTestRequest, all eleven events |
+| [`cluster/measurement`](../cluster/measurement) | Temperature (0x0402) · RelativeHumidity (0x0405) · Illuminance (0x0400) · Pressure (0x0403) · Flow (0x0404) · BooleanState (0x0045) · OccupancySensing (0x0406) · AirQuality (0x005B) · CO₂ (0x040D) · PM2.5 (0x042A) · PM10 (0x042D) · PowerSource (0x002F) · ElectricalPowerMeasurement (0x0090) · ElectricalEnergyMeasurement (0x0091) |
 | [`cluster/wire`](../cluster/wire) | Wire-format types and encoders for AdministratorCommissioning, Switch (Generic Switch), ScenesManagement, Schedules, the deprecated Groups stub, and the command payloads of the servers above |
 
 Groups (0x0004) is a **real server** ([`cluster/core`](../cluster/core)):
@@ -109,7 +112,21 @@ measurement classes carry a device type of their own
 (`contract.MeasurementClassDeviceType`): TemperatureSensor 0x0302,
 HumiditySensor 0x0307, LightSensor 0x0106, PressureSensor 0x0305,
 AirQualitySensor 0x002C, OccupancySensor 0x0107, ContactSensor 0x0015,
-GenericSwitch 0x003B, ElectricalSensor 0x0510.
+GenericSwitch 0x003B, ElectricalSensor 0x0510, FlowSensor 0x0306.
+
+Device types a host builds from the application servers, each assembled
+with its full mandatory server set (Identify, Groups where mandated,
+Descriptor and BridgedDeviceBasicInformation from the assembler, the rest
+from the host — `endpoint/application_device_types_test.go`):
+
+| Device type | Host supplies | Not built (optional) |
+| --- | --- | --- |
+| SmokeCoAlarm 0x0076 | `alarm.Server` | CO concentration, temperature, humidity measurement; the PowerSource *device type* entry (see the findings register) |
+| Fan 0x002B | `fan.Server` (Groups is mounted by the assembler) | OnOff |
+| AirPurifier 0x002D | `fan.Server` | HEPA / activated-carbon filter monitoring (0x0071 / 0x0072), OnOff |
+| ExtractorHood 0x007A | `fan.Server` without RCK / WND / DIR | HEPA / activated-carbon filter monitoring |
+| Pump 0x0303 | `pump.Server` plus the host's own OnOff server | LevelControl, ScenesManagement, the measurement servers |
+| FlowSensor 0x0306 | a `contract.MeasurementFlow` source | — |
 
 ## Operations and testing
 

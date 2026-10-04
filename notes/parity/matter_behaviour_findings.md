@@ -353,6 +353,50 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   in the `[]GroupInfoMapStruct` case of `bridge/reply.go` plus a GroupTable
   fixture in `generate-group-fixtures.ts`.
 
+## Application cluster servers — open items
+
+Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump` and
+FlowMeasurement. `../connectedhomeip` was not checked out when they were
+written, so the two rule sets below that matter.js does not carry were
+taken from memory of connectedhomeip and are unverified:
+
+- **FanControl percent / speed formulas and the On / Smart mapping.**
+  `ceil(SpeedMax × p / 100)`, `floor(s × 100 / SpeedMax)`, On → High,
+  Smart → Auto-or-High (`cluster/fan/fancontrol_server.go`
+  `percentSettings`, `speedSettings`, `resolveFanMode`) are recalled from
+  `src/app/clusters/fan-control-server/fan-control-server.cpp`. Fix
+  package: read that file and the spec's §4.4.6.3.1 / §4.4.6.6.1, correct
+  the three functions if they differ, extend `TestPercentAndSpeedWrites`.
+- **SmokeCoAlarm default ExpressedState priority.**
+  `alarm.DefaultExpressedStatePriority` is recalled from
+  `examples/smoke-co-alarm-app` (`SetExpressedStateByPriority`). Hosts can
+  override it, so a wrong default is a wrong default, not a lock-in. Fix
+  package: compare with the example app, adjust the slice and
+  `TestExpressedStatePriority`.
+- **SmokeCoAlarm requires a PowerSource device type on the endpoint.**
+  `smoke-co-alarm-device.element.ts` lists `PowerSource` (0x0011) as a
+  mandatory *deviceType* requirement; matter.js's `SmokeCoAlarmDevice`
+  does not install it either. A host can mount the PowerSource cluster
+  through `Spec.PowerSource`, but `endpoint/materialize.go` never adds
+  0x0011 to the Descriptor's DeviceTypeList. Fix package: append
+  PowerSource (with its schema revision) to DeviceTypeList when
+  `ep.PowerSource` is set, and assert it in
+  `endpoint/application_device_types_test.go`.
+- **Switch (0x003B) event payloads encode as TLV null.** Found while
+  pinning the new event payloads: `wire.GenericSwitch.Fire*` emits the
+  unexported `switch*Event` structs, which `bridge/reply.go`'s value
+  writer has no case for, so InitialPress / ShortRelease / LongPress /
+  LongRelease carry `null` (0x14) in the EventDataIB Data slot instead of
+  `{0: position}`. Pre-existing, not touched here. Fix package: export the
+  payload types (or give them an encoder the writer can reach), add the
+  cases, and a matter.js fixture for each event alongside
+  `bridge/testdata/application-wire-fixtures.json`.
+- **Not built:** HepaFilterMonitoring (0x0071) and
+  ActivatedCarbonFilterMonitoring (0x0072), optional on AirPurifier and
+  ExtractorHood; Pump's optional LevelControl / ScenesManagement /
+  measurement servers beyond FlowMeasurement; SmokeCoAlarm's optional
+  CarbonMonoxideConcentrationMeasurement (0x040C).
+
 ---
 
 ## Tier 3 — LOW

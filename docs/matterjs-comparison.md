@@ -82,7 +82,7 @@ matter.js HEAD as checked out at `../matter.js`.
 ## 5. Clusters
 
 matter.js ships roughly **140** cluster behaviours generated from `@matter/model`;
-`go-fabric` implements **~30** servers by hand, chosen by what a bridge
+`go-fabric` implements **~35** servers by hand, chosen by what a bridge
 actually mounts. The schema for all of them is present here (in `parity/` and
 `schema/`) — what is missing is server logic, not identifiers.
 
@@ -90,7 +90,10 @@ actually mounts. The schema for all of them is present here (in `parity/` and
 | --- | --- | --- | --- | --- | --- |
 | System / commissioning (BasicInformation, GeneralCommissioning, OperationalCredentials, NetworkCommissioning, AccessControl with Extension and Auxiliary, GroupKeyManagement, Groupcast, Descriptor, Binding, Identify, …) | ✅ | [`cluster/core`](../cluster/core) | ✅ | — | Complete for the bridge role; Groupcast without the Sender feature (`BD-Matter-GroupcastNoSender`). |
 | Actuation (OnOff, LevelControl, ColorControl, WindowCovering, DoorLock, Thermostat, ValveConfigurationAndControl, ModeSelect, ClosureControl) | ✅ | [`cluster/`](../cluster) | ✅ | — | The device surface a home bridge exposes. |
-| Sensing (Temperature, Humidity, Illuminance, Pressure, Occupancy, BooleanState, AirQuality, CO₂/PM2.5/PM10, PowerSource, Electrical Power/Energy) | ✅ | [`cluster/measurement`](../cluster/measurement) | ✅ | — | |
+| Fan and pump (FanControl, PumpConfigurationAndControl) | ✅ (behaviour = generated validation; FanControl defaults FanMode only) | [`cluster/fan`](../cluster/fan), [`cluster/pump`](../cluster/pump) | ✅ | — | Fan, AirPurifier, ExtractorHood, Pump. The FanMode / percent / speed coupling and a default Step are added from the specification text (`BD-Matter-FanControlCouplingInServer`); the percent / speed formulas await a connectedhomeip check (findings register). |
+| Safety (SmokeCoAlarm) | ✅ (initial state only) | [`cluster/alarm`](../cluster/alarm) | ✅ | — | ExpressedState priority, the BUSY self-test gate and event emission added from the specification text (`BD-Matter-SmokeCoAlarmRulesInServer`). |
+| Sensing (Temperature, Humidity, Illuminance, Pressure, Flow, Occupancy, BooleanState, AirQuality, CO₂/PM2.5/PM10, PowerSource, Electrical Power/Energy) | ✅ | [`cluster/measurement`](../cluster/measurement) | ✅ | — | |
+| Resource monitoring (HEPA / activated-carbon filter monitoring) | ✅ | — | ○ | **Low** | Optional on AirPurifier and ExtractorHood; not built until a host has a filter to report. |
 | Groups (0x0004) | full server | full server ([`core.Groups`](../cluster/core/groups.go)), membership as stack state in `groups.Manager`, persisted; mounted by the assembler where the device type mandates it | ✅ | — | [ADR 0009](./adr/0009-groups-and-group-messaging.md). Groupcast adoption (rev 5 INVALID_IN_STATE paths) is inert in matter.js's default server too. |
 | ScenesManagement (0x0062) | full server | stub: empty scene table, writes rejected | ◐ | **Low** | Presence is mandated by device-type conformance; a scene store is its own feature. `BD-Matter-P2-D18`. |
 | ICDManagement | full, incl. check-in sender (`protocol/src/icd`) | attributes 0x0000–0x0002 | ◐ | **Low** | `BD-chip-ICD-Attrs-0x3-0x5`. A mains-powered bridge is not an intermittently-connected device; the cluster is mounted for conformance, not for behaviour. |
@@ -98,7 +101,7 @@ actually mounts. The schema for all of them is present here (in `parity/` and
 | OTA Software Update **Requestor** | ✅ | `cluster/core/ota_software_update_requestor.go` | ✅ | — | |
 | OTA Software Update **Provider** | ✅ | — | ○ | **No** | `BD-Matter-OTAProvider-NotExposed`. A bridge that offers firmware to other nodes is a distribution role, not a device role, and it needs BDX. |
 | Network diagnostics (Ethernet / Wi-Fi / Thread / Software) | ✅ | GeneralDiagnostics only | ○ | **Low** | All optional. Useful telemetry, no controller depends on them. |
-| Appliance, media, energy, camera, TLS, WebRTC, closure-dimension, service-area, resource-monitoring, concentration extras, … (~100 behaviours) | ✅ | — | ○ | **Low** | Add on demand: a cluster server here is worth writing when a host has something to project onto it, and not before. The schema is already available for whichever one that turns out to be. |
+| Appliance, media, energy, camera, TLS, WebRTC, closure-dimension, service-area, concentration extras, … (~100 behaviours) | ✅ | — | ○ | **Low** | Add on demand: a cluster server here is worth writing when a host has something to project onto it, and not before. The schema is already available for whichever one that turns out to be. |
 
 ## 6. Device model and composition
 
