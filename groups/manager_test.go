@@ -421,3 +421,13 @@ func TestConcurrentDecodeAndChanges(t *testing.T) {
 	}()
 	wg.Wait()
 }
+
+func TestManagerFabricsListsEveryStoredFabric(t *testing.T) {
+	t.Parallel()
+	m, st := newTestManager(t)
+	st.addFabric(3, 0x0FAC, testCompressed)
+	got, err := m.Fabrics(context.Background())
+	if err != nil || !slices.Equal(got, []uint8{1, 3}) {
+		t.Fatalf("Fabrics = %v, %v; want [1 3]", got, err)
+	}
+}

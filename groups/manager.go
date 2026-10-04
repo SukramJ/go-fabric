@@ -397,6 +397,28 @@ func (m *Manager) forgetUnreferenced() {
 	m.receptionMu.Unlock()
 }
 
+// Fabrics returns the index of every fabric the store knows, ascending,
+// loading each one's group state first.
+func (m *Manager) Fabrics(ctx context.Context) ([]uint8, error) {
+	if err := m.ensureAllLoaded(ctx); err != nil {
+		return nil, err
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.fabricIndexesLocked(), nil
+}
+
+// fabricIndexesLocked returns the loaded fabric indexes ascending. Called
+// with m.mu held.
+func (m *Manager) fabricIndexesLocked() []uint8 {
+	idxs := make([]uint8, 0, len(m.fabrics))
+	for idx := range m.fabrics {
+		idxs = append(idxs, idx)
+	}
+	slices.Sort(idxs)
+	return idxs
+}
+
 // HasKeyMapping reports whether the fabric's GroupKeyMap maps groupID to
 // a key set. matter.js GroupsServer.addGroup answers UnsupportedAccess for
 // a group without one (`fabric.groups.groupKeyIdMap.has(groupId)`).

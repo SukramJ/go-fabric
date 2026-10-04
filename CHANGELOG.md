@@ -194,6 +194,14 @@ pseudo-version of `main`.
   `store.Schema()` through its own migration tool calls `store.Upgrade`
   once after it.
 
+- **GroupKeyMap and GroupTable answered an unfiltered read with the
+  accessing fabric's entries only.** Both are fabric-scoped lists without a
+  fabric-sensitive field, so a read with `isFabricFiltered=false` now
+  returns every fabric's entries, as matter.js does (`ListManager`
+  filters only fabric-filtered reads and fabric-sensitive lists) and as
+  `OperationalCredentials.Fabrics` / `NOCs` already did. Adds
+  `groups.Manager.Fabrics`.
+
 ### Deprecated
 
 - `wire.Groups`, the read-only Groups stub: group membership is stack state

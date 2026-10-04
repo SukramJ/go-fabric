@@ -273,66 +273,62 @@ type GroupKeySetStruct struct {
 const GroupKeyMulticastPolicyPerGroupID uint8 = 0
 
 // MatterRead implements [contract.ClusterServer].
+//
+// A read without an IM request behind it covers the fabric last set with
+// [GroupKeyManagement.SetCurrentFabric].
 func (g *GroupKeyManagement) MatterRead(attrID uint32) (any, bool) {
-	return g.matterReadWithCtx(context.Background(), attrID)
+	return g.matterReadWithCtx(context.Background(), attrID, true)
 }
 
-// MatterReadFiltered is the fabric-scoped read path for GroupKeyMap.
-// Derives the fabric from [im.FabricFilterFromContext] so CASE sessions
-// see only their own key mappings. Mirrors matter.js
-// GroupKeyManagementServer.ts:103-115 — GroupKeyMap attribute read uses
-// context.session.associatedFabric as the filter.
+// MatterReadFiltered is the read path for the fabric-scoped GroupKeyMap
+// and GroupTable: a fabric-filtered read sees the accessing fabric's
+// entries, an unfiltered one every fabric's (see readFabrics).
 func (g *GroupKeyManagement) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
-	return g.matterReadWithCtx(ctx, attrID)
+	return g.matterReadWithCtx(ctx, attrID, false)
 }
 
-func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint32) (any, bool) {
+func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint32, direct bool) (any, bool) {
 	switch attrID {
 	case groupKeyMgmtAttrGroupKeyMap:
-		// Derive fabric from IM context. Falls back to g.currentFabric for
-		// test harnesses that do not stamp the context.
-		_, fabric := im.FabricFilterFromContext(ctx)
-		if fabric == 0 {
-			g.mu.RLock()
-			fabric = g.currentFabric
-			g.mu.RUnlock()
-		}
-		mappings, err := g.store.ListGroupKeyMappings(ctx, fabric)
+		fabrics, err := g.readFabrics(ctx, direct)
 		if err != nil {
 			return nil, false
 		}
-		out := make([]GroupKeyMapStruct, 0, len(mappings))
-		for _, m := range mappings {
-			out = append(out, GroupKeyMapStruct{
-				GroupID:       m.GroupID,
-				GroupKeySetID: m.GroupKeySetID,
-				FabricIndex:   m.FabricIndex,
-			})
+		out := []GroupKeyMapStruct{}
+		for _, fabric := range fabrics {
+			mappings, err := g.store.ListGroupKeyMappings(ctx, fabric)
+			if err != nil {
+				return nil, false
+			}
+			for _, m := range mappings {
+				out = append(out, GroupKeyMapStruct{
+					GroupID:       m.GroupID,
+					GroupKeySetID: m.GroupKeySetID,
+					FabricIndex:   m.FabricIndex,
+				})
+			}
 		}
 		return out, true
 	case groupKeyMgmtAttrGroupTable:
-		// The group table the Groups servers maintain, for the requesting
-		// fabric. Mirrors matter.js GroupKeyManagementServer state
-		// `groupTable` (addEndpointForGroup / removeEndpoint).
+		// The group table the Groups servers maintain. Mirrors matter.js
+		// GroupKeyManagementServer state `groupTable` (addEndpointForGroup
+		// / removeEndpoint).
 		if g.groups == nil {
 			return []GroupInfoMapStruct{}, true
 		}
-		_, fabric := im.FabricFilterFromContext(ctx)
-		if fabric == 0 {
-			g.mu.RLock()
-			fabric = g.currentFabric
-			g.mu.RUnlock()
-		}
-		if fabric == 0 {
-			return []GroupInfoMapStruct{}, true
-		}
-		table, err := g.groups.GroupTable(ctx, fabric)
+		fabrics, err := g.readFabrics(ctx, direct)
 		if err != nil {
 			return nil, false
 		}
-		out := make([]GroupInfoMapStruct, 0, len(table))
-		for _, e := range table {
-			out = append(out, GroupInfoMapStruct{GroupID: e.GroupID, Endpoints: e.Endpoints, GroupName: e.GroupName, FabricIndex: fabric})
+		out := []GroupInfoMapStruct{}
+		for _, fabric := range fabrics {
+			table, err := g.groups.GroupTable(ctx, fabric)
+			if err != nil {
+				return nil, false
+			}
+			for _, e := range table {
+				out = append(out, GroupInfoMapStruct{GroupID: e.GroupID, Endpoints: e.Endpoints, GroupName: e.GroupName, FabricIndex: fabric})
+			}
 		}
 		return out, true
 	case groupKeyMgmtAttrMaxGroupsPerFabric:
@@ -387,6 +383,61 @@ func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint3
 		}, true
 	}
 	return nil, false
+}
+
+// fabricLister is the optional store capability an unfiltered read of a
+// fabric-scoped list needs: every fabric's index. *store.Store has it.
+type fabricLister interface {
+	ListFabrics(ctx context.Context) ([]store.FabricRecord, error)
+}
+
+// readFabrics returns the fabrics whose entries a GroupKeyMap / GroupTable
+// read covers. A fabric-filtered read covers the accessing fabric (the
+// legacy SetCurrentFabric value when the request carries none); an
+// unfiltered read covers every fabric. Neither list has a fabric-sensitive
+// field (group-key-management.element.ts: GroupKeyMapStruct and
+// GroupInfoMapStruct carry access "F" only), so the other fabrics' entries
+// go out whole. Mirrors matter.js ListManager createProxy, which filters a
+// fabric-scoped list only for `session.fabricFiltered ||
+// config.fabricSensitive`, the way OperationalCredentials.Fabrics and NOCs
+// already read here.
+func (g *GroupKeyManagement) readFabrics(ctx context.Context, direct bool) ([]uint8, error) {
+	filtered, fabric := im.FabricFilterFromContext(ctx)
+	if direct || filtered {
+		if fabric == 0 {
+			g.mu.RLock()
+			fabric = g.currentFabric
+			g.mu.RUnlock()
+		}
+		if fabric == 0 {
+			return nil, nil
+		}
+		return []uint8{fabric}, nil
+	}
+	if lister, ok := g.store.(fabricLister); ok {
+		recs, err := lister.ListFabrics(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("matter: GroupKeyManagement: list fabrics: %w", err)
+		}
+		out := make([]uint8, 0, len(recs))
+		for _, r := range recs {
+			out = append(out, r.FabricIndex)
+		}
+		slices.Sort(out)
+		return out, nil
+	}
+	if g.groups != nil {
+		idxs, err := g.groups.Fabrics(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("matter: GroupKeyManagement: list fabrics: %w", err)
+		}
+		return idxs, nil
+	}
+	// A store that cannot enumerate fabrics leaves the accessing one.
+	if fabric == 0 {
+		return nil, nil
+	}
+	return []uint8{fabric}, nil
 }
 
 // MatterWrite handles GroupKeyMap as a writable attribute (Matter

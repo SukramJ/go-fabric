@@ -372,12 +372,6 @@ are the behaviour the new pin implies and this module does not have yet.
 Gaps left by the Groups server and group-message reception of
 [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md).
 
-- **Unfiltered GroupKeyMap / GroupTable reads return only the accessing
-  fabric's entries.** matter.js answers a read with `isFabricFiltered=false`
-  with every fabric's entries, fabric-sensitive fields omitted for the others.
-  go-fabric scopes both attributes to the accessing fabric regardless of the
-  flag (`core.GroupKeyManagement.matterReadWithCtx`). Harmless for the
-  controllers seen so far, which read fabric-filtered.
 - **A reverted AddNOC leaves group state in memory.** `revertAddNOC` removes
   the fabric's rows (the cascade takes the group table along) without telling
   `groups.Manager`, which keeps a loaded fabric's keys until the next
