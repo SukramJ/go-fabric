@@ -58,7 +58,33 @@ type AuthorizingInvoker interface {
 // return the status the interaction ended with only so the caller can log
 // it.
 
+// GroupInvokeReport is what a group InvokeRequest did, for the report
+// Groupcast testing makes of every group message (matter.js
+// InteractionServer.handleInvokeRequest emits its GroupMessageEventInfo
+// from the same facts).
+type GroupInvokeReport struct {
+	// Status is the status the interaction ended with; nothing is sent.
+	Status StatusCode
+	// Processed reports that the request passed the checks that end a
+	// group interaction before any command is considered (a TimedRequest
+	// flag, a concrete or incomplete path, a wildcard sharing the
+	// message) — in matter.js those throw before the invoke results are
+	// iterated, so no outcome is reported for them.
+	Processed bool
+	// Requested are the command paths the request named.
+	Requested []ConcreteCommandPath
+	// Dispatched are the command's results on every endpoint it ran on;
+	// an endpoint access control denied is not among them.
+	Dispatched []InvokeResult
+}
+
 // HandleGroupInvokeRequest runs an InvokeRequest that arrived as a group
+// message and returns the status it ended with; see [HandleGroupInvoke].
+func HandleGroupInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest, timedRequired func(clusterID, commandID uint32) bool) StatusCode {
+	return HandleGroupInvoke(ctx, d, req, timedRequired).Status
+}
+
+// HandleGroupInvoke runs an InvokeRequest that arrived as a group
 // message. ctx carries the fabric ([WithFabricFilter]) and the Group
 // subject ([WithGroupSubject]). timedRequired reports a command whose
 // model access requires a timed interaction; may be nil.
@@ -74,41 +100,43 @@ type AuthorizingInvoker interface {
 // holds the command's privilege and the command needs no timed
 // interaction. A denied endpoint is skipped silently, as every wildcard
 // expansion skips it.
-func HandleGroupInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest, timedRequired func(clusterID, commandID uint32) bool) StatusCode {
+func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, timedRequired func(clusterID, commandID uint32) bool) GroupInvokeReport {
 	if req.TimedRequest {
-		return StatusTimedRequestMismatch
+		return GroupInvokeReport{Status: StatusTimedRequestMismatch}
 	}
 	for _, inv := range req.Invokes {
 		if inv.Path.HasEndpoint {
-			return StatusInvalidAction // "Group commands cannot be concrete paths"
+			return GroupInvokeReport{Status: StatusInvalidAction} // "Group commands cannot be concrete paths"
 		}
 		if !inv.Path.HasCluster || !inv.Path.HasCommand {
-			return StatusInvalidAction
+			return GroupInvokeReport{Status: StatusInvalidAction}
 		}
 	}
 	if len(req.Invokes) > 1 {
-		return StatusInvalidAction // "Wildcard path must not be used with multiple invokes"
+		return GroupInvokeReport{Status: StatusInvalidAction} // "Wildcard path must not be used with multiple invokes"
 	}
 	subject, ok := GroupSubjectFromContext(ctx)
 	invoker, canInvoke := d.(AuthorizingInvoker)
 	if !ok || !canInvoke || len(req.Invokes) == 0 {
-		return StatusSuccess
+		return GroupInvokeReport{Status: StatusSuccess}
 	}
 	inv := req.Invokes[0]
+	report := GroupInvokeReport{Status: StatusSuccess, Processed: true, Requested: []ConcreteCommandPath{inv.Path}}
 	if len(subject.Endpoints) == 0 {
-		return StatusSuccess // "No endpoints mapped to group, skipping wildcard invoke"
+		return report // "No endpoints mapped to group, skipping wildcard invoke"
 	}
 	if !inv.DecodeStatus.IsSuccess() {
-		return inv.DecodeStatus
+		report.Status = inv.DecodeStatus
+		return report
 	}
 	authorize := groupAuthorizer(ctx, d, subject)
-	invoker.InvokeAuthorized(ctx, inv.Path, inv.Fields, func(endpoint uint16, clusterID, commandID uint32) StatusCode {
+	report.Dispatched = invoker.InvokeAuthorized(ctx, inv.Path, inv.Fields, func(endpoint uint16, clusterID, commandID uint32) StatusCode {
 		if timedRequired != nil && timedRequired(clusterID, commandID) {
 			return StatusNeedsTimedInteraction
 		}
 		return authorize(endpoint, clusterID, invokePrivilegeOf(d, endpoint, clusterID, commandID))
 	})
-	return StatusSuccess
+	return report
 }
 
 // HandleGroupWriteRequest runs a WriteRequest that arrived as a group

@@ -446,6 +446,21 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		return privilegeOperate
 	}
 
+	// The access check a cluster server may consult for a privilege
+	// beyond the command's own ([AuthorityAt]): the same gate the command
+	// itself passed — PASE holds the implicit Administer, a CASE subject
+	// what the ACL grants, and nothing is granted without an ACL source.
+	requestCtx := ctx
+	ctx = WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
+		if pase || fabricIndex == 0 {
+			return StatusSuccess
+		}
+		if !hasACL {
+			return StatusUnsupportedAccess
+		}
+		return aclChecker.CheckACL(requestCtx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
+	})
+
 	var ir InvokeResponse
 	// The InvokeResponseMessage.SuppressResponse field is deprecated and matter.js
 	// always emits it as false (packages/node/src/node/server/InteractionServer.ts:987-988

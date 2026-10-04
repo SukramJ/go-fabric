@@ -56,6 +56,16 @@ func clusterDataVersionFor(ep *Endpoint, srv contract.ClusterServer) uint32 {
 type TopologyDispatcher struct {
 	topology *Topology
 	acl      ACLLister
+	aux      AuxiliaryACLLister
+}
+
+// AuxiliaryACLLister supplies the auxiliary access control entries of the
+// AccessControl cluster's Auxiliary (AUX) feature: entries a cluster
+// synthesises rather than a controller writes — today the Groupcast
+// cluster's Operate grants for the listener endpoints of a group with
+// HasAuxiliaryAcl. *groups.Manager satisfies it.
+type AuxiliaryACLLister interface {
+	AuxiliaryACL(ctx context.Context, fabricIndex uint8) ([]store.ACLEntry, error)
 }
 
 // ACLLister is the subset of the Matter ACL store [TopologyDispatcher.CheckACL]
@@ -107,6 +117,19 @@ func NewTopologyDispatcher(t *Topology) *TopologyDispatcher {
 func (d *TopologyDispatcher) SetACLLister(l ACLLister) {
 	if d != nil {
 		d.acl = l
+	}
+}
+
+// SetAuxiliaryACL wires the auxiliary access control entries
+// [TopologyDispatcher.CheckACL] evaluates next to the stored ones (see
+// Bridge.AttachAuxiliaryACL), and with them the Auxiliary feature's rule
+// that a Group entry without targets no longer reaches endpoint 0. nil
+// turns the feature off. Mirrors matter.js AccessControlServer
+// #applyFabricAcl, which installs `[...realAcl, ...#auxiliaryAclFor(fabric)]`
+// and sets FabricAccessControl.auxiliaryFeatureEnabled.
+func (d *TopologyDispatcher) SetAuxiliaryACL(l AuxiliaryACLLister) {
+	if d != nil {
+		d.aux = l
 	}
 }
 
@@ -871,7 +894,18 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		ep = d.topology.FindByID(endpoint)
 	}
 	if group, isGroup := im.GroupSubjectFromContext(ctx); isGroup {
-		return checkGroupACL(entries, group, ep, endpoint, clusterID, requiredPrivilege)
+		auxEnabled := d.aux != nil
+		if auxEnabled {
+			// Auxiliary entries are all Group entries, so only a group
+			// subject can match one. An auxiliary source that cannot be
+			// read fails closed like the stored ACL.
+			aux, err := d.aux.AuxiliaryACL(ctx, fabricIndex)
+			if err != nil {
+				return im.StatusUnsupportedAccess
+			}
+			entries = append(slices.Clone(entries), aux...)
+		}
+		return checkGroupACL(entries, group, ep, endpoint, clusterID, requiredPrivilege, auxEnabled)
 	}
 	var best store.Privilege
 	for _, e := range entries {
@@ -905,7 +939,12 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 // entries apply; an empty Subjects list matches any group, otherwise the
 // group id must be listed. A Group entry may never grant Administer:
 // matter.js throws on that grant, which denies the request.
-func checkGroupACL(entries []store.ACLEntry, group im.GroupSubject, ep *Endpoint, endpoint uint16, clusterID uint32, requiredPrivilege uint8) im.StatusCode {
+//
+// With the Auxiliary feature (auxEnabled) entries holds the auxiliary
+// entries too, and a Group entry without targets does not reach endpoint 0
+// (FabricAccessControl #getGrantedPrivileges: "Group subjects cannot grant
+// access to Endpoint 0 when Auxiliary feature is enabled").
+func checkGroupACL(entries []store.ACLEntry, group im.GroupSubject, ep *Endpoint, endpoint uint16, clusterID uint32, requiredPrivilege uint8, auxEnabled bool) im.StatusCode {
 	if !group.HasValidMapping {
 		return im.StatusUnsupportedAccess
 	}
@@ -915,6 +954,9 @@ func checkGroupACL(entries []store.ACLEntry, group im.GroupSubject, ep *Endpoint
 			continue
 		}
 		if len(e.Subjects) > 0 && !slices.Contains(e.Subjects, uint64(group.GroupID)) {
+			continue
+		}
+		if auxEnabled && len(e.Targets) == 0 && endpoint == 0 {
 			continue
 		}
 		if !aclTargetMatches(e.Targets, ep, endpoint, clusterID) {

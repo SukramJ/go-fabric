@@ -659,6 +659,12 @@ func HandleReadEventRequest(req ReadRequest, log *EventLog) []EventReport {
 // and requires Administer to read.
 const matterAccessControlClusterID uint32 = 0x001F
 
+// matterGroupcastClusterID is the Groupcast cluster (Matter 1.6 §11.27).
+// Its one event, GroupcastTesting, carries access "S A" like
+// AccessControl's (groupcast.element.ts): fabric-sensitive, Administer to
+// read.
+const matterGroupcastClusterID uint32 = 0x0065
+
 // EventReadAuthorizer bundles the accessing subject + ACL checker used to gate
 // event reads and subscriptions, mirroring the (fabricIndex, subject, CATs)
 // tuple the attribute read path threads through [HandleReadRequest]. A zero
@@ -718,10 +724,11 @@ func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events
 }
 
 // eventReadPrivilege returns the minimum privilege required to read events on
-// clusterID: Administer for AccessControl (§9.10.7.1 fabric-sensitive events),
-// View for every other cluster (the Matter default event read privilege).
+// clusterID: Administer for AccessControl (§9.10.7.1 fabric-sensitive events)
+// and Groupcast (GroupcastTesting, access "S A"), View for every other
+// cluster (the Matter default event read privilege).
 func eventReadPrivilege(clusterID uint32) uint8 {
-	if clusterID == matterAccessControlClusterID {
+	if clusterID == matterAccessControlClusterID || clusterID == matterGroupcastClusterID {
 		return 5 // Administer
 	}
 	return 1 // View
@@ -731,7 +738,7 @@ func eventReadPrivilege(clusterID uint32) uint8 {
 // FabricIndex and must be filtered to the accessing fabric regardless of the
 // read's FabricFiltered flag (Matter §8.4.3.2 / §9.10.7.1).
 func isFabricSensitiveEventCluster(clusterID uint32) bool {
-	return clusterID == matterAccessControlClusterID
+	return clusterID == matterAccessControlClusterID || clusterID == matterGroupcastClusterID
 }
 
 // eventPayloadFabricIndex extracts the FabricIndex a fabric-sensitive event
