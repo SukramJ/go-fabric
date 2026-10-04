@@ -5,10 +5,12 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 	"testing"
 
 	matterparity "github.com/SukramJ/go-fabric/parity"
+	gschema "github.com/SukramJ/go-fabric/schema"
 )
 
 // matter.js's MatterDefinition tree is the de-facto reference Matter
@@ -68,6 +70,16 @@ func loadMatterSchemaT(t *testing.T) *matterSchema {
 			len(s.Clusters), len(s.DeviceTypes))
 	}
 	return &s
+}
+
+// mustClusterRevision is the revision a server serves through
+// schema.ClusterRevision rather than a constant of its own.
+func mustClusterRevision(id uint32) uint16 {
+	rev, ok := gschema.ClusterRevision(id)
+	if !ok {
+		panic(fmt.Sprintf("cluster 0x%04X not in the generated schema", id))
+	}
+	return rev
 }
 
 func clusterByID(s *matterSchema, id uint32) (matterCluster, bool) {
@@ -203,6 +215,16 @@ func parityCases() []parityCase {
 				accessControlAttrSubjectsPerAccessControl,
 				accessControlAttrTargetsPerAccessControl,
 				accessControlAttrAccessControlEntriesPerFabric,
+				accessControlAttrAuxiliaryACL, // AUX, with Groupcast mounted
+			},
+		},
+		{
+			jsID:          GroupcastClusterID, // 0x0065
+			codeClusterID: GroupcastClusterID,
+			codeRevision:  mustClusterRevision(GroupcastClusterID),
+			codeAttrIDs: []uint32{
+				groupcastAttrMembership, groupcastAttrMaxMembershipCount, groupcastAttrMaxMcastAddrCount,
+				groupcastAttrUsedMcastAddrCount, groupcastAttrFabricUnderTest,
 			},
 		},
 		{

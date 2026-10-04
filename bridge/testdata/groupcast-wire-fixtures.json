@@ -1,0 +1,250 @@
+[
+  {
+    "label": "join_group_minimal",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "JoinGroup",
+    "fixture": {
+      "groupId": 257,
+      "endpoints": [
+        2,
+        3
+      ],
+      "keySetId": 66
+    },
+    "bytesHex": "15250001013601040204031824024218"
+  },
+  {
+    "label": "join_group_full",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "JoinGroup",
+    "fixture": {
+      "groupId": 65527,
+      "endpoints": [
+        65534
+      ],
+      "keySetId": 65535,
+      "key": "000102030405060708090a0b0c0d0e0f",
+      "useAuxiliaryAcl": true,
+      "replaceEndpoints": false,
+      "mcastAddrPolicy": 1
+    },
+    "bytesHex": "152500f7ff360105feff182502ffff300310000102030405060708090a0b0c0d0e0f2904280524060118"
+  },
+  {
+    "label": "leave_group_all",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "LeaveGroup",
+    "fixture": {
+      "groupId": 257
+    },
+    "bytesHex": "152500010118"
+  },
+  {
+    "label": "leave_group_endpoints",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "LeaveGroup",
+    "fixture": {
+      "groupId": 0,
+      "endpoints": [
+        2,
+        258
+      ]
+    },
+    "bytesHex": "15240000360104020502011818"
+  },
+  {
+    "label": "update_group_key",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "UpdateGroupKey",
+    "fixture": {
+      "groupId": 257,
+      "keySetId": 7,
+      "key": "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"
+    },
+    "bytesHex": "1525000101240107300210f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff18"
+  },
+  {
+    "label": "configure_auxiliary_acl",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "ConfigureAuxiliaryAcl",
+    "fixture": {
+      "groupId": 257,
+      "useAuxiliaryAcl": true
+    },
+    "bytesHex": "1525000101290118"
+  },
+  {
+    "label": "groupcast_testing_default",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "GroupcastTesting",
+    "fixture": {
+      "testOperation": 1
+    },
+    "bytesHex": "1524000118"
+  },
+  {
+    "label": "groupcast_testing_duration",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "GroupcastTesting",
+    "fixture": {
+      "testOperation": 0,
+      "durationSeconds": 1200
+    },
+    "bytesHex": "152400002501b00418"
+  },
+  {
+    "label": "leave_group_response",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "LeaveGroupResponse",
+    "fixture": {
+      "groupId": 257,
+      "endpoints": [
+        2,
+        768
+      ]
+    },
+    "bytesHex": "1525000101360104020500031818"
+  },
+  {
+    "label": "leave_group_response_wildcard",
+    "kind": "commands",
+    "cluster": 101,
+    "element": "LeaveGroupResponse",
+    "fixture": {
+      "groupId": 0,
+      "endpoints": []
+    },
+    "bytesHex": "1524000036011818"
+  },
+  {
+    "label": "membership",
+    "kind": "attributes",
+    "cluster": 101,
+    "element": "Membership",
+    "fixture": [
+      {
+        "groupId": 257,
+        "endpoints": [
+          2,
+          768
+        ],
+        "keySetId": 66,
+        "hasAuxiliaryAcl": true,
+        "mcastAddrPolicy": 0,
+        "fabricIndex": 1
+      },
+      {
+        "groupId": 514,
+        "endpoints": [],
+        "keySetId": 65535,
+        "hasAuxiliaryAcl": false,
+        "mcastAddrPolicy": 1,
+        "fabricIndex": 1
+      },
+      {
+        "groupId": 771,
+        "endpoints": [
+          4
+        ],
+        "hasAuxiliaryAcl": false,
+        "mcastAddrPolicy": 1,
+        "fabricIndex": 2
+      }
+    ],
+    "bytesHex": "1615250001013601040205000318240242290324040024fe011815250002023601182502ffff280324040124fe011815250003033601040418280324040124fe021818"
+  },
+  {
+    "label": "auxiliary_acl",
+    "kind": "attributes",
+    "cluster": 31,
+    "element": "AuxiliaryAcl",
+    "fixture": [
+      {
+        "privilege": 3,
+        "authMode": 3,
+        "subjects": [
+          257
+        ],
+        "targets": [
+          {
+            "cluster": null,
+            "endpoint": 2,
+            "deviceType": null
+          },
+          {
+            "cluster": null,
+            "endpoint": 768,
+            "deviceType": null
+          }
+        ],
+        "auxiliaryType": 1,
+        "fabricIndex": 1
+      },
+      {
+        "fabricIndex": 2
+      }
+    ],
+    "bytesHex": "16152401032402033603050101183604153400240102340218153400250100033402181824050124fe01181524fe021818"
+  },
+  {
+    "label": "groupcast_testing_event_success",
+    "kind": "events",
+    "cluster": 101,
+    "element": "GroupcastTesting",
+    "fixture": {
+      "sourceIpAddress": "fe800000000000000000000000000001",
+      "destinationIpAddress": "ff0500000000000000000000000000fa",
+      "groupId": 257,
+      "endpointId": 2,
+      "clusterId": 6,
+      "elementId": 2,
+      "accessAllowed": true,
+      "groupcastTestResult": 0,
+      "fabricIndex": 1
+    },
+    "bytesHex": "15300010fe800000000000000000000000000001300110ff0500000000000000000000000000fa25020101240302240406240502290624070024fe0118"
+  },
+  {
+    "label": "groupcast_testing_event_failed_auth",
+    "kind": "events",
+    "cluster": 101,
+    "element": "GroupcastTesting",
+    "fixture": {
+      "destinationIpAddress": "ff0500000000000000000000000000fa",
+      "groupcastTestResult": 3,
+      "fabricIndex": 1
+    },
+    "bytesHex": "15300110ff0500000000000000000000000000fa24070324fe0118"
+  },
+  {
+    "label": "auxiliary_access_updated",
+    "kind": "events",
+    "cluster": 31,
+    "element": "AuxiliaryAccessUpdated",
+    "fixture": {
+      "adminNodeId": "119",
+      "fabricIndex": 1
+    },
+    "bytesHex": "1524007724fe0118"
+  },
+  {
+    "label": "auxiliary_access_updated_no_admin",
+    "kind": "events",
+    "cluster": 31,
+    "element": "AuxiliaryAccessUpdated",
+    "fixture": {
+      "adminNodeId": null,
+      "fabricIndex": 2
+    },
+    "bytesHex": "15340024fe0218"
+  }
+]

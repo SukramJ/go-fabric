@@ -195,6 +195,9 @@ func run() error {
 		return fmt.Errorf("group state: %w", err)
 	}
 	br.AttachGroupMessaging(groupState)
+	// The Groupcast server (root, below) synthesises auxiliary access
+	// control entries; the bridge enforces them from the same state.
+	br.AttachAuxiliaryACL(groupState)
 	// A bounded trace of the moments that explain a failed pairing. Attached
 	// before Start because the first of those moments is the first
 	// commissioner datagram.

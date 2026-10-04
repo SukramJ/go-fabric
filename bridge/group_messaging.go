@@ -38,6 +38,10 @@ type GroupMessaging interface {
 	OnGroupTableChanged(fn func(fabricIndex uint8))
 	// ForgetFabric drops a removed fabric's group state.
 	ForgetFabric(fabricIndex uint8)
+	// ReportGroupMessage hands the outcome of a received group message
+	// to whoever observes it — the Groupcast server while a fabric is
+	// under GroupcastTesting ([groups.Manager.ReportGroupMessage]).
+	ReportGroupMessage(ev groups.GroupMessageEvent)
 }
 
 var _ GroupMessaging = (*groups.Manager)(nil)
@@ -56,9 +60,10 @@ func (noopGroupMessaging) Decode(context.Context, []byte) (*groups.Message, erro
 func (noopGroupMessaging) Memberships(context.Context) ([]groups.Membership, error) {
 	return nil, nil
 }
-func (noopGroupMessaging) OnMembershipChanged(func())      {}
-func (noopGroupMessaging) OnGroupTableChanged(func(uint8)) {}
-func (noopGroupMessaging) ForgetFabric(uint8)              {}
+func (noopGroupMessaging) OnMembershipChanged(func())                  {}
+func (noopGroupMessaging) OnGroupTableChanged(func(uint8))             {}
+func (noopGroupMessaging) ForgetFabric(uint8)                          {}
+func (noopGroupMessaging) ReportGroupMessage(groups.GroupMessageEvent) {}
 
 // AttachGroupMessaging wires group communication: the bridge then
 // authenticates group messages through g and routes a group Invoke or
@@ -246,15 +251,29 @@ func isGroupDatagram(buf []byte) bool {
 // .handleRequest and InteractionServer.handleInvokeRequest /
 // handleWriteRequest for a group session.
 func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.UDPAddr) error {
-	msg, err := b.groupMessagingPort().Decode(ctx, buf)
+	port := b.groupMessagingPort()
+	var srcIP net.IP
+	if src != nil {
+		srcIP = src.IP
+	}
+	msg, err := port.Decode(ctx, buf)
 	if err != nil {
 		b.logger.Debug("matter.rx.group.drop", slog.String("src", srcString(src)), slog.String("err", err.Error()))
+		if ev, ok := decodeFailureEvent(buf, srcIP, err); ok {
+			port.ReportGroupMessage(ev)
+		}
 		return err
 	}
 	if msg.Duplicate {
 		b.logger.Debug("matter.rx.group.duplicate",
 			slog.String("src", srcString(src)), slog.Int("group_id", int(msg.GroupID)),
 			slog.Uint64("source_node_id", msg.SourceNodeID), slog.Uint64("counter", uint64(msg.Header.MessageCounter)))
+		// Mirrors the ExchangeManager DuplicateMessageError branch for a
+		// group session: reported as MessageReplay, then dropped.
+		port.ReportGroupMessage(groups.GroupMessageEvent{
+			Result: groups.TestResultMessageReplay, FabricIndex: msg.FabricIndex,
+			GroupID: msg.GroupID, HasGroupID: true, SourceIP: srcIP,
+		})
 		return nil
 	}
 	proto, _, err := message.UnmarshalProtocolHeader(msg.Payload)
@@ -290,7 +309,11 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 			return fmt.Errorf("group invoke: %w", err)
 		}
 		gctx := im.WithGroupSubject(im.WithFabricFilter(ctx, false, msg.FabricIndex), subject)
-		status = im.HandleGroupInvokeRequest(gctx, dispatcher, req, schema.IsTimedInvoke)
+		report := im.HandleGroupInvoke(gctx, dispatcher, req, schema.IsTimedInvoke)
+		status = report.Status
+		for _, ev := range invokeOutcomeEvents(msg, srcIP, report) {
+			port.ReportGroupMessage(ev)
+		}
 	case im.OpcodeWriteRequest:
 		req, err := im.UnmarshalWriteRequestTLV(dec, attributeValueReader)
 		if err != nil {
@@ -306,4 +329,89 @@ func (b *Bridge) dispatchGroupMessage(ctx context.Context, buf []byte, src *net.
 		slog.Int("group_id", int(msg.GroupID)), slog.Int("opcode", int(proto.Opcode)),
 		slog.Bool("valid_mapping", msg.HasValidMapping), slog.String("status", status.String()))
 	return nil
+}
+
+// decodeFailureEvent is the report of a group message that did not
+// authenticate. NoAvailableKey names the fabric and group an unmapped key
+// set recovered, FailedAuth nothing but the group id of an unobfuscated
+// header; any other failure (a malformed message) is not reported. Mirrors
+// matter.js SessionManager.groupSessionFromPacket's catch block.
+func decodeFailureEvent(buf []byte, srcIP net.IP, err error) (groups.GroupMessageEvent, bool) {
+	ev := groups.GroupMessageEvent{SourceIP: srcIP}
+	// The group id is readable from the wire header only without privacy;
+	// it can derive the arrival address but is never reported as the
+	// authenticated group.
+	if len(buf) >= 4 && buf[3]&0x80 == 0 {
+		if hdr, _, herr := message.UnmarshalHeader(buf); herr == nil && hdr.DestSize == message.DestGroup {
+			ev.HeaderGroupID, ev.HasHeaderGroupID = hdr.DestGroupID, true
+		}
+	}
+	var noKey *groups.NoKeyError
+	switch {
+	case errors.As(err, &noKey):
+		ev.Result = groups.TestResultNoAvailableKey
+		if noKey.Authenticated {
+			ev.FabricIndex = noKey.FabricIndex
+			if !ev.HasHeaderGroupID {
+				ev.HeaderGroupID, ev.HasHeaderGroupID = noKey.GroupID, true
+			}
+		}
+	case errors.Is(err, groups.ErrNoKey):
+		ev.Result = groups.TestResultNoAvailableKey
+	case errors.Is(err, groups.ErrDecrypt):
+		ev.Result = groups.TestResultFailedAuth
+	default:
+		return groups.GroupMessageEvent{}, false
+	}
+	return ev, true
+}
+
+// invokeOutcomeEvents are the reports of a processed group Invoke: one
+// Success with AccessAllowed per endpoint the command ran on; without any,
+// FailedAuth for a message whose key is not the one its group is mapped
+// to, otherwise one Success per requested path whose AccessAllowed is
+// false when the group has member endpoints (access control filtered them
+// all) and absent when it has none. Mirrors matter.js
+// InteractionServer.handleInvokeRequest for a group session.
+func invokeOutcomeEvents(msg *groups.Message, srcIP net.IP, report im.GroupInvokeReport) []groups.GroupMessageEvent {
+	if !report.Processed {
+		return nil
+	}
+	base := groups.GroupMessageEvent{
+		Result: groups.TestResultSuccess, FabricIndex: msg.FabricIndex,
+		GroupID: msg.GroupID, HasGroupID: true, SourceIP: srcIP,
+	}
+	var out []groups.GroupMessageEvent
+	if len(report.Dispatched) > 0 {
+		allowed := true
+		for _, res := range report.Dispatched {
+			ev := base
+			ev.HasPath, ev.HasEndpoint = true, res.Path.HasEndpoint
+			ev.EndpointID, ev.ClusterID, ev.ElementID = res.Path.Endpoint, res.Path.Cluster, res.Path.Command
+			if len(report.Requested) > 0 {
+				ev.ClusterID, ev.ElementID = report.Requested[0].Cluster, report.Requested[0].Command
+			}
+			ev.AccessAllowed = &allowed
+			out = append(out, ev)
+		}
+		return out
+	}
+	if !msg.HasValidMapping {
+		return []groups.GroupMessageEvent{{
+			Result: groups.TestResultFailedAuth, FabricIndex: msg.FabricIndex, SourceIP: srcIP,
+		}}
+	}
+	var accessAllowed *bool
+	if len(msg.Endpoints) > 0 {
+		denied := false
+		accessAllowed = &denied
+	}
+	for _, p := range report.Requested {
+		ev := base
+		ev.HasPath, ev.HasEndpoint = true, p.HasEndpoint
+		ev.EndpointID, ev.ClusterID, ev.ElementID = p.Endpoint, p.Cluster, p.Command
+		ev.AccessAllowed = accessAllowed
+		out = append(out, ev)
+	}
+	return out
 }

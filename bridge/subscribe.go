@@ -1045,6 +1045,7 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 		return
 	}
 	mgr := b.subManager
+	b.wireRootNotifiersLocked(mgr)
 	var (
 		examined, notifierOK, withPaths int
 		sourceSeen, measurementSeen     int
@@ -1139,6 +1140,42 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 			slog.Int("notifier_ok", notifierOK),
 			slog.Int("with_paths", withPaths),
 			slog.Int("registered", len(b.measurementUnsubscribers)))
+	}
+}
+
+// wireRootNotifiersLocked subscribes every root cluster server that
+// implements [contract.ChangeNotifier] — today the Groupcast server, whose
+// Membership and counts move with the group state — to its own reportable
+// attributes on endpoint 0: a fire marks them dirty so subscribers get a
+// report. A root server keeps its own DataVersion (it bumps it before it
+// fires), so unlike a bridged endpoint nothing is bumped here. Mirrors the
+// reactive state matter.js keeps for root behaviors. Caller holds b.mu.
+func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
+	root := b.topology.FindByID(0)
+	if root == nil {
+		return
+	}
+	for _, srv := range endpointpkg.ClusterServers(root) {
+		notifier, ok := srv.(contract.ChangeNotifier)
+		if !ok {
+			continue
+		}
+		paths := make([]im.ConcreteAttributePath, 0, len(srv.MatterReportable()))
+		for _, attr := range srv.MatterReportable() {
+			paths = append(paths, im.ConcreteAttributePath{
+				Endpoint: root.ID, Cluster: srv.MatterClusterID(), Attribute: attr,
+				HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			})
+		}
+		unsub := notifier.OnMatterValueChanged(func() {
+			for _, p := range paths {
+				mgr.OnAttributeChanged(p)
+			}
+		})
+		if unsub == nil {
+			unsub = func() {}
+		}
+		b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
 	}
 }
 

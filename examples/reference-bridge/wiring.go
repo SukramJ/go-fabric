@@ -155,6 +155,17 @@ func buildRootClusters(
 	if err != nil {
 		return nil, refs, fmt.Errorf("group key management: %w", err)
 	}
+	// Groupcast is what Matter 1.6.1 asks of a root whose node has lights
+	// or plugs (RootNode GroupcastListenerCond). It shares the group state,
+	// creates keys and bindings through GroupKeyManagement, and turns on
+	// AccessControl's Auxiliary feature for the grants it synthesises —
+	// which the bridge enforces once AttachAuxiliaryACL has the same state.
+	groupcast, err := mattercore.NewGroupcast(mattercore.GroupcastConfig{
+		Groups: groupState, GroupKeyManagement: groupKeys, AccessControl: accessControl,
+	})
+	if err != nil {
+		return nil, refs, fmt.Errorf("groupcast: %w", err)
+	}
 
 	// ServerList is derived from the mounted set rather than written out,
 	// so adding a cluster below cannot leave the advertised list behind.
@@ -178,6 +189,7 @@ func buildRootClusters(
 		mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot),
 		opCreds,
 		groupKeys,
+		groupcast,
 		descriptor,
 	}
 	descriptor.SetServerListProvider(clusterIDsOf(servers))

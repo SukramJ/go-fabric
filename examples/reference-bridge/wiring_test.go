@@ -195,3 +195,37 @@ func TestCaseInitiatorProviderNeedsALoadedIdentity(t *testing.T) {
 		t.Fatalf("session table occupancy %+v → %+v: a refused initiation must not reserve an id", before, after)
 	}
 }
+
+// TestRootMountsGroupcastWithTheAuxiliaryACL: the bridged lights and plugs
+// require the RootNode GroupcastListenerCond in Matter 1.6.1, so the root
+// mounts Groupcast — Listener and PerGroup — and AccessControl advertises
+// the Auxiliary feature the Listener feature needs (matter.js
+// ServerNode.RootEndpoint: GroupcastServer + AccessControlServer.with(
+// "Extension", "Auxiliary")). The Descriptor's ServerList names it.
+func TestRootMountsGroupcastWithTheAuxiliaryACL(t *testing.T) {
+	t.Parallel()
+	servers, _ := testRootClusters(t)
+	features := map[uint32]uint32{}
+	for _, srv := range servers {
+		if v, ok := srv.MatterRead(0xFFFC); ok {
+			if fm, isU32 := v.(uint32); isU32 {
+				features[srv.MatterClusterID()] = fm
+			}
+		}
+	}
+	if fm, ok := features[mattercore.GroupcastClusterID]; !ok || fm != 0x5 {
+		t.Errorf("Groupcast FeatureMap = %#x (mounted %v), want Listener|PerGroup 0x5", fm, ok)
+	}
+	if fm := features[0x001F]; fm != 0x5 {
+		t.Errorf("AccessControl FeatureMap = %#x, want Extension|Auxiliary 0x5", fm)
+	}
+	for _, srv := range servers {
+		if srv.MatterClusterID() != 0x001D {
+			continue
+		}
+		raw, _ := srv.MatterRead(0x0001)
+		if list, _ := raw.([]uint32); !slices.Contains(list, mattercore.GroupcastClusterID) {
+			t.Errorf("root ServerList %v does not name Groupcast", list)
+		}
+	}
+}

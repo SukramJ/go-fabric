@@ -916,3 +916,97 @@ func (g *GroupKeyManagement) handleKeySetReadAllIndices(ctx context.Context, fab
 	}
 	return KeySetReadAllIndicesResponse{GroupKeySetIDs: ids}, nil
 }
+
+// groupcastKeyEpochStartTime is EpochStartTime0 of a key set Groupcast
+// creates: 1 µs after the Matter epoch, as core§11.27.7.1.4 requires.
+// Mirrors matter.js GroupKeyManagementServer GROUPCAST_KEY_EPOCH_START_TIME
+// (MATTER_EPOCH_OFFSET_US + 1 internally, 1 on the wire).
+const groupcastKeyEpochStartTime uint64 = 1
+
+// validateKeySetID reports whether the fabric holds key set id; key set 0,
+// the IPK, always exists. Mirrors matter.js
+// GroupKeyManagementServer.validateKeySetId.
+func (g *GroupKeyManagement) validateKeySetID(ctx context.Context, fabric uint8, id uint16) (bool, error) {
+	if id == 0 {
+		return true, nil
+	}
+	_, err := g.store.GetGroupKeySet(ctx, fabric, id)
+	if errors.Is(err, store.ErrGroupKeySetNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("matter: GroupKeyManagement: %w", err)
+	}
+	return true, nil
+}
+
+// createKeySetForGroupcast writes a key set for a Groupcast JoinGroup or
+// UpdateGroupKey that carried a key, bypassing KeySetWrite's validation:
+// TrustFirst, the key as EpochKey0 with EpochStartTime0 1, and the
+// MaxGroupKeysPerFabric budget. Mirrors matter.js
+// GroupKeyManagementServer.createKeySetForGroupcast.
+func (g *GroupKeyManagement) createKeySetForGroupcast(ctx context.Context, fabric uint8, id uint16, key []byte) error {
+	if err := g.enforceKeySetBudget(ctx, fabric, id); err != nil {
+		return err
+	}
+	if err := g.store.UpsertGroupKeySet(ctx, store.GroupKeySet{
+		FabricIndex: fabric, GroupKeySetID: id, SecurityPolicy: store.SecurityPolicyTrustFirst,
+		EpochKey0: slices.Clone(key), EpochStart0: groupcastKeyEpochStartTime,
+	}); err != nil {
+		return fmt.Errorf("matter: GroupKeyManagement: create Groupcast key set: %w", err)
+	}
+	g.dataVersion.Bump()
+	return g.syncGroups(ctx, fabric)
+}
+
+// checkGroupKeyMapping applies the GroupKeyMap validation a Groupcast
+// binding of groupID passes through before it is written: an application
+// group id (InvalidAction) and no more than MaxGroupsPerFabric bindings on
+// the fabric (ResourceExhausted). Mirrors matter.js GroupcastServer
+// #setGroupKeyMapping, whose groupKeyMap write runs
+// GroupKeyManagementServer #validateGroupKeyMap.
+func (g *GroupKeyManagement) checkGroupKeyMapping(ctx context.Context, fabric uint8, groupID uint16) error {
+	if !isApplicationGroupID(groupID) {
+		return gkmStatusError{im.StatusInvalidAction, fmt.Sprintf("GroupKeyMap: GroupId 0x%04X is not an operational group id", groupID)}
+	}
+	existing, err := g.store.ListGroupKeyMappings(ctx, fabric)
+	if err != nil {
+		return fmt.Errorf("matter: GroupKeyManagement: %w", err)
+	}
+	n := len(existing)
+	if !slices.ContainsFunc(existing, func(m store.GroupKeyMapping) bool { return m.GroupID == groupID }) {
+		n++
+	}
+	g.mu.RLock()
+	maxGroups := g.maxGroupsPerFabric
+	g.mu.RUnlock()
+	if n > int(maxGroups) {
+		return gkmStatusError{im.StatusResourceExhausted, fmt.Sprintf("GroupKeyMap: too many groups per fabric, maximum is %d", maxGroups)}
+	}
+	return nil
+}
+
+// setGroupKeyMapping binds groupID to key set keySetID on the fabric,
+// replacing an earlier binding, and brings the operational key map along.
+// Mirrors matter.js GroupcastServer #setGroupKeyMapping /
+// #syncOperationalKeyMap.
+func (g *GroupKeyManagement) setGroupKeyMapping(ctx context.Context, fabric uint8, groupID, keySetID uint16) error {
+	if err := g.checkGroupKeyMapping(ctx, fabric, groupID); err != nil {
+		return err
+	}
+	if err := g.store.SetGroupKeyMapping(ctx, store.GroupKeyMapping{FabricIndex: fabric, GroupID: groupID, GroupKeySetID: keySetID}); err != nil {
+		return fmt.Errorf("matter: GroupKeyManagement: %w", err)
+	}
+	g.dataVersion.Bump()
+	return g.syncGroups(ctx, fabric)
+}
+
+// removeGroupKeyMapping drops the fabric's binding of groupID. Mirrors
+// matter.js GroupcastServer #removeGroupKeyMappings.
+func (g *GroupKeyManagement) removeGroupKeyMapping(ctx context.Context, fabric uint8, groupID uint16) error {
+	if err := g.store.RemoveGroupKeyMapping(ctx, fabric, groupID); err != nil {
+		return fmt.Errorf("matter: GroupKeyManagement: %w", err)
+	}
+	g.dataVersion.Bump()
+	return g.syncGroups(ctx, fabric)
+}

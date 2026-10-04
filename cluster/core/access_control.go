@@ -57,6 +57,62 @@ type AccessControl struct {
 	// acl attribute writes trigger the entryChanged event.
 	endpoint uint16
 	emitter  contract.EventEmitter
+
+	// auxSource supplies the auxiliary entries of the Auxiliary (AUX)
+	// feature; nil keeps the feature off. auxApplied is the set the
+	// AuxiliaryAcl attribute last served, per fabric, so a change can be
+	// told from a recomputation. Mirrors matter.js AccessControlServer
+	// internal.auxiliaryAclProviders / state.auxiliaryAcl.
+	auxSource  AuxiliaryACLSource
+	auxApplied map[uint8][]store.ACLEntry
+	// auxBatch defers synchronisation while a command changes several
+	// sources in a row, so it is evaluated once, as matter.js derives once
+	// per command transaction.
+	auxBatch int
+}
+
+// AuxiliaryACLSource supplies the auxiliary access control entries of the
+// AccessControl Auxiliary feature and signals their changes. *groups.Manager
+// satisfies it; the Groupcast server registers it ([NewGroupcast]), as
+// matter.js GroupcastServer calls AccessControlServer.registerAuxAclProvider.
+type AuxiliaryACLSource interface {
+	// AuxiliaryACL returns the entries of one fabric, or of every fabric
+	// for fabricIndex 0.
+	AuxiliaryACL(ctx context.Context, fabricIndex uint8) ([]store.ACLEntry, error)
+	// Fabrics lists the fabrics that exist.
+	Fabrics(ctx context.Context) ([]uint8, error)
+	// OnGroupcastChanged registers fn for a change that may move the
+	// entries; ctx is the context of the request behind the change.
+	OnGroupcastChanged(fn func(ctx context.Context, fabricIndex uint8))
+}
+
+// AccessControlEntryStruct auxiliary types (AccessControlAuxiliaryTypeEnum,
+// access-control.element.ts).
+const (
+	// AccessControlAuxiliaryTypeSystem is AuxiliaryType System (0).
+	AccessControlAuxiliaryTypeSystem uint8 = 0
+	// AccessControlAuxiliaryTypeGroupcast is AuxiliaryType Groupcast (1).
+	AccessControlAuxiliaryTypeGroupcast uint8 = 1
+)
+
+// AccessControlAuxiliaryEntryStruct is one entry of the AuxiliaryAcl
+// attribute: an AccessControlEntryStruct with its AuxiliaryType (field 5).
+// Every field but FabricIndex is fabric-sensitive (access "S"), so an
+// unfiltered read carries another fabric's entry Redacted: FabricIndex
+// alone. Mirrors matter.js StructManager, whose mayRead withholds a
+// fabric-sensitive field from a session of another fabric.
+type AccessControlAuxiliaryEntryStruct struct {
+	Entry         AccessControlEntryStruct
+	AuxiliaryType uint8
+	Redacted      bool
+}
+
+// AuxiliaryAccessUpdatedEvent is the payload of AuxiliaryAccessUpdated
+// (event 0x0003, conformance AUX, access "S A"): [0] AdminNodeID (nullable),
+// [0xFE] FabricIndex. Mirrors access-control.element.ts.
+type AuxiliaryAccessUpdatedEvent struct {
+	AdminNodeID *uint64
+	FabricIndex uint8
 }
 
 // AccessControlExtensionEntry mirrors Matter §9.10.4.6
@@ -115,6 +171,16 @@ const (
 	// bump, mirroring how accessControlEventEntryChanged rides the ACL
 	// write.
 	accessControlEventExtensionChanged uint32 = 0x0001
+
+	// accessControlAttrAuxiliaryACL is AuxiliaryAcl (0x0007, conformance
+	// AUX, access "R F A", quality C) and accessControlEventAuxiliary
+	// AccessUpdated its change event (0x0003). The Auxiliary feature is
+	// FeatureMap bit 2. Mirrors access-control.element.ts.
+	accessControlAttrAuxiliaryACL         uint32 = 0x0007
+	accessControlEventAuxiliaryAccessUpd  uint32 = 0x0003
+	accessControlFeatureExtension         uint32 = 0x1
+	accessControlFeatureAuxiliary         uint32 = 0x4
+	accessControlAuxiliaryACLMaxEntries          = 2000
 )
 
 // ChangeType constants for [AccessControlEntryChangedEvent], mirroring
@@ -172,7 +238,11 @@ type AccessControlEntryStruct struct {
 	AuthMode    uint8             // 1=PASE, 2=CASE, 3=Group
 	Subjects    []uint64          // nullable; nil ⇒ matches every subject
 	Targets     []ACLTargetStruct // nullable; nil ⇒ matches every cluster/endpoint/device-type
-	FabricIndex uint8
+	// AuxiliaryType is field 5 as a write carried it. A controller may
+	// not set it — the ACL write refuses an entry that does — and a stored
+	// entry never has one.
+	AuxiliaryType *uint8
+	FabricIndex   uint8
 }
 
 // ACLTargetStruct mirrors §9.10.4.5.
@@ -218,7 +288,7 @@ func (a *AccessControl) MatterDataVersion() uint32 { return a.dataVersion.Curren
 // access: "administer" on acl + extension attributes.
 func (*AccessControl) MinReadPrivilege(attrID uint32) uint8 {
 	switch attrID {
-	case accessControlAttrACL, accessControlAttrExtension:
+	case accessControlAttrACL, accessControlAttrExtension, accessControlAttrAuxiliaryACL:
 		return accessControlPrivilegeAdminister // 5
 	default:
 		return 1 // View — standard default
@@ -336,9 +406,13 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 		// as schematically inconsistent (Extension list present but
 		// not feature-flagged) and drop the entire AccessControl
 		// schema validation, so the cluster advertises EXTS.
-		return uint32(0x1), true
+		return a.featureMap(), true
 	case cluster.AttrGlobalClusterRevision:
 		return accessControlClusterRevision, true
+	case accessControlAttrAuxiliaryACL:
+		// A read without an IM request behind it is a local one and
+		// sees every entry whole.
+		return a.auxiliaryACLRead(context.Background(), false, 0, true)
 	}
 	return nil, false
 }
@@ -361,6 +435,10 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // AccessControlEntriesPerFabric, FeatureMap, ClusterRevision) fall
 // through to MatterRead.
 func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
+	if attrID == accessControlAttrAuxiliaryACL {
+		filtered, fabricIndex := im.FabricFilterFromContext(ctx)
+		return a.auxiliaryACLRead(ctx, filtered, fabricIndex, false)
+	}
 	if attrID == accessControlAttrExtension {
 		_, fabricIndex := im.FabricFilterFromContext(ctx)
 		if fabricIndex == 0 {
@@ -425,6 +503,15 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		entries, ok := value.([]AccessControlEntryStruct)
 		if !ok {
 			return fmt.Errorf("matter: AccessControl.ACL write: value type %T not []AccessControlEntryStruct", value)
+		}
+		// An auxiliary entry is synthesised, never written. Mirrors
+		// matter.js AccessControlServer #validateAccessControlListChanges:
+		// "The spec forbids the field here without naming a status; CHIP
+		// answers FAILURE".
+		for i, e := range entries {
+			if e.AuxiliaryType != nil {
+				return aclStatusError{im.StatusFailure, fmt.Sprintf("ACL[%d] must not include AuxiliaryType", i)}
+			}
 		}
 		// Fabric resolution priority (matches MatterReadFiltered):
 		//   1. ctx-fabric stamped by bridge/receive.go from the inbound
@@ -761,13 +848,17 @@ func (a *AccessControl) MatterReportable() []uint32 {
 // EXCLUDING the universal globals (FeatureMap, ClusterRevision) —
 // the dispatcher merges those automatically.
 func (a *AccessControl) MatterAttributes() []uint32 {
-	return []uint32{
+	attrs := []uint32{
 		accessControlAttrACL,
 		accessControlAttrExtension,
 		accessControlAttrSubjectsPerAccessControl,
 		accessControlAttrTargetsPerAccessControl,
 		accessControlAttrAccessControlEntriesPerFabric,
 	}
+	if a.auxiliaryEnabled() {
+		attrs = append(attrs, accessControlAttrAuxiliaryACL)
+	}
+	return attrs
 }
 
 // MatterEvents implements [contract.ClusterEventLister] so the
@@ -780,7 +871,11 @@ func (a *AccessControl) MatterAttributes() []uint32 {
 // is lifted; no emission path is wired because Extensions are not
 // implemented in v1.1.
 func (a *AccessControl) MatterEvents() []uint32 {
-	return []uint32{accessControlEventEntryChanged, accessControlEventExtensionChanged}
+	events := []uint32{accessControlEventEntryChanged, accessControlEventExtensionChanged}
+	if a.auxiliaryEnabled() {
+		events = append(events, accessControlEventAuxiliaryAccessUpd)
+	}
+	return events
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].

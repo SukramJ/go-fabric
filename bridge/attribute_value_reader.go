@@ -137,6 +137,17 @@ func decodeACLEntry(dec *tlv.Decoder) (mattercore.AccessControlEntryStruct, erro
 				return mattercore.AccessControlEntryStruct{}, err
 			}
 			e.Targets = tgts
+		case 5:
+			// AuxiliaryType: a controller may not write it; the cluster
+			// refuses the write with Failure (matter.js
+			// AccessControlServer #validateAccessControlListChanges).
+			if el.IsContainer {
+				if err := skipContainerTLV(dec); err != nil {
+					return mattercore.AccessControlEntryStruct{}, err
+				}
+			}
+			v := uint8(el.Uint & 0xFF)
+			e.AuxiliaryType = &v
 		case 254:
 			e.FabricIndex = uint8(el.Uint & 0xFF)
 		default:

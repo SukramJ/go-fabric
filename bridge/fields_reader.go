@@ -60,6 +60,10 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 		if fields, ok, err := groupCommandFieldsReader(path, dec); ok {
 			return fields, err
 		}
+	case mattercore.GroupcastClusterID:
+		if fields, ok, err := groupcastFieldsReader(path, dec); ok {
+			return fields, err
+		}
 	case 0x0008: // LevelControl
 		switch path.Command {
 		case 0x00, 0x04: // MoveToLevel, MoveToLevelWithOnOff
@@ -648,6 +652,8 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 		ent.Path.Command = 0x02
 	case mattercore.KeySetReadAllIndicesResponse:
 		ent.Path.Command = 0x05
+	case mattercore.LeaveGroupResponse:
+		ent.Path.Command = 0x02
 	}
 	// Unknown response types (status-only commands wrapped) leave
 	// the path alone — the writer emits an empty struct + the

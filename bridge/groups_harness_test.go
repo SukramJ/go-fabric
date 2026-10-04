@@ -87,13 +87,34 @@ func (l lampSource) MatterClusterServers() []contract.ClusterServer {
 // groupsHarness is a secure harness over a bridge of lamps.
 type groupsHarness struct {
 	*secureHarness
-	groups *groups.Manager
-	lamps  map[uint16]*recordingOnOff // by endpoint id
+	groups    *groups.Manager
+	lamps     map[uint16]*recordingOnOff // by endpoint id
+	groupcast *mattercore.Groupcast      // set by newGroupcastHarness
 }
 
 // newGroupsHarness builds a bridge with n lamps (endpoints 2..n+1), a root
 // GroupKeyManagement, and the CASE controller holding Administer.
 func newGroupsHarness(t *testing.T, n int) *groupsHarness {
+	t.Helper()
+	return newGroupsHarnessWith(t, n, false)
+}
+
+// newGroupcastHarness is newGroupsHarness with the root Matter 1.6.1 asks
+// for: GroupKeyManagement, AccessControl and Groupcast over the one group
+// state, the bridge enforcing the auxiliary entries, and group messaging
+// attached.
+func newGroupcastHarness(t *testing.T, n int) *groupsHarness {
+	t.Helper()
+	gh := newGroupsHarnessWith(t, n, true)
+	gh.bridge.AttachAuxiliaryACL(gh.groups)
+	gh.bridge.AttachGroupMessaging(gh.groups)
+	if err := gh.bridge.Reassemble(context.Background()); err != nil {
+		t.Fatalf("Reassemble: %v", err)
+	}
+	return gh
+}
+
+func newGroupsHarnessWith(t *testing.T, n int, withGroupcast bool) *groupsHarness {
 	t.Helper()
 	gh := &groupsHarness{lamps: make(map[uint16]*recordingOnOff)}
 	recorders := make([]*recordingOnOff, n)
@@ -126,7 +147,20 @@ func newGroupsHarness(t *testing.T, n int) *groupsHarness {
 		if err != nil {
 			t.Fatalf("NewGroupKeyManagement: %v", err)
 		}
-		return snap, []contract.ClusterServer{gkm}
+		if !withGroupcast {
+			return snap, []contract.ClusterServer{gkm}
+		}
+		acl, err := mattercore.NewAccessControl(st)
+		if err != nil {
+			t.Fatalf("NewAccessControl: %v", err)
+		}
+		gc, err := mattercore.NewGroupcast(mattercore.GroupcastConfig{Groups: mgr, GroupKeyManagement: gkm, AccessControl: acl})
+		if err != nil {
+			t.Fatalf("NewGroupcast: %v", err)
+		}
+		t.Cleanup(gc.Close)
+		gh.groupcast = gc
+		return snap, []contract.ClusterServer{gkm, acl, gc}
 	})
 	h.allowAll()
 	gh.secureHarness = h

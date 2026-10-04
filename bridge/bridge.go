@@ -116,6 +116,16 @@
 //     since a group message is never answered, a controller sees a group
 //     command that did nothing. Attach before or after Start; the
 //     memberships are joined once both the port and the socket exist.
+//     The same port carries each group message's outcome to the
+//     Groupcast server's GroupcastTesting.
+//   - AttachAuxiliaryACL — fails closed, silently; needed once the root
+//     mounts the Groupcast server (core.NewGroupcast), which turns on
+//     AccessControl's Auxiliary feature. Pass the same *groups.Manager.
+//     Without it the dispatcher keeps the feature off: the auxiliary
+//     Operate grants a JoinGroup / ConfigureAuxiliaryAcl with
+//     UseAuxiliaryAcl creates are listed in AccessControl.AuxiliaryAcl
+//     but not enforced, so a group command relying on one is dropped
+//     like any other unauthorised group message — unanswered.
 //
 // Genuinely optional — a skip costs exactly the named feature:
 //
@@ -262,6 +272,9 @@ type Bridge struct {
 	// (typically an endpoint assembler the host owns). A field held here
 	// would be a collaborator that looks wired and is never called.
 	aclLister   endpoint.ACLLister // ACL source for the dispatcher's CheckACL; nil denies every operational request
+	// auxACL supplies the AccessControl Auxiliary feature's entries to
+	// the dispatcher; nil keeps the feature off. See AttachAuxiliaryACL.
+	auxACL endpoint.AuxiliaryACLLister
 	snapshotter Snapshotter
 	logger      *slog.Logger
 	advertiser  mdns.Advertiser
@@ -813,8 +826,10 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	// daemons attach a store-backed lister via AttachACLLister.
 	b.mu.RLock()
 	aclLister := b.aclLister
+	auxACL := b.auxACL
 	b.mu.RUnlock()
 	dispatcher.SetACLLister(aclLister)
+	dispatcher.SetAuxiliaryACL(auxACL)
 
 	// Wire MatterEventReceiver-aware cluster servers so they can fire
 	// events through the bridge's event emitter pipeline. The
@@ -1083,6 +1098,28 @@ func (b *Bridge) AttachACLLister(l endpoint.ACLLister) {
 	}
 	b.mu.Lock()
 	b.aclLister = l
+	b.mu.Unlock()
+}
+
+// AttachAuxiliaryACL wires the auxiliary access control entries of the
+// AccessControl cluster's Auxiliary feature into the dispatcher's access
+// check: a group message is then evaluated against the stored entries plus
+// the auxiliary ones, and a Group entry without targets no longer reaches
+// endpoint 0. Pass the *groups.Manager the Groupcast server was built
+// with — the server turns the feature on in AccessControl, this port makes
+// the dispatcher enforce what that cluster reports. Applied on the next
+// [Reassemble]. nil (the default) keeps the feature off in the
+// dispatcher: a Groupcast auxiliary grant is then not honoured, so group
+// commands relying on it are dropped — fails closed, silently, since a
+// group message is never answered. Mirrors matter.js AccessControlServer
+// #applyFabricAcl installing `[...realAcl, ...auxiliary]` and
+// FabricAccessControl.auxiliaryFeatureEnabled.
+func (b *Bridge) AttachAuxiliaryACL(src endpoint.AuxiliaryACLLister) {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	b.auxACL = src
 	b.mu.Unlock()
 }
 
