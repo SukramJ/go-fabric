@@ -814,6 +814,8 @@ func DeviceTypeName(id uint16) string {
 		return "Thermostat"
 	case 0x0302:
 		return "Temperature Sensor"
+	case 0x0303:
+		return "Pump"
 	case 0x0305:
 		return "Pressure Sensor"
 	case 0x0306:

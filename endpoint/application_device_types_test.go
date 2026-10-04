@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/fan"
+	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/schema"
@@ -144,12 +145,27 @@ func fanServer(dt uint16) contract.ClusterServer {
 	return srv
 }
 
+// pumpReading is a host pump's port.
+type pumpReading struct{}
+
+func (pumpReading) PumpState() pump.State                                      { return pump.State{} }
+func (pumpReading) SetOperationMode(context.Context, pump.OperationMode) error { return nil }
+
 func applicationDeviceCases() []applicationDeviceCase {
 	smoke, err := alarm.NewServer(alarm.Config{Source: smokeReading{}, Features: alarm.FeatureSmokeAlarm | alarm.FeatureCOAlarm})
 	if err != nil {
 		panic(err)
 	}
+	pumpServer, err := pump.NewServer(pump.Config{Source: pumpReading{}, Features: pump.FeatureConstantSpeed})
+	if err != nil {
+		panic(err)
+	}
 	return []applicationDeviceCase{
+		// Pump mandates OnOff next to PumpConfigurationAndControl; the
+		// OnOff server is the host's, as for every device type here.
+		{name: "Pump", deviceType: pump.DeviceTypePump, source: deviceTypeSource{
+			dt: pump.DeviceTypePump, servers: []contract.ClusterServer{fakeServer{id: 0x0006}, pumpServer},
+		}},
 		{name: "FlowSensor", deviceType: 0x0306, measurement: flowReading{}},
 		{name: "SmokeCoAlarm", deviceType: alarm.DeviceTypeSmokeCoAlarm, source: deviceTypeSource{
 			dt: alarm.DeviceTypeSmokeCoAlarm, servers: []contract.ClusterServer{smoke},

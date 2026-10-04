@@ -20,6 +20,7 @@ import (
 
 	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
 	matterfan "github.com/SukramJ/go-fabric/cluster/fan"
+	matterpump "github.com/SukramJ/go-fabric/cluster/pump"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -452,5 +453,94 @@ func TestFanStepDecoderRejectsMalformedFields(t *testing.T) {
 	got, err := commandFieldsReader(im.ConcreteCommandPath{Cluster: clusterwire.FanControlClusterID, Command: clusterwire.FanControlCmdStep}, dec, open)
 	if err != nil || got != (clusterwire.FanStepRequest{Direction: 1, LowestOff: true}) {
 		t.Errorf("Step with extra fields = %+v, %v", got, err)
+	}
+}
+
+// pumpDevice is a host pump.
+type pumpDevice struct {
+	mu sync.Mutex
+	st matterpump.State
+}
+
+func (d *pumpDevice) PumpState() matterpump.State {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.st
+}
+
+func (d *pumpDevice) SetOperationMode(_ context.Context, m matterpump.OperationMode) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.st.OperationMode = m
+	return nil
+}
+
+// hostOnOff is the OnOff server the Pump device type mandates; OnOff
+// servers are host-side in this module.
+type hostOnOff struct{}
+
+func (hostOnOff) MatterClusterID() uint32                                { return 0x0006 }
+func (hostOnOff) MatterRead(attrID uint32) (any, bool)                   { return false, attrID == 0 }
+func (hostOnOff) MatterWrite(context.Context, uint32, any) error         { return nil }
+func (hostOnOff) MatterInvoke(context.Context, uint32, any) (any, error) { return nil, nil }
+func (hostOnOff) MatterReportable() []uint32                             { return []uint32{0} }
+
+func TestPumpOverTheWire(t *testing.T) {
+	t.Parallel()
+	dev := &pumpDevice{}
+	srv, err := matterpump.NewServer(matterpump.Config{
+		Source:   dev,
+		Features: matterpump.FeatureConstantSpeed,
+		Limits:   matterpump.Limits{MaxSpeed: new(uint16)},
+		Events:   []uint32{matterpump.EventDryRunning},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newAppHarness(t, appDevice{deviceType: matterpump.DeviceTypePump, servers: []contract.ClusterServer{hostOnOff{}, srv}})
+	ep := h.endpoints[matterpump.DeviceTypePump]
+
+	// OperationMode Maximum (SPD) lands; Local (no LOCAL) does not.
+	if st := h.writeAttribute(ep, matterpump.ClusterID, matterpump.AttrOperationMode, func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.PutUint(tag, uint64(matterpump.OperationMaximum))
+	}); st != 0 {
+		t.Fatalf("OperationMode write status 0x%02X", st)
+	}
+	if data, _, _ := h.readAttribute(ep, matterpump.ClusterID, matterpump.AttrOperationMode); data.El.Uint != uint64(matterpump.OperationMaximum) {
+		t.Errorf("OperationMode read back %d", data.El.Uint)
+	}
+	if st := h.writeAttribute(ep, matterpump.ClusterID, matterpump.AttrOperationMode, func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.PutUint(tag, uint64(matterpump.OperationLocal))
+	}); st != uint64(im.StatusConstraintError) {
+		t.Errorf("OperationMode Local status 0x%02X, want ConstraintError", st)
+	}
+	// Capacity unknown: null on the wire. MaxSpeed 0 as a uint16.
+	if data, _, _ := h.readAttribute(ep, matterpump.ClusterID, matterpump.AttrCapacity); !data.El.IsNull {
+		t.Errorf("Capacity = %+v, want null", data.El)
+	}
+	if data, _, _ := h.readAttribute(ep, matterpump.ClusterID, matterpump.AttrMaxSpeed); data.El.Type != tlv.TypeUnsignedInt2 {
+		t.Errorf("MaxSpeed TLV type 0x%02X, want a two-byte unsigned integer", data.El.Type)
+	}
+	// The host raises DryRunning; it reads back as an empty structure.
+	if err := srv.Emit(matterpump.EventDryRunning); err != nil {
+		t.Fatal(err)
+	}
+	events := h.readEvents(ep, matterpump.ClusterID)
+	if len(events) != 1 || events[0].id != uint64(matterpump.EventDryRunning) ||
+		events[0].data.El.Type != tlv.TypeStructure || len(events[0].data.Children) != 0 {
+		t.Errorf("events = %+v, want one DryRunning with an empty structure", events)
+	}
+
+	// OperationMode is "RW VM": an Operate-only subject is refused.
+	if err := h.store.ReplaceACL(context.Background(), h.fabric, []store.ACLEntry{{
+		FabricIndex: h.fabric, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeCASE,
+		Subjects: []uint64{harnessControllerNodeID},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if st := h.writeAttribute(ep, matterpump.ClusterID, matterpump.AttrOperationMode, func(enc *tlv.Encoder, tag tlv.Tag) {
+		enc.PutUint(tag, uint64(matterpump.OperationNormal))
+	}); st != uint64(im.StatusUnsupportedAccess) {
+		t.Errorf("Operate-only OperationMode write status 0x%02X, want UnsupportedAccess", st)
 	}
 }

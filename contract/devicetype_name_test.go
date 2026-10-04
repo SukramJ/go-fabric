@@ -19,6 +19,7 @@ func TestDeviceTypeNameNamesTheApplicationDeviceTypes(t *testing.T) {
 		0x002D: "Air Purifier",
 		0x0076: "Smoke / CO Alarm",
 		0x007A: "Extractor Hood",
+		0x0303: "Pump",
 		0x0306: "Flow Sensor",
 	}
 	for id, want := range cases {

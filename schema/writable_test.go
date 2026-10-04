@@ -169,6 +169,10 @@ func TestAttributeWritable(t *testing.T) {
 		{"FanControl/PercentCurrent read-only", 0x0202, 0x0003, false, true},
 		// FanControl.PercentSetting (0x0002, "RW VO") — writable.
 		{"FanControl/PercentSetting writable", 0x0202, 0x0002, true, false},
+		// PumpConfigurationAndControl.Capacity (0x0013, "R V") — read-only.
+		{"PumpConfigurationAndControl/Capacity read-only", 0x0200, 0x0013, false, true},
+		// PumpConfigurationAndControl.OperationMode (0x0020, "RW VM") — writable.
+		{"PumpConfigurationAndControl/OperationMode writable", 0x0200, 0x0020, true, false},
 		// Cluster the bridge does not expose → unknown, treated writable.
 		{"unknown cluster", 0xBEEF, 0x0000, true, false},
 		// Global attribute (no access string) → not tracked.

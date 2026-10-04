@@ -31,6 +31,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/fan"
+	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -125,6 +126,41 @@ func newFanServer() *fan.Server {
 		Sequence:    fan.SequenceOffLowHigh,
 		SpeedMax:    4,
 		RockSupport: fan.RockLeftRight,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
+// pumpSource is a PumpConfigurationAndControl host that accepts every
+// write.
+type pumpSource struct{ st pump.State }
+
+func (p *pumpSource) PumpState() pump.State { return p.st }
+
+func (p *pumpSource) SetOperationMode(_ context.Context, m pump.OperationMode) error {
+	p.st.OperationMode = m
+	return nil
+}
+
+func (p *pumpSource) SetControlMode(_ context.Context, m pump.ControlMode) error {
+	p.st.ControlMode = m
+	return nil
+}
+
+func (p *pumpSource) SetLifetimeRunningHours(_ context.Context, h *uint32) error {
+	p.st.LifetimeRunningHours = h
+	return nil
+}
+
+// newPumpServer is a constant-pressure pump without SPD or LOCAL, serving
+// ControlMode and LifetimeRunningHours.
+func newPumpServer() *pump.Server {
+	srv, err := pump.NewServer(pump.Config{
+		Source:   &pumpSource{},
+		Features: pump.FeatureConstantPressure,
+		Optional: pump.OptionalControlMode | pump.OptionalLifetimeRunningHours,
 	})
 	if err != nil {
 		panic(err)
@@ -300,6 +336,48 @@ func TestNegativeWriteParity(t *testing.T) {
 			attrID:     fan.AttrPercentCurrent,
 			value:      uint64(10),
 			wantStatus: im.StatusUnsupportedWrite,
+		},
+		{
+			// matter.js pump-configuration-and-control.element.ts:146 —
+			// OperationModeEnum Minimum is conformance "SPD"; the
+			// resource (:252-254) answers an unsupported mode with
+			// CONSTRAINT_ERROR.
+			name: "PumpConfigurationAndControl/OperationMode=Minimum without SPD → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newPumpServer()
+			},
+			attrID:     pump.AttrOperationMode,
+			value:      uint64(pump.OperationMinimum),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// pump-configuration-and-control.element.ts:156 — ControlMode
+			// ConstantFlow is conformance "FLW" (resource :264-266).
+			name: "PumpConfigurationAndControl/ControlMode=ConstantFlow without FLW → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newPumpServer()
+			},
+			attrID:     pump.AttrControlMode,
+			value:      uint64(pump.ControlConstantFlow),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// pump-configuration-and-control.element.ts:95 —
+			// LifetimeRunningHours is a nullable uint24: 0xFFFFFF is the
+			// null sentinel, outside the value range (resource :217).
+			name: "PumpConfigurationAndControl/LifetimeRunningHours=0xFFFFFF → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newPumpServer()
+			},
+			attrID:     pump.AttrLifetimeRunningHours,
+			value:      uint64(0xFFFFFF),
+			wantStatus: im.StatusConstraintError,
 		},
 		{
 			// matter.js smoke-co-alarm-cluster.element.ts:44 + :82-87 —
@@ -499,6 +577,20 @@ func TestPositiveWriteControlApplicationClusters(t *testing.T) {
 		}
 		if v, _ := srv.MatterRead(fan.AttrPercentSetting); v != uint8(100) {
 			t.Errorf("PercentSetting after SpeedSetting=SpeedMax = %v, want 100 (speed rule)", v)
+		}
+	})
+
+	t.Run("PumpConfigurationAndControl/ControlMode == ConstantPressure and LifetimeRunningHours == 0xFFFFFE accepted", func(t *testing.T) {
+		t.Parallel()
+		srv := newPumpServer()
+		if err := srv.MatterWrite(context.Background(), pump.AttrControlMode, uint64(pump.ControlConstantPressure)); err != nil {
+			t.Fatalf("ControlMode ConstantPressure: %v", err)
+		}
+		if err := srv.MatterWrite(context.Background(), pump.AttrLifetimeRunningHours, uint64(0xFFFFFE)); err != nil {
+			t.Fatalf("LifetimeRunningHours 0xFFFFFE: %v", err)
+		}
+		if v, _ := srv.MatterRead(pump.AttrLifetimeRunningHours); v != uint32(0xFFFFFE) {
+			t.Errorf("LifetimeRunningHours = %v", v)
 		}
 	})
 
