@@ -1,0 +1,99 @@
+[
+  {
+    "label": "keyset_write_one_epoch",
+    "cluster": 63,
+    "command": "KeySetWrite",
+    "fixture": {
+      "groupKeySetId": 417,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+      "epochStartTime0": 2220000,
+      "epochKey1": null,
+      "epochStartTime1": null,
+      "epochKey2": null,
+      "epochStartTime2": null
+    },
+    "bytesHex": "1535002500a101240100300210d0d1d2d3d4d5d6d7d8d9dadbdcdddedf2603e0df210034043405340634071818"
+  },
+  {
+    "label": "keyset_write_three_epochs_all_nodes_policy",
+    "cluster": 63,
+    "command": "KeySetWrite",
+    "fixture": {
+      "groupKeySetId": 258,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+      "epochStartTime0": 1,
+      "epochKey1": "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+      "epochStartTime1": 18446744073709,
+      "epochKey2": "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf",
+      "epochStartTime2": 1110000000000000,
+      "groupKeyMulticastPolicy": 1
+    },
+    "bytesHex": "15350025000201240100300210a0a1a2a3a4a5a6a7a8a9aaabacadaeaf240301300410b0b1b2b3b4b5b6b7b8b9babbbcbdbebf2705edb5a0f7c6100000300610c0c1c2c3c4c5c6c7c8c9cacbcccdcecf27070060b3038af103002408011818"
+  },
+  {
+    "label": "keyset_read_response_one_epoch",
+    "cluster": 63,
+    "command": "KeySetReadResponse",
+    "fixture": {
+      "groupKeySetId": 417,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": null,
+      "epochStartTime0": 2220000,
+      "epochKey1": null,
+      "epochStartTime1": null,
+      "epochKey2": null,
+      "epochStartTime2": null,
+      "groupKeyMulticastPolicy": 0
+    },
+    "bytesHex": "1535002500a10124010034022603e0df210034043405340634072408001818"
+  },
+  {
+    "label": "keyset_read_response_ipk",
+    "cluster": 63,
+    "command": "KeySetReadResponse",
+    "fixture": {
+      "groupKeySetId": 0,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": null,
+      "epochStartTime0": 0,
+      "epochKey1": null,
+      "epochStartTime1": null,
+      "epochKey2": null,
+      "epochStartTime2": null,
+      "groupKeyMulticastPolicy": 0
+    },
+    "bytesHex": "153500240000240100340224030034043405340634072408001818"
+  },
+  {
+    "label": "keyset_read_response_three_epochs",
+    "cluster": 63,
+    "command": "KeySetReadResponse",
+    "fixture": {
+      "groupKeySetId": 258,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": null,
+      "epochStartTime0": 1,
+      "epochKey1": null,
+      "epochStartTime1": 18446744073709,
+      "epochKey2": null,
+      "epochStartTime2": 1110000000000000,
+      "groupKeyMulticastPolicy": 0
+    },
+    "bytesHex": "15350025000201240100340224030134042705edb5a0f7c6100000340627070060b3038af103002408001818"
+  },
+  {
+    "label": "keyset_read_all_indices_response",
+    "cluster": 63,
+    "command": "KeySetReadAllIndicesResponse",
+    "fixture": {
+      "groupKeySetIds": [
+        0,
+        417,
+        258
+      ]
+    },
+    "bytesHex": "153600040005a1010502011818"
+  }
+]

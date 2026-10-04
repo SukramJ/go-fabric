@@ -56,6 +56,17 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 		case 0x0B:
 			return decodeAddTrustedRootCertificateRequest(dec)
 		}
+	case 0x003F: // GroupKeyManagement
+		switch path.Command {
+		case 0x00:
+			return decodeKeySetWriteRequest(dec)
+		case 0x01:
+			return decodeKeySetReadRequest(dec)
+		case 0x03:
+			return decodeKeySetRemoveRequest(dec)
+		case 0x04:
+			return decodeKeySetReadAllIndicesRequest(dec)
+		}
 	case 0x0008: // LevelControl
 		switch path.Command {
 		case 0x00, 0x04: // MoveToLevel, MoveToLevelWithOnOff
@@ -640,6 +651,10 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 		ent.Path.Command = 0x05
 	case mattercore.NOCResponse:
 		ent.Path.Command = 0x08
+	case mattercore.KeySetReadResponse:
+		ent.Path.Command = 0x02
+	case mattercore.KeySetReadAllIndicesResponse:
+		ent.Path.Command = 0x05
 	}
 	// Unknown response types (status-only commands wrapped) leave
 	// the path alone — the writer emits an empty struct + the

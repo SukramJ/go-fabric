@@ -1305,6 +1305,20 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
 			enc.PutUTF8(tlv.ContextTag(2), x.DebugText)
 		}
 		_ = enc.EndContainer()
+	case mattercore.KeySetReadResponse:
+		// Matter §11.2.7.3 — [0] GroupKeySetStruct GroupKeySet.
+		enc.StartStruct(tag)
+		encodeGroupKeySetStruct(enc, tlv.ContextTag(0), x.GroupKeySet)
+		_ = enc.EndContainer()
+	case mattercore.KeySetReadAllIndicesResponse:
+		// Matter §11.2.7.6 — [0] list<uint16> GroupKeySetIDs.
+		enc.StartStruct(tag)
+		enc.StartArray(tlv.ContextTag(0))
+		for _, id := range x.GroupKeySetIDs {
+			enc.PutUint(tlv.AnonymousTag(), uint64(id))
+		}
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
 	default:
 		// Status-only command — emit empty struct as the TLV
 		// placeholder chip-tool's status-only decoder accepts.

@@ -207,6 +207,11 @@ type GroupInfoMapStruct struct {
 }
 
 // GroupKeySetStruct mirrors Matter §11.2.10.4.3.
+//
+// A zero EpochStartTime1 / EpochStartTime2 stands for the null the wire
+// carries for an unused slot: a used slot's start time is always greater
+// than EpochStartTime0, which is itself at least 1 for every key set but
+// the IPK (key set 0, start time 0).
 type GroupKeySetStruct struct {
 	GroupKeySetID          uint16
 	GroupKeySecurityPolicy uint8
@@ -216,7 +221,20 @@ type GroupKeySetStruct struct {
 	EpochStartTime1        uint64
 	EpochKey2              []byte
 	EpochStartTime2        uint64
+	// GroupKeyMulticastPolicy is field 8 (GroupKeyMulticastPolicyEnum).
+	// It has no effect: KeySetWrite accepts any value and does not store
+	// it, and KeySetRead reports PerGroupID while the model still defines
+	// the field. Mirrors matter.js 452d6f5c,
+	// packages/node/src/behaviors/group-key-management/
+	// GroupKeyManagementServer.ts:withoutMulticastPolicy / keySetRead
+	// (reportsMulticastPolicy).
+	GroupKeyMulticastPolicy uint8
 }
+
+// GroupKeyMulticastPolicyPerGroupID is GroupKeyMulticastPolicyEnum
+// PerGroupId (0), the value KeySetRead reports for every key set
+// (group-key-management.element.ts GroupKeyMulticastPolicyEnum).
+const GroupKeyMulticastPolicyPerGroupID uint8 = 0
 
 // MatterRead implements [contract.ClusterServer].
 func (g *GroupKeyManagement) MatterRead(attrID uint32) (any, bool) {
@@ -358,6 +376,9 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 	// compares an entry's fabricIndex with the session — so a controller
 	// that omits the field (decoded as 0) or echoes a stale value gets
 	// its write applied, not refused.
+	if err := g.validateGroupKeyMap(list); err != nil {
+		return err
+	}
 	existing, err := g.store.ListGroupKeyMappings(ctx, fabric)
 	if err != nil {
 		return fmt.Errorf("matter: GroupKeyMap write: list current bindings: %w", err)
@@ -382,6 +403,54 @@ func (g *GroupKeyManagement) MatterWrite(ctx context.Context, attrID uint32, val
 	// Bump DataVersion after a successful GroupKeyMap mutation so
 	// DataVersionFilter evaluation correctly detects the cluster changed.
 	g.dataVersion.Bump()
+	return nil
+}
+
+// gkmStatusError is a GroupKeyManagement rejection that carries the exact
+// IM status matter.js answers with (a StatusResponseError there).
+type gkmStatusError struct {
+	code im.StatusCode
+	msg  string
+}
+
+func (e gkmStatusError) Error() string { return "matter: GroupKeyManagement: " + e.msg }
+
+// MatterStatusCode implements [im.StatusCodeError].
+func (e gkmStatusError) MatterStatusCode() im.StatusCode { return e.code }
+
+var _ im.StatusCodeError = gkmStatusError{}
+
+// isApplicationGroupID reports whether id lies in the Application Group ID
+// range 0x0001..0xFEFF (Matter §2.5.4 Table 2). Mirrors matter.js
+// packages/types/src/datatype/GroupId.ts:isApplicationGroupId.
+func isApplicationGroupID(id uint16) bool { return id >= 0x0001 && id <= 0xFEFF }
+
+// validateGroupKeyMap applies the checks matter.js runs before a
+// GroupKeyMap write is accepted: every GroupId must be an Application
+// Group ID (InvalidAction), a GroupId may appear once per fabric
+// (ConstraintError), and no fabric may map more than MaxGroupsPerFabric
+// groups (ResourceExhausted). Every entry belongs to the accessing fabric
+// (see MatterWrite), so the per-fabric count is the list length. The
+// mapped key set is deliberately not required to exist — matter.js leaves
+// that check commented out because certification tests write it first.
+// Mirrors GroupKeyManagementServer.ts:#validateGroupKeyMap.
+func (g *GroupKeyManagement) validateGroupKeyMap(list []GroupKeyMapStruct) error {
+	seen := make(map[uint16]struct{}, len(list))
+	for _, m := range list {
+		if !isApplicationGroupID(m.GroupID) {
+			return gkmStatusError{im.StatusInvalidAction, fmt.Sprintf("GroupKeyMap: GroupId 0x%04X is not an operational group id", m.GroupID)}
+		}
+		if _, dup := seen[m.GroupID]; dup {
+			return gkmStatusError{im.StatusConstraintError, fmt.Sprintf("GroupKeyMap: duplicate GroupId 0x%04X", m.GroupID)}
+		}
+		seen[m.GroupID] = struct{}{}
+	}
+	g.mu.RLock()
+	maxGroups := g.maxGroupsPerFabric
+	g.mu.RUnlock()
+	if len(list) > int(maxGroups) {
+		return gkmStatusError{im.StatusResourceExhausted, fmt.Sprintf("GroupKeyMap: too many groups per fabric, maximum is %d", maxGroups)}
+	}
 	return nil
 }
 
@@ -601,6 +670,9 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 	if store.SecurityPolicy(gks.GroupKeySecurityPolicy) != store.SecurityPolicyTrustFirst {
 		return nil, errors.New("matter: KeySetWrite: invalid command argument: GroupKeySecurityPolicy must be TrustFirst")
 	}
+	// GroupKeyMulticastPolicy (field 8) is accepted whatever its value and
+	// never stored — matter.js 452d6f5c dropped the PerGroupID-only check
+	// (GroupKeyManagementServer.ts:keySetWrite → withoutMulticastPolicy).
 
 	if err := g.enforceKeySetBudget(ctx, fabric, gks.GroupKeySetID); err != nil {
 		return nil, err
@@ -628,22 +700,27 @@ func (g *GroupKeyManagement) handleKeySetWrite(ctx context.Context, fabric uint8
 
 // enforceKeySetBudget rejects ADDING a new key-set id once the
 // fabric's MaxGroupKeysPerFabric budget is reached — updating an
-// existing key set is always allowed. matter.js
-// GroupKeyManagementServer.ts:386-394 counts the fabric's key sets
-// plus the implicit IPK key set 0 and rejects with ResourceExhausted
-// at the cap; our store persists the IPK as key set 0 (installed by
-// AddNOC), so the plain list length carries the same total.
+// existing key set is always allowed. Mirrors matter.js
+// GroupKeyManagementServer.ts:keySetWrite, which counts the fabric's
+// written key sets plus one for the implicit IPK key set 0 and rejects
+// with ResourceExhausted when that count reaches the cap. Key set 0 is
+// counted once whether or not the store holds a row for it (AddNOC
+// installs one; a store that predates that does not).
 func (g *GroupKeyManagement) enforceKeySetBudget(ctx context.Context, fabric uint8, id uint16) error {
 	existing, err := g.store.ListGroupKeySets(ctx, fabric)
 	if err != nil {
 		return fmt.Errorf("matter: KeySetWrite: %w", err)
 	}
+	written := 0
 	for _, ks := range existing {
 		if ks.GroupKeySetID == id {
 			return nil
 		}
+		if ks.GroupKeySetID != 0 {
+			written++
+		}
 	}
-	if uint16(len(existing)) >= g.maxGroupKeysPerFabric { //nolint:gosec // key-set counts stay far below uint16 max
+	if written+1 >= int(g.maxGroupKeysPerFabric) {
 		return groupKeyExhaustedErr{maxKeys: g.maxGroupKeysPerFabric}
 	}
 	return nil
@@ -671,6 +748,10 @@ func (g *GroupKeyManagement) handleKeySetRead(ctx context.Context, fabric uint8,
 			EpochStartTime0: rec.EpochStart0,
 			EpochStartTime1: rec.EpochStart1,
 			EpochStartTime2: rec.EpochStart2,
+			// matter.js 452d6f5c: KeySetRead reports PerGroupID while the
+			// model defines the field (GroupKeyManagementServer.ts:keySetRead,
+			// reportsMulticastPolicy).
+			GroupKeyMulticastPolicy: GroupKeyMulticastPolicyPerGroupID,
 		},
 	}, nil
 }
@@ -712,8 +793,16 @@ func (g *GroupKeyManagement) handleKeySetReadAllIndices(ctx context.Context, fab
 	if err != nil {
 		return nil, fmt.Errorf("matter: KeySetReadAllIndices: %w", err)
 	}
-	ids := make([]uint16, 0, len(sets))
+	// Key set 0 (the IPK) is always listed, first, whether or not the
+	// store holds a row for it. Mirrors matter.js
+	// GroupKeyManagementServer.ts:keySetReadAllIndices
+	// (`groupKeySetIds.unshift(0)` over the fabric's written key sets).
+	ids := make([]uint16, 0, len(sets)+1)
+	ids = append(ids, 0)
 	for _, s := range sets {
+		if s.GroupKeySetID == 0 {
+			continue
+		}
 		ids = append(ids, s.GroupKeySetID)
 	}
 	return KeySetReadAllIndicesResponse{GroupKeySetIDs: ids}, nil

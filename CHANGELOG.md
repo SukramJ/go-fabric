@@ -95,6 +95,29 @@ pseudo-version of `main`.
 - `sigma.Initiator` is safe for concurrent use and refuses further input after
   a failed Sigma2.
 
+### Fixed
+
+- **GroupKeyManagement worked only through typed Go calls.** The bridge had
+  no wire codec for KeySetWrite / KeySetRead / KeySetRemove /
+  KeySetReadAllIndices, so a controller's command reached the server as a
+  generic tag map and answered Failure, and KeySetReadResponse /
+  KeySetReadAllIndicesResponse had no encoder. Both directions now go
+  through the schema matter.js uses (`TlvOfModel`, pinned by wire fixtures
+  from matter.js in `bridge/testdata/group-wire-fixtures.json`); a payload
+  that does not match the schema answers InvalidCommand as in matter.js.
+  `im.FieldsContainerConsumed` lets a fields reader report a reject it found
+  at the container's end.
+- GroupKeyManagement follows matter.js HEAD (`452d6f5c`,
+  `GroupKeyManagementServer.ts`): KeySetWrite accepts any
+  GroupKeyMulticastPolicy and does not store it, and KeySetRead reports
+  PerGroupID (`core.GroupKeySetStruct.GroupKeyMulticastPolicy`,
+  `core.GroupKeyMulticastPolicyPerGroupID`); KeySetReadAllIndices always
+  lists key set 0 first; the MaxGroupKeysPerFabric budget counts the
+  implicit IPK once whether or not the store holds a row for it; a
+  GroupKeyMap write is refused with InvalidAction for a non-application
+  GroupId, ConstraintError for a duplicate and ResourceExhausted beyond
+  MaxGroupsPerFabric.
+
 ### Deprecated
 
 - `im.StatusUnreportableAttr` (0x8c) and `im.StatusNoUpstreamSubscription`

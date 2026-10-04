@@ -345,21 +345,6 @@ are the behaviour the new pin implies and this module does not have yet.
   Deferred: it is the group-messaging work this module has kept out of scope
   so far (see [ADR 0004](../../docs/adr/0004-groups-cluster-stays-stub.md)),
   not a schema follow-up.
-- **GroupKeyManagement commands have no wire codec.** `bridge/fields_reader.go`
-  has no case for cluster 0x003F, so KeySetWrite / KeySetRead / KeySetRemove /
-  KeySetReadAllIndices reach `GroupKeyManagement.MatterInvoke` as the
-  tag-keyed `map[uint8]any` fallback, fail the `KeySetWriteRequest` /
-  `KeySetReadRequest` type assertion and answer an error; `bridge/reply.go`
-  has no encoder for `KeySetReadResponse` / `KeySetReadAllIndicesResponse`
-  either. The cluster logic is tested only through typed Go calls. matter.js
-  HEAD also changed the behaviour behind it in `452d6f5c`: KeySetWrite accepts
-  any `GroupKeyMulticastPolicy` and does not store it (previously anything but
-  PerGroupID was InvalidCommand), and KeySetRead reports
-  `GroupKeyMulticastPolicy = PerGroupID` (field 8) while the model defines the
-  field (`GroupKeyManagementServer.ts:keySetWrite`, `keySetRead`). Fix
-  package: TLV decoders for the four request payloads (GroupKeySetStruct
-  fields 0-8), encoders for the two responses including field 8, and a wire
-  test per command.
 
 ---
 

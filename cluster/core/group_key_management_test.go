@@ -297,9 +297,17 @@ func TestGKM_KeySetReadAllIndices(t *testing.T) {
 	if err != nil {
 		t.Fatalf("KeySetReadAllIndices: %v", err)
 	}
+	// Key set 0 (the IPK) is always listed first, whether or not the
+	// store holds a row for it — matter.js keySetReadAllIndices
+	// (`groupKeySetIds.unshift(0)`).
 	allResp := resp.(core.KeySetReadAllIndicesResponse)
-	if len(allResp.GroupKeySetIDs) != 3 {
-		t.Fatalf("GroupKeySetIDs len=%d, want 3", len(allResp.GroupKeySetIDs))
+	got := append([]uint16(nil), allResp.GroupKeySetIDs...)
+	if len(got) == 0 || got[0] != 0 {
+		t.Fatalf("GroupKeySetIDs = %v, want key set 0 first", got)
+	}
+	slices.Sort(got[1:]) // the fake store does not order its rows
+	if want := []uint16{0, 10, 20, 30}; !slices.Equal(got, want) {
+		t.Fatalf("GroupKeySetIDs = %v, want %v", allResp.GroupKeySetIDs, want)
 	}
 }
 
@@ -633,16 +641,18 @@ func TestGKM_KeySetWriteBudget_CapReached(t *testing.T) {
 	gkm.SetCurrentFabric(1)
 	ctx := context.Background()
 
-	// Writes up to the cap (three distinct new ids) must all succeed.
-	for _, id := range []uint16{1, 2, 3} {
+	// Writes up to the cap must all succeed. The implicit IPK key set 0
+	// occupies one slot of the cap, so a cap of three leaves room for two
+	// written key sets.
+	for _, id := range []uint16{1, 2} {
 		if _, err := gkm.MatterInvoke(ctx, 0x00 /*KeySetWrite*/, keySetWriteFields(id)); err != nil {
 			t.Fatalf("KeySetWrite id=%d: unexpected error: %v", id, err)
 		}
 	}
 
-	// The next ADD (a new, fourth id) must be rejected: len(existing) ==
-	// cap already.
-	_, err = gkm.MatterInvoke(ctx, 0x00, keySetWriteFields(4))
+	// The next ADD (a new, third written id) must be rejected: written
+	// key sets + the IPK == cap already.
+	_, err = gkm.MatterInvoke(ctx, 0x00, keySetWriteFields(3))
 	mustBeResourceExhausted(t, err)
 }
 
@@ -662,7 +672,7 @@ func TestGKM_KeySetWriteBudget_UpdateAtCapSucceeds(t *testing.T) {
 	gkm.SetCurrentFabric(1)
 	ctx := context.Background()
 
-	for _, id := range []uint16{1, 2, 3} {
+	for _, id := range []uint16{1, 2} {
 		if _, err := gkm.MatterInvoke(ctx, 0x00, keySetWriteFields(id)); err != nil {
 			t.Fatalf("KeySetWrite id=%d: unexpected error: %v", id, err)
 		}
@@ -695,14 +705,14 @@ func TestGKM_KeySetWriteBudget_CrossFabricIsolation(t *testing.T) {
 	ctxA := im.WithFabricFilter(context.Background(), true, 1)
 	ctxB := im.WithFabricFilter(context.Background(), true, 2)
 
-	// Fill fabric A to its cap.
-	for _, id := range []uint16{1, 2, 3} {
+	// Fill fabric A to its cap (two written key sets + the implicit IPK).
+	for _, id := range []uint16{1, 2} {
 		if _, err := gkm.MatterInvoke(ctxA, 0x00, keySetWriteFields(id)); err != nil {
 			t.Fatalf("fabric A KeySetWrite id=%d: unexpected error: %v", id, err)
 		}
 	}
 	// Fabric A is now exhausted.
-	_, err = gkm.MatterInvoke(ctxA, 0x00, keySetWriteFields(4))
+	_, err = gkm.MatterInvoke(ctxA, 0x00, keySetWriteFields(3))
 	mustBeResourceExhausted(t, err)
 
 	// Fabric B, still empty, must accept its own writes.
