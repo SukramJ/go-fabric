@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3250,
+  "entry_points": 3290,
   "entry_packages": [
     ".",
     "bootid",
@@ -50,9 +50,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 2820,
-    "reachable": 1360,
-    "whitelisted": 1451,
+    "total_exported": 2881,
+    "reachable": 1385,
+    "whitelisted": 1487,
     "unreachable": 9
   },
   "by_package": [
@@ -4198,6 +4198,69 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSubscriptionResumption_DisabledRecordsNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_resume_e2e_test.go",
+      "line": 857
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_resume_e2e_test.go",
+      "line": 874
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_resume_e2e_test.go",
+      "line": 746
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_resume_e2e_test.go",
+      "line": 891
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscriptionResumption_PeerThatSubscribesIsSkipped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_resume_e2e_test.go",
+      "line": 814
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscriptionResumption_RestartEndToEnd",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_resume_e2e_test.go",
+      "line": 660
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscriptionResumption_RestartEndToEndWithMRP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_resume_e2e_test.go",
+      "line": 668
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_resume_e2e_test.go",
+      "line": 917
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSubscriptionResumption_UnreachablePeerIsDropped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscription_resume_e2e_test.go",
+      "line": 779
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSubscription_AutoCloseOnMaxRetries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
@@ -5297,10 +5360,17 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestCaseInitiatorProviderNeedsALoadedIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/wiring_test.go",
+      "line": 174
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 59
+      "line": 61
     },
     {
       "package": "examples/reference-bridge",
@@ -5321,7 +5391,7 @@
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 104
+      "line": 106
     },
     {
       "package": "im",
@@ -5483,6 +5553,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/eventlog_test.go",
       "line": 480
+    },
+    {
+      "package": "im",
+      "identifier": "TestEventLog_DropBufferedKeepsNumbering",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/eventlog_drop_test.go",
+      "line": 11
     },
     {
       "package": "im",
@@ -6465,6 +6542,55 @@
       "line": 401
     },
     {
+      "package": "im/subscription",
+      "identifier": "TestParityMatterJS_PersistedSubscriptionFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/persistence_parity_matterjs_test.go",
+      "line": 29
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestParityMatterJS_ReestablishTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/persistence_parity_matterjs_test.go",
+      "line": 16
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestPeerSubscription_JSONRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/persistence_test.go",
+      "line": 38
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestRestore_KeepsIDAndNegotiatedIntervals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/persistence_test.go",
+      "line": 71
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestRestore_Refusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/persistence_test.go",
+      "line": 108
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestTerminatedHook_SeparatesTerminationFromClose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/persistence_test.go",
+      "line": 158
+    },
+    {
+      "package": "im/subscription",
+      "identifier": "TestUnmarshalPeerSubscription_RejectsUnknownVersionAndBadIntervals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/subscription/persistence_test.go",
+      "line": 54
+    },
+    {
       "package": "internal/channelseam",
       "identifier": "AnchorPeerCounter",
       "reason": "assigned by secure/channel at init and read by bridge/seam.go:77; a function variable installed through a seam has no call edge the analyzer can follow",
@@ -6858,6 +6984,48 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestOperationalResolver_AsksForHostAddressesAfterBareSRV",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/operational_resolver_test.go",
+      "line": 133
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestOperationalResolver_DropsLinkLocalWithoutZone",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/operational_resolver_test.go",
+      "line": 173
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestOperationalResolver_LiveMulticastRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/operational_resolver_live_test.go",
+      "line": 22
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestOperationalResolver_LiveTimesOut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/operational_resolver_live_test.go",
+      "line": 63
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestOperationalResolver_ResolvesFromOneResponseInPreferenceOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/operational_resolver_test.go",
+      "line": 88
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestOperationalResolver_RetriesThenGivesUp",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/operational_resolver_test.go",
+      "line": 158
+    },
+    {
+      "package": "mdns",
       "identifier": "TestPackSubtypePTRs_AnnouncementShape",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/subtype_internal_test.go",
@@ -6890,6 +7058,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/subtype_internal_test.go",
       "line": 424
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestResolution_ZonesLinkLocalByInterface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/operational_resolver_live_test.go",
+      "line": 75
     },
     {
       "package": "mdns",
@@ -8111,6 +8286,27 @@
     },
     {
       "package": "secure/sigma",
+      "identifier": "TestNewPeerInitiator_RequiresIdentityVerifierAndRoot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 352
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestParityMatterJS_InitiatorParsesMatterJSSigma1",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_parity_matterjs_test.go",
+      "line": 132
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestParityMatterJS_InitiatorSigma3Bytes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_parity_matterjs_test.go",
+      "line": 49
+    },
+    {
+      "package": "secure/sigma",
       "identifier": "TestParityMatterJS_Sigma_Vectors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/parity_matterjs_test.go",
@@ -8136,6 +8332,55 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_tlv_test.go",
       "line": 18
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestPeerInitiator_FullHandshakeAgainstResponder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 137
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestPeerInitiator_RejectsWrongFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 307
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestPeerInitiator_RejectsWrongPeerNode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 286
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestPeerInitiator_ResumesWithRecord",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 193
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestPeerInitiator_StaleRecordFallsBackToFullSigma",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 256
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestPeerInitiator_TamperedResumeMICRejected",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 338
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestPeerInitiator_UnexpectedSigma2Resume",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 323
     },
     {
       "package": "secure/sigma",
@@ -8605,6 +8850,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/sigma/sigma_marshal_test.go",
       "line": 176
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "TestUnmarshalSigma2_RejectsMissingFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/sigma/initiator_test.go",
+      "line": 366
     },
     {
       "package": "secure/sigma",
