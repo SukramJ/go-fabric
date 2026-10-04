@@ -35,6 +35,9 @@ var (
 	ErrCadenceInvertedAfterClamp = errors.New("subscription: cadence inverted after clamp")
 	// ErrNotFound is returned when a Get / Close hits no subscription.
 	ErrNotFound = errors.New("subscription: not found")
+	// ErrIDInUse is returned by [Manager.Restore] when the former
+	// subscription's id already names a live subscription.
+	ErrIDInUse = errors.New("subscription: id already in use")
 )
 
 // Reporter receives ReportData payloads the engine produces. The
@@ -84,6 +87,9 @@ type Manager struct {
 	perFabric map[uint8]int
 	nextID    uint32
 	onClosed  func(subID uint32)
+	// onTerminated observes the subset of closes that end a subscription
+	// for good — see [Manager.SetOnSubscriptionTerminated].
+	onTerminated func(subID uint32)
 
 	startOnce sync.Once
 	stopOnce  sync.Once
@@ -112,17 +118,48 @@ func (m *Manager) SetOnSubscriptionClosed(fn func(subID uint32)) {
 	m.mu.Unlock()
 }
 
+// SetOnSubscriptionTerminated registers a callback fired once per
+// subscription that is closed *for good*: the peer replaced it
+// (KeepSubscriptions=false, [Manager.ClosePeer], a same-session
+// re-subscribe), the peer rejected or stopped acknowledging its reports
+// ([Manager.Close]), its endpoint or fabric went away
+// ([Manager.CloseEndpoint], [Manager.CloseFabric]).
+//
+// A subscription that ends because its session closed
+// ([Manager.CloseSession], [Manager.CloseFabricExcept]) or that the
+// transport released without the peer having said anything
+// ([Manager.Release]) is closed but NOT terminated, and this hook stays
+// silent. That is the line matter.js draws between
+// `ServerSubscription.isTerminated` and a plain close
+// (packages/node/src/node/server/ServerSubscription.ts:handlePeerCancel,
+// #sendUpdate, #sendUpdateMessage), and the one
+// SubscriptionsServer.#subscriptionCancelled
+// (packages/node/src/behavior/system/subscriptions/SubscriptionsServer.ts)
+// keys persistence on: a terminated subscription is forgotten, a closed
+// one is re-established after a restart. Pass nil to detach.
+func (m *Manager) SetOnSubscriptionTerminated(fn func(subID uint32)) {
+	m.mu.Lock()
+	m.onTerminated = fn
+	m.mu.Unlock()
+}
+
 // finishClose runs the per-subscription teardown for every victim a
 // close path removed from the tables. Callers must have released m.mu:
-// the observer reaches back into the transport layer.
-func (m *Manager) finishClose(victims []*Subscription) {
+// the observer reaches back into the transport layer. terminated says
+// whether the close ends the subscription for good (see
+// [Manager.SetOnSubscriptionTerminated]).
+func (m *Manager) finishClose(victims []*Subscription, terminated bool) {
 	m.mu.RLock()
 	hook := m.onClosed
+	termHook := m.onTerminated
 	m.mu.RUnlock()
 	for _, sub := range victims {
 		sub.Close()
 		if hook != nil {
 			hook(sub.ID)
+		}
+		if terminated && termHook != nil {
+			termHook(sub.ID)
 		}
 	}
 }
@@ -213,7 +250,8 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// the quota check so that the new one fits even when the old entry still
 	// holds a slot.
 	if req.ReplaceSessionDuplicate && req.SessionID != 0 {
-		m.CloseSession(req.SessionID)
+		// The peer replaced these — terminated, not merely closed.
+		m.closeSession(req.SessionID, true)
 	}
 
 	m.mu.Lock()
@@ -301,8 +339,23 @@ func (m *Manager) Get(id uint32) (*Subscription, error) {
 	return sub, nil
 }
 
-// Close terminates a single subscription.
+// Close terminates a single subscription: the peer rejected it, or stopped
+// acknowledging its reports. Fires [Manager.SetOnSubscriptionTerminated].
 func (m *Manager) Close(id uint32) error {
+	return m.closeOne(id, true)
+}
+
+// Release closes a single subscription without terminating it — the
+// transport gave up on it without the peer having cancelled it (matter.js
+// closes a subscription on a non-InvalidSubscription error status without
+// setting `isTerminated`, ServerSubscription.ts:#sendUpdateMessage), or a
+// re-establishment attempt that never became active is unwound. The
+// terminated hook stays silent.
+func (m *Manager) Release(id uint32) error {
+	return m.closeOne(id, false)
+}
+
+func (m *Manager) closeOne(id uint32, terminated bool) error {
 	m.mu.Lock()
 	sub, ok := m.byID[id]
 	if !ok {
@@ -315,13 +368,21 @@ func (m *Manager) Close(id uint32) error {
 		delete(m.perFabric, sub.FabricIndex)
 	}
 	m.mu.Unlock()
-	m.finishClose([]*Subscription{sub})
+	m.finishClose([]*Subscription{sub}, terminated)
 	return nil
 }
 
-// CloseSession terminates every subscription tied to sessionID. Used
-// when an operational session disappears.
+// CloseSession closes every subscription tied to sessionID. Used when an
+// operational session disappears. The subscriptions are closed, not
+// terminated: a session that went away (peer close, idle reap, shutdown)
+// says nothing about whether the peer still wants them, so a persisted
+// record survives (matter.js SubscriptionsServer keeps a cancelled but
+// not terminated subscription).
 func (m *Manager) CloseSession(sessionID uint16) {
+	m.closeSession(sessionID, false)
+}
+
+func (m *Manager) closeSession(sessionID uint16, terminated bool) {
 	m.mu.Lock()
 	victims := make([]*Subscription, 0)
 	for id, sub := range m.byID {
@@ -335,7 +396,7 @@ func (m *Manager) CloseSession(sessionID uint16) {
 		}
 	}
 	m.mu.Unlock()
-	m.finishClose(victims)
+	m.finishClose(victims, terminated)
 }
 
 // ClosePeer terminates every subscription owned by the (fabric, peer)
@@ -361,7 +422,7 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 		}
 	}
 	m.mu.Unlock()
-	m.finishClose(victims)
+	m.finishClose(victims, true)
 	return len(victims)
 }
 
@@ -378,11 +439,12 @@ func (m *Manager) CloseFabric(fabricIndex uint8) {
 	}
 	delete(m.perFabric, fabricIndex)
 	m.mu.Unlock()
-	m.finishClose(victims)
+	m.finishClose(victims, true)
 }
 
-// CloseFabricExcept terminates every subscription on fabricIndex except those
-// bound to exceptSessionID. UpdateNOC tears down the rotated fabric's other
+// CloseFabricExcept closes every subscription on fabricIndex except those
+// bound to exceptSessionID. They are closed with their sessions, not
+// terminated (see [Manager.SetOnSubscriptionTerminated]). UpdateNOC tears down the rotated fabric's other
 // CASE sessions but must preserve the invoking session (and the subscriptions
 // it carries) so its NOCResponse reaches the wire and it can re-CASE. Mirrors
 // chip FabricTable::AbortAllOtherCommunicationOnFabric pinning the invoking
@@ -401,7 +463,7 @@ func (m *Manager) CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16) {
 		delete(m.perFabric, fabricIndex)
 	}
 	m.mu.Unlock()
-	m.finishClose(victims)
+	m.finishClose(victims, false)
 }
 
 // CloseEndpoint terminates every subscription that contains at least
@@ -428,7 +490,7 @@ func (m *Manager) CloseEndpoint(endpointID uint16) int {
 		}
 	}
 	m.mu.Unlock()
-	m.finishClose(victims)
+	m.finishClose(victims, true)
 	return len(victims)
 }
 
