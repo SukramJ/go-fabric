@@ -807,10 +807,18 @@ func DeviceTypeName(id uint16) string {
 		return "Air Purifier"
 	case 0x0043:
 		return "Water Leak Detector"
+	case 0x0073:
+		return "Laundry Washer"
+	case 0x0074:
+		return "Robotic Vacuum Cleaner"
+	case 0x0075:
+		return "Dishwasher"
 	case 0x0076:
 		return "Smoke / CO Alarm"
 	case 0x007A:
 		return "Extractor Hood"
+	case 0x007C:
+		return "Laundry Dryer"
 	case 0x0100:
 		return "On/Off Light"
 	case 0x0101:

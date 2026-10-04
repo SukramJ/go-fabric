@@ -1361,7 +1361,7 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
 		_ = enc.EndContainer()
 		_ = enc.EndContainer()
 	default:
-		if encodeGroupsResponse(enc, tag, v) || encodeGroupcastResponse(enc, tag, v) {
+		if encodeGroupsResponse(enc, tag, v) || encodeGroupcastResponse(enc, tag, v) || encodeApplicationResponse(enc, tag, v) {
 			return
 		}
 		// Status-only command — emit empty struct as the TLV

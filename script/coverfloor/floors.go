@@ -53,6 +53,7 @@ var floors = []packageFloor{
 	// statement — which is exactly the moment to notice it, while the
 	// change that added it is still on screen.
 	{pkg: "github.com/SukramJ/go-fabric/cluster/onoff", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/opstate", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/pump", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/thermo", min: 78},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/valve", min: 79},

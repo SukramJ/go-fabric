@@ -6,6 +6,7 @@ package bridge
 import (
 	_ "embed"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
@@ -22,19 +23,33 @@ import (
 var applicationWireFixturesJSON []byte
 
 type applicationWireFixture struct {
-	Label   string `json:"label"`
-	Kind    string `json:"kind"`
-	Cluster uint32 `json:"cluster"`
-	Element string `json:"element"`
-	Fixture struct {
-		Direction          uint8 `json:"direction"`
-		Wrap               *bool `json:"wrap"`
-		LowestOff          *bool `json:"lowestOff"`
-		AlarmSeverityLevel uint8 `json:"alarmSeverityLevel"`
-		NewPosition        uint8 `json:"newPosition"`
-		PreviousPosition   uint8 `json:"previousPosition"`
-	} `json:"fixture"`
-	BytesHex string `json:"bytesHex"`
+	Label    string                   `json:"label"`
+	Kind     string                   `json:"kind"`
+	Cluster  uint32                   `json:"cluster"`
+	Element  string                   `json:"element"`
+	Fixture  applicationFixtureFields `json:"fixture"`
+	BytesHex string                   `json:"bytesHex"`
+}
+
+// applicationFixtureFields are the scalar fixture fields of the fan,
+// alarm, pump and switch entries. A fixture that is not an object (a list
+// value, a fieldless payload) leaves them zero; the appliance entries are
+// read raw by appliance_parity_matterjs_test.go.
+type applicationFixtureFields struct {
+	Direction          uint8 `json:"direction"`
+	Wrap               *bool `json:"wrap"`
+	LowestOff          *bool `json:"lowestOff"`
+	AlarmSeverityLevel uint8 `json:"alarmSeverityLevel"`
+	NewPosition        uint8 `json:"newPosition"`
+	PreviousPosition   uint8 `json:"previousPosition"`
+}
+
+func (f *applicationFixtureFields) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 || b[0] != '{' {
+		return nil
+	}
+	type plain applicationFixtureFields
+	return json.Unmarshal(b, (*plain)(f))
 }
 
 // TestApplicationPayloadsMatchMatterJS decodes every Step payload
@@ -49,6 +64,9 @@ func TestApplicationPayloadsMatchMatterJS(t *testing.T) {
 		t.Fatalf("application-wire-fixtures.json: %v (%d entries)", err, len(fixtures))
 	}
 	for _, f := range fixtures {
+		if slices.Contains(applianceClusters, f.Cluster) {
+			continue // appliance_parity_matterjs_test.go
+		}
 		t.Run(f.Label, func(t *testing.T) {
 			t.Parallel()
 			switch {

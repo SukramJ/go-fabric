@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/fan"
+	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
@@ -18,7 +19,8 @@ import (
 )
 
 // The application device types the cluster/alarm, cluster/fan,
-// cluster/pump and cluster/measurement servers exist for, assembled the
+// cluster/pump, cluster/opstate, cluster/modebase and cluster/measurement
+// servers exist for, assembled the
 // way a host assembles them: the host supplies its device's application
 // clusters (or a measurement source), the assembler adds Identify,
 // Groups where the device type mandates it, Descriptor and
@@ -151,6 +153,19 @@ type pumpReading struct{}
 func (pumpReading) PumpState() pump.State                                      { return pump.State{} }
 func (pumpReading) SetOperationMode(context.Context, pump.OperationMode) error { return nil }
 
+// applianceServer is the OperationalState server a washer, dryer or
+// dishwasher host builds for its device type.
+func applianceServer(dt uint16) contract.ClusterServer {
+	srv, err := opstate.NewServer(opstate.Config{
+		States:     []opstate.StateEntry{{ID: opstate.StateStopped}, {ID: opstate.StateError}},
+		DeviceType: dt,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
 func applicationDeviceCases() []applicationDeviceCase {
 	smoke, err := alarm.NewServer(alarm.Config{Source: smokeReading{}, Features: alarm.FeatureSmokeAlarm | alarm.FeatureCOAlarm})
 	if err != nil {
@@ -182,6 +197,17 @@ func applicationDeviceCases() []applicationDeviceCase {
 		}},
 		{name: "ExtractorHood", deviceType: fan.DeviceTypeExtractorHood, source: deviceTypeSource{
 			dt: fan.DeviceTypeExtractorHood, servers: []contract.ClusterServer{fanServer(fan.DeviceTypeExtractorHood)},
+		}},
+		// The appliances mandate OperationalState alone; their mode,
+		// controls, temperature and OnOff servers are optional.
+		{name: "LaundryWasher", deviceType: opstate.DeviceTypeLaundryWasher, source: deviceTypeSource{
+			dt: opstate.DeviceTypeLaundryWasher, servers: []contract.ClusterServer{applianceServer(opstate.DeviceTypeLaundryWasher)},
+		}},
+		{name: "LaundryDryer", deviceType: opstate.DeviceTypeLaundryDryer, source: deviceTypeSource{
+			dt: opstate.DeviceTypeLaundryDryer, servers: []contract.ClusterServer{applianceServer(opstate.DeviceTypeLaundryDryer)},
+		}},
+		{name: "Dishwasher", deviceType: opstate.DeviceTypeDishwasher, source: deviceTypeSource{
+			dt: opstate.DeviceTypeDishwasher, servers: []contract.ClusterServer{applianceServer(opstate.DeviceTypeDishwasher)},
 		}},
 	}
 }

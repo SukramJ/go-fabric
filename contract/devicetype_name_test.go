@@ -17,8 +17,12 @@ func TestDeviceTypeNameNamesTheApplicationDeviceTypes(t *testing.T) {
 	cases := map[uint16]string{
 		0x002B: "Fan",
 		0x002D: "Air Purifier",
+		0x0073: "Laundry Washer",
+		0x0074: "Robotic Vacuum Cleaner",
+		0x0075: "Dishwasher",
 		0x0076: "Smoke / CO Alarm",
 		0x007A: "Extractor Hood",
+		0x007C: "Laundry Dryer",
 		0x0303: "Pump",
 		0x0306: "Flow Sensor",
 	}

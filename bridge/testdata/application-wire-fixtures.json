@@ -202,5 +202,223 @@
       "previousPosition": 0
     },
     "bytesHex": "1524000018"
+  },
+  {
+    "label": "opstate_pause_request",
+    "kind": "commands",
+    "cluster": 96,
+    "element": "Pause",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "rvc_go_home_request",
+    "kind": "commands",
+    "cluster": 97,
+    "element": "GoHome",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "opstate_response_no_error",
+    "kind": "commands",
+    "cluster": 96,
+    "element": "OperationalCommandResponse",
+    "fixture": {
+      "commandResponseState": {
+        "errorStateId": 0
+      }
+    },
+    "bytesHex": "1535002400001818"
+  },
+  {
+    "label": "opstate_response_invalid_in_state",
+    "kind": "commands",
+    "cluster": 96,
+    "element": "OperationalCommandResponse",
+    "fixture": {
+      "commandResponseState": {
+        "errorStateId": 3
+      }
+    },
+    "bytesHex": "1535002400031818"
+  },
+  {
+    "label": "opstate_response_manufacturer",
+    "kind": "commands",
+    "cluster": 96,
+    "element": "OperationalCommandResponse",
+    "fixture": {
+      "commandResponseState": {
+        "errorStateId": 128,
+        "errorStateLabel": "Door open",
+        "errorStateDetails": "close the door"
+      }
+    },
+    "bytesHex": "1535002400802c0109446f6f72206f70656e2c020e636c6f73652074686520646f6f721818"
+  },
+  {
+    "label": "opstate_response_details_only",
+    "kind": "commands",
+    "cluster": 96,
+    "element": "OperationalCommandResponse",
+    "fixture": {
+      "commandResponseState": {
+        "errorStateId": 1,
+        "errorStateDetails": "water supply"
+      }
+    },
+    "bytesHex": "1535002400012c020c776174657220737570706c791818"
+  },
+  {
+    "label": "rvc_response_stuck",
+    "kind": "commands",
+    "cluster": 97,
+    "element": "OperationalCommandResponse",
+    "fixture": {
+      "commandResponseState": {
+        "errorStateId": 65,
+        "errorStateDetails": "left wheel blocked"
+      }
+    },
+    "bytesHex": "1535002400412c02126c65667420776865656c20626c6f636b65641818"
+  },
+  {
+    "label": "opstate_event_operational_error",
+    "kind": "events",
+    "cluster": 96,
+    "element": "OperationalError",
+    "fixture": {
+      "errorState": {
+        "errorStateId": 2,
+        "errorStateDetails": "drain blocked"
+      }
+    },
+    "bytesHex": "1535002400022c020d647261696e20626c6f636b65641818"
+  },
+  {
+    "label": "rvc_event_operational_error",
+    "kind": "events",
+    "cluster": 97,
+    "element": "OperationalError",
+    "fixture": {
+      "errorState": {
+        "errorStateId": 76
+      }
+    },
+    "bytesHex": "15350024004c1818"
+  },
+  {
+    "label": "opstate_event_completion_minimal",
+    "kind": "events",
+    "cluster": 96,
+    "element": "OperationCompletion",
+    "fixture": {
+      "completionErrorCode": 0
+    },
+    "bytesHex": "1524000018"
+  },
+  {
+    "label": "opstate_event_completion_full",
+    "kind": "events",
+    "cluster": 96,
+    "element": "OperationCompletion",
+    "fixture": {
+      "completionErrorCode": 2,
+      "totalOperationalTime": 3600,
+      "pausedTime": 120
+    },
+    "bytesHex": "152400022501100e24027818"
+  },
+  {
+    "label": "opstate_event_completion_nulls",
+    "kind": "events",
+    "cluster": 96,
+    "element": "OperationCompletion",
+    "fixture": {
+      "completionErrorCode": 0,
+      "totalOperationalTime": null,
+      "pausedTime": null
+    },
+    "bytesHex": "152400003401340218"
+  },
+  {
+    "label": "opstate_event_completion_total_only",
+    "kind": "events",
+    "cluster": 96,
+    "element": "OperationCompletion",
+    "fixture": {
+      "completionErrorCode": 0,
+      "totalOperationalTime": 259200
+    },
+    "bytesHex": "15240000260180f4030018"
+  },
+  {
+    "label": "opstate_state_list",
+    "kind": "attributes",
+    "cluster": 96,
+    "element": "OperationalStateList",
+    "fixture": [
+      {
+        "operationalStateId": 0
+      },
+      {
+        "operationalStateId": 1
+      },
+      {
+        "operationalStateId": 2
+      },
+      {
+        "operationalStateId": 3
+      },
+      {
+        "operationalStateId": 128,
+        "operationalStateLabel": "Pre-soak"
+      }
+    ],
+    "bytesHex": "161524000018152400011815240002181524000318152400802c01085072652d736f616b1818"
+  },
+  {
+    "label": "rvc_state_list",
+    "kind": "attributes",
+    "cluster": 97,
+    "element": "OperationalStateList",
+    "fixture": [
+      {
+        "operationalStateId": 3
+      },
+      {
+        "operationalStateId": 64
+      },
+      {
+        "operationalStateId": 65
+      },
+      {
+        "operationalStateId": 66
+      }
+    ],
+    "bytesHex": "16152400031815240040181524004118152400421818"
+  },
+  {
+    "label": "opstate_operational_error",
+    "kind": "attributes",
+    "cluster": 96,
+    "element": "OperationalError",
+    "fixture": {
+      "errorStateId": 129,
+      "errorStateLabel": "Lid",
+      "errorStateDetails": "open"
+    },
+    "bytesHex": "152400812c01034c69642c02046f70656e18"
+  },
+  {
+    "label": "opstate_phase_list",
+    "kind": "attributes",
+    "cluster": 96,
+    "element": "PhaseList",
+    "fixture": [
+      "pre-soak",
+      "rinse",
+      "spin"
+    ],
+    "bytesHex": "160c087072652d736f616b0c0572696e73650c047370696e18"
   }
 ]

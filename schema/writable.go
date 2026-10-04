@@ -27,8 +27,8 @@ package schema
 // this table provides the same verdict schema-side. It is scoped to the
 // clusters the bridge exposes (core clusters plus OnOff/LevelControl/
 // ColorControl/Groups, WindowCovering, DoorLock, Thermostat, GenericSwitch,
-// SmokeCoAlarm, FanControl, PumpConfigurationAndControl, and the measurement
-// clusters) so it stays bounded. Every entry is derived
+// SmokeCoAlarm, OperationalState, RvcOperationalState, FanControl,
+// PumpConfigurationAndControl, and the measurement clusters) so it stays bounded. Every entry is derived
 // from the per-attribute `access` strings in
 // parity/schema.json (the matter.js HEAD pin);
 // TestReadOnlyAttributeParity reloads that snapshot and fails if any entry
@@ -130,6 +130,15 @@ var readOnlyAttributes = map[uint32]map[uint32]struct{}{
 	0x005C: newReadOnlySet(
 		0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007,
 		0x0008, 0x0009, 0x000A, 0x000C, 0x000D,
+	),
+	// OperationalState (0x0060) — every attribute "R V".
+	0x0060: newReadOnlySet(
+		0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005,
+	),
+	// RvcOperationalState (0x0061) — inherits OperationalState's
+	// attributes, every one "R V".
+	0x0061: newReadOnlySet(
+		0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005,
 	),
 	// ScenesManagement (0x0062) — 3 read-only
 	0x0062: newReadOnlySet(

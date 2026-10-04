@@ -173,6 +173,10 @@ func TestAttributeWritable(t *testing.T) {
 		{"PumpConfigurationAndControl/Capacity read-only", 0x0200, 0x0013, false, true},
 		// PumpConfigurationAndControl.OperationMode (0x0020, "RW VM") — writable.
 		{"PumpConfigurationAndControl/OperationMode writable", 0x0200, 0x0020, true, false},
+		// OperationalState.OperationalState (0x0004, "R V") — read-only.
+		{"OperationalState/OperationalState read-only", 0x0060, 0x0004, false, true},
+		// RvcOperationalState.CountdownTime (0x0002, inherited "R V") — read-only.
+		{"RvcOperationalState/CountdownTime read-only", 0x0061, 0x0002, false, true},
 		// Cluster the bridge does not expose → unknown, treated writable.
 		{"unknown cluster", 0xBEEF, 0x0000, true, false},
 		// Global attribute (no access string) → not tracked.

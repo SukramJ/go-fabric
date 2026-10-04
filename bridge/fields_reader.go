@@ -658,6 +658,8 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 		ent.Path.Command = 0x05
 	case mattercore.LeaveGroupResponse:
 		ent.Path.Command = 0x02
+	case wire.OperationalCommandResponse:
+		ent.Path.Command = wire.OperationalStateCmdOperationalCommandResponse
 	}
 	// Unknown response types (status-only commands wrapped) leave
 	// the path alone — the writer emits an empty struct + the

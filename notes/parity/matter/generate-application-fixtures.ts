@@ -75,6 +75,46 @@ function fixtures() {
     record("switch_LongPress", sw, "events", "LongPress", { newPosition: 1 });
     record("switch_ShortRelease", sw, "events", "ShortRelease", { previousPosition: 1 });
     record("switch_LongRelease", sw, "events", "LongRelease", { previousPosition: 0 });
+
+    // OperationalState / RvcOperationalState: the fieldless requests, the
+    // response, both events and the structured attributes.
+    const ops = model.OperationalState;
+    const rvc = model.RvcOperationalState;
+    record("opstate_pause_request", ops, "commands", "Pause", undefined);
+    record("rvc_go_home_request", rvc, "commands", "GoHome", undefined);
+    const responses = {
+        no_error: { errorStateId: 0 },
+        invalid_in_state: { errorStateId: 3 },
+        manufacturer: { errorStateId: 0x80, errorStateLabel: "Door open", errorStateDetails: "close the door" },
+        details_only: { errorStateId: 1, errorStateDetails: "water supply" },
+    };
+    for (const [label, state] of Object.entries(responses)) {
+        record(`opstate_response_${label}`, ops, "commands", "OperationalCommandResponse", { commandResponseState: state });
+    }
+    record("rvc_response_stuck", rvc, "commands", "OperationalCommandResponse",
+        { commandResponseState: { errorStateId: 0x41, errorStateDetails: "left wheel blocked" } });
+    record("opstate_event_operational_error", ops, "events", "OperationalError",
+        { errorState: { errorStateId: 2, errorStateDetails: "drain blocked" } });
+    record("rvc_event_operational_error", rvc, "events", "OperationalError",
+        { errorState: { errorStateId: 0x4c } });
+    for (const [label, ev] of Object.entries({
+        minimal: { completionErrorCode: 0 },
+        full: { completionErrorCode: 2, totalOperationalTime: 3600, pausedTime: 120 },
+        nulls: { completionErrorCode: 0, totalOperationalTime: null, pausedTime: null },
+        total_only: { completionErrorCode: 0, totalOperationalTime: 259200 },
+    })) {
+        record(`opstate_event_completion_${label}`, ops, "events", "OperationCompletion", ev);
+    }
+    record("opstate_state_list", ops, "attributes", "OperationalStateList", [
+        { operationalStateId: 0 }, { operationalStateId: 1 }, { operationalStateId: 2 }, { operationalStateId: 3 },
+        { operationalStateId: 0x80, operationalStateLabel: "Pre-soak" },
+    ]);
+    record("rvc_state_list", rvc, "attributes", "OperationalStateList", [
+        { operationalStateId: 3 }, { operationalStateId: 0x40 }, { operationalStateId: 0x41 }, { operationalStateId: 0x42 },
+    ]);
+    record("opstate_operational_error", ops, "attributes", "OperationalError",
+        { errorStateId: 0x81, errorStateLabel: "Lid", errorStateDetails: "open" });
+    record("opstate_phase_list", ops, "attributes", "PhaseList", ["pre-soak", "rinse", "spin"]);
     return out;
 }
 

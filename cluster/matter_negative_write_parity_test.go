@@ -31,6 +31,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
 	"github.com/SukramJ/go-fabric/cluster/fan"
+	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/cluster/wire"
@@ -127,6 +128,29 @@ func newFanServer() *fan.Server {
 		SpeedMax:    4,
 		RockSupport: fan.RockLeftRight,
 	})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
+// opstateHost accepts every OperationalState command.
+type opstateHost struct{}
+
+func (opstateHost) HandleOperationalCommand(context.Context, opstate.Command) (opstate.ErrorState, error) {
+	return opstate.ErrorState{}, nil
+}
+
+// newOpStateServer is a washer's OperationalState with Stop alone, or an
+// RVC's with Pause / Resume / GoHome, running.
+func newOpStateServer(rvc bool) *opstate.Server {
+	states := []opstate.StateEntry{{ID: opstate.StateStopped}, {ID: opstate.StateRunning}, {ID: opstate.StatePaused}, {ID: opstate.StateError}}
+	build, cmds := opstate.NewServer, opstate.CommandStop
+	if rvc {
+		states = append(states, opstate.StateEntry{ID: opstate.StateSeekingCharger})
+		build, cmds = opstate.NewRvcServer, opstate.CommandPause|opstate.CommandResume|opstate.CommandGoHome
+	}
+	srv, err := build(opstate.Config{Handler: opstateHost{}, Commands: cmds, States: states, State: opstate.StateRunning})
 	if err != nil {
 		panic(err)
 	}
@@ -407,6 +431,33 @@ func TestNegativeWriteParity(t *testing.T) {
 			value:      uint64(0),
 			wantStatus: im.StatusUnsupportedWrite,
 		},
+		{
+			// operational-state.element.ts:40 — OperationalState is
+			// access "R V"; matter.js AttributeWriteResponse answers
+			// UnsupportedWrite.
+			name: "OperationalState/OperationalState write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newOpStateServer(false)
+			},
+			attrID:     opstate.AttrOperationalState,
+			value:      uint64(opstate.StateStopped),
+			wantStatus: im.StatusUnsupportedWrite,
+		},
+		{
+			// rvc-operational-state.element.ts: OperationalError is
+			// inherited "R V".
+			name: "RvcOperationalState/OperationalError write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newOpStateServer(true)
+			},
+			attrID:     opstate.AttrOperationalError,
+			value:      map[uint8]any{0: uint64(0)},
+			wantStatus: im.StatusUnsupportedWrite,
+		},
 	}
 
 	ctx := context.Background()
@@ -496,6 +547,30 @@ func TestNegativeInvokeParity(t *testing.T) {
 				"percent": uint16(10001),
 			},
 			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// rvc-operational-state.element.ts:23 — Start is "X" in the
+			// derivation: not in AcceptedCommandList, UnsupportedCommand.
+			name: "RvcOperationalState/Start → UnsupportedCommand",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return newOpStateServer(true)
+			},
+			cmdID:      opstate.CmdStart,
+			wantStatus: im.StatusUnsupportedCommand,
+		},
+		{
+			// operational-state.element.ts:65-68 — Start is "O"; a server
+			// that does not support it does not accept it.
+			name: "OperationalState/Start on a Stop-only server → UnsupportedCommand",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return newOpStateServer(false)
+			},
+			cmdID:      opstate.CmdStart,
+			wantStatus: im.StatusUnsupportedCommand,
 		},
 	}
 
@@ -610,6 +685,17 @@ func TestPositiveWriteControlApplicationClusters(t *testing.T) {
 // matter.js accepts are not rejected by Loom.
 func TestPositiveInvokeControl(t *testing.T) {
 	t.Parallel()
+
+	t.Run("RvcOperationalState/GoHome while Running answered NoError", func(t *testing.T) {
+		t.Parallel()
+		resp, err := newOpStateServer(true).MatterInvoke(context.Background(), opstate.CmdGoHome, nil)
+		if err != nil {
+			t.Fatalf("GoHome: %v", err)
+		}
+		if r := resp.(wire.OperationalCommandResponse); r.CommandResponseState.ErrorStateID != 0 {
+			t.Errorf("GoHome = %+v, want NoError", r)
+		}
+	})
 
 	t.Run("WindowCovering/GoToLiftPercentage == 10000 accepted", func(t *testing.T) {
 		t.Parallel()
