@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3443,
+  "entry_points": 3486,
   "entry_packages": [
     ".",
     "bootid",
@@ -16,8 +16,10 @@
     "cluster/light",
     "cluster/lock",
     "cluster/measurement",
+    "cluster/modebase",
     "cluster/modeselect",
     "cluster/onoff",
+    "cluster/opstate",
     "cluster/pump",
     "cluster/thermo",
     "cluster/valve",
@@ -33,6 +35,7 @@
     "groups",
     "im",
     "im/subscription",
+    "internal/paritytest",
     "mdns",
     "parity",
     "schema",
@@ -54,9 +57,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 3313,
-    "reachable": 1738,
-    "whitelisted": 1569,
+    "total_exported": 3534,
+    "reachable": 1944,
+    "whitelisted": 1584,
     "unreachable": 6
   },
   "by_package": [
@@ -193,6 +196,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "FuzzChangeToModeFieldsReader",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fuzz_modebase_fields_test.go",
+      "line": 19
+    },
+    {
+      "package": "bridge",
       "identifier": "FuzzFanStepFieldsReader",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fuzz_fan_fields_test.go",
@@ -218,6 +228,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/groupcast_wire_test.go",
       "line": 228
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAccessControlUnfilteredReadsRedactOtherFabrics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/acl_unfiltered_read_test.go",
+      "line": 28
     },
     {
       "package": "bridge",
@@ -364,7 +381,7 @@
       "identifier": "TestApplicationPayloadsMatchMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_parity_matterjs_test.go",
-      "line": 42
+      "line": 60
     },
     {
       "package": "bridge",
@@ -470,6 +487,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
       "line": 103
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAttributeChangeNotifierMarksOnlyTheNamedAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/attribute_notifier_test.go",
+      "line": 54
     },
     {
       "package": "bridge",
@@ -2828,7 +2852,7 @@
       "identifier": "TestGroupcastPayloadsMatchMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/groupcast_parity_matterjs_test.go",
-      "line": 74
+      "line": 75
     },
     {
       "package": "bridge",
@@ -2958,6 +2982,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestLaundryWasherModeOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/appliance_clusters_wire_test.go",
+      "line": 331
+    },
+    {
+      "package": "bridge",
       "identifier": "TestMRPAckAdapter_DischargeIsSessionScoped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handlers_test.go",
@@ -3018,6 +3049,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/privacy_test.go",
       "line": 358
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestModeBaseOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/appliance_clusters_wire_test.go",
+      "line": 254
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestModeBasePayloadsMatchMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/appliance_parity_matterjs_test.go",
+      "line": 176
     },
     {
       "package": "bridge",
@@ -3151,6 +3196,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/handlers_extra_test.go",
       "line": 63
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOperationalStateChangesReachASubscriber",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/appliance_clusters_wire_test.go",
+      "line": 364
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOperationalStateOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/appliance_clusters_wire_test.go",
+      "line": 61
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOperationalStatePayloadsMatchMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/appliance_parity_matterjs_test.go",
+      "line": 104
     },
     {
       "package": "bridge",
@@ -4071,6 +4137,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestRvcOperationalStateOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/appliance_clusters_wire_test.go",
+      "line": 153
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSecurityFlagsByte_AllZero",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
@@ -4442,6 +4515,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSwitchPressEventsMatchMatterJSOverTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/switch_events_wire_test.go",
+      "line": 50
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTickOutboundReliable_NilListener",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
@@ -4763,6 +4843,13 @@
       "line": 114
     },
     {
+      "package": "cluster/opstate",
+      "identifier": "TestCountdownTimeIsReportedAsAQuieterAttribute",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/opstate/countdown_internal_test.go",
+      "line": 18
+    },
+    {
       "package": "cluster/wire",
       "identifier": "TestParityMatterJS_SchedulesClusterIsNotShipped",
       "reason": "auto-whitelist:pattern=test-file",
@@ -4984,7 +5071,7 @@
       "identifier": "TestApplicationDeviceTypesMountTheirMandatoryClusterSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/application_device_types_test.go",
-      "line": 191
+      "line": 259
     },
     {
       "package": "endpoint",
@@ -7099,6 +7186,27 @@
       "reason": "assigned by secure/channel at init and read by bridge/seam.go:77; a function variable installed through a seam has no call edge the analyzer can follow",
       "file": "internal/channelseam/channelseam.go",
       "line": 40
+    },
+    {
+      "package": "internal/paritytest",
+      "identifier": "TestClusterSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/paritytest/paritytest_test.go",
+      "line": 40
+    },
+    {
+      "package": "internal/paritytest",
+      "identifier": "TestConformance",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/paritytest/paritytest_test.go",
+      "line": 8
+    },
+    {
+      "package": "internal/paritytest",
+      "identifier": "TestLookupsFailOnUnknownNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/paritytest/paritytest_test.go",
+      "line": 69
     },
     {
       "package": "mdns",
