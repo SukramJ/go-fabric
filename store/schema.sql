@@ -119,6 +119,25 @@ CREATE TABLE IF NOT EXISTS matter_group_table (
     FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
 
+-- matter_groupcast_groups persists the Groupcast cluster's per-group
+-- properties: the multicast address policy (MulticastAddrPolicyEnum:
+-- 0 IanaAddr, 1 PerGroup) and whether the group carries an auxiliary
+-- access control entry. A row is what makes a group a Groupcast member
+-- beyond the group table. Mirrors matter.js GroupcastServer state
+-- `groupProperties` (GroupPropertiesStruct: GroupId, McastAddrPolicy,
+-- HasAuxiliaryAcl, FabricIndex; quality N), which together with
+-- GroupKeyManagement's groupTable and groupKeyMap is the source the
+-- Membership attribute is derived from
+-- (packages/node/src/behaviors/groupcast/GroupcastServer.ts).
+CREATE TABLE IF NOT EXISTS matter_groupcast_groups (
+    fabric_index        INTEGER NOT NULL,
+    group_id            INTEGER NOT NULL CHECK(group_id BETWEEN 1 AND 65535),
+    mcast_addr_policy   INTEGER NOT NULL CHECK(mcast_addr_policy BETWEEN 0 AND 255),
+    has_auxiliary_acl   INTEGER NOT NULL DEFAULT 0 CHECK(has_auxiliary_acl IN (0, 1)),
+    PRIMARY KEY(fabric_index, group_id),
+    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
+);
+
 -- matter_acl_entries persists the per-fabric AccessControl list
 -- (Matter §11.2.12). Subjects + Targets are JSON-encoded inline because
 -- they are short list-of-records and the access path is always

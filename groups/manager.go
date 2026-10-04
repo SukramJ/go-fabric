@@ -42,6 +42,9 @@ type Store interface {
 	ListGroupTable(ctx context.Context, fabricIndex uint8) ([]store.GroupTableEntry, error)
 	UpsertGroupTableEntry(ctx context.Context, e store.GroupTableEntry) error
 	RemoveGroupTableEntry(ctx context.Context, fabricIndex uint8, groupID uint16) error
+	ListGroupcastGroups(ctx context.Context, fabricIndex uint8) ([]store.GroupcastGroup, error)
+	UpsertGroupcastGroup(ctx context.Context, g store.GroupcastGroup) error
+	RemoveGroupcastGroup(ctx context.Context, fabricIndex uint8, groupID uint16) error
 }
 
 // TableEntry is one group of a fabric with the local endpoints that are
@@ -81,6 +84,11 @@ type fabricGroups struct {
 	keySets map[uint16]*keySet
 	idMap   map[uint16]uint16
 	table   map[uint16]*TableEntry
+	// props is the Groupcast cluster's per-group state (matter.js
+	// GroupcastServer groupProperties): existence of a Groupcast
+	// membership beyond the group table, its multicast address policy and
+	// its auxiliary-ACL flag.
+	props map[uint16]GroupProperties
 }
 
 // Manager holds the group state of every fabric of this node: what the
@@ -108,9 +116,16 @@ type Manager struct {
 	receptionMu sync.Mutex
 	reception   map[string]map[uint64]*mrp.Window
 
-	observersMu    sync.Mutex
-	observers      []func()
-	tableObservers []func(fabricIndex uint8)
+	observersMu        sync.Mutex
+	observers          []func()
+	tableObservers     []func(fabricIndex uint8)
+	groupcastObservers []func(ctx context.Context, fabricIndex uint8)
+
+	// messageListeners receive the outcome of every group message
+	// (matter.js SessionManager.onGroupMessage); see ReportGroupMessage.
+	listenersMu      sync.Mutex
+	messageListeners map[uint64]func(GroupMessageEvent)
+	nextListener     uint64
 }
 
 // NewManager returns a manager over st. logger may be nil.
@@ -209,6 +224,7 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 	f := &fabricGroups{
 		index: idx, fabricID: rec.FabricID, compressed: rec.CompressedID,
 		keySets: make(map[uint16]*keySet), idMap: make(map[uint16]uint16), table: make(map[uint16]*TableEntry),
+		props: make(map[uint16]GroupProperties),
 	}
 	sets, err := m.st.ListGroupKeySets(ctx, idx)
 	if err != nil {
@@ -242,6 +258,13 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 	}
 	for _, e := range table {
 		f.table[e.GroupID] = &TableEntry{GroupID: e.GroupID, GroupName: e.GroupName, Endpoints: slices.Clone(e.Endpoints)}
+	}
+	props, err := m.st.ListGroupcastGroups(ctx, idx)
+	if err != nil {
+		return nil, fmt.Errorf("groups: load groupcast groups of fabric %d: %w", idx, err)
+	}
+	for _, g := range props {
+		f.props[g.GroupID] = GroupProperties{McastAddrPolicy: g.McastAddrPolicy, HasAuxiliaryACL: g.HasAuxiliaryACL}
 	}
 	return f, nil
 }
@@ -350,13 +373,18 @@ func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
 		return err
 	}
 	if prev != nil {
-		// The group table is owned by this manager; keep the in-memory
-		// copy rather than racing a concurrent membership change.
+		// The group table and the Groupcast properties are owned by this
+		// manager; keep the in-memory copies rather than racing a
+		// concurrent membership change.
 		f.table = prev.table
+		f.props = prev.props
 	}
 	m.fabrics[fabricIndex] = f
 	m.mu.Unlock()
 	m.forgetUnreferenced()
+	// A GroupKeyMap change moves Membership's KeySetId. Mirrors
+	// GroupcastServer's groupKeyMap$Changed reactor (#deriveNow).
+	m.notifyGroupcast(ctx, fabricIndex)
 	return nil
 }
 
@@ -364,6 +392,10 @@ func (m *Manager) Reload(ctx context.Context, fabricIndex uint8) error {
 // and its multicast memberships. The store's cascade has already removed
 // the rows. Mirrors the FabricManager `deleting` handling of matter.js
 // ServerGroupNetworking and the fabric's own disposal.
+//
+// The fabric's Groupcast properties go with it, as matter.js
+// GroupcastServer #handleFabricDeleted drops the departed fabric's
+// groupProperties.
 func (m *Manager) ForgetFabric(fabricIndex uint8) {
 	m.mu.Lock()
 	_, had := m.fabrics[fabricIndex]
@@ -372,6 +404,7 @@ func (m *Manager) ForgetFabric(fabricIndex uint8) {
 	m.forgetUnreferenced()
 	if had {
 		m.notify()
+		m.notifyGroupcast(context.Background(), fabricIndex)
 	}
 }
 
@@ -492,6 +525,7 @@ func (m *Manager) AddEndpointForGroup(ctx context.Context, fabricIndex uint8, gr
 		slog.Int("fabric_index", int(fabricIndex)), slog.Int("group_id", int(groupID)),
 		slog.Int("endpoint", int(endpoint)), slog.String("name", name))
 	m.notifyTable(fabricIndex)
+	m.notifyGroupcast(ctx, fabricIndex)
 	if !exists {
 		m.notify()
 	}
@@ -535,6 +569,20 @@ func (m *Manager) RemoveEndpoint(ctx context.Context, fabricIndex uint8, endpoin
 			}
 			delete(f.table, id)
 			removed = true
+			// A group that lost its last endpoint is deleted, not kept as
+			// a Groupcast member without endpoints: matter.js
+			// GroupcastServer #handleGroupTableChanged /
+			// #applyPendingAndDerive prune the groupProperties of a group
+			// that left the group table (CHIP kDeleteGroupIfEmpty) unless
+			// a Groupcast command kept it sender-only — which needs the
+			// Sender feature this module does not advertise.
+			if _, ok := f.props[id]; ok {
+				if err := m.st.RemoveGroupcastGroup(ctx, fabricIndex, id); err != nil {
+					m.mu.Unlock()
+					return existing, fmt.Errorf("groups: remove groupcast group %d: %w", id, err)
+				}
+				delete(f.props, id)
+			}
 			continue
 		}
 		if err := m.st.UpsertGroupTableEntry(ctx, store.GroupTableEntry{
@@ -548,6 +596,7 @@ func (m *Manager) RemoveEndpoint(ctx context.Context, fabricIndex uint8, endpoin
 	m.mu.Unlock()
 	if existing {
 		m.notifyTable(fabricIndex)
+		m.notifyGroupcast(ctx, fabricIndex)
 	}
 	if removed {
 		m.notify()
@@ -566,8 +615,10 @@ type Membership struct {
 // Memberships returns, for every loaded fabric, each group that has a
 // member endpoint, with its multicast address — the addresses the node's
 // socket must have joined. Membership follows group existence, not key
-// availability, as in matter.js ServerGroupNetworking. Loads every fabric
-// first.
+// availability, as in matter.js ServerGroupNetworking. The address follows
+// the group's multicast policy ([Manager.MulticastAddressFor]): every
+// group a Groupcast JoinGroup put on IanaAddr shares [IANAGroupcastAddress],
+// so callers deduplicate by address. Loads every fabric first.
 func (m *Manager) Memberships(ctx context.Context) ([]Membership, error) {
 	if err := m.ensureAllLoaded(ctx); err != nil {
 		return nil, err
@@ -590,7 +641,7 @@ func (m *Manager) Memberships(ctx context.Context) ([]Membership, error) {
 		}
 		slices.Sort(ids)
 		for _, id := range ids {
-			out = append(out, Membership{FabricIndex: idx, GroupID: id, Address: MulticastAddress(f.fabricID, id)})
+			out = append(out, Membership{FabricIndex: idx, GroupID: id, Address: f.multicastAddress(id)})
 		}
 	}
 	return out, nil

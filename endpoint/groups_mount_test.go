@@ -41,6 +41,14 @@ func (nopGroupStore) UpsertGroupTableEntry(context.Context, store.GroupTableEntr
 
 func (nopGroupStore) RemoveGroupTableEntry(context.Context, uint8, uint16) error { return nil }
 
+func (nopGroupStore) ListGroupcastGroups(context.Context, uint8) ([]store.GroupcastGroup, error) {
+	return nil, nil
+}
+
+func (nopGroupStore) UpsertGroupcastGroup(context.Context, store.GroupcastGroup) error { return nil }
+
+func (nopGroupStore) RemoveGroupcastGroup(context.Context, uint8, uint16) error { return nil }
+
 // deviceTypeSource is a source of a given device type with given servers.
 type deviceTypeSource struct {
 	dt      uint16

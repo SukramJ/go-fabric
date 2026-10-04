@@ -35,6 +35,30 @@ var (
 	ErrMalformed = errors.New("groups: malformed group message")
 )
 
+// NoKeyError is the [ErrNoKey] outcome with what an unusable key set
+// revealed: when a key set that GroupKeyMap maps no group to still
+// authenticates the message, its fabric and the message's group id are
+// known — enough for Groupcast testing to name the fabric and derive the
+// arrival address, never enough to process the message. Mirrors matter.js
+// GroupSessionNoKeyError and GroupSession.decode's unmappedAuthentication.
+type NoKeyError struct {
+	// Authenticated reports that an unmapped key set opened the message;
+	// FabricIndex and GroupID are set only then.
+	Authenticated bool
+	FabricIndex   uint8
+	GroupID       uint16
+}
+
+func (e *NoKeyError) Error() string {
+	if e.Authenticated {
+		return fmt.Sprintf("%s (an unmapped key set of fabric %d authenticated group %d)", ErrNoKey, e.FabricIndex, e.GroupID)
+	}
+	return ErrNoKey.Error()
+}
+
+// Is makes errors.Is(err, ErrNoKey) hold.
+func (e *NoKeyError) Is(target error) bool { return target == ErrNoKey }
+
 // Message is a group message that authenticated under one of this node's
 // operational group keys.
 type Message struct {
@@ -114,11 +138,21 @@ func (m *Manager) Decode(ctx context.Context, datagram []byte) (*Message, error)
 	if datagram[0]&0x04 == 0 {
 		return nil, fmt.Errorf("%w: no source node id", ErrMalformed)
 	}
-	cands := m.candidates(sessionID)
-	if len(cands) == 0 {
-		return nil, ErrNoKey
-	}
 	privacy := secFlags&0x80 != 0
+	cands := m.candidates(sessionID, true)
+	if len(cands) == 0 {
+		// Matching the CHIP SDK, only mapped key sets count as
+		// available; an unmapped one that authenticates the message
+		// only recovers its fabric and group for the report.
+		noKey := &NoKeyError{}
+		for _, c := range m.candidates(sessionID, false) {
+			if msg, ok := tryDecrypt(datagram, sessionID, privacy, c); ok && msg.Header.DestSize == message.DestGroup {
+				noKey.Authenticated, noKey.FabricIndex, noKey.GroupID = true, c.fabric.index, msg.Header.DestGroupID
+				break
+			}
+		}
+		return nil, noKey
+	}
 	for _, c := range cands {
 		msg, ok := tryDecrypt(datagram, sessionID, privacy, c)
 		if !ok {
@@ -136,10 +170,11 @@ func (m *Manager) Decode(ctx context.Context, datagram []byte) (*Message, error)
 	return nil, ErrDecrypt
 }
 
-// candidates collects the mapped key sets' epoch keys with sessionID,
-// ordered by fabric index and key set id so the outcome does not depend on
-// map iteration.
-func (m *Manager) candidates(sessionID uint16) []candidate {
+// candidates collects the epoch keys with sessionID of the key sets that
+// GroupKeyMap maps a group to (mapped) or of those it maps none to
+// (!mapped), ordered by fabric index and key set id so the outcome does
+// not depend on map iteration.
+func (m *Manager) candidates(sessionID uint16, mapped bool) []candidate {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	idxs := make([]uint8, 0, len(m.fabrics))
@@ -150,9 +185,9 @@ func (m *Manager) candidates(sessionID uint16) []candidate {
 	var out []candidate
 	for _, idx := range idxs {
 		f := m.fabrics[idx]
-		mapped := make(map[uint16]bool, len(f.idMap))
+		inMap := make(map[uint16]bool, len(f.idMap))
 		for _, ks := range f.idMap {
-			mapped[ks] = true
+			inMap[ks] = true
 		}
 		ids := make([]uint16, 0, len(f.keySets))
 		for id := range f.keySets {
@@ -160,7 +195,7 @@ func (m *Manager) candidates(sessionID uint16) []candidate {
 		}
 		slices.Sort(ids)
 		for _, id := range ids {
-			if !mapped[id] {
+			if inMap[id] != mapped {
 				continue
 			}
 			for _, e := range f.keySets[id].epochs {

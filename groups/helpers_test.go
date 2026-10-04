@@ -23,6 +23,7 @@ type memStore struct {
 	sets    map[uint8][]store.GroupKeySet
 	maps    map[uint8][]store.GroupKeyMapping
 	table   map[uint8]map[uint16]store.GroupTableEntry
+	gcast   map[uint8]map[uint16]store.GroupcastGroup
 	failPut error
 }
 
@@ -30,6 +31,7 @@ func newMemStore() *memStore {
 	return &memStore{
 		fabrics: map[uint8]store.FabricRecord{}, sets: map[uint8][]store.GroupKeySet{},
 		maps: map[uint8][]store.GroupKeyMapping{}, table: map[uint8]map[uint16]store.GroupTableEntry{},
+		gcast: map[uint8]map[uint16]store.GroupcastGroup{},
 	}
 }
 
@@ -96,6 +98,40 @@ func (s *memStore) RemoveGroupTableEntry(_ context.Context, idx uint8, gid uint1
 		return s.failPut
 	}
 	delete(s.table[idx], gid)
+	return nil
+}
+
+func (s *memStore) ListGroupcastGroups(_ context.Context, idx uint8) ([]store.GroupcastGroup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]store.GroupcastGroup, 0, len(s.gcast[idx]))
+	for _, g := range s.gcast[idx] {
+		out = append(out, g)
+	}
+	slices.SortFunc(out, func(a, b store.GroupcastGroup) int { return int(a.GroupID) - int(b.GroupID) })
+	return out, nil
+}
+
+func (s *memStore) UpsertGroupcastGroup(_ context.Context, g store.GroupcastGroup) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.failPut != nil {
+		return s.failPut
+	}
+	if s.gcast[g.FabricIndex] == nil {
+		s.gcast[g.FabricIndex] = map[uint16]store.GroupcastGroup{}
+	}
+	s.gcast[g.FabricIndex][g.GroupID] = g
+	return nil
+}
+
+func (s *memStore) RemoveGroupcastGroup(_ context.Context, idx uint8, gid uint16) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.failPut != nil {
+		return s.failPut
+	}
+	delete(s.gcast[idx], gid)
 	return nil
 }
 
