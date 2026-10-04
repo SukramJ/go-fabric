@@ -175,7 +175,8 @@ func (r *resolution) query() []byte {
 		{Name: r.instance, Qtype: dns.TypeTXT, Qclass: dns.ClassINET},
 	}
 	if r.target != "" && len(r.hosts[strings.ToLower(r.target)]) == 0 {
-		m.Question = append(m.Question,
+		m.Question = append(
+			m.Question,
 			dns.Question{Name: r.target, Qtype: dns.TypeAAAA, Qclass: dns.ClassINET},
 			dns.Question{Name: r.target, Qtype: dns.TypeA, Qclass: dns.ClassINET},
 		)

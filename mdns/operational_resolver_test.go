@@ -98,7 +98,8 @@ func TestOperationalResolver_ResolvesFromOneResponseInPreferenceOrder(t *testing
 		return []received{
 			{msg: noiseBytes},
 			{msg: packResponse(t, goodbye)},
-			{msg: packResponse(t,
+			{msg: packResponse(
+				t,
 				aRR("ctrl.local.", "192.168.1.20"),
 				aaaaRR("ctrl.local.", "2001:db8::20"),
 				aaaaRR("ctrl.local.", "fd00::20"),
@@ -174,7 +175,8 @@ func TestOperationalResolver_DropsLinkLocalWithoutZone(t *testing.T) {
 	t.Parallel()
 	instance := OperationalInstanceQName(testCFID, testNodeID)
 	conn := newFakeQueryConn(func(*dns.Msg, int) []received {
-		return []received{{msg: packResponse(t,
+		return []received{{msg: packResponse(
+			t,
 			srvRR(instance, "ctrl.local.", 5540),
 			aaaaRR("ctrl.local.", "fe80::1"),
 			aRR("ctrl.local.", "10.0.0.2"),

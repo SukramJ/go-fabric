@@ -84,7 +84,8 @@ func Upgrade(ctx context.Context, db *sql.DB) error {
 // needs no foreign_keys pragma change.
 func dropGroupKeyMapKeySetForeignKey(ctx context.Context, db *sql.DB) error {
 	var n int
-	if err := db.QueryRowContext(ctx,
+	if err := db.QueryRowContext(
+		ctx,
 		`SELECT COUNT(*) FROM pragma_foreign_key_list('matter_group_key_map') WHERE "table" = 'matter_group_keys'`,
 	).Scan(&n); err != nil {
 		return fmt.Errorf("inspect matter_group_key_map: %w", err)
