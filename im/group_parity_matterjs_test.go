@@ -87,7 +87,7 @@ func (d *groupFakeDispatcher) CheckACL(ctx context.Context, fabric uint8, node u
 	return StatusSuccess
 }
 
-func (d *groupFakeDispatcher) MinInvokePrivilege(_ uint16, _ uint32, cmd uint32) uint8 {
+func (d *groupFakeDispatcher) MinInvokePrivilege(_ uint16, _, cmd uint32) uint8 {
 	if cmd == 1 {
 		return 4
 	}

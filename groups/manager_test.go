@@ -35,7 +35,7 @@ func newTestManager(t *testing.T) (*Manager, *memStore) {
 	return m, st
 }
 
-func opKeyOf(t *testing.T, seed byte) ([]byte, uint16) {
+func opKeyOf(t *testing.T, seed byte) (opKey []byte, sessionID uint16) {
 	t.Helper()
 	op, err := OperationalKey(epochKeyOf(seed), testCompressed)
 	if err != nil {

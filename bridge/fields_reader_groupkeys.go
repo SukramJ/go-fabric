@@ -119,11 +119,11 @@ func decodeKeySetRemoveRequest(dec *tlv.Decoder) (mattercore.KeySetRemoveRequest
 // KeySetReadAllIndices (Matter §11.2.7.5, whose one field DoNotUse has
 // conformance X) and Groups RemoveAllGroups. A stray field is ignored the
 // way matter.js's schema decode ignores an unknown tag.
-func decodeKeySetReadAllIndicesRequest(dec *tlv.Decoder) (any, error) {
+func decodeKeySetReadAllIndicesRequest(dec *tlv.Decoder) error {
 	if err := drainContainer(dec); err != nil {
-		return nil, fmt.Errorf("fieldless command: %w", err)
+		return fmt.Errorf("fieldless command: %w", err)
 	}
-	return nil, nil
+	return nil
 }
 
 // decodeKeySetWriteRequest reads GroupKeyManagement KeySetWrite (Matter
@@ -186,7 +186,7 @@ const groupKeySetMandatory uint16 = 0xFF
 // [mattercore.GroupKeySetStruct] uses for an unused slot. A key of the
 // wrong length is not rejected here: its "16" constraint is the server's
 // ConstraintError, as in matter.js.
-func decodeGroupKeySetStruct(dec *tlv.Decoder) (mattercore.GroupKeySetStruct, error) { //nolint:gocognit,gocyclo // one case per struct field
+func decodeGroupKeySetStruct(dec *tlv.Decoder) (mattercore.GroupKeySetStruct, error) { //nolint:gocognit,gocyclo,funlen // one case per struct field
 	const cmd = "KeySetWrite.GroupKeySet"
 	var (
 		gks  mattercore.GroupKeySetStruct

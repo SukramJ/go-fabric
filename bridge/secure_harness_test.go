@@ -106,14 +106,14 @@ func (h *harnessLookup) FabricFor(id uint16) (uint8, bool) {
 	return h.fabric, true
 }
 
-func (h *harnessLookup) SubjectFor(id uint16) (uint64, []uint32, bool) {
+func (h *harnessLookup) SubjectFor(id uint16) (nodeID uint64, cats []uint32, ok bool) {
 	if id != harnessLocalSessionID {
 		return 0, nil, false
 	}
 	return h.subject, nil, true
 }
 
-func (h *harnessLookup) IsPASE(id uint16) (bool, bool) {
+func (h *harnessLookup) IsPASE(id uint16) (pase, ok bool) {
 	return false, id == harnessLocalSessionID
 }
 

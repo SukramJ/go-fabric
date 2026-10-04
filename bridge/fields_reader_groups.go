@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -16,6 +17,37 @@ import (
 // ConstraintError status in its response; the decoders therefore accept
 // any uint16 group id and any name, and leave the checks to
 // [mattercore.Groups].
+
+// groupCommandFieldsReader decodes the Groups (0x0004) and
+// GroupKeyManagement (0x003F) command payloads; ok is false for a command
+// it does not know, which the caller then salvages generically.
+func groupCommandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder) (fields any, ok bool, err error) {
+	switch {
+	case path.Cluster == mattercore.GroupsClusterID && path.Command == 0x00:
+		fields, err = decodeAddGroupRequest(dec)
+	case path.Cluster == mattercore.GroupsClusterID && path.Command == 0x01:
+		fields, err = decodeViewGroupRequest(dec)
+	case path.Cluster == mattercore.GroupsClusterID && path.Command == 0x02:
+		fields, err = decodeGetGroupMembershipRequest(dec)
+	case path.Cluster == mattercore.GroupsClusterID && path.Command == 0x03:
+		fields, err = decodeRemoveGroupRequest(dec)
+	case path.Cluster == mattercore.GroupsClusterID && path.Command == 0x04: // RemoveAllGroups carries no fields
+		err = decodeKeySetReadAllIndicesRequest(dec)
+	case path.Cluster == mattercore.GroupsClusterID && path.Command == 0x05:
+		fields, err = decodeAddGroupIfIdentifyingRequest(dec)
+	case path.Cluster == 0x003F && path.Command == 0x00:
+		fields, err = decodeKeySetWriteRequest(dec)
+	case path.Cluster == 0x003F && path.Command == 0x01:
+		fields, err = decodeKeySetReadRequest(dec)
+	case path.Cluster == 0x003F && path.Command == 0x03:
+		fields, err = decodeKeySetRemoveRequest(dec)
+	case path.Cluster == 0x003F && path.Command == 0x04:
+		err = decodeKeySetReadAllIndicesRequest(dec)
+	default:
+		return nil, false, nil
+	}
+	return fields, true, err
+}
 
 // decodeGroupIDAndName reads AddGroup / AddGroupIfIdentifying:
 // [0] group-id GroupId, [1] string GroupName — both mandatory.

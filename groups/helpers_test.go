@@ -46,7 +46,7 @@ func (s *memStore) GetFabric(_ context.Context, idx uint8) (store.FabricRecord, 
 func (s *memStore) ListFabrics(context.Context) ([]store.FabricRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []store.FabricRecord
+	out := make([]store.FabricRecord, 0, len(s.fabrics))
 	for _, r := range s.fabrics {
 		out = append(out, r)
 	}
@@ -68,7 +68,7 @@ func (s *memStore) ListGroupKeyMappings(_ context.Context, idx uint8) ([]store.G
 func (s *memStore) ListGroupTable(_ context.Context, idx uint8) ([]store.GroupTableEntry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []store.GroupTableEntry
+	out := make([]store.GroupTableEntry, 0, len(s.table[idx]))
 	for _, e := range s.table[idx] {
 		out = append(out, e)
 	}
@@ -113,13 +113,6 @@ func (s *memStore) putKeySet(idx uint8, ks store.GroupKeySet) {
 	s.sets[idx] = append(s.sets[idx], ks)
 }
 
-func (s *memStore) removeKeySet(idx uint8, id uint16) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.sets[idx] = slices.DeleteFunc(s.sets[idx], func(o store.GroupKeySet) bool { return o.GroupKeySetID == id })
-	s.maps[idx] = slices.DeleteFunc(s.maps[idx], func(o store.GroupKeyMapping) bool { return o.GroupKeySetID == id })
-}
-
 func (s *memStore) mapGroup(idx uint8, gid, ksID uint16) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -132,8 +125,8 @@ func (s *memStore) mapGroup(idx uint8, gid, ksID uint16) {
 // the Security Flags naming a group session (with P when privacy is on),
 // the AEAD nonce from the Security Flags, the counter and the source node
 // id, and the privacy obfuscation of the header past the Security Flags.
-func sealGroup(t testing.TB, opKey []byte, sessionID, groupID uint16, source uint64, counter uint32, privacy bool, plain []byte) []byte {
-	t.Helper()
+func sealGroup(tb testing.TB, opKey []byte, sessionID, groupID uint16, source uint64, counter uint32, privacy bool, plain []byte) []byte {
+	tb.Helper()
 	hdr := message.Header{
 		SessionID: sessionID, MessageCounter: counter,
 		HasSourceNodeID: true, SourceNodeID: source,
@@ -147,25 +140,25 @@ func sealGroup(t testing.TB, opKey []byte, sessionID, groupID uint16, source uin
 	binary.LittleEndian.PutUint64(nonce[5:13], source)
 	ccm, err := aesccm.New(opKey)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	sealed, err := ccm.Seal(nil, nonce, plain, raw)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	out := append(slices.Clone(raw), sealed...)
 	if privacy {
 		pk, err := PrivacyKey(opKey)
 		if err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 		region := out[4:len(raw)]
 		mask, err := channel.PrivacyKeystream(pk, sessionID, out[len(out)-aesccm.TagSize:], len(region))
 		if err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 		if err := channel.ApplyPrivacyMask(mask, region); err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 	}
 	return out

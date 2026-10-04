@@ -114,18 +114,20 @@ func TestGroupsServerIsMountedWhereTheDeviceTypeMandatesIt(t *testing.T) {
 			}
 			// The ServerList the Descriptor serves names it once.
 			for _, srv := range servers {
-				if d, ok := srv.(*mattercore.Descriptor); ok {
-					v, _ := d.MatterRead(0x0001)
-					list, _ := v.([]uint32)
-					seen := 0
-					for _, id := range list {
-						if id == mattercore.GroupsClusterID {
-							seen++
-						}
+				d, ok := srv.(*mattercore.Descriptor)
+				if !ok {
+					continue
+				}
+				v, _ := d.MatterRead(0x0001)
+				list, _ := v.([]uint32)
+				seen := 0
+				for _, id := range list {
+					if id == mattercore.GroupsClusterID {
+						seen++
 					}
-					if seen != 1 {
-						t.Errorf("%s: ServerList %v names Groups %d times", tc.name, list, seen)
-					}
+				}
+				if seen != 1 {
+					t.Errorf("%s: ServerList %v names Groups %d times", tc.name, list, seen)
 				}
 			}
 		}

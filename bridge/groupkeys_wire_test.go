@@ -47,7 +47,7 @@ func newGKMHarness(t *testing.T) *secureHarness {
 
 // putKeySet encodes a GroupKeySetStruct at tag 0 with one epoch key and an
 // explicit GroupKeyMulticastPolicy.
-func putKeySet(id uint16, key []byte, start uint64, multicastPolicy uint64) func(enc *tlv.Encoder) {
+func putKeySet(id uint16, key []byte, start, multicastPolicy uint64) func(enc *tlv.Encoder) {
 	return func(enc *tlv.Encoder) {
 		enc.StartStruct(tlv.ContextTag(0))
 		enc.PutUint(tlv.ContextTag(0), uint64(id))
@@ -111,8 +111,9 @@ func TestGroupKeyManagementCommandsOverTheWire(t *testing.T) {
 	if isStatus || cmd != gkmCmdKeySetReadAllResp {
 		t.Fatalf("KeySetReadAllIndices answered command 0x%02X (isStatus=%v), want 0x05", cmd, isStatus)
 	}
-	var ids []uint64
-	for _, c := range fields.mustChild(t, 0).Children {
+	children := fields.mustChild(t, 0).Children
+	ids := make([]uint64, 0, len(children))
+	for _, c := range children {
 		ids = append(ids, c.El.Uint)
 	}
 	if len(ids) != 2 || ids[0] != 0 || ids[1] != 0x01A1 {

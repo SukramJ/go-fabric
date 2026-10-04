@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/ipv6"
+
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -32,7 +34,6 @@ import (
 	"github.com/SukramJ/go-fabric/store"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
-	"golang.org/x/net/ipv6"
 )
 
 // fakeMulticastMember records the memberships the bridge asks for.
@@ -62,7 +63,7 @@ func (f *fakeMulticastMember) LeaveGroup(ip net.IP) error {
 func (f *fakeMulticastMember) addresses() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	var out []string
+	out := make([]string, 0, len(f.joined))
 	for a := range f.joined {
 		out = append(out, a)
 	}
@@ -366,7 +367,7 @@ func TestGroupMessagingEndToEnd(t *testing.T) {
 
 // provisionGroupOnly provisions a group but writes the GroupKeyMap with
 // both the existing kitchen binding and the new one, so neither is lost.
-func (gh *groupsHarness) provisionGroupOnly(t *testing.T, keySetID uint16, epochKey []byte, groupID uint16, lamp uint16) {
+func (gh *groupsHarness) provisionGroupOnly(t *testing.T, keySetID uint16, epochKey []byte, groupID, lamp uint16) {
 	t.Helper()
 	if _, _, status, _ := invokeResult(t, gh.invoke(0, gkmCluster, gkmCmdKeySetWrite, putKeySet(keySetID, epochKey, 1, 0))); status != 0 {
 		t.Fatalf("KeySetWrite: %v", status)

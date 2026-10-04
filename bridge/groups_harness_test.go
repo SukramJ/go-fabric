@@ -10,6 +10,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -43,7 +44,7 @@ func (s *recordingOnOff) MatterRead(attrID uint32) (any, bool) {
 }
 
 func (s *recordingOnOff) MatterWrite(context.Context, uint32, any) error {
-	return fmt.Errorf("read-only")
+	return errors.New("read-only")
 }
 
 func (s *recordingOnOff) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
