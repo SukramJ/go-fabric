@@ -7598,14 +7598,14 @@
       "identifier": "TestOperationalResolver_AsksForHostAddressesAfterBareSRV",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/operational_resolver_test.go",
-      "line": 133
+      "line": 134
     },
     {
       "package": "mdns",
       "identifier": "TestOperationalResolver_DropsLinkLocalWithoutZone",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/operational_resolver_test.go",
-      "line": 173
+      "line": 174
     },
     {
       "package": "mdns",
@@ -7633,7 +7633,7 @@
       "identifier": "TestOperationalResolver_RetriesThenGivesUp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/operational_resolver_test.go",
-      "line": 158
+      "line": 159
     },
     {
       "package": "mdns",
