@@ -298,3 +298,19 @@ func TestCeilingLightOnDoesNotDeadlockItsNotifier(t *testing.T) {
 		t.Fatalf("after On: on=%v, notifier read-backs=%d; want on and one read-back", light.isOn(), reads)
 	}
 }
+
+// TestLightKeepsItsOnOffStateAcrossDispatches: the bridge asks a source for
+// its cluster servers on every dispatch, so the light hands out the same
+// OnOff server each time — a written OnTime reads back (TC-OO-2.1).
+func TestLightKeepsItsOnOffStateAcrossDispatches(t *testing.T) {
+	t.Parallel()
+	light := newDemoLight("kept")
+	first := light.MatterClusterServers()[0]
+	if err := first.MatterWrite(context.Background(), onoff.AttrOnTime, uint16(30)); err != nil {
+		t.Fatalf("write OnTime: %v", err)
+	}
+	again := light.MatterClusterServers()[0]
+	if v, _ := again.MatterRead(onoff.AttrOnTime); v != uint16(30) {
+		t.Fatalf("OnTime on the next dispatch = %v, want 30", v)
+	}
+}

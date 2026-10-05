@@ -117,6 +117,14 @@ type demoLight struct {
 
 	mu sync.RWMutex
 	on bool
+
+	// servers is built once: the bridge asks for the cluster servers on
+	// every dispatch, and the OnOff server holds the LT state (OnTime,
+	// OffWaitTime, the countdowns) and the change listeners the bridge
+	// subscribed at reassembly. Rebuilt per call, a written OnTime was
+	// gone by the next read (TC-OO-2.1).
+	serversOnce sync.Once
+	servers     []contract.ClusterServer
 }
 
 func newDemoLight(name string) *demoLight { return &demoLight{name: name} }
@@ -135,10 +143,13 @@ func (d *demoLight) MatterDeviceType() uint16 { return onoff.DeviceTypeOnOffLigh
 // it (endpoint.Config.Groups). ScenesManagement stays the module's stub; the
 // light has no scene table, and the stub advertises exactly that.
 func (d *demoLight) MatterClusterServers() []contract.ClusterServer {
-	return []contract.ClusterServer{
-		&onOffServer{dev: d, logMessage: "light.set", lt: newLightingState()},
-		wire.ScenesManagement{},
-	}
+	d.serversOnce.Do(func() {
+		d.servers = []contract.ClusterServer{
+			&onOffServer{dev: d, logMessage: "light.set", lt: newLightingState()},
+			wire.ScenesManagement{},
+		}
+	})
+	return d.servers
 }
 
 // deviceName implements [onOffDevice].

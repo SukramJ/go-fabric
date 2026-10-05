@@ -372,6 +372,9 @@ pseudo-version of `main`.
     command: switching it fired the device's change notification while the
     command still held the light's state, and the bridge's read-back of the
     changed paths waited on it forever (TC-CC-*, TC-LVL-*).
+  - The reference daemon's on/off light hands the bridge the same cluster
+    servers on every dispatch, so a written OnTime or OffWaitTime and a
+    running countdown survive to the next request (TC-OO-2.1 to 2.3).
   - A change notification of a host source marked every reportable
     attribute of its endpoint dirty; the bridge now reports only the
     attributes whose value moved, and advances only their clusters'
