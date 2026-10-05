@@ -335,6 +335,13 @@ pseudo-version of `main`.
     Fabrics after AddNOC. The bridge now compares the invoked cluster's
     attributes before and after the command and reports what moved, as
     matter.js's Datasource does (TC-IDM-1.5).
+  - A commissioning window that opened, timed out, was revoked or ended with
+    a commissioning never reported WindowStatus, AdminFabricIndex and
+    AdminVendorId to subscribers; the bridge now marks them changed on every
+    window transition (TC-CADMIN-1.3).
+  - OpenCommissioningWindow answered the IM-level BUSY where matter.js and
+    the spec give FAILURE with the cluster-specific status Busy (0x02)
+    (TC-CADMIN-1.5).
   - A list-append write (null ListIndex) — how a controller writes a list too
     large for one message, a replace followed by appends — was not
     understood: the path lost the null, the element failed to decode as a

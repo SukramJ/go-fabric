@@ -1144,6 +1144,26 @@ func (b *Bridge) AttachCommissioningWindow(w *CommissioningWindow) {
 	roots := b.rootClusters
 	b.mu.Unlock()
 	wireCommissioned(roots, w)
+	if w != nil {
+		// A window that opens, times out, is revoked or ends with a
+		// commissioning changes WindowStatus, AdminFabricIndex and
+		// AdminVendorId; subscribers learn of it like of any attribute
+		// change (matter.js AdministratorCommissioningServer sets the
+		// state, whose $Changed reports it). TC-CADMIN-1.3 step 9 waits for
+		// WindowStatus to fall back to WindowNotOpen on its subscription.
+		w.setStateChanged(func() {
+			mgr := b.subscriptionManagerLocked()
+			if mgr == nil {
+				return
+			}
+			for _, attr := range []uint32{0x0000, 0x0001, 0x0002} {
+				mgr.OnAttributeChanged(im.ConcreteAttributePath{
+					Endpoint: 0, Cluster: administratorCommissioningClusterID, Attribute: attr,
+					HasEndpoint: true, HasCluster: true, HasAttribute: true,
+				})
+			}
+		})
+	}
 }
 
 // CommissioningWindow returns the attached window tracker or nil

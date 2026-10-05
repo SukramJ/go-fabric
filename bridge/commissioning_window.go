@@ -141,6 +141,11 @@ type CommissioningWindow struct {
 	// — typically wired to the AdministratorCommissioning cluster's
 	// SubscriptionEventReporter so subscribers see WindowStatus flip.
 	onTransition func()
+	// onStateChanged is the bridge's own transition hook: it reports the
+	// AdministratorCommissioning attributes to subscribers
+	// (Bridge.AttachCommissioningWindow). Called with the caller's
+	// hook, under the same conditions, without the lock.
+	onStateChanged func()
 
 	// failSafeChecker, when non-nil, is consulted at the start of every
 	// OpenWindow call. A currently-armed FailSafe window (set by a prior
@@ -355,7 +360,7 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 		w.adminVendor = params.AdminVendorID
 		w.adminVendorSet = true
 	}
-	hook := w.onTransition
+	hook := w.transitionHooks()
 	armer := w.failSafeArmer
 	w.closeTimer = time.AfterFunc(time.Duration(params.CommissioningTimeoutSeconds)*time.Second, func() {
 		w.mu.Lock()
@@ -364,7 +369,7 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 		w.adminVendorSet = false
 		w.isBasicWindow = false
 		w.hasVerifier = false
-		closeHook := w.onTransition
+		closeHook := w.transitionHooks()
 		restore := w.restore
 		w.restore = nil
 		w.mu.Unlock()
@@ -499,7 +504,7 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 		w.closeTimer.Stop()
 		w.closeTimer = nil
 	}
-	hook := w.onTransition
+	hook := w.transitionHooks()
 	restore := w.restore
 	w.restore = nil
 	w.mu.Unlock()
@@ -836,7 +841,7 @@ func (w *CommissioningWindow) EndCommissioning() {
 		w.closeTimer.Stop()
 		w.closeTimer = nil
 	}
-	hook := w.onTransition
+	hook := w.transitionHooks()
 	restore := w.restore
 	w.restore = nil
 	w.mu.Unlock()
@@ -846,4 +851,29 @@ func (w *CommissioningWindow) EndCommissioning() {
 	if hook != nil {
 		hook()
 	}
+}
+
+// transitionHooks returns the hooks a transition fires — the host's
+// SetTransitionHook and the bridge's attribute reporting — as one func, or
+// nil when neither is set. Caller holds w.mu.
+func (w *CommissioningWindow) transitionHooks() func() {
+	host, own := w.onTransition, w.onStateChanged
+	if host == nil && own == nil {
+		return nil
+	}
+	return func() {
+		if own != nil {
+			own()
+		}
+		if host != nil {
+			host()
+		}
+	}
+}
+
+// setStateChanged installs the bridge's transition hook.
+func (w *CommissioningWindow) setStateChanged(fn func()) {
+	w.mu.Lock()
+	w.onStateChanged = fn
+	w.mu.Unlock()
 }

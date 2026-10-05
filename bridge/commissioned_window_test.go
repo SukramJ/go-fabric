@@ -6,11 +6,13 @@ package bridge
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/im/subscription"
 )
 
 // TestCommissioningCompleteEndsTheWindow pins that a successful
@@ -56,5 +58,41 @@ func TestCommissioningCompleteEndsTheWindow(t *testing.T) {
 		if err := w.OpenWindow(ctx, wire.OpenWindowParams{CommissioningTimeoutSeconds: 600}); err != nil {
 			t.Fatalf("window-first=%v: the next OpenWindow failed: %v", windowFirst, err)
 		}
+	}
+}
+
+// TestWindowTransitionsReachSubscribers pins that a window opening and
+// closing marks WindowStatus (and the admin attributes) dirty, so a
+// subscription to it reports the change — matter.js sets the
+// AdministratorCommissioning state, whose $Changed reports it. TC-CADMIN-1.3
+// step 9 waits on its WindowStatus subscription for the window to close.
+func TestWindowTransitionsReachSubscribers(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	spy := &reachAttrReporterSpy{}
+	mgr := subscription.NewManager(subscription.Config{}, spy.report, nil)
+	if _, err := mgr.Subscribe(subscription.SubscribeArgs{
+		PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 60,
+		AttributePaths: []im.ConcreteAttributePath{{
+			HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			Endpoint: 0, Cluster: administratorCommissioningClusterID, Attribute: 0x0000,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	b.AttachSubscriptionManager(mgr)
+	w := NewCommissioningWindow()
+	b.AttachCommissioningWindow(w)
+	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{CommissioningTimeoutSeconds: 600}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.RevokeWindow(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
+	spy.mu.Lock()
+	defer spy.mu.Unlock()
+	if len(spy.calls) == 0 || len(spy.calls[0]) == 0 {
+		t.Fatal("a window transition reported nothing to a WindowStatus subscription")
 	}
 }

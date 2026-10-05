@@ -462,7 +462,13 @@ type admCommBusyErr struct{}
 func (admCommBusyErr) Error() string {
 	return "matter: AdministratorCommissioning busy (no controller wired)"
 }
-func (admCommBusyErr) MatterStatusCode() im.StatusCode { return im.StatusBusy }
+
+// MatterStatusCode / MatterClusterStatus: FAILURE with the cluster-specific
+// Busy (0x02), as matter.js AdministratorCommissioningServer.ts:196,214
+// throws AdministratorCommissioning.BusyError — not the IM-level BUSY.
+// TC-CADMIN-1.5 step 14 reads the cluster status from the error.
+func (admCommBusyErr) MatterStatusCode() im.StatusCode { return im.StatusFailure }
+func (admCommBusyErr) MatterClusterStatus() uint8      { return 0x02 } // Busy
 
 // admCommPakeErr is the typed backing value for [ErrAdmCommPakeParameter].
 // Matter §11.19.7.3 mandates a cluster-specific status code for
@@ -511,6 +517,7 @@ func (admCommInvalidFieldsErr) MatterStatusCode() im.StatusCode { return im.Stat
 var (
 	_ im.StatusCodeError          = admCommInvalidFieldsErr{}
 	_ im.StatusCodeError          = admCommBusyErr{}
+	_ im.MatterClusterStatusError = admCommBusyErr{}
 	_ im.StatusCodeError          = admCommPakeErr{}
 	_ im.MatterClusterStatusError = admCommPakeErr{}
 	_ im.StatusCodeError          = admCommWindowNotOpenErr{}
@@ -520,7 +527,7 @@ var (
 // Cluster-side errors. The bridge invoke dispatcher maps these to
 // Matter wire status codes:
 //
-//   - [ErrAdmCommBusy]                → §11.19.7.1 Busy (0x9c)
+//   - [ErrAdmCommBusy]                → FAILURE, cluster status Busy (0x02)
 //   - [ErrAdmCommUnsupportedCommand]  → §10.6.7.4 UnsupportedCommand (0x81)
 //   - [ErrAdmCommInvalidFields]       → §10.6.7.4 InvalidCommand   (0x85)
 //   - [ErrAdmCommWindowNotOpen]       → §11.19.8.3 WindowNotOpen cluster-specific failure
