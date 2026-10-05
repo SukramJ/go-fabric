@@ -286,6 +286,38 @@ type endpointState struct {
 	// server is rebuilt on every dispatch — a label stored on the server
 	// was lost the moment the write returned.
 	nodeLabel *string
+	// configVersion is the BridgedDeviceBasicInformation
+	// ConfigurationVersion; 0 until set, served as 1.
+	configVersion uint32
+}
+
+// configurationVersion returns the version, 1 when never raised.
+func (s *endpointState) configurationVersion() uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return max(s.configVersion, 1)
+}
+
+// increaseConfigurationVersion raises the version by one and returns it.
+// Mirrors matter.js BasicInformationServer.nextConfigurationVersion: the
+// uint32 wraps to 1, never to 0.
+func (s *endpointState) increaseConfigurationVersion() uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	next := max(s.configVersion, 1) + 1
+	if next == 0 {
+		next = 1
+	}
+	s.configVersion = next
+	return next
+}
+
+// restoreConfigurationVersion installs a host-persisted version; it never
+// lowers the current one.
+func (s *endpointState) restoreConfigurationVersion(v uint32) {
+	s.mu.Lock()
+	s.configVersion = max(s.configVersion, v)
+	s.mu.Unlock()
 }
 
 // label returns the written label, if any.
@@ -432,6 +464,26 @@ func (e *Endpoint) NodeLabel() string {
 		return l
 	}
 	return e.FriendlyName
+}
+
+// ConfigurationVersion returns the endpoint's
+// BridgedDeviceBasicInformation ConfigurationVersion (1 until raised).
+func (e *Endpoint) ConfigurationVersion() uint32 {
+	return e.endpointState().configurationVersion()
+}
+
+// IncreaseConfigurationVersion raises the endpoint's
+// BridgedDeviceBasicInformation ConfigurationVersion by one, bumps the
+// cluster's DataVersion and returns the new version for the host to
+// persist (hand it back as [Spec.ConfigurationVersion]). Call it when the
+// bridged device's functionality changes — matter.js
+// BridgedDeviceBasicInformationServer.increaseConfigurationVersion. To
+// reach subscribers, go through bridge.Bridge.IncreaseConfigurationVersion,
+// which also marks the attribute dirty.
+func (e *Endpoint) IncreaseConfigurationVersion() uint32 {
+	v := e.endpointState().increaseConfigurationVersion()
+	e.BumpClusterDataVersion(mattercore.BridgedDeviceBasicInformationClusterID)
+	return v
 }
 
 // nodeLabelWriter returns the hook a BridgedDeviceBasicInformation server

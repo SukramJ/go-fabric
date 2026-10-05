@@ -333,3 +333,56 @@ func TestAccessControl_RemoveFabricExtension_NoEntryIsNoop(t *testing.T) {
 		t.Errorf("DataVersion changed (%d -> %d) purging a fabric with no Extension entry", before, after)
 	}
 }
+
+// settingsACLStore is a fakeACLStore with the settings side of
+// [core.ACLExtensionPersistence].
+type settingsACLStore struct {
+	fakeACLStore
+	settings map[string]string
+}
+
+func (s *settingsACLStore) GetSetting(_ context.Context, key string) (string, bool, error) {
+	v, ok := s.settings[key]
+	return v, ok, nil
+}
+
+func (s *settingsACLStore) SetSetting(_ context.Context, key, value string) error {
+	s.settings[key] = value
+	return nil
+}
+
+// TestAccessControl_ExtensionSurvivesARestart pins that the Extension
+// attribute is persisted: a server built on the same store after a reboot
+// serves what the controller wrote, and a removed fabric's entry stays gone.
+// matter.js persists it as fabric-scoped state; TC-ACL-2.10 step 9 reboots
+// the DUT between write and read.
+func TestAccessControl_ExtensionSurvivesARestart(t *testing.T) {
+	t.Parallel()
+	st := &settingsACLStore{settings: map[string]string{}}
+	ac, err := core.NewAccessControl(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := im.WithFabricFilter(context.Background(), true, 2)
+	data := encodeExtensionTLV(t)
+	if err := ac.MatterWrite(ctx, 0x0001, []core.AccessControlExtensionEntry{{Data: data}}); err != nil {
+		t.Fatalf("MatterWrite Extension: %v", err)
+	}
+
+	rebooted, err := core.NewAccessControl(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := rebooted.MatterReadFiltered(ctx, 0x0001)
+	got, _ := v.([]core.AccessControlExtensionEntry)
+	if len(got) != 1 || !bytes.Equal(got[0].Data, data) || got[0].FabricIndex != 2 {
+		t.Fatalf("after restart: %+v, want the written entry on fabric 2", got)
+	}
+
+	rebooted.RemoveFabricExtension(2)
+	again, _ := core.NewAccessControl(st)
+	v, _ = again.MatterReadFiltered(ctx, 0x0001)
+	if got, _ := v.([]core.AccessControlExtensionEntry); len(got) != 0 {
+		t.Fatalf("a removed fabric's extension came back after a restart: %+v", got)
+	}
+}

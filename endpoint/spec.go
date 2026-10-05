@@ -76,6 +76,12 @@ type Spec struct {
 	// [Config.OnNodeLabelWritten]. Empty serves FriendlyName until a
 	// controller writes one.
 	NodeLabel string
+	// ConfigurationVersion is the bridged device's
+	// BridgedDeviceBasicInformation ConfigurationVersion as the host last
+	// persisted it ([Endpoint.IncreaseConfigurationVersion] returns each new
+	// value). Zero serves 1. The version may never decrease, so a host that
+	// raises it keeps it across restarts — matter.js persists it as state.
+	ConfigurationVersion uint32
 	// PowerSource carries a battery reading to be served by the
 	// PowerSource cluster (0x002F) on this endpoint. At most one
 	// endpoint per physical device sets it — see the assembly's

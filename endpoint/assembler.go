@@ -232,6 +232,7 @@ func (a *Assembler) restoredState(spec *Spec) *endpointState {
 	if spec.NodeLabel != "" {
 		st.restoreLabel(truncateUTF8(spec.NodeLabel, nodeLabelMaxBytes))
 	}
+	st.restoreConfigurationVersion(spec.ConfigurationVersion)
 	return st
 }
 

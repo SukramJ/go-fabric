@@ -27,6 +27,7 @@ package core_test
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -434,25 +435,44 @@ func TestParityMatterJS_BasicInfoServer_LocalConfigDisabledAbsent(t *testing.T) 
 	}
 }
 
-// TestParityMatterJS_BasicInfoServer_ConfigurationVersionAbsentWhenZero asserts
-// that ConfigurationVersion (0x0018) is not emitted when zero. matter.js
-// bridge sample omits it on Root; a zero config version on the wire makes
-// Apple Home re-read the entire BasicInformation cluster on every reconnect.
-//
-// Mirrors matter.js packages/model/src/standard/elements/
-// basic-information.element.ts ConfigurationVersion (0x0018) — not
-// emitted by default in the bridge sample.
-func TestParityMatterJS_BasicInfoServer_ConfigurationVersionAbsentWhenZero(t *testing.T) {
+// TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne asserts
+// that ConfigurationVersion (0x0018) is served and listed, 1 when the host
+// sets none, and that IncreaseConfigurationVersion raises it by one and
+// bumps the DataVersion. The attribute is mandatory from cluster revision 6
+// (basic-information.element.ts:104, "Rev >= v6") and matter.js defaults it
+// to 1 (BasicInformationServer.ts:75). TC-BINFO-3.2 reads it.
+func TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne(t *testing.T) {
 	t.Parallel()
 	cfg := validBasicInfoConfig()
-	cfg.ConfigurationVersion = 0 // must be omitted
+	cfg.ConfigurationVersion = 0
 	b, err := core.NewBasicInformation(cfg)
 	if err != nil {
 		t.Fatalf("NewBasicInformation: %v", err)
 	}
-	v, ok := b.MatterRead(0x0018)
-	if ok {
-		t.Errorf("ConfigurationVersion (0x0018) present when zero = %v — must be omitted (matter.js bridge sample)", v)
+	if v, ok := b.MatterRead(0x0018); !ok || v != uint32(1) {
+		t.Fatalf("ConfigurationVersion = %v (%v), want 1", v, ok)
+	}
+	if !slices.Contains(b.MatterAttributes(), 0x0018) {
+		t.Error("ConfigurationVersion missing from the attribute list")
+	}
+	dv := b.MatterDataVersion()
+	if got := b.IncreaseConfigurationVersion(); got != 2 {
+		t.Errorf("IncreaseConfigurationVersion = %d, want 2", got)
+	}
+	if v, _ := b.MatterRead(0x0018); v != uint32(2) {
+		t.Errorf("ConfigurationVersion after increase = %v, want 2", v)
+	}
+	if b.MatterDataVersion() == dv {
+		t.Error("IncreaseConfigurationVersion did not bump the DataVersion")
+	}
+
+	cfg.ConfigurationVersion = 7 // a host-persisted value is kept
+	restored, err := core.NewBasicInformation(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := restored.MatterRead(0x0018); v != uint32(7) {
+		t.Errorf("restored ConfigurationVersion = %v, want 7", v)
 	}
 }
 

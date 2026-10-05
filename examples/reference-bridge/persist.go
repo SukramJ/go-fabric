@@ -8,12 +8,14 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	// The pure-Go SQLite driver. Neither store package imports a driver —
 	// both take an already-open *sql.DB — so picking one, and picking the
 	// DSN, is this host's job.
 	_ "modernc.org/sqlite"
 
+	"github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
@@ -68,10 +70,51 @@ type persistedLabels struct {
 }
 
 const (
-	rootNodeLabelKey     = "basic_information.node_label"
-	rootLocationKey      = "basic_information.location"
-	endpointLabelKeyRoot = "bridged_node_label."
+	rootNodeLabelKey         = "basic_information.node_label"
+	rootLocationKey          = "basic_information.location"
+	rootConfigVersionKey     = "basic_information.configuration_version"
+	endpointLabelKeyRoot     = "bridged_node_label."
+	endpointConfigVersionKey = "bridged_configuration_version."
 )
+
+// configVersion returns the ConfigurationVersion persisted for a bridged
+// endpoint, 0 for none.
+func (p persistedLabels) configVersion(ctx context.Context, key endpoint.StringKey) uint32 {
+	return p.loadUint32(ctx, endpointConfigVersionKey+string(key))
+}
+
+func (p persistedLabels) loadUint32(ctx context.Context, key string) uint32 {
+	v, ok, err := p.st.GetSetting(ctx, key)
+	if err != nil || !ok {
+		return 0
+	}
+	n, err := strconv.ParseUint(v, 10, 32)
+	if err != nil {
+		return 0
+	}
+	return uint32(n)
+}
+
+// storeConfigVersions persists what bridge.IncreaseConfigurationVersion
+// raised: the version may never decrease, so it has to outlive a restart.
+func (p persistedLabels) storeConfigVersions(topo *endpoint.Topology, v bridge.ConfigurationVersions) {
+	ctx := context.Background()
+	set := func(k string, n uint32) {
+		if err := p.st.SetSetting(ctx, k, strconv.FormatUint(uint64(n), 10)); err != nil {
+			p.logger.Warn("configuration_version.persist", slog.String("err", err.Error()))
+		}
+	}
+	if v.Node != 0 {
+		set(rootConfigVersionKey, v.Node)
+	}
+	for id, n := range v.Bridged {
+		if ep := topo.FindByID(id); ep != nil {
+			if k, ok := ep.SourceKey.(endpoint.StringKey); ok {
+				set(endpointConfigVersionKey+string(k), n)
+			}
+		}
+	}
+}
 
 // store implements endpoint.Config.OnNodeLabelWritten.
 func (p persistedLabels) store(key endpoint.SourceKey, label string) {
@@ -103,6 +146,7 @@ func (p persistedLabels) restoreRoot(ctx context.Context, b *mattercore.BasicInf
 	if v, ok, err := p.st.GetSetting(ctx, rootLocationKey); err == nil && ok {
 		_ = b.SetLocation(v)
 	}
+	b.RestoreConfigurationVersion(p.loadUint32(ctx, rootConfigVersionKey))
 	b.SetOnPersistentWrite(func(nodeLabel, location string) {
 		for k, v := range map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location} {
 			if err := p.st.SetSetting(context.Background(), k, v); err != nil {

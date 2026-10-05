@@ -187,9 +187,9 @@ func TestBasicInfo_ReadAllAttributes(t *testing.T) {
 		}
 		_ = v
 	}
-	// LocalConfigDisabled / ConfigurationVersion must NOT be advertised
-	// when unset (matter.js parity).
-	for _, id := range []uint32{0x0010, 0x0018} {
+	// LocalConfigDisabled must NOT be advertised when unset (matter.js
+	// parity); ConfigurationVersion is mandatory from revision 6.
+	for _, id := range []uint32{0x0010} {
 		if _, ok := b.MatterRead(id); ok {
 			t.Errorf("MatterRead(0x%04X) returned true; should be unimplemented", id)
 		}

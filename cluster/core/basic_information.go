@@ -264,11 +264,12 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		// ceiling cannot drift apart.
 		maxPaths = im.DefaultMaxPathsPerInvoke
 	}
-	// ConfigurationVersion is optional on Root BasicInformation and
-	// matter.js Sample omits it. Carry zero (= "not configured") all
-	// the way through — MatterRead skips the attribute on the wire
-	// when the value stays zero, matching matter.js parity.
-	cfgVer := cfg.ConfigurationVersion
+	// ConfigurationVersion is mandatory from cluster revision 6
+	// (basic-information.element.ts:104, conformance "Rev >= v6"); zero
+	// serves 1, matter.js's default (BasicInformationServer.ts:75
+	// setDefault("configurationVersion", 1)). A host that raised it
+	// (IncreaseConfigurationVersion) hands the persisted value back here.
+	cfgVer := max(cfg.ConfigurationVersion, 1)
 	// matter.js basic-information.element.ts: HardwareVersionString +
 	// SoftwareVersionString carry `constraint: "1 to 64"` — empty
 	// strings violate the spec's lower bound. Apple Home's HAP service
@@ -616,11 +617,6 @@ func (b *BasicInformation) MatterRead(attrID uint32) (any, bool) { //nolint:gocy
 	case basicInfoAttrMaxPathsPerInvoke:
 		return b.maxPathsPerInvoke, true
 	case basicInfoAttrConfigurationVersion:
-		// Matter 1.5 optional. matter.js Sample omits this on Root.
-		// Emit only when the config explicitly set a non-zero value.
-		if b.configurationVersion == 0 {
-			return nil, false
-		}
 		return b.configurationVersion, true
 	case cluster.AttrGlobalFeatureMap:
 		return uint32(0), true
@@ -750,9 +746,9 @@ func (b *BasicInformation) MatterReportable() []uint32 {
 // with HAPErrorDomain Code 24. Globals (FeatureMap + ClusterRevision)
 // are merged in by the dispatcher.
 func (b *BasicInformation) MatterAttributes() []uint32 {
-	// LocalConfigDisabled (0x10) and ConfigurationVersion (0x18) are
-	// intentionally OMITTED — optional on Root BasicInformation, and
-	// matter.js's bridge sample does not emit them. Reachable (0x11)
+	// LocalConfigDisabled (0x10) is intentionally OMITTED — optional, and
+	// matter.js's bridge sample does not emit it. ConfigurationVersion
+	// (0x18) is mandatory from revision 6 (TC-BINFO-3.2). Reachable (0x11)
 	// IS emitted because Apple's HMAccessory.Reachable signal depends
 	// on it (Run 15 vs Run 16 verification, empirically confirmed).
 	out := []uint32{
@@ -772,6 +768,7 @@ func (b *BasicInformation) MatterAttributes() []uint32 {
 		basicInfoAttrCapabilityMinima,
 		basicInfoAttrSpecificationVersion,
 		basicInfoAttrMaxPathsPerInvoke,
+		basicInfoAttrConfigurationVersion,
 	}
 	if b.manufacturingDate != "" {
 		out = append(out, basicInfoAttrManufacturingDate)
@@ -971,4 +968,35 @@ func (b *BasicInformation) EmitReachableChanged(reachable bool) {
 	emitter.MatterEmitEvent(endpoint, basicInfoClusterID, basicInfoEventReachableChanged,
 		ReachableChangedEvent{ReachableNewValue: reachable},
 		contract.EventPriorityInfo)
+}
+
+// IncreaseConfigurationVersion raises ConfigurationVersion by one — call it
+// when the node's functionality changes, e.g. a bridged device added or
+// removed — and returns the new value for the host to persist and hand back
+// as BasicInformationConfig.ConfigurationVersion: the version may never
+// decrease. The uint32 wraps to 1, never 0. Mirrors matter.js
+// BasicInformationServer.increaseConfigurationVersion /
+// nextConfigurationVersion. Subscribers learn of it through the owner's
+// attribute-change path (bridge.Bridge.IncreaseNodeConfigurationVersion).
+func (b *BasicInformation) IncreaseConfigurationVersion() uint32 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.configurationVersion++
+	if b.configurationVersion == 0 {
+		b.configurationVersion = 1
+	}
+	b.dataVersion.Bump()
+	return b.configurationVersion
+}
+
+// RestoreConfigurationVersion installs a ConfigurationVersion the host
+// persisted from an earlier IncreaseConfigurationVersion; it never lowers
+// the current value, since the version may not decrease.
+func (b *BasicInformation) RestoreConfigurationVersion(v uint32) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if v > b.configurationVersion {
+		b.configurationVersion = v
+		b.dataVersion.Bump()
+	}
 }

@@ -5,9 +5,11 @@ package core
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -267,7 +269,60 @@ func NewAccessControl(s ACLStoreFacade) (*AccessControl, error) {
 	if s == nil {
 		return nil, errors.New("matter: AccessControl store is required")
 	}
-	return &AccessControl{store: s}, nil
+	a := &AccessControl{store: s}
+	a.loadExtensions(context.Background())
+	return a, nil
+}
+
+// ACLExtensionPersistence is the optional key-value side of the store an
+// AccessControl keeps its Extension entries in ([store.Store] has it).
+// matter.js persists the extension attribute like any other fabric-scoped
+// state; without persistence a reboot lost it (TC-ACL-2.10 step 9 reboots
+// the DUT and reads the extension back).
+type ACLExtensionPersistence interface {
+	GetSetting(ctx context.Context, key string) (string, bool, error)
+	SetSetting(ctx context.Context, key, value string) error
+}
+
+// aclExtensionSettingKey is the settings key of one fabric's Extension.
+func aclExtensionSettingKey(fabric uint8) string {
+	return "access_control.extension." + strconv.Itoa(int(fabric))
+}
+
+// loadExtensions restores the persisted Extension entries, one per fabric
+// at most (the attribute's per-fabric constraint).
+func (a *AccessControl) loadExtensions(ctx context.Context) {
+	p, ok := a.store.(ACLExtensionPersistence)
+	if !ok {
+		return
+	}
+	for f := 1; f <= 254; f++ {
+		v, found, err := p.GetSetting(ctx, aclExtensionSettingKey(uint8(f)))
+		if err != nil || !found || v == "" {
+			continue
+		}
+		data, err := hex.DecodeString(v)
+		if err != nil {
+			continue
+		}
+		if a.extensions == nil {
+			a.extensions = make(map[uint8][]AccessControlExtensionEntry)
+		}
+		a.extensions[uint8(f)] = []AccessControlExtensionEntry{{Data: data, FabricIndex: uint8(f)}}
+	}
+}
+
+// persistExtension writes one fabric's Extension entries ("" clears them).
+func (a *AccessControl) persistExtension(ctx context.Context, fabric uint8, entries []AccessControlExtensionEntry) error {
+	p, ok := a.store.(ACLExtensionPersistence)
+	if !ok {
+		return nil
+	}
+	v := ""
+	if len(entries) > 0 {
+		v = hex.EncodeToString(entries[0].Data)
+	}
+	return p.SetSetting(ctx, aclExtensionSettingKey(fabric), v)
 }
 
 // Compile-time assertions.
@@ -352,6 +407,7 @@ func (a *AccessControl) RemoveFabricExtension(fabricIndex uint8) {
 	}
 	a.mu.Unlock()
 	if had {
+		_ = a.persistExtension(context.Background(), fabricIndex, nil)
 		a.dataVersion.Bump()
 	}
 }
@@ -820,6 +876,9 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				Data:        append([]byte(nil), e.Data...),
 				FabricIndex: fabric,
 			}
+		}
+		if err := a.persistExtension(ctx, fabric, stamped); err != nil {
+			return fmt.Errorf("matter: AccessControl.Extension write: persist: %w", err)
 		}
 		a.mu.Lock()
 		if a.extensions == nil {

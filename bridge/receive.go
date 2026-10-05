@@ -13,7 +13,9 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -629,4 +631,85 @@ func srcString(src *net.UDPAddr) string {
 		return "<nil>"
 	}
 	return src.String()
+}
+
+// ConfigurationVersions is what an increase produced: the node's
+// BasicInformation ConfigurationVersion and the BridgedDeviceBasicInformation
+// one of each bridged endpoint that was raised, for the host to persist
+// (BasicInformationConfig.ConfigurationVersion, endpoint.Spec.ConfigurationVersion).
+// A version may never decrease, so a host that raises one keeps it.
+type ConfigurationVersions struct {
+	Node    uint32
+	Bridged map[uint16]uint32
+}
+
+// IncreaseConfigurationVersion raises the BridgedDeviceBasicInformation
+// ConfigurationVersion of every bridged endpoint backed by the given
+// physical device (scope + deviceAddress, as for [Bridge.NotifyDeviceReachable])
+// and, once, the node's BasicInformation ConfigurationVersion — a bridged
+// node's configuration change is the bridge's too — and reports the changes
+// to subscribers. Call it when the device's functionality changes (a
+// thermostat rewired to support a new mode). Mirrors matter.js
+// BridgedDeviceBasicInformationServer.increaseConfigurationVersion, which
+// raises the root's BasicInformationServer version when called standalone
+// (TC-BRBINFO-3.2).
+func (b *Bridge) IncreaseConfigurationVersion(scope, deviceAddress string) ConfigurationVersions {
+	out := ConfigurationVersions{Bridged: map[uint16]uint32{}}
+	if b == nil {
+		return out
+	}
+	topo := b.Topology()
+	if topo == nil {
+		return out
+	}
+	mgr := b.subscriptionManagerLocked()
+	for _, ep := range topo.Bridged() {
+		if ep == nil || ep.Scope != scope || ep.DeviceAddress != deviceAddress {
+			continue
+		}
+		out.Bridged[ep.ID] = ep.IncreaseConfigurationVersion()
+		markConfigurationVersionDirty(mgr, ep.ID, core.BridgedDeviceBasicInformationClusterID)
+	}
+	if len(out.Bridged) > 0 {
+		out.Node = b.IncreaseNodeConfigurationVersion()
+	}
+	return out
+}
+
+// IncreaseNodeConfigurationVersion raises the root BasicInformation
+// ConfigurationVersion — call it when the node's functionality changes in a
+// way controllers should detect — reports it to subscribers and returns the
+// new value for the host to persist. Zero when no BasicInformation server is
+// attached to the root endpoint. Mirrors matter.js
+// BasicInformationServer.increaseConfigurationVersion.
+func (b *Bridge) IncreaseNodeConfigurationVersion() uint32 {
+	if b == nil {
+		return 0
+	}
+	topo := b.Topology()
+	if topo == nil {
+		return 0
+	}
+	root := topo.FindByID(0)
+	if root == nil {
+		return 0
+	}
+	for _, srv := range endpoint.ClusterServers(root) {
+		if bi, ok := srv.(*core.BasicInformation); ok {
+			v := bi.IncreaseConfigurationVersion()
+			markConfigurationVersionDirty(b.subscriptionManagerLocked(), 0, 0x0028) // BasicInformation
+			return v
+		}
+	}
+	return 0
+}
+
+func markConfigurationVersionDirty(mgr *subscription.Manager, ep uint16, clusterID uint32) {
+	if mgr == nil {
+		return
+	}
+	mgr.OnAttributeChanged(im.ConcreteAttributePath{
+		Endpoint: ep, Cluster: clusterID, Attribute: 0x0018, // ConfigurationVersion
+		HasEndpoint: true, HasCluster: true, HasAttribute: true,
+	})
 }

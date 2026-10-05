@@ -12,6 +12,9 @@ pseudo-version of `main`.
 
 ### Added
 
+- The reference daemon answers CHIP's `SimulateConfigurationVersionChange`
+  on its app pipe and persists the raised ConfigurationVersions.
+
 - `cluster/core` GeneralDiagnostics: `EnableTestEventTriggers(key, handler)`
   arms TestEventTrigger with a 16-byte test enable key and a host handler
   (`TestEventTriggerHandler`, `TestEventTriggerRequest`,
@@ -332,6 +335,20 @@ pseudo-version of `main`.
     Fabrics after AddNOC. The bridge now compares the invoked cluster's
     attributes before and after the command and reports what moved, as
     matter.js's Datasource does (TC-IDM-1.5).
+  - BasicInformation.ConfigurationVersion, mandatory from cluster revision
+    6, was not served on the root, and the bridged endpoints' was a constant
+    1. Both now start at 1 as in matter.js and can be raised:
+    `BasicInformation.IncreaseConfigurationVersion` /
+    `RestoreConfigurationVersion`, `endpoint.Endpoint.IncreaseConfigurationVersion`,
+    `endpoint.Spec.ConfigurationVersion` for the persisted value, and
+    `bridge.Bridge.IncreaseConfigurationVersion(scope, address)`, which raises
+    the device's endpoints and the node's version and reports both to
+    subscribers, as matter.js's increaseConfigurationVersion does
+    (TC-BINFO-3.2, TC-BRBINFO-3.2).
+  - The AccessControl Extension attribute lived in memory only and was gone
+    after a restart. It is persisted through the store's settings when the
+    store offers them (`core.ACLExtensionPersistence`, which `store.Store`
+    implements) (TC-ACL-2.10).
   - Command and attribute privileges came from the cluster servers alone,
     with Operate as the fallback, so every server that did not declare one
     let an Operate subject through: Identify and TriggerEffect (Manage),

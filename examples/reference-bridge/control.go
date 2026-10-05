@@ -122,6 +122,13 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 			return fmt.Errorf("SimulateMultiPress with %d presses: the button has no MSM feature", *cmd.NumPresses)
 		}
 		return f.pressButton(false)
+	case "SimulateConfigurationVersionChange":
+		// CHIP's name (TC-BRBINFO-3.2): the bridged devices' functionality
+		// changed. Every bridged device's version is raised, and the node's.
+		if f.configChange == nil {
+			return errors.New("SimulateConfigurationVersionChange: no bridge wired")
+		}
+		return f.configChange()
 	case "SetBooleanState":
 		if cmd.NewState == nil {
 			return errors.New("SetBooleanState needs NewState")

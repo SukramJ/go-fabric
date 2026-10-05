@@ -1296,6 +1296,12 @@ type fleet struct {
 	// labels returns the NodeLabel a controller wrote for a bridged
 	// endpoint in an earlier run (persist.go); nil restores nothing.
 	labels func(ctx context.Context, key endpoint.StringKey) string
+	// configVersions returns the ConfigurationVersion persisted for a
+	// bridged endpoint (persist.go); nil restores nothing.
+	configVersions func(ctx context.Context, key endpoint.StringKey) uint32
+	// configChange raises the ConfigurationVersion of every bridged device
+	// (the app pipe's SimulateConfigurationVersionChange); wired by main.
+	configChange func() error
 }
 
 func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*fleet, error) {
@@ -1382,6 +1388,13 @@ func (f *fleet) snapshotter(ctx context.Context) (*endpoint.Topology, error) {
 		for i := range specs {
 			if k, ok := specs[i].StableKey.(endpoint.StringKey); ok {
 				specs[i].NodeLabel = f.labels(ctx, k)
+			}
+		}
+	}
+	if f.configVersions != nil {
+		for i := range specs {
+			if k, ok := specs[i].StableKey.(endpoint.StringKey); ok {
+				specs[i].ConfigurationVersion = f.configVersions(ctx, k)
 			}
 		}
 	}

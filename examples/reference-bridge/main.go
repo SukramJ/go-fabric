@@ -23,6 +23,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -160,6 +161,7 @@ func run() error {
 		return err
 	}
 	devices.labels = labels.load
+	devices.configVersions = labels.configVersion
 
 	// --- the bridge ----------------------------------------------------
 	var advertiser mdns.Advertiser = mdns.NewNoop()
@@ -249,6 +251,21 @@ func run() error {
 	}
 	labels.restoreRoot(ctx, refs.basicInfo)
 	br.AttachRootClusters(rootServers)
+	devices.configChange = func() error {
+		topo := br.Topology()
+		if topo == nil {
+			return errors.New("no topology yet")
+		}
+		seen := map[string]bool{}
+		for _, ep := range topo.Bridged() {
+			if seen[ep.Scope+"|"+ep.DeviceAddress] {
+				continue
+			}
+			seen[ep.Scope+"|"+ep.DeviceAddress] = true
+			labels.storeConfigVersions(topo, br.IncreaseConfigurationVersion(ep.Scope, ep.DeviceAddress))
+		}
+		return nil
+	}
 
 	aggregatorServers, err := buildAggregatorClusters()
 	if err != nil {
