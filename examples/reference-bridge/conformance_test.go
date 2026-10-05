@@ -335,6 +335,12 @@ func TestValveTravelsThroughATarget(t *testing.T) {
 		if tg, ok := v.TargetState(); !ok || tg != valve.StateOpen {
 			t.Fatalf("TargetState right after Open = %v/%v, want Open", tg, ok)
 		}
+		if d, ok := v.OpenDuration(); !ok || d != 600 {
+			t.Fatalf("OpenDuration while travelling open = %v/%v, want 600", d, ok)
+		}
+		if _, ok := v.RemainingDuration(); !ok {
+			t.Fatal("RemainingDuration while travelling open is null")
+		}
 		time.Sleep(valveTravel)
 		synctest.Wait()
 		if st, _ := v.CurrentState(); st != valve.StateOpen {

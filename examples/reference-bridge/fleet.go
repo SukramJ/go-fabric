@@ -788,6 +788,13 @@ func (v *demoValve) arrived() {
 	v.notify()
 }
 
+// openingLocked reports whether the valve is open or travelling to open:
+// an opening's durations hold from the Open command on (TC-VALCC-4.1 reads
+// OpenDuration right after it). Caller holds v.mu.
+func (v *demoValve) openingLocked() bool {
+	return v.state == valve.StateOpen || (v.target != nil && *v.target == valve.StateOpen)
+}
+
 // stopTravelLocked abandons a travel in progress. Caller holds v.mu.
 func (v *demoValve) stopTravelLocked() {
 	if v.arrive != nil {
@@ -863,7 +870,7 @@ func (v *demoValve) OpenDuration() (uint32, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.expireLocked(time.Now())
-	if v.state != valve.StateOpen || v.openFor == nil {
+	if !v.openingLocked() || v.openFor == nil {
 		return 0, false
 	}
 	return *v.openFor, true
@@ -876,7 +883,7 @@ func (v *demoValve) RemainingDuration() (uint32, bool) {
 	defer v.mu.Unlock()
 	now := time.Now()
 	v.expireLocked(now)
-	if v.state != valve.StateOpen || v.closesAt.IsZero() {
+	if !v.openingLocked() || v.closesAt.IsZero() {
 		return 0, false
 	}
 	return secondsUntil(v.closesAt.Sub(now)), true
