@@ -267,6 +267,17 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `examples/reference-bridge` exposes one simulated device per surface the
+  module serves (colour-temperature light, fan, smoke/CO alarm, pump, flow
+  sensor, laundry washer, robot vacuum, thermostat, blind, door lock,
+  humidity / occupancy / contact sensors, wall button), takes CHIP-style
+  test control through `--app-pipe` and `--enable-key` (off by default),
+  wires AdministratorCommissioning and the enhanced (multi-admin)
+  commissioning window, serves the test Certification Declaration — a
+  commissioner that verifies attestation no longer fails the pairing — and
+  emits StartUp / BootReason / ShutDown / Leave. It prints its endpoint
+  topology after the banner.
+
 - **Matter 1.6.1.** `parity/schema.json` is re-extracted from matter.js
   `85cf6647` (Matter 1.6.1; previously `f07365a8`, 1.6.0) and `schema/` is
   regenerated from it. This is a matter.js parity correction and bypasses the

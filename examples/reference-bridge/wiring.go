@@ -17,6 +17,7 @@ import (
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
@@ -58,6 +59,14 @@ func deviceTypeRevision(id uint32) uint16 {
 type rootRefs struct {
 	generalCom *mattercore.GeneralCommissioning
 	opCreds    *mattercore.OperationalCredentials
+	// adminCom gets its window controller once the window exists
+	// (commissioning.go); the window needs the session manager, which is
+	// built after the root clusters.
+	adminCom *wire.AdministratorCommissioning
+	// basicInfo and genDiag emit the node's lifecycle events (StartUp,
+	// BootReason, ShutDown, Leave) once the bridge is running.
+	basicInfo *mattercore.BasicInformation
+	genDiag   *mattercore.GeneralDiagnostics
 }
 
 // buildRootClusters constructs endpoint 0's cluster surface.
@@ -90,6 +99,8 @@ func buildRootClusters(
 	if err != nil {
 		return nil, refs, fmt.Errorf("basic information: %w", err)
 	}
+	refs.basicInfo = basicInfo
+	refs.genDiag = mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
 
 	generalCom, err := mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
 		LocationCapability:           mattercore.RegulatoryIndoor,
@@ -100,6 +111,10 @@ func buildRootClusters(
 	}
 	refs.generalCom = generalCom
 
+	cd, err := attestation.BuildTestCertificationDeclaration(identity.vendorID, identity.productID)
+	if err != nil {
+		return nil, refs, fmt.Errorf("certification declaration: %w", err)
+	}
 	opCreds, err := mattercore.NewOperationalCredentials(st, mattercore.OpcredsConfig{
 		SupportedFabrics: 5,
 		// The CSA *test* attestation chain. It is what makes a bare
@@ -110,6 +125,16 @@ func buildRootClusters(
 		DACPrivateKey: chain.DACKey,
 		DAC:           chain.DAC,
 		PAI:           chain.PAI,
+		// The CSA *test* Certification Declaration for this vendor and
+		// product, signed with the test CMS key every commissioner trusts.
+		// Without it AttestationResponse carries an empty CD and a
+		// commissioner that verifies attestation — chip-tool and the CHIP
+		// Python harness without --bypass-attestation-verifier, every
+		// ecosystem — fails the pairing at AttestationVerification
+		// ("Certification declaration missing the required key ID in CMS
+		// envelope", chip CMS_ExtractKeyId on zero bytes). Found by the
+		// chip-tool suite's first unbypassed commissioning.
+		CertificationDeclaration: cd,
 		// Fires once AddNOC has persisted the fabric. The CASE identity
 		// is rebuilt from the freshly written row here — a bridge that
 		// skips this answers every post-commissioning Sigma1 with the
@@ -181,12 +206,18 @@ func buildRootClusters(
 		return nil, refs, fmt.Errorf("root descriptor: %w", err)
 	}
 
+	// AdministratorCommissioning, which RootNode mandates: the multi-admin
+	// surface. Commands answer BUSY until wireCommissioningWindow hands it
+	// the window.
+	refs.adminCom = wire.NewAdministratorCommissioning()
+
 	servers := []contract.ClusterServer{
 		basicInfo,
 		accessControl,
 		generalCom,
+		refs.adminCom,
 		mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{}),
-		mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot),
+		refs.genDiag,
 		opCreds,
 		groupKeys,
 		groupcast,
@@ -613,6 +644,13 @@ func buildPaseAdapter(sessions *operational.Manager, refs rootRefs, p paseParams
 	if err != nil {
 		return nil, fmt.Errorf("spake2 verifier context: %w", err)
 	}
+	return buildPaseAdapterFromContext(sessions, refs, vc, p.salt, p.iterations)
+}
+
+// buildPaseAdapterFromContext is the passcode-independent half of
+// buildPaseAdapter, shared with the enhanced commissioning window, whose
+// verifier arrives precomputed from the commissioner (commissioning.go).
+func buildPaseAdapterFromContext(sessions *operational.Manager, refs rootRefs, vc *spake2.VerifierContext, salt []byte, iterations int) (*matterbridge.PaseAdapter, error) {
 	sessionID, err := sessions.AllocateID()
 	if err != nil {
 		return nil, fmt.Errorf("allocate PASE session id: %w", err)
@@ -620,7 +658,7 @@ func buildPaseAdapter(sessions *operational.Manager, refs rootRefs, p paseParams
 	adapter := matterbridge.NewPaseAdapterWithFactory(func(transcript []byte) *spake2.Verifier {
 		return spake2.NewVerifier(vc, nil, nil, transcript)
 	})
-	adapter.SetPBKDFParams(uint32(p.iterations), p.salt, sessionID) //nolint:gosec // NewVerifierContext above rejects any iteration count outside [IterationsMin, IterationsMax]
+	adapter.SetPBKDFParams(uint32(iterations), salt, sessionID) //nolint:gosec // NewVerifierContext / the window's command validation bound the iteration count
 	adapter.SetOnSessionEstablished(func(sharedSecret []byte, peerSessionID uint16) error {
 		// PASE predates the fabric, so both node ids are zero.
 		entry, err := sessions.OpenFromPaseWithID(sessionID, 0, 0, peerSessionID, sharedSecret)

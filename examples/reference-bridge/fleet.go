@@ -984,10 +984,13 @@ func (s *demoSelector) supports(mode uint8) bool {
 	return false
 }
 
-// --- device 5: a powered speaker ----------------------------------------
+// --- devices 5 and 6: a powered speaker and a ceiling light ---------------
 
-// demoSpeaker is a hand-built stand-in for a powered speaker: a volume on a
-// continuous scale, plus the on/off state its LevelControl is coupled to.
+// dimmer is a hand-built stand-in for anything with a level on a continuous
+// scale plus the on/off state its LevelControl is coupled to. The fleet has
+// two: a powered speaker (its volume) and a colour-temperature ceiling light
+// (its brightness, see fleet_lighting.go), which differ in the device type
+// they advertise and in the Lighting feature, not in how the level moves.
 // Both clusters are mounted on the one endpoint, which is what makes the
 // coupling real rather than declared — the "with On/Off" commands drive an
 // OnOff cluster a controller can read back.
@@ -1004,8 +1007,18 @@ func (s *demoSelector) supports(mode uint8) bool {
 //     when the effective Options bitmap sets ExecuteIfOff. A gated-out
 //     command changes nothing and reports success, which is what the spec
 //     asks of it.
-type demoSpeaker struct {
+type dimmer struct {
 	name string
+	// kind prefixes this device's log messages ("speaker.level",
+	// "ceiling.level"), so a reader of the daemon log can tell which device
+	// was driven.
+	kind string
+	// minLevel is the lowest level the device reaches: 0 for the speaker,
+	// 1 for the light, whose LevelControl carries the Lighting feature
+	// (matter.js LevelControlServer.ts:89-91 minLevel, 1 with LT).
+	minLevel uint8
+	// lighting selects the ceiling-light surface; see MatterClusterServers.
+	lighting *lightingSurface
 	notifier
 	// version is held by the device for the reason given on [demoValve].
 	version cluster.DataVersionTracker
@@ -1021,23 +1034,32 @@ type demoSpeaker struct {
 
 // Compile-time assertions.
 var (
-	_ contract.EndpointSource  = (*demoSpeaker)(nil)
-	_ contract.ChangeNotifier  = (*demoSpeaker)(nil)
-	_ levelcontrol.LevelSource = (*demoSpeaker)(nil)
-	_ onOffDevice              = (*demoSpeaker)(nil)
+	_ contract.EndpointSource  = (*dimmer)(nil)
+	_ contract.ChangeNotifier  = (*dimmer)(nil)
+	_ levelcontrol.LevelSource = (*dimmer)(nil)
+	_ onOffDevice              = (*dimmer)(nil)
 )
 
 // newDemoSpeaker returns a speaker that is off, at the given volume.
-func newDemoSpeaker(name string, level uint8) *demoSpeaker {
-	return &demoSpeaker{name: name, level: level}
+func newDemoSpeaker(name string, level uint8) *dimmer {
+	return &dimmer{name: name, kind: "speaker", minLevel: levelcontrol.LevelMin, level: level}
 }
 
 // MatterDeviceType implements [contract.EndpointSource].
-func (s *demoSpeaker) MatterDeviceType() uint16 { return deviceTypeSpeaker }
+func (s *dimmer) MatterDeviceType() uint16 {
+	if s.lighting != nil {
+		return deviceTypeColorTemperatureLight
+	}
+	return deviceTypeSpeaker
+}
 
 // MatterClusterServers implements [contract.EndpointSource]. Speaker
-// requires both clusters, and both are served from this one device.
-func (s *demoSpeaker) MatterClusterServers() []contract.ClusterServer {
+// requires both clusters, and both are served from this one device; the
+// ceiling light adds the Lighting surface (fleet_lighting.go).
+func (s *dimmer) MatterClusterServers() []contract.ClusterServer {
+	if s.lighting != nil {
+		return s.lightingServers()
+	}
 	return []contract.ClusterServer{
 		&onOffServer{dev: s, logMessage: "speaker.set"},
 		levelcontrol.NewServer(levelcontrol.Config{
@@ -1048,10 +1070,10 @@ func (s *demoSpeaker) MatterClusterServers() []contract.ClusterServer {
 }
 
 // deviceName implements [onOffDevice].
-func (s *demoSpeaker) deviceName() string { return s.name }
+func (s *dimmer) deviceName() string { return s.name }
 
 // isOn implements [onOffDevice].
-func (s *demoSpeaker) isOn() bool {
+func (s *dimmer) isOn() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.on
@@ -1060,7 +1082,7 @@ func (s *demoSpeaker) isOn() bool {
 // setOn implements [onOffDevice]. Turning the speaker on restores OnLevel
 // when one is configured — the coupling the LevelControl attribute
 // describes, applied where the two clusters actually meet.
-func (s *demoSpeaker) setOn(on bool) {
+func (s *dimmer) setOn(on bool) {
 	s.mu.Lock()
 	s.on = on
 	if on && s.onLevel != nil {
@@ -1073,21 +1095,21 @@ func (s *demoSpeaker) setOn(on bool) {
 // CurrentLevel implements [levelcontrol.LevelSource]. The level is always
 // known: this device answers for itself rather than caching a reading taken
 // somewhere else.
-func (s *demoSpeaker) CurrentLevel() (uint8, bool) {
+func (s *dimmer) CurrentLevel() (uint8, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.level, true
 }
 
 // Options implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) Options() uint8 {
+func (s *dimmer) Options() uint8 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.options
 }
 
 // OnLevel implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) OnLevel() (uint8, bool) {
+func (s *dimmer) OnLevel() (uint8, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.onLevel == nil {
@@ -1098,17 +1120,17 @@ func (s *demoSpeaker) OnLevel() (uint8, bool) {
 
 // SetOptions implements [levelcontrol.LevelSource]. The server has already
 // refused a bitmap carrying a bit the advertised FeatureMap does not cover.
-func (s *demoSpeaker) SetOptions(_ context.Context, options uint8) error {
+func (s *dimmer) SetOptions(_ context.Context, options uint8) error {
 	s.mu.Lock()
 	s.options = options
 	s.mu.Unlock()
-	slog.Info("speaker.options", slog.String("device", s.name), slog.Int("options", int(options)))
+	slog.Info(s.kind+".options", slog.String("device", s.name), slog.Int("options", int(options)))
 	return nil
 }
 
 // SetOnLevel implements [levelcontrol.LevelSource]. A nil level is the
 // spec's null: the on-level has no effect.
-func (s *demoSpeaker) SetOnLevel(_ context.Context, level *uint8) error {
+func (s *dimmer) SetOnLevel(_ context.Context, level *uint8) error {
 	s.mu.Lock()
 	if level == nil {
 		s.onLevel = nil
@@ -1117,12 +1139,12 @@ func (s *demoSpeaker) SetOnLevel(_ context.Context, level *uint8) error {
 		s.onLevel = &v
 	}
 	s.mu.Unlock()
-	slog.Info("speaker.on_level", slog.String("device", s.name), slog.Any("level", level))
+	slog.Info(s.kind+".on_level", slog.String("device", s.name), slog.Any("level", level))
 	return nil
 }
 
 // MoveToLevel implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) MoveToLevel(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
+func (s *dimmer) MoveToLevel(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
 	if !s.executes(req.OptionsMask, req.OptionsOverride) {
 		return nil
 	}
@@ -1131,29 +1153,29 @@ func (s *demoSpeaker) MoveToLevel(_ context.Context, req levelcontrol.MoveToLeve
 }
 
 // MoveToLevelWithOnOff implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) MoveToLevelWithOnOff(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
+func (s *dimmer) MoveToLevelWithOnOff(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
 	s.applyLevel(req.Level, true)
 	return nil
 }
 
 // Move implements [levelcontrol.LevelSource]. With no travel time the move
 // arrives at the end of its direction inside the command.
-func (s *demoSpeaker) Move(_ context.Context, req levelcontrol.MoveRequest) error {
+func (s *dimmer) Move(_ context.Context, req levelcontrol.MoveRequest) error {
 	if !s.executes(req.OptionsMask, req.OptionsOverride) {
 		return nil
 	}
-	s.applyLevel(moveTarget(req.MoveMode), false)
+	s.applyLevel(s.moveTarget(req.MoveMode), false)
 	return nil
 }
 
 // MoveWithOnOff implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) MoveWithOnOff(_ context.Context, req levelcontrol.MoveRequest) error {
-	s.applyLevel(moveTarget(req.MoveMode), true)
+func (s *dimmer) MoveWithOnOff(_ context.Context, req levelcontrol.MoveRequest) error {
+	s.applyLevel(s.moveTarget(req.MoveMode), true)
 	return nil
 }
 
 // Step implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) Step(_ context.Context, req levelcontrol.StepRequest) error {
+func (s *dimmer) Step(_ context.Context, req levelcontrol.StepRequest) error {
 	if !s.executes(req.OptionsMask, req.OptionsOverride) {
 		return nil
 	}
@@ -1162,26 +1184,26 @@ func (s *demoSpeaker) Step(_ context.Context, req levelcontrol.StepRequest) erro
 }
 
 // StepWithOnOff implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) StepWithOnOff(_ context.Context, req levelcontrol.StepRequest) error {
+func (s *dimmer) StepWithOnOff(_ context.Context, req levelcontrol.StepRequest) error {
 	s.applyLevel(s.steppedLevel(req), true)
 	return nil
 }
 
 // Stop implements [levelcontrol.LevelSource]. See the type doc: this model
 // never has a move in flight to halt.
-func (s *demoSpeaker) Stop(context.Context, levelcontrol.StopRequest) error { return nil }
+func (s *dimmer) Stop(context.Context, levelcontrol.StopRequest) error { return nil }
 
 // StopWithOnOff implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) StopWithOnOff(context.Context, levelcontrol.StopRequest) error { return nil }
+func (s *dimmer) StopWithOnOff(context.Context, levelcontrol.StopRequest) error { return nil }
 
 // reportFromDevice applies a volume the speaker moved to by itself — its own
 // front-panel dial. Like the same method on the other two devices it stands
 // in for a southbound event, and the fleet's test is its caller.
-func (s *demoSpeaker) reportFromDevice(level uint8) {
+func (s *dimmer) reportFromDevice(level uint8) {
 	s.mu.Lock()
 	s.level = level
 	s.mu.Unlock()
-	slog.Info("speaker.reported", slog.String("device", s.name), slog.Int("level", int(level)))
+	slog.Info(s.kind+".reported", slog.String("device", s.name), slog.Int("level", int(level)))
 	s.notify()
 }
 
@@ -1191,7 +1213,7 @@ func (s *demoSpeaker) reportFromDevice(level uint8) {
 // server cannot see (matter.js LevelControlServer.ts:729-736
 // #optionsAllowExecution). The bitmap arithmetic is the cluster's, so it
 // comes from [levelcontrol.EffectiveOptions] rather than being restated.
-func (s *demoSpeaker) executes(mask, override uint8) bool {
+func (s *dimmer) executes(mask, override uint8) bool {
 	if s.isOn() {
 		return true
 	}
@@ -1201,22 +1223,23 @@ func (s *demoSpeaker) executes(mask, override uint8) bool {
 // applyLevel moves the speaker to level. withOnOff drives the on/off state
 // along with it: the minimum level turns the speaker off, anything above it
 // turns it on.
-func (s *demoSpeaker) applyLevel(level uint8, withOnOff bool) {
+func (s *dimmer) applyLevel(level uint8, withOnOff bool) {
+	level = max(level, s.minLevel)
 	s.mu.Lock()
 	s.level = level
 	if withOnOff {
-		s.on = level > levelcontrol.LevelMin
+		s.on = level > s.minLevel
 	}
 	on := s.on
 	s.mu.Unlock()
-	slog.Info("speaker.level", slog.String("device", s.name),
+	slog.Info(s.kind+".level", slog.String("device", s.name),
 		slog.Int("level", int(level)), slog.Bool("on", on))
 	s.notify()
 }
 
 // steppedLevel resolves a Step command against the current level, clamped to
 // the cluster's own bounds.
-func (s *demoSpeaker) steppedLevel(req levelcontrol.StepRequest) uint8 {
+func (s *dimmer) steppedLevel(req levelcontrol.StepRequest) uint8 {
 	s.mu.Lock()
 	current := s.level
 	s.mu.Unlock()
@@ -1226,18 +1249,18 @@ func (s *demoSpeaker) steppedLevel(req levelcontrol.StepRequest) uint8 {
 		}
 		return current + req.StepSize
 	}
-	if req.StepSize > current-levelcontrol.LevelMin {
-		return levelcontrol.LevelMin
+	if req.StepSize > current-s.minLevel {
+		return s.minLevel
 	}
 	return current - req.StepSize
 }
 
 // moveTarget is where a Move ends on a device with no travel time.
-func moveTarget(moveMode uint8) uint8 {
+func (s *dimmer) moveTarget(moveMode uint8) uint8 {
 	if moveMode == levelcontrol.MoveModeUp {
 		return levelcontrol.LevelMax
 	}
-	return levelcontrol.LevelMin
+	return s.minLevel
 }
 
 // --- the fleet ----------------------------------------------------------
@@ -1249,8 +1272,27 @@ type fleet struct {
 	thermometer *demoThermometer
 	valve       *demoValve
 	selector    *demoSelector
-	speaker     *demoSpeaker
-	assembler   *endpoint.Assembler
+	speaker     *dimmer
+
+	// One example device per surface the chip-tool suite drives
+	// (internal/chiptool). Each lives in the fleet_*.go file named after
+	// its kind.
+	ceiling    *dimmer
+	fan        *demoFan
+	smoke      *demoSmokeAlarm
+	pump       *demoPump
+	flow       *demoReading
+	washer     *demoWasher
+	vacuum     *demoVacuum
+	thermostat *demoThermostat
+	blind      *demoBlind
+	lock       *demoLock
+	humidity   *demoReading
+	occupancy  *demoBinary
+	contact    *demoBinary
+	button     *demoButton
+
+	assembler *endpoint.Assembler
 }
 
 func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*fleet, error) {
@@ -1264,19 +1306,33 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		valve:       newDemoValve("Garden Tap", 600),
 		selector:    newDemoSelector("Coffee Machine"),
 		speaker:     newDemoSpeaker("Kitchen Speaker", 120),
+		ceiling:     newDemoCeilingLight("Ceiling Light"),
+		fan:         newDemoFan("Ceiling Fan"),
+		smoke:       newDemoSmokeAlarm("Hallway Smoke Alarm"),
+		pump:        newDemoPump("Heating Pump"),
+		flow:        newDemoReading("Water Meter", contract.MeasurementFlow, 0.8),
+		washer:      newDemoWasher("Washing Machine"),
+		vacuum:      newDemoVacuum("Robot Vacuum"),
+		thermostat:  newDemoThermostat("Living Room Thermostat"),
+		blind:       newDemoBlind("Bedroom Blind"),
+		lock:        newDemoLock("Front Door"),
+		humidity:    newDemoReading("Bathroom Humidity", contract.MeasurementHumidity, 48),
+		occupancy:   newDemoBinary("Hall Motion", contract.MeasurementOccupancy, false),
+		contact:     newDemoBinary("Window Contact", contract.MeasurementContact, true),
+		button:      newDemoButton("Wall Button"),
 		assembler:   asm,
 	}, nil
 }
 
 // snapshotter is what the bridge calls at Start and on every Reassemble. It
-// walks this host's model — here, five hard-coded devices — describes each
+// walks this host's model — here, a hard-coded fleet — describes each
 // as a flat [endpoint.Spec], and hands the assembled topology back.
 //
 // StableKey is the load-bearing field: it decides which endpoint number the
 // device gets back after a restart, so it must render byte-for-byte
 // identically for the same device across releases.
 func (f *fleet) snapshotter(ctx context.Context) (*endpoint.Topology, error) {
-	specs := []endpoint.Spec{
+	specs := []endpoint.Spec{ //nolint:prealloc // the literal is the readable part; the surface devices are appended below
 		{
 			StableKey:      endpoint.StringKey("demo:light:1"),
 			DeviceAddress:  "demo-light-1",
@@ -1318,6 +1374,7 @@ func (f *fleet) snapshotter(ctx context.Context) (*endpoint.Topology, error) {
 			Source:         f.speaker,
 		},
 	}
+	specs = append(specs, f.surfaceSpecs()...)
 	return f.assembler.Assemble(ctx, []endpoint.Snapshot{{
 		Scope:     scope,
 		Endpoints: specs,
@@ -1327,4 +1384,50 @@ func (f *fleet) snapshotter(ctx context.Context) (*endpoint.Topology, error) {
 		// collection wipes every persisted endpoint number at boot.
 		ModelComplete: true,
 	}})
+}
+
+// surfaceSpecs describes the devices that give the chip-tool suite one
+// endpoint per surface it drives. They are appended after the original five
+// so those keep their StableKeys — and therefore their endpoint numbers — on
+// a database written by an earlier release of this example.
+func (f *fleet) surfaceSpecs() []endpoint.Spec {
+	spec := func(key, name string, deviceType uint16, src contract.EndpointSource) endpoint.Spec {
+		return endpoint.Spec{
+			StableKey:      endpoint.StringKey("demo:" + key + ":1"),
+			DeviceAddress:  "demo-" + key + "-1",
+			ChannelAddress: "demo-" + key + "-1:0",
+			DeviceType:     deviceType,
+			FriendlyName:   name,
+			Source:         src,
+		}
+	}
+	sensor := func(key, name string, m contract.MeasurementSource) endpoint.Spec {
+		return endpoint.Spec{
+			StableKey:      endpoint.StringKey("demo:" + key + ":1"),
+			DeviceAddress:  "demo-" + key + "-1",
+			ChannelAddress: "demo-" + key + "-1:0",
+			DeviceType:     contract.MeasurementClassDeviceType(m.MatterMeasurementClass()),
+			FriendlyName:   name,
+			Measurement:    m,
+		}
+	}
+	smoke := spec("smoke", f.smoke.name, f.smoke.MatterDeviceType(), f.smoke)
+	// SmokeCoAlarm mandates PowerSource; the alarm's battery is it.
+	smoke.PowerSource = f.smoke.battery
+	return []endpoint.Spec{
+		spec("ceiling", f.ceiling.name, f.ceiling.MatterDeviceType(), f.ceiling),
+		spec("fan", f.fan.name, f.fan.MatterDeviceType(), f.fan),
+		smoke,
+		spec("pump", f.pump.name, f.pump.MatterDeviceType(), f.pump),
+		sensor("flow", f.flow.name, f.flow),
+		spec("washer", f.washer.name, f.washer.MatterDeviceType(), f.washer),
+		spec("vacuum", f.vacuum.name, f.vacuum.MatterDeviceType(), f.vacuum),
+		spec("thermostat", f.thermostat.name, f.thermostat.MatterDeviceType(), f.thermostat),
+		spec("blind", f.blind.name, f.blind.MatterDeviceType(), f.blind),
+		spec("lock", f.lock.name, f.lock.MatterDeviceType(), f.lock),
+		sensor("humidity", f.humidity.name, f.humidity),
+		sensor("occupancy", f.occupancy.name, f.occupancy),
+		sensor("contact", f.contact.name, f.contact),
+		sensor("button", f.button.name, f.button),
+	}
 }
