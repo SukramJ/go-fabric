@@ -794,9 +794,10 @@ func TestTrustedRootCertificates_IncludesPendingRoot(t *testing.T) {
 // --- global attributes 0xFFF8–0xFFFB ---
 
 // TestOpcreds_GlobalAttributes_Served verifies that OperationalCredentials
-// serves GeneratedCommandList (0xFFF8), AcceptedCommandList (0xFFF9),
-// EventList (0xFFFA) and AttributeList (0xFFFB). These were missing and caused
-// Apple cache-drops on cluster 0x3E.
+// serves GeneratedCommandList (0xFFF8), AcceptedCommandList (0xFFF9) and
+// AttributeList (0xFFFB). These were missing and caused Apple cache-drops on
+// cluster 0x3E. EventList (0xFFFA) is deliberately not served — see
+// TestCoreServersDoNotServeEventList.
 // Mirrors matter.js ClusterServer auto-populated globalAttributes.
 func TestOpcreds_GlobalAttributes_Served(t *testing.T) {
 	t.Parallel()
@@ -808,7 +809,6 @@ func TestOpcreds_GlobalAttributes_Served(t *testing.T) {
 	}{
 		{"GeneratedCommandList", 0xFFF8},
 		{"AcceptedCommandList", 0xFFF9},
-		{"EventList", 0xFFFA},
 		{"AttributeList", 0xFFFB},
 		{"FeatureMap", 0xFFFC},
 		{"ClusterRevision", 0xFFFD},
@@ -834,7 +834,7 @@ func TestOpcreds_MatterAttributes_IncludesGlobals(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	attrs := oc.MatterAttributes()
-	wantIDs := []uint32{0xFFF8, 0xFFF9, 0xFFFA, 0xFFFB}
+	wantIDs := []uint32{0xFFF8, 0xFFF9, 0xFFFB}
 	attrSet := make(map[uint32]bool, len(attrs))
 	for _, a := range attrs {
 		attrSet[a] = true

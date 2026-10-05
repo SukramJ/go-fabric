@@ -7,8 +7,9 @@
 // This package is a conformance reference: the server holds its own state
 // and answers every command with Success without forwarding it anywhere,
 // so it does not drive a device. It exists to pin the cluster's wire shape
-// and attribute surface against matter.js HEAD, and nothing in this module
-// mounts it. A host that needs live control mounts its own
+// and attribute surface against matter.js HEAD; only the reference daemon
+// (examples/reference-bridge) mounts it, to put that surface in front of
+// chip-tool. A host that needs live control mounts its own
 // [contract.ClusterServer] on the endpoint instead.
 package cover
 
@@ -210,6 +211,29 @@ func (s *WindowCoveringServer) MatterInvoke(_ context.Context, cmdID uint32, fie
 		return nil, fmt.Errorf("windowcovering: unknown command 0x%02X", cmdID)
 	}
 }
+
+// coverFeatureLift is the LF bit of the WindowCovering FeatureMap
+// (window-covering-cluster.element.ts, feature "LF", bit 0).
+const coverFeatureLift uint32 = 1 << 0
+
+// MatterAcceptedCommands implements [contract.ClusterCommandLister]:
+// UpOrOpen, DownOrClose and StopMotion (conformance M), and
+// GoToLiftPercentage when the FeatureMap carries LF (conformance
+// "LF & PA_LF, [LF]"). The value and tilt commands are not handled, so
+// they are not listed. Without the lister the dispatcher synthesised an
+// empty AcceptedCommandList — a covering that, read by the book, accepts
+// no command at all. Found by the chip-tool data-model sweep.
+func (s *WindowCoveringServer) MatterAcceptedCommands() []uint32 {
+	cmds := []uint32{wire.WindowCoveringCmdUpOrOpen, wire.WindowCoveringCmdDownOrClose, wire.WindowCoveringCmdStopMotion}
+	if s.featureMap&coverFeatureLift != 0 {
+		cmds = append(cmds, wire.WindowCoveringCmdGoToLiftPercentage)
+	}
+	return cmds
+}
+
+// MatterGeneratedCommands implements [contract.ClusterCommandLister]: every
+// command answers with a status only.
+func (s *WindowCoveringServer) MatterGeneratedCommands() []uint32 { return []uint32{} }
 
 // MatterReportable lists the attributes that change at runtime and
 // require Matter subscription reports.

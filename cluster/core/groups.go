@@ -162,14 +162,11 @@ func (s *Groups) MatterRead(attrID uint32) (any, bool) {
 		return s.MatterAcceptedCommands(), true
 	case cluster.AttrGlobalGeneratedCommandList:
 		return s.MatterGeneratedCommands(), true
-	case cluster.AttrGlobalEventList:
-		return []uint32{}, true
 	case cluster.AttrGlobalAttributeList:
 		return []uint32{
 			groupsAttrNameSupport,
 			cluster.AttrGlobalGeneratedCommandList,
 			cluster.AttrGlobalAcceptedCommandList,
-			cluster.AttrGlobalEventList,
 			cluster.AttrGlobalAttributeList,
 			cluster.AttrGlobalFeatureMap,
 			cluster.AttrGlobalClusterRevision,

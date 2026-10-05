@@ -297,6 +297,30 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- **Found by the chip-tool data-model sweep** (`internal/chiptool`,
+  which holds every cluster a real controller reads against its own global
+  lists and the matter.js schema):
+  - `cluster/thermo`: AcceptedCommandList was empty — the server handled
+    SetpointRaiseLower, the cluster's one mandatory command, but
+    implemented no command lister, so the dispatcher synthesised `[]`. It
+    now lists SetpointRaiseLower.
+  - `cluster/cover`: AcceptedCommandList was empty for the same reason. It
+    now lists UpOrOpen, DownOrClose, StopMotion and, with LF,
+    GoToLiftPercentage — the commands the server handles and matter.js
+    mandates.
+  - `cluster/light`: the CT-only ColorControl server lacked the two
+    attributes conformance "CT" makes mandatory,
+    CoupleColorTempToLevelMinMireds (0x400D, the physical minimum, as
+    matter.js falls back to) and StartUpColorTemperatureMireds (0x4010,
+    nullable, writable at Manage, constraint 1 to 65279). New wire
+    constants `ColorCtrlAttrCoupleColorTempToLevelMinMireds` and
+    `ColorCtrlAttrStartUpColorTemperatureMireds`.
+  - `cluster/core`: OperationalCredentials, GroupKeyManagement and Groups
+    served EventList (0xFFFA) and named it in AttributeList, while the
+    dispatcher leaves it out of every other cluster and matter.js marks it
+    deprecated (conformance "D"). Groups even named it in AttributeList
+    without returning it from a wildcard read. All three now leave it out.
+
 - GroupKeyManagement GroupTable and GroupKeyMap write GroupId,
   GroupKeySetId and the endpoint ids at their smallest TLV width, as
   matter.js's `TlvUInt16` does, instead of always two bytes (both are valid

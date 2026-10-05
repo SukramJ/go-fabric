@@ -735,9 +735,9 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		return uint32(0), true
 	case cluster.AttrGlobalClusterRevision:
 		return opcredsClusterRevision, true
-	// Global attributes 0xFFF8–0xFFFB: Apple Home caches
-	// GeneratedCommandList / AcceptedCommandList / EventList /
-	// AttributeList during the initial subscribe sweep and marks the
+	// Global attributes 0xFFF8, 0xFFF9, 0xFFFB: Apple Home caches
+	// GeneratedCommandList / AcceptedCommandList / AttributeList during
+	// the initial subscribe sweep and marks the
 	// cluster unknown when they return UnsupportedAttribute. Adding these
 	// cases mirrors matter.js ClusterServer auto-populated globalAttributes
 	// (packages/node/src/behavior/cluster/ClusterBehavior.ts) and chip
@@ -769,12 +769,6 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 			opcredsCmdSetVidVerificationStatement, // 0x0C
 			opcredsCmdSignVidVerificationRequest,  // 0x0D
 		}, true
-	case cluster.AttrGlobalEventList:
-		// OpCreds has no events per matter.js operational-credentials.
-		// element.ts. Apple iOS 26 suppresses EventList (by-design PFAD-
-		// ASYMMETRIE) but the attribute must be served for non-Apple
-		// commissioners that do not suppress it.
-		return []uint32{}, true
 	case cluster.AttrGlobalAttributeList:
 		// Full attribute list per Matter §11.18.4 + global attrs.
 		return []uint32{
@@ -788,7 +782,6 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 			cluster.AttrGlobalClusterRevision,      // 0xFFFD
 			cluster.AttrGlobalGeneratedCommandList, // 0xFFF8
 			cluster.AttrGlobalAcceptedCommandList,  // 0xFFF9
-			cluster.AttrGlobalEventList,            // 0xFFFA
 			cluster.AttrGlobalAttributeList,        // 0xFFFB
 		}, true
 	}
@@ -1058,9 +1051,10 @@ func (o *OperationalCredentials) MatterReportable() []uint32 {
 // SupportedFabrics + TrustedRootCertificates Apple cannot validate
 // the fabric-credentials chain.
 //
-// Global attributes 0xFFF8–0xFFFB included so Apple's initial subscribe
-// sweep can cache GeneratedCommandList, AcceptedCommandList, EventList
-// and AttributeList for cluster 0x3E.
+// The globals are included so Apple's initial subscribe sweep can cache
+// GeneratedCommandList, AcceptedCommandList and AttributeList for cluster
+// 0x3E. EventList (0xFFFA) is not, for the reason
+// [GroupKeyManagement.MatterAttributes] gives.
 func (o *OperationalCredentials) MatterAttributes() []uint32 {
 	return []uint32{
 		opcredsAttrNOCs,
@@ -1073,7 +1067,6 @@ func (o *OperationalCredentials) MatterAttributes() []uint32 {
 		cluster.AttrGlobalClusterRevision,
 		cluster.AttrGlobalGeneratedCommandList,
 		cluster.AttrGlobalAcceptedCommandList,
-		cluster.AttrGlobalEventList,
 		cluster.AttrGlobalAttributeList,
 	}
 }

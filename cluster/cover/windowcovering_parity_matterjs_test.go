@@ -497,3 +497,33 @@ func TestParityMatterJS_WindowCoveringGoToLiftPercentageAcceptsTheBridgeTagMap(t
 		t.Fatalf("GoToLiftPercentage(10001 via tag map) error = %v, want ConstraintError", err)
 	}
 }
+
+// TestParityMatterJS_WindowCoveringAcceptedCommands pins AcceptedCommandList
+// to the commands the server handles and matter.js mandates
+// (window-covering-cluster.element.ts): UpOrOpen, DownOrClose, StopMotion
+// always, GoToLiftPercentage with LF. Found empty by the chip-tool
+// data-model sweep — the server implemented no command lister.
+func TestParityMatterJS_WindowCoveringAcceptedCommands(t *testing.T) {
+	t.Parallel()
+	lift := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 1 | 1<<2})
+	if got, want := lift.MatterAcceptedCommands(), []uint32{0x00, 0x01, 0x02, 0x05}; !slices.Equal(got, want) {
+		t.Errorf("LF|PA_LF AcceptedCommandList = %v, want %v", got, want)
+	}
+	tiltOnly := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 1 << 1})
+	if got, want := tiltOnly.MatterAcceptedCommands(), []uint32{0x00, 0x01, 0x02}; !slices.Equal(got, want) {
+		t.Errorf("TL AcceptedCommandList = %v, want %v (no lift command without LF)", got, want)
+	}
+	if got := lift.MatterGeneratedCommands(); len(got) != 0 {
+		t.Errorf("GeneratedCommandList = %v, want empty (every command answers with a status)", got)
+	}
+	// Every listed command is one MatterInvoke handles.
+	for _, cmd := range lift.MatterAcceptedCommands() {
+		var fields any
+		if cmd == 0x05 {
+			fields = uint16(5000)
+		}
+		if _, err := lift.MatterInvoke(context.Background(), cmd, fields); err != nil {
+			t.Errorf("listed command 0x%02X: %v", cmd, err)
+		}
+	}
+}

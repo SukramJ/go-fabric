@@ -16,17 +16,20 @@
 // This package is a conformance reference: the server holds its own state
 // and answers every command with Success without forwarding it anywhere,
 // so it does not drive a device. It exists to pin the cluster's wire shape
-// and attribute surface against matter.js HEAD, and nothing in this module
-// mounts it. A host that needs live control mounts its own
+// and attribute surface against matter.js HEAD; only the reference daemon
+// (examples/reference-bridge) mounts it, to put that surface in front of
+// chip-tool. A host that needs live control mounts its own
 // [contract.ClusterServer] on the endpoint instead.
 package light
 
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // ColorControlServerConfig holds the static configuration injected at
@@ -83,6 +86,16 @@ type ColorControlServer struct {
 	cfg     ColorControlServerConfig
 	current uint16
 	writer  ColorTemperatureWriter
+
+	// startUpMu guards startUpMireds, the one attribute a controller
+	// writes: a write arrives on the IM path while a subscription report
+	// may be reading it.
+	startUpMu sync.Mutex
+	// startUpMireds is StartUpColorTemperatureMireds (0x4010); nil is
+	// null, "keep the previous colour temperature at start-up" (the
+	// attribute's quality X, matter.js ColorControlServer.ts:382
+	// `startUpColorTemperatureMireds ?? null`).
+	startUpMireds *uint16
 }
 
 // NewColorControlServer constructs a ColorControlServer with the given
@@ -127,6 +140,20 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 		return s.cfg.MinMireds, true
 	case wire.ColorCtrlAttrColorTempPhysicalMax:
 		return s.cfg.MaxMireds, true
+	case wire.ColorCtrlAttrCoupleColorTempToLevelMinMireds:
+		// CT-mandatory (color-control.element.ts:183-184). The server
+		// keeps no separate coupling floor, so the value is the one
+		// matter.js falls back to: the physical minimum
+		// (ColorControlServer.ts:1582
+		// `coupleColorTempToLevelMinMireds ?? minimumColorTemperatureMireds`).
+		return s.cfg.MinMireds, true
+	case wire.ColorCtrlAttrStartUpColorTemperatureMireds:
+		s.startUpMu.Lock()
+		defer s.startUpMu.Unlock()
+		if s.startUpMireds == nil {
+			return nil, true
+		}
+		return *s.startUpMireds, true
 	case wire.ColorCtrlAttrNumberOfPrimaries:
 		// NumberOfPrimaries is mandatory (spec §3.2.6.6) with Quality X
 		// (nullable). CT-only mode has no primary colours; return null
@@ -142,11 +169,59 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 	}
 }
 
-// MatterWrite rejects all attribute writes; ColorControl attributes are
-// read-only — commands are the intended mutation path.
-func (s *ColorControlServer) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("colorcontrol: attribute 0x%04X is not writable", attrID)
+// MatterWrite accepts StartUpColorTemperatureMireds, the one writable
+// attribute of the CT surface (access "RW VM", constraint "1 to 65279",
+// nullable — color-control.element.ts:187-188); every other ColorControl
+// attribute is read-only and commands are the intended mutation path.
+//
+// The stored value is reported, never applied: a bridged endpoint has no
+// start-up of its own, the same reason matter.js gives for skipping
+// StartUpOnOff on an Aggregator-owned endpoint (OnOffServer.ts:33-36).
+func (s *ColorControlServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	if attrID != wire.ColorCtrlAttrStartUpColorTemperatureMireds {
+		return fmt.Errorf("colorcontrol: attribute 0x%04X is not writable", attrID)
+	}
+	var next *uint16
+	if value != nil {
+		v, ok := cluster.AsUintMax(value, 0xFFFF)
+		if !ok || v < 1 || v > startUpMiredsMax {
+			return colorControlConstraintErr(fmt.Sprintf(
+				"colorcontrol: StartUpColorTemperatureMireds %v outside 1 to %d", value, startUpMiredsMax,
+			))
+		}
+		m := uint16(v)
+		next = &m
+	}
+	s.startUpMu.Lock()
+	s.startUpMireds = next
+	s.startUpMu.Unlock()
+	return nil
 }
+
+// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
+// StartUpColorTemperatureMireds is "RW VM" (Manage).
+func (s *ColorControlServer) MinWritePrivilege(attrID uint32) uint8 {
+	if attrID == wire.ColorCtrlAttrStartUpColorTemperatureMireds {
+		return privilegeManage
+	}
+	return privilegeOperate
+}
+
+// startUpMiredsMax is the upper bound of StartUpColorTemperatureMireds'
+// constraint "1 to 65279".
+const startUpMiredsMax = 65279
+
+// Access-control privileges (Matter §9.10.5.2).
+const (
+	privilegeOperate uint8 = 3
+	privilegeManage  uint8 = 4
+)
+
+// colorControlConstraintErr answers a write with CONSTRAINT_ERROR.
+type colorControlConstraintErr string
+
+func (e colorControlConstraintErr) Error() string                 { return string(e) }
+func (colorControlConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
 
 // MatterInvoke handles ColorControl commands. MoveToColorTemperature
 // (0x0A) crops the target to [MinMireds, MaxMireds] and updates the
@@ -219,6 +294,8 @@ func (s *ColorControlServer) MatterAttributes() []uint32 {
 		wire.ColorCtrlAttrColorCapabilities,
 		wire.ColorCtrlAttrColorTempPhysicalMin,
 		wire.ColorCtrlAttrColorTempPhysicalMax,
+		wire.ColorCtrlAttrCoupleColorTempToLevelMinMireds,
+		wire.ColorCtrlAttrStartUpColorTemperatureMireds,
 	}
 }
 

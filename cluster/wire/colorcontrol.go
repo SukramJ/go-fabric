@@ -26,6 +26,11 @@ const (
 	ColorCtrlAttrColorCapabilities      uint32 = 0x400A
 	ColorCtrlAttrColorTempPhysicalMin   uint32 = 0x400B
 	ColorCtrlAttrColorTempPhysicalMax   uint32 = 0x400C
+	// ColorCtrlAttrCoupleColorTempToLevelMinMireds and
+	// ColorCtrlAttrStartUpColorTemperatureMireds carry conformance "CT"
+	// (matter.js color-control.element.ts:183-189).
+	ColorCtrlAttrCoupleColorTempToLevelMinMireds uint32 = 0x400D
+	ColorCtrlAttrStartUpColorTemperatureMireds   uint32 = 0x4010
 )
 
 // ColorControl command IDs per Matter §3.2.7.

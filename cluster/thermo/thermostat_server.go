@@ -9,8 +9,9 @@
 // This package is a conformance reference: the server holds its own state
 // and answers every command with Success without forwarding it anywhere,
 // so it does not drive a device. It exists to pin the cluster's wire shape
-// and attribute surface against matter.js HEAD, and nothing in this module
-// mounts it. A host that needs live control mounts its own
+// and attribute surface against matter.js HEAD; only the reference daemon
+// (examples/reference-bridge) mounts it, to put that surface in front of
+// chip-tool. A host that needs live control mounts its own
 // [contract.ClusterServer] on the endpoint instead.
 package thermo
 
@@ -374,7 +375,7 @@ func (s *ThermostatServer) MatterWrite(_ context.Context, attrID uint32, value a
 // MatterInvoke handles SetpointRaiseLower and weekly-schedule commands.
 func (s *ThermostatServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
-	case 0x00: // SetpointRaiseLower
+	case thermoCmdSetpointRaiseLower:
 		return nil, s.handleSetpointRaiseLower(fields)
 	default:
 		return nil, im.UnsupportedCommandf("thermostat: command 0x%02X not supported", cmdID)
@@ -573,6 +574,26 @@ func controlSequenceOfOperation(features uint32) uint8 {
 		return 2 // HeatingOnly (HM thermostats are heating by default)
 	}
 }
+
+// thermoCmdSetpointRaiseLower is SetpointRaiseLower, the cluster's one
+// conformance-M command (thermostat-cluster.element.ts).
+const thermoCmdSetpointRaiseLower uint32 = 0x00
+
+// MatterAcceptedCommands implements [contract.ClusterCommandLister].
+// SetpointRaiseLower is the only command the server handles, and the only
+// mandatory one: the schedule and preset commands carry MSCH / PRES /
+// TSUGGEST conformance, features this server never advertises. Without the
+// lister the dispatcher synthesised an empty AcceptedCommandList, and a
+// controller that reads the list before invoking — Apple Home and Google
+// Home both do — saw a thermostat that accepts nothing. Found by the
+// chip-tool data-model sweep.
+func (s *ThermostatServer) MatterAcceptedCommands() []uint32 {
+	return []uint32{thermoCmdSetpointRaiseLower}
+}
+
+// MatterGeneratedCommands implements [contract.ClusterCommandLister].
+// SetpointRaiseLower answers with a status only.
+func (s *ThermostatServer) MatterGeneratedCommands() []uint32 { return []uint32{} }
 
 // MatterReportable returns attributes that emit reports on change.
 func (s *ThermostatServer) MatterReportable() []uint32 {
