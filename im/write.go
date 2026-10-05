@@ -266,6 +266,19 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		return privilegeOperate
 	}
 
+	// lastWritten is the concrete attribute the previous data element of
+	// this request was written to successfully. A data element for the
+	// same attribute right after it is not re-authorized: chip
+	// WriteHandler::CheckWriteAccess validates the ACL "only if path has
+	// changed" from mLastSuccessfullyWrittenPath, so a chunked list write —
+	// a REPLACE-ALL followed by ListIndex=null appends — is authorized once,
+	// against the ACL in force when it began. Without it an administrator
+	// who rewrites the ACL in chunks loses the write to its own empty
+	// replace (TC-ACL-2.6, 2.8). matter.js checks every element
+	// (BD-Matter-ChunkedWriteAuthorizedOnce).
+	tx := writeTransactionFromContext(ctx)
+	lastWritten := tx.lastWritten
+	defer func() { tx.lastWritten = lastWritten }()
 	var wr WriteResponse
 	for _, w := range req.Writes {
 		// A write path MUST name a concrete cluster and attribute. Matter
@@ -289,7 +302,12 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		// so an Operate-only subject cannot escalate via a privileged
 		// write. A wildcard-endpoint path is authorized further down, at
 		// every endpoint it resolves to.
-		if aclActive && w.Path.HasEndpoint {
+		sameAsLast := lastWritten != nil && w.Path.HasEndpoint &&
+			lastWritten.Endpoint == w.Path.Endpoint && lastWritten.Cluster == w.Path.Cluster && lastWritten.Attribute == w.Path.Attribute
+		if !sameAsLast {
+			lastWritten = nil
+		}
+		if aclActive && w.Path.HasEndpoint && !sameAsLast {
 			priv := writePrivilege(w.Path.Endpoint, w.Path.Cluster, w.Path.Attribute)
 			if status := aclChecker.CheckACL(ctx, fabricIndex, subjectNodeID, subjectCATs, w.Path.Endpoint, w.Path.Cluster, priv); !status.IsSuccess() {
 				wr.Responses = append(wr.Responses, AttributeStatus{
@@ -350,6 +368,11 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 			})
 			continue
 		}
+		lastWritten = nil
+		if w.Path.HasEndpoint && len(results) > 0 && allSucceeded(results) {
+			p := w.Path
+			lastWritten = &p
+		}
 		for _, res := range results {
 			// When a cluster-specific status is conveyed, the outer global
 			// status MUST be FAILURE (not a more specific global code).
@@ -366,4 +389,38 @@ func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) Wri
 		}
 	}
 	return wr
+}
+
+// allSucceeded reports whether every result of a write is Success.
+func allSucceeded(results []WriteResult) bool {
+	for _, r := range results {
+		if r.Status != StatusSuccess {
+			return false
+		}
+	}
+	return true
+}
+
+// WriteTransaction carries what one Write interaction remembers across the
+// WriteRequest messages of a chunked write: the attribute its last data
+// element was written to successfully (chip WriteHandler
+// mLastSuccessfullyWrittenPath, which lives as long as the interaction).
+// The transport keeps one per chunked write and hands it to every chunk
+// through [WithWriteTransaction]; the zero value starts a transaction.
+type WriteTransaction struct {
+	lastWritten *ConcreteAttributePath
+}
+
+type writeTransactionKey struct{}
+
+// WithWriteTransaction attaches tx to ctx for [HandleWriteRequest].
+func WithWriteTransaction(ctx context.Context, tx *WriteTransaction) context.Context {
+	return context.WithValue(ctx, writeTransactionKey{}, tx)
+}
+
+func writeTransactionFromContext(ctx context.Context) *WriteTransaction {
+	if tx, ok := ctx.Value(writeTransactionKey{}).(*WriteTransaction); ok && tx != nil {
+		return tx
+	}
+	return &WriteTransaction{}
 }

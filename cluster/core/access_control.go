@@ -825,6 +825,17 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 					}, contract.EventPriorityInfo)
 			}
 			i := 0
+			if im.IsListAppendWrite(ctx) && len(out) > len(oldEntries) {
+				// A list append (ListIndex=null) adds the trailing entry and
+				// touches none before it: only that one is reported, as
+				// chip's AccessControl list append (CreateEntry → Added)
+				// reports it — a chunked ACL write (REPLACE-ALL then
+				// appends) yields Removed for the replaced entries and
+				// Added per appended one (TC-ACL-2.6). matter.js receives
+				// the whole list and reports every position
+				// (BD-Matter-ACLAppendEvents).
+				i = len(oldEntries)
+			}
 			for ; i < len(out); i++ {
 				changeType := AccessControlChangeTypeChanged
 				if i >= len(oldEntries) {

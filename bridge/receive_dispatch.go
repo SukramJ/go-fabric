@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // errChunkRejected is returned by a chunk loop when the peer answered a
@@ -375,6 +376,12 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 	if b.resolveSessionPASE(requestHdr.SessionID) {
 		writeCtx = im.WithAuthModePASE(writeCtx)
 	}
+	// The chunks of one chunked write share a transaction, as chip's
+	// WriteHandler serves the whole interaction (TC-ACL-2.6, 2.8).
+	writeCtx = im.WithWriteTransaction(writeCtx, b.routing.writeTransaction(
+		mrp.ExchangeKey{SessionID: requestHdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator},
+		req.MoreChunkedMessages, time.Now(),
+	))
 	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
 	b.reportWrittenAttributes(resp)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the

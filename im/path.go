@@ -4,6 +4,7 @@
 package im
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -217,3 +218,21 @@ func UnmarshalCommandPathTLV(dec *tlv.Decoder) (ConcreteCommandPath, error) {
 
 // EOF guard for the decoder helpers above.
 var _ = io.EOF
+
+type listAppendWriteKey struct{}
+
+// WithListAppendWrite marks ctx as carrying a list-append write (a
+// ListIndex=null AttributeDataIB): the cluster server receives the whole
+// list with one element appended, and only that element is new. A server
+// that reports per-element changes (AccessControl's
+// AccessControlEntryChanged) reports just the appended one, as chip's list
+// append (AccessControlAttribute CreateEntry) does.
+func WithListAppendWrite(ctx context.Context) context.Context {
+	return context.WithValue(ctx, listAppendWriteKey{}, true)
+}
+
+// IsListAppendWrite reports whether ctx carries [WithListAppendWrite].
+func IsListAppendWrite(ctx context.Context) bool {
+	v, _ := ctx.Value(listAppendWriteKey{}).(bool)
+	return v
+}

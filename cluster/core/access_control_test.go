@@ -1190,3 +1190,33 @@ func TestAccessControl_ReadUnknownAttrReturnsFalse(t *testing.T) {
 		t.Fatal("MatterRead(0xBEEF) = true, want false")
 	}
 }
+
+// TestAccessControl_ACLAppendEmitsAddedOnly pins chip's list-append
+// semantics (AccessControlAttribute CreateEntry): a ListIndex=null append
+// reports the appended entry as Added and none of the entries before it,
+// so a chunked ACL write — REPLACE-ALL then appends — reports Removed per
+// replaced entry and Added per appended one (TC-ACL-2.6).
+func TestAccessControl_ACLAppendEmitsAddedOnly(t *testing.T) {
+	t.Parallel()
+	store := &seededACLStore{existing: []mstore.ACLEntry{minimalACLEntry(1)}}
+	ac := newAccessControlWithStore(t, store)
+	ac.SetCurrentFabric(1)
+	ac.SetEndpoint(0)
+	emitter := &fakeEmitter{}
+	ac.SetMatterEventEmitter(emitter)
+	cur, _ := ac.MatterReadFiltered(im.WithFabricFilter(context.Background(), true, 1), 0x0000)
+	list := append([]core.AccessControlEntryStruct(nil), cur.([]core.AccessControlEntryStruct)...)
+	list = append(list, core.AccessControlEntryStruct{Privilege: 3, AuthMode: 3, FabricIndex: 1})
+	ctx := im.WithListAppendWrite(im.WithSubject(im.WithFabricFilter(context.Background(), true, 1), 112233, nil))
+	if err := ac.MatterWrite(ctx, 0x0000, list); err != nil {
+		t.Fatalf("MatterWrite: %v", err)
+	}
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+	if len(emitter.events) != 1 {
+		t.Fatalf("an append emitted %d events, want 1 (Added)", len(emitter.events))
+	}
+	if ev := emitter.events[0].data.(core.AccessControlEntryChangedEvent); ev.ChangeType != core.AccessControlChangeTypeAdded || ev.LatestValue.Privilege != 3 {
+		t.Fatalf("event %+v, want Added for the appended entry", ev)
+	}
+}

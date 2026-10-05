@@ -995,6 +995,30 @@ implementation wave.
 
 ---
 
+### BD-Matter-ChunkedWriteAuthorizedOnce — a chunked list write is authorized once, against the ACL it began with
+
+**Go path:** `im/write.go` — `HandleWriteRequest` (`lastWritten`, `WriteTransaction`); `bridge/exchange_routing.go` — `writeTransaction`.
+
+**matter.js:** `AttributeWriteResponse` authorizes every AttributeDataIB of a WriteRequest against the ACL as it stands when that element is processed. A chunked ACL write — a REPLACE-ALL followed by ListIndex=null appends — whose replace drops the writer's own Administer entry therefore loses every append to UnsupportedAccess. matter.js excludes TC-ACL-2.6 and 2.8, which do exactly that, as testing "the CHIP implementation" (`support/chip-testing/test/core/ACL.test.ts`).
+
+**Go:** chip `WriteHandler::CheckWriteAccess` — "only validate ACL if path has changed": a data element for the attribute the previous element of the same Write interaction was written to successfully is not re-authorized. The interaction spans the WriteRequest messages of a chunked write (one `im.WriteTransaction` per exchange, as chip's WriteHandler lives for the interaction). A different attribute, or a new interaction, is authorized afresh.
+
+**Rationale:** TC-ACL-2.6 and 2.8 are certification cases (ADR 0011), and a device on the chip behaviour passes them; an administrator rewriting the ACL in chunks is how chip controllers write a long ACL. The relaxation never extends a grant beyond the attribute the subject was already authorized to write in the same interaction.
+
+---
+
+### BD-Matter-ACLAppendEvents — a list append reports only the appended ACL entry
+
+**Go path:** `cluster/core/access_control.go` — the AccessControlEntryChanged emission; `endpoint/dispatcher.go` marks the write (`im.WithListAppendWrite`).
+
+**matter.js:** a ListIndex=null append is merged into the whole list before `AccessControlServer.#handleAccessControlListChange` sees it, which reports every position of the new list — Changed for each entry before the appended one, although none changed. A chunked ACL write (REPLACE-ALL, then appends) therefore yields Removed, Added, Changed, Added for a two-entry list; matter.js excludes TC-ACL-2.6, which counts them (`support/chip-testing/test/core/ACL.test.ts`).
+
+**Go:** an append reports the appended entry as Added and nothing else, as chip's AccessControl list append (`CreateEntry`) does. A whole-list replace keeps matter.js's per-position report.
+
+**Rationale:** TC-ACL-2.6 is a certification case (ADR 0011) and its expectation is the specification's ("an entry is added, removed or changed"): an entry an append does not touch has not changed.
+
+---
+
 ### BD-Matter-Scenes-RemainingCapacity — FabricSceneInfo RemainingCapacity is bounded by the shared table
 
 **Go path:** `cluster/core/scenes_management.go` — `ScenesState.remainingCapacity`.

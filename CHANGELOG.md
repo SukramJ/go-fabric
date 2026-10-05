@@ -341,6 +341,17 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - A chunked ACL write whose REPLACE-ALL drops the writer's own Administer
+    entry lost every following append to UnsupportedAccess. The elements of
+    one Write interaction that continue writing the attribute just written
+    successfully are no longer re-authorized, as chip's WriteHandler does —
+    across the messages of a chunked write too (`im.WriteTransaction`,
+    `im.WithWriteTransaction`; TC-ACL-2.6, 2.8;
+    `BD-Matter-ChunkedWriteAuthorizedOnce`).
+  - A list-append ACL write reported every entry before the appended one
+    as Changed; it now reports only the appended entry as Added, as chip's
+    list append does (`im.WithListAppendWrite`, `im.IsListAppendWrite`;
+    TC-ACL-2.6; `BD-Matter-ACLAppendEvents`).
   - A list attribute too large for one message — the NOCs of three
     fabrics, a long ACL or PartsList — went out as a single oversized
     ReportData that a chip controller cannot authenticate and discards,

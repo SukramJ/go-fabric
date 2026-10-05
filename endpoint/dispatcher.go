@@ -333,6 +333,7 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					}
 				}
 
+				writeCtx := ctx
 				if path.ListAppend {
 					merged, status := appendListValue(ctx, srv, attrID, value)
 					if status != im.StatusSuccess {
@@ -340,8 +341,12 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 						continue
 					}
 					value = merged
+					// The server sees the whole list; the mark tells it
+					// only the last element is new (AccessControl reports
+					// just that one as Added).
+					writeCtx = im.WithListAppendWrite(ctx)
 				}
-				res := writeOne(ctx, srv, aPath, value)
+				res := writeOne(writeCtx, srv, aPath, value)
 				// A successful write mutated cluster state; advance the
 				// endpoint-hosted DataVersion so DataVersionFilters miss
 				// and subscribers see the change (matter.js
