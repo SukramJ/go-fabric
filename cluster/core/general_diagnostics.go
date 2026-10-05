@@ -398,7 +398,7 @@ func (g *GeneralDiagnostics) SetDeviceLoadProvider(fn func(fabricIndex uint8) De
 // MatterRead does.
 func (g *GeneralDiagnostics) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
 	if attrID != gendiagAttrDeviceLoadStatus {
-		return g.MatterRead(attrID)
+		return g.MatterRead(attrID) //nolint:contextcheck // MatterRead is the contract's context-free read; no request state applies
 	}
 	_, fabricIndex := im.FabricFilterFromContext(ctx)
 	g.mu.RLock()
@@ -526,7 +526,7 @@ type TestEventTriggerRequest struct {
 
 // decodeTestEventTrigger accepts the typed request or the generic
 // tag-keyed map the bridge's fields reader produces for it.
-func decodeTestEventTrigger(fields any) ([]byte, uint64, bool) {
+func decodeTestEventTrigger(fields any) (enableKey []byte, trigger uint64, ok bool) {
 	switch f := fields.(type) {
 	case TestEventTriggerRequest:
 		return f.EnableKey, f.EventTrigger, true

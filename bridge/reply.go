@@ -1421,7 +1421,7 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 //
 // Add a case here whenever a new cluster command starts producing a
 // rich response struct.
-func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
+func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) { //nolint:funlen // a dispatch table: one case per response type
 	switch x := v.(type) {
 	case mattercore.ArmFailSafeResponse:
 		// Matter §11.10.6.3 — [0] enum8 ErrorCode, [1] string DebugText.

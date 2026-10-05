@@ -1085,7 +1085,7 @@ type fabricSessionCloser interface {
 // command the sessions close at once. Needs a [SessionRegistry] that can
 // close by fabric (the operational manager does).
 func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8) {
-	b.EmitFabricRemoved(fabricIndex)
+	b.emitFabricRemoved(ctx, fabricIndex)
 	b.mu.RLock()
 	reg := b.sessionRegistry
 	b.mu.RUnlock()
@@ -1104,8 +1104,15 @@ func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8
 // closure. Forwards to whatever closure the daemon wired via
 // [SetOnFabricRemoved]; nil-safe.
 func (b *Bridge) EmitFabricRemoved(fabricIndex uint8) {
+	b.emitFabricRemoved(context.Background(), fabricIndex)
+}
+
+// emitFabricRemoved is [Bridge.EmitFabricRemoved] under ctx, which bounds
+// the persisted-subscription cleanup (its cancellation does not: the
+// cleanup outlives the command that removed the fabric).
+func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	// A removed fabric's subscriptions can never be re-established.
-	b.forgetFabricSubscriptions(fabricIndex)
+	b.forgetFabricSubscriptions(ctx, fabricIndex)
 	// A window it opened no longer has an admin fabric.
 	if win := b.CommissioningWindow(); win != nil {
 		win.FabricRemoved(fabricIndex)

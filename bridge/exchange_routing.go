@@ -205,10 +205,15 @@ func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now t
 	})
 	if !more {
 		if v, ok := r.writeTxs.LoadAndDelete(key); ok {
-			return v.(*writeTx).tx //nolint:forcetypeassert // the table holds only *writeTx
+			if w, isTx := v.(*writeTx); isTx {
+				return w.tx
+			}
 		}
 		return &im.WriteTransaction{}
 	}
 	v, _ := r.writeTxs.LoadOrStore(key, &writeTx{tx: &im.WriteTransaction{}, started: now})
-	return v.(*writeTx).tx //nolint:forcetypeassert // the table holds only *writeTx
+	if w, isTx := v.(*writeTx); isTx {
+		return w.tx
+	}
+	return &im.WriteTransaction{}
 }

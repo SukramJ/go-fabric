@@ -214,7 +214,7 @@ func TestScenesRemainingCapacityIsBoundByTheTable(t *testing.T) {
 		}
 	})
 	defer unsub()
-	add := func(fabric uint8, scene uint8) im.StatusCode {
+	add := func(fabric, scene uint8) im.StatusCode {
 		ctx := im.WithFabricFilter(context.Background(), true, fabric)
 		resp, err := srv.MatterInvoke(ctx, 0x00, core.AddSceneRequest{SceneID: scene})
 		if err != nil {

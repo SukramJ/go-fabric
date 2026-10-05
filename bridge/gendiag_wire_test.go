@@ -24,6 +24,7 @@ func TestGeneralDiagnosticsResponsesCrossTheWire(t *testing.T) {
 		check   func(t *testing.T, m map[uint8]any)
 	}{
 		{mattercore.TimeSnapshotResponse{SystemTimeMs: 1234}, 0x02, func(t *testing.T, m map[uint8]any) {
+			t.Helper()
 			if m[0] != uint64(1234) {
 				t.Errorf("SystemTimeMs = %v", m[0])
 			}
@@ -32,6 +33,7 @@ func TestGeneralDiagnosticsResponsesCrossTheWire(t *testing.T) {
 			}
 		}},
 		{mattercore.PayloadTestResponse{Payload: []byte{7, 7, 7}}, 0x04, func(t *testing.T, m map[uint8]any) {
+			t.Helper()
 			if b, _ := m[0].([]byte); len(b) != 3 || b[0] != 7 {
 				t.Errorf("Payload = %v", m[0])
 			}

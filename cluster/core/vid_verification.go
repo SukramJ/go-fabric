@@ -101,8 +101,8 @@ func (o *OperationalCredentials) storeVidVerification(ctx context.Context, fabri
 	return nil
 }
 
-func (o *OperationalCredentials) forgetVidVerification(fabricIndex uint8) {
-	_ = o.storeVidVerification(context.Background(), fabricIndex, vidData{})
+func (o *OperationalCredentials) forgetVidVerification(ctx context.Context, fabricIndex uint8) {
+	_ = o.storeVidVerification(context.WithoutCancel(ctx), fabricIndex, vidData{})
 }
 
 // isValidVendorID is matter.js VendorId.isValid: 0..0xFFF4.

@@ -132,7 +132,9 @@ func settingPtr(s fan.Setting) *uint8 {
 	return &v
 }
 
-func percentToSpeed(p uint8) uint8 { return uint8((uint16(p)*uint16(fanSpeedMax) + 99) / 100) }
+func percentToSpeed(p uint8) uint8 {
+	return uint8(min((uint16(p)*uint16(fanSpeedMax)+99)/100, uint16(fanSpeedMax))) //nolint:gosec // bounded by fanSpeedMax, a uint8
+}
 
 func percentToMode(p uint8) fan.FanMode {
 	switch {

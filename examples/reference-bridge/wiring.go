@@ -77,7 +77,7 @@ type rootRefs struct {
 // answers UnsupportedCluster and the pairing aborts before a fabric can be
 // installed. The bridge builds none of them: it owns the wire format, the
 // host owns its identity.
-func buildRootClusters(
+func buildRootClusters( //nolint:funlen // the root endpoint's servers, built and cross-wired in one pass
 	identity bridgeIdentity,
 	st *store.Store,
 	groupState *groups.Manager,
@@ -364,7 +364,7 @@ func (c *caseIdentities) ResolveSigma1Destination(destinationID [32]byte, initia
 // most recently installed one. Without it a controller resuming on fabric
 // 1 after fabric 2 was installed got a session on fabric 2, and every
 // access check failed (TC-ACL-2.10 after the reboot).
-func (c *caseIdentities) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identity, sigma.PeerVerifier, bool) {
+func (c *caseIdentities) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identity, sigma.PeerVerifier, bool) { //nolint:unparam // sigma.FabricIndexResolver's signature
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	f, ok := c.byIdx[fabricIndex]
@@ -583,7 +583,7 @@ func wireSecurity(
 
 	// CASE, likewise per exchange. A single responder lands in `Finished`
 	// after the first Sigma3 and rejects every later Sigma1.
-	caseProvider := matterbridge.NewPerExchangeCaseProvider(func() *matterbridge.CaseAdapter {
+	caseProvider := matterbridge.NewPerExchangeCaseProvider(func() *matterbridge.CaseAdapter { //nolint:contextcheck // the adapter outlives this call; its callbacks run per handshake
 		adapter, err := buildCaseAdapter(sessions, ids, logger)
 		if err != nil {
 			logger.Warn("case.build_failed", slog.String("err", err.Error()))

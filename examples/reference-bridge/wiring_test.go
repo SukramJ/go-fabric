@@ -272,7 +272,7 @@ func TestRebootCountCountsBoots(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	st := store.New(db)
-	for want := uint16(0); want < 3; want++ {
+	for want := range uint16(3) {
 		got, err := countBoot(ctx, st)
 		if err != nil || got != want {
 			t.Fatalf("boot %d: RebootCount = %d, %v", want, got, err)

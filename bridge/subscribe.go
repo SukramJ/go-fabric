@@ -1489,7 +1489,7 @@ func newBooleanStateEvents(b *Bridge, ep *endpointpkg.Endpoint, pathSet []im.Con
 	return nil
 }
 
-func (e *booleanStateEvents) read() (bool, bool) {
+func (e *booleanStateEvents) read() (value, ok bool) {
 	for _, srv := range endpointpkg.ClusterServers(e.ep) {
 		if srv.MatterClusterID() == measurement.ClusterBooleanState {
 			v, ok := srv.MatterRead(0x0000)

@@ -59,7 +59,7 @@ func scenesMissing(cmd, name string) error {
 	return fieldInvalidCommandError{msg: fmt.Sprintf("%s: mandatory field %s missing", cmd, name), consumed: true}
 }
 
-func sceneUint(cmd, name string, nodes []scenesNode, t uint64, limit uint64) (uint64, error) {
+func sceneUint(cmd, name string, nodes []scenesNode, t, limit uint64) (uint64, error) {
 	n, ok := field(nodes, t)
 	if !ok {
 		return 0, scenesMissing(cmd, name)
@@ -275,7 +275,7 @@ func encodeExtensionFieldSetsTLV(enc *tlv.Encoder, sets []mattercore.ExtensionFi
 		for _, p := range s.AttributeValueList {
 			enc.StartStruct(tlv.AnonymousTag())
 			enc.PutUint(tlv.ContextTag(0), uint64(p.AttributeID))
-			enc.PutUint(tlv.ContextTag(uint8(p.Tag)), p.Unsigned)
+			enc.PutUint(tlv.ContextTag(p.Tag), p.Unsigned)
 			_ = enc.EndContainer()
 		}
 		_ = enc.EndContainer()

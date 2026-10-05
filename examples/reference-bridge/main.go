@@ -71,7 +71,7 @@ func main() {
 	}
 }
 
-//nolint:funlen // a composition root: one sequential wiring pass, deliberately readable top to bottom
+//nolint:funlen,gocognit,gocyclo // a composition root: one sequential wiring pass, deliberately readable top to bottom
 func run() error {
 	var (
 		dbPath       = flag.String("db", "reference-bridge.db", "SQLite file holding fabrics, credentials and endpoint numbers")

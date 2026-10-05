@@ -25,7 +25,7 @@ func (*fakeContact) MatterMeasurementClass() contract.MeasurementClass {
 	return contract.MeasurementContact
 }
 
-func (s *fakeContact) MatterBoolValue() (bool, bool) {
+func (s *fakeContact) MatterBoolValue() (value, observed bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.value, true

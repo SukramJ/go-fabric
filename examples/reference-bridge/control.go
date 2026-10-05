@@ -72,7 +72,7 @@ func serveAppPipe(ctx context.Context, f *fleet, path string, logger *slog.Logge
 				logger.Warn("apppipe.open", slog.String("err", err.Error()))
 				return
 			}
-			readPipe(f, fh, logger)
+			readPipe(f, fh, logger) //nolint:contextcheck // each command is applied to completion; ctx only ends the reading loop
 			_ = fh.Close()
 		}
 	}()
@@ -110,7 +110,7 @@ var errUnknownPipeCommand = errors.New("not a command this daemon implements")
 
 // applyPipeCommand applies one command.
 //
-//nolint:gocyclo,cyclop // a flat dispatch table: one case per command
+//nolint:gocyclo,cyclop,funlen // a flat dispatch table: one case per command
 func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 	switch cmd.Name {
 	// --- CHIP's own names ---
@@ -313,7 +313,7 @@ const (
 // testEventTrigger is the daemon's GeneralDiagnostics TestEventTrigger
 // handler. It mirrors what CHIP's smoke-co-alarm app does for each trigger
 // (HandleSmokeCOTestEventTrigger): set one condition, or clear it.
-func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error {
+func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //nolint:gocyclo,cyclop,funlen // a flat dispatch table: one case per trigger
 	set := func(change func(*alarm.State)) error {
 		f.smoke.update(change)
 		return nil

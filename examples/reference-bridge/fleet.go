@@ -72,7 +72,7 @@ type notifier struct {
 }
 
 // OnMatterValueChanged implements [contract.ChangeNotifier].
-func (n *notifier) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+func (n *notifier) OnMatterValueChanged(cb func()) (unsubscribe func()) { //nolint:unparam // the contract's signature; the bridge keeps the closure
 	if cb == nil {
 		return func() {}
 	}
@@ -213,7 +213,7 @@ type onOffServer struct {
 }
 
 // OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
-func (s *onOffServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
+func (s *onOffServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) { //nolint:unparam // the contract's signature; the bridge keeps the closure
 	return s.changes.OnMatterAttributesChanged(cb)
 }
 
@@ -337,19 +337,19 @@ func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) 
 		return nil, nil
 	}
 	s.lt.mu.Lock()
-	res, err := s.invokeLighting(cmdID, fields)
+	err := s.invokeLighting(cmdID, fields)
 	switched := s.lt.takeSwitch()
 	s.lt.mu.Unlock()
 	if switched != nil {
 		s.apply(*switched)
 	}
-	return res, err
+	return nil, err
 }
 
 // invokeLighting runs one command against the LT state. Caller holds
 // s.lt.mu; the on/off switch it decides is applied once the lock is
 // released ([lightingState.takeSwitch]).
-func (s *onOffServer) invokeLighting(cmdID uint32, fields any) (any, error) {
+func (s *onOffServer) invokeLighting(cmdID uint32, fields any) error {
 	switch cmdID {
 	case onoff.CmdOn:
 		s.on()
@@ -368,7 +368,7 @@ func (s *onOffServer) invokeLighting(cmdID uint32, fields any) (any, error) {
 		s.off()
 	case onoff.CmdOnWithRecallGlobalScene:
 		if s.lt.globalSceneControl {
-			return nil, nil
+			return nil
 		}
 		s.lt.globalSceneControl = true
 		if s.lt.onTime == 0 {
@@ -378,13 +378,13 @@ func (s *onOffServer) invokeLighting(cmdID uint32, fields any) (any, error) {
 	case onoff.CmdOnWithTimedOff:
 		control, onTime, offWaitTime, err := onWithTimedOffFields(fields)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		s.onWithTimedOff(control, onTime, offWaitTime)
 	default:
-		return nil, fmt.Errorf("onoff: unsupported command %#x", cmdID)
+		return fmt.Errorf("onoff: unsupported command %#x", cmdID)
 	}
-	return nil, nil
+	return nil
 }
 
 // on is the LT-aware On. Caller holds s.lt.mu. Mirrors matter.js
@@ -457,7 +457,7 @@ func (s *onOffServer) timedOnTick() {
 // timedOnStep is one countdown step of [onOffServer.timedOnTick]; it
 // returns the attributes it changed and the switch it decided, which the
 // caller applies and reports once the lock is released.
-func (s *onOffServer) timedOnStep() ([]uint32, *bool) {
+func (s *onOffServer) timedOnStep() (changed []uint32, switched *bool) {
 	s.lt.mu.Lock()
 	defer s.lt.mu.Unlock()
 	if s.lt.timedOn == nil {

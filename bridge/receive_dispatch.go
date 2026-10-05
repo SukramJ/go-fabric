@@ -446,7 +446,7 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 // matter.js model (schema.IsTimedInvoke) invoked outside a timed interaction
 // answers NEEDS_TIMED_INTERACTION for its own path in the InvokeResponse
 // (CommandInvokeResponse.ts:291), via [im.WithTimedInteraction].
-func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.InvokeRequest) error {
+func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.InvokeRequest) error { //nolint:funlen // the invoke path's gates in their wire order, read top to bottom
 	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
 		return b.replyTimedStatus(src, requestHdr, proto, "invoke", status)
 	}
@@ -746,7 +746,7 @@ func renderCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map
 // InvokeResponse split by maxPayloadSize). Found by the CHIP Python harness
 // (TC-IDM-1.4 step 11 batches two commands whose responses exceed one
 // message).
-func chunkInvokeResponse(resp im.InvokeResponse, budget int) ([][]byte, error) {
+func chunkInvokeResponse(resp im.InvokeResponse, budget int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one
 	whole, err := EncodeInvokeResponse(resp)
 	if err != nil {
 		return nil, err

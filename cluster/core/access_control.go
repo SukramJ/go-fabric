@@ -1117,13 +1117,10 @@ func validateAccessControlExtensionData(data []byte) error {
 	// its members carries a context or profile tag, never an anonymous
 	// one ("Structure element tags should have an id", TlvObject.ts). The
 	// test plan's D_BAD_ELEM holds an anonymous octet string (TC-ACL-2.3).
+	// The element stream was validated above; the walk ends at its end.
 	dec := tlv.NewDecoder(data)
 	depth := 0
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			break
-		}
+	for el, err := dec.Next(); err == nil; el, err = dec.Next() {
 		if el.Type == tlv.TypeEndContainer {
 			depth--
 			continue
@@ -1142,7 +1139,7 @@ func validateAccessControlExtensionData(data []byte) error {
 // change events: a CASE session's subject node id, or passcode id 0 for a
 // PASE session (or a change without a session). Mirrors matter.js
 // AccessControlServer.ts #adminDataFromSession.
-func aclAdminFromContext(ctx context.Context) (*uint64, *uint16) {
+func aclAdminFromContext(ctx context.Context) (adminNode *uint64, adminPasscodeID *uint16) {
 	node, _ := im.SubjectFromContext(ctx)
 	if im.IsPASEFromContext(ctx) || node == 0 {
 		zero := uint16(0)

@@ -81,7 +81,7 @@ func newDemoBinary(name string, class contract.MeasurementClass, value bool) *de
 func (b *demoBinary) MatterMeasurementClass() contract.MeasurementClass { return b.class }
 
 // MatterBoolValue implements [contract.BoolMeasurementSource].
-func (b *demoBinary) MatterBoolValue() (bool, bool) {
+func (b *demoBinary) MatterBoolValue() (value, observed bool) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.value, true

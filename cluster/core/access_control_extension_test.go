@@ -347,7 +347,7 @@ type settingsACLStore struct {
 	settings map[string]string
 }
 
-func (s *settingsACLStore) GetSetting(_ context.Context, key string) (string, bool, error) {
+func (s *settingsACLStore) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
 	v, ok := s.settings[key]
 	return v, ok, nil
 }

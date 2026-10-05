@@ -1496,7 +1496,7 @@ func TestManager_AttestationChallengeFor(t *testing.T) {
 		t.Fatalf("OpenFromSigma: %v", err)
 	}
 	got, ok := m.AttestationChallengeFor(e.SessionID)
-	if !ok || len(got) != 16 || string(got) != string(e.AttestationChallenge) {
+	if !ok || len(got) != 16 || !bytes.Equal(got, e.AttestationChallenge) {
 		t.Fatalf("AttestationChallengeFor = %x, %v; want the session's 16-byte challenge", got, ok)
 	}
 	got[0] ^= 0xFF

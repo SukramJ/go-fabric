@@ -139,7 +139,7 @@ func (w *demoWasher) build() {
 // has already refused what is invalid in the current state; what arrives
 // here moves the cycle.
 func (w *demoWasher) HandleOperationalCommand(_ context.Context, cmd opstate.Command) (opstate.ErrorState, error) {
-	next := opstate.StateStopped
+	var next opstate.State
 	switch cmd {
 	case opstate.CommandStart, opstate.CommandResume:
 		next = opstate.StateRunning

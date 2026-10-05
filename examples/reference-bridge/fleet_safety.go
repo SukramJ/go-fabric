@@ -218,7 +218,7 @@ func (l *demoLock) IsJammed() bool {
 }
 
 // IsLocked implements [lock.StateSource].
-func (l *demoLock) IsLocked() (bool, bool) {
+func (l *demoLock) IsLocked() (locked, observed bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.locked, true

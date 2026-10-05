@@ -35,6 +35,7 @@ func TestRequestsWithoutInteractionModelRevision(t *testing.T) {
 	}
 
 	t.Run("read", func(t *testing.T) {
+		t.Parallel()
 		dec := build(func(enc *tlv.Encoder) {
 			enc.StartArray(tlv.ContextTag(0))
 			attrPath(enc, tlv.AnonymousTag())
@@ -47,6 +48,7 @@ func TestRequestsWithoutInteractionModelRevision(t *testing.T) {
 		}
 	})
 	t.Run("subscribe", func(t *testing.T) {
+		t.Parallel()
 		dec := build(func(enc *tlv.Encoder) {
 			enc.PutBool(tlv.ContextTag(0), true) // KeepSubscriptions
 			enc.PutUint(tlv.ContextTag(1), 0)    // MinIntervalFloor
@@ -62,6 +64,7 @@ func TestRequestsWithoutInteractionModelRevision(t *testing.T) {
 		}
 	})
 	t.Run("timed", func(t *testing.T) {
+		t.Parallel()
 		dec := build(func(enc *tlv.Encoder) { enc.PutUint(tlv.ContextTag(0), 1000) })
 		req, err := UnmarshalTimedRequestTLV(dec)
 		if err != nil || req.TimeoutMs != 1000 {
@@ -69,6 +72,7 @@ func TestRequestsWithoutInteractionModelRevision(t *testing.T) {
 		}
 	})
 	t.Run("invoke", func(t *testing.T) {
+		t.Parallel()
 		dec := build(func(enc *tlv.Encoder) {
 			enc.PutBool(tlv.ContextTag(0), false) // SuppressResponse
 			enc.PutBool(tlv.ContextTag(1), false) // TimedRequest
@@ -90,6 +94,7 @@ func TestRequestsWithoutInteractionModelRevision(t *testing.T) {
 		}
 	})
 	t.Run("write", func(t *testing.T) {
+		t.Parallel()
 		dec := build(func(enc *tlv.Encoder) {
 			enc.PutBool(tlv.ContextTag(0), false)
 			enc.PutBool(tlv.ContextTag(1), false)

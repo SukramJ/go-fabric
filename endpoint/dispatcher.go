@@ -226,7 +226,7 @@ func (d *TopologyDispatcher) Write(ctx context.Context, path im.ConcreteAttribut
 // wildcard-endpoint write can be authorized, since the requested path
 // names no endpoint. authorize may be nil, which dispatches without a
 // gate.
-func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult {
+func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult { //nolint:gocognit // the write path's ordered checks (matter.js AttributeWriteResponse), one branch per status
 	endpoints := d.resolveEndpoints(path)
 	if len(endpoints) == 0 {
 		return []im.WriteResult{{Path: path, Status: im.StatusUnsupportedEndpoint}}

@@ -149,7 +149,7 @@ func (p persistedLabels) restoreRoot(ctx context.Context, b *mattercore.BasicInf
 	b.RestoreConfigurationVersion(p.loadUint32(ctx, rootConfigVersionKey))
 	b.SetOnPersistentWrite(func(nodeLabel, location string) {
 		for k, v := range map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location} {
-			if err := p.st.SetSetting(context.Background(), k, v); err != nil {
+			if err := p.st.SetSetting(context.WithoutCancel(ctx), k, v); err != nil {
 				p.logger.Warn("label.persist", slog.String("err", err.Error()))
 			}
 		}
@@ -197,7 +197,7 @@ func (p persistedLabels) restoreBlind(ctx context.Context, b *demoBlind) {
 		}
 	}
 	b.persist = func(pos uint16) {
-		if err := p.st.SetSetting(context.Background(), blindPositionKey, strconv.FormatUint(uint64(pos), 10)); err != nil {
+		if err := p.st.SetSetting(context.WithoutCancel(ctx), blindPositionKey, strconv.FormatUint(uint64(pos), 10)); err != nil {
 			p.logger.Warn("blind.persist", slog.String("err", err.Error()))
 		}
 	}

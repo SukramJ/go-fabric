@@ -120,7 +120,6 @@ func (st *ScenesState) infoDigest() string {
 		Info SceneInfoStruct
 		N    int
 	}
-	var rows []row
 	fabrics := map[uint8]bool{}
 	for f := range st.info {
 		fabrics[f] = true
@@ -128,6 +127,7 @@ func (st *ScenesState) infoDigest() string {
 	for _, e := range st.table {
 		fabrics[e.FabricIndex] = true
 	}
+	rows := make([]row, 0, len(fabrics))
 	for f := range fabrics {
 		r := row{F: f, N: st.countFor(f)}
 		if inf := st.info[f]; inf != nil {

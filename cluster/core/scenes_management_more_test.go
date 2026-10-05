@@ -5,6 +5,7 @@ package core_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -90,11 +91,11 @@ func scenesWith(t *testing.T, siblings ...contract.ClusterServer) (*core.ScenesM
 
 func scenesStatus(t *testing.T, err error) im.StatusCode {
 	t.Helper()
-	sc, ok := err.(interface{ MatterStatusCode() im.StatusCode })
-	if !ok {
+	var sc interface{ MatterStatusCode() im.StatusCode }
+	if !errors.As(err, &sc) {
 		t.Fatalf("error %v carries no status", err)
 	}
-	if err.(error).Error() == "" {
+	if err.Error() == "" {
 		t.Fatal("empty error text")
 	}
 	return sc.MatterStatusCode()

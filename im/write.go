@@ -239,7 +239,7 @@ func (wr WriteResponse) MarshalTLV(enc *tlv.Encoder) {
 // [IsPASEFromContext] after it, mirroring matter.js
 // packages/protocol/src/interaction/FabricAccessControl.ts:189-191, which
 // keys the implicit Administer grant on the session's auth mode.
-func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse {
+func HandleWriteRequest(ctx context.Context, d Dispatcher, req WriteRequest) WriteResponse { //nolint:gocyclo // the write interaction's per-path gates in matter.js order
 	_, fabricIndex := FabricFilterFromContext(ctx)
 	subjectNodeID, subjectCATs := SubjectFromContext(ctx)
 	pase := IsPASEFromContext(ctx)

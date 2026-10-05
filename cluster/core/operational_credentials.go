@@ -593,7 +593,7 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 		// host's fan-out (the OnFabricRemoved hook — sessions,
 		// subscriptions and, through Bridge.EmitFabricRemoved, the
 		// fabric's group keys, group table and multicast memberships).
-		o.NotifyFabricRemoved(fabricToRevert)
+		o.notifyFabricRemoved(ctx, fabricToRevert)
 		o.notifyChanged()
 		o.mu.RLock()
 		hook := o.onFabricRemoved
@@ -1514,7 +1514,7 @@ func hkdfSHA256(ikm, salt, info []byte, length int) ([]byte, error) {
 	return hkdfPkg.Key(sha256.New, ikm, salt, string(info), length)
 }
 
-func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (any, error) { //nolint:funlen // single-purpose NOC install handler with many validation/crypto branches
+func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (any, error) { //nolint:funlen,gocyclo // single-purpose NOC install handler with many validation/crypto branches
 	req, ok := fields.(AddNOCRequest)
 	if !ok {
 		return nil, fmt.Errorf("%w: AddNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
@@ -1899,7 +1899,7 @@ func validateUpdateNOCCert(fab store.FabricRecord, priv *ecdsa.PrivateKey, nocVa
 	return noc, nil
 }
 
-func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any) (any, error) {
+func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any) (any, error) { //nolint:funlen // matter.js updateNoc's validation sequence, step by step
 	req, ok := fields.(UpdateNOCRequest)
 	if !ok {
 		return nil, fmt.Errorf("%w: UpdateNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
@@ -2127,7 +2127,7 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 	// Also bumps DataVersion — see [OperationalCredentials.NotifyFabricRemoved],
 	// which every fabric-removal surface (this wire command, REST revoke,
 	// factory reset) runs so none of them skip a consequence the others apply.
-	o.NotifyFabricRemoved(req.FabricIndex)
+	o.notifyFabricRemoved(ctx, req.FabricIndex)
 
 	o.mu.Lock()
 	hook := o.onFabricRemoved
@@ -2254,8 +2254,14 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(fields any) (an
 //     cleanup so a subsequent CSR/AddNOC does not reuse stale state tied
 //     to a fabric that no longer exists.
 func (o *OperationalCredentials) NotifyFabricRemoved(fabricIndex uint8) {
+	o.notifyFabricRemoved(context.Background(), fabricIndex)
+}
+
+// notifyFabricRemoved is [OperationalCredentials.NotifyFabricRemoved] under
+// the removing command's ctx.
+func (o *OperationalCredentials) notifyFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	// The fabric's vendor verification data goes with it.
-	o.forgetVidVerification(fabricIndex) //nolint:contextcheck // removal surfaces carry no ctx; the settings delete is local and short
+	o.forgetVidVerification(ctx, fabricIndex)
 	o.mu.Lock()
 	if o.currentFabric == fabricIndex {
 		o.currentFabric = 0

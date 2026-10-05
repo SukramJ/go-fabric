@@ -26,7 +26,7 @@ import (
 // post-commissioning command set on the bridge's root endpoint.
 // Add a switch case when wiring a new cluster command that carries
 // fields (status-only commands need nothing here).
-func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.Element) (any, error) {
+func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.Element) (any, error) { //nolint:gocyclo,funlen // a dispatch table: one case per typed command decoder
 	switch path.Cluster {
 	case 0x0030: // GeneralCommissioning
 		switch path.Command {

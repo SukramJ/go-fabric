@@ -182,13 +182,13 @@ func (a *AdministratorCommissioning) MatterDataVersion() uint32 {
 	if c != nil {
 		snap = c.CurrentWindow()
 	}
-	print := fmt.Sprintf("%+v", snap)
+	rendered := fmt.Sprintf("%+v", snap)
 	a.versionMu.Lock()
 	defer a.versionMu.Unlock()
-	if a.lastSnapshot != "" && a.lastSnapshot != print {
+	if a.lastSnapshot != "" && a.lastSnapshot != rendered {
 		a.version.Bump()
 	}
-	a.lastSnapshot = print
+	a.lastSnapshot = rendered
 	return a.version.Current()
 }
 
