@@ -49,7 +49,9 @@ import (
 // The cluster keeps no in-memory fabric list — every read goes
 // through [store.Store] so the persisted state is the source of truth.
 type OperationalCredentials struct {
-	store StoreFacade
+	// initialFabricLabel is [OpcredsConfig.InitialFabricLabel].
+	initialFabricLabel string
+	store              StoreFacade
 
 	// vid holds each fabric's VID Verification Statement and VVSC when the
 	// store cannot persist them (no [vidVerificationSettings]).
@@ -343,6 +345,14 @@ func (opcredsConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusC
 
 // OpcredsConfig drives [NewOperationalCredentials].
 type OpcredsConfig struct {
+	// InitialFabricLabel is the Label a fabric gets when AddNOC installs
+	// it. Empty by default, as matter.js's FabricBuilder starts a fabric
+	// (packages/protocol/src/fabric/Fabric.ts `#label = ""`) and as
+	// TC-OPCREDS-3.7 checks right after commissioning; the administrator
+	// names its fabric with UpdateFabricLabel. A host that wants a
+	// non-empty label from the first read sets one here (at most 32
+	// bytes, the Label constraint).
+	InitialFabricLabel string
 	// SupportedFabrics is the maximum number of fabrics the bridge
 	// admits. Mirrors matter.js's default 254 when unset; legal
 	// range per Matter §11.18.4.4 is 1..254.
@@ -434,6 +444,9 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 	if s == nil {
 		return nil, errors.New("matter: OperationalCredentials store is required")
 	}
+	if len(cfg.InitialFabricLabel) > 32 {
+		return nil, fmt.Errorf("matter: OperationalCredentials InitialFabricLabel %q exceeds 32 bytes", cfg.InitialFabricLabel)
+	}
 	if cfg.SupportedFabrics == 0 {
 		// Mirrors matter.js packages/node/src/behaviors/
 		// operational-credentials/OperationalCredentialsServer.ts:87 —
@@ -448,6 +461,7 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 	return &OperationalCredentials{
 		store:                  s,
 		supportedFabrics:       cfg.SupportedFabrics,
+		initialFabricLabel:     cfg.InitialFabricLabel,
 		devAttestKey:           cfg.DACPrivateKey,
 		dacBytes:               append([]byte(nil), cfg.DAC...),
 		paiBytes:               append([]byte(nil), cfg.PAI...),
@@ -1684,17 +1698,10 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		RootPublicKey: append([]byte(nil), root...),
 		RootCert:      append([]byte(nil), rootDER...),
 		VendorID:      req.AdminVendorID,
-		// Matter spec allows an empty Label at commission time, but
-		// Apple Home reads OperationalCredentials.Fabrics right after
-		// CommissioningComplete and silently sends RemoveFabric ~10 s
-		// later when the entry's `Label` field is empty (post-pairing
-		// cross-validation step in iCloud-Heim). matter.js servers
-		// avoid this by exposing whatever the application configured
-		// (see Fabric.ts:547-553); we mirror the behaviour with a
-		// built-in default label so first-pair attempts pass Apple's
-		// validator before the controller has a chance to send
-		// UpdateFabricLabel.
-		Label: "go-fabric",
+		// Empty unless the host configured one: matter.js's FabricBuilder
+		// starts every fabric with label "" (Fabric.ts), and
+		// TC-OPCREDS-3.7 reads exactly that after commissioning.
+		Label: o.initialFabricLabel,
 	}
 	slog.Default().Debug("matter.opcreds.addnoc.params",
 		slog.String("noc_subject_fabric_id", fmt.Sprintf("0x%016X", noc.Subject.MatterFabricID)),

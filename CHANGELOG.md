@@ -282,6 +282,12 @@ pseudo-version of `main`.
 
 ### Changed
 
+- **A fabric AddNOC installs starts with an empty Label**, as matter.js's
+  `FabricBuilder` starts one and as TC-OPCREDS-3.7 reads it right after
+  commissioning; it was `"go-fabric"`. A host that wants a label from the
+  first read sets `core.OpcredsConfig.InitialFabricLabel` (at most 32
+  bytes). Retires `L3-PFAD-1` in `notes/parity/by_design.md`.
+
 - `examples/reference-bridge` exposes one simulated device per surface the
   module serves (colour-temperature light, fan, smoke/CO alarm, pump, flow
   sensor, laundry washer, robot vacuum, thermostat, blind, door lock,
