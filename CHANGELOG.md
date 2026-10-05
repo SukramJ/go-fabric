@@ -360,6 +360,12 @@ pseudo-version of `main`.
     NoRemoteLockUnlock) is stored, anything else is a ConstraintError. The
     reference daemon's lock builds its server once, so the written mode
     survives to the next request (TC-DRLK-2.1).
+  - `cluster/cover.Config.MoveStep` lets the WindowCovering server's lift
+    travel — six steps, OperationalStatus Opening or Closing until it
+    arrives, every step reported through `contract.AttributeChangeNotifier`,
+    StopMotion halting it where it is — as matter.js's CHIP test node
+    moves it; zero keeps the instant movement. The reference daemon's
+    blind travels with 950 ms steps (TC-WNCV-3.1 to 3.3).
   - `mdns.Zeroconf.HostName` replaces the SRV target of every published
     record; the reference daemon sets it to the OS host name with
     `--mdns-os-hostname` (testing only), which the chip-tool harness passes

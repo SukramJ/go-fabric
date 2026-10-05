@@ -265,6 +265,10 @@ func (b *demoBlind) MatterClusterServers() []contract.ClusterServer {
 			EndProductType:               0, // RollerShade
 			FeatureMap:                   coverFeatureLift | coverFeaturePositionAwareLift,
 			InitialPositionPercent100ths: 0,
+			// The blind travels: six steps of 950 ms, as matter.js's CHIP
+			// test node (TestWindowCoveringServer.ts) — the TC-WNCV-3.x
+			// cases read OperationalStatus while it moves.
+			MoveStep: 950 * time.Millisecond,
 		})
 	})
 	return []contract.ClusterServer{b.srv}
