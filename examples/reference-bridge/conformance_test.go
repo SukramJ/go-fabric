@@ -9,12 +9,14 @@ import (
 	"reflect"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/parity"
@@ -313,4 +315,39 @@ func TestLightKeepsItsOnOffStateAcrossDispatches(t *testing.T) {
 	if v, _ := again.MatterRead(onoff.AttrOnTime); v != uint16(30) {
 		t.Fatalf("OnTime on the next dispatch = %v, want 30", v)
 	}
+}
+
+// TestValveTravelsThroughATarget: Open sets TargetState and reads
+// Transitioning while the head travels; on arrival CurrentState is Open and
+// TargetState null again (TC-VALCC-3.1).
+func TestValveTravelsThroughATarget(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		v := newDemoValve("travel", 600)
+		var notified atomic.Int32
+		v.OnMatterValueChanged(func() { notified.Add(1) })
+		if err := v.Open(context.Background(), valve.OpenRequest{}); err != nil {
+			t.Fatalf("Open: %v", err)
+		}
+		if st, _ := v.CurrentState(); st != valve.StateTransitioning {
+			t.Fatalf("CurrentState right after Open = %v, want Transitioning", st)
+		}
+		if tg, ok := v.TargetState(); !ok || tg != valve.StateOpen {
+			t.Fatalf("TargetState right after Open = %v/%v, want Open", tg, ok)
+		}
+		time.Sleep(valveTravel)
+		synctest.Wait()
+		if st, _ := v.CurrentState(); st != valve.StateOpen {
+			t.Fatalf("CurrentState after travel = %v, want Open", st)
+		}
+		if _, ok := v.TargetState(); ok {
+			t.Fatal("TargetState after travel is still set, want null")
+		}
+		if n := notified.Load(); n != 2 {
+			t.Fatalf("notifications = %d, want 2 (start, arrival)", n)
+		}
+		_ = v.Close(context.Background())
+		time.Sleep(valveTravel)
+		synctest.Wait()
+	})
 }

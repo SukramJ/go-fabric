@@ -375,6 +375,9 @@ pseudo-version of `main`.
   - The reference daemon's on/off light hands the bridge the same cluster
     servers on every dispatch, so a written OnTime or OffWaitTime and a
     running countdown survive to the next request (TC-OO-2.1 to 2.3).
+  - The reference daemon's valve travels: Open and Close set TargetState and
+    report CurrentState Transitioning, and on arrival TargetState returns to
+    null — the pair of reports TC-VALCC-3.1 waits for.
   - A change notification of a host source marked every reportable
     attribute of its endpoint dirty; the bridge now reports only the
     attributes whose value moved, and advances only their clusters'

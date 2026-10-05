@@ -716,10 +716,11 @@ func (t *demoThermometer) MatterFloatValue() (float64, bool) {
 //
 // What the model does and does not claim:
 //
-//   - The head has no travel time. Open and Close take effect at once, so
-//     CurrentState never reads Transitioning, and TargetState reports "no
-//     target set" (a TLV null) rather than a position the head is still
-//     travelling to.
+//   - The head travels for [valveTravel]. Open and Close set TargetState
+//     and report CurrentState Transitioning; when the head arrives,
+//     CurrentState reads the new position and TargetState goes back to
+//     null — the specification's "no target is set, the change is done"
+//     (TC-VALCC-3.1 waits for exactly that pair of reports).
 //   - The timer is real. A timed opening stores its deadline and arms a
 //     timer for it; when it fires the valve closes itself and notifies, so
 //     a subscriber learns of the self-close from a report, as from a valve
@@ -754,6 +755,46 @@ type demoValve struct {
 	defaultOpen *uint32
 	// closer fires at closesAt; replaced by every Open, stopped by Close.
 	closer *time.Timer
+	// target is the position the head is travelling to; nil when it is not
+	// moving. arrive fires when it gets there.
+	target *valve.State
+	arrive *time.Timer
+}
+
+// valveTravel is how long the head takes to open or close.
+const valveTravel = 200 * time.Millisecond
+
+// travelLocked starts the head towards to. Caller holds v.mu.
+func (v *demoValve) travelLocked(to valve.State) {
+	if v.arrive != nil {
+		v.arrive.Stop()
+	}
+	v.target = &to
+	v.state = valve.StateTransitioning
+	v.arrive = time.AfterFunc(valveTravel, v.arrived)
+}
+
+// arrived completes the head's travel.
+func (v *demoValve) arrived() {
+	v.mu.Lock()
+	if v.target == nil {
+		v.mu.Unlock()
+		return
+	}
+	v.state = *v.target
+	v.target = nil
+	v.arrive = nil
+	v.mu.Unlock()
+	v.notify()
+}
+
+// stopTravelLocked abandons a travel in progress. Caller holds v.mu.
+func (v *demoValve) stopTravelLocked() {
+	if v.arrive != nil {
+		v.arrive.Stop()
+		v.arrive = nil
+	}
+	v.target = nil
 }
 
 // Compile-time assertions: the device is the endpoint source, the host port
@@ -795,8 +836,8 @@ func (v *demoValve) expireLocked(now time.Time) {
 	v.closesAt = time.Time{}
 }
 
-// CurrentState implements [valve.StateSource]. The head has no travel time,
-// so the state is always known and never Transitioning.
+// CurrentState implements [valve.StateSource]. Transitioning while the head
+// travels.
 func (v *demoValve) CurrentState() (valve.State, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -804,11 +845,16 @@ func (v *demoValve) CurrentState() (valve.State, bool) {
 	return v.state, true
 }
 
-// TargetState implements [valve.StateSource]. A move completes inside the
-// command that started it, so no target is ever outstanding — which the
-// cluster reports as null, the spec's reading for "no target is set because
-// the change is done".
-func (v *demoValve) TargetState() (valve.State, bool) { return valve.StateClosed, false }
+// TargetState implements [valve.StateSource]: the position the head is
+// travelling to, null once it has arrived.
+func (v *demoValve) TargetState() (valve.State, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.target == nil {
+		return valve.StateClosed, false
+	}
+	return *v.target, true
+}
 
 // OpenDuration implements [valve.StateSource]. Null while the valve is
 // closed, and null for an indefinite opening — the spec's own meaning for
@@ -867,7 +913,7 @@ func (v *demoValve) Open(_ context.Context, req valve.OpenRequest) error {
 	if req.HasOpenDuration {
 		duration = req.OpenDuration
 	}
-	v.state = valve.StateOpen
+	v.travelLocked(valve.StateOpen)
 	v.openFor = copyUint32(duration)
 	if v.closer != nil {
 		v.closer.Stop()
@@ -903,7 +949,7 @@ func (v *demoValve) Close(context.Context) error {
 		v.closer.Stop()
 		v.closer = nil
 	}
-	v.state = valve.StateClosed
+	v.travelLocked(valve.StateClosed)
 	v.openFor = nil
 	v.closesAt = time.Time{}
 	v.mu.Unlock()
@@ -920,6 +966,7 @@ func (v *demoValve) Close(context.Context) error {
 // device rather than at a controller.
 func (v *demoValve) reportFromDevice(state valve.State) {
 	v.mu.Lock()
+	v.stopTravelLocked()
 	v.state = state
 	if state != valve.StateOpen {
 		v.openFor = nil
