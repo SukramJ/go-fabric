@@ -116,6 +116,11 @@ type OperationalCredentials struct {
 	// fabric; TC-OPCREDS-3.5 step 10).
 	pendingUpdateRevert *nocUpdateRevert
 
+	// changeListeners receive [OperationalCredentials.OnMatterValueChanged]
+	// notifications.
+	changeListeners    map[uint64]func()
+	nextChangeListener uint64
+
 	// isFailSafeArmed is the runtime accessor to [GeneralCommissioning]'s
 	// FailSafe state, wired via [OpcredsConfig.IsFailSafeArmed]. When
 	// nil, the FailsafeRequired guard is skipped (test setups).
@@ -503,6 +508,12 @@ type nocUpdateRevert struct {
 	fabricIndex uint8
 	identity    store.IdentityRecord
 	nodeID      uint64
+	// vid and vendorID are the fabric's vendor verification data before
+	// the update: a SetVIDVerificationStatement inside the fail-safe
+	// belongs to the pending update and is dropped with it
+	// (TC-OPCREDS-3.8 step 24).
+	vid      vidData
+	vendorID uint16
 }
 
 // ClearPendingState resets all FailSafe-window-scoped state on this
@@ -569,6 +580,7 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 		// subscriptions and, through Bridge.EmitFabricRemoved, the
 		// fabric's group keys, group table and multicast memberships).
 		o.NotifyFabricRemoved(fabricToRevert)
+		o.notifyChanged()
 		o.mu.RLock()
 		hook := o.onFabricRemoved
 		o.mu.RUnlock()
@@ -586,6 +598,12 @@ func (o *OperationalCredentials) revertUpdateNOC(ctx context.Context, r nocUpdat
 	if err := o.store.UpsertIdentity(ctx, r.identity); err != nil {
 		return
 	}
+	_ = o.storeVidVerification(ctx, r.fabricIndex, r.vid)
+	if fab, err := o.store.GetFabric(ctx, r.fabricIndex); err == nil && fab.VendorID != r.vendorID {
+		if up, ok := o.store.(fabricVendorIDUpdater); ok {
+			_ = up.UpdateFabricVendorID(ctx, r.fabricIndex, r.vendorID)
+		}
+	}
 	if fab, err := o.store.GetFabric(ctx, r.fabricIndex); err == nil && fab.NodeID != r.nodeID {
 		if err := o.store.UpdateFabricNodeID(ctx, r.fabricIndex, r.nodeID); err != nil {
 			return
@@ -598,11 +616,49 @@ func (o *OperationalCredentials) revertUpdateNOC(ctx context.Context, r nocUpdat
 		}
 	}
 	o.dataVersion.Bump()
+	o.notifyChanged()
 	o.mu.RLock()
 	hook := o.onFabricUpdated
 	o.mu.RUnlock()
 	if hook != nil {
 		hook(ctx, r.fabricIndex)
+	}
+}
+
+// OnMatterValueChanged implements [contract.ChangeNotifier]: cb fires when
+// the cluster's lists change outside a command on this cluster — a
+// fail-safe expiry or disarm (an ArmFailSafe command) rolling back an
+// AddNOC or UpdateNOC. A command on this cluster is reported by the
+// bridge itself; matter.js reports every state change of the behavior
+// (TC-OPCREDS-3.8 step 24 waits for the reverted Fabrics).
+func (o *OperationalCredentials) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	if cb == nil {
+		return func() {}
+	}
+	o.mu.Lock()
+	if o.changeListeners == nil {
+		o.changeListeners = map[uint64]func(){}
+	}
+	o.nextChangeListener++
+	id := o.nextChangeListener
+	o.changeListeners[id] = cb
+	o.mu.Unlock()
+	return func() {
+		o.mu.Lock()
+		delete(o.changeListeners, id)
+		o.mu.Unlock()
+	}
+}
+
+func (o *OperationalCredentials) notifyChanged() {
+	o.mu.RLock()
+	fns := make([]func(), 0, len(o.changeListeners))
+	for _, fn := range o.changeListeners {
+		fns = append(fns, fn)
+	}
+	o.mu.RUnlock()
+	for _, fn := range fns {
+		fn()
 	}
 }
 
@@ -625,6 +681,7 @@ var errOpcredsFailsafeRequired error = opcredsFailsafeRequiredErr{}
 var (
 	_ contract.ClusterServer                 = (*OperationalCredentials)(nil)
 	_ contract.FabricScopedReader            = (*OperationalCredentials)(nil)
+	_ contract.ChangeNotifier                = (*OperationalCredentials)(nil)
 	_ contract.ClusterDataVersion            = (*OperationalCredentials)(nil)
 	_ contract.ClusterCommandLister          = (*OperationalCredentials)(nil)
 	_ contract.ClusterCommandInvokePrivilege = (*OperationalCredentials)(nil)
@@ -1912,10 +1969,19 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	}
 	identity.IPK = existing.IPK
 	o.mu.Lock()
-	if o.pendingUpdateRevert == nil {
-		o.pendingUpdateRevert = &nocUpdateRevert{fabricIndex: idx, identity: existing, nodeID: fab.NodeID}
-	}
+	pendingRevert := o.pendingUpdateRevert == nil
 	o.mu.Unlock()
+	if pendingRevert {
+		r := &nocUpdateRevert{
+			fabricIndex: idx, identity: existing, nodeID: fab.NodeID,
+			vid: o.vidVerification(ctx, idx), vendorID: fab.VendorID,
+		}
+		o.mu.Lock()
+		if o.pendingUpdateRevert == nil {
+			o.pendingUpdateRevert = r
+		}
+		o.mu.Unlock()
+	}
 	if err := o.store.UpsertIdentity(ctx, identity); err != nil {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}

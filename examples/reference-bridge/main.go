@@ -315,6 +315,11 @@ func run() error {
 		// BasicInformation Leave, as matter.js BasicInformationServer
 		// emits it when a fabric goes.
 		refs.basicInfo.EmitLeave(fabricIndex)
+		// Its CASE identity and operational record go too — a rolled-back
+		// commissioning included, which no RemoveFabric announces.
+		if compressedID, nodeID, ok := caseIDs.forget(fabricIndex); ok {
+			br.WithdrawFabric(ctx, compressedID, nodeID)
+		}
 		// The fabric's sessions end once the NOCResponse is out.
 		br.EmitFabricRemovedContext(ctx, fabricIndex)
 	})

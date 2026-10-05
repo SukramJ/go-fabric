@@ -26,8 +26,9 @@ import (
 //   - MaxNetworks = 1 (the bridge has one Ethernet interface).
 //   - Networks contains a single NetworkInfoStruct entry naming the
 //     local interface (default "eth0", configurable).
-//   - LastNetworkingStatus is null until ConnectNetwork is invoked
-//     (which never happens for Ethernet-only).
+//   - LastNetworkingStatus is Success and LastNetworkID the interface:
+//     the node is on its Ethernet network from boot; LastConnectErrorValue
+//     stays null.
 type NetworkCommissioning struct {
 	mu sync.RWMutex
 
@@ -113,9 +114,18 @@ func NewNetworkCommissioning(cfg NetworkCommissioningConfig) *NetworkCommissioni
 	if len(id) == 0 {
 		id = []byte("eth0")
 	}
+	// The node is on its Ethernet network from the start: the last
+	// networking outcome is Success on that network, and there was no
+	// connect error. TC-CNET-4.3 reads exactly that (steps 5-7); matter.js
+	// configures its bridge test node the same way
+	// (support/chip-testing/src/BridgeTestInstance.ts networkCommissioning:
+	// lastNetworkingStatus Success, lastNetworkId the network id).
+	success := NetworkingStatusSuccess
 	n := &NetworkCommissioning{
-		interfaceID:      append([]byte(nil), id...),
-		interfaceEnabled: true,
+		interfaceID:        append([]byte(nil), id...),
+		interfaceEnabled:   true,
+		lastNetworkingStat: &success,
+		lastNetworkID:      append([]byte(nil), id...),
 	}
 	// Seed DataVersion at a non-zero sentinel so DataVersionFilter=0 from
 	// controllers does not falsely suppress the initial cluster report.

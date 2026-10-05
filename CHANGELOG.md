@@ -341,6 +341,18 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - A rolled-back UpdateNOC now also drops a VID verification statement,
+    VVSC or vendor id set under it, and OperationalCredentials reports
+    changes made outside its own commands — a fail-safe expiry or disarm
+    rolling back AddNOC or UpdateNOC — to subscribers
+    (`contract.ChangeNotifier`; TC-OPCREDS-3.8). The reference daemon drops
+    a removed or rolled-back fabric's CASE identity and operational record,
+    so a recommissioned fabric does not land its sessions on the stale
+    index (TC-CGEN-2.4).
+  - NetworkCommissioning reported LastNetworkingStatus and LastNetworkID
+    as null on a node that is on its Ethernet network; they are now Success
+    and the interface's network id, as TC-CNET-4.3 reads them and as
+    matter.js configures its bridge test node.
   - An UpdateNOC whose fail-safe expired or was disarmed without
     CommissioningComplete stayed in force. The fail-safe's expiry now
     restores the replaced NOC, key and node id and runs the

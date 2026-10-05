@@ -352,6 +352,29 @@ func (c *caseIdentities) ResolveSigma1Destination(destinationID [32]byte, initia
 	return nil, nil, false
 }
 
+// forget drops a removed fabric's identity, so a Sigma1 addressed to it is
+// no longer answered: a fabric whose commissioning was rolled back (or
+// that RemoveFabric deleted) must not keep a CASE identity — the next
+// commissioning of the same fabric ID would otherwise land its sessions
+// on the stale index (TC-CGEN-2.4). Returns the identity's DNS-SD names
+// so the caller can withdraw the record.
+func (c *caseIdentities) forget(fabricIndex uint8) (compressedID [8]byte, nodeID uint64, ok bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.byIdx[fabricIndex]
+	if !ok || entry.identity == nil {
+		return compressedID, 0, false
+	}
+	delete(c.byIdx, fabricIndex)
+	if c.latest == entry {
+		c.latest = nil
+		for _, e := range c.byIdx {
+			c.latest = e
+		}
+	}
+	return entry.identity.CompressedFabricID, entry.identity.NodeID, true
+}
+
 // current returns the most recently installed identity, or nil before the
 // first AddNOC.
 func (c *caseIdentities) current() *caseFabric {

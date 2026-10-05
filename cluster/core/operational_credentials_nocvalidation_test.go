@@ -417,8 +417,23 @@ func TestUpdateNOC_RevertedOnFailSafeExpiry(t *testing.T) {
 			t.Fatalf("UpdateNOC: %v %+v", err, resp)
 		}
 	}
+	changes := 0
+	unsub := oc.OnMatterValueChanged(func() { changes++ })
+	defer unsub()
 	update(testDefaultNodeID + 7)
+	// A statement set under the pending update goes with it (TC-OPCREDS-3.8).
+	if _, err := oc.MatterInvoke(fabCtx, 0x0C, core.SetVidVerificationStatementRequest{
+		HasVidVerificationStatement: true, VidVerificationStatement: bytes.Repeat([]byte{7}, 85),
+	}); err != nil {
+		t.Fatalf("SetVIDVerificationStatement: %v", err)
+	}
 	oc.OnFailSafeExpiry(ctx, fabricIndex)
+	if v, _ := oc.MatterReadFiltered(fabCtx, 0x0001); v.([]core.FabricDescriptorStruct)[0].VidVerificationStatement != nil {
+		t.Error("a statement set under the expired update survived it")
+	}
+	if changes != 1 {
+		t.Errorf("the revert reported %d changes, want 1", changes)
+	}
 	after, _ := fs.GetIdentity(ctx, fabricIndex)
 	fabAfter, _ := fs.GetFabric(ctx, fabricIndex)
 	if !bytes.Equal(after.NOC, before.NOC) || !bytes.Equal(after.PrivateKey, before.PrivateKey) || fabAfter.NodeID != fabBefore.NodeID {
