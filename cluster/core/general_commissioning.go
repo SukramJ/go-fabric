@@ -89,10 +89,12 @@ type GeneralCommissioning struct {
 	// CommissioningComplete; the bridge wires it (bridge.AttachRootClusters
 	// / AttachCommissioningWindow), separately from the host's hook.
 	onCommissioned func()
-	// Hook invoked every time ArmFailSafe successfully arms (or re-arms)
-	// the FailSafe window. The bridge wires this to OperationalCredentials
-	// so the pending-NOC / pending-trust-root state is reset for every
-	// new commissioning attempt — Matter §11.10.6.2 + matter.js
+	// Hook invoked every time ArmFailSafe arms the FailSafe window from
+	// the disarmed state — a re-arm extends the fail-safe in force and
+	// keeps its state, as matter.js failsafeContext.extend does. The bridge
+	// wires this to OperationalCredentials so the pending-NOC /
+	// pending-trust-root state is reset for every new commissioning
+	// attempt — Matter §11.10.6.2 + matter.js
 	// OperationalCredentialsServer.ts model the FailSafeContext as
 	// fabricIndex-scoped fresh state per arm. Without this hook Apple's
 	// multi-admin "SystemCommissioner" flow (second CSRRequest +
@@ -615,6 +617,13 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 			DebugText: fmt.Sprintf("cumulative fail-safe cap of %d s exceeded", g.cumulativeFailSafeMaxSec),
 		}, nil
 	}
+	// A re-arm extends the fail-safe in force; only an arm from the
+	// disarmed state starts a new fail-safe context. matter.js
+	// GeneralCommissioningServer #armFailSafe: failsafeContext.extend(...)
+	// when isFailsafeArmed, a new ServerNodeFailsafeContext otherwise — so
+	// a trusted root or NOC added under the fail-safe survives the re-arm
+	// (TC-CGEN-2.2 step 34).
+	extending := g.failSafeArmed
 	g.failSafeArmed = true
 	g.failSafeExpiresAt = now.Add(time.Duration(req.ExpiryLengthSeconds) * time.Second)
 	g.breadcrumb = req.Breadcrumb
@@ -637,7 +646,7 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// acquires its own lock).
 	armedHook := g.onFailSafeArmed
 	armedFabric := g.failSafeFabricIndex
-	if armedHook != nil {
+	if armedHook != nil && !extending {
 		// Mirrors matter.js OperationalCredentialsServer.ts:
 		// FailSafeContext is recreated on every ArmFailSafe, surfacing a
 		// fresh `rootCertSet` / `fabricIndex` set so multi-admin pairing
@@ -731,7 +740,9 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 	_, sessFabric := im.FabricFilterFromContext(ctx)
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if sessFabric == 0 {
+	// A PASE session adopted onto the fabric AddNOC installed has a
+	// fabric and is still PASE (TC-CGEN-2.4 step kSendNOC).
+	if sessFabric == 0 || im.IsPASEFromContext(ctx) {
 		return CommissioningCompleteResponse{
 			ErrorCode: CommissioningErrorInvalidAuthentication,
 			DebugText: "Command must be executed over CASE session.",
@@ -849,6 +860,7 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 	// handleArmFailSafe re-derives it from ctx via FabricFilterFromContext;
 	// override the context's fabric filter if needed, or set directly.
 	g.mu.Lock()
+	fresh := !g.failSafeArmed || !g.failSafeExpiresAt.After(time.Now())
 	g.failSafeArmed = true
 	g.failSafeExpiresAt = time.Now().Add(time.Duration(seconds) * time.Second)
 	g.breadcrumb = req.Breadcrumb
@@ -856,11 +868,49 @@ func (g *GeneralCommissioning) ArmFailSafeFor(ctx context.Context, seconds uint3
 	g.dataVersion.Bump()
 	expiresAt := g.failSafeExpiresAt
 	hasCB := g.onFailSafeExpired != nil
+	armedHook := g.onFailSafeArmed
 	g.mu.Unlock()
 	if hasCB {
 		go g.watchFailSafeExpiry(ctx, fabricIndex, expiresAt)
 	}
+	// An arm from the disarmed state starts a new fail-safe context — the
+	// PASE auto-arm included, as matter.js arms a new
+	// ServerNodeFailsafeContext when the PASE session is established — so
+	// nothing an aborted earlier attempt left pending carries over
+	// (TC-CGEN-2.4).
+	if fresh && armedHook != nil {
+		armedHook(ctx, fabricIndex)
+	}
 	return nil
+}
+
+// ExpireFailSafe expires an armed fail-safe at once, with the cleanup its
+// timeout runs (onFailSafeExpired: the pending NOC and fabric are rolled
+// back), and does nothing when none is armed. RevokeCommissioning uses it
+// — Matter §11.19.8.3 step 1 expires the fail-safe, which matter.js
+// AdministratorCommissioningServer.revokeCommissioning does with
+// failsafeContext.close(), rolling back what the commissioning installed.
+// Without the rollback a fabric an aborted commissioning had added over
+// PASE survived the revoke and the next attempt failed FabricConflict
+// (TC-CGEN-2.4). The fail-safe is disarmed before the hook runs, so a hook
+// that revokes the window again finds nothing to expire.
+func (g *GeneralCommissioning) ExpireFailSafe(ctx context.Context) {
+	g.mu.Lock()
+	if !g.failSafeArmed {
+		g.mu.Unlock()
+		return
+	}
+	fabric := g.failSafeFabricIndex
+	g.failSafeArmed = false
+	g.failSafeFabricIndex = 0
+	g.failSafeCumulativeStarted = false
+	g.breadcrumb = 0
+	g.dataVersion.Bump()
+	hook := g.onFailSafeExpired
+	g.mu.Unlock()
+	if hook != nil {
+		hook(ctx, fabric)
+	}
 }
 
 // SetCurrentFabric records the fabric the active commissioning

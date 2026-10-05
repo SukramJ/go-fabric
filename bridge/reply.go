@@ -1470,6 +1470,14 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
 			enc.PutUTF8(tlv.ContextTag(2), x.DebugText)
 		}
 		_ = enc.EndContainer()
+	case mattercore.SignVidVerificationResponse:
+		// SignVIDVerificationResponse (operational-credentials.element.ts
+		// 0x0E): [0] FabricIndex, [1] FabricBindingVersion, [2] Signature.
+		enc.StartStruct(tag)
+		enc.PutUint(tlv.ContextTag(0), uint64(x.FabricIndex))
+		enc.PutUint(tlv.ContextTag(1), uint64(x.FabricBindingVersion))
+		enc.PutOctets(tlv.ContextTag(2), x.Signature)
+		_ = enc.EndContainer()
 	case mattercore.KeySetReadResponse:
 		// Matter §11.2.7.3 — [0] GroupKeySetStruct GroupKeySet.
 		enc.StartStruct(tag)

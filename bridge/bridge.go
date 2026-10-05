@@ -1067,6 +1067,38 @@ func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
 	b.mu.Unlock()
 }
 
+// fabricSessionCloser is the optional capability of a [SessionRegistry]
+// to close every session of one fabric (operational.Manager.CloseFabric).
+type fabricSessionCloser interface {
+	CloseFabric(fabricIndex uint8)
+}
+
+// EmitFabricRemovedContext is [Bridge.EmitFabricRemoved] for a removal
+// the host learns about inside the RemoveFabric command (ctx is the
+// command's context): it also ends every secure session of the removed
+// fabric once the command's response is out — the session that removed
+// its own fabric included, which must still carry the NOCResponse. matter.js
+// OperationalCredentialsServer.removeFabric → Fabric.remove closes the
+// fabric's sessions, the invoking one after its exchange
+// (NodeSession deferredClose); without it a controller whose fabric is
+// gone kept being answered on it (TC-CADMIN-1.15 step 12). Outside a
+// command the sessions close at once. Needs a [SessionRegistry] that can
+// close by fabric (the operational manager does).
+func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8) {
+	b.EmitFabricRemoved(fabricIndex)
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
+	closer, ok := reg.(fabricSessionCloser)
+	if !ok {
+		return
+	}
+	closeNow := func() { closer.CloseFabric(fabricIndex) }
+	if !im.DeferAfterResponse(ctx, closeNow) {
+		closeNow()
+	}
+}
+
 // EmitFabricRemoved is the bridge-side dispatch helper the daemon
 // invokes inside the [core.OperationalCredentials.SetOnFabricRemoved]
 // closure. Forwards to whatever closure the daemon wired via
@@ -1074,6 +1106,10 @@ func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
 func (b *Bridge) EmitFabricRemoved(fabricIndex uint8) {
 	// A removed fabric's subscriptions can never be re-established.
 	b.forgetFabricSubscriptions(fabricIndex)
+	// A window it opened no longer has an admin fabric.
+	if win := b.CommissioningWindow(); win != nil {
+		win.FabricRemoved(fabricIndex)
+	}
 	// Its groups go with it: keys, group table, reception state and the
 	// multicast memberships only it used.
 	b.groupMessagingPort().ForgetFabric(fabricIndex)

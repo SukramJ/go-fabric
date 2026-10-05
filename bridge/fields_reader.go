@@ -55,6 +55,10 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 			return decodeRemoveFabricRequest(dec)
 		case 0x0B:
 			return decodeAddTrustedRootCertificateRequest(dec)
+		case 0x0C:
+			return decodeSetVidVerificationStatementRequest(dec)
+		case 0x0D:
+			return decodeSignVidVerificationRequest(dec)
 		}
 	case administratorCommissioningClusterID:
 		if path.Command == 0x00 { // OpenCommissioningWindow
@@ -636,6 +640,98 @@ func decodeAddTrustedRootCertificateRequest(dec *tlv.Decoder) (mattercore.AddTru
 	}
 }
 
+// decodeSetVidVerificationStatementRequest reads SetVIDVerificationStatement
+// (operational-credentials.element.ts, command 0x0C): [0] VendorID
+// (vendor-id, optional), [1] VIDVerificationStatement (octstr max 85,
+// optional), [2] VVSC (octstr max 400, optional), recording which were
+// present — an empty statement or VVSC that is present clears it.
+func decodeSetVidVerificationStatementRequest(dec *tlv.Decoder) (mattercore.SetVidVerificationStatementRequest, error) {
+	const cmd = "SetVIDVerificationStatement"
+	var req mattercore.SetVidVerificationStatementRequest
+	for {
+		el, err := dec.Next()
+		if err != nil {
+			return req, fmt.Errorf("%s: %w", cmd, err)
+		}
+		if el.IsEndContainer {
+			return req, nil
+		}
+		if el.Tag.Kind != tlv.TagKindContext {
+			if err := skipValue(dec, el); err != nil {
+				return req, err
+			}
+			continue
+		}
+		switch el.Tag.Number {
+		case 0:
+			if req.VendorID, err = fieldUint16(cmd, "VendorID", el); err != nil {
+				return req, err
+			}
+			req.HasVendorID = true
+		case 1:
+			if len(el.Octets) > 85 {
+				return req, fieldConstraintError{fmt.Sprintf("%s: VIDVerificationStatement of %d bytes exceeds 85", cmd, len(el.Octets))}
+			}
+			req.VidVerificationStatement = append([]byte{}, el.Octets...)
+			req.HasVidVerificationStatement = true
+		case 2:
+			if len(el.Octets) > 400 {
+				return req, fieldConstraintError{fmt.Sprintf("%s: VVSC of %d bytes exceeds 400", cmd, len(el.Octets))}
+			}
+			req.Vvsc = append([]byte{}, el.Octets...)
+			req.HasVvsc = true
+		default:
+			if err := skipValue(dec, el); err != nil {
+				return req, err
+			}
+		}
+	}
+}
+
+// decodeSignVidVerificationRequest reads SignVIDVerificationRequest
+// (command 0x0D): [0] FabricIndex (mandatory), [1] ClientChallenge (octstr
+// of exactly 32 bytes, mandatory).
+func decodeSignVidVerificationRequest(dec *tlv.Decoder) (mattercore.SignVidVerificationRequest, error) {
+	const cmd = "SignVIDVerificationRequest"
+	var req mattercore.SignVidVerificationRequest
+	var hasIndex, hasChallenge bool
+	for {
+		el, err := dec.Next()
+		if err != nil {
+			return req, fmt.Errorf("%s: %w", cmd, err)
+		}
+		if el.IsEndContainer {
+			if !hasIndex || !hasChallenge {
+				return req, fieldInvalidCommandError{msg: cmd + ": mandatory field missing", consumed: true}
+			}
+			return req, nil
+		}
+		if el.Tag.Kind != tlv.TagKindContext {
+			if err := skipValue(dec, el); err != nil {
+				return req, err
+			}
+			continue
+		}
+		switch el.Tag.Number {
+		case 0:
+			if req.FabricIndex, err = fieldUint8(cmd, "FabricIndex", el); err != nil {
+				return req, err
+			}
+			hasIndex = true
+		case 1:
+			if len(el.Octets) != 32 {
+				return req, fieldConstraintError{fmt.Sprintf("%s: ClientChallenge of %d bytes, want 32", cmd, len(el.Octets))}
+			}
+			req.ClientChallenge = append([]byte(nil), el.Octets...)
+			hasChallenge = true
+		default:
+			if err := skipValue(dec, el); err != nil {
+				return req, err
+			}
+		}
+	}
+}
+
 // rewriteInvokeResponseCommand updates ent.Path.Command from the
 // request command ID to the response command ID per Matter §10.6.7
 // — chip-tool's TypedCommandCallback decodes the response payload by
@@ -664,6 +760,8 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 		ent.Path.Command = 0x05
 	case mattercore.NOCResponse:
 		ent.Path.Command = 0x08
+	case mattercore.SignVidVerificationResponse:
+		ent.Path.Command = 0x0E
 	case mattercore.KeySetReadResponse:
 		ent.Path.Command = 0x02
 	case mattercore.KeySetReadAllIndicesResponse:

@@ -450,6 +450,13 @@ func (w *CommissioningWindow) setRestore(restore func()) bool {
 	return true
 }
 
+// failSafeExpirer is the optional capability of a [FailSafeArmer] to expire
+// an armed fail-safe with its cleanup (core.GeneralCommissioning
+// .ExpireFailSafe).
+type failSafeExpirer interface {
+	ExpireFailSafe(ctx context.Context)
+}
+
 // RevokeWindow implements [wire.WindowController]. Per Matter §11.19.7.3
 // step 1, any open PASE session is evicted first (via [PaseSessionCloser]
 // when wired), regardless of whether a commissioning window is open.
@@ -458,11 +465,20 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	// Matter §11.19.7.3 step 1: close any open PASE session before
 	// touching window state. Mirrors matter.js AdministratorCommissioningServer.ts:
 	// revokeCommissioning → paseCommissioner.close().
+	//
+	// Revoked over the PASE session itself, the close waits for the
+	// command's response, as matter.js's paseSession.initiateClose defers
+	// the close until the session's exchanges end (NodeSession
+	// deferredClose): closing first left the RevokeCommissioning
+	// unanswered (TC-CADMIN-1.10 step 9).
 	w.mu.RLock()
 	closer := w.paseSessionCloser
 	w.mu.RUnlock()
 	if closer != nil {
-		_ = closer.ClosePaseSessions(ctx)
+		closeNow := func() { _ = closer.ClosePaseSessions(context.WithoutCancel(ctx)) }
+		if !im.IsPASEFromContext(ctx) || !im.DeferAfterResponse(ctx, closeNow) {
+			closeNow()
+		}
 	}
 
 	// Matter §11.19.7.3 step 1 ALSO expires the fail-safe, unconditionally
@@ -480,7 +496,11 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	w.mu.RLock()
 	armer := w.failSafeArmer
 	w.mu.RUnlock()
-	if armer != nil {
+	if expirer, ok := armer.(failSafeExpirer); ok {
+		// Expire with the timeout's cleanup, as matter.js
+		// failsafeContext.close() does (TC-CGEN-2.4).
+		expirer.ExpireFailSafe(context.WithoutCancel(ctx))
+	} else if armer != nil {
 		_ = armer.ArmFailSafeFor(ctx, 0, 0)
 	}
 
@@ -848,6 +868,25 @@ func (w *CommissioningWindow) EndCommissioning() {
 	if restore != nil {
 		restore()
 	}
+	if hook != nil {
+		hook()
+	}
+}
+
+// FabricRemoved clears AdminFabricIndex when the fabric that opened the
+// window is removed while it is open, and reports the change. Mirrors
+// matter.js AdministratorCommissioningServer #fabricRemovedCallback, wired
+// to the admin fabric's deleting event when the window opens; the window
+// itself and AdminVendorId stay (TC-CADMIN-1.25 step 29).
+func (w *CommissioningWindow) FabricRemoved(fabricIndex uint8) {
+	w.mu.Lock()
+	if !w.open || !w.adminFabricSet || w.adminFabric != fabricIndex {
+		w.mu.Unlock()
+		return
+	}
+	w.adminFabricSet = false
+	hook := w.transitionHooks()
+	w.mu.Unlock()
 	if hook != nil {
 		hook()
 	}

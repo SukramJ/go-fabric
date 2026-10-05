@@ -717,6 +717,13 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, logger
 		return next, true
 	})
 
+	// Session resumption as the responder (Matter §4.13.2.4): a Sigma1
+	// presenting a resumption id this node issued resumes with
+	// Sigma2_Resume instead of a full handshake. matter.js CaseServer looks
+	// the record up in SessionManager and saves a fresh one after every
+	// session (CaseServer.ts:210); TC-SC-3.2 checks the resume.
+	responder.SetResumptionStore(resumptionLookup{sessions})
+
 	adapter := matterbridge.NewCaseAdapter(responder)
 	adapter.SetOnSessionEstablished(func(keys sigma.SessionKeys, peerSessionID uint16) error {
 		// Everything is read back off the responder rather than captured at
@@ -745,9 +752,38 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, logger
 			slog.Int("session_id", int(entry.SessionID)),
 			slog.Int("fabric_index", int(fabricIndex)),
 			slog.Uint64("peer_node_id", peerNodeID))
+		// The record the peer resumes from next time: the id this
+		// handshake issued (Sigma2's, or the fresh one Sigma2_Resume
+		// carried) with the session's shared secret.
+		if resp := adapter.SnapshotResponder(); resp != nil {
+			if id, secret := resp.ResumptionID(), resp.ECDHSharedSecret(); len(id) == 16 && len(secret) > 0 {
+				if err := sessions.PersistResumption(context.Background(), fabricIndex, peerNodeID, id, secret, peerCATs); err != nil {
+					logger.Warn("case.resumption.persist_failed", slog.String("err", err.Error()))
+				}
+			}
+		}
 		return nil
 	})
 	return adapter, nil
+}
+
+// resumptionLookup serves the CASE responder's resumption records from the
+// session manager's store.
+type resumptionLookup struct{ sessions *operational.Manager }
+
+// GetByID implements [sigma.ResumptionStore].
+func (l resumptionLookup) GetByID(resumptionID []byte) (*sigma.ResumptionRecord, error) {
+	rec, err := l.sessions.LookupResumption(context.Background(), resumptionID)
+	if err != nil {
+		return nil, err
+	}
+	return &sigma.ResumptionRecord{
+		SharedSecret: rec.SharedSecret,
+		ResumptionID: rec.ResumptionID,
+		FabricIndex:  rec.FabricIndex,
+		PeerNodeID:   rec.PeerNodeID,
+		PeerCATs:     rec.CASEAuthTags,
+	}, nil
 }
 
 // rejectingVerifier stands in before the first fabric exists. It fails every

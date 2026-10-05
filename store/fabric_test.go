@@ -783,3 +783,27 @@ func TestFabric_RemoveMissingFabricReturnsError(t *testing.T) {
 		t.Errorf("RemoveFabric missing: got %v, want ErrFabricNotFound", err)
 	}
 }
+
+// TestFabric_UpdateVendorID verifies that UpdateFabricVendorID rewrites the
+// vendor id and that a miss returns ErrFabricNotFound.
+func TestFabric_UpdateVendorID(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := store.New(openTestDB(t))
+	if _, err := s.AddFabric(ctx, newFabricRecord(2, 40)); err != nil {
+		t.Fatalf("AddFabric: %v", err)
+	}
+	if err := s.UpdateFabricVendorID(ctx, 2, 0xFFF2); err != nil {
+		t.Fatalf("UpdateFabricVendorID: %v", err)
+	}
+	got, err := s.GetFabric(ctx, 2)
+	if err != nil {
+		t.Fatalf("GetFabric: %v", err)
+	}
+	if got.VendorID != 0xFFF2 {
+		t.Errorf("VendorID=0x%04X want 0xFFF2", got.VendorID)
+	}
+	if err := s.UpdateFabricVendorID(ctx, 99, 1); !errors.Is(err, store.ErrFabricNotFound) {
+		t.Errorf("miss: got %v, want ErrFabricNotFound", err)
+	}
+}

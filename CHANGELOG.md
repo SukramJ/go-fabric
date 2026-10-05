@@ -341,6 +341,77 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - An UpdateNOC whose fail-safe expired or was disarmed without
+    CommissioningComplete stayed in force. The fail-safe's expiry now
+    restores the replaced NOC, key and node id and runs the
+    fabric-updated hook, as matter.js's FailsafeContext rollback does
+    (TC-OPCREDS-3.5). The reference daemon follows an UpdateNOC — and its
+    rollback — with the CASE identity, the operational record under the
+    new instance name and the fabric's other sessions (TC-OPCREDS-3.8).
+  - RevokeCommissioning only disarmed the fail-safe, so a fabric an
+    aborted commissioning had added over PASE survived the revoke and the
+    next commissioning of the same fabric failed FabricConflict. The revoke
+    now expires the fail-safe with its timeout cleanup
+    (`core.GeneralCommissioning.ExpireFailSafe`, used by
+    `bridge.CommissioningWindow.RevokeWindow`), as matter.js's
+    `failsafeContext.close()` does (TC-CGEN-2.4).
+  - A list-append ACL write reported every entry before the appended one
+    as Changed; it now reports only the appended entry as Added, as chip's
+    list append does (`im.WithListAppendWrite`, `im.IsListAppendWrite`;
+    TC-ACL-2.6; `BD-Matter-ACLAppendEvents`).
+  - Arming the fail-safe from the disarmed state inside the stack — the
+    PASE auto-arm, the window-open arm — did not start a new fail-safe
+    context, so a trusted root an aborted attempt left pending made the
+    next attempt's AddTrustedRootCertificate fail (TC-CGEN-2.4).
+  - SetVIDVerificationStatement and SignVIDVerificationRequest, mandatory
+    OperationalCredentials commands, answered InvalidCommand. They are now
+    served as matter.js serves them: the statement and VVSC are stored per
+    fabric (through a store with `GetSetting`/`SetSetting`, in memory
+    otherwise) and reported in Fabrics and NOCs, a VendorID updates the
+    fabric (`store.Store.UpdateFabricVendorID`), and the signature covers
+    `VendorIdVerification.dataToSign` with the invoking session's
+    attestation challenge (`core.WithInvokeAttestationChallenge`,
+    `operational.Manager.AttestationChallengeFor`). AttestationRequest and
+    CSRRequest sign with the invoking session's challenge too
+    (`SetVidVerificationStatementRequest` gains `HasVendorID`,
+    `HasVidVerificationStatement`, `HasVvsc`; TC-OPCREDS-3.8, TC-RR-1.1).
+  - A second AddNOC — or an UpdateNOC — after AddNOC in the same
+    fail-safe context was processed instead of failing with ConstraintError,
+    as matter.js's `addNoc` / `updateNoc` do (TC-OPCREDS-3.1).
+  - A PASE session an AddNOC succeeded on kept no accessing fabric, so a
+    fabric-scoped command sent on it afterwards — CommissioningComplete
+    over PASE — was refused UnsupportedAccess instead of being answered
+    InvalidAuthentication. The bridge now moves the session onto the
+    installed fabric (through a session registry with `AdoptFabricIndex`,
+    as `secure/operational.Manager` has), as matter.js sets
+    `session.fabric` and chip calls `AdoptFabricIndex`; GeneralCommissioning
+    rejects CommissioningComplete on any PASE session (TC-CGEN-2.4).
+  - ArmFailSafe while the fail-safe was already armed reset the pending
+    credentials, dropping a trusted root added under it. A re-arm now only
+    extends the fail-safe in force; the armed hook runs for an arm from the
+    disarmed state, as matter.js's `failsafeContext.extend` (TC-CGEN-2.2).
+  - Removing the fabric that opened a commissioning window left
+    AdminFabricIndex naming it. `bridge.CommissioningWindow.FabricRemoved`
+    (run by `EmitFabricRemoved`) now clears it and reports the change, as
+    matter.js's AdministratorCommissioningServer does (TC-CADMIN-1.25).
+  - A controller that removed its own fabric kept being answered on the
+    removed fabric's sessions. `bridge.Bridge.EmitFabricRemovedContext`
+    (new; call it from `OperationalCredentials.SetOnFabricRemoved` with the
+    command's context) also closes every session of the removed fabric once
+    the NOCResponse is out, as matter.js's `Fabric.remove` does
+    (TC-CADMIN-1.15). `EmitFabricRemoved` is unchanged.
+  - A RevokeCommissioning sent over the PASE session it revokes closed that
+    session before answering, so the command timed out at the controller.
+    The close now waits for the response, as matter.js defers a session
+    close until its exchanges end (`im.AfterResponse`,
+    `im.WithAfterResponse`, `im.DeferAfterResponse`; TC-CADMIN-1.10).
+  - A commissioner that aborted a PASE handshake with a failure
+    StatusReport — chip's answer to a wrong passcode — left the handshake
+    holding the single-active-PASE slot for its one-minute timeout; every
+    retry in that minute was dropped as busy and the failure was not
+    counted. The report now ends the handshake and counts toward the
+    20-failure window revocation, as matter.js's PaseServer does
+    (TC-CADMIN-1.9).
   - A chunked ACL write whose REPLACE-ALL drops the writer's own Administer
     entry lost every following append to UnsupportedAccess. The elements of
     one Write interaction that continue writing the attribute just written
@@ -348,10 +419,6 @@ pseudo-version of `main`.
     across the messages of a chunked write too (`im.WriteTransaction`,
     `im.WithWriteTransaction`; TC-ACL-2.6, 2.8;
     `BD-Matter-ChunkedWriteAuthorizedOnce`).
-  - A list-append ACL write reported every entry before the appended one
-    as Changed; it now reports only the appended entry as Added, as chip's
-    list append does (`im.WithListAppendWrite`, `im.IsListAppendWrite`;
-    TC-ACL-2.6; `BD-Matter-ACLAppendEvents`).
   - A list attribute too large for one message — the NOCs of three
     fabrics, a long ACL or PartsList — went out as a single oversized
     ReportData that a chip controller cannot authenticate and discards,

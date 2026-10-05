@@ -1111,52 +1111,6 @@ func TestOpcreds_VidVerificationCommandsInAcceptedList(t *testing.T) {
 	}
 }
 
-// TestOpcreds_SetVidVerificationStatementReturnsInvalidCommand verifies that
-// invoking SetVidVerificationStatement (0x0C) returns StatusInvalidCommand
-// because this bridge does not support VID-Verification mode.
-func TestOpcreds_SetVidVerificationStatementReturnsInvalidCommand(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	oc, _ := opcredsWithFakeStore(t)
-
-	_, err := oc.MatterInvoke(ctx, 0x0C, core.SetVidVerificationStatementRequest{})
-	if err == nil {
-		t.Fatal("SetVidVerificationStatement: expected error, got nil")
-	}
-	type statusCoder interface{ MatterStatusCode() im.StatusCode }
-	var sc statusCoder
-	if !errors.As(err, &sc) {
-		t.Fatalf("error %v does not implement MatterStatusCode()", err)
-	}
-	if got := sc.MatterStatusCode(); got != im.StatusInvalidCommand {
-		t.Errorf("MatterStatusCode()=0x%02X, want StatusInvalidCommand (0x85)", got)
-	}
-}
-
-// TestOpcreds_SignVidVerificationRequestReturnsInvalidCommand mirrors the
-// SetVidVerificationStatement check for command 0x0D.
-func TestOpcreds_SignVidVerificationRequestReturnsInvalidCommand(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	oc, _ := opcredsWithFakeStore(t)
-
-	_, err := oc.MatterInvoke(ctx, 0x0D, core.SignVidVerificationRequest{
-		FabricIndex:     1,
-		ClientChallenge: make([]byte, 32),
-	})
-	if err == nil {
-		t.Fatal("SignVidVerificationRequest: expected error, got nil")
-	}
-	type statusCoder interface{ MatterStatusCode() im.StatusCode }
-	var sc statusCoder
-	if !errors.As(err, &sc) {
-		t.Fatalf("error %v does not implement MatterStatusCode()", err)
-	}
-	if got := sc.MatterStatusCode(); got != im.StatusInvalidCommand {
-		t.Errorf("MatterStatusCode()=0x%02X, want StatusInvalidCommand (0x85)", got)
-	}
-}
-
 // TestNOCStruct_VvscFieldPresent verifies that the NOCStruct type carries the
 // Vvsc field and that its zero value is nil (not set).
 func TestNOCStruct_VvscFieldPresent(t *testing.T) {

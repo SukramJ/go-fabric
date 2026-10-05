@@ -11,10 +11,12 @@ package core_test
 // UpdateNOC and on RemoveFabric.
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
@@ -357,5 +359,79 @@ func TestRemoveFabric_FiresWithdrawBeforeMDNSReannounce(t *testing.T) {
 	}
 	if withdrawnCompressedID != fabBefore.CompressedID {
 		t.Errorf("OnFabricWithdraw compressedID = %x, want %x", withdrawnCompressedID, fabBefore.CompressedID)
+	}
+}
+
+// TestAddNOC_SecondInSameFailSafeIsConstraintError pins matter.js
+// OperationalCredentialsServer.addNoc / updateNoc: once AddNOC succeeded
+// in a fail-safe context, a further AddNOC or UpdateNOC in it fails with
+// the IM status ConstraintError before any other check (TC-OPCREDS-3.1
+// step 25).
+func TestAddNOC_SecondInSameFailSafeIsConstraintError(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	fs := newFakeStore()
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	if err != nil {
+		t.Fatalf("NewOperationalCredentials: %v", err)
+	}
+	_, _, fabricIndex := commissionTestFabric(ctx, t, oc)
+
+	assertConstraint := func(name string, cmd uint32, req any) {
+		t.Helper()
+		_, err := oc.MatterInvoke(im.WithFabricFilter(ctx, true, fabricIndex), cmd, req)
+		var sc interface{ MatterStatusCode() im.StatusCode }
+		if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusConstraintError {
+			t.Fatalf("%s after AddNOC: %v, want ConstraintError", name, err)
+		}
+	}
+	assertConstraint("AddNOC", 0x06, core.AddNOCRequest{IPKValue: make([]byte, 16), CaseAdminSubject: 0xABCD, AdminVendorID: 0x1234})
+	assertConstraint("UpdateNOC", 0x07, core.UpdateNOCRequest{NOCValue: []byte{1}})
+}
+
+// TestUpdateNOC_RevertedOnFailSafeExpiry pins matter.js FailsafeContext
+// rollback of an updated fabric: an UpdateNOC whose fail-safe expires
+// (or is disarmed) without CommissioningComplete leaves the original NOC,
+// key and node id in force, and the host is told to follow
+// (TC-OPCREDS-3.5 step 10). After CommissioningComplete the update stays.
+func TestUpdateNOC_RevertedOnFailSafeExpiry(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	fs := newFakeStore()
+	updated := 0
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oc.SetOnFabricUpdated(func(context.Context, uint8) { updated++ })
+	_, rootPriv, fabricIndex := commissionTestFabric(ctx, t, oc)
+	before, _ := fs.GetIdentity(ctx, fabricIndex)
+	fabBefore, _ := fs.GetFabric(ctx, fabricIndex)
+
+	fabCtx := im.WithFabricFilter(ctx, true, fabricIndex)
+	update := func(nodeID uint64) {
+		t.Helper()
+		nocRaw := mintUpdateNOC(fabCtx, t, oc, rootPriv, testDefaultFabricID, nodeID)
+		resp, err := oc.MatterInvoke(fabCtx, 0x07, core.UpdateNOCRequest{NOCValue: nocRaw})
+		if err != nil || resp.(core.NOCResponse).StatusCode != core.NOCStatusOK {
+			t.Fatalf("UpdateNOC: %v %+v", err, resp)
+		}
+	}
+	update(testDefaultNodeID + 7)
+	oc.OnFailSafeExpiry(ctx, fabricIndex)
+	after, _ := fs.GetIdentity(ctx, fabricIndex)
+	fabAfter, _ := fs.GetFabric(ctx, fabricIndex)
+	if !bytes.Equal(after.NOC, before.NOC) || !bytes.Equal(after.PrivateKey, before.PrivateKey) || fabAfter.NodeID != fabBefore.NodeID {
+		t.Fatal("the expired fail-safe left the updated NOC in force")
+	}
+	if updated != 2 {
+		t.Fatalf("onFabricUpdated ran %d times, want 2 (update and revert)", updated)
+	}
+
+	update(testDefaultNodeID + 8)
+	oc.ClearPendingState() // CommissioningComplete
+	oc.OnFailSafeExpiry(ctx, fabricIndex)
+	if f, _ := fs.GetFabric(ctx, fabricIndex); f.NodeID != testDefaultNodeID+8 {
+		t.Fatalf("a committed UpdateNOC was reverted (node 0x%X)", f.NodeID)
 	}
 }

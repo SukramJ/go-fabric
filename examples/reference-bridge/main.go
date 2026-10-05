@@ -33,6 +33,7 @@ import (
 	"time"
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
@@ -310,11 +311,34 @@ func run() error {
 	// A removed fabric takes its persisted subscriptions with it.
 	// Its groups go with it too: EmitFabricRemoved hands the fabric to the
 	// attached group messaging.
-	refs.opCreds.SetOnFabricRemoved(func(_ context.Context, fabricIndex uint8) {
+	refs.opCreds.SetOnFabricRemoved(func(ctx context.Context, fabricIndex uint8) {
 		// BasicInformation Leave, as matter.js BasicInformationServer
 		// emits it when a fabric goes.
 		refs.basicInfo.EmitLeave(fabricIndex)
-		br.EmitFabricRemoved(fabricIndex) //nolint:contextcheck // EmitFabricRemoved takes no ctx; its store delete runs on its own bounded timeout
+		// The fabric's sessions end once the NOCResponse is out.
+		br.EmitFabricRemovedContext(ctx, fabricIndex)
+	})
+
+	// UpdateNOC rewrites the fabric's operational identity, possibly with a
+	// new node id: the CASE responder must answer as the new identity, the
+	// operational record must move to the new instance name at once (a
+	// controller reaches the node under it before CommissioningComplete),
+	// and the fabric's other sessions end. matter.js FabricManager's
+	// replaced event drives the same through DeviceAdvertiser and
+	// SessionManager.
+	refs.opCreds.SetOnFabricUpdated(func(hookCtx context.Context, fabricIndex uint8) {
+		oldCompressed, oldNode, hadOld := caseIDs.announceIdentity(fabricIndex)
+		if err := caseIDs.load(hookCtx, credentials, fabricIndex); err != nil {
+			logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
+			return
+		}
+		if newCompressed, newNode, ok := caseIDs.announceIdentity(fabricIndex); ok && (!hadOld || newCompressed != oldCompressed || newNode != oldNode) {
+			if hadOld {
+				br.WithdrawFabric(hookCtx, oldCompressed, oldNode)
+			}
+			br.AnnounceFabric(hookCtx, newCompressed, newNode)
+		}
+		sec.sessions.CloseFabricExcept(fabricIndex, mattercore.InvokeSessionIDFromContext(hookCtx))
 	})
 
 	// Event numbers must not restart at zero across a reboot: a controller

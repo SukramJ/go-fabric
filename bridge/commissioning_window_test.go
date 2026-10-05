@@ -737,3 +737,96 @@ func TestRandomSalt_Length16(t *testing.T) {
 		t.Errorf("RandomSalt: len = %d, want 16", len(s))
 	}
 }
+
+// TestCommissioningWindow_RevokeOverPaseDefersTheClose pins matter.js
+// NodeSession.initiateClose's deferred close: a RevokeCommissioning that
+// arrives over a PASE session closes it only once the command's response
+// is out (TC-CADMIN-1.10 step 9); over CASE, or with nothing to defer to,
+// the close is immediate.
+func TestCommissioningWindow_RevokeOverPaseDefersTheClose(t *testing.T) {
+	t.Parallel()
+	w := bridge.NewCommissioningWindow()
+	closer := &fakePaseSessionCloser{}
+	w.SetPaseSessionCloser(closer)
+
+	after := &im.AfterResponse{}
+	paseCtx := im.WithAfterResponse(im.WithAuthModePASE(context.Background()), after)
+	_ = w.RevokeWindow(paseCtx)
+	if n := closer.calls.Load(); n != 0 {
+		t.Fatalf("the PASE session closed before the response (%d calls)", n)
+	}
+	after.Run()
+	if n := closer.calls.Load(); n != 1 {
+		t.Fatalf("ClosePaseSessions after the response = %d calls, want 1", n)
+	}
+	after.Run()
+	if n := closer.calls.Load(); n != 1 {
+		t.Fatalf("a second Run closed again (%d calls)", n)
+	}
+
+	caseCtx := im.WithAfterResponse(context.Background(), &im.AfterResponse{})
+	_ = w.RevokeWindow(caseCtx)
+	if n := closer.calls.Load(); n != 2 {
+		t.Fatalf("a revoke over CASE did not close at once (%d calls)", n)
+	}
+	_ = w.RevokeWindow(im.WithAuthModePASE(context.Background()))
+	if n := closer.calls.Load(); n != 3 {
+		t.Fatalf("a PASE revoke with nothing to defer to did not close at once (%d calls)", n)
+	}
+}
+
+// TestCommissioningWindow_FabricRemovedClearsTheAdminFabric pins matter.js
+// #fabricRemovedCallback: removing the fabric that opened the window nulls
+// AdminFabricIndex and reports it; the window stays open, AdminVendorId
+// stays, and another fabric's removal changes nothing (TC-CADMIN-1.25).
+func TestCommissioningWindow_FabricRemovedClearsTheAdminFabric(t *testing.T) {
+	t.Parallel()
+	w := bridge.NewCommissioningWindow()
+	var fired atomic.Int32
+	w.SetTransitionHook(func() { fired.Add(1) })
+	if err := w.OpenWindow(context.Background(), wire.OpenWindowParams{
+		CommissioningTimeoutSeconds: 600, AdminFabricIndex: 2, AdminVendorID: 0xFFF1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	before := fired.Load()
+	w.FabricRemoved(3)
+	if snap := w.CurrentWindow(); snap.AdminFabricIsNull || fired.Load() != before {
+		t.Fatal("another fabric's removal touched the window")
+	}
+	w.FabricRemoved(2)
+	snap := w.CurrentWindow()
+	if !snap.AdminFabricIsNull || snap.Status == wire.WindowStatusClosed || snap.AdminVendorIsNull {
+		t.Fatalf("after the admin fabric's removal: %+v, want AdminFabricIndex null, window open, vendor kept", snap)
+	}
+	if fired.Load() != before+1 {
+		t.Fatalf("the change was reported %d times, want once", fired.Load()-before)
+	}
+}
+
+// expiringArmer records how RevokeWindow ends the fail-safe.
+type expiringArmer struct {
+	expired, armed atomic.Int32
+}
+
+func (a *expiringArmer) ArmFailSafeFor(context.Context, uint32, uint8) error {
+	a.armed.Add(1)
+	return nil
+}
+
+func (a *expiringArmer) ExpireFailSafe(context.Context) { a.expired.Add(1) }
+
+// TestCommissioningWindow_RevokeExpiresTheFailSafe pins Matter §11.19.8.3
+// step 1 as matter.js runs it (failsafeContext.close()): RevokeWindow
+// expires the fail-safe with its cleanup when the armer can, instead of a
+// bare disarm (TC-CGEN-2.4).
+func TestCommissioningWindow_RevokeExpiresTheFailSafe(t *testing.T) {
+	t.Parallel()
+	w := bridge.NewCommissioningWindow()
+	a := &expiringArmer{}
+	w.SetFailSafeArmer(a)
+	_ = w.RevokeWindow(context.Background())
+	if a.expired.Load() != 1 || a.armed.Load() != 0 {
+		t.Fatalf("expired %d, disarmed %d; want one expiry", a.expired.Load(), a.armed.Load())
+	}
+}

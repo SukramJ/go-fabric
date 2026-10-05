@@ -194,6 +194,27 @@ WHERE fabric_index = ?`, label, fabricIndex)
 	return nil
 }
 
+// UpdateFabricVendorID rewrites the vendor id of fabricIndex — the
+// VendorID a SetVIDVerificationStatement supplies, which matter.js
+// Fabric.updateVendorVerificationData stores as the fabric's rootVendorId.
+// Returns [ErrFabricNotFound] when no row exists.
+func (s *Store) UpdateFabricVendorID(ctx context.Context, fabricIndex uint8, vendorID uint16) error {
+	res, err := s.db.ExecContext(ctx, `
+UPDATE matter_fabrics SET vendor_id = ?, updated_at = CURRENT_TIMESTAMP
+WHERE fabric_index = ?`, vendorID, fabricIndex)
+	if err != nil {
+		return fmt.Errorf("matter store: update fabric vendor id: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("matter store: update fabric vendor id: rows affected: %w", err)
+	}
+	if n == 0 {
+		return ErrFabricNotFound
+	}
+	return nil
+}
+
 // UpdateFabricNodeID rewrites the operational NodeID for fabricIndex.
 // UpdateNOC installs a NOC that may carry a new NodeID for the same
 // fabric; the stored row must follow so destinationID resolution and

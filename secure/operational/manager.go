@@ -504,6 +504,9 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		SessionID:   id,
 		fabricIndex: fabricIndex,
 		Session:     sess,
+		// As openFromSigma: the Sigma key schedule's third block
+		// (matter.js NodeSession.ts:80).
+		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
 	}
 	m.sessions[id] = entry
 	m.mu.Unlock()
@@ -781,6 +784,20 @@ func (m *Manager) Get(sessionID uint16) (*Entry, error) {
 		return nil, ErrSessionNotFound
 	}
 	return entry, nil
+}
+
+// AttestationChallengeFor returns the attestation challenge of the session
+// sessionID (Matter §4.13.2.6), or false when the session is unknown or has
+// none. SignVIDVerificationRequest signs over the challenge of the session
+// it arrived on (matter.js session.attestationChallengeKey).
+func (m *Manager) AttestationChallengeFor(sessionID uint16) ([]byte, bool) {
+	m.mu.RLock()
+	entry, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+	if !ok || entry == nil || len(entry.AttestationChallenge) == 0 {
+		return nil, false
+	}
+	return append([]byte(nil), entry.AttestationChallenge...), true
 }
 
 // AdoptFabricIndex rewrites the FabricIndex on the session identified

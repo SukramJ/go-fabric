@@ -495,10 +495,20 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 	// the session that issued the CSRRequest (matter.js
 	// OperationalCredentialsServer.ts session-ID binding guard).
 	invokeCtx = core.WithInvokeSessionID(invokeCtx, requestHdr.SessionID)
+	if challenge, ok := b.sessionAttestationChallenge(requestHdr.SessionID); ok {
+		invokeCtx = core.WithInvokeAttestationChallenge(invokeCtx, challenge)
+	}
 	// The gate above passed, so a set Timed flag means a valid window.
 	invokeCtx = im.WithTimedInteraction(invokeCtx, req.TimedRequest)
+	// Work a command defers until its response is out — the PASE session
+	// a RevokeCommissioning over PASE closes — runs when this returns,
+	// whichever way: the reply sent, suppressed, or failed.
+	after := &im.AfterResponse{}
+	defer after.Run()
+	invokeCtx = im.WithAfterResponse(invokeCtx, after)
 	before := b.snapshotInvokedClusters(invokeCtx, dispatcher, req)
 	resp := im.HandleInvokeRequest(invokeCtx, dispatcher, req)
+	b.adoptPASESessionOnAddNOC(requestHdr.SessionID, resp)
 	b.reportInvokeChanges(invokeCtx, dispatcher, before)
 	for i := range resp.Responses {
 		rewriteInvokeResponseCommand(&resp.Responses[i])
@@ -798,4 +808,73 @@ func oversizedInvokeEntry(ent im.InvokeResponseEntry) im.InvokeResponseEntry {
 		Path: ent.Path, CommandRef: ent.CommandRef, HasCommandRef: ent.HasCommandRef,
 		IsStatus: true, Status: im.StatusIB{Status: im.StatusResourceExhausted},
 	}
+}
+
+// sessionFabricAdopter is the optional capability of the session table to
+// move a session onto a fabric (operational.Manager.AdoptFabricIndex).
+type sessionFabricAdopter interface {
+	AdoptFabricIndex(sessionID uint16, fabricIndex uint8) error
+}
+
+// adoptPASESessionOnAddNOC moves the PASE session an AddNOC succeeded on
+// onto the fabric it installed, so the commands that follow on it have
+// that fabric as their accessing fabric — matter.js
+// OperationalCredentialsServer.addNoc sets `session.fabric = fabric` for a
+// PASE session, chip calls SecureSession::AdoptFabricIndex. Without it a
+// CommissioningComplete sent over PASE after AddNOC was refused by the
+// fabric-scoped access gate (UnsupportedAccess) instead of reaching the
+// cluster, which answers InvalidAuthentication (TC-CGEN-2.4). The session
+// stays a PASE session (its implicit Administer grant and the PASE-only
+// rules still apply).
+func (b *Bridge) adoptPASESessionOnAddNOC(sessionID uint16, resp im.InvokeResponse) {
+	if sessionID == 0 || !b.resolveSessionPASE(sessionID) {
+		return
+	}
+	for _, e := range resp.Responses {
+		if e.Path.Cluster != 0x003E || !e.HasResponse { // OperationalCredentials
+			continue
+		}
+		noc, ok := e.Response.(core.NOCResponse)
+		if !ok || noc.StatusCode != core.NOCStatusOK || noc.FabricIndex == 0 {
+			continue
+		}
+		b.mu.RLock()
+		adopter, ok := b.sessionRegistry.(sessionFabricAdopter)
+		if !ok {
+			adopter, ok = b.sessions.(sessionFabricAdopter)
+		}
+		b.mu.RUnlock()
+		if !ok {
+			return
+		}
+		if err := adopter.AdoptFabricIndex(sessionID, noc.FabricIndex); err != nil {
+			b.logger.Debug("matter.rx.im.addnoc.adopt_failed",
+				slog.Int("session_id", int(sessionID)), slog.String("err", err.Error()))
+		}
+	}
+}
+
+// sessionAttestationChallenger is the optional capability of the session
+// table to name a session's attestation challenge
+// (operational.Manager.AttestationChallengeFor).
+type sessionAttestationChallenger interface {
+	AttestationChallengeFor(sessionID uint16) ([]byte, bool)
+}
+
+// sessionAttestationChallenge returns the attestation challenge of the
+// session an invoke arrived on, when the session table can name it.
+func (b *Bridge) sessionAttestationChallenge(sessionID uint16) ([]byte, bool) {
+	if sessionID == 0 {
+		return nil, false
+	}
+	b.mu.RLock()
+	c, ok := b.sessionRegistry.(sessionAttestationChallenger)
+	if !ok {
+		c, ok = b.sessions.(sessionAttestationChallenger)
+	}
+	b.mu.RUnlock()
+	if !ok {
+		return nil, false
+	}
+	return c.AttestationChallengeFor(sessionID)
 }

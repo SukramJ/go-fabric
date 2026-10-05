@@ -1085,3 +1085,72 @@ func TestGencomm_ArmFailSafeFor_ZeroSecondsDoesNotSelfLoop(t *testing.T) {
 		t.Fatalf("ArmFailSafeFor(0) disarm re-entered the expiry hook %d time(s); RevokeWindow→ArmFailSafeFor(0) must not loop", n)
 	}
 }
+
+// TestArmFailSafe_ReArmExtendsWithoutResettingState pins matter.js
+// GeneralCommissioningServer #armFailSafe: arming from the disarmed state
+// starts a new fail-safe context (the armed hook resets the pending
+// credentials), a re-arm while armed only extends it — a trusted root
+// added under the fail-safe survives it (TC-CGEN-2.2 step 34).
+func TestArmFailSafe_ReArmExtendsWithoutResettingState(t *testing.T) {
+	t.Parallel()
+	gc := newGencomm(t, core.GeneralCommissioningConfig{})
+	fresh := 0
+	gc.SetOnFailSafeArmed(func(context.Context, uint8) { fresh++ })
+	ctx := im.WithFabricFilter(context.Background(), false, 1)
+	arm := func(seconds uint16) {
+		t.Helper()
+		resp, err := gc.MatterInvoke(ctx, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: seconds})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r := resp.(core.ArmFailSafeResponse); r.ErrorCode != core.CommissioningErrorOK {
+			t.Fatalf("ArmFailSafe(%d): %v", seconds, r.ErrorCode)
+		}
+	}
+	arm(60)
+	arm(120)
+	if fresh != 1 {
+		t.Fatalf("armed hook ran %d times for an arm and a re-arm, want 1", fresh)
+	}
+	arm(0)
+	arm(60)
+	if fresh != 2 {
+		t.Fatalf("armed hook ran %d times after a disarm and a new arm, want 2", fresh)
+	}
+	// The internal arms follow the same rule: the PASE auto-arm on a
+	// disarmed fail-safe starts a new context, on an armed one nothing.
+	arm(0)
+	gc.AutoArmOnPaseEstablished(ctx)
+	if fresh != 3 {
+		t.Fatalf("armed hook ran %d times after the PASE auto-arm, want 3", fresh)
+	}
+	_ = gc.ArmFailSafeFor(ctx, 120, 0)
+	if fresh != 3 {
+		t.Fatalf("an internal re-arm reset the context (%d hook runs)", fresh)
+	}
+}
+
+// TestExpireFailSafe pins the revoke-time expiry: an armed fail-safe is
+// disarmed and its expiry cleanup runs once, for the arming fabric; an
+// unarmed one is left alone; a hook that expires again finds nothing.
+func TestExpireFailSafe(t *testing.T) {
+	t.Parallel()
+	gc := newGencomm(t, core.GeneralCommissioningConfig{})
+	var expired []uint8
+	gc.SetOnFailSafeExpired(func(ctx context.Context, fabric uint8) {
+		expired = append(expired, fabric)
+		gc.ExpireFailSafe(ctx)
+	})
+	ctx := context.Background()
+	gc.ExpireFailSafe(ctx)
+	if len(expired) != 0 {
+		t.Fatal("an unarmed fail-safe ran its expiry")
+	}
+	if _, err := gc.MatterInvoke(im.WithFabricFilter(ctx, false, 2), 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60}); err != nil {
+		t.Fatal(err)
+	}
+	gc.ExpireFailSafe(ctx)
+	if len(expired) != 1 || expired[0] != 2 || gc.FailSafeArmed() {
+		t.Fatalf("expiry ran for %v, armed=%v; want once for fabric 2 and disarmed", expired, gc.FailSafeArmed())
+	}
+}
