@@ -1154,3 +1154,39 @@ func TestExpireFailSafe(t *testing.T) {
 		t.Fatalf("expiry ran for %v, armed=%v; want once for fabric 2 and disarmed", expired, gc.FailSafeArmed())
 	}
 }
+
+// TestSetRegulatoryConfig_HonoursLocationCapability pins matter.js
+// setRegulatoryConfig: an Indoor-only or Outdoor-only node accepts only
+// that configuration (ValueOutsideRange otherwise); IndoorOutdoor accepts
+// all three (TC-CGEN-2.4 step 19).
+func TestSetRegulatoryConfig_HonoursLocationCapability(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		capability uint8
+		ok         []uint8
+		refused    []uint8
+	}{
+		{core.RegulatoryIndoor, []uint8{core.RegulatoryIndoor}, []uint8{core.RegulatoryOutdoor, core.RegulatoryIndoorOutdoor}},
+		{core.RegulatoryOutdoor, []uint8{core.RegulatoryOutdoor}, []uint8{core.RegulatoryIndoor, core.RegulatoryIndoorOutdoor}},
+		{core.RegulatoryIndoorOutdoor, []uint8{core.RegulatoryIndoor, core.RegulatoryOutdoor, core.RegulatoryIndoorOutdoor}, nil},
+	} {
+		gc := newGencomm(t, core.GeneralCommissioningConfig{LocationCapability: tc.capability})
+		set := func(v uint8) uint8 {
+			resp, err := gc.MatterInvoke(context.Background(), 0x02, core.SetRegulatoryConfigRequest{NewRegulatoryConfig: v, CountryCode: "XX"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return resp.(core.SetRegulatoryConfigResponse).ErrorCode
+		}
+		for _, v := range tc.ok {
+			if got := set(v); got != core.CommissioningErrorOK {
+				t.Errorf("capability %d, config %d: %d, want OK", tc.capability, v, got)
+			}
+		}
+		for _, v := range tc.refused {
+			if got := set(v); got != core.CommissioningErrorValueOutsideRange {
+				t.Errorf("capability %d, config %d: %d, want ValueOutsideRange", tc.capability, v, got)
+			}
+		}
+	}
+}

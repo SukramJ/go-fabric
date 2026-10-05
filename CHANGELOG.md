@@ -341,6 +341,9 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - SetRegulatoryConfig accepted a configuration the LocationCapability
+    rules out; an Indoor-only or Outdoor-only node now answers
+    ValueOutsideRange for anything else, as matter.js does (TC-CGEN-2.4).
   - A rolled-back UpdateNOC now also drops a VID verification statement,
     VVSC or vendor id set under it, and OperationalCredentials reports
     changes made outside its own commands — a fail-safe expiry or disarm

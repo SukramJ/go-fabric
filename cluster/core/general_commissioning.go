@@ -711,6 +711,20 @@ func (g *GeneralCommissioning) handleSetRegulatoryConfig(fields any) (any, error
 			DebugText: fmt.Sprintf("CountryCode length=%d (want 0 or 2)", len(req.CountryCode)),
 		}, nil
 	}
+	// The new configuration must be one the LocationCapability allows:
+	// Indoor or Outdoor alone, or any of the three for IndoorOutdoor.
+	// Mirrors matter.js GeneralCommissioningServer.setRegulatoryConfig
+	// (validValues per locationCapability → ValueOutsideRange);
+	// TC-CGEN-2.4 step 19.
+	g.mu.RLock()
+	capability := g.locationCapability
+	g.mu.RUnlock()
+	if capability != RegulatoryIndoorOutdoor && req.NewRegulatoryConfig != capability {
+		return SetRegulatoryConfigResponse{
+			ErrorCode: CommissioningErrorValueOutsideRange,
+			DebugText: fmt.Sprintf("NewRegulatoryConfig=%d not allowed by LocationCapability=%d", req.NewRegulatoryConfig, capability),
+		}, nil
+	}
 	g.mu.Lock()
 	g.regulatoryConfig = req.NewRegulatoryConfig
 	g.breadcrumb = req.Breadcrumb
