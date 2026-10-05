@@ -191,3 +191,25 @@ func TestWrite_UnlistedAttributeIsUnsupportedAttribute(t *testing.T) {
 		t.Errorf("the write reached the server: %v", srv.writeCalls)
 	}
 }
+
+// TestWrite_GlobalAttributesAreNeverWritable pins that a concrete write to
+// any global attribute answers UNSUPPORTED_WRITE without reaching the cluster
+// server — on a cluster outside the read-only table too (ValveConfiguration).
+// TC-ACE-2.2 writes every one of them and accepts only UNSUPPORTED_WRITE or
+// UNSUPPORTED_ACCESS; matter.js models them read-only
+// (AttributeWriteResponse.ts:229-231).
+func TestWrite_GlobalAttributesAreNeverWritable(t *testing.T) {
+	t.Parallel()
+	srv := &recordingServer{id: 0x0081, attrs: []uint32{0x0000}}
+	ep := &Endpoint{ID: 4, Source: recordingSource{srv: srv}}
+	d := NewTopologyDispatcher(makeTopology(ep))
+	for _, attr := range []uint32{0xFFF8, 0xFFF9, 0xFFFA, 0xFFFB, 0xFFFC, 0xFFFD} {
+		results := d.Write(context.Background(), concreteAttrPath(4, 0x0081, attr), im.AttributeValue{Value: uint16(1)})
+		if len(results) != 1 || results[0].Status != im.StatusUnsupportedWrite {
+			t.Errorf("write 0x%04X: %+v, want one UNSUPPORTED_WRITE", attr, results)
+		}
+	}
+	if len(srv.writeCalls) != 0 {
+		t.Errorf("a global-attribute write reached the cluster server: %v", srv.writeCalls)
+	}
+}

@@ -104,7 +104,7 @@ func TestBuildInitialReport_SortOrder(t *testing.T) {
 // EventRequests handling.
 func TestBuildInitialReport_EventOnlyEmptyLog_Establishes(t *testing.T) {
 	t.Parallel()
-	b := newStartedBridge(t)
+	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
 	dispatcher := b.Dispatcher()
 	if dispatcher == nil {
 		t.Skip("dispatcher nil after start — topology not yet assembled")
@@ -118,11 +118,11 @@ func TestBuildInitialReport_EventOnlyEmptyLog_Establishes(t *testing.T) {
 
 	req := im.SubscribeRequest{
 		EventRequests: []im.ConcreteEventPath{
-			{
-				HasEndpoint: true, Endpoint: 1,
-				HasCluster: true, Cluster: 0x003B, // Switch
-				HasEvent: true, Event: 0x01, // InitialPress
-			},
+			// Wildcard endpoint and cluster: the path resolves to the
+			// clusters the test topology has. A concrete path to a cluster
+			// the topology lacks is not existent and is rejected, as in
+			// matter.js (TestSubscribeRejectsEventPathsTheSubjectMayNotRead).
+			{HasEvent: true, Event: 0x01},
 		},
 	}
 	report, matched := b.buildInitialReport(context.Background(), dispatcher, req)

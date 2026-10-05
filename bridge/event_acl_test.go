@@ -93,3 +93,34 @@ func TestAuthorizedEventReports_PASEBypass(t *testing.T) {
 		t.Fatalf("PASE bypass: want 1 event, got %d", len(got))
 	}
 }
+
+// TestSubscribeRejectsEventPathsTheSubjectMayNotRead pins the establish
+// decision for an event-only subscription: a path counts only when it
+// resolves to a cluster whose events the subject may read. A View-only
+// subject subscribing to AccessControlEntryChanged (Administer) matches
+// nothing, so the subscription is rejected with INVALID_ACTION, as matter.js
+// does (EventReadResponse.ts counts.existent excludes denied paths;
+// ServerSubscription.ts "no attributes or events are matching"). TC-ACE-1.2
+// step 14 expects it. An Administer subject's identical subscription counts.
+func TestSubscribeRejectsEventPathsTheSubjectMayNotRead(t *testing.T) {
+	t.Parallel()
+	fake := &aclStoreFake{entries: []store.ACLEntry{
+		{FabricIndex: 1, Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE},
+	}}
+	b := newACLTestBridge(t, fake)
+	ctx := im.WithSubject(im.WithFabricFilter(context.Background(), true, 1), 0x1111, nil)
+
+	aclEvent := im.SubscribeRequest{EventRequests: []im.ConcreteEventPath{{
+		Endpoint: 0, HasEndpoint: true, Cluster: 0x001F, HasCluster: true, Event: 0x00, HasEvent: true,
+	}}}
+	if _, matched := b.buildInitialReport(ctx, b.Dispatcher(), aclEvent); matched != 0 {
+		t.Fatalf("View-only subject: AccessControlEntryChanged matched %d path(s), want 0 (INVALID_ACTION)", matched)
+	}
+
+	admin := newACLTestBridge(t, &aclStoreFake{entries: []store.ACLEntry{
+		{FabricIndex: 1, Privilege: store.PrivilegeAdminister, AuthMode: store.AuthModeCASE},
+	}})
+	if _, matched := admin.buildInitialReport(ctx, admin.Dispatcher(), aclEvent); matched != 1 {
+		t.Fatalf("Administer subject: AccessControlEntryChanged matched %d path(s), want 1", matched)
+	}
+}

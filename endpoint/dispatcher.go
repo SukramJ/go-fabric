@@ -280,6 +280,19 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// the UnsupportedWrite check at :229-231. Found by the CHIP
 				// Python harness (TC-IDM-3.2 step 3 writes a spec attribute
 				// the DUT does not list).
+				// The global attributes (GeneratedCommandList … ClusterRevision)
+				// exist on every cluster and are never writable: UNSUPPORTED_WRITE
+				// on a concrete path, skipped on a wildcard one — matter.js
+				// models them read-only like any other attribute
+				// (AttributeWriteResponse.ts:229-231). They used to reach the
+				// cluster server, which answered Failure or
+				// UNSUPPORTED_ATTRIBUTE (TC-ACE-2.2).
+				if isGlobalAttribute(attrID) {
+					if !wildcardEndpoint && path.HasAttribute {
+						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedWrite})
+					}
+					continue
+				}
 				if path.HasAttribute && !attributeListed(srv, attrID) {
 					if !wildcardEndpoint {
 						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedAttribute})
@@ -813,60 +826,56 @@ func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID
 	return 1
 }
 
-// MinWritePrivilege implements [im.AttributeWritePrivilegeProvider]. It
-// looks up the cluster server for (endpoint, clusterID) and consults the
-// server's [contract.ClusterAttributeWritePrivilege] optional
-// interface for the given attrID. Returns 3 (Operate) — the Matter
-// §9.10.4.4 default write privilege — when the cluster is not found, does
-// not implement the interface, or reports no elevated requirement.
-// Returns the server-reported value (e.g. 4=Manage for
-// BasicInformation.NodeLabel, 5=Administer for AccessControl.ACL)
-// otherwise. Mirrors the writeAccess bits in matter.js
-// packages/model/src/standard/elements/*.element.ts.
+// MinWritePrivilege implements [im.AttributeWritePrivilegeProvider]: the
+// write privilege matter.js gives the attribute ([schema.AttributeWritePrivilege],
+// generated from the access strings of parity/schema.json), raised further
+// when the cluster server's [contract.ClusterAttributeWritePrivilege] asks for
+// more. Servers without the optional interface used to fall back to Operate,
+// so an Operate subject could write BridgedDeviceBasicInformation.NodeLabel,
+// OnOff.StartUpOnOff or the Thermostat setpoint limits ("RW VM") —
+// TC-ACE-2.2.
 func (d *TopologyDispatcher) MinWritePrivilege(endpoint uint16, clusterID, attrID uint32) uint8 {
+	want := schema.AttributeWritePrivilege(clusterID, attrID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
-		return 3
+		return want
 	}
 	for _, srv := range ClusterServers(ep) {
 		if srv.MatterClusterID() != clusterID {
 			continue
 		}
-		priv, ok := srv.(contract.ClusterAttributeWritePrivilege)
-		if !ok {
-			return 3
+		if priv, ok := srv.(contract.ClusterAttributeWritePrivilege); ok {
+			want = max(want, priv.MinWritePrivilege(attrID))
 		}
-		return priv.MinWritePrivilege(attrID)
+		return want
 	}
-	return 3
+	return want
 }
 
-// MinInvokePrivilege implements [im.CommandInvokePrivilegeProvider]. It
-// looks up the cluster server for (endpoint, clusterID) and consults the
-// server's [contract.ClusterCommandInvokePrivilege] optional
-// interface for the given cmdID. Returns 3 (Operate) — the Matter
-// §9.10.4.4 default invoke privilege — when the cluster is not found,
-// does not implement the interface, or reports no elevated requirement.
-// Returns the server-reported value (e.g. 5=Administer for
-// OperationalCredentials.RemoveFabric) otherwise. Mirrors the
-// invokeAccess bits in matter.js
-// packages/model/src/standard/elements/*.element.ts.
+// MinInvokePrivilege implements [im.CommandInvokePrivilegeProvider]: the
+// privilege matter.js gives the command ([schema.InvokePrivilege], Operate
+// unless the element file says Manage or Administer), raised further when the
+// cluster server's [contract.ClusterCommandInvokePrivilege] asks for more.
+// Mirrors the command access bits in matter.js
+// packages/model/src/standard/elements/*.element.ts; a server without the
+// optional interface (Identify) used to fall back to Operate and let an
+// Operate subject identify a device (TC-ACE-2.3).
 func (d *TopologyDispatcher) MinInvokePrivilege(endpoint uint16, clusterID, cmdID uint32) uint8 {
+	want := schema.InvokePrivilege(clusterID, cmdID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
-		return 3
+		return want
 	}
 	for _, srv := range ClusterServers(ep) {
 		if srv.MatterClusterID() != clusterID {
 			continue
 		}
-		priv, ok := srv.(contract.ClusterCommandInvokePrivilege)
-		if !ok {
-			return 3
+		if priv, ok := srv.(contract.ClusterCommandInvokePrivilege); ok {
+			want = max(want, priv.MinInvokePrivilege(cmdID))
 		}
-		return priv.MinInvokePrivilege(cmdID)
+		return want
 	}
-	return 3
+	return want
 }
 
 // FabricIndexUnresolvable marks a session whose fabric the bridge could not
@@ -1197,3 +1206,9 @@ func (d *TopologyDispatcher) CurrentDataVersion(_ context.Context, endpoint uint
 	}
 	return 0, false
 }
+
+// isGlobalAttribute reports whether id is one of the global attributes every
+// cluster carries: GeneratedCommandList (0xFFF8), AcceptedCommandList
+// (0xFFF9), EventList (0xFFFA), AttributeList (0xFFFB), FeatureMap (0xFFFC),
+// ClusterRevision (0xFFFD).
+func isGlobalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }

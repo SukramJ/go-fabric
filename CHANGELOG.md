@@ -332,6 +332,26 @@ pseudo-version of `main`.
     Fabrics after AddNOC. The bridge now compares the invoked cluster's
     attributes before and after the command and reports what moved, as
     matter.js's Datasource does (TC-IDM-1.5).
+  - Command and attribute privileges came from the cluster servers alone,
+    with Operate as the fallback, so every server that did not declare one
+    let an Operate subject through: Identify and TriggerEffect (Manage),
+    PayloadTestRequest (Manage), a write to
+    BridgedDeviceBasicInformation.NodeLabel, OnOff.StartUpOnOff or the
+    Thermostat setpoint limits (Manage). The dispatcher now takes matter.js's
+    privilege for every command (`schema.InvokePrivilege`, held against the
+    element files by a test) and every attribute
+    (`schema.AttributeWritePrivilege`, generated from the access strings of
+    `parity/schema.json`, inherited ones included); a server can only raise
+    it (TC-ACE-2.2, TC-ACE-2.3).
+  - A write to a global attribute (AttributeList, FeatureMap, …) reached the
+    cluster server and answered FAILURE or UNSUPPORTED_ATTRIBUTE; it answers
+    UNSUPPORTED_WRITE now, as matter.js models them read-only (TC-ACE-2.2).
+  - An event-only subscription established even when the subject may not
+    read any of the requested events (AccessControlEntryChanged without
+    Administer) or the path names no cluster the node has. Such a
+    subscription is now rejected with INVALID_ACTION, as matter.js counts
+    only readable, existent event paths (EventReadResponse.ts,
+    ServerSubscription.ts) (TC-ACE-1.2).
   - An InvokeResponse too large for one datagram was dropped by the
     listener. It is now chunked with MoreChunkedMessages, each chunk but
     the last waiting for the controller's StatusResponse, as matter.js

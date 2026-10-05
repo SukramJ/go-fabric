@@ -683,6 +683,17 @@ type EventReadAuthorizer struct {
 	SubjectCATs   []uint32
 }
 
+// Allows reports whether the accessing subject may read the events of
+// (endpoint, cluster): the event read privilege — View, Administer for
+// AccessControl and Groupcast — checked against the ACL. A PASE session, a
+// zero fabric or a missing checker allows, as AuthorizeEventReports does.
+func (a EventReadAuthorizer) Allows(ctx context.Context, endpoint uint16, cluster uint32) bool {
+	if a.FabricIndex == 0 || a.PASE || IsPASEFromContext(ctx) || a.Checker == nil {
+		return true
+	}
+	return a.Checker.CheckACL(ctx, a.FabricIndex, a.SubjectNodeID, a.SubjectCATs, endpoint, cluster, eventReadPrivilege(cluster)).IsSuccess()
+}
+
 // AuthorizeEventReports filters events down to those the accessing subject may
 // read and drops fabric-sensitive records that belong to another fabric.
 // Denied paths/records are SILENTLY OMITTED — a wildcard event read discloses

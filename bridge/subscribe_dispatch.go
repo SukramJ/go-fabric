@@ -104,8 +104,9 @@ func (b *Bridge) buildInitialReport(
 	// Apple flipped to count: 21 + InitialSubscriptionEstablished.
 	if len(req.EventRequests) > 0 {
 		raw := im.BuildEventReports(req.EventRequests, b.eventLog, req.EventFilters)
-		// The establish decision (matched > 0) counts the REQUESTED event paths,
-		// not the priming-log instances: a momentary/event-only subscribe
+		// The establish decision (matched > 0) counts the requested event paths
+		// that resolve to a cluster the subject may read events of, not the
+		// priming-log instances: a momentary/event-only subscribe
 		// (GenericSwitch button) is placed BEFORE the event fires, so its event
 		// log is empty at establish time — counting log records would reject it
 		// with no_match and it could never receive the future press. matter.js
@@ -119,10 +120,10 @@ func (b *Bridge) buildInitialReport(
 		// sees no AccessControl events (Matter §8.4.3.2 / §9.10.7.1). Mirrors
 		// matter.js EventReadResponse.ts #readAllowedEvents; subCtx carries the
 		// requesting fabric + subject.
-		matched += len(req.EventRequests)
 		_, subFabricIndex := im.FabricFilterFromContext(subCtx)
 		subSubjectNodeID, subSubjectCATs := im.SubjectFromContext(subCtx)
 		auth := b.eventReadAuthorizer(dispatcher, subFabricIndex, im.IsPASEFromContext(subCtx), subSubjectNodeID, subSubjectCATs)
+		matched += b.allowedEventPaths(subCtx, dispatcher, auth, req.EventRequests)
 		initialReport.EventReports = im.AuthorizeEventReports(subCtx, auth, raw)
 	}
 	// Sort reports by (endpoint, cluster, attribute) ascending. Apple
@@ -605,3 +606,46 @@ func (b *Bridge) sendSubscribeResponse(
 		slog.Int("max_interval", int(req.MaxIntervalCeiling)))
 	return nil
 }
+
+// allowedEventPaths counts the requested event paths that resolve to at least
+// one (endpoint, cluster) of the topology whose events the subject may read.
+// A subscription whose attribute and event paths all fail that test is
+// rejected with INVALID_ACTION: matter.js counts an event path as existent
+// only after its View pass, its existence checks and its read-privilege pass
+// (packages/protocol/src/action/server/EventReadResponse.ts #addConcrete /
+// counts.existent) and ServerSubscription.ts rejects "no attributes or events
+// are matching" when both counts are zero. TC-ACE-1.2 step 14 subscribes to
+// AccessControlEntryChanged without Administer and expects exactly that.
+func (b *Bridge) allowedEventPaths(ctx context.Context, dispatcher im.Dispatcher, auth im.EventReadAuthorizer, paths []im.ConcreteEventPath) int {
+	n := 0
+	for _, p := range paths {
+		if eventPathAllowed(ctx, dispatcher, auth, p) {
+			n++
+		}
+	}
+	return n
+}
+
+// eventPathAllowed resolves p's endpoint and cluster through the data model
+// (a read of ClusterRevision, which every cluster instance has, expands the
+// wildcards) and reports whether any resolved cluster's events are readable
+// by the subject.
+func eventPathAllowed(ctx context.Context, dispatcher im.Dispatcher, auth im.EventReadAuthorizer, p im.ConcreteEventPath) bool {
+	if dispatcher == nil {
+		return true
+	}
+	probe := im.ConcreteAttributePath{
+		Endpoint: p.Endpoint, HasEndpoint: p.HasEndpoint,
+		Cluster: p.Cluster, HasCluster: p.HasCluster,
+		Attribute: clusterRevisionAttributeID, HasAttribute: true,
+	}
+	for _, rr := range dispatcher.Read(ctx, probe) {
+		if rr.Status == im.StatusSuccess && auth.Allows(ctx, rr.Path.Endpoint, rr.Path.Cluster) {
+			return true
+		}
+	}
+	return false
+}
+
+// clusterRevisionAttributeID is the global ClusterRevision attribute.
+const clusterRevisionAttributeID = 0xFFFD
