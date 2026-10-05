@@ -341,6 +341,11 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - The reference daemon's smoke/CO alarm builds its SmokeCoAlarm server
+    once, so the alarm events go out through the instance the bridge wired
+    its emitter into (TC-SMOKECO-2.2 to 2.5), and reports a future
+    ExpiryDate (TC-SMOKECO-2.1); its valve closes itself when a timed
+    opening ends and reports it (TC-VALCC-4.5).
   - The reference daemon's washer counts its CountdownTime down while a
     cycle runs (TC-OPSTATE-2.2), and its robot vacuum behaves as matter.js's
     RVC test node: it starts Stopped, its run and clean modes refuse with

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/alarm"
@@ -18,6 +19,10 @@ import (
 )
 
 // --- device: a smoke and CO alarm ---------------------------------------------
+
+// smokeExpiryDate is the alarm's end of service, 2036-01-01, in Matter
+// epoch seconds (seconds since 2000-01-01 UTC).
+var smokeExpiryDate = uint32(time.Date(2036, 1, 1, 0, 0, 0, 0, time.UTC).Sub(time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)) / time.Second)
 
 // demoSmokeAlarm is a battery-powered smoke and CO alarm.
 //
@@ -51,7 +56,9 @@ func newDemoSmokeAlarm(name string) *demoSmokeAlarm {
 	return &demoSmokeAlarm{
 		name:    name,
 		battery: newDemoReading(name+" battery", contract.MeasurementBattery, 87),
-		state:   alarm.State{SmokeSensitivityLevel: alarm.SensitivityStandard},
+		// A device expires some years after it was made; TC-SMOKECO-2.1
+		// reads an ExpiryDate in the future (epoch-s, from 2000-01-01).
+		state: alarm.State{SmokeSensitivityLevel: alarm.SensitivityStandard, ExpiryDate: smokeExpiryDate},
 	}
 }
 
@@ -61,7 +68,18 @@ func (a *demoSmokeAlarm) MatterDeviceType() uint16 { return alarm.DeviceTypeSmok
 // MatterClusterServers implements [contract.EndpointSource]. PowerSource,
 // which SmokeCoAlarm also mandates, comes from the Spec's PowerSource
 // reading (the battery) rather than from here.
+//
+// The server is built once: it carries the event emitter the bridge wires
+// at reassembly, and Refresh must emit through that same instance — a
+// server rebuilt per call left the alarm events unsent (TC-SMOKECO-2.2).
 func (a *demoSmokeAlarm) MatterClusterServers() []contract.ClusterServer {
+	a.mu.Lock()
+	if a.srv != nil {
+		srv := a.srv
+		a.mu.Unlock()
+		return []contract.ClusterServer{srv}
+	}
+	a.mu.Unlock()
 	srv, err := alarm.NewServer(alarm.Config{
 		Source:   a,
 		Features: alarm.FeatureSmokeAlarm | alarm.FeatureCOAlarm,
@@ -76,7 +94,10 @@ func (a *demoSmokeAlarm) MatterClusterServers() []contract.ClusterServer {
 		panic(fmt.Sprintf("smoke alarm SmokeCoAlarm: %v", err))
 	}
 	a.mu.Lock()
-	a.srv = srv
+	if a.srv == nil {
+		a.srv = srv
+	}
+	srv = a.srv
 	a.mu.Unlock()
 	return []contract.ClusterServer{srv}
 }

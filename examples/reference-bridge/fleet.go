@@ -644,11 +644,11 @@ func (t *demoThermometer) MatterFloatValue() (float64, bool) {
 //     CurrentState never reads Transitioning, and TargetState reports "no
 //     target set" (a TLV null) rather than a position the head is still
 //     travelling to.
-//   - The timer is real but lazy. A timed opening stores its deadline, and
-//     the valve finds itself closed on the first read after it. Nothing in
-//     this process wakes at the deadline, so a subscriber learns of a
-//     self-close on its next read rather than from a report — a device with
-//     a clock of its own would fire [notifier.notify] instead.
+//   - The timer is real. A timed opening stores its deadline and arms a
+//     timer for it; when it fires the valve closes itself and notifies, so
+//     a subscriber learns of the self-close from a report, as from a valve
+//     with its own clock (TC-VALCC-4.5 compares its subscription with a
+//     read once the opening has ended).
 type demoValve struct {
 	name string
 	notifier
@@ -676,6 +676,8 @@ type demoValve struct {
 	// is none.
 	closesAt    time.Time
 	defaultOpen *uint32
+	// closer fires at closesAt; replaced by every Open, stopped by Close.
+	closer *time.Timer
 }
 
 // Compile-time assertions: the device is the endpoint source, the host port
@@ -791,8 +793,14 @@ func (v *demoValve) Open(_ context.Context, req valve.OpenRequest) error {
 	}
 	v.state = valve.StateOpen
 	v.openFor = copyUint32(duration)
+	if v.closer != nil {
+		v.closer.Stop()
+		v.closer = nil
+	}
 	if duration != nil {
-		v.closesAt = time.Now().Add(time.Duration(*duration) * time.Second)
+		d := time.Duration(*duration) * time.Second
+		v.closesAt = time.Now().Add(d)
+		v.closer = time.AfterFunc(d, v.timedClose)
 	} else {
 		v.closesAt = time.Time{}
 	}
@@ -802,9 +810,23 @@ func (v *demoValve) Open(_ context.Context, req valve.OpenRequest) error {
 	return nil
 }
 
+// timedClose is the valve's own timer ending a timed opening.
+func (v *demoValve) timedClose() {
+	v.mu.Lock()
+	v.expireLocked(time.Now())
+	v.closer = nil
+	v.mu.Unlock()
+	slog.Info("valve.timed_close", slog.String("device", v.name))
+	v.notify()
+}
+
 // Close implements [valve.StateSource].
 func (v *demoValve) Close(context.Context) error {
 	v.mu.Lock()
+	if v.closer != nil {
+		v.closer.Stop()
+		v.closer = nil
+	}
 	v.state = valve.StateClosed
 	v.openFor = nil
 	v.closesAt = time.Time{}
