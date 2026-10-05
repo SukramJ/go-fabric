@@ -62,7 +62,7 @@ func recordedWrite(calls []uint32, attr uint32) bool {
 // AttributeWriteResponse.ts:229-231.
 func TestWrite_ConcreteReadOnlyAttributeRejected(t *testing.T) {
 	t.Parallel()
-	srv := &recordingServer{id: 0x0006} // OnOff
+	srv := &recordingServer{id: 0x0006, attrs: []uint32{0x0000}} // OnOff
 	ep := &Endpoint{ID: 2, Source: recordingSource{srv: srv}}
 	d := NewTopologyDispatcher(makeTopology(ep))
 
@@ -83,7 +83,7 @@ func TestWrite_ConcreteReadOnlyAttributeRejected(t *testing.T) {
 // dispatched to the cluster server and reported successful.
 func TestWrite_ConcreteWritableAttributeProceeds(t *testing.T) {
 	t.Parallel()
-	srv := &recordingServer{id: 0x0006}
+	srv := &recordingServer{id: 0x0006, attrs: []uint32{0x4001}}
 	ep := &Endpoint{ID: 2, Source: recordingSource{srv: srv}}
 	d := NewTopologyDispatcher(makeTopology(ep))
 
@@ -169,5 +169,25 @@ func TestWrite_WildcardEndpointSkipsReadOnlyAttributeSilently(t *testing.T) {
 	}
 	if len(srvA.writeCalls) != 0 || len(srvB.writeCalls) != 0 {
 		t.Errorf("read-only write reached a cluster server; calls=%v %v", srvA.writeCalls, srvB.writeCalls)
+	}
+}
+
+// TestWrite_UnlistedAttributeIsUnsupportedAttribute verifies a concrete write
+// to an attribute the cluster does not list answers UNSUPPORTED_ATTRIBUTE
+// and never reaches the server — before, and regardless of, its schema
+// writability (matter.js AttributeWriteResponse.ts:225-231). OnTime is
+// schema-writable; this server simply does not implement it. Found by the
+// CHIP Python harness (TC-IDM-3.2 step 3).
+func TestWrite_UnlistedAttributeIsUnsupportedAttribute(t *testing.T) {
+	t.Parallel()
+	srv := &recordingServer{id: 0x0006, attrs: []uint32{0x0000}}
+	ep := &Endpoint{ID: 2, Source: recordingSource{srv: srv}}
+	d := NewTopologyDispatcher(makeTopology(ep))
+	results := d.Write(context.Background(), concreteAttrPath(2, 0x0006, 0x4001), im.AttributeValue{Value: uint16(5)})
+	if len(results) != 1 || results[0].Status != im.StatusUnsupportedAttribute {
+		t.Fatalf("results = %+v, want one UNSUPPORTED_ATTRIBUTE", results)
+	}
+	if len(srv.writeCalls) != 0 {
+		t.Errorf("the write reached the server: %v", srv.writeCalls)
 	}
 }

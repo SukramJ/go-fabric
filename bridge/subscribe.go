@@ -767,6 +767,7 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 }
 
 func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byte) (uint32, error) {
+	b.load.imSent.Add(1)
 	b.mu.RLock()
 	listener := b.listener
 	sessions := b.sessions

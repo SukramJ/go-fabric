@@ -12,6 +12,22 @@ pseudo-version of `main`.
 
 ### Added
 
+- `cluster/core` GeneralDiagnostics: `EnableTestEventTriggers(key, handler)`
+  arms TestEventTrigger with a 16-byte test enable key and a host handler
+  (`TestEventTriggerHandler`, `TestEventTriggerRequest`,
+  `TestEnableKeySize`), as matter.js's `deviceTestEnableKey` does; the
+  DataModelTest (DMTEST) feature with PayloadTestRequest / Response
+  (`PayloadTestResponse`), mandatory above a MaxPathsPerInvoke of one; and
+  DeviceLoadStatus (0x000A, `DeviceLoadStruct`, `SetDeviceLoadProvider`),
+  mandatory at cluster revision 3 — `bridge.AttachRootClusters` wires the
+  bridge's own counters into it (`Bridge.DeviceLoad`).
+- `bridge.DefaultSessionParameters`: what Sigma2 advertises when the host
+  sets nothing — matter.js `SessionParameters.defaults`, with the module's
+  revisions, SpecificationVersion and MaxPathsPerInvoke.
+  `sigma.Responder.SessionParameters` reads a responder's own.
+- `schema.IsFabricScopedInvoke`: the commands matter.js marks fabric-scoped.
+- `im.WithTimedInteraction` / `im.TimedInteractionFromContext`.
+
 - `contract.AttributeChangeNotifier`: a bridged cluster server that keeps
   its own attribute state names the attributes that moved, and the bridge
   advances the cluster's DataVersion and marks just those dirty for
@@ -296,6 +312,47 @@ pseudo-version of `main`.
   a failed Sigma2.
 
 ### Fixed
+
+- **Found by the CHIP Python certification harness** (`internal/chiptool`,
+  run in matter.js's CHIP image against the reference daemon):
+  - A command a cluster changed state with was never reported to
+    subscribers unless the server fired a change notification of its own,
+    and none of the root servers does: Breadcrumb after ArmFailSafe,
+    Fabrics after AddNOC. The bridge now compares the invoked cluster's
+    attributes before and after the command and reports what moved, as
+    matter.js's Datasource does (TC-IDM-1.5).
+  - A successful write was not reported to subscribers either: writing
+    BasicInformation.NodeLabel never reached a subscription to it. Written
+    attributes are now marked dirty (TC-IDM-2.3).
+  - A write to an attribute the cluster does not implement answered
+    UNSUPPORTED_WRITE (or reached the server); it now answers
+    UNSUPPORTED_ATTRIBUTE before writability is considered, as matter.js
+    AttributeWriteResponse.ts does (TC-IDM-3.2).
+  - AdministratorCommissioning.OpenCommissioningWindow had no field decoder,
+    so every controller's enhanced commissioning window — the multi-admin
+    "share" — answered INVALID_COMMAND. It is decoded now (TC-IDM-1.2).
+  - A fabric-scoped command on a session without an accessing fabric (PASE
+    before AddNOC) reached the server; it now answers UNSUPPORTED_ACCESS
+    (matter.js CommandInvokeResponse.ts:287, TC-IDM-1.2).
+  - An InvokeRequest or WriteRequest whose Timed flag is set without a
+    preceding TimedRequest answered NEEDS_TIMED_INTERACTION; matter.js
+    answers TIMED_REQUEST_MISMATCH. A timed-required command outside a timed
+    interaction now answers NEEDS_TIMED_INTERACTION for its own path in the
+    InvokeResponse instead of failing the whole interaction (TC-IDM-1.2).
+  - Sigma2 carried no session parameters, so a controller assumed
+    MaxPathsPerInvoke 1 against a device whose BasicInformation says 10
+    (TC-IDM-1.4).
+  - The root Descriptor and AdministratorCommissioning had no DataVersion
+    and answered every read with the sentinel, which a DataVersionFilter
+    never matches. Both now derive one from their content (TC-IDM-2.2).
+  - BasicInformation.CapabilityMinima lacked the four fields revision 6
+    makes mandatory; they default to matter.js's 20 (TC-IDM-2.3).
+  - GeneralDiagnostics TimeSnapshot answered under its request's command id
+    with an empty struct; the response is encoded now, with PosixTimeMs
+    null as matter.js reports it without TimeSynchronization.
+  - LevelControl lacked MinLevel / MaxLevel (conformance "Rev >= v7"), and
+    the CT ColorControl lacked RemainingTime, which ColorTemperatureLight
+    requires (TC-IDM-10.2).
 
 - **Found by the chip-tool data-model sweep** (`internal/chiptool`,
   which holds every cluster a real controller reads against its own global

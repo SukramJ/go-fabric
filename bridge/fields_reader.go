@@ -56,6 +56,10 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 		case 0x0B:
 			return decodeAddTrustedRootCertificateRequest(dec)
 		}
+	case administratorCommissioningClusterID:
+		if path.Command == 0x00 { // OpenCommissioningWindow
+			return decodeOpenCommissioningWindowRequest(dec)
+		}
 	case mattercore.GroupsClusterID, 0x003F: // Groups, GroupKeyManagement
 		if fields, ok, err := groupCommandFieldsReader(path, dec); ok {
 			return fields, err
@@ -662,6 +666,10 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 		ent.Path.Command = 0x05
 	case mattercore.LeaveGroupResponse:
 		ent.Path.Command = 0x02
+	case mattercore.TimeSnapshotResponse:
+		ent.Path.Command = 0x02 // GeneralDiagnostics TimeSnapshotResponse
+	case mattercore.PayloadTestResponse:
+		ent.Path.Command = 0x04 // GeneralDiagnostics PayloadTestResponse
 	case wire.OperationalCommandResponse:
 		ent.Path.Command = wire.OperationalStateCmdOperationalCommandResponse
 	case wire.ChangeToModeResponse:

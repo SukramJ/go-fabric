@@ -15,7 +15,6 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
@@ -376,6 +375,7 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 		writeCtx = im.WithAuthModePASE(writeCtx)
 	}
 	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
+	b.reportWrittenAttributes(resp)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
 	// initiator opts out of the WriteResponse the server MUST
 	// elide it. matter.js InteractionServer.ts and chip
@@ -431,37 +431,15 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 	return nil
 }
 
-// anyTimedRequiredInvoke reports whether any command in req targets a
-// timed-required (cluster, command) pair per matter.js (schema.IsTimedInvoke).
-// A batched invoke is timed-required as a whole if any of its commands is.
-func anyTimedRequiredInvoke(req im.InvokeRequest) bool {
-	for i := range req.Invokes {
-		p := req.Invokes[i].Path
-		if schema.IsTimedInvoke(p.Cluster, p.Command) {
-			return true
-		}
-	}
-	return false
-}
-
-// dispatchInvokeRequest handles a decoded InvokeRequest. The TLV decode and
-// dispatcher nil-check are done by the caller (handleIMOpcode).
-//
-// Server-side timed-required conformance: a command marked "T" in the matter.js
-// model (schema.IsTimedInvoke) must be invoked inside a valid timed window even
-// when the controller left the InvokeRequest's own Timed flag clear. Folding it
-// into the gate flag makes a timed-required command with no window yield
-// NEEDS_TIMED_INTERACTION, mirroring matter.js CommandInvokeResponse.ts:266
-// `if (limits.timed && !this.session.timed)`. For a non-timed command the flag
-// is unchanged, so the existing flag-vs-window mismatch handling is preserved.
+// Timed interactions, as matter.js splits them: the interaction-level gate
+// compares the request's own Timed flag with the exchange's timed window
+// (a mismatch either way is TIMED_REQUEST_MISMATCH, an expired window
+// TIMEOUT — InteractionServer.ts:940-950), and a command marked "T" in the
+// matter.js model (schema.IsTimedInvoke) invoked outside a timed interaction
+// answers NEEDS_TIMED_INTERACTION for its own path in the InvokeResponse
+// (CommandInvokeResponse.ts:291), via [im.WithTimedInteraction].
 func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.InvokeRequest) error {
-	// Server-side timed-required conformance: a command marked "T" in the
-	// matter.js model (schema.IsTimedInvoke) must be invoked inside a valid
-	// timed window even when the controller left the InvokeRequest's own Timed
-	// flag clear. Fold it into the gate flag so a timed-required command with no
-	// window yields NEEDS_TIMED_INTERACTION. Mirrors matter.js
-	// CommandInvokeResponse.ts:266 `if (limits.timed && !this.session.timed)`.
-	if status, gated := b.checkTimedGate(req.TimedRequest || anyTimedRequiredInvoke(req), requestHdr.SessionID, proto.ExchangeID); gated {
+	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
 		return b.replyTimedStatus(src, requestHdr, proto, "invoke", status)
 	}
 	// Batch-invoke path validation: a malformed batch (wildcard-endpoint path
@@ -509,7 +487,11 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 	// the session that issued the CSRRequest (matter.js
 	// OperationalCredentialsServer.ts session-ID binding guard).
 	invokeCtx = core.WithInvokeSessionID(invokeCtx, requestHdr.SessionID)
+	// The gate above passed, so a set Timed flag means a valid window.
+	invokeCtx = im.WithTimedInteraction(invokeCtx, req.TimedRequest)
+	before := b.snapshotInvokedClusters(invokeCtx, dispatcher, req)
 	resp := im.HandleInvokeRequest(invokeCtx, dispatcher, req)
+	b.reportInvokeChanges(invokeCtx, dispatcher, before)
 	for i := range resp.Responses {
 		rewriteInvokeResponseCommand(&resp.Responses[i])
 	}
@@ -608,4 +590,109 @@ func (b *Bridge) dispatchTimedRequest(src *net.UDPAddr, requestHdr *message.Head
 		slog.String("src", srcString(src)),
 		slog.Int("timeout_ms", int(req.TimeoutMs)))
 	return nil
+}
+
+// reportWrittenAttributes marks every successfully written attribute dirty
+// for the subscriptions that cover it. (The dispatcher has already advanced
+// the cluster's DataVersion: endpoint/dispatcher.go WriteAuthorized for a
+// bridged endpoint, the server's own tracker for the root.) A write is a state change
+// like any other: matter.js commits it to the behavior's state, whose
+// Datasource advances the version and broadcasts the changed property to
+// every subscriber (Datasource.ts). Without this a subscriber learned of a
+// write — its own or another controller's — only when the cluster happened
+// to fire a change notification of its own; a root attribute such as
+// BasicInformation.NodeLabel was never reported at all. Found by the CHIP
+// Python harness (TC-IDM-2.3 step 4).
+func (b *Bridge) reportWrittenAttributes(resp im.WriteResponse) {
+	mgr := b.subscriptionManagerLocked()
+	for _, r := range resp.Responses {
+		if !r.Status.Status.IsSuccess() || !r.Path.HasEndpoint || !r.Path.HasCluster || !r.Path.HasAttribute {
+			continue
+		}
+		if mgr != nil {
+			mgr.OnAttributeChanged(im.ConcreteAttributePath{
+				Endpoint: r.Path.Endpoint, Cluster: r.Path.Cluster, Attribute: r.Path.Attribute,
+				HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			})
+		}
+	}
+}
+
+// invokedCluster names one cluster instance an invoke ran against.
+type invokedCluster struct {
+	endpoint uint16
+	cluster  uint32
+}
+
+// snapshotInvokedClusters renders every attribute of each cluster a
+// concrete invoke path names, before the commands run. A subscription
+// manager is required for the comparison to matter; without one this is a
+// no-op.
+func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, req im.InvokeRequest) map[invokedCluster]map[uint32]string {
+	if b.subscriptionManagerLocked() == nil {
+		return nil
+	}
+	out := map[invokedCluster]map[uint32]string{}
+	for _, inv := range req.Invokes {
+		if !inv.Path.HasEndpoint {
+			continue
+		}
+		key := invokedCluster{inv.Path.Endpoint, inv.Path.Cluster}
+		if _, done := out[key]; !done {
+			out[key] = renderCluster(ctx, d, key)
+		}
+	}
+	return out
+}
+
+// reportInvokeChanges marks dirty every attribute whose value a command
+// changed, after advancing a bridged cluster's DataVersion. A command is a
+// state change like a write: matter.js commits whatever the command handler
+// assigned to the behavior's state, and its Datasource advances the version
+// and reports the changed properties (Datasource.ts). Root servers here
+// change their state inside MatterInvoke without a change notification —
+// GeneralCommissioning's Breadcrumb on ArmFailSafe, OperationalCredentials'
+// Fabrics on AddNOC — so without this comparison no subscriber ever saw
+// those changes. Found by the CHIP Python harness (TC-IDM-1.5 subscribes to
+// Breadcrumb and arms the fail-safe).
+func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, before map[invokedCluster]map[uint32]string) {
+	mgr := b.subscriptionManagerLocked()
+	if mgr == nil || len(before) == 0 {
+		return
+	}
+	topo := b.Topology()
+	for key, old := range before {
+		now := renderCluster(ctx, d, key)
+		bumped := false
+		for attr, v := range now {
+			if attr >= 0xFFF8 {
+				continue
+			}
+			if prev, ok := old[attr]; ok && prev == v {
+				continue
+			}
+			if !bumped && topo != nil {
+				if ep := topo.FindByID(key.endpoint); ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+					ep.BumpClusterDataVersion(key.cluster)
+				}
+				bumped = true
+			}
+			mgr.OnAttributeChanged(im.ConcreteAttributePath{
+				Endpoint: key.endpoint, Cluster: key.cluster, Attribute: attr,
+				HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			})
+		}
+	}
+}
+
+// renderCluster reads every attribute of one cluster instance and renders
+// each value for comparison.
+func renderCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map[uint32]string {
+	out := map[uint32]string{}
+	for _, r := range d.Read(ctx, im.ConcreteAttributePath{Endpoint: key.endpoint, Cluster: key.cluster, HasEndpoint: true, HasCluster: true}) {
+		if r.Status == im.StatusSuccess {
+			out[r.Path.Attribute] = fmt.Sprintf("%#v", r.Value)
+		}
+	}
+	return out
 }

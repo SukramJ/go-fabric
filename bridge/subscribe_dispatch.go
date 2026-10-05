@@ -537,6 +537,7 @@ func (b *Bridge) sendSubscribeResponse(
 			subRespHdr.MessageCounter = counter
 		}
 	}
+	b.load.subscriptionsSucceeded.Add(1)
 	if err := b.sendReplyReliable(src, &subRespHdr, proto, im.OpcodeSubscribeResponse, respBody); err != nil {
 		debugReplyError(b.logger, "send_subscribe_response", src, err)
 		return err

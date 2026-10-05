@@ -265,6 +265,10 @@ func (c Config) validate() error {
 // topology / dispatcher pair is swapped atomically on [Reassemble]
 // so in-flight IM dispatches see a consistent view.
 type Bridge struct {
+	// load counts the Interaction Model traffic GeneralDiagnostics'
+	// DeviceLoadStatus reports (see device_load.go).
+	load deviceLoadCounters
+
 	cfg Config
 	// There is deliberately no endpoint.Store here. The bridge consumes an
 	// assembled topology through [Snapshotter] and never reads endpoint
@@ -1162,6 +1166,7 @@ func (b *Bridge) CommissioningWindow() *CommissioningWindow {
 // re-roll.
 func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
 	cp := append([]contract.ClusterServer(nil), servers...)
+	b.wireDeviceLoad(cp)
 	b.mu.Lock()
 	b.rootClusters = cp
 	if b.topology != nil {

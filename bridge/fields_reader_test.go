@@ -8,6 +8,7 @@ package bridge
 // Lives in package bridge to access unexported functions.
 
 import (
+	"bytes"
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -1264,5 +1265,52 @@ func TestDecodeGenericTagMap_NestedContainerDrainError(t *testing.T) {
 	_, err := decodeGenericTagMap(dec)
 	if err == nil {
 		t.Error("decodeGenericTagMap nested container drain error: want error, got nil")
+	}
+}
+
+// TestCommandFieldsReader_OpenCommissioningWindow pins the typed decode of
+// AdministratorCommissioning.OpenCommissioningWindow (matter.js
+// administrator-commissioning.element.ts tags 0-4). Before it the command
+// reached the server as a tag map and answered INVALID_COMMAND; the CHIP
+// Python harness found it (TC-IDM-1.2 step 5).
+func TestCommandFieldsReader_OpenCommissioningWindow(t *testing.T) {
+	t.Parallel()
+	verifier := bytes.Repeat([]byte{0xA5}, 97)
+	salt := bytes.Repeat([]byte{0x5A}, 16)
+	enc := tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutUint(tlv.ContextTag(0), 600)
+	enc.PutOctets(tlv.ContextTag(1), verifier)
+	enc.PutUint(tlv.ContextTag(2), 3840)
+	enc.PutUint(tlv.ContextTag(3), 10000)
+	enc.PutOctets(tlv.ContextTag(4), salt)
+	_ = enc.EndContainer()
+	raw, _ := enc.Bytes()
+	dec := tlv.NewDecoder(raw)
+	opener, _ := dec.Next()
+
+	v, err := commandFieldsReader(cmdPath(0x003C, 0x00), dec, opener)
+	if err != nil {
+		t.Fatalf("commandFieldsReader OpenCommissioningWindow: %v", err)
+	}
+	p, ok := v.(wire.OpenWindowParams)
+	if !ok {
+		t.Fatalf("expected wire.OpenWindowParams, got %T", v)
+	}
+	if p.CommissioningTimeoutSeconds != 600 || p.Discriminator != 3840 || p.Iterations != 10000 ||
+		!bytes.Equal(p.PAKEPasscodeVerifier, verifier) || !bytes.Equal(p.Salt, salt) {
+		t.Errorf("decoded %+v", p)
+	}
+
+	// Discriminator is 12 bits.
+	enc = tlv.NewEncoder()
+	enc.StartStruct(tlv.AnonymousTag())
+	enc.PutUint(tlv.ContextTag(2), 4096)
+	_ = enc.EndContainer()
+	raw, _ = enc.Bytes()
+	dec = tlv.NewDecoder(raw)
+	opener, _ = dec.Next()
+	if _, err := commandFieldsReader(cmdPath(0x003C, 0x00), dec, opener); err == nil {
+		t.Error("a 13-bit discriminator decoded")
 	}
 }

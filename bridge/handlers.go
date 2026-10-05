@@ -14,6 +14,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/im"
+
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/secure/spake2"
@@ -517,9 +520,47 @@ type CaseAdapter struct {
 type CaseSessionEstablished func(keys sigma.SessionKeys, peerSessionID uint16) error
 
 // NewCaseAdapter wraps r.
+//
+// A responder without session parameters of its own is given
+// [DefaultSessionParameters]: matter.js always answers Sigma1 with its
+// SessionParameters (CaseServer.ts:258-264 `responderSessionParams:
+// this.#sessions.sessionParameters`), and a controller that finds none
+// assumes MaxPathsPerInvoke 1 and the oldest revisions — the CHIP Python
+// harness then batches two commands into a device it believes accepts one
+// and fails TC-IDM-1.4 when the device, rightly by its own
+// BasicInformation, accepts them.
 func NewCaseAdapter(r *sigma.Responder) *CaseAdapter {
+	if r != nil && r.SessionParameters() == nil {
+		p := DefaultSessionParameters()
+		r.SetSessionParameters(&p)
+	}
 	return &CaseAdapter{responder: r}
 }
+
+// DefaultSessionParameters is what a node advertises in Sigma2 when the
+// host chose nothing: matter.js SessionParameters.defaults
+// (packages/protocol/src/session/SessionParameters.ts) — the MRP intervals
+// of SessionIntervals.defaults (idle 500 ms, active 300 ms, active
+// threshold 4000 ms), this module's DataModelRevision, Interaction Model
+// revision and SpecificationVersion, and MaxPathsPerInvoke equal to what
+// BasicInformation advertises and the invoke path enforces
+// ([im.DefaultMaxPathsPerInvoke]).
+func DefaultSessionParameters() sigma.SessionParameters {
+	return sigma.SessionParameters{
+		SessionIdleInterval:      500,
+		SessionActiveInterval:    300,
+		SessionActiveThreshold:   4000,
+		DataModelRevision:        defaultDataModelRevision,
+		InteractionModelRevision: uint16(im.MatterInteractionModelRevision),
+		SpecificationVersion:     cluster.SpecificationVersion,
+		MaxPathsPerInvoke:        im.DefaultMaxPathsPerInvoke,
+	}
+}
+
+// defaultDataModelRevision is the BasicInformation DataModelRevision the
+// root advertises by default (cluster/core NewBasicInformation: 21, matter.js
+// Specification.ts DATA_MODEL_REVISION for 1.6.x).
+const defaultDataModelRevision uint16 = 21
 
 // SetResponder swaps the underlying sigma responder. Called after
 // AddNOC installs a real fabric so subsequent CASE handshakes use the

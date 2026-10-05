@@ -391,6 +391,7 @@ func (b *Bridge) notifySessionActivity(sessionID uint16, rx bool) {
 //     matching follow-up Write/Invoke is gated against it via
 //     `Bridge.checkTimedGate` per Matter §8.7.
 func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
+	b.load.imReceived.Add(1)
 	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType) {
 	case imGateProceed:
 		// fall through to decode + dispatch below
@@ -488,7 +489,13 @@ func (b *Bridge) checkTimedGate(timedFlag bool, sessionID, exchangeID uint16) (i
 		return 0, false
 	}
 	if !ok {
-		return im.StatusNeedsTimedInteraction, true
+		// The request claims a timed interaction the exchange never
+		// opened: TIMED_REQUEST_MISMATCH, as matter.js answers
+		// `timedRequest !== exchange.hasTimedInteraction()`
+		// (InteractionServer.ts:409-412 write, :945-948 invoke). Found by
+		// the CHIP Python harness (TC-IDM-1.2 step 8), which sends exactly
+		// that.
+		return im.StatusTimedRequestMismatch, true
 	}
 	deadline, isTime := raw.(time.Time)
 	if !isTime || time.Now().After(deadline) {

@@ -132,6 +132,9 @@ func (b *Bridge) sendReplyOpts(
 	responsePayload []byte,
 	reliable bool,
 ) error {
+	if requestProto.ProtocolID == im.InteractionModelProtocolID {
+		b.load.imSent.Add(1)
+	}
 	b.mu.RLock()
 	listener := b.listener
 	sessions := b.sessions
@@ -614,9 +617,28 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 	case mattercore.CapabilityMinimaStruct:
 		// BasicInformation attribute 0x0013 (Matter §11.1.5.20). Two
 		// uint16 fields under context tags 0 / 1.
+		// Tags 2-5 are the rev-6 fields (basic-information.element.ts:
+		// 173-184); BasicInformation fills them with matter.js's defaults.
 		enc.StartStruct(tag)
 		enc.PutUint16(tlv.ContextTag(0), x.CaseSessionsPerFabric)
 		enc.PutUint16(tlv.ContextTag(1), x.SubscriptionsPerFabric)
+		for i, v := range []uint16{x.SimultaneousInvocationsSupported, x.SimultaneousWritesSupported, x.ReadPathsSupported, x.SubscribePathsSupported} {
+			if v != 0 {
+				enc.PutUint16(tlv.ContextTag(uint8(2+i)), v) //nolint:gosec // i < 4
+			}
+		}
+		_ = enc.EndContainer()
+	case mattercore.DeviceLoadStruct:
+		// GeneralDiagnostics DeviceLoadStatus (general-diagnostics.element.ts
+		// :202-207): two uint16 then three uint32 fields, tags 0-4, each at
+		// its smallest TLV width as matter.js's TlvUInt16 / TlvUInt32 write
+		// them.
+		enc.StartStruct(tag)
+		enc.PutUint(tlv.ContextTag(0), uint64(x.CurrentSubscriptions))
+		enc.PutUint(tlv.ContextTag(1), uint64(x.CurrentSubscriptionsForFabric))
+		enc.PutUint(tlv.ContextTag(2), uint64(x.TotalSubscriptionsEstablished))
+		enc.PutUint(tlv.ContextTag(3), uint64(x.TotalInteractionModelMessagesSent))
+		enc.PutUint(tlv.ContextTag(4), uint64(x.TotalInteractionModelMessagesReceived))
 		_ = enc.EndContainer()
 	case mattercore.ProductAppearanceStruct:
 		// BasicInformation attribute 0x0014. Finish (tag 0) is a plain
@@ -1359,6 +1381,22 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
 			enc.PutUint(tlv.AnonymousTag(), uint64(id))
 		}
 		_ = enc.EndContainer()
+		_ = enc.EndContainer()
+	case mattercore.TimeSnapshotResponse:
+		// TimeSnapshotResponse (general-diagnostics.element.ts:103-105):
+		// [0] SystemTimeMs systime-ms, [1] PosixTimeMs posix-ms nullable.
+		enc.StartStruct(tag)
+		enc.PutUint(tlv.ContextTag(0), x.SystemTimeMs)
+		if x.PosixTimeMs != nil {
+			enc.PutUint(tlv.ContextTag(1), *x.PosixTimeMs)
+		} else {
+			enc.PutNull(tlv.ContextTag(1))
+		}
+		_ = enc.EndContainer()
+	case mattercore.PayloadTestResponse:
+		// PayloadTestResponse (element :119): [0] Payload octets.
+		enc.StartStruct(tag)
+		enc.PutOctets(tlv.ContextTag(0), x.Payload)
 		_ = enc.EndContainer()
 	default:
 		if encodeGroupsResponse(enc, tag, v) || encodeGroupcastResponse(enc, tag, v) || encodeApplicationResponse(enc, tag, v) {

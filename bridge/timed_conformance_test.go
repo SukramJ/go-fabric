@@ -3,12 +3,11 @@
 
 package bridge
 
-// White-box tests for the timed-required-invoke conformance path added
-// in receive_dispatch.go: anyTimedRequiredInvoke (the batched-invoke
-// scan) and its composition with dispatchInvokeRequest's checkTimedGate
-// call. This file lives in package bridge so it can call the unexported
-// helper and construct a bare Bridge directly, matching the style of
-// receive_test.go's checkTimedGate unit tests.
+// White-box tests for the timed-required-invoke conformance path in
+// receive_dispatch.go: a timed-required command outside a timed interaction
+// answers NEEDS_TIMED_INTERACTION for its own path. This file lives in
+// package bridge so it can construct a bare Bridge directly, matching the
+// style of receive_test.go's checkTimedGate unit tests.
 
 import (
 	"context"
@@ -20,63 +19,6 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
-
-// ─── anyTimedRequiredInvoke ───────────────────────────────────────────────
-
-// TestAnyTimedRequiredInvoke covers the batched-invoke scan that folds
-// into dispatchInvokeRequest's timed gate: a request is timed-required
-// as a whole if any one of its commands is (schema.IsTimedInvoke).
-func TestAnyTimedRequiredInvoke(t *testing.T) {
-	t.Parallel()
-
-	openCommissioningWindow := im.ConcreteCommandPath{
-		Cluster: 0x003C, Command: 0x0, HasCluster: true, HasCommand: true,
-	}
-	onOffOn := im.ConcreteCommandPath{
-		Cluster: 0x0006, Command: 0x0, HasCluster: true, HasCommand: true,
-	}
-
-	cases := []struct {
-		name string
-		req  im.InvokeRequest
-		want bool
-	}{
-		{
-			name: "single timed-required command",
-			req:  im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: openCommissioningWindow}}},
-			want: true,
-		},
-		{
-			name: "single non-timed command",
-			req:  im.InvokeRequest{Invokes: []im.CommandInvocation{{Path: onOffOn}}},
-			want: false,
-		},
-		{
-			name: "empty invokes",
-			req:  im.InvokeRequest{},
-			want: false,
-		},
-		{
-			name: "batched: non-timed then timed-required",
-			req: im.InvokeRequest{Invokes: []im.CommandInvocation{
-				{Path: onOffOn},
-				{Path: openCommissioningWindow},
-			}},
-			want: true,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if got := anyTimedRequiredInvoke(tc.req); got != tc.want {
-				t.Errorf("anyTimedRequiredInvoke(%+v) = %v, want %v", tc.req, got, tc.want)
-			}
-		})
-	}
-}
-
-// ─── dispatch-level composition ───────────────────────────────────────────
 
 // encodeTimedTestInvokeRequest encodes a minimal InvokeRequestMessage
 // carrying one CommandDataIB per path, with no CommandFields — the
@@ -134,14 +76,14 @@ func decodeStatusResponseCode(t *testing.T, body []byte) im.StatusCode {
 
 // TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction
 // drives a real Bridge.dispatch with an OpenCommissioningWindow InvokeRequest
-// whose own TimedRequest flag is clear and with no preceding TimedRequest
-// registered, and asserts the wire reply is a StatusResponse carrying
-// NEEDS_TIMED_INTERACTION (0xC6). This exercises the full composition added
-// to dispatchInvokeRequest: anyTimedRequiredInvoke(req) || req.TimedRequest
-// feeding checkTimedGate. Uses SessionID=0 (unsecured), matching
-// TestDispatch_IMReadRoutes's precedent, so no CASE session pair is needed —
-// the reply is captured on a real loopback UDP socket instead of only
-// asserting a nil dispatch error.
+// whose own TimedRequest flag is clear and with no preceding TimedRequest,
+// and asserts the reply is an InvokeResponse whose entry for that path
+// carries NEEDS_TIMED_INTERACTION (0xC6) — matter.js answers it per path
+// (CommandInvokeResponse.ts:291 `limits.timed && !this.session.timed`), not
+// with an interaction-level StatusResponse, which matter.js reserves for a
+// Timed flag that disagrees with the exchange (TIMED_REQUEST_MISMATCH).
+// Uses SessionID=0 (unsecured), matching TestDispatch_IMReadRoutes's
+// precedent, so no CASE session pair is needed.
 func TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridge(t)
@@ -176,23 +118,52 @@ func TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction(
 	}
 	got := rbuf[:n]
 
-	rhdr, hdrLen, err := message.UnmarshalHeader(got)
+	_, hdrLen, err := message.UnmarshalHeader(got)
 	if err != nil {
 		t.Fatalf("UnmarshalHeader: %v", err)
-	}
-	if rhdr.SessionID != 0 {
-		t.Fatalf("reply SessionID = %d, want 0 (unsecured)", rhdr.SessionID)
 	}
 	rproto, protoLen, err := message.UnmarshalProtocolHeader(got[hdrLen:])
 	if err != nil {
 		t.Fatalf("UnmarshalProtocolHeader: %v", err)
 	}
-	if rproto.Opcode != im.OpcodeStatusResponse {
-		t.Fatalf("reply opcode = 0x%02X, want StatusResponse (0x%02X)", rproto.Opcode, im.OpcodeStatusResponse)
+	if rproto.Opcode != im.OpcodeInvokeResponse {
+		t.Fatalf("reply opcode = 0x%02X, want InvokeResponse (0x%02X)", rproto.Opcode, im.OpcodeInvokeResponse)
 	}
+	if status, found := firstStatusIBCode(t, got[hdrLen+protoLen:]); !found || status != im.StatusNeedsTimedInteraction {
+		t.Errorf("path status = %v (found %v), want StatusNeedsTimedInteraction (0xC6)", status, found)
+	}
+}
 
-	status := decodeStatusResponseCode(t, got[hdrLen+protoLen:])
-	if status != im.StatusNeedsTimedInteraction {
-		t.Errorf("StatusResponse status = %v, want StatusNeedsTimedInteraction (0xC6)", status)
+// firstStatusIBCode returns the Status of the first StatusIB in an
+// InvokeResponseMessage: InvokeResponses (tag 1) → InvokeResponseIB →
+// CommandStatusIB (tag 1) → StatusIB (tag 1) → Status (tag 0).
+func firstStatusIBCode(t *testing.T, body []byte) (im.StatusCode, bool) {
+	t.Helper()
+	dec := tlv.NewDecoder(body)
+	var stack []uint64
+	for {
+		el, err := dec.Next()
+		if err != nil {
+			return 0, false
+		}
+		if el.IsEndContainer {
+			if len(stack) == 0 {
+				return 0, false
+			}
+			stack = stack[:len(stack)-1]
+			continue
+		}
+		tag := uint64(0xFFFF)
+		if el.Tag.Kind == tlv.TagKindContext {
+			tag = uint64(el.Tag.Number)
+		}
+		if el.IsContainer {
+			stack = append(stack, tag)
+			continue
+		}
+		// [anon, 1(array), anon(InvokeResponseIB), 1(CommandStatusIB), 1(StatusIB)] → tag 0
+		if tag == 0 && len(stack) == 5 && stack[1] == 1 && stack[3] == 1 && stack[4] == 1 {
+			return im.StatusCode(el.Uint), true
+		}
 	}
 }

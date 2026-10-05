@@ -273,6 +273,19 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// `if (!attribute.limits.writable) return;`). Attributes with
 				// no read-only record — globals, writable attrs, clusters
 				// outside the table (known == false) — fall through unchanged.
+				// An attribute the cluster does not implement answers
+				// UNSUPPORTED_ATTRIBUTE before its writability is
+				// considered — matter.js AttributeWriteResponse.ts:225-226
+				// (`if (!attribute) … Status.UnsupportedAttribute`), ahead of
+				// the UnsupportedWrite check at :229-231. Found by the CHIP
+				// Python harness (TC-IDM-3.2 step 3 writes a spec attribute
+				// the DUT does not list).
+				if path.HasAttribute && !attributeListed(srv, attrID) {
+					if !wildcardEndpoint {
+						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedAttribute})
+					}
+					continue
+				}
 				if writable, known := schema.AttributeWritable(cPath.Cluster, attrID); known && !writable {
 					// "Concrete" means endpoint AND cluster AND attribute are
 					// all named — the split matter.js makes before it picks a
@@ -643,6 +656,31 @@ func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool)
 		return nil, false
 	}
 	return nil, false
+}
+
+// attributeListed reports whether attrID is one of the attributes srv
+// implements, by the same AttributeList a controller reads: the server's
+// own when it answers one, the dispatcher's synthesis otherwise.
+//
+// A server that neither answers AttributeList nor implements
+// [contract.ClusterAttributeLister] declares no attribute set to check
+// against (the synthesis would fall back to its reportable list), so its
+// writes reach it as before.
+func attributeListed(srv contract.ClusterServer, attrID uint32) bool {
+	list, ok := srv.MatterRead(cluster.AttrGlobalAttributeList)
+	if !ok {
+		if _, lister := srv.(contract.ClusterAttributeLister); !lister {
+			return true
+		}
+		list, ok = synthesizeGlobalRead(srv, cluster.AttrGlobalAttributeList)
+	}
+	ids, isList := list.([]uint32)
+	if !ok || !isList {
+		// A server whose AttributeList is not a plain id list keeps the
+		// previous behaviour: the write reaches it.
+		return true
+	}
+	return slices.Contains(ids, attrID)
 }
 
 // writeOne dispatches a single Write against srv. Errors are mapped

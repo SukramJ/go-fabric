@@ -430,8 +430,8 @@ func TestHandleWriteRequest_RejectsWildcardAttributePath(t *testing.T) {
 // location and returns without a status on denial).
 func TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint(t *testing.T) {
 	t.Parallel()
-	rootSrv := &recordingServer{id: plainClusterID}
-	bridgedSrv := &recordingServer{id: plainClusterID}
+	rootSrv := &recordingServer{id: plainClusterID, attrs: []uint32{0x0012}}
+	bridgedSrv := &recordingServer{id: plainClusterID, attrs: []uint32{0x0012}}
 	topo := &Topology{
 		Endpoints: []*Endpoint{
 			rootEndpointWith(rootSrv),

@@ -126,3 +126,25 @@ func IsPASEFromContext(ctx context.Context) bool {
 	_, ok := ctx.Value(authModePASECtxKey{}).(authModePASEContext)
 	return ok
 }
+
+// timedCtxKey carries whether an Invoke runs inside a valid timed
+// interaction.
+type timedCtxKey struct{}
+
+// WithTimedInteraction stamps whether the request runs inside a valid
+// timed interaction (a TimedRequest preceded it on the exchange and its
+// window has not expired). The transport stamps it once the timed gate has
+// passed; [HandleInvokeRequest] then answers a timed-required command
+// outside one with NeedsTimedInteraction for that path — matter.js
+// CommandInvokeResponse.ts:291 `limits.timed && !this.session.timed`.
+func WithTimedInteraction(ctx context.Context, timed bool) context.Context {
+	return context.WithValue(ctx, timedCtxKey{}, timed)
+}
+
+// TimedInteractionFromContext reports the stamp of [WithTimedInteraction];
+// known is false when the caller stamped nothing, in which case the
+// per-command timed check is the caller's.
+func TimedInteractionFromContext(ctx context.Context) (timed, known bool) {
+	timed, known = ctx.Value(timedCtxKey{}).(bool)
+	return timed, known
+}
