@@ -257,3 +257,29 @@ func TestCaseIdentitiesResolveAndForget(t *testing.T) {
 		t.Fatal("forgetting an unknown fabric reported one")
 	}
 }
+
+// TestRebootCountCountsBoots: RebootCount is 0 on a database's first boot
+// and one more on each boot after (matter.js GeneralDiagnosticsServer.ts;
+// TC-DGGEN-2.1).
+func TestRebootCountCountsBoots(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	st := store.New(db)
+	for want := uint16(0); want < 3; want++ {
+		got, err := countBoot(ctx, st)
+		if err != nil || got != want {
+			t.Fatalf("boot %d: RebootCount = %d, %v", want, got, err)
+		}
+	}
+	if err := st.SetSetting(ctx, rebootCountSetting, "not a number"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := countBoot(ctx, st); err == nil {
+		t.Fatal("a corrupt reboot count was accepted")
+	}
+}

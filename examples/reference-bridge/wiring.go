@@ -11,7 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -101,6 +103,11 @@ func buildRootClusters(
 	}
 	refs.basicInfo = basicInfo
 	refs.genDiag = mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
+	reboots, err := countBoot(context.Background(), st)
+	if err != nil {
+		return nil, refs, fmt.Errorf("general diagnostics: %w", err)
+	}
+	refs.genDiag.SetPersistedCounters(reboots, 0)
 
 	generalCom, err := mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
 		LocationCapability:           mattercore.RegulatoryIndoor,
@@ -832,4 +839,32 @@ type rejectingVerifier struct{}
 // VerifyAndExtractPubKey implements [sigma.PeerVerifier].
 func (rejectingVerifier) VerifyAndExtractPubKey(_, _ []byte) (*ecdsa.PublicKey, error) {
 	return nil, errors.New("no fabric installed yet: commission the bridge before opening a CASE session")
+}
+
+// rebootCountSetting is the settings key the daemon keeps RebootCount
+// under.
+const rebootCountSetting = "gendiag.reboot_count"
+
+// countBoot returns this boot's RebootCount and persists it: 0 on the
+// first boot of a database, one more on every boot after — matter.js
+// GeneralDiagnosticsServer.ts initialize() (rebootCount undefined → 0,
+// else ++). A factory reset starts a fresh database and so counts from 0
+// again. TC-DGGEN-2.1 reads it across a reboot.
+func countBoot(ctx context.Context, st *store.Store) (uint16, error) {
+	raw, ok, err := st.GetSetting(ctx, rebootCountSetting)
+	if err != nil {
+		return 0, err
+	}
+	var count uint16
+	if ok {
+		prev, perr := strconv.ParseUint(raw, 10, 16)
+		if perr != nil {
+			return 0, fmt.Errorf("%s %q: %w", rebootCountSetting, raw, perr)
+		}
+		count = uint16(min(prev+1, math.MaxUint16))
+	}
+	if err := st.SetSetting(ctx, rebootCountSetting, strconv.FormatUint(uint64(count), 10)); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
