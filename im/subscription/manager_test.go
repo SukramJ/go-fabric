@@ -1616,3 +1616,86 @@ func TestPrimingSubscriptionStaysSilent(t *testing.T) {
 		t.Errorf("%d reports after EndPriming, want the queued change", reports)
 	}
 }
+
+// TestStart_SlowReportDoesNotStallOthers pins the per-subscription report
+// independence of matter.js ServerSubscription (#triggerSendUpdate /
+// #currentUpdatePromise): while one subscription's report is held on the
+// wire, another subscription's changes still go out, and the held one is
+// not re-entered — its newer change waits until its report completes.
+func TestStart_SlowReportDoesNotStallOthers(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		const tick = 10 * time.Millisecond
+		release := make(chan struct{})
+		calls := make(chan uint32, 16)
+		var slowID uint32
+		var mu sync.Mutex
+		reporter := func(_ context.Context, sub *subscription.Subscription, paths []im.ConcreteAttributePath) {
+			if len(paths) == 0 {
+				return
+			}
+			calls <- sub.ID
+			mu.Lock()
+			slow := sub.ID == slowID
+			mu.Unlock()
+			if slow {
+				<-release
+			}
+		}
+		m := newManager(subscription.Config{TickInterval: tick, MinIntervalFloorSeconds: 1}, reporter)
+		slowArgs := defaultArgs()
+		slowArgs.AttributePaths = []im.ConcreteAttributePath{mkPath(1, 6, 0)}
+		slowSub, err := m.Subscribe(slowArgs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mu.Lock()
+		slowID = slowSub.ID
+		mu.Unlock()
+		fastArgs := defaultArgs()
+		fastArgs.SessionID = 2
+		fastArgs.AttributePaths = []im.ConcreteAttributePath{mkPath(2, 6, 0)}
+		fastSub, err := m.Subscribe(fastArgs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.Start(context.Background())
+		defer m.Stop()
+
+		time.Sleep(2 * time.Second)
+		m.OnAttributeChanged(mkPath(1, 6, 0))
+		time.Sleep(2 * tick)
+		synctest.Wait()
+		if got := <-calls; got != slowSub.ID {
+			t.Fatalf("first report for %d, want the slow subscription %d", got, slowSub.ID)
+		}
+		// The slow report is held; the other subscription still reports.
+		m.OnAttributeChanged(mkPath(2, 6, 0))
+		m.OnAttributeChanged(mkPath(1, 6, 0))
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		select {
+		case got := <-calls:
+			if got != fastSub.ID {
+				t.Fatalf("report for %d while the slow one is held, want %d (and no re-entry)", got, fastSub.ID)
+			}
+		default:
+			t.Fatal("a held report stalled another subscription's report")
+		}
+		select {
+		case got := <-calls:
+			t.Fatalf("unexpected report for %d while the slow one is held", got)
+		default:
+		}
+		close(release)
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		select {
+		case got := <-calls:
+			if got != slowSub.ID {
+				t.Fatalf("after release: report for %d, want the queued slow change", got)
+			}
+		default:
+			t.Fatal("the change queued behind the held report never went out")
+		}
+	})
+}

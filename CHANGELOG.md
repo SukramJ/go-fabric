@@ -336,6 +336,11 @@ pseudo-version of `main`.
     REPLACE-ALL with the leading members and ListIndex=null appends, as
     matter.js's `chunkAttributePayload` and chip's report engine do
     (`tlv.SplitArrayMembers`, `tlv.Encoder.PutRawElement`; TC-S-2.6).
+  - One subscription whose peer was slow to answer a report chunk held up
+    every other subscription's reports until it timed out. Each
+    subscription now reports on its own, and a subscription whose report is
+    still on the wire is not re-entered — its changes wait for the next
+    one — as matter.js's ServerSubscription does (TC-S-2.6).
   - A command a cluster changed state with was never reported to
     subscribers unless the server fired a change notification of its own,
     and none of the root servers does: Breadcrumb after ArmFailSafe,

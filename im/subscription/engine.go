@@ -5,6 +5,7 @@ package subscription
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
@@ -50,84 +51,118 @@ func (m *Manager) run(ctx context.Context) {
 	}
 }
 
-// tick walks every subscription once. Public for tests that want to
-// drive the engine deterministically without waiting for the timer.
-func (m *Manager) tick(ctx context.Context, now time.Time) {
+// tick walks every subscription once and starts, for each that has
+// something due, its report on a goroutine of its own, returning the
+// group of the reports it started. A subscription whose previous report
+// is still on the wire is skipped — its changes stay queued for the next
+// tick — so one peer that is slow to answer a chunk holds up only its own
+// subscription, never the others: matter.js gives every
+// ServerSubscription its own update promise
+// (packages/node/src/node/server/ServerSubscription.ts #triggerSendUpdate
+// / #currentUpdatePromise), and chip's ReportingEngine serves each
+// ReadHandler on its own exchange. Before this, the reporter ran inline
+// and a single chunk handshake waiting out its timeout stalled every
+// other subscription's reports for that long (the CHIP harness lost its
+// FabricSceneInfo reports to TC-S-2.6 that way).
+func (m *Manager) tick(ctx context.Context, now time.Time) *sync.WaitGroup {
 	m.mu.RLock()
 	eventReporter := m.eventReporter
 	m.mu.RUnlock()
 
+	started := &sync.WaitGroup{}
 	for _, sub := range m.snapshot() {
 		if sub.IsClosed() || sub.isPriming() {
 			continue
 		}
-		// Pending events drain whenever MinInterval has elapsed —
-		// Critical priority bypasses the gate inside the subscription.
-		// Drains BEFORE attribute dirty so urgent events do not wait
-		// behind a value sweep.
-		//
-		// After an event drain the same-tick dirty drain is explicitly
-		// skipped. drainEventsIfElapsed stamps lastReport=now,
-		// which makes drainDirtyIfElapsed return nil (0 < MinIntervalFloor)
-		// for floor>0, but the skip-flag makes the intent unambiguous and
-		// prevents a double-report when floor=0 (degenerate subscription
-		// created outside the manager). Apple Home's duplicate-suppression
-		// heuristic rejects two consecutive ReportData frames in the same
-		// 250 ms window regardless of which path produced them.
-		// matter.js ref: ServerSubscription.ts — events and dirty attrs
-		// are merged into a single ReportData per send cycle.
-		eventDrained := false
-		if events := sub.drainEventsIfElapsed(now); len(events) > 0 {
-			eventDrained = true
-			if eventReporter != nil {
-				out := make([]im.EventReport, 0, len(events))
-				for _, ev := range events {
-					ts := ev.Timestamp
-					if ts == 0 {
-						ts = uint64(now.UnixMilli()) //nolint:gosec // millis fit uint64; see #20
-					}
-					out = append(out, im.EventReport{
-						Path:      ev.Path,
-						Number:    ev.Number,
-						Priority:  ev.Priority,
-						Timestamp: ts,
-						Data:      ev.Data,
-					})
-				}
-				eventReporter(ctx, sub, out)
-			}
-		}
-		// Dirty-path report fires when MinInterval has elapsed, but only
-		// when no event report fired in the same tick. The
-		// lastReport stamp inside drainEventsIfElapsed already prevents
-		// drainDirtyIfElapsed from firing when floor>0; the explicit
-		// eventDrained guard closes the degenerate floor=0 case and
-		// makes the intent unambiguous at code-review time.
-		if dirty := sub.drainDirtyIfElapsed(now); !eventDrained && len(dirty) > 0 {
-			if m.reporter != nil {
-				m.reporter(ctx, sub, dirty)
-			}
+		if !sub.reporting.CompareAndSwap(false, true) {
 			continue
 		}
-		// Keep-alive: nothing dirty, but the publisher-side heartbeat
-		// cadence (≈ matter.js sendInterval; see
-		// [Subscription.heartbeatIntervalElapsed]) has elapsed. Apple
-		// Home's MTRDevice and chip-tool's ReadClient both drop the
-		// subscription after an internal timer that fires *well before*
-		// `MaxIntervalCeiling` would — so heartbeats must ride at the
-		// faster matter.js-style cadence computed by
-		// [Subscription.sendIntervalLocked], not at the spec-only
-		// `MaxIntervalCeiling`.
-		if sub.heartbeatIntervalElapsed(now) {
-			sub.touchLastReport(now)
-			if m.reporter != nil {
-				m.reporter(ctx, sub, nil)
-			}
+		work := m.dueReport(ctx, sub, now, eventReporter)
+		if work == nil {
+			sub.reporting.Store(false)
+			continue
 		}
+		m.wg.Add(1)
+		started.Add(1)
+		go func() {
+			defer m.wg.Done()
+			defer started.Done()
+			defer sub.reporting.Store(false)
+			work()
+		}()
 	}
+	return started
 }
 
-// Tick is the test surface for [Manager.tick].
+// dueReport drains what sub has due at now and returns the report to send
+// for it, or nil when nothing is due.
+func (m *Manager) dueReport(ctx context.Context, sub *Subscription, now time.Time, eventReporter EventReporter) func() {
+	// Pending events drain whenever MinInterval has elapsed —
+	// Critical priority bypasses the gate inside the subscription.
+	// Drains BEFORE attribute dirty so urgent events do not wait
+	// behind a value sweep.
+	//
+	// After an event drain the same-tick dirty drain is explicitly
+	// skipped. drainEventsIfElapsed stamps lastReport=now,
+	// which makes drainDirtyIfElapsed return nil (0 < MinIntervalFloor)
+	// for floor>0, but the skip-flag makes the intent unambiguous and
+	// prevents a double-report when floor=0 (degenerate subscription
+	// created outside the manager). Apple Home's duplicate-suppression
+	// heuristic rejects two consecutive ReportData frames in the same
+	// 250 ms window regardless of which path produced them.
+	// matter.js ref: ServerSubscription.ts — events and dirty attrs
+	// are merged into a single ReportData per send cycle.
+	if events := sub.drainEventsIfElapsed(now); len(events) > 0 {
+		if eventReporter == nil {
+			return nil
+		}
+		out := make([]im.EventReport, 0, len(events))
+		for _, ev := range events {
+			ts := ev.Timestamp
+			if ts == 0 {
+				ts = uint64(now.UnixMilli()) //nolint:gosec // millis fit uint64; see #20
+			}
+			out = append(out, im.EventReport{
+				Path:      ev.Path,
+				Number:    ev.Number,
+				Priority:  ev.Priority,
+				Timestamp: ts,
+				Data:      ev.Data,
+			})
+		}
+		return func() { eventReporter(ctx, sub, out) }
+	}
+	// Dirty-path report fires when MinInterval has elapsed, but only
+	// when no event report fired in the same tick (returned above).
+	if dirty := sub.drainDirtyIfElapsed(now); len(dirty) > 0 {
+		if m.reporter == nil {
+			return nil
+		}
+		reporter := m.reporter
+		return func() { reporter(ctx, sub, dirty) }
+	}
+	// Keep-alive: nothing dirty, but the publisher-side heartbeat
+	// cadence (≈ matter.js sendInterval; see
+	// [Subscription.heartbeatIntervalElapsed]) has elapsed. Apple
+	// Home's MTRDevice and chip-tool's ReadClient both drop the
+	// subscription after an internal timer that fires *well before*
+	// `MaxIntervalCeiling` would — so heartbeats must ride at the
+	// faster matter.js-style cadence computed by
+	// [Subscription.sendIntervalLocked], not at the spec-only
+	// `MaxIntervalCeiling`.
+	if sub.heartbeatIntervalElapsed(now) {
+		sub.touchLastReport(now)
+		if m.reporter == nil {
+			return nil
+		}
+		reporter := m.reporter
+		return func() { reporter(ctx, sub, nil) }
+	}
+	return nil
+}
+
+// Tick is the test surface for [Manager.tick]: it waits for the reports
+// the tick started, so a test observes them deterministically.
 func (m *Manager) Tick(ctx context.Context, now time.Time) {
-	m.tick(ctx, now)
+	m.tick(ctx, now).Wait()
 }

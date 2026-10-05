@@ -5,6 +5,7 @@ package subscription
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
@@ -23,6 +24,11 @@ const maxSendInterval = 2 * time.Minute
 // manager keeps these in a map keyed by ID; engine.Tick walks the
 // map to drive reports.
 type Subscription struct {
+	// reporting is set while a report for this subscription is on the
+	// wire: the engine starts no second one until it completes, as
+	// matter.js ServerSubscription #triggerSendUpdate defers an update
+	// while #currentUpdatePromise is pending.
+	reporting atomic.Bool
 	// ID is the bridge-allocated 32-bit subscription identifier
 	// returned in SubscribeResponse (Matter §8.5.5).
 	ID uint32
