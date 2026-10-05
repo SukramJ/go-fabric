@@ -28,12 +28,15 @@ func TestSchemaCreatesEveryTableThePackageQueries(t *testing.T) {
 		"matter_node_identities",
 		"matter_group_keys",
 		"matter_group_key_map",
+		"matter_group_table",
+		"matter_groupcast_groups",
 		"matter_acl_entries",
 		"matter_resumption",
 		"matter_diagnostics",
 		"matter_metadata",
 		"matter_settings",
 		"matter_persistent_subscriptions",
+		"matter_server_subscriptions",
 	} {
 		if !strings.Contains(ddl, "CREATE TABLE IF NOT EXISTS "+table) {
 			t.Errorf("Schema() does not create %s", table)

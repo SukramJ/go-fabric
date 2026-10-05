@@ -185,6 +185,19 @@ func (l *EventLog) Append(rec EventRecord) uint64 {
 	return rec.Number
 }
 
+// DropBuffered discards every buffered record and keeps the numbering, so
+// the next Append continues where the log left off. This log is volatile —
+// it does not survive a restart — and the bridge calls this when it goes
+// offline, so an in-process Stop/Start loses its events exactly as a
+// process restart does. Mirrors matter.js
+// packages/node/src/behavior/system/events/EventsBehavior.ts, which clears
+// a volatile event store when the node goes offline (#4594).
+func (l *EventLog) DropBuffered() {
+	l.mu.Lock()
+	l.occurrences = nil
+	l.mu.Unlock()
+}
+
 // harvestLocked drops the least valuable records once the buffer has grown
 // past MaxEventAllowance, bringing it back to MinEventAllowance. A no-op
 // below that threshold, so the cost is paid once per MaxEventAllowance -

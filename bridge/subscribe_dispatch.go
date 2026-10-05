@@ -205,6 +205,8 @@ func (b *Bridge) registerSubscription(
 	var subID uint32
 	if m := b.subscriptionManagerLocked(); m != nil {
 		fabricIndex := b.resolveSessionFabric(requestHdr.SessionID)
+		subjectNodeID, _ := b.resolveSessionSubject(requestHdr.SessionID)
+		peerNodeID := subscriptionPeerNodeID(requestHdr, subjectNodeID)
 		// KeepSubscriptions=false teardown — Matter §10.6.5: when the
 		// commissioner clears `KeepSubscriptions`, the bridge MUST
 		// cancel every existing subscription owned by the same peer
@@ -219,13 +221,16 @@ func (b *Bridge) registerSubscription(
 		// PASE subscriber that re-subscribes with KeepSubscriptions=false
 		// would accumulate stale subscriptions.
 		if !req.KeepSubscriptions {
-			if fabricIndex != 0 && requestHdr.SourceNodeID != 0 {
-				// CASE session — tear down by (fabric, peer) tuple.
-				if cleared := m.ClosePeer(fabricIndex, requestHdr.SourceNodeID); cleared > 0 {
+			if fabricIndex != 0 && peerNodeID != 0 {
+				// CASE session — tear down by (fabric, peer) tuple. The
+				// peer is the session's subject: a secure unicast header
+				// carries no source node id (Matter §4.4.1.4), and
+				// matter.js matches on session.peerAddress.
+				if cleared := m.ClosePeer(fabricIndex, peerNodeID); cleared > 0 {
 					b.logger.Info("matter.rx.im.subscribe.peer_teardown",
 						slog.String("src", srcString(src)),
 						slog.Int("fabric", int(fabricIndex)),
-						slog.Uint64("peer_node", requestHdr.SourceNodeID),
+						slog.Uint64("peer_node", peerNodeID),
 						slog.Int("cleared", cleared))
 				}
 			} else {
@@ -239,7 +244,7 @@ func (b *Bridge) registerSubscription(
 		}
 		sub, err := m.Subscribe(subscription.SubscribeArgs{
 			FabricIndex:        fabricIndex,
-			PeerNodeID:         requestHdr.SourceNodeID,
+			PeerNodeID:         peerNodeID,
 			SessionID:          requestHdr.SessionID,
 			MinIntervalFloor:   req.MinIntervalFloor,
 			MaxIntervalCeiling: req.MaxIntervalCeiling,
@@ -289,6 +294,16 @@ func (b *Bridge) registerSubscription(
 		b.captureSubTarget(subID, src, requestHdr, proto, req.FabricFiltered)
 	}
 	return subID, nil
+}
+
+// subscriptionPeerNodeID names the peer a subscribe came from: the source
+// node id of the request header when it carries one (unsecured / PASE
+// traffic), else the subject node id of the secure session it rode on.
+func subscriptionPeerNodeID(requestHdr *message.Header, subjectNodeID uint64) uint64 {
+	if requestHdr.HasSourceNodeID && requestHdr.SourceNodeID != 0 {
+		return requestHdr.SourceNodeID
+	}
+	return subjectNodeID
 }
 
 // subscribeRejectStatus maps a subscription-manager rejection to the IM

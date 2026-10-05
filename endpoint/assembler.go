@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+
+	"github.com/SukramJ/go-fabric/groups"
 )
 
 // Config tunes the assembler. The zero value is *not* valid — at
@@ -22,6 +24,14 @@ type Config struct {
 	ProductID uint16
 	// NodeLabel is the user-visible bridge label.
 	NodeLabel string
+	// Groups is the node's group state. When set, every bridged endpoint
+	// whose device type mandates the Groups cluster (on-off-light,
+	// on-off-plug-in-unit, … — schema.DeviceTypeRequiresServerCluster)
+	// serves a real Groups server over it, and a Groups server a source
+	// supplies itself is replaced by one: group membership is stack state,
+	// as in matter.js (GroupsServer keeps it in the root's
+	// GroupKeyManagementServer). nil keeps whatever the source supplies.
+	Groups *groups.Manager
 }
 
 // Validate returns nil when the config is internally consistent.
@@ -202,6 +212,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		// aggregator.add(child) which establishes the same parent chain.
 		ParentEndpointID:    1,
 		HasParentEndpointID: true,
+		groups:              a.cfg.Groups,
 	}, nil
 }
 

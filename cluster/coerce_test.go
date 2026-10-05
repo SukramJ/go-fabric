@@ -26,3 +26,17 @@ func TestAsInt16AcceptsDecoderWidths(t *testing.T) {
 		t.Error("AsInt16([]byte) must return false")
 	}
 }
+
+func TestAsUintMaxChecksRangeInsteadOfWrapping(t *testing.T) {
+	t.Parallel()
+	for _, v := range []any{uint8(100), uint16(100), uint32(100), uint64(100), int(100), int8(100), int16(100), int32(100), int64(100)} {
+		if got, ok := AsUintMax(v, 100); !ok || got != 100 {
+			t.Errorf("AsUintMax(%T %v, 100) = (%d, %v); want (100, true)", v, v, got, ok)
+		}
+	}
+	for _, v := range []any{uint64(101), int64(-1), float64(5), "5", nil} {
+		if got, ok := AsUintMax(v, 100); ok {
+			t.Errorf("AsUintMax(%T %v, 100) = (%d, true); want a rejection", v, v, got)
+		}
+	}
+}

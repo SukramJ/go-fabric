@@ -52,6 +52,12 @@ type Subscription struct {
 	// event fan-out for this subscription.
 	EventPaths []im.ConcreteEventPath
 
+	// sendIntervalOverride, when non-zero, replaces the derived heartbeat
+	// cadence. Set only by [Manager.Restore], which re-creates a former
+	// subscription with the send interval it negotiated in its first run
+	// (matter.js ServerSubscription `useAsSendInterval`).
+	sendIntervalOverride time.Duration
+
 	mu            sync.Mutex
 	lastReport    time.Time
 	pendingDirty  map[im.ConcreteAttributePath]struct{}
@@ -140,6 +146,9 @@ func (s *Subscription) heartbeatIntervalElapsed(now time.Time) bool {
 // unobservable by any Matter commissioner. Documented in
 // `notes/parity/by_design.md` §"Systematic Parity Run #02".
 func (s *Subscription) sendIntervalLocked() time.Duration {
+	if s.sendIntervalOverride > 0 {
+		return s.sendIntervalOverride
+	}
 	maxInt := time.Duration(s.MaxIntervalCeiling) * time.Second
 	if maxInt <= 0 {
 		// Defensive: degenerate subscription — 30 s heartbeat so the
@@ -180,6 +189,14 @@ func (s *Subscription) sendIntervalLocked() time.Duration {
 		send = time.Second
 	}
 	return send
+}
+
+// SendInterval returns the publisher heartbeat cadence the engine uses for
+// this subscription — matter.js ServerSubscription.sendInterval.
+func (s *Subscription) SendInterval() time.Duration {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sendIntervalLocked()
 }
 
 // Close marks the subscription closed; the engine skips it on the

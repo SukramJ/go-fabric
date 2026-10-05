@@ -33,6 +33,139 @@ left verbatim rather than re-translated after the fact.
 
 ---
 
+### BD-Matter-SmokeCoAlarmRulesInServer — ExpressedState, the self-test gate and the events are derived by the server
+
+matter.js `SmokeCoAlarmServer`
+(`packages/node/src/behaviors/smoke-co-alarm/SmokeCoAlarmServer.ts:19-43`)
+seeds the initial state and nothing else: which condition ExpressedState
+shows, refusing SelfTestRequest while alarming, and emitting the eleven
+events are left to the application that subclasses it.
+[`cluster/alarm`](../../cluster/alarm) does all three, from the
+specification text matter.js carries in
+`packages/model/src/standard/resources/smoke-co-alarm-cluster.resource.ts`:
+
+- **ExpressedState** is derived from the host's snapshot through a
+  priority order (`DefaultExpressedStatePriority`, overridable per host,
+  since the resource says the order is the manufacturer's, :27-30);
+  `State.Inoperative` takes precedence. The default order is the one
+  connectedhomeip's smoke-co-alarm example application passes to
+  `SetExpressedStateByPriority` — recalled, not read from a checkout (see
+  the findings register).
+- **SelfTestRequest** answers BUSY while ExpressedState is SmokeAlarm,
+  CoAlarm, Testing, InterconnectSmoke or InterconnectCO (:201-204) and
+  only then reaches the host's `SelfTester`. A source without one leaves
+  the optional command out of AcceptedCommandList, which is what matter.js
+  does for an optional command it was given no implementation for.
+- **Events** are the difference between two snapshots (`Server.Refresh`),
+  one rule per event as the resource words it (:124-195), at the
+  element's priorities. The baseline before the first Refresh is
+  matter.js's initial state.
+
+**Rationale.** In a bridge the application is the host, whose device model
+knows nothing about Matter's event rules; spreading them across every host
+would produce a different reading of the same specification per host. The
+wire surface is unchanged against matter.js — same attributes, same event
+payloads (pinned against matter.js encodings in
+`bridge/testdata/application-wire-fixtures.json`).
+
+### BD-Matter-FanControlCouplingInServer — FanMode / PercentSetting / SpeedSetting coupling and a default Step
+
+matter.js `FanControlServer`
+(`packages/node/src/behaviors/fan-control/FanControlServer.ts:13-19`) only
+defaults FanMode to Off. [`cluster/fan`](../../cluster/fan) resolves every
+speed-oriented write into one `fan.Settings` before the host sees it:
+
+- FanMode Off → PercentSetting 0 / SpeedSetting 0; Auto → both null
+  (`fan-control.resource.ts:82-84`, :120-122); Low / Medium / High leave
+  both to the device's own mode mapping (nil fields), because the
+  percentage a mode means is the manufacturer's.
+- PercentSetting p → SpeedSetting ceil(SpeedMax × p / 100); SpeedSetting s
+  → PercentSetting floor(s × 100 / SpeedMax); either at 0 → FanMode Off.
+  The resource refers to "Percent Rules" (§4.4.6.3.1) and "Speed Rules"
+  (§4.4.6.6.1) without carrying them; the formulas are connectedhomeip's
+  `fan-control-server.cpp`, recalled rather than read (findings register).
+- A null PercentSetting / SpeedSetting write succeeds and changes nothing
+  (:86-87, :126); a FanMode the FanModeSequence does not offer is
+  CONSTRAINT_ERROR (:48-51, :62-63); the deprecated On maps to High and
+  Smart to Auto or High, as connectedhomeip does.
+- Step goes to a host `Stepper` when there is one; otherwise the server
+  steps one unit of SpeedSetting (MultiSpeed) or one rung of the
+  sequence's speed modes, honouring Wrap and LowestOff. The resource calls
+  the interpretation "implementation specific" (:214-215); the mode ladder
+  is its own example (:219-224).
+
+**Rationale.** Same as for SmokeCoAlarm: the coupling is identical for every
+fan, and a host that had to re-derive it would differ from the next host.
+Validation that matter.js's generated behavior does perform — types, enum
+membership, "max 100", "max speedMax", bitmap bits — is mirrored as such.
+
+### BD-Matter-OperationalStateRulesInServer — command answers and state-list rules the specification text adds to OperationalStateServer
+
+matter.js `OperationalStateServer` / `RvcOperationalStateServer`
+(`packages/node/src/behaviors/operational-state/OperationalStateServer.ts`,
+`.../rvc-operational-state/RvcOperationalStateServer.ts`) keep the state
+consistent through reactors and implement no command; the device that
+subclasses them calls `OperationalStateUtils.assertPause` /
+`assertRvcPause` / `assertResume` / `assertRvcResume` / `assertRvcGoHome`
+and moves the state. [`cluster/opstate`](../../cluster/opstate) mirrors the
+reactors and the Utils checks as code and hands every command that passes
+them to the host's `CommandHandler`. On top it applies, from
+`operational-state.resource.ts` / `rvc-operational-state.resource.ts`:
+
+- A command that finds the device in its target state — Pause while
+  Paused, Stop while Stopped, Start or Resume while Running, GoHome while
+  SeekingCharger — answers NoError and does not reach the host ("respond
+  with … NoError but take no further action", :176, :213, :241, :266;
+  GoHome).
+- OperationalStateList must contain the state each supported command
+  leads to (Paused, Running, Stopped, SeekingCharger), "at a minimum, …
+  the set of states matching the commands that are also supported"
+  (:98-99); the initial state must be listed (:106-107); no state is
+  listed twice, and a reserved (undefined, non-manufacturer) id is
+  refused.
+- OperationalStateList is fixed at construction. matter.js lets a device
+  replace it at run time; no appliance seen so far changes its state set,
+  and a fixed list keeps every OperationalState assertion stable.
+- The state the device ends up in after a successful command is the
+  host's to set, as in matter.js; the server does not guess it.
+
+CountdownTime's "Q" reporting is matter.js's own (QuietEvent, at most one
+report a second, at once to or from null) — the specification's fuller
+list of reportable changes is not implemented by either.
+
+**Rationale.** As for SmokeCoAlarm: the rules are the same for every
+appliance, and a host should not re-derive them. The wire surface is
+matter.js's, pinned in `bridge/testdata/application-wire-fixtures.json`.
+
+### BD-Matter-ModeBaseRulesInServer — ModeBase tag rules from the specification, and ChangeToMode decided by the device
+
+matter.js's mode servers (`RvcRunModeServer.ts`, `RvcCleanModeServer.ts`,
+`LaundryWasherModeServer.ts`, `DishwasherModeServer.ts`, with
+`mode-base/ModeUtils.ts`) check labels and mode values for duplicates and
+each derivation's required tags, and their default `changeToMode` sets
+CurrentMode to any supported mode. [`cluster/modebase`](../../cluster/modebase)
+mirrors those checks as code and differs in two respects:
+
+- **Spec-text checks at construction** (`mode-base.resource.ts`,
+  SupportedModes and ModeOptionStruct.ModeTags): the tags of one mode are
+  distinct, no two modes carry the same set of tags (order-independent),
+  and every mode has at least one standard tag (one without MfgCode).
+- **ChangeToMode is the device's**: a supported mode other than the
+  current one goes to the host's `ModeChanger`, which may refuse with
+  GenericFailure, InvalidInMode, a derivation status (Stuck, BatteryLow,
+  CleaningInProgress, …) or a product-specific status (0x80 and above, see
+  the findings register); only Success moves CurrentMode. matter.js's
+  default accepts every supported mode — a bridged device has to be asked.
+  A host answering UnsupportedMode (the server's own verdict) or an
+  undefined status gets FAILURE; StatusText is cut to its "max 64" bytes.
+
+DIRECTMODECH is advertised as configured; its rule (InvalidInMode while
+the RVC is not in an Idle mode) involves RvcRunMode's state and is the
+host's to apply in its `ModeChanger`, as matter.js leaves it to the device.
+
+**Rationale.** A bridge cannot accept a mode change on the device's behalf;
+the tag rules are the specification's and the same for every host.
+
 ### BD-Matter-ClosureWithoutTagList — the Closure endpoint omits the TAGLIST feature its device type marks mandatory
 
 A garage drive projects as the Closure device type (0x0230) carrying
@@ -168,36 +301,6 @@ forbids. Re-open only if loom takes on the OtaProvider device-class role on
 a dedicated device-type-0x14 endpoint, which is out of scope. The cluster
 IDs / command shapes are recorded in the A1 plan for that future work.
 
-### BD-Matter-SubscriptionResumption-Deferred — no cross-restart subscription resumption
-
-A daemon restart drops every Matter subscription; the controller
-re-subscribes on its own liveness timeout. The SQLite store
-(`store/subscriptions.go`) and its table exist but
-are intentionally **not** wired to save-on-subscribe / restore-at-boot in
-production.
-
-**Rationale (verified against the gold standard, 2026-07-01):** matter.js
-HEAD implements **no** subscription resumption — a repo-wide search of
-`../matter.js/packages/protocol/src/interaction/` for resumption /
-server-initiated-CASE re-establishment finds nothing. Meaningful
-resumption is not just persisting rows: (1) the `subscription.Manager`
-generates the `SubscriptionId` internally with no restore-with-id path, so
-a restored row would re-arm under a fresh id the controller does not
-recognise; and (2) report delivery is **session-bound** —
-`bridge/subscribe.go` ships every ReportData through
-`b.subTargets.Load(sub.ID)`, a `subTarget{src: <transport session>}`
-captured at Subscribe time. After a restart the CASE session is gone, so a
-restored subscription has no `subTarget` and the engine tick delivers
-nothing. Resuming delivery would require the daemon to **initiate** CASE
-back to the controller (operational discovery + a CASE-initiator role),
-which loom does not have — the bridge is a pure CASE responder, matching
-matter.js. Building a server-initiated-CASE resumption path the gold
-standard itself omits would be a large divergence, not parity. Deferred
-until matter.js (or a concrete interop need) makes it a parity
-requirement. WIP scaffolding for the id-preserving store lives on the
-unmerged `wip/a1-subscription-persistence` branch; the corrected scope is
-recorded in the A1 implementation plan.
-
 ### BD-Matter-ButtonPressCycleFromDiscreteFrames — Switch (0x003B) events from discrete CCU frames, not a position stream
 
 matter.js derives Switch (0x003B) events from a continuous currentPosition
@@ -328,7 +431,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | L8-D03 | matter.js `AdministratorCommissioningServer.ts:283-290` — 48-h extended window when `FabricCount == 0`; chip `CommissioningWindowManager.cpp:313-325` — `MaxCommissioningTimeout()` extends to 48 h for uncommissioned nodes | `bridge/commissioning_window.go` — `OpenWindowParams.IsUncommissioned` flag enables the 172800 s (48 h) cap via `commissioningWindowMaxSecUncommissioned` | Implemented (C-P2-4): the constant `commissioningWindowMaxSecUncommissioned = 172800` is wired into `OpenWindow`; the daemon must set `IsUncommissioned: fabricStore.Count() == 0` before calling OpenWindow. Default (IsUncommissioned=false) retains the 900-s cap. Wiring the fabric-count query into the commissioning-window open path is a daemon-side follow-up. |
 | L9-D9 | AccessControl.MatterReadFiltered + UpdateFabricLabel + UpdateNOC fabric resolution | `cluster/core/operational_credentials.go:252-286, 1058-1065, 1003-1008` | Confirmed correct by audit 2026-05-12 (L9-D9): Bug M + Bug P fixes are wire-correct; all three paths use `im.FabricFilterFromContext` with `currentFabric` fallback. No action required. Drift L9-D9 (LOW, confirmed ✓). |
 | BD-Matter-Dispatcher-StringHeuristic | matter.js `InteractionServer.ts` and chip `WriteHandler.cpp` / `CommandHandler.cpp` map typed errors via `StatusCodeError` / `MatterClusterStatusError` interfaces only | `endpoint/dispatcher.go::writeErrorStatus` / `invokeErrorStatus` (lines ~447-509) keep a string-contains fallback for "read-only", "unknown attribute", "constraint", "resource exhausted", "unknown command", "invalid command argument" | The 2026-05-19 chip-audit drift M-DRIFT-02 / L4-D03 is a **defense-in-depth** entry: every production cluster server already returns typed errors that implement `im.StatusCodeError` (verified via `grep -rn 'errors.New(' cluster/` — zero hits in production paths; the matches in `tests/` and `endpoint/*_test.go` are intentional fake-server fixtures). The string heuristic survives so legacy fakes keep working; removing it would only break tests, not production wire behaviour. New cluster code is expected to return typed errors via the `StatusCodeError` pattern. |
-| BD-Matter-Groups-Already-Mounted | chip + matter.js mandate Groups (0x0004) + ScenesManagement (0x0062) on every OnOff-mapped device-type (OnOffPlugInUnit 0x010A, OnOffLight 0x0100) | go-fabric mounts both stub servers on `Switch` (`internal/model/custom/switch/matter.go:74-75`), `Light` (both dimmable and non-dimmable branches in `internal/model/custom/light/matter.go:114-115, 120-121`), `Siren` (`internal/model/custom/siren/matter.go:131-132`), and the generic-DP OnOff projection (`internal/model/generic/switch_matter.go::MatterClusterServers`) | Audit drift L2-D01-NEW is a **false positive** for the custom-DP projections. The generic-DP projection — the assembler's Path 1, taken for any channel with a writable STATE and no custom-DP wrapper — was the one exception and mounted OnOff alone while still advertising OnOffPlugInUnit; it now mounts both stubs and advertises the mandatory LT feature with its four attributes and three commands. Climate / Cover / Lock correctly have no Groups attachment (non-OnOff device types). |
+| BD-Matter-Groups-Already-Mounted | chip + matter.js mandate Groups (0x0004) + ScenesManagement (0x0062) on every OnOff-mapped device-type (OnOffPlugInUnit 0x010A, OnOffLight 0x0100) | Since [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md) the assembler mounts the real Groups server itself wherever a device type mandates it (`endpoint.Config.Groups`) and replaces a host-supplied Groups stub; the host still supplies the ScenesManagement stub. The record below is the reference host's former wiring: it mounted both stub servers on `Switch` (`internal/model/custom/switch/matter.go:74-75`), `Light` (both dimmable and non-dimmable branches in `internal/model/custom/light/matter.go:114-115, 120-121`), `Siren` (`internal/model/custom/siren/matter.go:131-132`), and the generic-DP OnOff projection (`internal/model/generic/switch_matter.go::MatterClusterServers`) | Audit drift L2-D01-NEW is a **false positive** for the custom-DP projections. The generic-DP projection — the assembler's Path 1, taken for any channel with a writable STATE and no custom-DP wrapper — was the one exception and mounted OnOff alone while still advertising OnOffPlugInUnit; it now mounts both stubs and advertises the mandatory LT feature with its four attributes and three commands. Climate / Cover / Lock correctly have no Groups attachment (non-OnOff device types). |
 
 | BD-Matter-TimeSync-NotMounted | matter.js `packages/node/src/endpoints/root.ts:215` lists TimeSynchronization (0x0038) as `optional` on RootNode | `cmd/openccu-loom/daemon_matter.go::buildRootClusters` — not mounted by default; operator-mountable via `north.matter.enable_time_sync` (default off, 0.15.0) | TimeSynchronization is optional on a Matter-Bridge; home-assistant-matter-bridge omits it, and Apple's HAP mapper may reject unexpected clusters on the RootNode device-type. The cluster implementation exists (`cluster/core/time_synchronization.go`); since 0.15.0 it is mounted only behind the default-off `north.matter.enable_time_sync` opt-in (operators who need a time-sync surface, re-pair afterwards). Status (2026-06): flag-gated mount available; default remains off. (M-P2-03 documented as by-design.) |
 | BD-Matter-Actions-NotMounted | chip bridge-app mounts Actions (0x0025) on the Aggregator endpoint for the TC-BR test plan | `cmd/openccu-loom/daemon_matter.go::buildAggregatorClusters` — Actions intentionally not mounted (only Identify 0x0003 + Descriptor 0x001D are mounted; the SetServerListProvider comment names 0x0025 as the deliberate omission) | go-fabric has no scene/action surface to model via Actions. Identify (0x0003) is already mounted; Actions will be added if bridge-app TC-BR conformance is required. Status (2026-06): still intentionally not mounted (no use-case). (C-P2-1 documented as by-design.) |
@@ -354,7 +457,7 @@ The following entries reflect clusters where go-fabric follows matter.js HEAD (t
 
 ### L00 Schema Audit — cluster-stub design choices (2026-05-12)
 
-- **L00-BD-Groups** Groups/ScenesManagement as stubs — HM has no group/scene concept; go-fabric's Groups and ScenesManagement cluster servers return empty collections and reject all writes. Presence is mandated by Matter device-type requirements (OnOff Light, Dimmable Light, etc.), not feature preference. matter.js `packages/node/src/behaviors/groups/GroupsServer.ts` / `packages/node/src/behaviors/scenes-management/`. Reason: no Homematic CCU-side primitive to map to; stubs satisfy the device-type conformance requirement without exposing broken functionality.
+- **L00-BD-Groups** ScenesManagement as a stub — the ScenesManagement cluster server returns an empty scene table and rejects all writes. Presence is mandated by Matter device-type requirements (OnOff Light, Dimmable Light, etc.), not feature preference. matter.js `packages/node/src/behaviors/scenes-management/`. Reason: no scene store; the stub satisfies the device-type conformance requirement without exposing broken functionality. Groups is no longer part of this entry: it is a real server since [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md).
 - **L00-BD-OnOffDefault** OnOff default-false on unobserved state — matter.js `OnOffServer.ts` defaults `onOff` to `false` when the underlying DP has not yet reported; go-fabric mirrors this rather than returning null (which matter.js also documents as not spec-nullable for the OnOff attribute). Reason: spec-aligned default; null would be a schema violation.
 - **L00-BD-BoolStateEvent** BooleanState no StateChangeEvent — StateChangeEvent (event id 0x0) has conformance `"O"` in matter.js `packages/model/src/standard/elements/boolean-state.element.ts`; go-fabric omits it because HM push events are handled via DP value changes, not a dedicated state-change event mechanism. Reason: optional event, no HM-side equivalent event source.
 
@@ -528,7 +631,7 @@ Re-enable when Apple iOS ships Matter 1.4 SDK schema. No code change needed.
 matter.js ref: `packages/protocol/src/interaction/InteractionServer.ts`.
 chip ref: `src/app/clusters/*/` Attribute::kEventList.
 
-**L2-D04 — OnOffLight/OnOffPlugInUnit: Groups + ScenesManagement stubs present; chip bridge-app omits them (by-design).**
+**L2-D04 — OnOffLight/OnOffPlugInUnit: Groups + ScenesManagement present; chip bridge-app omits them (by-design).** Groups is the real server since ADR 0009; ScenesManagement is still the stub.
 matter.js `packages/node/src/devices/on-off-light.ts` and `on-off-plug-in-unit.ts` list
 Groups (0x0004) and ScenesManagement (0x0062) as mandatory. go-fabric's
 `internal/model/custom/switch/matter.go:74-86` returns them from `MatterClusterServers()`,
@@ -838,16 +941,6 @@ attribute code defect. Marked dependent on L4-D03 (Subscribe-Initial delivery)
 and L10-D02 (IM-revision field guard). Will re-test as part of the L4/L10
 implementation wave.
 
-**L9-NEW-7 — GroupKeyManagement.GroupTable always empty (by-design, v1.1).**
-Matter §11.2.7.5 `GroupTable` (attr 0x0001) lists all multicast group memberships
-for the node. go-fabric v1.0 does not implement group multicast — there are no
-multicast group entries to report. chip `src/app/clusters/group-key-mgmt-server/
-group-key-mgmt-server.cpp` returns the entries from `GroupDataProvider`; in
-go-fabric `GroupKeyManagement.MatterRead` returns `[]GroupEntry{}` for attr 0x0001.
-Apple Home does not emit an error for an empty GroupTable during commissioning or
-normal operation. Implementation deferred to v1.1 when group multicast is added.
-No interop impact for the bridge-only v1.0 use-case.
-
 ### Open audit hooks
 
 | Audit | Status | Source of truth |
@@ -907,14 +1000,6 @@ No interop impact for the bridge-only v1.0 use-case.
 **Go path:** `cluster/wire/scenes_management.go`.
 
 **Rationale:** HomeMatic has no scene concept. ScenesManagement (0x0062) is mounted as a mandatory stub on OnOff device types (per Matter device-type conformance). The stub correctly returns `SceneTableSize=0` and rejects AddScene / RemoveScene / StoreScene / RecallScene with `UnsupportedCommand`. This is the same pattern as the matter.js `ScenesManagementBehavior` when no store backend is wired. Full implementation would require a scene store (new SQLite migration) and a HM-side trigger mapping — out of scope for 0.1.0.
-
----
-
-### BD-Matter-P2-D19 — Groups stub returns NameSupport=0x80 / rejects writes with UnsupportedCommand
-
-**Go path:** `cluster/wire/groups.go`.
-
-**Rationale:** HomeMatic has no group concept. Groups (0x0004) is mounted as a mandatory stub on OnOff device types. The stub returns `NameSupport=0x80` (bit 7 set, GroupNames mandatory per matter.js `groups.element.ts:31`) and rejects AddGroup / RemoveGroup / AddGroupIfIdentifying with IM StatusCode `UnsupportedCommand` (0x81). The 0x81 code is produced by the bridge dispatcher's string-heuristic (`invokeErrorStatus` in `endpoint/dispatcher.go`) when the error message contains "no commands"; `MatterInvoke` includes that sentinel so Apple Home and Google Home receive the correct status. Apple Home, Google Home, and chip-tool all tolerate a Groups stub that rejects commands — this is the same surface that matter.js's default `GroupsBehavior` exposes when no membership provider is wired. Full implementation requires a group-membership store and coordination with the GroupKeyManagement cluster; deferred to a future release.
 
 ---
 
@@ -1118,7 +1203,7 @@ The same reasoning covers the sibling MRP keys **SII and SAI** on both the opera
 
 ### BD-Matter-InteractionModelRevision — go-fabric emits interactionModelRevision on every IM response
 
-matter.js HEAD commit `47e7f2f78` (`#3751`, 2026-05-17) marks `interactionModelRevision` (tag 0xFF) as `TlvOptionalField` in 10 IM message schemas. go-fabric emits this field on every response (`im/subscribe.go:37-41`, `MatterInteractionModelRevision = 13`).
+matter.js HEAD commit `47e7f2f78` (`#3751`, 2026-05-17) marks `interactionModelRevision` (tag 0xFF) as `TlvOptionalField` in 10 IM message schemas. go-fabric emits this field on every response (`im/subscribe.go:37-41`, `MatterInteractionModelRevision = 12`, matter.js `Specification.INTERACTION_MODEL_REVISION`).
 
 This is by design: matter.js' own send-path (`TlvDataReportForSend`, `TlvInvokeResponseForSend`) continues to emit the field. Apple Home fails silently when expected fields are absent. Emitting the field unconditionally matches both the prior spec requirement and the actual matter.js wire output; removing it would risk silent Apple Home pairing regressions. No code change is planned.
 
@@ -1223,6 +1308,99 @@ commands (DoorLock); per-attribute enforcement and quota eviction become real
 work when the bridge exposes a timed-quality attribute or targets large
 controller fleets, respectively.
 (Re-audit 2026-05-31, findings F3 / F4.)
+
+### BD-Matter-CaseInitiatorPeerCATs — the CASE initiator takes the responder's CATs from its NOC
+
+matter.js `packages/protocol/src/session/case/CaseClient.ts:#doPair` gives a
+fully handshaken initiator session the CATs it was *configured* with, falling
+back to the resumption record's — on the subscription re-establishment path
+(`SubscriptionsServer.reestablishFormerSubscriptions` → `peer.connect`) that
+is none on a full handshake. go-fabric's initiator (`secure/sigma/initiator.go`,
+`Initiator.processSigma2`) lifts the responder's CATs out of its NOC once the
+transcript signature authenticated it, as chip's `CASESession::HandleSigma2`
+does and as Matter §6.6.2.1.2 defines a subject's CATs.
+
+By design. The session the device opens is one the controller can reuse for
+its own requests, and the ACL gate matches CAT subjects from the session.
+Taking them from the NOC is what the responder side already does
+(`Responder.verifySigma3Locked`); leaving them empty would deny a
+CAT-scoped controller on the one session that exists right after a restart.
+Pinned by `TestPeerInitiator_FullHandshakeAgainstResponder`.
+
+---
+
+### BD-Matter-GroupReceiveOnly — group messages are received, never sent
+
+matter.js sends group messages too: `GroupSession.create` opens an outbound
+group session, and a node-global group data message counter (seeded from the
+legacy per-key counters by `MessagingState.legacyGroupDataCounterMax`) numbers
+them. go-fabric only receives them (`groups.Manager.Decode`,
+`Bridge.dispatchGroupMessage`) and keeps no group data counter. Reason: a node
+sends group messages only as a controller or a binding client, and the
+controller role is a scope decision (`docs/matterjs-comparison.md`).
+Retires if a sending role is ever in scope.
+
+---
+
+### BD-Matter-KeySetReadAllIndicesOrder — key set ids listed in id order
+
+matter.js `GroupKeyManagementServer.keySetReadAllIndices` lists key set 0
+first and the written key sets in the order they were first written (its
+state array). go-fabric lists key set 0 first and the rest in ascending id
+order, the order the store returns them. The list is a set on the wire — no
+controller reads meaning into the order — and keeping write order would mean
+persisting an order column for it. Pinned by
+`TestGroupKeyManagementParityMatterJS` (key set 0 leading, membership only).
+
+---
+
+### BD-Matter-GroupcastNoSender — Groupcast advertises Listener and PerGroup, not Sender
+
+matter.js's default root installs `GroupcastServer.with("Listener", "Sender",
+"PerGroup")` (`packages/node/src/node/ServerNode.ts`). go-fabric's
+`core.Groupcast` advertises Listener and PerGroup (FeatureMap 0x05). The
+Sender feature obliges a node to keep memberships for groups it sends to —
+JoinGroup with an empty endpoint list, LeaveGroup keeping an emptied group as
+sender-only (`GroupcastServer.ts #leave`, `retainedSenderOnly`),
+EnableSenderTesting — and to originate group messages for them (matter.js
+`4ad47150`, group bindings that send). This node originates none
+(`BD-Matter-GroupReceiveOnly`), so it would advertise memberships that do
+nothing. Without Sender the server behaves as matter.js's Listener-only
+server: an empty endpoint list answers ConstraintError ("Empty endpoint list
+requires Sender feature"), a group losing its last endpoint is removed, and
+EnableSenderTesting (conformance SD) answers ConstraintError. RootNode needs
+the Sender condition only for switch / controller device types
+(`GroupcastSenderCond`, conformance O), which no bridge of this module
+advertises. Retires with `BD-Matter-GroupReceiveOnly`.
+[ADR 0010](../../docs/adr/0010-groupcast-and-auxiliary-acl.md). Pinned by
+`TestGroupcastAndAuxiliarySurfaceMatchSchema` and the "no endpoints" case of
+`TestGroupcastJoinGroupParityMatterJS`.
+
+---
+
+### BD-Matter-GroupcastListOrder — Membership and unfiltered group lists in id order
+
+matter.js keeps Groupcast Membership in the order `#deriveMembership` meets
+the groups (groupProperties first, then the group table, each in insertion
+order) and an unfiltered GroupKeyMap / GroupTable read in its state arrays'
+insertion order across fabrics. go-fabric derives Membership on read and
+lists every one of these by fabric index, then group id. The lists are sets
+on the wire — each entry carries its own GroupId and FabricIndex — and
+keeping insertion order would mean persisting an order column, as for
+`BD-Matter-KeySetReadAllIndicesOrder`.
+
+---
+
+### BD-Matter-AuxiliaryAccessAdminNode — AuxiliaryAccessUpdated names the acting node
+
+matter.js fills AuxiliaryAccessUpdated.AdminNodeID from the accessing
+fabric's `rootNodeId` — the CaseAdminSubject AddNOC recorded
+(`AccessControlServer.ts #adminDataFromSession`). go-fabric names the CASE
+subject of the request that changed the auxiliary entries
+(`core.adminNodeIDOf`), null for PASE or a change without a request. It does
+not persist the CaseAdminSubject per fabric, and for the usual single
+administrator the two are the same node; the field is nullable, and
+AccessControlEntryChanged here reports null altogether.
 
 ---
 

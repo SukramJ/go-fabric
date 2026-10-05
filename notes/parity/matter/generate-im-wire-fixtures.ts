@@ -53,6 +53,14 @@ const {
     TlvBoolean,
 } = require(typesMain);
 
+// The IM revision matter.js stamps on every message it sends
+// (packages/model/src/common/Specification.ts INTERACTION_MODEL_REVISION,
+// 12 at the Matter 1.6.1 pin). Read from the checkout rather than written
+// as a literal, so a regeneration follows matter.js instead of a stale copy.
+const modelMain = path.join(matterJsRoot, "node_modules/@matter/model/dist/cjs/index.js");
+const { Specification } = require(modelMain);
+const IM_REVISION: number = Specification.INTERACTION_MODEL_REVISION;
+
 function toHex(bytes: Uint8Array): string {
     return Buffer.from(bytes).toString("hex");
 }
@@ -98,7 +106,7 @@ add(
     {
         suppressResponse: false,
         attributeReports: [],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
 );
@@ -113,7 +121,7 @@ add(
     "ReportData",
     {
         suppressResponse: true,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
     {
@@ -131,7 +139,7 @@ add(
     {
         subscriptionId: 5,
         suppressResponse: true,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
     {
@@ -152,7 +160,7 @@ add(
         subscriptionId: 42,
         suppressResponse: false,
         attributeReports: [],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
     {
@@ -171,7 +179,7 @@ add(
         suppressResponse: false,
         attributeReports: [],
         moreChunkedMessages: true,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
     {
@@ -189,7 +197,7 @@ add(
         suppressResponse: false,
         attributeReports: [],
         moreChunkedMessages: true,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
 );
@@ -203,7 +211,7 @@ add(
         subscriptionId: 99,
         suppressResponse: false,
         eventReports: [],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
     {
@@ -220,7 +228,7 @@ add(
     {
         subscriptionId: 7,
         suppressResponse: true,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvDataReportForSend,
     {
@@ -249,7 +257,7 @@ add(
         minIntervalFloorSeconds: 0,
         maxIntervalCeilingSeconds: 60,
         isFabricFiltered: false,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
     {
@@ -267,7 +275,7 @@ add(
         minIntervalFloorSeconds: 0,
         maxIntervalCeilingSeconds: 30,
         isFabricFiltered: false,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
     {
@@ -287,7 +295,7 @@ add(
         maxIntervalCeilingSeconds: 30,
         attributeRequests: [{ endpointId: 1, clusterId: 6, attributeId: 0 }],
         isFabricFiltered: true,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
     {
@@ -307,7 +315,7 @@ add(
         maxIntervalCeilingSeconds: 60,
         eventRequests: [{ endpointId: 1, clusterId: 6, eventId: 0 }],
         isFabricFiltered: false,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
     {
@@ -327,7 +335,7 @@ add(
         maxIntervalCeilingSeconds: 30,
         isFabricFiltered: false,
         dataVersionFilters: [{ path: { endpointId: 1, clusterId: 6 }, dataVersion: 100 }],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
     {
@@ -351,7 +359,7 @@ add(
     {
         subscriptionId: 1,
         maxInterval: 30,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeResponse,
     {
@@ -367,7 +375,7 @@ add(
     {
         subscriptionId: 0x12345678,
         maxInterval: 120,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeResponse,
     {
@@ -384,7 +392,7 @@ add(
     "status_resp_success",
     "StatusResponse: status=SUCCESS(0)",
     "StatusResponse",
-    { status: 0, interactionModelRevision: 13 },
+    { status: 0, interactionModelRevision: IM_REVISION },
     TlvStatusResponse,
 );
 
@@ -392,7 +400,7 @@ add(
     "status_resp_unsupported_attribute",
     "StatusResponse: status=UNSUPPORTED_ATTRIBUTE(0x86)",
     "StatusResponse",
-    { status: 0x86, interactionModelRevision: 13 },
+    { status: 0x86, interactionModelRevision: IM_REVISION },
     TlvStatusResponse,
 );
 
@@ -400,7 +408,7 @@ add(
     "status_resp_unsupported_cluster",
     "StatusResponse: status=UNSUPPORTED_CLUSTER(0xC3)",
     "StatusResponse",
-    { status: 0xc3, interactionModelRevision: 13 },
+    { status: 0xc3, interactionModelRevision: IM_REVISION },
     TlvStatusResponse,
 );
 
@@ -408,7 +416,7 @@ add(
     "status_resp_failure",
     "StatusResponse: status=FAILURE(0x01)",
     "StatusResponse",
-    { status: 0x01, interactionModelRevision: 13 },
+    { status: 0x01, interactionModelRevision: IM_REVISION },
     TlvStatusResponse,
 );
 
@@ -416,7 +424,7 @@ add(
     "status_resp_invalid_action",
     "StatusResponse: status=INVALID_ACTION(0x80)",
     "StatusResponse",
-    { status: 0x80, interactionModelRevision: 13 },
+    { status: 0x80, interactionModelRevision: IM_REVISION },
     TlvStatusResponse,
 );
 
@@ -424,7 +432,7 @@ add(
     "status_resp_busy",
     "StatusResponse: status=BUSY(0x9C)",
     "StatusResponse",
-    { status: 0x9c, interactionModelRevision: 13 },
+    { status: 0x9c, interactionModelRevision: IM_REVISION },
     TlvStatusResponse,
 );
 
@@ -441,7 +449,7 @@ add(
     "read_req_minimal",
     "ReadRequest: no attributeRequests, isFabricFiltered=false",
     "ReadRequest",
-    { isFabricFiltered: false, interactionModelRevision: 13 },
+    { isFabricFiltered: false, interactionModelRevision: IM_REVISION },
     TlvReadRequest,
     {
         byDesign: true,
@@ -456,7 +464,7 @@ add(
     {
         attributeRequests: [{ endpointId: 1, clusterId: 6, attributeId: 0 }],
         isFabricFiltered: false,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvReadRequest,
     {
@@ -472,7 +480,7 @@ add(
     {
         attributeRequests: [{}],
         isFabricFiltered: false,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvReadRequest,
     {
@@ -488,7 +496,7 @@ add(
     {
         attributeRequests: [{ endpointId: 0, clusterId: 0x001f, attributeId: 0 }],
         isFabricFiltered: true,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvReadRequest,
     {
@@ -504,7 +512,7 @@ add(
     {
         eventRequests: [{ endpointId: 1, clusterId: 6, eventId: 0 }],
         isFabricFiltered: false,
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvReadRequest,
     {
@@ -534,7 +542,7 @@ add(
                 data: boolTrueTlv,
             },
         ],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvWriteRequest,
     {
@@ -555,7 +563,7 @@ add(
                 data: boolTrueTlv,
             },
         ],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvWriteRequest,
     {
@@ -577,7 +585,7 @@ add(
                 data: boolTrueTlv,
             },
         ],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvWriteRequest,
     {
@@ -601,7 +609,7 @@ add(
                 status: { status: 0 },
             },
         ],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvWriteResponse,
 );
@@ -612,7 +620,7 @@ add(
     "WriteResponse",
     {
         writeResponses: [],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvWriteResponse,
 );
@@ -628,7 +636,7 @@ add(
                 status: { status: 0x86 },
             },
         ],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvWriteResponse,
 );
@@ -653,7 +661,7 @@ add(
                 commandFields: [],
             },
         ],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvInvokeRequest,
     {
@@ -675,7 +683,7 @@ add(
                 commandFields: [],
             },
         ],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvInvokeRequest,
     {
@@ -697,7 +705,7 @@ add(
                 commandFields: [],
             },
         ],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvInvokeRequest,
     {
@@ -714,7 +722,7 @@ add(
         suppressResponse: false,
         timedRequest: false,
         invokeRequests: [],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvInvokeRequest,
     {
@@ -734,7 +742,7 @@ add(
     {
         suppressResponse: false,
         invokeResponses: [],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvInvokeResponseForSend,
 );
@@ -746,7 +754,7 @@ add(
     {
         suppressResponse: true,
         invokeResponses: [],
-        interactionModelRevision: 13,
+        interactionModelRevision: IM_REVISION,
     },
     TlvInvokeResponseForSend,
 );
@@ -762,7 +770,7 @@ add(
     "timed_req_short",
     "TimedRequest: timeout=6000ms (typical door-lock timed-request window) — decode-only fixture",
     "TimedRequest",
-    { timeout: 6000, interactionModelRevision: 13 },
+    { timeout: 6000, interactionModelRevision: IM_REVISION },
     TlvTimedRequest,
     {
         byDesign: true,
@@ -774,7 +782,7 @@ add(
     "timed_req_max",
     "TimedRequest: timeout=65535ms (maximum uint16 value) — decode-only fixture",
     "TimedRequest",
-    { timeout: 65535, interactionModelRevision: 13 },
+    { timeout: 65535, interactionModelRevision: IM_REVISION },
     TlvTimedRequest,
     {
         byDesign: true,
@@ -786,7 +794,7 @@ add(
     "timed_req_minimal",
     "TimedRequest: timeout=1ms — decode-only fixture",
     "TimedRequest",
-    { timeout: 1, interactionModelRevision: 13 },
+    { timeout: 1, interactionModelRevision: IM_REVISION },
     TlvTimedRequest,
     {
         byDesign: true,

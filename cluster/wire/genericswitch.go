@@ -271,7 +271,7 @@ func (s *GenericSwitch) FireInitialPress(newPosition uint8) {
 		return
 	}
 	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventInitialPress,
-		switchInitialPressEvent{NewPosition: newPosition},
+		SwitchInitialPressEvent{NewPosition: newPosition},
 		contract.EventPriorityInfo)
 }
 
@@ -281,7 +281,7 @@ func (s *GenericSwitch) FireShortRelease(previousPosition uint8) {
 		return
 	}
 	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventShortRelease,
-		switchShortReleaseEvent{PreviousPosition: previousPosition},
+		SwitchShortReleaseEvent{PreviousPosition: previousPosition},
 		contract.EventPriorityInfo)
 }
 
@@ -293,7 +293,7 @@ func (s *GenericSwitch) FireLongPress(newPosition uint8) {
 	}
 	// Priority INFO per matter.js HEAD switch.element.ts:52.
 	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventLongPress,
-		switchLongPressEvent{NewPosition: newPosition},
+		SwitchLongPressEvent{NewPosition: newPosition},
 		contract.EventPriorityInfo)
 }
 
@@ -303,27 +303,39 @@ func (s *GenericSwitch) FireLongRelease(previousPosition uint8) {
 		return
 	}
 	s.emitter.MatterEmitEvent(s.endpoint, matterClusterGenericSwitch, MatterEventLongRelease,
-		switchLongReleaseEvent{PreviousPosition: previousPosition},
+		SwitchLongReleaseEvent{PreviousPosition: previousPosition},
 		contract.EventPriorityInfo)
 }
 
-// switch{event}Event are the cluster-native event payload structs.
-// The bridge serialises these via the value writer when encoding the
-// EventReportIB. Each field carries a context tag matching the
-// Matter spec's event field numbers.
-type switchInitialPressEvent struct {
+// The Switch{event}Event types are the event payloads the Fire*
+// methods emit. The bridge's value writer encodes each as a structure
+// with its one field at context tag 0, a uint8 — matter.js
+// switch.element.ts: InitialPress / LongPress carry NewPosition (id 0x0),
+// ShortRelease / LongRelease PreviousPosition (id 0x0). They are
+// exported so that writer can reach them; while they were not, every
+// press event went out with a null Data slot.
+//
+// MultiPressOngoing / MultiPressComplete have no payload type here: the
+// server never advertises MSM, so neither event is in EventList or ever
+// emitted.
+
+// SwitchInitialPressEvent is the InitialPress (0x01) payload.
+type SwitchInitialPressEvent struct {
 	NewPosition uint8 // ContextTag(0)
 }
 
-type switchLongPressEvent struct {
+// SwitchLongPressEvent is the LongPress (0x02) payload.
+type SwitchLongPressEvent struct {
 	NewPosition uint8 // ContextTag(0)
 }
 
-type switchShortReleaseEvent struct {
+// SwitchShortReleaseEvent is the ShortRelease (0x03) payload.
+type SwitchShortReleaseEvent struct {
 	PreviousPosition uint8 // ContextTag(0)
 }
 
-type switchLongReleaseEvent struct {
+// SwitchLongReleaseEvent is the LongRelease (0x04) payload.
+type SwitchLongReleaseEvent struct {
 	PreviousPosition uint8 // ContextTag(0)
 }
 

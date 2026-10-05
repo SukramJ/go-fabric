@@ -309,6 +309,12 @@ func (b *Bridge) dispatchSecureChannel(src *net.UDPAddr, requestHdr *message.Hea
 		b.sessionPeerAddrs.Store(requestHdr.SessionID, src)
 	}
 
+	// The peer answering, as responder, a CASE handshake this node opened
+	// to re-establish former subscriptions (case_initiator.go).
+	if b.deliverInitiatedSecureChannel(requestHdr, proto, payload) {
+		return nil
+	}
+
 	switch proto.Opcode {
 	case mrp.StandaloneAckOpcode:
 		// Pure StandaloneAck has no payload after the protocol header.

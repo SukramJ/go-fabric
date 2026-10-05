@@ -38,24 +38,30 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/bridge", min: 84},
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/alarm", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 81},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/core", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 87},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/fan", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 74},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 81},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/modebase", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/modeselect", min: 86},
 	// Pinned at full coverage. A package that reaches 100 % has no
 	// uncovered branch to lose, so anything less is a new untested
 	// statement — which is exactly the moment to notice it, while the
 	// change that added it is still on screen.
 	{pkg: "github.com/SukramJ/go-fabric/cluster/onoff", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/opstate", min: 99},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/pump", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/thermo", min: 78},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/valve", min: 79},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
 	// The module's lowest measured package by a wide margin. contract is
 	// the host-facing interface vocabulary, and much of what is uncovered
 	// are the default implementations and kind-registry helpers a host
@@ -94,6 +100,7 @@ var floors = []packageFloor{
 		min: 0,
 		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
 	},
+	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 76},

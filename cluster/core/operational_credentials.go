@@ -339,7 +339,10 @@ type OpcredsConfig struct {
 	// May be nil — the cluster works regardless.
 	OnFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
 	// OnFabricRemoved fires after a successful RemoveFabric has dropped
-	// a fabric from persistent storage. The daemon uses this to evict
+	// a fabric from persistent storage, and after an expired fail-safe
+	// reverted a fabric AddNOC installed (core§11.9.7.2 step 6: "the
+	// equivalent effect of invoking the RemoveFabric command"). The
+	// daemon uses this to evict
 	// every operational session, every active subscription, and every
 	// resumption record bound to the gone fabric — without the eviction
 	// stale state survives the fabric's death and a subsequent pair
@@ -519,6 +522,24 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 	// RevertPendingOpCertsExceptRoot to evict the pending fabric record.
 	if fabricToRevert != 0 {
 		o.revertAddNOC(ctx, fabricToRevert)
+		// The revert is a fabric removal: core§11.9.7.2 step 6 asks for
+		// "the equivalent effect of invoking the RemoveFabric command",
+		// which matter.js reaches by deleting the fabric
+		// (packages/protocol/src/common/FailsafeContext.ts:rollback →
+		// #associatedFabric.delete(), whose FabricManager deleting/deleted
+		// events fan out to every fabric-scoped holder, the group state
+		// among them). So the same consequences run as for the wire
+		// RemoveFabric: this cluster's own (NotifyFabricRemoved) and the
+		// host's fan-out (the OnFabricRemoved hook — sessions,
+		// subscriptions and, through Bridge.EmitFabricRemoved, the
+		// fabric's group keys, group table and multicast memberships).
+		o.NotifyFabricRemoved(fabricToRevert)
+		o.mu.RLock()
+		hook := o.onFabricRemoved
+		o.mu.RUnlock()
+		if hook != nil {
+			hook(ctx, fabricToRevert)
+		}
 	}
 }
 

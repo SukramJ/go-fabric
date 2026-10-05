@@ -6,7 +6,7 @@ pinned here. The authoritative Matter revision is whatever
 (`revision`, `specificationVersion`, `sourceCommit`) — it moves with every
 snapshot refresh (`make generate-matter-schema`, see
 [`CLAUDE.md`](../../CLAUDE.md)), so a number written into this page goes stale
-within a release. At the time of writing the snapshot pins revision 1.6.0.
+within a release. At the time of writing the snapshot pins revision 1.6.1.
 **Related:** [OpenCCU-Loom ADR 0012](https://github.com/SukramJ/openccu-loom/blob/main/docs/adr/0012-matter-pure-go-implementation.md),
 [`conformance/`](../../conformance)
 
@@ -116,11 +116,10 @@ be durable it has to be written down somewhere.
   commission other nodes.
 - **Certification is a non-goal.** The CSA cases in job 3 are regression
   cases, not a certification run.
-- **Subscription resumption across a host restart is not wired.**
-  `store/subscriptions.go` carries the `matter_persistent_subscriptions`
-  table, but no part of the subscription lifecycle writes or reads it, so a
-  restart drops every subscription and controllers re-subscribe once CASE is
-  re-established (`BD-Matter-SubscriptionResumption-Deferred` in
-  [`by_design.md`](../parity/by_design.md)). CASE *session* resumption
-  (Sigma2Resume) is a different mechanism and **is** implemented, in
+- **Subscriptions survive a host restart.** CASE subscriptions are recorded
+  in `matter_server_subscriptions` while active and re-established under
+  their old id after a restart, over a CASE session the device opens to the
+  controller ([ADR 0008](../../docs/adr/0008-subscription-resumption.md)).
+  The controller side of that path is not covered by this suite yet. CASE
+  *session* resumption (Sigma2Resume) is a different mechanism, in
   `secure/sigma`.

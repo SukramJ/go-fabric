@@ -47,6 +47,9 @@ func init() {
 	contract.SetMeasurementMaterializer(contract.MeasurementPressure, floatServer(
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewPressureServer(f) },
 	))
+	contract.SetMeasurementMaterializer(contract.MeasurementFlow, floatServer(
+		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewFlowServer(f) },
+	))
 
 	// The air-quality classes return two servers: the concentration
 	// cluster plus [AirQualityServer], which the AirQualitySensor device

@@ -193,9 +193,13 @@ generate-matter-schema: ## regenerate parity/schema.json + schema/ from a matter
 	# The extractor runs inside the matter.js tree so its bare @matter/model
 	# import resolves; the copy is removed again even when node fails.
 	cp script/extract-from-matter-js.ts $(MATTERJS_DIR)/.gofabric-extract.mts
+	# The snapshot is written to a temporary file and moved into place only
+	# on success: a failing extractor must not truncate the committed pin.
 	cd $(MATTERJS_DIR) && node .gofabric-extract.mts \
-		> $(CURDIR)/parity/schema.json; \
-		rc=$$?; rm -f .gofabric-extract.mts; exit $$rc
+		> $(CURDIR)/parity/schema.json.tmp; \
+		rc=$$?; rm -f .gofabric-extract.mts; \
+		if [ $$rc -ne 0 ]; then rm -f $(CURDIR)/parity/schema.json.tmp; exit $$rc; fi
+	mv parity/schema.json.tmp parity/schema.json
 	$(GO) run ./script/generate_matter_schema.go
 	$(GOFUMPT) -w schema/
 

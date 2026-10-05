@@ -1,0 +1,213 @@
+[
+  {
+    "label": "keyset_write_one_epoch",
+    "cluster": 63,
+    "command": "KeySetWrite",
+    "fixture": {
+      "groupKeySetId": 417,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+      "epochStartTime0": 2220000,
+      "epochKey1": null,
+      "epochStartTime1": null,
+      "epochKey2": null,
+      "epochStartTime2": null
+    },
+    "bytesHex": "1535002500a101240100300210d0d1d2d3d4d5d6d7d8d9dadbdcdddedf2603e0df210034043405340634071818"
+  },
+  {
+    "label": "keyset_write_three_epochs_all_nodes_policy",
+    "cluster": 63,
+    "command": "KeySetWrite",
+    "fixture": {
+      "groupKeySetId": 258,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+      "epochStartTime0": 1,
+      "epochKey1": "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+      "epochStartTime1": 18446744073709,
+      "epochKey2": "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf",
+      "epochStartTime2": 1110000000000000,
+      "groupKeyMulticastPolicy": 1
+    },
+    "bytesHex": "15350025000201240100300210a0a1a2a3a4a5a6a7a8a9aaabacadaeaf240301300410b0b1b2b3b4b5b6b7b8b9babbbcbdbebf2705edb5a0f7c6100000300610c0c1c2c3c4c5c6c7c8c9cacbcccdcecf27070060b3038af103002408011818"
+  },
+  {
+    "label": "keyset_read_response_one_epoch",
+    "cluster": 63,
+    "command": "KeySetReadResponse",
+    "fixture": {
+      "groupKeySetId": 417,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": null,
+      "epochStartTime0": 2220000,
+      "epochKey1": null,
+      "epochStartTime1": null,
+      "epochKey2": null,
+      "epochStartTime2": null,
+      "groupKeyMulticastPolicy": 0
+    },
+    "bytesHex": "1535002500a10124010034022603e0df210034043405340634072408001818"
+  },
+  {
+    "label": "keyset_read_response_ipk",
+    "cluster": 63,
+    "command": "KeySetReadResponse",
+    "fixture": {
+      "groupKeySetId": 0,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": null,
+      "epochStartTime0": 0,
+      "epochKey1": null,
+      "epochStartTime1": null,
+      "epochKey2": null,
+      "epochStartTime2": null,
+      "groupKeyMulticastPolicy": 0
+    },
+    "bytesHex": "153500240000240100340224030034043405340634072408001818"
+  },
+  {
+    "label": "keyset_read_response_three_epochs",
+    "cluster": 63,
+    "command": "KeySetReadResponse",
+    "fixture": {
+      "groupKeySetId": 258,
+      "groupKeySecurityPolicy": 0,
+      "epochKey0": null,
+      "epochStartTime0": 1,
+      "epochKey1": null,
+      "epochStartTime1": 18446744073709,
+      "epochKey2": null,
+      "epochStartTime2": 1110000000000000,
+      "groupKeyMulticastPolicy": 0
+    },
+    "bytesHex": "15350025000201240100340224030134042705edb5a0f7c6100000340627070060b3038af103002408001818"
+  },
+  {
+    "label": "keyset_read_all_indices_response",
+    "cluster": 63,
+    "command": "KeySetReadAllIndicesResponse",
+    "fixture": {
+      "groupKeySetIds": [
+        0,
+        417,
+        258
+      ]
+    },
+    "bytesHex": "153600040005a1010502011818"
+  },
+  {
+    "label": "groups_add_group",
+    "cluster": 4,
+    "command": "AddGroup",
+    "fixture": {
+      "groupId": 257,
+      "groupName": "Kitchen"
+    },
+    "bytesHex": "15250001012c01074b69746368656e18"
+  },
+  {
+    "label": "groups_add_group_if_identifying",
+    "cluster": 4,
+    "command": "AddGroupIfIdentifying",
+    "fixture": {
+      "groupId": 65279,
+      "groupName": ""
+    },
+    "bytesHex": "152500fffe2c010018"
+  },
+  {
+    "label": "groups_view_group",
+    "cluster": 4,
+    "command": "ViewGroup",
+    "fixture": {
+      "groupId": 514
+    },
+    "bytesHex": "152500020218"
+  },
+  {
+    "label": "groups_get_group_membership",
+    "cluster": 4,
+    "command": "GetGroupMembership",
+    "fixture": {
+      "groupList": [
+        257,
+        7
+      ]
+    },
+    "bytesHex": "15360005010104071818"
+  },
+  {
+    "label": "groups_get_group_membership_all",
+    "cluster": 4,
+    "command": "GetGroupMembership",
+    "fixture": {
+      "groupList": []
+    },
+    "bytesHex": "1536001818"
+  },
+  {
+    "label": "groups_remove_group",
+    "cluster": 4,
+    "command": "RemoveGroup",
+    "fixture": {
+      "groupId": 771
+    },
+    "bytesHex": "152500030318"
+  },
+  {
+    "label": "groups_add_group_response",
+    "cluster": 4,
+    "command": "AddGroupResponse",
+    "fixture": {
+      "status": 0,
+      "groupId": 257
+    },
+    "bytesHex": "152400002501010118"
+  },
+  {
+    "label": "groups_view_group_response",
+    "cluster": 4,
+    "command": "ViewGroupResponse",
+    "fixture": {
+      "status": 0,
+      "groupId": 257,
+      "groupName": "Kitchen"
+    },
+    "bytesHex": "15240000250101012c02074b69746368656e18"
+  },
+  {
+    "label": "groups_view_group_response_not_found",
+    "cluster": 4,
+    "command": "ViewGroupResponse",
+    "fixture": {
+      "status": 139,
+      "groupId": 514,
+      "groupName": ""
+    },
+    "bytesHex": "1524008b250102022c020018"
+  },
+  {
+    "label": "groups_get_group_membership_response",
+    "cluster": 4,
+    "command": "GetGroupMembershipResponse",
+    "fixture": {
+      "capacity": 252,
+      "groupList": [
+        257,
+        258
+      ]
+    },
+    "bytesHex": "152400fc36010501010502011818"
+  },
+  {
+    "label": "groups_remove_group_response",
+    "cluster": 4,
+    "command": "RemoveGroupResponse",
+    "fixture": {
+      "status": 139,
+      "groupId": 771
+    },
+    "bytesHex": "1524008b2501030318"
+  }
+]

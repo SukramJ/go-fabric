@@ -10,6 +10,386 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `contract.AttributeChangeNotifier`: a bridged cluster server that keeps
+  its own attribute state names the attributes that moved, and the bridge
+  advances the cluster's DataVersion and marks just those dirty for
+  subscribers — independently of the host source's `ChangeNotifier`. It
+  lets a server hold a "Q" (quieter) attribute out of change reporting
+  until its own rule reports it, as matter.js's `QuietEvent` does.
+- **Appliance cluster servers for laundry washers, laundry dryers,
+  dishwashers and robotic vacuum cleaners.** Each server holds its
+  cluster state the way matter.js's behavior does; the host moves it
+  through setters that enforce matter.js's reactors and answers the
+  commands the server could not decide itself. Changes are reported per
+  attribute through `contract.AttributeChangeNotifier`. Every command,
+  response, event and structured attribute crosses the real wire path in
+  `bridge` tests and is pinned against matter.js encodings
+  (`bridge/testdata/application-wire-fixtures.json`).
+  - `cluster/opstate` — OperationalState (0x0060) and RvcOperationalState
+    (0x0061): `Server`, `NewServer`, `NewRvcServer`, `Config`,
+    `CommandHandler`, `Command*`, `State*`, `Error*`, `StateEntry`,
+    `ErrorState`, `OperationCompletion`, the setters
+    (`SetOperationalState`, `SetOperationalError`, `SetPhaseList`,
+    `SetCurrentPhase`, `SetCountdownTime`), `EmitOperationCompletion`,
+    `Revision` / `RvcRevision` and the device-type constants. Pause /
+    Resume / GoHome follow matter.js's OperationalStateUtils; the
+    "already in that state" answers and the command-state list rule are
+    specification text (`BD-Matter-OperationalStateRulesInServer`).
+    CountdownTime is reported as matter.js reports a quieter attribute.
+  - `cluster/modebase` — `NewLaundryWasherMode`, `NewRvcRunMode`,
+    `NewRvcCleanMode`, `NewDishwasherMode` on one `Server`: `Config`,
+    `ModeChanger`, `ModeOption`, `ModeTag`, `Status*`, the tag constants,
+    `FeatureDirectModeChange`, `SetCurrentMode`. SupportedModes is checked
+    as matter.js's mode servers check it, plus the ModeBase tag rules of
+    the specification (`BD-Matter-ModeBaseRulesInServer`); a ChangeToMode
+    other than UnsupportedMode / the current mode is the device's.
+  - `cluster` — `AttributeChanges` (the listener set behind
+    `contract.AttributeChangeNotifier`) and `Quieter` (matter.js's
+    QuietEvent throttle for a "Q" attribute).
+  - `cluster/wire` — the OperationalState and ModeBase wire types
+    (`OperationalStateStruct`, `ErrorStateStruct`,
+    `OperationalCommandResponse`, `OperationalErrorEvent`,
+    `OperationCompletionEvent`, `ElapsedS`, `ModeOptionStruct`,
+    `ModeTagStruct`, `ChangeToModeRequest`, `ChangeToModeResponse`) and
+    their ids.
+  - `contract.DeviceTypeName` names Laundry Washer, Robotic Vacuum
+    Cleaner, Dishwasher and Laundry Dryer; `schema` knows the read-only
+    attributes of OperationalState and RvcOperationalState.
+  - Not built (none is mandatory for the four device types): the
+    microwave-oven clusters, OvenCavityOperationalState, ServiceArea,
+    LaundryWasherControls, LaundryDryerControls, DishwasherAlarm,
+    TemperatureControl.
+- **Application cluster servers for smoke / CO alarms, fans, air purifiers,
+  extractor hoods, pumps and flow sensors.** Each owns no device state: the
+  host reports a snapshot through a port of the server's package and
+  receives validated writes; the Matter-side rules — conformance, enum and
+  range checks, coupling, status codes, events, FeatureMap / AttributeList /
+  AcceptedCommandList / EventList, revisions from the generated schema —
+  live in the server. Every new command, write and event crosses the real
+  wire path in `bridge` tests, and the Step request and event payloads are
+  pinned against matter.js encodings
+  (`bridge/testdata/application-wire-fixtures.json`,
+  `notes/parity/matter/generate-application-fixtures.ts`).
+  - `cluster/alarm` — SmokeCoAlarm (0x005C) for device type 0x0076:
+    `Server`, `NewServer`, `Config`, `State`, `StateSource`, `SelfTester`,
+    `SensitivitySetter`, `Feature*`, `Optional*`, the enum types,
+    `DefaultExpressedStatePriority`, `Server.ExpressedStateOf`,
+    `Server.Refresh` (emits the specified events between two snapshots),
+    `AlarmSeverityEvent`. SelfTestRequest answers BUSY while alarming or
+    testing (`BD-Matter-SmokeCoAlarmRulesInServer`).
+  - `cluster/fan` — FanControl (0x0202) for Fan 0x002B, AirPurifier 0x002D
+    and ExtractorHood 0x007A: `Server`, `NewServer`, `Config`, `State`,
+    `Settings`, `Setting`, `StateSource`, `RockSetter`, `WindSetter`,
+    `AirflowDirectionSetter`, `Stepper`, `ErrInvalidInState`, `Feature*`
+    and the enum / bitmap types. FanMode, PercentSetting and SpeedSetting
+    writes resolve into one coupled `Settings`; Step has a default when the
+    host has no `Stepper` (`BD-Matter-FanControlCouplingInServer`).
+  - `cluster/pump` — PumpConfigurationAndControl (0x0200) for Pump 0x0303:
+    `Server`, `NewServer`, `Config`, `Limits`, `State`, `StateSource`,
+    `ControlModeSetter`, `RunningHoursSetter`, `EnergyConsumedSetter`,
+    `Server.Emit` for the seventeen alarm events, `Feature*`, `Optional*`
+    and the enum types. Pump's mandatory OnOff stays the host's.
+  - `cluster/measurement` — `FlowServer` / `NewFlowServer` / `FlowRevision`
+    for FlowMeasurement (0x0404); `contract.MeasurementFlow` (FlowSensor
+    0x0306) is a new built-in measurement class. It is appended after
+    `MeasurementElectrical`, so a host-registered class now starts one
+    value higher.
+  - `cluster/wire` — `FanControlClusterID`, `FanControlCmdStep`,
+    `FanStepRequest` and its field tags, `FieldlessEvent`; `cluster` —
+    `AsUintMax`, a narrowing that rejects instead of wrapping.
+  - `contract.DeviceTypeName` names Fan, Air Purifier, Extractor Hood, Pump
+    and Flow Sensor; `schema` knows the read-only attributes of FanControl,
+    PumpConfigurationAndControl and FlowMeasurement.
+  - Not built, all optional: HEPA / activated-carbon filter monitoring, and
+    the optional measurement / level / scene servers of these device types.
+    Open items (unverified connectedhomeip-derived formulas and the
+    PowerSource device-type entry SmokeCoAlarm requires) are in
+    `notes/parity/matter_behaviour_findings.md`.
+- **Groupcast (0x0065) and the AccessControl Auxiliary ACL on the root**, as
+  matter.js's default `ServerNode.RootEndpoint` installs them and Matter
+  1.6.1 requires them of a node with lights or plugs
+  ([ADR 0010](docs/adr/0010-groupcast-and-auxiliary-acl.md)).
+  `core.Groupcast` answers JoinGroup (key creation through
+  GroupKeyManagement, Administer for a key or UseAuxiliaryAcl, the
+  per-fabric and total membership limits, ReplaceEndpoints, IanaAddr /
+  PerGroup multicast policy), LeaveGroup (GroupID 0 applies its Endpoints
+  to every group of the fabric), UpdateGroupKey, ConfigureAuxiliaryAcl and
+  GroupcastTesting (60 s by default; every received group message's outcome
+  becomes a GroupcastTesting event meanwhile), with Membership derived from
+  the shared group state. It advertises Listener and PerGroup, not Sender:
+  this node sends no group message (`BD-Matter-GroupcastNoSender`).
+  `NewGroupcast` turns on AccessControl's Auxiliary feature — the
+  AuxiliaryAcl attribute, the AuxiliaryAccessUpdated event, and an ACL
+  write carrying AuxiliaryType refused with Failure. An IanaAddr group is
+  received on FF05::FA. The reference bridge mounts it.
+  - `cluster/core`: `Groupcast`, `NewGroupcast`, `GroupcastConfig`,
+    `GroupcastClusterID`, `JoinGroupRequest`, `LeaveGroupRequest`,
+    `LeaveGroupResponse`, `UpdateGroupKeyRequest`,
+    `ConfigureAuxiliaryACLRequest`, `GroupcastTestingRequest`,
+    `GroupcastMembershipStruct`, `GroupcastTestingEvent`,
+    `AuxiliaryACLSource`, `AccessControlAuxiliaryEntryStruct`,
+    `AuxiliaryAccessUpdatedEvent`, `AccessControlAuxiliaryTypeSystem`,
+    `AccessControlAuxiliaryTypeGroupcast`, and
+    `AccessControlEntryStruct.AuxiliaryType`.
+  - `bridge`: `AttachAuxiliaryACL` (nil default: the auxiliary grants are
+    not enforced — fails closed); `GroupMessaging.ReportGroupMessage`; a
+    root cluster server implementing `contract.ChangeNotifier` now reaches
+    subscribers.
+  - `endpoint`: `AuxiliaryACLLister`, `TopologyDispatcher.SetAuxiliaryACL`.
+  - `im`: `AuthorityAt`, `WithAuthority`, `AuthorityFunc` (the in-command
+    access check matter.js calls `session.authorityAt`),
+    `HandleGroupInvoke`, `GroupInvokeReport`.
+  - `groups`: `GroupProperties`, `GroupcastMembership`,
+    `Manager.GroupcastMemberships`, `SetGroupProperties`,
+    `RemoveGroupProperties`, `MulticastAddressFor`, `AuxiliaryACL`,
+    `OnGroupcastChanged`, `OnGroupMessage`, `ReportGroupMessage`,
+    `GroupMessageEvent`, `NoKeyError`, `IANAGroupcastAddress`,
+    `PolicyIanaAddr`, `PolicyPerGroup`, `DefaultMcastAddrPolicy`,
+    `UnmappedKeySetID`, the `TestResult*` values; `Store` gains the three
+    Groupcast-group methods.
+  - `store`: the `matter_groupcast_groups` table and `GroupcastGroup`,
+    `UpsertGroupcastGroup`, `RemoveGroupcastGroup`, `ListGroupcastGroups`.
+- **Package `groups`: the node's operational group state**, the Go
+  counterpart of matter.js `packages/protocol/src/groups` and the receive
+  half of `GroupSession`. `groups.Manager` holds, per fabric, the key sets
+  in derived form, the GroupKeyMap, the group table and the per-sender
+  replay windows; `Decode` authenticates a group message (privacy
+  deobfuscation, AES-CCM, the encrypted-with-rollover counter window) and
+  returns it with its Group subject; `Memberships` names the multicast
+  addresses to join. `OperationalKey`, `SessionID`, `PrivacyKey` and
+  `MulticastAddress` are the derivations, pinned against matter.js by
+  fixtures in `groups/testdata/group-crypto-fixtures.json`.
+- **Group messages are received and routed**, as matter.js does it
+  (`SessionManager.groupSessionFromPacket`, `GroupSession.decode`,
+  `InteractionServer` on a group session, `ServerGroupNetworking`). A group
+  message is authenticated through the node's group state, checked against
+  the per-key, per-sender counter window, and a group Invoke or a
+  SuppressResponse Write runs on every member endpoint of the group where a
+  Group access control entry grants the privilege — never answered, never
+  acknowledged; anything that fails a check is dropped silently. The bridge
+  joins the IPv6 multicast address of every group with a member endpoint
+  (`FF35:0040:FD<FabricID>00:<GroupID>`) on all multicast-capable
+  interfaces, follows membership changes, retries a failed join every 30 s
+  and leaves the addresses on Stop; GroupTable changes reach subscribers,
+  and a removed fabric's groups are forgotten.
+  - `bridge`: `GroupMessaging`, `AttachGroupMessaging` (noop default: every
+    group message dropped; see the package doc).
+  - `im`: `GroupSubject`, `WithGroupSubject`, `GroupSubjectFromContext`,
+    `HandleGroupInvokeRequest`, `HandleGroupWriteRequest`,
+    `AuthorizingInvoker`, `CommandAuthorizer`.
+  - `endpoint`: `TopologyDispatcher.InvokeAuthorized`; `CheckACL` evaluates
+    a request carrying a Group subject under the Group auth mode.
+  - `transport/udp`: `Listener.JoinGroup`, `Listener.LeaveGroup`,
+    `ErrNoMulticastInterface`.
+- **A real Groups server (0x0004)**, mirroring matter.js `GroupsServer`
+  ([ADR 0009](docs/adr/0009-groups-and-group-messaging.md), superseding
+  ADR 0004). `core.Groups` answers AddGroup, ViewGroup, GetGroupMembership,
+  RemoveGroup, RemoveAllGroups and AddGroupIfIdentifying with matter.js's
+  statuses (ConstraintError for GroupId 0 or a name over 16 characters,
+  UnsupportedAccess for a group without a GroupKeyMap entry,
+  ResourceExhausted beyond MaxGroupsPerFabric, NotFound), advertises the
+  GroupNames feature, and keeps membership in the shared `groups.Manager`,
+  persisted in the store. `GroupKeyManagement.GroupTable` now serves that
+  membership. Group membership is stack state: with
+  `endpoint.Config.Groups` set, the assembler mounts the server on every
+  bridged endpoint whose device type mandates Groups and replaces a Groups
+  server a source supplies itself.
+  - `cluster/core`: `Groups`, `NewGroups`, `GroupsClusterID`, the request
+    and response types `AddGroupRequest` / `AddGroupResponse`,
+    `ViewGroupRequest` / `ViewGroupResponse`, `GetGroupMembershipRequest` /
+    `GetGroupMembershipResponse`, `RemoveGroupRequest` /
+    `RemoveGroupResponse`, `AddGroupIfIdentifyingRequest`, and
+    `GroupKeyMgmtConfig.Groups`.
+  - `endpoint`: `Config.Groups`.
+  - `schema`: `DeviceTypeMandatoryServerClusters` (generated) and
+    `DeviceTypeRequiresServerCluster`.
+  - `groups`: `Manager.OnGroupTableChanged`.
+- `store`: the `matter_group_table` table and `GroupTableEntry`,
+  `UpsertGroupTableEntry`, `RemoveGroupTableEntry`, `ListGroupTable`. A host
+  that migrates the schema itself picks the table up from `store.Schema()`.
+- `transport/mrp`: `NewWindowEncryptedRollover`, matter.js
+  `MessageReceptionStateEncryptedWithRollover`.
+
+- **Subscriptions survive a restart**, as in matter.js
+  (`SubscriptionsServer`; [ADR 0008](docs/adr/0008-subscription-resumption.md)).
+  Each subscription of a CASE session is recorded while it is active and
+  forgotten when it is terminated; after a restart the bridge resolves the
+  controller, opens a CASE session to it as the initiator, and re-sends the
+  priming report under the old subscription id, so the controller carries on
+  instead of waiting out its liveness timeout. On by default.
+  - `bridge`: `SubscriptionStore`, `AttachSubscriptionStore`,
+    `SetSubscriptionPersistence`, `SubscriptionPersistenceEnabled`,
+    `FormerSubscriptionCount`, `ReestablishFormerSubscriptions` /
+    `ReestablishResult`, `CaseInitiation`, `CaseInitiatorProvider`,
+    `AttachCaseInitiatorProvider`, `OperationalResolver`,
+    `AttachOperationalResolver`, and the errors `ErrCaseInitiatorMissing`,
+    `ErrOperationalResolverMissing`, `ErrCaseRejected`. Each port defaults to
+    a noop; the package doc lists what a skip costs.
+  - `im/subscription`: `PeerSubscription`, `MarshalPeerSubscription`,
+    `UnmarshalPeerSubscription`, `Manager.Restore`, `Manager.Release`,
+    `Manager.SetOnSubscriptionTerminated`, `Subscription.PeerSubscription`,
+    `Subscription.SendInterval`, `ReestablishTimeout`, `ErrIDInUse`.
+  - `secure/sigma`: a CASE initiator towards a peer on the node's own fabric —
+    `NewPeerInitiator` / `InitiatorConfig`, `Initiator.ProcessSigma2Bytes`,
+    `Initiator.ProcessSigma2Resume`, `Initiator.Result` / `InitiatorResult`,
+    `UnmarshalSigma2`, `UnmarshalSigma2Resume`, `ErrPeerIdentityMismatch`,
+    `ErrUnexpectedSigma2Resume`. It exists for re-establishing subscriptions
+    only; the module still has no controller role.
+  - `secure/operational`: `Manager.OpenFromSigmaAsInitiatorWithID`.
+  - `mdns`: `OperationalResolver` / `NewOperationalResolver`,
+    `OperationalInstanceQName`, `SelectionPreference`,
+    `ErrOperationalNotResolved` — resolution of one peer's operational
+    instance, not a browser.
+  - `store`: the `matter_server_subscriptions` table and
+    `SaveServerSubscription`, `DeleteServerSubscription`,
+    `DeleteServerSubscriptionsByFabric`, `LoadServerSubscriptions`,
+    `ClearServerSubscriptions`; `*store.Store` satisfies
+    `bridge.SubscriptionStore`.
+  - `im`: `EventLog.DropBuffered`.
+
+### Changed
+
+- **Matter 1.6.1.** `parity/schema.json` is re-extracted from matter.js
+  `85cf6647` (Matter 1.6.1; previously `f07365a8`, 1.6.0) and `schema/` is
+  regenerated from it. This is a matter.js parity correction and bypasses the
+  deprecation window for the values below:
+  - `cluster.SpecificationVersion` is `0x01060100` (was `0x01050100`), and
+    `core.BasicInformation` defaults `DataModelRevision` to 21 (was 19) —
+    matter.js `Specification.SPECIFICATION_VERSION` / `DATA_MODEL_REVISION`.
+  - `im.MatterInteractionModelRevision` and `im.InteractionModelRevision` are
+    12 (were 13), the revision matter.js stamps on every IM message
+    (`Specification.INTERACTION_MODEL_REVISION`, capped below 13 because
+    revision 13's only delta is provisional). Every IM response's tag `0xFF`
+    changes byte; the IM wire fixtures were regenerated with the generator
+    reading the value from matter.js instead of a literal.
+  - GroupKeyManagement advertises ClusterRevision 4 (was 3). Its GroupKeyMap
+    carries quality `C` (changes omitted), so `MatterReportable` no longer
+    lists it.
+  - Advertised device-type revisions follow the snapshot through
+    `schema.DeviceTypeRevision`: RootNode 5, OnOffLight 4, DimmableLight 4,
+    OnOffPlugInUnit 5, DimmablePlugInUnit 6, ColorTemperatureLight 5,
+    ExtendedColorLight 5, WindowCovering 7, Thermostat 7, SmokeCoAlarm 2,
+    among others.
+  - A write to the deprecated Thermostat attributes PiCoolingDemand,
+    PiHeatingDemand and Occupied/UnoccupiedSetbackMin/Max is answered
+    UNSUPPORTED_WRITE: the 1.6.1 snapshot gives them access `R V`.
+
+  Matter 1.6.1 also requires a Groupcast server and the AccessControl
+  Auxiliary ACL on the root of a node with lights or plugs — see the
+  Groupcast entry above.
+
+- `Bridge.Stop` drops the buffered events (the numbering continues), as a
+  process restart does: the priming report of a subscription re-established
+  after an in-process Stop/Start no longer replays the former run's events
+  (matter.js #4594).
+- A `KeepSubscriptions=false` subscribe over CASE now cancels the peer's
+  subscriptions on all of its sessions, matching on the session's peer node —
+  matter.js matches `session.peerAddress`. It used to fall back to the
+  request's own session because a secure header carries no source node id.
+- `subscription.Manager.CloseSession` and `CloseFabricExcept` close
+  subscriptions without terminating them; `Close`, `ClosePeer`,
+  `CloseEndpoint`, `CloseFabric` and a replace-on-resubscribe terminate them.
+  Only the latter fire the new terminated hook.
+- `sigma.Initiator` is safe for concurrent use and refuses further input after
+  a failed Sigma2.
+
+### Fixed
+
+- GroupKeyManagement GroupTable and GroupKeyMap write GroupId,
+  GroupKeySetId and the endpoint ids at their smallest TLV width, as
+  matter.js's `TlvUInt16` does, instead of always two bytes (both are valid
+  TLV; pinned against matter.js in `bridge/testdata/groupcast-wire-fixtures.json`).
+- **AccessControl Acl and Extension answered a non-fabric-filtered read with
+  the accessing fabric's entries only.** They now return every fabric's
+  entries, as matter.js does (`ListManager` filters a fabric-scoped list
+  only on a fabric-filtered read): the accessing fabric's whole, another
+  fabric's with its fabric-sensitive fields — Privilege, AuthMode,
+  Subjects, Targets; Data — withheld, so such an entry carries FabricIndex
+  alone (`StructManager` / `AccessControl.mayRead`). Reading either still
+  needs Administer. `core.AccessControlEntryStruct.Redacted` and
+  `core.AccessControlExtensionEntry.Redacted` mark such an entry; matter.js
+  encodings are pinned in `bridge/testdata/groupcast-wire-fixtures.json`.
+- **Switch press events went out without their position.** InitialPress,
+  LongPress, ShortRelease and LongRelease carried TLV null in the EventDataIB
+  Data slot: their payload types were unexported, so the bridge's value
+  writer had no case for them. They are now `wire.SwitchInitialPressEvent`,
+  `wire.SwitchLongPressEvent`, `wire.SwitchShortReleaseEvent` and
+  `wire.SwitchLongReleaseEvent`, encoded as matter.js encodes them
+  (`{0: position}`, pinned in `bridge/testdata/application-wire-fixtures.json`
+  and checked through the event-read path). MultiPressOngoing /
+  MultiPressComplete are unaffected: the server does not advertise MSM.
+- **An AccessControl Group entry could not be written.** The validator
+  accepted only Group Node IDs (0xFFFF_FFFF_FFFF_FFxx) as Group subjects;
+  the subject of a Group entry is a Group ID, 0x0001..0xFFFF, as matter.js
+  validates it and as a group message's subject carries it.
+- **GroupKeyManagement worked only through typed Go calls.** The bridge had
+  no wire codec for KeySetWrite / KeySetRead / KeySetRemove /
+  KeySetReadAllIndices, so a controller's command reached the server as a
+  generic tag map and answered Failure, and KeySetReadResponse /
+  KeySetReadAllIndicesResponse had no encoder. Both directions now go
+  through the schema matter.js uses (`TlvOfModel`, pinned by wire fixtures
+  from matter.js in `bridge/testdata/group-wire-fixtures.json`); a payload
+  that does not match the schema answers InvalidCommand as in matter.js.
+  `im.FieldsContainerConsumed` lets a fields reader report a reject it found
+  at the container's end.
+- GroupKeyManagement follows matter.js HEAD (`452d6f5c`,
+  `GroupKeyManagementServer.ts`): KeySetWrite accepts any
+  GroupKeyMulticastPolicy and does not store it, and KeySetRead reports
+  PerGroupID (`core.GroupKeySetStruct.GroupKeyMulticastPolicy`,
+  `core.GroupKeyMulticastPolicyPerGroupID`); KeySetReadAllIndices always
+  lists key set 0 first; the MaxGroupKeysPerFabric budget counts the
+  implicit IPK once whether or not the store holds a row for it; a
+  GroupKeyMap write is refused with InvalidAction for a non-application
+  GroupId, ConstraintError for a duplicate and ResourceExhausted beyond
+  MaxGroupsPerFabric.
+
+- **A GroupKeyMap entry naming a key set not written yet failed with
+  Failure.** `matter_group_key_map` carried a foreign key into
+  `matter_group_keys`; matter.js accepts the write
+  (`GroupKeyManagementServer.ts #validateGroupKeyMap`) and the entry
+  authenticates nothing until the set exists. The constraint is gone:
+  `store.Upgrade` (run by `store.Apply`) rebuilds an existing table without
+  it, and `RemoveGroupKeySet` / `RemoveGroupKeysByFabric` now drop the
+  GroupKeyMap entries naming the removed sets explicitly. A host that feeds
+  `store.Schema()` through its own migration tool calls `store.Upgrade`
+  once after it.
+
+- **GroupKeyMap and GroupTable answered an unfiltered read with the
+  accessing fabric's entries only.** Both are fabric-scoped lists without a
+  fabric-sensitive field, so a read with `isFabricFiltered=false` now
+  returns every fabric's entries, as matter.js does (`ListManager`
+  filters only fabric-filtered reads and fabric-sensitive lists) and as
+  `OperationalCredentials.Fabrics` / `NOCs` already did. Adds
+  `groups.Manager.Fabrics`.
+
+- **A fail-safe revert of AddNOC left the fabric's group state loaded.**
+  The revert removes a fabric the way RemoveFabric does (core§11.9.7.2
+  step 6, matter.js `FailsafeContext.rollback`), so it now runs
+  `OperationalCredentials.NotifyFabricRemoved` and the `OnFabricRemoved`
+  hook as well — a host that hands that hook to `Bridge.EmitFabricRemoved`
+  forgets the reverted fabric's keys, group table, subscriptions and
+  multicast memberships.
+
+### Deprecated
+
+- `wire.Groups`, the read-only Groups stub: group membership is stack state
+  now, and the assembler mounts the real server where a device type
+  mandates Groups (replacing the stub where a source still supplies it).
+  Removal permissible in v0.3.0.
+- `im.StatusUnreportableAttr` (0x8c) and `im.StatusNoUpstreamSubscription`
+  (0xc5): Matter 1.6.1 removed both codes and matter.js dropped them from its
+  status table. No replacement; removal permissible in v0.3.0.
+- The never-wired `store` subscription API — `PersistentSubscriptionRecord`,
+  `ErrPersistentSubscriptionNotFound`, `SavePersistentSubscription`,
+  `LoadPersistentSubscriptions`, `DeletePersistentSubscription`,
+  `DeletePersistentSubscriptionsByFabric`, `GetPersistentSubscription`,
+  `PersistentSubscriptionIntervals`, `MarshalIntervals`, `UnmarshalIntervals`
+  — and its `matter_persistent_subscriptions` table. Nothing ever wrote or
+  read it. Replaced by `Store.SaveServerSubscription` and its siblings on the
+  new `matter_server_subscriptions` table; removal permissible in v0.3.0.
+
 ## [0.1.0] — 2026-10-02
 
 The first tagged release. It is the state of `main` the reference daemon

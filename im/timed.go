@@ -26,16 +26,16 @@ const (
 // existing call sites. Use [MatterInteractionModelRevision] (defined
 // in subscribe.go) for new code.
 //
-// matter.js v0.16.10 emits 13 (Matter 1.5) on every IM message; the
-// previous value of 11 made Apple Home tag our subscribe transactions
-// as stale-protocol and time them out after ~10 s.
-//
-// Original doc:
-// InteractionModelRevision is the IM protocol revision the bridge
-// advertises in TimedRequest replies and StatusResponses (Matter
-// §8.1.4 — bumped to 11 in 1.5.1; older controllers accept lower
-// values gracefully).
-const InteractionModelRevision uint8 = 13
+// It is the IM protocol revision the bridge advertises in TimedRequest
+// replies and StatusResponses (Matter §8.1.4) and always equals
+// [MatterInteractionModelRevision]: 12, matter.js HEAD
+// packages/model/src/common/Specification.ts INTERACTION_MODEL_REVISION
+// at the Matter 1.6.1 pin. matter.js caps the value at 12 because
+// revision 13's only delta is the provisional
+// WildcardFilterConfigurationVersion (§8.2.1.7.1). The value 11 once made
+// Apple Home treat subscribe transactions as stale-protocol; 12 is what
+// matter.js ships to every ecosystem.
+const InteractionModelRevision uint8 = MatterInteractionModelRevision
 
 // Errors.
 var (

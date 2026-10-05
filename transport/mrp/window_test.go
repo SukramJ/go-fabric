@@ -167,3 +167,36 @@ func TestRolloverWindowAcceptsWrappedCounter(t *testing.T) {
 		t.Fatal("replay of the pre-wrap counter should be rejected after advance")
 	}
 }
+
+// TestWindowEncryptedRollover pins the group-message window against matter.js
+// MessageReceptionStateEncryptedWithRollover: the first counter anchors a
+// full bitmap, a counter below it is a replay, a counter across the 2^32
+// wrap within 2^31 is new, and one more than 2^31 ahead counts as behind.
+func TestWindowEncryptedRollover(t *testing.T) {
+	t.Parallel()
+	w := NewWindowEncryptedRollover()
+	if !w.Accept(0xFFFFFFF0) {
+		t.Fatal("first counter must anchor")
+	}
+	if w.Accept(0xFFFFFFF0) {
+		t.Fatal("repeat of the anchor accepted")
+	}
+	if w.Accept(0xFFFFFFEF) {
+		t.Fatal("counter below the anchor accepted (bitmap anchors full)")
+	}
+	if !w.Accept(5) {
+		t.Fatal("counter across the wrap within 2^31 rejected")
+	}
+	if w.Accept(5) {
+		t.Fatal("replay after the wrap accepted")
+	}
+	if !w.Accept(0xFFFFFFFF) {
+		t.Fatal("unseen counter inside the window (pre-wrap) rejected")
+	}
+	if w.Accept(5 + 1<<31 + 1) {
+		t.Fatal("counter more than 2^31 ahead must read as behind the window")
+	}
+	if !w.Accept(5 + 1<<31 - 1) {
+		t.Fatal("counter just under 2^31 ahead must be new")
+	}
+}

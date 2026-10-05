@@ -28,7 +28,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/cover"
+	"github.com/SukramJ/go-fabric/cluster/fan"
+	"github.com/SukramJ/go-fabric/cluster/modebase"
+	"github.com/SukramJ/go-fabric/cluster/opstate"
+	"github.com/SukramJ/go-fabric/cluster/pump"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -66,6 +71,145 @@ func newWindowCoveringServer() *cover.WindowCoveringServer {
 		EndProductType: 0,
 		FeatureMap:     0x05, // LF (bit 0) + PA_LF (bit 2)
 	})
+}
+
+// smokeAlarmSource is a SmokeCoAlarm host that accepts every sensitivity
+// write and remembers the level.
+type smokeAlarmSource struct{ st alarm.State }
+
+func (s *smokeAlarmSource) SmokeCOState() alarm.State { return s.st }
+
+func (s *smokeAlarmSource) SetSmokeSensitivityLevel(_ context.Context, level alarm.Sensitivity) error {
+	s.st.SmokeSensitivityLevel = level
+	return nil
+}
+
+func newSmokeAlarmServer() *alarm.Server {
+	srv, err := alarm.NewServer(alarm.Config{
+		Source:   &smokeAlarmSource{st: alarm.State{SmokeSensitivityLevel: alarm.SensitivityStandard}},
+		Features: alarm.FeatureSmokeAlarm,
+		Optional: alarm.OptionalSmokeSensitivityLevel,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
+// fanSource is a FanControl host that accepts every change.
+type fanSource struct{ st fan.State }
+
+func (f *fanSource) FanState() fan.State { return f.st }
+
+func (f *fanSource) ApplyFanSettings(_ context.Context, s fan.Settings) error {
+	if s.FanMode != nil {
+		f.st.FanMode = *s.FanMode
+	}
+	if p := s.PercentSetting; p != nil && !p.Null {
+		f.st.PercentSetting = &p.Value
+	}
+	if v := s.SpeedSetting; v != nil && !v.Null {
+		f.st.SpeedSetting = &v.Value
+	}
+	return nil
+}
+
+func (f *fanSource) SetRockSetting(_ context.Context, r fan.RockBitmap) error {
+	f.st.RockSetting = r
+	return nil
+}
+
+// newFanServer is a fan without Auto (sequence OffLowHigh), with four
+// speeds, rocking left-right only, and the Step command.
+func newFanServer() *fan.Server {
+	srv, err := fan.NewServer(fan.Config{
+		Source:      &fanSource{},
+		Features:    fan.FeatureMultiSpeed | fan.FeatureRocking | fan.FeatureStep,
+		Sequence:    fan.SequenceOffLowHigh,
+		SpeedMax:    4,
+		RockSupport: fan.RockLeftRight,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
+// opstateHost accepts every OperationalState command.
+type opstateHost struct{}
+
+func (opstateHost) HandleOperationalCommand(context.Context, opstate.Command) (opstate.ErrorState, error) {
+	return opstate.ErrorState{}, nil
+}
+
+// newOpStateServer is a washer's OperationalState with Stop alone, or an
+// RVC's with Pause / Resume / GoHome, running.
+func newOpStateServer(rvc bool) *opstate.Server {
+	states := []opstate.StateEntry{{ID: opstate.StateStopped}, {ID: opstate.StateRunning}, {ID: opstate.StatePaused}, {ID: opstate.StateError}}
+	build, cmds := opstate.NewServer, opstate.CommandStop
+	if rvc {
+		states = append(states, opstate.StateEntry{ID: opstate.StateSeekingCharger})
+		build, cmds = opstate.NewRvcServer, opstate.CommandPause|opstate.CommandResume|opstate.CommandGoHome
+	}
+	srv, err := build(opstate.Config{Handler: opstateHost{}, Commands: cmds, States: states, State: opstate.StateRunning})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
+// modeHost accepts every mode change.
+type modeHost struct{}
+
+func (modeHost) ChangeToMode(context.Context, uint8) (modebase.Status, string, error) {
+	return modebase.StatusSuccess, "", nil
+}
+
+// newDishwasherModeServer is a DishwasherMode with Normal (0) and Heavy (1).
+func newDishwasherModeServer() *modebase.Server {
+	srv, err := modebase.NewDishwasherMode(modebase.Config{Changer: modeHost{}, SupportedModes: []modebase.ModeOption{
+		{Label: "Normal", Mode: 0, Tags: []modebase.ModeTag{{Value: modebase.DishwasherTagNormal}}},
+		{Label: "Heavy", Mode: 1, Tags: []modebase.ModeTag{{Value: modebase.DishwasherTagHeavy}}},
+	}})
+	if err != nil {
+		panic(err)
+	}
+	return srv
+}
+
+// pumpSource is a PumpConfigurationAndControl host that accepts every
+// write.
+type pumpSource struct{ st pump.State }
+
+func (p *pumpSource) PumpState() pump.State { return p.st }
+
+func (p *pumpSource) SetOperationMode(_ context.Context, m pump.OperationMode) error {
+	p.st.OperationMode = m
+	return nil
+}
+
+func (p *pumpSource) SetControlMode(_ context.Context, m pump.ControlMode) error {
+	p.st.ControlMode = m
+	return nil
+}
+
+func (p *pumpSource) SetLifetimeRunningHours(_ context.Context, h *uint32) error {
+	p.st.LifetimeRunningHours = h
+	return nil
+}
+
+// newPumpServer is a constant-pressure pump without SPD or LOCAL, serving
+// ControlMode and LifetimeRunningHours.
+func newPumpServer() *pump.Server {
+	srv, err := pump.NewServer(pump.Config{
+		Source:   &pumpSource{},
+		Features: pump.FeatureConstantPressure,
+		Optional: pump.OptionalControlMode | pump.OptionalLifetimeRunningHours,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return srv
 }
 
 // ── negative write cases ─────────────────────────────────────────────────────
@@ -160,6 +304,205 @@ func TestNegativeWriteParity(t *testing.T) {
 			value:      uint8(16),
 			wantStatus: im.StatusConstraintError,
 		},
+		{
+			// matter.js fan-control.element.ts:106 — FanModeEnum Auto has
+			// conformance "AUT"; matter.js rejects a member whose
+			// conformance fails with ConstraintError
+			// (EnumValueConformanceError, protocol/src/action/errors.ts).
+			name: "FanControl/FanMode=Auto without AUT → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrFanMode,
+			value:      uint64(fan.FanModeAuto),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.resource.ts:48-51 + :62-63 — Medium is offered
+			// only by sequences 0 and 2; any other value is CONSTRAINT_ERROR.
+			name: "FanControl/FanMode=Medium on OffLowHigh → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrFanMode,
+			value:      uint64(fan.FanModeMedium),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.element.ts:39 — PercentSetting "max 100".
+			name: "FanControl/PercentSetting=101 → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrPercentSetting,
+			value:      uint64(101),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.element.ts:48 — SpeedSetting "max speedMax".
+			name: "FanControl/SpeedSetting > SpeedMax → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrSpeedSetting,
+			value:      uint64(5),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.resource.ts:162-164 — a RockSetting bit not in
+			// RockSupport is CONSTRAINT_ERROR.
+			name: "FanControl/RockSetting outside RockSupport → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrRockSetting,
+			value:      uint64(fan.RockUpDown),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// fan-control.element.ts:41 — PercentCurrent is access "R V".
+			name: "FanControl/PercentCurrent write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newFanServer()
+			},
+			attrID:     fan.AttrPercentCurrent,
+			value:      uint64(10),
+			wantStatus: im.StatusUnsupportedWrite,
+		},
+		{
+			// matter.js pump-configuration-and-control.element.ts:146 —
+			// OperationModeEnum Minimum is conformance "SPD"; the
+			// resource (:252-254) answers an unsupported mode with
+			// CONSTRAINT_ERROR.
+			name: "PumpConfigurationAndControl/OperationMode=Minimum without SPD → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newPumpServer()
+			},
+			attrID:     pump.AttrOperationMode,
+			value:      uint64(pump.OperationMinimum),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// pump-configuration-and-control.element.ts:156 — ControlMode
+			// ConstantFlow is conformance "FLW" (resource :264-266).
+			name: "PumpConfigurationAndControl/ControlMode=ConstantFlow without FLW → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newPumpServer()
+			},
+			attrID:     pump.AttrControlMode,
+			value:      uint64(pump.ControlConstantFlow),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// pump-configuration-and-control.element.ts:95 —
+			// LifetimeRunningHours is a nullable uint24: 0xFFFFFF is the
+			// null sentinel, outside the value range (resource :217).
+			name: "PumpConfigurationAndControl/LifetimeRunningHours=0xFFFFFF → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newPumpServer()
+			},
+			attrID:     pump.AttrLifetimeRunningHours,
+			value:      uint64(0xFFFFFF),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// matter.js smoke-co-alarm-cluster.element.ts:44 + :82-87 —
+			// SmokeSensitivityLevel is a SensitivityEnum (High 0, Standard
+			// 1, Low 2); an enum write outside its values fails matter.js
+			// TlvEnum validation with ConstraintError.
+			name: "SmokeCoAlarm/SmokeSensitivityLevel=3 → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newSmokeAlarmServer()
+			},
+			attrID:     alarm.AttrSmokeSensitivityLevel,
+			value:      uint64(3),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// smoke-co-alarm-cluster.element.ts:28 — ExpressedState is
+			// access "R V".
+			name: "SmokeCoAlarm/ExpressedState write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newSmokeAlarmServer()
+			},
+			attrID:     alarm.AttrExpressedState,
+			value:      uint64(0),
+			wantStatus: im.StatusUnsupportedWrite,
+		},
+		{
+			// operational-state.element.ts:40 — OperationalState is
+			// access "R V"; matter.js AttributeWriteResponse answers
+			// UnsupportedWrite.
+			name: "OperationalState/OperationalState write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newOpStateServer(false)
+			},
+			attrID:     opstate.AttrOperationalState,
+			value:      uint64(opstate.StateStopped),
+			wantStatus: im.StatusUnsupportedWrite,
+		},
+		{
+			// rvc-operational-state.element.ts: OperationalError is
+			// inherited "R V".
+			name: "RvcOperationalState/OperationalError write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newOpStateServer(true)
+			},
+			attrID:     opstate.AttrOperationalError,
+			value:      map[uint8]any{0: uint64(0)},
+			wantStatus: im.StatusUnsupportedWrite,
+		},
+		{
+			// mode-base.element.ts:34 — CurrentMode is "R V".
+			name: "DishwasherMode/CurrentMode write → UnsupportedWrite",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newDishwasherModeServer()
+			},
+			attrID:     modebase.AttrCurrentMode,
+			value:      uint64(1),
+			wantStatus: im.StatusUnsupportedWrite,
+		},
+		{
+			// dishwasher-mode.element.ts — StartUpMode is "X": not an
+			// attribute of the server.
+			name: "DishwasherMode/StartUpMode write → UnsupportedAttribute",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newDishwasherModeServer()
+			},
+			attrID:     0x0002,
+			value:      uint64(1),
+			wantStatus: im.StatusUnsupportedAttribute,
+		},
 	}
 
 	ctx := context.Background()
@@ -206,6 +549,20 @@ func TestNegativeInvokeParity(t *testing.T) {
 
 	cases := []negativeInvokeCase{
 		{
+			// matter.js fan-control.element.ts:71 + :88-92 — Direction is a
+			// StepDirectionEnum (Increase 0, Decrease 1); an undefined
+			// member is UnknownEnumValueError, ConstraintError.
+			name: "FanControl/Step Direction=2 → ConstraintError",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return newFanServer()
+			},
+			cmdID:      fan.CmdStep,
+			fields:     wire.FanStepRequest{Direction: 2},
+			wantStatus: im.StatusConstraintError,
+		},
+		{
 			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:158-166
 			// setpointRaiseLower — mode=Heat without HEAT feature → InvalidCommand.
 			// Heat is 0x0 per SetpointRaiseLowerModeEnum
@@ -235,6 +592,43 @@ func TestNegativeInvokeParity(t *testing.T) {
 				"percent": uint16(10001),
 			},
 			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// rvc-operational-state.element.ts:23 — Start is "X" in the
+			// derivation: not in AcceptedCommandList, UnsupportedCommand.
+			name: "RvcOperationalState/Start → UnsupportedCommand",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return newOpStateServer(true)
+			},
+			cmdID:      opstate.CmdStart,
+			wantStatus: im.StatusUnsupportedCommand,
+		},
+		{
+			// operational-state.element.ts:65-68 — Start is "O"; a server
+			// that does not support it does not accept it.
+			name: "OperationalState/Start on a Stop-only server → UnsupportedCommand",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return newOpStateServer(false)
+			},
+			cmdID:      opstate.CmdStart,
+			wantStatus: im.StatusUnsupportedCommand,
+		},
+		{
+			// mode-base.element.ts:49 — NewMode is mandatory; a request the
+			// schema does not decode is InvalidCommand.
+			name: "DishwasherMode/ChangeToMode without NewMode → InvalidCommand",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return newDishwasherModeServer()
+			},
+			cmdID:      modebase.CmdChangeToMode,
+			fields:     map[uint8]any{},
+			wantStatus: im.StatusInvalidCommand,
 		},
 	}
 
@@ -300,10 +694,78 @@ func TestPositiveWriteControl(t *testing.T) {
 	})
 }
 
+// TestPositiveWriteControlApplicationClusters holds the accepted
+// boundaries of the application clusters' writable attributes.
+func TestPositiveWriteControlApplicationClusters(t *testing.T) {
+	t.Parallel()
+
+	t.Run("FanControl/PercentSetting == 100 and SpeedSetting == SpeedMax accepted", func(t *testing.T) {
+		t.Parallel()
+		srv := newFanServer()
+		if err := srv.MatterWrite(context.Background(), fan.AttrPercentSetting, uint64(100)); err != nil {
+			t.Fatalf("PercentSetting 100: %v", err)
+		}
+		if err := srv.MatterWrite(context.Background(), fan.AttrSpeedSetting, uint64(4)); err != nil {
+			t.Fatalf("SpeedSetting 4 (SpeedMax): %v", err)
+		}
+		if v, _ := srv.MatterRead(fan.AttrPercentSetting); v != uint8(100) {
+			t.Errorf("PercentSetting after SpeedSetting=SpeedMax = %v, want 100 (speed rule)", v)
+		}
+	})
+
+	t.Run("PumpConfigurationAndControl/ControlMode == ConstantPressure and LifetimeRunningHours == 0xFFFFFE accepted", func(t *testing.T) {
+		t.Parallel()
+		srv := newPumpServer()
+		if err := srv.MatterWrite(context.Background(), pump.AttrControlMode, uint64(pump.ControlConstantPressure)); err != nil {
+			t.Fatalf("ControlMode ConstantPressure: %v", err)
+		}
+		if err := srv.MatterWrite(context.Background(), pump.AttrLifetimeRunningHours, uint64(0xFFFFFE)); err != nil {
+			t.Fatalf("LifetimeRunningHours 0xFFFFFE: %v", err)
+		}
+		if v, _ := srv.MatterRead(pump.AttrLifetimeRunningHours); v != uint32(0xFFFFFE) {
+			t.Errorf("LifetimeRunningHours = %v", v)
+		}
+	})
+
+	t.Run("SmokeCoAlarm/SmokeSensitivityLevel == Low(2) accepted", func(t *testing.T) {
+		t.Parallel()
+		srv := newSmokeAlarmServer()
+		if err := srv.MatterWrite(context.Background(), alarm.AttrSmokeSensitivityLevel, uint64(alarm.SensitivityLow)); err != nil {
+			t.Fatalf("write Low: %v", err)
+		}
+		if v, _ := srv.MatterRead(alarm.AttrSmokeSensitivityLevel); v != uint8(alarm.SensitivityLow) {
+			t.Errorf("SmokeSensitivityLevel = %v, want 2", v)
+		}
+	})
+}
+
 // TestPositiveInvokeControl verifies that boundary command arguments
 // matter.js accepts are not rejected by Loom.
 func TestPositiveInvokeControl(t *testing.T) {
 	t.Parallel()
+
+	t.Run("DishwasherMode/ChangeToMode Heavy answered Success", func(t *testing.T) {
+		t.Parallel()
+		srv := newDishwasherModeServer()
+		resp, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, wire.ChangeToModeRequest{NewMode: 1})
+		if err != nil || resp.(wire.ChangeToModeResponse).Status != 0 {
+			t.Fatalf("ChangeToMode 1: %+v, %v", resp, err)
+		}
+		if v, _ := srv.MatterRead(modebase.AttrCurrentMode); v != uint8(1) {
+			t.Errorf("CurrentMode = %v", v)
+		}
+	})
+
+	t.Run("RvcOperationalState/GoHome while Running answered NoError", func(t *testing.T) {
+		t.Parallel()
+		resp, err := newOpStateServer(true).MatterInvoke(context.Background(), opstate.CmdGoHome, nil)
+		if err != nil {
+			t.Fatalf("GoHome: %v", err)
+		}
+		if r := resp.(wire.OperationalCommandResponse); r.CommandResponseState.ErrorStateID != 0 {
+			t.Errorf("GoHome = %+v, want NoError", r)
+		}
+	})
 
 	t.Run("WindowCovering/GoToLiftPercentage == 10000 accepted", func(t *testing.T) {
 		t.Parallel()

@@ -84,14 +84,58 @@ CREATE TABLE IF NOT EXISTS matter_group_keys (
 
 -- matter_group_key_map binds GroupID -> GroupKeySetID per fabric
 -- (Matter §11.2.10.4 GroupKeyMap attribute).
+--
+-- group_key_set_id deliberately carries no foreign key to
+-- matter_group_keys: a GroupKeyMap entry may name a key set that is not
+-- written yet. matter.js accepts such a write and leaves the existence
+-- check commented out because certification tests write the map first
+-- (GroupKeyManagementServer.ts #validateGroupKeyMap); an entry whose key
+-- set is missing authenticates nothing. KeySetRemove drops the entries
+-- that name the removed set explicitly (store.RemoveGroupKeySet). A
+-- database created with the earlier foreign key is rebuilt by
+-- store.Upgrade, which store.Apply runs.
 CREATE TABLE IF NOT EXISTS matter_group_key_map (
     fabric_index        INTEGER NOT NULL,
     group_id            INTEGER NOT NULL CHECK(group_id BETWEEN 0 AND 65535),
     group_key_set_id    INTEGER NOT NULL,
     PRIMARY KEY(fabric_index, group_id),
-    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE,
-    FOREIGN KEY(fabric_index, group_key_set_id)
-        REFERENCES matter_group_keys(fabric_index, group_key_set_id) ON DELETE CASCADE
+    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
+);
+
+-- matter_group_table persists the group membership of this node's
+-- endpoints per fabric — the GroupKeyManagement GroupTable attribute
+-- (Matter §11.2.6.2, GroupInfoMapStruct) that the Groups cluster's
+-- AddGroup / RemoveGroup maintain. endpoints_json is the ordered endpoint
+-- list as a JSON array. Mirrors matter.js GroupKeyManagementServer state
+-- `groupTable`, which is persisted (packages/node/src/behaviors/
+-- group-key-management/GroupKeyManagementServer.ts addEndpointForGroup /
+-- removeEndpoint).
+CREATE TABLE IF NOT EXISTS matter_group_table (
+    fabric_index        INTEGER NOT NULL,
+    group_id            INTEGER NOT NULL CHECK(group_id BETWEEN 1 AND 65535),
+    group_name          TEXT    NOT NULL DEFAULT '',
+    endpoints_json      TEXT    NOT NULL,
+    PRIMARY KEY(fabric_index, group_id),
+    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
+);
+
+-- matter_groupcast_groups persists the Groupcast cluster's per-group
+-- properties: the multicast address policy (MulticastAddrPolicyEnum:
+-- 0 IanaAddr, 1 PerGroup) and whether the group carries an auxiliary
+-- access control entry. A row is what makes a group a Groupcast member
+-- beyond the group table. Mirrors matter.js GroupcastServer state
+-- `groupProperties` (GroupPropertiesStruct: GroupId, McastAddrPolicy,
+-- HasAuxiliaryAcl, FabricIndex; quality N), which together with
+-- GroupKeyManagement's groupTable and groupKeyMap is the source the
+-- Membership attribute is derived from
+-- (packages/node/src/behaviors/groupcast/GroupcastServer.ts).
+CREATE TABLE IF NOT EXISTS matter_groupcast_groups (
+    fabric_index        INTEGER NOT NULL,
+    group_id            INTEGER NOT NULL CHECK(group_id BETWEEN 1 AND 65535),
+    mcast_addr_policy   INTEGER NOT NULL CHECK(mcast_addr_policy BETWEEN 0 AND 255),
+    has_auxiliary_acl   INTEGER NOT NULL DEFAULT 0 CHECK(has_auxiliary_acl IN (0, 1)),
+    PRIMARY KEY(fabric_index, group_id),
+    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
 );
 
 -- matter_acl_entries persists the per-fabric AccessControl list
@@ -181,16 +225,10 @@ CREATE TABLE IF NOT EXISTS matter_settings (
     value TEXT NOT NULL
 );
 
--- matter_persistent_subscriptions stores active subscriptions that
--- survive a restart. On boot the bridge re-arms every row as an in-memory
--- subscription so controllers that had active subscriptions before the
--- restart receive ongoing reports without re-subscribing, per Matter 1.4
--- §10.6.9.
---
--- paths_json holds a JSON array of ConcreteAttributePath objects
--- (serialised with the same field names as the Go struct so the store
--- layer decodes without a custom mapper). intervals_json holds
--- {"min":N,"max":N} for the negotiated cadence.
+-- matter_persistent_subscriptions is the deprecated first attempt at
+-- subscription persistence. Nothing in this module writes or reads it; it
+-- is still created so a host that pinned the old store API keeps working
+-- through the deprecation window. matter_server_subscriptions replaces it.
 CREATE TABLE IF NOT EXISTS matter_persistent_subscriptions (
     id                  INTEGER  PRIMARY KEY AUTOINCREMENT,
     fabric_index        INTEGER  NOT NULL,
@@ -205,3 +243,21 @@ CREATE TABLE IF NOT EXISTS matter_persistent_subscriptions (
 -- on fabric-removal teardown.
 CREATE INDEX IF NOT EXISTS matter_persistent_subscriptions_fabric
     ON matter_persistent_subscriptions(fabric_index);
+
+-- matter_server_subscriptions holds the server subscriptions of CASE
+-- sessions that are active right now, so they can be re-established
+-- under their old SubscriptionId after a restart (docs/adr/0008, mirroring
+-- matter.js SubscriptionsServer). One row per SubscriptionId; payload is
+-- the im/subscription.PeerSubscription encoding and is opaque to this
+-- package. The bridge clears the table when it loads it at start-up and
+-- writes back each subscription that becomes active again.
+CREATE TABLE IF NOT EXISTS matter_server_subscriptions (
+    subscription_id     INTEGER  PRIMARY KEY,
+    fabric_index        INTEGER  NOT NULL,
+    peer_node_id        BLOB     NOT NULL,
+    payload             BLOB     NOT NULL,
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS matter_server_subscriptions_fabric
+    ON matter_server_subscriptions(fabric_index);

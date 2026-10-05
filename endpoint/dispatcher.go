@@ -56,6 +56,16 @@ func clusterDataVersionFor(ep *Endpoint, srv contract.ClusterServer) uint32 {
 type TopologyDispatcher struct {
 	topology *Topology
 	acl      ACLLister
+	aux      AuxiliaryACLLister
+}
+
+// AuxiliaryACLLister supplies the auxiliary access control entries of the
+// AccessControl cluster's Auxiliary (AUX) feature: entries a cluster
+// synthesises rather than a controller writes — today the Groupcast
+// cluster's Operate grants for the listener endpoints of a group with
+// HasAuxiliaryAcl. *groups.Manager satisfies it.
+type AuxiliaryACLLister interface {
+	AuxiliaryACL(ctx context.Context, fabricIndex uint8) ([]store.ACLEntry, error)
 }
 
 // ACLLister is the subset of the Matter ACL store [TopologyDispatcher.CheckACL]
@@ -110,6 +120,19 @@ func (d *TopologyDispatcher) SetACLLister(l ACLLister) {
 	}
 }
 
+// SetAuxiliaryACL wires the auxiliary access control entries
+// [TopologyDispatcher.CheckACL] evaluates next to the stored ones (see
+// Bridge.AttachAuxiliaryACL), and with them the Auxiliary feature's rule
+// that a Group entry without targets no longer reaches endpoint 0. nil
+// turns the feature off. Mirrors matter.js AccessControlServer
+// #applyFabricAcl, which installs `[...realAcl, ...#auxiliaryAclFor(fabric)]`
+// and sets FabricAccessControl.auxiliaryFeatureEnabled.
+func (d *TopologyDispatcher) SetAuxiliaryACL(l AuxiliaryACLLister) {
+	if d != nil {
+		d.aux = l
+	}
+}
+
 // Compile-time assertion: TopologyDispatcher satisfies im.Dispatcher
 // and the optional im.DataVersionReader + im.AttributeReadPrivilegeProvider
 // + im.ACLChecker + im.AuthorizingWriter interfaces.
@@ -119,6 +142,7 @@ var (
 	_ im.AttributeReadPrivilegeProvider = (*TopologyDispatcher)(nil)
 	_ im.ACLChecker                     = (*TopologyDispatcher)(nil)
 	_ im.AuthorizingWriter              = (*TopologyDispatcher)(nil)
+	_ im.AuthorizingInvoker             = (*TopologyDispatcher)(nil)
 )
 
 // Read implements [im.Dispatcher]. Wildcards expand as follows:
@@ -323,6 +347,44 @@ func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommand
 		return im.InvokeResult{Path: path, Response: resp, Status: im.StatusSuccess}
 	}
 	return im.InvokeResult{Path: path, Status: im.StatusUnsupportedCluster}
+}
+
+// InvokeAuthorized implements [im.AuthorizingInvoker]: a command whose
+// endpoint is a wildcard runs on every endpoint that hosts the cluster and
+// accepts the command, in ascending endpoint order, each location gated by
+// authorize. A server that lists no accepted commands is taken to accept
+// the command and answers for itself. Mirrors matter.js
+// CommandInvokeResponse #processWildcard / #wildcardTargetOf, which skip an
+// endpoint lacking the cluster or command and one the session may not
+// invoke there.
+func (d *TopologyDispatcher) InvokeAuthorized(ctx context.Context, path im.ConcreteCommandPath, fields any, authorize im.CommandAuthorizer) []im.InvokeResult {
+	if path.HasEndpoint {
+		return []im.InvokeResult{d.Invoke(ctx, path, fields)}
+	}
+	var results []im.InvokeResult
+	for _, ep := range d.resolveEndpoints(im.ConcreteAttributePath{}) {
+		for _, srv := range ClusterServers(ep) {
+			if srv == nil || srv.MatterClusterID() != path.Cluster {
+				continue
+			}
+			if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), path.Command) {
+				break
+			}
+			if authorize != nil && !authorize(ep.ID, path.Cluster, path.Command).IsSuccess() {
+				break
+			}
+			ePath := path
+			ePath.Endpoint, ePath.HasEndpoint = ep.ID, true
+			resp, err := srv.MatterInvoke(ctx, path.Command, fields)
+			res := im.InvokeResult{Path: ePath, Response: resp, Status: im.StatusSuccess}
+			if err != nil {
+				res.Status, res.ClusterStatus, res.HasClusterStatus = classifyError(err, invokeErrorStatus)
+			}
+			results = append(results, res)
+			break
+		}
+	}
+	return results
 }
 
 // resolveEndpoints expands the wildcard-aware endpoint selector. A
@@ -831,6 +893,20 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 	if d.topology != nil {
 		ep = d.topology.FindByID(endpoint)
 	}
+	if group, isGroup := im.GroupSubjectFromContext(ctx); isGroup {
+		auxEnabled := d.aux != nil
+		if auxEnabled {
+			// Auxiliary entries are all Group entries, so only a group
+			// subject can match one. An auxiliary source that cannot be
+			// read fails closed like the stored ACL.
+			aux, err := d.aux.AuxiliaryACL(ctx, fabricIndex)
+			if err != nil {
+				return im.StatusUnsupportedAccess
+			}
+			entries = append(slices.Clone(entries), aux...)
+		}
+		return checkGroupACL(entries, group, ep, endpoint, clusterID, requiredPrivilege, auxEnabled)
+	}
 	var best store.Privilege
 	for _, e := range entries {
 		// Operational unicast sessions are CASE-authenticated; only CASE
@@ -847,6 +923,51 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		if e.Privilege > best {
 			best = e.Privilege
 		}
+	}
+	if privilegeRank(uint8(best)) >= privilegeRank(requiredPrivilege) {
+		return im.StatusSuccess
+	}
+	return im.StatusUnsupportedAccess
+}
+
+// checkGroupACL is the access check for a group message (Matter §9.10.5.6
+// with the Group auth mode). Mirrors matter.js FabricAccessControl:
+// #getIsdFromMessage gives a group message the Group auth mode and the
+// group id as its only subject — but only while the authenticating key is
+// the one GroupKeyMap maps the group to (hasValidMapping); otherwise the
+// subject descriptor keeps no auth mode and no entry can match. Only Group
+// entries apply; an empty Subjects list matches any group, otherwise the
+// group id must be listed. A Group entry may never grant Administer:
+// matter.js throws on that grant, which denies the request.
+//
+// With the Auxiliary feature (auxEnabled) entries holds the auxiliary
+// entries too, and a Group entry without targets does not reach endpoint 0
+// (FabricAccessControl #getGrantedPrivileges: "Group subjects cannot grant
+// access to Endpoint 0 when Auxiliary feature is enabled").
+func checkGroupACL(entries []store.ACLEntry, group im.GroupSubject, ep *Endpoint, endpoint uint16, clusterID uint32, requiredPrivilege uint8, auxEnabled bool) im.StatusCode {
+	if !group.HasValidMapping {
+		return im.StatusUnsupportedAccess
+	}
+	var best store.Privilege
+	for _, e := range entries {
+		if e.AuthMode != store.AuthModeGroup {
+			continue
+		}
+		if len(e.Subjects) > 0 && !slices.Contains(e.Subjects, uint64(group.GroupID)) {
+			continue
+		}
+		if auxEnabled && len(e.Targets) == 0 && endpoint == 0 {
+			continue
+		}
+		if !aclTargetMatches(e.Targets, ep, endpoint, clusterID) {
+			continue
+		}
+		if e.Privilege > best {
+			best = e.Privilege
+		}
+	}
+	if best == store.PrivilegeAdminister {
+		return im.StatusUnsupportedAccess
 	}
 	if privilegeRank(uint8(best)) >= privilegeRank(requiredPrivilege) {
 		return im.StatusSuccess

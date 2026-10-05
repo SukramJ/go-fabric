@@ -19,7 +19,9 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -67,6 +69,7 @@ type rootRefs struct {
 func buildRootClusters(
 	identity bridgeIdentity,
 	st *store.Store,
+	groupState *groups.Manager,
 	chain *attestation.Chain,
 	onFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte),
 ) ([]contract.ClusterServer, rootRefs, error) {
@@ -146,9 +149,22 @@ func buildRootClusters(
 	if err != nil {
 		return nil, refs, fmt.Errorf("access control: %w", err)
 	}
-	groupKeys, err := mattercore.NewGroupKeyManagement(st, mattercore.GroupKeyMgmtConfig{})
+	// GroupKeyManagement keeps the group state current and serves its
+	// GroupTable; without it no group message could be authenticated.
+	groupKeys, err := mattercore.NewGroupKeyManagement(st, mattercore.GroupKeyMgmtConfig{Groups: groupState})
 	if err != nil {
 		return nil, refs, fmt.Errorf("group key management: %w", err)
+	}
+	// Groupcast is what Matter 1.6.1 asks of a root whose node has lights
+	// or plugs (RootNode GroupcastListenerCond). It shares the group state,
+	// creates keys and bindings through GroupKeyManagement, and turns on
+	// AccessControl's Auxiliary feature for the grants it synthesises —
+	// which the bridge enforces once AttachAuxiliaryACL has the same state.
+	groupcast, err := mattercore.NewGroupcast(mattercore.GroupcastConfig{
+		Groups: groupState, GroupKeyManagement: groupKeys, AccessControl: accessControl,
+	})
+	if err != nil {
+		return nil, refs, fmt.Errorf("groupcast: %w", err)
 	}
 
 	// ServerList is derived from the mounted set rather than written out,
@@ -173,6 +189,7 @@ func buildRootClusters(
 		mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot),
 		opCreds,
 		groupKeys,
+		groupcast,
 		descriptor,
 	}
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
@@ -326,6 +343,14 @@ func (c *caseIdentities) announceIdentity(fabricIndex uint8) (compressedID [8]by
 		return compressedID, 0, false
 	}
 	return entry.identity.CompressedFabricID, entry.identity.NodeID, true
+}
+
+// forFabric returns the loaded identity of one fabric.
+func (c *caseIdentities) forFabric(fabricIndex uint8) (*caseFabric, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entry, ok := c.byIdx[fabricIndex]
+	return entry, ok && entry.identity != nil
 }
 
 // load rebuilds the identity for one fabric from its persisted rows. Called
@@ -494,7 +519,78 @@ func wireSecurity(
 	caseProvider.StartReaper(ctx, 30*time.Second, time.Minute)
 	br.AttachCaseHandlerProvider(caseProvider.Resolve)
 
+	// Subscription persistence and re-establishment (docs/adr/0008). The
+	// store keeps each CASE subscription across a restart; after one, the
+	// bridge resolves the controller over mDNS, opens CASE to it as the
+	// initiator, and resumes the subscription under its old id — main
+	// calls ReestablishFormerSubscriptions once the identities are loaded.
+	// Skip these and every restart costs each controller its subscription
+	// liveness timeout before it re-subscribes.
+	br.AttachSubscriptionStore(st)
+	br.AttachOperationalResolver(mdns.NewOperationalResolver(logger))
+	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger))
+
 	return &security{sessions: sessions, subs: subs, pase: paseProvider, casep: caseProvider}
+}
+
+// caseInitiatorProvider prepares the CASE handshakes the bridge opens to
+// re-establish former subscriptions: this node's identity on the peer's
+// fabric, a reserved session id, and — when one is stored — the peer's
+// resumption record, which matter.js CaseClient offers whenever it holds
+// one. A completed handshake registers the session and stores the new
+// resumption record, as matter.js does after every pair.
+func caseInitiatorProvider(st *store.Store, sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger) matterbridge.CaseInitiatorProvider {
+	return func(ctx context.Context, fabricIndex uint8, peerNodeID uint64) (*matterbridge.CaseInitiation, error) {
+		fabric, ok := ids.forFabric(fabricIndex)
+		if !ok {
+			return nil, fmt.Errorf("no CASE identity loaded for fabric %d", fabricIndex)
+		}
+		sessionID, err := sessions.AllocateID()
+		if err != nil {
+			return nil, fmt.Errorf("allocate CASE session id: %w", err)
+		}
+		var resumption *sigma.ResumptionRecord
+		if rec, rerr := st.GetResumptionByPeer(ctx, fabricIndex, peerNodeID); rerr == nil {
+			resumption = &sigma.ResumptionRecord{
+				SharedSecret: rec.SharedSecret,
+				ResumptionID: rec.ResumptionID,
+				FabricIndex:  fabricIndex,
+				PeerNodeID:   peerNodeID,
+				PeerCATs:     rec.CASEAuthTags,
+			}
+		}
+		initiator, err := sigma.NewPeerInitiator(sigma.InitiatorConfig{
+			Identity:      fabric.identity,
+			Verifier:      fabric.verifier,
+			SessionID:     sessionID,
+			PeerNodeID:    peerNodeID,
+			RootPublicKey: fabric.rootPublicKey,
+			Resumption:    resumption,
+		})
+		if err != nil {
+			sessions.ReleaseID(sessionID)
+			return nil, err
+		}
+		localNodeID := fabric.identity.NodeID
+		return &matterbridge.CaseInitiation{
+			Initiator:          initiator,
+			CompressedFabricID: fabric.identity.CompressedFabricID,
+			OnEstablished: func(ctx context.Context, res sigma.InitiatorResult) error {
+				entry, err := sessions.OpenFromSigmaAsInitiatorWithID(sessionID, fabricIndex, localNodeID, res.PeerNodeID, res.PeerSessionID, res.PeerCATs, res.Keys)
+				if err != nil {
+					return err
+				}
+				if p := res.PeerSessionParams; p != nil {
+					entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
+				}
+				if err := sessions.PersistResumption(ctx, fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
+					logger.Debug("case.initiator.resumption_persist", slog.String("err", err.Error()))
+				}
+				return nil
+			},
+			OnAbandoned: func() { sessions.ReleaseID(sessionID) },
+		}, nil
+	}
 }
 
 // paseParams is the commissioning secret in the shape the SPAKE2+ verifier

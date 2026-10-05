@@ -159,6 +159,24 @@ func TestAttributeWritable(t *testing.T) {
 		{"DoorLock/LockState read-only", 0x0101, 0x0000, false, true},
 		// DoorLock.OperatingMode (0x0025, "R[W] VM") — optional-write ⇒ writable.
 		{"DoorLock/OperatingMode writable", 0x0101, 0x0025, true, false},
+		// FlowMeasurement.MeasuredValue (0x0000, "R V") — read-only.
+		{"FlowMeasurement/MeasuredValue read-only", 0x0404, 0x0000, false, true},
+		// SmokeCoAlarm.ExpressedState (0x0000, "R V") — read-only.
+		{"SmokeCoAlarm/ExpressedState read-only", 0x005C, 0x0000, false, true},
+		// SmokeCoAlarm.SmokeSensitivityLevel (0x000B, "RW VM") — writable.
+		{"SmokeCoAlarm/SmokeSensitivityLevel writable", 0x005C, 0x000B, true, false},
+		// FanControl.PercentCurrent (0x0003, "R V") — read-only.
+		{"FanControl/PercentCurrent read-only", 0x0202, 0x0003, false, true},
+		// FanControl.PercentSetting (0x0002, "RW VO") — writable.
+		{"FanControl/PercentSetting writable", 0x0202, 0x0002, true, false},
+		// PumpConfigurationAndControl.Capacity (0x0013, "R V") — read-only.
+		{"PumpConfigurationAndControl/Capacity read-only", 0x0200, 0x0013, false, true},
+		// PumpConfigurationAndControl.OperationMode (0x0020, "RW VM") — writable.
+		{"PumpConfigurationAndControl/OperationMode writable", 0x0200, 0x0020, true, false},
+		// OperationalState.OperationalState (0x0004, "R V") — read-only.
+		{"OperationalState/OperationalState read-only", 0x0060, 0x0004, false, true},
+		// RvcOperationalState.CountdownTime (0x0002, inherited "R V") — read-only.
+		{"RvcOperationalState/CountdownTime read-only", 0x0061, 0x0002, false, true},
 		// Cluster the bridge does not expose → unknown, treated writable.
 		{"unknown cluster", 0xBEEF, 0x0000, true, false},
 		// Global attribute (no access string) → not tracked.

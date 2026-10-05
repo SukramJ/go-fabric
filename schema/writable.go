@@ -27,7 +27,8 @@ package schema
 // this table provides the same verdict schema-side. It is scoped to the
 // clusters the bridge exposes (core clusters plus OnOff/LevelControl/
 // ColorControl/Groups, WindowCovering, DoorLock, Thermostat, GenericSwitch,
-// and the measurement clusters) so it stays bounded. Every entry is derived
+// SmokeCoAlarm, OperationalState, RvcOperationalState, FanControl,
+// PumpConfigurationAndControl, and the measurement clusters) so it stays bounded. Every entry is derived
 // from the per-attribute `access` strings in
 // parity/schema.json (the matter.js HEAD pin);
 // TestReadOnlyAttributeParity reloads that snapshot and fails if any entry
@@ -130,6 +131,15 @@ var readOnlyAttributes = map[uint32]map[uint32]struct{}{
 		0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007,
 		0x0008, 0x0009, 0x000A, 0x000C, 0x000D,
 	),
+	// OperationalState (0x0060) — every attribute "R V".
+	0x0060: newReadOnlySet(
+		0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005,
+	),
+	// RvcOperationalState (0x0061) — inherits OperationalState's
+	// attributes, every one "R V".
+	0x0061: newReadOnlySet(
+		0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005,
+	),
 	// ScenesManagement (0x0062) — 3 read-only
 	0x0062: newReadOnlySet(
 		0x0000, 0x0001, 0x0002,
@@ -156,12 +166,31 @@ var readOnlyAttributes = map[uint32]map[uint32]struct{}{
 		0x0000, 0x0005, 0x0006, 0x0007, 0x0008, 0x0009, 0x000A, 0x000B,
 		0x000C, 0x000D, 0x000E, 0x000F, 0x001A,
 	),
-	// Thermostat (0x0201) — 26 read-only
+	// PumpConfigurationAndControl (0x0200) — 19 read-only;
+	// LifetimeRunningHours, LifetimeEnergyConsumed, OperationMode and
+	// ControlMode are "RW VM", AlarmMask (0x0022, deprecated) carries no
+	// access string.
+	0x0200: newReadOnlySet(
+		0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007,
+		0x0008, 0x0009, 0x000A, 0x000B, 0x000C, 0x0010, 0x0011, 0x0012,
+		0x0013, 0x0014, 0x0016,
+	),
+	// Thermostat (0x0201) — 32 read-only. The deprecated (conformance "D")
+	// PiCoolingDemand 0x0007, PiHeatingDemand 0x0008 and the
+	// Occupied/UnoccupiedSetbackMin/Max 0x0035/0x0036/0x0038/0x0039 carry
+	// access "R V" since the Matter 1.6.1 pin (matter.js 85cf6647); the
+	// 1.6.0 snapshot left them without an access string.
 	0x0201: newReadOnlySet(
-		0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x001E,
-		0x0029, 0x0030, 0x0031, 0x0032, 0x0046, 0x0048, 0x0049, 0x004A,
-		0x004B, 0x004C, 0x004D, 0x004E, 0x004F, 0x0052, 0x0053, 0x0054,
-		0x0055, 0x0056,
+		0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007,
+		0x0008, 0x001E, 0x0029, 0x0030, 0x0031, 0x0032, 0x0035, 0x0036,
+		0x0038, 0x0039, 0x0046, 0x0048, 0x0049, 0x004A, 0x004B, 0x004C,
+		0x004D, 0x004E, 0x004F, 0x0052, 0x0053, 0x0054, 0x0055, 0x0056,
+	),
+	// FanControl (0x0202) — 6 read-only; FanMode, PercentSetting,
+	// SpeedSetting, RockSetting, WindSetting and AirflowDirection are
+	// "RW VO".
+	0x0202: newReadOnlySet(
+		0x0001, 0x0003, 0x0004, 0x0006, 0x0007, 0x0009,
 	),
 	// ColorControl (0x0300) — 50 read-only
 	0x0300: newReadOnlySet(
@@ -185,6 +214,10 @@ var readOnlyAttributes = map[uint32]map[uint32]struct{}{
 	0x0403: newReadOnlySet(
 		0x0000, 0x0001, 0x0002, 0x0003, 0x0010, 0x0011, 0x0012, 0x0013,
 		0x0014,
+	),
+	// FlowMeasurement (0x0404) — 4 read-only
+	0x0404: newReadOnlySet(
+		0x0000, 0x0001, 0x0002, 0x0003,
 	),
 	// RelativeHumidityMeasurement (0x0405) — 4 read-only
 	0x0405: newReadOnlySet(

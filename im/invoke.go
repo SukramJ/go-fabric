@@ -94,7 +94,28 @@ type CommandInvocation struct {
 // pair MUST drain the container via the decoder's skip helper and
 // return (nil, nil); the IM layer treats that as "fields skipped"
 // and propagates path-only Invoke to the cluster server.
+//
+// A typed reject (an error carrying a [StatusCodeError]) normally leaves
+// `dec` inside the fields container and the IM layer drains the rest. A
+// reject the reader can only reach at the container's EndContainer — a
+// mandatory field found missing — has consumed it already; such an error
+// also implements [FieldsContainerConsumed] so the container is not
+// drained twice.
 type CommandFieldsReader func(path ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error)
+
+// FieldsContainerConsumed is implemented by a [CommandFieldsReader] reject
+// returned after the reader consumed the fields container's EndContainer.
+type FieldsContainerConsumed interface {
+	error
+	FieldsContainerConsumed() bool
+}
+
+// fieldsContainerConsumed reports whether err says the reader already
+// consumed the fields container.
+func fieldsContainerConsumed(err error) bool {
+	c, ok := errors.AsType[FieldsContainerConsumed](err)
+	return ok && c.FieldsContainerConsumed()
+}
 
 // UnmarshalInvokeRequestTLV decodes an InvokeRequestMessage.
 func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (InvokeRequest, error) {
@@ -210,7 +231,7 @@ func readCommandInvocation(dec *tlv.Decoder, fieldsReader CommandFieldsReader) (
 				if !errors.As(err, &sce) || sce.MatterStatusCode().IsSuccess() {
 					return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
 				}
-				if el.IsContainer {
+				if el.IsContainer && !fieldsContainerConsumed(err) {
 					if err := skipContainer(dec); err != nil {
 						return CommandInvocation{}, fmt.Errorf("%w: fields: %w", ErrInvalidInvokeRequest, err)
 					}
@@ -424,6 +445,21 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		}
 		return privilegeOperate
 	}
+
+	// The access check a cluster server may consult for a privilege
+	// beyond the command's own ([AuthorityAt]): the same gate the command
+	// itself passed — PASE holds the implicit Administer, a CASE subject
+	// what the ACL grants, and nothing is granted without an ACL source.
+	requestCtx := ctx
+	ctx = WithAuthority(ctx, func(endpoint uint16, clusterID uint32, privilege uint8) StatusCode {
+		if pase || fabricIndex == 0 {
+			return StatusSuccess
+		}
+		if !hasACL {
+			return StatusUnsupportedAccess
+		}
+		return aclChecker.CheckACL(requestCtx, fabricIndex, subjectNodeID, subjectCATs, endpoint, clusterID, privilege)
+	})
 
 	var ir InvokeResponse
 	// The InvokeResponseMessage.SuppressResponse field is deprecated and matter.js

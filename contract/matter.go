@@ -264,13 +264,14 @@ const (
 	MeasurementEnergy                           // 0x0091 ElectricalEnergyMeasurement
 	MeasurementMomentarySwitch                  // 0x003B Switch (Generic Switch endpoint)
 	MeasurementElectrical                       // 0x0090 + 0x0091 + 0x009C (ElectricalSensor endpoint)
+	MeasurementFlow                             // 0x0404 FlowMeasurement (FlowSensor endpoint)
 )
 
 // measurementClassBuiltinEnd is one past the last built-in class, and
 // the first class [RegisterMeasurementKind] hands out. Keeping the two
 // ranges apart is what lets the constants above keep their numeric
 // values while the set stays open.
-const measurementClassBuiltinEnd = MeasurementElectrical + 1
+const measurementClassBuiltinEnd = MeasurementFlow + 1
 
 // MeasurementMaterializer builds the cluster server(s) that carry one
 // source's readings for a measurement kind — the same job the library's
@@ -506,6 +507,9 @@ func builtinMeasurementKinds() map[MeasurementClass]MeasurementKind {
 		// so a verdict has a single id to report, and the full set is
 		// built by measurement.FromMeasurementClass.
 		MeasurementElectrical: {Name: "Electrical", DeviceType: 0x0510, ClusterID: 0x0090},
+		// FlowSensor (0x0306) mandates Identify plus FlowMeasurement
+		// (0x0404) and nothing else (matter.js flow-sensor.element.ts).
+		MeasurementFlow: {Name: "Flow", DeviceType: 0x0306, ClusterID: 0x0404},
 	}
 }
 
@@ -554,12 +558,13 @@ type MeasurementSource interface {
 
 // FloatMeasurementSource is the typed read surface for scalar
 // measurement classes (Temperature, Humidity, Illuminance, Pressure,
-// CO2, PM2.5, PM10). Implemented by Generic.Sensor[float64] and the
+// CO2, PM2.5, PM10, Flow). Implemented by Generic.Sensor[float64] and the
 // equivalent calculated-DP types.
 //
 // MatterFloatValue returns the current observed value in the model's
 // native unit (°C for temperature, % RH for humidity, lux for
-// illuminance, hPa for pressure, ppm for CO2, µg/m³ for particulates).
+// illuminance, hPa for pressure, ppm for CO2, µg/m³ for particulates,
+// m³/h for flow).
 // `observed` is false when no measurement has been received yet — the
 // bridge maps that to a Matter-spec NULL response (e.g. -32768 sentinel
 // for nullable int16 attributes).
@@ -609,6 +614,27 @@ type BoolMeasurementSource interface {
 // callback; do not retain `cb` references elsewhere.
 type ChangeNotifier interface {
 	OnMatterValueChanged(cb func()) (unsubscribe func())
+}
+
+// AttributeChangeNotifier is the optional capability of a [ClusterServer]
+// that holds its attribute state itself, as a matter.js behavior does,
+// and therefore knows exactly which of its attributes moved. The bridge
+// subscribes to it at reassembly for every bridged endpoint: on a fire it
+// advances the endpoint-hosted DataVersion of the server's cluster and
+// marks the named attributes — and only those — dirty for every
+// subscription that covers them.
+//
+// Unlike [ChangeNotifier], which a host's source fires and which marks
+// every reportable attribute of its cluster dirty, this one lets a server
+// keep an attribute out of change reporting until its own rule says it
+// changed — a "Q" (quieter) attribute such as OperationalState
+// CountdownTime. Mirrors matter.js Datasource onChange, which reports
+// the properties that changed, and ServerBehaviorBacking, which reports a
+// quieter property only when its QuietEvent emits.
+//
+// Returns an unsubscribe closure; calling it more than once is a no-op.
+type AttributeChangeNotifier interface {
+	OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func())
 }
 
 // EventPriority mirrors the Matter §10.6.6.1 priority enum.
@@ -760,60 +786,52 @@ func MeasurementClassDeviceType(class MeasurementClass) uint16 {
 // existence of each type come from that generated table, never from a
 // reading of the specification.
 func DeviceTypeName(id uint16) string {
-	switch id {
-	case 0:
+	if id == 0 {
 		return ""
-	case 0x000A:
-		return "Door Lock"
-	case 0x000F:
-		return "Generic Switch"
-	case 0x0015:
-		return "Contact Sensor"
-	case 0x0022:
-		return "Speaker"
-	case 0x0027:
-		return "Mode Select"
-	case 0x002C:
-		return "Air Quality Sensor"
-	case 0x0043:
-		return "Water Leak Detector"
-	case 0x0076:
-		return "Smoke / CO Alarm"
-	case 0x0100:
-		return "On/Off Light"
-	case 0x0101:
-		return "Dimmable Light"
-	case 0x0106:
-		return "Light Sensor"
-	case 0x0107:
-		return "Occupancy Sensor"
-	case 0x010A:
-		return "On/Off Plug-in Unit"
-	case 0x010C:
-		return "Color Temperature Light"
-	case 0x010D:
-		return "Extended Color Light"
-	case 0x0202:
-		return "Window Covering"
-	case 0x0230:
-		// Advertised by cover.Garage. matter.js HEAD names it
-		// "Closure" (schema/devicetypes.go, 0x0230).
-		return "Closure"
-	case 0x0301:
-		return "Thermostat"
-	case 0x0302:
-		return "Temperature Sensor"
-	case 0x0305:
-		return "Pressure Sensor"
-	case 0x0307:
-		return "Humidity Sensor"
-	case 0x0510:
-		// Advertised by MeasurementElectrical. matter.js HEAD
-		// names it "ElectricalSensor" (schema/devicetypes.go, 0x0510).
-		return "Electrical Sensor"
-	default:
-		return fmt.Sprintf("0x%04X", id)
 	}
+	if name, ok := deviceTypeNames[id]; ok {
+		return name
+	}
+	return fmt.Sprintf("0x%04X", id)
+}
+
+// deviceTypeNames holds the labels [DeviceTypeName] returns.
+var deviceTypeNames = map[uint16]string{
+	0x000A: "Door Lock",
+	0x000F: "Generic Switch",
+	0x0015: "Contact Sensor",
+	0x0022: "Speaker",
+	0x0027: "Mode Select",
+	0x002B: "Fan",
+	0x002C: "Air Quality Sensor",
+	0x002D: "Air Purifier",
+	0x0043: "Water Leak Detector",
+	0x0073: "Laundry Washer",
+	0x0074: "Robotic Vacuum Cleaner",
+	0x0075: "Dishwasher",
+	0x0076: "Smoke / CO Alarm",
+	0x007A: "Extractor Hood",
+	0x007C: "Laundry Dryer",
+	0x0100: "On/Off Light",
+	0x0101: "Dimmable Light",
+	0x0106: "Light Sensor",
+	0x0107: "Occupancy Sensor",
+	0x010A: "On/Off Plug-in Unit",
+	0x010C: "Color Temperature Light",
+	0x010D: "Extended Color Light",
+	0x0202: "Window Covering",
+	// Advertised by cover.Garage. matter.js HEAD names it
+	// "Closure" (schema/devicetypes.go, 0x0230).
+	0x0230: "Closure",
+	0x0301: "Thermostat",
+	0x0302: "Temperature Sensor",
+	0x0303: "Pump",
+	0x0305: "Pressure Sensor",
+	0x0306: "Flow Sensor",
+	0x0307: "Humidity Sensor",
+	// Advertised by MeasurementElectrical. matter.js HEAD
+	// names it "ElectricalSensor" (schema/devicetypes.go, 0x0510).
+	0x0510: "Electrical Sensor",
 }
 
 // MeasurementClassClusterID returns the cluster ID the given

@@ -119,3 +119,45 @@ func TestInvokeRequest_UntypedFieldsErrorStillFailsTheRequest(t *testing.T) {
 		t.Errorf("err = %v, want ErrInvalidInvokeRequest", err)
 	}
 }
+
+// consumedFieldsError is a typed reject a reader returns after it read the
+// fields container's EndContainer (a mandatory field found missing).
+type consumedFieldsError struct{}
+
+func (consumedFieldsError) Error() string                 { return "mandatory field missing" }
+func (consumedFieldsError) MatterStatusCode() StatusCode  { return StatusInvalidCommand }
+func (consumedFieldsError) FieldsContainerConsumed() bool { return true }
+
+var _ FieldsContainerConsumed = consumedFieldsError{}
+
+// TestInvokeRequest_ConsumedContainerRejectIsNotDrainedTwice pins
+// FieldsContainerConsumed: a reader that found its reject only at the
+// fields container's end has consumed the EndContainer, and draining the
+// container again would swallow the rest of the request. Both commands of
+// the batch must still decode, each with the reader's status.
+func TestInvokeRequest_ConsumedContainerRejectIsNotDrainedTwice(t *testing.T) {
+	t.Parallel()
+	reader := func(_ ConcreteCommandPath, dec *tlv.Decoder, _ tlv.Element) (any, error) {
+		for {
+			el, err := dec.Next()
+			if err != nil {
+				return nil, err
+			}
+			if el.IsEndContainer {
+				return nil, consumedFieldsError{}
+			}
+		}
+	}
+	req, err := UnmarshalInvokeRequestTLV(tlv.NewDecoder(encodeTwoCommandInvoke(t)), reader)
+	if err != nil {
+		t.Fatalf("UnmarshalInvokeRequestTLV: %v", err)
+	}
+	if len(req.Invokes) != 2 {
+		t.Fatalf("decoded %d invokes, want 2", len(req.Invokes))
+	}
+	for i, inv := range req.Invokes {
+		if inv.DecodeStatus != StatusInvalidCommand || inv.Path.Command != uint32(i+1) {
+			t.Errorf("invoke %d = %+v, want InvalidCommand on command %d", i, inv, i+1)
+		}
+	}
+}

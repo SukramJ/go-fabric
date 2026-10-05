@@ -104,6 +104,10 @@ func (b *Bridge) AttachSubscriptionManager(m *subscription.Manager) {
 		// re-subscribe, endpoint removal, fabric teardown and session
 		// reap all terminate subscriptions the bridge never hears about.
 		m.SetOnSubscriptionClosed(b.releaseSubscriptionRouting)
+		// A terminated subscription is forgotten; one closed with its
+		// session stays recorded for re-establishment after a restart
+		// (matter.js SubscriptionsServer.#subscriptionCancelled).
+		m.SetOnSubscriptionTerminated(b.forgetPersistedSubscription)
 	}
 }
 
@@ -161,6 +165,13 @@ type subTarget struct {
 	// implicit Administer grant even after AddNOC adopted the session
 	// onto a fabric and fabricIndex stopped being 0.
 	pase bool
+
+	// hasAck / ackCounter piggyback an acknowledgement on the next
+	// message sent for this target. Set only per chunk by the priming
+	// report of a re-established subscription, which answers the peer's
+	// StatusResponse to the previous chunk on the same exchange.
+	hasAck     bool
+	ackCounter uint32
 }
 
 // SubscriptionReporter returns the [subscription.Reporter] closure the
@@ -783,6 +794,10 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 		// nothing rebroadcasts on loss.
 		NeedsAck: tracker != nil,
 	}
+	if target.hasAck {
+		respProto.HasAck = true
+		respProto.AckCounter = target.ackCounter
+	}
 	body := append(respProto.Marshal(), payload...) //nolint:gocritic // single-allocation join
 
 	respHdr := message.Header{
@@ -917,6 +932,15 @@ func (b *Bridge) handleSubscribeRequest(
 		subCtx = im.WithAuthModePASE(subCtx)
 	}
 
+	// A normal subscribe from this peer has begun: a re-establishment of
+	// its former subscriptions still in flight must leave it alone.
+	// Mirrors matter.js InteractionServer.handleSubscribeRequest emitting
+	// subscriptionEstablishmentStarted(session.peerAddress) once the
+	// request has passed its validation.
+	if !b.resolveSessionPASE(requestHdr.SessionID) {
+		b.noteSubscriptionEstablishmentStarted(subFabricIndex, subscriptionPeerNodeID(requestHdr, subSubjectNodeID))
+	}
+
 	initialReport, matchedPaths := b.buildInitialReport(subCtx, dispatcher, req)
 	// A Subscribe whose (possibly wildcard) paths match zero attributes
 	// AND zero events cannot be established — matter.js
@@ -939,7 +963,15 @@ func (b *Bridge) handleSubscribeRequest(
 	if err := b.streamInitialReportChunks(src, requestHdr, proto, subID, initialReport); err != nil {
 		return err
 	}
-	return b.sendSubscribeResponse(src, requestHdr, proto, req, subID, initialReport)
+	if err := b.sendSubscribeResponse(src, requestHdr, proto, req, subID, initialReport); err != nil {
+		return err
+	}
+	// The subscription is active: record it for re-establishment after a
+	// restart (matter.js SubscriptionsServer.#addSubscription, fired when
+	// InteractionServer activates the subscription after its
+	// SubscribeResponse).
+	b.persistSubscription(ctx, subID)
+	return nil
 }
 
 // rejectSubscribeInvalidAction ships a top-level
@@ -1013,6 +1045,8 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 		return
 	}
 	mgr := b.subManager
+	b.wireRootNotifiersLocked(mgr)
+	b.wireAttributeNotifiersLocked(mgr)
 	var (
 		examined, notifierOK, withPaths int
 		sourceSeen, measurementSeen     int
@@ -1107,6 +1141,82 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 			slog.Int("notifier_ok", notifierOK),
 			slog.Int("with_paths", withPaths),
 			slog.Int("registered", len(b.measurementUnsubscribers)))
+	}
+}
+
+// wireRootNotifiersLocked subscribes every root cluster server that
+// implements [contract.ChangeNotifier] — today the Groupcast server, whose
+// Membership and counts move with the group state — to its own reportable
+// attributes on endpoint 0: a fire marks them dirty so subscribers get a
+// report. A root server keeps its own DataVersion (it bumps it before it
+// fires), so unlike a bridged endpoint nothing is bumped here. Mirrors the
+// reactive state matter.js keeps for root behaviors. Caller holds b.mu.
+func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
+	root := b.topology.FindByID(0)
+	if root == nil {
+		return
+	}
+	for _, srv := range endpointpkg.ClusterServers(root) {
+		notifier, ok := srv.(contract.ChangeNotifier)
+		if !ok {
+			continue
+		}
+		paths := make([]im.ConcreteAttributePath, 0, len(srv.MatterReportable()))
+		for _, attr := range srv.MatterReportable() {
+			paths = append(paths, im.ConcreteAttributePath{
+				Endpoint: root.ID, Cluster: srv.MatterClusterID(), Attribute: attr,
+				HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			})
+		}
+		unsub := notifier.OnMatterValueChanged(func() {
+			for _, p := range paths {
+				mgr.OnAttributeChanged(p)
+			}
+		})
+		if unsub == nil {
+			unsub = func() {}
+		}
+		b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+	}
+}
+
+// wireAttributeNotifiersLocked subscribes every bridged cluster server
+// that implements [contract.AttributeChangeNotifier] — the servers that
+// keep their own attribute state, such as cluster/opstate and
+// cluster/modebase — independently of whether the endpoint's source has a
+// notifier of its own. On a fire the cluster's endpoint-hosted DataVersion
+// advances once, before the named attributes are marked dirty, so the
+// report carries the post-change version (matter.js Datasource.ts
+// advanceVersion, then broadcastChanges for the changed properties only).
+// Caller holds b.mu.
+func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
+	for _, ep := range b.topology.Endpoints {
+		if ep == nil || ep.IsRoot() || ep.IsAggregator() {
+			continue
+		}
+		for _, srv := range endpointpkg.ClusterServers(ep) {
+			notifier, ok := srv.(contract.AttributeChangeNotifier)
+			if !ok {
+				continue
+			}
+			clusterID := srv.MatterClusterID()
+			unsub := notifier.OnMatterAttributesChanged(func(attrIDs []uint32) {
+				if len(attrIDs) == 0 {
+					return
+				}
+				ep.BumpClusterDataVersion(clusterID)
+				for _, attr := range attrIDs {
+					mgr.OnAttributeChanged(im.ConcreteAttributePath{
+						Endpoint: ep.ID, Cluster: clusterID, Attribute: attr,
+						HasEndpoint: true, HasCluster: true, HasAttribute: true,
+					})
+				}
+			})
+			if unsub == nil {
+				unsub = func() {}
+			}
+			b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+		}
 	}
 }
 

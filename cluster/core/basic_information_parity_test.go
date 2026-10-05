@@ -26,10 +26,13 @@
 package core_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/im"
+	matterparity "github.com/SukramJ/go-fabric/parity"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -64,15 +67,15 @@ func TestParityMatterJS_BasicInfoServer_ClusterRevision6(t *testing.T) {
 	}
 }
 
-// TestParityMatterJS_BasicInfoServer_DataModelRevision19 pins the
+// TestParityMatterJS_BasicInfoServer_DataModelRevision21 pins the
 // DATA_MODEL_REVISION constant from matter.js HEAD.
 //
-// Mirrors matter.js packages/model/src/common/Specification.ts:67
-// (`DATA_MODEL_REVISION = 19`). Apple Home checks that
+// Mirrors matter.js packages/model/src/common/Specification.ts
+// (`DATA_MODEL_REVISION = 21`, Matter 1.6.x). Apple Home checks that
 // DataModelRevision is consistent with SpecificationVersion's implied
 // data-model revision. Drift between the two caused a silent pair-abort
 // in a pre-publication Apple Home build.
-func TestParityMatterJS_BasicInfoServer_DataModelRevision19(t *testing.T) {
+func TestParityMatterJS_BasicInfoServer_DataModelRevision21(t *testing.T) {
 	t.Parallel()
 	cfg := validBasicInfoConfig()
 	cfg.DataModelRevision = 0 // trigger the default
@@ -84,8 +87,8 @@ func TestParityMatterJS_BasicInfoServer_DataModelRevision19(t *testing.T) {
 	if !ok {
 		t.Fatal("DataModelRevision: ok=false")
 	}
-	if got := v.(uint16); got != 19 {
-		t.Errorf("DataModelRevision = %d, want 19 (matter.js Specification.ts DATA_MODEL_REVISION)", got)
+	if got := v.(uint16); got != 21 {
+		t.Errorf("DataModelRevision = %d, want 21 (matter.js Specification.ts DATA_MODEL_REVISION)", got)
 	}
 }
 
@@ -93,7 +96,7 @@ func TestParityMatterJS_BasicInfoServer_DataModelRevision19(t *testing.T) {
 // Matter specification version constant.
 //
 // Mirrors matter.js packages/model/src/common/Specification.ts
-// SPECIFICATION_VERSION constant (0x01050100 = Matter 1.5.1.0).
+// SPECIFICATION_VERSION constant (0x01060100 = Matter 1.6.1.0).
 // cluster.SpecificationVersion holds the go-fabric constant; the
 // test asserts it reaches the wire.
 func TestParityMatterJS_BasicInfoServer_SpecificationVersion(t *testing.T) {
@@ -105,6 +108,58 @@ func TestParityMatterJS_BasicInfoServer_SpecificationVersion(t *testing.T) {
 	}
 	if got := v.(uint32); got != cluster.SpecificationVersion {
 		t.Errorf("SpecificationVersion = 0x%08X, want 0x%08X (matter.js HEAD)", got, cluster.SpecificationVersion)
+	}
+}
+
+// TestParityMatterJS_AdvertisedRevisionsMatchSnapshot holds the three
+// node-wide revisions this module advertises to the values the embedded
+// matter.js snapshot (parity/schema.json "matter" header, extracted from
+// packages/model/src/common/Specification.ts) records: SPECIFICATION_VERSION
+// (BasicInformation.SpecificationVersion), DATA_MODEL_REVISION (the
+// BasicInformation.DataModelRevision default) and INTERACTION_MODEL_REVISION
+// (tag 0xFF on every IM message). A snapshot refresh that moves any of them
+// fails here instead of shipping a node that claims the old revision.
+func TestParityMatterJS_AdvertisedRevisionsMatchSnapshot(t *testing.T) {
+	t.Parallel()
+	var snap struct {
+		Matter struct {
+			Revision                 string `json:"revision"`
+			SpecificationVersion     uint32 `json:"specificationVersion"`
+			InteractionModelRevision uint8  `json:"interactionModelRevision"`
+			DataModelRevision        uint16 `json:"dataModelRevision"`
+		} `json:"matter"`
+	}
+	if err := json.Unmarshal(matterparity.SchemaJSON(), &snap); err != nil {
+		t.Fatalf("unmarshal parity/schema.json: %v", err)
+	}
+	want := snap.Matter
+	if want.SpecificationVersion == 0 || want.DataModelRevision == 0 || want.InteractionModelRevision == 0 {
+		t.Fatalf("parity/schema.json matter header incomplete: %+v", want)
+	}
+	if cluster.SpecificationVersion != want.SpecificationVersion {
+		t.Errorf("cluster.SpecificationVersion = 0x%08X, matter.js %s snapshot = 0x%08X",
+			cluster.SpecificationVersion, want.Revision, want.SpecificationVersion)
+	}
+	if im.MatterInteractionModelRevision != want.InteractionModelRevision {
+		t.Errorf("im.MatterInteractionModelRevision = %d, matter.js %s snapshot = %d",
+			im.MatterInteractionModelRevision, want.Revision, want.InteractionModelRevision)
+	}
+	if im.InteractionModelRevision != want.InteractionModelRevision {
+		t.Errorf("im.InteractionModelRevision = %d, matter.js %s snapshot = %d",
+			im.InteractionModelRevision, want.Revision, want.InteractionModelRevision)
+	}
+	cfg := validBasicInfoConfig()
+	cfg.DataModelRevision = 0 // the default under test
+	b, err := core.NewBasicInformation(cfg)
+	if err != nil {
+		t.Fatalf("NewBasicInformation: %v", err)
+	}
+	v, ok := b.MatterRead(0x0000)
+	if !ok {
+		t.Fatal("DataModelRevision: ok=false")
+	}
+	if got := v.(uint16); got != want.DataModelRevision {
+		t.Errorf("default DataModelRevision = %d, matter.js %s snapshot = %d", got, want.Revision, want.DataModelRevision)
 	}
 }
 

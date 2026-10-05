@@ -9,6 +9,7 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/groups"
 )
 
 // Snapshot is one scope's contribution to a topology assembly: the
@@ -201,6 +202,11 @@ type Endpoint struct {
 	// in isolation.
 	stateMu sync.Mutex
 	state   *endpointState
+
+	// groups is the node's group state, set by the assembler on bridged
+	// endpoints from [Config.Groups]. Non-nil makes [ClusterServers]
+	// mount the stack's Groups server — see [Config.Groups].
+	groups *groups.Manager
 }
 
 // PublishClusterServers publishes servers as this endpoint's attached

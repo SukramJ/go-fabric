@@ -24,9 +24,11 @@
 // changes flow in via [Manager.OnAttributeChanged] (called by the
 // bridge core when the source DP fires).
 //
-// Replay buffering across transient network drops is **not** in
-// v1.1 — the spec leaves it implementation-defined and our
-// commissioner targets (Apple Home, Google Home) re-issue
-// SubscribeRequest after disconnect rather than relying on
-// resumable subscriptions.
+// Subscriptions survive a restart the way matter.js keeps them
+// (docs/adr/0008): [Subscription.PeerSubscription] captures the persisted
+// form, [Manager.Restore] re-creates a former subscription under its old
+// id, and [Manager.SetOnSubscriptionTerminated] tells a subscription that
+// ended for good apart from one that merely lost its session. The bridge
+// drives the rest — the store, the CASE session to the controller, the
+// priming report.
 package subscription

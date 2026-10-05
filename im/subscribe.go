@@ -37,8 +37,12 @@ const (
 	tagInteractionModelRevision uint8 = 0xFF
 
 	// MatterInteractionModelRevision is the IM revision the bridge
-	// advertises. Matches matter.js v0.16.10 (Matter 1.5).
-	MatterInteractionModelRevision uint8 = 13
+	// advertises. Mirrors matter.js HEAD packages/model/src/common/
+	// Specification.ts INTERACTION_MODEL_REVISION (12 at the Matter
+	// 1.6.1 pin; capped below 13 because revision 13's only delta,
+	// WildcardFilterConfigurationVersion, is provisional). The wire
+	// fixtures in im/testdata read the same constant from matter.js.
+	MatterInteractionModelRevision uint8 = 12
 )
 
 // Errors.

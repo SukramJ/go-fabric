@@ -692,46 +692,63 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// returning `null` (the previous default-writer fall-through)
 		// surfaces as ACCESS_DENIED on every follow-up read and Apple
 		// tears the fabric down via RemoveFabric.
+		// An entry another fabric owns, on a non-fabric-filtered read,
+		// carries FabricIndex alone: fields 1-5 are fabric-sensitive
+		// (access-control.element.ts, access "S"), withheld as matter.js
+		// StructManager mayRead withholds them.
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutUint(tlv.ContextTag(1), uint64(e.Privilege))
-			enc.PutUint(tlv.ContextTag(2), uint64(e.AuthMode))
-			if e.Subjects == nil {
-				enc.PutNull(tlv.ContextTag(3))
-			} else {
-				enc.StartArray(tlv.ContextTag(3))
-				for _, s := range e.Subjects {
-					enc.PutUint(tlv.AnonymousTag(), s)
-				}
+			if e.Redacted {
+				enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))
 				_ = enc.EndContainer()
+				continue
 			}
-			if e.Targets == nil {
-				enc.PutNull(tlv.ContextTag(4))
-			} else {
-				enc.StartArray(tlv.ContextTag(4))
-				for _, t := range e.Targets {
-					enc.StartStruct(tlv.AnonymousTag())
-					if t.Cluster != nil {
-						enc.PutUint(tlv.ContextTag(0), uint64(*t.Cluster))
-					} else {
-						enc.PutNull(tlv.ContextTag(0))
-					}
-					if t.Endpoint != nil {
-						enc.PutUint(tlv.ContextTag(1), uint64(*t.Endpoint))
-					} else {
-						enc.PutNull(tlv.ContextTag(1))
-					}
-					if t.DeviceType != nil {
-						enc.PutUint(tlv.ContextTag(2), uint64(*t.DeviceType))
-					} else {
-						enc.PutNull(tlv.ContextTag(2))
-					}
-					_ = enc.EndContainer()
-				}
-				_ = enc.EndContainer()
+			encodeACLEntryFields(enc, e)
+			if e.AuxiliaryType != nil {
+				enc.PutUint(tlv.ContextTag(5), uint64(*e.AuxiliaryType))
 			}
 			enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))
+			_ = enc.EndContainer()
+		}
+		_ = enc.EndContainer()
+	case []mattercore.AccessControlAuxiliaryEntryStruct:
+		// AccessControl.AuxiliaryAcl (0x0007): AccessControlEntryStruct
+		// with [5] AuxiliaryType. A redacted entry — another fabric's on
+		// an unfiltered read — carries FabricIndex alone, every other
+		// field being fabric-sensitive (access-control.element.ts).
+		enc.StartArray(tag)
+		for _, e := range x {
+			enc.StartStruct(tlv.AnonymousTag())
+			if !e.Redacted {
+				encodeACLEntryFields(enc, e.Entry)
+				enc.PutUint(tlv.ContextTag(5), uint64(e.AuxiliaryType))
+			}
+			enc.PutUint(tlv.ContextTag(254), uint64(e.Entry.FabricIndex))
+			_ = enc.EndContainer()
+		}
+		_ = enc.EndContainer()
+	case []mattercore.GroupcastMembershipStruct:
+		// Groupcast.Membership (0x0065:0x0000), MembershipStruct:
+		//   [0] GroupId u16, [1] Endpoints list<u16> (LN),
+		//   [2] KeySetId u16 (fabric-sensitive, left out for another
+		//   fabric's entry), [3] HasAuxiliaryAcl bool (LN),
+		//   [4] McastAddrPolicy enum8, [254] FabricIndex.
+		enc.StartArray(tag)
+		for _, m := range x {
+			enc.StartStruct(tlv.AnonymousTag())
+			enc.PutUint(tlv.ContextTag(0), uint64(m.GroupID))
+			enc.StartArray(tlv.ContextTag(1))
+			for _, ep := range m.Endpoints {
+				enc.PutUint(tlv.AnonymousTag(), uint64(ep))
+			}
+			_ = enc.EndContainer()
+			if m.KeySetID != nil {
+				enc.PutUint(tlv.ContextTag(2), uint64(*m.KeySetID))
+			}
+			enc.PutBool(tlv.ContextTag(3), m.HasAuxiliaryACL)
+			enc.PutUint(tlv.ContextTag(4), uint64(m.McastAddrPolicy))
+			enc.PutUint(tlv.ContextTag(254), uint64(m.FabricIndex))
 			_ = enc.EndContainer()
 		}
 		_ = enc.EndContainer()
@@ -854,10 +871,14 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// without this case every read/subscribe of 0x001F:0x0001 fell
 		// through to `default:` and returned TLV null regardless of
 		// what AccessControl.MatterWrite had stored.
+		// Data is fabric-sensitive: another fabric's entry on an
+		// unfiltered read carries FabricIndex alone.
 		enc.StartArray(tag)
 		for _, e := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutOctets(tlv.ContextTag(1), e.Data)
+			if !e.Redacted {
+				enc.PutOctets(tlv.ContextTag(1), e.Data)
+			}
 			enc.PutUint(tlv.ContextTag(254), uint64(e.FabricIndex))
 			_ = enc.EndContainer()
 		}
@@ -963,12 +984,14 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 	case []mattercore.GroupKeyMapStruct:
 		// GroupKeyManagement.GroupKeyMap (Matter §11.2.10.5.1).
 		// fabric-sensitive list of struct{ GroupId u16, GroupKeySetId
-		// u16, FabricIndex u8 }.
+		// u16, FabricIndex u8 }. Every integer at its smallest width,
+		// as matter.js's TlvUInt16 writes it (pinned by the
+		// group_key_map fixture in testdata/groupcast-wire-fixtures.json).
 		enc.StartArray(tag)
 		for _, m := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutUint16(tlv.ContextTag(1), m.GroupID)
-			enc.PutUint16(tlv.ContextTag(2), m.GroupKeySetID)
+			enc.PutUint(tlv.ContextTag(1), uint64(m.GroupID))
+			enc.PutUint(tlv.ContextTag(2), uint64(m.GroupKeySetID))
 			enc.PutUint(tlv.ContextTag(254), uint64(m.FabricIndex))
 			_ = enc.EndContainer()
 		}
@@ -976,14 +999,16 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 	case []mattercore.GroupInfoMapStruct:
 		// GroupKeyManagement.GroupTable (Matter §11.2.10.5.2).
 		// fabric-sensitive list of struct{ GroupId u16, Endpoints
-		// list<u16>, GroupName string, FabricIndex u8 }.
+		// list<u16>, GroupName string, FabricIndex u8 }, every integer
+		// at its smallest width as matter.js writes it (group_table
+		// fixture).
 		enc.StartArray(tag)
 		for _, m := range x {
 			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutUint16(tlv.ContextTag(1), m.GroupID)
+			enc.PutUint(tlv.ContextTag(1), uint64(m.GroupID))
 			enc.StartArray(tlv.ContextTag(2))
 			for _, ep := range m.Endpoints {
-				enc.PutUint16(tlv.AnonymousTag(), ep)
+				enc.PutUint(tlv.AnonymousTag(), uint64(ep))
 			}
 			_ = enc.EndContainer()
 			enc.PutUTF8(tlv.ContextTag(3), m.GroupName)
@@ -1202,6 +1227,19 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		}
 		enc.PutUint(tlv.ContextTag(254), uint64(x.FabricIndex))
 		_ = enc.EndContainer()
+	case mattercore.AuxiliaryAccessUpdatedEvent:
+		// AccessControl AuxiliaryAccessUpdated (0x0003): [0] AdminNodeId
+		// node-id nullable, [0xFE] FabricIndex.
+		enc.StartStruct(tag)
+		if x.AdminNodeID != nil {
+			enc.PutUint(tlv.ContextTag(0), *x.AdminNodeID)
+		} else {
+			enc.PutNull(tlv.ContextTag(0))
+		}
+		enc.PutUint(tlv.ContextTag(254), uint64(x.FabricIndex))
+		_ = enc.EndContainer()
+	case mattercore.GroupcastTestingEvent:
+		encodeGroupcastTestingEvent(enc, tag, x)
 	case mattercore.AccessControlExtensionChangedEvent:
 		// AccessControl §9.10.7.2. Same field tags as
 		// AccessControlEntryChanged above, per matter.js
@@ -1237,6 +1275,9 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		enc.PutUint(tlv.ContextTag(254), uint64(x.FabricIndex))
 		_ = enc.EndContainer()
 	default:
+		if encodeApplicationValue(enc, tag, v.Value) {
+			return
+		}
 		// Cluster server returned a Go value the writer does not
 		// handle (e.g. a struct or list). Emit null so the reply still
 		// parses on the controller side; the cluster server should
@@ -1305,7 +1346,24 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
 			enc.PutUTF8(tlv.ContextTag(2), x.DebugText)
 		}
 		_ = enc.EndContainer()
+	case mattercore.KeySetReadResponse:
+		// Matter §11.2.7.3 — [0] GroupKeySetStruct GroupKeySet.
+		enc.StartStruct(tag)
+		encodeGroupKeySetStruct(enc, tlv.ContextTag(0), x.GroupKeySet)
+		_ = enc.EndContainer()
+	case mattercore.KeySetReadAllIndicesResponse:
+		// Matter §11.2.7.6 — [0] list<uint16> GroupKeySetIDs.
+		enc.StartStruct(tag)
+		enc.StartArray(tlv.ContextTag(0))
+		for _, id := range x.GroupKeySetIDs {
+			enc.PutUint(tlv.AnonymousTag(), uint64(id))
+		}
+		_ = enc.EndContainer()
+		_ = enc.EndContainer()
 	default:
+		if encodeGroupsResponse(enc, tag, v) || encodeGroupcastResponse(enc, tag, v) || encodeApplicationResponse(enc, tag, v) {
+			return
+		}
 		// Status-only command — emit empty struct as the TLV
 		// placeholder chip-tool's status-only decoder accepts.
 		enc.StartStruct(tag)
@@ -1324,4 +1382,77 @@ func debugReplyError(logger *slog.Logger, stage string, src *net.UDPAddr, err er
 		slog.String("stage", stage),
 		slog.String("src", srcString(src)),
 		slog.String("err", err.Error()))
+}
+
+// encodeACLEntryFields writes fields 1-4 of an AccessControlEntryStruct.
+func encodeACLEntryFields(enc *tlv.Encoder, e mattercore.AccessControlEntryStruct) {
+	enc.PutUint(tlv.ContextTag(1), uint64(e.Privilege))
+	enc.PutUint(tlv.ContextTag(2), uint64(e.AuthMode))
+	if e.Subjects == nil {
+		enc.PutNull(tlv.ContextTag(3))
+	} else {
+		enc.StartArray(tlv.ContextTag(3))
+		for _, s := range e.Subjects {
+			enc.PutUint(tlv.AnonymousTag(), s)
+		}
+		_ = enc.EndContainer()
+	}
+	if e.Targets == nil {
+		enc.PutNull(tlv.ContextTag(4))
+		return
+	}
+	enc.StartArray(tlv.ContextTag(4))
+	for _, t := range e.Targets {
+		enc.StartStruct(tlv.AnonymousTag())
+		if t.Cluster != nil {
+			enc.PutUint(tlv.ContextTag(0), uint64(*t.Cluster))
+		} else {
+			enc.PutNull(tlv.ContextTag(0))
+		}
+		if t.Endpoint != nil {
+			enc.PutUint(tlv.ContextTag(1), uint64(*t.Endpoint))
+		} else {
+			enc.PutNull(tlv.ContextTag(1))
+		}
+		if t.DeviceType != nil {
+			enc.PutUint(tlv.ContextTag(2), uint64(*t.DeviceType))
+		} else {
+			enc.PutNull(tlv.ContextTag(2))
+		}
+		_ = enc.EndContainer()
+	}
+	_ = enc.EndContainer()
+}
+
+// encodeGroupcastTestingEvent writes the Groupcast GroupcastTesting event
+// (groupcast.element.ts): [0] SourceIpAddress, [1] DestinationIpAddress
+// (ipv6adr), [2] GroupId, [3] EndpointId, [4] ClusterId, [5] ElementId,
+// [6] AccessAllowed — each optional and left out when absent —
+// [7] GroupcastTestResult and [0xFE] FabricIndex.
+func encodeGroupcastTestingEvent(enc *tlv.Encoder, tag tlv.Tag, x mattercore.GroupcastTestingEvent) {
+	enc.StartStruct(tag)
+	if x.SourceIPAddress != nil {
+		enc.PutOctets(tlv.ContextTag(0), x.SourceIPAddress)
+	}
+	if x.DestinationIPAddress != nil {
+		enc.PutOctets(tlv.ContextTag(1), x.DestinationIPAddress)
+	}
+	if x.GroupID != nil {
+		enc.PutUint(tlv.ContextTag(2), uint64(*x.GroupID))
+	}
+	if x.EndpointID != nil {
+		enc.PutUint(tlv.ContextTag(3), uint64(*x.EndpointID))
+	}
+	if x.ClusterID != nil {
+		enc.PutUint(tlv.ContextTag(4), uint64(*x.ClusterID))
+	}
+	if x.ElementID != nil {
+		enc.PutUint(tlv.ContextTag(5), uint64(*x.ElementID))
+	}
+	if x.AccessAllowed != nil {
+		enc.PutBool(tlv.ContextTag(6), *x.AccessAllowed)
+	}
+	enc.PutUint(tlv.ContextTag(7), uint64(x.GroupcastTestResult))
+	enc.PutUint(tlv.ContextTag(254), uint64(x.FabricIndex))
+	_ = enc.EndContainer()
 }

@@ -1,25 +1,23 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)
-Entry points: 3249 across 46 test packages.
+Entry points: 3486 across 53 test packages.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 2820 |
-| Reached by a test | 1360 |
-| Whitelisted | 1451 |
-| **Unreached** | **9** |
+| Total exported | 3534 |
+| Reached by a test | 1944 |
+| Whitelisted | 1584 |
+| **Unreached** | **6** |
 
 ## Top-20 packages by unreached exported identifiers
 
 | Package | Funcs | Types | Other |
 |---|---|---|---|
 | cluster/measurement | 1 | 0 | 0 |
-| contract | 1 | 0 | 0 |
 | endpoint | 1 | 0 | 0 |
-| schema | 1 | 0 | 1 |
 | cluster/core | 0 | 1 | 0 |
 | secure/channel | 0 | 0 | 1 |
 | secure/mattercert | 0 | 0 | 1 |
@@ -29,19 +27,15 @@ Entry points: 3249 across 46 test packages.
 
 | Package | Identifier | File | Line |
 |---|---|---|---|
-| cluster/measurement | CelsiusToInt16 | cluster/measurement/measurement.go | 1732 |
-| contract | DeviceTypeName | contract/matter.go | 762 |
+| cluster/measurement | CelsiusToInt16 | cluster/measurement/measurement.go | 1733 |
 | endpoint | ComposeNodeLabel | endpoint/spec.go | 88 |
-| schema | DeviceTypeAllowsServerCluster | schema/lookup.go | 67 |
 
 ## Full by-package breakdown
 
 | Package | Funcs | Types | Other |
 |---|---|---|---|
 | cluster/measurement | 1 | 0 | 0 |
-| contract | 1 | 0 | 0 |
 | endpoint | 1 | 0 | 0 |
-| schema | 1 | 0 | 1 |
 | cluster/core | 0 | 1 | 0 |
 | secure/channel | 0 | 0 | 1 |
 | secure/mattercert | 0 | 0 | 1 |

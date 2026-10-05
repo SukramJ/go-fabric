@@ -312,6 +312,108 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 
 ---
 
+## Matter 1.6.1 pin — open items
+
+Raised when `parity/schema.json` moved from matter.js `f07365a8` (Matter 1.6.0)
+to `85cf6647` (Matter 1.6.1). The schema-level numbers (cluster and
+device-type revisions, SpecificationVersion, DataModelRevision, IM revision,
+Thermostat access strings) were followed in the same change; the items below
+are the behaviour the new pin implies and this module does not have yet.
+
+The item this section opened with — Groupcast (0x0065) on the root with the
+AccessControl Auxiliary ACL, which the 1.6.1 device library requires for the
+light and plug types (RootNode `GroupcastListenerCond`) — is built:
+[ADR 0010](../../docs/adr/0010-groupcast-and-auxiliary-acl.md), with Listener
+and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
+
+- **Groupcast has not met a real controller.** The evidence is the in-process
+  end-to-end test (`bridge/groupcast_e2e_test.go`) and the wire fixtures
+  matter.js produced (`bridge/testdata/groupcast-wire-fixtures.json`).
+  Unverified controller-side assumptions: that a controller provisions a
+  1.6.1 node through Groupcast JoinGroup (rather than KeySetWrite /
+  GroupKeyMap / AddGroup) and sends on FF05::FA for IanaAddr; that it relies
+  on `UseAuxiliaryAcl` instead of writing a Group ACL entry; and that
+  chip-tool's `groupcast` commands encode the optional fields as matter.js
+  does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
+  multicast `onoff toggle`, `groupcast leave-group`).
+- **AccessControl Acl / Extension read without an accessing fabric.** A
+  read on a session that has no fabric yet (PASE before AddNOC, FabricIndex
+  0) still answers with the entries of the fabric the last ACL write
+  targeted, whole. matter.js answers such a session's unfiltered read with
+  every entry redacted (`AccessControl.ts` mayRead: no `session.fabric`)
+  and its filtered read with no entry. Kept because the commissioning
+  flows exercised so far read the ACL only over CASE; fix package: the
+  `fabricIndex == 0` branch of `core.AccessControl.MatterReadFiltered`,
+  with a PASE-session read test.
+
+## Application cluster servers — open items
+
+Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
+FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
+`../connectedhomeip` was not checked out when they were written, so the
+rules below that matter.js does not carry and that were taken from memory
+of connectedhomeip are marked unverified:
+
+- **FanControl percent / speed formulas and the On / Smart mapping.**
+  `ceil(SpeedMax × p / 100)`, `floor(s × 100 / SpeedMax)`, On → High,
+  Smart → Auto-or-High (`cluster/fan/fancontrol_server.go`
+  `percentSettings`, `speedSettings`, `resolveFanMode`) are recalled from
+  `src/app/clusters/fan-control-server/fan-control-server.cpp`. Fix
+  package: read that file and the spec's §4.4.6.3.1 / §4.4.6.6.1, correct
+  the three functions if they differ, extend `TestPercentAndSpeedWrites`.
+- **SmokeCoAlarm default ExpressedState priority.**
+  `alarm.DefaultExpressedStatePriority` is recalled from
+  `examples/smoke-co-alarm-app` (`SetExpressedStateByPriority`). Hosts can
+  override it, so a wrong default is a wrong default, not a lock-in. Fix
+  package: compare with the example app, adjust the slice and
+  `TestExpressedStatePriority`.
+- **SmokeCoAlarm requires a PowerSource device type on the endpoint.**
+  `smoke-co-alarm-device.element.ts` lists `PowerSource` (0x0011) as a
+  mandatory *deviceType* requirement; matter.js's `SmokeCoAlarmDevice`
+  does not install it either. A host can mount the PowerSource cluster
+  through `Spec.PowerSource`, but `endpoint/materialize.go` never adds
+  0x0011 to the Descriptor's DeviceTypeList. Fix package: append
+  PowerSource (with its schema revision) to DeviceTypeList when
+  `ep.PowerSource` is set, and assert it in
+  `endpoint/application_device_types_test.go`.
+- **ModeBase DIRECTMODECH bit and product-specific statuses.**
+  `modebase.FeatureDirectModeChange` is bit 20, as matter.js's
+  `rvc-run-mode.element.ts` / `rvc-clean-mode.element.ts` give it
+  (constraint "20") and `parity/schema.json` pins it; connectedhomeip is
+  recalled — not read — to define it as 0x10000 (bit 16). Likewise the
+  ModeChangeStatus range a host may use for a product-specific failure is
+  taken to start at 0x80, from memory of the specification's range table
+  that matter.js does not carry. Fix package: read
+  `src/app/clusters/mode-base-server/` and the RVC Run Mode feature table;
+  if the bit differs, raise it against matter.js before changing the
+  constant here; narrow `modebase.Server.validHostStatus` if the range does.
+- **DIRECTMODECH is advertised, not enforced.** Without it a RvcRunMode /
+  RvcCleanMode change while the run mode is not Idle must answer
+  InvalidInMode (`rvc-run-mode.resource.ts`, `rvc-clean-mode.resource.ts`).
+  The server leaves that to the host's `ModeChanger`; matter.js does not
+  enforce it either. Fix package: a cross-cluster check would need the
+  RvcRunMode server to be visible to RvcCleanMode; decide with a host that
+  needs it.
+- **CountdownTime reportability.** The server reports CountdownTime as
+  matter.js does (QuietEvent: at once to or from null, otherwise at most
+  once a second). The specification's list — report on a change caused by
+  CurrentPhase / OperationalState, on 0 ↔ non-zero, on increases and on
+  changes not due to the passage of time; never for the plain countdown —
+  is not implemented here or in matter.js
+  (RvcOperationalStateServer's own comment says so).
+- **Not built:** HepaFilterMonitoring (0x0071) and
+  ActivatedCarbonFilterMonitoring (0x0072), optional on AirPurifier and
+  ExtractorHood; Pump's optional LevelControl / ScenesManagement /
+  measurement servers beyond FlowMeasurement; SmokeCoAlarm's optional
+  CarbonMonoxideConcentrationMeasurement (0x040C); the appliance types'
+  optional LaundryWasherControls (0x0053), LaundryDryerControls (0x004A),
+  DishwasherAlarm (0x005D), TemperatureControl (0x0056), DeadFront OnOff
+  and RVC ServiceArea (0x0150); the microwave-oven clusters and
+  OvenCavityOperationalState (0x0048), which no target device type
+  mandates.
+
+---
+
 ## Tier 3 — LOW
 
 Fixed-width integer encodes exceed the sanctioned SubscriptionID/DataVersion workaround family-wide, and the provenance comments misstate matter.js (`tlv/encode.go:119`); invalid UTF-8 preserved on decode (`tlv/decode.go:201`); maxPathsPerInvoke unenforced and Invoke SuppressResponse ignored (`im/invoke.go:307`); CSRRequest lacks the post-NOC ConstraintError guard; CaseAdminSubject CAT version 0 accepted (`cluster/core/operational_credentials.go:1831`); unfiltered NOCs read returns other fabrics' cert bytes; advertised port ignores the effective bind port (`bridge/bridge.go:1168`); ephemeral PASE provider leaks a reaper goroutine per close (`cmd/openccu-loom/matter_ephemeral_provider.go:164`); encrypted receive window permits rollover (`transport/mrp/window.go:88`); negative-write parity guards pin unmounted implementations (`cluster/matter_negative_write_parity_test.go:231`).

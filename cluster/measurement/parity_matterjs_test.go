@@ -83,6 +83,7 @@ func TestParityMatterJS_MeasurementClusterRevisions(t *testing.T) {
 		{ClusterHumidityMeasurement, "RelativeHumidityMeasurement", humidityClusterRevision},
 		{ClusterIlluminanceMeasurement, "IlluminanceMeasurement", illuminanceClusterRevision},
 		{ClusterPressureMeasurement, "PressureMeasurement", pressureClusterRevision},
+		{ClusterFlowMeasurement, "FlowMeasurement", FlowRevision()},
 		{ClusterBooleanState, "BooleanState", booleanStateClusterRevision},
 		{ClusterOccupancySensing, "OccupancySensing", occupancyClusterRevision},
 		{ClusterAirQuality, "AirQuality", airQualityClusterRevision},

@@ -77,6 +77,15 @@
 //     farewell (leaving controllers on stale sessions after a restart),
 //     and the two reverse hooks this call self-wires — the graceful-close
 //     notifier and the mDNS reannounce trigger — are never installed.
+//   - AttachSubscriptionStore — silent. Start loads the previous run's
+//     subscriptions from it and clears it; each subscription of a CASE
+//     session is written when it becomes active and deleted when it is
+//     terminated (docs/adr/0008). Without one nothing survives a restart:
+//     every controller waits out its own subscription liveness timeout
+//     before it re-subscribes, and the device looks unresponsive for that
+//     long. *store.Store satisfies the port. SetSubscriptionPersistence
+//     (false) switches recording and re-establishment off altogether —
+//     matter.js's `persistenceEnabled`; on by default.
 //
 // Cluster surface — order matters within this group, but not relative
 // to [Start]: attaching clusters republishes them onto the live
@@ -96,6 +105,28 @@
 //     check the bool, because the only other symptom is a PartsList
 //     frozen at whatever the Descriptor was constructed with.
 //
+// Group communication — needed by any node with a Groups server, which
+// a node with lights or plugs has:
+//
+//   - AttachGroupMessaging — fails closed, silently. Pass the
+//     *groups.Manager GroupKeyManagement and the assembler
+//     (endpoint.Config.Groups) were given. Without it every group message
+//     is dropped, no multicast group is joined, a fabric removal leaves
+//     the group state behind and GroupTable changes reach no subscriber;
+//     since a group message is never answered, a controller sees a group
+//     command that did nothing. Attach before or after Start; the
+//     memberships are joined once both the port and the socket exist.
+//     The same port carries each group message's outcome to the
+//     Groupcast server's GroupcastTesting.
+//   - AttachAuxiliaryACL — fails closed, silently; needed once the root
+//     mounts the Groupcast server (core.NewGroupcast), which turns on
+//     AccessControl's Auxiliary feature. Pass the same *groups.Manager.
+//     Without it the dispatcher keeps the feature off: the auxiliary
+//     Operate grants a JoinGroup / ConfigureAuxiliaryAcl with
+//     UseAuxiliaryAcl creates are listed in AccessControl.AuxiliaryAcl
+//     but not enforced, so a group command relying on one is dropped
+//     like any other unauthorised group message — unanswered.
+//
 // Genuinely optional — a skip costs exactly the named feature:
 //
 //   - AttachCommissioningWindow stores the tracker for
@@ -103,6 +134,16 @@
 //     reads it. Skipping it does not affect the mDNS commissionable
 //     record, which [Bridge.AnnounceCommissioning] publishes from its
 //     own argument.
+//   - AttachCaseInitiatorProvider and AttachOperationalResolver, then a
+//     call to [Bridge.ReestablishFormerSubscriptions] once the host's CASE
+//     identities are loaded (before it announces its operational
+//     records) — silent. Together they re-establish the former
+//     subscriptions under their old ids: the bridge resolves each
+//     controller's operational instance, opens CASE to it as the
+//     initiator, and re-sends the priming report. A skipped piece drops
+//     every former subscription; the controllers then recover through
+//     their liveness timeout, as without a store. This narrow initiator
+//     is the only one in the module (docs/adr/0008).
 //   - AttachDiagnosticEvents makes [Bridge.DiagnosticEvents] non-empty.
 //   - SetOnReassembled, SetOnFabricAdded and SetOnFabricRemoved are
 //     nil-safe observer hooks.
@@ -230,7 +271,10 @@ type Bridge struct {
 	// records itself; the store belongs to whoever builds that topology
 	// (typically an endpoint assembler the host owns). A field held here
 	// would be a collaborator that looks wired and is never called.
-	aclLister   endpoint.ACLLister // ACL source for the dispatcher's CheckACL; nil denies every operational request
+	aclLister endpoint.ACLLister // ACL source for the dispatcher's CheckACL; nil denies every operational request
+	// auxACL supplies the AccessControl Auxiliary feature's entries to
+	// the dispatcher; nil keeps the feature off. See AttachAuxiliaryACL.
+	auxACL      endpoint.AuxiliaryACLLister
 	snapshotter Snapshotter
 	logger      *slog.Logger
 	advertiser  mdns.Advertiser
@@ -270,6 +314,17 @@ type Bridge struct {
 	// path behind the bridge's topology lock.
 	diagEvents atomic.Pointer[diagevent.Ring]
 	subManager *subscription.Manager // optional; when set Subscribe is fully wired
+
+	// groupMessaging authenticates group messages and names the
+	// multicast groups to join; noop until AttachGroupMessaging.
+	groupMessaging GroupMessaging
+	// groupNetMu serialises the multicast-membership reconciler over
+	// groupMember (the started socket), groupJoined (addresses joined)
+	// and groupJoinRetry (the pending retry after a failed join).
+	groupNetMu     sync.Mutex
+	groupMember    multicastMember
+	groupJoined    map[string]net.IP
+	groupJoinRetry *time.Timer
 
 	// measurementUnsubscribers holds the unsubscribe closures returned
 	// by [contract.ChangeNotifier.OnMatterValueChanged] for
@@ -527,6 +582,11 @@ type Bridge struct {
 	reportExchangeOwner sync.Map
 	subReportExchange   sync.Map
 
+	// resumption holds subscription persistence and the re-establishment
+	// of former subscriptions after a restart (docs/adr/0008). See
+	// subscription_persistence.go and subscription_reestablish.go.
+	resumption resumptionState
+
 	// chunkStatusResponseTimeoutOverride pins the per-chunk
 	// StatusResponse wait bound ([Bridge.chunkStatusResponseTimeout])
 	// for tests that must not sit through the derived MRP worst case;
@@ -563,16 +623,17 @@ func New(snap Snapshotter, advertiser mdns.Advertiser, cfg Config, logger *slog.
 	}
 
 	br := &Bridge{
-		cfg:           cfg,
-		snapshotter:   snap,
-		logger:        logger.With(slog.String("subsystem", "matter.bridge")),
-		advertiser:    advertiser,
-		sessions:      noopSessionLookup{},
-		paseHandler:   noopPaseHandler{},
-		caseHandler:   noopCaseHandler{},
-		ackHandler:    noopAckHandler{},
-		eventLog:      im.NewEventLog(),
-		sigma1Replied: make(map[uint16][32]byte),
+		cfg:            cfg,
+		snapshotter:    snap,
+		logger:         logger.With(slog.String("subsystem", "matter.bridge")),
+		advertiser:     advertiser,
+		sessions:       noopSessionLookup{},
+		paseHandler:    noopPaseHandler{},
+		caseHandler:    noopCaseHandler{},
+		ackHandler:     noopAckHandler{},
+		groupMessaging: noopGroupMessaging{},
+		eventLog:       im.NewEventLog(),
+		sigma1Replied:  make(map[uint16][32]byte),
 	}
 	return br, nil
 }
@@ -630,6 +691,14 @@ func (b *Bridge) Start(ctx context.Context) error {
 		return fmt.Errorf("bridge: udp: %w", err)
 	}
 
+	// The previous run's subscriptions become the former ones before any
+	// subscription of this run can be established — the serve loop below
+	// is what admits the first — and only once nothing can fail Start any
+	// more, so a failed Start leaves the store untouched. Mirrors matter.js
+	// ServerNetworkRuntime running SubscriptionsServer.beginRun ahead of
+	// installing the InteractionServer.
+	b.beginSubscriptionRun()
+
 	serveCtx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() {
@@ -668,6 +737,10 @@ func (b *Bridge) Start(ctx context.Context) error {
 		b.pumpDone = pumpDone
 		b.mu.Unlock()
 	}
+
+	// Join the multicast group of every group with a member endpoint, and
+	// follow membership changes from here on (ServerGroupNetworking).
+	b.startGroupNetworking(listener)
 
 	b.logger.Info(
 		"matter.bridge.started",
@@ -753,8 +826,10 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	// daemons attach a store-backed lister via AttachACLLister.
 	b.mu.RLock()
 	aclLister := b.aclLister
+	auxACL := b.auxACL
 	b.mu.RUnlock()
 	dispatcher.SetACLLister(aclLister)
+	dispatcher.SetAuxiliaryACL(auxACL)
 
 	// Wire MatterEventReceiver-aware cluster servers so they can fire
 	// events through the bridge's event emitter pipeline. The
@@ -993,6 +1068,11 @@ func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
 // closure. Forwards to whatever closure the daemon wired via
 // [SetOnFabricRemoved]; nil-safe.
 func (b *Bridge) EmitFabricRemoved(fabricIndex uint8) {
+	// A removed fabric's subscriptions can never be re-established.
+	b.forgetFabricSubscriptions(fabricIndex)
+	// Its groups go with it: keys, group table, reception state and the
+	// multicast memberships only it used.
+	b.groupMessagingPort().ForgetFabric(fabricIndex)
 	b.mu.RLock()
 	hook := b.onFabricRemoved
 	b.mu.RUnlock()
@@ -1018,6 +1098,28 @@ func (b *Bridge) AttachACLLister(l endpoint.ACLLister) {
 	}
 	b.mu.Lock()
 	b.aclLister = l
+	b.mu.Unlock()
+}
+
+// AttachAuxiliaryACL wires the auxiliary access control entries of the
+// AccessControl cluster's Auxiliary feature into the dispatcher's access
+// check: a group message is then evaluated against the stored entries plus
+// the auxiliary ones, and a Group entry without targets no longer reaches
+// endpoint 0. Pass the *groups.Manager the Groupcast server was built
+// with — the server turns the feature on in AccessControl, this port makes
+// the dispatcher enforce what that cluster reports. Applied on the next
+// [Reassemble]. nil (the default) keeps the feature off in the
+// dispatcher: a Groupcast auxiliary grant is then not honoured, so group
+// commands relying on it are dropped — fails closed, silently, since a
+// group message is never answered. Mirrors matter.js AccessControlServer
+// #applyFabricAcl installing `[...realAcl, ...auxiliary]` and
+// FabricAccessControl.auxiliaryFeatureEnabled.
+func (b *Bridge) AttachAuxiliaryACL(src endpoint.AuxiliaryACLLister) {
+	if b == nil {
+		return
+	}
+	b.mu.Lock()
+	b.auxACL = src
 	b.mu.Unlock()
 }
 
@@ -1159,6 +1261,12 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		b.mu.Unlock()
 		return nil
 	}
+	// Going offline loses the buffered events, as a real restart does; the
+	// numbering continues. Without this the priming report of a
+	// subscription re-established after Stop/Start replays the former
+	// run's events (matter.js #4594: EventsBehavior clears a volatile
+	// store when the node goes offline).
+	b.eventLog.DropBuffered()
 	listener := b.listener
 	cancel := b.serveCancel
 	done := b.serveDone
@@ -1177,6 +1285,9 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// concurrent Start cannot CAS-claim before we've cleared the
 	// per-instance state above.
 	b.startClaim.Store(false)
+
+	// Leave the multicast groups while the socket is still open.
+	b.stopGroupNetworking()
 
 	// Cancel first so the serve loop unwinds; Close as belt-and-braces
 	// in case the listener wraps the context-cancel in its own way.

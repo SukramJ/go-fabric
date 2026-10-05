@@ -30,15 +30,18 @@ const (
 // in BasicInformation.SpecificationVersion (Matter §11.1.5.16). The
 // value encodes major / minor / patch / reserved as four bytes:
 //
-//	0x01 05 01 00 → 1.5.1.0
+//	0x01 06 01 00 → 1.6.1.0
 //
-// Tracks matter.js HEAD's `Specification.SPECIFICATION_VERSION` so the
+// Tracks matter.js HEAD's `Specification.SPECIFICATION_VERSION`
+// (packages/model/src/common/Specification.ts, 0x01060100 at the Matter
+// 1.6.1 pin; BasicInformationServer.ts:initialize sets it as the
+// specificationVersion default) so the
 // bridge rides on the same wire baseline as the reference
 // implementation. Matter §1.4 is explicit that revisions are strictly
-// superset-compatible — a 1.3 / 1.4 commissioner MUST tolerate a 1.5
+// superset-compatible — a 1.3 / 1.4 / 1.5 commissioner MUST tolerate a 1.6
 // bridge by ignoring unknown attributes, not by rejecting the
 // connection. Apple Home's HAP-service-mapper rejection
 // (`MTRErrorDomain Code=12 "No known schema for decoding attribute
 // value"`) lives one layer above the spec-compliant decoder; pinning
 // SpecificationVersion lower does not affect it.
-const SpecificationVersion uint32 = 0x01050100
+const SpecificationVersion uint32 = 0x01060100

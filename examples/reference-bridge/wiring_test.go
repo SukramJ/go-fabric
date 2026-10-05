@@ -13,6 +13,7 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -20,8 +21,10 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/attestation"
+	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -40,7 +43,12 @@ func testRootClusters(t *testing.T) (servers []contract.ClusterServer, refs root
 		t.Fatalf("BuildTestChain: %v", err)
 	}
 	identity := bridgeIdentity{vendorID: testVendorID, productID: testProductID, nodeLabel: "wiring-test", serialNumber: "TEST-0001"}
-	servers, refs, err = buildRootClusters(identity, store.New(db), chain,
+	st := store.New(db)
+	groupState, err := groups.NewManager(st, nil)
+	if err != nil {
+		t.Fatalf("groups.NewManager: %v", err)
+	}
+	servers, refs, err = buildRootClusters(identity, st, groupState, chain,
 		func(context.Context, uint8, uint64, uint64, []byte) {})
 	if err != nil {
 		t.Fatalf("buildRootClusters: %v", err)
@@ -164,4 +172,60 @@ func partsList(t *testing.T, ep *endpoint.Endpoint) []uint16 {
 	}
 	t.Fatalf("endpoint %d mounts no Descriptor", ep.ID)
 	return nil
+}
+
+// TestCaseInitiatorProviderNeedsALoadedIdentity: the provider the bridge
+// dials former-subscription peers with refuses a fabric whose CASE
+// identity is not loaded, and leaves no session id reserved behind.
+func TestCaseInitiatorProviderNeedsALoadedIdentity(t *testing.T) {
+	ctx := context.Background()
+	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	st := store.New(db)
+	sessions := operational.NewManager(st)
+	before := sessions.Occupancy()
+	provider := caseInitiatorProvider(st, sessions, newCaseIdentities(slog.Default()), slog.Default())
+	if init, err := provider(ctx, 1, 0xC0FFEE); err == nil || init != nil {
+		t.Fatalf("provider(unknown fabric) = %v, %v; want an error", init, err)
+	}
+	if after := sessions.Occupancy(); after != before {
+		t.Fatalf("session table occupancy %+v → %+v: a refused initiation must not reserve an id", before, after)
+	}
+}
+
+// TestRootMountsGroupcastWithTheAuxiliaryACL: the bridged lights and plugs
+// require the RootNode GroupcastListenerCond in Matter 1.6.1, so the root
+// mounts Groupcast — Listener and PerGroup — and AccessControl advertises
+// the Auxiliary feature the Listener feature needs (matter.js
+// ServerNode.RootEndpoint: GroupcastServer + AccessControlServer.with(
+// "Extension", "Auxiliary")). The Descriptor's ServerList names it.
+func TestRootMountsGroupcastWithTheAuxiliaryACL(t *testing.T) {
+	t.Parallel()
+	servers, _ := testRootClusters(t)
+	features := map[uint32]uint32{}
+	for _, srv := range servers {
+		if v, ok := srv.MatterRead(0xFFFC); ok {
+			if fm, isU32 := v.(uint32); isU32 {
+				features[srv.MatterClusterID()] = fm
+			}
+		}
+	}
+	if fm, ok := features[mattercore.GroupcastClusterID]; !ok || fm != 0x5 {
+		t.Errorf("Groupcast FeatureMap = %#x (mounted %v), want Listener|PerGroup 0x5", fm, ok)
+	}
+	if fm := features[0x001F]; fm != 0x5 {
+		t.Errorf("AccessControl FeatureMap = %#x, want Extension|Auxiliary 0x5", fm)
+	}
+	for _, srv := range servers {
+		if srv.MatterClusterID() != 0x001D {
+			continue
+		}
+		raw, _ := srv.MatterRead(0x0001)
+		if list, _ := raw.([]uint32); !slices.Contains(list, mattercore.GroupcastClusterID) {
+			t.Errorf("root ServerList %v does not name Groupcast", list)
+		}
+	}
 }

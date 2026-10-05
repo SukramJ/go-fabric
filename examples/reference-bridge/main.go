@@ -32,6 +32,7 @@ import (
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
@@ -128,12 +129,21 @@ func run() error {
 	// a composite key type must pass sqlitestore.WithKeyDecoder — its
 	// documentation says what silently breaks otherwise.
 	endpointStore := sqlitestore.New(db)
+	// The node's group state: key sets, GroupKeyMap and group table of
+	// every fabric. GroupKeyManagement writes it, every Groups server the
+	// assembler mounts reads and changes it, and the bridge receives group
+	// messages through it. One instance for all three.
+	groupState, err := groups.NewManager(credentials, logger)
+	if err != nil {
+		return fmt.Errorf("group state: %w", err)
+	}
 
 	// --- the fleet and its topology assembler --------------------------
 	assemblerCfg := endpoint.Config{
 		VendorID:  identity.vendorID,
 		ProductID: identity.productID,
 		NodeLabel: identity.nodeLabel,
+		Groups:    groupState,
 	}
 	devices, err := newFleet(endpointStore, assemblerCfg, logger)
 	if err != nil {
@@ -177,6 +187,17 @@ func run() error {
 	// operational request rather than allowing them. The stored ACL is what
 	// a commissioner writes during AddNOC, so this is the production wiring.
 	br.AttachACLLister(credentials)
+	// Group messages: authenticated through the node's group state, routed
+	// to the member endpoints, and received on the multicast address of
+	// every group with a member endpoint. Restore the persisted groups first
+	// so their addresses are joined when the bridge starts.
+	if err := groupState.Load(ctx); err != nil {
+		return fmt.Errorf("group state: %w", err)
+	}
+	br.AttachGroupMessaging(groupState)
+	// The Groupcast server (root, below) synthesises auxiliary access
+	// control entries; the bridge enforces them from the same state.
+	br.AttachAuxiliaryACL(groupState)
 	// A bounded trace of the moments that explain a failed pairing. Attached
 	// before Start because the first of those moments is the first
 	// commissioner datagram.
@@ -188,7 +209,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("attestation chain: %w", err)
 	}
-	rootServers, refs, err := buildRootClusters(identity, credentials, chain,
+	rootServers, refs, err := buildRootClusters(identity, credentials, groupState, chain,
 		func(hookCtx context.Context, fabricIndex uint8, _, _ uint64, _ []byte) {
 			if err := caseIDs.load(hookCtx, credentials, fabricIndex); err != nil {
 				logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
@@ -229,6 +250,12 @@ func run() error {
 		salt:       []byte(*salt),
 		iterations: *iterations,
 	}, logger)
+	// A removed fabric takes its persisted subscriptions with it.
+	// Its groups go with it too: EmitFabricRemoved hands the fabric to the
+	// attached group messaging.
+	refs.opCreds.SetOnFabricRemoved(func(_ context.Context, fabricIndex uint8) {
+		br.EmitFabricRemoved(fabricIndex) //nolint:contextcheck // EmitFabricRemoved takes no ctx; its store delete runs on its own bounded timeout
+	})
 
 	// Event numbers must not restart at zero across a reboot: a controller
 	// filters event reads on the last number it saw, so a reset makes it
@@ -266,11 +293,22 @@ func run() error {
 	// Fabrics installed in a previous run: rebuild each one's CASE identity
 	// and re-publish its operational record, so a controller that paired
 	// before this restart reconnects instead of being told to pair again.
-	for _, fabric := range listFabrics(ctx, credentials, logger) {
+	fabrics := listFabrics(ctx, credentials, logger)
+	loaded := fabrics[:0]
+	for _, fabric := range fabrics {
 		if err := caseIDs.load(ctx, credentials, fabric.FabricIndex); err != nil {
 			logger.Warn("case.identity.boot_load_failed", slog.String("err", err.Error()))
 			continue
 		}
+		loaded = append(loaded, fabric)
+	}
+	// With the identities back, resume the subscriptions the controllers
+	// held before the restart, under their old ids — before announcing, as
+	// matter.js re-establishes ahead of entering operational mode. Bounded
+	// at two seconds per controller; a controller that cannot be reached
+	// recovers on its own, as it would have without this.
+	br.ReestablishFormerSubscriptions(ctx)
+	for _, fabric := range loaded {
 		br.AnnounceFabric(ctx, fabric.CompressedID, fabric.NodeID)
 	}
 

@@ -9,18 +9,21 @@ an oversight to the next reader — including choices to *not* do something.
 | [0001](./0001-matter-commissioning-bring-up.md) | Matter wire-protocol design rules from chip-tool bring-up | accepted |
 | [0002](./0002-im-opcode-dispatch-seam.md) | A testable gate + per-opcode seam in `handleIMOpcode` | accepted |
 | [0003](./0003-sigma-resume-extraction.md) | Sigma resumption extraction: already satisfied (finding corrected) | accepted, no code change |
-| [0004](./0004-groups-cluster-stays-stub.md) | Groups stays a stub — a deliberate, matter.js-conformant divergence | rejected (the proposal, not the stub) |
+| [0004](./0004-groups-cluster-stays-stub.md) | Groups stays a stub — a deliberate, matter.js-conformant divergence | superseded by 0009 |
 | [0005](./0005-bridge-decomposition.md) | Defer the `Bridge` CommissioningSession / IMEngine facade split | accepted, deferred with a plan |
 | [0006](./0006-subscribe-dispatch-seam.md) | Cohesive sub-helpers out of `handleSubscribeRequest` | accepted |
 | [0007](./0007-chiptool-send-receive-matrix.md) | Hermetic per-type send/receive suite against chip-tool | accepted |
+| [0008](./0008-subscription-resumption.md) | Persist server subscriptions and re-establish them after restart, with a CASE initiator scoped to that alone | accepted |
+| [0009](./0009-groups-and-group-messaging.md) | A real Groups server and group message reception, with membership as stack state; Groupcast deferred to 0010 | accepted |
+| [0010](./0010-groupcast-and-auxiliary-acl.md) | Groupcast (Listener, PerGroup) and the AccessControl Auxiliary ACL on the root, on the ADR 0009 group state; no Sender | accepted |
 
 ## Provenance
 
-All seven were recorded in
+ADRs 0001–0007 were recorded in
 [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom/tree/main/docs/adr) while
 the Matter stack still lived there as `internal/north/matter/`, and moved here
 with the stack. They were renumbered into this module's own sequence; each file
-names the OpenCCU-Loom number it carried. Decisions that are about *projecting a
+names the OpenCCU-Loom number it carried. ADR 0008 onwards were written here. Decisions that are about *projecting a
 device model onto Matter* — which HomeMatic device becomes which device type,
 how many endpoints a physical device gets — stayed there, because that is the
 host's decision, not this module's.

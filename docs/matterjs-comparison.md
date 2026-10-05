@@ -49,7 +49,7 @@ matter.js HEAD as checked out at `../matter.js`.
 | BLE / BTP (`protocol/src/ble`, `packages/nodejs-ble`) | — | ○ | **No** | Declared non-goal. BLE commissioning pulls a platform radio stack (BlueZ/CoreBluetooth) into a library whose only other OS dependency is a UDP socket, and it exists to solve a problem a LAN-attached bridge does not have: getting network credentials onto a device that has none. |
 | TCP transport (`protocol/src/transport/tcp`) | — | ○ | **Low** | Matter 1.4's large-payload path. It matters for BDX-heavy features (OTA images, diagnostic log downloads, camera streams) — none of which are in scope. Revisit only if BDX lands. |
 | Thread border-router client (`packages/thread-br-client`, `thread-network-*`) | — | ○ | **No** | The host is on Ethernet/Wi-Fi already; `NetworkCommissioning` advertises the Ethernet feature. |
-| Group (multicast) messaging (`protocol/src/groups`, `groupcast` behavior) | group *sessions* are recognised and correctly rejected for Read/Subscribe/Timed per §8.5.7 (`bridge/im_gate.go`); `GroupKeyManagement` + key store present | ◐ | **Med** | A controller that groups endpoints for synchronised commands (a whole-room "off") sends over a group session. Today those writes/invokes have no delivery path. It is the largest genuinely device-side protocol gap in this table. Wants a host with a group primitive to be worth building — see [ADR 0004](./adr/0004-groups-cluster-stays-stub.md). |
+| Group (multicast) messaging (`protocol/src/groups`, `GroupSession`, `ServerGroupNetworking`, `groupcast` behavior) | [`groups`](../groups) authenticates group messages (privacy, AES-CCM, per-key per-sender rollover window); `bridge` routes a group Invoke / SuppressResponse Write to the member endpoints under the Group ACL auth mode — auxiliary entries included — answers nothing, and joins / leaves the multicast addresses on the UDP socket: the per-group address, or FF05::FA for a Groupcast IanaAddr group ([ADR 0009](./adr/0009-groups-and-group-messaging.md), [ADR 0010](./adr/0010-groupcast-and-auxiliary-acl.md)). [`core.Groupcast`](../cluster/core/groupcast.go) (Listener, PerGroup) and the AccessControl Auxiliary ACL on the root; every group message's outcome feeds GroupcastTesting. Read/Subscribe/Timed over a group are still dropped per §8.5.7. No Groupcast Sender feature, no group sending | ◐ | **Med** | Reception and Groupcast are complete and pinned against messages and payloads matter.js produced; neither has met a real controller yet. Sender (`BD-Matter-GroupcastNoSender`) stays out of scope with the controller role. |
 
 ## 3. Session and security
 
@@ -57,6 +57,7 @@ matter.js HEAD as checked out at `../matter.js`.
 | --- | --- | --- | --- | --- |
 | PASE (Spake2+) responder | `secure/spake2`, `commissioning/pase.go` | ✅ | — | |
 | CASE (Sigma1/2/3) responder + Sigma2Resume | `secure/sigma`, `store/resumption.go` | ✅ | — | Resumption is persisted and survives a restart. |
+| CASE initiator (`CaseClient`) | `secure/sigma.NewPeerInitiator`, `bridge/case_initiator.go` | ◐ | — | Only for re-establishing former subscriptions, as matter.js's server node uses it ([ADR 0008](./adr/0008-subscription-resumption.md)); offers resumption with a stored record. Not a controller role. |
 | Session parameters (Matter 1.3+ `TlvSessionParameters`) | full struct on the CASE path; PASE emits the legacy MRP triplet only | ◐ | **Low** | `BD-Matter-PASE-SessionParametersLegacy`. Only a commissioner-initiator's values pass through that decode, and real commissioners stay inside the legacy ranges. |
 | DAC / PAI / PAA validation, Certification Declaration | `secure/attestation` | ✅ | — | |
 | Matter-TLV certificate codec | `secure/mattercert` | ✅ | — | |
@@ -75,28 +76,33 @@ matter.js HEAD as checked out at `../matter.js`.
 | Data-version filtering | `cluster/dataversion.go`, `im/` | ✅ | — | |
 | Event log, event filters, fabric-scoped events | `im/eventlog.go`, `im/event_filter.go` | ✅ | — | Buffer is sized at a tenth of matter.js's, deliberately (`BD-Matter-EventBufferSizing`). |
 | Batched invoke | `im/invoke.go` | ✅ | — | |
-| Subscription resumption across restart (§10.6.9) | table exists in `store/subscriptions.go`, nothing reads or writes it | ○ | **Med** | `BD-Matter-SubscriptionResumption-Deferred`. Survivable — controllers re-subscribe once CASE is back — but it costs a burst of re-subscribes on every restart. Cheap to finish: a producer, a consumer, and two delete paths. |
+| Subscription persistence + re-establishment after restart (`SubscriptionsServer`, `InteractionServer.establishFormerSubscription`) | `bridge` (`AttachSubscriptionStore`, `ReestablishFormerSubscriptions`), `im/subscription` (`PeerSubscription`, `Manager.Restore`), `store/server_subscriptions.go`, `secure/sigma` initiator, `mdns.OperationalResolver` | ✅ | — | [ADR 0008](./adr/0008-subscription-resumption.md). Mirrors matter.js: CASE subscriptions recorded while active, forgotten when terminated, re-established after a restart under their old id over a CASE session the device opens (2 s per peer, block-list for peers that subscribe meanwhile). On by default; `SetSubscriptionPersistence(false)` is `persistenceEnabled = false`. Not yet exercised against a real controller in CI. |
 | Subscription quota / eviction per fabric | — | ○ | **Low** | A bridge on a home LAN does not meet the fabric counts the quota protects against. |
 
 ## 5. Clusters
 
 matter.js ships roughly **140** cluster behaviours generated from `@matter/model`;
-`go-fabric` implements **~30** servers by hand, chosen by what a bridge
+`go-fabric` implements **~41** servers by hand, chosen by what a bridge
 actually mounts. The schema for all of them is present here (in `parity/` and
 `schema/`) — what is missing is server logic, not identifiers.
 
 | Cluster family | matter.js | go-fabric | State | Interest | Assessment |
 | --- | --- | --- | --- | --- | --- |
-| System / commissioning (BasicInformation, GeneralCommissioning, OperationalCredentials, NetworkCommissioning, AccessControl, GroupKeyManagement, Descriptor, Binding, Identify, …) | ✅ | [`cluster/core`](../cluster/core) | ✅ | — | Complete for the bridge role. |
+| System / commissioning (BasicInformation, GeneralCommissioning, OperationalCredentials, NetworkCommissioning, AccessControl with Extension and Auxiliary, GroupKeyManagement, Groupcast, Descriptor, Binding, Identify, …) | ✅ | [`cluster/core`](../cluster/core) | ✅ | — | Complete for the bridge role; Groupcast without the Sender feature (`BD-Matter-GroupcastNoSender`). |
 | Actuation (OnOff, LevelControl, ColorControl, WindowCovering, DoorLock, Thermostat, ValveConfigurationAndControl, ModeSelect, ClosureControl) | ✅ | [`cluster/`](../cluster) | ✅ | — | The device surface a home bridge exposes. |
-| Sensing (Temperature, Humidity, Illuminance, Pressure, Occupancy, BooleanState, AirQuality, CO₂/PM2.5/PM10, PowerSource, Electrical Power/Energy) | ✅ | [`cluster/measurement`](../cluster/measurement) | ✅ | — | |
-| Groups (0x0004), ScenesManagement (0x0062) | full servers | stubs: empty collections, writes rejected | ◐ | **Med** | Presence is mandated by device-type conformance; backing them needs a host-side group/scene primitive. [ADR 0004](./adr/0004-groups-cluster-stays-stub.md). |
+| Fan and pump (FanControl, PumpConfigurationAndControl) | ✅ (behaviour = generated validation; FanControl defaults FanMode only) | [`cluster/fan`](../cluster/fan), [`cluster/pump`](../cluster/pump) | ✅ | — | Fan, AirPurifier, ExtractorHood, Pump. The FanMode / percent / speed coupling and a default Step are added from the specification text (`BD-Matter-FanControlCouplingInServer`); the percent / speed formulas await a connectedhomeip check (findings register). |
+| Appliance state and modes (OperationalState, RvcOperationalState, LaundryWasherMode, RvcRunMode, RvcCleanMode, DishwasherMode) | ✅ (OperationalStateServer: state reactors, no command implementation; mode servers: SupportedModes checks, default ChangeToMode) | [`cluster/opstate`](../cluster/opstate), [`cluster/modebase`](../cluster/modebase) | ✅ | — | LaundryWasher, LaundryDryer, Dishwasher, RoboticVacuumCleaner. matter.js's reactors and OperationalStateUtils / ModeUtils checks are mirrored; commands and mode changes reach the host. The "already in that state" answers, the command-state list rule and the ModeBase tag rules are added from the specification text (`BD-Matter-OperationalStateRulesInServer`, `BD-Matter-ModeBaseRulesInServer`). |
+| Safety (SmokeCoAlarm) | ✅ (initial state only) | [`cluster/alarm`](../cluster/alarm) | ✅ | — | ExpressedState priority, the BUSY self-test gate and event emission added from the specification text (`BD-Matter-SmokeCoAlarmRulesInServer`). |
+| Sensing (Temperature, Humidity, Illuminance, Pressure, Flow, Occupancy, BooleanState, AirQuality, CO₂/PM2.5/PM10, PowerSource, Electrical Power/Energy) | ✅ | [`cluster/measurement`](../cluster/measurement) | ✅ | — | |
+| Resource monitoring (HEPA / activated-carbon filter monitoring) | ✅ | — | ○ | **Low** | Optional on AirPurifier and ExtractorHood; not built until a host has a filter to report. |
+| Groups (0x0004) | full server | full server ([`core.Groups`](../cluster/core/groups.go)), membership as stack state in `groups.Manager`, persisted; mounted by the assembler where the device type mandates it | ✅ | — | [ADR 0009](./adr/0009-groups-and-group-messaging.md). Groupcast adoption (rev 5 INVALID_IN_STATE paths) is inert in matter.js's default server too. |
+| ScenesManagement (0x0062) | full server | stub: empty scene table, writes rejected | ◐ | **Low** | Presence is mandated by device-type conformance; a scene store is its own feature. `BD-Matter-P2-D18`. |
 | ICDManagement | full, incl. check-in sender (`protocol/src/icd`) | attributes 0x0000–0x0002 | ◐ | **Low** | `BD-chip-ICD-Attrs-0x3-0x5`. A mains-powered bridge is not an intermittently-connected device; the cluster is mounted for conformance, not for behaviour. |
 | DiagnosticLogs | full, with BDX transfer | responds, but never initiates a BDX transfer | ◐ | **Low** | `BD-chip-DiagLogs-NoBDX`. Needs BDX (and realistically TCP) to be worth more. |
 | OTA Software Update **Requestor** | ✅ | `cluster/core/ota_software_update_requestor.go` | ✅ | — | |
 | OTA Software Update **Provider** | ✅ | — | ○ | **No** | `BD-Matter-OTAProvider-NotExposed`. A bridge that offers firmware to other nodes is a distribution role, not a device role, and it needs BDX. |
 | Network diagnostics (Ethernet / Wi-Fi / Thread / Software) | ✅ | GeneralDiagnostics only | ○ | **Low** | All optional. Useful telemetry, no controller depends on them. |
-| Appliance, media, energy, camera, TLS, WebRTC, closure-dimension, service-area, resource-monitoring, concentration extras, … (~100 behaviours) | ✅ | — | ○ | **Low** | Add on demand: a cluster server here is worth writing when a host has something to project onto it, and not before. The schema is already available for whichever one that turns out to be. |
+| Further appliance (microwave oven, oven cavity, laundry / dishwasher controls and alarm, TemperatureControl), media, energy, camera, TLS, WebRTC, closure-dimension, service-area, concentration extras, … (~95 behaviours) | ✅ | — | ○ | **Low** | Add on demand: a cluster server here is worth writing when a host has something to project onto it, and not before. The schema is already available for whichever one that turns out to be. |
 
 ## 6. Device model and composition
 
@@ -127,7 +133,11 @@ Three of the ○ rows above are decisions, not backlog. Restating them so they
 are not re-opened by accident:
 
 1. **No controller / commissioner role.** `go-fabric` is a responder. It does
-   not discover, commission or drive other nodes.
+   not discover, commission or drive other nodes. The one exception is
+   bounded and on record: to re-establish its former subscriptions after a
+   restart, the device resolves the controller that held them and opens a
+   CASE session to it as the initiator — what matter.js's server node does —
+   and nothing else ([ADR 0008](./adr/0008-subscription-resumption.md)).
 2. **No Bluetooth.** Commissioning is on-network (DNS-SD) only.
 3. **No CSA certification.** The borrowed `Test_TC_*` cases are regression
    tests. Nothing built on this module may be described as certified.
@@ -136,14 +146,19 @@ are not re-opened by accident:
 
 In rough order of value to a real bridge:
 
-1. **Finish subscription resumption** (§4) — small, well-understood, and it
-   removes a re-subscribe storm from every restart.
-2. **Group multicast delivery** (§2) — the only protocol-level gap a controller
-   can actually walk into today. Needs a host with a group primitive to be
-   worth it, which also unblocks turning the Groups stub into a server.
-3. **Per-attribute timed-write enforcement** (§4) — the schema already knows
+1. **Prove group messaging and Groupcast against a real controller** (§2) —
+   chip-tool's `groupcast` / `groups` / `groupkeymanagement` commands and a
+   multicast `onoff toggle` in an `internal/chiptool` leg would pin the
+   controller-side assumptions (JoinGroup with UseAuxiliaryAcl, FF05::FA,
+   privacy on, ACL group subjects) the in-process tests rest on
+   ([ADR 0010](./adr/0010-groupcast-and-auxiliary-acl.md)).
+2. **Per-attribute timed-write enforcement** (§4) — the schema already knows
    which attributes require it (`schema/timed.go`); the enforcement point is
    the missing half.
+3. **Prove subscription re-establishment against a real controller** (§4) —
+   built and tested in-process ([ADR 0008](./adr/0008-subscription-resumption.md));
+   a chip-tool restart leg in `internal/chiptool` would pin the
+   controller-side assumptions it rests on.
 
 Everything else in this document is either deliberately out of scope or worth
 doing only when a specific consumer asks for it.
