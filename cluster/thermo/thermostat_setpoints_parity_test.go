@@ -214,3 +214,50 @@ func TestThermostat_SetpointWriteRefusals(t *testing.T) {
 		t.Error("a non-numeric limit was accepted")
 	}
 }
+
+// TestParityMatterJS_Thermostat_IgnoredWrites: ControlSequenceOfOperation
+// and MinSetpointDeadBand are "optionally writeable" and a write is
+// silently ignored — matter.js #ensureControlSequenceOfOperationNotWritable
+// / #ensureMinSetpointDeadBandNotWritable — while the type constraints
+// still answer ConstraintError (TC-TSTAT-2.2 steps 11-12).
+func TestParityMatterJS_Thermostat_IgnoredWrites(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := thermo.NewThermostatServer(thermo.DefaultThermostatConfig())
+	const csoo, deadband uint32 = 0x001B, 0x0019
+	before, _ := s.MatterRead(csoo)
+	if err := s.MatterWrite(ctx, csoo, uint8(4)); err != nil {
+		t.Fatalf("write ControlSequenceOfOperation=4: %v", err)
+	}
+	if err := s.MatterWrite(ctx, csoo, uint8(2)); err != nil {
+		t.Fatalf("write ControlSequenceOfOperation=2: %v", err)
+	}
+	if after, _ := s.MatterRead(csoo); after != before {
+		t.Errorf("ControlSequenceOfOperation changed %v -> %v; the write must be ignored", before, after)
+	}
+	if err := s.MatterWrite(ctx, csoo, uint8(6)); !isConstraintError(err) {
+		t.Errorf("ControlSequenceOfOperation=6: %v, want ConstraintError", err)
+	}
+	if err := s.MatterWrite(ctx, deadband, int16(5)); err != nil {
+		t.Fatalf("write MinSetpointDeadBand=5: %v", err)
+	}
+	if v, _ := s.MatterRead(deadband); v != int8(20) {
+		t.Errorf("MinSetpointDeadBand = %v after an ignored write, want 20", v)
+	}
+	for _, bad := range []int16{-1, 128} {
+		if err := s.MatterWrite(ctx, deadband, bad); !isConstraintError(err) {
+			t.Errorf("MinSetpointDeadBand=%d: %v, want ConstraintError", bad, err)
+		}
+	}
+	heatOnly := thermo.DefaultThermostatConfig()
+	heatOnly.Features = thermo.ThermostatFeatureHEAT
+	if err := thermo.NewThermostatServer(heatOnly).MatterWrite(ctx, deadband, int16(5)); err == nil {
+		t.Error("MinSetpointDeadBand written without AUTO")
+	}
+	if err := s.MatterWrite(ctx, csoo, "x"); err == nil {
+		t.Error("a non-numeric ControlSequenceOfOperation was accepted")
+	}
+	if err := s.MatterWrite(ctx, deadband, "x"); err == nil {
+		t.Error("a non-numeric MinSetpointDeadBand was accepted")
+	}
+}

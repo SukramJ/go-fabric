@@ -17,6 +17,7 @@ package thermo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -284,10 +285,10 @@ func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) { //nolint:gocy
 		// Mandatory (M conformance) per matter.js
 		// thermostat-cluster.element.ts (id 0x1b). Derived from the
 		// supported modes: 4=CoolingAndHeating, 2=HeatingOnly, 0=CoolingOnly.
-		// matter.js declares this RW; the bridge exposes it read-only because
-		// the value follows the wrapped HM device's immutable HEAT/COOL
-		// capability — there is nothing for a controller to change. Being
-		// immutable it is also (correctly) not in MatterReportable.
+		// The value follows the device's immutable HEAT/COOL capability; a
+		// write is accepted and ignored, as the specification and matter.js
+		// have it (see MatterWrite). Being immutable it is (correctly) not
+		// in MatterReportable.
 		return controlSequenceOfOperation(s.features), true
 	case thermoAttrSystemMode:
 		return s.systemMode, true
@@ -314,6 +315,37 @@ func (s *ThermostatServer) MatterWrite(_ context.Context, attrID uint32, value a
 		// The written attribute is reported by the write path; what the
 		// reconcile moved besides it is reported here.
 		s.changes.Notify(coupled...)
+		return nil
+	}
+	switch attrID {
+	case thermoAttrControlSequenceOfOperation:
+		// "For backwards compatibility, this attribute is optionally
+		// writeable. However, any writes to this attribute SHALL be
+		// silently ignored" — matter.js ThermostatServer.ts
+		// #ensureControlSequenceOfOperationNotWritable accepts the write
+		// and reverts it (TC-TSTAT-2.2 step 12). The enum is still checked.
+		v, ok := cluster.AsUint8(value)
+		if !ok {
+			return fmt.Errorf("thermostat: ControlSequenceOfOperation: expected numeric, got %T", value)
+		}
+		if v > 5 {
+			return thermoConstraintErr{fmt.Sprintf("thermostat: ControlSequenceOfOperation %d is not a ControlSequenceOfOperationEnum value", v)}
+		}
+		return nil
+	case thermoAttrMinSetpointDeadBand:
+		// Likewise optionally writable and silently ignored (matter.js
+		// #ensureMinSetpointDeadBandNotWritable); the constraint (0 to
+		// 127) still applies.
+		if s.features&ThermostatFeatureAUTO == 0 {
+			return errors.New("thermostat: MinSetpointDeadBand not supported (no AUTO feature)")
+		}
+		v, ok := cluster.AsInt16(value)
+		if !ok {
+			return fmt.Errorf("thermostat: MinSetpointDeadBand: expected numeric, got %T", value)
+		}
+		if v < 0 || v > 127 {
+			return thermoConstraintErr{fmt.Sprintf("thermostat: MinSetpointDeadBand %d outside 0 to 127", v)}
+		}
 		return nil
 	}
 	s.mu.Lock()

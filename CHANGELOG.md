@@ -354,7 +354,10 @@ pseudo-version of `main`.
     heating and cooling — as matter.js's `#reconcileSetpoints` (chip
     `FixUserLimits` / `FixUserLimitDeadband` / `FixRange`) does; the
     values it moves besides the written one are reported through
-    `contract.AttributeChangeNotifier` (TC-TSTAT-2.2).
+    `contract.AttributeChangeNotifier` (TC-TSTAT-2.2). Writes of
+    ControlSequenceOfOperation and MinSetpointDeadBand are accepted and
+    ignored, as the specification ("optionally writeable … silently
+    ignored") and matter.js have it, instead of being refused.
   - `cluster/lock.DoorLockServer` serves OperatingMode ("RW VM") as
     writable state, as matter.js does: a supported mode (Normal,
     NoRemoteLockUnlock) is stored, anything else is a ConstraintError. The
