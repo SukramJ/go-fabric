@@ -810,3 +810,40 @@ var (
 	// timeout values.
 	ErrCommissioningWindowDurationInvalid error = commWindowDurationInvalidErr{}
 )
+
+// EndCommissioning closes the window after a successful
+// CommissioningComplete: the commissioner it was opened for is done, so the
+// window must not admit another one until an administrator opens a new
+// one. Unlike [CommissioningWindow.RevokeWindow] it neither evicts PASE
+// sessions nor touches the fail-safe — CommissioningComplete has already
+// disarmed it. No-op when no window is open. Mirrors matter.js
+// DeviceCommissioner.endCommissioning, which failsafeContext.commissioned
+// triggers (DeviceCommissioner.ts:160). Without it a second
+// OpenCommissioningWindow right after a commissioning answered BUSY
+// (TC-CADMIN-1.3 step 9, TC-ACL-2.8).
+func (w *CommissioningWindow) EndCommissioning() {
+	w.mu.Lock()
+	if !w.open {
+		w.mu.Unlock()
+		return
+	}
+	w.open = false
+	w.adminFabricSet = false
+	w.adminVendorSet = false
+	w.isBasicWindow = false
+	w.hasVerifier = false
+	if w.closeTimer != nil {
+		w.closeTimer.Stop()
+		w.closeTimer = nil
+	}
+	hook := w.onTransition
+	restore := w.restore
+	w.restore = nil
+	w.mu.Unlock()
+	if restore != nil {
+		restore()
+	}
+	if hook != nil {
+		hook()
+	}
+}

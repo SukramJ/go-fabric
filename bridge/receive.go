@@ -713,3 +713,39 @@ func markConfigurationVersionDirty(mgr *subscription.Manager, ep uint16, cluster
 		HasEndpoint: true, HasCluster: true, HasAttribute: true,
 	})
 }
+
+// wireAdminEntryEvents connects the root's OperationalCredentials to its
+// AccessControl: the default Administer entry AddNOC installs is an ACL
+// change the AccessControl cluster reports (DataVersion and
+// AccessControlEntryChanged), as matter.js's AccessControlServer does for
+// the entry it adds on fabric creation.
+func wireAdminEntryEvents(servers []contract.ClusterServer) {
+	var opcreds *core.OperationalCredentials
+	var acl *core.AccessControl
+	for _, s := range servers {
+		switch v := s.(type) {
+		case *core.OperationalCredentials:
+			opcreds = v
+		case *core.AccessControl:
+			acl = v
+		}
+	}
+	if opcreds != nil && acl != nil {
+		opcreds.SetOnAdminEntryInstalled(acl.NotifyAdminEntryInstalled)
+	}
+}
+
+// wireCommissioned has the root's GeneralCommissioning end the
+// commissioning window after a successful CommissioningComplete, as matter.js
+// DeviceCommissioner does on failsafeContext.commissioned. Wired from
+// whichever of AttachRootClusters / AttachCommissioningWindow comes second.
+func wireCommissioned(servers []contract.ClusterServer, w *CommissioningWindow) {
+	if w == nil {
+		return
+	}
+	for _, s := range servers {
+		if gc, ok := s.(*core.GeneralCommissioning); ok {
+			gc.SetOnCommissioned(w.EndCommissioning)
+		}
+	}
+}

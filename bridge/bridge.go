@@ -1141,7 +1141,9 @@ func (b *Bridge) AttachAuxiliaryACL(src endpoint.AuxiliaryACLLister) {
 func (b *Bridge) AttachCommissioningWindow(w *CommissioningWindow) {
 	b.mu.Lock()
 	b.commissioningWindow = w
+	roots := b.rootClusters
 	b.mu.Unlock()
+	wireCommissioned(roots, w)
 }
 
 // CommissioningWindow returns the attached window tracker or nil
@@ -1167,14 +1169,17 @@ func (b *Bridge) CommissioningWindow() *CommissioningWindow {
 func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
 	cp := append([]contract.ClusterServer(nil), servers...)
 	b.wireDeviceLoad(cp)
+	wireAdminEntryEvents(cp)
 	b.mu.Lock()
 	b.rootClusters = cp
+	window := b.commissioningWindow
 	if b.topology != nil {
 		if root := b.topology.FindByID(0); root != nil {
 			root.PublishClusterServers(cp)
 		}
 	}
 	b.mu.Unlock()
+	wireCommissioned(cp, window)
 }
 
 // PartsListProviderSetter is the duck-typed surface a root-endpoint

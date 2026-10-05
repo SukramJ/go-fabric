@@ -335,6 +335,24 @@ pseudo-version of `main`.
     Fabrics after AddNOC. The bridge now compares the invoked cluster's
     attributes before and after the command and reports what moved, as
     matter.js's Datasource does (TC-IDM-1.5).
+  - AccessControlEntryChanged was one event per ACL write with no
+    LatestValue and no actor, and the entry AddNOC installs emitted none.
+    The events now follow matter.js AccessControlServer.ts: one per entry
+    position (Added / Changed with the new entry, Removed with the old one),
+    AdminNodeID for a CASE actor and AdminPasscodeID 0 for PASE, and the
+    AddNOC entry reported as Added by passcode 0
+    (`OperationalCredentials.SetOnAdminEntryInstalled`, wired by the bridge)
+    (TC-ACL-2.5, 2.6, 2.9). AccessControlExtensionChanged names the actor
+    too.
+  - An AccessControl Extension whose list member carries no tag was accepted;
+    matter.js decodes the extension as a tagged list and rejects it with
+    CONSTRAINT_ERROR (TC-ACL-2.3).
+  - The commissioning window stayed open after a successful
+    CommissioningComplete through it, so the next OpenCommissioningWindow was
+    answered BUSY until the window timed out. GeneralCommissioning now ends
+    it (`SetOnCommissioned`, wired by the bridge to its CommissioningWindow,
+    `CommissioningWindow.EndCommissioning`), as matter.js's DeviceCommissioner
+    does on `commissioned` (TC-CADMIN-1.3, TC-ACL-2.8).
   - BasicInformation.ConfigurationVersion, mandatory from cluster revision
     6, was not served on the root, and the bridged endpoints' was a constant
     1. Both now start at 1 as in matter.js and can be raised:

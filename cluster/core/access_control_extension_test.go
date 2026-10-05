@@ -386,3 +386,21 @@ func TestAccessControl_ExtensionSurvivesARestart(t *testing.T) {
 		t.Fatalf("a removed fabric's extension came back after a restart: %+v", got)
 	}
 }
+
+// TestAccessControl_Extension_RejectsAnonymousListMembers pins the
+// test plan's D_BAD_ELEM (TC-ACL-2.3 step 13): a list whose member has no
+// tag is not a valid extension, as matter.js's TlvTaggedList decode rejects
+// it; the test plan's valid D_OK_SINGLE (a profile-tagged string) passes.
+func TestAccessControl_Extension_RejectsAnonymousListMembers(t *testing.T) {
+	t.Parallel()
+	ac := newAccessControl(t)
+	ctx := im.WithFabricFilter(context.Background(), true, 1)
+	badElem := []byte{0x17, 0x10, 0x02, 'h', 'i', 0x18}
+	if err := ac.MatterWrite(ctx, 0x0001, []core.AccessControlExtensionEntry{{Data: badElem}}); err == nil {
+		t.Fatal("an anonymous list member was accepted")
+	}
+	okSingle := []byte{0x17, 0xD0, 0x00, 0x00, 0xF1, 0xFF, 0x01, 0x00, 0x02, 'h', 'i', 0x18}
+	if err := ac.MatterWrite(ctx, 0x0001, []core.AccessControlExtensionEntry{{Data: okSingle}}); err != nil {
+		t.Fatalf("a profile-tagged member was rejected: %v", err)
+	}
+}

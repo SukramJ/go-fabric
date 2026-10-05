@@ -85,6 +85,10 @@ type GeneralCommissioning struct {
 	// stays open for the full duration (typ. 180 s) and a second,
 	// unintended fabric can be admitted.
 	onCommissioningComplete func(ctx context.Context, fabricIndex uint8)
+	// onCommissioned ends the commissioning window after a successful
+	// CommissioningComplete; the bridge wires it (bridge.AttachRootClusters
+	// / AttachCommissioningWindow), separately from the host's hook.
+	onCommissioned func()
 	// Hook invoked every time ArmFailSafe successfully arms (or re-arms)
 	// the FailSafe window. The bridge wires this to OperationalCredentials
 	// so the pending-NOC / pending-trust-root state is reset for every
@@ -248,6 +252,18 @@ func (g *GeneralCommissioning) SetOnFailSafeArmed(fn func(ctx context.Context, f
 func (g *GeneralCommissioning) SetOnFailSafeExpired(fn func(ctx context.Context, fabricIndex uint8)) {
 	g.mu.Lock()
 	g.onFailSafeExpired = fn
+	g.mu.Unlock()
+}
+
+// SetOnCommissioned wires what ends the commissioning window after a
+// successful CommissioningComplete — matter.js DeviceCommissioner listens on
+// failsafeContext.commissioned and calls endCommissioning
+// (DeviceCommissioner.ts:160). The bridge wires it to its
+// CommissioningWindow; it fires after the host's OnCommissioningComplete
+// hook. Pass nil to detach.
+func (g *GeneralCommissioning) SetOnCommissioned(fn func()) {
+	g.mu.Lock()
+	g.onCommissioned = fn
 	g.mu.Unlock()
 }
 
@@ -762,6 +778,7 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 	// on CommissioningComplete.
 	g.dataVersion.Bump()
 	hook := g.onCommissioningComplete
+	commissioned := g.onCommissioned
 	// Release the read lock before firing the hook — the hook may take
 	// arbitrary locks (commissioning window mutex, mDNS unpublish, …)
 	// and holding ours invites deadlock.
@@ -774,6 +791,9 @@ func (g *GeneralCommissioning) handleCommissioningComplete(ctx context.Context) 
 		// not stay open until its full timeout (typ. 180s) and admit
 		// a second, unintended fabric.
 		hook(ctx, sessFabric)
+	}
+	if commissioned != nil {
+		commissioned()
 	}
 	g.mu.Lock() // re-acquire so the deferred Unlock in MatterInvoke balances correctly
 	return CommissioningCompleteResponse{ErrorCode: CommissioningErrorOK}, nil

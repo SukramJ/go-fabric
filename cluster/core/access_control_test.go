@@ -533,12 +533,15 @@ func TestAccessControl_TargetClusterAndDeviceTypeValidity(t *testing.T) {
 
 // ---- TestAccessControl_ACLWriteEmitsEntryChanged ----
 
-// TestAccessControl_ACLWriteEmitsEntryChanged verifies that a successful
-// MatterWrite to the ACL attribute (0x0000) emits exactly one
-// AccessControlEntryChanged event (cluster 0x001F, event 0x0000) at
-// priority Info. The ChangeType is derived from the list-length delta
-// between the pre-write snapshot and the new list, mirroring matter.js
-// packages/node/src/behaviors/access-control/AccessControlServer.ts.
+// TestAccessControl_ACLWriteEmitsEntryChanged verifies the
+// AccessControlEntryChanged events (cluster 0x001F, event 0x0000, priority
+// Info) a successful ACL write emits: one per position of the writing
+// fabric's new list — Added where the old list had no entry, Changed where
+// it had one — each carrying the new entry, then one Removed per old entry
+// past the new list's end, last first, carrying the old entry. A CASE
+// actor is named by AdminNodeID, a PASE one by AdminPasscodeID 0. Mirrors
+// matter.js AccessControlServer.ts #handleAccessControlListChange and
+// #adminDataFromSession; TC-ACL-2.5, 2.6 and 2.9 read the events back.
 func TestAccessControl_ACLWriteEmitsEntryChanged(t *testing.T) {
 	t.Parallel()
 
@@ -550,101 +553,70 @@ func TestAccessControl_ACLWriteEmitsEntryChanged(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		existingCount  int // number of entries already in the store
-		newCount       int // number of entries written
-		wantChangeType uint8
+		name          string
+		existingCount int
+		newCount      int
+		pase          bool
+		want          []uint8
 	}{
-		{
-			name:           "empty_store_write_one_entry_added",
-			existingCount:  0,
-			newCount:       1,
-			wantChangeType: core.AccessControlChangeTypeAdded,
-		},
-		{
-			name:           "two_entry_store_write_one_entry_removed",
-			existingCount:  2,
-			newCount:       1,
-			wantChangeType: core.AccessControlChangeTypeRemoved,
-		},
-		{
-			name:           "two_entry_store_write_two_entries_changed",
-			existingCount:  2,
-			newCount:       2,
-			wantChangeType: core.AccessControlChangeTypeChanged,
-		},
+		{"empty_store_write_one_entry_added", 0, 1, false, []uint8{core.AccessControlChangeTypeAdded}},
+		{"two_entry_store_write_one_entry_removed", 2, 1, false, []uint8{core.AccessControlChangeTypeChanged, core.AccessControlChangeTypeRemoved}},
+		{"two_entry_store_write_two_entries_changed", 2, 2, false, []uint8{core.AccessControlChangeTypeChanged, core.AccessControlChangeTypeChanged}},
+		{"one_entry_store_write_three_entries_over_pase", 1, 3, true, []uint8{core.AccessControlChangeTypeChanged, core.AccessControlChangeTypeAdded, core.AccessControlChangeTypeAdded}},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
-			// Build a seeded store with the requested number of existing
-			// entries. All entries are stamped on fabric 1.
 			existing := make([]mstore.ACLEntry, tc.existingCount)
 			for i := range existing {
 				existing[i] = minimalACLEntry(1)
 			}
 			store := &seededACLStore{existing: existing}
-
 			ac := newAccessControlWithStore(t, store)
 			ac.SetCurrentFabric(1)
-			ac.SetEndpoint(0) // root endpoint
-
+			ac.SetEndpoint(0)
 			emitter := &fakeEmitter{}
 			ac.SetMatterEventEmitter(emitter)
 
-			// Build the new entries slice.
 			newEntries := make([]core.AccessControlEntryStruct, tc.newCount)
 			for i := range newEntries {
-				e := minimalEntry
-				e.FabricIndex = 1
-				newEntries[i] = e
+				newEntries[i] = minimalEntry
 			}
-
-			if err := writeACL(ac, newEntries); err != nil {
-				t.Fatalf("MatterWrite: unexpected error: %v", err)
+			ctx := im.WithSubject(im.WithFabricFilter(context.Background(), true, 1), 112233, nil)
+			if tc.pase {
+				ctx = im.WithAuthModePASE(ctx)
+			}
+			if err := ac.MatterWrite(ctx, 0x0000, newEntries); err != nil {
+				t.Fatalf("MatterWrite: %v", err)
 			}
 
 			emitter.mu.Lock()
 			got := append([]recordedEvent(nil), emitter.events...)
 			emitter.mu.Unlock()
-
-			if len(got) != 1 {
-				t.Fatalf("expected 1 emitted event, got %d", len(got))
+			if len(got) != len(tc.want) {
+				t.Fatalf("emitted %d events, want %d", len(got), len(tc.want))
 			}
-			ev := got[0]
-
-			if ev.cluster != 0x001F {
-				t.Errorf("cluster = 0x%04X, want 0x001F (AccessControl)", ev.cluster)
-			}
-			if ev.event != 0x0000 {
-				t.Errorf("event = 0x%04X, want 0x0000 (AccessControlEntryChanged)", ev.event)
-			}
-			if ev.priority != contract.EventPriorityInfo {
-				t.Errorf("priority = %v, want Info (matter.js access-control.element.ts:62)", ev.priority)
-			}
-			if ev.endpoint != 0 {
-				t.Errorf("endpoint = %d, want 0 (root endpoint)", ev.endpoint)
-			}
-			payload, ok := ev.data.(core.AccessControlEntryChangedEvent)
-			if !ok {
-				t.Fatalf("data = %T, want AccessControlEntryChangedEvent", ev.data)
-			}
-			if payload.ChangeType != tc.wantChangeType {
-				t.Errorf("ChangeType = %d, want %d", payload.ChangeType, tc.wantChangeType)
-			}
-			if payload.AdminNodeID != nil {
-				t.Errorf("AdminNodeID = %v, want nil (not tracked in v1.1)", payload.AdminNodeID)
-			}
-			if payload.AdminPasscodeID != nil {
-				t.Errorf("AdminPasscodeID = %v, want nil (not tracked in v1.1)", payload.AdminPasscodeID)
-			}
-			if payload.LatestValue != nil {
-				t.Errorf("LatestValue = %v, want nil (bulk-replace path)", payload.LatestValue)
-			}
-			if payload.FabricIndex != 1 {
-				t.Errorf("FabricIndex = %d, want 1", payload.FabricIndex)
+			for i, ev := range got {
+				if ev.cluster != 0x001F || ev.event != 0x0000 || ev.priority != contract.EventPriorityInfo || ev.endpoint != 0 {
+					t.Errorf("event %d: %+v, want AccessControlEntryChanged at Info on endpoint 0", i, ev)
+				}
+				payload, ok := ev.data.(core.AccessControlEntryChangedEvent)
+				if !ok {
+					t.Fatalf("event %d data = %T", i, ev.data)
+				}
+				if payload.ChangeType != tc.want[i] {
+					t.Errorf("event %d ChangeType = %d, want %d", i, payload.ChangeType, tc.want[i])
+				}
+				if payload.FabricIndex != 1 || payload.LatestValue == nil || payload.LatestValue.FabricIndex != 1 {
+					t.Errorf("event %d: FabricIndex %d, LatestValue %+v; want fabric 1 and the entry", i, payload.FabricIndex, payload.LatestValue)
+				}
+				switch {
+				case tc.pase && (payload.AdminNodeID != nil || payload.AdminPasscodeID == nil || *payload.AdminPasscodeID != 0):
+					t.Errorf("event %d over PASE: AdminNodeID %v, AdminPasscodeID %v; want null and 0", i, payload.AdminNodeID, payload.AdminPasscodeID)
+				case !tc.pase && (payload.AdminNodeID == nil || *payload.AdminNodeID != 112233 || payload.AdminPasscodeID != nil):
+					t.Errorf("event %d over CASE: AdminNodeID %v, AdminPasscodeID %v; want 112233 and null", i, payload.AdminNodeID, payload.AdminPasscodeID)
+				}
 			}
 		})
 	}

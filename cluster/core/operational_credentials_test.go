@@ -1406,3 +1406,53 @@ func TestOpcreds_CSRRequestAfterNOCRejected(t *testing.T) {
 		t.Errorf("MatterStatusCode()=0x%02X, want StatusConstraintError (0x87)", uint8(got))
 	}
 }
+
+// TestAddNOC_ReportsTheAdminEntryToAccessControl pins that the default
+// Administer entry AddNOC installs reaches AccessControl, which emits
+// AccessControlEntryChanged (Added, AdminPasscodeID 0, the entry as
+// LatestValue) — matter.js AccessControlServer.ts emits it for the entry it
+// adds on fabric creation. TC-ACL-2.5/2.6/2.9 read it back.
+func TestAddNOC_ReportsTheAdminEntryToAccessControl(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	fs := newFakeStore()
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ac := newAccessControl(t)
+	emitter := &fakeEmitter{}
+	ac.SetMatterEventEmitter(emitter)
+	oc.SetOnAdminEntryInstalled(ac.NotifyAdminEntryInstalled)
+
+	rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{
+		RootCACertificate: buildCoreSignedCert(t, rootPriv, true, rootPriv),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pendingPub := issueCSRPendingPubKey(ctx, t, oc, false)
+	resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
+		NOCValue:         buildCoreSignedCertForPubKey(t, pendingPub, false, rootPriv, testDefaultFabricID, testDefaultNodeID),
+		IPKValue:         make([]byte, 16),
+		CaseAdminSubject: 112233,
+		AdminVendorID:    0xFFF1,
+	})
+	if err != nil || resp.(core.NOCResponse).StatusCode != core.NOCStatusOK {
+		t.Fatalf("AddNOC: %v %+v", err, resp)
+	}
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+	if len(emitter.events) != 1 {
+		t.Fatalf("emitted %d events, want one AccessControlEntryChanged", len(emitter.events))
+	}
+	ev, ok := emitter.events[0].data.(core.AccessControlEntryChangedEvent)
+	if !ok || ev.ChangeType != core.AccessControlChangeTypeAdded || ev.AdminNodeID != nil ||
+		ev.AdminPasscodeID == nil || *ev.AdminPasscodeID != 0 || ev.LatestValue == nil ||
+		len(ev.LatestValue.Subjects) != 1 || ev.LatestValue.Subjects[0] != 112233 {
+		t.Fatalf("event %+v, want Added by passcode 0 with the admin entry", emitter.events[0].data)
+	}
+}

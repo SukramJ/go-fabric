@@ -68,6 +68,7 @@ type OperationalCredentials struct {
 	// AddNOC installed; see [OpcredsConfig.RearmFailSafeForFabric].
 	rearmFailSafeForFabric func(fabricIndex uint8)
 	onFabricRemoved        func(ctx context.Context, fabricIndex uint8)
+	onAdminEntryInstalled  func(entry store.ACLEntry)
 
 	// pendingCSRSessionID is the session ID that issued the pending
 	// CSRRequest. Set in handleCSRRequest; checked in handleAddNOC to
@@ -160,6 +161,17 @@ type OperationalCredentials struct {
 func (o *OperationalCredentials) SetOnFabricRemoved(hook func(ctx context.Context, fabricIndex uint8)) {
 	o.mu.Lock()
 	o.onFabricRemoved = hook
+	o.mu.Unlock()
+}
+
+// SetOnAdminEntryInstalled wires the hook AddNOC calls with the default
+// Administer entry it installed for CaseAdminSubject — where the
+// AccessControl cluster reports the change ([AccessControl.NotifyAdminEntryInstalled]).
+// The bridge wires it when both servers are attached to the root. Pass nil
+// to detach.
+func (o *OperationalCredentials) SetOnAdminEntryInstalled(hook func(entry store.ACLEntry)) {
+	o.mu.Lock()
+	o.onAdminEntryInstalled = hook
 	o.mu.Unlock()
 }
 
@@ -1629,6 +1641,13 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if err := o.store.ReplaceACL(ctx, idx, defaultACL); err != nil {
 		o.revertAddNOC(ctx, idx)
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode
+	}
+
+	o.mu.RLock()
+	installed := o.onAdminEntryInstalled
+	o.mu.RUnlock()
+	if installed != nil {
+		installed(defaultACL[0])
 	}
 
 	o.mu.Lock()
