@@ -32,6 +32,13 @@ type Config struct {
 	// as in matter.js (GroupsServer keeps it in the root's
 	// GroupKeyManagementServer). nil keeps whatever the source supplies.
 	Groups *groups.Manager
+	// OnNodeLabelWritten fires after a controller wrote a bridged
+	// endpoint's BridgedDeviceBasicInformation NodeLabel, with the
+	// endpoint's stable key and the new label, so the host can persist it
+	// and hand it back as [Spec.NodeLabel] after a restart — matter.js
+	// keeps a written nodeLabel in the endpoint's persisted state. nil
+	// keeps the label for the life of the process only.
+	OnNodeLabelWritten func(key SourceKey, label string)
 }
 
 // Validate returns nil when the config is internally consistent.
@@ -205,7 +212,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		// Reuse the state bound to this stable source key so the
 		// endpoint's per-cluster version and Identify server survive
 		// reassembly.
-		state: a.states.stateFor(spec.StableKey),
+		state: a.restoredState(spec),
 		// Bridged endpoints are children of the Aggregator (EP 1).
 		// Mirrors chip examples/bridge-app/linux/main.cpp:261-276
 		// AddDeviceEndpoint(..., parentEndpointId=1) and matter.js
@@ -213,7 +220,19 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		ParentEndpointID:    1,
 		HasParentEndpointID: true,
 		groups:              a.cfg.Groups,
+		onNodeLabelWritten:  a.cfg.OnNodeLabelWritten,
 	}, nil
+}
+
+// restoredState returns the state bound to spec's key, with the label the
+// host restored for it (Spec.NodeLabel) installed unless a controller has
+// written one during this process.
+func (a *Assembler) restoredState(spec *Spec) *endpointState {
+	st := a.states.stateFor(spec.StableKey)
+	if spec.NodeLabel != "" {
+		st.restoreLabel(truncateUTF8(spec.NodeLabel, nodeLabelMaxBytes))
+	}
+	return st
 }
 
 // assignOrReuseID looks up the existing endpoint_id for sourceKey;

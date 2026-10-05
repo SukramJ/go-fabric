@@ -332,6 +332,30 @@ pseudo-version of `main`.
     Fabrics after AddNOC. The bridge now compares the invoked cluster's
     attributes before and after the command and reports what moved, as
     matter.js's Datasource does (TC-IDM-1.5).
+  - An InvokeResponse too large for one datagram was dropped by the
+    listener. It is now chunked with MoreChunkedMessages, each chunk but
+    the last waiting for the controller's StatusResponse, as matter.js
+    InteractionMessenger.ts sendInvokeResponseChunk does; a single entry
+    that cannot fit answers RESOURCE_EXHAUSTED (TC-IDM-1.4).
+  - An ongoing subscription report that needed several chunks sent them
+    back to back without the per-chunk StatusResponse handshake and without
+    piggybacking the ack of the controller's StatusResponse; chip drops
+    such a chunk ("Dropping message without piggyback ack when we are
+    waiting for an ack") and with it every change it carried. Ongoing
+    reports now follow the same handshake as the priming report
+    (InteractionMessenger.ts sendDataReportMessage, MessageExchange.ts
+    send) (TC-IDM-4.3).
+  - The subscription engine sent keep-alives and change reports for a
+    subscription whose priming report was still streaming; a controller
+    answers those with INVALID_SUBSCRIPTION and tears the subscription
+    down. A subscription stays silent until its SubscribeResponse is sent,
+    as matter.js's ServerSubscription only starts its timers after
+    activation (TC-IDM-4.3).
+  - A write to a bridged endpoint's BridgedDeviceBasicInformation.NodeLabel
+    was accepted but not kept: the next read returned the host label again,
+    and a reassembly lost it. The written label now lives on the endpoint,
+    survives Reassemble, and reaches the host through
+    `endpoint.Config.OnNodeLabelWritten` for persistence (TC-IDM-4.3).
   - A successful write was not reported to subscribers either: writing
     BasicInformation.NodeLabel never reached a subscription to it. Written
     attributes are now marked dirty (TC-IDM-2.3).

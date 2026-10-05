@@ -24,6 +24,7 @@ const (
 const (
 	tagInvokeRespSuppressResponse uint8 = 0
 	tagInvokeRespResponses        uint8 = 1
+	tagInvokeRespMoreChunked      uint8 = 2
 )
 
 // DefaultMaxPathsPerInvoke is the ceiling on CommandDataIBs a single
@@ -284,6 +285,9 @@ func readCommandPathFields(dec *tlv.Decoder) (ConcreteCommandPath, error) {
 type InvokeResponse struct {
 	SuppressResponse bool
 	Responses        []InvokeResponseEntry
+	// MoreChunkedMessages marks every chunk of a chunked InvokeResponse
+	// but the last (Matter §10.7.2; matter.js TlvInvokeResponse tag 2).
+	MoreChunkedMessages bool
 }
 
 // InvokeResponseEntry is one element in InvokeResponses — either a
@@ -384,6 +388,9 @@ func (ir InvokeResponse) MarshalTLV(enc *tlv.Encoder, fieldsWriter CommandFields
 		ent.marshal(enc, fieldsWriter)
 	}
 	_ = enc.EndContainer()
+	if ir.MoreChunkedMessages {
+		enc.PutBool(tlv.ContextTag(tagInvokeRespMoreChunked), true)
+	}
 	enc.PutUint(tlv.ContextTag(tagInteractionModelRevision), uint64(MatterInteractionModelRevision))
 	_ = enc.EndContainer()
 }

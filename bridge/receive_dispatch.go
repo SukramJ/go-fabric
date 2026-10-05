@@ -511,10 +511,32 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 			slog.Int("statuses", len(resp.Responses)))
 		return nil
 	}
-	body, err := EncodeInvokeResponse(resp)
+	chunks, err := chunkInvokeResponse(resp, reportChunkPayloadBudget)
 	if err != nil {
 		debugReplyError(b.logger, "encode_invoke", src, err)
 		return err
+	}
+	// All but the last chunk wait for the controller's StatusResponse
+	// before the next goes out, as for a chunked read (matter.js
+	// InteractionMessenger.ts sendInvokeResponse → waitForSuccess).
+	for i, chunk := range chunks[:len(chunks)-1] {
+		waitCh := b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+		chunkHdr := *requestHdr
+		b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
+		if err := b.sendReplyReliable(src, &chunkHdr, proto, im.OpcodeInvokeResponse, chunk); err != nil {
+			b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+			debugReplyError(b.logger, "send_invoke_chunk", src, err)
+			return err
+		}
+		if err := b.awaitChunkStatusResponse(waitCh, "invoke", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, im.ReportData{MoreChunkedMessages: true}); err != nil {
+			return err
+		}
+	}
+	body := chunks[len(chunks)-1]
+	if len(chunks) > 1 {
+		lastHdr := *requestHdr
+		b.refreshAckCounter(&lastHdr, proto.ExchangeID, !proto.Initiator)
+		requestHdr = &lastHdr
 	}
 	// Reliable: a lost InvokeResponse surfaces to the controller as
 	// "Not Responding" (Apple Home) even though the command executed.
@@ -695,4 +717,77 @@ func renderCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map
 		}
 	}
 	return out
+}
+
+// chunkInvokeResponse encodes an InvokeResponse into one message, or — when
+// its responses do not fit one — into as many as needed, every one but the
+// last carrying MoreChunkedMessages. Responses are never split; a single
+// response too large for a message on its own is replaced by a
+// ResourceExhausted status for its path, as matter.js answers a response it
+// cannot send. Mirrors matter.js InteractionServer invoke chunking (the
+// InvokeResponse split by maxPayloadSize). Found by the CHIP Python harness
+// (TC-IDM-1.4 step 11 batches two commands whose responses exceed one
+// message).
+func chunkInvokeResponse(resp im.InvokeResponse, budget int) ([][]byte, error) {
+	whole, err := EncodeInvokeResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	if len(whole) <= budget || len(resp.Responses) <= 1 {
+		if len(whole) > reportChunkHardCap && len(resp.Responses) == 1 {
+			resp.Responses[0] = oversizedInvokeEntry(resp.Responses[0])
+			whole, err = EncodeInvokeResponse(resp)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return [][]byte{whole}, nil
+	}
+	var chunks [][]byte
+	cur := im.InvokeResponse{SuppressResponse: resp.SuppressResponse}
+	flush := func(more bool) error {
+		cur.MoreChunkedMessages = more
+		body, err := EncodeInvokeResponse(cur)
+		if err != nil {
+			return err
+		}
+		chunks = append(chunks, body)
+		cur = im.InvokeResponse{SuppressResponse: resp.SuppressResponse}
+		return nil
+	}
+	for _, ent := range resp.Responses {
+		trial := cur
+		trial.Responses = append(append([]im.InvokeResponseEntry(nil), cur.Responses...), ent)
+		trial.MoreChunkedMessages = true
+		body, err := EncodeInvokeResponse(trial)
+		if err != nil {
+			return nil, err
+		}
+		if len(body) > budget && len(cur.Responses) > 0 {
+			if err := flush(true); err != nil {
+				return nil, err
+			}
+			trial = im.InvokeResponse{SuppressResponse: resp.SuppressResponse, Responses: []im.InvokeResponseEntry{ent}, MoreChunkedMessages: true}
+			if body, err = EncodeInvokeResponse(trial); err != nil {
+				return nil, err
+			}
+		}
+		if len(body) > reportChunkHardCap {
+			ent = oversizedInvokeEntry(ent)
+		}
+		cur.Responses = append(cur.Responses, ent)
+	}
+	if err := flush(false); err != nil {
+		return nil, err
+	}
+	return chunks, nil
+}
+
+// oversizedInvokeEntry answers a response that cannot fit a message with
+// ResourceExhausted for its path.
+func oversizedInvokeEntry(ent im.InvokeResponseEntry) im.InvokeResponseEntry {
+	return im.InvokeResponseEntry{
+		Path: ent.Path, CommandRef: ent.CommandRef, HasCommandRef: ent.HasCommandRef,
+		IsStatus: true, Status: im.StatusIB{Status: im.StatusResourceExhausted},
+	}
 }

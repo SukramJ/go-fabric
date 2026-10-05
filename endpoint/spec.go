@@ -71,6 +71,11 @@ type Spec struct {
 	// Measurement is set on sensor endpoints assembled from a
 	// measurement source. nil otherwise.
 	Measurement contract.MeasurementSource
+	// NodeLabel is a BridgedDeviceBasicInformation NodeLabel a controller
+	// wrote in an earlier run and the host persisted through
+	// [Config.OnNodeLabelWritten]. Empty serves FriendlyName until a
+	// controller writes one.
+	NodeLabel string
 	// PowerSource carries a battery reading to be served by the
 	// PowerSource cluster (0x002F) on this endpoint. At most one
 	// endpoint per physical device sets it — see the assembly's

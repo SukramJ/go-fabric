@@ -198,8 +198,12 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		ProductID:    productID,
 		ProductLabel: productName,
 		SerialNumber: address,
-		NodeLabel:    ep.FriendlyName,
-		UniqueID:     uniqueIDFor(ep.SourceKey),
+		// A label a controller wrote outlives this per-dispatch server in
+		// the endpoint's state (Endpoint.NodeLabel), and reaches the host
+		// through Config.OnNodeLabelWritten for persistence.
+		NodeLabel:        ep.NodeLabel(),
+		OnNodeLabelWrite: ep.nodeLabelWriter(),
+		UniqueID:         uniqueIDFor(ep.SourceKey),
 		// Reachable mirrors the underlying CCU device's live availability
 		// (see the `reachable` derivation above). When the device is dead
 		// the bridged endpoint now correctly advertises Reachable=false;

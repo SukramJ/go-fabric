@@ -36,6 +36,8 @@ type BridgedDeviceBasicInformation struct {
 	// Satisfies [contract.ClusterDataVersion].
 	dataVersion cluster.DataVersionTracker
 
+	onNodeLabelWrite func(string)
+
 	vendorName        string
 	vendorID          uint16
 	productName       string
@@ -151,6 +153,10 @@ type BridgedConfig struct {
 	UniqueID           string
 	NodeLabel          string
 	Reachable          bool
+	// OnNodeLabelWrite, when set, receives every NodeLabel a controller
+	// writes, after validation — where the owner of the endpoint keeps it
+	// (a server rebuilt per dispatch cannot keep it itself).
+	OnNodeLabelWrite func(label string)
 }
 
 // NewBridgedDeviceBasicInformation constructs the cluster from cfg.
@@ -206,6 +212,7 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 		uniqueID:          cfg.UniqueID,
 		nodeLabel:         cfg.NodeLabel,
 		reachable:         reachable,
+		onNodeLabelWrite:  cfg.OnNodeLabelWrite,
 	}
 	validateBridgedBasicInfoAttributes(cfg, serialNumber)
 	return b, nil
@@ -394,7 +401,11 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(_ context.Context, attrID ui
 	}
 	b.mu.Lock()
 	b.nodeLabel = s
+	hook := b.onNodeLabelWrite
 	b.mu.Unlock()
+	if hook != nil {
+		hook(s)
+	}
 	// Bump DataVersion after a successful NodeLabel mutation so
 	// DataVersionFilter evaluation correctly detects the cluster changed.
 	b.dataVersion.Bump()

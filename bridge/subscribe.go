@@ -701,11 +701,18 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // (packages/protocol/src/interaction/InteractionMessenger.ts:347
 // sendDataReport).
 //
-// Unlike [Bridge.streamInitialReportChunks] this does not block for
-// the peer's per-chunk IM StatusResponse: the ongoing reporters run on
-// the subscription engine's tick goroutine, which serves every other
-// subscription behind them. MRP carries the reliability instead —
-// each chunk is tracked and retransmitted independently.
+// Like [Bridge.streamInitialReportChunks] it waits for the peer's IM
+// StatusResponse to each chunk but the last before sending the next — the
+// Matter chunking handshake (§10.6.6), and what matter.js does for an
+// ongoing report too (InteractionMessenger.ts sendDataReport →
+// waitForSuccess). It used to send every chunk back to back to keep the
+// engine's tick goroutine free; a controller that is still waiting for
+// the ack of its StatusResponse to chunk N then drops chunk N+1 ("Dropping
+// message without piggyback ack when we are waiting for an ack"), and with
+// it every change that chunk carried. The CHIP Python harness lost a dozen
+// attribute reports to it (TC-IDM-4.3 step 10). A single-chunk report — the
+// common case — still does not wait: its StatusResponse is consumed by the
+// subscription's own report bookkeeping.
 func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uint32, error) {
 	chunks, err := chunkReportData(report, reportChunkPayloadBudget)
 	if err != nil {
@@ -713,18 +720,42 @@ func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uin
 		return nil, err
 	}
 	counters := make([]uint32, 0, len(chunks))
-	for _, chunk := range chunks {
+	ourRole := !target.peerInitiator
+	for i, chunk := range chunks {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
 			debugReplyError(b.logger, "encode_ongoing_report", target.src, err)
 			return nil, err
 		}
+		var waitCh <-chan im.StatusCode
+		if chunk.MoreChunkedMessages {
+			waitCh = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+		}
+		if i > 0 {
+			// Chunk N+1 piggybacks the ack of the peer's StatusResponse
+			// to chunk N. chip's ReliableMessageMgr drops it otherwise
+			// ("Dropping message without piggyback ack when we are
+			// waiting for an ack") — the same rule
+			// [Bridge.streamInitialReportChunks] honours through
+			// refreshAckCounter. matter.js gets it for free: its
+			// MessageExchange piggybacks the pending ack on the next send
+			// (packages/protocol/src/protocol/MessageExchange.ts:674 send).
+			target = b.piggybackOwedAck(target, ourRole)
+		}
 		counter, err := b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
 		if err != nil {
+			if waitCh != nil {
+				b.disarmStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+			}
 			return nil, err
 		}
 		if counter != 0 {
 			counters = append(counters, counter)
+		}
+		if waitCh != nil {
+			if err := b.awaitChunkStatusResponse(waitCh, "subscribe.ongoing", target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
+				return counters, err
+			}
 		}
 	}
 	return counters, nil
@@ -764,6 +795,24 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 		return nil, 0, err
 	}
 	return counters, freshExchangeID, nil
+}
+
+// piggybackOwedAck returns target with the ack the bridge owes the peer on
+// target's exchange attached, discharging the obligation so the ack pump
+// does not also send it standalone. target is returned unchanged when
+// nothing is owed or no tracker is wired.
+func (b *Bridge) piggybackOwedAck(target subTarget, ourRole bool) subTarget {
+	b.mu.RLock()
+	tracker := b.ackTracker
+	b.mu.RUnlock()
+	if tracker == nil {
+		return target
+	}
+	if counter, ok := tracker.LookupAndDischarge(target.sessionID, target.exchangeID, ourRole); ok {
+		target.hasAck = true
+		target.ackCounter = counter
+	}
+	return target
 }
 
 func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byte) (uint32, error) {
@@ -884,6 +933,17 @@ func (b *Bridge) currentPeerAddr(sessionID uint16, fallback *net.UDPAddr) *net.U
 //  2. registerSubscription — manager Subscribe + KeepSubscriptions teardown.
 //  3. streamInitialReportChunks — chunked ReportData send with per-chunk ack wait.
 //  4. sendSubscribeResponse — SubscribeResponse with piggyback ack + TouchLastReport.
+//
+// abandonPrimingSubscription closes a subscription whose priming report
+// or SubscribeResponse did not go out: the controller never saw it
+// established, and a priming subscription would otherwise sit silent in
+// the manager until its session closed.
+func (b *Bridge) abandonPrimingSubscription(subID uint32) {
+	if m := b.subscriptionManagerLocked(); m != nil && subID != 0 {
+		_ = m.Close(subID)
+	}
+}
+
 func (b *Bridge) handleSubscribeRequest(
 	ctx context.Context,
 	src *net.UDPAddr,
@@ -962,9 +1022,11 @@ func (b *Bridge) handleSubscribeRequest(
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "manager", subscribeRejectStatus(regErr))
 	}
 	if err := b.streamInitialReportChunks(src, requestHdr, proto, subID, initialReport); err != nil {
+		b.abandonPrimingSubscription(subID)
 		return err
 	}
 	if err := b.sendSubscribeResponse(src, requestHdr, proto, req, subID, initialReport); err != nil {
+		b.abandonPrimingSubscription(subID)
 		return err
 	}
 	// The subscription is active: record it for re-establishment after a

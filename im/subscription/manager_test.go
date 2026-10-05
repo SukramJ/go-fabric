@@ -1587,3 +1587,32 @@ func TestFabricHasAtLeastOneActiveSubscription(t *testing.T) {
 		t.Error("after Close, fabric 1 should have no subscription")
 	}
 }
+
+// TestPrimingSubscriptionStaysSilent pins the priming state: a
+// subscription admitted with Priming gets no keep-alive and no change
+// report — however long its priming report takes — until EndPriming;
+// changes marked meanwhile go out after it. matter.js activates a
+// subscription only once its initial report completed. Found by the CHIP
+// Python harness (TC-IDM-4.3): a keep-alive sent during a 37-chunk priming
+// report was answered INVALID_SUBSCRIPTION and ended the subscription.
+func TestPrimingSubscriptionStaysSilent(t *testing.T) {
+	t.Parallel()
+	var reports int
+	m := subscription.NewManager(subscription.Config{}, func(context.Context, *subscription.Subscription, []im.ConcreteAttributePath) { reports++ }, nil)
+	path := im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x28, Attribute: 5, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	sub, err := m.Subscribe(subscription.SubscribeArgs{PeerNodeID: 1, SessionID: 1, MaxIntervalCeiling: 3, AttributePaths: []im.ConcreteAttributePath{path}, Priming: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.OnAttributeChanged(path)
+	now := time.Now()
+	m.Tick(context.Background(), now.Add(10*time.Second))
+	if reports != 0 {
+		t.Fatalf("%d reports while priming, want none", reports)
+	}
+	sub.EndPriming(now.Add(10 * time.Second))
+	m.Tick(context.Background(), now.Add(12*time.Second))
+	if reports != 1 {
+		t.Errorf("%d reports after EndPriming, want the queued change", reports)
+	}
+}

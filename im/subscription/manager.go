@@ -312,6 +312,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 		// the entire subscription (chip-tool-test-brief T7/T8). Stamping
 		// here closes the race; TouchLastReport remains a no-op refresh.
 		lastReport: time.Now(),
+		priming:    req.Priming,
 	}
 	m.byID[id] = sub
 	m.perFabric[req.FabricIndex]++
@@ -580,6 +581,15 @@ type SubscribeArgs struct {
 	KeepSubscriptions  bool
 	AttributePaths     []im.ConcreteAttributePath
 	EventPaths         []im.ConcreteEventPath
+	// Priming admits the subscription in its priming state: the engine
+	// sends it nothing — no change report, no keep-alive — until the
+	// caller has sent the priming report and the SubscribeResponse and
+	// calls [Subscription.EndPriming]. A report on a subscription the
+	// controller has not seen established yet is answered
+	// INVALID_SUBSCRIPTION and ends it; a priming report long enough to
+	// outlast the keep-alive interval used to provoke exactly that (the
+	// CHIP harness's TC-IDM-4.3 wildcard subscription runs 37 chunks).
+	Priming bool
 	// ReplaceSessionDuplicate instructs Subscribe to close any
 	// existing subscriptions tied to the same SessionID before
 	// admitting the new one. Set this when a CASE session sends a

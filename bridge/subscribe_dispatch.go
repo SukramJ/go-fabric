@@ -259,6 +259,9 @@ func (b *Bridge) registerSubscription(
 			// packages/protocol/src/action/server/EventReadResponse.ts
 			// always passes both path arrays.
 			EventPaths: req.EventRequests,
+			// Nothing is reported on it until the priming report and the
+			// SubscribeResponse have gone out (EndPriming below).
+			Priming: true,
 			// Replace any stale subscription that arrived on the same
 			// CASE session earlier (parallel-reconnect race). Two
 			// SubscribeRequests on the same session can only arise when
@@ -588,7 +591,7 @@ func (b *Bridge) sendSubscribeResponse(
 	// primer above.
 	if m := b.subscriptionManagerLocked(); m != nil && subID != 0 {
 		if sub, err := m.Get(subID); err == nil {
-			sub.TouchLastReport(time.Now())
+			sub.EndPriming(time.Now())
 		}
 	}
 	b.logger.Debug("matter.rx.im.subscribe",

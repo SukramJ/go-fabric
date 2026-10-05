@@ -58,7 +58,7 @@ func (m *Manager) tick(ctx context.Context, now time.Time) {
 	m.mu.RUnlock()
 
 	for _, sub := range m.snapshot() {
-		if sub.IsClosed() {
+		if sub.IsClosed() || sub.isPriming() {
 			continue
 		}
 		// Pending events drain whenever MinInterval has elapsed —

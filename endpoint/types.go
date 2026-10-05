@@ -207,6 +207,8 @@ type Endpoint struct {
 	// endpoints from [Config.Groups]. Non-nil makes [ClusterServers]
 	// mount the stack's Groups server — see [Config.Groups].
 	groups *groups.Manager
+	// onNodeLabelWritten is [Config.OnNodeLabelWritten].
+	onNodeLabelWritten func(key SourceKey, label string)
 }
 
 // PublishClusterServers publishes servers as this endpoint's attached
@@ -278,6 +280,39 @@ type endpointState struct {
 	mu       sync.Mutex
 	trackers map[uint32]*contract.DataVersionTracker
 	identify *mattercore.Identify
+	// nodeLabel is a BridgedDeviceBasicInformation NodeLabel a controller
+	// wrote (or the host restored from its own storage, Spec.NodeLabel);
+	// nil reads the FriendlyName. It lives here because the cluster
+	// server is rebuilt on every dispatch — a label stored on the server
+	// was lost the moment the write returned.
+	nodeLabel *string
+}
+
+// label returns the written label, if any.
+func (s *endpointState) label() (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.nodeLabel == nil {
+		return "", false
+	}
+	return *s.nodeLabel, true
+}
+
+// setLabel stores a written label.
+func (s *endpointState) setLabel(l string) {
+	s.mu.Lock()
+	s.nodeLabel = &l
+	s.mu.Unlock()
+}
+
+// restoreLabel installs a host-restored label unless a controller has
+// written one since this state was created.
+func (s *endpointState) restoreLabel(l string) {
+	s.mu.Lock()
+	if s.nodeLabel == nil {
+		s.nodeLabel = &l
+	}
+	s.mu.Unlock()
 }
 
 func newEndpointState() *endpointState {
@@ -388,6 +423,27 @@ func (e *Endpoint) ClusterDataVersion(clusterID uint32) uint32 {
 // Datasource.ts:949.
 func (e *Endpoint) BumpClusterDataVersion(clusterID uint32) {
 	e.clusterTracker(clusterID).Bump()
+}
+
+// NodeLabel returns the endpoint's BridgedDeviceBasicInformation
+// NodeLabel: the label a controller last wrote, else the FriendlyName.
+func (e *Endpoint) NodeLabel() string {
+	if l, ok := e.endpointState().label(); ok {
+		return l
+	}
+	return e.FriendlyName
+}
+
+// nodeLabelWriter returns the hook a BridgedDeviceBasicInformation server
+// calls with a written NodeLabel: it stores the label in the endpoint's
+// state and hands it to the host's OnNodeLabelWritten.
+func (e *Endpoint) nodeLabelWriter() func(string) {
+	return func(label string) {
+		e.endpointState().setLabel(label)
+		if e.onNodeLabelWritten != nil {
+			e.onNodeLabelWritten(e.SourceKey, label)
+		}
+	}
 }
 
 // IsRoot reports whether this is the root bridge endpoint (ID 0).
