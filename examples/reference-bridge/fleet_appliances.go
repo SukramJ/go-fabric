@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
@@ -54,7 +55,14 @@ type demoWasher struct {
 
 	mu      sync.Mutex
 	running bool
+	// remaining is the cycle's CountdownTime in seconds; ticking is the
+	// stop channel of the goroutine counting it down while the cycle runs.
+	remaining uint32
+	ticking   chan struct{}
 }
+
+// washCycleSeconds is the countdown a started cycle begins with.
+const washCycleSeconds = 1800
 
 var (
 	_ contract.EndpointSource = (*demoWasher)(nil)
@@ -134,16 +142,71 @@ func (w *demoWasher) HandleOperationalCommand(_ context.Context, cmd opstate.Com
 	}
 	w.mu.Lock()
 	w.running = next == opstate.StateRunning || next == opstate.StatePaused
+	if cmd == opstate.CommandStart || next == opstate.StateStopped {
+		w.remaining = washCycleSeconds
+	}
 	w.mu.Unlock()
 	if err := w.ops.SetOperationalState(next); err != nil {
 		return opstate.ErrorState{}, err
 	}
-	if next == opstate.StateRunning {
-		remaining := uint32(1800)
+	// A running cycle counts its time down, a paused one holds it, a
+	// stopped one has none — what TC-OPSTATE-2.2 reads after a Start.
+	switch next {
+	case opstate.StateRunning:
+		w.mu.Lock()
+		remaining := w.remaining
+		w.mu.Unlock()
 		_ = w.ops.SetCountdownTime(&remaining)
+		w.startCountdown()
+	case opstate.StatePaused:
+		w.stopCountdown()
+	default:
+		w.stopCountdown()
+		_ = w.ops.SetCountdownTime(nil)
 	}
 	slog.Info("washer.state", slog.String("device", w.name), slog.Int("state", int(next)))
 	return opstate.ErrorState{ID: opstate.ErrorNoError}, nil
+}
+
+// startCountdown counts CountdownTime down once a second until the cycle
+// stops or pauses; it does nothing when already counting.
+func (w *demoWasher) startCountdown() {
+	w.mu.Lock()
+	if w.ticking != nil {
+		w.mu.Unlock()
+		return
+	}
+	stop := make(chan struct{})
+	w.ticking = stop
+	w.mu.Unlock()
+	go func() {
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-tick.C:
+				w.mu.Lock()
+				if w.remaining > 0 {
+					w.remaining--
+				}
+				remaining := w.remaining
+				w.mu.Unlock()
+				_ = w.ops.SetCountdownTime(&remaining)
+			}
+		}
+	}()
+}
+
+// stopCountdown ends the countdown goroutine, if any.
+func (w *demoWasher) stopCountdown() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.ticking != nil {
+		close(w.ticking)
+		w.ticking = nil
+	}
 }
 
 // ChangeToMode implements [modebase.ModeChanger]. The locked programme is
@@ -174,6 +237,7 @@ func (w *demoWasher) reportError(id opstate.ErrorID) error {
 // event, then Stopped with no countdown.
 func (w *demoWasher) reportCompletion() error {
 	w.build()
+	w.stopCountdown()
 	w.mu.Lock()
 	w.running = false
 	w.mu.Unlock()
@@ -252,7 +316,9 @@ func (v *demoVacuum) build() {
 				{ID: opstate.StateCharging},
 				{ID: opstate.StateDocked},
 			},
-			State:       opstate.StateDocked,
+			// matter.js's RVC test node starts Stopped, in run mode Idle
+			// (support/chip-testing/src/RvcTestInstance.ts).
+			State:       opstate.StateStopped,
 			DeviceType:  opstate.DeviceTypeRoboticVacuumCleaner,
 			DataVersion: &v.version.ops,
 		})
@@ -288,15 +354,32 @@ func (v *demoVacuum) build() {
 	})
 }
 
-// HandleOperationalCommand implements [opstate.CommandHandler].
+// state is the robot's current OperationalState.
+func (v *demoVacuum) state() opstate.State {
+	raw, _ := v.ops.MatterRead(0x0004) // OperationalState
+	st, _ := raw.(uint8)
+	return opstate.State(st)
+}
+
+// HandleOperationalCommand implements [opstate.CommandHandler], as
+// matter.js's RVC test node does (TestRvcOperationalStateServer): Resume
+// is refused on the dock (Charging, Docked) and GoHome in Error, with
+// CommandInvalidInState.
 func (v *demoVacuum) HandleOperationalCommand(_ context.Context, cmd opstate.Command) (opstate.ErrorState, error) {
 	var next opstate.State
+	current := v.state()
 	switch cmd {
 	case opstate.CommandPause:
 		next = opstate.StatePaused
 	case opstate.CommandResume:
+		if current == opstate.StateCharging || current == opstate.StateDocked {
+			return opstate.ErrorState{ID: opstate.ErrorCommandInvalidInState}, nil
+		}
 		next = opstate.StateRunning
 	case opstate.CommandGoHome:
+		if current == opstate.StateError {
+			return opstate.ErrorState{ID: opstate.ErrorCommandInvalidInState}, nil
+		}
 		next = opstate.StateSeekingCharger
 	default:
 		return opstate.ErrorState{ID: opstate.ErrorCommandInvalidInState}, nil
@@ -311,30 +394,44 @@ func (v *demoVacuum) HandleOperationalCommand(_ context.Context, cmd opstate.Com
 	return opstate.ErrorState{ID: opstate.ErrorNoError}, nil
 }
 
-// rvcRunChanger applies RvcRunMode changes: a cleaning or mapping run
-// starts the robot, Idle stops it.
+// rvcRunChanger applies RvcRunMode changes as matter.js's RVC test node
+// does (TestRvcRunModeServer.changeToMode): Idle → Cleaning starts a run
+// (Running), Cleaning → Idle sends the robot home (SeekingCharger), and
+// Mapping cannot be entered while cleaning (InvalidInMode).
 type rvcRunChanger struct{ v *demoVacuum }
 
 func (c rvcRunChanger) ChangeToMode(_ context.Context, newMode uint8) (modebase.Status, string, error) {
 	v := c.v
-	next := opstate.StateRunning
-	if newMode == rvcIdle {
-		next = opstate.StateStopped
+	v.mu.Lock()
+	current := v.runMode
+	v.mu.Unlock()
+	var next *opstate.State
+	switch {
+	case newMode == rvcIdle && current == rvcCleaning:
+		st := opstate.StateSeekingCharger
+		next = &st
+	case newMode == rvcCleaning && current == rvcIdle:
+		st := opstate.StateRunning
+		next = &st
+	case newMode == rvcMapping && current == rvcCleaning:
+		return modebase.StatusInvalidInMode, "can not switch operative modes while the device is operating", nil
 	}
 	v.mu.Lock()
 	v.runMode = newMode
 	v.paused = false
 	v.mu.Unlock()
 	slog.Info("vacuum.run_mode", slog.String("device", v.name), slog.Int("mode", int(newMode)))
-	if err := v.ops.SetOperationalState(next); err != nil {
-		return modebase.StatusGenericFailure, "", err
+	if next != nil {
+		if err := v.ops.SetOperationalState(*next); err != nil {
+			return modebase.StatusGenericFailure, "", err
+		}
 	}
 	return modebase.StatusSuccess, "", nil
 }
 
-// rvcCleanChanger applies RvcCleanMode changes. Switching between vacuum
-// and mop mid-run is refused with CleaningInProgress (0x40), the status the
-// derived cluster defines for it (rvc-clean-mode.element.ts).
+// rvcCleanChanger applies RvcCleanMode changes. A change is refused with
+// InvalidInMode outside the Idle run mode, as matter.js's RVC test node
+// does (TestRvcCleanModeServer.changeToMode; TC-RVCCLEANM-2.2).
 type rvcCleanChanger struct{ v *demoVacuum }
 
 func (c rvcCleanChanger) ChangeToMode(_ context.Context, newMode uint8) (modebase.Status, string, error) {
@@ -343,7 +440,7 @@ func (c rvcCleanChanger) ChangeToMode(_ context.Context, newMode uint8) (modebas
 	running := v.runMode != rvcIdle
 	v.mu.Unlock()
 	if running {
-		return modebase.StatusCleaningInProgress, "finish the run first", nil
+		return modebase.StatusInvalidInMode, "can not switch operative modes while the device is operating", nil
 	}
 	slog.Info("vacuum.clean_mode", slog.String("device", v.name), slog.Int("mode", int(newMode)))
 	return modebase.StatusSuccess, "", nil
@@ -359,7 +456,8 @@ func (v *demoVacuum) reportDocked() error {
 		return err
 	}
 	slog.Info("vacuum.docked", slog.String("device", v.name))
-	return v.ops.SetOperationalState(opstate.StateDocked)
+	// matter.js RvcTestInstance "docked": the robot charges on the dock.
+	return v.ops.SetOperationalState(opstate.StateCharging)
 }
 
 // reportError is the robot reporting a fault (stuck, dust bin full, …).
@@ -367,4 +465,29 @@ func (v *demoVacuum) reportError(id opstate.ErrorID) error {
 	v.build()
 	slog.Info("vacuum.error", slog.String("device", v.name), slog.Int("error", int(id)))
 	return v.ops.SetOperationalError(opstate.ErrorState{ID: id})
+}
+
+// reset is the rvc-app's Reset: Stopped, run mode Idle, no error — matter.js
+// RvcTestInstance "reset".
+func (v *demoVacuum) reset() error {
+	v.build()
+	v.mu.Lock()
+	v.runMode = rvcIdle
+	v.paused = false
+	v.mu.Unlock()
+	if err := v.run.SetCurrentMode(rvcIdle); err != nil {
+		return err
+	}
+	if err := v.ops.SetOperationalError(opstate.ErrorState{ID: opstate.ErrorNoError}); err != nil {
+		return err
+	}
+	return v.ops.SetOperationalState(opstate.StateStopped)
+}
+
+// reportState is a dock report of the rvc-app's pipe — ChargerFound and
+// Charging (Charging), Charged (Docked).
+func (v *demoVacuum) reportState(st opstate.State) error {
+	v.build()
+	slog.Info("vacuum.dock", slog.String("device", v.name), slog.Int("state", int(st)))
+	return v.ops.SetOperationalState(st)
 }

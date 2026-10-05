@@ -151,6 +151,12 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		return f.vacuum.reportError(id)
 	case "Docked":
 		return f.vacuum.reportDocked()
+	case "Reset":
+		return f.vacuum.reset()
+	case "ChargerFound", "Charging":
+		return f.vacuum.reportState(opstate.StateCharging)
+	case "Charged":
+		return f.vacuum.reportState(opstate.StateDocked)
 
 	// --- this daemon's own fleet ---
 	case "OperationCompletion":

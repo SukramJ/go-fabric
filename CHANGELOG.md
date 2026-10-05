@@ -341,6 +341,12 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - The reference daemon's washer counts its CountdownTime down while a
+    cycle runs (TC-OPSTATE-2.2), and its robot vacuum behaves as matter.js's
+    RVC test node: it starts Stopped, its run and clean modes refuse with
+    InvalidInMode where that node does, Resume is refused on the dock and
+    GoHome in Error, and the rvc-app pipe's Reset, ChargerFound, Charging and
+    Charged are understood (TC-RVCOPSTATE-*, TC-RVCRUNM-*, TC-RVCCLEANM-*).
   - A change notification of a host source marked every reportable
     attribute of its endpoint dirty; the bridge now reports only the
     attributes whose value moved, and advances only their clusters'
