@@ -140,6 +140,14 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 		return s.cfg.MinMireds, true
 	case wire.ColorCtrlAttrColorTempPhysicalMax:
 		return s.cfg.MaxMireds, true
+	case wire.ColorCtrlAttrRemainingTime:
+		// The ColorTemperatureLight device type requires RemainingTime
+		// (color-temperature-light.element.ts). This server applies a
+		// colour temperature at once, so no transition is ever in flight:
+		// 0, as matter.js reports it outside a transition
+		// (ColorControlServer.ts remainingTime). Found missing by the CHIP
+		// conformance checker (TC-IDM-10.2 device-type element override).
+		return uint16(0), true
 	case wire.ColorCtrlAttrCoupleColorTempToLevelMinMireds:
 		// CT-mandatory (color-control.element.ts:183-184). The server
 		// keeps no separate coupling floor, so the value is the one
@@ -286,6 +294,7 @@ func (s *ColorControlServer) MatterReportable() []uint32 {
 // feature bit is set in FeatureMap. CT-only FeatureMap has neither.
 func (s *ColorControlServer) MatterAttributes() []uint32 {
 	return []uint32{
+		wire.ColorCtrlAttrRemainingTime,
 		wire.ColorCtrlAttrColorTemperatureMireds,
 		wire.ColorCtrlAttrColorMode,
 		wire.ColorCtrlAttrOptions,

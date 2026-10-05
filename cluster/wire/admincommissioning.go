@@ -147,6 +147,10 @@ type AdministratorCommissioning struct {
 	// AdministratorCommissioningCluster.cpp OpenCommissioningWindow
 	// VerifyOrExit(IsFailSafeFullyDisarmed, ...).
 	isFailSafeArmed func() bool
+
+	versionMu    sync.Mutex
+	version      contract.DataVersionTracker
+	lastSnapshot string
 }
 
 // VendorIDResolver returns the rootVendorId of a fabric. The daemon
@@ -162,6 +166,31 @@ type VendorIDResolver func(ctx context.Context, fabricIndex uint8) uint16
 // FabricCount returns 0 the bridge is uncommissioned and the 48-h timeout
 // upper bound applies per Matter §11.19.8.1.
 type FabricCounter func(ctx context.Context) (int, error)
+
+// MatterDataVersion implements [contract.ClusterDataVersion]. The window
+// state lives in the controller, which changes it without a write this
+// server sees, so the version is derived from the content the way
+// cluster/core Descriptor derives its own: it advances whenever the
+// observed window snapshot differs from the last one. Without a version the
+// cluster answered every read with the sentinel, which a controller's
+// DataVersionFilter can never match.
+func (a *AdministratorCommissioning) MatterDataVersion() uint32 {
+	a.mu.RLock()
+	c := a.controller
+	a.mu.RUnlock()
+	var snap WindowStatusSnapshot
+	if c != nil {
+		snap = c.CurrentWindow()
+	}
+	print := fmt.Sprintf("%+v", snap)
+	a.versionMu.Lock()
+	defer a.versionMu.Unlock()
+	if a.lastSnapshot != "" && a.lastSnapshot != print {
+		a.version.Bump()
+	}
+	a.lastSnapshot = print
+	return a.version.Current()
+}
 
 // NewAdministratorCommissioning constructs the cluster with no
 // controller wired — every command returns Status BUSY until the

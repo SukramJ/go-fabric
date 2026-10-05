@@ -4,7 +4,10 @@
 package core
 
 import (
+	"bytes"
 	"context"
+	"crypto/subtle"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -93,6 +96,18 @@ type GeneralDiagnostics struct {
 	// src/app/clusters/general-diagnostics-server/.
 	dataVersion cluster.DataVersionTracker
 
+	// testEnableKey and testTrigger are set by [EnableTestEventTriggers]:
+	// the device's 16-byte test enable key and the host's trigger handler.
+	// Without them TestEventTriggersEnabled reads false and every
+	// TestEventTrigger fails the enable-key check.
+	testEnableKey []byte
+	testTrigger   TestEventTriggerHandler
+
+	// deviceLoad supplies DeviceLoadStatus for an accessing fabric; nil
+	// reports the zeroed struct matter.js reports before its interaction
+	// server is online.
+	deviceLoad func(fabricIndex uint8) DeviceLoadStruct
+
 	// Event emitter + endpoint; wired by the bridge topology assembler
 	// via [SetMatterEventEmitter] + [SetEndpoint] so [EmitBootReason]
 	// can fire the §11.12.8.1 BootReason event.
@@ -125,11 +140,35 @@ const (
 	gendiagAttrActiveRadioFaults        uint32 = 0x0006
 	gendiagAttrActiveNetworkFaults      uint32 = 0x0007
 	gendiagAttrTestEventTriggersEnabled uint32 = 0x0008
+	// gendiagAttrDeviceLoadStatus is DeviceLoadStatus (0x000A, conformance
+	// "Rev >= v3", quality C — general-diagnostics.element.ts:49-50):
+	// mandatory at the revision this server advertises.
+	gendiagAttrDeviceLoadStatus uint32 = 0x000A
 
 	// Commands per Matter §11.12.7.
 	gendiagCmdTestEventTrigger uint32 = 0x0000
 	gendiagCmdTimeSnapshot     uint32 = 0x0001
 	gendiagCmdTimeSnapshotResp uint32 = 0x0002
+	// PayloadTestRequest / PayloadTestResponse carry conformance DMTEST
+	// (general-diagnostics.element.ts:110-119).
+	gendiagCmdPayloadTestRequest  uint32 = 0x0003
+	gendiagCmdPayloadTestResponse uint32 = 0x0004
+
+	// gendiagFeatureDataModelTest is the DMTEST bit (element :24,
+	// constraint "0"). Mandatory above a MaxPathsPerInvoke of one
+	// (Matter 1.6.1 Core §11.12.4.1, matter.js
+	// GeneralDiagnosticsServer.ts #assertDataModelTest) — and this module's
+	// BasicInformation advertises im.DefaultMaxPathsPerInvoke (10).
+	gendiagFeatureDataModelTest uint32 = 1 << 0
+
+	// payloadTestMaxCount is PayloadTestRequest.Count's constraint "max 2048".
+	payloadTestMaxCount = 2048
+	// payloadTestMaxResponse bounds the Payload a response can carry in
+	// one unsegmented message: matter.js answers ResourceExhausted when the
+	// encoded response exceeds the exchange's maximum payload
+	// (GeneralDiagnosticsServer.ts payloadTestRequest), which for UDP is
+	// 1280 minus the message and security overhead.
+	payloadTestMaxResponse = 1100
 
 	// Events per Matter §11.12.8 / matter.js general-diagnostics.element.ts:74-79.
 	// BootReason is event 0x03; the lower three (HardwareFaultChange,
@@ -236,6 +275,10 @@ func (g *GeneralDiagnostics) MinInvokePrivilege(cmdID uint32) uint8 {
 
 // MatterRead implements [contract.ClusterServer].
 func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
+	if attrID == gendiagAttrDeviceLoadStatus {
+		// Without an accessing fabric; the provider runs outside g.mu.
+		return g.MatterReadFiltered(context.Background(), attrID)
+	}
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	switch attrID {
@@ -285,9 +328,10 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 	case gendiagAttrActiveNetworkFaults:
 		return nil, false
 	case gendiagAttrTestEventTriggersEnabled:
-		return false, true
+		return g.testTrigger != nil, true
+
 	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
+		return gendiagFeatureDataModelTest, true
 	case cluster.AttrGlobalClusterRevision:
 		return gendiagClusterRevision, true
 	}
@@ -309,46 +353,216 @@ func (g *GeneralDiagnostics) MatterWrite(_ context.Context, attrID uint32, _ any
 // enable-key validation with ConstraintError (see the handler); the bridge
 // configures no test-event enable key. PayloadTestRequest (0x03, DMTEST) is
 // not implemented.
-func (g *GeneralDiagnostics) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
+func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
 	case gendiagCmdTimeSnapshot:
 		systemMs := uint64(time.Since(g.startTime).Milliseconds()) //nolint:gosec // G115: wall-clock millis are non-negative for any valid host time; see #20
-		// Mirrors matter.js packages/node/src/behaviors/general-diagnostics/
-		// GeneralDiagnosticsServer.ts::timeSnapshot — PosixTimeMs is
-		// nullable per spec; we always have a wall-clock so emit a real
-		// value, but the encoder must respect the nullable shape on the
-		// wire side.
-		posixMs := uint64(time.Now().UnixMilli()) //nolint:gosec // UnixMilli >= 0 for valid wall-clock; see #20
-		return TimeSnapshotResponse{
-			SystemTimeMs: systemMs,
-			PosixTimeMs:  &posixMs,
-		}, nil
+		// PosixTimeMs stays null: matter.js GeneralDiagnosticsServer.ts
+		// timeSnapshot sets it only when a TimeSynchronization cluster holds
+		// a UTC time, which this server cannot see — and TC-DGGEN-2.4 fails
+		// a node that reports one without it (the reason matter.js gives).
+		return TimeSnapshotResponse{SystemTimeMs: systemMs}, nil
+	case gendiagCmdPayloadTestRequest:
+		return g.payloadTestRequest(fields)
 	case gendiagCmdTestEventTrigger:
-		// TestEventTrigger is mandatory (conformance M) but the bridge
-		// configures no test-event enable key, so every invocation fails
-		// enable-key validation with ConstraintError. Mirrors matter.js
-		// GeneralDiagnosticsServer.ts #validateTestEnabledKey (an all-zero
-		// or non-matching enable key → Status.ConstraintError,
-		// GeneralDiagnosticsServer.ts:99,104). Enumerating the command in
-		// AcceptedCommandList satisfies the mandatory-command conformance;
-		// it simply never enables a trigger on the bridge.
-		return nil, gendiagConstraintErr{}
+		return nil, g.testEventTrigger(ctx, fields)
 	}
 	return nil, im.UnsupportedCommandf("matter: GeneralDiagnostics command 0x%02X not supported", cmdID)
 }
 
-// gendiagConstraintErr is the typed [im.StatusCodeError] returned by
-// TestEventTrigger. Maps to IM ConstraintError (0x87), matching matter.js's
-// enable-key rejection.
-type gendiagConstraintErr struct{}
-
-func (gendiagConstraintErr) Error() string {
-	return "matter: GeneralDiagnostics TestEventTrigger: no test-event enable key configured"
+// DeviceLoadStruct is DeviceLoadStatus' value
+// (general-diagnostics.element.ts:202-207): the node's subscription and
+// Interaction Model message load, as matter.js computes it from its
+// InteractionServer counters and SessionManager
+// (GeneralDiagnosticsServer.ts deviceLoadStatus).
+type DeviceLoadStruct struct {
+	CurrentSubscriptions                  uint16
+	CurrentSubscriptionsForFabric         uint16
+	TotalSubscriptionsEstablished         uint32
+	TotalInteractionModelMessagesSent     uint32
+	TotalInteractionModelMessagesReceived uint32
 }
 
-func (gendiagConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
+// SetDeviceLoadProvider wires the source of DeviceLoadStatus. The bridge
+// installs its own counters when the cluster is attached to the root
+// (bridge.AttachRootClusters); a host only calls this to override them.
+func (g *GeneralDiagnostics) SetDeviceLoadProvider(fn func(fabricIndex uint8) DeviceLoadStruct) {
+	g.mu.Lock()
+	g.deviceLoad = fn
+	g.mu.Unlock()
+}
 
-var _ im.StatusCodeError = gendiagConstraintErr{}
+// MatterReadFiltered implements [contract.FabricScopedReader] for
+// DeviceLoadStatus, whose CurrentSubscriptionsForFabric counts the
+// accessing fabric's subscriptions; every other attribute reads as
+// MatterRead does.
+func (g *GeneralDiagnostics) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
+	if attrID != gendiagAttrDeviceLoadStatus {
+		return g.MatterRead(attrID)
+	}
+	_, fabricIndex := im.FabricFilterFromContext(ctx)
+	g.mu.RLock()
+	fn := g.deviceLoad
+	g.mu.RUnlock()
+	if fn == nil {
+		return DeviceLoadStruct{}, true
+	}
+	return fn(fabricIndex), true
+}
+
+// TestEventTriggerHandler performs one test event trigger (Matter §11.12.7.1).
+// It returns an error for a trigger the host does not support; a plain
+// error answers InvalidCommand — matter.js GeneralDiagnosticsServer.ts
+// triggerTestEvent's default — and an [im.StatusCodeError] answers its own
+// status.
+type TestEventTriggerHandler func(ctx context.Context, eventTrigger uint64) error
+
+// TestEnableKeySize is the length of the EnableKey field and the device's
+// test enable key (general-diagnostics.element.ts, "16" octets).
+const TestEnableKeySize = 16
+
+// EnableTestEventTriggers arms TestEventTrigger: TestEventTriggersEnabled
+// reads true, and a TestEventTrigger carrying key reaches handler. A device
+// in the field never calls this — the specification reserves test event
+// triggers for certification and development (§11.12.6.9), which is why
+// matter.js leaves them off unless a deviceTestEnableKey is configured
+// (GeneralDiagnosticsServer.ts initialize). key must be 16 bytes and not
+// all zero, the value matter.js treats as "not enabled".
+func (g *GeneralDiagnostics) EnableTestEventTriggers(key []byte, handler TestEventTriggerHandler) error {
+	if len(key) != TestEnableKeySize {
+		return fmt.Errorf("matter: test enable key is %d bytes, want %d", len(key), TestEnableKeySize)
+	}
+	if allZero(key) {
+		return errors.New("matter: an all-zero test enable key means test event triggers are disabled")
+	}
+	if handler == nil {
+		return errors.New("matter: test event triggers need a handler")
+	}
+	g.mu.Lock()
+	g.testEnableKey = append([]byte(nil), key...)
+	g.testTrigger = handler
+	g.mu.Unlock()
+	g.dataVersion.Bump()
+	return nil
+}
+
+// testEventTrigger validates the enable key and runs the trigger. Mirrors
+// matter.js GeneralDiagnosticsServer.ts #validateTestEnabledKey and
+// testEventTrigger: an all-zero or mismatching key answers ConstraintError,
+// an unsupported trigger InvalidCommand.
+func (g *GeneralDiagnostics) testEventTrigger(ctx context.Context, fields any) error {
+	key, trigger, ok := decodeTestEventTrigger(fields)
+	if !ok {
+		return gendiagStatusErr{im.StatusInvalidCommand, "TestEventTrigger: malformed fields"}
+	}
+	if len(key) != TestEnableKeySize {
+		return gendiagStatusErr{im.StatusConstraintError, "TestEventTrigger: EnableKey must be 16 bytes"}
+	}
+	if allZero(key) {
+		return gendiagStatusErr{im.StatusConstraintError, "TestEventTrigger: invalid test enable key, all zeros"}
+	}
+	g.mu.RLock()
+	want, handler := g.testEnableKey, g.testTrigger
+	g.mu.RUnlock()
+	if handler == nil || subtle.ConstantTimeCompare(key, want) != 1 {
+		return gendiagStatusErr{im.StatusConstraintError, "TestEventTrigger: invalid test enable key"}
+	}
+	if err := handler(ctx, trigger); err != nil {
+		if _, ok := errors.AsType[im.StatusCodeError](err); ok {
+			return err
+		}
+		return gendiagStatusErr{im.StatusInvalidCommand, fmt.Sprintf("TestEventTrigger 0x%016X: %v", trigger, err)}
+	}
+	return nil
+}
+
+// PayloadTestResponse is the DMTEST response: Payload is Count copies of
+// Value (general-diagnostics.element.ts:119).
+type PayloadTestResponse struct {
+	Payload []byte
+}
+
+// payloadTestRequest implements PayloadTestRequest, mirroring matter.js
+// GeneralDiagnosticsServer.ts payloadTestRequest: the enable key is checked
+// as for TestEventTrigger, test event triggers must be enabled
+// (ConstraintError otherwise), and a payload too large for one message is
+// ResourceExhausted. Fields: [0] EnableKey octets, [1] Value uint8,
+// [2] Count uint16 (max 2048).
+func (g *GeneralDiagnostics) payloadTestRequest(fields any) (any, error) {
+	m, ok := fields.(map[uint8]any)
+	if !ok {
+		return nil, gendiagStatusErr{im.StatusInvalidCommand, "PayloadTestRequest: malformed fields"}
+	}
+	key, _ := m[0].([]byte)
+	value, ok1 := m[1].(uint64)
+	count, ok2 := m[2].(uint64)
+	if !ok1 || !ok2 || value > 0xFF {
+		return nil, gendiagStatusErr{im.StatusInvalidCommand, "PayloadTestRequest: malformed fields"}
+	}
+	if count > payloadTestMaxCount {
+		return nil, gendiagStatusErr{im.StatusConstraintError, "PayloadTestRequest: Count above 2048"}
+	}
+	if len(key) != TestEnableKeySize || allZero(key) {
+		return nil, gendiagStatusErr{im.StatusConstraintError, "PayloadTestRequest: invalid test enable key"}
+	}
+	g.mu.RLock()
+	want, enabled := g.testEnableKey, g.testTrigger != nil
+	g.mu.RUnlock()
+	if !enabled || subtle.ConstantTimeCompare(key, want) != 1 {
+		return nil, gendiagStatusErr{im.StatusConstraintError, "PayloadTestRequest: test event triggers are disabled or the key does not match"}
+	}
+	if count > payloadTestMaxResponse {
+		return nil, gendiagStatusErr{im.StatusResourceExhausted, "PayloadTestRequest: response too large"}
+	}
+	return PayloadTestResponse{Payload: bytes.Repeat([]byte{byte(value)}, int(count))}, nil
+}
+
+// TestEventTriggerRequest is the decoded TestEventTrigger command
+// (general-diagnostics.element.ts: EnableKey tag 0, EventTrigger tag 1).
+type TestEventTriggerRequest struct {
+	EnableKey    []byte
+	EventTrigger uint64
+}
+
+// decodeTestEventTrigger accepts the typed request or the generic
+// tag-keyed map the bridge's fields reader produces for it.
+func decodeTestEventTrigger(fields any) ([]byte, uint64, bool) {
+	switch f := fields.(type) {
+	case TestEventTriggerRequest:
+		return f.EnableKey, f.EventTrigger, true
+	case *TestEventTriggerRequest:
+		if f == nil {
+			return nil, 0, false
+		}
+		return f.EnableKey, f.EventTrigger, true
+	case map[uint8]any:
+		key, ok1 := f[0].([]byte)
+		trigger, ok2 := f[1].(uint64)
+		return key, trigger, ok1 && ok2
+	}
+	return nil, 0, false
+}
+
+func allZero(b []byte) bool {
+	for _, v := range b {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// gendiagStatusErr answers a GeneralDiagnostics command with a specific
+// Interaction Model status.
+type gendiagStatusErr struct {
+	code im.StatusCode
+	msg  string
+}
+
+func (e gendiagStatusErr) Error() string                   { return "matter: GeneralDiagnostics " + e.msg }
+func (e gendiagStatusErr) MatterStatusCode() im.StatusCode { return e.code }
+
+var _ im.StatusCodeError = gendiagStatusErr{}
 
 // TimeSnapshotResponse mirrors Matter §11.12.7.3.
 // Mirrors matter.js packages/model/src/standard/elements/
@@ -372,8 +586,9 @@ type TimeSnapshotResponse struct {
 // PayloadTestRequest (0x03, DMTEST) stays unlisted.
 func (g *GeneralDiagnostics) MatterAcceptedCommands() []uint32 {
 	return []uint32{
-		gendiagCmdTestEventTrigger, // 0x00
-		gendiagCmdTimeSnapshot,     // 0x01
+		gendiagCmdTestEventTrigger,   // 0x00
+		gendiagCmdTimeSnapshot,       // 0x01
+		gendiagCmdPayloadTestRequest, // 0x03, DMTEST
 	}
 }
 
@@ -383,7 +598,8 @@ func (g *GeneralDiagnostics) MatterAcceptedCommands() []uint32 {
 // general-diagnostics.element.ts generated commands.
 func (g *GeneralDiagnostics) MatterGeneratedCommands() []uint32 {
 	return []uint32{
-		gendiagCmdTimeSnapshotResp, // 0x02
+		gendiagCmdTimeSnapshotResp,    // 0x02
+		gendiagCmdPayloadTestResponse, // 0x04, DMTEST
 	}
 }
 
@@ -410,6 +626,7 @@ func (g *GeneralDiagnostics) MatterAttributes() []uint32 {
 		gendiagAttrUpTime,
 		gendiagAttrTotalOperationalHours,
 		gendiagAttrTestEventTriggersEnabled,
+		gendiagAttrDeviceLoadStatus,
 	}
 }
 

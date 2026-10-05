@@ -17,13 +17,15 @@
 // Three attributes carry conformance "M" and are the whole projection:
 // CurrentLevel (0x0), Options (0xf) and OnLevel (0x11)
 // (matter.js packages/model/src/standard/elements/level-control.element.ts:29-30,
-// :65, :49-50). Every other attribute is feature-gated or optional and is
-// absent here, because advertising an attribute whose feature bit is
-// clear is the shape a controller can end a commissioning over:
+// :65, :49-50), and MinLevel (0x2) / MaxLevel (0x3), whose "Rev >= v7, O"
+// makes them mandatory at the revision served (:34-41; matter.js sets both
+// on every LevelControl, LevelControlServer.ts:114-120). Every other
+// attribute is feature-gated or optional and is absent here, because
+// advertising an attribute whose feature bit is clear is the shape a
+// controller can end a commissioning over:
 //
 //   - RemainingTime (0x1) and StartUpCurrentLevel (0x4000) carry
 //     conformance "LT" (element :33, :68-71);
-//   - MinLevel (0x2) and MaxLevel (0x3) carry "Rev >= v7, O" (:34-41);
 //   - CurrentFrequency (0x4), MinFrequency (0x5) and MaxFrequency (0x6)
 //     carry "FQ" (:42-47);
 //   - OnOffTransitionTime (0x10), OnTransitionTime (0x12),
@@ -72,8 +74,8 @@ import (
 // (matter.js level-control.element.ts:19).
 const ClusterID uint32 = 0x0008
 
-// Attribute ids. Only the three conformance-M attributes are listed; the
-// package doc names the gated and optional ones this server leaves out.
+// Attribute ids of the served attributes; the package doc names the gated
+// and optional ones this server leaves out.
 const (
 	// AttrCurrentLevel is the level the device is at, access "R V",
 	// quality "X N S Q" — the X is why an unobserved level reads as TLV
@@ -83,6 +85,14 @@ const (
 	// AttrOptions is the OptionsBitmap that sets the default behaviour of
 	// the commands that consult it, access "RW VO" (element :65).
 	AttrOptions uint32 = 0x000F
+	// AttrMinLevel and AttrMaxLevel carry conformance "Rev >= v7, O"
+	// (element :34-41): mandatory at the revision this server advertises.
+	// matter.js sets both on every LevelControl (LevelControlServer.ts:
+	// 114-120 initialize: "Spec 1.5.1 made minLevel/maxLevel mandatory at
+	// rev 7"), to 0 (1 with LT) and 254. Found missing by the CHIP
+	// conformance checker (TC-IDM-10.2).
+	AttrMinLevel uint32 = 0x0002
+	AttrMaxLevel uint32 = 0x0003
 	// AttrOnLevel is the level CurrentLevel is set to when an On/Off
 	// cluster on the same endpoint turns on, access "RW VO", quality "X"
 	// — null means "no effect" (element :49-50, resource :144-153).
@@ -363,6 +373,10 @@ func (s *Server) MatterRead(attrID uint32) (value any, ok bool) {
 			return nil, true
 		}
 		return s.readFromSource(attrID)
+	case AttrMinLevel:
+		return LevelMin, true
+	case AttrMaxLevel:
+		return LevelMax, true
 	case cluster.AttrGlobalFeatureMap:
 		return featureMap, true
 	case cluster.AttrGlobalClusterRevision:
@@ -970,7 +984,7 @@ func (*Server) MatterReportable() []uint32 { return []uint32{AttrCurrentLevel} }
 // MatterAttributes implements [contract.ClusterAttributeLister], in id
 // order and without the universal globals — the dispatcher merges those.
 func (*Server) MatterAttributes() []uint32 {
-	return []uint32{AttrCurrentLevel, AttrOptions, AttrOnLevel}
+	return []uint32{AttrCurrentLevel, AttrMinLevel, AttrMaxLevel, AttrOptions, AttrOnLevel}
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister], in

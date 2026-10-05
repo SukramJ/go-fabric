@@ -14,10 +14,14 @@ const ColorControlClusterID uint32 = 0x0300
 
 // ColorControl attribute IDs per Matter §3.2.6.
 const (
-	ColorCtrlAttrCurrentHue             uint32 = 0x0000
-	ColorCtrlAttrCurrentSaturation      uint32 = 0x0001
-	ColorCtrlAttrCurrentX               uint32 = 0x0003
-	ColorCtrlAttrCurrentY               uint32 = 0x0004
+	ColorCtrlAttrCurrentHue        uint32 = 0x0000
+	ColorCtrlAttrCurrentSaturation uint32 = 0x0001
+	ColorCtrlAttrCurrentX          uint32 = 0x0003
+	ColorCtrlAttrCurrentY          uint32 = 0x0004
+	// ColorCtrlAttrRemainingTime is RemainingTime (0x0002): conformance "O"
+	// on the cluster, made mandatory by the ColorTemperatureLight device
+	// type (color-temperature-light.element.ts element requirement).
+	ColorCtrlAttrRemainingTime          uint32 = 0x0002
 	ColorCtrlAttrColorTemperatureMireds uint32 = 0x0007
 	ColorCtrlAttrColorMode              uint32 = 0x0008
 	ColorCtrlAttrOptions                uint32 = 0x000F

@@ -36,6 +36,38 @@ type Descriptor struct {
 	partsList          []uint16
 	partsListProvider  func() []uint16
 	serverListProvider func() []uint32
+
+	// version is the cluster's DataVersion, bumped whenever an observed
+	// ServerList / PartsList differs from the last one; lastLists is that
+	// last observation. See MatterDataVersion.
+	versionMu sync.Mutex
+	version   cluster.DataVersionTracker
+	lastLists string
+}
+
+// MatterDataVersion implements [contract.ClusterDataVersion].
+//
+// Descriptor's content changes only through its providers (the mounted set
+// and the topology), never through a write, so there is no write path to
+// bump on. The version is therefore derived from the content: each call
+// renders the two dynamic lists and bumps when they differ from the last
+// rendering. A Descriptor without a version answered every read with the
+// sentinel DataVersion, which the read path will not filter on — a
+// controller's DataVersionFilter for it never matched, and the CHIP read
+// cases (TC-IDM-2.2 step 13) fail exactly that. Mirrors matter.js, where
+// every cluster's Datasource carries a version that advances when its
+// state changes (Datasource.ts).
+func (d *Descriptor) MatterDataVersion() uint32 {
+	server, _ := d.MatterRead(descriptorAttrServerList)
+	parts, _ := d.MatterRead(descriptorAttrPartsList)
+	lists := fmt.Sprint(server, parts)
+	d.versionMu.Lock()
+	defer d.versionMu.Unlock()
+	if d.lastLists != "" && d.lastLists != lists {
+		d.version.Bump()
+	}
+	d.lastLists = lists
+	return d.version.Current()
 }
 
 // DeviceTypeStruct mirrors the Matter Descriptor.DeviceTypeList entry

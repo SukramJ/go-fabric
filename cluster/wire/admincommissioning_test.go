@@ -675,3 +675,25 @@ func TestAdmComm_Invoke_OpenWindow_MalformedPAKEBeatsBusy(t *testing.T) {
 		t.Errorf("OpenWindow call count = %d, want 0 (rejected before controller dispatch)", ctrl.openWindowCalls)
 	}
 }
+
+// TestAdmComm_DataVersionFollowsTheWindow pins the content-derived
+// DataVersion: stable while the window snapshot is unchanged (so a
+// DataVersionFilter matches), advancing when the window opens, never the
+// sentinel — with or without a controller.
+func TestAdmComm_DataVersionFollowsTheWindow(t *testing.T) {
+	t.Parallel()
+	a := newAdmComm()
+	if v := a.MatterDataVersion(); v <= 1 {
+		t.Fatalf("DataVersion without a controller = %d, the sentinel", v)
+	}
+	ctl := &fakeWindowController{snapshot: wire.WindowStatusSnapshot{Status: wire.WindowStatusClosed, AdminFabricIsNull: true, AdminVendorIsNull: true}}
+	a.SetController(ctl)
+	v1 := a.MatterDataVersion()
+	if v2 := a.MatterDataVersion(); v2 != v1 {
+		t.Errorf("unchanged window moved the version %d → %d", v1, v2)
+	}
+	ctl.snapshot = wire.WindowStatusSnapshot{Status: wire.WindowStatusEnhanced, AdminFabricIndex: 1, AdminVendorID: 0xFFF1}
+	if v3 := a.MatterDataVersion(); v3 == v1 {
+		t.Error("an opened window kept the version")
+	}
+}

@@ -115,9 +115,18 @@ type ProductAppearanceStruct struct {
 const PrimaryColorAbsent uint8 = 0xFF
 
 // CapabilityMinimaStruct mirrors Matter §11.1.5.18.
+//
+// The four fields after SubscriptionsPerFabric carry conformance
+// "Rev >= v6" (basic-information.element.ts:173-184), so at the revision
+// this module advertises (6) they are mandatory; zero takes matter.js's
+// default of 20 (BasicInformationServer.ts:27-30, initialize).
 type CapabilityMinimaStruct struct {
-	CaseSessionsPerFabric  uint16
-	SubscriptionsPerFabric uint16
+	CaseSessionsPerFabric            uint16
+	SubscriptionsPerFabric           uint16
+	SimultaneousInvocationsSupported uint16
+	SimultaneousWritesSupported      uint16
+	ReadPathsSupported               uint16
+	SubscribePathsSupported          uint16
 }
 
 // Cluster ID + revision per Matter §11.1.
@@ -437,8 +446,24 @@ func defaultCapabilityMinima(in CapabilityMinimaStruct) CapabilityMinimaStruct {
 	if out.SubscriptionsPerFabric < 3 {
 		out.SubscriptionsPerFabric = 3
 	}
+	// matter.js BasicInformationServer.ts:27-30 / :78-87: each of the
+	// rev-6 minima defaults to 20 when the node sets none. Found missing
+	// by the CHIP Python harness (TC-IDM-2.3 reads ReadPathsSupported).
+	for _, f := range []*uint16{
+		&out.SimultaneousInvocationsSupported, &out.SimultaneousWritesSupported,
+		&out.ReadPathsSupported, &out.SubscribePathsSupported,
+	} {
+		if *f == 0 {
+			*f = capabilityMinimaRev6Default
+		}
+	}
 	return out
 }
+
+// capabilityMinimaRev6Default is matter.js's default for the four rev-6
+// CapabilityMinima fields (DEFAULT_SIMULTANEOUS_INVOCATIONS_SUPPORTED …
+// DEFAULT_SUBSCRIBE_PATHS_SUPPORTED, all 20).
+const capabilityMinimaRev6Default uint16 = 20
 
 // StartUpEvent is the payload for the Matter §11.1.8.1 StartUp event
 // (id 0x0000, priority Critical). Mirrors matter.js

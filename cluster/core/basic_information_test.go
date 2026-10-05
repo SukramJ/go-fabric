@@ -1393,3 +1393,31 @@ func newValidBasicInfoWithSerial(t *testing.T, cfg core.Config) *core.BasicInfor
 	}
 	return b
 }
+
+// TestCapabilityMinimaRev6Defaults pins the four CapabilityMinima fields
+// conformance "Rev >= v6" makes mandatory at the revision this server
+// advertises, defaulted to matter.js's 20 (BasicInformationServer.ts:27-30)
+// unless the host sets them. Found by the CHIP Python harness (TC-IDM-2.3).
+func TestCapabilityMinimaRev6Defaults(t *testing.T) {
+	t.Parallel()
+	b, err := core.NewBasicInformation(core.Config{
+		VendorID: 0xFFF1, ProductID: 0x8001, NodeLabel: "n", VendorName: "v", ProductName: "p", SerialNumber: "s",
+		CapabilityMinima: core.CapabilityMinimaStruct{ReadPathsSupported: 50},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := b.MatterRead(0x0013)
+	cm, ok := v.(core.CapabilityMinimaStruct)
+	if !ok {
+		t.Fatalf("CapabilityMinima = %T", v)
+	}
+	want := core.CapabilityMinimaStruct{
+		CaseSessionsPerFabric: 3, SubscriptionsPerFabric: 3,
+		SimultaneousInvocationsSupported: 20, SimultaneousWritesSupported: 20,
+		ReadPathsSupported: 50, SubscribePathsSupported: 20,
+	}
+	if cm != want {
+		t.Errorf("CapabilityMinima = %+v, want %+v", cm, want)
+	}
+}
