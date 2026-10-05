@@ -9,12 +9,15 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
+	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 )
 
 // TestAppPipeCommandsReachTheDevices drives every app-pipe command the
@@ -157,23 +160,59 @@ func TestSmokeSelfTestEndsOnItsOwn(t *testing.T) {
 	})
 }
 
-// TestWasherCycleCompletesOnItsOwn: a started cycle counts down
-// washCycleSeconds and then completes — OperationalState back to Stopped,
-// CountdownTime null (TC-OPSTATE-2.5 waits out a whole cycle).
-func TestWasherCycleCompletesOnItsOwn(t *testing.T) {
+// TestWasherStopReportsTheCycleTimes: the countdown stops at zero with the
+// cycle still running, and the Stop that ends it emits OperationCompletion
+// with the running and paused seconds (TC-OPSTATE-2.5 steps 11-13).
+func TestWasherStopReportsTheCycleTimes(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		w := newDemoWasher("cycle")
 		w.build()
-		if got, err := w.HandleOperationalCommand(context.Background(), opstate.CommandStart); err != nil || got.ID != opstate.ErrorNoError {
+		events := &eventCapture{}
+		w.ops.SetMatterEventEmitter(events)
+		ctx := context.Background()
+		if got, err := w.HandleOperationalCommand(ctx, opstate.CommandStart); err != nil || got.ID != opstate.ErrorNoError {
 			t.Fatalf("Start = %+v, %v", got, err)
 		}
 		time.Sleep(washCycleSeconds*time.Second + time.Second)
 		synctest.Wait()
-		if v, _ := w.ops.MatterRead(opstate.AttrOperationalState); v != uint8(opstate.StateStopped) {
-			t.Errorf("OperationalState after the cycle = %v, want Stopped", v)
+		if v, _ := w.ops.MatterRead(opstate.AttrOperationalState); v != uint8(opstate.StateRunning) {
+			t.Errorf("OperationalState after the countdown = %v, want still Running", v)
 		}
-		if v, ok := w.ops.MatterRead(opstate.AttrCountdownTime); !ok || v != nil {
-			t.Errorf("CountdownTime after the cycle = %v (%v), want null", v, ok)
+		if got, err := w.HandleOperationalCommand(ctx, opstate.CommandStop); err != nil || got.ID != opstate.ErrorNoError {
+			t.Fatalf("Stop = %+v, %v", got, err)
+		}
+		if v, _ := w.ops.MatterRead(opstate.AttrOperationalState); v != uint8(opstate.StateStopped) {
+			t.Errorf("OperationalState after Stop = %v, want Stopped", v)
+		}
+		var done *clusterwire.OperationCompletionEvent
+		for _, e := range events.all() {
+			if ev, ok := e.(clusterwire.OperationCompletionEvent); ok {
+				done = &ev
+			}
+		}
+		if done == nil || done.TotalOperationalTime == nil || done.PausedTime == nil {
+			t.Fatalf("OperationCompletion = %+v, want one with both times", done)
+		}
+		if got := done.TotalOperationalTime.Seconds; got != washCycleSeconds+1 || done.PausedTime.Seconds != 0 {
+			t.Errorf("OperationCompletion times = %d running / %d paused, want %d / 0", got, done.PausedTime.Seconds, washCycleSeconds+1)
 		}
 	})
+}
+
+// eventCapture records the event payloads a server emits.
+type eventCapture struct {
+	mu   sync.Mutex
+	data []any
+}
+
+func (c *eventCapture) MatterEmitEvent(_ uint16, _, _ uint32, data any, _ contract.EventPriority) {
+	c.mu.Lock()
+	c.data = append(c.data, data)
+	c.mu.Unlock()
+}
+
+func (c *eventCapture) all() []any {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]any(nil), c.data...)
 }

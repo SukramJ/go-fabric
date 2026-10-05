@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
+	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -55,6 +56,10 @@ type demoWasher struct {
 
 	mu      sync.Mutex
 	running bool
+	// runStart, pausedAt and pausedFor time the current cycle for the
+	// OperationCompletion a Stop emits.
+	runStart, pausedAt time.Time
+	pausedFor          time.Duration
 	// startBlocked is set by a reported fault: Start and Resume answer
 	// UnableToStartOrResume until a fault of NoError clears it.
 	startBlocked bool
@@ -64,10 +69,9 @@ type demoWasher struct {
 	ticking   chan struct{}
 }
 
-// washCycleSeconds is the countdown a started cycle begins with. When it
-// runs out the cycle completes on its own (OperationCompletion, then
-// Stopped). Short, because TC-OPSTATE-2.5 waits out a whole cycle inside
-// its 90 s budget, as it does on CHIP's all-clusters app.
+// washCycleSeconds is the countdown a started cycle begins with. Short,
+// because TC-OPSTATE-2.5 waits out the whole countdown inside its 90 s
+// budget before it stops the cycle.
 const washCycleSeconds = 30
 
 var (
@@ -153,6 +157,33 @@ func (w *demoWasher) HandleOperationalCommand(_ context.Context, cmd opstate.Com
 		w.mu.Unlock()
 		return opstate.ErrorState{ID: opstate.ErrorUnableToStartOrResume}, nil
 	}
+	wasRunning := w.running
+	now := time.Now()
+	var completion *opstate.OperationCompletion
+	switch {
+	case cmd == opstate.CommandStart:
+		w.runStart, w.pausedFor, w.pausedAt = now, 0, time.Time{}
+	case cmd == opstate.CommandPause && w.pausedAt.IsZero():
+		w.pausedAt = now
+	case cmd == opstate.CommandResume && !w.pausedAt.IsZero():
+		w.pausedFor += now.Sub(w.pausedAt)
+		w.pausedAt = time.Time{}
+	case cmd == opstate.CommandStop && wasRunning:
+		// Stopping a cycle ends the operation: OperationCompletion with
+		// the time it ran and the time it was paused, which
+		// TC-OPSTATE-2.5 holds against the countdown it waited out.
+		paused := w.pausedFor
+		if !w.pausedAt.IsZero() {
+			paused += now.Sub(w.pausedAt)
+		}
+		total := now.Sub(w.runStart) - paused
+		completion = &opstate.OperationCompletion{
+			Code:                 opstate.ErrorNoError,
+			TotalOperationalTime: &clusterwire.ElapsedS{Seconds: uint32(total.Round(time.Second) / time.Second)},  //nolint:gosec // a wash cycle's seconds fit
+			PausedTime:           &clusterwire.ElapsedS{Seconds: uint32(paused.Round(time.Second) / time.Second)}, //nolint:gosec // as above
+		}
+		w.pausedAt = time.Time{}
+	}
 	w.running = next == opstate.StateRunning || next == opstate.StatePaused
 	if cmd == opstate.CommandStart || next == opstate.StateStopped {
 		w.remaining = washCycleSeconds
@@ -160,6 +191,11 @@ func (w *demoWasher) HandleOperationalCommand(_ context.Context, cmd opstate.Com
 	w.mu.Unlock()
 	if err := w.ops.SetOperationalState(next); err != nil {
 		return opstate.ErrorState{}, err
+	}
+	if completion != nil {
+		if err := w.ops.EmitOperationCompletion(*completion); err != nil {
+			return opstate.ErrorState{}, err
+		}
 	}
 	// A running cycle counts its time down, a paused one holds it, a
 	// stopped one has none — what TC-OPSTATE-2.2 reads after a Start.
@@ -206,12 +242,6 @@ func (w *demoWasher) startCountdown() {
 				remaining := w.remaining
 				w.mu.Unlock()
 				_ = w.ops.SetCountdownTime(&remaining)
-				if remaining == 0 {
-					// The cycle is done: the device reports its own
-					// completion, which also ends this countdown.
-					_ = w.reportCompletion()
-					return
-				}
 			}
 		}
 	}()
