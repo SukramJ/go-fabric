@@ -316,16 +316,18 @@ const reportChunkHardCap = udp.MaxDatagramSize - 200
 //
 // Greedy fill: each AttributeReport / EventReport is appended one at
 // a time; whenever the running encode breaches budget the current
-// chunk closes and the entry seeds a fresh chunk. A single oversized
-// entry (e.g. a Descriptor.PartsList with 1000+ endpoint IDs) cannot
-// be sub-split at this layer — v1.1 leaves the in-attribute list-index
-// split (Matter §10.6.1) to a future iteration — so it ships in its
-// own chunk. When that chunk alone would still exceed
-// [reportChunkHardCap] (the hard wire ceiling [udp.Listener.Send]
-// enforces, so an oversized chunk could never be sent regardless), the
-// entry is downgraded to an AttributeStatusIB / EventStatusIB carrying
-// StatusResourceExhausted for that one path instead — the rest of the
-// report, and the SubscribeResponse that depends on it, still go out.
+// chunk closes and the entry seeds a fresh chunk. A list attribute that
+// does not fit one chunk on its own (e.g. a Descriptor.PartsList with
+// 1000+ endpoint IDs, the NOCs of several fabrics) is split by
+// [splitListAttributeReport] into a REPLACE-ALL plus ListIndex=null
+// appends (Matter §10.6.4.3.1, matter.js chunkAttributePayload). Any
+// other single entry that does not fit ships in its own chunk; when that
+// chunk alone would still exceed [reportChunkHardCap] (the hard wire
+// ceiling [udp.Listener.Send] enforces, so an oversized chunk could never
+// be sent regardless), the entry is downgraded to an AttributeStatusIB /
+// EventStatusIB carrying StatusResourceExhausted for that one path
+// instead — the rest of the report, and the SubscribeResponse that
+// depends on it, still go out.
 func chunkReportData(rd im.ReportData, budget int) ([]im.ReportData, error) {
 	// Fast path: single small report → no work.
 	probe, err := EncodeReportData(rd)
@@ -342,7 +344,16 @@ func chunkReportData(rd im.ReportData, budget int) ([]im.ReportData, error) {
 		SubscriptionID:  rd.SubscriptionID,
 	}
 
-	addAttributeReport := func(rep im.AttributeReport) error {
+	var addAttributeReport func(rep im.AttributeReport) error
+	addAttributeReport = func(rep im.AttributeReport) error {
+		if parts, ok := splitListAttributeReport(rd, rep, budget); ok {
+			for _, part := range parts {
+				if err := addAttributeReport(part); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 		rep, err := capOversizedAttributeReport(rd, rep)
 		if err != nil {
 			return err
@@ -415,6 +426,80 @@ func chunkReportData(rd im.ReportData, budget int) ([]im.ReportData, error) {
 		chunks[len(chunks)-1].SuppressResponse = true
 	}
 	return chunks, nil
+}
+
+// rawListValue is a list attribute value carried as the TLV encodings of
+// its members, as [tlv.SplitArrayMembers] returns them; rawListMember is
+// one member. [splitListAttributeReport] builds both, and
+// [defaultAttributeValueWriter] writes them back verbatim.
+type (
+	rawListValue  [][]byte
+	rawListMember []byte
+)
+
+// splitListAttributeReport splits a list attribute whose report alone
+// does not fit budget into a REPLACE-ALL report carrying as many leading
+// members as fit, followed by one ListIndex=null append report per
+// remaining member, all at the attribute's DataVersion. Mirrors matter.js
+// InteractionMessenger.sendDataReport, which chunks such an attribute with
+// chunkAttributePayload (packages/protocol/src/interaction/
+// AttributeDataEncoder.ts) and packs as many members into the initial
+// REPLACE-ALL as the message holds; chip's ReportDataEncoder does the
+// same (src/app/reporting/Engine.cpp, the AttributeValueEncoder list
+// chunking). Without it a list larger than one datagram — the NOCs of
+// three fabrics, a long ACL — rides in a single oversized message that a
+// chip controller cannot authenticate and discards.
+//
+// ok is false when rep is no splittable list: a status, an entry that
+// already addresses a list item, a non-list value, an empty list, or one
+// that fits budget alone.
+func splitListAttributeReport(rd im.ReportData, rep im.AttributeReport, budget int) ([]im.AttributeReport, bool) {
+	if rep.IsStatus || rep.Path.ListAppend || rep.Path.HasListIndex || rep.Value.IsNull || rep.Value.Value == nil {
+		return nil, false
+	}
+	switch rep.Value.Value.(type) {
+	case rawListValue, rawListMember, []byte, string:
+		return nil, false
+	}
+	size := func(r im.AttributeReport) int {
+		body, err := EncodeReportData(im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID, Reports: []im.AttributeReport{r}})
+		if err != nil {
+			return budget + 1
+		}
+		return len(body)
+	}
+	if size(rep) <= budget {
+		return nil, false
+	}
+	enc := tlv.NewEncoder()
+	defaultAttributeValueWriter(enc, tlv.AnonymousTag(), rep.Value)
+	encoded, err := enc.Bytes()
+	if err != nil {
+		return nil, false
+	}
+	members, err := tlv.SplitArrayMembers(encoded)
+	if err != nil || len(members) == 0 {
+		return nil, false
+	}
+	head := rep
+	n := 1
+	for n < len(members) {
+		head.Value = im.AttributeValue{Value: rawListValue(members[:n+1])}
+		if size(head) > budget {
+			break
+		}
+		n++
+	}
+	head.Value = im.AttributeValue{Value: rawListValue(members[:n])}
+	out := make([]im.AttributeReport, 0, 1+len(members)-n)
+	out = append(out, head)
+	for _, m := range members[n:] {
+		item := rep
+		item.Path.ListAppend = true
+		item.Value = im.AttributeValue{Value: rawListMember(m)}
+		out = append(out, item)
+	}
+	return out, true
 }
 
 // capOversizedAttributeReport downgrades rep to an
@@ -572,6 +657,14 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 	// path; Apple
 	// silently rejects the topology and sends RemoveFabric.
 	switch x := v.Value.(type) {
+	case rawListValue:
+		enc.StartArray(tag)
+		for _, m := range x {
+			_ = enc.PutRawElement(tlv.AnonymousTag(), m)
+		}
+		_ = enc.EndContainer()
+	case rawListMember:
+		_ = enc.PutRawElement(tag, x)
 	case bool:
 		enc.PutBool(tag, x)
 	case uint8:

@@ -329,6 +329,13 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - A list attribute too large for one message — the NOCs of three
+    fabrics, a long ACL or PartsList — went out as a single oversized
+    ReportData that a chip controller cannot authenticate and discards,
+    stalling the read or subscription. Such a list is now split into a
+    REPLACE-ALL with the leading members and ListIndex=null appends, as
+    matter.js's `chunkAttributePayload` and chip's report engine do
+    (`tlv.SplitArrayMembers`, `tlv.Encoder.PutRawElement`; TC-S-2.6).
   - A command a cluster changed state with was never reported to
     subscribers unless the server fired a change notification of its own,
     and none of the root servers does: Breadcrumb after ArmFailSafe,

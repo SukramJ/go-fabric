@@ -610,6 +610,85 @@ func bigPartsList(endpoint uint16, n int) im.AttributeReport {
 	}
 }
 
+// bigOctets returns an AttributeReport whose single octet-string value
+// alone exceeds reportChunkHardCap: an entry that is no list and so
+// cannot be split across chunks.
+func bigOctets(endpoint uint16, n int) im.AttributeReport {
+	return im.AttributeReport{
+		Path: im.ConcreteAttributePath{
+			Endpoint: endpoint, Cluster: 0x28, Attribute: 0x0001,
+			HasEndpoint: true, HasCluster: true, HasAttribute: true,
+		},
+		Value:       im.AttributeValue{Value: make([]byte, n)},
+		DataVersion: 1,
+	}
+}
+
+// TestChunkReportData_SplitsOversizedList pins the list chunking matter.js
+// chunkAttributePayload and chip's ReportDataEncoder perform: a list too
+// large for one chunk travels as a REPLACE-ALL with the leading members
+// followed by ListIndex=null appends, every chunk within budget, every
+// part at the attribute's DataVersion, the members complete and in order.
+func TestChunkReportData_SplitsOversizedList(t *testing.T) {
+	t.Parallel()
+	rep := bigPartsList(1, 2000)
+	rep.DataVersion = 77
+	chunks, err := chunkReportData(im.ReportData{Reports: []im.AttributeReport{makeAttributeReport(9), rep}}, reportChunkPayloadBudget)
+	if err != nil {
+		t.Fatalf("chunkReportData: %v", err)
+	}
+	var got []uint16
+	parts := 0
+	for ci, c := range chunks {
+		body, err := EncodeReportData(c)
+		if err != nil {
+			t.Fatalf("EncodeReportData: %v", err)
+		}
+		if len(body) > reportChunkPayloadBudget {
+			t.Errorf("chunk %d is %d bytes, budget %d", ci, len(body), reportChunkPayloadBudget)
+		}
+		for _, r := range c.Reports {
+			if r.Path.Endpoint != 1 {
+				continue
+			}
+			if r.IsStatus || r.DataVersion != 77 {
+				t.Fatalf("part %d: status=%v dataVersion=%d, want data at 77", parts, r.IsStatus, r.DataVersion)
+			}
+			var members [][]byte
+			switch v := r.Value.Value.(type) {
+			case rawListValue:
+				if parts != 0 || r.Path.ListAppend {
+					t.Fatalf("part %d is a REPLACE-ALL (append=%v); only the first may be", parts, r.Path.ListAppend)
+				}
+				members = v
+			case rawListMember:
+				if parts == 0 || !r.Path.ListAppend {
+					t.Fatalf("part %d: append=%v, want a ListIndex=null append after the REPLACE-ALL", parts, r.Path.ListAppend)
+				}
+				members = [][]byte{v}
+			default:
+				t.Fatalf("part %d carries %T", parts, v)
+			}
+			for _, m := range members {
+				el, err := tlv.NewDecoder(m).Next()
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = append(got, uint16(el.Uint)) //nolint:gosec // test fixture ids
+			}
+			parts++
+		}
+	}
+	if parts < 2 || len(got) != 2000 {
+		t.Fatalf("%d parts carried %d members, want the list split and all 2000 members", parts, len(got))
+	}
+	for i, id := range got {
+		if id != uint16(i+1) { //nolint:gosec // bounded
+			t.Fatalf("member %d = %d, want %d (order lost)", i, id, i+1)
+		}
+	}
+}
+
 // TestChunkReportData_OversizedSingleAttributeDowngradesToStatus
 // verifies that an AttributeReport whose own encoded size breaches
 // reportChunkHardCap — and therefore could never be sent as data
@@ -619,7 +698,7 @@ func bigPartsList(endpoint uint16, n int) im.AttributeReport {
 // refused by the transport.
 func TestChunkReportData_OversizedSingleAttributeDowngradesToStatus(t *testing.T) {
 	t.Parallel()
-	rep := bigPartsList(1, 2000) // ~6 KB encoded, well past reportChunkHardCap.
+	rep := bigOctets(1, 4000) // ~4 KB encoded, well past reportChunkHardCap.
 	rd := im.ReportData{Reports: []im.AttributeReport{rep}}
 
 	chunks, err := chunkReportData(rd, reportChunkPayloadBudget)
@@ -661,7 +740,7 @@ func TestChunkReportData_OversizedSingleAttributeAmongOthers(t *testing.T) {
 	t.Parallel()
 	reports := []im.AttributeReport{
 		makeAttributeReport(1),
-		bigPartsList(2, 2000),
+		bigOctets(2, 4000),
 		makeAttributeReport(3),
 	}
 	rd := im.ReportData{Reports: reports}
