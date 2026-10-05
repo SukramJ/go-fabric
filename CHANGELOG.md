@@ -382,6 +382,10 @@ pseudo-version of `main`.
     UnableToStartOrResume after the app pipe reported a fault, and a
     cleared fault resumes the cycle, as matter.js's test node does
     (TC-OPSTATE-2.2).
+  - The reference daemon's smoke/CO alarm ends a self-test on its own after
+    five seconds (SelfTestComplete, then AllClear), and its app pipe takes
+    CHIP's smoke-co-alarm-app `LongPress` (start a self-test) and
+    `SetUnmounted` (TC-SMOKECO-2.4, TC-SMOKECO-2.7).
   - A change notification of a host source marked every reportable
     attribute of its endpoint dirty; the bridge now reports only the
     attributes whose value moved, and advances only their clusters'

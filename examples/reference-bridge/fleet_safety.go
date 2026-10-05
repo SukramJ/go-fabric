@@ -109,11 +109,20 @@ func (a *demoSmokeAlarm) SmokeCOState() alarm.State {
 	return a.state
 }
 
-// SelfTest implements [alarm.SelfTester]: the test starts and stays in
-// progress until the device reports it done.
+// smokeSelfTestDuration is how long the alarm's self-test runs.
+const smokeSelfTestDuration = 5 * time.Second
+
+// SelfTest implements [alarm.SelfTester]: the test runs for
+// [smokeSelfTestDuration] and then ends on its own — TestInProgress goes
+// back to false, which is what emits SelfTestComplete and, with
+// ExpressedState back at Normal, AllClear (TC-SMOKECO-2.4 waits for both).
 func (a *demoSmokeAlarm) SelfTest(context.Context) error {
 	slog.Info("smoke.selftest", slog.String("device", a.name))
 	a.update(func(st *alarm.State) { st.TestInProgress = true })
+	time.AfterFunc(smokeSelfTestDuration, func() {
+		slog.Info("smoke.selftest_done", slog.String("device", a.name))
+		a.update(func(st *alarm.State) { st.TestInProgress = false })
+	})
 	return nil
 }
 

@@ -55,6 +55,7 @@ type pipeCommand struct {
 	Event      string  `json:"Event"`
 	Jammed     bool    `json:"Jammed"`
 	NumPresses *uint8  `json:"MultiPressNumPresses"`
+	Unmounted  *uint8  `json:"Unmounted"`
 }
 
 // serveAppPipe creates the FIFO (when absent) and applies every command
@@ -122,6 +123,18 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 			return fmt.Errorf("SimulateMultiPress with %d presses: the button has no MSM feature", *cmd.NumPresses)
 		}
 		return f.pressButton(false)
+	case "LongPress":
+		// CHIP's smoke-co-alarm app: a long press of the test button starts
+		// the self-test (TC-SMOKECO-2.4 step 37).
+		return f.smoke.SelfTest(context.Background())
+	case "SetUnmounted":
+		// CHIP's smoke-co-alarm app (TC-SMOKECO-2.7).
+		if cmd.Unmounted == nil {
+			return errors.New("SetUnmounted needs Unmounted")
+		}
+		unmounted := *cmd.Unmounted != 0
+		f.smoke.update(func(s *alarm.State) { s.Unmounted = unmounted })
+		return nil
 	case "SimulateConfigurationVersionChange":
 		// CHIP's name (TC-BRBINFO-3.2): the bridged devices' functionality
 		// changed. Every bridged device's version is raised, and the node's.

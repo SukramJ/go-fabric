@@ -10,6 +10,8 @@ import (
 	"log/slog"
 	"strings"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
@@ -34,6 +36,8 @@ func TestAppPipeCommandsReachTheDevices(t *testing.T) {
 		`{"Name":"SetValveState","Value":1}`,
 		`{"Name":"SetSelectorMode","Value":2}`,
 		`{"Name":"SetSpeakerLevel","Value":42}`,
+		`{"Name":"SetUnmounted","EndpointId":9,"Unmounted":1}`,
+		`{"Name":"LongPress","EndpointId":9,"NewPosition":0}`,
 		`{"Name":"OperationalStateChange","Device":"Generic","Operation":"Start"}`,
 		`{"Name":"OperationalStateChange","Device":"Generic","Operation":"OnFault","Param":1}`,
 		`{"Name":"OperationCompletion"}`,
@@ -56,6 +60,9 @@ func TestAppPipeCommandsReachTheDevices(t *testing.T) {
 	}
 	if on, _ := f.contact.MatterBoolValue(); on {
 		t.Error("contact still closed")
+	}
+	if st := f.smoke.SmokeCOState(); !st.Unmounted || !st.TestInProgress {
+		t.Errorf("smoke alarm after SetUnmounted and LongPress = %+v, want unmounted and testing", st)
 	}
 	if !f.lock.IsJammed() {
 		t.Error("lock not jammed")
@@ -129,4 +136,23 @@ func TestWasherFaultBlocksStart(t *testing.T) {
 		t.Fatalf("Start after the fault cleared = %+v, %v; want NoError", got, err)
 	}
 	f.washer.stopCountdown()
+}
+
+// TestSmokeSelfTestEndsOnItsOwn: the self-test a SelfTestRequest or the
+// test button starts ends after smokeSelfTestDuration (TC-SMOKECO-2.4).
+func TestSmokeSelfTestEndsOnItsOwn(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		a := newDemoSmokeAlarm("selftest")
+		if err := a.SelfTest(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if !a.SmokeCOState().TestInProgress {
+			t.Fatal("self-test did not start")
+		}
+		time.Sleep(smokeSelfTestDuration)
+		synctest.Wait()
+		if a.SmokeCOState().TestInProgress {
+			t.Fatal("self-test still in progress after its duration")
+		}
+	})
 }
