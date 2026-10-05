@@ -355,5 +355,19 @@ func TestValveTravelsThroughATarget(t *testing.T) {
 		_ = v.Close(context.Background())
 		time.Sleep(valveTravel)
 		synctest.Wait()
+		// Closing a closed valve moves nothing.
+		before := notified.Load()
+		_ = v.Close(context.Background())
+		if st, _ := v.CurrentState(); st != valve.StateClosed {
+			t.Fatalf("CurrentState after closing a closed valve = %v, want Closed", st)
+		}
+		if _, ok := v.TargetState(); ok {
+			t.Fatal("closing a closed valve set a TargetState")
+		}
+		time.Sleep(valveTravel)
+		synctest.Wait()
+		if n := notified.Load() - before; n != 1 {
+			t.Fatalf("closing a closed valve notified %d times, want 1 (the command)", n)
+		}
 	})
 }

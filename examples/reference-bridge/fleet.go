@@ -766,6 +766,11 @@ const valveTravel = 200 * time.Millisecond
 
 // travelLocked starts the head towards to. Caller holds v.mu.
 func (v *demoValve) travelLocked(to valve.State) {
+	if v.target == nil && v.state == to {
+		// Already there: the head does not move, and nothing reads
+		// Transitioning (TC-VALCC-3.1 closes a closed valve first).
+		return
+	}
 	if v.arrive != nil {
 		v.arrive.Stop()
 	}

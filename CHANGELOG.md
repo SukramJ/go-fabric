@@ -401,7 +401,7 @@ pseudo-version of `main`.
     report CurrentState Transitioning, and on arrival TargetState returns to
     null — the pair of reports TC-VALCC-3.1 waits for; OpenDuration and
     RemainingDuration hold from the Open command on (TC-VALCC-4.1, 4.2,
-    4.5).
+    4.5); a command for the position the valve already holds moves nothing.
   - The reference daemon's washer refuses Start and Resume with
     UnableToStartOrResume after the app pipe reported a fault, and a
     cleared fault resumes the cycle, as matter.js's test node does
