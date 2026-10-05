@@ -48,14 +48,20 @@ make fuzz             # every fuzz target, iteration-budgeted (FUZZTIME=100000x)
 number legitimately, regenerate, read the diff, and commit the new snapshot —
 adjusting the ratchet constant in the *same* commit.
 
-The chip-tool guard needs Linux and a ~2.5 GiB image pull, so it normally runs
-in CI (`.github/workflows/chiptool.yml`, three jobs including a control leg
-that separates our defects from environment failures):
+The chip-tool guard needs Linux. CI runs it (`.github/workflows/chiptool.yml`,
+three jobs including a control leg that separates our defects from
+environment failures); it also runs locally without exports:
 
 ```sh
-make chiptool-extract   # pull chip-tool out of the pinned chip-cert-bins image
+make chiptool-setup     # once: ../connectedhomeip at the pin (sparse) + bin/chipyaml-venv
+make chiptool-extract   # arm64 only: copy chip-tool out of the pinned chip-cert-bins image (~2.5 GiB)
 make chiptool-test      # build examples/reference-bridge, commission it for real
 ```
+
+The chip-cert-bins image is arm64-only, so on amd64 `chiptool-extract` stops
+with an explanation; install the snap (`sudo snap install chip-tool`) and the
+suite finds it on PATH and keeps its storage under `~/snap/chip-tool/common`.
+`internal/chiptool/doc.go` has the details.
 
 ## Architecture
 
@@ -134,7 +140,7 @@ certification. `docs/matterjs-comparison.md` records each with its reasoning.
 | Repo | Local path | Role |
 | --- | --- | --- |
 | matter.js | `../matter.js/` | Matter Core implementation: schema (`packages/model`), wire codec (`packages/types`), behavior layer (`packages/node/src/behaviors`), device types (`packages/node/src/devices`), protocol engine (`packages/protocol`). The single Matter-side gold standard. |
-| connectedhomeip ("chip") | `../connectedhomeip/` | The CSA reference implementation, checked out locally. Not a second gold standard — matter.js remains the one. It is the **authority on tool and controller behaviour that matter.js does not model**: chip-tool's own argument handling (`examples/chip-tool/`), the access-control and read-client semantics already cited across `bridge/` and `im/` (`src/access/AccessControl.cpp`, `src/app/ReadClient.cpp`), and the source of every error string a chip-tool run prints. |
+| connectedhomeip ("chip") | `../connectedhomeip/` | The CSA reference implementation, checked out at the chip-cert-bins pin by `make chiptool-setup` (sparse: the YAML suites, the cluster XML, the runner, `examples/chip-tool/` and `src/`). Not a second gold standard — matter.js remains the one. It is the **authority on tool and controller behaviour that matter.js does not model**: chip-tool's own argument handling (`examples/chip-tool/`), the access-control and read-client semantics already cited across `bridge/` and `im/` (`src/access/AccessControl.cpp`, `src/app/ReadClient.cpp`), and the source of every error string a chip-tool run prints. |
 
 **When chip-tool behaves unexpectedly, read its source, not its output.**
 The suite under `internal/chiptool/` and the CI control leg both drive the

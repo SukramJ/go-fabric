@@ -196,7 +196,15 @@ func requireChipRoot(t *testing.T) string {
 
 	root := os.Getenv(chipRootEnv)
 	if root == "" {
-		t.Skipf("%s is not set; the chip YAML cases need a connectedhomeip checkout at the Makefile pin", chipRootEnv)
+		// The default is the checkout `make chiptool-setup` creates, at the
+		// path CLAUDE.md names. Absent, the leg skips with the command that
+		// provides it.
+		local := filepath.Join(moduleRoot(), "..", "connectedhomeip")
+		if _, err := os.Stat(filepath.Join(local, "src", "app", "tests", "suites", "certification")); err != nil {
+			t.Skipf("%s is not set and %s has no certification suites; the chip YAML cases need a "+
+				"connectedhomeip checkout at the Makefile pin — run `make chiptool-setup`", chipRootEnv, local)
+		}
+		root = filepath.Clean(local)
 	}
 	yaml := filepath.Join(root, "src", "app", "tests", "suites", "certification")
 	if _, err := os.Stat(yaml); err != nil {
@@ -256,7 +264,11 @@ func requireChipYamlPython(t *testing.T, chipRoot string) string {
 
 	python := os.Getenv(chipYamlPythonEnv)
 	if python == "" {
+		// The venv `make chiptool-setup` creates, else whatever python3 is.
 		python = "python3"
+		if venv := filepath.Join(moduleRoot(), "bin", "chipyaml-venv", "bin", "python"); fileExists(venv) {
+			python = venv
+		}
 	}
 	resolved, err := exec.LookPath(python)
 	if err != nil {
@@ -288,6 +300,12 @@ func chipYamlPythonPath(chipRoot string) string {
 	return filepath.Join(moduleRoot(), "internal", "chiptool", "testdata", "pythonpath") +
 		string(os.PathListSeparator) +
 		filepath.Join(chipRoot, "scripts", "tests")
+}
+
+// fileExists reports whether path names an existing file.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // moduleRoot returns this module's root directory.

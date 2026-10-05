@@ -152,24 +152,55 @@ CHIP_CERT_BINS_IMAGE ?= connectedhomeip/chip-cert-bins:6feac778f196483b6355d35fc
 CHIPTOOL_BIN_DIR     ?= bin
 
 .PHONY: chiptool-extract
-chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into ./bin (~2.5 GiB pull)
+chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into ./bin (arm64 hosts; ~2.5 GiB pull)
+	@# The image publishes arm64 manifests only. On any other host the pull
+	@# fails with Docker's "no matching manifest for linux/amd64", which names
+	@# neither the cause nor a way out -- so say both before Docker does.
+	@arch=$$(uname -m); case "$$arch" in aarch64|arm64) ;; *) \
+		echo "chiptool-extract: $(CHIP_CERT_BINS_IMAGE) publishes linux/arm64 only; this host is $$arch."; \
+		echo "  On amd64, use the chip-tool snap instead -- the suite finds it on PATH and"; \
+		echo "  keeps its storage under ~/snap/chip-tool/common by itself:"; \
+		echo "      sudo snap install chip-tool"; \
+		echo "  or point GOFABRIC_CHIPTOOL_BIN at any other chip-tool build."; \
+		echo "  See internal/chiptool/doc.go for what differs between the snap and the CI pin."; \
+		exit 1;; esac
 	@mkdir -p $(CHIPTOOL_BIN_DIR)
 	@# /root/chip-tool in the image is a symlink; /root/apps/chip-tool is the file.
 	docker create --name gofabric-chip-cert-bins $(CHIP_CERT_BINS_IMAGE)
 	docker cp gofabric-chip-cert-bins:/root/apps/chip-tool $(CHIPTOOL_BIN_DIR)/chip-tool
 	docker rm gofabric-chip-cert-bins
 	chmod +x $(CHIPTOOL_BIN_DIR)/chip-tool
+	@# The suite logs this sidecar as the binary's identity in every run.
+	@echo "$(CHIP_CERT_BINS_IMAGE)" > $(CHIPTOOL_BIN_DIR)/chip-tool.source
+
+# Where `make chiptool-setup` puts the YAML runner's inputs. CHIP_ROOT is the
+# path CLAUDE.md names for the connectedhomeip checkout; the suite looks in
+# the same two places when GOFABRIC_CHIP_ROOT / GOFABRIC_CHIPYAML_PYTHON are
+# unset, so a set-up machine needs no exports.
+CHIP_ROOT     ?= ../connectedhomeip
+CHIPYAML_VENV ?= $(CHIPTOOL_BIN_DIR)/chipyaml-venv
+
+.PHONY: chiptool-setup
+chiptool-setup: ## sparse connectedhomeip checkout at the pin + YAML-runner venv (what the conformance leg needs)
+	@pin=$$(sed -n 's|^CHIP_CERT_BINS_IMAGE[^=]*=[[:space:]]*connectedhomeip/chip-cert-bins:\([0-9a-f]\{40\}\).*|\1|p' Makefile); \
+	test -n "$$pin" || { echo "chiptool-setup: no CHIP_CERT_BINS_IMAGE pin in the Makefile"; exit 1; }; \
+	script/chiptool-setup.sh "$$pin" "$(CHIP_ROOT)" "$(CHIPYAML_VENV)"
 
 .PHONY: chiptool-build
 chiptool-build: ## build the reference daemon the chip-tool guard commissions
 	$(GO) build -o $(CHIPTOOL_BIN_DIR)/reference-bridge ./examples/reference-bridge
 
+# CHIPTOOL_TIMEOUT bounds the whole suite. The broad leg commissions once and
+# runs its subtests over one interactive chip-tool session; the YAML leg
+# commissions again per case. Raise it rather than trimming tests.
+CHIPTOOL_TIMEOUT ?= 1500s
+
 .PHONY: chiptool-test
-chiptool-test: chiptool-build ## commission the reference daemon with chip-tool (Linux host + chip-tool required)
+chiptool-test: chiptool-build ## run the chip-tool suite against the reference daemon (Linux host + chip-tool required)
 	@# The suite skips itself when chip-tool is missing, which is the whole
 	@# story on macOS: chip-tool has no macOS host build. It fails loudly on a
 	@# missing daemon binary instead, which chiptool-build has just produced.
-	$(GO) test -tags=chiptool -count=1 -timeout=900s -v ./internal/chiptool/...
+	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIPTOOL_TIMEOUT) -v ./internal/chiptool/...
 
 .PHONY: fmt
 fmt: ## format with gofumpt

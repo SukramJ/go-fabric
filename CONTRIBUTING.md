@@ -43,7 +43,25 @@ Prerequisites:
   rather than on the diff. Bumping one is its own change, with whatever the
   new release finds fixed or justified in the same commit.
 
-There is no `Makefile`; CI calls `go` directly and so should you.
+`make help` lists the targets; `make ci` runs what the pipeline runs.
+
+## The chip-tool suite
+
+`internal/chiptool` drives the CSA reference commissioner against
+`examples/reference-bridge` over real PASE and CASE. It needs Linux, a
+chip-tool and a running avahi-daemon, and runs locally with no exports:
+
+```sh
+make chiptool-setup   # once: connectedhomeip at the pin (../connectedhomeip) + the YAML-runner venv
+make chiptool-test
+```
+
+chip-tool comes from `$GOFABRIC_CHIPTOOL_BIN`, `./bin/chip-tool` or PATH, in
+that order. On arm64, `make chiptool-extract` copies the CI pin out of the
+chip-cert-bins image; that image has no amd64 build, so on amd64 install the
+snap (`sudo snap install chip-tool`). Every run logs which chip-tool it used.
+`internal/chiptool/doc.go` explains the rest, including what differs between
+the snap and the CI pin.
 
 ## What a passing PR looks like
 
