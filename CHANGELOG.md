@@ -335,6 +335,14 @@ pseudo-version of `main`.
     Fabrics after AddNOC. The bridge now compares the invoked cluster's
     attributes before and after the command and reports what moved, as
     matter.js's Datasource does (TC-IDM-1.5).
+  - The CASE initiator that re-establishes former subscriptions after a
+    restart never acknowledged the responder's final StatusReport, so the
+    controller retransmitted it until its MRP budget ran out. It is
+    acknowledged when the handshake ends, as matter.js's MessageExchange
+    does on destroy. Found by the matter.js controller leg of the chip-tool
+    suite, which also confirms the resumption itself: after a daemon
+    restart matter.js's controller receives changes on its subscription
+    without subscribing again.
   - AccessControlEntryChanged was one event per ACL write with no
     LatestValue and no actor, and the entry AddNOC installs emitted none.
     The events now follow matter.js AccessControlServer.ts: one per entry

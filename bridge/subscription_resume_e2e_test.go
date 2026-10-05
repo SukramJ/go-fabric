@@ -216,6 +216,11 @@ type fakeController struct {
 	reports chan reportSeen
 	subResp chan uint32
 	sigma1s chan struct{}
+	// statusSent is the counter of the CASE StatusReport this responder
+	// sent; acked receives the counters the device's standalone acks
+	// acknowledge on the unsecured session.
+	statusSent uint32
+	acked      chan uint32
 }
 
 func newFakeController(t *testing.T, fab resumeFabric) *fakeController {
@@ -226,6 +231,7 @@ func newFakeController(t *testing.T, fab resumeFabric) *fakeController {
 		reports: make(chan reportSeen, 16),
 		subResp: make(chan uint32, 4),
 		sigma1s: make(chan struct{}, 4),
+		acked:   make(chan uint32, 8),
 	}
 	go c.serve()
 	return c
@@ -359,6 +365,10 @@ func (c *fakeController) handleUnsecured(hdr *message.Header, body []byte) {
 	}
 	payload := body[protoLen:]
 	switch proto.Opcode {
+	case mrp.StandaloneAckOpcode:
+		if proto.HasAck {
+			c.acked <- proto.AckCounter
+		}
 	case mrp.SCOpcodeSigma1:
 		resp := sigma.NewResponder(c.fab.controller, c.fab.verifier, resumeCtrlSIDRun2)
 		resp.SetIdentityResolver(c.fab)
@@ -397,7 +407,33 @@ func (c *fakeController) handleUnsecured(hdr *message.Header, body []byte) {
 		}
 		c.setSession(sess, resumeCtrlSIDRun2, resp.PeerSessionID())
 		ok := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolSessionEstablishmentSuccess, nil)
+		c.mu.Lock()
+		c.statusSent = c.counter + 1
+		c.mu.Unlock()
 		c.sendUnsecured(hdr, proto, mrp.SCOpcodeStatusReport, ok)
+	}
+}
+
+// awaitStatusAck waits for the device's standalone ack of the CASE
+// StatusReport: the initiator acknowledges the responder's last message
+// when the handshake's exchange ends, as matter.js MessageExchange.destroy
+// does — without it the responder retransmits the StatusReport until its
+// MRP budget runs out.
+func (c *fakeController) awaitStatusAck(t *testing.T) {
+	t.Helper()
+	deadline := time.After(3 * time.Second)
+	for {
+		select {
+		case n := <-c.acked:
+			c.mu.Lock()
+			want := c.statusSent
+			c.mu.Unlock()
+			if n == want {
+				return
+			}
+		case <-deadline:
+			t.Fatal("the device never acknowledged the CASE StatusReport")
+		}
 	}
 }
 
@@ -723,6 +759,10 @@ func runRestartEndToEnd(t *testing.T, withMRP bool) {
 	if cfid := <-resolverCalls; cfid != fab.cfid {
 		t.Fatalf("resolver asked for fabric %x", cfid)
 	}
+
+	// The handshake's last message, the responder's StatusReport, is
+	// acknowledged.
+	ctrl.awaitStatusAck(t)
 
 	// The priming report arrived on the NEW session under the OLD id.
 	priming := ctrl.nextReport(t, time.Second)
