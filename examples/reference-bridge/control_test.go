@@ -114,6 +114,11 @@ func TestSmokeTestEventTriggers(t *testing.T) {
 			t.Errorf("trigger 0x%016X left %+v", tc.trigger, f.smoke.SmokeCOState())
 		}
 	}
+	for _, generic := range []uint64{triggerGeneric, triggerGenericAlias} {
+		if err := f.testEventTrigger(context.Background(), generic); err != nil {
+			t.Errorf("generic trigger 0x%016X: %v", generic, err)
+		}
+	}
 	if err := f.testEventTrigger(context.Background(), 0x1234); err == nil {
 		t.Error("an unknown trigger was accepted")
 	}

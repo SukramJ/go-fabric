@@ -278,6 +278,8 @@ var rvcErrors = map[string]opstate.ErrorID{
 // (SmokeCOTestEventTriggerHandler.h). The low 16 bits of the upper half may
 // carry an endpoint (clearEndpointInEventTrigger); this daemon has one alarm.
 const (
+	triggerGeneric                uint64 = 0x00000000_00000003
+	triggerGenericAlias           uint64 = 0xFFFFFFFF_FFF10000
 	smokeTriggerMask              uint64 = 0xFFFF0000_FFFFFFFF
 	triggerForceSmokeWarning      uint64 = 0x005c0000_00000090
 	triggerForceCOWarning         uint64 = 0x005c0000_00000091
@@ -314,6 +316,12 @@ const (
 func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error {
 	set := func(change func(*alarm.State)) error {
 		f.smoke.update(change)
+		return nil
+	}
+	// The generic trigger the DGGEN cases send, and the alias matter.js's
+	// test node maps onto it (TestGeneralDiagnosticsServer.ts
+	// triggerTestEvent): accepted, nothing to do (TC-DGGEN-2.1 step 9c).
+	if trigger == triggerGeneric || trigger == triggerGenericAlias {
 		return nil
 	}
 	switch trigger & smokeTriggerMask {

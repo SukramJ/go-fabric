@@ -412,7 +412,8 @@ pseudo-version of `main`.
     Inoperative, and a critical alarm cannot be muted (TC-SMOKECO-2.5).
   - The reference daemon persists GeneralDiagnostics RebootCount — 0 on a
     database's first boot, one more on each boot after, as matter.js counts
-    it — where it reported a fixed placeholder (TC-DGGEN-2.1).
+    it — where it reported a fixed placeholder — and accepts the generic
+    test event trigger 0x3 the DGGEN cases send (TC-DGGEN-2.1).
   - The reference daemon's washer counts a 30-second cycle down instead of
     a 30-minute one, and the Stop that ends a cycle emits
     OperationCompletion with the seconds it ran and was paused
