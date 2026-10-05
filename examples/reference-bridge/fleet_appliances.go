@@ -170,13 +170,16 @@ func (w *demoWasher) HandleOperationalCommand(_ context.Context, cmd opstate.Com
 		w.pausedAt = time.Time{}
 	case cmd == opstate.CommandStop && wasRunning:
 		// Stopping a cycle ends the operation: OperationCompletion with
-		// the time it ran and the time it was paused, which
+		// the time it lasted and the time it was paused, which
 		// TC-OPSTATE-2.5 holds against the countdown it waited out.
 		paused := w.pausedFor
 		if !w.pausedAt.IsZero() {
 			paused += now.Sub(w.pausedAt)
 		}
-		total := now.Sub(w.runStart) - paused
+		// TotalOperationalTime is the whole operation, pauses included;
+		// TC-OPSTATE-2.5 expects 1.5 x the countdown after a pause of half
+		// of it.
+		total := now.Sub(w.runStart)
 		completion = &opstate.OperationCompletion{
 			Code:                 opstate.ErrorNoError,
 			TotalOperationalTime: &clusterwire.ElapsedS{Seconds: uint32(total.Round(time.Second) / time.Second)},  //nolint:gosec // a wash cycle's seconds fit

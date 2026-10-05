@@ -188,6 +188,14 @@ func TestWasherStopReportsTheCycleTimes(t *testing.T) {
 		if v, _ := w.ops.MatterRead(opstate.AttrOperationalState); v != uint8(opstate.StateRunning) {
 			t.Errorf("OperationalState after the countdown = %v, want still Running", v)
 		}
+		// A pause of 10 s counts into the total and into PausedTime.
+		if _, err := w.HandleOperationalCommand(ctx, opstate.CommandPause); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(10 * time.Second)
+		if _, err := w.HandleOperationalCommand(ctx, opstate.CommandResume); err != nil {
+			t.Fatal(err)
+		}
 		if got, err := w.HandleOperationalCommand(ctx, opstate.CommandStop); err != nil || got.ID != opstate.ErrorNoError {
 			t.Fatalf("Stop = %+v, %v", got, err)
 		}
@@ -203,8 +211,8 @@ func TestWasherStopReportsTheCycleTimes(t *testing.T) {
 		if done == nil || done.TotalOperationalTime == nil || done.PausedTime == nil {
 			t.Fatalf("OperationCompletion = %+v, want one with both times", done)
 		}
-		if got := done.TotalOperationalTime.Seconds; got != washCycleSeconds+1 || done.PausedTime.Seconds != 0 {
-			t.Errorf("OperationCompletion times = %d running / %d paused, want %d / 0", got, done.PausedTime.Seconds, washCycleSeconds+1)
+		if got := done.TotalOperationalTime.Seconds; got != washCycleSeconds+11 || done.PausedTime.Seconds != 10 {
+			t.Errorf("OperationCompletion times = %d total / %d paused, want %d / 10", got, done.PausedTime.Seconds, washCycleSeconds+11)
 		}
 	})
 }

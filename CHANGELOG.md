@@ -416,7 +416,8 @@ pseudo-version of `main`.
     test event trigger 0x3 the DGGEN cases send (TC-DGGEN-2.1).
   - The reference daemon's washer counts a 30-second cycle down instead of
     a 30-minute one, and the Stop that ends a cycle emits
-    OperationCompletion with the seconds it ran and was paused
+    OperationCompletion with the seconds it lasted, pauses included, and
+    the seconds it was paused
     (TC-OPSTATE-2.5).
   - A change notification of a host source marked every reportable
     attribute of its endpoint dirty; the bridge now reports only the
