@@ -106,3 +106,27 @@ func TestSmokeTestEventTriggers(t *testing.T) {
 		t.Errorf("washer error: %v", err)
 	}
 }
+
+// TestWasherFaultBlocksStart: a fault reported through the app pipe blocks
+// Start and Resume with UnableToStartOrResume until a NoError fault clears
+// it and resumes the cycle — matter.js AllClustersTestInstance.ts OnFault
+// with TestOperationalStateServer's startBlocked (TC-OPSTATE-2.2 step 17).
+func TestWasherFaultBlocksStart(t *testing.T) {
+	f, _ := startFleetBridge(t)
+	one, zero := uint8(2), uint8(0)
+	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Generic", Operation: "OnFault", Param: &one}); err != nil {
+		t.Fatalf("OnFault 2: %v", err)
+	}
+	got, err := f.washer.HandleOperationalCommand(context.Background(), opstate.CommandStart)
+	if err != nil || got.ID != opstate.ErrorUnableToStartOrResume {
+		t.Fatalf("Start after a fault = %+v, %v; want UnableToStartOrResume", got, err)
+	}
+	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Generic", Operation: "OnFault", Param: &zero}); err != nil {
+		t.Fatalf("OnFault 0: %v", err)
+	}
+	got, err = f.washer.HandleOperationalCommand(context.Background(), opstate.CommandStart)
+	if err != nil || got.ID != opstate.ErrorNoError {
+		t.Fatalf("Start after the fault cleared = %+v, %v; want NoError", got, err)
+	}
+	f.washer.stopCountdown()
+}

@@ -55,6 +55,9 @@ type demoWasher struct {
 
 	mu      sync.Mutex
 	running bool
+	// startBlocked is set by a reported fault: Start and Resume answer
+	// UnableToStartOrResume until a fault of NoError clears it.
+	startBlocked bool
 	// remaining is the cycle's CountdownTime in seconds; ticking is the
 	// stop channel of the goroutine counting it down while the cycle runs.
 	remaining uint32
@@ -141,6 +144,12 @@ func (w *demoWasher) HandleOperationalCommand(_ context.Context, cmd opstate.Com
 		return opstate.ErrorState{ID: opstate.ErrorCommandInvalidInState}, nil
 	}
 	w.mu.Lock()
+	if w.startBlocked && (cmd == opstate.CommandStart || cmd == opstate.CommandResume) {
+		// A fault that keeps the cycle from starting — matter.js
+		// TestOperationalStateServer start()/resume() with startBlocked.
+		w.mu.Unlock()
+		return opstate.ErrorState{ID: opstate.ErrorUnableToStartOrResume}, nil
+	}
 	w.running = next == opstate.StateRunning || next == opstate.StatePaused
 	if cmd == opstate.CommandStart || next == opstate.StateStopped {
 		w.remaining = washCycleSeconds
@@ -228,6 +237,9 @@ func (w *demoWasher) reportError(id opstate.ErrorID) error {
 	w.build()
 	w.mu.Lock()
 	w.running = false
+	// Any fault blocks a Start until the fault is cleared (matter.js
+	// AllClustersTestInstance.ts OnFault: startBlocked for 1 and 2).
+	w.startBlocked = id != opstate.ErrorNoError
 	w.mu.Unlock()
 	slog.Info("washer.error", slog.String("device", w.name), slog.Int("error", int(id)))
 	return w.ops.SetOperationalError(opstate.ErrorState{ID: id})

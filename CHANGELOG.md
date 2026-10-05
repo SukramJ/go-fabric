@@ -378,6 +378,10 @@ pseudo-version of `main`.
   - The reference daemon's valve travels: Open and Close set TargetState and
     report CurrentState Transitioning, and on arrival TargetState returns to
     null — the pair of reports TC-VALCC-3.1 waits for.
+  - The reference daemon's washer refuses Start and Resume with
+    UnableToStartOrResume after the app pipe reported a fault, and a
+    cleared fault resumes the cycle, as matter.js's test node does
+    (TC-OPSTATE-2.2).
   - A change notification of a host source marked every reportable
     attribute of its endpoint dirty; the bridge now reports only the
     attributes whose value moved, and advances only their clusters'

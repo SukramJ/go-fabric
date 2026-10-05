@@ -227,7 +227,15 @@ func (f *fleet) washerOperation(cmd pipeCommand) error {
 		if cmd.Param == nil {
 			return errors.New("OnFault needs Param (an ErrorStateEnum value)")
 		}
-		return w.reportError(opstate.ErrorID(*cmd.Param))
+		if err := w.reportError(opstate.ErrorID(*cmd.Param)); err != nil {
+			return err
+		}
+		if opstate.ErrorID(*cmd.Param) == opstate.ErrorNoError {
+			// Clearing the fault resumes the cycle (matter.js
+			// AllClustersTestInstance.ts OnFault 0).
+			return w.ops.SetOperationalState(opstate.StateRunning)
+		}
+		return nil
 	}
 	return fmt.Errorf("OperationalStateChange operation %q: %w", cmd.Operation, errUnknownPipeCommand)
 }
