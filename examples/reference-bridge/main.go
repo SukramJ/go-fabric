@@ -29,6 +29,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -84,6 +85,7 @@ func run() error {
 		logLevel     = flag.String("log-level", "info", "debug, info, warn or error")
 		appPipe      = flag.String("app-pipe", "", "TESTING ONLY: named pipe of CHIP-style JSON test commands (button presses, sensor values, …); see control.go")
 		enableKey    = flag.String("enable-key", "", "TESTING ONLY: 16-byte hex test enable key that arms GeneralDiagnostics TestEventTrigger; see control.go")
+		osHostName   = flag.Bool("mdns-os-hostname", false, "TESTING ONLY: advertise the OS host name as SRV target instead of the MAC-derived one, for a test host whose LAN interface has no IPv6")
 	)
 	flag.Parse()
 
@@ -169,6 +171,11 @@ func run() error {
 	var advertiser mdns.Advertiser = mdns.NewNoop()
 	if *advertise {
 		zc := mdns.NewZeroconf()
+		if *osHostName {
+			if h, err := os.Hostname(); err == nil && h != "" {
+				zc.HostName = strings.TrimSuffix(h, ".local")
+			}
+		}
 		// The subtype side-car is NOT optional for discovery, only for the
 		// generic browse: without it `_matterc._udp` carries the instance
 		// but `_L<discriminator>._sub._matterc._udp` answers nothing, and

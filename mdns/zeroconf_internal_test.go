@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -604,5 +605,24 @@ func TestZeroconfInternal_ResponderCloseIsIdempotentUnderTwoOwners(t *testing.T)
 	}
 	if r.cancel != nil {
 		t.Error("responder still running after Close — its goroutines outlive both owners")
+	}
+}
+
+// TestZeroconfInternal_Publish_HostNameOverride pins Zeroconf.HostName: it
+// replaces the SRV target a Service carries for every record published.
+func TestZeroconfInternal_Publish_HostNameOverride(t *testing.T) {
+	t.Parallel()
+	z := NewZeroconf()
+	z.HostName = "override-host"
+	t.Cleanup(func() { _ = z.Close() })
+	svc := Service{InstanceName: "AAAABBBBCCCCDDDD", ServiceType: ServiceTypeOperational, Port: 5540, HostName: "ignored"}
+	if err := z.Publish(context.Background(), svc); err != nil {
+		t.Skipf("publish unavailable here: %v", err)
+	}
+	z.mu.Lock()
+	fp := z.published[noopKey(svc.InstanceName, svc.ServiceType)]
+	z.mu.Unlock()
+	if !strings.Contains(fp, "|override-host|") {
+		t.Fatalf("published fingerprint %q does not carry the override host", fp)
 	}
 }

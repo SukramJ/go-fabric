@@ -94,6 +94,14 @@ type Zeroconf struct {
 	// predicate. Replace it before the first Publish to change the
 	// policy — it is read on every Publish, under the advertiser lock.
 	InterfaceFilter func(name string) bool
+	// HostName, when set, is the SRV target of every record this
+	// advertiser publishes, in place of the one the Service carries (the
+	// MAC-derived default the Build* helpers fill in). A test host whose
+	// LAN interface has no IPv6 sets the OS host name here, whose address
+	// records the OS responder publishes for every interface — the IPv6
+	// link-local ones an IPv6-only controller needs included. Set it
+	// before the first Publish.
+	HostName string
 }
 
 // NewZeroconf returns a multicast advertiser backed by zeroconf. The
@@ -298,6 +306,9 @@ func (z *Zeroconf) publishLocked(svc Service) error {
 	// OS-pinned name on macOS and uses the Matter MAC-derived name
 	// elsewhere (matter.js MdnsAdvertisement.ts:155).
 	host := svc.HostName
+	if z.HostName != "" {
+		host = z.HostName
+	}
 	if host == "" {
 		host = defaultHostName()
 	}

@@ -341,6 +341,12 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - `mdns.Zeroconf.HostName` replaces the SRV target of every published
+    record; the reference daemon sets it to the OS host name with
+    `--mdns-os-hostname` (testing only), which the chip-tool harness passes
+    on a host whose LAN interface has no IPv6 — there the MAC-derived name
+    carries only IPv4 records, and the image's chip-tool resolves
+    operational nodes over IPv6 only.
   - The reference daemon's smoke/CO alarm builds its SmokeCoAlarm server
     once, so the alarm events go out through the instance the bridge wired
     its emitter into (TC-SMOKECO-2.2 to 2.5), and reports a future

@@ -76,14 +76,19 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
 - `--app-pipe <path>` creates a named pipe that takes one JSON command per
   line, in CHIP's shape: `{"Name": "SimulateLongPress", ...}`,
   `SetBooleanState`, `SetOccupancy`, `OperationalStateChange`,
-  `ErrorEvent`, `Docked`, plus this fleet's own (`SetSensorValue`,
+  `ErrorEvent`, `Docked`, `Reset`, `ChargerFound`, `Charging`, `Charged`,
+  plus this fleet's own (`SetSensorValue`,
   `SetLocalTemperature`, `SetLockJammed`, `PumpEvent`, …). The CHIP Python
   certification cases drive a device through exactly this pipe.
 - `--enable-key <hex>` arms GeneralDiagnostics TestEventTrigger with that
   test enable key; the SmokeCoAlarm triggers are CHIP's.
+- `--mdns-os-hostname` advertises the OS host name as the SRV target instead
+  of the MAC-derived one, for a test host whose LAN interface has no IPv6:
+  the OS responder then publishes the address records — the IPv6 link-local
+  ones of every interface an IPv6-only controller needs included.
 
-Each applied command is logged as `apppipe.applied`. Neither flag belongs in
-a real deployment.
+Each applied command is logged as `apppipe.applied`. None of these flags
+belongs in a real deployment.
 
 ## This is a TEST identity
 
