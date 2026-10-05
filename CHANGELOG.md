@@ -347,6 +347,14 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - `cluster/thermo.ThermostatServer` accepts writes of
+    Min/MaxHeatSetpointLimit and Min/MaxCoolSetpointLimit (ConstraintError
+    outside the absolute range) and reconciles the setpoints and limits a
+    write leaves inconsistent — including the AutoMode deadband between
+    heating and cooling — as matter.js's `#reconcileSetpoints` (chip
+    `FixUserLimits` / `FixUserLimitDeadband` / `FixRange`) does; the
+    values it moves besides the written one are reported through
+    `contract.AttributeChangeNotifier` (TC-TSTAT-2.2).
   - `mdns.Zeroconf.HostName` replaces the SRV target of every published
     record; the reference daemon sets it to the OS host name with
     `--mdns-os-hostname` (testing only), which the chip-tool harness passes
