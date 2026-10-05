@@ -126,14 +126,16 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 	case "LongPress":
 		// CHIP's smoke-co-alarm app: a long press of the test button starts
 		// the self-test (TC-SMOKECO-2.4 step 37).
-		return f.smoke.SelfTest(context.Background())
+		return f.smoke.pressTestButton(context.Background())
 	case "SetUnmounted":
 		// CHIP's smoke-co-alarm app (TC-SMOKECO-2.7).
 		if cmd.Unmounted == nil {
 			return errors.New("SetUnmounted needs Unmounted")
 		}
+		// An unmounted alarm cannot detect: it expresses Inoperative until it
+		// is mounted again (TC-SMOKECO-2.7 step 8).
 		unmounted := *cmd.Unmounted != 0
-		f.smoke.update(func(s *alarm.State) { s.Unmounted = unmounted })
+		f.smoke.update(func(s *alarm.State) { s.Unmounted, s.Inoperative = unmounted, unmounted })
 		return nil
 	case "SimulateConfigurationVersionChange":
 		// CHIP's name (TC-BRBINFO-3.2): the bridged devices' functionality

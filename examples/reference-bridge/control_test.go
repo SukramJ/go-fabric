@@ -64,8 +64,8 @@ func TestAppPipeCommandsReachTheDevices(t *testing.T) {
 	if on, _ := f.contact.MatterBoolValue(); on {
 		t.Error("contact still closed")
 	}
-	if st := f.smoke.SmokeCOState(); !st.Unmounted || !st.TestInProgress {
-		t.Errorf("smoke alarm after SetUnmounted and LongPress = %+v, want unmounted and testing", st)
+	if st := f.smoke.SmokeCOState(); !st.Unmounted || !st.Inoperative || !st.TestInProgress {
+		t.Errorf("smoke alarm after SetUnmounted and LongPress = %+v, want unmounted, inoperative and testing", st)
 	}
 	if !f.lock.IsJammed() {
 		t.Error("lock not jammed")
@@ -215,4 +215,18 @@ func (c *eventCapture) all() []any {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return append([]any(nil), c.data...)
+}
+
+// TestSmokeTestButtonIsIgnoredWhileAlarming: the test button starts no
+// self-test while the alarm sounds, the rule a SelfTestRequest answers with
+// BUSY (TC-SMOKECO-2.2 steps 9-10).
+func TestSmokeTestButtonIsIgnoredWhileAlarming(t *testing.T) {
+	a := newDemoSmokeAlarm("busy")
+	a.update(func(s *alarm.State) { s.SmokeState = alarm.AlarmWarning })
+	if err := a.pressTestButton(context.Background()); err != nil {
+		t.Fatalf("press while alarming: %v", err)
+	}
+	if a.SmokeCOState().TestInProgress {
+		t.Fatal("a self-test started while the alarm sounds")
+	}
 }

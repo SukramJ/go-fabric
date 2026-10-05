@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/lock"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // --- device: a smoke and CO alarm ---------------------------------------------
@@ -124,6 +126,22 @@ func (a *demoSmokeAlarm) SelfTest(context.Context) error {
 		a.update(func(st *alarm.State) { st.TestInProgress = false })
 	})
 	return nil
+}
+
+// pressTestButton is the test button on the alarm (CHIP's smoke-co-alarm
+// app's LongPress). It starts a self-test by the same rule a
+// SelfTestRequest follows — the server refuses one while the alarm sounds
+// or already tests (TC-SMOKECO-2.2 step 9) — and a refused press does
+// nothing, as on the device.
+func (a *demoSmokeAlarm) pressTestButton(ctx context.Context) error {
+	srv := a.MatterClusterServers()[0]
+	_, err := srv.MatterInvoke(ctx, alarm.CmdSelfTestRequest, nil)
+	var st interface{ MatterStatusCode() im.StatusCode }
+	if errors.As(err, &st) && st.MatterStatusCode() == im.StatusBusy {
+		slog.Info("smoke.selftest_refused", slog.String("device", a.name), slog.String("reason", err.Error()))
+		return nil
+	}
+	return err
 }
 
 // SetSmokeSensitivityLevel implements [alarm.SensitivitySetter].

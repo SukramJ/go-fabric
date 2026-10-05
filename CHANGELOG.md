@@ -406,7 +406,10 @@ pseudo-version of `main`.
   - The reference daemon's smoke/CO alarm ends a self-test on its own after
     five seconds (SelfTestComplete, then AllClear), and its app pipe takes
     CHIP's smoke-co-alarm-app `LongPress` (start a self-test) and
-    `SetUnmounted` (TC-SMOKECO-2.4, TC-SMOKECO-2.7).
+    `SetUnmounted` (TC-SMOKECO-2.4, TC-SMOKECO-2.7). The test button starts
+    no self-test while the alarm sounds, the rule SelfTestRequest answers
+    with BUSY (TC-SMOKECO-2.2, 2.3), and an unmounted alarm expresses
+    Inoperative.
   - The reference daemon's washer counts a 30-second cycle down instead of
     a 30-minute one, and the Stop that ends a cycle emits
     OperationCompletion with the seconds it ran and was paused
