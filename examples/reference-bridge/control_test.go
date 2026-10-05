@@ -92,6 +92,11 @@ func TestSmokeTestEventTriggers(t *testing.T) {
 		{triggerForceCOWarning, func(s alarm.State) bool { return s.COState == alarm.AlarmWarning }},
 		{triggerForceLowBatteryCrit, func(s alarm.State) bool { return s.BatteryAlert == alarm.AlarmCritical }},
 		{triggerForceSilence, func(s alarm.State) bool { return s.DeviceMuted == alarm.Muted }},
+		{triggerClearSilence, func(s alarm.State) bool { return s.DeviceMuted == alarm.NotMuted }},
+		// A critical alarm cannot be muted (TC-SMOKECO-2.5 step 55).
+		{triggerForceSmokeCritical, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmCritical }},
+		{triggerForceSilence, func(s alarm.State) bool { return s.DeviceMuted == alarm.NotMuted }},
+		{triggerClearSmoke, func(s alarm.State) bool { return s.SmokeState == alarm.AlarmNormal }},
 		{triggerForceMalfunction, func(s alarm.State) bool { return s.HardwareFaultAlert }},
 		{triggerForceEndOfLife, func(s alarm.State) bool { return s.EndOfServiceAlert == alarm.EndOfServiceExpired }},
 		{triggerForceContaminationHigh, func(s alarm.State) bool { return s.ContaminationState == alarm.ContaminationCritical }},

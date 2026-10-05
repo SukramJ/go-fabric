@@ -364,7 +364,13 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error {
 	case triggerClearEndOfLife:
 		return set(func(s *alarm.State) { s.EndOfServiceAlert = alarm.EndOfServiceNormal })
 	case triggerForceSilence:
-		return set(func(s *alarm.State) { s.DeviceMuted = alarm.Muted })
+		// A critical alarm cannot be muted (the SmokeCoAlarm "mute" rule
+		// CHIP's smoke-co-alarm app applies; TC-SMOKECO-2.5 step 55).
+		return set(func(s *alarm.State) {
+			if s.SmokeState != alarm.AlarmCritical && s.COState != alarm.AlarmCritical {
+				s.DeviceMuted = alarm.Muted
+			}
+		})
 	case triggerClearSilence:
 		return set(func(s *alarm.State) { s.DeviceMuted = alarm.NotMuted })
 	case triggerForceUnmounted:
