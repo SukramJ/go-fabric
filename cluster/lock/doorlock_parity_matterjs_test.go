@@ -6,10 +6,12 @@ package lock_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	doorlockcluster "github.com/SukramJ/go-fabric/cluster/lock"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/im"
 	matterparity "github.com/SukramJ/go-fabric/parity"
 )
 
@@ -236,5 +238,37 @@ func TestParityMatterJS_DoorLockAcceptedCommands(t *testing.T) {
 		if !accepted[r.id] {
 			t.Errorf("MatterAcceptedCommands missing %s", r.name)
 		}
+	}
+}
+
+// TestParityMatterJS_DoorLock_OperatingModeWritable: OperatingMode is "RW
+// VM" (door-lock.element.ts) and matter.js keeps it as writable state. A
+// supported mode (Normal, NoRemoteLockUnlock: their SupportedOperatingModes
+// bits are clear) is stored and read back; an unsupported or out-of-enum
+// one is a ConstraintError (TC-DRLK-2.1 steps 24b-24d).
+func TestParityMatterJS_DoorLock_OperatingModeWritable(t *testing.T) {
+	t.Parallel()
+	srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Source: &stubSource{observed: true}})
+	ctx := context.Background()
+	for _, mode := range []uint8{0, 3} {
+		if err := srv.MatterWrite(ctx, wire.DoorLockAttrOperatingMode, mode); err != nil {
+			t.Fatalf("write OperatingMode=%d: %v", mode, err)
+		}
+		if v, _ := srv.MatterRead(wire.DoorLockAttrOperatingMode); v != mode {
+			t.Fatalf("OperatingMode after writing %d = %v", mode, v)
+		}
+	}
+	for _, mode := range []uint8{1, 2, 4, 5} {
+		err := srv.MatterWrite(ctx, wire.DoorLockAttrOperatingMode, mode)
+		var st interface{ MatterStatusCode() im.StatusCode }
+		if !errors.As(err, &st) || st.MatterStatusCode() != im.StatusConstraintError {
+			t.Errorf("write OperatingMode=%d: %v, want ConstraintError", mode, err)
+		}
+	}
+	if err := srv.MatterWrite(ctx, wire.DoorLockAttrLockState, uint8(1)); err == nil {
+		t.Error("LockState was writable")
+	}
+	if err := srv.MatterWrite(ctx, wire.DoorLockAttrOperatingMode, "normal"); err == nil {
+		t.Error("a non-numeric OperatingMode was accepted")
 	}
 }

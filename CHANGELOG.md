@@ -355,6 +355,11 @@ pseudo-version of `main`.
     `FixUserLimits` / `FixUserLimitDeadband` / `FixRange`) does; the
     values it moves besides the written one are reported through
     `contract.AttributeChangeNotifier` (TC-TSTAT-2.2).
+  - `cluster/lock.DoorLockServer` serves OperatingMode ("RW VM") as
+    writable state, as matter.js does: a supported mode (Normal,
+    NoRemoteLockUnlock) is stored, anything else is a ConstraintError. The
+    reference daemon's lock builds its server once, so the written mode
+    survives to the next request (TC-DRLK-2.1).
   - `mdns.Zeroconf.HostName` replaces the SRV target of every published
     record; the reference daemon sets it to the OS host name with
     `--mdns-os-hostname` (testing only), which the chip-tool harness passes

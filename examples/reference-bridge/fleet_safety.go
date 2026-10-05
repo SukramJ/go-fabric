@@ -162,6 +162,12 @@ type demoLock struct {
 	mu     sync.Mutex
 	locked bool
 	jammed bool
+
+	// srv is built once: the bridge asks for the cluster servers on every
+	// dispatch, and the server holds OperatingMode and the event emitter
+	// the bridge wired at reassembly (TC-DRLK-2.1).
+	srvOnce sync.Once
+	srv     *lock.DoorLockServer
 }
 
 var (
@@ -179,7 +185,10 @@ func (l *demoLock) MatterDeviceType() uint16 { return deviceTypeDoorLock }
 
 // MatterClusterServers implements [contract.EndpointSource].
 func (l *demoLock) MatterClusterServers() []contract.ClusterServer {
-	return []contract.ClusterServer{lock.NewDoorLockServer(lock.DoorLockConfig{Source: l, DataVersion: &l.version})}
+	l.srvOnce.Do(func() {
+		l.srv = lock.NewDoorLockServer(lock.DoorLockConfig{Source: l, DataVersion: &l.version})
+	})
+	return []contract.ClusterServer{l.srv}
 }
 
 // IsJammed implements [lock.StateSource].

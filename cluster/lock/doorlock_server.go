@@ -120,6 +120,8 @@ type DoorLockServer struct {
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
 	endpoint uint16
+	// operatingMode is OperatingMode; Normal (0) until written.
+	operatingMode uint8
 }
 
 // Compile-time assertions.
@@ -172,13 +174,15 @@ func (s *DoorLockServer) MatterRead(attrID uint32) (any, bool) {
 	case wire.DoorLockAttrActuatorEnabled:
 		return true, true
 	case wire.DoorLockAttrOperatingMode:
-		return uint8(0), true
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.operatingMode, true
 	case wire.DoorLockAttrSupportedOperatingModes:
 		// 0xFFF6: alwaysSet bits (0x07FF, bits 0-10) | vacation (bit 1) |
 		// privacy (bit 2) | passage (bit 4) — Normal (bit 0) and
 		// NoRemoteLockUnlock (bit 3) clear = supported.
 		// Mirrors matter.js DoorLockServer.ts:69.
-		return uint16(0xFFF6), true
+		return supportedOperatingModes, true
 	case cluster.AttrGlobalFeatureMap:
 		return doorLockFeatureUnbolt, true
 	case cluster.AttrGlobalClusterRevision:
@@ -188,12 +192,42 @@ func (s *DoorLockServer) MatterRead(attrID uint32) (any, bool) {
 	}
 }
 
-// MatterWrite implements [contract.ClusterServer]. DoorLock has
-// no writable attributes in this projection; all state changes go through
-// commands.
-func (*DoorLockServer) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("%w: 0x%04X", errUnknownAttribute, attrID)
+// supportedOperatingModes is SupportedOperatingModes: 0xFFF6 — Normal (bit 0)
+// and NoRemoteLockUnlock (bit 3) clear, i.e. supported (matter.js
+// DoorLockServer.ts:69 default).
+const supportedOperatingModes uint16 = 0xFFF6
+
+// operatingModeMax is the highest OperatingModeEnum value (Passage, 4).
+const operatingModeMax = 4
+
+// MatterWrite implements [contract.ClusterServer]. OperatingMode ("RW VM",
+// door-lock.element.ts) is the one writable attribute: matter.js keeps it
+// as plain writable state. A value outside the enum, or a mode whose bit
+// in SupportedOperatingModes is set (not supported — the bitmap inverts),
+// is a ConstraintError.
+func (s *DoorLockServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	if attrID != wire.DoorLockAttrOperatingMode {
+		return fmt.Errorf("%w: 0x%04X", errUnknownAttribute, attrID)
+	}
+	v, ok := cluster.AsUint8(value)
+	if !ok {
+		return fmt.Errorf("doorlock: OperatingMode expects enum8, got %T", value)
+	}
+	if v > operatingModeMax || supportedOperatingModes&(1<<v) != 0 {
+		return doorLockConstraintErr{fmt.Sprintf("doorlock: OperatingMode %d is not a supported mode", v)}
+	}
+	s.mu.Lock()
+	s.operatingMode = v
+	s.mu.Unlock()
+	s.tracker().Bump()
+	return nil
 }
+
+// doorLockConstraintErr surfaces as CONSTRAINT_ERROR.
+type doorLockConstraintErr struct{ msg string }
+
+func (e doorLockConstraintErr) Error() string                 { return e.msg }
+func (doorLockConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
 
 // MatterInvoke implements [contract.ClusterServer]. Dispatches
 // LockDoor / UnlockDoor / UnboltDoor to the underlying source and fires
