@@ -194,3 +194,40 @@ func TestAttributeWritable(t *testing.T) {
 		})
 	}
 }
+
+// TestAttributeWritePrivilege pins the write privilege generated from the
+// matter.js access strings: AccessControl ACL "RW F A" needs Administer,
+// BasicInformation NodeLabel "RW VM" Manage, OnOff OnTime "RW VO" and an
+// attribute with no entry the Operate default.
+func TestAttributeWritePrivilege(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		cluster, attr uint32
+		want          uint8
+	}{
+		{0x001F, 0x0000, PrivilegeAdminister},
+		{0x0028, 0x0005, PrivilegeManage},
+		{0x0006, 0x4001, PrivilegeOperate},
+		{0xFFF1FC00, 0x0000, PrivilegeOperate},
+	}
+	for _, c := range cases {
+		if got := AttributeWritePrivilege(c.cluster, c.attr); got != c.want {
+			t.Errorf("AttributeWritePrivilege(0x%04X, 0x%04X) = %d, want %d", c.cluster, c.attr, got, c.want)
+		}
+	}
+}
+
+// TestDeviceTypeAllowsServerCluster pins the three answers of the
+// conformance oracle: a listed cluster, an unlisted one, an unknown type.
+func TestDeviceTypeAllowsServerCluster(t *testing.T) {
+	t.Parallel()
+	if allowed, known := DeviceTypeAllowsServerCluster(0x0100, 0x0006); !allowed || !known {
+		t.Errorf("OnOffLight / OnOff: allowed=%v known=%v", allowed, known)
+	}
+	if allowed, known := DeviceTypeAllowsServerCluster(0x0100, 0x0201); allowed || !known {
+		t.Errorf("OnOffLight / Thermostat: allowed=%v known=%v", allowed, known)
+	}
+	if _, known := DeviceTypeAllowsServerCluster(0xFFFF_FFFF, 0x0006); known {
+		t.Error("an unknown device type is reported known")
+	}
+}
