@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -295,16 +294,12 @@ func (z *Zeroconf) publishLocked(svc Service) error {
 	// host's `<LocalHostName>.local` and our duplicate publish is
 	// drowned out — Apple Home resolves the SRV target after
 	// CommissioningComplete, finds nothing, and tears the fabric down
-	// with RemoveFabric ~10s later. Falling back to `os.Hostname()`
-	// reuses the OS-pinned name, which is guaranteed to have A/AAAA on
-	// the wire for the lifetime of the host.
+	// with RemoveFabric ~10s later. defaultHostName therefore keeps the
+	// OS-pinned name on macOS and uses the Matter MAC-derived name
+	// elsewhere (matter.js MdnsAdvertisement.ts:155).
 	host := svc.HostName
 	if host == "" {
-		if h, err := os.Hostname(); err == nil && h != "" {
-			host = strings.TrimSuffix(h, ".local")
-		} else {
-			host = "go-fabric-matter"
-		}
+		host = defaultHostName()
 	}
 	ips := primaryHostIPs(z.InterfaceFilter)
 	// Stamp the effective address set onto the copy we keep: the A/AAAA

@@ -387,7 +387,8 @@ func TestZeroconfInternal_RepublishAll_WithItems(t *testing.T) {
 }
 
 // TestZeroconfInternal_Publish_HostName_Empty_FallsBack verifies that an
-// empty HostName in the Service causes Publish to fall back to os.Hostname()
+// empty HostName in the Service causes Publish to fall back to the
+// MAC-derived default host name
 // rather than crashing. This exercises the `host == ""` branch in Publish.
 func TestZeroconfInternal_Publish_HostName_Empty_FallsBack(t *testing.T) {
 	t.Parallel()
@@ -398,10 +399,10 @@ func TestZeroconfInternal_Publish_HostName_Empty_FallsBack(t *testing.T) {
 		InstanceName: "EEEEEEEEFFFFFFFF",
 		ServiceType:  ServiceTypeOperational,
 		Port:         5540,
-		HostName:     "", // triggers os.Hostname() fallback
+		HostName:     "", // triggers the defaultHostName fallback
 	}
 	// Publish must not panic. It may succeed or fail depending on whether
-	// zeroconf.RegisterProxy accepts the OS hostname; we only care that
+	// zeroconf.RegisterProxy accepts the host name; we only care that
 	// the empty-hostname branch is reached without a nil-dereference.
 	_ = z.Publish(context.Background(), svc)
 }

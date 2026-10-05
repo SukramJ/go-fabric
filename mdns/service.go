@@ -4,25 +4,53 @@
 package mdns
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-// defaultHostName returns the OS hostname (with any `.local` suffix
-// stripped) so a SRV target without an explicit HostName resolves via
-// the operating-system mDNS responder's existing A/AAAA records.
-// Falls back to "go-fabric-matter" only when os.Hostname fails.
+// defaultHostName is the SRV target host name when none is configured:
+// the hardware address of the first up, non-loopback, multicast interface
+// as 12 uppercase hex digits, followed by "0000" — matter.js
+// MdnsAdvertisement.ts:155 (`addrs.mac.replace(/:/g, "").toUpperCase() +
+// "0000"`), which satisfies the Matter host-name rule TC-SC-4.3 checks (12
+// or 16 uppercase hexadecimal characters derived from the MAC). Without a
+// hardware address the name is the same 16-digit shape, derived from the OS
+// host name so it is stable across restarts.
+//
+// On macOS the OS host name is kept: there mDNSResponder owns the host's
+// address records, and a separate name published through the zeroconf
+// library was observed to lose its A/AAAA records, so Apple Home tore the
+// fabric down after CommissioningComplete (see zeroconf.go Publish). That
+// is a recorded divergence (notes/parity/by_design.md, mDNS host name on
+// macOS); a product certifies on its own platform.
 func defaultHostName() string {
-	if h, err := os.Hostname(); err == nil && h != "" {
-		return strings.TrimSuffix(h, ".local")
+	if runtime.GOOS == "darwin" {
+		if h, err := os.Hostname(); err == nil && h != "" {
+			return strings.TrimSuffix(h, ".local")
+		}
 	}
-	return "go-fabric-matter"
+	if ifaces, err := net.Interfaces(); err == nil {
+		for _, ifi := range ifaces {
+			if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagLoopback != 0 || ifi.Flags&net.FlagMulticast == 0 || len(ifi.HardwareAddr) != 6 {
+				continue
+			}
+			if addrs, err := ifi.Addrs(); err != nil || len(addrs) == 0 {
+				continue
+			}
+			return strings.ToUpper(hex.EncodeToString(ifi.HardwareAddr)) + "0000"
+		}
+	}
+	h, _ := os.Hostname()
+	sum := sha256.Sum256([]byte("go-fabric host " + h))
+	return strings.ToUpper(hex.EncodeToString(sum[:8]))
 }
 
 // Errors.

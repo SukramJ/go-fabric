@@ -6,6 +6,7 @@ package mdns_test
 import (
 	"errors"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -714,15 +715,17 @@ func TestBuildOperationalService_ICD_Nil_NoKey(t *testing.T) {
 // ---- defaultHostName fallback ----
 
 // TestBuildOperationalService_EmptyHostName_UsesDefault exercises defaultHostName indirectly through
-// BuildOperationalService when HostName is left empty so the function
-// supplies the OS hostname fallback.
+// BuildOperationalService when HostName is left empty.
 func TestBuildOperationalService_EmptyHostName_UsesDefault(t *testing.T) {
 	t.Parallel()
 	cfg := operationalCfg()
 	cfg.HostName = ""
 	svc := mdns.BuildOperationalService(cfg)
-	if svc.HostName == "" {
-		t.Fatal("expected non-empty HostName from defaultHostName fallback")
+	// 16 uppercase hex digits — the MAC plus "0000", as matter.js
+	// MdnsAdvertisement.ts:155 names its host; TC-SC-4.3 rejects any
+	// other shape (12 or 16 uppercase hexadecimal characters).
+	if !regexp.MustCompile(`^[0-9A-F]{16}$`).MatchString(svc.HostName) {
+		t.Fatalf("default HostName %q is not 16 uppercase hex digits", svc.HostName)
 	}
 }
 

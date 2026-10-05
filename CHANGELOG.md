@@ -335,6 +335,12 @@ pseudo-version of `main`.
     Fabrics after AddNOC. The bridge now compares the invoked cluster's
     attributes before and after the command and reports what moved, as
     matter.js's Datasource does (TC-IDM-1.5).
+  - The DNS-SD SRV target was the OS host name, which fails the Matter
+    host-name rule (12 or 16 uppercase hexadecimal characters from the MAC
+    address). The default host name is now the first multicast interface's
+    MAC plus "0000", as matter.js MdnsAdvertisement.ts names its host; on
+    macOS the OS host name is kept, where a separately published name lost
+    its address records (TC-SC-4.3).
   - BooleanState served FeatureMap 0 and never emitted StateChange. The
     ChangeEvent feature is on, and the bridge emits StateChange whenever a
     host's notification changes StateValue, as matter.js BooleanStateServer
