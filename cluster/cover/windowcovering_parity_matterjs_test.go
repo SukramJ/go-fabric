@@ -334,7 +334,10 @@ func TestWindowCoveringServer_WriteModeAccepted(t *testing.T) {
 }
 
 // TestWindowCoveringServer_WriteModeConstraint verifies that Mode > 15
-// returns ConstraintError per matter.js window-covering-cluster.element.ts:79.
+// returns ConstraintError per matter.js window-covering-cluster.element.ts:79 —
+// the reserved-bit case of matter.js packages/node/test/node/
+// BitmapWriteValidationTest.ts ("rejects a reserved bit with ConstraintError":
+// 0x10, bit 4, is reserved).
 func TestWindowCoveringServer_WriteModeConstraint(t *testing.T) {
 	t.Parallel()
 

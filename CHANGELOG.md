@@ -335,6 +335,10 @@ pseudo-version of `main`.
     Fabrics after AddNOC. The bridge now compares the invoked cluster's
     attributes before and after the command and reports what moved, as
     matter.js's Datasource does (TC-IDM-1.5).
+  - BooleanState served FeatureMap 0 and never emitted StateChange. The
+    ChangeEvent feature is on, and the bridge emits StateChange whenever a
+    host's notification changes StateValue, as matter.js BooleanStateServer
+    does by default (ported from matter.js BooleanStateServerTest).
   - The CASE initiator that re-establishes former subscriptions after a
     restart never acknowledged the responder's final StatusReport, so the
     controller retransmitted it until its MRP budget ran out. It is

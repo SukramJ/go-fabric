@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
@@ -1291,7 +1293,9 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 // unsubscribe is tracked so a reassemble tears every listener down.
 func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID
+	boolState := newBooleanStateEvents(b, ep, pathSet)
 	unsub := notifier.OnMatterValueChanged(func() {
+		defer boolState.check()
 		if b.logger != nil {
 			b.logger.Debug("matter.bridge.measurement.notify",
 				slog.Int("endpoint", int(epID)),
@@ -1444,4 +1448,61 @@ func (b *Bridge) resolveSessionPASE(sessionID uint16) bool {
 	}
 	pase, _ := resolver.IsPASE(sessionID)
 	return pase
+}
+
+// booleanStateEvents emits BooleanState.StateChange when an endpoint's
+// StateValue changes: matter.js BooleanStateServer enables the ChangeEvent
+// feature by default and emits the event on stateValue$Changed
+// (packages/node/src/behaviors/boolean-state/BooleanStateServer.ts). The
+// value is a host measurement, so the change is observed here, where the
+// host's notification arrives.
+type booleanStateEvents struct {
+	b    *Bridge
+	ep   *endpointpkg.Endpoint
+	mu   sync.Mutex
+	last *bool
+}
+
+// newBooleanStateEvents returns nil when the notifier does not cover
+// BooleanState.StateValue.
+func newBooleanStateEvents(b *Bridge, ep *endpointpkg.Endpoint, pathSet []im.ConcreteAttributePath) *booleanStateEvents {
+	for _, p := range pathSet {
+		if p.Cluster == measurement.ClusterBooleanState && p.Attribute == 0x0000 {
+			e := &booleanStateEvents{b: b, ep: ep}
+			if v, ok := e.read(); ok {
+				e.last = &v
+			}
+			return e
+		}
+	}
+	return nil
+}
+
+func (e *booleanStateEvents) read() (bool, bool) {
+	for _, srv := range endpointpkg.ClusterServers(e.ep) {
+		if srv.MatterClusterID() == measurement.ClusterBooleanState {
+			v, ok := srv.MatterRead(0x0000)
+			bv, isBool := v.(bool)
+			return bv, ok && isBool
+		}
+	}
+	return false, false
+}
+
+func (e *booleanStateEvents) check() {
+	if e == nil {
+		return
+	}
+	v, ok := e.read()
+	if !ok {
+		return
+	}
+	e.mu.Lock()
+	changed := e.last == nil || *e.last != v
+	e.last = &v
+	e.mu.Unlock()
+	if changed {
+		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterBooleanState, 0x00,
+			measurement.BooleanStateChangeEvent{StateValue: v}, contract.EventPriorityInfo)
+	}
 }

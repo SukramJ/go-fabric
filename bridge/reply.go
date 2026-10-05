@@ -1149,6 +1149,12 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		enc.StartStruct(tag)
 		enc.PutUint(tlv.ContextTag(0), uint64(x.BootReason))
 		_ = enc.EndContainer()
+	case mattermeasure.BooleanStateChangeEvent:
+		// BooleanState StateChange — single field StateValue (bool),
+		// boolean-state.element.ts.
+		enc.StartStruct(tag)
+		enc.PutBool(tlv.ContextTag(0), x.StateValue)
+		_ = enc.EndContainer()
 	case mattercore.ReachableChangedEvent:
 		// BridgedDeviceBasicInformation §9.13.6.1 — single field
 		// ReachableNewValue (bool).

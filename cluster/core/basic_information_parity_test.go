@@ -474,6 +474,13 @@ func TestParityMatterJS_BasicInfoServer_ConfigurationVersionDefaultsToOne(t *tes
 	if v, _ := restored.MatterRead(0x0018); v != uint32(7) {
 		t.Errorf("restored ConfigurationVersion = %v, want 7", v)
 	}
+	// The version never decreases — matter.js
+	// packages/node/test/behaviors/basic-information/ConfigurationVersionTest.ts
+	// ("rejects decrease of configurationVersion").
+	restored.RestoreConfigurationVersion(3)
+	if v, _ := restored.MatterRead(0x0018); v != uint32(7) {
+		t.Errorf("ConfigurationVersion after restoring a lower value = %v, want 7", v)
+	}
 }
 
 // TestParityMatterJS_BasicInfoServer_AsyncObserverMechanism_Unsupported records
