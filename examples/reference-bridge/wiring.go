@@ -352,6 +352,21 @@ func (c *caseIdentities) ResolveSigma1Destination(destinationID [32]byte, initia
 	return nil, nil, false
 }
 
+// ResolveFabricIndex implements [sigma.FabricIndexResolver]: a resumed
+// session answers as the fabric its resumption record names, not as the
+// most recently installed one. Without it a controller resuming on fabric
+// 1 after fabric 2 was installed got a session on fabric 2, and every
+// access check failed (TC-ACL-2.10 after the reboot).
+func (c *caseIdentities) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identity, sigma.PeerVerifier, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	f, ok := c.byIdx[fabricIndex]
+	if !ok || f.identity == nil {
+		return nil, nil, false
+	}
+	return f.identity, f.verifier, true
+}
+
 // forget drops a removed fabric's identity, so a Sigma1 addressed to it is
 // no longer answered: a fabric whose commissioning was rolled back (or
 // that RemoveFabric deleted) must not keep a CASE identity — the next

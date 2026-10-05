@@ -341,6 +341,11 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - The reference daemon's CASE identity table resolves a resumed
+    session by the fabric its resumption record names
+    (`sigma.FabricIndexResolver`); a controller resuming on its fabric after
+    another fabric was installed got a session on the newest fabric and was
+    refused everything (TC-ACL-2.10).
   - SetRegulatoryConfig accepted a configuration the LocationCapability
     rules out; an Indoor-only or Outdoor-only node now answers
     ValueOutsideRange for anything else, as matter.js does (TC-CGEN-2.4).

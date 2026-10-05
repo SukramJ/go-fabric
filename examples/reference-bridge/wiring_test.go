@@ -25,6 +25,7 @@ import (
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -227,5 +228,32 @@ func TestRootMountsGroupcastWithTheAuxiliaryACL(t *testing.T) {
 		if list, _ := raw.([]uint32); !slices.Contains(list, mattercore.GroupcastClusterID) {
 			t.Errorf("root ServerList %v does not name Groupcast", list)
 		}
+	}
+}
+
+// TestCaseIdentitiesResolveAndForget pins the per-fabric identity table the
+// CASE responder resolves through: a resumed session answers as the fabric
+// its record names, and a forgotten fabric is no longer resolvable — by
+// index or as the latest identity.
+func TestCaseIdentitiesResolveAndForget(t *testing.T) {
+	t.Parallel()
+	c := newCaseIdentities(nil)
+	one := &caseFabric{identity: &sigma.Identity{FabricIndex: 1, NodeID: 11}}
+	two := &caseFabric{identity: &sigma.Identity{FabricIndex: 2, NodeID: 22}}
+	c.byIdx[1], c.byIdx[2], c.latest = one, two, two
+	if id, _, ok := c.ResolveFabricIndex(1); !ok || id.NodeID != 11 {
+		t.Fatalf("ResolveFabricIndex(1) = %+v, %v; want fabric 1's identity", id, ok)
+	}
+	if _, nodeID, ok := c.forget(2); !ok || nodeID != 22 {
+		t.Fatalf("forget(2) = %d, %v", nodeID, ok)
+	}
+	if _, _, ok := c.ResolveFabricIndex(2); ok {
+		t.Fatal("a forgotten fabric still resolves")
+	}
+	if cur := c.current(); cur != one {
+		t.Fatalf("latest after forgetting it: %+v, want fabric 1", cur)
+	}
+	if _, _, ok := c.forget(9); ok {
+		t.Fatal("forgetting an unknown fabric reported one")
 	}
 }
