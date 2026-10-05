@@ -362,6 +362,10 @@ pseudo-version of `main`.
     change on their own: OnTime and OffWaitTime as they run down, and OnOff
     when the timed-on phase switches the light off. Before, a subscriber
     learned of none of it (TC-OO-2.8).
+  - The reference daemon's ceiling light no longer hangs on an OnOff
+    command: switching it fired the device's change notification while the
+    command still held the light's state, and the bridge's read-back of the
+    changed paths waited on it forever (TC-CC-*, TC-LVL-*).
   - A change notification of a host source marked every reportable
     attribute of its endpoint dirty; the bridge now reports only the
     attributes whose value moved, and advances only their clusters'

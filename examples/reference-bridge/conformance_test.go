@@ -257,3 +257,44 @@ func TestDelayedOffReportsItsCountdown(t *testing.T) {
 		}
 	})
 }
+
+// TestCeilingLightOnDoesNotDeadlockItsNotifier: switching the ceiling
+// light fires the dimmer's change notification, whose subscriber — the
+// bridge's changed-path check — reads the OnOff server back. That read
+// must not wait on the command still running (it did, and every OnOff
+// command on the light hung: TC-CC-3.1, TC-CC-2.2).
+func TestCeilingLightOnDoesNotDeadlockItsNotifier(t *testing.T) {
+	t.Parallel()
+	light := newDemoCeilingLight("ceiling")
+	var srv *onOffServer
+	for _, s := range light.MatterClusterServers() {
+		if o, ok := s.(*onOffServer); ok {
+			srv = o
+		}
+	}
+	if srv == nil {
+		t.Fatal("the ceiling light mounts no onOffServer")
+	}
+	reads := 0
+	light.OnMatterValueChanged(func() {
+		if _, ok := srv.MatterRead(onoff.AttrOnTime); ok {
+			reads++
+		}
+	})
+	done := make(chan error, 1)
+	go func() {
+		_, err := srv.MatterInvoke(context.Background(), onoff.CmdOn, nil)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("On: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("On did not return: the change notification's read-back deadlocked on the command")
+	}
+	if !light.isOn() || reads != 1 {
+		t.Fatalf("after On: on=%v, notifier read-backs=%d; want on and one read-back", light.isOn(), reads)
+	}
+}

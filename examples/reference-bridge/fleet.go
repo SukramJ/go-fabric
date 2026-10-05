@@ -326,7 +326,19 @@ func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) 
 		return nil, nil
 	}
 	s.lt.mu.Lock()
-	defer s.lt.mu.Unlock()
+	res, err := s.invokeLighting(cmdID, fields)
+	switched := s.lt.takeSwitch()
+	s.lt.mu.Unlock()
+	if switched != nil {
+		s.apply(*switched)
+	}
+	return res, err
+}
+
+// invokeLighting runs one command against the LT state. Caller holds
+// s.lt.mu; the on/off switch it decides is applied once the lock is
+// released ([lightingState.takeSwitch]).
+func (s *onOffServer) invokeLighting(cmdID uint32, fields any) (any, error) {
 	switch cmdID {
 	case onoff.CmdOn:
 		s.on()
@@ -367,8 +379,12 @@ func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) 
 // on is the LT-aware On. Caller holds s.lt.mu. Mirrors matter.js
 // OnOffServer.ts on(): GlobalSceneControl is set, and OffWaitTime is kept
 // through a timed-on phase but cleared when no OnTime runs.
+//
+// The device is switched after s.lt.mu is released, not here: switching it
+// fires the device's change notification, whose subscriber reads this
+// server back — under s.lt.mu that read would deadlock.
 func (s *onOffServer) on() {
-	s.apply(true)
+	s.lt.switchTo(true)
 	s.lt.globalSceneControl = true
 	if s.lt.onTime == 0 {
 		s.lt.stopDelayedOff()
@@ -381,7 +397,7 @@ func (s *onOffServer) on() {
 // above zero (and below the 0xFFFF hold) enters the delayed-off guard
 // period of spec §1.5.7.6.4.
 func (s *onOffServer) off() {
-	s.apply(false)
+	s.lt.switchTo(false)
 	s.lt.stopTimedOn()
 	s.lt.onTime = 0
 	if s.lt.offWaitTime > 0 && s.lt.offWaitTime != 0xFFFF && s.lt.delayedOff == nil {
@@ -420,21 +436,25 @@ func (s *onOffServer) onWithTimedOff(control uint8, onTime, offWaitTime uint16) 
 // timedOnTick runs every 100 ms while a timed-on phase counts down —
 // matter.js OnOffServer.ts #timedOnTick. OnTime is in tenths of a second.
 func (s *onOffServer) timedOnTick() {
-	s.changes.Notify(s.timedOnStep()...)
+	changed, switched := s.timedOnStep()
+	if switched != nil {
+		s.apply(*switched)
+	}
+	s.changes.Notify(changed...)
 }
 
 // timedOnStep is one countdown step of [onOffServer.timedOnTick]; it
-// returns the attributes it changed, which the caller reports once the
-// lock is released.
-func (s *onOffServer) timedOnStep() []uint32 {
+// returns the attributes it changed and the switch it decided, which the
+// caller applies and reports once the lock is released.
+func (s *onOffServer) timedOnStep() ([]uint32, *bool) {
 	s.lt.mu.Lock()
 	defer s.lt.mu.Unlock()
 	if s.lt.timedOn == nil {
-		return nil // stopped between the fire and the lock
+		return nil, nil // stopped between the fire and the lock
 	}
 	if s.lt.onTime == 0xFFFF {
 		s.lt.stopTimedOn()
-		return nil
+		return nil, nil
 	}
 	if s.lt.onTime <= 1 {
 		changed := []uint32{onoff.AttrOnOff, onoff.AttrOnTime}
@@ -445,12 +465,12 @@ func (s *onOffServer) timedOnStep() []uint32 {
 		s.lt.stopTimedOn()
 		s.lt.offWaitTime = 0
 		s.off()
-		return changed
+		return changed, s.lt.takeSwitch()
 	}
 	s.lt.onTime--
 	s.version.Bump()
 	s.lt.timedOn.Reset(lightingTick)
-	return []uint32{onoff.AttrOnTime}
+	return []uint32{onoff.AttrOnTime}, nil
 }
 
 // delayedOffTick runs every 100 ms through the delayed-off guard —
@@ -540,6 +560,19 @@ type lightingState struct {
 	startUpOnOff       *uint8
 	timedOn            *time.Timer
 	delayedOff         *time.Timer
+	// pendingSwitch is the on/off state a command or tick decided while
+	// holding mu, applied to the device after mu is released.
+	pendingSwitch *bool
+}
+
+// switchTo records the on/off state to apply once mu is released.
+func (l *lightingState) switchTo(on bool) { l.pendingSwitch = &on }
+
+// takeSwitch returns and clears the recorded switch.
+func (l *lightingState) takeSwitch() *bool {
+	p := l.pendingSwitch
+	l.pendingSwitch = nil
+	return p
 }
 
 // newLightingState returns the LT defaults: GlobalSceneControl true, no
