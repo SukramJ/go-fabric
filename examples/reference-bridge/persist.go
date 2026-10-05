@@ -7,12 +7,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 
 	// The pure-Go SQLite driver. Neither store package imports a driver —
 	// both take an already-open *sql.DB — so picking one, and picking the
 	// DSN, is this host's job.
 	_ "modernc.org/sqlite"
 
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -54,4 +57,57 @@ func openDB(ctx context.Context, path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("apply endpoint schema: %w", err)
 	}
 	return db, nil
+}
+
+// persistedLabels keeps controller-written NodeLabels in the store's
+// settings table: the root's under rootNodeLabelKey, each bridged
+// endpoint's under its stable key.
+type persistedLabels struct {
+	st     *store.Store
+	logger *slog.Logger
+}
+
+const (
+	rootNodeLabelKey     = "basic_information.node_label"
+	rootLocationKey      = "basic_information.location"
+	endpointLabelKeyRoot = "bridged_node_label."
+)
+
+// store implements endpoint.Config.OnNodeLabelWritten.
+func (p persistedLabels) store(key endpoint.SourceKey, label string) {
+	k, ok := key.(endpoint.StringKey)
+	if !ok {
+		return
+	}
+	if err := p.st.SetSetting(context.Background(), endpointLabelKeyRoot+string(k), label); err != nil {
+		p.logger.Warn("label.persist", slog.String("err", err.Error()))
+	}
+}
+
+// load returns the label persisted for a bridged endpoint, "" for none.
+func (p persistedLabels) load(ctx context.Context, key endpoint.StringKey) string {
+	label, ok, err := p.st.GetSetting(ctx, endpointLabelKeyRoot+string(key))
+	if err != nil || !ok {
+		return ""
+	}
+	return label
+}
+
+// restoreRoot applies the persisted root NodeLabel / Location and wires
+// their persistence — BasicInformation's writable attributes, which
+// matter.js keeps in node storage.
+func (p persistedLabels) restoreRoot(ctx context.Context, b *mattercore.BasicInformation) {
+	if v, ok, err := p.st.GetSetting(ctx, rootNodeLabelKey); err == nil && ok {
+		_ = b.SetNodeLabel(v)
+	}
+	if v, ok, err := p.st.GetSetting(ctx, rootLocationKey); err == nil && ok {
+		_ = b.SetLocation(v)
+	}
+	b.SetOnPersistentWrite(func(nodeLabel, location string) {
+		for k, v := range map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location} {
+			if err := p.st.SetSetting(context.Background(), k, v); err != nil {
+				p.logger.Warn("label.persist", slog.String("err", err.Error()))
+			}
+		}
+	})
 }

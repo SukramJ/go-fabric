@@ -144,16 +144,22 @@ func run() error {
 	}
 
 	// --- the fleet and its topology assembler --------------------------
+	// A NodeLabel a controller writes on a bridged endpoint is kept in
+	// the settings table and handed back to the assembler on the next
+	// boot (fleet.snapshotter), as matter.js persists a written nodeLabel.
+	labels := persistedLabels{st: credentials, logger: logger}
 	assemblerCfg := endpoint.Config{
-		VendorID:  identity.vendorID,
-		ProductID: identity.productID,
-		NodeLabel: identity.nodeLabel,
-		Groups:    groupState,
+		VendorID:           identity.vendorID,
+		ProductID:          identity.productID,
+		NodeLabel:          identity.nodeLabel,
+		Groups:             groupState,
+		OnNodeLabelWritten: labels.store,
 	}
 	devices, err := newFleet(endpointStore, assemblerCfg, logger)
 	if err != nil {
 		return err
 	}
+	devices.labels = labels.load
 
 	// --- the bridge ----------------------------------------------------
 	var advertiser mdns.Advertiser = mdns.NewNoop()
@@ -241,6 +247,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	labels.restoreRoot(ctx, refs.basicInfo)
 	br.AttachRootClusters(rootServers)
 
 	aggregatorServers, err := buildAggregatorClusters()

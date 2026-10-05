@@ -1293,6 +1293,9 @@ type fleet struct {
 	button     *demoButton
 
 	assembler *endpoint.Assembler
+	// labels returns the NodeLabel a controller wrote for a bridged
+	// endpoint in an earlier run (persist.go); nil restores nothing.
+	labels func(ctx context.Context, key endpoint.StringKey) string
 }
 
 func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*fleet, error) {
@@ -1375,6 +1378,13 @@ func (f *fleet) snapshotter(ctx context.Context) (*endpoint.Topology, error) {
 		},
 	}
 	specs = append(specs, f.surfaceSpecs()...)
+	if f.labels != nil {
+		for i := range specs {
+			if k, ok := specs[i].StableKey.(endpoint.StringKey); ok {
+				specs[i].NodeLabel = f.labels(ctx, k)
+			}
+		}
+	}
 	return f.assembler.Assemble(ctx, []endpoint.Snapshot{{
 		Scope:     scope,
 		Endpoints: specs,
