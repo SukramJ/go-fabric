@@ -213,3 +213,62 @@ func TestWrite_GlobalAttributesAreNeverWritable(t *testing.T) {
 		t.Errorf("a global-attribute write reached the cluster server: %v", srv.writeCalls)
 	}
 }
+
+// listServer keeps one writable list attribute (Binding-like, 0x0000 on a
+// cluster outside the read-only table) and records what is written.
+type listServer struct {
+	list    []uint16
+	written [][]uint16
+}
+
+func (s *listServer) MatterClusterID() uint32 { return 0xFFF1FC01 }
+func (s *listServer) MatterRead(attr uint32) (any, bool) {
+	if attr == 0 {
+		return append([]uint16(nil), s.list...), true
+	}
+	return nil, false
+}
+func (s *listServer) MatterReportable() []uint32 { return []uint32{0} }
+func (s *listServer) MatterAttributes() []uint32 { return []uint32{0} }
+func (s *listServer) MatterWrite(_ context.Context, _ uint32, v any) error {
+	l, _ := v.([]uint16)
+	s.list = l
+	s.written = append(s.written, l)
+	return nil
+}
+
+func (s *listServer) MatterInvoke(context.Context, uint32, any) (any, error) { return nil, nil }
+
+type listSource struct{ srv *listServer }
+
+func (s listSource) MatterDeviceType() uint16 { return 0x010A }
+func (s listSource) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{s.srv}
+}
+
+// TestWrite_ListAppendAppendsToTheCurrentList pins the list-append write
+// (null ListIndex, Matter §10.6.4.3.1): the element is appended to the list
+// as it stands, as matter.js AttributeWriteResponse applies it. A controller
+// writes a long list as a replace followed by appends (chip
+// TestOnlyWriteAttributeWithLegacyList, TC-ACL-2.3/2.5). A value that is not
+// one element of the list's type is a CONSTRAINT_ERROR.
+func TestWrite_ListAppendAppendsToTheCurrentList(t *testing.T) {
+	t.Parallel()
+	srv := &listServer{list: []uint16{1}}
+	ep := &Endpoint{ID: 3, Source: listSource{srv: srv}}
+	d := NewTopologyDispatcher(makeTopology(ep))
+	path := concreteAttrPath(3, srv.MatterClusterID(), 0)
+	path.HasListIndex, path.ListAppend = true, true
+
+	res := d.Write(context.Background(), path, im.AttributeValue{Value: []uint16{7}})
+	if len(res) != 1 || res[0].Status != im.StatusSuccess {
+		t.Fatalf("append: %+v", res)
+	}
+	if !slices.Equal(srv.list, []uint16{1, 7}) {
+		t.Fatalf("list after append = %v, want [1 7]", srv.list)
+	}
+	res = d.Write(context.Background(), path, im.AttributeValue{Value: []string{"x"}})
+	if len(res) != 1 || res[0].Status != im.StatusConstraintError {
+		t.Fatalf("append of a mistyped element: %+v, want CONSTRAINT_ERROR", res)
+	}
+}

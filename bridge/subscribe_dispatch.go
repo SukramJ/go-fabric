@@ -124,7 +124,8 @@ func (b *Bridge) buildInitialReport(
 		subSubjectNodeID, subSubjectCATs := im.SubjectFromContext(subCtx)
 		auth := b.eventReadAuthorizer(dispatcher, subFabricIndex, im.IsPASEFromContext(subCtx), subSubjectNodeID, subSubjectCATs)
 		matched += b.allowedEventPaths(subCtx, dispatcher, auth, req.EventRequests)
-		initialReport.EventReports = im.AuthorizeEventReports(subCtx, auth, raw)
+		initialReport.EventReports = append(im.DeniedEventPathStatuses(subCtx, auth, req.EventRequests),
+			im.AuthorizeEventReports(subCtx, auth, raw)...)
 	}
 	// Sort reports by (endpoint, cluster, attribute) ascending. Apple
 	// Home's MTRDevice processes the wildcard Subscribe-Initial in

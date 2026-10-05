@@ -202,7 +202,8 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 	// #readAllowedEvents.
 	if len(req.EventRequests) > 0 {
 		auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
-		report.EventReports = im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(req, b.eventLog))
+		report.EventReports = append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
+			im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(req, b.eventLog))...)
 	}
 	// Diagnostic: show what we returned per path.
 	for i, r := range report.Reports {

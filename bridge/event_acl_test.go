@@ -124,3 +124,23 @@ func TestSubscribeRejectsEventPathsTheSubjectMayNotRead(t *testing.T) {
 		t.Fatalf("Administer subject: AccessControlEntryChanged matched %d path(s), want 1", matched)
 	}
 }
+
+// TestConcreteDeniedEventPathIsAnsweredWithAStatus pins that a concrete event
+// path the subject may not read is answered with UNSUPPORTED_ACCESS rather
+// than left out (matter.js EventReadResponse.ts #addConcrete); a wildcard is
+// still skipped silently. TC-ACL-2.9 step 11.
+func TestConcreteDeniedEventPathIsAnsweredWithAStatus(t *testing.T) {
+	t.Parallel()
+	b := newACLTestBridge(t, &aclStoreFake{entries: []store.ACLEntry{
+		{FabricIndex: 1, Privilege: store.PrivilegeView, AuthMode: store.AuthModeCASE},
+	}})
+	ctx := im.WithSubject(im.WithFabricFilter(context.Background(), true, 1), 0x1111, nil)
+	auth := b.eventReadAuthorizer(b.Dispatcher(), 1, false, 0x1111, nil)
+	got := im.DeniedEventPathStatuses(ctx, auth, []im.ConcreteEventPath{
+		{Endpoint: 0, HasEndpoint: true, Cluster: 0x001F, HasCluster: true, Event: 0, HasEvent: true},
+		{Endpoint: 0, HasEndpoint: true, Cluster: 0x001F, HasCluster: true}, // wildcard event
+	})
+	if len(got) != 1 || !got[0].IsStatus || got[0].Status.Status != im.StatusUnsupportedAccess {
+		t.Fatalf("statuses %+v, want one UNSUPPORTED_ACCESS for the concrete path", got)
+	}
+}

@@ -582,6 +582,9 @@ func TestAccessControl_ACLWriteEmitsEntryChanged(t *testing.T) {
 			newEntries := make([]core.AccessControlEntryStruct, tc.newCount)
 			for i := range newEntries {
 				newEntries[i] = minimalEntry
+				// Each position differs from the stored entry, so every
+				// position is a change (an identical rewrite emits nothing).
+				newEntries[i].Subjects = []uint64{uint64(100 + i)}
 			}
 			ctx := im.WithSubject(im.WithFabricFilter(context.Background(), true, 1), 112233, nil)
 			if tc.pase {

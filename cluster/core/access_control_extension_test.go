@@ -195,8 +195,14 @@ func TestAccessControl_ExtensionWriteEmitsExtensionChanged(t *testing.T) {
 	if err := ac.MatterWrite(context.Background(), 0x0001, []core.AccessControlExtensionEntry{{Data: data}}); err != nil {
 		t.Fatalf("first MatterWrite: unexpected error: %v", err)
 	}
-	// Second write: 1 -> 1 entry => Changed.
+	// Rewriting the same list changes nothing and reports nothing — matter.js
+	// emits on extension$Changed only.
 	if err := ac.MatterWrite(context.Background(), 0x0001, []core.AccessControlExtensionEntry{{Data: data}}); err != nil {
+		t.Fatalf("identical MatterWrite: unexpected error: %v", err)
+	}
+	// Second write: 1 -> 1 different entry => Changed.
+	other := []byte{0x17, 0x24, 0x01, 0x07, 0x18} // a list holding context tag 1 = 7
+	if err := ac.MatterWrite(context.Background(), 0x0001, []core.AccessControlExtensionEntry{{Data: other}}); err != nil {
 		t.Fatalf("second MatterWrite: unexpected error: %v", err)
 	}
 	// Third write: 1 -> 0 entries => Removed.

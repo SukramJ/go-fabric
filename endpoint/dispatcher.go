@@ -6,6 +6,7 @@ package endpoint
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -332,6 +333,14 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					}
 				}
 
+				if path.ListAppend {
+					merged, status := appendListValue(ctx, srv, attrID, value)
+					if status != im.StatusSuccess {
+						results = append(results, im.WriteResult{Path: aPath, Status: status})
+						continue
+					}
+					value = merged
+				}
 				res := writeOne(ctx, srv, aPath, value)
 				// A successful write mutated cluster state; advance the
 				// endpoint-hosted DataVersion so DataVersionFilters miss
@@ -1212,3 +1221,32 @@ func (d *TopologyDispatcher) CurrentDataVersion(_ context.Context, endpoint uint
 // (0xFFF9), EventList (0xFFFA), AttributeList (0xFFFB), FeatureMap (0xFFFC),
 // ClusterRevision (0xFFFD).
 func isGlobalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
+
+// appendListValue turns a list-append write (null ListIndex) into the write
+// of the whole list: the attribute's current value as the writer sees it —
+// fabric-filtered for a fabric-scoped list — with the written element
+// appended. matter.js AttributeWriteResponse applies a ListIndex-null write
+// as an append to the current list the same way. A value that is not a
+// one-element list of the attribute's element type is a CONSTRAINT_ERROR.
+func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (im.AttributeValue, im.StatusCode) {
+	var current any
+	var ok bool
+	if fr, isFR := srv.(contract.FabricScopedReader); isFR {
+		_, fabric := im.FabricFilterFromContext(ctx)
+		current, ok = fr.MatterReadFiltered(im.WithFabricFilter(ctx, true, fabric), attrID)
+	} else {
+		current, ok = srv.MatterRead(attrID)
+	}
+	item := reflect.ValueOf(value.Value)
+	if !ok || current == nil || item.Kind() != reflect.Slice || item.Len() != 1 {
+		return value, im.StatusConstraintError
+	}
+	list := reflect.ValueOf(current)
+	if list.Kind() != reflect.Slice || list.Type() != item.Type() {
+		return value, im.StatusConstraintError
+	}
+	merged := reflect.MakeSlice(list.Type(), 0, list.Len()+1)
+	merged = reflect.AppendSlice(merged, list)
+	merged = reflect.Append(merged, item.Index(0))
+	return im.AttributeValue{Value: merged.Interface()}, im.StatusSuccess
+}

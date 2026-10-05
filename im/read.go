@@ -239,6 +239,7 @@ func readAttributePathFields(dec *tlv.Decoder) (ConcreteAttributePath, error) {
 		case tagAttrPathListIndex:
 			p.ListIndex = uint16(el.Uint & 0xFFFF)
 			p.HasListIndex = true
+			p.ListAppend = el.IsNull
 		}
 	}
 }
@@ -853,6 +854,26 @@ func DedupAttributePaths(paths []ConcreteAttributePath) []ConcreteAttributePath 
 	}
 	if len(out) == len(paths) {
 		return paths
+	}
+	return out
+}
+
+// DeniedEventPathStatuses returns an UNSUPPORTED_ACCESS EventStatusIB for
+// every concrete event path (endpoint, cluster and event named) whose
+// events the subject may not read. A denied concrete path is answered with
+// its status, a denied wildcard is skipped silently — matter.js
+// EventReadResponse.ts #addConcrete returns #asStatus(path, denied) where
+// the wildcard expansion just leaves the cluster out. TC-ACL-2.9 reads
+// AccessControlEntryChanged without Administer and expects the status.
+func DeniedEventPathStatuses(ctx context.Context, auth EventReadAuthorizer, paths []ConcreteEventPath) []EventReport {
+	var out []EventReport
+	for _, p := range paths {
+		if !p.HasEndpoint || !p.HasCluster || !p.HasEvent {
+			continue
+		}
+		if !auth.Allows(ctx, p.Endpoint, p.Cluster) {
+			out = append(out, EventReport{Path: p, IsStatus: true, Status: StatusIB{Status: StatusUnsupportedAccess}})
+		}
 	}
 	return out
 }

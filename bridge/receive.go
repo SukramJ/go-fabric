@@ -419,35 +419,35 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHd
 		req, err := im.UnmarshalReadRequestTLV(dec)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.read_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "read", err)
 		}
 		return b.dispatchReadRequest(ctx, src, requestHdr, proto, dispatcher, req)
 	case im.OpcodeWriteRequest:
 		req, err := im.UnmarshalWriteRequestTLV(dec, attributeValueReader)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.write_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "write", err)
 		}
 		return b.dispatchWriteRequest(ctx, src, requestHdr, proto, dispatcher, req)
 	case im.OpcodeInvokeRequest:
 		req, err := im.UnmarshalInvokeRequestTLV(dec, commandFieldsReader)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.invoke_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "invoke", err)
 		}
 		return b.dispatchInvokeRequest(ctx, src, requestHdr, proto, dispatcher, req)
 	case im.OpcodeSubscribeRequest:
 		req, err := im.UnmarshalSubscribeRequestTLV(dec)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.subscribe_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "subscribe", err)
 		}
 		return b.handleSubscribeRequest(ctx, src, requestHdr, proto, req)
 	case im.OpcodeTimedRequest:
 		req, err := im.UnmarshalTimedRequestTLV(dec)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.timed_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "timed", err)
 		}
 		return b.dispatchTimedRequest(src, requestHdr, proto, req)
 	}
@@ -748,4 +748,29 @@ func wireCommissioned(servers []contract.ClusterServer, w *CommissioningWindow) 
 			gc.SetOnCommissioned(w.EndCommissioning)
 		}
 	}
+}
+
+// replyDecodeError answers an IM request that does not decode with a
+// StatusResponse instead of leaving the controller to time out: the
+// status a typed decode error carries ([im.StatusCodeError]), FAILURE
+// otherwise — matter.js InteractionMessenger.handleRequest sends
+// StatusResponseError.of(error)?.code ?? Status.Failure for any error the
+// handling of a request throws. Found by the CHIP harness (TC-ACL-2.3 waited
+// ten seconds for a WriteResponse to a write it could not decode).
+func (b *Bridge) replyDecodeError(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, op string, decodeErr error) error {
+	status := im.StatusFailure
+	var sce im.StatusCodeError
+	if errors.As(decodeErr, &sce) {
+		status = sce.MatterStatusCode()
+	}
+	body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
+	if err != nil {
+		return err
+	}
+	if err := b.sendReply(src, requestHdr, proto, im.OpcodeStatusResponse, body); err != nil {
+		debugReplyError(b.logger, "send_"+op+"_decode_status", src, err)
+		return err
+	}
+	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	return decodeErr
 }

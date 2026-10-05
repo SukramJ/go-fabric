@@ -335,6 +335,22 @@ pseudo-version of `main`.
     Fabrics after AddNOC. The bridge now compares the invoked cluster's
     attributes before and after the command and reports what moved, as
     matter.js's Datasource does (TC-IDM-1.5).
+  - A list-append write (null ListIndex) — how a controller writes a list too
+    large for one message, a replace followed by appends — was not
+    understood: the path lost the null, the element failed to decode as a
+    list, and the whole WriteRequest went unanswered. Appends now add the
+    element to the list as the writer sees it (`im.ConcreteAttributePath.ListAppend`),
+    as matter.js AttributeWriteResponse does (TC-ACL-2.3, 2.5).
+  - A Read, Write, Invoke, Subscribe or Timed request that does not decode is
+    answered with a StatusResponse (the error's status, FAILURE otherwise)
+    instead of being left to time out, as matter.js's InteractionMessenger
+    does.
+  - Writing an ACL or Extension list identical to the stored one emitted
+    change events; matter.js reports only an actual change, and the empty
+    replace that opens a chunked list write now reports nothing (TC-ACL-2.5).
+  - A concrete event path the subject may not read was left out of the
+    report; it is answered with UNSUPPORTED_ACCESS, a wildcard still skips
+    it silently, as matter.js EventReadResponse does (TC-ACL-2.9).
   - The DNS-SD SRV target was the OS host name, which fails the Matter
     host-name rule (12 or 16 uppercase hexadecimal characters from the MAC
     address). The default host name is now the first multicast interface's

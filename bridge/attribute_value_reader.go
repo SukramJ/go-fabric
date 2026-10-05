@@ -39,6 +39,9 @@ import (
 // that carries a structured value (primitives are handled by the
 // generic primitiveAttributeValue branch).
 func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
+	if path.ListAppend {
+		return listItemValue(path, el, dec)
+	}
 	switch {
 	case path.Cluster == 0x001F && path.Attribute == 0x0000: // AccessControl.ACL
 		return decodeACLList(el, dec)
@@ -434,4 +437,30 @@ func skipContainerTLV(dec *tlv.Decoder) error {
 		}
 	}
 	return nil
+}
+
+// listItemValue decodes the value of a list-append write (null ListIndex):
+// one element of the list attribute, returned as a one-element list for the
+// dispatcher to append (endpoint.TopologyDispatcher.Write). A controller
+// writes a list too large for one message as a replace followed by such
+// appends (Matter §10.6.4.3.1); chip's TestOnlyWriteAttributeWithLegacyList
+// and matter.js's AttributeWriteResponse both produce and accept them.
+func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
+	isStruct := el.IsContainer && el.Type == tlv.TypeStructure
+	switch {
+	case path.Cluster == 0x001F && path.Attribute == 0x0000 && isStruct:
+		e, err := decodeACLEntry(dec)
+		return im.AttributeValue{Value: []mattercore.AccessControlEntryStruct{e}}, err
+	case path.Cluster == 0x001F && path.Attribute == 0x0001 && isStruct:
+		e, err := decodeExtensionEntry(dec)
+		return im.AttributeValue{Value: []mattercore.AccessControlExtensionEntry{e}}, err
+	case path.Cluster == 0x003F && path.Attribute == 0x0000 && isStruct:
+		e, err := decodeGroupKeyMapEntry(dec)
+		return im.AttributeValue{Value: []mattercore.GroupKeyMapStruct{e}}, err
+	}
+	v, err := primitiveAttributeValue(el, dec)
+	if err != nil {
+		return v, err
+	}
+	return im.AttributeValue{Value: []any{v.Value}}, nil
 }

@@ -4,10 +4,12 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"sync"
@@ -806,7 +808,10 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		emitter := a.emitter
 		endpoint := a.endpoint
 		a.mu.RUnlock()
-		if emitter != nil {
+		// matter.js reports an ACL change on acl$Changed, which a write of
+		// the list it already holds does not fire — the replace-with-empty
+		// a chunked list write opens with included (TC-ACL-2.5).
+		if emitter != nil && !aclEntriesEqual(oldEntries, out) {
 			nodeID, passcodeID := aclAdminFromContext(ctx)
 			emit := func(changeType uint8, latest store.ACLEntry) {
 				v := aclEntryStruct(latest)
@@ -902,7 +907,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// list-length delta, LatestValue=nil for a bulk-replace (spec
 		// quality X — permitted to omit) unless exactly one entry is
 		// involved on either side of the change.
-		if emitter != nil {
+		if emitter != nil && !extensionsEqual(oldExtensions, stamped) {
 			changeType := AccessControlChangeTypeChanged
 			switch {
 			case len(stamped) > len(oldExtensions):
@@ -1159,4 +1164,31 @@ func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
 			LatestValue:     &v,
 			FabricIndex:     entry.FabricIndex,
 		}, contract.EventPriorityInfo)
+}
+
+// aclEntriesEqual reports whether two stored ACL lists hold the same
+// entries in the same order (positions and fabric stamps ignored).
+func aclEntriesEqual(a, b []store.ACLEntry) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !reflect.DeepEqual(aclEntryStruct(a[i]), aclEntryStruct(b[i])) {
+			return false
+		}
+	}
+	return true
+}
+
+// extensionsEqual reports whether two Extension lists hold the same data.
+func extensionsEqual(a, b []AccessControlExtensionEntry) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !bytes.Equal(a[i].Data, b[i].Data) || a[i].FabricIndex != b[i].FabricIndex {
+			return false
+		}
+	}
+	return true
 }
