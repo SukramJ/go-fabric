@@ -166,6 +166,7 @@ func run() error {
 	}
 	devices.labels = labels.load
 	devices.configVersions = labels.configVersion
+	labels.restoreBlind(ctx, devices.blind)
 
 	// --- the bridge ----------------------------------------------------
 	var advertiser mdns.Advertiser = mdns.NewNoop()

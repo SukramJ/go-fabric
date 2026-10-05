@@ -17,8 +17,10 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
@@ -281,5 +283,44 @@ func TestRebootCountCountsBoots(t *testing.T) {
 	}
 	if _, err := countBoot(ctx, st); err == nil {
 		t.Fatal("a corrupt reboot count was accepted")
+	}
+}
+
+// TestBlindPositionSurvivesARestart: the blind persists every position it
+// reaches and a new blind on the same database starts there (matter.js
+// keeps WindowCovering state non-volatile; TC-WNCV-4.5).
+func TestBlindPositionSurvivesARestart(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	labels := persistedLabels{st: store.New(db), logger: slog.Default()}
+	saved := make(chan struct{}, 16)
+	first := newDemoBlind("blind")
+	labels.restoreBlind(ctx, first)
+	persist := first.persist
+	first.persist = func(pos uint16) { persist(pos); saved <- struct{}{} }
+	srv := first.MatterClusterServers()[0]
+	if _, err := srv.MatterInvoke(ctx, wire.WindowCoveringCmdGoToLiftPercentage, uint16(9000)); err != nil {
+		t.Fatalf("GoToLiftPercentage: %v", err)
+	}
+	deadline := time.After(20 * time.Second)
+	for {
+		if v, _ := srv.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v == uint16(9000) {
+			break
+		}
+		select {
+		case <-saved:
+		case <-deadline:
+			t.Fatal("the blind did not reach 9000")
+		}
+	}
+	second := newDemoBlind("blind")
+	labels.restoreBlind(ctx, second)
+	if v, _ := second.MatterClusterServers()[0].MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v != uint16(9000) {
+		t.Fatalf("restarted blind at %v, want 9000", v)
 	}
 }

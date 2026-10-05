@@ -183,3 +183,22 @@ func (p persistedLabels) SaveScenes(key endpoint.SourceKey, table []byte) {
 		p.logger.Warn("scenes.persist", slog.String("err", err.Error()))
 	}
 }
+
+// blindPositionKey is the settings key the blind's lift position is kept
+// under.
+const blindPositionKey = "blind.position"
+
+// restoreBlind seeds the blind's position from the settings table and
+// persists every position it reaches.
+func (p persistedLabels) restoreBlind(ctx context.Context, b *demoBlind) {
+	if v, ok, err := p.st.GetSetting(ctx, blindPositionKey); err == nil && ok {
+		if pos, perr := strconv.ParseUint(v, 10, 16); perr == nil && pos <= 10000 {
+			b.position = uint16(pos)
+		}
+	}
+	b.persist = func(pos uint16) {
+		if err := p.st.SetSetting(context.Background(), blindPositionKey, strconv.FormatUint(uint64(pos), 10)); err != nil {
+			p.logger.Warn("blind.persist", slog.String("err", err.Error()))
+		}
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -256,6 +257,14 @@ type demoBlind struct {
 	name string
 	once sync.Once
 	srv  *cover.WindowCoveringServer
+
+	// position is where the blind starts (0, open, for a new one), and
+	// persist is told every position it reaches — WindowCovering state is
+	// non-volatile in matter.js, and TC-WNCV-4.5 reads the lift position
+	// back after a reboot. Both are set before the first
+	// MatterClusterServers call; persist may be nil.
+	position uint16
+	persist  func(position uint16)
 }
 
 var _ contract.EndpointSource = (*demoBlind)(nil)
@@ -282,12 +291,25 @@ func (b *demoBlind) MatterClusterServers() []contract.ClusterServer {
 			Type:                         0, // Rollershade
 			EndProductType:               0, // RollerShade
 			FeatureMap:                   coverFeatureLift | coverFeaturePositionAwareLift,
-			InitialPositionPercent100ths: 0,
+			InitialPositionPercent100ths: b.position,
 			// The blind travels: six steps of 950 ms, as matter.js's CHIP
 			// test node (TestWindowCoveringServer.ts) — the TC-WNCV-3.x
 			// cases read OperationalStatus while it moves.
 			MoveStep: 950 * time.Millisecond,
 		})
+		if b.persist != nil {
+			srv := b.srv
+			srv.OnMatterAttributesChanged(func(ids []uint32) {
+				if !slices.Contains(ids, wire.WindowCoveringAttrCurrentPositionLiftPercent100ths) {
+					return
+				}
+				if v, ok := srv.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); ok {
+					if pos, isU16 := v.(uint16); isU16 {
+						b.persist(pos)
+					}
+				}
+			})
+		}
 	})
 	return []contract.ClusterServer{b.srv}
 }

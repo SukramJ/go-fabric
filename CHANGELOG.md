@@ -369,6 +369,8 @@ pseudo-version of `main`.
     StopMotion halting it where it is — as matter.js's CHIP test node
     moves it; zero keeps the instant movement. The reference daemon's
     blind travels with 950 ms steps (TC-WNCV-3.1 to 3.3).
+  - The reference daemon's blind keeps its lift position across a restart,
+    as matter.js keeps WindowCovering state non-volatile (TC-WNCV-4.5).
   - `mdns.Zeroconf.HostName` replaces the SRV target of every published
     record; the reference daemon sets it to the OS host name with
     `--mdns-os-hostname` (testing only), which the chip-tool harness passes
