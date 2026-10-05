@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // fakeColorTemperatureWriter is a test double for ColorTemperatureWriter that
@@ -194,5 +195,27 @@ func TestColorControl_WriteThrough_SetWriterNil(t *testing.T) {
 	}
 	if got := currentMireds(t, srv); got != target {
 		t.Errorf("reported state = %d, want %d", got, target)
+	}
+}
+
+// TestColorControlOptionsWritable pins the Options attribute ("RW VO",
+// bitmap8 with ExecuteIfOff): a written value is stored and read back, and
+// a set undefined bit is CONSTRAINT_ERROR (TC-CC-6.5 step 0a).
+func TestColorControlOptionsWritable(t *testing.T) {
+	t.Parallel()
+	s := light.NewColorControlServer(light.DefaultColorControlServerConfig())
+	if err := s.MatterWrite(context.Background(), wire.ColorCtrlAttrOptions, uint8(1)); err != nil {
+		t.Fatalf("write Options 1: %v", err)
+	}
+	if v, _ := s.MatterRead(wire.ColorCtrlAttrOptions); v != uint8(1) {
+		t.Fatalf("Options = %v, want 1", v)
+	}
+	err := s.MatterWrite(context.Background(), wire.ColorCtrlAttrOptions, uint8(0x80))
+	var sc interface{ MatterStatusCode() im.StatusCode }
+	if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusConstraintError {
+		t.Fatalf("an undefined bit: %v, want CONSTRAINT_ERROR", err)
+	}
+	if v, _ := s.MatterRead(wire.ColorCtrlAttrOptions); v != uint8(1) {
+		t.Fatalf("a refused write changed Options to %v", v)
 	}
 }

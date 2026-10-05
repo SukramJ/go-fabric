@@ -11,6 +11,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
 )
 
@@ -97,4 +98,43 @@ func readFeatureMap(t *testing.T, b *Bridge, ep uint16) (uint32, bool) {
 		}
 	}
 	return 0, false
+}
+
+// TestPathValuesReportOnlyMovedAttributes pins the change filter behind a
+// source's notification: matter.js Datasource broadcasts only the
+// properties whose value changed, so an unchanged attribute is not
+// reported again (TC-FAN-3.2 counts the FanMode reports).
+func TestPathValuesReportOnlyMovedAttributes(t *testing.T) {
+	t.Parallel()
+	src := &fakeContact{}
+	asm, err := endpoint.New(endpointtest.NewFakeStore(), endpointtest.AssemblerConfig(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topo, err := asm.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []endpoint.Spec{{
+		StableKey: endpoint.StringKey("contact"), DeviceAddress: "C", DeviceType: 0x0015,
+		FriendlyName: "Contact", ChannelAddress: "C:1", Measurement: src,
+	}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ep := topo.Bridged()[0]
+	state := im.ConcreteAttributePath{Endpoint: ep.ID, Cluster: 0x0045, Attribute: 0, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	missing := im.ConcreteAttributePath{Endpoint: ep.ID, Cluster: 0x0045, Attribute: 0x7777, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	v := newPathValues(ep, []im.ConcreteAttributePath{state, missing})
+	if got := v.changed(); len(got) != 1 || got[0] != missing {
+		t.Fatalf("nothing moved: %v, want only the unreadable path", got)
+	}
+	src.mu.Lock()
+	src.value = true
+	src.mu.Unlock()
+	if got := v.changed(); len(got) != 2 || got[0] != state {
+		t.Fatalf("StateValue moved: %v, want it reported", got)
+	}
+	if got := v.changed(); len(got) != 1 {
+		t.Fatalf("after the report: %v, want StateValue quiet again", got)
+	}
+	if derefValue((*int)(nil)) != nil || derefValue(nil) != nil {
+		t.Fatal("derefValue of nil")
+	}
 }

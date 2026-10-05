@@ -96,7 +96,14 @@ type ColorControlServer struct {
 	// attribute's quality X, matter.js ColorControlServer.ts:382
 	// `startUpColorTemperatureMireds ?? null`).
 	startUpMireds *uint16
+	// options is the Options bitmap (0x000F, "RW VO"): bit 0
+	// ExecuteIfOff is the only defined bit. Guarded by startUpMu.
+	options uint8
 }
+
+// colorOptionsDefinedBits are the defined bits of the ColorControl
+// OptionsBitmap (color-control.element.ts: ExecuteIfOff).
+const colorOptionsDefinedBits uint8 = 0x01
 
 // NewColorControlServer constructs a ColorControlServer with the given
 // configuration. cfg.InitialMireds is clamped to [cfg.MinMireds,
@@ -131,8 +138,9 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 		// ColorMode 2 = ColorTemperatureMireds is the active mode.
 		return colorModeCT, true
 	case wire.ColorCtrlAttrOptions:
-		// Options bitmap8: 0 = execute command unconditionally.
-		return uint8(0), true
+		s.startUpMu.Lock()
+		defer s.startUpMu.Unlock()
+		return s.options, true
 	case wire.ColorCtrlAttrColorCapabilities:
 		// CT feature bit only (bit 4).
 		return colorCapCT, true
@@ -186,6 +194,21 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 // start-up of its own, the same reason matter.js gives for skipping
 // StartUpOnOff on an Aggregator-owned endpoint (OnOffServer.ts:33-36).
 func (s *ColorControlServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	if attrID == wire.ColorCtrlAttrOptions {
+		// Options is "RW VO" (color-control.element.ts), a bitmap8 whose
+		// only defined bit is ExecuteIfOff; matter.js stores what the
+		// controller writes and validates the bitmap against its bits
+		// (ColorControlServer, TC-CC-6.5 step 0a). A set undefined bit is
+		// CONSTRAINT_ERROR.
+		v, ok := cluster.AsUintMax(value, 0xFF)
+		if !ok || uint8(v)&^colorOptionsDefinedBits != 0 { //nolint:gosec // bounded by AsUintMax
+			return colorControlConstraintErr(fmt.Sprintf("colorcontrol: Options %v sets an undefined bit", value))
+		}
+		s.startUpMu.Lock()
+		s.options = uint8(v) //nolint:gosec // bounded by AsUintMax
+		s.startUpMu.Unlock()
+		return nil
+	}
 	if attrID != wire.ColorCtrlAttrStartUpColorTemperatureMireds {
 		return fmt.Errorf("colorcontrol: attribute 0x%04X is not writable", attrID)
 	}

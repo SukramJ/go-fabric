@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"reflect"
 	"sync"
 	"time"
 
@@ -1294,21 +1295,31 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID
 	boolState := newBooleanStateEvents(b, ep, pathSet)
+	values := newPathValues(ep, pathSet)
 	unsub := notifier.OnMatterValueChanged(func() {
 		defer boolState.check()
+		// Only the attributes whose value moved are reported, and only
+		// their clusters' DataVersions advance: matter.js Datasource
+		// compares the new state with the old one and broadcasts the
+		// changed properties alone (Datasource.ts, broadcastChanges). A
+		// source that notifies once per change of any of its values
+		// otherwise reported every attribute each time — FanMode on every
+		// SpeedSetting step (TC-FAN-3.2).
+		changed := values.changed()
 		if b.logger != nil {
 			b.logger.Debug("matter.bridge.measurement.notify",
 				slog.Int("endpoint", int(epID)),
-				slog.Int("paths", len(pathSet)))
+				slog.Int("paths", len(pathSet)),
+				slog.Int("changed", len(changed)))
 		}
 		bumped := make(map[uint32]struct{}, 1)
-		for _, p := range pathSet {
+		for _, p := range changed {
 			if _, done := bumped[p.Cluster]; !done {
 				ep.BumpClusterDataVersion(p.Cluster)
 				bumped[p.Cluster] = struct{}{}
 			}
 		}
-		for _, p := range pathSet {
+		for _, p := range changed {
 			mgr.OnAttributeChanged(p)
 		}
 	})
@@ -1505,4 +1516,79 @@ func (e *booleanStateEvents) check() {
 		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterBooleanState, 0x00,
 			measurement.BooleanStateChangeEvent{StateValue: v}, contract.EventPriorityInfo)
 	}
+}
+
+// pathValues remembers the last value of each path a change notifier
+// covers, so a notification reports only the paths that moved.
+type pathValues struct {
+	mu    sync.Mutex
+	ep    *endpointpkg.Endpoint
+	paths []im.ConcreteAttributePath
+	last  map[im.ConcreteAttributePath]string
+}
+
+func newPathValues(ep *endpointpkg.Endpoint, paths []im.ConcreteAttributePath) *pathValues {
+	v := &pathValues{ep: ep, paths: paths, last: make(map[im.ConcreteAttributePath]string, len(paths))}
+	for p, val := range v.read() {
+		v.last[p] = val
+	}
+	return v
+}
+
+// read renders every path's current value; a path no server answers is
+// left out, so it counts as changed on every notification.
+func (v *pathValues) read() map[im.ConcreteAttributePath]string {
+	servers := map[uint32]contract.ClusterServer{}
+	for _, srv := range endpointpkg.ClusterServers(v.ep) {
+		if srv != nil {
+			servers[srv.MatterClusterID()] = srv
+		}
+	}
+	out := make(map[im.ConcreteAttributePath]string, len(v.paths))
+	for _, p := range v.paths {
+		srv := servers[p.Cluster]
+		if srv == nil {
+			continue
+		}
+		if val, ok := srv.MatterRead(p.Attribute); ok {
+			out[p] = fmt.Sprintf("%#v", derefValue(val))
+		}
+	}
+	return out
+}
+
+// changed returns the paths whose value differs from the last
+// notification's, and remembers the new values.
+func (v *pathValues) changed() []im.ConcreteAttributePath {
+	now := v.read()
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	out := make([]im.ConcreteAttributePath, 0, len(v.paths))
+	for _, p := range v.paths {
+		cur, ok := now[p]
+		if prev, had := v.last[p]; ok && had && prev == cur {
+			continue
+		}
+		out = append(out, p)
+		if ok {
+			v.last[p] = cur
+		}
+	}
+	return out
+}
+
+// derefValue follows pointers so two reads of an unchanged pointer-typed
+// value render alike.
+func derefValue(v any) any {
+	rv := reflect.ValueOf(v)
+	for rv.IsValid() && rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil
+		}
+		rv = rv.Elem()
+	}
+	if !rv.IsValid() {
+		return nil
+	}
+	return rv.Interface()
 }

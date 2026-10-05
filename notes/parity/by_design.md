@@ -1047,14 +1047,6 @@ implementation wave.
 
 ---
 
-### BD-Matter-P1-D8 — ColorControl.Options attribute is read-only
-
-**Go path:** `cluster/light/colorcontrol_server.go` — `case wire.ColorCtrlAttrOptions: return uint8(0), true`.
-
-**Rationale:** matter.js `color-control.element.ts` marks Options (0x000F) as access "RW VO" (view-optional write). In practice Apple Home, Google Home, and chip-tool do not write the Options bitmap on a CT-only bridge — they read it once and cache. The attribute is always 0 (no overrides) which is the correct default for a CT-only profile with no scenes. Implementing a write handler would require persisting the bitmap per device and plumbing it into the command-execution gate; deferred to a future release when a use-case arises.
-
----
-
 ### BD-Matter-P1-D9 — WindowCovering.Mode write is validated but not yet persisted or mapped to HM
 
 **Go path:** `internal/model/custom/cover/matter.go` — `validateWindowCoveringMode` gates all three WindowCovering projections' `MatterWrite`.

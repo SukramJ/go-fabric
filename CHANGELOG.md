@@ -341,6 +341,14 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - A change notification of a host source marked every reportable
+    attribute of its endpoint dirty; the bridge now reports only the
+    attributes whose value moved, and advances only their clusters'
+    DataVersions, as matter.js's Datasource broadcasts the changed
+    properties (TC-FAN-3.2 counts the FanMode reports).
+  - `cluster/light.ColorControlServer` serves Options ("RW VO") as a
+    writable bitmap (ExecuteIfOff), as matter.js does (TC-CC-6.5); the
+    read-only divergence `BD-Matter-P1-D8` is retired.
   - The reference daemon's CASE identity table resolves a resumed
     session by the fabric its resumption record names
     (`sigma.FabricIndexResolver`); a controller resuming on its fabric after
