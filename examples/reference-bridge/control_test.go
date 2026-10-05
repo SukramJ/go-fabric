@@ -156,3 +156,24 @@ func TestSmokeSelfTestEndsOnItsOwn(t *testing.T) {
 		}
 	})
 }
+
+// TestWasherCycleCompletesOnItsOwn: a started cycle counts down
+// washCycleSeconds and then completes — OperationalState back to Stopped,
+// CountdownTime null (TC-OPSTATE-2.5 waits out a whole cycle).
+func TestWasherCycleCompletesOnItsOwn(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := newDemoWasher("cycle")
+		w.build()
+		if got, err := w.HandleOperationalCommand(context.Background(), opstate.CommandStart); err != nil || got.ID != opstate.ErrorNoError {
+			t.Fatalf("Start = %+v, %v", got, err)
+		}
+		time.Sleep(washCycleSeconds*time.Second + time.Second)
+		synctest.Wait()
+		if v, _ := w.ops.MatterRead(opstate.AttrOperationalState); v != uint8(opstate.StateStopped) {
+			t.Errorf("OperationalState after the cycle = %v, want Stopped", v)
+		}
+		if v, ok := w.ops.MatterRead(opstate.AttrCountdownTime); !ok || v != nil {
+			t.Errorf("CountdownTime after the cycle = %v (%v), want null", v, ok)
+		}
+	})
+}

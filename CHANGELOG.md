@@ -386,6 +386,9 @@ pseudo-version of `main`.
     five seconds (SelfTestComplete, then AllClear), and its app pipe takes
     CHIP's smoke-co-alarm-app `LongPress` (start a self-test) and
     `SetUnmounted` (TC-SMOKECO-2.4, TC-SMOKECO-2.7).
+  - The reference daemon's washer runs a 30-second cycle that completes on
+    its own — OperationCompletion, then Stopped — instead of a 30-minute
+    countdown that stopped at zero (TC-OPSTATE-2.5).
   - A change notification of a host source marked every reportable
     attribute of its endpoint dirty; the bridge now reports only the
     attributes whose value moved, and advances only their clusters'

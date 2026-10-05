@@ -64,8 +64,11 @@ type demoWasher struct {
 	ticking   chan struct{}
 }
 
-// washCycleSeconds is the countdown a started cycle begins with.
-const washCycleSeconds = 1800
+// washCycleSeconds is the countdown a started cycle begins with. When it
+// runs out the cycle completes on its own (OperationCompletion, then
+// Stopped). Short, because TC-OPSTATE-2.5 waits out a whole cycle inside
+// its 90 s budget, as it does on CHIP's all-clusters app.
+const washCycleSeconds = 30
 
 var (
 	_ contract.EndpointSource = (*demoWasher)(nil)
@@ -203,6 +206,12 @@ func (w *demoWasher) startCountdown() {
 				remaining := w.remaining
 				w.mu.Unlock()
 				_ = w.ops.SetCountdownTime(&remaining)
+				if remaining == 0 {
+					// The cycle is done: the device reports its own
+					// completion, which also ends this countdown.
+					_ = w.reportCompletion()
+					return
+				}
 			}
 		}
 	}()
