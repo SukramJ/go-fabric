@@ -415,7 +415,8 @@ pseudo-version of `main`.
     no self-test while the alarm sounds, the rule SelfTestRequest answers
     with BUSY (TC-SMOKECO-2.2, 2.3), an unmounted alarm expresses
     Inoperative, and a critical alarm cannot be muted (TC-SMOKECO-2.5).
-  - The reference daemon persists GeneralDiagnostics RebootCount — 0 on a
+  - The reference daemon persists GeneralDiagnostics TotalOperationalHours
+    (every minute and on shutdown) and RebootCount — 0 on a
     database's first boot, one more on each boot after, as matter.js counts
     it — where it reported a fixed placeholder — and accepts the generic
     test event trigger 0x3 the DGGEN cases send (TC-DGGEN-2.1).

@@ -386,9 +386,13 @@ func run() error {
 	}
 	refs.basicInfo.EmitStartUp()
 	refs.genDiag.EmitBootReason()
+	go keepOperationalHours(ctx, credentials, refs.genDiag, time.Minute, logger)
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		if err := storeOperationalHours(stopCtx, credentials, refs.genDiag); err != nil {
+			logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
+		}
 		refs.basicInfo.EmitShutDown()
 		sec.pase.Stop()
 		commissioning.stop()

@@ -324,3 +324,40 @@ func TestBlindPositionSurvivesARestart(t *testing.T) {
 		t.Fatalf("restarted blind at %v, want 9000", v)
 	}
 }
+
+// TestOperationalHoursSurviveARestart: TotalOperationalHours is seeded from
+// the settings table and stored back, so a reboot does not reset it
+// (TC-DGGEN-2.1 step 10c).
+func TestOperationalHoursSurviveARestart(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	st := store.New(db)
+	if h, err := loadOperationalHours(ctx, st); err != nil || h != 0 {
+		t.Fatalf("hours on a new database = %d, %v", h, err)
+	}
+	g := mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
+	g.SetPersistedCounters(0, 3)
+	if err := storeOperationalHours(ctx, st, g); err != nil {
+		t.Fatal(err)
+	}
+	if h, err := loadOperationalHours(ctx, st); err != nil || h != 3 {
+		t.Fatalf("hours after a store = %d, %v; want 3", h, err)
+	}
+	runCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() { keepOperationalHours(runCtx, st, g, time.Millisecond, slog.Default()); close(done) }()
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+	<-done
+	if err := st.SetSetting(ctx, operationalHoursSetting, "x"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadOperationalHours(ctx, st); err == nil {
+		t.Fatal("a corrupt hour count was accepted")
+	}
+}

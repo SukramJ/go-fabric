@@ -107,7 +107,11 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	if err != nil {
 		return nil, refs, fmt.Errorf("general diagnostics: %w", err)
 	}
-	refs.genDiag.SetPersistedCounters(reboots, 0)
+	hours, err := loadOperationalHours(context.Background(), st)
+	if err != nil {
+		return nil, refs, fmt.Errorf("general diagnostics: %w", err)
+	}
+	refs.genDiag.SetPersistedCounters(reboots, hours)
 
 	generalCom, err := mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
 		LocationCapability:           mattercore.RegulatoryIndoor,
@@ -867,4 +871,55 @@ func countBoot(ctx context.Context, st *store.Store) (uint16, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+// operationalHoursSetting is the settings key TotalOperationalHours is
+// kept under across boots.
+const operationalHoursSetting = "gendiag.operational_hours"
+
+// loadOperationalHours is the TotalOperationalHours earlier boots
+// accumulated (0 for a new database).
+func loadOperationalHours(ctx context.Context, st *store.Store) (uint32, error) {
+	raw, ok, err := st.GetSetting(ctx, operationalHoursSetting)
+	if err != nil || !ok {
+		return 0, err
+	}
+	h, err := strconv.ParseUint(raw, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("%s %q: %w", operationalHoursSetting, raw, err)
+	}
+	return uint32(h), nil
+}
+
+// storeOperationalHours persists the node's current TotalOperationalHours.
+func storeOperationalHours(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics) error {
+	v, ok := g.MatterRead(gendiagTotalOperationalHours) //nolint:contextcheck // the contract's context-free read
+	h, isU32 := v.(uint32)
+	if !ok || !isU32 {
+		return fmt.Errorf("TotalOperationalHours read as %T", v)
+	}
+	return st.SetSetting(ctx, operationalHoursSetting, strconv.FormatUint(uint64(h), 10))
+}
+
+// gendiagTotalOperationalHours is GeneralDiagnostics TotalOperationalHours
+// (general-diagnostics.element.ts, 0x0003).
+const gendiagTotalOperationalHours uint32 = 0x0003
+
+// keepOperationalHours persists TotalOperationalHours every interval until
+// ctx ends, so the count survives a restart — chip and matter.js keep it in
+// non-volatile storage, and TC-DGGEN-2.1 reads it back after a reboot. The
+// daemon stores it once more on shutdown.
+func keepOperationalHours(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics, interval time.Duration, logger *slog.Logger) {
+	tick := time.NewTicker(interval)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			if err := storeOperationalHours(ctx, st, g); err != nil {
+				logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
+			}
+		}
+	}
 }
