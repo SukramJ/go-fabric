@@ -379,6 +379,7 @@ func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommand
 			status, cs, hasCS := classifyError(err, invokeErrorStatus)
 			return im.InvokeResult{Path: path, Response: resp, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
 		}
+		ep.invalidateSceneOnCommand(path.Cluster)
 		return im.InvokeResult{Path: path, Response: resp, Status: im.StatusSuccess}
 	}
 	return im.InvokeResult{Path: path, Status: im.StatusUnsupportedCluster}

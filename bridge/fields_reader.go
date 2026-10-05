@@ -68,6 +68,10 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 		if fields, ok, err := groupcastFieldsReader(path, dec); ok {
 			return fields, err
 		}
+	case mattercore.ScenesManagementClusterID:
+		if fields, ok, err := scenesFieldsReader(path, dec); ok {
+			return fields, err
+		}
 	case wire.FanControlClusterID:
 		if path.Command == wire.FanControlCmdStep {
 			return decodeFanStepRequest(dec)

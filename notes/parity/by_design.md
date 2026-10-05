@@ -995,11 +995,15 @@ implementation wave.
 
 ---
 
-### BD-Matter-P2-D18 — ScenesManagement stub returns empty / rejects writes
+### BD-Matter-Scenes-RemainingCapacity — FabricSceneInfo RemainingCapacity is bounded by the shared table
 
-**Go path:** `cluster/wire/scenes_management.go`.
+**Go path:** `cluster/core/scenes_management.go` — `ScenesState.remainingCapacity`.
 
-**Rationale:** HomeMatic has no scene concept. ScenesManagement (0x0062) is mounted as a mandatory stub on OnOff device types (per Matter device-type conformance). The stub correctly returns `SceneTableSize=0` and rejects AddScene / RemoveScene / StoreScene / RecallScene with `UnsupportedCommand`. This is the same pattern as the matter.js `ScenesManagementBehavior` when no store backend is wired. Full implementation would require a scene store (new SQLite migration) and a HM-side trigger mapping — out of scope for 0.1.0.
+**matter.js:** `ScenesManagementServer.#countsForFabric` reports the fabric's quota left, `floor((SceneTableSize-1)/2) - sceneCount`, and `#addOrReplaceSceneEntry` admits a scene while that is positive. With the default `SceneTableSize` of 128, three fabrics can therefore store 3 × 63 = 189 scenes in a table that declares 128 entries.
+
+**Go:** the quota left, bounded by the entries the table still has free — chip `FabricTableImpl::GetRemainingCapacity` (`src/app/storage/FabricTableImpl.ipp`), and the specification's note that the value "may change … due to other clients associated with other fabrics". AddScene into a full table is RESOURCE_EXHAUSTED, and GetSceneMembership reports the same bounded capacity.
+
+**Rationale:** TC-S-2.6 asserts the bounded value for a third fabric once two have used their quota; matter.js's count would fail it and overrun its own declared table. Everything else of the server — command checks, the out-of-range value rules, recall through the clusters' own commands — mirrors matter.js. Decided in [ADR 0012](../../docs/adr/0012-scenesmanagement-server.md).
 
 ---
 

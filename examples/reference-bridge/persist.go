@@ -155,3 +155,31 @@ func (p persistedLabels) restoreRoot(ctx context.Context, b *mattercore.BasicInf
 		}
 	})
 }
+
+// scenesKeyRoot prefixes a bridged endpoint's persisted scene table.
+const scenesKeyRoot = "scenes."
+
+// LoadScenes implements endpoint.ScenesStore: the endpoint's scene table
+// from the settings table (matter.js keeps sceneTable nonvolatile).
+func (p persistedLabels) LoadScenes(key endpoint.SourceKey) []byte {
+	k, ok := key.(endpoint.StringKey)
+	if !ok {
+		return nil
+	}
+	v, found, err := p.st.GetSetting(context.Background(), scenesKeyRoot+string(k))
+	if err != nil || !found {
+		return nil
+	}
+	return []byte(v)
+}
+
+// SaveScenes implements endpoint.ScenesStore.
+func (p persistedLabels) SaveScenes(key endpoint.SourceKey, table []byte) {
+	k, ok := key.(endpoint.StringKey)
+	if !ok {
+		return
+	}
+	if err := p.st.SetSetting(context.Background(), scenesKeyRoot+string(k), string(table)); err != nil {
+		p.logger.Warn("scenes.persist", slog.String("err", err.Error()))
+	}
+}

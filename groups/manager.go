@@ -441,6 +441,22 @@ func (m *Manager) Fabrics(ctx context.Context) ([]uint8, error) {
 	return m.fabricIndexesLocked(), nil
 }
 
+// StoredFabrics returns the index of every fabric the store holds right
+// now, ascending — unlike Fabrics, which lists those the manager has
+// loaded, it includes a fabric added since.
+func (m *Manager) StoredFabrics(ctx context.Context) ([]uint8, error) {
+	recs, err := m.st.ListFabrics(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("groups: list fabrics: %w", err)
+	}
+	out := make([]uint8, 0, len(recs))
+	for _, r := range recs {
+		out = append(out, r.FabricIndex)
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
 // fabricIndexesLocked returns the loaded fabric indexes ascending. Called
 // with m.mu held.
 func (m *Manager) fabricIndexesLocked() []uint8 {

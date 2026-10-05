@@ -155,6 +155,7 @@ func run() error {
 		NodeLabel:          identity.nodeLabel,
 		Groups:             groupState,
 		OnNodeLabelWritten: labels.store,
+		Scenes:             labels,
 	}
 	devices, err := newFleet(endpointStore, assemblerCfg, logger)
 	if err != nil {

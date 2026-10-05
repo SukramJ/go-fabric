@@ -209,6 +209,8 @@ type Endpoint struct {
 	groups *groups.Manager
 	// onNodeLabelWritten is [Config.OnNodeLabelWritten].
 	onNodeLabelWritten func(key SourceKey, label string)
+	// scenesStore is [Config.Scenes].
+	scenesStore ScenesStore
 }
 
 // PublishClusterServers publishes servers as this endpoint's attached
@@ -289,6 +291,8 @@ type endpointState struct {
 	// configVersion is the BridgedDeviceBasicInformation
 	// ConfigurationVersion; 0 until set, served as 1.
 	configVersion uint32
+	// scenes is the ScenesManagement scene table, created on first use.
+	scenes *mattercore.ScenesState
 }
 
 // configurationVersion returns the version, 1 when never raised.
@@ -553,4 +557,62 @@ func (t *Topology) Bridged() []*Endpoint {
 		out = append(out, ep)
 	}
 	return out
+}
+
+// scenesState returns (creating, restoring from the store) the endpoint's
+// scene table.
+func (e *Endpoint) scenesState() *mattercore.ScenesState {
+	st := e.endpointState()
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.scenes != nil {
+		return st.scenes
+	}
+	var persist func([]byte)
+	var data []byte
+	if e.scenesStore != nil && e.SourceKey != nil {
+		store, key := e.scenesStore, e.SourceKey
+		persist = func(table []byte) { store.SaveScenes(key, table) }
+		data = store.LoadScenes(key)
+	}
+	scenes, err := mattercore.LoadScenesState(data, persist)
+	if err != nil {
+		scenes = mattercore.NewScenesState(persist)
+	}
+	st.scenes = scenes
+	return scenes
+}
+
+// ForgetFabricScenes drops a removed fabric's scenes from the endpoint's
+// scene table, if it has one: the entries are fabric-scoped state that
+// matter.js removes with the fabric.
+func (e *Endpoint) ForgetFabricScenes(fabricIndex uint8) {
+	st := e.endpointState()
+	st.mu.Lock()
+	loaded := st.scenes != nil
+	st.mu.Unlock()
+	if loaded || e.scenesStore != nil {
+		// A persisted table that no dispatch has loaded yet is loaded now,
+		// so the removed fabric's entries cannot survive in it.
+		e.scenesState().RemoveScenesForFabric(fabricIndex)
+	}
+}
+
+// invalidateSceneOnCommand ends the validity of the endpoint's current
+// scene after a command on a scene-able cluster — matter.js OnOffServer,
+// LevelControlServer and ColorControlServer call
+// ScenesManagementServer.makeAllFabricSceneInfoEntriesInvalid from their
+// state-changing commands. A recall applies its values through the
+// servers directly and keeps the scene valid.
+func (e *Endpoint) invalidateSceneOnCommand(clusterID uint32) {
+	if clusterID != 0x0006 && clusterID != 0x0008 && clusterID != 0x0300 {
+		return
+	}
+	st := e.endpointState()
+	st.mu.Lock()
+	scenes := st.scenes
+	st.mu.Unlock()
+	if scenes != nil {
+		scenes.InvalidateCurrentScene()
+	}
 }

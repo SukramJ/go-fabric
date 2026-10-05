@@ -1399,6 +1399,9 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		if encodeApplicationValue(enc, tag, v.Value) {
 			return
 		}
+		if _, isSceneInfo := v.Value.([]mattercore.SceneInfoStruct); isSceneInfo && encodeScenesResponse(enc, tag, v.Value) {
+			return
+		}
 		// Cluster server returned a Go value the writer does not
 		// handle (e.g. a struct or list). Emit null so the reply still
 		// parses on the controller side; the cluster server should
@@ -1498,7 +1501,7 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
 		enc.PutOctets(tlv.ContextTag(0), x.Payload)
 		_ = enc.EndContainer()
 	default:
-		if encodeGroupsResponse(enc, tag, v) || encodeGroupcastResponse(enc, tag, v) || encodeApplicationResponse(enc, tag, v) {
+		if encodeGroupsResponse(enc, tag, v) || encodeGroupcastResponse(enc, tag, v) || encodeScenesResponse(enc, tag, v) || encodeApplicationResponse(enc, tag, v) {
 			return
 		}
 		// Status-only command — emit empty struct as the TLV

@@ -17,6 +17,7 @@ an oversight to the next reader — including choices to *not* do something.
 | [0009](./0009-groups-and-group-messaging.md) | A real Groups server and group message reception, with membership as stack state; Groupcast deferred to 0010 | accepted |
 | [0010](./0010-groupcast-and-auxiliary-acl.md) | Groupcast (Listener, PerGroup) and the AccessControl Auxiliary ACL on the root, on the ADR 0009 group state; no Sender | accepted |
 | [0011](./0011-certifiability-is-a-goal.md) | Certifiability is a goal, certification is not pursued; certification families are the yardstick, every exclusion is classified, PICS are honest, tests replace manual device testing | accepted |
+| [0012](./0012-scenesmanagement-server.md) | A real ScenesManagement server on the bridged lights, as matter.js builds it; RemainingCapacity bounded by the shared table as chip does | accepted |
 
 ## Provenance
 

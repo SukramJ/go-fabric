@@ -1077,6 +1077,12 @@ func (b *Bridge) EmitFabricRemoved(fabricIndex uint8) {
 	// Its groups go with it: keys, group table, reception state and the
 	// multicast memberships only it used.
 	b.groupMessagingPort().ForgetFabric(fabricIndex)
+	// And its scenes (fabric-scoped scene table entries).
+	if topo := b.Topology(); topo != nil {
+		for _, ep := range topo.Bridged() {
+			ep.ForgetFabricScenes(fabricIndex)
+		}
+	}
 	b.mu.RLock()
 	hook := b.onFabricRemoved
 	b.mu.RUnlock()

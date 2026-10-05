@@ -4,7 +4,9 @@
 - **Date**: 2026-10-04
 - **Supersedes**: [ADR 0004 — Groups stays a stub](./0004-groups-cluster-stays-stub.md)
 - **Followed by**: [ADR 0010 — Groupcast and the Auxiliary ACL](./0010-groupcast-and-auxiliary-acl.md),
-  which builds what the section "What is not built" below deferred
+  which builds what the section "What is not built" below deferred, and
+  [ADR 0012 — ScenesManagement server](./0012-scenesmanagement-server.md),
+  which replaces the ScenesManagement stub this ADR kept
 - **Related**:
   [`../matterjs-comparison.md`](../matterjs-comparison.md) §2 / §5,
   [`../../notes/parity/by_design.md`](../../notes/parity/by_design.md)

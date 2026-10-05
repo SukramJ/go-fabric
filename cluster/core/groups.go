@@ -124,7 +124,15 @@ type Groups struct {
 	endpoint     uint16
 	groups       *groups.Manager
 	identifyTime func() uint16
+	// scenes is the endpoint's scene table, whose scenes of a removed
+	// group go with it (matter.js GroupsServer → ScenesManagementServer
+	// removeScenesForGroupOnFabric / removeScenesForAllGroupsForFabric).
+	scenes *ScenesState
 }
+
+// SetScenes ties the endpoint's scene table to its groups: removing a group
+// removes the fabric's scenes of that group.
+func (s *Groups) SetScenes(st *ScenesState) { s.scenes = st }
 
 // NewGroups returns the Groups server of endpoint. identifyTime reports the
 // endpoint's Identify.IdentifyTime and may be nil (never identifying).
@@ -351,6 +359,9 @@ func (s *Groups) removeGroup(ctx context.Context, fabric uint8, groupID uint16) 
 	if !existed {
 		return RemoveGroupResponse{Status: im.StatusNotFound, GroupID: groupID}, nil
 	}
+	if s.scenes != nil {
+		s.scenes.RemoveScenesForGroup(fabric, groupID)
+	}
 	return RemoveGroupResponse{Status: im.StatusSuccess, GroupID: groupID}, nil
 }
 
@@ -358,6 +369,9 @@ func (s *Groups) removeGroup(ctx context.Context, fabric uint8, groupID uint16) 
 func (s *Groups) removeAllGroups(ctx context.Context, fabric uint8) (any, error) {
 	if _, err := s.groups.RemoveEndpoint(ctx, fabric, s.endpoint, 0, true); err != nil {
 		return nil, fmt.Errorf("matter: Groups.RemoveAllGroups: %w", err)
+	}
+	if s.scenes != nil {
+		s.scenes.RemoveScenesForFabric(fabric)
 	}
 	return nil, nil
 }

@@ -39,6 +39,21 @@ type Config struct {
 	// keeps a written nodeLabel in the endpoint's persisted state. nil
 	// keeps the label for the life of the process only.
 	OnNodeLabelWritten func(key SourceKey, label string)
+	// Scenes persists the scene tables of the endpoints that serve
+	// ScenesManagement (see [ScenesStore]). With Groups set, every bridged
+	// endpoint whose device type mandates ScenesManagement (the light
+	// device types) serves the stack's ScenesManagement server, in place
+	// of any a source supplies — as matter.js mounts ScenesManagementServer
+	// for those device types. nil keeps the tables for the life of the
+	// process.
+	Scenes ScenesStore
+}
+
+// ScenesStore keeps an endpoint's scene table across restarts — matter.js
+// keeps sceneTable as nonvolatile state. key is the endpoint's stable key.
+type ScenesStore interface {
+	LoadScenes(key SourceKey) []byte
+	SaveScenes(key SourceKey, table []byte)
 }
 
 // Validate returns nil when the config is internally consistent.
@@ -221,6 +236,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		HasParentEndpointID: true,
 		groups:              a.cfg.Groups,
 		onNodeLabelWritten:  a.cfg.OnNodeLabelWritten,
+		scenesStore:         a.cfg.Scenes,
 	}, nil
 }
 

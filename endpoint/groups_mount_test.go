@@ -194,13 +194,12 @@ func (s *oneEndpointStore) ListEndpoints(context.Context, string) ([]Record, err
 
 func (s *oneEndpointStore) RemoveEndpoint(context.Context, SourceKey) error { return nil }
 
-// TestScenesStubStaysBesideTheGroupsServer pins the ScenesManagement stub's
-// place next to the real Groups server. matter.js couples the two only
-// through RemoveGroup / RemoveAllGroups, which drop the group's scenes
-// (GroupsServer → ScenesManagementServer.removeScenesForGroupOnFabric);
-// the stub keeps no scenes (SceneTableSize 0, FabricSceneInfo empty), so
-// there is nothing to drop and the stub is mounted unchanged.
-func TestScenesStubStaysBesideTheGroupsServer(t *testing.T) {
+// TestScenesServerReplacesTheStub pins the stack's ScenesManagement server
+// on a light endpoint with group state: it replaces a source's stub, serves
+// matter.js's SceneTableSize (128) and SceneNames feature, and is tied to the
+// Groups server (matter.js GroupsServer → ScenesManagementServer
+// removeScenesForGroupOnFabric).
+func TestScenesServerReplacesTheStub(t *testing.T) {
 	t.Parallel()
 	mgr, _ := groups.NewManager(nopGroupStore{}, nil)
 	ep := &Endpoint{
@@ -213,15 +212,23 @@ func TestScenesStubStaysBesideTheGroupsServer(t *testing.T) {
 		t.Fatal("no stack Groups server")
 	}
 	var scenes contract.ClusterServer
+	n := 0
 	for _, s := range servers {
 		if s.MatterClusterID() == 0x0062 {
 			scenes = s
+			n++
 		}
 	}
-	if scenes == nil {
-		t.Fatal("the ScenesManagement stub was dropped")
+	if n != 1 {
+		t.Fatalf("%d ScenesManagement servers, want 1", n)
 	}
-	if v, _ := scenes.MatterRead(0x0001); v != uint16(0) {
-		t.Fatalf("SceneTableSize = %v, want 0", v)
+	if _, ok := scenes.(*mattercore.ScenesManagement); !ok {
+		t.Fatalf("ScenesManagement is %T, want the stack's server", scenes)
+	}
+	if v, _ := scenes.MatterRead(0x0001); v != uint16(128) {
+		t.Fatalf("SceneTableSize = %v, want 128", v)
+	}
+	if v, _ := scenes.MatterRead(0xFFFC); v != uint32(1) {
+		t.Fatalf("FeatureMap = %v, want 1 (SceneNames)", v)
 	}
 }

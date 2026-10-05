@@ -12,6 +12,18 @@ pseudo-version of `main`.
 
 ### Added
 
+- **ScenesManagement (0x0062) is a real server** on the bridged lights
+  (ADR 0012), a port of matter.js's `ScenesManagementServer`:
+  `cluster/core.ScenesManagement`, `NewScenesManagement`, `ScenesConfig`,
+  `ScenesState` / `NewScenesState` / `LoadScenesState`, the request and
+  response types (`AddSceneRequest`, `SceneRef`, `ViewSceneResponse`, …) and
+  `SceneInfoStruct`. Scenes capture and recall the endpoint's OnOff,
+  LevelControl and ColorControl state; FabricSceneInfo reports every change;
+  a removed group or fabric takes its scenes along. The host persists the
+  table through `endpoint.Config.Scenes` (`endpoint.ScenesStore`);
+  `groups.Manager.StoredFabrics` lists the fabrics FabricSceneInfo covers.
+  Replaces the stub that rejected every command (`BD-Matter-P2-D18`, retired).
+
 - The reference daemon answers CHIP's `SimulateConfigurationVersionChange`
   on its app pipe and persists the raised ConfigurationVersions.
 

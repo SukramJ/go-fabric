@@ -6,6 +6,7 @@ package groups
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"slices"
 	"sync"
 	"testing"
@@ -25,6 +26,8 @@ type memStore struct {
 	table   map[uint8]map[uint16]store.GroupTableEntry
 	gcast   map[uint8]map[uint16]store.GroupcastGroup
 	failPut error
+	// failList makes ListFabrics fail.
+	failList bool
 }
 
 func newMemStore() *memStore {
@@ -48,6 +51,9 @@ func (s *memStore) GetFabric(_ context.Context, idx uint8) (store.FabricRecord, 
 func (s *memStore) ListFabrics(context.Context) ([]store.FabricRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.failList {
+		return nil, errors.New("memStore: list fabrics failed")
+	}
 	out := make([]store.FabricRecord, 0, len(s.fabrics))
 	for _, r := range s.fabrics {
 		out = append(out, r)
