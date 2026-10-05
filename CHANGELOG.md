@@ -358,6 +358,10 @@ pseudo-version of `main`.
     InvalidInMode where that node does, Resume is refused on the dock and
     GoHome in Error, and the rvc-app pipe's Reset, ChargerFound, Charging and
     Charged are understood (TC-RVCOPSTATE-*, TC-RVCRUNM-*, TC-RVCCLEANM-*).
+  - The reference daemon's light reports what its OnWithTimedOff countdowns
+    change on their own: OnTime and OffWaitTime as they run down, and OnOff
+    when the timed-on phase switches the light off. Before, a subscriber
+    learned of none of it (TC-OO-2.8).
   - A change notification of a host source marked every reportable
     attribute of its endpoint dirty; the bridge now reports only the
     attributes whose value moved, and advances only their clusters'

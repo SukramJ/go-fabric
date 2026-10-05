@@ -191,6 +191,19 @@ type onOffServer struct {
 	version    contract.DataVersionTracker
 	// lt is nil for a server without the Lighting feature.
 	lt *lightingState
+	// changes reports what the two LT countdowns change on their own. A
+	// command's or a write's changes reach subscribers through the bridge
+	// (reportInvokeChanges, reportWrittenAttributes); a timer tick has no
+	// request behind it, so without this a subscriber never learned that
+	// OnTime ran down or that the timed-on phase switched the light off
+	// (found by TC-OO-2.8). matter.js OnOffServer.ts assigns the ticked
+	// values to its state, whose Datasource reports every change.
+	changes cluster.AttributeChanges
+}
+
+// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
+func (s *onOffServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
+	return s.changes.OnMatterAttributesChanged(cb)
 }
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -407,38 +420,56 @@ func (s *onOffServer) onWithTimedOff(control uint8, onTime, offWaitTime uint16) 
 // timedOnTick runs every 100 ms while a timed-on phase counts down —
 // matter.js OnOffServer.ts #timedOnTick. OnTime is in tenths of a second.
 func (s *onOffServer) timedOnTick() {
+	s.changes.Notify(s.timedOnStep()...)
+}
+
+// timedOnStep is one countdown step of [onOffServer.timedOnTick]; it
+// returns the attributes it changed, which the caller reports once the
+// lock is released.
+func (s *onOffServer) timedOnStep() []uint32 {
 	s.lt.mu.Lock()
 	defer s.lt.mu.Unlock()
 	if s.lt.timedOn == nil {
-		return // stopped between the fire and the lock
+		return nil // stopped between the fire and the lock
 	}
 	if s.lt.onTime == 0xFFFF {
 		s.lt.stopTimedOn()
-		return
+		return nil
 	}
 	if s.lt.onTime <= 1 {
+		changed := []uint32{onoff.AttrOnOff, onoff.AttrOnTime}
+		if s.lt.offWaitTime != 0 {
+			changed = append(changed, onoff.AttrOffWaitTime)
+		}
 		s.lt.onTime = 0
 		s.lt.stopTimedOn()
 		s.lt.offWaitTime = 0
 		s.off()
-		return
+		return changed
 	}
 	s.lt.onTime--
 	s.version.Bump()
 	s.lt.timedOn.Reset(lightingTick)
+	return []uint32{onoff.AttrOnTime}
 }
 
 // delayedOffTick runs every 100 ms through the delayed-off guard —
 // matter.js OnOffServer.ts #delayedOffTick.
 func (s *onOffServer) delayedOffTick() {
+	s.changes.Notify(s.delayedOffStep()...)
+}
+
+// delayedOffStep is one step of [onOffServer.delayedOffTick], returning
+// what it changed.
+func (s *onOffServer) delayedOffStep() []uint32 {
 	s.lt.mu.Lock()
 	defer s.lt.mu.Unlock()
 	if s.lt.delayedOff == nil {
-		return
+		return nil
 	}
 	if s.lt.offWaitTime == 0xFFFF {
 		s.lt.stopDelayedOff()
-		return
+		return nil
 	}
 	if s.lt.offWaitTime <= 1 {
 		s.lt.offWaitTime = 0
@@ -448,6 +479,7 @@ func (s *onOffServer) delayedOffTick() {
 		s.lt.delayedOff.Reset(lightingTick)
 	}
 	s.version.Bump()
+	return []uint32{onoff.AttrOffWaitTime}
 }
 
 // apply drives the device and bumps the cluster's DataVersion, so a

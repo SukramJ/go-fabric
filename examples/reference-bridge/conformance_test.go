@@ -6,7 +6,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -166,6 +168,13 @@ func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 		if srv == nil {
 			t.Fatal("the light mounts no onOffServer")
 		}
+		var reportedMu sync.Mutex
+		var reported [][]uint32
+		srv.OnMatterAttributesChanged(func(ids []uint32) {
+			reportedMu.Lock()
+			reported = append(reported, ids)
+			reportedMu.Unlock()
+		})
 		if _, err := srv.MatterInvoke(context.Background(), onoff.CmdOnWithTimedOff,
 			map[uint8]any{0: uint8(0), 1: uint16(3), 2: uint16(0)}); err != nil {
 			t.Fatalf("OnWithTimedOff: %v", err)
@@ -194,6 +203,57 @@ func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 		}
 		if v, _ := srv.MatterRead(onoff.AttrOnTime); v != uint16(0) {
 			t.Errorf("OnTime after the countdown = %v, want 0", v)
+		}
+		// Every tick reports what it changed — the request that started the
+		// countdown is long answered, so nothing else would.
+		reportedMu.Lock()
+		defer reportedMu.Unlock()
+		want := [][]uint32{{onoff.AttrOnTime}, {onoff.AttrOnTime}, {onoff.AttrOnOff, onoff.AttrOnTime}}
+		if !reflect.DeepEqual(reported, want) {
+			t.Errorf("reported changes = %v, want %v (two countdown ticks, then the timed-off)", reported, want)
+		}
+	})
+}
+
+// TestDelayedOffReportsItsCountdown: the delayed-off guard's ticks report
+// OffWaitTime as it runs down.
+func TestDelayedOffReportsItsCountdown(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		light := newDemoLight("guard")
+		var srv *onOffServer
+		for _, s := range light.MatterClusterServers() {
+			if o, ok := s.(*onOffServer); ok {
+				srv = o
+			}
+		}
+		var reportedMu sync.Mutex
+		var reported [][]uint32
+		srv.OnMatterAttributesChanged(func(ids []uint32) {
+			reportedMu.Lock()
+			reported = append(reported, ids)
+			reportedMu.Unlock()
+		})
+		ctx := context.Background()
+		if _, err := srv.MatterInvoke(ctx, onoff.CmdOn, nil); err != nil {
+			t.Fatalf("On: %v", err)
+		}
+		if err := srv.MatterWrite(ctx, onoff.AttrOffWaitTime, uint16(2)); err != nil {
+			t.Fatalf("write OffWaitTime: %v", err)
+		}
+		if _, err := srv.MatterInvoke(ctx, onoff.CmdOff, nil); err != nil {
+			t.Fatalf("Off: %v", err)
+		}
+		time.Sleep(2 * lightingTick)
+		synctest.Wait()
+		if v, _ := srv.MatterRead(onoff.AttrOffWaitTime); v != uint16(0) {
+			t.Fatalf("OffWaitTime after the guard = %v, want 0", v)
+		}
+		reportedMu.Lock()
+		defer reportedMu.Unlock()
+		want := [][]uint32{{onoff.AttrOffWaitTime}, {onoff.AttrOffWaitTime}}
+		if !reflect.DeepEqual(reported, want) {
+			t.Errorf("reported changes = %v, want %v", reported, want)
 		}
 	})
 }
