@@ -643,3 +643,21 @@ func TestZeroconfInternal_Publish_HostNameOverride(t *testing.T) {
 		t.Fatalf("published fingerprint %q does not carry the override host", fp)
 	}
 }
+
+// TestPrimaryHostInterfaces: the interfaces a publish answers on are the
+// ones the address list comes from — never a loopback or an excluded one —
+// and nil when the filter leaves none.
+func TestPrimaryHostInterfaces(t *testing.T) {
+	t.Parallel()
+	if got := primaryHostInterfaces(func(string) bool { return true }); got != nil {
+		t.Fatalf("every interface excluded: got %v, want nil", got)
+	}
+	for _, ifi := range primaryHostInterfaces(nil) {
+		if ifi.Flags&net.FlagLoopback != 0 || ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagMulticast == 0 {
+			t.Errorf("interface %s (%v) does not qualify", ifi.Name, ifi.Flags)
+		}
+		if isVirtualInterfaceName(ifi.Name) {
+			t.Errorf("virtual interface %s was kept", ifi.Name)
+		}
+	}
+}

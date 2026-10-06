@@ -403,6 +403,10 @@ pseudo-version of `main`.
     only, and an IPv6-only resolver such as chip-tool never found the
     commissioned node. Where a routable IPv6 exists, the link-local one
     stays out as before.
+  - `mdns.Zeroconf` answers only on the interfaces its address records come
+    from. Answering on every interface sent the records over container
+    bridges too, and a local IPv6 resolver scoped the link-local address
+    to the bridge, an unreachable route (TC-BINFO-2.2 in CI).
   - `cluster/thermo.ThermostatServer` accepts writes of
     Min/MaxHeatSetpointLimit and Min/MaxCoolSetpointLimit (ConstraintError
     outside the absolute range) and reconciles the setpoints and limits a

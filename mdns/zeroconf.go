@@ -147,6 +147,28 @@ type hostIface struct {
 	ips          []net.IP
 }
 
+// primaryHostInterfaces lists the interfaces the advertise policy takes
+// addresses from (see filterPrimaryHostIPs): up, multicast-capable, not
+// loopback or point-to-point, not excluded by name. nil when none is.
+func primaryHostInterfaces(exclude func(string) bool) []net.Interface {
+	if exclude == nil {
+		exclude = isVirtualInterfaceName
+	}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	var out []net.Interface
+	for _, ifi := range ifaces {
+		if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagMulticast == 0 ||
+			ifi.Flags&net.FlagLoopback != 0 || ifi.Flags&net.FlagPointToPoint != 0 || exclude(ifi.Name) {
+			continue
+		}
+		out = append(out, ifi)
+	}
+	return out
+}
+
 // primaryHostIPs returns the curated host-IP list the Matter mDNS
 // records should publish (see filterPrimaryHostIPs for the policy).
 // exclude may be nil; see filterPrimaryHostIPs.
@@ -373,7 +395,14 @@ func (z *Zeroconf) publishLocked(svc Service) error {
 		host,
 		ips,
 		txt,
-		nil, // nil → all multicast-capable interfaces
+		// Only the interfaces the address list comes from. Sent on every
+		// interface (nil), a response also reached local listeners over a
+		// container bridge, and an IPv6 resolver scoped the link-local
+		// address it carries to that bridge — an unreachable route
+		// (TC-BINFO-2.2 in CI: fe80::…%docker0, ENETUNREACH). nil when the
+		// filter leaves none, which keeps the library's every-interface
+		// default.
+		primaryHostInterfaces(z.InterfaceFilter),
 	)
 	if err != nil {
 		return fmt.Errorf("mdns: zeroconf register %s/%s: %w", svc.InstanceName, svc.ServiceType, err)
