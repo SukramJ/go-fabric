@@ -17,7 +17,10 @@
 // [ColorControlServerConfig.ManageTransitions] — gradual transitions on
 // the module's transition engine (cluster/transition, matter.js
 // behavior/Transitions.ts) with a live RemainingTime. Hue, saturation, xy
-// and the colour loop are not served (FeatureMap CT only).
+// and the colour loop are not served (FeatureMap CT only) — so this server
+// does not carry ExtendedColorLight (0x010D), which requires the XY feature
+// (extended-color-light.element.ts); endpoint.ValidateDeviceTypes reports
+// "missing ColorControl.XY" for such an endpoint.
 //
 // The server holds the colour temperature itself and pushes every value it
 // applies — at once, or step by step — to an optional

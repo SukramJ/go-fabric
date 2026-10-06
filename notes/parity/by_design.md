@@ -1477,6 +1477,27 @@ AccessControlEntryChanged here reports null altogether.
 
 ---
 
+### BD-Matter-DeviceTypeValidationPerTopology — device type validation judges and refuses whole topologies
+
+matter.js `DeviceTypeConformanceService`
+(`packages/node/src/node/server/DeviceTypeConformanceService.ts`) judges an
+endpoint when its construction completes and what a later change may
+affect (`NodeScopeIndex`), refuses the constructing endpoint — which crashes
+while its siblings run — reads its mode from `endpoint.validation` once per
+node, and injects a `BindingServer` where Base's `Simple & Client` makes
+Binding mandatory (`missingBaseServersOf`). go-fabric's bridge judges the
+whole assembled topology on every Start and Reassemble
+(`bridge/devicetype_validation.go`), refuses the assembly as a whole so the
+previous topology stays live, takes its mode from
+`Bridge.SetDeviceTypeValidation`, and mounts no Binding a host did not ask
+for — the verdict names it instead. The verdicts, the modes (warn, strict,
+off) and what each refuses are matter.js's; only the unit of construction
+differs, because a Go topology is installed whole. Pinned by
+`bridge/devicetype_validation_test.go`;
+[ADR 0016](../../docs/adr/0016-device-type-validation.md).
+
+---
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

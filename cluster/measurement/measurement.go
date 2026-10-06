@@ -772,6 +772,23 @@ func (s *BooleanStateServer) MatterAttributes() []uint32 {
 	return []uint32{attrBoolStateValue}
 }
 
+// BooleanStateEventStateChange is the StateChange event (0x00) the bridge
+// emits on every StateValue change.
+const BooleanStateEventStateChange uint32 = 0x00
+
+// Compile-time assertion: BooleanStateServer lists its events.
+var _ contract.ClusterEventLister = (*BooleanStateServer)(nil)
+
+// MatterEvents implements [contract.ClusterEventLister]: StateChange, which
+// the CHGEVENT feature the server advertises makes mandatory ("CHGEVENT, O",
+// boolean-state.element.ts) and which the bridge emits on every StateValue
+// change. Water Freeze Detector, Water Leak Detector and Rain Sensor require
+// it of the endpoint (the device types' event requirement, M); matter.js
+// BooleanStateServer emits it with the feature enabled by default.
+func (s *BooleanStateServer) MatterEvents() []uint32 {
+	return []uint32{BooleanStateEventStateChange}
+}
+
 // BooleanStateChangeEvent is the payload of BooleanState.StateChange
 // (event 0x00, priority Info, field 0 StateValue), boolean-state.element.ts.
 type BooleanStateChangeEvent struct {

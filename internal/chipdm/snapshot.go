@@ -26,14 +26,16 @@ type snapFile struct {
 	Clusters        []snapCluster    `json:"clusters"`
 	DeviceTypes     []snapDeviceType `json:"deviceTypes"`
 	GlobalDatatypes []*snapValue     `json:"globalDatatypes"`
+	BaseDeviceTypes []snapDeviceType `json:"baseDeviceTypes"`
 }
 
 type snapCluster struct {
-	ID       uint32 `json:"id"`
-	Name     string `json:"name"`
-	Revision int    `json:"revision"`
-	Base     string `json:"base"`
-	Features []struct {
+	ID             uint32 `json:"id"`
+	Name           string `json:"name"`
+	Revision       int    `json:"revision"`
+	Base           string `json:"base"`
+	Classification string `json:"classification"`
+	Features       []struct {
 		Name      string `json:"name"`
 		Bit       *int   `json:"bit"`
 		Effective struct {
@@ -89,6 +91,30 @@ type snapDeviceType struct {
 		Element     string `json:"element"`
 		Conformance string `json:"conformance"`
 	} `json:"requirements"`
+	// Effective is the device-type layer: the requirement tree matter.js's
+	// device type validation reads, and the declared conditions.
+	Effective *struct {
+		Conditions   []string             `json:"conditions"`
+		Requirements []*snapDTRequirement `json:"requirements"`
+	} `json:"effective"`
+}
+
+// snapDTRequirement is one requirement of a device type's effective layer.
+type snapDTRequirement struct {
+	Element     string    `json:"element"`
+	Name        string    `json:"name"`
+	ID          *uint32   `json:"id"`
+	Conformance *snapConf `json:"conformance"`
+	Constraint  *struct {
+		Text string `json:"text"`
+	} `json:"constraint"`
+	Quality  map[string]bool `json:"quality"`
+	Referent *struct {
+		ID       *uint32 `json:"id"`
+		Name     string  `json:"name"`
+		Declarer string  `json:"declarer"`
+	} `json:"referent"`
+	Requirements []*snapDTRequirement `json:"requirements"`
 }
 
 // SnapshotInfo is the snapshot's provenance.
@@ -112,6 +138,14 @@ func LoadSnapshot(data []byte) (*Model, SnapshotInfo, error) {
 		}
 		m.Clusters = append(m.Clusters, c)
 	}
+	// The Base device type has no id; it sorts first, as CHIP's side does.
+	for i := range f.BaseDeviceTypes {
+		dt, err := snapshotBaseDeviceType(&f.BaseDeviceTypes[i])
+		if err != nil {
+			return nil, info, err
+		}
+		m.DeviceTypes = append(m.DeviceTypes, dt)
+	}
 	for i := range f.DeviceTypes {
 		dt, err := snapshotDeviceType(&f.DeviceTypes[i])
 		if err != nil {
@@ -130,7 +164,7 @@ func LoadSnapshot(data []byte) (*Model, SnapshotInfo, error) {
 }
 
 func snapshotCluster(sc *snapCluster) (*Cluster, error) {
-	c := &Cluster{ID: u32(sc.ID), Name: sc.Name, Revision: sc.Revision, Base: sc.Base}
+	c := &Cluster{ID: u32(sc.ID), Name: sc.Name, Revision: sc.Revision, Base: sc.Base, Classification: sc.Classification}
 	wrap := func(err error) error { return fmt.Errorf("cluster %s: %w", sc.Name, err) }
 	for _, f := range sc.Features {
 		e := &Element{Name: f.Name}
@@ -332,7 +366,130 @@ func snapshotDeviceType(sd *snapDeviceType) (*DeviceType, error) {
 		if err != nil {
 			return nil, fmt.Errorf("device type %s: requirement %s: %w", sd.Name, r.Name, err)
 		}
-		dt.Requirements = append(dt.Requirements, &Requirement{ID: r.ID, Name: r.Name, Side: side, Conformance: conf})
+		req := &Requirement{ID: r.ID, Name: r.Name, Side: side, Conformance: conf}
+		if eff := effectiveClusterRequirement(sd, r.Element, r.ID); eff != nil {
+			if err := withElements(req, eff); err != nil {
+				return nil, fmt.Errorf("device type %s: requirement %s: %w", sd.Name, r.Name, err)
+			}
+		}
+		dt.Requirements = append(dt.Requirements, req)
+	}
+	if err := withConditions(dt, sd); err != nil {
+		return nil, err
 	}
 	return dt, nil
+}
+
+// snapshotBaseDeviceType reads the Base device type, which has no id and so
+// no raw requirement list: its requirements come from the effective layer.
+func snapshotBaseDeviceType(sd *snapDeviceType) (*DeviceType, error) {
+	dt := &DeviceType{Name: sd.Name, Revision: sd.Revision, Classification: sd.Classification}
+	if sd.Effective == nil {
+		return nil, fmt.Errorf("base device type %s has no effective layer", sd.Name)
+	}
+	for _, r := range sd.Effective.Requirements {
+		var side string
+		switch r.Element {
+		case "serverCluster":
+			side = "server"
+		case "clientCluster":
+			side = "client"
+		default:
+			continue
+		}
+		if r.ID == nil {
+			return nil, fmt.Errorf("base device type %s: cluster requirement %s has no id", sd.Name, r.Name)
+		}
+		conf, err := snapshotConf(r.Conformance)
+		if err != nil {
+			return nil, fmt.Errorf("base device type %s: requirement %s: %w", sd.Name, r.Name, err)
+		}
+		req := &Requirement{ID: *r.ID, Name: r.Name, Side: side, Conformance: conf}
+		if err := withElements(req, r); err != nil {
+			return nil, fmt.Errorf("base device type %s: requirement %s: %w", sd.Name, r.Name, err)
+		}
+		dt.Requirements = append(dt.Requirements, req)
+	}
+	if err := withConditions(dt, sd); err != nil {
+		return nil, err
+	}
+	return dt, nil
+}
+
+// effectiveClusterRequirement finds the effective-layer counterpart of a raw
+// cluster requirement: the device type's own requirement of the cluster on
+// that side. A requirement the raw layer inherits from a base device type
+// without restating it has none — matter.js's validation reads only a
+// device type's own requirements (DeviceTypeModel.requirements).
+func effectiveClusterRequirement(sd *snapDeviceType, element string, id uint32) *snapDTRequirement {
+	if sd.Effective == nil {
+		return nil
+	}
+	for _, r := range sd.Effective.Requirements {
+		if r.Element == element && r.ID != nil && *r.ID == id {
+			return r
+		}
+	}
+	return nil
+}
+
+// withElements carries a cluster requirement's quality and its feature,
+// attribute, command and event requirements over from the effective layer.
+func withElements(req *Requirement, eff *snapDTRequirement) error {
+	if eff.Quality != nil {
+		req.Quality = []string{}
+		for flag, set := range eff.Quality {
+			if set {
+				req.Quality = append(req.Quality, flag)
+			}
+		}
+		slices.Sort(req.Quality)
+	}
+	for _, n := range eff.Requirements {
+		switch n.Element {
+		case "feature", "attribute", "command", "event":
+		default:
+			continue
+		}
+		conf, err := snapshotConf(n.Conformance)
+		if err != nil {
+			return fmt.Errorf("%s requirement %s: %w", n.Element, n.Name, err)
+		}
+		er := &ElementRequirement{Element: n.Element, Name: n.Name, Conformance: conf}
+		if n.Constraint != nil {
+			er.Constraint = n.Constraint.Text
+		}
+		if n.Element != "feature" && n.Referent != nil {
+			er.ID = n.Referent.ID
+		}
+		req.Elements = append(req.Elements, er)
+	}
+	return nil
+}
+
+// withConditions carries the declared conditions and the condition
+// requirements over from the effective layer.
+func withConditions(dt *DeviceType, sd *snapDeviceType) error {
+	if sd.Effective == nil {
+		return nil
+	}
+	dt.Conditions = sd.Effective.Conditions
+	for _, r := range sd.Effective.Requirements {
+		if r.Element != "condition" {
+			continue
+		}
+		conf, err := snapshotConf(r.Conformance)
+		if err != nil {
+			return fmt.Errorf("device type %s: condition requirement %s: %w", sd.Name, r.Name, err)
+		}
+		cr := &ConditionRequirement{Name: r.Name, Conformance: conf}
+		if r.Referent != nil {
+			cr.DeviceType, cr.Name = r.Referent.Declarer, r.Referent.Name
+		}
+		if r.Constraint != nil {
+			cr.Constraint = r.Constraint.Text
+		}
+		dt.ConditionRequirements = append(dt.ConditionRequirements, cr)
+	}
+	return nil
 }

@@ -147,6 +147,13 @@
 //   - AttachDiagnosticEvents makes [Bridge.DiagnosticEvents] non-empty.
 //   - SetOnReassembled, SetOnFabricAdded and SetOnFabricRemoved are
 //     nil-safe observer hooks.
+//   - SetDeviceTypeValidation — visible either way. Start and every
+//     Reassemble judge the topology against its device types; the
+//     default, matter.js's warn mode, logs each new violation once
+//     ("matter.devicetype.violation") and refuses only a misplaced
+//     singleton, strict refuses any new violation, off judges nothing but
+//     singleton placement. [Bridge.DeviceTypeViolations] returns what the
+//     installed topology violates (docs/adr/0016).
 package bridge
 
 import (
@@ -275,6 +282,11 @@ type Bridge struct {
 	// load counts the Interaction Model traffic GeneralDiagnostics'
 	// DeviceLoadStatus reports (see device_load.go).
 	load deviceLoadCounters
+
+	// deviceTypes judges every assembled topology against its device types
+	// (devicetype_validation.go); nil until first used, then matter.js's
+	// default mode, warn.
+	deviceTypes *endpoint.DeviceTypeValidator
 
 	cfg Config
 	// There is deliberately no endpoint.Store here. The bridge consumes an
@@ -796,7 +808,7 @@ func (b *Bridge) Reassemble(ctx context.Context) error {
 // lock. Concurrent Reassembles serialise harmlessly: each finishes
 // independently, and the last writer wins (subsequent reads see one
 // of the two assembled topologies, never a torn intermediate).
-func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit,funlen // single-purpose bridge topology reassembly with many endpoint/cluster branches
+func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit,gocyclo,funlen // single-purpose bridge topology reassembly with many endpoint/cluster branches
 	topology, err := b.snapshotter(ctx)
 	if err != nil {
 		return fmt.Errorf("bridge: assemble: %w", err)
@@ -830,6 +842,9 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	// after a Reassemble.
 	if agg := topology.FindByID(1); agg != nil && len(aggregatorClusters) > 0 {
 		agg.PublishClusterServers(aggregatorClusters)
+	}
+	if err := b.validateDeviceTypes(topology); err != nil {
+		return fmt.Errorf("bridge: assemble: %w", err)
 	}
 	dispatcher := endpoint.NewTopologyDispatcher(topology)
 	// Wire ACL enforcement onto the fresh dispatcher (Matter §9.10). A nil

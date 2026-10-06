@@ -3,7 +3,8 @@
 
 // Package endpointtest provides the endpoint-level scaffolding a test needs
 // to stand a bridge up: an in-memory [endpoint.Store] and a snapshotter over
-// an empty fleet.
+// an empty fleet — and [AssertDeviceTypeConformance], which holds a host's
+// assembled topology to its device types.
 //
 // It is the test-support counterpart of package endpoint, in the shape
 // net/http/httptest has to net/http, and it is separate from
@@ -17,9 +18,47 @@ package endpointtest
 
 import (
 	"context"
+	"slices"
+	"strconv"
+	"testing"
 
 	"github.com/SukramJ/go-fabric/endpoint"
 )
+
+// AssertDeviceTypeConformance fails tb for every device type violation
+// [endpoint.ValidateDeviceTypes] finds in topology — a host's test that its
+// projection produces endpoints its device types allow, with every
+// mandatory cluster, feature, attribute, command and event in place.
+// Publish the root's and the Aggregator's cluster servers on topology
+// first ([endpoint.Endpoint.PublishClusterServers]); without them those two
+// endpoints are judged empty.
+//
+// tolerate lists the violations the host accepts knowingly, each as
+// "<endpoint>/<kind> <requirement>" ("9/instanceCount device:PowerSource",
+// [endpoint.DeviceTypeViolation.Key] behind the endpoint id). A tolerated
+// entry that matches no violation fails tb too, so the list cannot outlive
+// the reason for it. It returns the violations found, tolerated ones
+// included.
+func AssertDeviceTypeConformance(tb testing.TB, topology *endpoint.Topology, tolerate ...string) []endpoint.DeviceTypeViolation {
+	tb.Helper()
+	found := endpoint.ValidateDeviceTypes(topology)
+	matched := make([]bool, len(tolerate))
+	for i := range found {
+		v := &found[i]
+		key := strconv.FormatUint(uint64(v.Endpoint), 10) + "/" + v.Key()
+		if at := slices.Index(tolerate, key); at >= 0 {
+			matched[at] = true
+			continue
+		}
+		tb.Errorf("device type violation: %s", v)
+	}
+	for i, ok := range matched {
+		if !ok {
+			tb.Errorf("tolerated device type violation %q no longer occurs", tolerate[i])
+		}
+	}
+	return found
+}
 
 // FakeStore is an in-memory implementation of [endpoint.Store]. It is
 // concurrency-naive — callers must not race it — and carries only the state

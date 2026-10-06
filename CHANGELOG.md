@@ -375,6 +375,48 @@ pseudo-version of `main`.
   `LastChangedTimeWriter`; all three features (Condition, Warning,
   ReplacementProductList), InPlaceIndicator, the writable LastChangedTime and
   ResetCondition. The first server built on a generated definition.
+- **Device type validation** ([ADR 0016](./docs/adr/0016-device-type-validation.md)):
+  `endpoint.ValidateDeviceTypes` judges every endpoint of a topology
+  against the device types its Descriptor lists and the Base device type —
+  a port of matter.js's `DeviceTypeConformance`: mandatory and disallowed
+  server and client clusters, the feature / attribute / command / event
+  requirements nested in a served cluster, component device types,
+  Descendant condition counts, singleton placement and unknown stated
+  conditions, with matter.js's condition derivation (structural, asserted at
+  Root / Self / Descendant, CustomNetworkConfig, network interfaces) and its
+  rule that a condition never disallows. Each `endpoint.DeviceTypeViolation`
+  names the endpoint, device type, requirement path, kind, cluster, element,
+  conformance and the conditions that applied.
+  `endpoint.DeviceTypeValidator` (`NewDeviceTypeValidator`, `Validate`,
+  `Violations`, `DeviceTypeVerdict`, `DeviceTypeConformanceError`) adds
+  matter.js's modes `DeviceTypeValidationWarn` (default),
+  `DeviceTypeValidationStrict` and `DeviceTypeValidationOff`. **The bridge
+  validates every assembly**: in the default mode it logs each new violation
+  once (`matter.devicetype.violation`) and refuses only a root singleton
+  misplaced on another endpoint — Start / Reassemble then return the error
+  and the previous topology stays live; `Bridge.SetDeviceTypeValidation`
+  selects the mode, `Bridge.DeviceTypeViolations` returns what the installed
+  topology violates. `Spec.DeviceConditions`, `Config.RootDeviceConditions`
+  and `Endpoint.DeviceConditions` let a host state the conditions no
+  topology shows (LanguageLocale, PhysicalInputs, …).
+  `endpointtest.AssertDeviceTypeConformance` asserts a host's topology in
+  its tests, with a list of tolerated violations that fails when stale.
+- **Typed device-type requirement lookups** in `schema`, generated from the
+  snapshot's new device-type layer: `DeviceTypeDefinitionOf`,
+  `BaseDeviceTypes`, `DeviceTypeConditions`, `DeviceTypeConditionScope`,
+  `ConditionScopeOf`, `DeviceTypeClusterRequirement`,
+  `DeviceTypeElementRequirements`, `ClusterFeatures`, `ClusterFeatureNames`,
+  `ClusterClassification`, `ClusterBindable`, with the types
+  `DeviceTypeDefinition`, `DeviceTypeRequirement`, `RequirementElement`,
+  `ConditionLocation`, `Composition`, `Conformance`, `ConformanceChoice`,
+  `CountRange`, `Referent`, `ClusterFeature`. `spec.ConformanceFromSchema`
+  and `spec.Conformance.Names` evaluate them.
+- **The CHIP data model cross-check covers device-type element requirements
+  and conditions**: 153 feature / attribute / command / event requirements,
+  46 conditions, 57 condition requirements, the Base device type and every
+  cluster's classification are compared with CHIP's XML; none differs (the
+  Base device type's CHIP name is normalized). The "Not compared" rows for
+  them are gone.
 
 ### Changed
 
@@ -533,6 +575,22 @@ pseudo-version of `main`.
   `ControlMode` and `Status` are now aliases of the generated types (same
   values, same underlying types), and the servers' lists, globals, write
   checks and privileges come from the definition.
+- **The matter.js extract carries device-type element requirements and
+  conditions** (`parity/schema.json`, same matter.js commit `85cf664`).
+  Each device type gains an `effective` object — its composition
+  (`tree` / `full-family`), the device type it derives from, the 46
+  conditions the device types declare, and its full requirement tree as
+  matter.js's device type validation reads it: server and client clusters
+  with their nested feature / attribute / command / event requirements
+  (conformance as matter.js's AST, constraint, quality — the singleton
+  `I` — access, default), component device types with their instance
+  numbers and the clusters they require, and the condition requirements
+  with their location; every requirement names what matter.js resolves it
+  to. The snapshot gains `baseDeviceTypes` (the Base device type), and
+  each cluster its `classification` and, where a binding never directs
+  it, `bindable: false`. Every key the extract carried before is
+  byte-identical in content and position. `schema.SchemaSnapshotSHA256`
+  changes: **a host pinning the snapshot's bytes must re-pin.**
 
 ### Fixed
 
@@ -637,6 +695,14 @@ pseudo-version of `main`.
   outcome event — before the next, as matter.js and chip do on their single
   loops. The second copy is still a replay and still reported as one.
 
+- **BooleanState lists its StateChange event** (`measurement.BooleanStateServer.MatterEvents`,
+  `measurement.BooleanStateEventStateChange`). The server advertises CHGEVENT,
+  which makes the event mandatory, and the bridge emits it on every change,
+  but the server did not list it — so a Water Leak Detector, Water Freeze
+  Detector or Rain Sensor built on it lacked the event its device type
+  requires. Found by the new device type validation. `cluster/light` no
+  longer claims ExtendedColorLight, whose XY feature its ColorControl server
+  does not serve.
 - **The schema snapshot carries inherited features.**
   `script/extract-from-matter-js.ts` read a cluster's features from its own
   FeatureMap, which in a derived cluster replaces the base's, so a feature

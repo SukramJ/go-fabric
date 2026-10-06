@@ -156,6 +156,17 @@ type Endpoint struct {
 	// meaningful value (i.e. for any bridged endpoint with ID ≥ 2).
 	HasParentEndpointID bool
 
+	// DeviceConditions are the device-type conditions the host states for
+	// this endpoint (Core § 9.2.6), as declared ("PhysicalInputs",
+	// "LanguageLocale"): what describes the product rather than the
+	// topology, so [ValidateDeviceTypes] cannot derive it. Stating one
+	// makes it true, which can make a requirement mandatory; a name that
+	// names no condition in the endpoint's scope is reported. Carried from
+	// [Spec.DeviceConditions], and on the root from
+	// [Config.RootDeviceConditions]. Mirrors matter.js
+	// Endpoint.Options.deviceConditions.
+	DeviceConditions []string
+
 	// attachedClusters holds the cluster servers that come from OUTSIDE
 	// the assembler: the daemon builds them and hands them to the bridge,
 	// which places them on the root endpoint (BasicInformation,

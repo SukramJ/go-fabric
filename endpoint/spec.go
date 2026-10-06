@@ -92,6 +92,9 @@ type Spec struct {
 	// endpoint per physical device sets it — see the assembly's
 	// power-source placement rule.
 	PowerSource contract.MeasurementSource
+	// DeviceConditions are the device-type conditions the host states for
+	// the endpoint ([Endpoint.DeviceConditions]); nil states none.
+	DeviceConditions []string
 }
 
 // ComposeNodeLabel appends the parameter suffix to the base label and

@@ -76,7 +76,7 @@ var floors = []packageFloor{
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
 		min: 0,
-		why: "test scaffolding with no tests of its own; it is exercised through the packages that import it, and go credits that coverage to them",
+		why: "test scaffolding, exercised through the packages that import it, and go credits that coverage to them; only the device type conformance helper has a test of its own",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 72},
 	{

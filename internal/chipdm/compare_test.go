@@ -130,6 +130,53 @@ func TestCompareSeededDifferences(t *testing.T) {
 				}
 			}
 		}, `OnOffLight revision: chip "4", ours "1"`},
+		// Element requirements, both directions.
+		{"element requirement conformance", func(m *Model) {
+			elementRequirement(m, "OnOffLight", "OnOff", "LT").Conformance = &Conf{Op: opOptional}
+		}, `OnOffLight.OnOff (server).LT conformance: chip "m", ours "o"`},
+		{"element requirement constraint", func(m *Model) {
+			elementRequirement(m, "OnOffLight", "LevelControl", "CurrentLevel").Constraint = "1 to 253"
+		}, `OnOffLight.LevelControl (server).CurrentLevel constraint: chip "1to254", ours "1to253"`},
+		{"element requirement id", func(m *Model) {
+			elementRequirement(m, "OnOffLight", "Identify", "TriggerEffect").ID = u32(0x41)
+		}, `OnOffLight.Identify (server).TriggerEffect id: chip "0x40", ours "0x41"`},
+		{"element requirement missing", func(m *Model) {
+			r := clusterRequirement(m, "OnOffLight", "OnOff")
+			r.Elements = nil
+		}, `OnOffLight.OnOff (server).LT feature requirement: chip "present", ours "absent"`},
+		{"element requirement extra", func(m *Model) {
+			r := clusterRequirement(m, "OnOffLight", "OnOff")
+			r.Elements = append(r.Elements, &ElementRequirement{Element: "feature", Name: "DF", Conformance: &Conf{Op: opDisallowed}})
+		}, `OnOffLight.OnOff (server).DF feature requirement: chip "absent", ours "present"`},
+		{"cluster requirement quality", func(m *Model) {
+			clusterRequirement(m, "RootNode", "AccessControl").Quality = nil
+		}, `RootNode.AccessControl (server) quality: chip "singleton", ours "none"`},
+		{"base device type requirement", func(m *Model) {
+			clusterRequirement(m, "Base", "Binding").Conformance = &Conf{Op: opMandatory}
+		}, `Base.Binding (server) conformance: chip "client&simple", ours "m"`},
+		// Conditions and condition requirements, both directions.
+		{"condition missing", func(m *Model) {
+			dt := deviceTypeNamed(m, "RootNode")
+			dt.Conditions = slices.DeleteFunc(slices.Clone(dt.Conditions), func(c string) bool { return c == "CustomNetworkConfig" })
+		}, `RootNode.CustomNetworkConfig condition: chip "present", ours "absent"`},
+		{"condition extra", func(m *Model) {
+			dt := deviceTypeNamed(m, "Aggregator")
+			dt.Conditions = append(slices.Clone(dt.Conditions), "Federated")
+		}, `Aggregator.Federated condition: chip "absent", ours "present"`},
+		{"condition requirement conformance", func(m *Model) {
+			conditionRequirement(m, "OnOffLight", "GroupcastListenerCond").Conformance = &Conf{Op: opOptional}
+		}, `OnOffLight.RootNode.GroupcastListenerCond (condition) conformance: chip "m", ours "o"`},
+		{"condition requirement missing", func(m *Model) {
+			dt := deviceTypeNamed(m, "OnOffLight")
+			dt.ConditionRequirements = nil
+		}, `OnOffLight.Root Node.GroupcastListenerCond (condition) conditionRequirement: chip "present", ours "absent"`},
+		{"condition requirement extra", func(m *Model) {
+			dt := deviceTypeNamed(m, "Aggregator")
+			dt.ConditionRequirements = append(dt.ConditionRequirements, &ConditionRequirement{DeviceType: "RootNode", Name: "TimeSyncCond", Conformance: &Conf{Op: opMandatory}})
+		}, `Aggregator.RootNode.TimeSyncCond (condition) conditionRequirement: chip "absent", ours "present"`},
+		{"cluster classification", func(m *Model) {
+			cluster(m, "OnOff").Classification = "endpoint"
+		}, `OnOff classification: chip "application", ours "endpoint"`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -159,6 +206,60 @@ func added(got, baseline []string) []string {
 		}
 	}
 	return out
+}
+
+func deviceTypeNamed(m *Model, name string) *DeviceType {
+	for _, dt := range m.DeviceTypes {
+		if dt.Name == name {
+			return dt
+		}
+	}
+	panic("no device type " + name)
+}
+
+func clusterRequirement(m *Model, deviceType, name string) *Requirement {
+	for _, r := range deviceTypeNamed(m, deviceType).Requirements {
+		if r.Name == name && r.Side == "server" {
+			return r
+		}
+	}
+	panic("no server requirement " + name)
+}
+
+func elementRequirement(m *Model, deviceType, clusterName, name string) *ElementRequirement {
+	for _, e := range clusterRequirement(m, deviceType, clusterName).Elements {
+		if e.Name == name {
+			return e
+		}
+	}
+	panic("no element requirement " + name)
+}
+
+func conditionRequirement(m *Model, deviceType, name string) *ConditionRequirement {
+	for _, r := range deviceTypeNamed(m, deviceType).ConditionRequirements {
+		if r.Name == name {
+			return r
+		}
+	}
+	panic("no condition requirement " + name)
+}
+
+// TestCompareBaseDeviceTypePairing: the Base device type pairs by having no
+// id on both sides, and one present on a single side is reported.
+func TestCompareBaseDeviceTypePairing(t *testing.T) {
+	t.Parallel()
+	base := func(name string) *DeviceType {
+		return &DeviceType{Name: name, Revision: 3, Requirements: []*Requirement{{ID: 0x1D, Name: "Descriptor", Side: "server", Conformance: &Conf{Op: opMandatory}}}}
+	}
+	if got := diffStrings(Compare(&Model{DeviceTypes: []*DeviceType{base("Base")}}, &Model{DeviceTypes: []*DeviceType{base("Base Device Type")}})); len(got) != 0 {
+		t.Errorf("paired Base differs: %v", got)
+	}
+	if got := diffStrings(Compare(&Model{DeviceTypes: []*DeviceType{base("Base")}}, &Model{})); !slices.Equal(got, []string{`Base deviceType: chip "absent", ours "present"`}) {
+		t.Errorf("Base only ours: %v", got)
+	}
+	if got := diffStrings(Compare(&Model{}, &Model{DeviceTypes: []*DeviceType{base("Base Device Type")}})); !slices.Equal(got, []string{`Base Device Type deviceType: chip "present", ours "absent"`}) {
+		t.Errorf("Base only CHIP's: %v", got)
+	}
 }
 
 func mustSnapshot(t *testing.T) *Model {
@@ -191,8 +292,24 @@ func TestCompareRules(t *testing.T) {
 	chip, err := LoadFiles(fixtureFiles(t, map[string]string{
 		"device_types/Light.xml": `<deviceType id="0xFFF0" name="Fancy Light" revision="2">
   <classification superset="Plain Light" class="simple"/>
+  <conditions><condition name="One"/><condition name="Two"/></conditions>
+  <conditionRequirements>
+    <deviceType id="0x0016" name="Root Node">
+      <conditionRequirement name="Wi-Fi"><mandatoryConform/></conditionRequirement>
+      <conditionRequirement name="Thread"><mandatoryConform/></conditionRequirement>
+    </deviceType>
+    <deviceType name="Base Device Type">
+      <conditionRequirement name="Ethernet"><mandatoryConform/></conditionRequirement>
+    </deviceType>
+  </conditionRequirements>
   <clusters>
-    <cluster id="0xFFF1" name="Widget" side="server"><mandatoryConform/></cluster>
+    <cluster id="0xFFF1" name="Widget" side="server">
+      <quality singleton="true"/>
+      <mandatoryConform/>
+      <features><feature code="DER"><mandatoryConform/></feature><feature code="GONE"><optionalConform/></feature></features>
+      <attributes><attribute code="0x0000" name="Mode"><constraint><between><from value="1"/><to value="4"/></between></constraint></attribute></attributes>
+      <commands><command id="0x0040" name="Reset"><mandatoryConform/></command></commands>
+    </cluster>
     <cluster id="0x0006" name="On/Off" side="client"><optionalConform/></cluster>
     <cluster id="0x0007" name="Missing" side="server"><optionalConform/></cluster>
   </clusters>
@@ -214,7 +331,7 @@ func TestCompareRules(t *testing.T) {
 	ours := &Model{
 		Clusters: []*Cluster{
 			{
-				ID: id(0xFFF1), Name: "Widget", Revision: 2, Base: "WidgetBase",
+				ID: id(0xFFF1), Name: "Widget", Revision: 2, Base: "WidgetBase", Classification: "endpoint",
 				Features: []*Element{
 					{Name: "BASEF", Constraint: "0"},
 					{Name: "DER", Constraint: "1", Conformance: &Conf{Op: opMandatory}},
@@ -253,8 +370,20 @@ func TestCompareRules(t *testing.T) {
 			{ID: id(0xFFF5), Name: "OnlyOurs", Revision: 1},
 		},
 		DeviceTypes: []*DeviceType{
-			{ID: id(0xFFF0), Name: "FancyLight", Revision: 2, Classification: "simple", Requirements: []*Requirement{
-				{ID: 0xFFF1, Name: "Widget", Side: "server", Conformance: &Conf{Op: opMandatory}},
+			{Name: "Base", Revision: 1, Classification: "base", Requirements: []*Requirement{
+				{ID: 0x1D, Name: "Descriptor", Side: "server", Conformance: &Conf{Op: opMandatory}},
+			}},
+			{ID: id(0xFFF0), Name: "FancyLight", Revision: 2, Classification: "simple", Conditions: []string{"One", "Three"}, ConditionRequirements: []*ConditionRequirement{
+				{DeviceType: "RootNode", Name: "WiFi", Conformance: &Conf{Op: opOptional}},
+				{DeviceType: "Base", Name: "Ethernet", Conformance: &Conf{Op: opMandatory}},
+				{DeviceType: "RootNode", Name: "GroupcastListenerCond", Conformance: &Conf{Op: opMandatory}},
+			}, Requirements: []*Requirement{
+				{ID: 0xFFF1, Name: "Widget", Side: "server", Conformance: &Conf{Op: opMandatory}, Elements: []*ElementRequirement{
+					{Element: "feature", Name: "DER", Conformance: &Conf{Op: opOptional}},
+					{Element: "attribute", ID: id(0), Name: "Mode", Constraint: "1 to 5"},
+					{Element: "command", ID: id(0x41), Name: "Reset", Conformance: &Conf{Op: opMandatory}},
+					{Element: "attribute", ID: id(1), Name: "Extra", Conformance: &Conf{Op: opDisallowed}},
+				}},
 				{ID: 6, Name: "OnOff", Side: "client", Conformance: &Conf{Op: opOptional}},
 				{ID: 0x1D, Name: "Descriptor", Side: "server"},
 				{ID: 0x11, Name: "PowerSource", Side: "deviceType"},
@@ -290,6 +419,18 @@ func TestCompareRules(t *testing.T) {
 		`FancyLight.Groups (server) requirement: chip "absent", ours "present"`,
 		`Unmatched global datatype: chip "absent", ours "present"`,
 		`LostStruct global datatype: chip "present", ours "absent"`,
+		`FancyLight.Widget (server) quality: chip "singleton", ours "none"`,
+		`FancyLight.Widget (server).DER conformance: chip "m", ours "o"`,
+		`FancyLight.Widget (server).GONE feature requirement: chip "present", ours "absent"`,
+		`FancyLight.Widget (server).Mode constraint: chip "1to4", ours "1to5"`,
+		`FancyLight.Widget (server).Reset id: chip "0x40", ours "0x41"`,
+		`FancyLight.Widget (server).Extra attribute requirement: chip "absent", ours "present"`,
+		`FancyLight.Two condition: chip "present", ours "absent"`,
+		`FancyLight.Three condition: chip "absent", ours "present"`,
+		`FancyLight.RootNode.WiFi (condition) conformance: chip "m", ours "o"`,
+		`FancyLight.Root Node.Thread (condition) conditionRequirement: chip "present", ours "absent"`,
+		`FancyLight.RootNode.GroupcastListenerCond (condition) conditionRequirement: chip "absent", ours "present"`,
+		`Widget classification: chip "application", ours "endpoint"`,
 		`semtag.Label conformance: chip "o", ours "o"`,
 	} {
 		if want == `semtag.Label conformance: chip "o", ours "o"` {
@@ -305,7 +446,7 @@ func TestCompareRules(t *testing.T) {
 	for rule, n := range map[string]int{
 		"global-attribute": 1, "fabric-index": 2, "descriptor-required": 1, "composed-device-type": 1,
 		"superset-requirement": 1, "core-global": 1, "global-datatype": 2,
-		"scoped-global": 1, "type-alias": 1, "value-table-m": 1,
+		"scoped-global": 1, "type-alias": 1, "value-table-m": 1, "base-device-type": 1,
 	} {
 		if res.Normalized[rule] != n {
 			t.Errorf("rule %s applied %d times, want %d (%v)", rule, res.Normalized[rule], n, res.Normalized)
@@ -314,8 +455,8 @@ func TestCompareRules(t *testing.T) {
 	if len(res.Provisional) != 1 || res.Provisional[0] != "BetaThing" {
 		t.Errorf("provisional = %v", res.Provisional)
 	}
-	if res.NotCompared["definitions outside the snapshot"] != 1 || res.NotCompared["cluster classification"] == 0 ||
-		res.NotCompared["members CHIP does not state"] != 1 || res.NotCompared["base device type"] != 1 {
+	if res.NotCompared["definitions outside the snapshot"] != 1 || res.NotCompared["cluster classification"] != 0 ||
+		res.NotCompared["members CHIP does not state"] != 1 || res.NotCompared["base device type"] != 0 {
 		t.Errorf("not compared = %v", res.NotCompared)
 	}
 }
