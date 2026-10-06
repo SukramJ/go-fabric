@@ -1699,3 +1699,39 @@ func TestStart_SlowReportDoesNotStallOthers(t *testing.T) {
 		}
 	})
 }
+
+// TestOnAttributeChanged_ChangesOmittedNeverReports: a change to an
+// attribute with matter.js's "C" (changesOmitted) quality — GroupKeyMap here
+// — reaches no subscriber, while a change to an ordinary attribute of the
+// same cluster does (TC-ACE-1.6 step 33).
+func TestOnAttributeChanged_ChangesOmittedNeverReports(t *testing.T) {
+	t.Parallel()
+	ch := make(chan reporterCall, 4)
+	m := newManager(subscription.Config{}, chanReporter(ch))
+
+	args := defaultArgs()
+	args.MinIntervalFloor = 1
+	args.MaxIntervalCeiling = 60
+	args.AttributePaths = []im.ConcreteAttributePath{mkPath(0, 0x003F, 0x0000), mkPath(0, 0x003F, 0x0001)}
+	if _, err := m.Subscribe(args); err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+	ctx := context.Background()
+	t0 := time.Now()
+	m.Tick(ctx, t0)
+	for len(ch) > 0 {
+		<-ch
+	}
+
+	m.OnAttributeChanged(mkPath(0, 0x003F, 0x0000)) // GroupKeyMap "N C"
+	m.Tick(ctx, t0.Add(2*time.Second))
+	if len(ch) != 0 {
+		t.Fatalf("got %d reports after a GroupKeyMap change, want none (changesOmitted)", len(ch))
+	}
+
+	m.OnAttributeChanged(mkPath(0, 0x003F, 0x0001)) // GroupTable, no C
+	m.Tick(ctx, t0.Add(4*time.Second))
+	if len(ch) != 1 {
+		t.Fatalf("got %d reports after a GroupTable change, want 1", len(ch))
+	}
+}

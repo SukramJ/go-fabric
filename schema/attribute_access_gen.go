@@ -170,3 +170,109 @@ var attributeWritePrivileges = map[uint32]map[uint32]uint8{
 		0x0029: 4, // ImageRotationDiscreteAngles "RW M"
 	},
 }
+
+// changesOmittedAttributes lists every attribute whose matter.js quality
+// carries "C" (changesOmitted): a change to it is never reported to a
+// subscriber. Generated from the quality strings in parity/schema.json.
+var changesOmittedAttributes = map[uint32]map[uint32]struct{}{
+	0x001F: { // AccessControl
+		0x0007: {}, // AuxiliaryAcl "C"
+	},
+	0x002F: { // PowerSource
+		0x0003: {}, // WiredAssessedInputVoltage "X C"
+		0x0004: {}, // WiredAssessedInputFrequency "X C"
+		0x0006: {}, // WiredAssessedCurrent "X C"
+		0x000B: {}, // BatVoltage "X C"
+		0x001D: {}, // BatChargingCurrent "X C"
+	},
+	0x0033: { // GeneralDiagnostics
+		0x0002: {}, // UpTime "C"
+		0x0003: {}, // TotalOperationalHours "N C"
+		0x000A: {}, // DeviceLoadStatus "C"
+	},
+	0x0034: { // SoftwareDiagnostics
+		0x0000: {}, // ThreadMetrics "C"
+		0x0001: {}, // CurrentHeapFree "C"
+		0x0002: {}, // CurrentHeapUsed "C"
+		0x0003: {}, // CurrentHeapHighWatermark "C"
+	},
+	0x0035: { // ThreadNetworkDiagnostics
+		0x0006: {}, // OverrunCount "C"
+		0x000E: {}, // DetachedRoleCount "C"
+		0x000F: {}, // ChildRoleCount "C"
+		0x0010: {}, // RouterRoleCount "C"
+		0x0011: {}, // LeaderRoleCount "C"
+		0x0012: {}, // AttachAttemptCount "C"
+		0x0013: {}, // PartitionIdChangeCount "C"
+		0x0014: {}, // BetterPartitionAttachAttemptCount "C"
+		0x0015: {}, // ParentChangeCount "C"
+		0x0016: {}, // TxTotalCount "C"
+		0x0017: {}, // TxUnicastCount "C"
+		0x0018: {}, // TxBroadcastCount "C"
+		0x0019: {}, // TxAckRequestedCount "C"
+		0x001A: {}, // TxAckedCount "C"
+		0x001B: {}, // TxNoAckRequestedCount "C"
+		0x001C: {}, // TxDataCount "C"
+		0x001D: {}, // TxDataPollCount "C"
+		0x001E: {}, // TxBeaconCount "C"
+		0x001F: {}, // TxBeaconRequestCount "C"
+		0x0020: {}, // TxOtherCount "C"
+		0x0021: {}, // TxRetryCount "C"
+		0x0022: {}, // TxDirectMaxRetryExpiryCount "C"
+		0x0023: {}, // TxIndirectMaxRetryExpiryCount "C"
+		0x0024: {}, // TxErrCcaCount "C"
+		0x0025: {}, // TxErrAbortCount "C"
+		0x0026: {}, // TxErrBusyChannelCount "C"
+		0x0027: {}, // RxTotalCount "C"
+		0x0028: {}, // RxUnicastCount "C"
+		0x0029: {}, // RxBroadcastCount "C"
+		0x002A: {}, // RxDataCount "C"
+		0x002B: {}, // RxDataPollCount "C"
+		0x002C: {}, // RxBeaconCount "C"
+		0x002D: {}, // RxBeaconRequestCount "C"
+		0x002E: {}, // RxOtherCount "C"
+		0x002F: {}, // RxAddressFilteredCount "C"
+		0x0030: {}, // RxDestAddrFilteredCount "C"
+		0x0031: {}, // RxDuplicatedCount "C"
+		0x0032: {}, // RxErrNoFrameCount "C"
+		0x0033: {}, // RxErrUnknownNeighborCount "C"
+		0x0034: {}, // RxErrInvalidSrcAddrCount "C"
+		0x0035: {}, // RxErrSecCount "C"
+		0x0036: {}, // RxErrFcsCount "C"
+		0x0037: {}, // RxErrOtherCount "C"
+	},
+	0x0036: { // WiFiNetworkDiagnostics
+		0x0004: {}, // Rssi "X C"
+		0x0005: {}, // BeaconLostCount "X C"
+		0x0006: {}, // BeaconRxCount "X C"
+		0x0007: {}, // PacketMulticastRxCount "X C"
+		0x0008: {}, // PacketMulticastTxCount "X C"
+		0x0009: {}, // PacketUnicastRxCount "X C"
+		0x000A: {}, // PacketUnicastTxCount "X C"
+		0x000B: {}, // CurrentMaxRate "X C"
+		0x000C: {}, // OverrunCount "X C"
+	},
+	0x0037: { // EthernetNetworkDiagnostics
+		0x0002: {}, // PacketRxCount "C"
+		0x0003: {}, // PacketTxCount "C"
+		0x0004: {}, // TxErrCount "C"
+		0x0005: {}, // CollisionCount "C"
+		0x0006: {}, // OverrunCount "C"
+		0x0007: {}, // CarrierDetect "X C"
+		0x0008: {}, // TimeSinceReset "C"
+	},
+	0x0038: { // TimeSynchronization
+		0x0000: {}, // UtcTime "X C"
+		0x0007: {}, // LocalTime "X C"
+	},
+	0x003E: { // OperationalCredentials
+		0x0000: {}, // Nocs "N C"
+		0x0004: {}, // TrustedRootCertificates "N C"
+	},
+	0x003F: { // GroupKeyManagement
+		0x0000: {}, // GroupKeyMap "N C"
+	},
+	0x0046: { // IcdManagement
+		0x0004: {}, // IcdCounter "N C"
+	},
+}

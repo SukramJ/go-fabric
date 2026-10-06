@@ -288,3 +288,14 @@ func AttributeWritePrivilege(clusterID, attrID uint32) uint8 {
 	}
 	return PrivilegeOperate
 }
+
+// AttributeChangesOmitted reports whether matter.js gives the attribute the
+// "C" (changesOmitted) quality: a change to it is never reported to a
+// subscriber, though it reads normally. Mirrors matter.js
+// ProtocolService.addCluster, which leaves such attributes out of the
+// changed set, and ServerBehaviorBacking, which suppresses their change
+// broadcasts. Generated from parity/schema.json (changesOmittedAttributes).
+func AttributeChangesOmitted(clusterID, attrID uint32) bool {
+	_, ok := changesOmittedAttributes[clusterID][attrID]
+	return ok
+}

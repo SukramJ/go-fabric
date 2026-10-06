@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // Errors.
@@ -555,6 +556,14 @@ func (m *Manager) FabricHasAtLeastOneActiveSubscription(fabricIndex uint8) bool 
 // covers `path` that a new value is available. The engine emits the
 // report on the next tick once MinInterval has elapsed.
 func (m *Manager) OnAttributeChanged(path im.ConcreteAttributePath) {
+	// A changesOmitted ("C") attribute is never reported on change, however
+	// the change was made — a write, a command, the server itself (matter.js
+	// ProtocolService.addCluster leaves it out of the changed set). It still
+	// appears in priming reports and reads. TC-ACE-1.6 counts the
+	// GroupKeyMap reports a subscription receives and expects none.
+	if path.HasCluster && path.HasAttribute && schema.AttributeChangesOmitted(path.Cluster, path.Attribute) {
+		return
+	}
 	m.mu.RLock()
 	matches := make([]*Subscription, 0)
 	for _, sub := range m.byID {

@@ -49,3 +49,25 @@ func TestInvokeAccessSpotChecks(t *testing.T) {
 		}
 	}
 }
+
+// TestAttributeChangesOmitted pins the generated changesOmitted set against
+// the quality strings of matter.js's element files.
+func TestAttributeChangesOmitted(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		cluster, attr uint32
+		want          bool
+	}{
+		{0x003F, 0x0000, true},  // GroupKeyManagement GroupKeyMap "N C"
+		{0x003E, 0x0000, true},  // OperationalCredentials Nocs "N C"
+		{0x003E, 0x0004, true},  // TrustedRootCertificates "N C"
+		{0x0033, 0x0002, true},  // GeneralDiagnostics UpTime "C"
+		{0x003F, 0x0001, false}, // GroupTable
+		{0x001F, 0x0000, false}, // AccessControl Acl
+		{0x9999, 0x0000, false}, // unknown cluster
+	} {
+		if got := schema.AttributeChangesOmitted(c.cluster, c.attr); got != c.want {
+			t.Errorf("AttributeChangesOmitted(0x%04X, 0x%04X) = %v, want %v", c.cluster, c.attr, got, c.want)
+		}
+	}
+}

@@ -39,6 +39,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -89,9 +90,10 @@ type snapshotCluster struct {
 
 // snapshotAttribute mirrors one attribute of a cluster in parity/schema.json.
 type snapshotAttribute struct {
-	ID     uint32 `json:"id"`
-	Name   string `json:"name"`
-	Access string `json:"access"`
+	ID      uint32 `json:"id"`
+	Name    string `json:"name"`
+	Access  string `json:"access"`
+	Quality string `json:"quality"`
 }
 
 // snapshotRequirement mirrors one cluster requirement of a device type in
@@ -429,10 +431,37 @@ func writeAccessFile(clusters []snapshotCluster) error {
 		}
 		buf.WriteString("\t},\n")
 	}
+	buf.WriteString("}\n\n")
+	buf.WriteString("// changesOmittedAttributes lists every attribute whose matter.js quality\n")
+	buf.WriteString("// carries \"C\" (changesOmitted): a change to it is never reported to a\n")
+	buf.WriteString("// subscriber. Generated from the quality strings in parity/schema.json.\n")
+	buf.WriteString("var changesOmittedAttributes = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			if hasQuality(a.Quality, "C") {
+				rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, a.Quality))
+			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
 	buf.WriteString("}\n")
 	out, err := format.Source(buf.Bytes())
 	if err != nil {
 		return err
 	}
 	return writeIfChanged(accessFile, out)
+}
+
+// hasQuality reports whether a matter.js quality string carries flag as a
+// token of its own ("N C" carries "C").
+func hasQuality(quality, flag string) bool {
+	return slices.Contains(strings.Fields(quality), flag)
 }

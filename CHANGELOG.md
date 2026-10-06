@@ -389,6 +389,13 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - An attribute with matter.js's "C" (changesOmitted) quality — GroupKeyMap,
+    Nocs, TrustedRootCertificates, the diagnostics counters and the rest —
+    is no longer reported to subscribers when it changes, however the
+    change was made; it still reads and appears in priming reports.
+    A write of GroupKeyMap was reported back (TC-ACE-1.6 counts none). New:
+    `schema.AttributeChangesOmitted`, generated from the quality strings
+    in `parity/schema.json`.
   - `mdns.Zeroconf` publishes an interface's link-local IPv6 address when
     the interface has no routable IPv6, as chip and matter.js publish every
     IPv6 address. On a host whose LAN interface is link-local-only for
