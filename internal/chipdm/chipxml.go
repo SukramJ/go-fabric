@@ -186,21 +186,6 @@ func (l *xmlLoader) addFile(dir, filename string, data []byte) error {
 			return err
 		}
 		l.model.DeviceTypes = append(l.model.DeviceTypes, dt)
-		if conds := root.child("conditions"); conds != nil {
-			l.uncompared("device-type conditions", len(conds.children("condition")))
-		}
-		if clusters := root.child("clusters"); clusters != nil {
-			for _, c := range clusters.children("cluster") {
-				for _, wrapper := range []string{"features", "attributes", "commands", "events"} {
-					if w := c.child(wrapper); w != nil {
-						l.uncompared("device-type element requirements", len(w.Children))
-					}
-				}
-				if c.child("quality") != nil {
-					l.uncompared("device-type cluster quality", 1)
-				}
-			}
-		}
 	case "globals":
 		for _, node := range root.Children {
 			if node.tag() == "command" {
@@ -550,12 +535,97 @@ func loadDeviceType(root *xmlNode, filename string) (*DeviceType, error) {
 			dt.Requirements = append(dt.Requirements, req)
 		}
 	}
+	if conds := root.child("conditions"); conds != nil {
+		for _, c := range conds.children("condition") {
+			name, err := nameOf(c)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", filename, err)
+			}
+			dt.Conditions = append(dt.Conditions, name)
+		}
+	}
+	if reqs := root.child("conditionRequirements"); reqs != nil {
+		for _, declarer := range reqs.children("deviceType") {
+			owner, err := nameOf(declarer)
+			if err != nil {
+				return nil, fmt.Errorf("%s: condition requirements: %w", filename, err)
+			}
+			for _, c := range declarer.children("conditionRequirement") {
+				cr, err := loadConditionRequirement(owner, c)
+				if err != nil {
+					return nil, fmt.Errorf("%s: %w", filename, err)
+				}
+				dt.ConditionRequirements = append(dt.ConditionRequirements, cr)
+			}
+		}
+	}
 	return dt, nil
 }
 
-// loadClusterRequirement keeps the cluster-level requirement. The nested
-// feature / attribute / command overrides are not read: the snapshot
-// carries no element requirements to compare them with (NotCompared).
+// loadConditionRequirement reads one <conditionRequirement> of the device
+// type named owner, which declares the condition.
+func loadConditionRequirement(owner string, n *xmlNode) (*ConditionRequirement, error) {
+	name, err := nameOf(n)
+	if err != nil {
+		return nil, fmt.Errorf("condition requirement of %s: %w", owner, err)
+	}
+	conf, err := translateConformance(n)
+	if err != nil {
+		return nil, fmt.Errorf("condition requirement %s.%s: %w", owner, name, err)
+	}
+	constraint, err := translateConstraint(n)
+	if err != nil {
+		return nil, fmt.Errorf("condition requirement %s.%s: %w", owner, name, err)
+	}
+	return &ConditionRequirement{DeviceType: owner, Name: name, Conformance: conf, Constraint: constraint}, nil
+}
+
+// elementRequirementKinds are the element requirements a cluster
+// requirement nests, by wrapper and element tag (matter.js
+// load-data-model.ts loadClusterRequirement).
+var elementRequirementKinds = []struct{ wrapper, element string }{
+	{"features", "feature"},
+	{"attributes", "attribute"},
+	{"commands", "command"},
+	{"events", "event"},
+}
+
+// loadElementRequirement is load-data-model.ts loadRequirement for a
+// feature, attribute, command or event requirement: named by its name, or
+// a feature by its code, with the id or code it states.
+func loadElementRequirement(element string, n *xmlNode) (*ElementRequirement, error) {
+	name := n.str("name")
+	if name == "" {
+		name = n.str("code")
+	}
+	if name == "" {
+		return nil, fmt.Errorf("<%s> requirement has no name", element)
+	}
+	r := &ElementRequirement{Element: element, Name: name}
+	if element != "feature" {
+		id, err := n.num("id")
+		if err != nil {
+			return nil, err
+		}
+		if id == nil {
+			if id, err = n.num("code"); err != nil {
+				return nil, err
+			}
+		}
+		r.ID = id
+	}
+	var err error
+	if r.Conformance, err = translateConformance(n); err != nil {
+		return nil, fmt.Errorf("%s requirement %s: %w", element, name, err)
+	}
+	if r.Constraint, err = translateConstraint(n); err != nil {
+		return nil, fmt.Errorf("%s requirement %s: %w", element, name, err)
+	}
+	return r, nil
+}
+
+// loadClusterRequirement reads a cluster requirement with its quality and
+// its nested feature / attribute / command / event requirements.
 func loadClusterRequirement(n *xmlNode) (*Requirement, error) {
 	name, err := nameOf(n)
 	if err != nil {
@@ -576,7 +646,25 @@ func loadClusterRequirement(n *xmlNode) (*Requirement, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cluster requirement %s: %w", name, err)
 	}
-	return &Requirement{ID: *id, Name: name, Side: side, Conformance: conf}, nil
+	quality, err := translateQuality(n)
+	if err != nil {
+		return nil, fmt.Errorf("cluster requirement %s: %w", name, err)
+	}
+	req := &Requirement{ID: *id, Name: name, Side: side, Conformance: conf, Quality: quality}
+	for _, kind := range elementRequirementKinds {
+		w := n.child(kind.wrapper)
+		if w == nil {
+			continue
+		}
+		for _, e := range w.children(kind.element) {
+			er, err := loadElementRequirement(kind.element, e)
+			if err != nil {
+				return nil, fmt.Errorf("cluster requirement %s: %w", name, err)
+			}
+			req.Elements = append(req.Elements, er)
+		}
+	}
+	return req, nil
 }
 
 // --- translate-conformance.ts ----------------------------------------------

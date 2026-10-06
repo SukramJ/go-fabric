@@ -253,6 +253,16 @@ func TestBooleanStateServer_MatterRead_FeatureMap(t *testing.T) {
 	}
 }
 
+// The StateChange event the bridge emits is listed: CHGEVENT, which the
+// server advertises, makes it mandatory ("CHGEVENT, O").
+func TestBooleanStateServer_MatterEvents(t *testing.T) {
+	t.Parallel()
+	s := measurement.NewBooleanStateServer(fakeBool{class: contract.MeasurementContact, val: true, obs: true})
+	if got := s.MatterEvents(); len(got) != 1 || got[0] != measurement.BooleanStateEventStateChange {
+		t.Fatalf("MatterEvents = %v, want [StateChange]", got)
+	}
+}
+
 func TestBooleanStateServer_MatterRead_ClusterRevision(t *testing.T) {
 	t.Parallel()
 	s := measurement.NewBooleanStateServer(fakeBool{class: contract.MeasurementContact, val: true, obs: true})

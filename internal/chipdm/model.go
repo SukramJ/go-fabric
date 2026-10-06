@@ -9,7 +9,9 @@
 // Both sides are reduced to one representation (Model) and compared element
 // by element: clusters (id, revision, features, attributes, commands,
 // events, data types and their members) and device types (id, revision,
-// classification, cluster requirements). Every difference is either
+// classification, conditions, cluster requirements with their quality and
+// their feature / attribute / command / event requirements, condition
+// requirements — the Base device type included). Every difference is either
 // normalized away as representation (the rules in compare.go, each
 // counted), or listed with a class and a reason in the acknowledged table
 // (acknowledged.go). The cross-check test fails on any other difference and
@@ -149,6 +151,15 @@ type DeviceType struct {
 	Superset string `json:"superset,omitempty"`
 
 	Requirements []*Requirement `json:"requirements,omitempty"`
+
+	// Conditions are the conditions the device type declares (CHIP:
+	// <conditions>; matter.js: the device type's Condition children).
+	Conditions []string `json:"conditions,omitempty"`
+
+	// ConditionRequirements are the conditions of other device types this
+	// one asserts (CHIP: <conditionRequirements>; matter.js: requirements
+	// of element "condition").
+	ConditionRequirements []*ConditionRequirement `json:"conditionRequirements,omitempty"`
 }
 
 // Requirement is a device type's requirement of a cluster on one side.
@@ -157,6 +168,36 @@ type Requirement struct {
 	Name        string `json:"name"`
 	Side        string `json:"side"` // "server" or "client"
 	Conformance *Conf  `json:"conformance,omitempty"`
+
+	// Quality is the requirement's quality flags (the singleton "I"); nil
+	// is "not stated".
+	Quality []string `json:"quality,omitempty"`
+
+	// Elements are the feature, attribute, command and event requirements
+	// the device type states for the cluster (CHIP: the <features>,
+	// <attributes>, <commands> and <events> of the cluster requirement;
+	// matter.js: its nested requirements).
+	Elements []*ElementRequirement `json:"elements,omitempty"`
+}
+
+// ElementRequirement is a device type's requirement of one element of a
+// cluster: whether the endpoint must, may or must not offer it, and the
+// constraint it narrows the element to.
+type ElementRequirement struct {
+	Element     string  `json:"element"` // feature, attribute, command, event
+	ID          *uint32 `json:"id,omitempty"`
+	Name        string  `json:"name"` // a feature's code, an element's name
+	Conformance *Conf   `json:"conformance,omitempty"`
+	Constraint  string  `json:"constraint,omitempty"`
+}
+
+// ConditionRequirement is a device type's assertion of a condition another
+// device type declares.
+type ConditionRequirement struct {
+	DeviceType  string `json:"deviceType"` // the declaring device type
+	Name        string `json:"name"`
+	Conformance *Conf  `json:"conformance,omitempty"`
+	Constraint  string `json:"constraint,omitempty"`
 }
 
 func u32(v uint32) *uint32 { return &v }

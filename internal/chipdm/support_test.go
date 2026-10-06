@@ -76,6 +76,68 @@ func TestLoadSnapshotShapes(t *testing.T) {
 	}
 }
 
+// TestLoadSnapshotDeviceTypeLayer reads the device-type layer: element
+// requirements and quality from a device type's own (effective) cluster
+// requirement, conditions and condition requirements, and the Base device
+// type, which has no raw requirement list.
+func TestLoadSnapshotDeviceTypeLayer(t *testing.T) {
+	t.Parallel()
+	doc := `{
+  "deviceTypes": [{"id": 256, "name": "OnOffLight", "revision": 4, "requirements": [
+    {"id": 6, "name": "OnOff", "element": "serverCluster", "conformance": "M"},
+    {"id": 8, "name": "LevelControl", "element": "serverCluster", "conformance": "O"}
+  ], "effective": {"conditions": ["Mine"], "requirements": [
+    {"element": "condition", "name": "GroupcastListenerCond", "conformance": {"text": "M", "ast": {"type": "M"}},
+     "constraint": {"text": "min 1"}, "referent": {"declarer": "RootNode", "name": "GroupcastListenerCond"}},
+    {"element": "condition", "name": "Unresolved"},
+    {"element": "serverCluster", "name": "OnOff", "id": 6, "quality": {"singleton": true, "fixed": false},
+     "requirements": [
+       {"element": "feature", "name": "LT", "conformance": {"text": "M", "ast": {"type": "M"}}, "referent": {"name": "LT", "bit": 0}},
+       {"element": "attribute", "name": "OnTime", "constraint": {"text": "max 10"}, "referent": {"id": 16385, "name": "OnTime"}},
+       {"element": "commandField", "name": "OffEffectEffectIdentifier"}
+     ]}
+  ]}}],
+  "baseDeviceTypes": [{"name": "Base", "classification": "base", "revision": 3, "effective": {"conditions": ["Duplicate"], "requirements": [
+    {"element": "serverCluster", "name": "Descriptor", "id": 29, "conformance": {"text": "M", "ast": {"type": "M"}},
+     "requirements": [{"element": "feature", "name": "TAGLIST", "conformance": {"text": "Duplicate", "ast": {"type": "name", "param": "Duplicate"}}}]},
+    {"element": "clientCluster", "name": "Client", "id": 7},
+    {"element": "deviceType", "name": "Ignored", "id": 17}
+  ]}}]
+}`
+	m, _, err := LoadSnapshot([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, light := m.DeviceTypes[0], m.DeviceTypes[1]
+	if base.ID != nil || base.Name != "Base" || len(base.Requirements) != 2 || base.Requirements[1].Side != "client" ||
+		strings.Join(base.Conditions, ",") != "Duplicate" {
+		t.Fatalf("base = %+v", base)
+	}
+	if tl := base.Requirements[0].Elements; len(tl) != 1 || tl[0].Conformance.Key() != "duplicate" {
+		t.Errorf("base Descriptor elements = %+v", tl)
+	}
+	onOff, level := light.Requirements[0], light.Requirements[1]
+	if strings.Join(onOff.Quality, " ") != "singleton" || len(onOff.Elements) != 2 {
+		t.Fatalf("OnOff requirement = %+v", onOff)
+	}
+	if lt, ot := onOff.Elements[0], onOff.Elements[1]; lt.ID != nil || lt.Conformance.Key() != "m" ||
+		*ot.ID != 16385 || ot.Constraint != "max 10" || ot.Conformance != nil {
+		t.Errorf("elements = %+v %+v", lt, ot)
+	}
+	if level.Quality != nil || level.Elements != nil {
+		t.Errorf("an inherited requirement carries effective data: %+v", level)
+	}
+	if strings.Join(light.Conditions, ",") != "Mine" || len(light.ConditionRequirements) != 2 {
+		t.Fatalf("conditions = %+v / %+v", light.Conditions, light.ConditionRequirements)
+	}
+	if cr := light.ConditionRequirements[0]; cr.DeviceType != "RootNode" || cr.Constraint != "min 1" || cr.Conformance.Key() != "m" {
+		t.Errorf("condition requirement = %+v", cr)
+	}
+	if cr := light.ConditionRequirements[1]; cr.DeviceType != "" || cr.Name != "Unresolved" || cr.Conformance != nil {
+		t.Errorf("unresolved condition requirement = %+v", cr)
+	}
+}
+
 func TestLoadSnapshotErrors(t *testing.T) {
 	t.Parallel()
 	cluster := func(body string) string {
@@ -94,6 +156,13 @@ func TestLoadSnapshotErrors(t *testing.T) {
 		"requirement element": `{"deviceTypes":[{"id":1,"name":"D","requirements":[{"id":1,"name":"R","element":"condition"}]}]}`,
 		"requirement conf":    `{"deviceTypes":[{"id":1,"name":"D","requirements":[{"id":1,"name":"R","element":"serverCluster","conformance":"[A"}]}]}`,
 		"global":              `{"globalDatatypes":[{"name":"G","conformance":{"ast":{"type":"bogus"}}}]}`,
+		"element conf":        `{"deviceTypes":[{"id":1,"name":"D","requirements":[{"id":6,"name":"R","element":"serverCluster"}],"effective":{"requirements":[{"element":"serverCluster","name":"R","id":6,"requirements":[{"element":"feature","name":"F","conformance":{"ast":{"type":"bogus"}}}]}]}}]}`,
+		"condition conf":      `{"deviceTypes":[{"id":1,"name":"D","effective":{"requirements":[{"element":"condition","name":"C","conformance":{"ast":{"type":"bogus"}}}]}}]}`,
+		"base effective":      `{"baseDeviceTypes":[{"name":"Base"}]}`,
+		"base cluster id":     `{"baseDeviceTypes":[{"name":"Base","effective":{"requirements":[{"element":"serverCluster","name":"R"}]}}]}`,
+		"base conf":           `{"baseDeviceTypes":[{"name":"Base","effective":{"requirements":[{"element":"serverCluster","name":"R","id":1,"conformance":{"ast":{"type":"bogus"}}}]}}]}`,
+		"base element conf":   `{"baseDeviceTypes":[{"name":"Base","effective":{"requirements":[{"element":"serverCluster","name":"R","id":1,"requirements":[{"element":"feature","name":"F","conformance":{"ast":{"type":"bogus"}}}]}]}}]}`,
+		"base condition conf": `{"baseDeviceTypes":[{"name":"Base","effective":{"requirements":[{"element":"condition","name":"C","conformance":{"ast":{"type":"bogus"}}}]}}]}`,
 	} {
 		if _, _, err := LoadSnapshot([]byte(doc)); err == nil {
 			t.Errorf("%s: LoadSnapshot accepted %s", name, doc)

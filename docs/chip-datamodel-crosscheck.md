@@ -25,8 +25,15 @@ element, the way matter.js validates its own model against the same XML
   list entry type); data types and their members (enum values, bitmap bits,
   struct, command and event fields). Derived clusters are compared resolved:
   the snapshot's `effective` layer against CHIP's base chain (`baseCluster`).
-- **device types** — id, name, revision, classification, and every server and
-  client cluster requirement with its conformance.
+- **device types** — id, name, revision, classification, the conditions each
+  declares, every server and client cluster requirement with its conformance
+  and quality (the singleton `I`), the feature / attribute / command / event
+  requirements nested in it (conformance, constraint, id), and every
+  condition requirement (the declaring device type, the condition, its
+  conformance and constraint). The Base device type is compared too: it has
+  no id on either side and pairs as the one without. Cluster classification
+  (application / endpoint / node utility) is compared with the clusters —
+  device type validation reads it for Base's Server and Client conditions.
 - **global data types** — CHIP's `globals/` against the snapshot's
   `globalDatatypes`.
 
@@ -85,10 +92,15 @@ What `spec_parsing.py`, `conformance.py` and `device_conformance_tests.py`
   and 0x042A and two device-type names are corrected in code
   (`CLUSTER_NAME_FIXES`, `DEVICE_TYPE_NAME_FIXES`) — names this comparison
   normalizes anyway. The feature, attribute and command overrides a device
-  type states for a cluster are enforced (`check_feature_overrides` and its
-  siblings); the snapshot does not carry them, so they are the largest part
-  of the "Not compared" table below and an open finding in
-  [`matter_behaviour_findings.md`](../notes/parity/matter_behaviour_findings.md).
+  type states for a cluster are enforced (`check_device_type`,
+  `check_feature_overrides` and its siblings) on a cluster the endpoint
+  serves; event overrides are not read. Every condition evaluates as
+  optional (`conformance.py` `device_feature`; only `Matter` is mandatory
+  and `Zigbee` disallowed), so an override that a condition gates is never
+  required by the harness, and `!Condition` stays optional too. The
+  snapshot carries these overrides and conditions, compared above; the
+  module holds an assembled endpoint to them
+  ([ADR 0016](./adr/0016-device-type-validation.md)).
 
 ## The CHIP side
 
@@ -131,7 +143,7 @@ block below.
 
 | Side | Source |
 | --- | --- |
-| snapshot | `parity/schema.json`, matter.js `85cf66472b02763fe3b9c736ebab443b999a95a1`, Matter 1.6.1, SHA-256 `5b57c2878c29bb66e4283607c708f59412bae1cc178d3e618036cc2da95a9bc4` |
+| snapshot | `parity/schema.json`, matter.js `85cf66472b02763fe3b9c736ebab443b999a95a1`, Matter 1.6.1, SHA-256 `854113df1ee2eae0795d2df168ae14c70d1d01ae8b817ef3c86bacd93785418c` |
 | CHIP | connectedhomeip `6170af8461b10b1766044122ac83332c6d00ab20`, `data_model/1.6.1` (git tree `77969732bddf4bd12ba57eb1c6fa032eb2613425`) |
 | CHIP's source | specification `1.6.1-attempt-4` (`49f70c101b4211df3febb975a7f7f9d6e4c4bc94`), alchemy version: v1.7.10 |
 | read | at test time from a connectedhomeip checkout; nothing of it is committed (ADR 0015) |
@@ -144,14 +156,17 @@ block below.
 | attribute | 1116 |
 | cluster | 135 |
 | command | 457 |
+| condition | 46 |
+| conditionRequirement | 57 |
 | datatype | 548 |
-| deviceType | 91 |
+| deviceType | 92 |
+| element requirement | 153 |
 | event | 137 |
 | feature | 347 |
 | field | 3927 |
 | global datatype | 19 |
-| requirement | 466 |
-| **total** | **7243** |
+| requirement | 470 |
+| **total** | **7504** |
 
 ### Differences by class
 
@@ -159,7 +174,7 @@ block below.
 | --- | ---: |
 | (i) matter.js right or deliberate | 96 |
 | (ii) CHIP right, snapshot wrong | 2 |
-| (iii) representation, normalized in code | 533 |
+| (iii) representation, normalized in code | 539 |
 | (iv) excused by the harness | 2 |
 | unexplained | 0 |
 
@@ -167,6 +182,7 @@ block below.
 
 | Rule | Applied | What it normalizes |
 | --- | ---: | --- |
+| `base-device-type` | 6 | CHIP names the Base device type "Base Device Type", matter.js "Base"; a condition requirement asserting one of its conditions names it so. |
 | `composed-device-type` | 56 | CHIP models the device types a composed device type contains outside its cluster requirements. |
 | `core-global` | 3 | The Interaction Model status codes, event priority and semantic namespace ids are global types of the Core specification that CHIP's data model XML does not restate. |
 | `datatype-fabric` | 21 | matter.js marks a fabric-scoped struct by its FabricIndex field, CHIP on the struct. |
@@ -192,14 +208,9 @@ What CHIP states and the snapshot does not carry, counted in CHIP's model.
 
 | Aspect | CHIP elements | Why |
 | --- | ---: | --- |
-| base device type | 4 | CHIP's Base Device Type has no id and the snapshot extracts only device types with one, so its cluster requirements (counted), which the harness adds to every device type, are not compared. |
-| cluster classification | 135 | The snapshot does not record a cluster's classification (role / scope). |
 | cluster provisional status | 3 | The snapshot does not record that a cluster is provisional; the clusters CHIP marks are listed below. |
 | command quality | 39 | The snapshot records no quality for commands (CHIP marks large-message commands L). |
 | definitions outside the snapshot | 5 | CHIP global types matter.js defines in a shared definitions scope (WebRtcTransportDefinitions) that the extractor does not emit. |
-| device-type cluster quality | 19 | The snapshot does not record the quality of a device type's cluster requirement (singleton). |
-| device-type conditions | 46 | The snapshot does not record the conditions a device type declares. |
-| device-type element requirements | 153 | The snapshot records a device type's cluster requirements, not its feature / attribute / command / event requirements. |
 | event quality | 0 | The snapshot records no quality for events. |
 | global commands | 2 | AtomicRequest / AtomicResponse: matter.js models them in the clusters that use them (load-data-model.ts globalCommands). |
 | members CHIP does not state | 4 | A command, event or data type whose fields CHIP leaves unstated because the specification gives them by reference (Level Control's *WithOnOff commands); the snapshot's fields have nothing to be compared with. |

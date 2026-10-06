@@ -54,6 +54,11 @@ type Config struct {
 	// for those device types. nil keeps the tables for the life of the
 	// process.
 	Scenes ScenesStore
+	// RootDeviceConditions are the device-type conditions the host states
+	// for the root endpoint ([Endpoint.DeviceConditions]) — the node's own
+	// facts no topology shows, such as LanguageLocale, TimeLocale or
+	// UnitLocale. nil states none.
+	RootDeviceConditions []string
 }
 
 // ScenesStore keeps an endpoint's scene table across restarts — matter.js
@@ -132,9 +137,10 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 	//   EP 1 = Aggregator(DeviceType 0x000E) — Descriptor.PartsList enumerates bridged
 	//   EP ≥ 2 = bridged devices
 	root := &Endpoint{
-		ID:         0,
-		DeviceType: deviceTypeRootNode,
-		Reachable:  true,
+		ID:               0,
+		DeviceType:       deviceTypeRootNode,
+		Reachable:        true,
+		DeviceConditions: append([]string(nil), a.cfg.RootDeviceConditions...),
 	}
 	aggregator := &Endpoint{
 		ID:         1,
@@ -244,6 +250,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		// aggregator.add(child) which establishes the same parent chain.
 		ParentEndpointID:    1,
 		HasParentEndpointID: true,
+		DeviceConditions:    append([]string(nil), spec.DeviceConditions...),
 		groups:              a.cfg.Groups,
 		onNodeLabelWritten:  a.cfg.OnNodeLabelWritten,
 		scenesStore:         a.cfg.Scenes,

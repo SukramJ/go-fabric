@@ -174,12 +174,19 @@ var fixture = map[string]string{
     <condition name="One"/>
     <condition name="Two"/>
   </conditions>
+  <conditionRequirements>
+    <deviceType id="0x0016" name="Root Node">
+      <conditionRequirement name="Wi-Fi"><mandatoryConform/><constraint><min value="1"/></constraint></conditionRequirement>
+    </deviceType>
+  </conditionRequirements>
   <clusters>
     <cluster id="0xFFF1" name="Widget" side="server">
       <quality singleton="true"/>
       <mandatoryConform/>
       <features><feature code="DER"><mandatoryConform/></feature></features>
-      <attributes><attribute code="0x0000" name="Mode"><optionalConform/></attribute></attributes>
+      <attributes><attribute code="0x0000" name="Mode"><optionalConform/><constraint><between><from value="1"/><to value="4"/></between></constraint></attribute></attributes>
+      <commands><command id="0x0040" name="Reset"/></commands>
+      <events><event id="0x0001" name="Went"><disallowConform/></event></events>
     </cluster>
     <cluster id="0x0006" name="On/Off" side="client"><optionalConform/></cluster>
   </clusters>
@@ -364,16 +371,37 @@ func TestLoadFilesDeviceTypesAndGlobals(t *testing.T) {
 	if light.Superset != "Plain Light" || light.Classification != "simple" || light.Revision != 2 || len(light.Requirements) != 2 {
 		t.Errorf("light = %+v", light)
 	}
-	if r := light.Requirements[1]; r.Side != "client" || r.ID != 6 || r.Conformance.String() != "O" {
+	if r := light.Requirements[1]; r.Side != "client" || r.ID != 6 || r.Conformance.String() != "O" || r.Quality != nil {
 		t.Errorf("client requirement = %+v", r)
+	}
+	widget := light.Requirements[0]
+	if strings.Join(widget.Quality, " ") != "singleton" || len(widget.Elements) != 4 {
+		t.Fatalf("widget requirement = %+v", widget)
+	}
+	der, mode, reset, ev := widget.Elements[0], widget.Elements[1], widget.Elements[2], widget.Elements[3]
+	if der.Element != "feature" || der.Name != "DER" || der.ID != nil || der.Conformance.String() != "M" {
+		t.Errorf("feature requirement = %+v", der)
+	}
+	if mode.Element != "attribute" || *mode.ID != 0 || mode.Conformance.String() != "O" || mode.Constraint != "1 to 4" {
+		t.Errorf("attribute requirement = %+v", mode)
+	}
+	if reset.Element != "command" || *reset.ID != 0x40 || reset.Name != "Reset" || reset.Conformance != nil {
+		t.Errorf("command requirement = %+v", reset)
+	}
+	if ev.Element != "event" || *ev.ID != 1 || ev.Conformance.String() != "X" {
+		t.Errorf("event requirement = %+v", ev)
+	}
+	if strings.Join(light.Conditions, ",") != "One,Two" || len(light.ConditionRequirements) != 1 {
+		t.Fatalf("conditions = %v / %+v", light.Conditions, light.ConditionRequirements)
+	}
+	if cr := light.ConditionRequirements[0]; cr.DeviceType != "Root Node" || cr.Name != "Wi-Fi" ||
+		cr.Conformance.String() != "M" || cr.Constraint != "min 1" {
+		t.Errorf("condition requirement = %+v", cr)
 	}
 	if len(m.Globals) != 1 || m.Globals[0].Name != "GlobalEnum" {
 		t.Errorf("globals = %+v", m.Globals)
 	}
-	want := map[string]int{
-		"device-type conditions": 2, "device-type element requirements": 2, "device-type cluster quality": 1,
-		"global commands": 1, "semantic namespaces": 1,
-	}
+	want := map[string]int{"global commands": 1, "semantic namespaces": 1}
 	for k, v := range want {
 		if m.Uncompared[k] != v {
 			t.Errorf("uncompared %s = %d, want %d", k, m.Uncompared[k], v)
@@ -479,6 +507,17 @@ func TestLoadFilesErrors(t *testing.T) {
 		"requirement id":      {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster name="C"/></clusters></deviceType>`},
 		"requirement bad id":  {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="z" name="C"/></clusters></deviceType>`},
 		"requirement conf":    {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><bogusConform/><mandatoryConform/><optionalConform/></cluster></clusters></deviceType>`},
+		"requirement quality": {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><quality singleton="maybe"/></cluster></clusters></deviceType>`},
+		"element name":        {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><features><feature/></features></cluster></clusters></deviceType>`},
+		"element id":          {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><commands><command id="z" name="Go"/></commands></cluster></clusters></deviceType>`},
+		"element code":        {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><attributes><attribute code="z" name="A"/></attributes></cluster></clusters></deviceType>`},
+		"element conf":        {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><features><feature code="F"><mandatoryConform/><optionalConform/></feature></features></cluster></clusters></deviceType>`},
+		"element constraint":  {"device_types/X.xml": `<deviceType id="1" name="D"><clusters><cluster id="1" name="C"><attributes><attribute code="0" name="A"><constraint><bogus/></constraint></attribute></attributes></cluster></clusters></deviceType>`},
+		"condition name":      {"device_types/X.xml": `<deviceType id="1" name="D"><conditions><condition/></conditions></deviceType>`},
+		"cond req declarer":   {"device_types/X.xml": `<deviceType id="1" name="D"><conditionRequirements><deviceType id="2"/></conditionRequirements></deviceType>`},
+		"cond req name":       {"device_types/X.xml": `<deviceType id="1" name="D"><conditionRequirements><deviceType name="R"><conditionRequirement/></deviceType></conditionRequirements></deviceType>`},
+		"cond req conf":       {"device_types/X.xml": `<deviceType id="1" name="D"><conditionRequirements><deviceType name="R"><conditionRequirement name="C"><mandatoryConform/><optionalConform/></conditionRequirement></deviceType></conditionRequirements></deviceType>`},
+		"cond req constraint": {"device_types/X.xml": `<deviceType id="1" name="D"><conditionRequirements><deviceType name="R"><conditionRequirement name="C"><constraint><bogus/></constraint></conditionRequirement></deviceType></conditionRequirements></deviceType>`},
 	}
 	for name, override := range cases {
 		t.Run(name, func(t *testing.T) {
