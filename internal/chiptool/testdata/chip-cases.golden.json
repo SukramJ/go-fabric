@@ -628,6 +628,11 @@
       "steps": 12,
       "stepsSkipped": 4
     },
+    "IDM/10.4@ep22": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
     "IDM/10.4@ep3": {
       "tests": 1,
       "steps": 12,
