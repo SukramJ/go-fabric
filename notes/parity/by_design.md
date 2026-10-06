@@ -195,7 +195,10 @@ and ElectricalEnergyTariff device types with `DescriptorServer.with("TagList")`
 (08ef820f, #4576), so the divergence is now one from matter.js's code as
 well as its model. The reference daemon's garage door
 (`examples/reference-bridge/fleet_closure.go`) is such an endpoint, and the
-CHIP families that check device-type conformance run against it.
+CHIP families that check device-type conformance run against it. The
+device-type validator (ADR 0016, warn mode) reports it at every start as
+`matter.devicetype.violation … requirement=Descriptor.TAGLIST`; that warning
+is this entry, not a new defect.
 
 ### BD-Matter-GarageIsClosureNotWindowCovering — the garage drive left the WindowCovering projection
 
