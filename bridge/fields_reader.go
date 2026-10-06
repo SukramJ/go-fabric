@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -26,7 +27,7 @@ import (
 // post-commissioning command set on the bridge's root endpoint.
 // Add a switch case when wiring a new cluster command that carries
 // fields (status-only commands need nothing here).
-func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.Element) (any, error) { //nolint:gocyclo,funlen // a dispatch table: one case per typed command decoder
+func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any, error) { //nolint:gocyclo,funlen // a dispatch table: one case per typed command decoder
 	switch path.Cluster {
 	case 0x0030: // GeneralCommissioning
 		switch path.Command {
@@ -100,6 +101,12 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, _ tlv.El
 		case wire.ColorCtrlCmdMoveToColorTemperature:
 			return decodeMoveToColorTemperatureFields(dec)
 		}
+	}
+	// A cluster with a generated definition (cluster/spec/...) decodes its
+	// request payloads through it, with the statuses matter.js's request
+	// schema answers a rejected payload with.
+	if fields, ok, err := spec.DecodeRequest(path.Cluster, path.Command, dec, el); ok {
+		return fields, err
 	}
 	// Unknown command-path: salvage as a tag-keyed map[uint8]any so the
 	// cluster server gets the field payload regardless of whether the
@@ -745,7 +752,7 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 	if ent.IsStatus || ent.Response == nil {
 		return
 	}
-	switch ent.Response.(type) {
+	switch x := ent.Response.(type) {
 	case mattercore.ArmFailSafeResponse:
 		ent.Path.Command = 0x01
 	case mattercore.SetRegulatoryConfigResponse:
@@ -776,6 +783,10 @@ func rewriteInvokeResponseCommand(ent *im.InvokeResponseEntry) {
 		ent.Path.Command = wire.OperationalStateCmdOperationalCommandResponse
 	case wire.ChangeToModeResponse:
 		ent.Path.Command = wire.ModeBaseCmdChangeToModeResponse
+	case spec.ResponsePayload:
+		// A response payload of a generated cluster definition names its
+		// own response command.
+		_, ent.Path.Command = x.ResponseCommand()
 	}
 	// Unknown response types (status-only commands wrapped) leave
 	// the path alone — the writer emits an empty struct + the

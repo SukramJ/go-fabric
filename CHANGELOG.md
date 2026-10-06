@@ -293,6 +293,8 @@ pseudo-version of `main`.
   `Conformance.Applicability`, the codec helpers, `spec.Register` /
   `spec.Lookup` / `spec.DecodeRequest`. `cluster/spec/spectest` holds the
   parity assertions (`CheckDefinition`, `CheckServer`, the round trips).
+  The bridge decodes a generated cluster's request payloads through the
+  registry and encodes any `spec.Encodable` value or response.
 
 ### Changed
 
