@@ -210,9 +210,9 @@ const (
 // Level bounds applied to Level and OnLevel.
 //
 // LevelMax is the MoveToLevel Level constraint "max 254" (element :74)
-// and the MaxLevel default (:38-41). LevelMin is 0 rather than 1 because
-// this server does not advertise LT: matter.js resolves an unset
-// MinLevel to `this.features.lighting ? 1 : 0`
+// and the MaxLevel default (:38-41). LevelMin is MinLevel without the
+// Lighting feature and LightingLevelMin with it: matter.js resolves an
+// unset MinLevel to `this.features.lighting ? 1 : 0`
 // (LevelControlServer.ts:89-90, :115-116).
 const (
 	LevelMin uint8 = 0
@@ -261,6 +261,10 @@ type (
 // purpose — see the package doc. Implementing one by delegating to the
 // other is a decision the host writes down; forgetting the coupling is
 // not something it can do by accident.
+//
+// Under [Config.Transitions] the server calls MoveToLevel alone, with
+// TransitionTime 0 and ExecuteIfOff forced, once per level it applies;
+// the other seven command methods are not called.
 type LevelSource interface {
 	// CurrentLevel reports the level the device is at.
 	CurrentLevel() (level uint8, known bool)

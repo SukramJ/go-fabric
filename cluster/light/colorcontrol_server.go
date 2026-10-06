@@ -88,12 +88,14 @@ func DefaultColorControlServerConfig() ColorControlServerConfig {
 }
 
 // ColorTemperatureWriter is the optional sink a [ColorControlServer]
-// drives on a successful MoveToColorTemperature. Implementations translate
-// the cropped mired value into the device's native unit — HM exposes
-// COLOR_TEMPERATURE in Kelvin (mireds = 1_000_000 / Kelvin) — and push it
-// to the CCU. A write error aborts the command and leaves the in-process
-// CurrentColorTemperatureMireds attribute unchanged, so the reported state
-// never claims a value the device did not accept.
+// drives with every colour temperature it applies: the target of a command
+// that applies at once, or each step of a transition. Implementations
+// translate the cropped mired value into the device's native unit — HM
+// exposes COLOR_TEMPERATURE in Kelvin (mireds = 1_000_000 / Kelvin) — and
+// push it to the device. A write error fails the command, or ends the
+// transition, and leaves the in-process ColorTemperatureMireds attribute
+// unchanged, so the reported state never claims a value the device did not
+// accept.
 //
 // The implementation owns the southbound urgency of the write it
 // performs: the cluster contract carries no priority, so a host whose
