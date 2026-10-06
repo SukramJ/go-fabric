@@ -43,6 +43,34 @@ const (
 	GranularityMicrosecondGran uint8 = 4
 )
 
+// matterEpochOffsetSec is the Matter epoch (2000-01-01 00:00:00 UTC, §A.2)
+// in Unix seconds: 30 years + 7 leap days.
+const matterEpochOffsetSec int64 = 946684800
+
+// UTC returns the node's UTC time — the host clock — and false while the
+// UTCTime attribute is null (a host clock before the Matter epoch). It is
+// the clock [GeneralDiagnostics.SetUTCClock] takes, so TimeSnapshot
+// carries a PosixTimeMs exactly when UTCTime is not null.
+func (t *TimeSynchronization) UTC() (time.Time, bool) {
+	now := time.Now()
+	if now.Unix() < matterEpochOffsetSec {
+		return time.Time{}, false
+	}
+	return now, true
+}
+
+// MatterAcceptedCommands implements [contract.ClusterCommandLister]:
+// SetUTCTime (0x00, conformance M). Without it the dispatcher answered an
+// empty AcceptedCommandList for a mandatory command (TC-IDM-10.x).
+func (t *TimeSynchronization) MatterAcceptedCommands() []uint32 {
+	return []uint32{timeSyncCmdSetUTCTime}
+}
+
+// MatterGeneratedCommands implements [contract.ClusterCommandLister]:
+// SetUTCTime has no response command; the other commands that do belong
+// to features the server does not advertise.
+func (t *TimeSynchronization) MatterGeneratedCommands() []uint32 { return []uint32{} }
+
 // NewTimeSynchronization returns the cluster server. Stateless —
 // every read is computed at call time from `time.Now`.
 func NewTimeSynchronization() *TimeSynchronization { return &TimeSynchronization{} }
@@ -50,6 +78,7 @@ func NewTimeSynchronization() *TimeSynchronization { return &TimeSynchronization
 var (
 	_ contract.ClusterServer          = (*TimeSynchronization)(nil)
 	_ contract.ClusterAttributeLister = (*TimeSynchronization)(nil)
+	_ contract.ClusterCommandLister   = (*TimeSynchronization)(nil)
 )
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -62,14 +91,12 @@ func (t *TimeSynchronization) MatterClusterID() uint32 { return timeSyncClusterI
 func (t *TimeSynchronization) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case timeSyncAttrUTCTime:
-		// Matter §A.2: epoch is 2000-01-01 00:00:00 UTC. Difference
-		// from Unix epoch is 30 years + 7 leap days = 946684800 seconds.
-		const matterEpochOffsetSec int64 = 946684800
-		nowMicros := time.Now().UnixMicro() - matterEpochOffsetSec*1_000_000
-		if nowMicros < 0 {
+		now, ok := t.UTC()
+		if !ok {
 			return nil, true // null per spec when host clock is pre-Matter-epoch
 		}
-		return uint64(nowMicros), true //nolint:gosec // wall-clock micros fit uint64; see #20
+		// Matter §A.2: epoch is 2000-01-01 00:00:00 UTC.
+		return uint64(now.UnixMicro() - matterEpochOffsetSec*1_000_000), true //nolint:gosec // non-negative, UTC checked it
 	case timeSyncAttrGranularity:
 		return GranularityMillisecGran, true
 	case cluster.AttrGlobalFeatureMap:

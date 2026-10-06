@@ -12,6 +12,14 @@ pseudo-version of `main`.
 
 ### Added
 
+- `core.GeneralDiagnostics.SetUTCClock`: TimeSnapshot carries
+  PosixTimeMs when the node's TimeSynchronization holds a UTC time, as
+  matter.js `GeneralDiagnosticsServer.timeSnapshot` couples them (and as
+  TC-DGGEN-2.4 requires). `core.TimeSynchronization.UTC` is that clock.
+- `core.TimeSynchronization` lists SetUTCTime in AcceptedCommandList
+  (`MatterAcceptedCommands`); the list was empty, although the command is
+  mandatory.
+
 - `closure.ControlServer` emits the ClosureControl events —
   OperationalError (`ReportError`, which also enters the Error state),
   MovementCompleted (MainState Moving → Stopped), SecureStateChanged (a
