@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3717,
+  "entry_points": 3768,
   "entry_packages": [
     ".",
     "bootid",
@@ -41,6 +41,7 @@
     "diagevent",
     "eligibility",
     "endpoint",
+    "endpoint/endpointtest",
     "endpoint/sqlitestore",
     "examples/reference-bridge",
     "groups",
@@ -71,9 +72,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 4266,
-    "reachable": 2490,
-    "whitelisted": 1771,
+    "total_exported": 4358,
+    "reachable": 2546,
+    "whitelisted": 1807,
     "unreachable": 5
   },
   "by_package": [
@@ -113,14 +114,14 @@
       "package": "cluster/measurement",
       "identifier": "CelsiusToInt16",
       "file": "cluster/measurement/measurement.go",
-      "line": 1742,
+      "line": 1759,
       "kind": "func"
     },
     {
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 104,
+      "line": 107,
       "kind": "func"
     },
     {
@@ -4960,21 +4961,21 @@
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 941
+      "line": 958
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 933
+      "line": 950
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1677
+      "line": 1694
     },
     {
       "package": "cluster/measurement",
@@ -5965,6 +5966,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestApplicationDeviceTypesMeetTheirDeviceTypeRequirements",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_module_test.go",
+      "line": 51
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestApplicationDeviceTypesMountTheirMandatoryClusterSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/application_device_types_test.go",
@@ -5983,6 +5991,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
       "line": 1380
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestBooleanStateServerMeetsTheDetectorDeviceTypes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_module_test.go",
+      "line": 145
     },
     {
       "package": "endpoint",
@@ -6098,6 +6113,83 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestDeviceTypeClusterRequirements",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 81
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeComponentInstances",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_composition_test.go",
+      "line": 17
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeConditionsDescendant",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 322
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeConditionsNeverDisallow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 307
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeConditionsNode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 242
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeConditionsRootAssertions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 164
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeConditionsStated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 269
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeConditionsStructural",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 198
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeElementRequirements",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 123
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeOutsideNodeScope",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_composition_test.go",
+      "line": 102
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeRanges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_composition_test.go",
+      "line": 80
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestDeviceTypeRevision_KnownType",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
@@ -6109,6 +6201,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
       "line": 1366
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeSingletons",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 342
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeStructuralConditionClasses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 390
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeValidatorModes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 587
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeViolationReportedOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 372
     },
     {
       "package": "endpoint",
@@ -6224,10 +6344,115 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestLightServersMeetTheLightDeviceTypes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_module_test.go",
+      "line": 113
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestMeasurementKindsMeetTheirDeviceTypeRequirements",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_module_test.go",
+      "line": 88
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestNewTopologyDispatcher_NilReturnsNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
       "line": 178
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSBaseRequirements",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 398
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSChoiceRanges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 303
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSChoices",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 256
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSComponentCount",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 105
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSComponentEndpoints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 337
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSFeatureDisallowedByFeatureNotCondition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 74
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSInstanceCountRanges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 182
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSMissingServerCluster",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 61
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSNodeConditions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 141
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSProvisionalElementNeverMissing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 87
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSSingletonMisplaced",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 125
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSStructuralConditionSpelling",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 456
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestParityMatterJSToleratedChoiceMembers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_parity_matterjs_test.go",
+      "line": 289
     },
     {
       "package": "endpoint",
@@ -6455,6 +6680,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestTopologyFacts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 477
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestUniqueIDFor_DistinctAcrossSourceKeys",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/uniqueid_test.go",
@@ -6487,6 +6719,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/uniqueid_test.go",
       "line": 86
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestValidateDeviceTypesAssembledBridge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_validation_test.go",
+      "line": 555
     },
     {
       "package": "endpoint",
@@ -6626,7 +6865,7 @@
       "identifier": "FakeStore",
       "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
       "file": "endpoint/endpointtest/endpointtest.go",
-      "line": 27
+      "line": 66
     },
     {
       "package": "examples/reference-bridge",
@@ -8271,7 +8510,7 @@
       "identifier": "TestAsIntIsBounded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 526
+      "line": 565
     },
     {
       "package": "internal/chipdm",
@@ -8289,17 +8528,24 @@
     },
     {
       "package": "internal/chipdm",
+      "identifier": "TestCompareBaseDeviceTypePairing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/compare_test.go",
+      "line": 249
+    },
+    {
+      "package": "internal/chipdm",
       "identifier": "TestCompareElementRules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/compare_test.go",
-      "line": 323
+      "line": 464
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestCompareRules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/compare_test.go",
-      "line": 189
+      "line": 290
     },
     {
       "package": "internal/chipdm",
@@ -8313,7 +8559,7 @@
       "identifier": "TestComparerPanicsOnUnknownNames",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/compare_test.go",
-      "line": 429
+      "line": 570
     },
     {
       "package": "internal/chipdm",
@@ -8334,35 +8580,42 @@
       "identifier": "TestDataModelVersion",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/support_test.go",
-      "line": 124
+      "line": 193
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestLoadFilesClusters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 243
+      "line": 250
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestLoadFilesDeviceTypesAndGlobals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 354
+      "line": 361
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestLoadFilesErrors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 384
+      "line": 412
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestLoadSnapshotDeviceTypeLayer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/support_test.go",
+      "line": 83
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestLoadSnapshotErrors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/support_test.go",
-      "line": 79
+      "line": 141
     },
     {
       "package": "internal/chipdm",
@@ -8376,7 +8629,7 @@
       "identifier": "TestLoaderUnknownDirectory",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 493
+      "line": 532
     },
     {
       "package": "internal/chipdm",
@@ -8404,49 +8657,49 @@
       "identifier": "TestReadChipModel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/support_test.go",
-      "line": 156
+      "line": 225
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestReconcile",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/support_test.go",
-      "line": 222
+      "line": 291
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestRender",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/support_test.go",
-      "line": 256
+      "line": 325
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestRunGit",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/support_test.go",
-      "line": 212
+      "line": 281
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestSnapshotDefault",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/support_test.go",
-      "line": 104
+      "line": 173
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestStatusName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 501
+      "line": 540
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestTranslateValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 508
+      "line": 547
     },
     {
       "package": "internal/chiptool",
