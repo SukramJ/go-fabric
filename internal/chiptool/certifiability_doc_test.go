@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -235,14 +236,23 @@ func TestWorkflowRunsEveryFamily(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The groups are the `"<group>=<FAMILY,FAMILY,…>"` entries of the
+	// `groups` step in the workflow's `code touched` job.
+	entry := regexp.MustCompile(`^"([a-z-]+)=([A-Z0-9,]+)"$`)
 	seen := map[string]int{}
+	groups := 0
 	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if v, ok := strings.CutPrefix(line, "families: "); ok {
-			for _, f := range strings.Split(v, ",") {
-				seen[strings.TrimSpace(f)]++
-			}
+		m := entry.FindStringSubmatch(strings.TrimSpace(line))
+		if m == nil {
+			continue
 		}
+		groups++
+		for _, f := range strings.Split(m[2], ",") {
+			seen[f]++
+		}
+	}
+	if groups == 0 {
+		t.Fatal("no family groups found in chiptool.yml (expected `\"<group>=<families>\"` entries in the `groups` step)")
 	}
 	declared := map[string]bool{}
 	for _, fam := range chipFamilies {

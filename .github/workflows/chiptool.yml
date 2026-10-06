@@ -24,9 +24,10 @@
 #     pursued by this project, but certifiability is a goal
 #     (docs/adr/0011-certifiability-is-a-goal.md): the families run with PICS
 #     generated from the device, every excluded case carries its class and
-#     reason, and docs/certifiability.md is the status. A pull request runs
-#     the core families; the nightly run covers all of them, split so no job
-#     exceeds the runner limit.
+#     reason, and docs/certifiability.md is the status. An unlabelled pull
+#     request runs the core families; the nightly run, a manual dispatch and
+#     the `needs-chiptool` label run all of them, split into groups so no job
+#     exceeds the runner limit. A group an event does not run gets no job.
 #
 # Not a blanket per-PR gate — the runs are slow and the image is large. It
 # runs nightly, on manual dispatch, on the `needs-chiptool` label, and
@@ -77,6 +78,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      families: ${{ steps.groups.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -109,6 +111,38 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
             echo "-> no Go code touched; suite runs only if labelled"
           fi
+      # The certification-family groups, and which of them this event runs.
+      # One place for the split (TestWorkflowRunsEveryFamily holds it to the
+      # family table): the groups divide internal/chiptool's family table so
+      # no job exceeds the runner's six hours. An unlabelled pull request runs
+      # the core group only; the nightly run, a manual dispatch and the
+      # `needs-chiptool` label run every group. A group that is not run does
+      # not get a job at all, so it can neither look green nor hide a skip.
+      - id: groups
+        env:
+          EVENT: ${{ github.event_name }}
+          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'needs-chiptool') }}
+        run: |
+          set -euo pipefail
+          groups=(
+            "core=IDM,DESC,BINFO,BRBINFO,ACE,ACL,CGEN,OPCREDS,GRPKEY,DT,RR,SM"
+            "commissioning=CADMIN,SC,DA,DD,CNET,DGGEN,G,GC"
+            "app-lights=OO,LVL,CC,I,S,SWTCH,BOOL,OCC,TMP,RH,FLW"
+            "app-appliances=DRLK,FAN,LWM,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV"
+          )
+          all=true
+          if [ "$EVENT" = "pull_request" ] && [ "$LABELLED" != "true" ]; then
+            all=false
+          fi
+          include="[]"
+          for entry in "${groups[@]}"; do
+            group="${entry%%=*}"; families="${entry#*=}"
+            if [ "$all" = true ] || [ "$group" = core ]; then
+              include=$(jq -c --arg g "$group" --arg f "$families" '. + [{group: $g, families: $f}]' <<<"$include")
+            fi
+          done
+          echo "matrix={\"include\":$include}" >> "$GITHUB_OUTPUT"
+          echo "family groups this event runs: $(jq -r '.[].group' <<<"$include" | paste -sd, -)"
 
   chiptool:
     name: chip-tool commissions the reference daemon
@@ -275,38 +309,15 @@ jobs:
     timeout-minutes: 350
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          # A pull request runs the core group only; the nightly run (and
-          # a manual dispatch) runs every group. The groups split the
-          # family table of internal/chiptool/families_table_test.go so no
-          # job exceeds the runner's six hours; a family missing from every
-          # group fails the nightly check below.
-          - group: core
-            families: IDM,DESC,BINFO,BRBINFO,ACE,ACL,CGEN,OPCREDS,GRPKEY,DT,RR,SM
-            pr: true
-          - group: commissioning
-            families: CADMIN,SC,DA,DD,CNET,DGGEN,G,GC
-            pr: false
-          - group: app-lights
-            families: OO,LVL,CC,I,S,SWTCH,BOOL,OCC,TMP,RH,FLW
-            pr: false
-          - group: app-appliances
-            families: DRLK,FAN,LWM,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV
-            pr: false
+      # Decided by the `code touched` job: see its `groups` step.
+      matrix: ${{ fromJSON(needs.changes.outputs.families) }}
     steps:
-      - name: skip groups a pull request does not run
-        if: github.event_name == 'pull_request' && !matrix.pr
-        run: echo "pull requests run the core group; this group runs nightly"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: github.event_name != 'pull_request' || matrix.pr
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: github.event_name != 'pull_request' || matrix.pr
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: start avahi
-        if: github.event_name != 'pull_request' || matrix.pr
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends avahi-daemon
@@ -320,10 +331,8 @@ jobs:
           sudo systemctl restart avahi-daemon
           systemctl is-active dbus avahi-daemon
       - name: pull the pinned CHIP image
-        if: github.event_name != 'pull_request' || matrix.pr
         run: make chiptool-image
       - name: families
-        if: github.event_name != 'pull_request' || matrix.pr
         env:
           GOFABRIC_CHIP_FAMILIES: ${{ matrix.families }}
           GOFABRIC_CHIP_HARNESS: image
@@ -335,7 +344,7 @@ jobs:
             exit 1
           fi
       - name: upload case logs
-        if: failure() && (github.event_name != 'pull_request' || matrix.pr)
+        if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: chip-families-${{ matrix.group }}
