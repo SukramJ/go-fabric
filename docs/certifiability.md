@@ -68,7 +68,13 @@ wherever a connectedhomeip checkout is present): the
 whole schema snapshot — every cluster and device type, not only those the
 reference daemon mounts — with connectedhomeip's `data_model/<version>` XML,
 the model the Python cases judge a device by, and classifies every
-difference.
+difference; device types are compared down to their feature, attribute,
+command and event requirements and their conditions, the overrides
+TC_DeviceConformance enforces. What the snapshot states, the module holds
+every assembled topology to: the bridge runs matter.js's device type
+validation on each assembly ([ADR 0016](./adr/0016-device-type-validation.md)),
+and a host's tests can assert it with
+`endpointtest.AssertDeviceTypeConformance`.
 
 ## PICS
 

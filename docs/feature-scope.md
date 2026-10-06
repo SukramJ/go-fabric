@@ -119,10 +119,23 @@ HumiditySensor 0x0307, LightSensor 0x0106, PressureSensor 0x0305,
 AirQualitySensor 0x002C, OccupancySensor 0x0107, ContactSensor 0x0015,
 GenericSwitch 0x003B, ElectricalSensor 0x0510, FlowSensor 0x0306.
 
+Every assembled topology is validated against its device types — mandatory
+and disallowed clusters, their feature / attribute / command / event
+requirements, components, conditions, singleton placement — as matter.js
+validates a server node; the bridge logs new violations by default and can
+refuse them (`Bridge.SetDeviceTypeValidation`, `endpoint.ValidateDeviceTypes`,
+[ADR 0016](./adr/0016-device-type-validation.md)). Conditions that describe
+the product rather than the topology (LanguageLocale, PhysicalInputs, …) are
+the host's to state (`Spec.DeviceConditions`, `Config.RootDeviceConditions`).
+Not servable as the module stands: ExtendedColorLight (the ColorControl
+server has no XY) and a SmokeCoAlarm's PowerSource component endpoint
+(bridged endpoints have no parts).
+
 Device types a host builds from the application servers, each assembled
 with its full mandatory server set (Identify, Groups where mandated,
 Descriptor and BridgedDeviceBasicInformation from the assembler, the rest
-from the host — `endpoint/application_device_types_test.go`):
+from the host — `endpoint/application_device_types_test.go`, held to every
+device-type requirement by `endpoint/devicetype_module_test.go`):
 
 | Device type | Host supplies | Not built (optional) |
 | --- | --- | --- |
