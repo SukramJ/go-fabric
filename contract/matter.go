@@ -637,6 +637,37 @@ type AttributeChangeNotifier interface {
 	OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func())
 }
 
+// SelfReportedAttributeLister is the optional capability of an
+// [AttributeChangeNotifier] that decides by itself when some of its
+// attributes are reported: a quieter ("Q") attribute that changes while a
+// transition runs, such as LevelControl CurrentLevel, or a value matter.js
+// emits by hand, such as RemainingTime. The bridge reports a command's
+// effect on a cluster by comparing the cluster's attributes before and
+// after the command; it leaves the listed attributes out of that
+// comparison, so their changes reach subscribers only through the
+// server's own notification — matter.js ServerBehaviorBacking reports a
+// quieter property only when its QuietEvent emits.
+//
+// MatterSelfReportedAttributes may answer differently over a server's
+// lifetime only where its configuration says so; the bridge asks per
+// command.
+// loom:reachable:reason="called through a type assertion in bridge when it reports a command's changes; an interface type has no construction site the analyzer can follow"
+type SelfReportedAttributeLister interface {
+	MatterSelfReportedAttributes() []uint32
+}
+
+// ClusterQuiescer is the optional capability of a [ClusterServer] that
+// runs timers of its own, such as an attribute transition. The bridge
+// calls MatterQuiesce when the server leaves the topology — a reassembly
+// that drops its endpoint or replaces the server — and when it stops, so
+// no timer outlives the bridge's use of the server. MatterQuiesce ends
+// that activity without reporting it; the server stays usable, and a
+// later command starts it again.
+// loom:reachable:reason="called through a type assertion in bridge on Stop and on reassembly; an interface type has no construction site the analyzer can follow"
+type ClusterQuiescer interface {
+	MatterQuiesce()
+}
+
 // EventPriority mirrors the Matter §10.6.6.1 priority enum.
 type EventPriority uint8
 

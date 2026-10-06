@@ -7,30 +7,48 @@
 // ModeSelect.
 //
 // The server owns no level. Every attribute it answers is read from a
-// [LevelSource] the host implements, and all eight conformance-M
-// commands are forwarded to that same port; a server that moved an
-// internal field and reported Success would tell a controller the device
-// changed without anything having reached it.
+// [LevelSource] the host implements; a server that moved an internal
+// field and reported Success would tell a controller the device changed
+// without anything having reached it.
+//
+// # Two ways to move the level
+//
+// A device that ramps by itself takes the eight conformance-M commands as
+// they arrive: by default the server forwards each to the port method of
+// the same name, and the host applies TransitionTime and Rate natively
+// (notes/parity/by_design.md BD-Matter-LevelControl-NativeRamp).
+//
+// A device that cannot ramp turns on the module's transition engine with
+// [Config.Transitions]. The server then runs matter.js LevelControlServer
+// itself — MoveToLevel, Move, Step and Stop, their On/Off coupling, the
+// ExecuteIfOff gate, CoupleColorTempToLevel — on the transition engine of
+// [transition] (matter.js behavior/Transitions.ts), and the host receives
+// the levels it steps through as [LevelSource.MoveToLevel] requests with
+// TransitionTime 0. CurrentLevel and RemainingTime are then reported by
+// the server's own rules (see [Server.OnMatterAttributesChanged]).
 //
 // # What is served, and what is deliberately not
 //
-// Three attributes carry conformance "M" and are the whole projection:
-// CurrentLevel (0x0), Options (0xf) and OnLevel (0x11)
+// Three attributes carry conformance "M": CurrentLevel (0x0), Options
+// (0xf) and OnLevel (0x11)
 // (matter.js packages/model/src/standard/elements/level-control.element.ts:29-30,
 // :65, :49-50), and MinLevel (0x2) / MaxLevel (0x3), whose "Rev >= v7, O"
 // makes them mandatory at the revision served (:34-41; matter.js sets both
-// on every LevelControl, LevelControlServer.ts:114-120). Every other
-// attribute is feature-gated or optional and is absent here, because
-// advertising an attribute whose feature bit is clear is the shape a
-// controller can end a commissioning over:
+// on every LevelControl, LevelControlServer.ts:114-120). With
+// [Config.Lighting] the server advertises the LT feature and adds the two
+// attributes LT makes mandatory, RemainingTime (0x1) and
+// StartUpCurrentLevel (0x4000) (element :33, :68-71); MinLevel is then 1.
+// Every other attribute is feature-gated or optional and is absent here,
+// because advertising an attribute whose feature bit is clear is the shape
+// a controller can end a commissioning over:
 //
-//   - RemainingTime (0x1) and StartUpCurrentLevel (0x4000) carry
-//     conformance "LT" (element :33, :68-71);
 //   - CurrentFrequency (0x4), MinFrequency (0x5) and MaxFrequency (0x6)
 //     carry "FQ" (:42-47);
 //   - OnOffTransitionTime (0x10), OnTransitionTime (0x12),
 //     OffTransitionTime (0x13) and DefaultMoveRate (0x14) carry "O"
-//     (:48, :53-64).
+//     (:48, :53-64). The engine reads them as matter.js does when a state
+//     leaves them unset: a MoveToLevel without TransitionTime and a Move
+//     without Rate apply at once.
 //
 // MoveToClosestFrequency (0x8) is likewise absent: conformance "FQ"
 // (element :118-124). The eight commands this server does handle are all
@@ -41,29 +59,33 @@
 //
 // Four of the eight commands are the "with On/Off" variants, which differ
 // from their plain forms only in that they also drive the OnOff cluster
-// on the same endpoint. They reach the host through their own port
-// methods rather than through a flag on a shared call: a flag inside a
-// request struct is a field a host implementation can leave unread and
+// on the same endpoint. Forwarded, they reach the host through their own
+// port methods rather than through a flag on a shared call: a flag inside
+// a request struct is a field a host implementation can leave unread and
 // still compile, which turns "turn the speaker on and set it to 40" into
 // a silent "set it to 40 while it stays muted". A separate method cannot
 // be left unimplemented — the interface does not accept the host until
 // each of the eight exists.
 //
-// What this server does not decide is whether a plain (non-On/Off)
+// Forwarded, the server does not decide whether a plain (non-On/Off)
 // command executes while the device is off. That gate reads the OnOff
 // attribute of a different cluster on the same endpoint
 // (matter.js LevelControlServer.ts:729-736 #optionsAllowExecution), which
-// a single-cluster server cannot see. The arithmetic that *is* this
-// cluster's — folding OptionsMask and OptionsOverride onto the Options
-// attribute — is [EffectiveOptions], so a host applies the gate without
-// re-deriving the bitmap rule.
+// the host owns. The arithmetic that *is* this cluster's — folding
+// OptionsMask and OptionsOverride onto the Options attribute — is
+// [EffectiveOptions], so a host applies the gate without re-deriving the
+// bitmap rule. With the engine the host names its On/Off state in
+// [Transitions.OnOff] and the server applies the gate and the coupling
+// itself.
 package levelcontrol
 
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/transition"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -97,6 +119,14 @@ const (
 	// cluster on the same endpoint turns on, access "RW VO", quality "X"
 	// — null means "no effect" (element :49-50, resource :144-153).
 	AttrOnLevel uint32 = 0x0011
+	// AttrRemainingTime is the time left in the current transition, in
+	// tenths of a second, access "R V", quality "Q", conformance "LT"
+	// (element :33). Served with [Config.Lighting].
+	AttrRemainingTime uint32 = 0x0001
+	// AttrStartUpCurrentLevel is the level the device takes at power-up,
+	// access "RW VM", quality "X N", conformance "LT" (element :68-71).
+	// Served with [Config.Lighting].
+	AttrStartUpCurrentLevel uint32 = 0x4000
 )
 
 // Command ids, taken from the wire package so the repository carries one
@@ -129,15 +159,15 @@ const (
 	FeatureFrequency uint32 = 1 << 2
 )
 
-// featureMap is what this server advertises: OO alone.
+// featureMap is what this server advertises by default: OO alone.
 //
 // OO is the element's own default (default 1, :24) and it gates no
 // attribute, so advertising it promises nothing this server does not
 // serve — it says the four "with On/Off" commands act on a real OnOff
 // cluster, which is exactly what the port's four WithOnOff methods do.
-// LT and FQ stay clear because each gates attributes this server does
-// not serve; a host that needs them extends the port and the FeatureMap
-// together, never one without the other.
+// LT is added with [Config.Lighting], together with the attributes it
+// gates; FQ stays clear because this server serves none of its
+// attributes.
 const featureMap uint32 = FeatureOnOff
 
 // OptionsBitmap bits (element :127-130). ExecuteIfOff carries
@@ -147,17 +177,21 @@ const (
 	// even while the device is off (resource :190-199).
 	OptionExecuteIfOff uint8 = 1 << 0
 	// OptionCoupleColorTempToLevel, when set, moves the ColorControl
-	// colour temperature along with the level. LT-gated, so this server
-	// never accepts it.
+	// colour temperature along with the level. LT-gated: accepted with
+	// [Config.Lighting] only.
 	OptionCoupleColorTempToLevel uint8 = 1 << 1
 )
 
 // optionsSupportedMask is the set of Options bits that are conformant
 // under [featureMap]: ExecuteIfOff exists under "LT | OO" and OO is
-// advertised; CoupleColorTempToLevel needs LT, which is not. A write
-// carrying any other bit is refused rather than stored, because a stored
-// bit would be read back as a capability the cluster does not have.
+// advertised; CoupleColorTempToLevel needs LT (lightingOptionsMask). A
+// write carrying any other bit is refused rather than stored, because a
+// stored bit would be read back as a capability the cluster does not
+// have.
 const optionsSupportedMask = OptionExecuteIfOff
+
+// lightingOptionsMask is optionsSupportedMask under OO | LT.
+const lightingOptionsMask = OptionExecuteIfOff | OptionCoupleColorTempToLevel
 
 // MoveMode values, taken from the wire package (MoveModeEnum, element
 // :131-135).
@@ -183,6 +217,10 @@ const (
 const (
 	LevelMin uint8 = 0
 	LevelMax uint8 = 254
+	// LightingLevelMin is MinLevel under the Lighting feature — the only
+	// value LT allows (matter.js LevelControlServer.ts:205-220
+	// initializeLighting warns on any other).
+	LightingLevelMin uint8 = 1
 )
 
 // Command payload types. These are aliases, not copies: the bridge's
@@ -293,27 +331,104 @@ type Config struct {
 	// bumps it, and the version survives server reconstruction; when nil
 	// an embedded tracker is used.
 	DataVersion *cluster.DataVersionTracker
+	// Lighting advertises the LT feature: MinLevel 1, RemainingTime,
+	// StartUpCurrentLevel and the CoupleColorTempToLevel option
+	// (level-control.element.ts:25, :33, :68-71, :127-130). A light needs
+	// it — every lighting device type marks LT mandatory. The server keeps
+	// StartUpCurrentLevel itself and reports it, but never applies it: a
+	// bridged endpoint has no power-up of its own, the reason matter.js
+	// skips start-up behaviour on an endpoint an Aggregator owns
+	// (LevelControlServer.ts initializeLighting).
+	Lighting bool
+	// Transitions, when non-nil, runs the module's transition engine
+	// instead of forwarding the commands (see the package doc). Nil keeps
+	// the hand-off path, where the host ramps natively and RemainingTime
+	// reads 0.
+	Transitions *Transitions
 }
 
 // Server implements [contract.ClusterServer] for LevelControl (0x0008).
 type Server struct {
-	src LevelSource
+	src      LevelSource
+	lighting bool
 
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
+
+	// The transition engine and what it couples to; engine is nil on the
+	// hand-off path.
+	engine *transition.Engine
+	onOff  OnOff
+	ct     ColorTemperatureCoupling
+	// cmd serialises the commands the engine runs.
+	cmd sync.Mutex
+	// changes and quiet report CurrentLevel and RemainingTime under the
+	// engine.
+	changes cluster.AttributeChanges
+	quiet   *cluster.Quieter
+
+	mu sync.Mutex
+	// startUp is StartUpCurrentLevel; nil is null.
+	startUp *uint8
+	// level / levelKnown is the CurrentLevel last seen, so a change is
+	// reported once, by the quieter rules.
+	level      uint8
+	levelKnown bool
+	// coupling is what the running transition couples to.
+	coupling coupling
+	// listeners counts the change listeners; the host's notifier is
+	// subscribed while there is one.
+	listeners int
+	unsubSrc  func()
 }
 
 // Compile-time assertions.
 var (
-	_ contract.ClusterServer          = (*Server)(nil)
-	_ contract.ClusterDataVersion     = (*Server)(nil)
-	_ contract.ClusterAttributeLister = (*Server)(nil)
-	_ contract.ClusterCommandLister   = (*Server)(nil)
-	_ contract.ChangeNotifier         = (*Server)(nil)
+	_ contract.ClusterServer                  = (*Server)(nil)
+	_ contract.ClusterDataVersion             = (*Server)(nil)
+	_ contract.ClusterAttributeLister         = (*Server)(nil)
+	_ contract.ClusterCommandLister           = (*Server)(nil)
+	_ contract.ClusterAttributeWritePrivilege = (*Server)(nil)
+	_ contract.ChangeNotifier                 = (*Server)(nil)
+	_ contract.AttributeChangeNotifier        = (*Server)(nil)
+	_ contract.SelfReportedAttributeLister    = (*Server)(nil)
+	_ contract.ClusterQuiescer                = (*Server)(nil)
 )
 
 // NewServer constructs a LevelControl server over the host port in cfg.
-func NewServer(cfg Config) *Server { return &Server{src: cfg.Source, ext: cfg.DataVersion} }
+func NewServer(cfg Config) *Server {
+	s := &Server{src: cfg.Source, ext: cfg.DataVersion, lighting: cfg.Lighting}
+	if cfg.Transitions != nil {
+		s.initTransitions(*cfg.Transitions)
+	}
+	return s
+}
+
+// minLevel is MinLevel: 1 under the Lighting feature, 0 otherwise
+// (matter.js LevelControlServer.ts:89-91).
+func (s *Server) minLevel() uint8 {
+	if s.lighting {
+		return LightingLevelMin
+	}
+	return LevelMin
+}
+
+// optionsMask is the set of Options bits the advertised FeatureMap makes
+// conformant.
+func (s *Server) optionsMask() uint8 {
+	if s.lighting {
+		return lightingOptionsMask
+	}
+	return optionsSupportedMask
+}
+
+// features is the advertised FeatureMap.
+func (s *Server) features() uint32 {
+	if s.lighting {
+		return featureMap | FeatureLighting
+	}
+	return featureMap
+}
 
 // tracker returns the active DataVersion counter — the host's when it
 // supplied one, the embedded one otherwise.
@@ -333,9 +448,12 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 // the device — would reach a controller only on its next read. Mirrors
 // the forwarding in cluster/modeselect/modeselect_server.go. Returns a
 // no-op unsubscribe when the port cannot notify.
+//
+// Under the engine the server reports CurrentLevel itself (see
+// [Server.OnMatterAttributesChanged]) and this hop stays silent.
 func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	n, ok := s.src.(contract.ChangeNotifier)
-	if !ok || n == nil {
+	if !ok || n == nil || s.engine != nil {
 		return func() {}
 	}
 	return n.OnMatterValueChanged(func() {
@@ -374,11 +492,26 @@ func (s *Server) MatterRead(attrID uint32) (value any, ok bool) {
 		}
 		return s.readFromSource(attrID)
 	case AttrMinLevel:
-		return LevelMin, true
+		return s.minLevel(), true
 	case AttrMaxLevel:
 		return LevelMax, true
+	case AttrRemainingTime:
+		if !s.lighting {
+			return nil, false
+		}
+		return s.remainingTime(), true
+	case AttrStartUpCurrentLevel:
+		if !s.lighting {
+			return nil, false
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.startUp == nil {
+			return nil, true
+		}
+		return *s.startUp, true
 	case cluster.AttrGlobalFeatureMap:
-		return featureMap, true
+		return s.features(), true
 	case cluster.AttrGlobalClusterRevision:
 		return Revision(), true
 	default:
@@ -399,7 +532,7 @@ func (s *Server) readFromSource(attrID uint32) (any, bool) {
 		// Masked on the way out for the same reason a write is checked:
 		// a bit whose feature is not advertised must not be readable as
 		// though the cluster honoured it.
-		return s.src.Options() & optionsSupportedMask, true
+		return s.src.Options() & s.optionsMask(), true
 	default:
 		return nil, false
 	}
@@ -425,6 +558,13 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 		return s.writeOptions(ctx, value)
 	case AttrOnLevel:
 		return s.writeOnLevel(ctx, value)
+	case AttrStartUpCurrentLevel:
+		if s.lighting {
+			return s.writeStartUpCurrentLevel(value)
+		}
+		return unsupportedAttributeErr{
+			fmt.Sprintf("levelcontrol: attribute 0x%04X is not implemented by this server", attrID),
+		}
 	case AttrCurrentLevel:
 		return unsupportedWriteErr{fmt.Sprintf("levelcontrol: attribute 0x%04X is read-only", attrID)}
 	default:
@@ -448,9 +588,9 @@ func (s *Server) writeOptions(ctx context.Context, value any) error {
 	if !ok {
 		return constraintErr{fmt.Sprintf("levelcontrol: Options expected a map8, got %T", value)}
 	}
-	if options&^optionsSupportedMask != 0 {
+	if options&^s.optionsMask() != 0 {
 		return constraintErr{fmt.Sprintf(
-			"levelcontrol: Options 0x%02X sets a bit that is not conformant under FeatureMap 0x%02X", options, featureMap,
+			"levelcontrol: Options 0x%02X sets a bit that is not conformant under FeatureMap 0x%02X", options, s.features(),
 		)}
 	}
 	if s.src == nil {
@@ -466,8 +606,8 @@ func (s *Server) writeOptions(ctx context.Context, value any) error {
 // writeOnLevel validates and forwards an OnLevel write. A null clears
 // the on-level, which the spec reads as "it has no effect"
 // (resource :146-149); any other value must satisfy constraint
-// "minLevel to maxLevel" (element :49-50), resolved here to
-// [LevelMin]..[LevelMax].
+// "minLevel to maxLevel" (element :49-50), resolved here to MinLevel
+// ([LevelMin], or [LightingLevelMin] under LT) .. [LevelMax].
 func (s *Server) writeOnLevel(ctx context.Context, value any) error {
 	var level *uint8
 	if value != nil {
@@ -475,11 +615,9 @@ func (s *Server) writeOnLevel(ctx context.Context, value any) error {
 		if !ok {
 			return constraintErr{fmt.Sprintf("levelcontrol: OnLevel expected a number, got %T", value)}
 		}
-		// Only the upper bound can be violated by a uint8: LevelMin
-		// resolves to 0 here, which every uint8 satisfies.
-		if v > LevelMax {
+		if v < s.minLevel() || v > LevelMax {
 			return constraintErr{fmt.Sprintf(
-				"levelcontrol: OnLevel %d violates constraint minLevel to maxLevel (%d to %d)", v, LevelMin, LevelMax,
+				"levelcontrol: OnLevel %d violates constraint minLevel to maxLevel (%d to %d)", v, s.minLevel(), LevelMax,
 			)}
 		}
 		level = &v
@@ -494,12 +632,49 @@ func (s *Server) writeOnLevel(ctx context.Context, value any) error {
 	return nil
 }
 
-// MatterInvoke dispatches the eight conformance-M commands. Each one
-// reaches the host port; none reports Success on its own, and a host
-// refusal is returned as an error so the dispatcher maps it to a failure
-// status rather than to Success.
+// writeStartUpCurrentLevel stores StartUpCurrentLevel: null, or a level
+// the uint8 range allows up to [LevelMax] (0 is "the minimum level", 0xFF
+// is the null of the wire).
+func (s *Server) writeStartUpCurrentLevel(value any) error {
+	var next *uint8
+	if value != nil {
+		v, ok := asUint8(value)
+		if !ok || v > LevelMax {
+			return constraintErr{fmt.Sprintf("levelcontrol: StartUpCurrentLevel %v is outside 0 to %d", value, LevelMax)}
+		}
+		next = &v
+	}
+	s.mu.Lock()
+	s.startUp = next
+	s.mu.Unlock()
+	s.tracker().Bump()
+	return nil
+}
+
+// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
+// StartUpCurrentLevel is "RW VM" (element :68), Options and OnLevel
+// "RW VO" (:65, :49).
+func (*Server) MinWritePrivilege(attrID uint32) uint8 {
+	if attrID == AttrStartUpCurrentLevel {
+		return privilegeManage
+	}
+	return privilegeOperate
+}
+
+// Access-control privileges (Matter §9.10.5.2, AccessControlEntryPrivilegeEnum).
+const (
+	privilegeOperate uint8 = 3
+	privilegeManage  uint8 = 4
+)
+
+// MatterInvoke dispatches the eight conformance-M commands. Forwarded,
+// each one reaches the host port; none reports Success on its own, and a
+// host refusal is returned as an error so the dispatcher maps it to a
+// failure status rather than to Success. Under the engine the server runs
+// the command (transitions.go) and the host receives the levels it steps
+// through.
 //
-// The DataVersion is bumped only after the port accepted: a refused
+// The DataVersion is bumped only after the command succeeded: a refused
 // command changed nothing a subscriber caches.
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
@@ -532,6 +707,9 @@ func (s *Server) invokeMoveToLevel(ctx context.Context, cmdID uint32, fields any
 	if s.src == nil {
 		return nil, errNoSource(name)
 	}
+	if s.engine != nil {
+		return s.finish(name, s.runMoveToLevel(ctx, req, cmdID == CmdMoveToLevelWithOnOff))
+	}
 	call := s.src.MoveToLevel
 	if cmdID == CmdMoveToLevelWithOnOff {
 		call = s.src.MoveToLevelWithOnOff
@@ -558,6 +736,9 @@ func (s *Server) invokeMove(ctx context.Context, cmdID uint32, fields any) (any,
 	if s.src == nil {
 		return nil, errNoSource(name)
 	}
+	if s.engine != nil {
+		return s.finish(name, s.runMove(ctx, req, cmdID == CmdMoveWithOnOff))
+	}
 	call := s.src.Move
 	if cmdID == CmdMoveWithOnOff {
 		call = s.src.MoveWithOnOff
@@ -579,6 +760,9 @@ func (s *Server) invokeStep(ctx context.Context, cmdID uint32, fields any) (any,
 	if s.src == nil {
 		return nil, errNoSource(name)
 	}
+	if s.engine != nil {
+		return s.finish(name, s.runStep(ctx, req, cmdID == CmdStepWithOnOff))
+	}
 	call := s.src.Step
 	if cmdID == CmdStepWithOnOff {
 		call = s.src.StepWithOnOff
@@ -596,6 +780,9 @@ func (s *Server) invokeStop(ctx context.Context, cmdID uint32, fields any) (any,
 	}
 	if s.src == nil {
 		return nil, errNoSource(name)
+	}
+	if s.engine != nil {
+		return s.finish(name, s.runStop(req, cmdID == CmdStopWithOnOff))
 	}
 	call := s.src.Stop
 	if cmdID == CmdStopWithOnOff {
@@ -976,14 +1163,28 @@ func errNoSource(what string) error {
 	return fmt.Errorf("levelcontrol: %s has no host port", what)
 }
 
-// MatterReportable lists the attributes that move while the device runs.
-// Options and OnLevel are absent: both change only through a write,
-// which already bumps the DataVersion the dispatcher reports.
-func (*Server) MatterReportable() []uint32 { return []uint32{AttrCurrentLevel} }
+// MatterReportable lists the attributes that move while the device runs
+// and that the host's change notification reports. Options and OnLevel
+// are absent: both change only through a write, which already bumps the
+// DataVersion the dispatcher reports. Under the engine the list is
+// empty: the server reports CurrentLevel and RemainingTime itself
+// ([Server.MatterSelfReportedAttributes]).
+func (s *Server) MatterReportable() []uint32 {
+	if s.engine != nil {
+		return []uint32{}
+	}
+	return []uint32{AttrCurrentLevel}
+}
 
 // MatterAttributes implements [contract.ClusterAttributeLister], in id
 // order and without the universal globals — the dispatcher merges those.
-func (*Server) MatterAttributes() []uint32 {
+func (s *Server) MatterAttributes() []uint32 {
+	if s.lighting {
+		return []uint32{
+			AttrCurrentLevel, AttrRemainingTime, AttrMinLevel, AttrMaxLevel,
+			AttrOptions, AttrOnLevel, AttrStartUpCurrentLevel,
+		}
+	}
 	return []uint32{AttrCurrentLevel, AttrMinLevel, AttrMaxLevel, AttrOptions, AttrOnLevel}
 }
 
