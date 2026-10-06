@@ -103,9 +103,12 @@ func (d *Decoder) readTag(kind TagKind) (Tag, error) {
 	case TagKindCommonProfile2, TagKindImplicitProfile2:
 		// Note: ImplicitProfile tags are decoded as raw
 		// Tag{Kind: TagKindImplicitProfile2, Number: n} without resolving
-		// the implicit profile context — by design. matter.js TlvCodec.ts:170
-		// throws NotImplementedError for these; chip's TLVReader resolves them
-		// against ImplicitProfileId when set. go-fabric acts solely as a
+		// the implicit profile context — by design (L3-D2). matter.js
+		// TlvCodec.ts readTag throws UnexpectedDataError for these (malformed
+		// peer data since e21a1e72, #4514); chip's TLVReader resolves them
+		// against ImplicitProfileId when set and otherwise fails with
+		// CHIP_ERROR_UNKNOWN_IMPLICIT_TLV_TAG. Consumers here switch on
+		// context tags, so such an element is skipped rather than accepted. go-fabric acts solely as a
 		// responder (never initiates ImplicitProfile-tagged requests) so
 		// no resolution is needed. If future code paths require it, implement
 		// chip's ImplicitProfileId pattern.
