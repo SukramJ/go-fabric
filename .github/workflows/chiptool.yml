@@ -133,7 +133,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends avahi-daemon
-          sudo systemctl start avahi-daemon
+          # The runner's docker0 bridge has no carrier in a host-network
+          # setup, yet avahi listens on it and hands resolvers addresses
+          # scoped to it (fe80::…%docker0, 10.1.0.x%docker0): unreachable
+          # routes and stale cache entries. The DUT and every controller
+          # share the host network, so avahi only needs the real interfaces.
+          sudo sed -i 's/^#\?deny-interfaces=.*$/deny-interfaces=docker0/' /etc/avahi/avahi-daemon.conf
+          grep -q '^deny-interfaces=docker0$' /etc/avahi/avahi-daemon.conf
+          sudo systemctl restart avahi-daemon
           systemctl is-active dbus avahi-daemon
 
       - name: pull the pinned CHIP image
@@ -206,7 +213,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends avahi-daemon
-          sudo systemctl start avahi-daemon
+          # The runner's docker0 bridge has no carrier in a host-network
+          # setup, yet avahi listens on it and hands resolvers addresses
+          # scoped to it (fe80::…%docker0, 10.1.0.x%docker0): unreachable
+          # routes and stale cache entries. The DUT and every controller
+          # share the host network, so avahi only needs the real interfaces.
+          sudo sed -i 's/^#\?deny-interfaces=.*$/deny-interfaces=docker0/' /etc/avahi/avahi-daemon.conf
+          grep -q '^deny-interfaces=docker0$' /etc/avahi/avahi-daemon.conf
+          sudo systemctl restart avahi-daemon
           systemctl is-active dbus avahi-daemon
       - name: pull the pinned CHIP image
         run: make chiptool-image
@@ -296,7 +310,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends avahi-daemon
-          sudo systemctl start avahi-daemon
+          # The runner's docker0 bridge has no carrier in a host-network
+          # setup, yet avahi listens on it and hands resolvers addresses
+          # scoped to it (fe80::…%docker0, 10.1.0.x%docker0): unreachable
+          # routes and stale cache entries. The DUT and every controller
+          # share the host network, so avahi only needs the real interfaces.
+          sudo sed -i 's/^#\?deny-interfaces=.*$/deny-interfaces=docker0/' /etc/avahi/avahi-daemon.conf
+          grep -q '^deny-interfaces=docker0$' /etc/avahi/avahi-daemon.conf
+          sudo systemctl restart avahi-daemon
           systemctl is-active dbus avahi-daemon
       - name: pull the pinned CHIP image
         if: github.event_name != 'pull_request' || matrix.pr
