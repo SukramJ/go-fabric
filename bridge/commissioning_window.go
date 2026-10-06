@@ -263,6 +263,13 @@ func (w *CommissioningWindow) SetTransitionHook(fn func()) {
 	w.mu.Unlock()
 }
 
+// IsOpen reports whether an administrator's commissioning window is open.
+func (w *CommissioningWindow) IsOpen() bool {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.open
+}
+
 // CurrentWindow implements [wire.WindowController]. Returns the
 // snapshot the AdministratorCommissioning cluster reads attributes
 // from.

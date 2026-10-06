@@ -473,6 +473,12 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- ArmFailSafe over CASE answers BusyWithOtherAdmin while an administrator's
+  commissioning window is open and the fail-safe is not armed: the bridge
+  now hands the window's state to GeneralCommissioning
+  (`CommissioningWindow.IsOpen`), whose check was never wired outside its
+  unit tests (matter.js `GeneralCommissioningServer.#armFailSafe`, #4602).
+
 - **SuppressResponse suppresses error statuses too.** A Write or Invoke
   request with SuppressResponse set that failed before dispatch — a timed
   mismatch or timeout, a chunked or batch InvalidAction, a request that does

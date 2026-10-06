@@ -44,10 +44,16 @@ func TestCommissioningCompleteEndsTheWindow(t *testing.T) {
 		if err := w.OpenWindow(ctx, wire.OpenWindowParams{CommissioningTimeoutSeconds: 600}); err != nil {
 			t.Fatal(err)
 		}
-		fabric := im.WithFabricFilter(ctx, false, 1)
-		if _, err := gc.MatterInvoke(fabric, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60}); err != nil {
-			t.Fatal(err)
+		// The commissioner arms the fail-safe over PASE (fabric 0); AddNOC
+		// moves it onto the new fabric (RearmFailSafeForFabric), over whose
+		// CASE session CommissioningComplete arrives. An arm over CASE
+		// while the window is open is BusyWithOtherAdmin (#4602).
+		pase := im.WithAuthModePASE(im.WithFabricFilter(ctx, false, 0))
+		if r, err := gc.MatterInvoke(pase, 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60}); err != nil || r.(core.ArmFailSafeResponse).ErrorCode != core.CommissioningErrorOK {
+			t.Fatalf("ArmFailSafe over PASE: %v %+v", err, r)
 		}
+		gc.SetCurrentFabric(1)
+		fabric := im.WithFabricFilter(ctx, false, 1)
 		resp, err := gc.MatterInvoke(fabric, 0x04, nil)
 		if err != nil || resp.(core.CommissioningCompleteResponse).ErrorCode != core.CommissioningErrorOK {
 			t.Fatalf("CommissioningComplete: %v %+v", err, resp)

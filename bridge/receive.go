@@ -800,6 +800,13 @@ func wireCommissioned(servers []contract.ClusterServer, w *CommissioningWindow) 
 	for _, s := range servers {
 		if gc, ok := s.(*core.GeneralCommissioning); ok {
 			gc.SetOnCommissioned(w.EndCommissioning)
+			// ArmFailSafe over CASE answers BusyWithOtherAdmin while a
+			// window is open and the fail-safe is not armed: matter.js
+			// GeneralCommissioningServer.#armFailSafe consults
+			// commissioner.windowStatus (9397828d, #4602). The predicate
+			// existed in GeneralCommissioning but was never wired, so the
+			// check never ran outside its unit tests.
+			gc.SetIsCommissioningWindowOpen(w.IsOpen)
 		}
 	}
 }
