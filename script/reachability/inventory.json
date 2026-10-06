@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3588,
+  "entry_points": 3589,
   "entry_packages": [
     ".",
     "bootid",
@@ -8167,98 +8167,98 @@
       "identifier": "TestZeroconfInternal_CloseClosesAttachedResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 549
+      "line": 566
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Close_WithResponder_SubFQDNs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 297
+      "line": 314
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_NewSubtypeResponder_Logger_NonNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 415
+      "line": 432
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_HostNameOverride",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 613
+      "line": 630
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_HostName_Empty_FallsBack",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 394
+      "line": 411
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_RecordsAdvertisedAddresses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 436
+      "line": 453
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_UnchangedSkipsReRegister",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 236
+      "line": 253
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_WithResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 140
+      "line": 157
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_WithResponder_Domain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 207
+      "line": 224
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_WithResponder_EmptySubtype",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 180
+      "line": 197
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_RepublishAllDoesNotResurrectWithdrawn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 486
+      "line": 503
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_RepublishAll_WithItems",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 363
+      "line": 380
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_ResponderCloseIsIdempotentUnderTwoOwners",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 575
+      "line": 592
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Withdraw_WithResponder_SubFQDNs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 329
+      "line": 346
     },
     {
       "package": "schema",
