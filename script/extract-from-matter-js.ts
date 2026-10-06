@@ -15,8 +15,23 @@
 // "effective" object, each cluster its "datatypes" (and "base" when it
 // derives from one), and the snapshot a "globalDatatypes" list. That is what
 // script/clustergen generates cluster definitions from — see
-// docs/adr/0013-generated-cluster-definitions.md.
-import { ClusterModel, DatatypeModel, Matter, MatterDefinition, Specification } from "@matter/model";
+// docs/adr/0013-generated-cluster-definitions.md. A third, device-type layer
+// gives each device type an "effective" object (its requirement tree,
+// conditions and composition as matter.js's device type validation reads
+// them), the snapshot "baseDeviceTypes", and each cluster its
+// "classification" — see the section at the end and
+// docs/adr/0016-device-type-validation.md.
+import {
+    ClusterModel,
+    ConditionModel,
+    DatatypeModel,
+    DeviceTypeModel,
+    Matter,
+    MatterDefinition,
+    RequirementResolver,
+    Specification,
+    ValueModel,
+} from "@matter/model";
 import { execSync } from "node:child_process";
 
 // ReqOut is one cluster requirement of a device type: which cluster the
@@ -559,6 +574,147 @@ for (const d of (Matter as any).children) {
 }
 globalDatatypes.sort((a, b) => a.name.localeCompare(b.name));
 (out as any).globalDatatypes = globalDatatypes;
+
+// ---------------------------------------------------------------------------
+// Device-type layer.
+//
+// What matter.js's device type validation reads
+// (packages/model/src/logic/device-types/DeviceTypeConformance.ts, driven by
+// packages/node/src/node/server/DeviceTypeConformanceService.ts): each
+// device type's own requirement tree as the operational model holds it
+// (DeviceTypeModel.requirements — server and client clusters with their
+// nested feature / attribute / command / event requirements, component
+// device types, condition requirements), the conditions it declares, how
+// it composes its PartsList (effectiveComposition) and the device type it
+// derives from, plus the Base device type, whose requirements and
+// conditions apply to every endpoint. Each requirement carries what
+// RequirementResolver resolves it to, so the Go side judges the same
+// referent matter.js judges. Appended as new keys only: every key above
+// keeps its content and position.
+//
+// Each cluster also gains its effective classification and, where a
+// binding never directs it, bindable: false — the inputs of Base's Server
+// and Client conditions (ResolvedEndpoint.hasApplicationServer /
+// hasBindableApplicationClient).
+
+for (const raw of out.clusters as any[]) {
+    const model: any = Matter.get(ClusterModel, raw.id);
+    const classification = model?.effectiveClassification;
+    if (classification !== undefined) raw.classification = classification;
+    if (model !== undefined && model.effectiveBindable === false) raw.bindable = false;
+}
+
+// referentOut is what RequirementResolver resolves a requirement to: the
+// cluster, the feature (by code), the attribute / command / event (by
+// name, of the stated kind), the command field, the component device type
+// or the asserted condition. Absent when it resolves to nothing, which
+// matter.js leaves unjudged. A feature, attribute, command or event whose
+// own conformance is provisional is marked: matter.js never reports one
+// missing (DeviceTypeConformance.ts isProvisional).
+function referentOut(r: any): any {
+    const provisional = (m: any) => m instanceof ValueModel && m.conformance.isProvisional;
+    switch (r.element) {
+        case "serverCluster":
+        case "clientCluster": {
+            const c = RequirementResolver.clusterOf(r);
+            return c?.id === undefined ? undefined : { id: c.id, name: c.name };
+        }
+        case "feature": {
+            const f: any = RequirementResolver.featureOf(r);
+            if (f === undefined) return undefined;
+            const o: any = { name: f.name };
+            const bit = f.constraint === undefined ? undefined : Number(`${f.constraint}`);
+            if (Number.isInteger(bit)) o.bit = bit;
+            if (provisional(f)) o.provisional = true;
+            return o;
+        }
+        case "attribute":
+        case "command":
+        case "event": {
+            const e: any = RequirementResolver.elementOf(r);
+            if (e === undefined) return undefined;
+            const o: any = { name: e.name };
+            if (typeof e.id === "number") o.id = e.id;
+            if (provisional(e)) o.provisional = true;
+            return o;
+        }
+        case "commandField": {
+            const f: any = RequirementResolver.commandFieldOf(r);
+            if (f === undefined) return undefined;
+            const o: any = { command: f.parent?.name, name: f.name };
+            if (typeof f.id === "number") o.id = f.id;
+            return o;
+        }
+        case "deviceType": {
+            const d: any = RequirementResolver.deviceTypeOf(r);
+            return d === undefined ? undefined : { id: d.id, name: d.name };
+        }
+        case "condition": {
+            const c: any = RequirementResolver.conditionOf(r);
+            return c === undefined ? undefined : { declarer: c.parent?.name, name: c.name };
+        }
+    }
+    return undefined;
+}
+
+// requirementOut is one requirement, its aspects as matter.js parses them
+// (conformance as its AST, constraint, quality, access), the referent it
+// resolves to and its nested requirements, in declaration order — the
+// order matter.js judges and reports them in.
+function requirementOut(r: any): any {
+    const o: any = { element: r.element, name: r.name };
+    if (typeof r.id === "number") o.id = r.id;
+    if (r.type !== undefined) o.type = r.type;
+    if (r.instanceNumber !== undefined) o.instance = r.instanceNumber;
+    if (r.location !== undefined) o.location = r.location;
+    const conformance = conformanceOut(r.conformance);
+    if (conformance !== undefined) o.conformance = conformance;
+    const constraint = constraintOut(r.constraint);
+    if (constraint !== undefined) o.constraint = constraint;
+    const quality = qualityOut(r.quality);
+    if (quality !== undefined) o.quality = quality;
+    const access = accessOut(r.access);
+    if (access !== undefined) o.access = access;
+    if (r.default !== undefined) o.default = jsonable(r.default);
+    const referent = referentOut(r);
+    if (referent !== undefined) o.referent = referent;
+    const nested = r.requirements.map(requirementOut);
+    if (nested.length) o.requirements = nested;
+    return o;
+}
+
+function deviceTypeEffective(m: any): any {
+    const o: any = { composition: m.effectiveComposition };
+    if (m.type !== undefined && m.base instanceof DeviceTypeModel) o.base = m.type;
+    o.conditions = m.all(ConditionModel).map((c: any) => c.name);
+    o.requirements = m.requirements.map(requirementOut);
+    return o;
+}
+
+for (const raw of out.deviceTypes as any[]) {
+    const model: any = Matter.get(DeviceTypeModel, raw.id);
+    if (model === undefined) {
+        unmatched.push(`device type ${raw.name}`);
+        continue;
+    }
+    raw.effective = deviceTypeEffective(model);
+}
+
+// The Base device type has no id, so the loop above never emits it; its
+// requirements apply to every endpoint that lists a device type
+// (DeviceTypeConformance.check, lookupsFor(model).baseDeviceTypes).
+const baseDeviceTypes: any[] = [];
+for (const m of (Matter as any).deviceTypes as any[]) {
+    if (m.classification !== "base") continue;
+    baseDeviceTypes.push({
+        name: m.name,
+        classification: m.classification,
+        revision: m.revision,
+        effective: deviceTypeEffective(m),
+    });
+}
+baseDeviceTypes.sort((a, b) => a.name.localeCompare(b.name));
+(out as any).baseDeviceTypes = baseDeviceTypes;
 
 if (unmatched.length) {
     // A raw element the operational model does not know means the two layers

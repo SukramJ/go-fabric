@@ -486,6 +486,22 @@ pseudo-version of `main`.
   `ControlMode` and `Status` are now aliases of the generated types (same
   values, same underlying types), and the servers' lists, globals, write
   checks and privileges come from the definition.
+- **The matter.js extract carries device-type element requirements and
+  conditions** (`parity/schema.json`, same matter.js commit `85cf664`).
+  Each device type gains an `effective` object — its composition
+  (`tree` / `full-family`), the device type it derives from, the 46
+  conditions the device types declare, and its full requirement tree as
+  matter.js's device type validation reads it: server and client clusters
+  with their nested feature / attribute / command / event requirements
+  (conformance as matter.js's AST, constraint, quality — the singleton
+  `I` — access, default), component device types with their instance
+  numbers and the clusters they require, and the condition requirements
+  with their location; every requirement names what matter.js resolves it
+  to. The snapshot gains `baseDeviceTypes` (the Base device type), and
+  each cluster its `classification` and, where a binding never directs
+  it, `bindable: false`. Every key the extract carried before is
+  byte-identical in content and position. `schema.SchemaSnapshotSHA256`
+  changes: **a host pinning the snapshot's bytes must re-pin.**
 
 ### Fixed
 
