@@ -473,6 +473,22 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- **mDNS: the node answers address queries for its own host name.** A
+  query for the A / AAAA (or ANY) records of the SRV target
+  (`<MAC>0000.local.`) went unanswered: grandcat/zeroconf's
+  `Server.handleQuestion` answers only service-type, service and instance
+  questions and sends the host's addresses solely as additionals of an SRV
+  answer, so a resolver that follows the SRV target with its own address
+  query found nothing (TC-SC-4.1 / TC-SC-4.3: "No AAAA addresses were
+  resolved for hostname"). The `SubtypeResponder` side-car now answers
+  them (`SubtypeResponder.SetHost`, set by `Zeroconf.Publish`), from the
+  addresses the advertise policy publishes for the interface the query
+  arrived on — none, and no answer, on an excluded interface — with the
+  120 s TTL and the cache-flush bit, known-answer suppression, the
+  unicast-response rule, the 900 ms multicast rate limit and RFC 6762 §7.3
+  duplicate-question suppression, as matter.js `MdnsServer` does
+  (`#registerResponderNames`, `#handleMessage`, `sendable`). The OS host
+  name (`Zeroconf.HostName`, macOS) stays the OS responder's.
 - **Certification:** TC-LVL-2.3, TC-LVL-3.1, TC-LVL-4.1, TC-LVL-5.1,
   TC-LVL-6.1, TC-CC-2.2, TC-CC-6.2 and TC-CC-6.3 run and pass — they were
   excluded as class (a) gaps because no level or colour temperature was

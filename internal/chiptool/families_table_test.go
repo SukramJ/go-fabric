@@ -83,10 +83,6 @@ type family struct {
 	// run only on a host where an up, multicast-capable interface has IPv6,
 	// and otherwise skip naming the exact command that enables it.
 	multicast map[string]bool
-	// ipv6 cases need an IPv6 address on the host's advertising interface
-	// for another reason, named by the value; they run and skip like the
-	// multicast ones.
-	ipv6 map[string]string
 	// perEndpoint cases run once per endpoint of the daemon, each against
 	// that endpoint's PICS slice (TC-IDM-10.4, the PICS checker).
 	perEndpoint map[string]bool
@@ -252,15 +248,11 @@ var chipFamilies = []family{
 	{
 		name:      "SC",
 		multicast: map[string]bool{"5.2": true, "5.3": true},
-		// TC-SC-4.3 resolves the AAAA records of the operational host
-		// name; the daemon publishes the addresses its interfaces have.
-		// TC-SC-4.1 checks that the SRV target is the MAC-derived host
-		// name; without IPv6 on the LAN the harness runs the daemon with
-		// --mdns-os-hostname (bridge_test.go), which that check refuses.
-		ipv6: map[string]string{
-			"4.1": "checks the MAC-derived SRV host name, which the daemon advertises only when the host's LAN interface has IPv6 (without it the harness passes --mdns-os-hostname),",
-			"4.3": "resolves the DUT's AAAA records, which name the advertising interface's IPv6 addresses,",
-		},
+		// TC-SC-4.1 and TC-SC-4.3 follow the SRV target with a bare
+		// host-name AAAA query; the daemon's mDNS side-car answers it
+		// (mdns/host_responder.go). Both run unconditionally: they failed
+		// on an IPv6-capable runner because that answer was missing, not
+		// because of the host.
 		// TC_SC_7_1 checks the commissionable advertisement of a factory-new
 		// device and commissions it (matter.js test/core/SC.test.ts
 		// chip("SC/7.1").uncommissioned()).

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -438,8 +439,72 @@ func (z *Zeroconf) publishLocked(svc Service) error {
 		}
 	}
 	z.subFQDNs[key] = subFQDNs
+	z.setResponderHostLocked(host, domain)
 	z.announceSubtypes()
 	return nil
+}
+
+// setResponderHostLocked hands the SRV target to the side-car responder,
+// which answers the A/AAAA/ANY questions for it that grandcat/zeroconf
+// leaves unanswered (see [SubtypeResponder.SetHost]) — from the same
+// interfaces and addresses the A/AAAA additionals carry. A name the OS
+// responder owns is left to it: the [Zeroconf.HostName] override and the
+// OS host name (macOS, defaultHostName). Caller holds z.mu.
+func (z *Zeroconf) setResponderHostLocked(host, domain string) {
+	if z.responder == nil {
+		return
+	}
+	if z.HostName != "" || strings.EqualFold(strings.TrimSuffix(host, "."), osHostName()) {
+		z.responder.SetHost("", nil)
+		return
+	}
+	// The SRV target exactly as grandcat's RegisterProxy forms it.
+	fqdn := strings.Trim(host, ".")
+	if d := strings.Trim(domain, "."); !strings.HasSuffix(fqdn, d) {
+		fqdn += "." + d
+	}
+	fqdn += "."
+	z.responder.SetHost(fqdn, hostAddrsFor(z.InterfaceFilter))
+}
+
+// osHostName is the OS host name without a ".local" suffix, "" if unknown.
+func osHostName() string {
+	h, err := os.Hostname()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSuffix(strings.TrimSuffix(h, "."), ".local")
+}
+
+// hostAddrsFor returns the address source of the host-name answers: the
+// addresses [filterPrimaryHostIPs] publishes for the one interface a query
+// arrived on — none for an interface the policy excludes (loopback, tunnel,
+// container bridge, down), so a query from such a link is not answered
+// with addresses that are not reachable over it.
+func hostAddrsFor(exclude func(string) bool) func(ifIndex int) []net.IP {
+	return func(ifIndex int) []net.IP {
+		ifi, err := net.InterfaceByIndex(ifIndex)
+		if err != nil {
+			return nil
+		}
+		info := hostIface{
+			name:         ifi.Name,
+			up:           ifi.Flags&net.FlagUp != 0,
+			multicast:    ifi.Flags&net.FlagMulticast != 0,
+			loopback:     ifi.Flags&net.FlagLoopback != 0,
+			pointToPoint: ifi.Flags&net.FlagPointToPoint != 0,
+		}
+		addrs, err := ifi.Addrs()
+		if err != nil {
+			return nil
+		}
+		for _, a := range addrs {
+			if ipn, ok := a.(*net.IPNet); ok {
+				info.ips = append(info.ips, ipn.IP)
+			}
+		}
+		return parseHostIPs(filterPrimaryHostIPs([]hostIface{info}, exclude))
+	}
 }
 
 // announceSubtypes multicasts the registered subtype PTRs as an
@@ -492,6 +557,10 @@ func (z *Zeroconf) Withdraw(_ context.Context, instanceName, serviceType string)
 	}
 	z.shutdownByKeyLocked(key)
 	delete(z.items, key)
+	if len(z.servers) == 0 && z.responder != nil {
+		// Nothing advertised names the host any more.
+		z.responder.SetHost("", nil)
+	}
 	return nil
 }
 

@@ -43,10 +43,19 @@ const subtypePTRTTL = 3200
 // joins the mDNS multicast groups (224.0.0.251, ff02::fb) on UDP/5353
 // alongside zeroconf via `SO_REUSEADDR`-style multicast wildcard bind
 // and answers only the PTR queries it has explicit mappings for.
-// Anything else is ignored — the upstream library still owns the
-// SRV/TXT/A/AAAA chain.
+// It also answers the address questions for the advertiser's own host
+// name (A, AAAA, ANY), which grandcat/zeroconf never answers on its own
+// — see [SubtypeResponder.SetHost]. Anything else is ignored — the
+// upstream library still owns the service records (PTR/SRV/TXT) and the
+// A/AAAA additionals it sends with them.
 type SubtypeResponder struct {
 	logger *slog.Logger
+
+	// host answers A/AAAA/ANY questions for the advertised host name;
+	// hostSend is the transport its replies go out on (the responder's
+	// own sockets; a test substitutes a fake).
+	host     *hostAnswerer
+	hostSend hostSender
 
 	pc4    *ipv4.PacketConn
 	pc6    *ipv6.PacketConn
@@ -82,7 +91,9 @@ func NewSubtypeResponder(logger *slog.Logger) (*SubtypeResponder, error) {
 	r := &SubtypeResponder{
 		logger:   logger,
 		mappings: make(map[string]string),
+		host:     newHostAnswerer(),
 	}
+	r.hostSend = socketHostSender{r}
 
 	pc4, err4 := joinMcast4()
 	if err4 != nil {
@@ -419,24 +430,28 @@ func (r *SubtypeResponder) survivesReadError(ctx context.Context, family string,
 
 func (r *SubtypeResponder) handleV4(ctx context.Context, buf []byte, cm *ipv4.ControlMessage, src net.Addr) {
 	r.traceInbound(ctx, "v4", buf, src)
+	if cm != nil {
+		r.answerHost(buf, cm.IfIndex, src)
+	}
 	out, ok := r.buildReply(buf)
 	if !ok || r.pc4 == nil {
 		return
 	}
 	dst := &net.UDPAddr{IP: net.IPv4(224, 0, 0, 251), Port: 5353}
 	r.writeMulticastV4(out, cm, dst)
-	_ = src
 }
 
 func (r *SubtypeResponder) handleV6(ctx context.Context, buf []byte, cm *ipv6.ControlMessage, src net.Addr) {
 	r.traceInbound(ctx, "v6", buf, src)
+	if cm != nil {
+		r.answerHost(buf, cm.IfIndex, src)
+	}
 	out, ok := r.buildReply(buf)
 	if !ok || r.pc6 == nil {
 		return
 	}
 	dst := &net.UDPAddr{IP: net.ParseIP("ff02::fb"), Port: 5353}
 	r.writeMulticastV6(out, cm, dst)
-	_ = src
 }
 
 // writeMulticastV4 prefers the incoming-packet interface (so the

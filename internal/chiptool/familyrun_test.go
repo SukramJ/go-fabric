@@ -298,9 +298,6 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 			if fam.multicast[c.Name] {
 				requireIPv6(t, c.ID, "sends Matter group messages (IPv6 multicast)")
 			}
-			if why, ok := fam.ipv6[c.Name]; ok {
-				requireIPv6(t, c.ID, why)
-			}
 			applyEdits(ctx, t, h, c, fam.edits[c.Name], pics.epOf)
 			start := time.Now()
 			switch {
