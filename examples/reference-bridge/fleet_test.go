@@ -177,10 +177,11 @@ func startFleetBridge(t *testing.T) (*fleet, *matterbridge.Bridge) {
 		t.Fatalf("groups.NewManager: %v", err)
 	}
 	f, err := newFleet(endpointtest.NewFakeStore(), endpoint.Config{
-		VendorID:  testVendorID,
-		ProductID: testProductID,
-		NodeLabel: "fleet-test",
-		Groups:    groupState,
+		VendorID:   testVendorID,
+		ProductID:  testProductID,
+		NodeLabel:  "fleet-test",
+		VendorName: exampleVendorName,
+		Groups:     groupState,
 	}, logger)
 	if err != nil {
 		t.Fatalf("newFleet: %v", err)
@@ -262,4 +263,20 @@ func (s *reporterSpy) reported() [][]im.ConcreteAttributePath {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([][]im.ConcreteAttributePath(nil), s.calls...)
+}
+
+// TestBridgedDevicesServeTheNodesVendorName: the demo devices have no
+// manufacturer of their own, so every bridged endpoint serves the node's
+// VendorName — non-empty, as Apple Home needs the four vendor fields.
+func TestBridgedDevicesServeTheNodesVendorName(t *testing.T) {
+	_, br := startFleetBridge(t)
+	topo := br.Topology()
+	if topo == nil || len(topo.Bridged()) == 0 {
+		t.Fatal("the fleet mounted no bridged endpoint")
+	}
+	for _, ep := range topo.Bridged() {
+		if got := readMounted(t, ep, 0x0039, 0x0001); got != exampleVendorName {
+			t.Errorf("endpoint %d VendorName = %v, want %q", ep.ID, got, exampleVendorName)
+		}
+	}
 }

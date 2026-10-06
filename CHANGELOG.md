@@ -282,6 +282,18 @@ pseudo-version of `main`.
 
 ### Changed
 
+- **A bridged endpoint's VendorName comes from the host.** The module
+  served `"eQ-3"` as the BridgedDeviceBasicInformation VendorName of every
+  bridged endpoint — one host's manufacturer inside the module. It now
+  serves `endpoint.Spec.VendorName`, and when the host leaves that empty the
+  node's own VendorName, `endpoint.Config.VendorName` (both new; also
+  `Topology.VendorName`, `Endpoint.VendorName` and
+  `Endpoint.BridgeVendorName`). A host that set neither now serves no
+  VendorName on its bridged endpoints, matter.js's default for a bridged
+  device; set `Config.VendorName` (or a per-device `Spec.VendorName`) to
+  keep the four vendor fields Apple Home relies on filled
+  (`BD-Matter-BridgedVendorNameFallback`).
+
 - **A fabric AddNOC installs starts with an empty Label**, as matter.js's
   `FabricBuilder` starts one and as TC-OPCREDS-3.7 reads it right after
   commissioning; it was `"go-fabric"`. A host that wants a label from the

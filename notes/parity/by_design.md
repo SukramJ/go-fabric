@@ -365,6 +365,20 @@ nullish means transition instantly" (`LevelControlServer.ts:459`). Devices
 whose channel lacks RAMP_TIME (`LightCapabilities.Transition` unset) always
 take the instant path.
 
+### BD-Matter-BridgedVendorNameFallback — a bridged endpoint without a vendor serves the node's
+
+matter.js treats BridgedDeviceBasicInformation `vendorName` as optional on a
+bridged device (`basic-information-validators.ts`) and its bridge example
+(`examples/device-bridge-onoff/src/BridgedDevicesNode.ts`) sets none, so an
+unset vendor is simply absent. The module serves the host's
+`endpoint.Spec.VendorName`, and when the host leaves it empty it falls back
+to the node's own BasicInformation VendorName (`endpoint.Config.VendorName`)
+instead of leaving the attribute out: Apple Home projects a bridged
+accessory only when VendorName, ProductName, VendorID and ProductID are all
+non-empty (`endpoint/materialize.go`). With neither value set the attribute
+is not served, as in matter.js. Pinned by
+`TestParityMatterJS_BridgedVendorNameComesFromTheHost`.
+
 > **Rule of thumb (CLAUDE.md):** matter.js HEAD is the gold standard for everything under ``. Cluster IDs / revisions / attribute IDs / constraints / defaults / wire shape are taken verbatim. Any item below is a **deliberate** divergence with a documented reason. Bug-class drift (hand-coded revisions etc.) does **not** belong here — it belongs in a fix.
 
 ### Idiomatic translations TypeScript → Go (not real divergence)

@@ -87,7 +87,7 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	var refs rootRefs
 
 	basicInfo, err := mattercore.NewBasicInformation(mattercore.Config{
-		VendorName:         "go-fabric example",
+		VendorName:         exampleVendorName,
 		VendorID:           identity.vendorID,
 		ProductName:        "reference-bridge",
 		ProductID:          identity.productID,
@@ -923,3 +923,10 @@ func keepOperationalHours(ctx context.Context, st *store.Store, g *mattercore.Ge
 		}
 	}
 }
+
+// exampleVendorName is the node's BasicInformation VendorName. The
+// assembler serves it as the BridgedDeviceBasicInformation VendorName of
+// every bridged device (endpoint.Config.VendorName): the demo devices have
+// no manufacturer of their own, which a host with real devices would set
+// per device through endpoint.Spec.VendorName.
+const exampleVendorName = "go-fabric example"

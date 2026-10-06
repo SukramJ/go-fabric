@@ -156,6 +156,7 @@ func run() error {
 		VendorID:           identity.vendorID,
 		ProductID:          identity.productID,
 		NodeLabel:          identity.nodeLabel,
+		VendorName:         exampleVendorName,
 		Groups:             groupState,
 		OnNodeLabelWritten: labels.store,
 		Scenes:             labels,

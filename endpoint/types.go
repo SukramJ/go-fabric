@@ -130,6 +130,13 @@ type Endpoint struct {
 	// values trigger the test-pair fallback for the dev workflow.
 	BridgeVendorID  uint16
 	BridgeProductID uint16
+	// BridgeVendorName is the node's own VendorName ([Config.VendorName]),
+	// stamped like BridgeVendorID: the BridgedDeviceBasicInformation
+	// VendorName of a bridged endpoint without one of its own.
+	BridgeVendorName string
+	// VendorName is the bridged device's own manufacturer
+	// ([Spec.VendorName]); empty falls back to BridgeVendorName.
+	VendorName string
 
 	// ParentEndpointID is the Matter endpoint ID of the parent
 	// endpoint in the bridge hierarchy. For bridged endpoints (ID ≥ 2)
@@ -527,6 +534,9 @@ type Topology struct {
 	// NodeLabel is the bridge's user-visible label
 	// (BasicInformation.NodeLabel, Matter §11.1.5.6).
 	NodeLabel string
+	// VendorName is the node's BasicInformation VendorName
+	// ([Config.VendorName]).
+	VendorName string
 }
 
 // FindByID returns the endpoint with id ID, or nil when no such

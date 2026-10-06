@@ -190,11 +190,12 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		// non-empty VendorName + ProductName + VendorID + ProductID.
 		// matter.js's Sample-Bridge sets these to Test-Vendor values and
 		// Apple's iPad shows sensors as Reachable+Controllable=YES. We set
-		// them analogously plus the HmIP manufacturer "eQ-3" + the
+		// them analogously: the device's manufacturer as the host names it,
+		// else the node's own vendor (bridgedVendorName), plus the
 		// device-specific ProductName (= Address for unique per-endpoint
 		// identification). Without these fields Apple shows the sensors
 		// in the Home app as "not available".
-		VendorName:   "eQ-3",
+		VendorName:   bridgedVendorName(ep),
 		VendorID:     vendorID,
 		ProductName:  productName,
 		ProductID:    productID,
@@ -484,4 +485,18 @@ func mountScenes(ep *Endpoint, inner []contract.ClusterServer) []contract.Cluste
 		}
 	}
 	return append(kept, srv)
+}
+
+// bridgedVendorName is the BridgedDeviceBasicInformation VendorName of a
+// bridged endpoint: the device's own manufacturer as the host supplied it,
+// else the node's BasicInformation VendorName. Empty when the host gave
+// neither — the attribute is then not served, matter.js's default for a
+// bridged device (vendorName is optional, and its bridge example sets
+// none).
+func bridgedVendorName(ep *Endpoint) string {
+	name := ep.VendorName
+	if name == "" {
+		name = ep.BridgeVendorName
+	}
+	return truncateLabel(name)
 }
