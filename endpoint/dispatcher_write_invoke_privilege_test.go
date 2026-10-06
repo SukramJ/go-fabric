@@ -163,7 +163,8 @@ func TestTopologyDispatcher_MinWritePrivilege(t *testing.T) {
 		{"GeneralCommissioning attribute without override defaults to Operate", 0, generalCommID, gcCommissioningIn, 3},
 		{"plain cluster attribute defaults to Operate", 0, plainClusterID, 0x0000, 3},
 		{"unmounted cluster on a real endpoint defaults to Operate", 0, 0x9999, 0x0000, 3},
-		{"unmounted endpoint defaults to Operate", 42, accessControlID, accessControlACL, 3},
+		{"unmounted endpoint keeps the model privilege", 42, accessControlID, accessControlACL, 5},
+		{"BridgedDeviceBasicInformation.NodeLabel requires Manage without a server override", 42, 0x0039, 0x0005, 4},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -209,7 +210,11 @@ func TestTopologyDispatcher_MinInvokePrivilege(t *testing.T) {
 		{"GeneralCommissioning unmapped command defaults to Operate", 0, generalCommID, gcUnmappedCmd, 3},
 		{"plain cluster command defaults to Operate", 0, plainClusterID, 0x00, 3},
 		{"unmounted cluster on a real endpoint defaults to Operate", 0, 0x9999, 0x00, 3},
-		{"unmounted endpoint defaults to Operate", 42, opCredsID, opCredsRemoveFab, 3},
+		// The model's privilege applies even where the cluster is not
+		// mounted, as matter.js resolves limits from the model for a path
+		// that does not exist (CommandInvokeResponse.ts).
+		{"unmounted endpoint keeps the model privilege", 42, opCredsID, opCredsRemoveFab, 5},
+		{"Identify.Identify requires Manage without a server override", 42, 0x0003, 0x00, 4},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -430,8 +435,8 @@ func TestHandleWriteRequest_RejectsWildcardAttributePath(t *testing.T) {
 // location and returns without a status on denial).
 func TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint(t *testing.T) {
 	t.Parallel()
-	rootSrv := &recordingServer{id: plainClusterID}
-	bridgedSrv := &recordingServer{id: plainClusterID}
+	rootSrv := &recordingServer{id: plainClusterID, attrs: []uint32{0x0012}}
+	bridgedSrv := &recordingServer{id: plainClusterID, attrs: []uint32{0x0012}}
 	topo := &Topology{
 		Endpoints: []*Endpoint{
 			rootEndpointWith(rootSrv),

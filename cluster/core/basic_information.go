@@ -115,9 +115,18 @@ type ProductAppearanceStruct struct {
 const PrimaryColorAbsent uint8 = 0xFF
 
 // CapabilityMinimaStruct mirrors Matter §11.1.5.18.
+//
+// The four fields after SubscriptionsPerFabric carry conformance
+// "Rev >= v6" (basic-information.element.ts:173-184), so at the revision
+// this module advertises (6) they are mandatory; zero takes matter.js's
+// default of 20 (BasicInformationServer.ts:27-30, initialize).
 type CapabilityMinimaStruct struct {
-	CaseSessionsPerFabric  uint16
-	SubscriptionsPerFabric uint16
+	CaseSessionsPerFabric            uint16
+	SubscriptionsPerFabric           uint16
+	SimultaneousInvocationsSupported uint16
+	SimultaneousWritesSupported      uint16
+	ReadPathsSupported               uint16
+	SubscribePathsSupported          uint16
 }
 
 // Cluster ID + revision per Matter §11.1.
@@ -255,11 +264,12 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		// ceiling cannot drift apart.
 		maxPaths = im.DefaultMaxPathsPerInvoke
 	}
-	// ConfigurationVersion is optional on Root BasicInformation and
-	// matter.js Sample omits it. Carry zero (= "not configured") all
-	// the way through — MatterRead skips the attribute on the wire
-	// when the value stays zero, matching matter.js parity.
-	cfgVer := cfg.ConfigurationVersion
+	// ConfigurationVersion is mandatory from cluster revision 6
+	// (basic-information.element.ts:104, conformance "Rev >= v6"); zero
+	// serves 1, matter.js's default (BasicInformationServer.ts:75
+	// setDefault("configurationVersion", 1)). A host that raised it
+	// (IncreaseConfigurationVersion) hands the persisted value back here.
+	cfgVer := max(cfg.ConfigurationVersion, 1)
 	// matter.js basic-information.element.ts: HardwareVersionString +
 	// SoftwareVersionString carry `constraint: "1 to 64"` — empty
 	// strings violate the spec's lower bound. Apple Home's HAP service
@@ -437,8 +447,24 @@ func defaultCapabilityMinima(in CapabilityMinimaStruct) CapabilityMinimaStruct {
 	if out.SubscriptionsPerFabric < 3 {
 		out.SubscriptionsPerFabric = 3
 	}
+	// matter.js BasicInformationServer.ts:27-30 / :78-87: each of the
+	// rev-6 minima defaults to 20 when the node sets none. Found missing
+	// by the CHIP Python harness (TC-IDM-2.3 reads ReadPathsSupported).
+	for _, f := range []*uint16{
+		&out.SimultaneousInvocationsSupported, &out.SimultaneousWritesSupported,
+		&out.ReadPathsSupported, &out.SubscribePathsSupported,
+	} {
+		if *f == 0 {
+			*f = capabilityMinimaRev6Default
+		}
+	}
 	return out
 }
+
+// capabilityMinimaRev6Default is matter.js's default for the four rev-6
+// CapabilityMinima fields (DEFAULT_SIMULTANEOUS_INVOCATIONS_SUPPORTED …
+// DEFAULT_SUBSCRIBE_PATHS_SUPPORTED, all 20).
+const capabilityMinimaRev6Default uint16 = 20
 
 // StartUpEvent is the payload for the Matter §11.1.8.1 StartUp event
 // (id 0x0000, priority Critical). Mirrors matter.js
@@ -591,11 +617,6 @@ func (b *BasicInformation) MatterRead(attrID uint32) (any, bool) { //nolint:gocy
 	case basicInfoAttrMaxPathsPerInvoke:
 		return b.maxPathsPerInvoke, true
 	case basicInfoAttrConfigurationVersion:
-		// Matter 1.5 optional. matter.js Sample omits this on Root.
-		// Emit only when the config explicitly set a non-zero value.
-		if b.configurationVersion == 0 {
-			return nil, false
-		}
 		return b.configurationVersion, true
 	case cluster.AttrGlobalFeatureMap:
 		return uint32(0), true
@@ -725,9 +746,9 @@ func (b *BasicInformation) MatterReportable() []uint32 {
 // with HAPErrorDomain Code 24. Globals (FeatureMap + ClusterRevision)
 // are merged in by the dispatcher.
 func (b *BasicInformation) MatterAttributes() []uint32 {
-	// LocalConfigDisabled (0x10) and ConfigurationVersion (0x18) are
-	// intentionally OMITTED — optional on Root BasicInformation, and
-	// matter.js's bridge sample does not emit them. Reachable (0x11)
+	// LocalConfigDisabled (0x10) is intentionally OMITTED — optional, and
+	// matter.js's bridge sample does not emit it. ConfigurationVersion
+	// (0x18) is mandatory from revision 6 (TC-BINFO-3.2). Reachable (0x11)
 	// IS emitted because Apple's HMAccessory.Reachable signal depends
 	// on it (Run 15 vs Run 16 verification, empirically confirmed).
 	out := []uint32{
@@ -747,6 +768,7 @@ func (b *BasicInformation) MatterAttributes() []uint32 {
 		basicInfoAttrCapabilityMinima,
 		basicInfoAttrSpecificationVersion,
 		basicInfoAttrMaxPathsPerInvoke,
+		basicInfoAttrConfigurationVersion,
 	}
 	if b.manufacturingDate != "" {
 		out = append(out, basicInfoAttrManufacturingDate)
@@ -946,4 +968,35 @@ func (b *BasicInformation) EmitReachableChanged(reachable bool) {
 	emitter.MatterEmitEvent(endpoint, basicInfoClusterID, basicInfoEventReachableChanged,
 		ReachableChangedEvent{ReachableNewValue: reachable},
 		contract.EventPriorityInfo)
+}
+
+// IncreaseConfigurationVersion raises ConfigurationVersion by one — call it
+// when the node's functionality changes, e.g. a bridged device added or
+// removed — and returns the new value for the host to persist and hand back
+// as BasicInformationConfig.ConfigurationVersion: the version may never
+// decrease. The uint32 wraps to 1, never 0. Mirrors matter.js
+// BasicInformationServer.increaseConfigurationVersion /
+// nextConfigurationVersion. Subscribers learn of it through the owner's
+// attribute-change path (bridge.Bridge.IncreaseNodeConfigurationVersion).
+func (b *BasicInformation) IncreaseConfigurationVersion() uint32 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.configurationVersion++
+	if b.configurationVersion == 0 {
+		b.configurationVersion = 1
+	}
+	b.dataVersion.Bump()
+	return b.configurationVersion
+}
+
+// RestoreConfigurationVersion installs a ConfigurationVersion the host
+// persisted from an earlier IncreaseConfigurationVersion; it never lowers
+// the current value, since the version may not decrease.
+func (b *BasicInformation) RestoreConfigurationVersion(v uint32) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if v > b.configurationVersion {
+		b.configurationVersion = v
+		b.dataVersion.Bump()
+	}
 }

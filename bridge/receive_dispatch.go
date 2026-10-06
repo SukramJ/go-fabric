@@ -15,9 +15,9 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // errChunkRejected is returned by a chunk loop when the peer answered a
@@ -203,7 +203,8 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 	// #readAllowedEvents.
 	if len(req.EventRequests) > 0 {
 		auth := b.eventReadAuthorizer(dispatcher, readFabricIndex, readPASE, readSubjectNodeID, readSubjectCATs)
-		report.EventReports = im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(req, b.eventLog))
+		report.EventReports = append(im.DeniedEventPathStatuses(readCtx, auth, req.EventRequests),
+			im.AuthorizeEventReports(readCtx, auth, im.HandleReadEventRequest(req, b.eventLog))...)
 	}
 	// Diagnostic: show what we returned per path.
 	for i, r := range report.Reports {
@@ -375,7 +376,14 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 	if b.resolveSessionPASE(requestHdr.SessionID) {
 		writeCtx = im.WithAuthModePASE(writeCtx)
 	}
+	// The chunks of one chunked write share a transaction, as chip's
+	// WriteHandler serves the whole interaction (TC-ACL-2.6, 2.8).
+	writeCtx = im.WithWriteTransaction(writeCtx, b.routing.writeTransaction(
+		mrp.ExchangeKey{SessionID: requestHdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator},
+		req.MoreChunkedMessages, time.Now(),
+	))
 	resp := im.HandleWriteRequest(writeCtx, dispatcher, req)
+	b.reportWrittenAttributes(resp)
 	// Honor SuppressResponse=true per Matter §10.6.3.1: when the
 	// initiator opts out of the WriteResponse the server MUST
 	// elide it. matter.js InteractionServer.ts and chip
@@ -431,37 +439,15 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 	return nil
 }
 
-// anyTimedRequiredInvoke reports whether any command in req targets a
-// timed-required (cluster, command) pair per matter.js (schema.IsTimedInvoke).
-// A batched invoke is timed-required as a whole if any of its commands is.
-func anyTimedRequiredInvoke(req im.InvokeRequest) bool {
-	for i := range req.Invokes {
-		p := req.Invokes[i].Path
-		if schema.IsTimedInvoke(p.Cluster, p.Command) {
-			return true
-		}
-	}
-	return false
-}
-
-// dispatchInvokeRequest handles a decoded InvokeRequest. The TLV decode and
-// dispatcher nil-check are done by the caller (handleIMOpcode).
-//
-// Server-side timed-required conformance: a command marked "T" in the matter.js
-// model (schema.IsTimedInvoke) must be invoked inside a valid timed window even
-// when the controller left the InvokeRequest's own Timed flag clear. Folding it
-// into the gate flag makes a timed-required command with no window yield
-// NEEDS_TIMED_INTERACTION, mirroring matter.js CommandInvokeResponse.ts:266
-// `if (limits.timed && !this.session.timed)`. For a non-timed command the flag
-// is unchanged, so the existing flag-vs-window mismatch handling is preserved.
-func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.InvokeRequest) error {
-	// Server-side timed-required conformance: a command marked "T" in the
-	// matter.js model (schema.IsTimedInvoke) must be invoked inside a valid
-	// timed window even when the controller left the InvokeRequest's own Timed
-	// flag clear. Fold it into the gate flag so a timed-required command with no
-	// window yields NEEDS_TIMED_INTERACTION. Mirrors matter.js
-	// CommandInvokeResponse.ts:266 `if (limits.timed && !this.session.timed)`.
-	if status, gated := b.checkTimedGate(req.TimedRequest || anyTimedRequiredInvoke(req), requestHdr.SessionID, proto.ExchangeID); gated {
+// Timed interactions, as matter.js splits them: the interaction-level gate
+// compares the request's own Timed flag with the exchange's timed window
+// (a mismatch either way is TIMED_REQUEST_MISMATCH, an expired window
+// TIMEOUT — InteractionServer.ts:940-950), and a command marked "T" in the
+// matter.js model (schema.IsTimedInvoke) invoked outside a timed interaction
+// answers NEEDS_TIMED_INTERACTION for its own path in the InvokeResponse
+// (CommandInvokeResponse.ts:291), via [im.WithTimedInteraction].
+func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.InvokeRequest) error { //nolint:funlen // the invoke path's gates in their wire order, read top to bottom
+	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
 		return b.replyTimedStatus(src, requestHdr, proto, "invoke", status)
 	}
 	// Batch-invoke path validation: a malformed batch (wildcard-endpoint path
@@ -509,7 +495,21 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 	// the session that issued the CSRRequest (matter.js
 	// OperationalCredentialsServer.ts session-ID binding guard).
 	invokeCtx = core.WithInvokeSessionID(invokeCtx, requestHdr.SessionID)
+	if challenge, ok := b.sessionAttestationChallenge(requestHdr.SessionID); ok {
+		invokeCtx = core.WithInvokeAttestationChallenge(invokeCtx, challenge)
+	}
+	// The gate above passed, so a set Timed flag means a valid window.
+	invokeCtx = im.WithTimedInteraction(invokeCtx, req.TimedRequest)
+	// Work a command defers until its response is out — the PASE session
+	// a RevokeCommissioning over PASE closes — runs when this returns,
+	// whichever way: the reply sent, suppressed, or failed.
+	after := &im.AfterResponse{}
+	defer after.Run()
+	invokeCtx = im.WithAfterResponse(invokeCtx, after)
+	before := b.snapshotInvokedClusters(invokeCtx, dispatcher, req)
 	resp := im.HandleInvokeRequest(invokeCtx, dispatcher, req)
+	b.adoptPASESessionOnAddNOC(requestHdr.SessionID, resp)
+	b.reportInvokeChanges(invokeCtx, dispatcher, before)
 	for i := range resp.Responses {
 		rewriteInvokeResponseCommand(&resp.Responses[i])
 	}
@@ -529,10 +529,32 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 			slog.Int("statuses", len(resp.Responses)))
 		return nil
 	}
-	body, err := EncodeInvokeResponse(resp)
+	chunks, err := chunkInvokeResponse(resp, reportChunkPayloadBudget)
 	if err != nil {
 		debugReplyError(b.logger, "encode_invoke", src, err)
 		return err
+	}
+	// All but the last chunk wait for the controller's StatusResponse
+	// before the next goes out, as for a chunked read (matter.js
+	// InteractionMessenger.ts sendInvokeResponse → waitForSuccess).
+	for i, chunk := range chunks[:len(chunks)-1] {
+		waitCh := b.armStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+		chunkHdr := *requestHdr
+		b.refreshAckCounter(&chunkHdr, proto.ExchangeID, !proto.Initiator)
+		if err := b.sendReplyReliable(src, &chunkHdr, proto, im.OpcodeInvokeResponse, chunk); err != nil {
+			b.disarmStatusResponseWait(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+			debugReplyError(b.logger, "send_invoke_chunk", src, err)
+			return err
+		}
+		if err := b.awaitChunkStatusResponse(waitCh, "invoke", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, im.ReportData{MoreChunkedMessages: true}); err != nil {
+			return err
+		}
+	}
+	body := chunks[len(chunks)-1]
+	if len(chunks) > 1 {
+		lastHdr := *requestHdr
+		b.refreshAckCounter(&lastHdr, proto.ExchangeID, !proto.Initiator)
+		requestHdr = &lastHdr
 	}
 	// Reliable: a lost InvokeResponse surfaces to the controller as
 	// "Not Responding" (Apple Home) even though the command executed.
@@ -608,4 +630,251 @@ func (b *Bridge) dispatchTimedRequest(src *net.UDPAddr, requestHdr *message.Head
 		slog.String("src", srcString(src)),
 		slog.Int("timeout_ms", int(req.TimeoutMs)))
 	return nil
+}
+
+// reportWrittenAttributes marks every successfully written attribute dirty
+// for the subscriptions that cover it. (The dispatcher has already advanced
+// the cluster's DataVersion: endpoint/dispatcher.go WriteAuthorized for a
+// bridged endpoint, the server's own tracker for the root.) A write is a state change
+// like any other: matter.js commits it to the behavior's state, whose
+// Datasource advances the version and broadcasts the changed property to
+// every subscriber (Datasource.ts). Without this a subscriber learned of a
+// write — its own or another controller's — only when the cluster happened
+// to fire a change notification of its own; a root attribute such as
+// BasicInformation.NodeLabel was never reported at all. Found by the CHIP
+// Python harness (TC-IDM-2.3 step 4).
+func (b *Bridge) reportWrittenAttributes(resp im.WriteResponse) {
+	mgr := b.subscriptionManagerLocked()
+	for _, r := range resp.Responses {
+		if !r.Status.Status.IsSuccess() || !r.Path.HasEndpoint || !r.Path.HasCluster || !r.Path.HasAttribute {
+			continue
+		}
+		if mgr != nil {
+			mgr.OnAttributeChanged(im.ConcreteAttributePath{
+				Endpoint: r.Path.Endpoint, Cluster: r.Path.Cluster, Attribute: r.Path.Attribute,
+				HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			})
+		}
+	}
+}
+
+// invokedCluster names one cluster instance an invoke ran against.
+type invokedCluster struct {
+	endpoint uint16
+	cluster  uint32
+}
+
+// snapshotInvokedClusters renders every attribute of each cluster a
+// concrete invoke path names, before the commands run. A subscription
+// manager is required for the comparison to matter; without one this is a
+// no-op.
+func (b *Bridge) snapshotInvokedClusters(ctx context.Context, d im.Dispatcher, req im.InvokeRequest) map[invokedCluster]map[uint32]string {
+	if b.subscriptionManagerLocked() == nil {
+		return nil
+	}
+	out := map[invokedCluster]map[uint32]string{}
+	for _, inv := range req.Invokes {
+		if !inv.Path.HasEndpoint {
+			continue
+		}
+		key := invokedCluster{inv.Path.Endpoint, inv.Path.Cluster}
+		if _, done := out[key]; !done {
+			out[key] = renderCluster(ctx, d, key)
+		}
+	}
+	return out
+}
+
+// reportInvokeChanges marks dirty every attribute whose value a command
+// changed, after advancing a bridged cluster's DataVersion. A command is a
+// state change like a write: matter.js commits whatever the command handler
+// assigned to the behavior's state, and its Datasource advances the version
+// and reports the changed properties (Datasource.ts). Root servers here
+// change their state inside MatterInvoke without a change notification —
+// GeneralCommissioning's Breadcrumb on ArmFailSafe, OperationalCredentials'
+// Fabrics on AddNOC — so without this comparison no subscriber ever saw
+// those changes. Found by the CHIP Python harness (TC-IDM-1.5 subscribes to
+// Breadcrumb and arms the fail-safe).
+func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, before map[invokedCluster]map[uint32]string) {
+	mgr := b.subscriptionManagerLocked()
+	if mgr == nil || len(before) == 0 {
+		return
+	}
+	topo := b.Topology()
+	for key, old := range before {
+		now := renderCluster(ctx, d, key)
+		bumped := false
+		for attr, v := range now {
+			if attr >= 0xFFF8 {
+				continue
+			}
+			if prev, ok := old[attr]; ok && prev == v {
+				continue
+			}
+			if !bumped && topo != nil {
+				if ep := topo.FindByID(key.endpoint); ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+					ep.BumpClusterDataVersion(key.cluster)
+				}
+				bumped = true
+			}
+			mgr.OnAttributeChanged(im.ConcreteAttributePath{
+				Endpoint: key.endpoint, Cluster: key.cluster, Attribute: attr,
+				HasEndpoint: true, HasCluster: true, HasAttribute: true,
+			})
+		}
+	}
+}
+
+// renderCluster reads every attribute of one cluster instance and renders
+// each value for comparison.
+func renderCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map[uint32]string {
+	out := map[uint32]string{}
+	for _, r := range d.Read(ctx, im.ConcreteAttributePath{Endpoint: key.endpoint, Cluster: key.cluster, HasEndpoint: true, HasCluster: true}) {
+		if r.Status == im.StatusSuccess {
+			out[r.Path.Attribute] = fmt.Sprintf("%#v", r.Value)
+		}
+	}
+	return out
+}
+
+// chunkInvokeResponse encodes an InvokeResponse into one message, or — when
+// its responses do not fit one — into as many as needed, every one but the
+// last carrying MoreChunkedMessages. Responses are never split; a single
+// response too large for a message on its own is replaced by a
+// ResourceExhausted status for its path, as matter.js answers a response it
+// cannot send. Mirrors matter.js InteractionServer invoke chunking (the
+// InvokeResponse split by maxPayloadSize). Found by the CHIP Python harness
+// (TC-IDM-1.4 step 11 batches two commands whose responses exceed one
+// message).
+func chunkInvokeResponse(resp im.InvokeResponse, budget int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one
+	whole, err := EncodeInvokeResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	if len(whole) <= budget || len(resp.Responses) <= 1 {
+		if len(whole) > reportChunkHardCap && len(resp.Responses) == 1 {
+			resp.Responses[0] = oversizedInvokeEntry(resp.Responses[0])
+			whole, err = EncodeInvokeResponse(resp)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return [][]byte{whole}, nil
+	}
+	var chunks [][]byte
+	cur := im.InvokeResponse{SuppressResponse: resp.SuppressResponse}
+	flush := func(more bool) error {
+		cur.MoreChunkedMessages = more
+		body, err := EncodeInvokeResponse(cur)
+		if err != nil {
+			return err
+		}
+		chunks = append(chunks, body)
+		cur = im.InvokeResponse{SuppressResponse: resp.SuppressResponse}
+		return nil
+	}
+	for _, ent := range resp.Responses {
+		trial := cur
+		trial.Responses = append(append([]im.InvokeResponseEntry(nil), cur.Responses...), ent)
+		trial.MoreChunkedMessages = true
+		body, err := EncodeInvokeResponse(trial)
+		if err != nil {
+			return nil, err
+		}
+		if len(body) > budget && len(cur.Responses) > 0 {
+			if err := flush(true); err != nil {
+				return nil, err
+			}
+			trial = im.InvokeResponse{SuppressResponse: resp.SuppressResponse, Responses: []im.InvokeResponseEntry{ent}, MoreChunkedMessages: true}
+			if body, err = EncodeInvokeResponse(trial); err != nil {
+				return nil, err
+			}
+		}
+		if len(body) > reportChunkHardCap {
+			ent = oversizedInvokeEntry(ent)
+		}
+		cur.Responses = append(cur.Responses, ent)
+	}
+	if err := flush(false); err != nil {
+		return nil, err
+	}
+	return chunks, nil
+}
+
+// oversizedInvokeEntry answers a response that cannot fit a message with
+// ResourceExhausted for its path.
+func oversizedInvokeEntry(ent im.InvokeResponseEntry) im.InvokeResponseEntry {
+	return im.InvokeResponseEntry{
+		Path: ent.Path, CommandRef: ent.CommandRef, HasCommandRef: ent.HasCommandRef,
+		IsStatus: true, Status: im.StatusIB{Status: im.StatusResourceExhausted},
+	}
+}
+
+// sessionFabricAdopter is the optional capability of the session table to
+// move a session onto a fabric (operational.Manager.AdoptFabricIndex).
+type sessionFabricAdopter interface {
+	AdoptFabricIndex(sessionID uint16, fabricIndex uint8) error
+}
+
+// adoptPASESessionOnAddNOC moves the PASE session an AddNOC succeeded on
+// onto the fabric it installed, so the commands that follow on it have
+// that fabric as their accessing fabric — matter.js
+// OperationalCredentialsServer.addNoc sets `session.fabric = fabric` for a
+// PASE session, chip calls SecureSession::AdoptFabricIndex. Without it a
+// CommissioningComplete sent over PASE after AddNOC was refused by the
+// fabric-scoped access gate (UnsupportedAccess) instead of reaching the
+// cluster, which answers InvalidAuthentication (TC-CGEN-2.4). The session
+// stays a PASE session (its implicit Administer grant and the PASE-only
+// rules still apply).
+func (b *Bridge) adoptPASESessionOnAddNOC(sessionID uint16, resp im.InvokeResponse) {
+	if sessionID == 0 || !b.resolveSessionPASE(sessionID) {
+		return
+	}
+	for _, e := range resp.Responses {
+		if e.Path.Cluster != 0x003E || !e.HasResponse { // OperationalCredentials
+			continue
+		}
+		noc, ok := e.Response.(core.NOCResponse)
+		if !ok || noc.StatusCode != core.NOCStatusOK || noc.FabricIndex == 0 {
+			continue
+		}
+		b.mu.RLock()
+		adopter, ok := b.sessionRegistry.(sessionFabricAdopter)
+		if !ok {
+			adopter, ok = b.sessions.(sessionFabricAdopter)
+		}
+		b.mu.RUnlock()
+		if !ok {
+			return
+		}
+		if err := adopter.AdoptFabricIndex(sessionID, noc.FabricIndex); err != nil {
+			b.logger.Debug("matter.rx.im.addnoc.adopt_failed",
+				slog.Int("session_id", int(sessionID)), slog.String("err", err.Error()))
+		}
+	}
+}
+
+// sessionAttestationChallenger is the optional capability of the session
+// table to name a session's attestation challenge
+// (operational.Manager.AttestationChallengeFor).
+type sessionAttestationChallenger interface {
+	AttestationChallengeFor(sessionID uint16) ([]byte, bool)
+}
+
+// sessionAttestationChallenge returns the attestation challenge of the
+// session an invoke arrived on, when the session table can name it.
+func (b *Bridge) sessionAttestationChallenge(sessionID uint16) ([]byte, bool) {
+	if sessionID == 0 {
+		return nil, false
+	}
+	b.mu.RLock()
+	c, ok := b.sessionRegistry.(sessionAttestationChallenger)
+	if !ok {
+		c, ok = b.sessions.(sessionAttestationChallenger)
+	}
+	b.mu.RUnlock()
+	if !ok {
+		return nil, false
+	}
+	return c.AttestationChallengeFor(sessionID)
 }

@@ -6,10 +6,12 @@ package light_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/im"
 	matterparity "github.com/SukramJ/go-fabric/parity"
 )
 
@@ -78,6 +80,10 @@ func TestParityMatterJS_ColorControlMandatoryAttributes(t *testing.T) {
 		{wire.ColorCtrlAttrColorCapabilities, "ColorCapabilities (0x400A)"},
 		{wire.ColorCtrlAttrColorTempPhysicalMin, "ColorTempPhysicalMinMireds (0x400B)"},
 		{wire.ColorCtrlAttrColorTempPhysicalMax, "ColorTempPhysicalMaxMireds (0x400C)"},
+		// Conformance "CT" (color-control.element.ts:183-189); found
+		// missing by the chip-tool data-model sweep.
+		{wire.ColorCtrlAttrCoupleColorTempToLevelMinMireds, "CoupleColorTempToLevelMinMireds (0x400D)"},
+		{wire.ColorCtrlAttrStartUpColorTemperatureMireds, "StartUpColorTemperatureMireds (0x4010)"},
 	}
 	for _, m := range mandatory {
 		if !present[m.id] {
@@ -301,5 +307,42 @@ func TestColorControl_NoHSXYAttributes(t *testing.T) {
 		if ok {
 			t.Errorf("MatterRead(0x%04X) returned ok=true for %s but HS/XY feature absent", a.id, a.name)
 		}
+	}
+}
+
+// TestParityMatterJS_ColorControlStartUpColorTemperatureMireds pins the one
+// writable CT attribute: null by default, Manage to write, constraint
+// "1 to 65279", nullable (matter.js color-control.element.ts:187-188).
+func TestParityMatterJS_ColorControlStartUpColorTemperatureMireds(t *testing.T) {
+	t.Parallel()
+	srv := light.NewColorControlServer(light.DefaultColorControlServerConfig())
+	attr := wire.ColorCtrlAttrStartUpColorTemperatureMireds
+	if v, ok := srv.MatterRead(attr); !ok || v != nil {
+		t.Fatalf("initial read = %v, %v; want null", v, ok)
+	}
+	if got := srv.MinWritePrivilege(attr); got != 4 {
+		t.Errorf("MinWritePrivilege = %d, want 4 (Manage, access RW VM)", got)
+	}
+	if err := srv.MatterWrite(context.Background(), attr, uint64(250)); err != nil {
+		t.Fatalf("write 250: %v", err)
+	}
+	if v, _ := srv.MatterRead(attr); v != uint16(250) {
+		t.Errorf("after write 250 read %v", v)
+	}
+	for _, bad := range []any{uint64(0), uint64(65280)} {
+		err := srv.MatterWrite(context.Background(), attr, bad)
+		var sce im.StatusCodeError
+		if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusConstraintError {
+			t.Errorf("write %v = %v, want CONSTRAINT_ERROR", bad, err)
+		}
+	}
+	if err := srv.MatterWrite(context.Background(), attr, nil); err != nil {
+		t.Fatalf("write null: %v", err)
+	}
+	if v, _ := srv.MatterRead(attr); v != nil {
+		t.Errorf("after null write read %v", v)
+	}
+	if v, _ := srv.MatterRead(wire.ColorCtrlAttrCoupleColorTempToLevelMinMireds); v != uint16(153) {
+		t.Errorf("CoupleColorTempToLevelMinMireds = %v, want the physical minimum 153", v)
 	}
 }

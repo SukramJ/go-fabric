@@ -130,6 +130,13 @@ type Endpoint struct {
 	// values trigger the test-pair fallback for the dev workflow.
 	BridgeVendorID  uint16
 	BridgeProductID uint16
+	// BridgeVendorName is the node's own VendorName ([Config.VendorName]),
+	// stamped like BridgeVendorID: the BridgedDeviceBasicInformation
+	// VendorName of a bridged endpoint without one of its own.
+	BridgeVendorName string
+	// VendorName is the bridged device's own manufacturer
+	// ([Spec.VendorName]); empty falls back to BridgeVendorName.
+	VendorName string
 
 	// ParentEndpointID is the Matter endpoint ID of the parent
 	// endpoint in the bridge hierarchy. For bridged endpoints (ID ≥ 2)
@@ -207,6 +214,10 @@ type Endpoint struct {
 	// endpoints from [Config.Groups]. Non-nil makes [ClusterServers]
 	// mount the stack's Groups server — see [Config.Groups].
 	groups *groups.Manager
+	// onNodeLabelWritten is [Config.OnNodeLabelWritten].
+	onNodeLabelWritten func(key SourceKey, label string)
+	// scenesStore is [Config.Scenes].
+	scenesStore ScenesStore
 }
 
 // PublishClusterServers publishes servers as this endpoint's attached
@@ -278,6 +289,73 @@ type endpointState struct {
 	mu       sync.Mutex
 	trackers map[uint32]*contract.DataVersionTracker
 	identify *mattercore.Identify
+	// nodeLabel is a BridgedDeviceBasicInformation NodeLabel a controller
+	// wrote (or the host restored from its own storage, Spec.NodeLabel);
+	// nil reads the FriendlyName. It lives here because the cluster
+	// server is rebuilt on every dispatch — a label stored on the server
+	// was lost the moment the write returned.
+	nodeLabel *string
+	// configVersion is the BridgedDeviceBasicInformation
+	// ConfigurationVersion; 0 until set, served as 1.
+	configVersion uint32
+	// scenes is the ScenesManagement scene table, created on first use.
+	scenes *mattercore.ScenesState
+}
+
+// configurationVersion returns the version, 1 when never raised.
+func (s *endpointState) configurationVersion() uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return max(s.configVersion, 1)
+}
+
+// increaseConfigurationVersion raises the version by one and returns it.
+// Mirrors matter.js BasicInformationServer.nextConfigurationVersion: the
+// uint32 wraps to 1, never to 0.
+func (s *endpointState) increaseConfigurationVersion() uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	next := max(s.configVersion, 1) + 1
+	if next == 0 {
+		next = 1
+	}
+	s.configVersion = next
+	return next
+}
+
+// restoreConfigurationVersion installs a host-persisted version; it never
+// lowers the current one.
+func (s *endpointState) restoreConfigurationVersion(v uint32) {
+	s.mu.Lock()
+	s.configVersion = max(s.configVersion, v)
+	s.mu.Unlock()
+}
+
+// label returns the written label, if any.
+func (s *endpointState) label() (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.nodeLabel == nil {
+		return "", false
+	}
+	return *s.nodeLabel, true
+}
+
+// setLabel stores a written label.
+func (s *endpointState) setLabel(l string) {
+	s.mu.Lock()
+	s.nodeLabel = &l
+	s.mu.Unlock()
+}
+
+// restoreLabel installs a host-restored label unless a controller has
+// written one since this state was created.
+func (s *endpointState) restoreLabel(l string) {
+	s.mu.Lock()
+	if s.nodeLabel == nil {
+		s.nodeLabel = &l
+	}
+	s.mu.Unlock()
 }
 
 func newEndpointState() *endpointState {
@@ -390,6 +468,47 @@ func (e *Endpoint) BumpClusterDataVersion(clusterID uint32) {
 	e.clusterTracker(clusterID).Bump()
 }
 
+// NodeLabel returns the endpoint's BridgedDeviceBasicInformation
+// NodeLabel: the label a controller last wrote, else the FriendlyName.
+func (e *Endpoint) NodeLabel() string {
+	if l, ok := e.endpointState().label(); ok {
+		return l
+	}
+	return e.FriendlyName
+}
+
+// ConfigurationVersion returns the endpoint's
+// BridgedDeviceBasicInformation ConfigurationVersion (1 until raised).
+func (e *Endpoint) ConfigurationVersion() uint32 {
+	return e.endpointState().configurationVersion()
+}
+
+// IncreaseConfigurationVersion raises the endpoint's
+// BridgedDeviceBasicInformation ConfigurationVersion by one, bumps the
+// cluster's DataVersion and returns the new version for the host to
+// persist (hand it back as [Spec.ConfigurationVersion]). Call it when the
+// bridged device's functionality changes — matter.js
+// BridgedDeviceBasicInformationServer.increaseConfigurationVersion. To
+// reach subscribers, go through bridge.Bridge.IncreaseConfigurationVersion,
+// which also marks the attribute dirty.
+func (e *Endpoint) IncreaseConfigurationVersion() uint32 {
+	v := e.endpointState().increaseConfigurationVersion()
+	e.BumpClusterDataVersion(mattercore.BridgedDeviceBasicInformationClusterID)
+	return v
+}
+
+// nodeLabelWriter returns the hook a BridgedDeviceBasicInformation server
+// calls with a written NodeLabel: it stores the label in the endpoint's
+// state and hands it to the host's OnNodeLabelWritten.
+func (e *Endpoint) nodeLabelWriter() func(string) {
+	return func(label string) {
+		e.endpointState().setLabel(label)
+		if e.onNodeLabelWritten != nil {
+			e.onNodeLabelWritten(e.SourceKey, label)
+		}
+	}
+}
+
 // IsRoot reports whether this is the root bridge endpoint (ID 0).
 func (e *Endpoint) IsRoot() bool { return e.ID == 0 }
 
@@ -415,6 +534,9 @@ type Topology struct {
 	// NodeLabel is the bridge's user-visible label
 	// (BasicInformation.NodeLabel, Matter §11.1.5.6).
 	NodeLabel string
+	// VendorName is the node's BasicInformation VendorName
+	// ([Config.VendorName]).
+	VendorName string
 }
 
 // FindByID returns the endpoint with id ID, or nil when no such
@@ -445,4 +567,62 @@ func (t *Topology) Bridged() []*Endpoint {
 		out = append(out, ep)
 	}
 	return out
+}
+
+// scenesState returns (creating, restoring from the store) the endpoint's
+// scene table.
+func (e *Endpoint) scenesState() *mattercore.ScenesState {
+	st := e.endpointState()
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.scenes != nil {
+		return st.scenes
+	}
+	var persist func([]byte)
+	var data []byte
+	if e.scenesStore != nil && e.SourceKey != nil {
+		store, key := e.scenesStore, e.SourceKey
+		persist = func(table []byte) { store.SaveScenes(key, table) }
+		data = store.LoadScenes(key)
+	}
+	scenes, err := mattercore.LoadScenesState(data, persist)
+	if err != nil {
+		scenes = mattercore.NewScenesState(persist)
+	}
+	st.scenes = scenes
+	return scenes
+}
+
+// ForgetFabricScenes drops a removed fabric's scenes from the endpoint's
+// scene table, if it has one: the entries are fabric-scoped state that
+// matter.js removes with the fabric.
+func (e *Endpoint) ForgetFabricScenes(fabricIndex uint8) {
+	st := e.endpointState()
+	st.mu.Lock()
+	loaded := st.scenes != nil
+	st.mu.Unlock()
+	if loaded || e.scenesStore != nil {
+		// A persisted table that no dispatch has loaded yet is loaded now,
+		// so the removed fabric's entries cannot survive in it.
+		e.scenesState().RemoveScenesForFabric(fabricIndex)
+	}
+}
+
+// invalidateSceneOnCommand ends the validity of the endpoint's current
+// scene after a command on a scene-able cluster — matter.js OnOffServer,
+// LevelControlServer and ColorControlServer call
+// ScenesManagementServer.makeAllFabricSceneInfoEntriesInvalid from their
+// state-changing commands. A recall applies its values through the
+// servers directly and keeps the scene valid.
+func (e *Endpoint) invalidateSceneOnCommand(clusterID uint32) {
+	if clusterID != 0x0006 && clusterID != 0x0008 && clusterID != 0x0300 {
+		return
+	}
+	st := e.endpointState()
+	st.mu.Lock()
+	scenes := st.scenes
+	st.mu.Unlock()
+	if scenes != nil {
+		scenes.InvalidateCurrentScene()
+	}
 }

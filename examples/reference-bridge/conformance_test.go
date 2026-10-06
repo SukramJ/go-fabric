@@ -6,13 +6,17 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/parity"
@@ -166,6 +170,13 @@ func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 		if srv == nil {
 			t.Fatal("the light mounts no onOffServer")
 		}
+		var reportedMu sync.Mutex
+		var reported [][]uint32
+		srv.OnMatterAttributesChanged(func(ids []uint32) {
+			reportedMu.Lock()
+			reported = append(reported, ids)
+			reportedMu.Unlock()
+		})
 		if _, err := srv.MatterInvoke(context.Background(), onoff.CmdOnWithTimedOff,
 			map[uint8]any{0: uint8(0), 1: uint16(3), 2: uint16(0)}); err != nil {
 			t.Fatalf("OnWithTimedOff: %v", err)
@@ -194,6 +205,169 @@ func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 		}
 		if v, _ := srv.MatterRead(onoff.AttrOnTime); v != uint16(0) {
 			t.Errorf("OnTime after the countdown = %v, want 0", v)
+		}
+		// Every tick reports what it changed — the request that started the
+		// countdown is long answered, so nothing else would.
+		reportedMu.Lock()
+		defer reportedMu.Unlock()
+		want := [][]uint32{{onoff.AttrOnTime}, {onoff.AttrOnTime}, {onoff.AttrOnOff, onoff.AttrOnTime}}
+		if !reflect.DeepEqual(reported, want) {
+			t.Errorf("reported changes = %v, want %v (two countdown ticks, then the timed-off)", reported, want)
+		}
+	})
+}
+
+// TestDelayedOffReportsItsCountdown: the delayed-off guard's ticks report
+// OffWaitTime as it runs down.
+func TestDelayedOffReportsItsCountdown(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		light := newDemoLight("guard")
+		var srv *onOffServer
+		for _, s := range light.MatterClusterServers() {
+			if o, ok := s.(*onOffServer); ok {
+				srv = o
+			}
+		}
+		var reportedMu sync.Mutex
+		var reported [][]uint32
+		srv.OnMatterAttributesChanged(func(ids []uint32) {
+			reportedMu.Lock()
+			reported = append(reported, ids)
+			reportedMu.Unlock()
+		})
+		ctx := context.Background()
+		if _, err := srv.MatterInvoke(ctx, onoff.CmdOn, nil); err != nil {
+			t.Fatalf("On: %v", err)
+		}
+		if err := srv.MatterWrite(ctx, onoff.AttrOffWaitTime, uint16(2)); err != nil {
+			t.Fatalf("write OffWaitTime: %v", err)
+		}
+		if _, err := srv.MatterInvoke(ctx, onoff.CmdOff, nil); err != nil {
+			t.Fatalf("Off: %v", err)
+		}
+		time.Sleep(2 * lightingTick)
+		synctest.Wait()
+		if v, _ := srv.MatterRead(onoff.AttrOffWaitTime); v != uint16(0) {
+			t.Fatalf("OffWaitTime after the guard = %v, want 0", v)
+		}
+		reportedMu.Lock()
+		defer reportedMu.Unlock()
+		want := [][]uint32{{onoff.AttrOffWaitTime}, {onoff.AttrOffWaitTime}}
+		if !reflect.DeepEqual(reported, want) {
+			t.Errorf("reported changes = %v, want %v", reported, want)
+		}
+	})
+}
+
+// TestCeilingLightOnDoesNotDeadlockItsNotifier: switching the ceiling
+// light fires the dimmer's change notification, whose subscriber — the
+// bridge's changed-path check — reads the OnOff server back. That read
+// must not wait on the command still running (it did, and every OnOff
+// command on the light hung: TC-CC-3.1, TC-CC-2.2).
+func TestCeilingLightOnDoesNotDeadlockItsNotifier(t *testing.T) {
+	t.Parallel()
+	light := newDemoCeilingLight("ceiling")
+	var srv *onOffServer
+	for _, s := range light.MatterClusterServers() {
+		if o, ok := s.(*onOffServer); ok {
+			srv = o
+		}
+	}
+	if srv == nil {
+		t.Fatal("the ceiling light mounts no onOffServer")
+	}
+	reads := 0
+	light.OnMatterValueChanged(func() {
+		if _, ok := srv.MatterRead(onoff.AttrOnTime); ok {
+			reads++
+		}
+	})
+	done := make(chan error, 1)
+	go func() {
+		_, err := srv.MatterInvoke(context.Background(), onoff.CmdOn, nil)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("On: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("On did not return: the change notification's read-back deadlocked on the command")
+	}
+	if !light.isOn() || reads != 1 {
+		t.Fatalf("after On: on=%v, notifier read-backs=%d; want on and one read-back", light.isOn(), reads)
+	}
+}
+
+// TestLightKeepsItsOnOffStateAcrossDispatches: the bridge asks a source for
+// its cluster servers on every dispatch, so the light hands out the same
+// OnOff server each time — a written OnTime reads back (TC-OO-2.1).
+func TestLightKeepsItsOnOffStateAcrossDispatches(t *testing.T) {
+	t.Parallel()
+	light := newDemoLight("kept")
+	first := light.MatterClusterServers()[0]
+	if err := first.MatterWrite(context.Background(), onoff.AttrOnTime, uint16(30)); err != nil {
+		t.Fatalf("write OnTime: %v", err)
+	}
+	again := light.MatterClusterServers()[0]
+	if v, _ := again.MatterRead(onoff.AttrOnTime); v != uint16(30) {
+		t.Fatalf("OnTime on the next dispatch = %v, want 30", v)
+	}
+}
+
+// TestValveTravelsThroughATarget: Open sets TargetState and reads
+// Transitioning while the head travels; on arrival CurrentState is Open and
+// TargetState null again (TC-VALCC-3.1).
+func TestValveTravelsThroughATarget(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		v := newDemoValve("travel", 600)
+		var notified atomic.Int32
+		v.OnMatterValueChanged(func() { notified.Add(1) })
+		if err := v.Open(context.Background(), valve.OpenRequest{}); err != nil {
+			t.Fatalf("Open: %v", err)
+		}
+		if st, _ := v.CurrentState(); st != valve.StateTransitioning {
+			t.Fatalf("CurrentState right after Open = %v, want Transitioning", st)
+		}
+		if tg, ok := v.TargetState(); !ok || tg != valve.StateOpen {
+			t.Fatalf("TargetState right after Open = %v/%v, want Open", tg, ok)
+		}
+		if d, ok := v.OpenDuration(); !ok || d != 600 {
+			t.Fatalf("OpenDuration while travelling open = %v/%v, want 600", d, ok)
+		}
+		if _, ok := v.RemainingDuration(); !ok {
+			t.Fatal("RemainingDuration while travelling open is null")
+		}
+		time.Sleep(valveTravel)
+		synctest.Wait()
+		if st, _ := v.CurrentState(); st != valve.StateOpen {
+			t.Fatalf("CurrentState after travel = %v, want Open", st)
+		}
+		if _, ok := v.TargetState(); ok {
+			t.Fatal("TargetState after travel is still set, want null")
+		}
+		if n := notified.Load(); n != 2 {
+			t.Fatalf("notifications = %d, want 2 (start, arrival)", n)
+		}
+		_ = v.Close(context.Background())
+		time.Sleep(valveTravel)
+		synctest.Wait()
+		// Closing a closed valve moves nothing.
+		before := notified.Load()
+		_ = v.Close(context.Background())
+		if st, _ := v.CurrentState(); st != valve.StateClosed {
+			t.Fatalf("CurrentState after closing a closed valve = %v, want Closed", st)
+		}
+		if _, ok := v.TargetState(); ok {
+			t.Fatal("closing a closed valve set a TargetState")
+		}
+		time.Sleep(valveTravel)
+		synctest.Wait()
+		if n := notified.Load() - before; n != 1 {
+			t.Fatalf("closing a closed valve notified %d times, want 1 (the command)", n)
 		}
 	})
 }

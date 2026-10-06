@@ -794,9 +794,10 @@ func TestTrustedRootCertificates_IncludesPendingRoot(t *testing.T) {
 // --- global attributes 0xFFF8–0xFFFB ---
 
 // TestOpcreds_GlobalAttributes_Served verifies that OperationalCredentials
-// serves GeneratedCommandList (0xFFF8), AcceptedCommandList (0xFFF9),
-// EventList (0xFFFA) and AttributeList (0xFFFB). These were missing and caused
-// Apple cache-drops on cluster 0x3E.
+// serves GeneratedCommandList (0xFFF8), AcceptedCommandList (0xFFF9) and
+// AttributeList (0xFFFB). These were missing and caused Apple cache-drops on
+// cluster 0x3E. EventList (0xFFFA) is deliberately not served — see
+// TestCoreServersDoNotServeEventList.
 // Mirrors matter.js ClusterServer auto-populated globalAttributes.
 func TestOpcreds_GlobalAttributes_Served(t *testing.T) {
 	t.Parallel()
@@ -808,7 +809,6 @@ func TestOpcreds_GlobalAttributes_Served(t *testing.T) {
 	}{
 		{"GeneratedCommandList", 0xFFF8},
 		{"AcceptedCommandList", 0xFFF9},
-		{"EventList", 0xFFFA},
 		{"AttributeList", 0xFFFB},
 		{"FeatureMap", 0xFFFC},
 		{"ClusterRevision", 0xFFFD},
@@ -834,7 +834,7 @@ func TestOpcreds_MatterAttributes_IncludesGlobals(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	attrs := oc.MatterAttributes()
-	wantIDs := []uint32{0xFFF8, 0xFFF9, 0xFFFA, 0xFFFB}
+	wantIDs := []uint32{0xFFF8, 0xFFF9, 0xFFFB}
 	attrSet := make(map[uint32]bool, len(attrs))
 	for _, a := range attrs {
 		attrSet[a] = true
@@ -1111,52 +1111,6 @@ func TestOpcreds_VidVerificationCommandsInAcceptedList(t *testing.T) {
 	}
 }
 
-// TestOpcreds_SetVidVerificationStatementReturnsInvalidCommand verifies that
-// invoking SetVidVerificationStatement (0x0C) returns StatusInvalidCommand
-// because this bridge does not support VID-Verification mode.
-func TestOpcreds_SetVidVerificationStatementReturnsInvalidCommand(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	oc, _ := opcredsWithFakeStore(t)
-
-	_, err := oc.MatterInvoke(ctx, 0x0C, core.SetVidVerificationStatementRequest{})
-	if err == nil {
-		t.Fatal("SetVidVerificationStatement: expected error, got nil")
-	}
-	type statusCoder interface{ MatterStatusCode() im.StatusCode }
-	var sc statusCoder
-	if !errors.As(err, &sc) {
-		t.Fatalf("error %v does not implement MatterStatusCode()", err)
-	}
-	if got := sc.MatterStatusCode(); got != im.StatusInvalidCommand {
-		t.Errorf("MatterStatusCode()=0x%02X, want StatusInvalidCommand (0x85)", got)
-	}
-}
-
-// TestOpcreds_SignVidVerificationRequestReturnsInvalidCommand mirrors the
-// SetVidVerificationStatement check for command 0x0D.
-func TestOpcreds_SignVidVerificationRequestReturnsInvalidCommand(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	oc, _ := opcredsWithFakeStore(t)
-
-	_, err := oc.MatterInvoke(ctx, 0x0D, core.SignVidVerificationRequest{
-		FabricIndex:     1,
-		ClientChallenge: make([]byte, 32),
-	})
-	if err == nil {
-		t.Fatal("SignVidVerificationRequest: expected error, got nil")
-	}
-	type statusCoder interface{ MatterStatusCode() im.StatusCode }
-	var sc statusCoder
-	if !errors.As(err, &sc) {
-		t.Fatalf("error %v does not implement MatterStatusCode()", err)
-	}
-	if got := sc.MatterStatusCode(); got != im.StatusInvalidCommand {
-		t.Errorf("MatterStatusCode()=0x%02X, want StatusInvalidCommand (0x85)", got)
-	}
-}
-
 // TestNOCStruct_VvscFieldPresent verifies that the NOCStruct type carries the
 // Vvsc field and that its zero value is nil (not set).
 func TestNOCStruct_VvscFieldPresent(t *testing.T) {
@@ -1404,5 +1358,55 @@ func TestOpcreds_CSRRequestAfterNOCRejected(t *testing.T) {
 	}
 	if got := sc.MatterStatusCode(); got != im.StatusConstraintError {
 		t.Errorf("MatterStatusCode()=0x%02X, want StatusConstraintError (0x87)", uint8(got))
+	}
+}
+
+// TestAddNOC_ReportsTheAdminEntryToAccessControl pins that the default
+// Administer entry AddNOC installs reaches AccessControl, which emits
+// AccessControlEntryChanged (Added, AdminPasscodeID 0, the entry as
+// LatestValue) — matter.js AccessControlServer.ts emits it for the entry it
+// adds on fabric creation. TC-ACL-2.5/2.6/2.9 read it back.
+func TestAddNOC_ReportsTheAdminEntryToAccessControl(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	fs := newFakeStore()
+	oc, err := core.NewOperationalCredentials(fs, core.OpcredsConfig{SupportedFabrics: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ac := newAccessControl(t)
+	emitter := &fakeEmitter{}
+	ac.SetMatterEventEmitter(emitter)
+	oc.SetOnAdminEntryInstalled(ac.NotifyAdminEntryInstalled)
+
+	rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{
+		RootCACertificate: buildCoreSignedCert(t, rootPriv, true, rootPriv),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pendingPub := issueCSRPendingPubKey(ctx, t, oc, false)
+	resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
+		NOCValue:         buildCoreSignedCertForPubKey(t, pendingPub, false, rootPriv, testDefaultFabricID, testDefaultNodeID),
+		IPKValue:         make([]byte, 16),
+		CaseAdminSubject: 112233,
+		AdminVendorID:    0xFFF1,
+	})
+	if err != nil || resp.(core.NOCResponse).StatusCode != core.NOCStatusOK {
+		t.Fatalf("AddNOC: %v %+v", err, resp)
+	}
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+	if len(emitter.events) != 1 {
+		t.Fatalf("emitted %d events, want one AccessControlEntryChanged", len(emitter.events))
+	}
+	ev, ok := emitter.events[0].data.(core.AccessControlEntryChangedEvent)
+	if !ok || ev.ChangeType != core.AccessControlChangeTypeAdded || ev.AdminNodeID != nil ||
+		ev.AdminPasscodeID == nil || *ev.AdminPasscodeID != 0 || ev.LatestValue == nil ||
+		len(ev.LatestValue.Subjects) != 1 || ev.LatestValue.Subjects[0] != 112233 {
+		t.Fatalf("event %+v, want Added by passcode 0 with the admin entry", emitter.events[0].data)
 	}
 }

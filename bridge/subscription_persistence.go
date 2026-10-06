@@ -239,7 +239,7 @@ func (b *Bridge) forgetPersistedSubscription(subID uint32) {
 
 // forgetFabricSubscriptions drops every record of a removed fabric, and
 // any former subscription of it still waiting to be re-established.
-func (b *Bridge) forgetFabricSubscriptions(fabricIndex uint8) {
+func (b *Bridge) forgetFabricSubscriptions(ctx context.Context, fabricIndex uint8) {
 	b.resumption.mu.Lock()
 	defer b.resumption.mu.Unlock()
 	kept := b.resumption.former[:0]
@@ -249,7 +249,7 @@ func (b *Bridge) forgetFabricSubscriptions(fabricIndex uint8) {
 		}
 	}
 	b.resumption.former = kept
-	ctx, cancel := context.WithTimeout(context.Background(), subscriptionStoreTimeout)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), subscriptionStoreTimeout)
 	defer cancel()
 	if err := b.resumption.storeLocked().DeleteServerSubscriptionsByFabric(ctx, fabricIndex); err != nil {
 		b.logger.Warn("matter.subscription.persist.delete_fabric",

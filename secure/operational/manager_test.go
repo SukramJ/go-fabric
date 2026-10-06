@@ -1484,3 +1484,26 @@ func TestManagerCloseDropsReservedButUnestablishedID(t *testing.T) {
 		t.Fatalf("second Close error = %v, want ErrSessionNotFound", err)
 	}
 }
+
+// TestManager_AttestationChallengeFor pins the per-session attestation
+// challenge lookup SignVIDVerificationRequest signs over: the session's
+// own challenge, and a miss for an unknown session.
+func TestManager_AttestationChallengeFor(t *testing.T) {
+	t.Parallel()
+	m, _ := newTestManager()
+	e, err := m.OpenFromSigma(1, 1, 100, testKeys())
+	if err != nil {
+		t.Fatalf("OpenFromSigma: %v", err)
+	}
+	got, ok := m.AttestationChallengeFor(e.SessionID)
+	if !ok || len(got) != 16 || !bytes.Equal(got, e.AttestationChallenge) {
+		t.Fatalf("AttestationChallengeFor = %x, %v; want the session's 16-byte challenge", got, ok)
+	}
+	got[0] ^= 0xFF
+	if again, _ := m.AttestationChallengeFor(e.SessionID); again[0] == got[0] {
+		t.Fatal("the returned challenge aliases the session's")
+	}
+	if _, ok := m.AttestationChallengeFor(0xFFFE); ok {
+		t.Fatal("an unknown session has a challenge")
+	}
+}

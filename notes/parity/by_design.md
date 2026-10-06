@@ -365,6 +365,20 @@ nullish means transition instantly" (`LevelControlServer.ts:459`). Devices
 whose channel lacks RAMP_TIME (`LightCapabilities.Transition` unset) always
 take the instant path.
 
+### BD-Matter-BridgedVendorNameFallback — a bridged endpoint without a vendor serves the node's
+
+matter.js treats BridgedDeviceBasicInformation `vendorName` as optional on a
+bridged device (`basic-information-validators.ts`) and its bridge example
+(`examples/device-bridge-onoff/src/BridgedDevicesNode.ts`) sets none, so an
+unset vendor is simply absent. The module serves the host's
+`endpoint.Spec.VendorName`, and when the host leaves it empty it falls back
+to the node's own BasicInformation VendorName (`endpoint.Config.VendorName`)
+instead of leaving the attribute out: Apple Home projects a bridged
+accessory only when VendorName, ProductName, VendorID and ProductID are all
+non-empty (`endpoint/materialize.go`). With neither value set the attribute
+is not served, as in matter.js. Pinned by
+`TestParityMatterJS_BridgedVendorNameComesFromTheHost`.
+
 > **Rule of thumb (CLAUDE.md):** matter.js HEAD is the gold standard for everything under ``. Cluster IDs / revisions / attribute IDs / constraints / defaults / wire shape are taken verbatim. Any item below is a **deliberate** divergence with a documented reason. Bug-class drift (hand-coded revisions etc.) does **not** belong here — it belongs in a fix.
 
 ### Idiomatic translations TypeScript → Go (not real divergence)
@@ -384,7 +398,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | # | matter.js source | go-fabric deviation | rationale |
 |---|---|---|---|
 | L4-1 | `packages/model/src/standard/elements/root-node-device.element.ts` — Revision 4 | `cmd/openccu-loom/daemon_matter.go::buildRootClusters` → `{DeviceType: 0x0016, Revision: matterschema.DeviceTypeRevisions[0x0016]}` (= 4, `schema/devicetypes.go:23`) | **Status (2026-06): RESOLVED — no longer a divergence.** Die frühere Apple-Home-Bypass-Hardcodierung auf Revision 3 ist entfernt; die RootNode-Revision wird jetzt aus der generierten Schema-Tabelle (matter.js HEAD = 4) gezogen. Hardcodiertes `Revision: 3` driftete hinter matter.js zurück und löste in Apple's HAP-Mapper `Unable to find HAP service type for deviceType 22` aus. |
-| L3-PFAD-1 | `packages/protocol/src/session/case/Fabric.ts` — FabricLabel default `""` | `cluster/core/operational_credentials.go:688` `Label: "openccu-loom"` | Apple Home rejectet leeres Label nach CommissioningComplete mit RemoveFabric. Workaround setzt einen non-empty Label; Commissioner kann via `UpdateFabricLabel` umbenennen. Spec-konform (max 32 printable bytes). |
+| L3-PFAD-1 | `packages/protocol/src/fabric/Fabric.ts` — FabricBuilder `#label = ""` | `cluster/core/operational_credentials.go` AddNOC — `Label: o.initialFabricLabel` | **Status (2026-10): RESOLVED — no longer a divergence.** A new fabric starts with the empty Label matter.js gives it (TC-OPCREDS-3.7 reads it after commissioning). The former built-in non-empty default, an Apple-Home workaround, is now the host's choice through `OpcredsConfig.InitialFabricLabel`. |
 | L3-PFAD-2 | `packages/node/src/behaviors/basic-information/BasicInformationServer.ts:88` — reactTo emitter für Reachable | `cluster/core/basic_information.go:279` returns `true, true` hardcoded | Root-Endpoint ist der Bridge-Daemon selbst; während daemon läuft ist die Bridge per definitionem reachable. Kein ReachableChanged-Event nötig. |
 | L3-PFAD-3 | `BasicInformationServer.ts:110-127` — StartUp/ShutDown/Leave events emittiert | `cluster/core/basic_information.go::EmitStartUp` / `EmitShutDown` / `EmitLeave` (+ `SetMatterEventEmitter`) | **Status (2026-06): RESOLVED — implementiert und verdrahtet.** Die früher als deferred markierten Optional-Events (`conformance: "O"`) sind jetzt vollständig vorhanden: Event-Konstanten (0x0000–0x0002), Payload-Typen (`StartUpEvent`/`ShutDownEvent`/`LeaveEvent`) und Emitter. Produktiv aufgerufen aus `cmd/openccu-loom/daemon_north.go:252` (EmitShutDown), `daemon_matter.go:538` (EmitLeave bei RemoveFabric) und `daemon_matter.go:2607,2632` (EmitStartUp). |
 | L3-PFAD-4 | `GeneralCommissioningServer.ts:54` `this.state.breadcrumb = 0` in `initialize()` | `cluster/core/general_commissioning.go:138` — Go struct zero-value | Funktional äquivalent (Go zero = 0); idiomatisch in Go. |
@@ -408,7 +422,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | L3-ContainerTypeValidation | `chip TLVWriter.cpp:686-699` — `WriteElementHead` returns `CHIP_ERROR_INVALID_TLV_TAG` when a context-specific tag is used outside Structure/List, or a non-anonymous tag inside Array | `tlv/encode.go::writeControlAndTag` — emits tag bytes unconditionally; no container-type stack | Defensive-coding gap: chip rejects wire-invalid tag/container combinations at write time; go-fabric does not. All struct-building call sites in `bridge/reply.go` and cluster servers are hand-typed and correct, so no active interop breakage exists. A container-type stack will be added if a fuzz regression surfaces the gap; until then the cost-benefit does not justify the overhead. |
 | L3-ImplicitProfile-Decode | `packages/types/src/tlv/TlvCodec.ts:170-172` — `case TagControl.ImplicitProfile16: case TagControl.ImplicitProfile32: throw new NotImplementedError(…)` | `tlv/decode.go::readTag` — silently decodes ImplicitProfile tags as raw `Tag{Kind, Number}` without profile resolution | go-fabric acts only as a TLV responder (never as an initiator that would need to generate ImplicitProfile tags); no incoming IM message in a standard commissioning or subscription exchange uses ImplicitProfile tags. Profile resolution (chip's `ImplicitProfileId` pattern) is deferred until a code path that needs it materialises. matter.js throws; go-fabric decodes without error and without resolution — both are non-breaking divergences from chip's conditional resolution. |
 
-| L7-D03 | matter.js `MdnsAdvertisement.ts:153` — MAC-derived hostname `<12hexUC>0000.local`; chip `ServiceNaming.cpp:89` `MakeHostName` from MAC/EUI-64 | `mdns/service.go::defaultHostName` — uses OS hostname (with `.local` stripped); `zeroconf.go:189-194` — falls back to `os.Hostname()` | go-fabric runs as a daemon on Linux/macOS where the OS mDNS responder (avahi / mDNSResponder) already owns the A/AAAA record for the OS hostname. Using the OS hostname lets the OS-registered record resolve the SRV target without a second A/AAAA advertisement from the bridge. A MAC-derived label is the recommended Matter approach but requires the bridge to also register the A/AAAA record itself (outside the scope of the current mDNS layer). `Config.HostName` can be set explicitly when a MAC-derived label is preferred. `MACAddress [6]byte` field can be added in a future iteration. Drift L7-D03 (LOW). |
+| L7-D03 | matter.js `MdnsAdvertisement.ts:153` — MAC-derived hostname `<12hexUC>0000.local`; chip `ServiceNaming.cpp:89` `MakeHostName` from MAC/EUI-64 | `mdns/service.go::defaultHostName` — the first up, multicast-capable interface's MAC plus `0000`, as matter.js does (TC-SC-4.3); without a usable MAC a stable 16-hex-digit name hashed from the OS host name. **On macOS** the OS host name is kept | The macOS exception is the divergence: there mDNSResponder owns the host's A/AAAA records, and a separately published name lost its address records, so Apple Home tore the fabric down after CommissioningComplete (`mdns/zeroconf.go` Publish). A product certifies on its own platform; a macOS-hosted product sets `Config.HostName` to a MAC-derived name it publishes addresses for. Drift L7-D03 (LOW, macOS only). |
 | BD-Matter-UniqueID-Stable | matter.js `BasicInformationServer.createUniqueId()` — 32-char random persisted with Quality "FN" so the value survives bridge restarts | `cluster/core/basic_information.go::uniqueID` mixes `bootid.Salt()` into a deterministic SHA-256 derivation; `bootid/bootid.go` defaults `rotationEnabled = false`, so `Salt()` returns `[16]byte{}` and the hash collapses to a stable function of vendor/product/nodeLabel/serialNumber | go-fabric produces a stable UniqueID across daemon restarts by default. Rotation is opt-in via `matter.dev_rotate_unique_ids=true` and is intended for the dev/debug workflow where pair-iteration has corrupted Apple's HMHome state. Audit drift L1-D19 (in `audit_runs/2026-05-18_resolution_status.md`) is a **false positive**: it assumes `bootid.Salt()` rotates unconditionally, but the default zeroed salt means the production daemon's UniqueID is stable. The bootid package docstring spells out the contract; no code change required. |
 | BD-Matter-SoftwareVersion-StringDerived | matter.js derives SoftwareVersionString from the numeric SoftwareVersion default (`packages/node/src/behaviors/basic-information/BasicInformationServer.ts:71` — `setDefault("softwareVersionString", state.softwareVersion.toString())`) and has no string-to-numeric path; its consumers supply the numeric value directly | go-fabric's authoritative version is the human-readable daemon build string (`build.Version`), so `core.SoftwareVersionFromString` derives the numeric attribute from the string instead, using the stable monotonic encoding `major*1_000_000 + minor*1_000 + patch` (components clamped to 999; semver pre-release/build-metadata suffixes dropped, so "0.32.0-rc.1" → 32000; leading "v" tolerated; non-semver strings such as "dev" and all-zero results floor at 1, never advertising matter.js's development default 0 from `BasicInformationServer.ts:59`) | The matter.js invariant — both attributes describe the same release — is preserved; only the derivation direction differs. When the string is absent, the fallback mirrors matter.js exactly (decimal rendering of the numeric value). Guards: `TestSoftwareVersionFromString`, `TestBasicInfo_SoftwareVersionDerivedFromVersionString`, `TestParityMatterJS_BasicInfoServer_SoftwareVersionStringFallback`. |
 | BD-Matter-TimeSync-NoUTCFeature | matter.js `time-synchronization.element.ts:32-35` — `UtcTime` and `Granularity` both carry `conformance: "M"` unconditionally; no `UTC` feature flag exists | `cluster/core/time_synchronization.go::MatterRead` returns `FeatureMap = 0` while exposing UTCTime + Granularity | The matter-exhaustive audit drift L1-D14 ("UTC-Feature-Bit nicht gesetzt obwohl UTCTime exponiert wird") is a **false positive**: it presumes a non-existent UTC feature flag. UTCTime and Granularity are mandatory regardless of any feature flag; the optional TZ / NTPC / NTPS / TSC features gate additional attributes (TimeZone, DefaultNtp, TrustedTimeSource, …) that the bridge intentionally does not implement. `FeatureMap = 0` is therefore correct — the bridge advertises no optional time-sync features, which matches the implemented surface. |
@@ -995,11 +1009,39 @@ implementation wave.
 
 ---
 
-### BD-Matter-P2-D18 — ScenesManagement stub returns empty / rejects writes
+### BD-Matter-ChunkedWriteAuthorizedOnce — a chunked list write is authorized once, against the ACL it began with
 
-**Go path:** `cluster/wire/scenes_management.go`.
+**Go path:** `im/write.go` — `HandleWriteRequest` (`lastWritten`, `WriteTransaction`); `bridge/exchange_routing.go` — `writeTransaction`.
 
-**Rationale:** HomeMatic has no scene concept. ScenesManagement (0x0062) is mounted as a mandatory stub on OnOff device types (per Matter device-type conformance). The stub correctly returns `SceneTableSize=0` and rejects AddScene / RemoveScene / StoreScene / RecallScene with `UnsupportedCommand`. This is the same pattern as the matter.js `ScenesManagementBehavior` when no store backend is wired. Full implementation would require a scene store (new SQLite migration) and a HM-side trigger mapping — out of scope for 0.1.0.
+**matter.js:** `AttributeWriteResponse` authorizes every AttributeDataIB of a WriteRequest against the ACL as it stands when that element is processed. A chunked ACL write — a REPLACE-ALL followed by ListIndex=null appends — whose replace drops the writer's own Administer entry therefore loses every append to UnsupportedAccess. matter.js excludes TC-ACL-2.6 and 2.8, which do exactly that, as testing "the CHIP implementation" (`support/chip-testing/test/core/ACL.test.ts`).
+
+**Go:** chip `WriteHandler::CheckWriteAccess` — "only validate ACL if path has changed": a data element for the attribute the previous element of the same Write interaction was written to successfully is not re-authorized. The interaction spans the WriteRequest messages of a chunked write (one `im.WriteTransaction` per exchange, as chip's WriteHandler lives for the interaction). A different attribute, or a new interaction, is authorized afresh.
+
+**Rationale:** TC-ACL-2.6 and 2.8 are certification cases (ADR 0011), and a device on the chip behaviour passes them; an administrator rewriting the ACL in chunks is how chip controllers write a long ACL. The relaxation never extends a grant beyond the attribute the subject was already authorized to write in the same interaction.
+
+---
+
+### BD-Matter-ACLAppendEvents — a list append reports only the appended ACL entry
+
+**Go path:** `cluster/core/access_control.go` — the AccessControlEntryChanged emission; `endpoint/dispatcher.go` marks the write (`im.WithListAppendWrite`).
+
+**matter.js:** a ListIndex=null append is merged into the whole list before `AccessControlServer.#handleAccessControlListChange` sees it, which reports every position of the new list — Changed for each entry before the appended one, although none changed. A chunked ACL write (REPLACE-ALL, then appends) therefore yields Removed, Added, Changed, Added for a two-entry list; matter.js excludes TC-ACL-2.6, which counts them (`support/chip-testing/test/core/ACL.test.ts`).
+
+**Go:** an append reports the appended entry as Added and nothing else, as chip's AccessControl list append (`CreateEntry`) does. A whole-list replace keeps matter.js's per-position report.
+
+**Rationale:** TC-ACL-2.6 is a certification case (ADR 0011) and its expectation is the specification's ("an entry is added, removed or changed"): an entry an append does not touch has not changed.
+
+---
+
+### BD-Matter-Scenes-RemainingCapacity — FabricSceneInfo RemainingCapacity is bounded by the shared table
+
+**Go path:** `cluster/core/scenes_management.go` — `ScenesState.remainingCapacity`.
+
+**matter.js:** `ScenesManagementServer.#countsForFabric` reports the fabric's quota left, `floor((SceneTableSize-1)/2) - sceneCount`, and `#addOrReplaceSceneEntry` admits a scene while that is positive. With the default `SceneTableSize` of 128, three fabrics can therefore store 3 × 63 = 189 scenes in a table that declares 128 entries.
+
+**Go:** the quota left, bounded by the entries the table still has free — chip `FabricTableImpl::GetRemainingCapacity` (`src/app/storage/FabricTableImpl.ipp`), and the specification's note that the value "may change … due to other clients associated with other fabrics". AddScene into a full table is RESOURCE_EXHAUSTED, and GetSceneMembership reports the same bounded capacity.
+
+**Rationale:** TC-S-2.6 asserts the bounded value for a third fabric once two have used their quota; matter.js's count would fail it and overrun its own declared table. Everything else of the server — command checks, the out-of-range value rules, recall through the clusters' own commands — mirrors matter.js. Decided in [ADR 0012](../../docs/adr/0012-scenesmanagement-server.md).
 
 ---
 
@@ -1016,14 +1058,6 @@ implementation wave.
 **Go path:** `bridge/reply.go` — `case []any:` encoder loop.
 
 **Rationale:** The `[]any` case in the TLV struct encoder is used exclusively for the AccessControl Extension attribute, which is always an empty list (`[]any{}`). The loop body never executes a per-element type dispatch because the list is empty. A full type-dispatch encoder (mirroring matter.js's per-element codec) would be required only if the Extension list ever carries entries — which it never does in the current implementation (Extension is served as an empty-list placeholder, conforming to the `EXTS` feature surface without real content). This is a documented intentional scope boundary; the by-design entry `BD-Matter-AccessControl-Extension-Empty` above covers the Extension-empty-list design choice.
-
----
-
-### BD-Matter-P1-D8 — ColorControl.Options attribute is read-only
-
-**Go path:** `cluster/light/colorcontrol_server.go` — `case wire.ColorCtrlAttrOptions: return uint8(0), true`.
-
-**Rationale:** matter.js `color-control.element.ts` marks Options (0x000F) as access "RW VO" (view-optional write). In practice Apple Home, Google Home, and chip-tool do not write the Options bitmap on a CT-only bridge — they read it once and cache. The attribute is always 0 (no overrides) which is the correct default for a CT-only profile with no scenes. Implementing a write handler would require persisting the bitmap per device and plumbing it into the command-execution gate; deferred to a future release when a use-case arises.
 
 ---
 

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/schema"
 )
 
 // Errors.
@@ -312,6 +313,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 		// the entire subscription (chip-tool-test-brief T7/T8). Stamping
 		// here closes the race; TouchLastReport remains a no-op refresh.
 		lastReport: time.Now(),
+		priming:    req.Priming,
 	}
 	m.byID[id] = sub
 	m.perFabric[req.FabricIndex]++
@@ -554,6 +556,14 @@ func (m *Manager) FabricHasAtLeastOneActiveSubscription(fabricIndex uint8) bool 
 // covers `path` that a new value is available. The engine emits the
 // report on the next tick once MinInterval has elapsed.
 func (m *Manager) OnAttributeChanged(path im.ConcreteAttributePath) {
+	// A changesOmitted ("C") attribute is never reported on change, however
+	// the change was made — a write, a command, the server itself (matter.js
+	// ProtocolService.addCluster leaves it out of the changed set). It still
+	// appears in priming reports and reads. TC-ACE-1.6 counts the
+	// GroupKeyMap reports a subscription receives and expects none.
+	if path.HasCluster && path.HasAttribute && schema.AttributeChangesOmitted(path.Cluster, path.Attribute) {
+		return
+	}
 	m.mu.RLock()
 	matches := make([]*Subscription, 0)
 	for _, sub := range m.byID {
@@ -580,6 +590,15 @@ type SubscribeArgs struct {
 	KeepSubscriptions  bool
 	AttributePaths     []im.ConcreteAttributePath
 	EventPaths         []im.ConcreteEventPath
+	// Priming admits the subscription in its priming state: the engine
+	// sends it nothing — no change report, no keep-alive — until the
+	// caller has sent the priming report and the SubscribeResponse and
+	// calls [Subscription.EndPriming]. A report on a subscription the
+	// controller has not seen established yet is answered
+	// INVALID_SUBSCRIPTION and ends it; a priming report long enough to
+	// outlast the keep-alive interval used to provoke exactly that (the
+	// CHIP harness's TC-IDM-4.3 wildcard subscription runs 37 chunks).
+	Priming bool
 	// ReplaceSessionDuplicate instructs Subscribe to close any
 	// existing subscriptions tied to the same SessionID before
 	// admitting the new one. Set this when a CASE session sends a

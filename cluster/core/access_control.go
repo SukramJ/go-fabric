@@ -4,10 +4,14 @@
 package core
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
+	"strconv"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -267,7 +271,60 @@ func NewAccessControl(s ACLStoreFacade) (*AccessControl, error) {
 	if s == nil {
 		return nil, errors.New("matter: AccessControl store is required")
 	}
-	return &AccessControl{store: s}, nil
+	a := &AccessControl{store: s}
+	a.loadExtensions(context.Background())
+	return a, nil
+}
+
+// ACLExtensionPersistence is the optional key-value side of the store an
+// AccessControl keeps its Extension entries in ([store.Store] has it).
+// matter.js persists the extension attribute like any other fabric-scoped
+// state; without persistence a reboot lost it (TC-ACL-2.10 step 9 reboots
+// the DUT and reads the extension back).
+type ACLExtensionPersistence interface {
+	GetSetting(ctx context.Context, key string) (string, bool, error)
+	SetSetting(ctx context.Context, key, value string) error
+}
+
+// aclExtensionSettingKey is the settings key of one fabric's Extension.
+func aclExtensionSettingKey(fabric uint8) string {
+	return "access_control.extension." + strconv.Itoa(int(fabric))
+}
+
+// loadExtensions restores the persisted Extension entries, one per fabric
+// at most (the attribute's per-fabric constraint).
+func (a *AccessControl) loadExtensions(ctx context.Context) {
+	p, ok := a.store.(ACLExtensionPersistence)
+	if !ok {
+		return
+	}
+	for f := 1; f <= 254; f++ {
+		v, found, err := p.GetSetting(ctx, aclExtensionSettingKey(uint8(f)))
+		if err != nil || !found || v == "" {
+			continue
+		}
+		data, err := hex.DecodeString(v)
+		if err != nil {
+			continue
+		}
+		if a.extensions == nil {
+			a.extensions = make(map[uint8][]AccessControlExtensionEntry)
+		}
+		a.extensions[uint8(f)] = []AccessControlExtensionEntry{{Data: data, FabricIndex: uint8(f)}}
+	}
+}
+
+// persistExtension writes one fabric's Extension entries ("" clears them).
+func (a *AccessControl) persistExtension(ctx context.Context, fabric uint8, entries []AccessControlExtensionEntry) error {
+	p, ok := a.store.(ACLExtensionPersistence)
+	if !ok {
+		return nil
+	}
+	v := ""
+	if len(entries) > 0 {
+		v = hex.EncodeToString(entries[0].Data)
+	}
+	return p.SetSetting(ctx, aclExtensionSettingKey(fabric), v)
 }
 
 // Compile-time assertions.
@@ -352,6 +409,7 @@ func (a *AccessControl) RemoveFabricExtension(fabricIndex uint8) {
 	}
 	a.mu.Unlock()
 	if had {
+		_ = a.persistExtension(context.Background(), fabricIndex, nil)
 		a.dataVersion.Bump()
 	}
 }
@@ -738,37 +796,56 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// AFTER the store write succeeds per DataVersionTracker contract.
 		a.dataVersion.Bump()
 
-		// Emit AccessControlEntryChanged event per Matter §9.10.7.1.
-		// Use bulk-classify heuristic (mirrors matter.js
-		// packages/node/src/behaviors/access-control/AccessControlServer.ts
-		// entryChanged emit on every acl write): one event per write,
-		// ChangeType derived from list-length delta, LatestValue=nil
-		// (spec quality X — permitted to omit).
+		// Emit AccessControlEntryChanged per Matter §9.10.7.1, one event per
+		// entry of the writing fabric, the way matter.js
+		// AccessControlServer.ts #handleAccessControlListChange does: each
+		// position of the new list is Added (no old entry there) or Changed,
+		// carrying the new entry; old entries past the new list's end are
+		// Removed, last first, carrying the old entry. AdminNodeID /
+		// AdminPasscodeID name the actor (#adminDataFromSession).
+		// TC-ACL-2.5 / 2.6 / 2.9 read the events back.
 		a.mu.RLock()
 		emitter := a.emitter
 		endpoint := a.endpoint
 		a.mu.RUnlock()
-		if emitter != nil {
-			changeType := AccessControlChangeTypeChanged
-			switch {
-			case len(out) > len(oldEntries):
-				changeType = AccessControlChangeTypeAdded
-			case len(out) < len(oldEntries):
-				changeType = AccessControlChangeTypeRemoved
+		// matter.js reports an ACL change on acl$Changed, which a write of
+		// the list it already holds does not fire — the replace-with-empty
+		// a chunked list write opens with included (TC-ACL-2.5).
+		if emitter != nil && !aclEntriesEqual(oldEntries, out) {
+			nodeID, passcodeID := aclAdminFromContext(ctx)
+			emit := func(changeType uint8, latest store.ACLEntry) {
+				v := aclEntryStruct(latest)
+				emitter.MatterEmitEvent(endpoint, accessControlClusterID, accessControlEventEntryChanged,
+					AccessControlEntryChangedEvent{
+						AdminNodeID:     nodeID,
+						AdminPasscodeID: passcodeID,
+						ChangeType:      changeType,
+						LatestValue:     &v,
+						FabricIndex:     fabric,
+					}, contract.EventPriorityInfo)
 			}
-			emitter.MatterEmitEvent(
-				endpoint,
-				accessControlClusterID,
-				accessControlEventEntryChanged,
-				AccessControlEntryChangedEvent{
-					AdminNodeID:     nil,
-					AdminPasscodeID: nil,
-					ChangeType:      changeType,
-					LatestValue:     nil,
-					FabricIndex:     fabric,
-				},
-				contract.EventPriorityInfo,
-			)
+			i := 0
+			if im.IsListAppendWrite(ctx) && len(out) > len(oldEntries) {
+				// A list append (ListIndex=null) adds the trailing entry and
+				// touches none before it: only that one is reported, as
+				// chip's AccessControl list append (CreateEntry → Added)
+				// reports it — a chunked ACL write (REPLACE-ALL then
+				// appends) yields Removed for the replaced entries and
+				// Added per appended one (TC-ACL-2.6). matter.js receives
+				// the whole list and reports every position
+				// (BD-Matter-ACLAppendEvents).
+				i = len(oldEntries)
+			}
+			for ; i < len(out); i++ {
+				changeType := AccessControlChangeTypeChanged
+				if i >= len(oldEntries) {
+					changeType = AccessControlChangeTypeAdded
+				}
+				emit(changeType, out[i])
+			}
+			for j := len(oldEntries) - 1; j >= i; j-- {
+				emit(AccessControlChangeTypeRemoved, oldEntries[j])
+			}
 		}
 		return nil
 	}
@@ -821,6 +898,9 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				FabricIndex: fabric,
 			}
 		}
+		if err := a.persistExtension(ctx, fabric, stamped); err != nil {
+			return fmt.Errorf("matter: AccessControl.Extension write: persist: %w", err)
+		}
 		a.mu.Lock()
 		if a.extensions == nil {
 			a.extensions = make(map[uint8][]AccessControlExtensionEntry)
@@ -838,7 +918,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 		// list-length delta, LatestValue=nil for a bulk-replace (spec
 		// quality X — permitted to omit) unless exactly one entry is
 		// involved on either side of the change.
-		if emitter != nil {
+		if emitter != nil && !extensionsEqual(oldExtensions, stamped) {
 			changeType := AccessControlChangeTypeChanged
 			switch {
 			case len(stamped) > len(oldExtensions):
@@ -846,6 +926,7 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 			case len(stamped) < len(oldExtensions):
 				changeType = AccessControlChangeTypeRemoved
 			}
+			extNodeID, extPasscodeID := aclAdminFromContext(ctx)
 			var latest *AccessControlExtensionEntry
 			switch {
 			case changeType == AccessControlChangeTypeRemoved && len(oldExtensions) > 0:
@@ -860,8 +941,8 @@ func (a *AccessControl) MatterWrite(ctx context.Context, attrID uint32, value an
 				accessControlClusterID,
 				accessControlEventExtensionChanged,
 				AccessControlExtensionChangedEvent{
-					AdminNodeID:     nil,
-					AdminPasscodeID: nil,
+					AdminNodeID:     extNodeID,
+					AdminPasscodeID: extPasscodeID,
 					ChangeType:      changeType,
 					LatestValue:     latest,
 					FabricIndex:     fabric,
@@ -1032,5 +1113,90 @@ func validateAccessControlExtensionData(data []byte) error {
 	if err := tlv.Validate(data); err != nil {
 		return fmt.Errorf("extension must be a valid TLV: %w", err)
 	}
+	// The list decodes as a tagged list (TlvTaggedList(…, true)): each of
+	// its members carries a context or profile tag, never an anonymous
+	// one ("Structure element tags should have an id", TlvObject.ts). The
+	// test plan's D_BAD_ELEM holds an anonymous octet string (TC-ACL-2.3).
+	// The element stream was validated above; the walk ends at its end.
+	dec := tlv.NewDecoder(data)
+	depth := 0
+	for el, err := dec.Next(); err == nil; el, err = dec.Next() {
+		if el.Type == tlv.TypeEndContainer {
+			depth--
+			continue
+		}
+		if depth == 1 && el.Tag.Kind == tlv.TagKindAnonymous {
+			return errors.New("extension must be a valid TLV: list member without a tag")
+		}
+		if el.Type == tlv.TypeStructure || el.Type == tlv.TypeArray || el.Type == tlv.TypeList {
+			depth++
+		}
+	}
 	return nil
+}
+
+// aclAdminFromContext names the actor of an ACL or Extension change for the
+// change events: a CASE session's subject node id, or passcode id 0 for a
+// PASE session (or a change without a session). Mirrors matter.js
+// AccessControlServer.ts #adminDataFromSession.
+func aclAdminFromContext(ctx context.Context) (adminNode *uint64, adminPasscodeID *uint16) {
+	node, _ := im.SubjectFromContext(ctx)
+	if im.IsPASEFromContext(ctx) || node == 0 {
+		zero := uint16(0)
+		return nil, &zero
+	}
+	return &node, nil
+}
+
+// NotifyAdminEntryInstalled reports the default Administer entry AddNOC
+// installed for a new fabric: the ACL changed, so the DataVersion moves and
+// an AccessControlEntryChanged event (Added, AdminPasscodeID 0 — AddNOC
+// always runs over PASE) is emitted. Mirrors matter.js
+// AccessControlServer.ts, which emits the event itself for the entry it
+// adds on fabric creation. TC-ACL-2.5/2.6/2.9 read it back.
+func (a *AccessControl) NotifyAdminEntryInstalled(entry store.ACLEntry) {
+	a.dataVersion.Bump()
+	a.mu.RLock()
+	emitter := a.emitter
+	endpoint := a.endpoint
+	a.mu.RUnlock()
+	if emitter == nil {
+		return
+	}
+	v := aclEntryStruct(entry)
+	zero := uint16(0)
+	emitter.MatterEmitEvent(endpoint, accessControlClusterID, accessControlEventEntryChanged,
+		AccessControlEntryChangedEvent{
+			AdminPasscodeID: &zero,
+			ChangeType:      AccessControlChangeTypeAdded,
+			LatestValue:     &v,
+			FabricIndex:     entry.FabricIndex,
+		}, contract.EventPriorityInfo)
+}
+
+// aclEntriesEqual reports whether two stored ACL lists hold the same
+// entries in the same order (positions and fabric stamps ignored).
+func aclEntriesEqual(a, b []store.ACLEntry) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !reflect.DeepEqual(aclEntryStruct(a[i]), aclEntryStruct(b[i])) {
+			return false
+		}
+	}
+	return true
+}
+
+// extensionsEqual reports whether two Extension lists hold the same data.
+func extensionsEqual(a, b []AccessControlExtensionEntry) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !bytes.Equal(a[i].Data, b[i].Data) || a[i].FabricIndex != b[i].FabricIndex {
+			return false
+		}
+	}
+	return true
 }

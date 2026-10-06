@@ -11,12 +11,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
@@ -58,6 +61,14 @@ func deviceTypeRevision(id uint32) uint16 {
 type rootRefs struct {
 	generalCom *mattercore.GeneralCommissioning
 	opCreds    *mattercore.OperationalCredentials
+	// adminCom gets its window controller once the window exists
+	// (commissioning.go); the window needs the session manager, which is
+	// built after the root clusters.
+	adminCom *wire.AdministratorCommissioning
+	// basicInfo and genDiag emit the node's lifecycle events (StartUp,
+	// BootReason, ShutDown, Leave) once the bridge is running.
+	basicInfo *mattercore.BasicInformation
+	genDiag   *mattercore.GeneralDiagnostics
 }
 
 // buildRootClusters constructs endpoint 0's cluster surface.
@@ -66,7 +77,7 @@ type rootRefs struct {
 // answers UnsupportedCluster and the pairing aborts before a fabric can be
 // installed. The bridge builds none of them: it owns the wire format, the
 // host owns its identity.
-func buildRootClusters(
+func buildRootClusters( //nolint:funlen // the root endpoint's servers, built and cross-wired in one pass
 	identity bridgeIdentity,
 	st *store.Store,
 	groupState *groups.Manager,
@@ -76,7 +87,7 @@ func buildRootClusters(
 	var refs rootRefs
 
 	basicInfo, err := mattercore.NewBasicInformation(mattercore.Config{
-		VendorName:         "go-fabric example",
+		VendorName:         exampleVendorName,
 		VendorID:           identity.vendorID,
 		ProductName:        "reference-bridge",
 		ProductID:          identity.productID,
@@ -90,6 +101,17 @@ func buildRootClusters(
 	if err != nil {
 		return nil, refs, fmt.Errorf("basic information: %w", err)
 	}
+	refs.basicInfo = basicInfo
+	refs.genDiag = mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
+	reboots, err := countBoot(context.Background(), st)
+	if err != nil {
+		return nil, refs, fmt.Errorf("general diagnostics: %w", err)
+	}
+	hours, err := loadOperationalHours(context.Background(), st)
+	if err != nil {
+		return nil, refs, fmt.Errorf("general diagnostics: %w", err)
+	}
+	refs.genDiag.SetPersistedCounters(reboots, hours)
 
 	generalCom, err := mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
 		LocationCapability:           mattercore.RegulatoryIndoor,
@@ -100,6 +122,10 @@ func buildRootClusters(
 	}
 	refs.generalCom = generalCom
 
+	cd, err := attestation.BuildTestCertificationDeclaration(identity.vendorID, identity.productID)
+	if err != nil {
+		return nil, refs, fmt.Errorf("certification declaration: %w", err)
+	}
 	opCreds, err := mattercore.NewOperationalCredentials(st, mattercore.OpcredsConfig{
 		SupportedFabrics: 5,
 		// The CSA *test* attestation chain. It is what makes a bare
@@ -110,6 +136,16 @@ func buildRootClusters(
 		DACPrivateKey: chain.DACKey,
 		DAC:           chain.DAC,
 		PAI:           chain.PAI,
+		// The CSA *test* Certification Declaration for this vendor and
+		// product, signed with the test CMS key every commissioner trusts.
+		// Without it AttestationResponse carries an empty CD and a
+		// commissioner that verifies attestation — chip-tool and the CHIP
+		// Python harness without --bypass-attestation-verifier, every
+		// ecosystem — fails the pairing at AttestationVerification
+		// ("Certification declaration missing the required key ID in CMS
+		// envelope", chip CMS_ExtractKeyId on zero bytes). Found by the
+		// chip-tool suite's first unbypassed commissioning.
+		CertificationDeclaration: cd,
 		// Fires once AddNOC has persisted the fabric. The CASE identity
 		// is rebuilt from the freshly written row here — a bridge that
 		// skips this answers every post-commissioning Sigma1 with the
@@ -181,12 +217,18 @@ func buildRootClusters(
 		return nil, refs, fmt.Errorf("root descriptor: %w", err)
 	}
 
+	// AdministratorCommissioning, which RootNode mandates: the multi-admin
+	// surface. Commands answer BUSY until wireCommissioningWindow hands it
+	// the window.
+	refs.adminCom = wire.NewAdministratorCommissioning()
+
 	servers := []contract.ClusterServer{
 		basicInfo,
 		accessControl,
 		generalCom,
+		refs.adminCom,
 		mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{}),
-		mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot),
+		refs.genDiag,
 		opCreds,
 		groupKeys,
 		groupcast,
@@ -319,6 +361,44 @@ func (c *caseIdentities) ResolveSigma1Destination(destinationID [32]byte, initia
 		}
 	}
 	return nil, nil, false
+}
+
+// ResolveFabricIndex implements [sigma.FabricIndexResolver]: a resumed
+// session answers as the fabric its resumption record names, not as the
+// most recently installed one. Without it a controller resuming on fabric
+// 1 after fabric 2 was installed got a session on fabric 2, and every
+// access check failed (TC-ACL-2.10 after the reboot).
+func (c *caseIdentities) ResolveFabricIndex(fabricIndex uint8) (*sigma.Identity, sigma.PeerVerifier, bool) { //nolint:unparam // sigma.FabricIndexResolver's signature
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	f, ok := c.byIdx[fabricIndex]
+	if !ok || f.identity == nil {
+		return nil, nil, false
+	}
+	return f.identity, f.verifier, true
+}
+
+// forget drops a removed fabric's identity, so a Sigma1 addressed to it is
+// no longer answered: a fabric whose commissioning was rolled back (or
+// that RemoveFabric deleted) must not keep a CASE identity — the next
+// commissioning of the same fabric ID would otherwise land its sessions
+// on the stale index (TC-CGEN-2.4). Returns the identity's DNS-SD names
+// so the caller can withdraw the record.
+func (c *caseIdentities) forget(fabricIndex uint8) (compressedID [8]byte, nodeID uint64, ok bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.byIdx[fabricIndex]
+	if !ok || entry.identity == nil {
+		return compressedID, 0, false
+	}
+	delete(c.byIdx, fabricIndex)
+	if c.latest == entry {
+		c.latest = nil
+		for _, e := range c.byIdx {
+			c.latest = e
+		}
+	}
+	return entry.identity.CompressedFabricID, entry.identity.NodeID, true
 }
 
 // current returns the most recently installed identity, or nil before the
@@ -507,7 +587,7 @@ func wireSecurity(
 
 	// CASE, likewise per exchange. A single responder lands in `Finished`
 	// after the first Sigma3 and rejects every later Sigma1.
-	caseProvider := matterbridge.NewPerExchangeCaseProvider(func() *matterbridge.CaseAdapter {
+	caseProvider := matterbridge.NewPerExchangeCaseProvider(func() *matterbridge.CaseAdapter { //nolint:contextcheck // the adapter outlives this call; its callbacks run per handshake
 		adapter, err := buildCaseAdapter(sessions, ids, logger)
 		if err != nil {
 			logger.Warn("case.build_failed", slog.String("err", err.Error()))
@@ -613,6 +693,13 @@ func buildPaseAdapter(sessions *operational.Manager, refs rootRefs, p paseParams
 	if err != nil {
 		return nil, fmt.Errorf("spake2 verifier context: %w", err)
 	}
+	return buildPaseAdapterFromContext(sessions, refs, vc, p.salt, p.iterations)
+}
+
+// buildPaseAdapterFromContext is the passcode-independent half of
+// buildPaseAdapter, shared with the enhanced commissioning window, whose
+// verifier arrives precomputed from the commissioner (commissioning.go).
+func buildPaseAdapterFromContext(sessions *operational.Manager, refs rootRefs, vc *spake2.VerifierContext, salt []byte, iterations int) (*matterbridge.PaseAdapter, error) {
 	sessionID, err := sessions.AllocateID()
 	if err != nil {
 		return nil, fmt.Errorf("allocate PASE session id: %w", err)
@@ -620,7 +707,7 @@ func buildPaseAdapter(sessions *operational.Manager, refs rootRefs, p paseParams
 	adapter := matterbridge.NewPaseAdapterWithFactory(func(transcript []byte) *spake2.Verifier {
 		return spake2.NewVerifier(vc, nil, nil, transcript)
 	})
-	adapter.SetPBKDFParams(uint32(p.iterations), p.salt, sessionID) //nolint:gosec // NewVerifierContext above rejects any iteration count outside [IterationsMin, IterationsMax]
+	adapter.SetPBKDFParams(uint32(iterations), salt, sessionID) //nolint:gosec // NewVerifierContext / the window's command validation bound the iteration count
 	adapter.SetOnSessionEstablished(func(sharedSecret []byte, peerSessionID uint16) error {
 		// PASE predates the fabric, so both node ids are zero.
 		entry, err := sessions.OpenFromPaseWithID(sessionID, 0, 0, peerSessionID, sharedSecret)
@@ -679,6 +766,13 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, logger
 		return next, true
 	})
 
+	// Session resumption as the responder (Matter §4.13.2.4): a Sigma1
+	// presenting a resumption id this node issued resumes with
+	// Sigma2_Resume instead of a full handshake. matter.js CaseServer looks
+	// the record up in SessionManager and saves a fresh one after every
+	// session (CaseServer.ts:210); TC-SC-3.2 checks the resume.
+	responder.SetResumptionStore(resumptionLookup{sessions})
+
 	adapter := matterbridge.NewCaseAdapter(responder)
 	adapter.SetOnSessionEstablished(func(keys sigma.SessionKeys, peerSessionID uint16) error {
 		// Everything is read back off the responder rather than captured at
@@ -707,9 +801,38 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, logger
 			slog.Int("session_id", int(entry.SessionID)),
 			slog.Int("fabric_index", int(fabricIndex)),
 			slog.Uint64("peer_node_id", peerNodeID))
+		// The record the peer resumes from next time: the id this
+		// handshake issued (Sigma2's, or the fresh one Sigma2_Resume
+		// carried) with the session's shared secret.
+		if resp := adapter.SnapshotResponder(); resp != nil {
+			if id, secret := resp.ResumptionID(), resp.ECDHSharedSecret(); len(id) == 16 && len(secret) > 0 {
+				if err := sessions.PersistResumption(context.Background(), fabricIndex, peerNodeID, id, secret, peerCATs); err != nil {
+					logger.Warn("case.resumption.persist_failed", slog.String("err", err.Error()))
+				}
+			}
+		}
 		return nil
 	})
 	return adapter, nil
+}
+
+// resumptionLookup serves the CASE responder's resumption records from the
+// session manager's store.
+type resumptionLookup struct{ sessions *operational.Manager }
+
+// GetByID implements [sigma.ResumptionStore].
+func (l resumptionLookup) GetByID(resumptionID []byte) (*sigma.ResumptionRecord, error) {
+	rec, err := l.sessions.LookupResumption(context.Background(), resumptionID)
+	if err != nil {
+		return nil, err
+	}
+	return &sigma.ResumptionRecord{
+		SharedSecret: rec.SharedSecret,
+		ResumptionID: rec.ResumptionID,
+		FabricIndex:  rec.FabricIndex,
+		PeerNodeID:   rec.PeerNodeID,
+		PeerCATs:     rec.CASEAuthTags,
+	}, nil
 }
 
 // rejectingVerifier stands in before the first fabric exists. It fails every
@@ -721,3 +844,89 @@ type rejectingVerifier struct{}
 func (rejectingVerifier) VerifyAndExtractPubKey(_, _ []byte) (*ecdsa.PublicKey, error) {
 	return nil, errors.New("no fabric installed yet: commission the bridge before opening a CASE session")
 }
+
+// rebootCountSetting is the settings key the daemon keeps RebootCount
+// under.
+const rebootCountSetting = "gendiag.reboot_count"
+
+// countBoot returns this boot's RebootCount and persists it: 0 on the
+// first boot of a database, one more on every boot after — matter.js
+// GeneralDiagnosticsServer.ts initialize() (rebootCount undefined → 0,
+// else ++). A factory reset starts a fresh database and so counts from 0
+// again. TC-DGGEN-2.1 reads it across a reboot.
+func countBoot(ctx context.Context, st *store.Store) (uint16, error) {
+	raw, ok, err := st.GetSetting(ctx, rebootCountSetting)
+	if err != nil {
+		return 0, err
+	}
+	var count uint16
+	if ok {
+		prev, perr := strconv.ParseUint(raw, 10, 16)
+		if perr != nil {
+			return 0, fmt.Errorf("%s %q: %w", rebootCountSetting, raw, perr)
+		}
+		count = uint16(min(prev+1, math.MaxUint16))
+	}
+	if err := st.SetSetting(ctx, rebootCountSetting, strconv.FormatUint(uint64(count), 10)); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// operationalHoursSetting is the settings key TotalOperationalHours is
+// kept under across boots.
+const operationalHoursSetting = "gendiag.operational_hours"
+
+// loadOperationalHours is the TotalOperationalHours earlier boots
+// accumulated (0 for a new database).
+func loadOperationalHours(ctx context.Context, st *store.Store) (uint32, error) {
+	raw, ok, err := st.GetSetting(ctx, operationalHoursSetting)
+	if err != nil || !ok {
+		return 0, err
+	}
+	h, err := strconv.ParseUint(raw, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("%s %q: %w", operationalHoursSetting, raw, err)
+	}
+	return uint32(h), nil
+}
+
+// storeOperationalHours persists the node's current TotalOperationalHours.
+func storeOperationalHours(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics) error {
+	v, ok := g.MatterRead(gendiagTotalOperationalHours) //nolint:contextcheck // the contract's context-free read
+	h, isU32 := v.(uint32)
+	if !ok || !isU32 {
+		return fmt.Errorf("TotalOperationalHours read as %T", v)
+	}
+	return st.SetSetting(ctx, operationalHoursSetting, strconv.FormatUint(uint64(h), 10))
+}
+
+// gendiagTotalOperationalHours is GeneralDiagnostics TotalOperationalHours
+// (general-diagnostics.element.ts, 0x0003).
+const gendiagTotalOperationalHours uint32 = 0x0003
+
+// keepOperationalHours persists TotalOperationalHours every interval until
+// ctx ends, so the count survives a restart — chip and matter.js keep it in
+// non-volatile storage, and TC-DGGEN-2.1 reads it back after a reboot. The
+// daemon stores it once more on shutdown.
+func keepOperationalHours(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics, interval time.Duration, logger *slog.Logger) {
+	tick := time.NewTicker(interval)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			if err := storeOperationalHours(ctx, st, g); err != nil {
+				logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
+			}
+		}
+	}
+}
+
+// exampleVendorName is the node's BasicInformation VendorName. The
+// assembler serves it as the BridgedDeviceBasicInformation VendorName of
+// every bridged device (endpoint.Config.VendorName): the demo devices have
+// no manufacturer of their own, which a host with real devices would set
+// per device through endpoint.Spec.VendorName.
+const exampleVendorName = "go-fabric example"

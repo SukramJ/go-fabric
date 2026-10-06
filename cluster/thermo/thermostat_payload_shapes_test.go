@@ -361,11 +361,13 @@ func TestThermostatWriteRejectsWhatItCannotStore(t *testing.T) {
 			t.Fatal("SystemMode accepted a string")
 		}
 	})
-	t.Run("read-only ControlSequenceOfOperation", func(t *testing.T) {
+	t.Run("ControlSequenceOfOperation write is ignored", func(t *testing.T) {
 		t.Parallel()
 		srv := newHeatCool()
-		if err := srv.MatterWrite(ctx, 0x001B, uint8(2)); err == nil {
-			t.Fatal("ControlSequenceOfOperation accepted a write")
+		// matter.js accepts the write and reverts it
+		// (#ensureControlSequenceOfOperationNotWritable).
+		if err := srv.MatterWrite(ctx, 0x001B, uint8(2)); err != nil {
+			t.Fatalf("ControlSequenceOfOperation write refused: %v", err)
 		}
 		// The value a controller reads is still the derived one:
 		// CoolingAndHeating (4) for a HEAT+COOL server

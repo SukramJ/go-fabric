@@ -141,6 +141,11 @@ type CommissioningWindow struct {
 	// — typically wired to the AdministratorCommissioning cluster's
 	// SubscriptionEventReporter so subscribers see WindowStatus flip.
 	onTransition func()
+	// onStateChanged is the bridge's own transition hook: it reports the
+	// AdministratorCommissioning attributes to subscribers
+	// (Bridge.AttachCommissioningWindow). Called with the caller's
+	// hook, under the same conditions, without the lock.
+	onStateChanged func()
 
 	// failSafeChecker, when non-nil, is consulted at the start of every
 	// OpenWindow call. A currently-armed FailSafe window (set by a prior
@@ -355,7 +360,7 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 		w.adminVendor = params.AdminVendorID
 		w.adminVendorSet = true
 	}
-	hook := w.onTransition
+	hook := w.transitionHooks()
 	armer := w.failSafeArmer
 	w.closeTimer = time.AfterFunc(time.Duration(params.CommissioningTimeoutSeconds)*time.Second, func() {
 		w.mu.Lock()
@@ -364,7 +369,7 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 		w.adminVendorSet = false
 		w.isBasicWindow = false
 		w.hasVerifier = false
-		closeHook := w.onTransition
+		closeHook := w.transitionHooks()
 		restore := w.restore
 		w.restore = nil
 		w.mu.Unlock()
@@ -445,6 +450,13 @@ func (w *CommissioningWindow) setRestore(restore func()) bool {
 	return true
 }
 
+// failSafeExpirer is the optional capability of a [FailSafeArmer] to expire
+// an armed fail-safe with its cleanup (core.GeneralCommissioning
+// .ExpireFailSafe).
+type failSafeExpirer interface {
+	ExpireFailSafe(ctx context.Context)
+}
+
 // RevokeWindow implements [wire.WindowController]. Per Matter §11.19.7.3
 // step 1, any open PASE session is evicted first (via [PaseSessionCloser]
 // when wired), regardless of whether a commissioning window is open.
@@ -453,11 +465,20 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	// Matter §11.19.7.3 step 1: close any open PASE session before
 	// touching window state. Mirrors matter.js AdministratorCommissioningServer.ts:
 	// revokeCommissioning → paseCommissioner.close().
+	//
+	// Revoked over the PASE session itself, the close waits for the
+	// command's response, as matter.js's paseSession.initiateClose defers
+	// the close until the session's exchanges end (NodeSession
+	// deferredClose): closing first left the RevokeCommissioning
+	// unanswered (TC-CADMIN-1.10 step 9).
 	w.mu.RLock()
 	closer := w.paseSessionCloser
 	w.mu.RUnlock()
 	if closer != nil {
-		_ = closer.ClosePaseSessions(ctx)
+		closeNow := func() { _ = closer.ClosePaseSessions(context.WithoutCancel(ctx)) }
+		if !im.IsPASEFromContext(ctx) || !im.DeferAfterResponse(ctx, closeNow) {
+			closeNow()
+		}
 	}
 
 	// Matter §11.19.7.3 step 1 ALSO expires the fail-safe, unconditionally
@@ -475,7 +496,11 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 	w.mu.RLock()
 	armer := w.failSafeArmer
 	w.mu.RUnlock()
-	if armer != nil {
+	if expirer, ok := armer.(failSafeExpirer); ok {
+		// Expire with the timeout's cleanup, as matter.js
+		// failsafeContext.close() does (TC-CGEN-2.4).
+		expirer.ExpireFailSafe(context.WithoutCancel(ctx))
+	} else if armer != nil {
 		_ = armer.ArmFailSafeFor(ctx, 0, 0)
 	}
 
@@ -499,7 +524,7 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 		w.closeTimer.Stop()
 		w.closeTimer = nil
 	}
-	hook := w.onTransition
+	hook := w.transitionHooks()
 	restore := w.restore
 	w.restore = nil
 	w.mu.Unlock()
@@ -810,3 +835,84 @@ var (
 	// timeout values.
 	ErrCommissioningWindowDurationInvalid error = commWindowDurationInvalidErr{}
 )
+
+// EndCommissioning closes the window after a successful
+// CommissioningComplete: the commissioner it was opened for is done, so the
+// window must not admit another one until an administrator opens a new
+// one. Unlike [CommissioningWindow.RevokeWindow] it neither evicts PASE
+// sessions nor touches the fail-safe — CommissioningComplete has already
+// disarmed it. No-op when no window is open. Mirrors matter.js
+// DeviceCommissioner.endCommissioning, which failsafeContext.commissioned
+// triggers (DeviceCommissioner.ts:160). Without it a second
+// OpenCommissioningWindow right after a commissioning answered BUSY
+// (TC-CADMIN-1.3 step 9, TC-ACL-2.8).
+func (w *CommissioningWindow) EndCommissioning() {
+	w.mu.Lock()
+	if !w.open {
+		w.mu.Unlock()
+		return
+	}
+	w.open = false
+	w.adminFabricSet = false
+	w.adminVendorSet = false
+	w.isBasicWindow = false
+	w.hasVerifier = false
+	if w.closeTimer != nil {
+		w.closeTimer.Stop()
+		w.closeTimer = nil
+	}
+	hook := w.transitionHooks()
+	restore := w.restore
+	w.restore = nil
+	w.mu.Unlock()
+	if restore != nil {
+		restore()
+	}
+	if hook != nil {
+		hook()
+	}
+}
+
+// FabricRemoved clears AdminFabricIndex when the fabric that opened the
+// window is removed while it is open, and reports the change. Mirrors
+// matter.js AdministratorCommissioningServer #fabricRemovedCallback, wired
+// to the admin fabric's deleting event when the window opens; the window
+// itself and AdminVendorId stay (TC-CADMIN-1.25 step 29).
+func (w *CommissioningWindow) FabricRemoved(fabricIndex uint8) {
+	w.mu.Lock()
+	if !w.open || !w.adminFabricSet || w.adminFabric != fabricIndex {
+		w.mu.Unlock()
+		return
+	}
+	w.adminFabricSet = false
+	hook := w.transitionHooks()
+	w.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+}
+
+// transitionHooks returns the hooks a transition fires — the host's
+// SetTransitionHook and the bridge's attribute reporting — as one func, or
+// nil when neither is set. Caller holds w.mu.
+func (w *CommissioningWindow) transitionHooks() func() {
+	host, own := w.onTransition, w.onStateChanged
+	if host == nil && own == nil {
+		return nil
+	}
+	return func() {
+		if own != nil {
+			own()
+		}
+		if host != nil {
+			host()
+		}
+	}
+}
+
+// setStateChanged installs the bridge's transition hook.
+func (w *CommissioningWindow) setStateChanged(fn func()) {
+	w.mu.Lock()
+	w.onStateChanged = fn
+	w.mu.Unlock()
+}

@@ -5,6 +5,7 @@ package thermo_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/thermo"
@@ -346,5 +347,21 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerWithoutModeIsRefused(t *tes
 	var empty map[uint8]any
 	if _, err := srv.MatterInvoke(context.Background(), 0x00, empty); err == nil {
 		t.Fatal("SetpointRaiseLower(empty tag map) = Success, want an error for the missing mandatory Mode")
+	}
+}
+
+// TestParityMatterJS_ThermostatAcceptedCommands pins AcceptedCommandList to
+// SetpointRaiseLower, the cluster's one conformance-M command
+// (thermostat-cluster.element.ts) and the only one the server handles.
+// Found empty by the chip-tool data-model sweep — the server implemented no
+// command lister.
+func TestParityMatterJS_ThermostatAcceptedCommands(t *testing.T) {
+	t.Parallel()
+	srv := thermo.NewThermostatServer(thermo.DefaultThermostatConfig())
+	if got, want := srv.MatterAcceptedCommands(), []uint32{0x00}; !slices.Equal(got, want) {
+		t.Errorf("AcceptedCommandList = %v, want %v", got, want)
+	}
+	if got := srv.MatterGeneratedCommands(); len(got) != 0 {
+		t.Errorf("GeneratedCommandList = %v, want empty", got)
 	}
 }

@@ -415,6 +415,9 @@ func (b *Bridge) dispatchSecureChannel(src *net.UDPAddr, requestHdr *message.Hea
 			ch.ProcessSigma2Resume)
 
 	case mrp.SCOpcodeStatusReport:
+		if b.abortPaseOnStatusReport(src, requestHdr, proto, payload) {
+			return nil
+		}
 		return b.handleSecureChannelStatusReport(src, requestHdr, payload)
 
 	default:
@@ -967,6 +970,43 @@ func (b *Bridge) AttachSessionRegistry(reg SessionRegistry) {
 	if setter, ok := reg.(reannounceTriggerSetter); ok {
 		setter.SetReannounceTrigger(b.triggerSessionReannounce)
 	}
+}
+
+// abortPaseOnStatusReport ends the PASE handshake in progress when the
+// commissioner answers it with a failure StatusReport — chip's initiator
+// does so when Pake2's key confirmation fails, which is how a wrong
+// passcode surfaces. matter.js PaseServer.onNewExchange sees the report as
+// a ChannelStatusResponseError: it counts a pairing error toward
+// PASE_COMMISSIONING_MAX_ERRORS, cancels the pairing without answering,
+// and frees the server for the next attempt (PaseServer.ts:94-118).
+// Without it the handshake kept the single-active-PASE slot until
+// pasePairingTimeout, every retry in that minute was dropped as busy, and
+// the twenty wrong-passcode attempts of TC-CADMIN-1.9 timed out instead
+// of failing. Returns whether the report belonged to the PASE handshake.
+func (b *Bridge) abortPaseOnStatusReport(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) bool {
+	if requestHdr.SessionID != 0 {
+		return false
+	}
+	generalCode, _, protocolCode, ok := decodeStatusReport(payload)
+	if !ok || generalCode == mrp.SCStatusGeneralSuccess {
+		return false
+	}
+	b.mu.Lock()
+	ours := !b.paseInFlightSince.IsZero() && b.paseInFlightExchange == proto.ExchangeID
+	b.mu.Unlock()
+	if !ours {
+		return false
+	}
+	b.logger.Info("matter.rx.sc.pase_aborted_by_peer",
+		slog.String("src", srcString(src)),
+		slog.Int("exchange_id", int(proto.ExchangeID)),
+		slog.Int("general_code", int(generalCode)),
+		slog.Int("protocol_code", int(protocolCode)))
+	b.recordPaseFailure()
+	b.releasePaseInFlight(proto.ExchangeID)
+	// The report itself is acked by the pump, like any reliable message
+	// that elicits no reply.
+	return true
 }
 
 // decodeStatusReport splits a Secure-Channel StatusReport body into

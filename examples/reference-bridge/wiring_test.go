@@ -17,14 +17,17 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -227,5 +230,134 @@ func TestRootMountsGroupcastWithTheAuxiliaryACL(t *testing.T) {
 		if list, _ := raw.([]uint32); !slices.Contains(list, mattercore.GroupcastClusterID) {
 			t.Errorf("root ServerList %v does not name Groupcast", list)
 		}
+	}
+}
+
+// TestCaseIdentitiesResolveAndForget pins the per-fabric identity table the
+// CASE responder resolves through: a resumed session answers as the fabric
+// its record names, and a forgotten fabric is no longer resolvable — by
+// index or as the latest identity.
+func TestCaseIdentitiesResolveAndForget(t *testing.T) {
+	t.Parallel()
+	c := newCaseIdentities(nil)
+	one := &caseFabric{identity: &sigma.Identity{FabricIndex: 1, NodeID: 11}}
+	two := &caseFabric{identity: &sigma.Identity{FabricIndex: 2, NodeID: 22}}
+	c.byIdx[1], c.byIdx[2], c.latest = one, two, two
+	if id, _, ok := c.ResolveFabricIndex(1); !ok || id.NodeID != 11 {
+		t.Fatalf("ResolveFabricIndex(1) = %+v, %v; want fabric 1's identity", id, ok)
+	}
+	if _, nodeID, ok := c.forget(2); !ok || nodeID != 22 {
+		t.Fatalf("forget(2) = %d, %v", nodeID, ok)
+	}
+	if _, _, ok := c.ResolveFabricIndex(2); ok {
+		t.Fatal("a forgotten fabric still resolves")
+	}
+	if cur := c.current(); cur != one {
+		t.Fatalf("latest after forgetting it: %+v, want fabric 1", cur)
+	}
+	if _, _, ok := c.forget(9); ok {
+		t.Fatal("forgetting an unknown fabric reported one")
+	}
+}
+
+// TestRebootCountCountsBoots: RebootCount is 0 on a database's first boot
+// and one more on each boot after (matter.js GeneralDiagnosticsServer.ts;
+// TC-DGGEN-2.1).
+func TestRebootCountCountsBoots(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	st := store.New(db)
+	for want := range uint16(3) {
+		got, err := countBoot(ctx, st)
+		if err != nil || got != want {
+			t.Fatalf("boot %d: RebootCount = %d, %v", want, got, err)
+		}
+	}
+	if err := st.SetSetting(ctx, rebootCountSetting, "not a number"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := countBoot(ctx, st); err == nil {
+		t.Fatal("a corrupt reboot count was accepted")
+	}
+}
+
+// TestBlindPositionSurvivesARestart: the blind persists every position it
+// reaches and a new blind on the same database starts there (matter.js
+// keeps WindowCovering state non-volatile; TC-WNCV-4.5).
+func TestBlindPositionSurvivesARestart(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	labels := persistedLabels{st: store.New(db), logger: slog.Default()}
+	saved := make(chan struct{}, 16)
+	first := newDemoBlind("blind")
+	labels.restoreBlind(ctx, first)
+	persist := first.persist
+	first.persist = func(pos uint16) { persist(pos); saved <- struct{}{} }
+	srv := first.MatterClusterServers()[0]
+	if _, err := srv.MatterInvoke(ctx, wire.WindowCoveringCmdGoToLiftPercentage, uint16(9000)); err != nil {
+		t.Fatalf("GoToLiftPercentage: %v", err)
+	}
+	deadline := time.After(20 * time.Second)
+	for {
+		if v, _ := srv.MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v == uint16(9000) {
+			break
+		}
+		select {
+		case <-saved:
+		case <-deadline:
+			t.Fatal("the blind did not reach 9000")
+		}
+	}
+	second := newDemoBlind("blind")
+	labels.restoreBlind(ctx, second)
+	if v, _ := second.MatterClusterServers()[0].MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v != uint16(9000) {
+		t.Fatalf("restarted blind at %v, want 9000", v)
+	}
+}
+
+// TestOperationalHoursSurviveARestart: TotalOperationalHours is seeded from
+// the settings table and stored back, so a reboot does not reset it
+// (TC-DGGEN-2.1 step 10c).
+func TestOperationalHoursSurviveARestart(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	st := store.New(db)
+	if h, err := loadOperationalHours(ctx, st); err != nil || h != 0 {
+		t.Fatalf("hours on a new database = %d, %v", h, err)
+	}
+	g := mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
+	g.SetPersistedCounters(0, 3)
+	if err := storeOperationalHours(ctx, st, g); err != nil {
+		t.Fatal(err)
+	}
+	if h, err := loadOperationalHours(ctx, st); err != nil || h != 3 {
+		t.Fatalf("hours after a store = %d, %v; want 3", h, err)
+	}
+	runCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() { keepOperationalHours(runCtx, st, g, time.Millisecond, slog.Default()); close(done) }()
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+	<-done
+	if err := st.SetSetting(ctx, operationalHoursSetting, "x"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadOperationalHours(ctx, st); err == nil {
+		t.Fatal("a corrupt hour count was accepted")
 	}
 }

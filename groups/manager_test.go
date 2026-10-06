@@ -431,3 +431,27 @@ func TestManagerFabricsListsEveryStoredFabric(t *testing.T) {
 		t.Fatalf("Fabrics = %v, %v; want [1 3]", got, err)
 	}
 }
+
+// TestStoredFabricsSeesAFabricAddedSince pins StoredFabrics against the
+// store: a fabric committed after the manager loaded is listed, ascending,
+// where Fabrics still lists only the loaded ones — what ScenesManagement's
+// FabricSceneInfo needs for a fabric commissioned since (TC-S-2.6).
+func TestStoredFabricsSeesAFabricAddedSince(t *testing.T) {
+	t.Parallel()
+	m, st := newTestManager(t)
+	st.addFabric(3, 0x0FAC, testCompressed)
+	st.addFabric(2, 0x0FAD, testCompressed)
+	got, err := m.StoredFabrics(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, []uint8{1, 2, 3}) {
+		t.Fatalf("StoredFabrics = %v, want [1 2 3]", got)
+	}
+	st.mu.Lock()
+	st.failList = true
+	st.mu.Unlock()
+	if _, err := m.StoredFabrics(context.Background()); err == nil {
+		t.Fatal("a store error was swallowed")
+	}
+}

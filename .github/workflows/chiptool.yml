@@ -1,53 +1,43 @@
-name: chiptool
-
-# The real-commissioner guard. Everything else in this repository tests
+# The real-controller guard. Everything else in this repository tests
 # go-fabric against go-fabric; this workflow puts the CSA reference
-# commissioner on the other side of the wire and commissions the reference
-# daemon in examples/reference-bridge for real — PASE, AddNOC, CASE, an
-# attribute read, an OnOff command, and a clean teardown.
+# commissioner and the CSA certification harness on the other side of the
+# wire, against the reference daemon in examples/reference-bridge.
 #
-# chip-tool has no macOS host build and Docker Desktop does not bridge
-# multicast, so this cannot run on a developer machine here. GitHub's Linux
-# runners can, which is why the guard lives in CI and nowhere else.
+# Everything runs in matter.js's CHIP image (ghcr.io/matter-js/chip), pinned
+# by digest in the Makefile (CHIP_TEST_IMAGE) — the single source for the
+# commissioner, the harness and the CHIP reference apps, at one CHIP commit.
+# The image is multi-arch, so the jobs run on ordinary amd64 runners. The
+# container shares the host network and the runner's avahi over /run/dbus.
 #
 # Three jobs, and the second is the point:
 #
-#   - chiptool: the Go suite (`make chiptool-test`, build tag `chiptool`)
-#     against a runner-native chip-tool extracted from the pinned
-#     connectedhomeip/chip-cert-bins image.
-#   - chiptool-control: the CONTROL LEG. The same chip-tool, the same runner
-#     setup, driving a CHIP reference app instead of the reference daemon —
-#     no go-fabric code in the path at all. It answers the question a red
-#     `chiptool` job cannot answer on its own: is chip-tool and its
-#     environment working here? Green control + red suite is a go-fabric
-#     defect; both red is the environment (a pin bump, a runner image change,
-#     avahi/dbus, network). Without it, every red run starts with the same
-#     hour of ruling the environment out — and a guard whose failures are
-#     uninterpretable gets ignored, which is worse than not having one.
-#   - chiptool-conformance: cases from the CSA's own certification suite
-#     (the Test_TC_* YAML files) run against the reference daemon by the
-#     chip runner, out of a sparse connectedhomeip checkout at the SAME pin.
-#     CERTIFICATION IS A NON-GOAL — these are borrowed as regression cases,
-#     and the PICS file this job feeds the runner is written only as far as
-#     those cases need it. See internal/chiptool/conformance_test.go.
+#   - chiptool: `make chiptool-test` — commission the daemon for real, then
+#     the chip-tool suite over one interactive session.
+#   - chiptool-control: the CONTROL LEG. The same image, the same runner
+#     setup, chip-tool pairing CHIP's own all-clusters app instead of the
+#     reference daemon — no go-fabric code in the path at all. Green control
+#     + red suite is a go-fabric defect; both red is the environment (an
+#     image bump, a runner change, avahi/dbus, network). Without it every red
+#     run starts with an hour of ruling the environment out.
+#   - chip-families: the CSA certification families (`make
+#     chiptool-families`), the way matter.js runs them. Certification is not
+#     pursued by this project, but certifiability is a goal
+#     (docs/adr/0011-certifiability-is-a-goal.md): the families run with PICS
+#     generated from the device, every excluded case carries its class and
+#     reason, and docs/certifiability.md is the status. An unlabelled pull
+#     request runs the core families; the nightly run, a manual dispatch and
+#     the `needs-chiptool` label run all of them, split into groups so no job
+#     exceeds the runner limit. A group an event does not run gets no job.
 #
-# Both jobs run on ubuntu-24.04-arm: Docker Hub's chip-cert-bins publishes
-# arm64-only manifests for every recent tag, so an amd64 runner cannot pull
-# the image, and QEMU emulation is far too slow for the PASE crypto.
-#
-# Not a blanket per-PR gate — chip-tool runs are slow and the image pull is
-# ~2.5 GiB. It runs nightly, on manual dispatch, on the `needs-chiptool` label,
-# and automatically whenever a pull request touches Go code.
+# Not a blanket per-PR gate — the runs are slow and the image is large. It
+# runs nightly, on manual dispatch, on the `needs-chiptool` label, and
+# automatically whenever a pull request touches Go code.
 #
 # That last trigger is wider here than in a consuming daemon, and deliberately
 # so: this module IS the Matter stack, so almost any change to it can move
 # commissioning. A path list would be a list of nearly every directory, which
 # is a filter that reads as one and is not. Documentation, the changelog and
 # the notes tree do not start it; anything the binary is built from does.
-#
-# The commissioner suite is the only check here that runs a real controller
-# against a real daemon. It found the reference bridge shipping un-pairable
-# when nothing else did, and a label is a thing a human has to remember.
 
 on:
   schedule:
@@ -88,6 +78,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      families: ${{ steps.groups.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -120,6 +111,38 @@ jobs:
             echo "code=false" >> "$GITHUB_OUTPUT"
             echo "-> no Go code touched; suite runs only if labelled"
           fi
+      # The certification-family groups, and which of them this event runs.
+      # One place for the split (TestWorkflowRunsEveryFamily holds it to the
+      # family table): the groups divide internal/chiptool's family table so
+      # no job exceeds the runner's six hours. An unlabelled pull request runs
+      # the core group only; the nightly run, a manual dispatch and the
+      # `needs-chiptool` label run every group. A group that is not run does
+      # not get a job at all, so it can neither look green nor hide a skip.
+      - id: groups
+        env:
+          EVENT: ${{ github.event_name }}
+          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'needs-chiptool') }}
+        run: |
+          set -euo pipefail
+          groups=(
+            "core=IDM,DESC,BINFO,BRBINFO,ACE,ACL,CGEN,OPCREDS,GRPKEY,DT,RR,SM"
+            "commissioning=CADMIN,SC,DA,DD,CNET,DGGEN,G,GC"
+            "app-lights=OO,LVL,CC,I,S,SWTCH,BOOL,OCC,TMP,RH,FLW"
+            "app-appliances=DRLK,FAN,LWM,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV"
+          )
+          all=true
+          if [ "$EVENT" = "pull_request" ] && [ "$LABELLED" != "true" ]; then
+            all=false
+          fi
+          include="[]"
+          for entry in "${groups[@]}"; do
+            group="${entry%%=*}"; families="${entry#*=}"
+            if [ "$all" = true ] || [ "$group" = core ]; then
+              include=$(jq -c --arg g "$group" --arg f "$families" '. + [{group: $g, families: $f}]' <<<"$include")
+            fi
+          done
+          echo "matrix={\"include\":$include}" >> "$GITHUB_OUTPUT"
+          echo "family groups this event runs: $(jq -r '.[].group' <<<"$include" | paste -sd, -)"
 
   chiptool:
     name: chip-tool commissions the reference daemon
@@ -128,236 +151,8 @@ jobs:
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
-      needs.changes.outputs.code == 'true' 
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      # The single source of truth for the chip-tool build is the
-      # CHIP_CERT_BINS_IMAGE line in the Makefile, which `make
-      # chiptool-extract` also reads. Both jobs here resolve it the same way,
-      # so the control leg can never validate a different chip-tool build
-      # than the suite runs against.
-      - name: resolve chip-tool pin
-        id: pin
-        run: |
-          pin=$(sed -n 's|^CHIP_CERT_BINS_IMAGE[^=]*=[[:space:]]*connectedhomeip/chip-cert-bins:\([0-9a-f]\{40\}\).*|\1|p' Makefile)
-          if [ -z "$pin" ]; then
-            echo "::error::chip-cert-bins pin not found in Makefile (CHIP_CERT_BINS_IMAGE)"
-            exit 1
-          fi
-          echo "pin=$pin" >> "$GITHUB_OUTPUT"
-
-      - name: cache chip-tool binary
-        id: chiptool-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/chiptool-bin
-          key: chiptool-bin-${{ steps.pin.outputs.pin }}
-
-      # ~2.5 GiB compressed image — pulled only on a cache miss, i.e. once per
-      # pin bump. The binary lives at /root/apps/chip-tool; /root/chip-tool is
-      # a symlink, so docker cp must name the real file.
-      - name: extract chip-tool from chip-cert-bins
-        if: steps.chiptool-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p "$HOME/.cache/chiptool-bin"
-          docker create --name chip-cert-bins "connectedhomeip/chip-cert-bins:${{ steps.pin.outputs.pin }}"
-          docker cp chip-cert-bins:/root/apps/chip-tool "$HOME/.cache/chiptool-bin/chip-tool"
-          docker rm chip-cert-bins
-          chmod +x "$HOME/.cache/chiptool-bin/chip-tool"
-
-      # chip-tool links dynamically against the host dbus/avahi/glib stack,
-      # plus pcsclite for the NFC-commissioning variant the chip-cert-bins
-      # image builds. The -dev package names are release-stable (the runtime
-      # t64 names are not) and each pulls in the runtime library.
-      #
-      # avahi-daemon must RUN, not merely be installed: commissioning starts
-      # with `pairing already-discovered`, which needs no discovery, but the
-      # stage after AddNOC resolves the daemon's operational `_matter._tcp`
-      # record through avahi and dies with "Incorrect state" when no daemon
-      # answers on the bus.
-      - name: install chip-tool runtime libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libavahi-client-dev libdbus-1-dev libglib2.0-dev \
-            libevent-dev libssl-dev libpcsclite-dev avahi-daemon
-          sudo systemctl start avahi-daemon
-          systemctl is-active dbus avahi-daemon
-
-      # Fail fast with a readable diagnostic instead of letting the suite skip
-      # on a missing binary or die on an obscure loader error.
-      - name: chip-tool sanity
-        run: |
-          bin="$HOME/.cache/chiptool-bin/chip-tool"
-          if ldd "$bin" | grep "not found"; then
-            echo "::error::chip-tool has unresolved shared libraries (see ldd output above)"
-            exit 1
-          fi
-          ("$bin" || true) 2>&1 | head -n 5
-          ("$bin" || true) 2>&1 | grep -qi "usage" \
-            || { echo "::error::chip-tool did not print its usage banner"; exit 1; }
-
-      # GOFABRIC_CHIPTOOL_BIN pins the binary location so the suite never
-      # silently skips on a PATH miss — the cache directory is not on PATH.
-      # `make chiptool-test` builds ./bin/reference-bridge first; the suite
-      # fails loudly rather than skipping if that binary is missing.
-      - name: chip-tool guard
-        run: GOFABRIC_CHIPTOOL_BIN="$HOME/.cache/chiptool-bin/chip-tool" make chiptool-test
-
-  chiptool-control:
-    name: chip-tool control leg (CHIP app, no go-fabric)
-    needs: changes
-    if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
-      needs.changes.outputs.code == 'true' 
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # Same pin, read from the same single source as the suite job.
-      - name: resolve chip-tool pin
-        id: pin
-        run: |
-          pin=$(sed -n 's|^CHIP_CERT_BINS_IMAGE[^=]*=[[:space:]]*connectedhomeip/chip-cert-bins:\([0-9a-f]\{40\}\).*|\1|p' Makefile)
-          if [ -z "$pin" ]; then
-            echo "::error::chip-cert-bins pin not found in Makefile (CHIP_CERT_BINS_IMAGE)"
-            exit 1
-          fi
-          echo "pin=$pin" >> "$GITHUB_OUTPUT"
-
-      # The reference app is picked by looking at what the image actually
-      # contains, not by assuming a name: the binary set has changed across
-      # chip-cert-bins tags before, and a hardcoded name turns a pin bump into
-      # a mystery failure. If no candidate is present the step prints the real
-      # listing and fails with it, which is the diagnostic the next person
-      # needs.
-      - name: select a CHIP reference app
-        id: app
-        run: |
-          image="connectedhomeip/chip-cert-bins:${{ steps.pin.outputs.pin }}"
-          apps=$(docker run --rm --entrypoint ls "$image" -1 /root/apps)
-          echo "apps in /root/apps:"
-          echo "$apps"
-          for candidate in chip-all-clusters-app chip-bridge-app chip-lighting-app; do
-            if echo "$apps" | grep -qx "$candidate"; then
-              echo "app=$candidate" >> "$GITHUB_OUTPUT"
-              echo "selected $candidate"
-              exit 0
-            fi
-          done
-          echo "::error::none of the expected reference apps is in this chip-cert-bins tag (listing above)"
-          exit 1
-
-      - name: extract chip-tool and the reference app
-        run: |
-          image="connectedhomeip/chip-cert-bins:${{ steps.pin.outputs.pin }}"
-          mkdir -p "$HOME/chip-control"
-          docker create --name chip-control-bins "$image"
-          docker cp chip-control-bins:/root/apps/chip-tool "$HOME/chip-control/chip-tool"
-          docker cp "chip-control-bins:/root/apps/${{ steps.app.outputs.app }}" "$HOME/chip-control/app"
-          docker rm chip-control-bins
-          chmod +x "$HOME/chip-control/chip-tool" "$HOME/chip-control/app"
-
-      # Identical runtime dependencies to the suite job — that is the point:
-      # the control leg validates this setup, so it must be the same setup.
-      - name: install chip-tool runtime libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libavahi-client-dev libdbus-1-dev libglib2.0-dev \
-            libevent-dev libssl-dev libpcsclite-dev avahi-daemon
-          sudo systemctl start avahi-daemon
-          systemctl is-active dbus avahi-daemon
-
-      # CHIP drives CHIP. The app commissions on loopback with the same
-      # `already-discovered` flow the suite uses, and one Descriptor read
-      # proves the session carries data both ways. Nothing here touches
-      # go-fabric, so a failure is never a finding about this module.
-      - name: chip-tool against the CHIP reference app
-        run: |
-          set -o pipefail
-          cd "$HOME/chip-control"
-          # chip-tool does not create its storage root: ExamplePersistentStorage
-          # fails Init with 0x000000AF against a missing directory. The suite's
-          # controller creates it too (internal/chiptool/controller_test.go,
-          # newController). The app's --KVS is a file path and needs no
-          # directory of its own.
-          rm -rf ./kvs-app ./kvs-tool
-          mkdir -p ./kvs-tool
-          # Passcode and discriminator are the reference daemon's own defaults
-          # (examples/reference-bridge/main.go --passcode / --discriminator),
-          # so the control leg and the suite differ in what they drive, never
-          # in how they drive it.
-          ./app --KVS ./kvs-app --secured-device-port 5560 --discriminator 3840 --passcode 20202021 \
-            > app.log 2>&1 &
-          app_pid=$!
-          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
-
-          # Wait for the app to bind rather than sleeping a fixed guess.
-          for _ in $(seq 1 30); do
-            if grep -qiE "server listening|CHIP minimal mDNS started|Server initialization complete" app.log; then
-              break
-            fi
-            sleep 1
-          done
-
-          # Every part of this call matches the suite's own controller in
-          # internal/chiptool/controller_test.go rather than convention:
-          #
-          #   --storage-directory is APPENDED after the command arguments.
-          #     chip-tool reads its first argument as the cluster/command set,
-          #     so a leading global flag fails with "Unknown cluster or command
-          #     set".
-          #   ::1, not 127.0.0.1. The CSA chip-cert-bins builds are ipv6only
-          #     (INET_CONFIG_ENABLE_IPV4=0) and reject IPv4 literals while
-          #     parsing arguments, with CHIP_ERROR_INVALID_ARGUMENT (0x2F).
-          #   already-discovered with an explicit address and a hex node id,
-          #     plus --bypass-attestation-verifier: the reference app carries
-          #     test attestation certificates the verifier rejects by default,
-          #     and already-discovered needs no mDNS round trip.
-          #
-          # No --pase-only: the Descriptor read below needs an operational CASE
-          # session, which is what the suite establishes too.
-          ./chip-tool pairing already-discovered 0x1234 20202021 ::1 5560 \
-            --bypass-attestation-verifier true \
-            --storage-directory ./kvs-tool \
-            | tee pair.log
-          ./chip-tool descriptor read parts-list 0x1234 0 \
-            --storage-directory ./kvs-tool \
-            | tee read.log
-          grep -q "PartsList" read.log \
-            || { echo "::error::Descriptor.PartsList not returned by the reference app"; exit 1; }
-
-      - name: upload control-leg logs
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: chiptool-control-logs
-          path: |
-            ~/chip-control/app.log
-            ~/chip-control/pair.log
-            ~/chip-control/read.log
-          if-no-files-found: ignore
-
-  chiptool-conformance:
-    name: chip certification cases against the reference daemon
-    needs: changes
-    if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
-      needs.changes.outputs.code == 'true' 
-    runs-on: ubuntu-24.04-arm
+      needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -366,132 +161,219 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      # Same single source as the other two jobs.
-      - name: resolve chip-tool pin
-        id: pin
-        run: |
-          pin=$(sed -n 's|^CHIP_CERT_BINS_IMAGE[^=]*=[[:space:]]*connectedhomeip/chip-cert-bins:\([0-9a-f]\{40\}\).*|\1|p' Makefile)
-          if [ -z "$pin" ]; then
-            echo "::error::chip-cert-bins pin not found in Makefile (CHIP_CERT_BINS_IMAGE)"
-            exit 1
-          fi
-          echo "pin=$pin" >> "$GITHUB_OUTPUT"
-
-      # The cases, the cluster definitions they are parsed against, the PICS
-      # semantics and the commissioner all have to come from ONE commit, so
-      # this checks out connectedhomeip at the very commit the chip-tool image
-      # is built from. The Go test asserts that too (requireChipRoot compares
-      # this checkout's HEAD against the Makefile pin) rather than trusting
-      # the workflow to have got it right.
-      #
-      # Sparse, because the full tree is several GiB and four directories are
-      # enough: the YAML suites, the ZCL cluster definitions the parser reads,
-      # the chipyaml runner itself, and the two Python packages it needs.
-      - name: check out connectedhomeip at the pin
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: project-chip/connectedhomeip
-          ref: ${{ steps.pin.outputs.pin }}
-          path: chip
-          fetch-depth: 1
-          sparse-checkout: |
-            scripts/py_matter_idl
-            scripts/py_matter_yamltests
-            scripts/tests
-            src/app/tests/suites
-            src/app/zap-templates/zcl/data-model/chip
-
-      - name: cache chip-tool binary
-        id: chiptool-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/chiptool-bin
-          key: chiptool-bin-${{ steps.pin.outputs.pin }}
-
-      - name: extract chip-tool from chip-cert-bins
-        if: steps.chiptool-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p "$HOME/.cache/chiptool-bin"
-          docker create --name chip-cert-bins "connectedhomeip/chip-cert-bins:${{ steps.pin.outputs.pin }}"
-          docker cp chip-cert-bins:/root/apps/chip-tool "$HOME/.cache/chiptool-bin/chip-tool"
-          docker rm chip-cert-bins
-          chmod +x "$HOME/.cache/chiptool-bin/chip-tool"
-
-      # Identical to the other jobs — the YAML runner drives the same binary
-      # and therefore needs the same host stack, including a RUNNING avahi for
-      # the operational discovery that follows AddNOC.
-      - name: install chip-tool runtime libraries
+      # chip-tool resolves the daemon's operational record after AddNOC
+      # through the host's avahi (the container mounts /run/dbus).
+      - name: start avahi
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libavahi-client-dev libdbus-1-dev libglib2.0-dev \
-            libevent-dev libssl-dev libpcsclite-dev avahi-daemon
-          sudo systemctl start avahi-daemon
+          sudo apt-get install -y --no-install-recommends avahi-daemon
+          # The runner's docker0 bridge has no carrier in a host-network
+          # setup, yet avahi listens on it and hands resolvers addresses
+          # scoped to it (fe80::…%docker0, 10.1.0.x%docker0): unreachable
+          # routes and stale cache entries. The DUT and every controller
+          # share the host network, so avahi only needs the real interfaces.
+          sudo sed -i 's/^#\?deny-interfaces=.*$/deny-interfaces=docker0/' /etc/avahi/avahi-daemon.conf
+          grep -q '^deny-interfaces=docker0$' /etc/avahi/avahi-daemon.conf
+          sudo systemctl restart avahi-daemon
           systemctl is-active dbus avahi-daemon
 
-      # The extra check over the other jobs: the YAML runner does not shell
-      # out per step, it talks to `chip-tool interactive server` over a
-      # websocket. That subcommand only exists when the binary was built with
-      # CONFIG_USE_INTERACTIVE_MODE (examples/chip-tool/commands/interactive/
-      # Commands.h). A build without it fails much later, as a websocket that
-      # never accepts a connection.
-      - name: chip-tool sanity
+      - name: pull the pinned CHIP image
+        run: make chiptool-image
+
+      # The matter.js controller leg (TestMatterJSController) drives the
+      # daemon from matter.js's CommissioningController, built from the
+      # matter.js commit the schema snapshot was extracted from
+      # (parity/schema.json matter.sourceCommit) and checked out next to
+      # the module, where the test looks for it. The built tree is cached
+      # per commit.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: matter.js pin
+        id: matterjs
+        run: echo "sha=$(jq -r .matter.sourceCommit parity/schema.json)" >> "$GITHUB_OUTPUT"
+      - name: cache the built matter.js
+        id: matterjs-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/../matter.js
+          key: matterjs-${{ steps.matterjs.outputs.sha }}-node22
+      - name: build matter.js at the pin
+        if: steps.matterjs-cache.outputs.cache-hit != 'true'
         run: |
-          bin="$HOME/.cache/chiptool-bin/chip-tool"
-          if ldd "$bin" | grep "not found"; then
-            echo "::error::chip-tool has unresolved shared libraries (see ldd output above)"
-            exit 1
-          fi
-          ("$bin" || true) 2>&1 | grep -qi "usage" \
-            || { echo "::error::chip-tool did not print its usage banner"; exit 1; }
-          ("$bin" interactive || true) 2>&1 | tee /tmp/interactive.txt | head -n 20
-          grep -q "server" /tmp/interactive.txt \
-            || { echo "::error::this chip-tool has no 'interactive server' subcommand; the YAML runner cannot drive it"; exit 1; }
+          git clone --filter=blob:none https://github.com/matter-js/matter.js "$GITHUB_WORKSPACE/../matter.js"
+          cd "$GITHUB_WORKSPACE/../matter.js"
+          git checkout --detach "${{ steps.matterjs.outputs.sha }}"
+          npm ci --no-audit --no-fund
+          npm run build
 
-      # matter-yamltests and matter-idl are installed FROM THE CHECKOUT, not
-      # from PyPI: a released wheel would float against the pinned commit and
-      # silently parse the cases with a different vocabulary. click and
-      # diskcache are the only two further imports the runner needs outside a
-      # full CHIP bootstrap — click for chiptool.py's own command line,
-      # diskcache for scripts/tests/chipyaml/paths_finder.py. Both were found
-      # by running the runner and reading the ImportError, not by copying
-      # scripts/tests/requirements.txt, which also pulls the bluez and
-      # pigweed-side machinery none of this touches.
-      - name: install the chip YAML runner
-        run: |
-          python3 -m venv "$HOME/chipyaml-venv"
-          "$HOME/chipyaml-venv/bin/pip" install --disable-pip-version-check \
-            ./chip/scripts/py_matter_idl ./chip/scripts/py_matter_yamltests click diskcache
-          "$HOME/chipyaml-venv/bin/python" -c "import matter.yamltests, matter.idl, click, diskcache; print('runner ok')"
-
-      - name: build the reference daemon
-        run: make chiptool-build
-
-      # The suite skips itself if either input is missing, so both are passed
-      # explicitly and the run is checked for the skip afterwards: a
-      # conformance job that silently skips is worth less than no job.
-      - name: chip certification cases
-        env:
-          GOFABRIC_CHIPTOOL_BIN: /home/runner/.cache/chiptool-bin/chip-tool
-          GOFABRIC_CHIP_ROOT: ${{ github.workspace }}/chip
-          GOFABRIC_CHIPYAML_PYTHON: /home/runner/chipyaml-venv/bin/python
+      # The suite skips itself when no harness is usable, and the matter.js
+      # leg when no built matter.js is found; in CI either would be a silent
+      # green, so the run is checked for both skips.
+      - name: chip-tool suite
         run: |
           set -o pipefail
-          go test -tags=chiptool -count=1 -timeout=1800s -v \
-            -run '^TestChipToolRunsChipConformanceCases$' ./internal/chiptool/... 2>&1 | tee /tmp/conformance.log
-          if grep -q -- "--- SKIP: TestChipToolRunsChipConformanceCases" /tmp/conformance.log; then
-            echo "::error::the conformance test skipped itself; its inputs were not wired"
+          GOFABRIC_CHIP_HARNESS=image make chiptool-test 2>&1 | tee /tmp/chiptool.log
+          if grep -q -- "--- SKIP: TestChipTool" /tmp/chiptool.log; then
+            echo "::error::the chip-tool suite skipped itself; the harness was not usable"
             exit 1
           fi
-          if ! grep -q -- "--- PASS: TestChipToolRunsChipConformanceCases" /tmp/conformance.log; then
-            echo "::error::no PASS line for the conformance test"
+          if grep -q -- "--- SKIP: TestMatterJSController" /tmp/chiptool.log; then
+            echo "::error::the matter.js controller leg skipped itself; matter.js was not built"
             exit 1
           fi
 
-      - name: upload conformance logs
+      - name: upload logs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: chiptool-conformance-logs
-          path: /tmp/conformance.log
+          name: chiptool-logs
+          path: /tmp/chiptool.log
           if-no-files-found: ignore
+
+  chiptool-control:
+    # The name is a required status check on main (branch protection); keep
+    # it byte-for-byte, or every pull request waits on a check nobody reports.
+    name: chip-tool control leg (CHIP app, no go-fabric)
+    needs: changes
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: start avahi
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends avahi-daemon
+          # The runner's docker0 bridge has no carrier in a host-network
+          # setup, yet avahi listens on it and hands resolvers addresses
+          # scoped to it (fe80::…%docker0, 10.1.0.x%docker0): unreachable
+          # routes and stale cache entries. The DUT and every controller
+          # share the host network, so avahi only needs the real interfaces.
+          sudo sed -i 's/^#\?deny-interfaces=.*$/deny-interfaces=docker0/' /etc/avahi/avahi-daemon.conf
+          grep -q '^deny-interfaces=docker0$' /etc/avahi/avahi-daemon.conf
+          sudo systemctl restart avahi-daemon
+          systemctl is-active dbus avahi-daemon
+      - name: pull the pinned CHIP image
+        run: make chiptool-image
+      # Same container setup as the suite (internal/chiptool/harness_test.go
+      # launchHarness): host network, apparmor unconfined for avahi over
+      # dbus, the host's /run/dbus.
+      - name: pair the all-clusters app and read its parts list
+        run: |
+          set -euo pipefail
+          image=$(sed -n 's/^CHIP_TEST_IMAGE[[:space:]]*?=[[:space:]]*//p' Makefile)
+          docker run -d --name chip-control --network host --security-opt apparmor=unconfined \
+            -v /run/dbus:/run/dbus --entrypoint sleep "$image" infinity
+          docker exec -d chip-control sh -c '/bin/chip-all-clusters-app --KVS /tmp/kvs-app > /tmp/app.log 2>&1'
+          # chip-tool writes its KVS into --storage-directory but does not
+          # create it: PersistentStorage::CommitConfig opens
+          # <dir>/chip_tool_config.ini.tmp and fails with
+          # CHIP_ERROR_WRITE_FAILED (ExamplePersistentStorage.cpp:210) when
+          # the directory is missing.
+          docker exec chip-control mkdir -p /tmp/kvs-ctl
+          sleep 5
+          docker exec chip-control /bin/chip-tool pairing onnetwork-long 1 20202021 3840 \
+            --storage-directory /tmp/kvs-ctl 2>&1 | tee /tmp/pair.log
+          grep -q "Device commissioning completed with success" /tmp/pair.log \
+            || { echo "::error::chip-tool could not commission CHIP's own all-clusters app"; exit 1; }
+          docker exec chip-control /bin/chip-tool descriptor read parts-list 1 0 \
+            --storage-directory /tmp/kvs-ctl 2>&1 | tee /tmp/read.log
+          grep -q "PartsList" /tmp/read.log \
+            || { echo "::error::Descriptor.PartsList not returned by the all-clusters app"; exit 1; }
+      - name: collect logs
+        if: always()
+        run: docker exec chip-control cat /tmp/app.log > /tmp/app.log 2>/dev/null || true
+      - name: upload control-leg logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: chiptool-control-logs
+          path: |
+            /tmp/app.log
+            /tmp/pair.log
+            /tmp/read.log
+          if-no-files-found: ignore
+
+  chip-families:
+    name: certification families (${{ matrix.group }})
+    needs: changes
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'needs-chiptool') ||
+      needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      # Decided by the `code touched` job: see its `groups` step.
+      matrix: ${{ fromJSON(needs.changes.outputs.families) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: start avahi
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends avahi-daemon
+          # The runner's docker0 bridge has no carrier in a host-network
+          # setup, yet avahi listens on it and hands resolvers addresses
+          # scoped to it (fe80::…%docker0, 10.1.0.x%docker0): unreachable
+          # routes and stale cache entries. The DUT and every controller
+          # share the host network, so avahi only needs the real interfaces.
+          sudo sed -i 's/^#\?deny-interfaces=.*$/deny-interfaces=docker0/' /etc/avahi/avahi-daemon.conf
+          grep -q '^deny-interfaces=docker0$' /etc/avahi/avahi-daemon.conf
+          sudo systemctl restart avahi-daemon
+          systemctl is-active dbus avahi-daemon
+      - name: pull the pinned CHIP image
+        run: make chiptool-image
+      - name: families
+        env:
+          GOFABRIC_CHIP_FAMILIES: ${{ matrix.families }}
+          GOFABRIC_CHIP_HARNESS: image
+        run: |
+          set -o pipefail
+          make chiptool-families 2>&1 | tee /tmp/families.log
+          if grep -q -- "--- SKIP: TestChipCertificationFamilies " /tmp/families.log; then
+            echo "::error::the certification families skipped themselves; the harness was not usable"
+            exit 1
+          fi
+      - name: upload case logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: chip-families-${{ matrix.group }}
+          path: |
+            /tmp/families.log
+            bin/chip-harness/logs
+          if-no-files-found: ignore
+
+  # The required status check for the certification families. Branch
+  # protection on main names it, and a matrix job cannot serve: its check
+  # names depend on the groups an event runs, and a skipped matrix job
+  # reports under its unexpanded name. This job always reports, under one
+  # fixed name: green when every family group that ran passed (or the suite
+  # was not due at all), red when one failed or was cancelled.
+  chip-families-gate:
+    name: chip certification cases against the reference daemon
+    needs: [changes, chip-families]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          FAMILIES: ${{ needs.chip-families.result }}
+          CHANGES: ${{ needs.changes.result }}
+        run: |
+          echo "code touched: $CHANGES; certification families: $FAMILIES"
+          case "$CHANGES/$FAMILIES" in
+            success/success|success/skipped) exit 0 ;;
+            *) echo "::error::a certification family group did not pass ($FAMILIES)"; exit 1 ;;
+          esac

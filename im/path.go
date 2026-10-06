@@ -4,6 +4,7 @@
 package im
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -51,6 +52,10 @@ type ConcreteAttributePath struct {
 	HasCluster   bool
 	HasAttribute bool
 	HasListIndex bool
+	// ListAppend marks a null ListIndex: the write appends its value — one
+	// list element — to the list (Matter §10.6.4.3.1; the chunked list
+	// encoding a controller uses for a list too large for one message).
+	ListAppend bool
 }
 
 // IsWildcardEndpoint reports whether the path matches every endpoint.
@@ -88,7 +93,10 @@ func (p ConcreteAttributePath) MarshalTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	if p.HasAttribute {
 		enc.PutUint(tlv.ContextTag(tagAttrPathAttribute), uint64(p.Attribute))
 	}
-	if p.HasListIndex {
+	switch {
+	case p.ListAppend:
+		enc.PutNull(tlv.ContextTag(tagAttrPathListIndex))
+	case p.HasListIndex:
 		enc.PutUint(tlv.ContextTag(tagAttrPathListIndex), uint64(p.ListIndex))
 	}
 	_ = enc.EndContainer()
@@ -133,6 +141,7 @@ func UnmarshalAttributePathTLV(dec *tlv.Decoder) (ConcreteAttributePath, error) 
 		case tagAttrPathListIndex:
 			p.ListIndex = uint16(el.Uint & 0xFFFF)
 			p.HasListIndex = true
+			p.ListAppend = el.IsNull
 		case tagAttrPathEnableTagCompression:
 			// Tag-compression is an encoder-side optimisation we do
 			// not honour on the decode path; spec §A.7 allows
@@ -209,3 +218,21 @@ func UnmarshalCommandPathTLV(dec *tlv.Decoder) (ConcreteCommandPath, error) {
 
 // EOF guard for the decoder helpers above.
 var _ = io.EOF
+
+type listAppendWriteKey struct{}
+
+// WithListAppendWrite marks ctx as carrying a list-append write (a
+// ListIndex=null AttributeDataIB): the cluster server receives the whole
+// list with one element appended, and only that element is new. A server
+// that reports per-element changes (AccessControl's
+// AccessControlEntryChanged) reports just the appended one, as chip's list
+// append (AccessControlAttribute CreateEntry) does.
+func WithListAppendWrite(ctx context.Context) context.Context {
+	return context.WithValue(ctx, listAppendWriteKey{}, true)
+}
+
+// IsListAppendWrite reports whether ctx carries [WithListAppendWrite].
+func IsListAppendWrite(ctx context.Context) bool {
+	v, _ := ctx.Value(listAppendWriteKey{}).(bool)
+	return v
+}

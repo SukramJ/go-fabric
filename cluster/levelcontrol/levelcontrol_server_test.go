@@ -228,12 +228,28 @@ func TestUnservedAttributesAreNotResolved(t *testing.T) {
 	t.Parallel()
 
 	srv := levelcontrol.NewServer(levelcontrol.Config{Source: observedHost()})
-	// RemainingTime (LT), MinLevel/MaxLevel (O), CurrentFrequency (FQ),
-	// OnOffTransitionTime (O), DefaultMoveRate (O), StartUpCurrentLevel (LT).
-	for _, attrID := range []uint32{0x0001, 0x0002, 0x0003, 0x0004, 0x0010, 0x0014, 0x4000} {
+	// RemainingTime (LT), CurrentFrequency (FQ), OnOffTransitionTime (O),
+	// DefaultMoveRate (O), StartUpCurrentLevel (LT). MinLevel / MaxLevel
+	// are served — see TestMinAndMaxLevelAreServed.
+	for _, attrID := range []uint32{0x0001, 0x0004, 0x0010, 0x0014, 0x4000} {
 		if _, ok := srv.MatterRead(attrID); ok {
 			t.Errorf("MatterRead(0x%04X) resolved, but the attribute is not conformance M here", attrID)
 		}
+	}
+}
+
+// TestMinAndMaxLevelAreServed pins MinLevel and MaxLevel, conformance
+// "Rev >= v7, O" — mandatory at revision 7, which matter.js serves on every
+// LevelControl (LevelControlServer.ts:114-120): 0 without LT, and 254.
+// Found missing by the CHIP conformance checker (TC-IDM-10.2).
+func TestMinAndMaxLevelAreServed(t *testing.T) {
+	t.Parallel()
+	srv := levelcontrol.NewServer(levelcontrol.Config{Source: observedHost()})
+	if v, ok := srv.MatterRead(levelcontrol.AttrMinLevel); !ok || v != levelcontrol.LevelMin {
+		t.Errorf("MinLevel = %v, %v; want %d", v, ok, levelcontrol.LevelMin)
+	}
+	if v, ok := srv.MatterRead(levelcontrol.AttrMaxLevel); !ok || v != levelcontrol.LevelMax {
+		t.Errorf("MaxLevel = %v, %v; want %d", v, ok, levelcontrol.LevelMax)
 	}
 }
 
@@ -778,7 +794,7 @@ func TestSurfaceLists(t *testing.T) {
 
 	srv := levelcontrol.NewServer(levelcontrol.Config{Source: observedHost()})
 
-	wantAttrs := []uint32{levelcontrol.AttrCurrentLevel, levelcontrol.AttrOptions, levelcontrol.AttrOnLevel}
+	wantAttrs := []uint32{levelcontrol.AttrCurrentLevel, levelcontrol.AttrMinLevel, levelcontrol.AttrMaxLevel, levelcontrol.AttrOptions, levelcontrol.AttrOnLevel}
 	if got := srv.MatterAttributes(); !reflect.DeepEqual(got, wantAttrs) {
 		t.Errorf("MatterAttributes() = %v, want %v", got, wantAttrs)
 	}

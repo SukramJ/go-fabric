@@ -195,8 +195,14 @@ func TestAccessControl_ExtensionWriteEmitsExtensionChanged(t *testing.T) {
 	if err := ac.MatterWrite(context.Background(), 0x0001, []core.AccessControlExtensionEntry{{Data: data}}); err != nil {
 		t.Fatalf("first MatterWrite: unexpected error: %v", err)
 	}
-	// Second write: 1 -> 1 entry => Changed.
+	// Rewriting the same list changes nothing and reports nothing — matter.js
+	// emits on extension$Changed only.
 	if err := ac.MatterWrite(context.Background(), 0x0001, []core.AccessControlExtensionEntry{{Data: data}}); err != nil {
+		t.Fatalf("identical MatterWrite: unexpected error: %v", err)
+	}
+	// Second write: 1 -> 1 different entry => Changed.
+	other := []byte{0x17, 0x24, 0x01, 0x07, 0x18} // a list holding context tag 1 = 7
+	if err := ac.MatterWrite(context.Background(), 0x0001, []core.AccessControlExtensionEntry{{Data: other}}); err != nil {
 		t.Fatalf("second MatterWrite: unexpected error: %v", err)
 	}
 	// Third write: 1 -> 0 entries => Removed.
@@ -331,5 +337,76 @@ func TestAccessControl_RemoveFabricExtension_NoEntryIsNoop(t *testing.T) {
 	ac.RemoveFabricExtension(3)
 	if after := ac.MatterDataVersion(); after != before {
 		t.Errorf("DataVersion changed (%d -> %d) purging a fabric with no Extension entry", before, after)
+	}
+}
+
+// settingsACLStore is a fakeACLStore with the settings side of
+// [core.ACLExtensionPersistence].
+type settingsACLStore struct {
+	fakeACLStore
+	settings map[string]string
+}
+
+func (s *settingsACLStore) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
+	v, ok := s.settings[key]
+	return v, ok, nil
+}
+
+func (s *settingsACLStore) SetSetting(_ context.Context, key, value string) error {
+	s.settings[key] = value
+	return nil
+}
+
+// TestAccessControl_ExtensionSurvivesARestart pins that the Extension
+// attribute is persisted: a server built on the same store after a reboot
+// serves what the controller wrote, and a removed fabric's entry stays gone.
+// matter.js persists it as fabric-scoped state; TC-ACL-2.10 step 9 reboots
+// the DUT between write and read.
+func TestAccessControl_ExtensionSurvivesARestart(t *testing.T) {
+	t.Parallel()
+	st := &settingsACLStore{settings: map[string]string{}}
+	ac, err := core.NewAccessControl(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := im.WithFabricFilter(context.Background(), true, 2)
+	data := encodeExtensionTLV(t)
+	if err := ac.MatterWrite(ctx, 0x0001, []core.AccessControlExtensionEntry{{Data: data}}); err != nil {
+		t.Fatalf("MatterWrite Extension: %v", err)
+	}
+
+	rebooted, err := core.NewAccessControl(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := rebooted.MatterReadFiltered(ctx, 0x0001)
+	got, _ := v.([]core.AccessControlExtensionEntry)
+	if len(got) != 1 || !bytes.Equal(got[0].Data, data) || got[0].FabricIndex != 2 {
+		t.Fatalf("after restart: %+v, want the written entry on fabric 2", got)
+	}
+
+	rebooted.RemoveFabricExtension(2)
+	again, _ := core.NewAccessControl(st)
+	v, _ = again.MatterReadFiltered(ctx, 0x0001)
+	if got, _ := v.([]core.AccessControlExtensionEntry); len(got) != 0 {
+		t.Fatalf("a removed fabric's extension came back after a restart: %+v", got)
+	}
+}
+
+// TestAccessControl_Extension_RejectsAnonymousListMembers pins the
+// test plan's D_BAD_ELEM (TC-ACL-2.3 step 13): a list whose member has no
+// tag is not a valid extension, as matter.js's TlvTaggedList decode rejects
+// it; the test plan's valid D_OK_SINGLE (a profile-tagged string) passes.
+func TestAccessControl_Extension_RejectsAnonymousListMembers(t *testing.T) {
+	t.Parallel()
+	ac := newAccessControl(t)
+	ctx := im.WithFabricFilter(context.Background(), true, 1)
+	badElem := []byte{0x17, 0x10, 0x02, 'h', 'i', 0x18}
+	if err := ac.MatterWrite(ctx, 0x0001, []core.AccessControlExtensionEntry{{Data: badElem}}); err == nil {
+		t.Fatal("an anonymous list member was accepted")
+	}
+	okSingle := []byte{0x17, 0xD0, 0x00, 0x00, 0xF1, 0xFF, 0x01, 0x00, 0x02, 'h', 'i', 0x18}
+	if err := ac.MatterWrite(ctx, 0x0001, []core.AccessControlExtensionEntry{{Data: okSingle}}); err != nil {
+		t.Fatalf("a profile-tagged member was rejected: %v", err)
 	}
 }

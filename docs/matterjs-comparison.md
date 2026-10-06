@@ -96,7 +96,7 @@ actually mounts. The schema for all of them is present here (in `parity/` and
 | Sensing (Temperature, Humidity, Illuminance, Pressure, Flow, Occupancy, BooleanState, AirQuality, CO₂/PM2.5/PM10, PowerSource, Electrical Power/Energy) | ✅ | [`cluster/measurement`](../cluster/measurement) | ✅ | — | |
 | Resource monitoring (HEPA / activated-carbon filter monitoring) | ✅ | — | ○ | **Low** | Optional on AirPurifier and ExtractorHood; not built until a host has a filter to report. |
 | Groups (0x0004) | full server | full server ([`core.Groups`](../cluster/core/groups.go)), membership as stack state in `groups.Manager`, persisted; mounted by the assembler where the device type mandates it | ✅ | — | [ADR 0009](./adr/0009-groups-and-group-messaging.md). Groupcast adoption (rev 5 INVALID_IN_STATE paths) is inert in matter.js's default server too. |
-| ScenesManagement (0x0062) | full server | stub: empty scene table, writes rejected | ◐ | **Low** | Presence is mandated by device-type conformance; a scene store is its own feature. `BD-Matter-P2-D18`. |
+| ScenesManagement (0x0062) | full server | full server ([`core.ScenesManagement`](../cluster/core/scenes_management.go)): the scene table as endpoint stack state, persisted; scenes over the endpoint's OnOff / LevelControl / ColorControl, recalled through their commands; RemainingCapacity bounded by the shared table as chip computes it | ✅ | — | [ADR 0012](./adr/0012-scenesmanagement-server.md), `BD-Matter-Scenes-RemainingCapacity`. |
 | ICDManagement | full, incl. check-in sender (`protocol/src/icd`) | attributes 0x0000–0x0002 | ◐ | **Low** | `BD-chip-ICD-Attrs-0x3-0x5`. A mains-powered bridge is not an intermittently-connected device; the cluster is mounted for conformance, not for behaviour. |
 | DiagnosticLogs | full, with BDX transfer | responds, but never initiates a BDX transfer | ◐ | **Low** | `BD-chip-DiagLogs-NoBDX`. Needs BDX (and realistically TCP) to be worth more. |
 | OTA Software Update **Requestor** | ✅ | `cluster/core/ota_software_update_requestor.go` | ✅ | — | |
@@ -139,8 +139,13 @@ are not re-opened by accident:
    CASE session to it as the initiator — what matter.js's server node does —
    and nothing else ([ADR 0008](./adr/0008-subscription-resumption.md)).
 2. **No Bluetooth.** Commissioning is on-network (DNS-SD) only.
-3. **No CSA certification.** The borrowed `Test_TC_*` cases are regression
-   tests. Nothing built on this module may be described as certified.
+3. **Certification is not pursued; certifiability is a goal.** This project
+   does not seek CSA certification, and nothing built on it may be described
+   as certified. The module is, however, meant to be in a state where a
+   product built on it could pass certification: the CSA certification
+   families run against the reference daemon, every gap is classified, and
+   the status lives in [`certifiability.md`](./certifiability.md)
+   ([ADR 0011](./adr/0011-certifiability-is-a-goal.md)).
 
 ## If you are looking for the next thing to build
 

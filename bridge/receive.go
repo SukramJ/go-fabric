@@ -13,7 +13,9 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -391,6 +393,7 @@ func (b *Bridge) notifySessionActivity(sessionID uint16, rx bool) {
 //     matching follow-up Write/Invoke is gated against it via
 //     `Bridge.checkTimedGate` per Matter §8.7.
 func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
+	b.load.imReceived.Add(1)
 	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType) {
 	case imGateProceed:
 		// fall through to decode + dispatch below
@@ -416,35 +419,35 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHd
 		req, err := im.UnmarshalReadRequestTLV(dec)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.read_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "read", err)
 		}
 		return b.dispatchReadRequest(ctx, src, requestHdr, proto, dispatcher, req)
 	case im.OpcodeWriteRequest:
 		req, err := im.UnmarshalWriteRequestTLV(dec, attributeValueReader)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.write_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "write", err)
 		}
 		return b.dispatchWriteRequest(ctx, src, requestHdr, proto, dispatcher, req)
 	case im.OpcodeInvokeRequest:
 		req, err := im.UnmarshalInvokeRequestTLV(dec, commandFieldsReader)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.invoke_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "invoke", err)
 		}
 		return b.dispatchInvokeRequest(ctx, src, requestHdr, proto, dispatcher, req)
 	case im.OpcodeSubscribeRequest:
 		req, err := im.UnmarshalSubscribeRequestTLV(dec)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.subscribe_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "subscribe", err)
 		}
 		return b.handleSubscribeRequest(ctx, src, requestHdr, proto, req)
 	case im.OpcodeTimedRequest:
 		req, err := im.UnmarshalTimedRequestTLV(dec)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.timed_decode", slog.String("err", err.Error()))
-			return err
+			return b.replyDecodeError(src, requestHdr, proto, "timed", err)
 		}
 		return b.dispatchTimedRequest(src, requestHdr, proto, req)
 	}
@@ -488,7 +491,13 @@ func (b *Bridge) checkTimedGate(timedFlag bool, sessionID, exchangeID uint16) (i
 		return 0, false
 	}
 	if !ok {
-		return im.StatusNeedsTimedInteraction, true
+		// The request claims a timed interaction the exchange never
+		// opened: TIMED_REQUEST_MISMATCH, as matter.js answers
+		// `timedRequest !== exchange.hasTimedInteraction()`
+		// (InteractionServer.ts:409-412 write, :945-948 invoke). Found by
+		// the CHIP Python harness (TC-IDM-1.2 step 8), which sends exactly
+		// that.
+		return im.StatusTimedRequestMismatch, true
 	}
 	deadline, isTime := raw.(time.Time)
 	if !isTime || time.Now().After(deadline) {
@@ -622,4 +631,146 @@ func srcString(src *net.UDPAddr) string {
 		return "<nil>"
 	}
 	return src.String()
+}
+
+// ConfigurationVersions is what an increase produced: the node's
+// BasicInformation ConfigurationVersion and the BridgedDeviceBasicInformation
+// one of each bridged endpoint that was raised, for the host to persist
+// (BasicInformationConfig.ConfigurationVersion, endpoint.Spec.ConfigurationVersion).
+// A version may never decrease, so a host that raises one keeps it.
+type ConfigurationVersions struct {
+	Node    uint32
+	Bridged map[uint16]uint32
+}
+
+// IncreaseConfigurationVersion raises the BridgedDeviceBasicInformation
+// ConfigurationVersion of every bridged endpoint backed by the given
+// physical device (scope + deviceAddress, as for [Bridge.NotifyDeviceReachable])
+// and, once, the node's BasicInformation ConfigurationVersion — a bridged
+// node's configuration change is the bridge's too — and reports the changes
+// to subscribers. Call it when the device's functionality changes (a
+// thermostat rewired to support a new mode). Mirrors matter.js
+// BridgedDeviceBasicInformationServer.increaseConfigurationVersion, which
+// raises the root's BasicInformationServer version when called standalone
+// (TC-BRBINFO-3.2).
+func (b *Bridge) IncreaseConfigurationVersion(scope, deviceAddress string) ConfigurationVersions {
+	out := ConfigurationVersions{Bridged: map[uint16]uint32{}}
+	if b == nil {
+		return out
+	}
+	topo := b.Topology()
+	if topo == nil {
+		return out
+	}
+	mgr := b.subscriptionManagerLocked()
+	for _, ep := range topo.Bridged() {
+		if ep == nil || ep.Scope != scope || ep.DeviceAddress != deviceAddress {
+			continue
+		}
+		out.Bridged[ep.ID] = ep.IncreaseConfigurationVersion()
+		markConfigurationVersionDirty(mgr, ep.ID, core.BridgedDeviceBasicInformationClusterID)
+	}
+	if len(out.Bridged) > 0 {
+		out.Node = b.IncreaseNodeConfigurationVersion()
+	}
+	return out
+}
+
+// IncreaseNodeConfigurationVersion raises the root BasicInformation
+// ConfigurationVersion — call it when the node's functionality changes in a
+// way controllers should detect — reports it to subscribers and returns the
+// new value for the host to persist. Zero when no BasicInformation server is
+// attached to the root endpoint. Mirrors matter.js
+// BasicInformationServer.increaseConfigurationVersion.
+func (b *Bridge) IncreaseNodeConfigurationVersion() uint32 {
+	if b == nil {
+		return 0
+	}
+	topo := b.Topology()
+	if topo == nil {
+		return 0
+	}
+	root := topo.FindByID(0)
+	if root == nil {
+		return 0
+	}
+	for _, srv := range endpoint.ClusterServers(root) {
+		if bi, ok := srv.(*core.BasicInformation); ok {
+			v := bi.IncreaseConfigurationVersion()
+			markConfigurationVersionDirty(b.subscriptionManagerLocked(), 0, 0x0028) // BasicInformation
+			return v
+		}
+	}
+	return 0
+}
+
+func markConfigurationVersionDirty(mgr *subscription.Manager, ep uint16, clusterID uint32) {
+	if mgr == nil {
+		return
+	}
+	mgr.OnAttributeChanged(im.ConcreteAttributePath{
+		Endpoint: ep, Cluster: clusterID, Attribute: 0x0018, // ConfigurationVersion
+		HasEndpoint: true, HasCluster: true, HasAttribute: true,
+	})
+}
+
+// wireAdminEntryEvents connects the root's OperationalCredentials to its
+// AccessControl: the default Administer entry AddNOC installs is an ACL
+// change the AccessControl cluster reports (DataVersion and
+// AccessControlEntryChanged), as matter.js's AccessControlServer does for
+// the entry it adds on fabric creation.
+func wireAdminEntryEvents(servers []contract.ClusterServer) {
+	var opcreds *core.OperationalCredentials
+	var acl *core.AccessControl
+	for _, s := range servers {
+		switch v := s.(type) {
+		case *core.OperationalCredentials:
+			opcreds = v
+		case *core.AccessControl:
+			acl = v
+		}
+	}
+	if opcreds != nil && acl != nil {
+		opcreds.SetOnAdminEntryInstalled(acl.NotifyAdminEntryInstalled)
+	}
+}
+
+// wireCommissioned has the root's GeneralCommissioning end the
+// commissioning window after a successful CommissioningComplete, as matter.js
+// DeviceCommissioner does on failsafeContext.commissioned. Wired from
+// whichever of AttachRootClusters / AttachCommissioningWindow comes second.
+func wireCommissioned(servers []contract.ClusterServer, w *CommissioningWindow) {
+	if w == nil {
+		return
+	}
+	for _, s := range servers {
+		if gc, ok := s.(*core.GeneralCommissioning); ok {
+			gc.SetOnCommissioned(w.EndCommissioning)
+		}
+	}
+}
+
+// replyDecodeError answers an IM request that does not decode with a
+// StatusResponse instead of leaving the controller to time out: the
+// status a typed decode error carries ([im.StatusCodeError]), FAILURE
+// otherwise — matter.js InteractionMessenger.handleRequest sends
+// StatusResponseError.of(error)?.code ?? Status.Failure for any error the
+// handling of a request throws. Found by the CHIP harness (TC-ACL-2.3 waited
+// ten seconds for a WriteResponse to a write it could not decode).
+func (b *Bridge) replyDecodeError(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, op string, decodeErr error) error {
+	status := im.StatusFailure
+	var sce im.StatusCodeError
+	if errors.As(decodeErr, &sce) {
+		status = sce.MatterStatusCode()
+	}
+	body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
+	if err != nil {
+		return err
+	}
+	if err := b.sendReply(src, requestHdr, proto, im.OpcodeStatusResponse, body); err != nil {
+		debugReplyError(b.logger, "send_"+op+"_decode_status", src, err)
+		return err
+	}
+	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	return decodeErr
 }

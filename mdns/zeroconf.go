@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -95,6 +94,14 @@ type Zeroconf struct {
 	// predicate. Replace it before the first Publish to change the
 	// policy — it is read on every Publish, under the advertiser lock.
 	InterfaceFilter func(name string) bool
+	// HostName, when set, is the SRV target of every record this
+	// advertiser publishes, in place of the one the Service carries (the
+	// MAC-derived default the Build* helpers fill in). A test host whose
+	// LAN interface has no IPv6 sets the OS host name here, whose address
+	// records the OS responder publishes for every interface — the IPv6
+	// link-local ones an IPv6-only controller needs included. Set it
+	// before the first Publish.
+	HostName string
 }
 
 // NewZeroconf returns a multicast advertiser backed by zeroconf. The
@@ -138,6 +145,28 @@ type hostIface struct {
 	loopback     bool
 	pointToPoint bool
 	ips          []net.IP
+}
+
+// primaryHostInterfaces lists the interfaces the advertise policy takes
+// addresses from (see filterPrimaryHostIPs): up, multicast-capable, not
+// loopback or point-to-point, not excluded by name. nil when none is.
+func primaryHostInterfaces(exclude func(string) bool) []net.Interface {
+	if exclude == nil {
+		exclude = isVirtualInterfaceName
+	}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	var out []net.Interface
+	for _, ifi := range ifaces {
+		if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagMulticast == 0 ||
+			ifi.Flags&net.FlagLoopback != 0 || ifi.Flags&net.FlagPointToPoint != 0 || exclude(ifi.Name) {
+			continue
+		}
+		out = append(out, ifi)
+	}
+	return out
 }
 
 // primaryHostIPs returns the curated host-IP list the Matter mDNS
@@ -187,7 +216,8 @@ func parseHostIPs(ips []string) []net.IP {
 }
 
 // filterPrimaryHostIPs applies the advertise policy: the routable IPv4 +
-// globally-routable IPv6 addresses from every non-loopback, non-tunnel,
+// globally-routable IPv6 addresses (an interface's link-local IPv6 only when
+// it has no routable one) from every non-loopback, non-tunnel,
 // multicast-capable interface that is currently UP — excluding container /
 // virtualisation bridges by interface name. Apple iOS Matter daemon
 // iterates the published address list during resolve and aborts on
@@ -220,6 +250,12 @@ func filterPrimaryHostIPs(ifaces []hostIface, exclude func(string) bool) []strin
 		if exclude(ifi.name) {
 			continue
 		}
+		// An interface whose only IPv6 is link-local still publishes it:
+		// Matter is IPv6-first — chip-tool resolves operational nodes over
+		// IPv6 only — and chip and matter.js (NodeJsNetwork) publish every
+		// IPv6 address of the interface. Where a routable IPv6 exists the
+		// link-local one stays out, the policy above.
+		keepLinkLocal6 := !hasRoutableIPv6(ifi.ips)
 		for _, ip := range ifi.ips {
 			if ip == nil || ip.IsLoopback() {
 				continue
@@ -235,13 +271,28 @@ func filterPrimaryHostIPs(ifaces []hostIface, exclude func(string) bool) []strin
 				}
 				continue
 			}
-			if !ip.IsLinkLocalUnicast() && !ip.IsUnspecified() {
-				seen[s] = struct{}{}
-				v6s = append(v6s, s)
+			if ip.IsUnspecified() || (ip.IsLinkLocalUnicast() && !keepLinkLocal6) {
+				continue
 			}
+			seen[s] = struct{}{}
+			v6s = append(v6s, s)
 		}
 	}
 	return append(v4s, v6s...)
+}
+
+// hasRoutableIPv6 reports whether ips holds an IPv6 address that is
+// neither link-local, loopback nor unspecified.
+func hasRoutableIPv6(ips []net.IP) bool {
+	for _, ip := range ips {
+		if ip == nil || ip.To4() != nil {
+			continue
+		}
+		if !ip.IsLinkLocalUnicast() && !ip.IsLoopback() && !ip.IsUnspecified() {
+			return true
+		}
+	}
+	return false
 }
 
 // Publish implements [Advertiser]. Each publish call registers a
@@ -295,16 +346,15 @@ func (z *Zeroconf) publishLocked(svc Service) error {
 	// host's `<LocalHostName>.local` and our duplicate publish is
 	// drowned out — Apple Home resolves the SRV target after
 	// CommissioningComplete, finds nothing, and tears the fabric down
-	// with RemoveFabric ~10s later. Falling back to `os.Hostname()`
-	// reuses the OS-pinned name, which is guaranteed to have A/AAAA on
-	// the wire for the lifetime of the host.
+	// with RemoveFabric ~10s later. defaultHostName therefore keeps the
+	// OS-pinned name on macOS and uses the Matter MAC-derived name
+	// elsewhere (matter.js MdnsAdvertisement.ts:155).
 	host := svc.HostName
+	if z.HostName != "" {
+		host = z.HostName
+	}
 	if host == "" {
-		if h, err := os.Hostname(); err == nil && h != "" {
-			host = strings.TrimSuffix(h, ".local")
-		} else {
-			host = "go-fabric-matter"
-		}
+		host = defaultHostName()
 	}
 	ips := primaryHostIPs(z.InterfaceFilter)
 	// Stamp the effective address set onto the copy we keep: the A/AAAA
@@ -345,7 +395,14 @@ func (z *Zeroconf) publishLocked(svc Service) error {
 		host,
 		ips,
 		txt,
-		nil, // nil → all multicast-capable interfaces
+		// Only the interfaces the address list comes from. Sent on every
+		// interface (nil), a response also reached local listeners over a
+		// container bridge, and an IPv6 resolver scoped the link-local
+		// address it carries to that bridge — an unreachable route
+		// (TC-BINFO-2.2 in CI: fe80::…%docker0, ENETUNREACH). nil when the
+		// filter leaves none, which keeps the library's every-interface
+		// default.
+		primaryHostInterfaces(z.InterfaceFilter),
 	)
 	if err != nil {
 		return fmt.Errorf("mdns: zeroconf register %s/%s: %w", svc.InstanceName, svc.ServiceType, err)

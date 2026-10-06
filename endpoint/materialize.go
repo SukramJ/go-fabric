@@ -4,6 +4,7 @@
 package endpoint
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -93,6 +94,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// Group membership is stack state: the stack's Groups server goes
 	// first, ahead of the source's own clusters (see mountGroups).
 	inner = mountGroups(ep, ep.identifyServer(), inner)
+	inner = mountScenes(ep, inner)
 
 	// Spec §9.5 + §9.13: every bridged endpoint MUST advertise both
 	// the Descriptor cluster (DeviceTypeList containing BridgedNode +
@@ -188,18 +190,24 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		// non-empty VendorName + ProductName + VendorID + ProductID.
 		// matter.js's Sample-Bridge sets these to Test-Vendor values and
 		// Apple's iPad shows sensors as Reachable+Controllable=YES. We set
-		// them analogously plus the HmIP manufacturer "eQ-3" + the
+		// them analogously: the device's manufacturer as the host names it,
+		// else the node's own vendor (bridgedVendorName), plus the
 		// device-specific ProductName (= Address for unique per-endpoint
 		// identification). Without these fields Apple shows the sensors
 		// in the Home app as "not available".
-		VendorName:   "eQ-3",
+		VendorName:   bridgedVendorName(ep),
 		VendorID:     vendorID,
 		ProductName:  productName,
 		ProductID:    productID,
 		ProductLabel: productName,
 		SerialNumber: address,
-		NodeLabel:    ep.FriendlyName,
-		UniqueID:     uniqueIDFor(ep.SourceKey),
+		// A label a controller wrote outlives this per-dispatch server in
+		// the endpoint's state (Endpoint.NodeLabel), and reaches the host
+		// through Config.OnNodeLabelWritten for persistence.
+		NodeLabel:            ep.NodeLabel(),
+		OnNodeLabelWrite:     ep.nodeLabelWriter(),
+		ConfigurationVersion: ep.ConfigurationVersion(),
+		UniqueID:             uniqueIDFor(ep.SourceKey),
 		// Reachable mirrors the underlying CCU device's live availability
 		// (see the `reachable` derivation above). When the device is dead
 		// the bridged endpoint now correctly advertises Reachable=false;
@@ -427,4 +435,68 @@ func mountGroups(ep *Endpoint, identify *mattercore.Identify, inner []contract.C
 		return inner
 	}
 	return append([]contract.ClusterServer{srv}, kept...)
+}
+
+// mountScenes places the stack's ScenesManagement server on a bridged
+// endpoint that has the node's group state, wherever the device type
+// mandates ScenesManagement or the source supplied a server for it (which
+// it replaces): scenes are stack state like groups — matter.js mounts
+// ScenesManagementServer for the light device types
+// (packages/node/src/devices/on-off-light.ts …) and keeps the table in the
+// endpoint's nonvolatile state. The endpoint's Groups server is tied to the
+// table so a removed group takes its scenes with it.
+func mountScenes(ep *Endpoint, inner []contract.ClusterServer) []contract.ClusterServer {
+	if ep.groups == nil {
+		return inner
+	}
+	supplied := false
+	kept := make([]contract.ClusterServer, 0, len(inner)+1)
+	for _, srv := range inner {
+		if srv != nil && srv.MatterClusterID() == mattercore.ScenesManagementClusterID {
+			supplied = true
+			continue
+		}
+		kept = append(kept, srv)
+	}
+	if !supplied && !schema.DeviceTypeRequiresServerCluster(uint32(ep.DeviceType), mattercore.ScenesManagementClusterID) {
+		return inner
+	}
+	state := ep.scenesState()
+	siblings := append([]contract.ClusterServer(nil), kept...)
+	gm := ep.groups
+	srv, err := mattercore.NewScenesManagement(mattercore.ScenesConfig{
+		State:    state,
+		Siblings: func() []contract.ClusterServer { return siblings },
+		GroupKnown: func(ctx context.Context, fabric uint8, groupID uint16) bool {
+			ok, err := gm.HasKeyMapping(ctx, fabric, groupID)
+			return err == nil && ok
+		},
+		Fabrics: func(ctx context.Context) []uint8 {
+			f, _ := gm.StoredFabrics(ctx)
+			return f
+		},
+	})
+	if err != nil {
+		return inner
+	}
+	for _, s := range kept {
+		if g, ok := s.(*mattercore.Groups); ok {
+			g.SetScenes(state)
+		}
+	}
+	return append(kept, srv)
+}
+
+// bridgedVendorName is the BridgedDeviceBasicInformation VendorName of a
+// bridged endpoint: the device's own manufacturer as the host supplied it,
+// else the node's BasicInformation VendorName. Empty when the host gave
+// neither — the attribute is then not served, matter.js's default for a
+// bridged device (vendorName is optional, and its bridge example sets
+// none).
+func bridgedVendorName(ep *Endpoint) string {
+	name := ep.VendorName
+	if name == "" {
+		name = ep.BridgeVendorName
+	}
+	return truncateLabel(name)
 }

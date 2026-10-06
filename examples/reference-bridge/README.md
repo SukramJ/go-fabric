@@ -1,9 +1,11 @@
 # reference-bridge
 
 A runnable Matter bridge built **only from `go-fabric`'s public API** — no
-`internal/`, no `_test.go` helper, no fork. It bridges two hard-coded fake
-devices, advertises itself over mDNS, accepts a commissioner over PASE and
-serves the operational CASE session that follows.
+`internal/`, no `_test.go` helper, no fork. It bridges a hard-coded fleet of
+simulated devices — one per surface the module serves — advertises itself
+over mDNS, accepts a commissioner over PASE and serves the operational CASE
+session that follows. It is also the device the chip-tool suite
+(`internal/chiptool`) and the borrowed CSA certification cases run against.
 
 It exists as the module's *second* consumer. The first is the daemon
 go-fabric was extracted from, which remembers how the code used to be
@@ -21,7 +23,7 @@ Startup prints the pairing information on stdout:
   go-fabric reference bridge
   --------------------------------------------------------------
   listening on     [::]:5540
-  bridged devices  2
+  bridged devices  19
   vendor/product   0xFFF1 / 0x8001  (CSA TEST identity — not shippable)
 
   discriminator    3840
@@ -42,7 +44,19 @@ Startup prints the pairing information on stdout:
 | 3 | TemperatureSensor `0x0302` | `demoThermometer`, a `contract.FloatMeasurementSource` — no cluster code at all; the assembler picks the cluster from the declared measurement class |
 | 4 | WaterValve `0x0042` | `demoValve`, the host port behind the library's `cluster/valve` server (ValveConfigurationAndControl `0x0081`) |
 | 5 | ModeSelect `0x0027` | `demoSelector`, the host port behind `cluster/modeselect` (ModeSelect `0x0050`) |
-| 6 | Speaker `0x0022` | `demoSpeaker`, the host port behind `cluster/levelcontrol` (LevelControl `0x0008`), with the OnOff cluster its "with On/Off" commands drive |
+| 6 | Speaker `0x0022` | `dimmer`, the host port behind `cluster/levelcontrol` (LevelControl `0x0008`), with the OnOff cluster its "with On/Off" commands drive |
+| 7 | ColorTemperatureLight `0x010C` | the same `dimmer` with the Lighting surface (`fleet_lighting.go`): LT OnOff, the module's LevelControl extended by the LT attributes, `cluster/light` ColorControl |
+| 8 | Fan `0x002B` | `demoFan`, host port of `cluster/fan` (MultiSpeed, Auto, Step) |
+| 9 | SmokeCoAlarm `0x0076` | `demoSmokeAlarm`, host port of `cluster/alarm` with every optional attribute, plus the battery as PowerSource |
+| 10 | Pump `0x0303` | `demoPump`: OnOff, `cluster/pump`, and a FlowMeasurement |
+| 11 | FlowSensor `0x0306` | a `demoReading` (`fleet_sensors.go`) |
+| 12 | LaundryWasher `0x0073` | `demoWasher`: `cluster/opstate` OperationalState and `cluster/modebase` LaundryWasherMode (`fleet_appliances.go`) |
+| 13 | RoboticVacuumCleaner `0x0074` | `demoVacuum`: RvcOperationalState, RvcRunMode, RvcCleanMode |
+| 14 | Thermostat `0x0301` | `cluster/thermo` |
+| 15 | WindowCovering `0x0202` | `cluster/cover` |
+| 16 | DoorLock `0x000A` | `demoLock`, host port of `cluster/lock` |
+| 17-19 | Humidity, Occupancy, Contact sensors | `demoReading` / `demoBinary` measurement sources |
+| 20 | GenericSwitch `0x000F` | `demoButton`, a momentary press source with long-press |
 
 The shapes are deliberately different. A device with commands has to serve
 `contract.ClusterServer` itself; a read-only measurement does not, and the
@@ -54,6 +68,28 @@ cluster the library already models is meant to reach for.
 Endpoint numbers are the assembler's to assign and are shown here as they
 come out of an empty store; nothing reads them back as constants.
 
+## Test controls (off by default)
+
+Two flags let a test make the devices do what a controller cannot ask for —
+the same two mechanisms CHIP's own example apps take (`control.go`):
+
+- `--app-pipe <path>` creates a named pipe that takes one JSON command per
+  line, in CHIP's shape: `{"Name": "SimulateLongPress", ...}`,
+  `SetBooleanState`, `SetOccupancy`, `OperationalStateChange`,
+  `ErrorEvent`, `Docked`, `Reset`, `ChargerFound`, `Charging`, `Charged`,
+  plus this fleet's own (`SetSensorValue`,
+  `SetLocalTemperature`, `SetLockJammed`, `PumpEvent`, …). The CHIP Python
+  certification cases drive a device through exactly this pipe.
+- `--enable-key <hex>` arms GeneralDiagnostics TestEventTrigger with that
+  test enable key; the SmokeCoAlarm triggers are CHIP's.
+- `--mdns-os-hostname` advertises the OS host name as the SRV target instead
+  of the MAC-derived one, for a test host whose LAN interface has no IPv6:
+  the OS responder then publishes the address records — the IPv6 link-local
+  ones of every interface an IPv6-only controller needs included.
+
+Each applied command is logged as `apppipe.applied`. None of these flags
+belongs in a real deployment.
+
 ## This is a TEST identity
 
 The bridge advertises vendor `0xFFF1`, product `0x8001`, and presents the
@@ -62,7 +98,10 @@ from the Matter specification's test vectors.
 
 That is what makes this example pairable at all: chip-tool, Apple Home and
 Google Home all ship the matching test PAA in their trust stores, so no
-vendor-supplied DAC is needed and no `--bypass-attestation-verifier`.
+vendor-supplied DAC is needed and no `--bypass-attestation-verifier` — the
+example also serves the matching test Certification Declaration
+(`attestation.BuildTestCertificationDeclaration`); without one, a
+commissioner that verifies attestation stops the pairing.
 
 It is also why nothing built on it may ship. `0xFFF1` is reserved for test
 and development; a device advertising it is not a product identity, cannot be
@@ -132,12 +171,10 @@ one omits, listed so the omission is not mistaken for "not needed":
 - **Fabric teardown.** `RemoveFabric` persists and drops the fabric's
   persisted subscriptions, but no session, live subscription or resumption
   record is evicted, and the operational mDNS record is not withdrawn.
-- **AdministratorCommissioning (`0x003C`)** and a runtime commissioning
-  window. The window here is open for the process lifetime with a fixed
-  passcode; there is no `OpenCommissioningWindow` path and no
-  multi-admin/enhanced window.
-- **Live updates.** Neither device pushes: nothing implements
-  `contract.ChangeNotifier`, so subscribers get heartbeats rather than change
-  reports, and `Bridge.Reassemble` is never called.
-- **BasicInformation events** (`StartUp`, `ShutDown`, `Leave`) and
-  persisted `GeneralDiagnostics` counters.
+- **A closing commissioning window.** The configured passcode's window is
+  open for the process lifetime. AdministratorCommissioning and the enhanced
+  (multi-admin) window are wired (`commissioning.go`); the basic window is
+  not.
+- **Reassembly.** `Bridge.Reassemble` is never called; the fleet is fixed.
+- **Persisted `GeneralDiagnostics` counters** (RebootCount,
+  TotalOperationalHours).

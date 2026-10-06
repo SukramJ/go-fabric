@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"reflect"
+	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/contract"
 	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
@@ -701,11 +704,18 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // (packages/protocol/src/interaction/InteractionMessenger.ts:347
 // sendDataReport).
 //
-// Unlike [Bridge.streamInitialReportChunks] this does not block for
-// the peer's per-chunk IM StatusResponse: the ongoing reporters run on
-// the subscription engine's tick goroutine, which serves every other
-// subscription behind them. MRP carries the reliability instead —
-// each chunk is tracked and retransmitted independently.
+// Like [Bridge.streamInitialReportChunks] it waits for the peer's IM
+// StatusResponse to each chunk but the last before sending the next — the
+// Matter chunking handshake (§10.6.6), and what matter.js does for an
+// ongoing report too (InteractionMessenger.ts sendDataReport →
+// waitForSuccess). It used to send every chunk back to back to keep the
+// engine's tick goroutine free; a controller that is still waiting for
+// the ack of its StatusResponse to chunk N then drops chunk N+1 ("Dropping
+// message without piggyback ack when we are waiting for an ack"), and with
+// it every change that chunk carried. The CHIP Python harness lost a dozen
+// attribute reports to it (TC-IDM-4.3 step 10). A single-chunk report — the
+// common case — still does not wait: its StatusResponse is consumed by the
+// subscription's own report bookkeeping.
 func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uint32, error) {
 	chunks, err := chunkReportData(report, reportChunkPayloadBudget)
 	if err != nil {
@@ -713,18 +723,42 @@ func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uin
 		return nil, err
 	}
 	counters := make([]uint32, 0, len(chunks))
-	for _, chunk := range chunks {
+	ourRole := !target.peerInitiator
+	for i, chunk := range chunks {
 		body, err := EncodeReportData(chunk)
 		if err != nil {
 			debugReplyError(b.logger, "encode_ongoing_report", target.src, err)
 			return nil, err
 		}
+		var waitCh <-chan im.StatusCode
+		if chunk.MoreChunkedMessages {
+			waitCh = b.armStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+		}
+		if i > 0 {
+			// Chunk N+1 piggybacks the ack of the peer's StatusResponse
+			// to chunk N. chip's ReliableMessageMgr drops it otherwise
+			// ("Dropping message without piggyback ack when we are
+			// waiting for an ack") — the same rule
+			// [Bridge.streamInitialReportChunks] honours through
+			// refreshAckCounter. matter.js gets it for free: its
+			// MessageExchange piggybacks the pending ack on the next send
+			// (packages/protocol/src/protocol/MessageExchange.ts:674 send).
+			target = b.piggybackOwedAck(target, ourRole)
+		}
 		counter, err := b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
 		if err != nil {
+			if waitCh != nil {
+				b.disarmStatusResponseWait(target.sessionID, target.exchangeID, ourRole)
+			}
 			return nil, err
 		}
 		if counter != 0 {
 			counters = append(counters, counter)
+		}
+		if waitCh != nil {
+			if err := b.awaitChunkStatusResponse(waitCh, "subscribe.ongoing", target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
+				return counters, err
+			}
 		}
 	}
 	return counters, nil
@@ -766,7 +800,26 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 	return counters, freshExchangeID, nil
 }
 
+// piggybackOwedAck returns target with the ack the bridge owes the peer on
+// target's exchange attached, discharging the obligation so the ack pump
+// does not also send it standalone. target is returned unchanged when
+// nothing is owed or no tracker is wired.
+func (b *Bridge) piggybackOwedAck(target subTarget, ourRole bool) subTarget {
+	b.mu.RLock()
+	tracker := b.ackTracker
+	b.mu.RUnlock()
+	if tracker == nil {
+		return target
+	}
+	if counter, ok := tracker.LookupAndDischarge(target.sessionID, target.exchangeID, ourRole); ok {
+		target.hasAck = true
+		target.ackCounter = counter
+	}
+	return target
+}
+
 func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byte) (uint32, error) {
+	b.load.imSent.Add(1)
 	b.mu.RLock()
 	listener := b.listener
 	sessions := b.sessions
@@ -883,6 +936,17 @@ func (b *Bridge) currentPeerAddr(sessionID uint16, fallback *net.UDPAddr) *net.U
 //  2. registerSubscription — manager Subscribe + KeepSubscriptions teardown.
 //  3. streamInitialReportChunks — chunked ReportData send with per-chunk ack wait.
 //  4. sendSubscribeResponse — SubscribeResponse with piggyback ack + TouchLastReport.
+//
+// abandonPrimingSubscription closes a subscription whose priming report
+// or SubscribeResponse did not go out: the controller never saw it
+// established, and a priming subscription would otherwise sit silent in
+// the manager until its session closed.
+func (b *Bridge) abandonPrimingSubscription(subID uint32) {
+	if m := b.subscriptionManagerLocked(); m != nil && subID != 0 {
+		_ = m.Close(subID)
+	}
+}
+
 func (b *Bridge) handleSubscribeRequest(
 	ctx context.Context,
 	src *net.UDPAddr,
@@ -961,9 +1025,11 @@ func (b *Bridge) handleSubscribeRequest(
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "manager", subscribeRejectStatus(regErr))
 	}
 	if err := b.streamInitialReportChunks(src, requestHdr, proto, subID, initialReport); err != nil {
+		b.abandonPrimingSubscription(subID)
 		return err
 	}
 	if err := b.sendSubscribeResponse(src, requestHdr, proto, req, subID, initialReport); err != nil {
+		b.abandonPrimingSubscription(subID)
 		return err
 	}
 	// The subscription is active: record it for re-establishment after a
@@ -1228,20 +1294,32 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 // unsubscribe is tracked so a reassemble tears every listener down.
 func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID
+	boolState := newBooleanStateEvents(b, ep, pathSet)
+	values := newPathValues(ep, pathSet)
 	unsub := notifier.OnMatterValueChanged(func() {
+		defer boolState.check()
+		// Only the attributes whose value moved are reported, and only
+		// their clusters' DataVersions advance: matter.js Datasource
+		// compares the new state with the old one and broadcasts the
+		// changed properties alone (Datasource.ts, broadcastChanges). A
+		// source that notifies once per change of any of its values
+		// otherwise reported every attribute each time — FanMode on every
+		// SpeedSetting step (TC-FAN-3.2).
+		changed := values.changed()
 		if b.logger != nil {
 			b.logger.Debug("matter.bridge.measurement.notify",
 				slog.Int("endpoint", int(epID)),
-				slog.Int("paths", len(pathSet)))
+				slog.Int("paths", len(pathSet)),
+				slog.Int("changed", len(changed)))
 		}
 		bumped := make(map[uint32]struct{}, 1)
-		for _, p := range pathSet {
+		for _, p := range changed {
 			if _, done := bumped[p.Cluster]; !done {
 				ep.BumpClusterDataVersion(p.Cluster)
 				bumped[p.Cluster] = struct{}{}
 			}
 		}
-		for _, p := range pathSet {
+		for _, p := range changed {
 			mgr.OnAttributeChanged(p)
 		}
 	})
@@ -1381,4 +1459,136 @@ func (b *Bridge) resolveSessionPASE(sessionID uint16) bool {
 	}
 	pase, _ := resolver.IsPASE(sessionID)
 	return pase
+}
+
+// booleanStateEvents emits BooleanState.StateChange when an endpoint's
+// StateValue changes: matter.js BooleanStateServer enables the ChangeEvent
+// feature by default and emits the event on stateValue$Changed
+// (packages/node/src/behaviors/boolean-state/BooleanStateServer.ts). The
+// value is a host measurement, so the change is observed here, where the
+// host's notification arrives.
+type booleanStateEvents struct {
+	b    *Bridge
+	ep   *endpointpkg.Endpoint
+	mu   sync.Mutex
+	last *bool
+}
+
+// newBooleanStateEvents returns nil when the notifier does not cover
+// BooleanState.StateValue.
+func newBooleanStateEvents(b *Bridge, ep *endpointpkg.Endpoint, pathSet []im.ConcreteAttributePath) *booleanStateEvents {
+	for _, p := range pathSet {
+		if p.Cluster == measurement.ClusterBooleanState && p.Attribute == 0x0000 {
+			e := &booleanStateEvents{b: b, ep: ep}
+			if v, ok := e.read(); ok {
+				e.last = &v
+			}
+			return e
+		}
+	}
+	return nil
+}
+
+func (e *booleanStateEvents) read() (value, ok bool) {
+	for _, srv := range endpointpkg.ClusterServers(e.ep) {
+		if srv.MatterClusterID() == measurement.ClusterBooleanState {
+			v, ok := srv.MatterRead(0x0000)
+			bv, isBool := v.(bool)
+			return bv, ok && isBool
+		}
+	}
+	return false, false
+}
+
+func (e *booleanStateEvents) check() {
+	if e == nil {
+		return
+	}
+	v, ok := e.read()
+	if !ok {
+		return
+	}
+	e.mu.Lock()
+	changed := e.last == nil || *e.last != v
+	e.last = &v
+	e.mu.Unlock()
+	if changed {
+		e.b.MatterEmitEvent(e.ep.ID, measurement.ClusterBooleanState, 0x00,
+			measurement.BooleanStateChangeEvent{StateValue: v}, contract.EventPriorityInfo)
+	}
+}
+
+// pathValues remembers the last value of each path a change notifier
+// covers, so a notification reports only the paths that moved.
+type pathValues struct {
+	mu    sync.Mutex
+	ep    *endpointpkg.Endpoint
+	paths []im.ConcreteAttributePath
+	last  map[im.ConcreteAttributePath]string
+}
+
+func newPathValues(ep *endpointpkg.Endpoint, paths []im.ConcreteAttributePath) *pathValues {
+	v := &pathValues{ep: ep, paths: paths, last: make(map[im.ConcreteAttributePath]string, len(paths))}
+	for p, val := range v.read() {
+		v.last[p] = val
+	}
+	return v
+}
+
+// read renders every path's current value; a path no server answers is
+// left out, so it counts as changed on every notification.
+func (v *pathValues) read() map[im.ConcreteAttributePath]string {
+	servers := map[uint32]contract.ClusterServer{}
+	for _, srv := range endpointpkg.ClusterServers(v.ep) {
+		if srv != nil {
+			servers[srv.MatterClusterID()] = srv
+		}
+	}
+	out := make(map[im.ConcreteAttributePath]string, len(v.paths))
+	for _, p := range v.paths {
+		srv := servers[p.Cluster]
+		if srv == nil {
+			continue
+		}
+		if val, ok := srv.MatterRead(p.Attribute); ok {
+			out[p] = fmt.Sprintf("%#v", derefValue(val))
+		}
+	}
+	return out
+}
+
+// changed returns the paths whose value differs from the last
+// notification's, and remembers the new values.
+func (v *pathValues) changed() []im.ConcreteAttributePath {
+	now := v.read()
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	out := make([]im.ConcreteAttributePath, 0, len(v.paths))
+	for _, p := range v.paths {
+		cur, ok := now[p]
+		if prev, had := v.last[p]; ok && had && prev == cur {
+			continue
+		}
+		out = append(out, p)
+		if ok {
+			v.last[p] = cur
+		}
+	}
+	return out
+}
+
+// derefValue follows pointers so two reads of an unchanged pointer-typed
+// value render alike.
+func derefValue(v any) any {
+	rv := reflect.ValueOf(v)
+	for rv.IsValid() && rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil
+		}
+		rv = rv.Elem()
+	}
+	if !rv.IsValid() {
+		return nil
+	}
+	return rv.Interface()
 }

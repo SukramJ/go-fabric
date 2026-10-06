@@ -4,8 +4,9 @@
 // Command reference-bridge is a runnable Matter bridge assembled only from
 // go-fabric's public API.
 //
-// It bridges a small hard-coded fleet — an on/off light, a temperature
-// sensor, an irrigation valve, a mode selector and a powered speaker — over
+// It bridges a hard-coded fleet of simulated devices — one per surface the
+// module serves: lights, a speaker, a fan, a smoke alarm, a pump, a washer,
+// a vacuum robot, a thermostat, a blind, a lock, sensors and a button — over
 // mDNS, accepts a commissioner over PASE, and serves reads, writes and
 // commands over the operational CASE session that follows. It
 // exists as the module's second consumer: everything it does, a third-party
@@ -18,17 +19,22 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
@@ -65,7 +71,7 @@ func main() {
 	}
 }
 
-//nolint:funlen // a composition root: one sequential wiring pass, deliberately readable top to bottom
+//nolint:funlen,gocognit,gocyclo // a composition root: one sequential wiring pass, deliberately readable top to bottom
 func run() error {
 	var (
 		dbPath       = flag.String("db", "reference-bridge.db", "SQLite file holding fabrics, credentials and endpoint numbers")
@@ -77,6 +83,9 @@ func run() error {
 		salt         = flag.String("pbkdf-salt", "go-fabric-ref-salt", "SPAKE2+ salt (16-32 bytes; change it for anything real)")
 		advertise    = flag.Bool("advertise", true, "publish the commissionable mDNS record (false = no discovery, direct address only)")
 		logLevel     = flag.String("log-level", "info", "debug, info, warn or error")
+		appPipe      = flag.String("app-pipe", "", "TESTING ONLY: named pipe of CHIP-style JSON test commands (button presses, sensor values, …); see control.go")
+		enableKey    = flag.String("enable-key", "", "TESTING ONLY: 16-byte hex test enable key that arms GeneralDiagnostics TestEventTrigger; see control.go")
+		osHostName   = flag.Bool("mdns-os-hostname", false, "TESTING ONLY: advertise the OS host name as SRV target instead of the MAC-derived one, for a test host whose LAN interface has no IPv6")
 	)
 	flag.Parse()
 
@@ -139,21 +148,36 @@ func run() error {
 	}
 
 	// --- the fleet and its topology assembler --------------------------
+	// A NodeLabel a controller writes on a bridged endpoint is kept in
+	// the settings table and handed back to the assembler on the next
+	// boot (fleet.snapshotter), as matter.js persists a written nodeLabel.
+	labels := persistedLabels{st: credentials, logger: logger}
 	assemblerCfg := endpoint.Config{
-		VendorID:  identity.vendorID,
-		ProductID: identity.productID,
-		NodeLabel: identity.nodeLabel,
-		Groups:    groupState,
+		VendorID:           identity.vendorID,
+		ProductID:          identity.productID,
+		NodeLabel:          identity.nodeLabel,
+		VendorName:         exampleVendorName,
+		Groups:             groupState,
+		OnNodeLabelWritten: labels.store,
+		Scenes:             labels,
 	}
 	devices, err := newFleet(endpointStore, assemblerCfg, logger)
 	if err != nil {
 		return err
 	}
+	devices.labels = labels.load
+	devices.configVersions = labels.configVersion
+	labels.restoreBlind(ctx, devices.blind)
 
 	// --- the bridge ----------------------------------------------------
 	var advertiser mdns.Advertiser = mdns.NewNoop()
 	if *advertise {
 		zc := mdns.NewZeroconf()
+		if *osHostName {
+			if h, err := os.Hostname(); err == nil && h != "" {
+				zc.HostName = strings.TrimSuffix(h, ".local")
+			}
+		}
 		// The subtype side-car is NOT optional for discovery, only for the
 		// generic browse: without it `_matterc._udp` carries the instance
 		// but `_L<discriminator>._sub._matterc._udp` answers nothing, and
@@ -236,7 +260,23 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	labels.restoreRoot(ctx, refs.basicInfo)
 	br.AttachRootClusters(rootServers)
+	devices.configChange = func() error {
+		topo := br.Topology()
+		if topo == nil {
+			return errors.New("no topology yet")
+		}
+		seen := map[string]bool{}
+		for _, ep := range topo.Bridged() {
+			if seen[ep.Scope+"|"+ep.DeviceAddress] {
+				continue
+			}
+			seen[ep.Scope+"|"+ep.DeviceAddress] = true
+			labels.storeConfigVersions(topo, br.IncreaseConfigurationVersion(ep.Scope, ep.DeviceAddress))
+		}
+		return nil
+	}
 
 	aggregatorServers, err := buildAggregatorClusters()
 	if err != nil {
@@ -250,11 +290,69 @@ func run() error {
 		salt:       []byte(*salt),
 		iterations: *iterations,
 	}, logger)
+	// The commissionable advertisement: published at the end of start-up
+	// with the configured passcode's discriminator (CM=1), and replaced by
+	// the enhanced window's own (CM=2) while an admin has one open.
+	var instanceID [8]byte
+	if _, err := rand.Read(instanceID[:]); err != nil {
+		return fmt.Errorf("commissioning instance id: %w", err)
+	}
+	advert := matterbridge.CommissioningAdvertisement{
+		InstanceID:    instanceID,
+		Discriminator: discriminator,
+		VendorID:      identity.vendorID,
+		ProductID:     identity.productID,
+		NodeLabel:     identity.nodeLabel,
+		RotatingID: mdns.GenerateRotatingID(
+			mdns.DeriveUniqueIDFromIdentity(identity.vendorID, identity.productID, identity.serialNumber, identity.nodeLabel), 0,
+		),
+		CommissioningMode: 1, // §4.3.1.4 CM=1: standard commissioning window
+		DeviceTypeID:      deviceTypeRootNode,
+	}
+	// Multi-admin: AdministratorCommissioning's window, wired to this
+	// daemon's PASE provider and advertisement (commissioning.go).
+	commissioning := &commissioningHost{
+		br: br, sessions: sec.sessions, refs: refs, logger: logger,
+		baseline: sec.pase, advert: advert,
+	}
+	wireCommissioningWindow(ctx, commissioning, credentials)
+
 	// A removed fabric takes its persisted subscriptions with it.
 	// Its groups go with it too: EmitFabricRemoved hands the fabric to the
 	// attached group messaging.
-	refs.opCreds.SetOnFabricRemoved(func(_ context.Context, fabricIndex uint8) {
-		br.EmitFabricRemoved(fabricIndex) //nolint:contextcheck // EmitFabricRemoved takes no ctx; its store delete runs on its own bounded timeout
+	refs.opCreds.SetOnFabricRemoved(func(ctx context.Context, fabricIndex uint8) {
+		// BasicInformation Leave, as matter.js BasicInformationServer
+		// emits it when a fabric goes.
+		refs.basicInfo.EmitLeave(fabricIndex)
+		// Its CASE identity and operational record go too — a rolled-back
+		// commissioning included, which no RemoveFabric announces.
+		if compressedID, nodeID, ok := caseIDs.forget(fabricIndex); ok {
+			br.WithdrawFabric(ctx, compressedID, nodeID)
+		}
+		// The fabric's sessions end once the NOCResponse is out.
+		br.EmitFabricRemovedContext(ctx, fabricIndex)
+	})
+
+	// UpdateNOC rewrites the fabric's operational identity, possibly with a
+	// new node id: the CASE responder must answer as the new identity, the
+	// operational record must move to the new instance name at once (a
+	// controller reaches the node under it before CommissioningComplete),
+	// and the fabric's other sessions end. matter.js FabricManager's
+	// replaced event drives the same through DeviceAdvertiser and
+	// SessionManager.
+	refs.opCreds.SetOnFabricUpdated(func(hookCtx context.Context, fabricIndex uint8) {
+		oldCompressed, oldNode, hadOld := caseIDs.announceIdentity(fabricIndex)
+		if err := caseIDs.load(hookCtx, credentials, fabricIndex); err != nil {
+			logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
+			return
+		}
+		if newCompressed, newNode, ok := caseIDs.announceIdentity(fabricIndex); ok && (!hadOld || newCompressed != oldCompressed || newNode != oldNode) {
+			if hadOld {
+				br.WithdrawFabric(hookCtx, oldCompressed, oldNode)
+			}
+			br.AnnounceFabric(hookCtx, newCompressed, newNode)
+		}
+		sec.sessions.CloseFabricExcept(fabricIndex, mattercore.InvokeSessionIDFromContext(hookCtx))
 	})
 
 	// Event numbers must not restart at zero across a reboot: a controller
@@ -272,10 +370,33 @@ func run() error {
 	if err := br.Start(ctx); err != nil {
 		return fmt.Errorf("bridge start: %w", err)
 	}
+	// The node's lifecycle events, in the order matter.js emits them when
+	// a node comes online: BasicInformation StartUp, then GeneralDiagnostics
+	// BootReason (BasicInformationServer.ts / GeneralDiagnosticsServer.ts).
+	// A controller's wildcard event subscription is primed with these; a
+	// node that never emits them answers it with nothing at all, which the
+	// CHIP device-composition checker (TC-IDM-10.1) fails.
+	if *enableKey != "" {
+		key, err := hex.DecodeString(*enableKey)
+		if err != nil {
+			return fmt.Errorf("--enable-key: %w", err)
+		}
+		if err := refs.genDiag.EnableTestEventTriggers(key, devices.testEventTrigger); err != nil {
+			return fmt.Errorf("--enable-key: %w", err)
+		}
+	}
+	refs.basicInfo.EmitStartUp()
+	refs.genDiag.EmitBootReason()
+	go keepOperationalHours(ctx, credentials, refs.genDiag, time.Minute, logger)
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		if err := storeOperationalHours(stopCtx, credentials, refs.genDiag); err != nil {
+			logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
+		}
+		refs.basicInfo.EmitShutDown()
 		sec.pase.Stop()
+		commissioning.stop()
 		sec.casep.StopReaper()
 		sec.subs.Stop()
 		if err := br.Stop(stopCtx); err != nil {
@@ -313,28 +434,18 @@ func run() error {
 	}
 
 	// --- commissionable advertisement + pairing information -------------
-	var instanceID [8]byte
-	if _, err := rand.Read(instanceID[:]); err != nil {
-		return fmt.Errorf("commissioning instance id: %w", err)
-	}
-	rotatingID := mdns.GenerateRotatingID(
-		mdns.DeriveUniqueIDFromIdentity(identity.vendorID, identity.productID, identity.serialNumber, identity.nodeLabel), 0,
-	)
-	if err := br.AnnounceCommissioning(ctx, matterbridge.CommissioningAdvertisement{
-		InstanceID:        instanceID,
-		Discriminator:     discriminator,
-		VendorID:          identity.vendorID,
-		ProductID:         identity.productID,
-		NodeLabel:         identity.nodeLabel,
-		RotatingID:        rotatingID,
-		CommissioningMode: 1, // §4.3.1.4 CM=1: standard commissioning window
-		DeviceTypeID:      deviceTypeRootNode,
-	}); err != nil {
+	if err := br.AnnounceCommissioning(ctx, advert); err != nil {
 		logger.Warn("mdns.commissioning_announce", slog.String("err", err.Error()))
 	}
 
 	if err := printPairingInfo(br, identity, discriminator, passcode); err != nil {
 		return err
+	}
+	printTopology(br)
+	if *appPipe != "" {
+		if err := serveAppPipe(ctx, devices, *appPipe, logger); err != nil {
+			return err
+		}
 	}
 
 	<-ctx.Done()
@@ -396,4 +507,26 @@ func listFabrics(ctx context.Context, credentials *store.Store, logger *slog.Log
 		return nil
 	}
 	return fabrics
+}
+
+// printTopology writes the assembled endpoints and their device types to
+// stdout after the banner — what a test driver reads to point a case at
+// the endpoint that serves its cluster, without a controller of its own.
+// Like the banner it is for an operator's eyes too.
+func printTopology(br *matterbridge.Bridge) {
+	topology := br.Topology()
+	if topology == nil {
+		return
+	}
+	var b bytes.Buffer
+	b.WriteString("  topology\n")
+	for _, id := range endpointIDs(br, func(*endpoint.Endpoint) bool { return true }) {
+		ep := topology.FindByID(id)
+		if ep == nil {
+			continue
+		}
+		fmt.Fprintf(&b, "    endpoint %3d  device types 0x%04X\n", id, ep.DeviceType)
+	}
+	b.WriteString("  topology end\n\n")
+	fmt.Print(b.String())
 }

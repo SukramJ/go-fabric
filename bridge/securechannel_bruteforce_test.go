@@ -347,3 +347,37 @@ func TestBridge_PaseLockoutBacksOffOnRepeatedCaps(t *testing.T) {
 		}
 	})
 }
+
+// TestBridge_PaseAbortedByPeerStatusReport pins matter.js
+// PaseServer.onNewExchange's ChannelStatusResponseError path: the
+// commissioner's failure StatusReport on the PASE exchange — chip's answer
+// to a Pake2 whose key confirmation fails, i.e. a wrong passcode — counts
+// a pairing error and frees the single-active-PASE slot at once, so the
+// next attempt is served (TC-CADMIN-1.9). A report on another exchange,
+// or a success report, leaves the handshake alone.
+func TestBridge_PaseAbortedByPeerStatusReport(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	const exchange = uint16(21)
+	if !b.claimPaseInFlight(exchange) {
+		t.Fatal("claim failed")
+	}
+	failure := mrp.EncodeStatusReport(mrp.SCStatusGeneralFailure, uint32(mrp.SecureChannelProtocolID), mrp.SCStatusProtocolInvalidParameter, nil)
+	success := mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), 0, nil)
+
+	_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodeStatusReport, exchange+1, false, 0), failure)
+	_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodeStatusReport, exchange, false, 0), success)
+	if b.claimPaseInFlight(exchange + 2) {
+		t.Fatal("a report on another exchange, or a success report, released the handshake")
+	}
+	if got := b.paseFailures.Load(); got != 0 {
+		t.Fatalf("paseFailures = %d before the peer's failure report, want 0", got)
+	}
+	_ = b.dispatchSecureChannel(loopbackSrc(), scHdr(), scProto(mrp.SCOpcodeStatusReport, exchange, false, 0), failure)
+	if got := b.paseFailures.Load(); got != 1 {
+		t.Errorf("paseFailures = %d after the peer's failure report, want 1", got)
+	}
+	if !b.claimPaseInFlight(exchange + 2) {
+		t.Fatal("the slot is still held after the commissioner aborted the handshake; its retry would be dropped as busy")
+	}
+}

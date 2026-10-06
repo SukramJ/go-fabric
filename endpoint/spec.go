@@ -52,6 +52,11 @@ type Spec struct {
 	// DeviceType is the Matter Device Type ID the endpoint advertises
 	// as its primary type (e.g. 0x010A OnOffPlugInUnit).
 	DeviceType uint16
+	// VendorName is the bridged device's manufacturer, served as its
+	// BridgedDeviceBasicInformation VendorName (capped at the attribute's
+	// 32 bytes). The vendor is the host's knowledge, never the module's.
+	// Empty serves the node's own VendorName ([Config.VendorName]).
+	VendorName string
 	// FriendlyName is the finished BridgedDeviceBasicInformation
 	// NodeLabel. The assembly caps it at the Matter 32-byte maximum but
 	// never derives it — naming is the owner's authority.
@@ -71,6 +76,17 @@ type Spec struct {
 	// Measurement is set on sensor endpoints assembled from a
 	// measurement source. nil otherwise.
 	Measurement contract.MeasurementSource
+	// NodeLabel is a BridgedDeviceBasicInformation NodeLabel a controller
+	// wrote in an earlier run and the host persisted through
+	// [Config.OnNodeLabelWritten]. Empty serves FriendlyName until a
+	// controller writes one.
+	NodeLabel string
+	// ConfigurationVersion is the bridged device's
+	// BridgedDeviceBasicInformation ConfigurationVersion as the host last
+	// persisted it ([Endpoint.IncreaseConfigurationVersion] returns each new
+	// value). Zero serves 1. The version may never decrease, so a host that
+	// raises it keeps it across restarts — matter.js persists it as state.
+	ConfigurationVersion uint32
 	// PowerSource carries a battery reading to be served by the
 	// PowerSource cluster (0x002F) on this endpoint. At most one
 	// endpoint per physical device sets it — see the assembly's
@@ -89,21 +105,22 @@ func ComposeNodeLabel(base, suffix string) string {
 	if suffix != "" {
 		base = strings.TrimSpace(base + " (" + suffix + ")")
 	}
-	return truncateUTF8(base, nodeLabelMaxBytes)
+	return truncateLabel(base)
 }
 
-// nodeLabelMaxBytes is the Matter maximum length of
-// BridgedDeviceBasicInformation.NodeLabel — 32 utf-8 BYTES, not 32
-// codepoints (Matter Core §9.13.6.5).
-const nodeLabelMaxBytes = 32
+// labelMaxBytes is the Matter maximum length of the
+// BridgedDeviceBasicInformation strings the assembly fills — NodeLabel and
+// VendorName, both "max 32" — 32 utf-8 BYTES, not 32 codepoints (Matter
+// Core §9.13.6.5).
+const labelMaxBytes = 32
 
-// truncateUTF8 caps s at maxBytes, snapping back to a rune boundary so
-// a multi-byte codepoint is never cut in half.
-func truncateUTF8(s string, maxBytes int) string {
-	if len(s) <= maxBytes {
+// truncateLabel caps s at [labelMaxBytes], snapping back to a rune
+// boundary so a multi-byte codepoint is never cut in half.
+func truncateLabel(s string) string {
+	if len(s) <= labelMaxBytes {
 		return s
 	}
-	cut := maxBytes
+	cut := labelMaxBytes
 	for cut > 0 && (s[cut]&0xC0) == 0x80 { //nolint:revive // continuation byte
 		cut--
 	}

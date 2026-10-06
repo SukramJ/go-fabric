@@ -9,8 +9,9 @@
 // This package is a conformance reference: the server holds its own state
 // and answers every command with Success without forwarding it anywhere,
 // so it does not drive a device. It exists to pin the cluster's wire shape
-// and attribute surface against matter.js HEAD, and nothing in this module
-// mounts it. A host that needs live control mounts its own
+// and attribute surface against matter.js HEAD; only the reference daemon
+// (examples/reference-bridge) mounts it, to put that surface in front of
+// chip-tool. A host that needs live control mounts its own
 // [contract.ClusterServer] on the endpoint instead.
 package thermo
 
@@ -133,6 +134,9 @@ type ThermostatServer struct {
 	minSetpointDeadBand int8 // 0.1°C units; default 20 = 2.0°C
 
 	systemMode uint8 // SystemModeEnum value
+
+	// changes reports the setpoints a write's reconcile moved.
+	changes cluster.AttributeChanges
 }
 
 // NewThermostatServer constructs the cluster. AUTO is silently cleared
@@ -281,10 +285,10 @@ func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) { //nolint:gocy
 		// Mandatory (M conformance) per matter.js
 		// thermostat-cluster.element.ts (id 0x1b). Derived from the
 		// supported modes: 4=CoolingAndHeating, 2=HeatingOnly, 0=CoolingOnly.
-		// matter.js declares this RW; the bridge exposes it read-only because
-		// the value follows the wrapped HM device's immutable HEAT/COOL
-		// capability — there is nothing for a controller to change. Being
-		// immutable it is also (correctly) not in MatterReportable.
+		// The value follows the device's immutable HEAT/COOL capability; a
+		// write is accepted and ignored, as the specification and matter.js
+		// have it (see MatterWrite). Being immutable it is (correctly) not
+		// in MatterReportable.
 		return controlSequenceOfOperation(s.features), true
 	case thermoAttrSystemMode:
 		return s.systemMode, true
@@ -297,47 +301,56 @@ func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) { //nolint:gocy
 	return nil, false
 }
 
-// MatterWrite handles writable attributes (setpoints, SystemMode).
+// MatterWrite handles writable attributes (setpoints, setpoint limits,
+// SystemMode).
 func (s *ThermostatServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	switch attrID {
+	case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint,
+		thermoAttrMinHeatSetpointLimit, thermoAttrMaxHeatSetpointLimit,
+		thermoAttrMinCoolSetpointLimit, thermoAttrMaxCoolSetpointLimit:
+		coupled, err := s.writeSetpoint(attrID, value)
+		if err != nil {
+			return err
+		}
+		// The written attribute is reported by the write path; what the
+		// reconcile moved besides it is reported here.
+		s.changes.Notify(coupled...)
+		return nil
+	}
+	switch attrID {
+	case thermoAttrControlSequenceOfOperation:
+		// "For backwards compatibility, this attribute is optionally
+		// writeable. However, any writes to this attribute SHALL be
+		// silently ignored" — matter.js ThermostatServer.ts
+		// #ensureControlSequenceOfOperationNotWritable accepts the write
+		// and reverts it (TC-TSTAT-2.2 step 12). The enum is still checked.
+		v, ok := cluster.AsUint8(value)
+		if !ok {
+			return fmt.Errorf("thermostat: ControlSequenceOfOperation: expected numeric, got %T", value)
+		}
+		if v > 5 {
+			return thermoConstraintErr{fmt.Sprintf("thermostat: ControlSequenceOfOperation %d is not a ControlSequenceOfOperationEnum value", v)}
+		}
+		return nil
+	case thermoAttrMinSetpointDeadBand:
+		// Likewise optionally writable and silently ignored (matter.js
+		// #ensureMinSetpointDeadBandNotWritable); the constraint (0 to
+		// 127) still applies.
+		if s.features&ThermostatFeatureAUTO == 0 {
+			return errors.New("thermostat: MinSetpointDeadBand not supported (no AUTO feature)")
+		}
+		v, ok := cluster.AsInt16(value)
+		if !ok {
+			return fmt.Errorf("thermostat: MinSetpointDeadBand: expected numeric, got %T", value)
+		}
+		if v < 0 || v > 127 {
+			return thermoConstraintErr{fmt.Sprintf("thermostat: MinSetpointDeadBand %d outside 0 to 127", v)}
+		}
+		return nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch attrID {
-	case thermoAttrOccupiedHeatingSetpoint:
-		if s.features&ThermostatFeatureHEAT == 0 {
-			return errors.New("thermostat: OccupiedHeatingSetpoint not supported (no HEAT feature)")
-		}
-		v, ok := cluster.AsInt16(value)
-		if !ok {
-			return fmt.Errorf("thermostat: OccupiedHeatingSetpoint: expected numeric, got %T", value)
-		}
-		// Reject values outside [minHeat, maxHeat] per matter.js
-		// ThermostatServer.ts:#assertSetpointWithinLimits (lines 879-892).
-		if v < s.minHeat {
-			return thermoConstraintErr{fmt.Sprintf("thermostat: OccupiedHeatingSetpoint %d below MinHeatSetpointLimit %d", v, s.minHeat)}
-		}
-		if v > s.maxHeat {
-			return thermoConstraintErr{fmt.Sprintf("thermostat: OccupiedHeatingSetpoint %d above MaxHeatSetpointLimit %d", v, s.maxHeat)}
-		}
-		s.occupHeat = v
-		return nil
-	case thermoAttrOccupiedCoolingSetpoint:
-		if s.features&ThermostatFeatureCOOL == 0 {
-			return errors.New("thermostat: OccupiedCoolingSetpoint not supported (no COOL feature)")
-		}
-		v, ok := cluster.AsInt16(value)
-		if !ok {
-			return fmt.Errorf("thermostat: OccupiedCoolingSetpoint: expected numeric, got %T", value)
-		}
-		// Reject values outside [minCool, maxCool] per matter.js
-		// ThermostatServer.ts:#assertSetpointWithinLimits (lines 879-892).
-		if v < s.minCool {
-			return thermoConstraintErr{fmt.Sprintf("thermostat: OccupiedCoolingSetpoint %d below MinCoolSetpointLimit %d", v, s.minCool)}
-		}
-		if v > s.maxCool {
-			return thermoConstraintErr{fmt.Sprintf("thermostat: OccupiedCoolingSetpoint %d above MaxCoolSetpointLimit %d", v, s.maxCool)}
-		}
-		s.occupCool = v
-		return nil
 	case thermoAttrSystemMode:
 		v, ok := cluster.AsUint8(value)
 		if !ok {
@@ -371,10 +384,81 @@ func (s *ThermostatServer) MatterWrite(_ context.Context, attrID uint32, value a
 	}
 }
 
+// writeSetpoint writes an occupied setpoint or a user setpoint limit and
+// reconciles the rest, as matter.js ThermostatServer does on
+// occupied*Setpoint$Changing (#assertSetpointWithinLimits, then
+// #reconcileSetpoints) and on the limits' $Changing
+// (#assertLimitWithinAbs, then #reconcileSetpoints). It returns the
+// attributes the reconcile moved besides the written one.
+func (s *ThermostatServer) writeSetpoint(attrID uint32, value any) ([]uint32, error) {
+	type target struct {
+		heat  bool
+		limit bool
+		key   string
+		name  string
+	}
+	t := map[uint32]target{
+		thermoAttrOccupiedHeatingSetpoint: {true, false, spOccupiedHeating, "OccupiedHeatingSetpoint"},
+		thermoAttrOccupiedCoolingSetpoint: {false, false, spOccupiedCooling, "OccupiedCoolingSetpoint"},
+		thermoAttrMinHeatSetpointLimit:    {true, true, spMinHeatLimit, "MinHeatSetpointLimit"},
+		thermoAttrMaxHeatSetpointLimit:    {true, true, spMaxHeatLimit, "MaxHeatSetpointLimit"},
+		thermoAttrMinCoolSetpointLimit:    {false, true, spMinCoolLimit, "MinCoolSetpointLimit"},
+		thermoAttrMaxCoolSetpointLimit:    {false, true, spMaxCoolLimit, "MaxCoolSetpointLimit"},
+	}[attrID]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if (t.heat && s.features&ThermostatFeatureHEAT == 0) || (!t.heat && s.features&ThermostatFeatureCOOL == 0) {
+		return nil, fmt.Errorf("thermostat: %s not supported (feature absent)", t.name)
+	}
+	v16, ok := cluster.AsInt16(value)
+	if !ok {
+		return nil, fmt.Errorf("thermostat: %s: expected numeric, got %T", t.name, value)
+	}
+	v := int(v16)
+	st := s.setpointState()
+	if t.limit {
+		if err := st.assertLimitWithinAbs(t.heat, v); err != nil {
+			return nil, err
+		}
+	} else if err := st.assertSetpointWithinLimits(t.heat, v); err != nil {
+		return nil, err
+	}
+	switch attrID {
+	case thermoAttrOccupiedHeatingSetpoint:
+		st.occupHeat = v
+	case thermoAttrOccupiedCoolingSetpoint:
+		st.occupCool = v
+	case thermoAttrMinHeatSetpointLimit:
+		st.minHeat = v
+	case thermoAttrMaxHeatSetpointLimit:
+		st.maxHeat = v
+	case thermoAttrMinCoolSetpointLimit:
+		st.minCool = v
+	case thermoAttrMaxCoolSetpointLimit:
+		st.maxCool = v
+	}
+	if err := st.reconcile(t.key); err != nil {
+		return nil, err
+	}
+	var coupled []uint32
+	for _, id := range s.commitSetpoints(st) {
+		if id != attrID {
+			coupled = append(coupled, id)
+		}
+	}
+	return coupled, nil
+}
+
+// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier]:
+// the setpoints a write's reconcile moved besides the written attribute.
+func (s *ThermostatServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
+	return s.changes.OnMatterAttributesChanged(cb)
+}
+
 // MatterInvoke handles SetpointRaiseLower and weekly-schedule commands.
 func (s *ThermostatServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
-	case 0x00: // SetpointRaiseLower
+	case thermoCmdSetpointRaiseLower:
 		return nil, s.handleSetpointRaiseLower(fields)
 	default:
 		return nil, im.UnsupportedCommandf("thermostat: command 0x%02X not supported", cmdID)
@@ -573,6 +657,26 @@ func controlSequenceOfOperation(features uint32) uint8 {
 		return 2 // HeatingOnly (HM thermostats are heating by default)
 	}
 }
+
+// thermoCmdSetpointRaiseLower is SetpointRaiseLower, the cluster's one
+// conformance-M command (thermostat-cluster.element.ts).
+const thermoCmdSetpointRaiseLower uint32 = 0x00
+
+// MatterAcceptedCommands implements [contract.ClusterCommandLister].
+// SetpointRaiseLower is the only command the server handles, and the only
+// mandatory one: the schedule and preset commands carry MSCH / PRES /
+// TSUGGEST conformance, features this server never advertises. Without the
+// lister the dispatcher synthesised an empty AcceptedCommandList, and a
+// controller that reads the list before invoking — Apple Home and Google
+// Home both do — saw a thermostat that accepts nothing. Found by the
+// chip-tool data-model sweep.
+func (s *ThermostatServer) MatterAcceptedCommands() []uint32 {
+	return []uint32{thermoCmdSetpointRaiseLower}
+}
+
+// MatterGeneratedCommands implements [contract.ClusterCommandLister].
+// SetpointRaiseLower answers with a status only.
+func (s *ThermostatServer) MatterGeneratedCommands() []uint32 { return []uint32{} }
 
 // MatterReportable returns attributes that emit reports on change.
 func (s *ThermostatServer) MatterReportable() []uint32 {

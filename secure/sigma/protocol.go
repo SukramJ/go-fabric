@@ -432,6 +432,14 @@ func (r *Responder) SetSessionParameters(p *SessionParameters) {
 	r.sessionParams = p
 }
 
+// SessionParameters returns the parameters Sigma2 carries, nil when none
+// are set.
+func (r *Responder) SessionParameters() *SessionParameters {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.sessionParams
+}
+
 // SetIdentityResolver wires a multi-fabric identity selector. When
 // set, every fresh Sigma1 arrival runs the resolver against the
 // inbound `(destinationID, initiatorRandom)` pair; the matching

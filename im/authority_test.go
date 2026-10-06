@@ -33,11 +33,41 @@ func (d authorityProbeACL) CheckACL(_ context.Context, fabric uint8, node uint64
 	return StatusSuccess
 }
 
+// probeInvoke invokes Groupcast command 0x02, which is not fabric-scoped,
+// so the probe measures AuthorityAt alone — a fabric-scoped command would
+// stop at the accessing-fabric gate first (TestFabricScopedInvokeNeedsAFabric).
 func probeInvoke(ctx context.Context, d Dispatcher) StatusCode {
 	resp := HandleInvokeRequest(ctx, d, InvokeRequest{Invokes: []CommandInvocation{{
-		Path: ConcreteCommandPath{Endpoint: 0, Cluster: 0x0065, Command: 0, HasEndpoint: true, HasCluster: true, HasCommand: true},
+		Path: ConcreteCommandPath{Endpoint: 0, Cluster: 0x0065, Command: 0x02, HasEndpoint: true, HasCluster: true, HasCommand: true},
 	}}})
 	return resp.Responses[0].Status.Status
+}
+
+// TestFabricScopedInvokeNeedsAFabric pins matter.js
+// CommandInvokeResponse.ts:287: a fabric-scoped command (GroupKeyManagement
+// KeySetRead, "F A") on a session without an accessing fabric answers
+// UnsupportedAccess and never reaches the server; the same command with a
+// fabric, and a non-fabric-scoped command without one, are dispatched.
+// Found by the CHIP Python harness (TC-IDM-1.2 step 5).
+func TestFabricScopedInvokeNeedsAFabric(t *testing.T) {
+	t.Parallel()
+	invoke := func(ctx context.Context, cluster, command uint32) StatusCode {
+		d := &authorityProbe{}
+		resp := HandleInvokeRequest(ctx, d, InvokeRequest{Invokes: []CommandInvocation{{
+			Path: ConcreteCommandPath{Endpoint: 0, Cluster: cluster, Command: command, HasEndpoint: true, HasCluster: true, HasCommand: true},
+		}}})
+		return resp.Responses[0].Status.Status
+	}
+	noFabric := WithAuthModePASE(WithFabricFilter(context.Background(), false, 0))
+	if got := invoke(noFabric, 0x003F, 0x01); got != StatusUnsupportedAccess {
+		t.Errorf("KeySetRead without a fabric: %v, want UnsupportedAccess", got)
+	}
+	if got := invoke(WithAuthModePASE(WithFabricFilter(context.Background(), false, 2)), 0x003F, 0x01); got == StatusUnsupportedAccess {
+		t.Errorf("KeySetRead with a fabric was refused")
+	}
+	if got := invoke(noFabric, 0x0030, 0x00); got == StatusUnsupportedAccess {
+		t.Errorf("ArmFailSafe (not fabric-scoped) without a fabric was refused")
+	}
 }
 
 // TestAuthorityAtParityMatterJS pins the in-handler access check a command

@@ -62,7 +62,7 @@ func recordedWrite(calls []uint32, attr uint32) bool {
 // AttributeWriteResponse.ts:229-231.
 func TestWrite_ConcreteReadOnlyAttributeRejected(t *testing.T) {
 	t.Parallel()
-	srv := &recordingServer{id: 0x0006} // OnOff
+	srv := &recordingServer{id: 0x0006, attrs: []uint32{0x0000}} // OnOff
 	ep := &Endpoint{ID: 2, Source: recordingSource{srv: srv}}
 	d := NewTopologyDispatcher(makeTopology(ep))
 
@@ -83,7 +83,7 @@ func TestWrite_ConcreteReadOnlyAttributeRejected(t *testing.T) {
 // dispatched to the cluster server and reported successful.
 func TestWrite_ConcreteWritableAttributeProceeds(t *testing.T) {
 	t.Parallel()
-	srv := &recordingServer{id: 0x0006}
+	srv := &recordingServer{id: 0x0006, attrs: []uint32{0x4001}}
 	ep := &Endpoint{ID: 2, Source: recordingSource{srv: srv}}
 	d := NewTopologyDispatcher(makeTopology(ep))
 
@@ -169,5 +169,106 @@ func TestWrite_WildcardEndpointSkipsReadOnlyAttributeSilently(t *testing.T) {
 	}
 	if len(srvA.writeCalls) != 0 || len(srvB.writeCalls) != 0 {
 		t.Errorf("read-only write reached a cluster server; calls=%v %v", srvA.writeCalls, srvB.writeCalls)
+	}
+}
+
+// TestWrite_UnlistedAttributeIsUnsupportedAttribute verifies a concrete write
+// to an attribute the cluster does not list answers UNSUPPORTED_ATTRIBUTE
+// and never reaches the server — before, and regardless of, its schema
+// writability (matter.js AttributeWriteResponse.ts:225-231). OnTime is
+// schema-writable; this server simply does not implement it. Found by the
+// CHIP Python harness (TC-IDM-3.2 step 3).
+func TestWrite_UnlistedAttributeIsUnsupportedAttribute(t *testing.T) {
+	t.Parallel()
+	srv := &recordingServer{id: 0x0006, attrs: []uint32{0x0000}}
+	ep := &Endpoint{ID: 2, Source: recordingSource{srv: srv}}
+	d := NewTopologyDispatcher(makeTopology(ep))
+	results := d.Write(context.Background(), concreteAttrPath(2, 0x0006, 0x4001), im.AttributeValue{Value: uint16(5)})
+	if len(results) != 1 || results[0].Status != im.StatusUnsupportedAttribute {
+		t.Fatalf("results = %+v, want one UNSUPPORTED_ATTRIBUTE", results)
+	}
+	if len(srv.writeCalls) != 0 {
+		t.Errorf("the write reached the server: %v", srv.writeCalls)
+	}
+}
+
+// TestWrite_GlobalAttributesAreNeverWritable pins that a concrete write to
+// any global attribute answers UNSUPPORTED_WRITE without reaching the cluster
+// server — on a cluster outside the read-only table too (ValveConfiguration).
+// TC-ACE-2.2 writes every one of them and accepts only UNSUPPORTED_WRITE or
+// UNSUPPORTED_ACCESS; matter.js models them read-only
+// (AttributeWriteResponse.ts:229-231).
+func TestWrite_GlobalAttributesAreNeverWritable(t *testing.T) {
+	t.Parallel()
+	srv := &recordingServer{id: 0x0081, attrs: []uint32{0x0000}}
+	ep := &Endpoint{ID: 4, Source: recordingSource{srv: srv}}
+	d := NewTopologyDispatcher(makeTopology(ep))
+	for _, attr := range []uint32{0xFFF8, 0xFFF9, 0xFFFA, 0xFFFB, 0xFFFC, 0xFFFD} {
+		results := d.Write(context.Background(), concreteAttrPath(4, 0x0081, attr), im.AttributeValue{Value: uint16(1)})
+		if len(results) != 1 || results[0].Status != im.StatusUnsupportedWrite {
+			t.Errorf("write 0x%04X: %+v, want one UNSUPPORTED_WRITE", attr, results)
+		}
+	}
+	if len(srv.writeCalls) != 0 {
+		t.Errorf("a global-attribute write reached the cluster server: %v", srv.writeCalls)
+	}
+}
+
+// listServer keeps one writable list attribute (Binding-like, 0x0000 on a
+// cluster outside the read-only table) and records what is written.
+type listServer struct {
+	list    []uint16
+	written [][]uint16
+}
+
+func (s *listServer) MatterClusterID() uint32 { return 0xFFF1FC01 }
+func (s *listServer) MatterRead(attr uint32) (any, bool) {
+	if attr == 0 {
+		return append([]uint16(nil), s.list...), true
+	}
+	return nil, false
+}
+func (s *listServer) MatterReportable() []uint32 { return []uint32{0} }
+func (s *listServer) MatterAttributes() []uint32 { return []uint32{0} }
+func (s *listServer) MatterWrite(_ context.Context, _ uint32, v any) error {
+	l, _ := v.([]uint16)
+	s.list = l
+	s.written = append(s.written, l)
+	return nil
+}
+
+func (s *listServer) MatterInvoke(context.Context, uint32, any) (any, error) { return nil, nil }
+
+type listSource struct{ srv *listServer }
+
+func (s listSource) MatterDeviceType() uint16 { return 0x010A }
+func (s listSource) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{s.srv}
+}
+
+// TestWrite_ListAppendAppendsToTheCurrentList pins the list-append write
+// (null ListIndex, Matter §10.6.4.3.1): the element is appended to the list
+// as it stands, as matter.js AttributeWriteResponse applies it. A controller
+// writes a long list as a replace followed by appends (chip
+// TestOnlyWriteAttributeWithLegacyList, TC-ACL-2.3/2.5). A value that is not
+// one element of the list's type is a CONSTRAINT_ERROR.
+func TestWrite_ListAppendAppendsToTheCurrentList(t *testing.T) {
+	t.Parallel()
+	srv := &listServer{list: []uint16{1}}
+	ep := &Endpoint{ID: 3, Source: listSource{srv: srv}}
+	d := NewTopologyDispatcher(makeTopology(ep))
+	path := concreteAttrPath(3, srv.MatterClusterID(), 0)
+	path.HasListIndex, path.ListAppend = true, true
+
+	res := d.Write(context.Background(), path, im.AttributeValue{Value: []uint16{7}})
+	if len(res) != 1 || res[0].Status != im.StatusSuccess {
+		t.Fatalf("append: %+v", res)
+	}
+	if !slices.Equal(srv.list, []uint16{1, 7}) {
+		t.Fatalf("list after append = %v, want [1 7]", srv.list)
+	}
+	res = d.Write(context.Background(), path, im.AttributeValue{Value: []string{"x"}})
+	if len(res) != 1 || res[0].Status != im.StatusConstraintError {
+		t.Fatalf("append of a mistyped element: %+v, want CONSTRAINT_ERROR", res)
 	}
 }

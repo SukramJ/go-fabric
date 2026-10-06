@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -41,8 +42,8 @@ func TestPrimaryHostIPs_ReturnsNonNilSlice(t *testing.T) {
 // filterPrimaryHostIPs with the default (nil) filter: container/
 // virtualisation bridges are dropped by name, down/non-multicast/loopback/point-to-point interfaces are dropped
 // by flag, IPv4 sorts before IPv6, duplicates are deduplicated, and
-// link-local addresses (both families) are excluded while global IPv6
-// survives.
+// link-local addresses are excluded (IPv6 ones only where the interface
+// has a routable IPv6) while global IPv6 survives.
 func TestFilterPrimaryHostIPs(t *testing.T) {
 	t.Parallel()
 	ip := net.ParseIP
@@ -116,6 +117,23 @@ func TestFilterPrimaryHostIPs(t *testing.T) {
 				}},
 			},
 			want: []string{"192.168.1.10", "2001:db8::1"},
+		},
+		{
+			// An interface with only a link-local IPv6 still advertises
+			// it — an IPv6-only resolver (chip-tool) has nothing else to
+			// reach the node over; chip and matter.js publish every IPv6.
+			name: "IPv6 link-local kept where the interface has no routable IPv6",
+			ifaces: []hostIface{
+				{name: "eth0", up: true, multicast: true, ips: []net.IP{
+					ip("10.1.0.4"),
+					ip("fe80::20d:3aff:fe1b:2c3d"),
+				}},
+				{name: "eth1", up: true, multicast: true, ips: []net.IP{
+					ip("fe80::1"),
+					ip("2001:db8::2"),
+				}},
+			},
+			want: []string{"10.1.0.4", "fe80::20d:3aff:fe1b:2c3d", "2001:db8::2"},
 		},
 	}
 
@@ -387,7 +405,8 @@ func TestZeroconfInternal_RepublishAll_WithItems(t *testing.T) {
 }
 
 // TestZeroconfInternal_Publish_HostName_Empty_FallsBack verifies that an
-// empty HostName in the Service causes Publish to fall back to os.Hostname()
+// empty HostName in the Service causes Publish to fall back to the
+// MAC-derived default host name
 // rather than crashing. This exercises the `host == ""` branch in Publish.
 func TestZeroconfInternal_Publish_HostName_Empty_FallsBack(t *testing.T) {
 	t.Parallel()
@@ -398,10 +417,10 @@ func TestZeroconfInternal_Publish_HostName_Empty_FallsBack(t *testing.T) {
 		InstanceName: "EEEEEEEEFFFFFFFF",
 		ServiceType:  ServiceTypeOperational,
 		Port:         5540,
-		HostName:     "", // triggers os.Hostname() fallback
+		HostName:     "", // triggers the defaultHostName fallback
 	}
 	// Publish must not panic. It may succeed or fail depending on whether
-	// zeroconf.RegisterProxy accepts the OS hostname; we only care that
+	// zeroconf.RegisterProxy accepts the host name; we only care that
 	// the empty-hostname branch is reached without a nil-dereference.
 	_ = z.Publish(context.Background(), svc)
 }
@@ -603,5 +622,42 @@ func TestZeroconfInternal_ResponderCloseIsIdempotentUnderTwoOwners(t *testing.T)
 	}
 	if r.cancel != nil {
 		t.Error("responder still running after Close — its goroutines outlive both owners")
+	}
+}
+
+// TestZeroconfInternal_Publish_HostNameOverride pins Zeroconf.HostName: it
+// replaces the SRV target a Service carries for every record published.
+func TestZeroconfInternal_Publish_HostNameOverride(t *testing.T) {
+	t.Parallel()
+	z := NewZeroconf()
+	z.HostName = "override-host"
+	t.Cleanup(func() { _ = z.Close() })
+	svc := Service{InstanceName: "AAAABBBBCCCCDDDD", ServiceType: ServiceTypeOperational, Port: 5540, HostName: "ignored"}
+	if err := z.Publish(context.Background(), svc); err != nil {
+		t.Skipf("publish unavailable here: %v", err)
+	}
+	z.mu.Lock()
+	fp := z.published[noopKey(svc.InstanceName, svc.ServiceType)]
+	z.mu.Unlock()
+	if !strings.Contains(fp, "|override-host|") {
+		t.Fatalf("published fingerprint %q does not carry the override host", fp)
+	}
+}
+
+// TestPrimaryHostInterfaces: the interfaces a publish answers on are the
+// ones the address list comes from — never a loopback or an excluded one —
+// and nil when the filter leaves none.
+func TestPrimaryHostInterfaces(t *testing.T) {
+	t.Parallel()
+	if got := primaryHostInterfaces(func(string) bool { return true }); got != nil {
+		t.Fatalf("every interface excluded: got %v, want nil", got)
+	}
+	for _, ifi := range primaryHostInterfaces(nil) {
+		if ifi.Flags&net.FlagLoopback != 0 || ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagMulticast == 0 {
+			t.Errorf("interface %s (%v) does not qualify", ifi.Name, ifi.Flags)
+		}
+		if isVirtualInterfaceName(ifi.Name) {
+			t.Errorf("virtual interface %s was kept", ifi.Name)
+		}
 	}
 }

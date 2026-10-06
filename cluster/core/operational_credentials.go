@@ -49,7 +49,13 @@ import (
 // The cluster keeps no in-memory fabric list — every read goes
 // through [store.Store] so the persisted state is the source of truth.
 type OperationalCredentials struct {
-	store StoreFacade
+	// initialFabricLabel is [OpcredsConfig.InitialFabricLabel].
+	initialFabricLabel string
+	store              StoreFacade
+
+	// vid holds each fabric's VID Verification Statement and VVSC when the
+	// store cannot persist them (no [vidVerificationSettings]).
+	vid vidVerificationMemory
 
 	mu                  sync.RWMutex
 	supportedFabrics    uint8             // from OpcredsConfig; default 254 (matter.js HEAD) when unset
@@ -68,6 +74,7 @@ type OperationalCredentials struct {
 	// AddNOC installed; see [OpcredsConfig.RearmFailSafeForFabric].
 	rearmFailSafeForFabric func(fabricIndex uint8)
 	onFabricRemoved        func(ctx context.Context, fabricIndex uint8)
+	onAdminEntryInstalled  func(entry store.ACLEntry)
 
 	// pendingCSRSessionID is the session ID that issued the pending
 	// CSRRequest. Set in handleCSRRequest; checked in handleAddNOC to
@@ -104,6 +111,17 @@ type OperationalCredentials struct {
 	// RevertPendingOpCertsExceptRoot to undo the incomplete commissioning.
 	// Cleared by clearPendingState.
 	pendingInstallFabricIndex uint8
+
+	// pendingUpdateRevert, when non-nil, holds what an UpdateNOC in the
+	// current fail-safe context replaced, so the fail-safe's expiry
+	// restores it (matter.js FailsafeContext rollback of an updated
+	// fabric; TC-OPCREDS-3.5 step 10).
+	pendingUpdateRevert *nocUpdateRevert
+
+	// changeListeners receive [OperationalCredentials.OnMatterValueChanged]
+	// notifications.
+	changeListeners    map[uint64]func()
+	nextChangeListener uint64
 
 	// isFailSafeArmed is the runtime accessor to [GeneralCommissioning]'s
 	// FailSafe state, wired via [OpcredsConfig.IsFailSafeArmed]. When
@@ -160,6 +178,17 @@ type OperationalCredentials struct {
 func (o *OperationalCredentials) SetOnFabricRemoved(hook func(ctx context.Context, fabricIndex uint8)) {
 	o.mu.Lock()
 	o.onFabricRemoved = hook
+	o.mu.Unlock()
+}
+
+// SetOnAdminEntryInstalled wires the hook AddNOC calls with the default
+// Administer entry it installed for CaseAdminSubject — where the
+// AccessControl cluster reports the change ([AccessControl.NotifyAdminEntryInstalled]).
+// The bridge wires it when both servers are attached to the root. Pass nil
+// to detach.
+func (o *OperationalCredentials) SetOnAdminEntryInstalled(hook func(entry store.ACLEntry)) {
+	o.mu.Lock()
+	o.onAdminEntryInstalled = hook
 	o.mu.Unlock()
 }
 
@@ -316,6 +345,14 @@ func (opcredsConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusC
 
 // OpcredsConfig drives [NewOperationalCredentials].
 type OpcredsConfig struct {
+	// InitialFabricLabel is the Label a fabric gets when AddNOC installs
+	// it. Empty by default, as matter.js's FabricBuilder starts a fabric
+	// (packages/protocol/src/fabric/Fabric.ts `#label = ""`) and as
+	// TC-OPCREDS-3.7 checks right after commissioning; the administrator
+	// names its fabric with UpdateFabricLabel. A host that wants a
+	// non-empty label from the first read sets one here (at most 32
+	// bytes, the Label constraint).
+	InitialFabricLabel string
 	// SupportedFabrics is the maximum number of fabrics the bridge
 	// admits. Mirrors matter.js's default 254 when unset; legal
 	// range per Matter §11.18.4.4 is 1..254.
@@ -407,6 +444,9 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 	if s == nil {
 		return nil, errors.New("matter: OperationalCredentials store is required")
 	}
+	if len(cfg.InitialFabricLabel) > 32 {
+		return nil, fmt.Errorf("matter: OperationalCredentials InitialFabricLabel %q exceeds 32 bytes", cfg.InitialFabricLabel)
+	}
 	if cfg.SupportedFabrics == 0 {
 		// Mirrors matter.js packages/node/src/behaviors/
 		// operational-credentials/OperationalCredentialsServer.ts:87 —
@@ -421,6 +461,7 @@ func NewOperationalCredentials(s StoreFacade, cfg OpcredsConfig) (*OperationalCr
 	return &OperationalCredentials{
 		store:                  s,
 		supportedFabrics:       cfg.SupportedFabrics,
+		initialFabricLabel:     cfg.InitialFabricLabel,
 		devAttestKey:           cfg.DACPrivateKey,
 		dacBytes:               append([]byte(nil), cfg.DAC...),
 		paiBytes:               append([]byte(nil), cfg.PAI...),
@@ -472,6 +513,21 @@ func (o *OperationalCredentials) clearPendingState() {
 	o.pendingCSRForUpdate = false
 	o.nocWasInvoked = false
 	o.pendingInstallFabricIndex = 0
+	o.pendingUpdateRevert = nil
+}
+
+// nocUpdateRevert is the operational identity and node id an UpdateNOC
+// replaced.
+type nocUpdateRevert struct {
+	fabricIndex uint8
+	identity    store.IdentityRecord
+	nodeID      uint64
+	// vid and vendorID are the fabric's vendor verification data before
+	// the update: a SetVIDVerificationStatement inside the fail-safe
+	// belongs to the pending update and is dropped with it
+	// (TC-OPCREDS-3.8 step 24).
+	vid      vidData
+	vendorID uint16
 }
 
 // ClearPendingState resets all FailSafe-window-scoped state on this
@@ -512,8 +568,12 @@ func (o *OperationalCredentials) ClearPendingState() {
 func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) {
 	o.mu.Lock()
 	fabricToRevert := o.pendingInstallFabricIndex
+	updateRevert := o.pendingUpdateRevert
 	o.clearPendingState()
 	o.mu.Unlock()
+	if updateRevert != nil {
+		o.revertUpdateNOC(ctx, *updateRevert)
+	}
 	// Roll back the half-paired fabric when AddNOC completed but
 	// CommissioningComplete was never received. Without the rollback the
 	// fabric slot stays occupied and the next pair attempt collides on
@@ -533,13 +593,86 @@ func (o *OperationalCredentials) OnFailSafeExpiry(ctx context.Context, _ uint8) 
 		// host's fan-out (the OnFabricRemoved hook — sessions,
 		// subscriptions and, through Bridge.EmitFabricRemoved, the
 		// fabric's group keys, group table and multicast memberships).
-		o.NotifyFabricRemoved(fabricToRevert)
+		o.notifyFabricRemoved(ctx, fabricToRevert)
+		o.notifyChanged()
 		o.mu.RLock()
 		hook := o.onFabricRemoved
 		o.mu.RUnlock()
 		if hook != nil {
 			hook(ctx, fabricToRevert)
 		}
+	}
+}
+
+// revertUpdateNOC restores the identity and node id an UpdateNOC in an
+// expired fail-safe replaced, and lets the host follow (onFabricUpdated:
+// CASE identity, operational record). Mirrors matter.js FailsafeContext
+// rollback, which restores the fabric the update replaced.
+func (o *OperationalCredentials) revertUpdateNOC(ctx context.Context, r nocUpdateRevert) {
+	if err := o.store.UpsertIdentity(ctx, r.identity); err != nil {
+		return
+	}
+	_ = o.storeVidVerification(ctx, r.fabricIndex, r.vid)
+	if fab, err := o.store.GetFabric(ctx, r.fabricIndex); err == nil && fab.VendorID != r.vendorID {
+		if up, ok := o.store.(fabricVendorIDUpdater); ok {
+			_ = up.UpdateFabricVendorID(ctx, r.fabricIndex, r.vendorID)
+		}
+	}
+	if fab, err := o.store.GetFabric(ctx, r.fabricIndex); err == nil && fab.NodeID != r.nodeID {
+		if err := o.store.UpdateFabricNodeID(ctx, r.fabricIndex, r.nodeID); err != nil {
+			return
+		}
+		o.mu.RLock()
+		withdraw := o.onFabricWithdraw
+		o.mu.RUnlock()
+		if withdraw != nil {
+			withdraw(ctx, fab.CompressedID, fab.NodeID)
+		}
+	}
+	o.dataVersion.Bump()
+	o.notifyChanged()
+	o.mu.RLock()
+	hook := o.onFabricUpdated
+	o.mu.RUnlock()
+	if hook != nil {
+		hook(ctx, r.fabricIndex)
+	}
+}
+
+// OnMatterValueChanged implements [contract.ChangeNotifier]: cb fires when
+// the cluster's lists change outside a command on this cluster — a
+// fail-safe expiry or disarm (an ArmFailSafe command) rolling back an
+// AddNOC or UpdateNOC. A command on this cluster is reported by the
+// bridge itself; matter.js reports every state change of the behavior
+// (TC-OPCREDS-3.8 step 24 waits for the reverted Fabrics).
+func (o *OperationalCredentials) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	if cb == nil {
+		return func() {}
+	}
+	o.mu.Lock()
+	if o.changeListeners == nil {
+		o.changeListeners = map[uint64]func(){}
+	}
+	o.nextChangeListener++
+	id := o.nextChangeListener
+	o.changeListeners[id] = cb
+	o.mu.Unlock()
+	return func() {
+		o.mu.Lock()
+		delete(o.changeListeners, id)
+		o.mu.Unlock()
+	}
+}
+
+func (o *OperationalCredentials) notifyChanged() {
+	o.mu.RLock()
+	fns := make([]func(), 0, len(o.changeListeners))
+	for _, fn := range o.changeListeners {
+		fns = append(fns, fn)
+	}
+	o.mu.RUnlock()
+	for _, fn := range fns {
+		fn()
 	}
 }
 
@@ -562,6 +695,7 @@ var errOpcredsFailsafeRequired error = opcredsFailsafeRequiredErr{}
 var (
 	_ contract.ClusterServer                 = (*OperationalCredentials)(nil)
 	_ contract.FabricScopedReader            = (*OperationalCredentials)(nil)
+	_ contract.ChangeNotifier                = (*OperationalCredentials)(nil)
 	_ contract.ClusterDataVersion            = (*OperationalCredentials)(nil)
 	_ contract.ClusterCommandLister          = (*OperationalCredentials)(nil)
 	_ contract.ClusterCommandInvokePrivilege = (*OperationalCredentials)(nil)
@@ -652,6 +786,7 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 			out = append(out, NOCStruct{
 				NOC:         id.NOC,
 				ICAC:        id.ICAC,
+				Vvsc:        o.vidVerification(ctx, f.FabricIndex).vvsc,
 				FabricIndex: f.FabricIndex,
 			})
 		}
@@ -670,6 +805,8 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 				NodeID:        f.NodeID,
 				Label:         f.Label,
 				FabricIndex:   f.FabricIndex,
+
+				VidVerificationStatement: o.vidVerification(ctx, f.FabricIndex).statement,
 			})
 		}
 		return out, true
@@ -735,9 +872,9 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 		return uint32(0), true
 	case cluster.AttrGlobalClusterRevision:
 		return opcredsClusterRevision, true
-	// Global attributes 0xFFF8–0xFFFB: Apple Home caches
-	// GeneratedCommandList / AcceptedCommandList / EventList /
-	// AttributeList during the initial subscribe sweep and marks the
+	// Global attributes 0xFFF8, 0xFFF9, 0xFFFB: Apple Home caches
+	// GeneratedCommandList / AcceptedCommandList / AttributeList during
+	// the initial subscribe sweep and marks the
 	// cluster unknown when they return UnsupportedAttribute. Adding these
 	// cases mirrors matter.js ClusterServer auto-populated globalAttributes
 	// (packages/node/src/behavior/cluster/ClusterBehavior.ts) and chip
@@ -769,12 +906,6 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 			opcredsCmdSetVidVerificationStatement, // 0x0C
 			opcredsCmdSignVidVerificationRequest,  // 0x0D
 		}, true
-	case cluster.AttrGlobalEventList:
-		// OpCreds has no events per matter.js operational-credentials.
-		// element.ts. Apple iOS 26 suppresses EventList (by-design PFAD-
-		// ASYMMETRIE) but the attribute must be served for non-Apple
-		// commissioners that do not suppress it.
-		return []uint32{}, true
 	case cluster.AttrGlobalAttributeList:
 		// Full attribute list per Matter §11.18.4 + global attrs.
 		return []uint32{
@@ -788,7 +919,6 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 			cluster.AttrGlobalClusterRevision,      // 0xFFFD
 			cluster.AttrGlobalGeneratedCommandList, // 0xFFF8
 			cluster.AttrGlobalAcceptedCommandList,  // 0xFFF9
-			cluster.AttrGlobalEventList,            // 0xFFFA
 			cluster.AttrGlobalAttributeList,        // 0xFFFB
 		}, true
 	}
@@ -844,6 +974,8 @@ func (o *OperationalCredentials) MatterReadFiltered(ctx context.Context, attrID 
 				NodeID:        f.NodeID,
 				Label:         f.Label,
 				FabricIndex:   f.FabricIndex,
+
+				VidVerificationStatement: o.vidVerification(ctx, f.FabricIndex).statement,
 			})
 		}
 		return out, true
@@ -864,6 +996,7 @@ func (o *OperationalCredentials) MatterReadFiltered(ctx context.Context, attrID 
 			out = append(out, NOCStruct{
 				NOC:         id.NOC,
 				ICAC:        id.ICAC,
+				Vvsc:        o.vidVerification(ctx, f.FabricIndex).vvsc,
 				FabricIndex: f.FabricIndex,
 			})
 		}
@@ -960,6 +1093,12 @@ type SetVidVerificationStatementRequest struct {
 	VendorID                 uint16
 	VidVerificationStatement []byte // max 85 bytes
 	Vvsc                     []byte // max 400 bytes
+	// HasVendorID, HasVidVerificationStatement and HasVvsc report which
+	// optional fields the request carried — an empty statement or VVSC
+	// that is present clears the stored one.
+	HasVendorID                 bool
+	HasVidVerificationStatement bool
+	HasVvsc                     bool
 }
 
 // SignVidVerificationRequest (Matter §11.18.7.14, command 0x0D).
@@ -997,7 +1136,7 @@ func (o *OperationalCredentials) MatterInvoke(ctx context.Context, cmdID uint32,
 func (o *OperationalCredentials) dispatchCmd(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
 	case opcredsCmdAttestationRequest:
-		return o.handleAttestationRequest(fields)
+		return o.handleAttestationRequest(ctx, fields)
 	case opcredsCmdCertificateChainRequest:
 		return o.handleCertificateChainRequest(fields)
 	case opcredsCmdCSRRequest:
@@ -1058,9 +1197,10 @@ func (o *OperationalCredentials) MatterReportable() []uint32 {
 // SupportedFabrics + TrustedRootCertificates Apple cannot validate
 // the fabric-credentials chain.
 //
-// Global attributes 0xFFF8–0xFFFB included so Apple's initial subscribe
-// sweep can cache GeneratedCommandList, AcceptedCommandList, EventList
-// and AttributeList for cluster 0x3E.
+// The globals are included so Apple's initial subscribe sweep can cache
+// GeneratedCommandList, AcceptedCommandList and AttributeList for cluster
+// 0x3E. EventList (0xFFFA) is not, for the reason
+// [GroupKeyManagement.MatterAttributes] gives.
 func (o *OperationalCredentials) MatterAttributes() []uint32 {
 	return []uint32{
 		opcredsAttrNOCs,
@@ -1073,7 +1213,6 @@ func (o *OperationalCredentials) MatterAttributes() []uint32 {
 		cluster.AttrGlobalClusterRevision,
 		cluster.AttrGlobalGeneratedCommandList,
 		cluster.AttrGlobalAcceptedCommandList,
-		cluster.AttrGlobalEventList,
 		cluster.AttrGlobalAttributeList,
 	}
 }
@@ -1113,7 +1252,7 @@ func (o *OperationalCredentials) MatterGeneratedCommands() []uint32 {
 	}
 }
 
-func (o *OperationalCredentials) handleAttestationRequest(fields any) (any, error) {
+func (o *OperationalCredentials) handleAttestationRequest(ctx context.Context, fields any) (any, error) {
 	req, ok := fields.(AttestationRequest)
 	if !ok {
 		return nil, fmt.Errorf("%w: AttestationRequest expected, got %T", errOpcredsInvalidArg, fields)
@@ -1126,6 +1265,11 @@ func (o *OperationalCredentials) handleAttestationRequest(fields any) (any, erro
 	dacKey := o.devAttestKey
 	challenge := o.attestationChalleng
 	o.mu.RUnlock()
+	// The invoking session's own challenge, when the bridge names it
+	// (matter.js signs with session.attestationChallengeKey).
+	if c := InvokeAttestationChallengeFromContext(ctx); c != nil {
+		challenge = c
+	}
 
 	elements := encodeAttestationElements(cd, req.AttestationNonce)
 	sig, err := signAttestationPayload(dacKey, elements, challenge)
@@ -1290,6 +1434,9 @@ func (o *OperationalCredentials) handleCSRRequest(ctx context.Context, fields an
 	dacKey := o.devAttestKey
 	challenge := append([]byte(nil), o.attestationChalleng...)
 	o.mu.Unlock()
+	if c := InvokeAttestationChallengeFromContext(ctx); c != nil {
+		challenge = c
+	}
 
 	sig, err := signAttestationPayload(dacKey, nocsrElements, challenge)
 	if err != nil {
@@ -1367,7 +1514,7 @@ func hkdfSHA256(ikm, salt, info []byte, length int) ([]byte, error) {
 	return hkdfPkg.Key(sha256.New, ikm, salt, string(info), length)
 }
 
-func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (any, error) { //nolint:funlen // single-purpose NOC install handler with many validation/crypto branches
+func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (any, error) { //nolint:funlen,gocyclo // single-purpose NOC install handler with many validation/crypto branches
 	req, ok := fields.(AddNOCRequest)
 	if !ok {
 		return nil, fmt.Errorf("%w: AddNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
@@ -1378,9 +1525,18 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	// OperationalCredentialsServer.ts:218 #failsafeContext check.
 	o.mu.RLock()
 	checkArmed := o.isFailSafeArmed
+	nocInvoked := o.nocWasInvoked
 	o.mu.RUnlock()
 	if checkArmed != nil && !checkArmed() {
 		return nil, errOpcredsFailsafeRequired
+	}
+	// A second AddNOC — or one after UpdateNOC — in the same fail-safe
+	// context is an IM-level ConstraintError. Mirrors matter.js
+	// OperationalCredentialsServer.addNoc (`failsafeContext.fabricIndex !==
+	// undefined` → StatusResponseError(ConstraintError)); TC-OPCREDS-3.1
+	// step 25.
+	if nocInvoked {
+		return nil, opcredsConstraintErr{msg: "matter: AddNOC illegal after AddNOC/UpdateNOC in same FailSafe context"}
 	}
 	if len(req.IPKValue) != 16 {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "IPK length"}, nil
@@ -1542,17 +1698,10 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 		RootPublicKey: append([]byte(nil), root...),
 		RootCert:      append([]byte(nil), rootDER...),
 		VendorID:      req.AdminVendorID,
-		// Matter spec allows an empty Label at commission time, but
-		// Apple Home reads OperationalCredentials.Fabrics right after
-		// CommissioningComplete and silently sends RemoveFabric ~10 s
-		// later when the entry's `Label` field is empty (post-pairing
-		// cross-validation step in iCloud-Heim). matter.js servers
-		// avoid this by exposing whatever the application configured
-		// (see Fabric.ts:547-553); we mirror the behaviour with a
-		// built-in default label so first-pair attempts pass Apple's
-		// validator before the controller has a chance to send
-		// UpdateFabricLabel.
-		Label: "go-fabric",
+		// Empty unless the host configured one: matter.js's FabricBuilder
+		// starts every fabric with label "" (Fabric.ts), and
+		// TC-OPCREDS-3.7 reads exactly that after commissioning.
+		Label: o.initialFabricLabel,
 	}
 	slog.Default().Debug("matter.opcreds.addnoc.params",
 		slog.String("noc_subject_fabric_id", fmt.Sprintf("0x%016X", noc.Subject.MatterFabricID)),
@@ -1636,6 +1785,13 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if err := o.store.ReplaceACL(ctx, idx, defaultACL); err != nil {
 		o.revertAddNOC(ctx, idx)
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode
+	}
+
+	o.mu.RLock()
+	installed := o.onAdminEntryInstalled
+	o.mu.RUnlock()
+	if installed != nil {
+		installed(defaultACL[0])
 	}
 
 	o.mu.Lock()
@@ -1743,7 +1899,7 @@ func validateUpdateNOCCert(fab store.FabricRecord, priv *ecdsa.PrivateKey, nocVa
 	return noc, nil
 }
 
-func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any) (any, error) {
+func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any) (any, error) { //nolint:funlen // matter.js updateNoc's validation sequence, step by step
 	req, ok := fields.(UpdateNOCRequest)
 	if !ok {
 		return nil, fmt.Errorf("%w: UpdateNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
@@ -1755,9 +1911,15 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	checkArmed := o.isFailSafeArmed
 	priv := o.pendingPrivKey
 	pendingForUpdate := o.pendingCSRForUpdate
+	nocInvoked := o.nocWasInvoked
 	o.mu.RUnlock()
 	if checkArmed != nil && !checkArmed() {
 		return nil, errOpcredsFailsafeRequired
+	}
+	// matter.js updateNoc: `timedOp.fabricIndex !== undefined` →
+	// ConstraintError, ahead of every other check.
+	if nocInvoked {
+		return nil, opcredsConstraintErr{msg: "matter: UpdateNOC illegal after AddNOC/UpdateNOC in same FailSafe context"}
 	}
 	if priv == nil {
 		return NOCResponse{StatusCode: NOCStatusMissingCsr, DebugText: "CSR not issued"}, nil
@@ -1813,6 +1975,20 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
 	identity.IPK = existing.IPK
+	o.mu.Lock()
+	pendingRevert := o.pendingUpdateRevert == nil
+	o.mu.Unlock()
+	if pendingRevert {
+		r := &nocUpdateRevert{
+			fabricIndex: idx, identity: existing, nodeID: fab.NodeID,
+			vid: o.vidVerification(ctx, idx), vendorID: fab.VendorID,
+		}
+		o.mu.Lock()
+		if o.pendingUpdateRevert == nil {
+			o.pendingUpdateRevert = r
+		}
+		o.mu.Unlock()
+	}
 	if err := o.store.UpsertIdentity(ctx, identity); err != nil {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
 	}
@@ -1951,7 +2127,7 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 	// Also bumps DataVersion — see [OperationalCredentials.NotifyFabricRemoved],
 	// which every fabric-removal surface (this wire command, REST revoke,
 	// factory reset) runs so none of them skip a consequence the others apply.
-	o.NotifyFabricRemoved(req.FabricIndex)
+	o.notifyFabricRemoved(ctx, req.FabricIndex)
 
 	o.mu.Lock()
 	hook := o.onFabricRemoved
@@ -2078,6 +2254,14 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(fields any) (an
 //     cleanup so a subsequent CSR/AddNOC does not reuse stale state tied
 //     to a fabric that no longer exists.
 func (o *OperationalCredentials) NotifyFabricRemoved(fabricIndex uint8) {
+	o.notifyFabricRemoved(context.Background(), fabricIndex)
+}
+
+// notifyFabricRemoved is [OperationalCredentials.NotifyFabricRemoved] under
+// the removing command's ctx.
+func (o *OperationalCredentials) notifyFabricRemoved(ctx context.Context, fabricIndex uint8) {
+	// The fabric's vendor verification data goes with it.
+	o.forgetVidVerification(ctx, fabricIndex)
 	o.mu.Lock()
 	if o.currentFabric == fabricIndex {
 		o.currentFabric = 0
@@ -2145,37 +2329,6 @@ type opcredsInvalidCommandErr struct{ msg string }
 
 func (e opcredsInvalidCommandErr) Error() string                   { return e.msg }
 func (e opcredsInvalidCommandErr) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }
-
-// handleSetVidVerificationStatement handles command 0x0C
-// (SetVidVerificationStatement). The command is mandatory per the cluster
-// schema. This bridge does not run a VID-Verification-capable fabric, so
-// the handler returns InvalidCommand per Matter §11.18.6.13 conformance:
-// a device that does not support VID Verification SHALL return
-// INVALID_COMMAND for this request.
-//
-// When VID-Verification support is added in a future revision, this handler
-// should persist the VidVerificationStatement and Vvsc fields into the
-// FabricRecord and update the NOCStruct.Vvsc attribute read path.
-func (o *OperationalCredentials) handleSetVidVerificationStatement(_ context.Context, fields any) (any, error) {
-	if _, ok := fields.(SetVidVerificationStatementRequest); !ok {
-		return nil, fmt.Errorf("%w: SetVidVerificationStatementRequest expected, got %T", errOpcredsInvalidArg, fields)
-	}
-	return nil, opcredsInvalidCommandErr{"matter: SetVidVerificationStatement: VID-Verification mode not supported"}
-}
-
-// handleSignVidVerificationRequest handles command 0x0D
-// (SignVidVerificationRequest). The command is mandatory per the cluster
-// schema. This bridge does not support VID-Verification, so it returns
-// InvalidCommand. When VID-Verification support is added, this handler
-// must sign the TBS (FabricIndex || FabricBindingVersion || ClientChallenge)
-// with the fabric's operational key and return SignVidVerificationResponse
-// (0x0E) with the resulting signature.
-func (o *OperationalCredentials) handleSignVidVerificationRequest(_ context.Context, fields any) (any, error) {
-	if _, ok := fields.(SignVidVerificationRequest); !ok {
-		return nil, fmt.Errorf("%w: SignVidVerificationRequest expected, got %T", errOpcredsInvalidArg, fields)
-	}
-	return nil, opcredsInvalidCommandErr{"matter: SignVidVerificationRequest: VID-Verification mode not supported"}
-}
 
 // isOperationalAdminVendorID reports whether v is a Vendor-ID a
 // commissioner may legitimately bind into a fabric's admin subject.

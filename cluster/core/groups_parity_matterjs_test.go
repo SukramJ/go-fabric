@@ -315,7 +315,7 @@ func TestGroupsServerSurface(t *testing.T) {
 	if !slices.Equal(s.MatterReportable(), []uint32{0}) || !slices.Equal(s.MatterAttributes(), []uint32{0}) {
 		t.Fatal("attribute lists")
 	}
-	for _, attr := range []uint32{cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList, cluster.AttrGlobalEventList, cluster.AttrGlobalAttributeList} {
+	for _, attr := range []uint32{cluster.AttrGlobalAcceptedCommandList, cluster.AttrGlobalGeneratedCommandList, cluster.AttrGlobalAttributeList} {
 		if _, ok := s.MatterRead(attr); !ok {
 			t.Errorf("global 0x%04X not served", attr)
 		}

@@ -132,6 +132,9 @@ func (b *Bridge) sendReplyOpts(
 	responsePayload []byte,
 	reliable bool,
 ) error {
+	if requestProto.ProtocolID == im.InteractionModelProtocolID {
+		b.load.imSent.Add(1)
+	}
 	b.mu.RLock()
 	listener := b.listener
 	sessions := b.sessions
@@ -313,16 +316,18 @@ const reportChunkHardCap = udp.MaxDatagramSize - 200
 //
 // Greedy fill: each AttributeReport / EventReport is appended one at
 // a time; whenever the running encode breaches budget the current
-// chunk closes and the entry seeds a fresh chunk. A single oversized
-// entry (e.g. a Descriptor.PartsList with 1000+ endpoint IDs) cannot
-// be sub-split at this layer — v1.1 leaves the in-attribute list-index
-// split (Matter §10.6.1) to a future iteration — so it ships in its
-// own chunk. When that chunk alone would still exceed
-// [reportChunkHardCap] (the hard wire ceiling [udp.Listener.Send]
-// enforces, so an oversized chunk could never be sent regardless), the
-// entry is downgraded to an AttributeStatusIB / EventStatusIB carrying
-// StatusResourceExhausted for that one path instead — the rest of the
-// report, and the SubscribeResponse that depends on it, still go out.
+// chunk closes and the entry seeds a fresh chunk. A list attribute that
+// does not fit one chunk on its own (e.g. a Descriptor.PartsList with
+// 1000+ endpoint IDs, the NOCs of several fabrics) is split by
+// [splitListAttributeReport] into a REPLACE-ALL plus ListIndex=null
+// appends (Matter §10.6.4.3.1, matter.js chunkAttributePayload). Any
+// other single entry that does not fit ships in its own chunk; when that
+// chunk alone would still exceed [reportChunkHardCap] (the hard wire
+// ceiling [udp.Listener.Send] enforces, so an oversized chunk could never
+// be sent regardless), the entry is downgraded to an AttributeStatusIB /
+// EventStatusIB carrying StatusResourceExhausted for that one path
+// instead — the rest of the report, and the SubscribeResponse that
+// depends on it, still go out.
 func chunkReportData(rd im.ReportData, budget int) ([]im.ReportData, error) {
 	// Fast path: single small report → no work.
 	probe, err := EncodeReportData(rd)
@@ -339,7 +344,16 @@ func chunkReportData(rd im.ReportData, budget int) ([]im.ReportData, error) {
 		SubscriptionID:  rd.SubscriptionID,
 	}
 
-	addAttributeReport := func(rep im.AttributeReport) error {
+	var addAttributeReport func(rep im.AttributeReport) error
+	addAttributeReport = func(rep im.AttributeReport) error {
+		if parts, ok := splitListAttributeReport(rd, rep, budget); ok {
+			for _, part := range parts {
+				if err := addAttributeReport(part); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
 		rep, err := capOversizedAttributeReport(rd, rep)
 		if err != nil {
 			return err
@@ -412,6 +426,80 @@ func chunkReportData(rd im.ReportData, budget int) ([]im.ReportData, error) {
 		chunks[len(chunks)-1].SuppressResponse = true
 	}
 	return chunks, nil
+}
+
+// rawListValue is a list attribute value carried as the TLV encodings of
+// its members, as [tlv.SplitArrayMembers] returns them; rawListMember is
+// one member. [splitListAttributeReport] builds both, and
+// [defaultAttributeValueWriter] writes them back verbatim.
+type (
+	rawListValue  [][]byte
+	rawListMember []byte
+)
+
+// splitListAttributeReport splits a list attribute whose report alone
+// does not fit budget into a REPLACE-ALL report carrying as many leading
+// members as fit, followed by one ListIndex=null append report per
+// remaining member, all at the attribute's DataVersion. Mirrors matter.js
+// InteractionMessenger.sendDataReport, which chunks such an attribute with
+// chunkAttributePayload (packages/protocol/src/interaction/
+// AttributeDataEncoder.ts) and packs as many members into the initial
+// REPLACE-ALL as the message holds; chip's ReportDataEncoder does the
+// same (src/app/reporting/Engine.cpp, the AttributeValueEncoder list
+// chunking). Without it a list larger than one datagram — the NOCs of
+// three fabrics, a long ACL — rides in a single oversized message that a
+// chip controller cannot authenticate and discards.
+//
+// ok is false when rep is no splittable list: a status, an entry that
+// already addresses a list item, a non-list value, an empty list, or one
+// that fits budget alone.
+func splitListAttributeReport(rd im.ReportData, rep im.AttributeReport, budget int) ([]im.AttributeReport, bool) {
+	if rep.IsStatus || rep.Path.ListAppend || rep.Path.HasListIndex || rep.Value.IsNull || rep.Value.Value == nil {
+		return nil, false
+	}
+	switch rep.Value.Value.(type) {
+	case rawListValue, rawListMember, []byte, string:
+		return nil, false
+	}
+	size := func(r im.AttributeReport) int {
+		body, err := EncodeReportData(im.ReportData{HasSubscription: rd.HasSubscription, SubscriptionID: rd.SubscriptionID, Reports: []im.AttributeReport{r}})
+		if err != nil {
+			return budget + 1
+		}
+		return len(body)
+	}
+	if size(rep) <= budget {
+		return nil, false
+	}
+	enc := tlv.NewEncoder()
+	defaultAttributeValueWriter(enc, tlv.AnonymousTag(), rep.Value)
+	encoded, err := enc.Bytes()
+	if err != nil {
+		return nil, false
+	}
+	members, err := tlv.SplitArrayMembers(encoded)
+	if err != nil || len(members) == 0 {
+		return nil, false
+	}
+	head := rep
+	n := 1
+	for n < len(members) {
+		head.Value = im.AttributeValue{Value: rawListValue(members[:n+1])}
+		if size(head) > budget {
+			break
+		}
+		n++
+	}
+	head.Value = im.AttributeValue{Value: rawListValue(members[:n])}
+	out := make([]im.AttributeReport, 0, 1+len(members)-n)
+	out = append(out, head)
+	for _, m := range members[n:] {
+		item := rep
+		item.Path.ListAppend = true
+		item.Value = im.AttributeValue{Value: rawListMember(m)}
+		out = append(out, item)
+	}
+	return out, true
 }
 
 // capOversizedAttributeReport downgrades rep to an
@@ -569,6 +657,14 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 	// path; Apple
 	// silently rejects the topology and sends RemoveFabric.
 	switch x := v.Value.(type) {
+	case rawListValue:
+		enc.StartArray(tag)
+		for _, m := range x {
+			_ = enc.PutRawElement(tlv.AnonymousTag(), m)
+		}
+		_ = enc.EndContainer()
+	case rawListMember:
+		_ = enc.PutRawElement(tag, x)
 	case bool:
 		enc.PutBool(tag, x)
 	case uint8:
@@ -614,9 +710,28 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 	case mattercore.CapabilityMinimaStruct:
 		// BasicInformation attribute 0x0013 (Matter §11.1.5.20). Two
 		// uint16 fields under context tags 0 / 1.
+		// Tags 2-5 are the rev-6 fields (basic-information.element.ts:
+		// 173-184); BasicInformation fills them with matter.js's defaults.
 		enc.StartStruct(tag)
 		enc.PutUint16(tlv.ContextTag(0), x.CaseSessionsPerFabric)
 		enc.PutUint16(tlv.ContextTag(1), x.SubscriptionsPerFabric)
+		for i, v := range []uint16{x.SimultaneousInvocationsSupported, x.SimultaneousWritesSupported, x.ReadPathsSupported, x.SubscribePathsSupported} {
+			if v != 0 {
+				enc.PutUint16(tlv.ContextTag(uint8(2+i)), v) //nolint:gosec // i < 4
+			}
+		}
+		_ = enc.EndContainer()
+	case mattercore.DeviceLoadStruct:
+		// GeneralDiagnostics DeviceLoadStatus (general-diagnostics.element.ts
+		// :202-207): two uint16 then three uint32 fields, tags 0-4, each at
+		// its smallest TLV width as matter.js's TlvUInt16 / TlvUInt32 write
+		// them.
+		enc.StartStruct(tag)
+		enc.PutUint(tlv.ContextTag(0), uint64(x.CurrentSubscriptions))
+		enc.PutUint(tlv.ContextTag(1), uint64(x.CurrentSubscriptionsForFabric))
+		enc.PutUint(tlv.ContextTag(2), uint64(x.TotalSubscriptionsEstablished))
+		enc.PutUint(tlv.ContextTag(3), uint64(x.TotalInteractionModelMessagesSent))
+		enc.PutUint(tlv.ContextTag(4), uint64(x.TotalInteractionModelMessagesReceived))
 		_ = enc.EndContainer()
 	case mattercore.ProductAppearanceStruct:
 		// BasicInformation attribute 0x0014. Finish (tag 0) is a plain
@@ -1127,6 +1242,12 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		enc.StartStruct(tag)
 		enc.PutUint(tlv.ContextTag(0), uint64(x.BootReason))
 		_ = enc.EndContainer()
+	case mattermeasure.BooleanStateChangeEvent:
+		// BooleanState StateChange — single field StateValue (bool),
+		// boolean-state.element.ts.
+		enc.StartStruct(tag)
+		enc.PutBool(tlv.ContextTag(0), x.StateValue)
+		_ = enc.EndContainer()
 	case mattercore.ReachableChangedEvent:
 		// BridgedDeviceBasicInformation §9.13.6.1 — single field
 		// ReachableNewValue (bool).
@@ -1278,6 +1399,9 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		if encodeApplicationValue(enc, tag, v.Value) {
 			return
 		}
+		if _, isSceneInfo := v.Value.([]mattercore.SceneInfoStruct); isSceneInfo && encodeScenesResponse(enc, tag, v.Value) {
+			return
+		}
 		// Cluster server returned a Go value the writer does not
 		// handle (e.g. a struct or list). Emit null so the reply still
 		// parses on the controller side; the cluster server should
@@ -1297,7 +1421,7 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 //
 // Add a case here whenever a new cluster command starts producing a
 // rich response struct.
-func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
+func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) { //nolint:funlen // a dispatch table: one case per response type
 	switch x := v.(type) {
 	case mattercore.ArmFailSafeResponse:
 		// Matter §11.10.6.3 — [0] enum8 ErrorCode, [1] string DebugText.
@@ -1346,6 +1470,14 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
 			enc.PutUTF8(tlv.ContextTag(2), x.DebugText)
 		}
 		_ = enc.EndContainer()
+	case mattercore.SignVidVerificationResponse:
+		// SignVIDVerificationResponse (operational-credentials.element.ts
+		// 0x0E): [0] FabricIndex, [1] FabricBindingVersion, [2] Signature.
+		enc.StartStruct(tag)
+		enc.PutUint(tlv.ContextTag(0), uint64(x.FabricIndex))
+		enc.PutUint(tlv.ContextTag(1), uint64(x.FabricBindingVersion))
+		enc.PutOctets(tlv.ContextTag(2), x.Signature)
+		_ = enc.EndContainer()
 	case mattercore.KeySetReadResponse:
 		// Matter §11.2.7.3 — [0] GroupKeySetStruct GroupKeySet.
 		enc.StartStruct(tag)
@@ -1360,8 +1492,24 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) {
 		}
 		_ = enc.EndContainer()
 		_ = enc.EndContainer()
+	case mattercore.TimeSnapshotResponse:
+		// TimeSnapshotResponse (general-diagnostics.element.ts:103-105):
+		// [0] SystemTimeMs systime-ms, [1] PosixTimeMs posix-ms nullable.
+		enc.StartStruct(tag)
+		enc.PutUint(tlv.ContextTag(0), x.SystemTimeMs)
+		if x.PosixTimeMs != nil {
+			enc.PutUint(tlv.ContextTag(1), *x.PosixTimeMs)
+		} else {
+			enc.PutNull(tlv.ContextTag(1))
+		}
+		_ = enc.EndContainer()
+	case mattercore.PayloadTestResponse:
+		// PayloadTestResponse (element :119): [0] Payload octets.
+		enc.StartStruct(tag)
+		enc.PutOctets(tlv.ContextTag(0), x.Payload)
+		_ = enc.EndContainer()
 	default:
-		if encodeGroupsResponse(enc, tag, v) || encodeGroupcastResponse(enc, tag, v) || encodeApplicationResponse(enc, tag, v) {
+		if encodeGroupsResponse(enc, tag, v) || encodeGroupcastResponse(enc, tag, v) || encodeScenesResponse(enc, tag, v) || encodeApplicationResponse(enc, tag, v) {
 			return
 		}
 		// Status-only command — emit empty struct as the TLV

@@ -27,6 +27,14 @@ logos. See [`licenses/NOTICE-matter.js.txt`](./licenses/NOTICE-matter.js.txt),
 reproduced from matter.js, which states the same terms for the project this
 one is ported from.
 
+Certification is not pursued by this project. Certifiability is a goal: the
+module is meant to let a product built on it pass certification, and the CSA
+certification test families run against the reference daemon to hold it
+there. What passes, what does not and why, and what a product owner must
+supply that a library cannot is in
+[`docs/certifiability.md`](./docs/certifiability.md)
+([ADR 0011](./docs/adr/0011-certifiability-is-a-goal.md)).
+
 ## Documentation
 
 | | |

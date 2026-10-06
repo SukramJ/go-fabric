@@ -265,6 +265,10 @@ func (c Config) validate() error {
 // topology / dispatcher pair is swapped atomically on [Reassemble]
 // so in-flight IM dispatches see a consistent view.
 type Bridge struct {
+	// load counts the Interaction Model traffic GeneralDiagnostics'
+	// DeviceLoadStatus reports (see device_load.go).
+	load deviceLoadCounters
+
 	cfg Config
 	// There is deliberately no endpoint.Store here. The bridge consumes an
 	// assembled topology through [Snapshotter] and never reads endpoint
@@ -1063,16 +1067,65 @@ func (b *Bridge) SetOnFabricRemoved(fn func(fabricIndex uint8)) {
 	b.mu.Unlock()
 }
 
+// fabricSessionCloser is the optional capability of a [SessionRegistry]
+// to close every session of one fabric (operational.Manager.CloseFabric).
+type fabricSessionCloser interface {
+	CloseFabric(fabricIndex uint8)
+}
+
+// EmitFabricRemovedContext is [Bridge.EmitFabricRemoved] for a removal
+// the host learns about inside the RemoveFabric command (ctx is the
+// command's context): it also ends every secure session of the removed
+// fabric once the command's response is out — the session that removed
+// its own fabric included, which must still carry the NOCResponse. matter.js
+// OperationalCredentialsServer.removeFabric → Fabric.remove closes the
+// fabric's sessions, the invoking one after its exchange
+// (NodeSession deferredClose); without it a controller whose fabric is
+// gone kept being answered on it (TC-CADMIN-1.15 step 12). Outside a
+// command the sessions close at once. Needs a [SessionRegistry] that can
+// close by fabric (the operational manager does).
+func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8) {
+	b.emitFabricRemoved(ctx, fabricIndex)
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
+	closer, ok := reg.(fabricSessionCloser)
+	if !ok {
+		return
+	}
+	closeNow := func() { closer.CloseFabric(fabricIndex) }
+	if !im.DeferAfterResponse(ctx, closeNow) {
+		closeNow()
+	}
+}
+
 // EmitFabricRemoved is the bridge-side dispatch helper the daemon
 // invokes inside the [core.OperationalCredentials.SetOnFabricRemoved]
 // closure. Forwards to whatever closure the daemon wired via
 // [SetOnFabricRemoved]; nil-safe.
 func (b *Bridge) EmitFabricRemoved(fabricIndex uint8) {
+	b.emitFabricRemoved(context.Background(), fabricIndex)
+}
+
+// emitFabricRemoved is [Bridge.EmitFabricRemoved] under ctx, which bounds
+// the persisted-subscription cleanup (its cancellation does not: the
+// cleanup outlives the command that removed the fabric).
+func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	// A removed fabric's subscriptions can never be re-established.
-	b.forgetFabricSubscriptions(fabricIndex)
+	b.forgetFabricSubscriptions(ctx, fabricIndex)
+	// A window it opened no longer has an admin fabric.
+	if win := b.CommissioningWindow(); win != nil {
+		win.FabricRemoved(fabricIndex)
+	}
 	// Its groups go with it: keys, group table, reception state and the
 	// multicast memberships only it used.
 	b.groupMessagingPort().ForgetFabric(fabricIndex)
+	// And its scenes (fabric-scoped scene table entries).
+	if topo := b.Topology(); topo != nil {
+		for _, ep := range topo.Bridged() {
+			ep.ForgetFabricScenes(fabricIndex)
+		}
+	}
 	b.mu.RLock()
 	hook := b.onFabricRemoved
 	b.mu.RUnlock()
@@ -1137,7 +1190,29 @@ func (b *Bridge) AttachAuxiliaryACL(src endpoint.AuxiliaryACLLister) {
 func (b *Bridge) AttachCommissioningWindow(w *CommissioningWindow) {
 	b.mu.Lock()
 	b.commissioningWindow = w
+	roots := b.rootClusters
 	b.mu.Unlock()
+	wireCommissioned(roots, w)
+	if w != nil {
+		// A window that opens, times out, is revoked or ends with a
+		// commissioning changes WindowStatus, AdminFabricIndex and
+		// AdminVendorId; subscribers learn of it like of any attribute
+		// change (matter.js AdministratorCommissioningServer sets the
+		// state, whose $Changed reports it). TC-CADMIN-1.3 step 9 waits for
+		// WindowStatus to fall back to WindowNotOpen on its subscription.
+		w.setStateChanged(func() {
+			mgr := b.subscriptionManagerLocked()
+			if mgr == nil {
+				return
+			}
+			for _, attr := range []uint32{0x0000, 0x0001, 0x0002} {
+				mgr.OnAttributeChanged(im.ConcreteAttributePath{
+					Endpoint: 0, Cluster: administratorCommissioningClusterID, Attribute: attr,
+					HasEndpoint: true, HasCluster: true, HasAttribute: true,
+				})
+			}
+		})
+	}
 }
 
 // CommissioningWindow returns the attached window tracker or nil
@@ -1162,14 +1237,18 @@ func (b *Bridge) CommissioningWindow() *CommissioningWindow {
 // re-roll.
 func (b *Bridge) AttachRootClusters(servers []contract.ClusterServer) {
 	cp := append([]contract.ClusterServer(nil), servers...)
+	b.wireDeviceLoad(cp)
+	wireAdminEntryEvents(cp)
 	b.mu.Lock()
 	b.rootClusters = cp
+	window := b.commissioningWindow
 	if b.topology != nil {
 		if root := b.topology.FindByID(0); root != nil {
 			root.PublishClusterServers(cp)
 		}
 	}
 	b.mu.Unlock()
+	wireCommissioned(cp, window)
 }
 
 // PartsListProviderSetter is the duck-typed surface a root-endpoint
@@ -1489,7 +1568,7 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 		CompressedFabricID: compressedFabricID,
 		NodeID:             nodeID,
 		Port:               uint16(b.effectiveUDPPort()), //nolint:gosec // the bound / parsed port is ≤ 65535; see #20
-		// HostName empty → advertiser uses the OS LocalHostName so the
+		// HostName empty → the advertiser's MAC-derived default (mdns defaultHostName) so the
 		// SRV target resolves via macOS Bonjour / Linux avahi A/AAAA.
 		HostName: "",
 	})
@@ -1593,7 +1672,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 		PairingInstruction: params.PairingInstruction,
 		RotatingID:         params.RotatingID,
 		Port:               uint16(b.effectiveUDPPort()), //nolint:gosec // the bound / parsed port is ≤ 65535; see #20
-		// HostName empty → advertiser uses the OS LocalHostName so the
+		// HostName empty → the advertiser's MAC-derived default (mdns defaultHostName) so the
 		// SRV target resolves via macOS Bonjour / Linux avahi A/AAAA.
 		HostName: "",
 	})

@@ -741,7 +741,10 @@ func (s *BooleanStateServer) MatterRead(attrID uint32) (any, bool) {
 		}
 		return v, true
 	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
+		// ChangeEvent (CHGEVENT, bit 0): the StateChange event is emitted
+		// on every StateValue change, the feature matter.js
+		// BooleanStateServer enables by default.
+		return uint32(1), true
 	case cluster.AttrGlobalClusterRevision:
 		return booleanStateClusterRevision, true
 	}
@@ -767,6 +770,12 @@ func (s *BooleanStateServer) MatterReportable() []uint32 { return []uint32{attrB
 // to MatterReportable's single attribute.
 func (s *BooleanStateServer) MatterAttributes() []uint32 {
 	return []uint32{attrBoolStateValue}
+}
+
+// BooleanStateChangeEvent is the payload of BooleanState.StateChange
+// (event 0x00, priority Info, field 0 StateValue), boolean-state.element.ts.
+type BooleanStateChangeEvent struct {
+	StateValue bool
 }
 
 // --- OccupancySensing (0x0406) -----------------------------------------

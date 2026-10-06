@@ -28,13 +28,16 @@ import (
 //   - Reachable is mutable based on bridged-device availability.
 //   - UniqueID is mandatory (vs. optional on BasicInformation).
 type BridgedDeviceBasicInformation struct {
-	mu sync.RWMutex
+	configVersion uint32
+	mu            sync.RWMutex
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped after every successful state mutation (Reachable
 	// flip, NodeLabel write) so DataVersionFilter evaluation works.
 	// Satisfies [contract.ClusterDataVersion].
 	dataVersion cluster.DataVersionTracker
+
+	onNodeLabelWrite func(string)
 
 	vendorName        string
 	vendorID          uint16
@@ -151,6 +154,15 @@ type BridgedConfig struct {
 	UniqueID           string
 	NodeLabel          string
 	Reachable          bool
+	// ConfigurationVersion is the bridged device's ConfigurationVersion;
+	// zero serves 1, matter.js's initial value
+	// (BridgedDeviceBasicInformationServer.ts / BasicInformationServer.ts
+	// setDefault("configurationVersion", 1)).
+	ConfigurationVersion uint32
+	// OnNodeLabelWrite, when set, receives every NodeLabel a controller
+	// writes, after validation — where the owner of the endpoint keeps it
+	// (a server rebuilt per dispatch cannot keep it itself).
+	OnNodeLabelWrite func(label string)
 }
 
 // NewBridgedDeviceBasicInformation constructs the cluster from cfg.
@@ -206,6 +218,8 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 		uniqueID:          cfg.UniqueID,
 		nodeLabel:         cfg.NodeLabel,
 		reachable:         reachable,
+		onNodeLabelWrite:  cfg.OnNodeLabelWrite,
+		configVersion:     max(cfg.ConfigurationVersion, 1),
 	}
 	validateBridgedBasicInfoAttributes(cfg, serialNumber)
 	return b, nil
@@ -368,9 +382,10 @@ func (b *BridgedDeviceBasicInformation) MatterRead(attrID uint32) (any, bool) { 
 		}
 		return b.productAppearance, true
 	case bridgedBasicInfoAttrConfigurationVersion:
-		// Static `1` matches chip's default; bumped on any future
-		// runtime-configuration change to the bridged-device surface.
-		return uint32(1), true
+		// The owner raises it when the bridged device's functionality
+		// changes (endpoint.Endpoint.IncreaseConfigurationVersion), as
+		// matter.js's increaseConfigurationVersion does.
+		return b.configVersion, true
 	case cluster.AttrGlobalFeatureMap:
 		return uint32(0), true
 	case cluster.AttrGlobalClusterRevision:
@@ -394,7 +409,11 @@ func (b *BridgedDeviceBasicInformation) MatterWrite(_ context.Context, attrID ui
 	}
 	b.mu.Lock()
 	b.nodeLabel = s
+	hook := b.onNodeLabelWrite
 	b.mu.Unlock()
+	if hook != nil {
+		hook(s)
+	}
 	// Bump DataVersion after a successful NodeLabel mutation so
 	// DataVersionFilter evaluation correctly detects the cluster changed.
 	b.dataVersion.Bump()

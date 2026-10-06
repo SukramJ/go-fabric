@@ -4,7 +4,9 @@
 package core_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -183,7 +185,8 @@ type genDiagStatusCoder interface {
 func TestGenDiag_TestEventTrigger_ReturnsConstraintError(t *testing.T) {
 	t.Parallel()
 	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
-	_, err := g.MatterInvoke(context.Background(), 0x00, nil)
+	key := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	_, err := g.MatterInvoke(context.Background(), 0x00, map[uint8]any{0: key, 1: uint64(1)})
 	if err == nil {
 		t.Fatal("TestEventTrigger: expected error, got nil")
 	}
@@ -222,11 +225,71 @@ func TestGenDiag_TimeSnapshot(t *testing.T) {
 	if !ok {
 		t.Fatalf("response = %T, want core.TimeSnapshotResponse", resp)
 	}
-	if r.PosixTimeMs == nil {
-		t.Fatal("PosixTimeMs is nil; bridge has a wall-clock so the value should be present")
+	// PosixTimeMs is null without a TimeSynchronization UTC time, as
+	// matter.js GeneralDiagnosticsServer.ts timeSnapshot answers it (and
+	// TC-DGGEN-2.4 requires).
+	if r.PosixTimeMs != nil {
+		t.Errorf("PosixTimeMs = %d, want null", *r.PosixTimeMs)
 	}
-	if *r.PosixTimeMs == 0 {
-		t.Errorf("PosixTimeMs = 0, want a wall-clock value")
+	if r.SystemTimeMs > 60_000 {
+		t.Errorf("SystemTimeMs = %d for a cluster built just now", r.SystemTimeMs)
+	}
+}
+
+// TestGenDiag_DataModelTest pins the DMTEST surface matter.js requires above
+// a MaxPathsPerInvoke of one (GeneralDiagnosticsServer.ts
+// #assertDataModelTest, payloadTestRequest): the feature bit, the
+// PayloadTestRequest / PayloadTestResponse pair in the command lists, and
+// the request's checks — disabled triggers or a wrong key ConstraintError,
+// Count above 2048 ConstraintError, an oversized payload ResourceExhausted,
+// otherwise Count copies of Value. Found by the CHIP Python harness
+// (TC-IDM-1.4).
+func TestGenDiag_DataModelTest(t *testing.T) {
+	t.Parallel()
+	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
+	if fm, _ := g.MatterRead(0xFFFC); fm != uint32(1) {
+		t.Errorf("FeatureMap = %v, want DMTEST (1)", fm)
+	}
+	if !slices.Contains(g.MatterAcceptedCommands(), 0x03) || !slices.Contains(g.MatterGeneratedCommands(), 0x04) {
+		t.Errorf("command lists %v / %v lack PayloadTestRequest / PayloadTestResponse",
+			g.MatterAcceptedCommands(), g.MatterGeneratedCommands())
+	}
+	key := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	req := func(count uint64) map[uint8]any { return map[uint8]any{0: key, 1: uint64(0x5A), 2: count} }
+	status := func(fields any) (im.StatusCode, any) {
+		resp, err := g.MatterInvoke(context.Background(), 0x03, fields)
+		if err == nil {
+			return im.StatusSuccess, resp
+		}
+		sc, ok := err.(genDiagStatusCoder)
+		if !ok {
+			t.Fatalf("error %v is not a status", err)
+		}
+		return sc.MatterStatusCode(), nil
+	}
+	if s, _ := status(req(4)); s != im.StatusConstraintError {
+		t.Errorf("triggers disabled: %v, want ConstraintError", s)
+	}
+	if err := g.EnableTestEventTriggers(key, func(context.Context, uint64) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	s, resp := status(req(4))
+	if s != im.StatusSuccess {
+		t.Fatalf("enabled: %v", s)
+	}
+	if got := resp.(core.PayloadTestResponse).Payload; !bytes.Equal(got, []byte{0x5A, 0x5A, 0x5A, 0x5A}) {
+		t.Errorf("payload %x", got)
+	}
+	if s, _ := status(req(2049)); s != im.StatusConstraintError {
+		t.Errorf("Count 2049: %v, want ConstraintError", s)
+	}
+	if s, _ := status(req(2048)); s != im.StatusResourceExhausted {
+		t.Errorf("Count 2048: %v, want ResourceExhausted", s)
+	}
+	bad := append([]byte(nil), key...)
+	bad[0] = 9
+	if s, _ := status(map[uint8]any{0: bad, 1: uint64(1), 2: uint64(1)}); s != im.StatusConstraintError {
+		t.Errorf("wrong key: %v, want ConstraintError", s)
 	}
 }
 
@@ -415,4 +478,68 @@ func TestGenDiag_TotalOperationalHoursReadable(t *testing.T) {
 		t.Fatal("TotalOperationalHours: ok=false")
 	}
 	_ = v.(uint32)
+}
+
+// TestGenDiag_TestEventTriggersEnabled pins the armed path against matter.js
+// GeneralDiagnosticsServer.ts: TestEventTriggersEnabled reads true once a
+// key and handler are configured; an all-zero or wrong key answers
+// ConstraintError; the right key reaches the handler with the trigger; a
+// trigger the handler refuses answers InvalidCommand (triggerTestEvent's
+// default), and a handler's own status passes through.
+func TestGenDiag_TestEventTriggersEnabled(t *testing.T) {
+	t.Parallel()
+	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
+	if v, _ := g.MatterRead(0x0008); v != false {
+		t.Fatalf("TestEventTriggersEnabled before arming = %v", v)
+	}
+	key := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	var got uint64
+	err := g.EnableTestEventTriggers(key, func(_ context.Context, trigger uint64) error {
+		switch trigger {
+		case 0x005c00000000009c:
+			got = trigger
+			return nil
+		case 0xdead:
+			return im.ErrUnsupportedCommand
+		}
+		return errors.New("unsupported trigger")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := g.MatterRead(0x0008); v != true {
+		t.Fatalf("TestEventTriggersEnabled after arming = %v", v)
+	}
+	status := func(fields any) im.StatusCode {
+		t.Helper()
+		_, err := g.MatterInvoke(context.Background(), 0x00, fields)
+		if err == nil {
+			return im.StatusSuccess
+		}
+		sc, ok := err.(genDiagStatusCoder)
+		if !ok {
+			t.Fatalf("error %v is not a status", err)
+		}
+		return sc.MatterStatusCode()
+	}
+	if s := status(map[uint8]any{0: make([]byte, 16), 1: uint64(0x005c00000000009c)}); s != im.StatusConstraintError {
+		t.Errorf("all-zero key: %v, want ConstraintError", s)
+	}
+	wrong := append([]byte(nil), key...)
+	wrong[15] ^= 0xFF
+	if s := status(map[uint8]any{0: wrong, 1: uint64(0x005c00000000009c)}); s != im.StatusConstraintError {
+		t.Errorf("wrong key: %v, want ConstraintError", s)
+	}
+	if s := status(core.TestEventTriggerRequest{EnableKey: key, EventTrigger: 0x005c00000000009c}); s != im.StatusSuccess || got != 0x005c00000000009c {
+		t.Errorf("right key: %v, handler saw 0x%X", s, got)
+	}
+	if s := status(map[uint8]any{0: key, 1: uint64(7)}); s != im.StatusInvalidCommand {
+		t.Errorf("unsupported trigger: %v, want InvalidCommand", s)
+	}
+	if s := status(map[uint8]any{0: key, 1: uint64(0xdead)}); s != im.StatusUnsupportedCommand {
+		t.Errorf("handler status: %v, want the handler's UnsupportedCommand", s)
+	}
+	if err := g.EnableTestEventTriggers(make([]byte, 16), func(context.Context, uint64) error { return nil }); err == nil {
+		t.Error("an all-zero key was accepted")
+	}
 }

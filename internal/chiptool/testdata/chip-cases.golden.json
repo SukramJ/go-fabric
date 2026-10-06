@@ -1,0 +1,1781 @@
+{
+  "image": "ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326",
+  "cases": {
+    "ACE/1.1": {
+      "steps": 38,
+      "stepsSkipped": 0
+    },
+    "ACE/1.2": {
+      "tests": 1,
+      "steps": 30,
+      "stepsSkipped": 0
+    },
+    "ACE/1.3": {
+      "tests": 1,
+      "steps": 58,
+      "stepsSkipped": 0
+    },
+    "ACE/1.4": {
+      "tests": 1,
+      "steps": 49,
+      "stepsSkipped": 0
+    },
+    "ACE/1.5": {
+      "tests": 1,
+      "steps": 13,
+      "stepsSkipped": 0
+    },
+    "ACE/1.6": {
+      "tests": 1,
+      "steps": 53,
+      "stepsSkipped": 26
+    },
+    "ACE/2.1": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "ACE/2.2": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
+    "ACE/2.3": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "ACE/2.4": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "ACL/2.1": {
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "ACL/2.10": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 0
+    },
+    "ACL/2.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "ACL/2.3": {
+      "tests": 1,
+      "steps": 42,
+      "stepsSkipped": 2
+    },
+    "ACL/2.4": {
+      "tests": 1,
+      "steps": 45,
+      "stepsSkipped": 0
+    },
+    "ACL/2.5": {
+      "tests": 1,
+      "steps": 28,
+      "stepsSkipped": 2
+    },
+    "ACL/2.6": {
+      "tests": 2,
+      "steps": 16,
+      "stepsSkipped": 2
+    },
+    "ACL/2.7": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "ACL/2.8": {
+      "tests": 1,
+      "steps": 22,
+      "stepsSkipped": 2
+    },
+    "ACL/2.9": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
+    "BINFO/2.1": {
+      "tests": 1,
+      "steps": 30,
+      "stepsSkipped": 22
+    },
+    "BINFO/2.2": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "BOOL/2.1": {
+      "steps": 2,
+      "stepsSkipped": 0
+    },
+    "BOOL/2.2": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "BRBINFO/2.1": {
+      "tests": 1,
+      "steps": 30,
+      "stepsSkipped": 38
+    },
+    "CADMIN/1.10": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "CADMIN/1.11": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 8
+    },
+    "CADMIN/1.15": {
+      "tests": 1,
+      "steps": 21,
+      "stepsSkipped": 0
+    },
+    "CADMIN/1.19": {
+      "tests": 1,
+      "steps": 30,
+      "stepsSkipped": 0
+    },
+    "CADMIN/1.22": {
+      "tests": 1,
+      "steps": 10,
+      "stepsSkipped": 0
+    },
+    "CADMIN/1.25": {
+      "tests": 1,
+      "steps": 33,
+      "stepsSkipped": 0
+    },
+    "CADMIN/1.3": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "CADMIN/1.5": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 0
+    },
+    "CADMIN/1.9": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "CC/10.1": {
+      "tests": 1,
+      "steps": 46,
+      "stepsSkipped": 60
+    },
+    "CC/2.1": {
+      "tests": 1,
+      "steps": 54,
+      "stepsSkipped": 82
+    },
+    "CC/3.1": {
+      "steps": 4,
+      "stepsSkipped": 47
+    },
+    "CC/3.2": {
+      "steps": 4,
+      "stepsSkipped": 30
+    },
+    "CC/3.3": {
+      "steps": 4,
+      "stepsSkipped": 23
+    },
+    "CC/4.1": {
+      "steps": 4,
+      "stepsSkipped": 14
+    },
+    "CC/4.2": {
+      "steps": 4,
+      "stepsSkipped": 33
+    },
+    "CC/4.3": {
+      "steps": 4,
+      "stepsSkipped": 29
+    },
+    "CC/4.4": {
+      "steps": 4,
+      "stepsSkipped": 17
+    },
+    "CC/5.1": {
+      "steps": 12,
+      "stepsSkipped": 49
+    },
+    "CC/5.2": {
+      "steps": 4,
+      "stepsSkipped": 19
+    },
+    "CC/5.3": {
+      "steps": 4,
+      "stepsSkipped": 16
+    },
+    "CC/6.1": {
+      "steps": 22,
+      "stepsSkipped": 0
+    },
+    "CC/7.1": {
+      "steps": 4,
+      "stepsSkipped": 47
+    },
+    "CC/7.2": {
+      "steps": 4,
+      "stepsSkipped": 30
+    },
+    "CC/7.3": {
+      "steps": 4,
+      "stepsSkipped": 27
+    },
+    "CC/7.4": {
+      "steps": 4,
+      "stepsSkipped": 17
+    },
+    "CC/8.1": {
+      "steps": 27,
+      "stepsSkipped": 12
+    },
+    "CGEN/2.1": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "CGEN/2.2": {
+      "tests": 1,
+      "steps": 48,
+      "stepsSkipped": 12
+    },
+    "CGEN/2.4": {
+      "tests": 1,
+      "steps": 1,
+      "stepsSkipped": 0
+    },
+    "CNET/1.4": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 4
+    },
+    "CNET/4.3": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "DA/1.1": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "DA/1.2": {
+      "tests": 1,
+      "steps": 30,
+      "stepsSkipped": 6
+    },
+    "DA/1.5": {
+      "tests": 1,
+      "steps": 20,
+      "stepsSkipped": 0
+    },
+    "DA/1.7": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "DD/1.16": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 2
+    },
+    "DD/1.17": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 4
+    },
+    "DESC/2.2": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "DESC/2.3": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "DGGEN/2.1": {
+      "steps": 30,
+      "stepsSkipped": 14
+    },
+    "DGGEN/2.3": {
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "DGGEN/2.5": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "DGGEN/3.1": {
+      "steps": 2,
+      "stepsSkipped": 0
+    },
+    "DGGEN/3.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "DRLK/2.1": {
+      "steps": 29,
+      "stepsSkipped": 161
+    },
+    "DRLK/2.12": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "DRLK/2.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "DRLK/2.3": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "DRLK/2.4": {
+      "steps": 1,
+      "stepsSkipped": 16
+    },
+    "DRLK/2.8": {
+      "steps": 1,
+      "stepsSkipped": 14
+    },
+    "DRLK/2.9": {
+      "tests": 1,
+      "steps": 54,
+      "stepsSkipped": 104
+    },
+    "DT/1.1": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "FAN/2.1": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "FAN/2.2": {
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "FAN/3.1": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "FAN/3.2": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "FAN/3.3": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 24
+    },
+    "FAN/3.4": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 18
+    },
+    "FAN/3.5": {
+      "tests": 1,
+      "steps": 29,
+      "stepsSkipped": 0
+    },
+    "FLW/2.1": {
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "G/2.1": {
+      "steps": 4,
+      "stepsSkipped": 2
+    },
+    "G/2.4": {
+      "steps": 19,
+      "stepsSkipped": 1
+    },
+    "GC/2.1": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 2
+    },
+    "GC/2.2": {
+      "tests": 1,
+      "steps": 40,
+      "stepsSkipped": 24
+    },
+    "GC/2.3": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "GC/2.4": {
+      "tests": 1,
+      "steps": 26,
+      "stepsSkipped": 0
+    },
+    "GC/2.5": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 4
+    },
+    "GC/2.6": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "GC/2.7": {
+      "tests": 1,
+      "steps": 20,
+      "stepsSkipped": 0
+    },
+    "GRPKEY/2.1": {
+      "steps": 11,
+      "stepsSkipped": 4
+    },
+    "GRPKEY/2.2": {
+      "steps": 31,
+      "stepsSkipped": 3
+    },
+    "I/2.1": {
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "I/2.2": {
+      "steps": 11,
+      "stepsSkipped": 2
+    },
+    "I/2.3": {
+      "steps": 11,
+      "stepsSkipped": 10
+    },
+    "IDM/1.2": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "IDM/1.4": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "IDM/1.5": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "IDM/10.1": {
+      "tests": 1,
+      "steps": 13,
+      "stepsSkipped": 0
+    },
+    "IDM/10.2": {
+      "tests": 1,
+      "steps": 1,
+      "stepsSkipped": 0
+    },
+    "IDM/10.3": {
+      "tests": 1,
+      "steps": 1,
+      "stepsSkipped": 0
+    },
+    "IDM/10.4@ep0": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "IDM/10.4@ep1": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep10": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep11": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep12": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep13": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep14": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep15": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep16": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep17": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep18": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep19": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep2": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep20": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep3": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep4": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep5": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep6": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep7": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep8": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep9": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.5": {
+      "tests": 1,
+      "steps": 1,
+      "stepsSkipped": 0
+    },
+    "IDM/10.6": {
+      "tests": 1,
+      "steps": 1,
+      "stepsSkipped": 0
+    },
+    "IDM/11.1": {
+      "tests": 1,
+      "steps": 1,
+      "stepsSkipped": 0
+    },
+    "IDM/12.1": {
+      "tests": 1,
+      "steps": 2,
+      "stepsSkipped": 0
+    },
+    "IDM/13.1": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 14
+    },
+    "IDM/14.1": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "IDM/2.2": {
+      "tests": 1,
+      "steps": 21,
+      "stepsSkipped": 0
+    },
+    "IDM/2.3": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "IDM/3.2": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 2
+    },
+    "IDM/4.2": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "IDM/4.3": {
+      "tests": 1,
+      "steps": 13,
+      "stepsSkipped": 0
+    },
+    "IDM/5.2": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "IDM/9.1": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "LVL/2.1": {
+      "steps": 9,
+      "stepsSkipped": 13
+    },
+    "LVL/2.2": {
+      "steps": 7,
+      "stepsSkipped": 13
+    },
+    "LVL/9.1": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 0
+    },
+    "LWM/1.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "LWM/2.1": {
+      "steps": 9,
+      "stepsSkipped": 5
+    },
+    "MOD/1.2": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 4
+    },
+    "MOD/2.1": {
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "OCC/2.1": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 20
+    },
+    "OCC/2.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "OCC/2.3": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 16
+    },
+    "OCC/3.1": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 8
+    },
+    "OCC/3.2": {
+      "tests": 1,
+      "steps": 10,
+      "stepsSkipped": 6
+    },
+    "OO/2.1": {
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "OO/2.2": {
+      "steps": 22,
+      "stepsSkipped": 4
+    },
+    "OO/2.3": {
+      "steps": 132,
+      "stepsSkipped": 1
+    },
+    "OO/2.7": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "OPCREDS/3.1": {
+      "tests": 1,
+      "steps": 86,
+      "stepsSkipped": 0
+    },
+    "OPCREDS/3.2": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "OPCREDS/3.4": {
+      "tests": 1,
+      "steps": 31,
+      "stepsSkipped": 0
+    },
+    "OPCREDS/3.5": {
+      "tests": 1,
+      "steps": 20,
+      "stepsSkipped": 0
+    },
+    "OPCREDS/3.7": {
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "OPCREDS/3.8": {
+      "tests": 1,
+      "steps": 29,
+      "stepsSkipped": 0
+    },
+    "OPSTATE/2.1": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 0
+    },
+    "OPSTATE/2.2": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 0
+    },
+    "OPSTATE/2.3": {
+      "tests": 1,
+      "steps": 18,
+      "stepsSkipped": 0
+    },
+    "OPSTATE/2.4": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "OPSTATE/2.5": {
+      "tests": 1,
+      "steps": 26,
+      "stepsSkipped": 0
+    },
+    "OPSTATE/2.6": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 6
+    },
+    "PCC/2.1": {
+      "steps": 11,
+      "stepsSkipped": 13
+    },
+    "PCC/2.2": {
+      "steps": 7,
+      "stepsSkipped": 2
+    },
+    "PCC/2.3": {
+      "steps": 4,
+      "stepsSkipped": 11
+    },
+    "PCC/2.4": {
+      "steps": 1,
+      "stepsSkipped": 12
+    },
+    "PS/2.1": {
+      "steps": 9,
+      "stepsSkipped": 24
+    },
+    "PS/3.1": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "RH/2.1": {
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "RR/1.1": {
+      "tests": 1,
+      "steps": 1,
+      "stepsSkipped": 0
+    },
+    "RVCCLEANM/1.2": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "RVCCLEANM/2.1": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "RVCCLEANM/2.2": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "RVCOPSTATE/2.1": {
+      "tests": 1,
+      "steps": 45,
+      "stepsSkipped": 2
+    },
+    "RVCOPSTATE/2.3": {
+      "tests": 1,
+      "steps": 33,
+      "stepsSkipped": 0
+    },
+    "RVCOPSTATE/2.4": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
+    "RVCOPSTATE/2.5": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "RVCRUNM/1.2": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "RVCRUNM/2.1": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "RVCRUNM/2.2": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
+    "S/2.1": {
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "S/2.2": {
+      "steps": 66,
+      "stepsSkipped": 20
+    },
+    "S/2.4": {
+      "steps": 23,
+      "stepsSkipped": 11
+    },
+    "S/2.5": {
+      "tests": 1,
+      "steps": 20,
+      "stepsSkipped": 2
+    },
+    "S/2.6": {
+      "tests": 1,
+      "steps": 24,
+      "stepsSkipped": 0
+    },
+    "SC/3.1": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "SC/3.2": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "SC/3.4": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "SC/3.6": {
+      "tests": 1,
+      "steps": 1,
+      "stepsSkipped": 0
+    },
+    "SC/5.1": {
+      "tests": 1,
+      "steps": 74,
+      "stepsSkipped": 42
+    },
+    "SC/7.1": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "SM/1.1": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "SM/1.2": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "SMOKECO/2.1": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "SMOKECO/2.2": {
+      "tests": 1,
+      "steps": 21,
+      "stepsSkipped": 0
+    },
+    "SMOKECO/2.3": {
+      "tests": 1,
+      "steps": 21,
+      "stepsSkipped": 0
+    },
+    "SMOKECO/2.4": {
+      "tests": 1,
+      "steps": 50,
+      "stepsSkipped": 0
+    },
+    "SMOKECO/2.5": {
+      "tests": 1,
+      "steps": 73,
+      "stepsSkipped": 0
+    },
+    "SMOKECO/2.6": {
+      "tests": 1,
+      "steps": 34,
+      "stepsSkipped": 0
+    },
+    "SMOKECO/2.7": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "SWTCH/2.1": {
+      "steps": 3,
+      "stepsSkipped": 1
+    },
+    "TMP/2.1": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "TSTAT/2.1": {
+      "steps": 23,
+      "stepsSkipped": 53
+    },
+    "TSTAT/2.2": {
+      "tests": 1,
+      "steps": 42,
+      "stepsSkipped": 52
+    },
+    "TSTAT/4.2": {
+      "tests": 1,
+      "steps": 18,
+      "stepsSkipped": 34
+    },
+    "VALCC/2.1": {
+      "tests": 1,
+      "steps": 13,
+      "stepsSkipped": 0
+    },
+    "VALCC/3.1": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "VALCC/3.4": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "VALCC/4.1": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "VALCC/4.2": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 0
+    },
+    "VALCC/4.3": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "VALCC/4.4": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 0
+    },
+    "VALCC/4.5": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
+    "WNCV/2.1": {
+      "steps": 11,
+      "stepsSkipped": 5
+    },
+    "WNCV/2.2": {
+      "steps": 4,
+      "stepsSkipped": 2
+    },
+    "WNCV/2.3": {
+      "steps": 5,
+      "stepsSkipped": 13
+    },
+    "WNCV/2.4": {
+      "steps": 2,
+      "stepsSkipped": 2
+    },
+    "WNCV/2.5": {
+      "steps": 2,
+      "stepsSkipped": 0
+    },
+    "WNCV/3.1": {
+      "steps": 18,
+      "stepsSkipped": 6
+    },
+    "WNCV/3.2": {
+      "steps": 18,
+      "stepsSkipped": 6
+    },
+    "WNCV/3.3": {
+      "steps": 15,
+      "stepsSkipped": 2
+    },
+    "WNCV/3.4": {
+      "steps": 8,
+      "stepsSkipped": 2
+    },
+    "WNCV/3.5": {
+      "steps": 8,
+      "stepsSkipped": 2
+    },
+    "WNCV/4.1": {
+      "steps": 18,
+      "stepsSkipped": 0
+    },
+    "WNCV/4.2": {
+      "steps": 9,
+      "stepsSkipped": 9
+    },
+    "WNCV/4.3": {
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "WNCV/4.4": {
+      "steps": 1,
+      "stepsSkipped": 5
+    },
+    "WNCV/4.5": {
+      "steps": 13,
+      "stepsSkipped": 4
+    }
+  },
+  "families": {
+    "ACE": [
+      "1.1",
+      "1.2",
+      "1.3",
+      "1.4",
+      "1.5",
+      "1.6",
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4"
+    ],
+    "ACL": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.10",
+      "2.11"
+    ],
+    "BINFO": [
+      "2.1",
+      "2.2",
+      "3.1",
+      "3.2"
+    ],
+    "BOOL": [
+      "2.1",
+      "2.2"
+    ],
+    "BRBINFO": [
+      "2.1",
+      "2.2",
+      "3.1",
+      "3.2",
+      "4.1"
+    ],
+    "CADMIN": [
+      "1.1",
+      "1.2",
+      "1.3",
+      "1.4",
+      "1.5",
+      "1.6",
+      "1.7",
+      "1.8",
+      "1.9",
+      "1.10",
+      "1.11",
+      "1.12",
+      "1.13",
+      "1.14",
+      "1.15",
+      "1.16",
+      "1.17",
+      "1.18",
+      "1.19",
+      "1.22",
+      "1.25"
+    ],
+    "CC": [
+      "2.1",
+      "2.2",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4.Simulated",
+      "4.1",
+      "4.2",
+      "4.3",
+      "4.4",
+      "4.5.Simulated",
+      "5.1",
+      "5.2",
+      "5.3",
+      "5.4.Simulated",
+      "6.1",
+      "6.2",
+      "6.3",
+      "6.4.Simulated",
+      "6.5",
+      "7.1",
+      "7.2",
+      "7.3",
+      "7.4",
+      "7.5.Simulated",
+      "8.1",
+      "9.1",
+      "9.2",
+      "9.3",
+      "9.4.Simulated",
+      "10.1"
+    ],
+    "CGEN": [
+      "2.1",
+      "2.2",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.10",
+      "2.11"
+    ],
+    "CNET": [
+      "1.4",
+      "4.1",
+      "4.2",
+      "4.3",
+      "4.4",
+      "4.5",
+      "4.6",
+      "4.9",
+      "4.10",
+      "4.11",
+      "4.12",
+      "4.13",
+      "4.14",
+      "4.15",
+      "4.16",
+      "4.20",
+      "4.21",
+      "4.22",
+      "4.23",
+      "4.25",
+      "4.26",
+      "4.27",
+      "4.29"
+    ],
+    "DA": [
+      "1.1",
+      "1.2",
+      "1.3",
+      "1.4",
+      "1.5",
+      "1.6",
+      "1.7",
+      "1.8",
+      "1.9",
+      "1.10",
+      "1.11",
+      "1.12",
+      "1.13"
+    ],
+    "DD": [
+      "1.6",
+      "1.7",
+      "1.8",
+      "1.9",
+      "1.10",
+      "1.11",
+      "1.16",
+      "1.17",
+      "2.1",
+      "2.2",
+      "3.3",
+      "3.4",
+      "3.5",
+      "3.6",
+      "3.7",
+      "3.8",
+      "3.9",
+      "3.10",
+      "3.11",
+      "3.12",
+      "3.13",
+      "3.14",
+      "3.15",
+      "3.16",
+      "3.17",
+      "3.18",
+      "3.19",
+      "3.20",
+      "3.21",
+      "3.22"
+    ],
+    "DESC": [
+      "2.1",
+      "2.2",
+      "2.3"
+    ],
+    "DGGEN": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "3.1",
+      "3.2"
+    ],
+    "DRLK": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.10",
+      "2.11",
+      "2.12",
+      "2.13",
+      "3.2"
+    ],
+    "DT": [
+      "1.1"
+    ],
+    "FAN": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "3.5",
+      "3.6",
+      "4.1"
+    ],
+    "FLW": [
+      "2.1",
+      "2.2"
+    ],
+    "G": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "3.2"
+    ],
+    "GC": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8"
+    ],
+    "GRPKEY": [
+      "2.1",
+      "2.2",
+      "5.4"
+    ],
+    "I": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "3.2"
+    ],
+    "IDM": [
+      "1.1",
+      "1.2",
+      "1.3",
+      "1.4",
+      "1.5",
+      "2.1",
+      "2.2",
+      "2.3",
+      "3.1",
+      "3.2",
+      "4.1",
+      "4.2",
+      "4.3",
+      "4.4",
+      "5.1",
+      "5.2",
+      "6.1",
+      "6.2",
+      "6.3",
+      "6.4",
+      "7.1",
+      "8.1",
+      "9.1",
+      "10.1",
+      "10.2",
+      "10.3",
+      "10.4",
+      "10.5",
+      "10.6",
+      "11.1",
+      "12.1",
+      "13.1",
+      "14.1"
+    ],
+    "LVL": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "3.1",
+      "4.1",
+      "5.1",
+      "6.1",
+      "7.1",
+      "8.1",
+      "9.1"
+    ],
+    "LWM": [
+      "1.2",
+      "2.1"
+    ],
+    "MOD": [
+      "1.2",
+      "2.1",
+      "2.2",
+      "2.3",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4"
+    ],
+    "OCC": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "3.1",
+      "3.2"
+    ],
+    "OO": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.6",
+      "2.7",
+      "2.8",
+      "3.2.Simulated"
+    ],
+    "OPCREDS": [
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "3.5",
+      "3.6",
+      "3.7",
+      "3.8",
+      "3.9"
+    ],
+    "OPSTATE": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6"
+    ],
+    "PCC": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4"
+    ],
+    "PS": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "3.1"
+    ],
+    "RH": [
+      "2.1",
+      "2.2"
+    ],
+    "RR": [
+      "1.1"
+    ],
+    "RVCCLEANM": [
+      "1.2",
+      "2.1",
+      "2.2"
+    ],
+    "RVCOPSTATE": [
+      "2.1",
+      "2.3",
+      "2.4",
+      "2.5"
+    ],
+    "RVCRUNM": [
+      "1.2",
+      "2.1",
+      "2.2"
+    ],
+    "S": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "3.1"
+    ],
+    "SC": [
+      "1.1",
+      "1.2",
+      "1.3",
+      "1.4",
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "3.5",
+      "3.6",
+      "4.1",
+      "4.2",
+      "4.3",
+      "4.4",
+      "4.6",
+      "4.7",
+      "4.8",
+      "4.9",
+      "5.1",
+      "5.2",
+      "5.3",
+      "6.1",
+      "7.1",
+      "8.1",
+      "8.2",
+      "8.3",
+      "8.4",
+      "8.5",
+      "8.6",
+      "8.7"
+    ],
+    "SM": [
+      "1.1",
+      "1.2"
+    ],
+    "SMOKECO": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7"
+    ],
+    "SWTCH": [
+      "2.1",
+      "2.2",
+      "2.5",
+      "2.6",
+      "3.2"
+    ],
+    "TMP": [
+      "2.1",
+      "2.2"
+    ],
+    "TSTAT": [
+      "2.1",
+      "2.2",
+      "3.2",
+      "4.2",
+      "4.3",
+      "4.4"
+    ],
+    "VALCC": [
+      "2.1",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "4.1",
+      "4.2",
+      "4.3",
+      "4.4",
+      "4.5"
+    ],
+    "WNCV": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "3.5",
+      "4.1",
+      "4.2",
+      "4.3",
+      "4.4",
+      "4.5",
+      "6.1.Simulated",
+      "7.1.Simulated"
+    ]
+  },
+  "notApplicable": {
+    "ACL/2.11": "ACL.S.F01",
+    "BINFO/3.1": "BINFO.S.A0014",
+    "BINFO/3.2": "BINFO.S \u0026 BINFO.S.M.DeviceConfigurationChange",
+    "BRBINFO/3.1": "BRBINFO.S.A0014",
+    "BRBINFO/3.2": "BRBINFO.S \u0026 BRBINFO.S.A.A0018 \u0026 BRBINFO.S.M.DeviceConfigurationChange",
+    "CADMIN/1.16": "CADMIN.S \u0026 CADMIN.S.F00",
+    "CADMIN/1.4": "CADMIN.S.F00",
+    "CADMIN/1.6": "CADMIN.S \u0026 CADMIN.S.F00",
+    "CC/3.4.Simulated": "CC.C",
+    "CC/4.5.Simulated": "CC.C",
+    "CC/5.4.Simulated": "CC.C",
+    "CC/6.4.Simulated": "CC.C",
+    "CC/7.5.Simulated": "CC.C",
+    "CC/9.4.Simulated": "CC.C",
+    "CGEN/2.10": "CGEN.S \u0026 CGEN.S.F00",
+    "CGEN/2.11": "CGEN.S \u0026 CGEN.S.F00",
+    "CGEN/2.5": "CGEN.S \u0026 CGEN.S.F00",
+    "CGEN/2.6": "CGEN.S \u0026 CGEN.S.F00",
+    "CGEN/2.7": "CGEN.S \u0026 CGEN.S.F00",
+    "CGEN/2.8": "CGEN.S \u0026 CGEN.S.F00",
+    "CGEN/2.9": "CGEN.S \u0026 CGEN.S.F00",
+    "CNET/4.1": "CNET.S.F00",
+    "CNET/4.10": "CNET.S \u0026 CNET.S.F01",
+    "CNET/4.12": "CNET.S.F01",
+    "CNET/4.15": "CNET.S.F00",
+    "CNET/4.16": "CNET.S.F01",
+    "CNET/4.2": "CNET.S.F01",
+    "CNET/4.22": "CNET.S.F01",
+    "CNET/4.23": "CNET.S.F00",
+    "CNET/4.4": "CNET.S.F00",
+    "CNET/4.5": "CNET.S.F00",
+    "CNET/4.6": "CNET.S.F01",
+    "CNET/4.9": "CNET.S.F00",
+    "DA/1.10": "MCORE.ROLE.COMMISSIONEE \u0026 OPCREDS.S \u0026 OPCREDS.S.F00 \u0026 OPCREDS.S.C02.Rsp \u0026 OPCREDS.S.C03.Tx",
+    "DA/1.11": "MCORE.ROLE.COMMISSIONER",
+    "DA/1.12": "MCORE.ROLE.COMMISSIONEE \u0026 OPCREDS.S \u0026 OPCREDS.S.F00 \u0026 OPCREDS.S.C00.Rsp \u0026 OPCREDS.S.C01.Tx \u0026 OPCREDS.S.C02.Rsp \u0026 OPCREDS.S.C03.Tx",
+    "DA/1.13": "MCORE.ROLE.COMMISSIONER",
+    "DA/1.9": "MCORE.ROLE.COMMISSIONER",
+    "DD/3.11": "MCORE.ROLE.COMMISSIONER \u0026 MCORE.DD.QR_COMMISSIONING \u0026 MCORE.DD.STANDARD_COMM_FLOW",
+    "DRLK/2.11": "DRLK.S \u0026 DRLK.S.F00 \u0026 DRLK.S.F01 \u0026 DRLK.S.F02",
+    "DRLK/2.13": "DRLK.S.F0d",
+    "DRLK/2.5": "DRLK.S \u0026 DRLK.S.F04",
+    "DRLK/2.7": "DRLK.S \u0026 DRLK.S.F08",
+    "FAN/2.3": "FAN.S.F02",
+    "FAN/2.4": "FAN.S.F03",
+    "FAN/2.5": "FAN.S \u0026 FAN.S.F05",
+    "FAN/3.6": "FAN.S \u0026 FAN.S.F05",
+    "FAN/4.1": "FAN.S \u0026 OO.S",
+    "LVL/7.1": "LVL.S \u0026 LVL.S.F02",
+    "MOD/2.3": "MOD.S \u0026 S.S",
+    "MOD/3.1": "MOD.S.A0005",
+    "MOD/3.2": "MOD.S.A0004",
+    "MOD/3.3": "MOD.S.A0004",
+    "MOD/3.4": "MOD.S.A0004 \u0026 MOD.S.A0005 \u0026 OO.S.A4003",
+    "OO/2.6": "OO.S \u0026 OO.S.F02",
+    "OO/3.2.Simulated": "OO.C",
+    "OPCREDS/3.9": "OPCREDS.S \u0026 OPCREDS.S.F00 \u0026 OPCREDS.S.C02.Rsp \u0026 OPCREDS.S.C03.Tx",
+    "PS/2.3": "PWRTL.S",
+    "SC/3.5": "MCORE.ROLE.COMMISSIONER",
+    "SC/4.6": "MCORE.ROLE.COMMISSIONER \u0026 MCORE.DD.COMM_DISCOVERY",
+    "SC/4.7": "MCORE.ROLE.COMMISSIONEE \u0026 MCORE.DD.COMM_DISCOVERY",
+    "SC/8.1": "MCORE.SC.S.TCP",
+    "SC/8.2": "MCORE.SC.S.TCP",
+    "SC/8.3": "MCORE.SC.S.TCP",
+    "SC/8.4": "MCORE.SC.S.TCP",
+    "SC/8.5": "MCORE.SC.S.TCP",
+    "SC/8.6": "MCORE.SC.S.TCP",
+    "SC/8.7": "MCORE.SC.S.TCP",
+    "TSTAT/4.3": "TSTAT.S \u0026 TSTAT.S.F08 \u0026 TSTAT.S.F0a",
+    "TSTAT/4.4": "TSTAT.S \u0026 TSTAT.S.F0b",
+    "WNCV/6.1.Simulated": "WNCV.C",
+    "WNCV/7.1.Simulated": "WNCV.C"
+  },
+  "hostSkipped": {
+    "BRBINFO/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CADMIN/1.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CADMIN/1.12": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CADMIN/1.13": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CADMIN/1.14": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CADMIN/1.17": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CADMIN/1.18": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CADMIN/1.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CADMIN/1.7": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CADMIN/1.8": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CNET/4.13": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CNET/4.14": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CNET/4.20": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CNET/4.21": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DA/1.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DA/1.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DA/1.6": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DA/1.8": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/1.10": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/1.11": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/1.6": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/1.7": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/1.8": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/1.9": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.10": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.12": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.13": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.14": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.15": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.16": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.17": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.18": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.19": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.20": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.21": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.22": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.5": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.6": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.7": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.8": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DD/3.9": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DESC/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DGGEN/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DRLK/2.10": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DRLK/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "G/2.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "G/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "GC/2.8": "not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
+    "GRPKEY/5.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "I/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/1.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/1.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/3.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/4.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/4.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/5.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/6.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/6.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/6.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/6.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/7.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "IDM/8.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "LVL/8.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "MOD/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "OPCREDS/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "OPCREDS/3.6": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "PS/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "S/2.3": "not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
+    "S/3.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/1.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/1.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/1.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/1.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/2.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/2.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/4.1": "not run on the host that took the counts: the case checks the MAC-derived SRV host name, which the daemon advertises only when the host's LAN interface has IPv6 (without it the harness passes --mdns-os-hostname), and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
+    "SC/4.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/4.3": "not run on the host that took the counts: the case resolves the DUT's AAAA records, which name the advertising interface's IPv6 addresses, and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
+    "SC/4.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/4.8": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/4.9": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/5.2": "not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
+    "SC/5.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SC/6.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "SWTCH/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "TSTAT/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate"
+  }
+}

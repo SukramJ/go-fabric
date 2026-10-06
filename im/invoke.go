@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/SukramJ/go-fabric/schema"
+
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -22,6 +24,7 @@ const (
 const (
 	tagInvokeRespSuppressResponse uint8 = 0
 	tagInvokeRespResponses        uint8 = 1
+	tagInvokeRespMoreChunked      uint8 = 2
 )
 
 // DefaultMaxPathsPerInvoke is the ceiling on CommandDataIBs a single
@@ -282,6 +285,9 @@ func readCommandPathFields(dec *tlv.Decoder) (ConcreteCommandPath, error) {
 type InvokeResponse struct {
 	SuppressResponse bool
 	Responses        []InvokeResponseEntry
+	// MoreChunkedMessages marks every chunk of a chunked InvokeResponse
+	// but the last (Matter §10.7.2; matter.js TlvInvokeResponse tag 2).
+	MoreChunkedMessages bool
 }
 
 // InvokeResponseEntry is one element in InvokeResponses — either a
@@ -382,6 +388,9 @@ func (ir InvokeResponse) MarshalTLV(enc *tlv.Encoder, fieldsWriter CommandFields
 		ent.marshal(enc, fieldsWriter)
 	}
 	_ = enc.EndContainer()
+	if ir.MoreChunkedMessages {
+		enc.PutBool(tlv.ContextTag(tagInvokeRespMoreChunked), true)
+	}
 	enc.PutUint(tlv.ContextTag(tagInteractionModelRevision), uint64(MatterInteractionModelRevision))
 	_ = enc.EndContainer()
 }
@@ -490,6 +499,34 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 				})
 				continue
 			}
+		}
+		// A fabric-scoped command needs an accessing fabric: invoked on a
+		// session without one — PASE before AddNOC — it answers
+		// UnsupportedAccess. Mirrors matter.js CommandInvokeResponse.ts:287
+		// (`limits.fabricScoped && !this.session.fabric`). Found by the CHIP
+		// Python harness: TC-IDM-1.2 step 5 sends KeySetRead over PASE.
+		if fabricIndex == 0 && schema.IsFabricScopedInvoke(inv.Path.Cluster, inv.Path.Command) {
+			ir.Responses = append(ir.Responses, InvokeResponseEntry{
+				Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
+				CommandRef:    inv.CommandRef,
+				HasCommandRef: inv.HasCommandRef,
+				IsStatus:      true,
+				Status:        StatusIB{Status: StatusUnsupportedAccess},
+			})
+			continue
+		}
+		// A timed-required command ("T") outside a timed interaction answers
+		// NeedsTimedInteraction for its own path, after the access and
+		// fabric checks — matter.js CommandInvokeResponse.ts:291-294.
+		if timed, known := TimedInteractionFromContext(ctx); known && !timed && schema.IsTimedInvoke(inv.Path.Cluster, inv.Path.Command) {
+			ir.Responses = append(ir.Responses, InvokeResponseEntry{
+				Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
+				CommandRef:    inv.CommandRef,
+				HasCommandRef: inv.HasCommandRef,
+				IsStatus:      true,
+				Status:        StatusIB{Status: StatusNeedsTimedInteraction},
+			})
+			continue
 		}
 		// Fields the reader rejected never reach the cluster server: the
 		// command owes the status the reader attached (ConstraintError for

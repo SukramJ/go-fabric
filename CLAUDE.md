@@ -48,14 +48,20 @@ make fuzz             # every fuzz target, iteration-budgeted (FUZZTIME=100000x)
 number legitimately, regenerate, read the diff, and commit the new snapshot —
 adjusting the ratchet constant in the *same* commit.
 
-The chip-tool guard needs Linux and a ~2.5 GiB image pull, so it normally runs
-in CI (`.github/workflows/chiptool.yml`, three jobs including a control leg
-that separates our defects from environment failures):
+The chip-tool guard needs Linux. CI runs it (`.github/workflows/chiptool.yml`,
+three jobs including a control leg that separates our defects from
+environment failures); it also runs locally without exports:
 
 ```sh
-make chiptool-extract   # pull chip-tool out of the pinned chip-cert-bins image
-make chiptool-test      # build examples/reference-bridge, commission it for real
+make chiptool-test       # build examples/reference-bridge, commission it for real, run the chip-tool suite
+make chiptool-families   # the CSA certification families (hours; GOFABRIC_CHIP_FAMILIES=IDM,ACL narrows)
+make chiptool-setup      # optional: ../connectedhomeip at the harness image's CHIP commit (sparse)
 ```
+
+Both run in matter.js's CHIP image (`CHIP_TEST_IMAGE` in the Makefile, pinned
+by digest; needs Docker and a running avahi-daemon). A host chip-tool —
+`make chiptool-extract` on arm64, the snap on amd64 — is the fallback for
+`chiptool-test`. `internal/chiptool/doc.go` has the details.
 
 ## Architecture
 
@@ -113,8 +119,11 @@ one-way test seams (`bridgeseam`, `channelseam`), the shared parity-test
 support (`paritytest`) and the chip-tool suite.
 
 Scope boundaries that are decisions, not backlog — do not "fix" them:
-no controller/commissioner role, no Bluetooth, no Thread, no CSA
-certification. `docs/matterjs-comparison.md` records each with its reasoning.
+no controller/commissioner role, no Bluetooth, no Thread.
+`docs/matterjs-comparison.md` records each with its reasoning. CSA
+certification is not pursued by this project and nothing built on it may be
+described as certified, but certifiability is a goal, tracked in
+`docs/certifiability.md` ([ADR 0011](./docs/adr/0011-certifiability-is-a-goal.md)).
 
 ## matter.js is the gold standard
 
@@ -134,7 +143,7 @@ certification. `docs/matterjs-comparison.md` records each with its reasoning.
 | Repo | Local path | Role |
 | --- | --- | --- |
 | matter.js | `../matter.js/` | Matter Core implementation: schema (`packages/model`), wire codec (`packages/types`), behavior layer (`packages/node/src/behaviors`), device types (`packages/node/src/devices`), protocol engine (`packages/protocol`). The single Matter-side gold standard. |
-| connectedhomeip ("chip") | `../connectedhomeip/` | The CSA reference implementation, checked out locally. Not a second gold standard — matter.js remains the one. It is the **authority on tool and controller behaviour that matter.js does not model**: chip-tool's own argument handling (`examples/chip-tool/`), the access-control and read-client semantics already cited across `bridge/` and `im/` (`src/access/AccessControl.cpp`, `src/app/ReadClient.cpp`), and the source of every error string a chip-tool run prints. |
+| connectedhomeip ("chip") | `../connectedhomeip/` | The CSA reference implementation, checked out at the CHIP commit of the harness image by `make chiptool-setup` (sparse: the YAML and Python cases and their runners, `examples/chip-tool/` and `src/`). Not a second gold standard — matter.js remains the one. It is the **authority on tool and controller behaviour that matter.js does not model**: chip-tool's own argument handling (`examples/chip-tool/`), the access-control and read-client semantics already cited across `bridge/` and `im/` (`src/access/AccessControl.cpp`, `src/app/ReadClient.cpp`), and the source of every error string a chip-tool run prints. |
 
 **When chip-tool behaves unexpectedly, read its source, not its output.**
 The suite under `internal/chiptool/` and the CI control leg both drive the

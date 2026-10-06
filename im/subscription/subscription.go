@@ -5,6 +5,7 @@ package subscription
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
@@ -23,6 +24,11 @@ const maxSendInterval = 2 * time.Minute
 // manager keeps these in a map keyed by ID; engine.Tick walks the
 // map to drive reports.
 type Subscription struct {
+	// reporting is set while a report for this subscription is on the
+	// wire: the engine starts no second one until it completes, as
+	// matter.js ServerSubscription #triggerSendUpdate defers an update
+	// while #currentUpdatePromise is pending.
+	reporting atomic.Bool
 	// ID is the bridge-allocated 32-bit subscription identifier
 	// returned in SubscribeResponse (Matter §8.5.5).
 	ID uint32
@@ -58,7 +64,11 @@ type Subscription struct {
 	// (matter.js ServerSubscription `useAsSendInterval`).
 	sendIntervalOverride time.Duration
 
-	mu            sync.Mutex
+	mu sync.Mutex
+	// priming is set while the subscription's priming report and
+	// SubscribeResponse are still going out ([SubscribeArgs.Priming]);
+	// the engine reports nothing for it until [Subscription.EndPriming].
+	priming       bool
 	lastReport    time.Time
 	pendingDirty  map[im.ConcreteAttributePath]struct{}
 	pendingEvents []pendingEvent
@@ -221,6 +231,27 @@ func (s *Subscription) touchLastReport(now time.Time) {
 	s.mu.Lock()
 	s.lastReport = now
 	s.mu.Unlock()
+}
+
+// EndPriming marks the priming report and the SubscribeResponse as sent:
+// the subscription is established, and its report cadence starts now.
+// Changes marked dirty while it was priming stay queued and go out once
+// MinInterval has elapsed, as matter.js reports what changed during the
+// initial report afterwards (ServerSubscription.ts: the subscription is
+// activated only once the initial report completed — activate() sets
+// #sendUpdatesActivated, packages/node/src/node/server/ServerSubscription.ts:412).
+func (s *Subscription) EndPriming(now time.Time) {
+	s.mu.Lock()
+	s.priming = false
+	s.lastReport = now
+	s.mu.Unlock()
+}
+
+// isPriming reports whether the subscription is still being established.
+func (s *Subscription) isPriming() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.priming
 }
 
 // TouchLastReport is the exported counterpart of [touchLastReport].

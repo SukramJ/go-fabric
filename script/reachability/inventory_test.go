@@ -55,7 +55,7 @@ import (
 // tests read contract.DeviceTypeName and schema.DeviceTypeAllowsServerCluster
 // (and with it the server-cluster table it consults), which no test had
 // reached before.
-const reachabilityUnreachedRatchet = 6
+const reachabilityUnreachedRatchet = 5
 
 // inventoryWhitelistEntry mirrors one whitelist row of inventory.json.
 type inventoryWhitelistEntry struct {

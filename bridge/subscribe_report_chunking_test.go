@@ -25,6 +25,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -158,8 +159,27 @@ func chunkTestPeer(t *testing.T, b *Bridge, sessionID uint16) (*net.UDPConn, *ch
 
 // drainReportDataChunks reads every datagram the bridge sent until the
 // socket goes quiet, decrypts each one and returns the per-chunk
-// (attributeReports, moreChunkedMessages) pairs in wire order.
-func drainReportDataChunks(t *testing.T, peerConn *net.UDPConn, peerSess *channel.Session) (reportCounts []int, moreFlags []bool) {
+// (attributeReports, moreChunkedMessages) pairs in wire order. A chunk
+// that announces more is answered with an IM StatusResponse(Success) —
+// delivered to the bridge's wait hook, as the receive path would deliver
+// it — because the bridge, like matter.js, sends the next chunk only after
+// that answer.
+// chunkResponder answers every non-final chunk drainReportDataChunks
+// reads with a StatusResponse(SUCCESS), the way a controller does
+// (matter.js InteractionMessenger.ts sendDataReport waits for it). The
+// bridge keys its wait by its own local session ID — the ID an inbound
+// StatusResponse carries — so the responder names it explicitly.
+type chunkResponder struct {
+	b         *Bridge
+	sessionID uint16
+	// acks, when non-nil, records the AckCounter each chunk after the
+	// first piggybacks (0 when none) and has the responder register the
+	// MRP ack obligation its StatusResponse creates, the way the receive
+	// path does.
+	acks *[]uint32
+}
+
+func drainReportDataChunks(t *testing.T, peerConn *net.UDPConn, peerSess *channel.Session, answer ...chunkResponder) (reportCounts []int, moreFlags []bool) {
 	t.Helper()
 	buf := make([]byte, udp.MaxDatagramSize)
 	for {
@@ -191,6 +211,20 @@ func drainReportDataChunks(t *testing.T, peerConn *net.UDPConn, peerSess *channe
 		}
 		reportCounts = append(reportCounts, count)
 		moreFlags = append(moreFlags, more)
+		if len(answer) > 0 && answer[0].acks != nil && len(reportCounts) > 1 {
+			var ack uint32
+			if proto.HasAck {
+				ack = proto.AckCounter
+			}
+			*answer[0].acks = append(*answer[0].acks, ack)
+		}
+		if more && len(answer) > 0 && answer[0].acks != nil {
+			// The StatusResponse's own counter, owed an ack by the bridge.
+			answer[0].b.ackTracker.Owe(uint32(0x5000+len(reportCounts)), answer[0].sessionID, proto.ExchangeID, proto.Initiator, time.Now())
+		}
+		if more && len(answer) > 0 {
+			answer[0].b.signalStatusResponseRX(answer[0].sessionID, proto.ExchangeID, proto.Initiator, im.StatusSuccess)
+		}
 	}
 }
 
@@ -236,9 +270,13 @@ func TestReportSubscriptionChunksAnOversizedOngoingReport(t *testing.T) {
 		peerInitiator:       true,
 	})
 
-	b.reportSubscription(context.Background(), &subscription.Subscription{ID: subID}, paths)
-
-	counts, moreFlags := drainReportDataChunks(t, peerConn, peerSess)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		b.reportSubscription(context.Background(), &subscription.Subscription{ID: subID}, paths)
+	}()
+	counts, moreFlags := drainReportDataChunks(t, peerConn, peerSess, chunkResponder{b, sessionID, nil})
+	<-done
 	if len(counts) < 2 {
 		t.Fatalf("peer received %d ReportData datagram(s) for %d paths; want >=2 chunks (an oversized report reached the listener unchunked and was dropped)", len(counts), len(paths))
 	}
@@ -292,13 +330,99 @@ func TestReportSubscriptionEventsChunksAnOversizedReport(t *testing.T) {
 		})
 	}
 
-	b.reportSubscriptionEvents(context.Background(), &subscription.Subscription{ID: subID}, events)
-
-	counts, _ := drainReportDataChunks(t, peerConn, peerSess)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		b.reportSubscriptionEvents(context.Background(), &subscription.Subscription{ID: subID}, events)
+	}()
+	counts, _ := drainReportDataChunks(t, peerConn, peerSess, chunkResponder{b, sessionID, nil})
+	<-done
 	if len(counts) < 2 {
 		t.Fatalf("peer received %d ReportData datagram(s) for %d events; want >=2 chunks", len(counts), len(events))
 	}
 	if _, ok := b.routing.subTargets.Load(subID); !ok {
 		t.Error("subTarget was deleted; a chunked event report must not be treated as a send failure")
+	}
+}
+
+// TestOngoingReportWaitsForEachChunksStatusResponse pins the chunking
+// handshake on ongoing reports: chunk N+1 goes out only after the peer
+// answered chunk N, as matter.js waits (InteractionMessenger.ts
+// sendDataReport → waitForSuccess); a peer that never answers stops the
+// report after its first chunk. Found by the CHIP Python harness
+// (TC-IDM-4.3 step 10): chunks sent back to back were dropped by a
+// controller still waiting for the ack of its StatusResponse.
+func TestOngoingReportWaitsForEachChunksStatusResponse(t *testing.T) {
+	t.Parallel()
+	const sessionID uint16 = 73
+	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
+	b.chunkStatusResponseTimeoutOverride = 200 * time.Millisecond
+	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
+	var paths []im.ConcreteAttributePath
+	for _, ep := range b.Topology().Endpoints {
+		if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+			paths = append(paths, endpointpkg.ReportablePaths(ep)...)
+		}
+	}
+	const subID uint32 = 8383
+	b.routing.subTargets.Store(subID, subTarget{
+		src: peerAddr, hasPeerSourceNodeID: true, peerSourceNodeID: 0xBBBB4444,
+		exchangeID: 14, sessionID: sessionID, peerInitiator: true,
+	})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		b.reportSubscription(context.Background(), &subscription.Subscription{ID: subID}, paths)
+	}()
+	// No answers: exactly one chunk may arrive before the bridge gives up.
+	counts, more := drainReportDataChunks(t, peerConn, peerSess)
+	<-done
+	if len(counts) != 1 || !more[0] {
+		t.Fatalf("an unanswered chunked report sent %d chunks (more flags %v); want exactly the first", len(counts), more)
+	}
+}
+
+// TestOngoingReportChunkPiggybacksTheStatusResponseAck pins that chunk N+1
+// of an ongoing report carries the MRP ack of the peer's StatusResponse to
+// chunk N. chip's ReliableMessageMgr drops a message on an exchange that
+// is waiting for an ack unless it piggybacks one ("Dropping message
+// without piggyback ack when we are waiting for an ack") — TC-IDM-4.3
+// step 10 lost the tail of a two-chunk report to exactly that. matter.js
+// piggybacks the pending ack on every send (packages/protocol/src/
+// protocol/MessageExchange.ts:674).
+func TestOngoingReportChunkPiggybacksTheStatusResponseAck(t *testing.T) {
+	t.Parallel()
+	const sessionID uint16 = 74
+	b := newStartedBridgeWithSnapshotter(t, manyTempSensorsSnapshotterForTest())
+	b.mu.Lock()
+	b.ackTracker = mrp.NewAckTracker(time.Hour) // obligations only; no pump
+	b.mu.Unlock()
+	peerConn, peerSess, peerAddr := chunkTestPeer(t, b, sessionID)
+	var paths []im.ConcreteAttributePath
+	for _, ep := range b.Topology().Endpoints {
+		if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+			paths = append(paths, endpointpkg.ReportablePaths(ep)...)
+		}
+	}
+	const subID uint32 = 8484
+	b.routing.subTargets.Store(subID, subTarget{
+		src: peerAddr, hasPeerSourceNodeID: true, peerSourceNodeID: 0xBBBB4444,
+		exchangeID: 15, sessionID: sessionID, peerInitiator: true,
+	})
+	var acks []uint32
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		b.reportSubscription(context.Background(), &subscription.Subscription{ID: subID}, paths)
+	}()
+	counts, _ := drainReportDataChunks(t, peerConn, peerSess, chunkResponder{b, sessionID, &acks})
+	<-done
+	if len(counts) < 2 {
+		t.Fatalf("report went out in %d chunk(s); the test needs >=2", len(counts))
+	}
+	for i, ack := range acks {
+		if want := uint32(0x5000 + i + 1); ack != want {
+			t.Errorf("chunk %d piggybacked ack %#x, want %#x (the StatusResponse to chunk %d)", i+1, ack, want, i)
+		}
 	}
 }

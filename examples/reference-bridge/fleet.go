@@ -72,7 +72,7 @@ type notifier struct {
 }
 
 // OnMatterValueChanged implements [contract.ChangeNotifier].
-func (n *notifier) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+func (n *notifier) OnMatterValueChanged(cb func()) (unsubscribe func()) { //nolint:unparam // the contract's signature; the bridge keeps the closure
 	if cb == nil {
 		return func() {}
 	}
@@ -117,6 +117,14 @@ type demoLight struct {
 
 	mu sync.RWMutex
 	on bool
+
+	// servers is built once: the bridge asks for the cluster servers on
+	// every dispatch, and the OnOff server holds the LT state (OnTime,
+	// OffWaitTime, the countdowns) and the change listeners the bridge
+	// subscribed at reassembly. Rebuilt per call, a written OnTime was
+	// gone by the next read (TC-OO-2.1).
+	serversOnce sync.Once
+	servers     []contract.ClusterServer
 }
 
 func newDemoLight(name string) *demoLight { return &demoLight{name: name} }
@@ -135,10 +143,13 @@ func (d *demoLight) MatterDeviceType() uint16 { return onoff.DeviceTypeOnOffLigh
 // it (endpoint.Config.Groups). ScenesManagement stays the module's stub; the
 // light has no scene table, and the stub advertises exactly that.
 func (d *demoLight) MatterClusterServers() []contract.ClusterServer {
-	return []contract.ClusterServer{
-		&onOffServer{dev: d, logMessage: "light.set", lt: newLightingState()},
-		wire.ScenesManagement{},
-	}
+	d.serversOnce.Do(func() {
+		d.servers = []contract.ClusterServer{
+			&onOffServer{dev: d, logMessage: "light.set", lt: newLightingState()},
+			wire.ScenesManagement{},
+		}
+	})
+	return d.servers
 }
 
 // deviceName implements [onOffDevice].
@@ -191,6 +202,19 @@ type onOffServer struct {
 	version    contract.DataVersionTracker
 	// lt is nil for a server without the Lighting feature.
 	lt *lightingState
+	// changes reports what the two LT countdowns change on their own. A
+	// command's or a write's changes reach subscribers through the bridge
+	// (reportInvokeChanges, reportWrittenAttributes); a timer tick has no
+	// request behind it, so without this a subscriber never learned that
+	// OnTime ran down or that the timed-on phase switched the light off
+	// (found by TC-OO-2.8). matter.js OnOffServer.ts assigns the ticked
+	// values to its state, whose Datasource reports every change.
+	changes cluster.AttributeChanges
+}
+
+// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
+func (s *onOffServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) { //nolint:unparam // the contract's signature; the bridge keeps the closure
+	return s.changes.OnMatterAttributesChanged(cb)
 }
 
 // MatterClusterID implements [contract.ClusterServer].
@@ -313,7 +337,19 @@ func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) 
 		return nil, nil
 	}
 	s.lt.mu.Lock()
-	defer s.lt.mu.Unlock()
+	err := s.invokeLighting(cmdID, fields)
+	switched := s.lt.takeSwitch()
+	s.lt.mu.Unlock()
+	if switched != nil {
+		s.apply(*switched)
+	}
+	return nil, err
+}
+
+// invokeLighting runs one command against the LT state. Caller holds
+// s.lt.mu; the on/off switch it decides is applied once the lock is
+// released ([lightingState.takeSwitch]).
+func (s *onOffServer) invokeLighting(cmdID uint32, fields any) error {
 	switch cmdID {
 	case onoff.CmdOn:
 		s.on()
@@ -332,7 +368,7 @@ func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) 
 		s.off()
 	case onoff.CmdOnWithRecallGlobalScene:
 		if s.lt.globalSceneControl {
-			return nil, nil
+			return nil
 		}
 		s.lt.globalSceneControl = true
 		if s.lt.onTime == 0 {
@@ -342,20 +378,24 @@ func (s *onOffServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) 
 	case onoff.CmdOnWithTimedOff:
 		control, onTime, offWaitTime, err := onWithTimedOffFields(fields)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		s.onWithTimedOff(control, onTime, offWaitTime)
 	default:
-		return nil, fmt.Errorf("onoff: unsupported command %#x", cmdID)
+		return fmt.Errorf("onoff: unsupported command %#x", cmdID)
 	}
-	return nil, nil
+	return nil
 }
 
 // on is the LT-aware On. Caller holds s.lt.mu. Mirrors matter.js
 // OnOffServer.ts on(): GlobalSceneControl is set, and OffWaitTime is kept
 // through a timed-on phase but cleared when no OnTime runs.
+//
+// The device is switched after s.lt.mu is released, not here: switching it
+// fires the device's change notification, whose subscriber reads this
+// server back — under s.lt.mu that read would deadlock.
 func (s *onOffServer) on() {
-	s.apply(true)
+	s.lt.switchTo(true)
 	s.lt.globalSceneControl = true
 	if s.lt.onTime == 0 {
 		s.lt.stopDelayedOff()
@@ -368,7 +408,7 @@ func (s *onOffServer) on() {
 // above zero (and below the 0xFFFF hold) enters the delayed-off guard
 // period of spec §1.5.7.6.4.
 func (s *onOffServer) off() {
-	s.apply(false)
+	s.lt.switchTo(false)
 	s.lt.stopTimedOn()
 	s.lt.onTime = 0
 	if s.lt.offWaitTime > 0 && s.lt.offWaitTime != 0xFFFF && s.lt.delayedOff == nil {
@@ -407,38 +447,60 @@ func (s *onOffServer) onWithTimedOff(control uint8, onTime, offWaitTime uint16) 
 // timedOnTick runs every 100 ms while a timed-on phase counts down —
 // matter.js OnOffServer.ts #timedOnTick. OnTime is in tenths of a second.
 func (s *onOffServer) timedOnTick() {
+	changed, switched := s.timedOnStep()
+	if switched != nil {
+		s.apply(*switched)
+	}
+	s.changes.Notify(changed...)
+}
+
+// timedOnStep is one countdown step of [onOffServer.timedOnTick]; it
+// returns the attributes it changed and the switch it decided, which the
+// caller applies and reports once the lock is released.
+func (s *onOffServer) timedOnStep() (changed []uint32, switched *bool) {
 	s.lt.mu.Lock()
 	defer s.lt.mu.Unlock()
 	if s.lt.timedOn == nil {
-		return // stopped between the fire and the lock
+		return nil, nil // stopped between the fire and the lock
 	}
 	if s.lt.onTime == 0xFFFF {
 		s.lt.stopTimedOn()
-		return
+		return nil, nil
 	}
 	if s.lt.onTime <= 1 {
+		changed := []uint32{onoff.AttrOnOff, onoff.AttrOnTime}
+		if s.lt.offWaitTime != 0 {
+			changed = append(changed, onoff.AttrOffWaitTime)
+		}
 		s.lt.onTime = 0
 		s.lt.stopTimedOn()
 		s.lt.offWaitTime = 0
 		s.off()
-		return
+		return changed, s.lt.takeSwitch()
 	}
 	s.lt.onTime--
 	s.version.Bump()
 	s.lt.timedOn.Reset(lightingTick)
+	return []uint32{onoff.AttrOnTime}, nil
 }
 
 // delayedOffTick runs every 100 ms through the delayed-off guard —
 // matter.js OnOffServer.ts #delayedOffTick.
 func (s *onOffServer) delayedOffTick() {
+	s.changes.Notify(s.delayedOffStep()...)
+}
+
+// delayedOffStep is one step of [onOffServer.delayedOffTick], returning
+// what it changed.
+func (s *onOffServer) delayedOffStep() []uint32 {
 	s.lt.mu.Lock()
 	defer s.lt.mu.Unlock()
 	if s.lt.delayedOff == nil {
-		return
+		return nil
 	}
 	if s.lt.offWaitTime == 0xFFFF {
 		s.lt.stopDelayedOff()
-		return
+		return nil
 	}
 	if s.lt.offWaitTime <= 1 {
 		s.lt.offWaitTime = 0
@@ -448,6 +510,7 @@ func (s *onOffServer) delayedOffTick() {
 		s.lt.delayedOff.Reset(lightingTick)
 	}
 	s.version.Bump()
+	return []uint32{onoff.AttrOffWaitTime}
 }
 
 // apply drives the device and bumps the cluster's DataVersion, so a
@@ -508,6 +571,19 @@ type lightingState struct {
 	startUpOnOff       *uint8
 	timedOn            *time.Timer
 	delayedOff         *time.Timer
+	// pendingSwitch is the on/off state a command or tick decided while
+	// holding mu, applied to the device after mu is released.
+	pendingSwitch *bool
+}
+
+// switchTo records the on/off state to apply once mu is released.
+func (l *lightingState) switchTo(on bool) { l.pendingSwitch = &on }
+
+// takeSwitch returns and clears the recorded switch.
+func (l *lightingState) takeSwitch() *bool {
+	p := l.pendingSwitch
+	l.pendingSwitch = nil
+	return p
 }
 
 // newLightingState returns the LT defaults: GlobalSceneControl true, no
@@ -640,15 +716,16 @@ func (t *demoThermometer) MatterFloatValue() (float64, bool) {
 //
 // What the model does and does not claim:
 //
-//   - The head has no travel time. Open and Close take effect at once, so
-//     CurrentState never reads Transitioning, and TargetState reports "no
-//     target set" (a TLV null) rather than a position the head is still
-//     travelling to.
-//   - The timer is real but lazy. A timed opening stores its deadline, and
-//     the valve finds itself closed on the first read after it. Nothing in
-//     this process wakes at the deadline, so a subscriber learns of a
-//     self-close on its next read rather than from a report — a device with
-//     a clock of its own would fire [notifier.notify] instead.
+//   - The head travels for [valveTravel]. Open and Close set TargetState
+//     and report CurrentState Transitioning; when the head arrives,
+//     CurrentState reads the new position and TargetState goes back to
+//     null — the specification's "no target is set, the change is done"
+//     (TC-VALCC-3.1 waits for exactly that pair of reports).
+//   - The timer is real. A timed opening stores its deadline and arms a
+//     timer for it; when it fires the valve closes itself and notifies, so
+//     a subscriber learns of the self-close from a report, as from a valve
+//     with its own clock (TC-VALCC-4.5 compares its subscription with a
+//     read once the opening has ended).
 type demoValve struct {
 	name string
 	notifier
@@ -676,6 +753,60 @@ type demoValve struct {
 	// is none.
 	closesAt    time.Time
 	defaultOpen *uint32
+	// closer fires at closesAt; replaced by every Open, stopped by Close.
+	closer *time.Timer
+	// target is the position the head is travelling to; nil when it is not
+	// moving. arrive fires when it gets there.
+	target *valve.State
+	arrive *time.Timer
+}
+
+// valveTravel is how long the head takes to open or close.
+const valveTravel = 200 * time.Millisecond
+
+// travelLocked starts the head towards to. Caller holds v.mu.
+func (v *demoValve) travelLocked(to valve.State) {
+	if v.target == nil && v.state == to {
+		// Already there: the head does not move, and nothing reads
+		// Transitioning (TC-VALCC-3.1 closes a closed valve first).
+		return
+	}
+	if v.arrive != nil {
+		v.arrive.Stop()
+	}
+	v.target = &to
+	v.state = valve.StateTransitioning
+	v.arrive = time.AfterFunc(valveTravel, v.arrived)
+}
+
+// arrived completes the head's travel.
+func (v *demoValve) arrived() {
+	v.mu.Lock()
+	if v.target == nil {
+		v.mu.Unlock()
+		return
+	}
+	v.state = *v.target
+	v.target = nil
+	v.arrive = nil
+	v.mu.Unlock()
+	v.notify()
+}
+
+// openingLocked reports whether the valve is open or travelling to open:
+// an opening's durations hold from the Open command on (TC-VALCC-4.1 reads
+// OpenDuration right after it). Caller holds v.mu.
+func (v *demoValve) openingLocked() bool {
+	return v.state == valve.StateOpen || (v.target != nil && *v.target == valve.StateOpen)
+}
+
+// stopTravelLocked abandons a travel in progress. Caller holds v.mu.
+func (v *demoValve) stopTravelLocked() {
+	if v.arrive != nil {
+		v.arrive.Stop()
+		v.arrive = nil
+	}
+	v.target = nil
 }
 
 // Compile-time assertions: the device is the endpoint source, the host port
@@ -717,8 +848,8 @@ func (v *demoValve) expireLocked(now time.Time) {
 	v.closesAt = time.Time{}
 }
 
-// CurrentState implements [valve.StateSource]. The head has no travel time,
-// so the state is always known and never Transitioning.
+// CurrentState implements [valve.StateSource]. Transitioning while the head
+// travels.
 func (v *demoValve) CurrentState() (valve.State, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
@@ -726,11 +857,16 @@ func (v *demoValve) CurrentState() (valve.State, bool) {
 	return v.state, true
 }
 
-// TargetState implements [valve.StateSource]. A move completes inside the
-// command that started it, so no target is ever outstanding — which the
-// cluster reports as null, the spec's reading for "no target is set because
-// the change is done".
-func (v *demoValve) TargetState() (valve.State, bool) { return valve.StateClosed, false }
+// TargetState implements [valve.StateSource]: the position the head is
+// travelling to, null once it has arrived.
+func (v *demoValve) TargetState() (valve.State, bool) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.target == nil {
+		return valve.StateClosed, false
+	}
+	return *v.target, true
+}
 
 // OpenDuration implements [valve.StateSource]. Null while the valve is
 // closed, and null for an indefinite opening — the spec's own meaning for
@@ -739,7 +875,7 @@ func (v *demoValve) OpenDuration() (uint32, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.expireLocked(time.Now())
-	if v.state != valve.StateOpen || v.openFor == nil {
+	if !v.openingLocked() || v.openFor == nil {
 		return 0, false
 	}
 	return *v.openFor, true
@@ -752,7 +888,7 @@ func (v *demoValve) RemainingDuration() (uint32, bool) {
 	defer v.mu.Unlock()
 	now := time.Now()
 	v.expireLocked(now)
-	if v.state != valve.StateOpen || v.closesAt.IsZero() {
+	if !v.openingLocked() || v.closesAt.IsZero() {
 		return 0, false
 	}
 	return secondsUntil(v.closesAt.Sub(now)), true
@@ -789,10 +925,16 @@ func (v *demoValve) Open(_ context.Context, req valve.OpenRequest) error {
 	if req.HasOpenDuration {
 		duration = req.OpenDuration
 	}
-	v.state = valve.StateOpen
+	v.travelLocked(valve.StateOpen)
 	v.openFor = copyUint32(duration)
+	if v.closer != nil {
+		v.closer.Stop()
+		v.closer = nil
+	}
 	if duration != nil {
-		v.closesAt = time.Now().Add(time.Duration(*duration) * time.Second)
+		d := time.Duration(*duration) * time.Second
+		v.closesAt = time.Now().Add(d)
+		v.closer = time.AfterFunc(d, v.timedClose)
 	} else {
 		v.closesAt = time.Time{}
 	}
@@ -802,10 +944,24 @@ func (v *demoValve) Open(_ context.Context, req valve.OpenRequest) error {
 	return nil
 }
 
+// timedClose is the valve's own timer ending a timed opening.
+func (v *demoValve) timedClose() {
+	v.mu.Lock()
+	v.expireLocked(time.Now())
+	v.closer = nil
+	v.mu.Unlock()
+	slog.Info("valve.timed_close", slog.String("device", v.name))
+	v.notify()
+}
+
 // Close implements [valve.StateSource].
 func (v *demoValve) Close(context.Context) error {
 	v.mu.Lock()
-	v.state = valve.StateClosed
+	if v.closer != nil {
+		v.closer.Stop()
+		v.closer = nil
+	}
+	v.travelLocked(valve.StateClosed)
 	v.openFor = nil
 	v.closesAt = time.Time{}
 	v.mu.Unlock()
@@ -822,6 +978,7 @@ func (v *demoValve) Close(context.Context) error {
 // device rather than at a controller.
 func (v *demoValve) reportFromDevice(state valve.State) {
 	v.mu.Lock()
+	v.stopTravelLocked()
 	v.state = state
 	if state != valve.StateOpen {
 		v.openFor = nil
@@ -984,10 +1141,13 @@ func (s *demoSelector) supports(mode uint8) bool {
 	return false
 }
 
-// --- device 5: a powered speaker ----------------------------------------
+// --- devices 5 and 6: a powered speaker and a ceiling light ---------------
 
-// demoSpeaker is a hand-built stand-in for a powered speaker: a volume on a
-// continuous scale, plus the on/off state its LevelControl is coupled to.
+// dimmer is a hand-built stand-in for anything with a level on a continuous
+// scale plus the on/off state its LevelControl is coupled to. The fleet has
+// two: a powered speaker (its volume) and a colour-temperature ceiling light
+// (its brightness, see fleet_lighting.go), which differ in the device type
+// they advertise and in the Lighting feature, not in how the level moves.
 // Both clusters are mounted on the one endpoint, which is what makes the
 // coupling real rather than declared — the "with On/Off" commands drive an
 // OnOff cluster a controller can read back.
@@ -1004,8 +1164,18 @@ func (s *demoSelector) supports(mode uint8) bool {
 //     when the effective Options bitmap sets ExecuteIfOff. A gated-out
 //     command changes nothing and reports success, which is what the spec
 //     asks of it.
-type demoSpeaker struct {
+type dimmer struct {
 	name string
+	// kind prefixes this device's log messages ("speaker.level",
+	// "ceiling.level"), so a reader of the daemon log can tell which device
+	// was driven.
+	kind string
+	// minLevel is the lowest level the device reaches: 0 for the speaker,
+	// 1 for the light, whose LevelControl carries the Lighting feature
+	// (matter.js LevelControlServer.ts:89-91 minLevel, 1 with LT).
+	minLevel uint8
+	// lighting selects the ceiling-light surface; see MatterClusterServers.
+	lighting *lightingSurface
 	notifier
 	// version is held by the device for the reason given on [demoValve].
 	version cluster.DataVersionTracker
@@ -1021,23 +1191,32 @@ type demoSpeaker struct {
 
 // Compile-time assertions.
 var (
-	_ contract.EndpointSource  = (*demoSpeaker)(nil)
-	_ contract.ChangeNotifier  = (*demoSpeaker)(nil)
-	_ levelcontrol.LevelSource = (*demoSpeaker)(nil)
-	_ onOffDevice              = (*demoSpeaker)(nil)
+	_ contract.EndpointSource  = (*dimmer)(nil)
+	_ contract.ChangeNotifier  = (*dimmer)(nil)
+	_ levelcontrol.LevelSource = (*dimmer)(nil)
+	_ onOffDevice              = (*dimmer)(nil)
 )
 
 // newDemoSpeaker returns a speaker that is off, at the given volume.
-func newDemoSpeaker(name string, level uint8) *demoSpeaker {
-	return &demoSpeaker{name: name, level: level}
+func newDemoSpeaker(name string, level uint8) *dimmer {
+	return &dimmer{name: name, kind: "speaker", minLevel: levelcontrol.LevelMin, level: level}
 }
 
 // MatterDeviceType implements [contract.EndpointSource].
-func (s *demoSpeaker) MatterDeviceType() uint16 { return deviceTypeSpeaker }
+func (s *dimmer) MatterDeviceType() uint16 {
+	if s.lighting != nil {
+		return deviceTypeColorTemperatureLight
+	}
+	return deviceTypeSpeaker
+}
 
 // MatterClusterServers implements [contract.EndpointSource]. Speaker
-// requires both clusters, and both are served from this one device.
-func (s *demoSpeaker) MatterClusterServers() []contract.ClusterServer {
+// requires both clusters, and both are served from this one device; the
+// ceiling light adds the Lighting surface (fleet_lighting.go).
+func (s *dimmer) MatterClusterServers() []contract.ClusterServer {
+	if s.lighting != nil {
+		return s.lightingServers()
+	}
 	return []contract.ClusterServer{
 		&onOffServer{dev: s, logMessage: "speaker.set"},
 		levelcontrol.NewServer(levelcontrol.Config{
@@ -1048,10 +1227,10 @@ func (s *demoSpeaker) MatterClusterServers() []contract.ClusterServer {
 }
 
 // deviceName implements [onOffDevice].
-func (s *demoSpeaker) deviceName() string { return s.name }
+func (s *dimmer) deviceName() string { return s.name }
 
 // isOn implements [onOffDevice].
-func (s *demoSpeaker) isOn() bool {
+func (s *dimmer) isOn() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.on
@@ -1060,7 +1239,7 @@ func (s *demoSpeaker) isOn() bool {
 // setOn implements [onOffDevice]. Turning the speaker on restores OnLevel
 // when one is configured — the coupling the LevelControl attribute
 // describes, applied where the two clusters actually meet.
-func (s *demoSpeaker) setOn(on bool) {
+func (s *dimmer) setOn(on bool) {
 	s.mu.Lock()
 	s.on = on
 	if on && s.onLevel != nil {
@@ -1073,21 +1252,21 @@ func (s *demoSpeaker) setOn(on bool) {
 // CurrentLevel implements [levelcontrol.LevelSource]. The level is always
 // known: this device answers for itself rather than caching a reading taken
 // somewhere else.
-func (s *demoSpeaker) CurrentLevel() (uint8, bool) {
+func (s *dimmer) CurrentLevel() (uint8, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.level, true
 }
 
 // Options implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) Options() uint8 {
+func (s *dimmer) Options() uint8 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.options
 }
 
 // OnLevel implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) OnLevel() (uint8, bool) {
+func (s *dimmer) OnLevel() (uint8, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.onLevel == nil {
@@ -1098,17 +1277,17 @@ func (s *demoSpeaker) OnLevel() (uint8, bool) {
 
 // SetOptions implements [levelcontrol.LevelSource]. The server has already
 // refused a bitmap carrying a bit the advertised FeatureMap does not cover.
-func (s *demoSpeaker) SetOptions(_ context.Context, options uint8) error {
+func (s *dimmer) SetOptions(_ context.Context, options uint8) error {
 	s.mu.Lock()
 	s.options = options
 	s.mu.Unlock()
-	slog.Info("speaker.options", slog.String("device", s.name), slog.Int("options", int(options)))
+	slog.Info(s.kind+".options", slog.String("device", s.name), slog.Int("options", int(options)))
 	return nil
 }
 
 // SetOnLevel implements [levelcontrol.LevelSource]. A nil level is the
 // spec's null: the on-level has no effect.
-func (s *demoSpeaker) SetOnLevel(_ context.Context, level *uint8) error {
+func (s *dimmer) SetOnLevel(_ context.Context, level *uint8) error {
 	s.mu.Lock()
 	if level == nil {
 		s.onLevel = nil
@@ -1117,12 +1296,12 @@ func (s *demoSpeaker) SetOnLevel(_ context.Context, level *uint8) error {
 		s.onLevel = &v
 	}
 	s.mu.Unlock()
-	slog.Info("speaker.on_level", slog.String("device", s.name), slog.Any("level", level))
+	slog.Info(s.kind+".on_level", slog.String("device", s.name), slog.Any("level", level))
 	return nil
 }
 
 // MoveToLevel implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) MoveToLevel(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
+func (s *dimmer) MoveToLevel(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
 	if !s.executes(req.OptionsMask, req.OptionsOverride) {
 		return nil
 	}
@@ -1131,29 +1310,29 @@ func (s *demoSpeaker) MoveToLevel(_ context.Context, req levelcontrol.MoveToLeve
 }
 
 // MoveToLevelWithOnOff implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) MoveToLevelWithOnOff(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
+func (s *dimmer) MoveToLevelWithOnOff(_ context.Context, req levelcontrol.MoveToLevelRequest) error {
 	s.applyLevel(req.Level, true)
 	return nil
 }
 
 // Move implements [levelcontrol.LevelSource]. With no travel time the move
 // arrives at the end of its direction inside the command.
-func (s *demoSpeaker) Move(_ context.Context, req levelcontrol.MoveRequest) error {
+func (s *dimmer) Move(_ context.Context, req levelcontrol.MoveRequest) error {
 	if !s.executes(req.OptionsMask, req.OptionsOverride) {
 		return nil
 	}
-	s.applyLevel(moveTarget(req.MoveMode), false)
+	s.applyLevel(s.moveTarget(req.MoveMode), false)
 	return nil
 }
 
 // MoveWithOnOff implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) MoveWithOnOff(_ context.Context, req levelcontrol.MoveRequest) error {
-	s.applyLevel(moveTarget(req.MoveMode), true)
+func (s *dimmer) MoveWithOnOff(_ context.Context, req levelcontrol.MoveRequest) error {
+	s.applyLevel(s.moveTarget(req.MoveMode), true)
 	return nil
 }
 
 // Step implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) Step(_ context.Context, req levelcontrol.StepRequest) error {
+func (s *dimmer) Step(_ context.Context, req levelcontrol.StepRequest) error {
 	if !s.executes(req.OptionsMask, req.OptionsOverride) {
 		return nil
 	}
@@ -1162,26 +1341,26 @@ func (s *demoSpeaker) Step(_ context.Context, req levelcontrol.StepRequest) erro
 }
 
 // StepWithOnOff implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) StepWithOnOff(_ context.Context, req levelcontrol.StepRequest) error {
+func (s *dimmer) StepWithOnOff(_ context.Context, req levelcontrol.StepRequest) error {
 	s.applyLevel(s.steppedLevel(req), true)
 	return nil
 }
 
 // Stop implements [levelcontrol.LevelSource]. See the type doc: this model
 // never has a move in flight to halt.
-func (s *demoSpeaker) Stop(context.Context, levelcontrol.StopRequest) error { return nil }
+func (s *dimmer) Stop(context.Context, levelcontrol.StopRequest) error { return nil }
 
 // StopWithOnOff implements [levelcontrol.LevelSource].
-func (s *demoSpeaker) StopWithOnOff(context.Context, levelcontrol.StopRequest) error { return nil }
+func (s *dimmer) StopWithOnOff(context.Context, levelcontrol.StopRequest) error { return nil }
 
 // reportFromDevice applies a volume the speaker moved to by itself — its own
 // front-panel dial. Like the same method on the other two devices it stands
 // in for a southbound event, and the fleet's test is its caller.
-func (s *demoSpeaker) reportFromDevice(level uint8) {
+func (s *dimmer) reportFromDevice(level uint8) {
 	s.mu.Lock()
 	s.level = level
 	s.mu.Unlock()
-	slog.Info("speaker.reported", slog.String("device", s.name), slog.Int("level", int(level)))
+	slog.Info(s.kind+".reported", slog.String("device", s.name), slog.Int("level", int(level)))
 	s.notify()
 }
 
@@ -1191,7 +1370,7 @@ func (s *demoSpeaker) reportFromDevice(level uint8) {
 // server cannot see (matter.js LevelControlServer.ts:729-736
 // #optionsAllowExecution). The bitmap arithmetic is the cluster's, so it
 // comes from [levelcontrol.EffectiveOptions] rather than being restated.
-func (s *demoSpeaker) executes(mask, override uint8) bool {
+func (s *dimmer) executes(mask, override uint8) bool {
 	if s.isOn() {
 		return true
 	}
@@ -1201,22 +1380,23 @@ func (s *demoSpeaker) executes(mask, override uint8) bool {
 // applyLevel moves the speaker to level. withOnOff drives the on/off state
 // along with it: the minimum level turns the speaker off, anything above it
 // turns it on.
-func (s *demoSpeaker) applyLevel(level uint8, withOnOff bool) {
+func (s *dimmer) applyLevel(level uint8, withOnOff bool) {
+	level = max(level, s.minLevel)
 	s.mu.Lock()
 	s.level = level
 	if withOnOff {
-		s.on = level > levelcontrol.LevelMin
+		s.on = level > s.minLevel
 	}
 	on := s.on
 	s.mu.Unlock()
-	slog.Info("speaker.level", slog.String("device", s.name),
+	slog.Info(s.kind+".level", slog.String("device", s.name),
 		slog.Int("level", int(level)), slog.Bool("on", on))
 	s.notify()
 }
 
 // steppedLevel resolves a Step command against the current level, clamped to
 // the cluster's own bounds.
-func (s *demoSpeaker) steppedLevel(req levelcontrol.StepRequest) uint8 {
+func (s *dimmer) steppedLevel(req levelcontrol.StepRequest) uint8 {
 	s.mu.Lock()
 	current := s.level
 	s.mu.Unlock()
@@ -1226,18 +1406,18 @@ func (s *demoSpeaker) steppedLevel(req levelcontrol.StepRequest) uint8 {
 		}
 		return current + req.StepSize
 	}
-	if req.StepSize > current-levelcontrol.LevelMin {
-		return levelcontrol.LevelMin
+	if req.StepSize > current-s.minLevel {
+		return s.minLevel
 	}
 	return current - req.StepSize
 }
 
 // moveTarget is where a Move ends on a device with no travel time.
-func moveTarget(moveMode uint8) uint8 {
+func (s *dimmer) moveTarget(moveMode uint8) uint8 {
 	if moveMode == levelcontrol.MoveModeUp {
 		return levelcontrol.LevelMax
 	}
-	return levelcontrol.LevelMin
+	return s.minLevel
 }
 
 // --- the fleet ----------------------------------------------------------
@@ -1249,8 +1429,36 @@ type fleet struct {
 	thermometer *demoThermometer
 	valve       *demoValve
 	selector    *demoSelector
-	speaker     *demoSpeaker
-	assembler   *endpoint.Assembler
+	speaker     *dimmer
+
+	// One example device per surface the chip-tool suite drives
+	// (internal/chiptool). Each lives in the fleet_*.go file named after
+	// its kind.
+	ceiling    *dimmer
+	fan        *demoFan
+	smoke      *demoSmokeAlarm
+	pump       *demoPump
+	flow       *demoReading
+	washer     *demoWasher
+	vacuum     *demoVacuum
+	thermostat *demoThermostat
+	blind      *demoBlind
+	lock       *demoLock
+	humidity   *demoReading
+	occupancy  *demoBinary
+	contact    *demoBinary
+	button     *demoButton
+
+	assembler *endpoint.Assembler
+	// labels returns the NodeLabel a controller wrote for a bridged
+	// endpoint in an earlier run (persist.go); nil restores nothing.
+	labels func(ctx context.Context, key endpoint.StringKey) string
+	// configVersions returns the ConfigurationVersion persisted for a
+	// bridged endpoint (persist.go); nil restores nothing.
+	configVersions func(ctx context.Context, key endpoint.StringKey) uint32
+	// configChange raises the ConfigurationVersion of every bridged device
+	// (the app pipe's SimulateConfigurationVersionChange); wired by main.
+	configChange func() error
 }
 
 func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*fleet, error) {
@@ -1264,19 +1472,33 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		valve:       newDemoValve("Garden Tap", 600),
 		selector:    newDemoSelector("Coffee Machine"),
 		speaker:     newDemoSpeaker("Kitchen Speaker", 120),
+		ceiling:     newDemoCeilingLight("Ceiling Light"),
+		fan:         newDemoFan("Ceiling Fan"),
+		smoke:       newDemoSmokeAlarm("Hallway Smoke Alarm"),
+		pump:        newDemoPump("Heating Pump"),
+		flow:        newDemoReading("Water Meter", contract.MeasurementFlow, 0.8),
+		washer:      newDemoWasher("Washing Machine"),
+		vacuum:      newDemoVacuum("Robot Vacuum"),
+		thermostat:  newDemoThermostat("Living Room Thermostat"),
+		blind:       newDemoBlind("Bedroom Blind"),
+		lock:        newDemoLock("Front Door"),
+		humidity:    newDemoReading("Bathroom Humidity", contract.MeasurementHumidity, 48),
+		occupancy:   newDemoBinary("Hall Motion", contract.MeasurementOccupancy, false),
+		contact:     newDemoBinary("Window Contact", contract.MeasurementContact, true),
+		button:      newDemoButton("Wall Button"),
 		assembler:   asm,
 	}, nil
 }
 
 // snapshotter is what the bridge calls at Start and on every Reassemble. It
-// walks this host's model — here, five hard-coded devices — describes each
+// walks this host's model — here, a hard-coded fleet — describes each
 // as a flat [endpoint.Spec], and hands the assembled topology back.
 //
 // StableKey is the load-bearing field: it decides which endpoint number the
 // device gets back after a restart, so it must render byte-for-byte
 // identically for the same device across releases.
 func (f *fleet) snapshotter(ctx context.Context) (*endpoint.Topology, error) {
-	specs := []endpoint.Spec{
+	specs := []endpoint.Spec{ //nolint:prealloc // the literal is the readable part; the surface devices are appended below
 		{
 			StableKey:      endpoint.StringKey("demo:light:1"),
 			DeviceAddress:  "demo-light-1",
@@ -1318,6 +1540,21 @@ func (f *fleet) snapshotter(ctx context.Context) (*endpoint.Topology, error) {
 			Source:         f.speaker,
 		},
 	}
+	specs = append(specs, f.surfaceSpecs()...)
+	if f.labels != nil {
+		for i := range specs {
+			if k, ok := specs[i].StableKey.(endpoint.StringKey); ok {
+				specs[i].NodeLabel = f.labels(ctx, k)
+			}
+		}
+	}
+	if f.configVersions != nil {
+		for i := range specs {
+			if k, ok := specs[i].StableKey.(endpoint.StringKey); ok {
+				specs[i].ConfigurationVersion = f.configVersions(ctx, k)
+			}
+		}
+	}
 	return f.assembler.Assemble(ctx, []endpoint.Snapshot{{
 		Scope:     scope,
 		Endpoints: specs,
@@ -1327,4 +1564,50 @@ func (f *fleet) snapshotter(ctx context.Context) (*endpoint.Topology, error) {
 		// collection wipes every persisted endpoint number at boot.
 		ModelComplete: true,
 	}})
+}
+
+// surfaceSpecs describes the devices that give the chip-tool suite one
+// endpoint per surface it drives. They are appended after the original five
+// so those keep their StableKeys — and therefore their endpoint numbers — on
+// a database written by an earlier release of this example.
+func (f *fleet) surfaceSpecs() []endpoint.Spec {
+	spec := func(key, name string, deviceType uint16, src contract.EndpointSource) endpoint.Spec {
+		return endpoint.Spec{
+			StableKey:      endpoint.StringKey("demo:" + key + ":1"),
+			DeviceAddress:  "demo-" + key + "-1",
+			ChannelAddress: "demo-" + key + "-1:0",
+			DeviceType:     deviceType,
+			FriendlyName:   name,
+			Source:         src,
+		}
+	}
+	sensor := func(key, name string, m contract.MeasurementSource) endpoint.Spec {
+		return endpoint.Spec{
+			StableKey:      endpoint.StringKey("demo:" + key + ":1"),
+			DeviceAddress:  "demo-" + key + "-1",
+			ChannelAddress: "demo-" + key + "-1:0",
+			DeviceType:     contract.MeasurementClassDeviceType(m.MatterMeasurementClass()),
+			FriendlyName:   name,
+			Measurement:    m,
+		}
+	}
+	smoke := spec("smoke", f.smoke.name, f.smoke.MatterDeviceType(), f.smoke)
+	// SmokeCoAlarm mandates PowerSource; the alarm's battery is it.
+	smoke.PowerSource = f.smoke.battery
+	return []endpoint.Spec{
+		spec("ceiling", f.ceiling.name, f.ceiling.MatterDeviceType(), f.ceiling),
+		spec("fan", f.fan.name, f.fan.MatterDeviceType(), f.fan),
+		smoke,
+		spec("pump", f.pump.name, f.pump.MatterDeviceType(), f.pump),
+		sensor("flow", f.flow.name, f.flow),
+		spec("washer", f.washer.name, f.washer.MatterDeviceType(), f.washer),
+		spec("vacuum", f.vacuum.name, f.vacuum.MatterDeviceType(), f.vacuum),
+		spec("thermostat", f.thermostat.name, f.thermostat.MatterDeviceType(), f.thermostat),
+		spec("blind", f.blind.name, f.blind.MatterDeviceType(), f.blind),
+		spec("lock", f.lock.name, f.lock.MatterDeviceType(), f.lock),
+		sensor("humidity", f.humidity.name, f.humidity),
+		sensor("occupancy", f.occupancy.name, f.occupancy),
+		sensor("contact", f.contact.name, f.contact),
+		sensor("button", f.button.name, f.button),
+	}
 }

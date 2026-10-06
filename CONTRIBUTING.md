@@ -43,7 +43,30 @@ Prerequisites:
   rather than on the diff. Bumping one is its own change, with whatever the
   new release finds fixed or justified in the same commit.
 
-There is no `Makefile`; CI calls `go` directly and so should you.
+`make help` lists the targets; `make ci` runs what the pipeline runs.
+
+## The chip-tool suite
+
+`internal/chiptool` drives the CSA reference commissioner and the CSA
+certification harness against `examples/reference-bridge` over real PASE and
+CASE. It needs Linux, Docker and a running avahi-daemon, and runs locally
+with no exports:
+
+```sh
+make chiptool-test       # commission the daemon, run the chip-tool suite
+make chiptool-families   # the CSA certification families (hours in full;
+                         # GOFABRIC_CHIP_FAMILIES=IDM,ACL narrows)
+make chiptool-setup      # optional: CHIP source at ../connectedhomeip to read
+```
+
+Both run inside matter.js's CHIP image, pinned by digest in the Makefile
+(`CHIP_TEST_IMAGE`); the first run pulls it. A host chip-tool
+(`$GOFABRIC_CHIPTOOL_BIN`, `./bin/chip-tool`, PATH) is the fallback for
+`chiptool-test`. Every run logs the image digest and CHIP commit it used.
+A change that moves a family's result updates
+`internal/chiptool/testdata/chip-cases.golden.json` and
+`docs/certifiability.md` in the same commit. `internal/chiptool/doc.go`
+explains the rest.
 
 ## What a passing PR looks like
 

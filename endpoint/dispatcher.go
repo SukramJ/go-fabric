@@ -6,6 +6,7 @@ package endpoint
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -225,7 +226,7 @@ func (d *TopologyDispatcher) Write(ctx context.Context, path im.ConcreteAttribut
 // wildcard-endpoint write can be authorized, since the requested path
 // names no endpoint. authorize may be nil, which dispatches without a
 // gate.
-func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult {
+func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.ConcreteAttributePath, value im.AttributeValue, authorize im.WriteAuthorizer) []im.WriteResult { //nolint:gocognit // the write path's ordered checks (matter.js AttributeWriteResponse), one branch per status
 	endpoints := d.resolveEndpoints(path)
 	if len(endpoints) == 0 {
 		return []im.WriteResult{{Path: path, Status: im.StatusUnsupportedEndpoint}}
@@ -273,6 +274,32 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// `if (!attribute.limits.writable) return;`). Attributes with
 				// no read-only record — globals, writable attrs, clusters
 				// outside the table (known == false) — fall through unchanged.
+				// An attribute the cluster does not implement answers
+				// UNSUPPORTED_ATTRIBUTE before its writability is
+				// considered — matter.js AttributeWriteResponse.ts:225-226
+				// (`if (!attribute) … Status.UnsupportedAttribute`), ahead of
+				// the UnsupportedWrite check at :229-231. Found by the CHIP
+				// Python harness (TC-IDM-3.2 step 3 writes a spec attribute
+				// the DUT does not list).
+				// The global attributes (GeneratedCommandList … ClusterRevision)
+				// exist on every cluster and are never writable: UNSUPPORTED_WRITE
+				// on a concrete path, skipped on a wildcard one — matter.js
+				// models them read-only like any other attribute
+				// (AttributeWriteResponse.ts:229-231). They used to reach the
+				// cluster server, which answered Failure or
+				// UNSUPPORTED_ATTRIBUTE (TC-ACE-2.2).
+				if isGlobalAttribute(attrID) {
+					if !wildcardEndpoint && path.HasAttribute {
+						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedWrite})
+					}
+					continue
+				}
+				if path.HasAttribute && !attributeListed(srv, attrID) {
+					if !wildcardEndpoint {
+						results = append(results, im.WriteResult{Path: aPath, Status: im.StatusUnsupportedAttribute})
+					}
+					continue
+				}
 				if writable, known := schema.AttributeWritable(cPath.Cluster, attrID); known && !writable {
 					// "Concrete" means endpoint AND cluster AND attribute are
 					// all named — the split matter.js makes before it picks a
@@ -306,7 +333,20 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 					}
 				}
 
-				res := writeOne(ctx, srv, aPath, value)
+				writeCtx := ctx
+				if path.ListAppend {
+					merged, status := appendListValue(ctx, srv, attrID, value)
+					if status != im.StatusSuccess {
+						results = append(results, im.WriteResult{Path: aPath, Status: status})
+						continue
+					}
+					value = merged
+					// The server sees the whole list; the mark tells it
+					// only the last element is new (AccessControl reports
+					// just that one as Added).
+					writeCtx = im.WithListAppendWrite(ctx)
+				}
+				res := writeOne(writeCtx, srv, aPath, value)
 				// A successful write mutated cluster state; advance the
 				// endpoint-hosted DataVersion so DataVersionFilters miss
 				// and subscribers see the change (matter.js
@@ -344,6 +384,7 @@ func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommand
 			status, cs, hasCS := classifyError(err, invokeErrorStatus)
 			return im.InvokeResult{Path: path, Response: resp, Status: status, ClusterStatus: cs, HasClusterStatus: hasCS}
 		}
+		ep.invalidateSceneOnCommand(path.Cluster)
 		return im.InvokeResult{Path: path, Response: resp, Status: im.StatusSuccess}
 	}
 	return im.InvokeResult{Path: path, Status: im.StatusUnsupportedCluster}
@@ -645,6 +686,31 @@ func synthesizeGlobalRead(srv contract.ClusterServer, attrID uint32) (any, bool)
 	return nil, false
 }
 
+// attributeListed reports whether attrID is one of the attributes srv
+// implements, by the same AttributeList a controller reads: the server's
+// own when it answers one, the dispatcher's synthesis otherwise.
+//
+// A server that neither answers AttributeList nor implements
+// [contract.ClusterAttributeLister] declares no attribute set to check
+// against (the synthesis would fall back to its reportable list), so its
+// writes reach it as before.
+func attributeListed(srv contract.ClusterServer, attrID uint32) bool {
+	list, ok := srv.MatterRead(cluster.AttrGlobalAttributeList)
+	if !ok {
+		if _, lister := srv.(contract.ClusterAttributeLister); !lister {
+			return true
+		}
+		list, ok = synthesizeGlobalRead(srv, cluster.AttrGlobalAttributeList)
+	}
+	ids, isList := list.([]uint32)
+	if !ok || !isList {
+		// A server whose AttributeList is not a plain id list keeps the
+		// previous behaviour: the write reaches it.
+		return true
+	}
+	return slices.Contains(ids, attrID)
+}
+
 // writeOne dispatches a single Write against srv. Errors are mapped
 // to spec-coded status values where the cluster surfaces them
 // distinctly; the catch-all is StatusFailure.
@@ -775,60 +841,56 @@ func (d *TopologyDispatcher) MinReadPrivilege(endpoint uint16, clusterID, attrID
 	return 1
 }
 
-// MinWritePrivilege implements [im.AttributeWritePrivilegeProvider]. It
-// looks up the cluster server for (endpoint, clusterID) and consults the
-// server's [contract.ClusterAttributeWritePrivilege] optional
-// interface for the given attrID. Returns 3 (Operate) — the Matter
-// §9.10.4.4 default write privilege — when the cluster is not found, does
-// not implement the interface, or reports no elevated requirement.
-// Returns the server-reported value (e.g. 4=Manage for
-// BasicInformation.NodeLabel, 5=Administer for AccessControl.ACL)
-// otherwise. Mirrors the writeAccess bits in matter.js
-// packages/model/src/standard/elements/*.element.ts.
+// MinWritePrivilege implements [im.AttributeWritePrivilegeProvider]: the
+// write privilege matter.js gives the attribute ([schema.AttributeWritePrivilege],
+// generated from the access strings of parity/schema.json), raised further
+// when the cluster server's [contract.ClusterAttributeWritePrivilege] asks for
+// more. Servers without the optional interface used to fall back to Operate,
+// so an Operate subject could write BridgedDeviceBasicInformation.NodeLabel,
+// OnOff.StartUpOnOff or the Thermostat setpoint limits ("RW VM") —
+// TC-ACE-2.2.
 func (d *TopologyDispatcher) MinWritePrivilege(endpoint uint16, clusterID, attrID uint32) uint8 {
+	want := schema.AttributeWritePrivilege(clusterID, attrID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
-		return 3
+		return want
 	}
 	for _, srv := range ClusterServers(ep) {
 		if srv.MatterClusterID() != clusterID {
 			continue
 		}
-		priv, ok := srv.(contract.ClusterAttributeWritePrivilege)
-		if !ok {
-			return 3
+		if priv, ok := srv.(contract.ClusterAttributeWritePrivilege); ok {
+			want = max(want, priv.MinWritePrivilege(attrID))
 		}
-		return priv.MinWritePrivilege(attrID)
+		return want
 	}
-	return 3
+	return want
 }
 
-// MinInvokePrivilege implements [im.CommandInvokePrivilegeProvider]. It
-// looks up the cluster server for (endpoint, clusterID) and consults the
-// server's [contract.ClusterCommandInvokePrivilege] optional
-// interface for the given cmdID. Returns 3 (Operate) — the Matter
-// §9.10.4.4 default invoke privilege — when the cluster is not found,
-// does not implement the interface, or reports no elevated requirement.
-// Returns the server-reported value (e.g. 5=Administer for
-// OperationalCredentials.RemoveFabric) otherwise. Mirrors the
-// invokeAccess bits in matter.js
-// packages/model/src/standard/elements/*.element.ts.
+// MinInvokePrivilege implements [im.CommandInvokePrivilegeProvider]: the
+// privilege matter.js gives the command ([schema.InvokePrivilege], Operate
+// unless the element file says Manage or Administer), raised further when the
+// cluster server's [contract.ClusterCommandInvokePrivilege] asks for more.
+// Mirrors the command access bits in matter.js
+// packages/model/src/standard/elements/*.element.ts; a server without the
+// optional interface (Identify) used to fall back to Operate and let an
+// Operate subject identify a device (TC-ACE-2.3).
 func (d *TopologyDispatcher) MinInvokePrivilege(endpoint uint16, clusterID, cmdID uint32) uint8 {
+	want := schema.InvokePrivilege(clusterID, cmdID)
 	ep := d.topology.FindByID(endpoint)
 	if ep == nil {
-		return 3
+		return want
 	}
 	for _, srv := range ClusterServers(ep) {
 		if srv.MatterClusterID() != clusterID {
 			continue
 		}
-		priv, ok := srv.(contract.ClusterCommandInvokePrivilege)
-		if !ok {
-			return 3
+		if priv, ok := srv.(contract.ClusterCommandInvokePrivilege); ok {
+			want = max(want, priv.MinInvokePrivilege(cmdID))
 		}
-		return priv.MinInvokePrivilege(cmdID)
+		return want
 	}
-	return 3
+	return want
 }
 
 // FabricIndexUnresolvable marks a session whose fabric the bridge could not
@@ -1158,4 +1220,39 @@ func (d *TopologyDispatcher) CurrentDataVersion(_ context.Context, endpoint uint
 		return v, true
 	}
 	return 0, false
+}
+
+// isGlobalAttribute reports whether id is one of the global attributes every
+// cluster carries: GeneratedCommandList (0xFFF8), AcceptedCommandList
+// (0xFFF9), EventList (0xFFFA), AttributeList (0xFFFB), FeatureMap (0xFFFC),
+// ClusterRevision (0xFFFD).
+func isGlobalAttribute(id uint32) bool { return id >= 0xFFF8 && id <= 0xFFFD }
+
+// appendListValue turns a list-append write (null ListIndex) into the write
+// of the whole list: the attribute's current value as the writer sees it —
+// fabric-filtered for a fabric-scoped list — with the written element
+// appended. matter.js AttributeWriteResponse applies a ListIndex-null write
+// as an append to the current list the same way. A value that is not a
+// one-element list of the attribute's element type is a CONSTRAINT_ERROR.
+func appendListValue(ctx context.Context, srv contract.ClusterServer, attrID uint32, value im.AttributeValue) (im.AttributeValue, im.StatusCode) {
+	var current any
+	var ok bool
+	if fr, isFR := srv.(contract.FabricScopedReader); isFR {
+		_, fabric := im.FabricFilterFromContext(ctx)
+		current, ok = fr.MatterReadFiltered(im.WithFabricFilter(ctx, true, fabric), attrID)
+	} else {
+		current, ok = srv.MatterRead(attrID)
+	}
+	item := reflect.ValueOf(value.Value)
+	if !ok || current == nil || item.Kind() != reflect.Slice || item.Len() != 1 {
+		return value, im.StatusConstraintError
+	}
+	list := reflect.ValueOf(current)
+	if list.Kind() != reflect.Slice || list.Type() != item.Type() {
+		return value, im.StatusConstraintError
+	}
+	merged := reflect.MakeSlice(list.Type(), 0, list.Len()+1)
+	merged = reflect.AppendSlice(merged, list)
+	merged = reflect.Append(merged, item.Index(0))
+	return im.AttributeValue{Value: merged.Interface()}, im.StatusSuccess
 }

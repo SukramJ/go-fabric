@@ -443,3 +443,29 @@ func TestDescriptor_ProviderReadDoesNotCopyStaticLists(t *testing.T) {
 		})
 	}
 }
+
+// TestDescriptorDataVersionFollowsItsLists pins the content-derived
+// DataVersion: stable while ServerList and PartsList are unchanged (so a
+// controller's DataVersionFilter matches — TC-IDM-2.2 step 13), advancing
+// when either changes, never the sentinel.
+func TestDescriptorDataVersionFollowsItsLists(t *testing.T) {
+	t.Parallel()
+	d, err := core.NewDescriptor([]core.DeviceTypeStruct{{DeviceType: 0x16, Revision: 4}}, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := []uint16{1, 2}
+	d.SetPartsListProvider(func() []uint16 { return parts })
+	d.SetServerListProvider(func() []uint32 { return []uint32{0x1D, 0x28} })
+	v1 := d.MatterDataVersion()
+	if v1 <= 1 {
+		t.Fatalf("DataVersion %d is the sentinel", v1)
+	}
+	if v2 := d.MatterDataVersion(); v2 != v1 {
+		t.Errorf("unchanged lists moved the version %d → %d", v1, v2)
+	}
+	parts = []uint16{1, 2, 3}
+	if v3 := d.MatterDataVersion(); v3 == v1 {
+		t.Error("a changed PartsList kept the version")
+	}
+}

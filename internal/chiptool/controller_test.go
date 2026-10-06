@@ -8,6 +8,8 @@ package chiptool
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +17,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -62,24 +65,183 @@ type controller struct {
 	bin        string
 	storageDir string
 	nodeID     uint64
+	// commissionerName is chip-tool's --commissioner-name, the alpha/beta/
+	// gamma identity inside one storage directory. Empty means chip-tool's
+	// default (alpha). A second controller on another fabric uses its own
+	// storage directory instead, so this stays empty in practice; it exists
+	// so the argument is spelled in one place if a test needs it.
+	commissionerName string
 }
+
+// chipTool is the resolved commissioner binary plus the account of which
+// build it is, logged once per test so a red run names the chip-tool it ran.
+type chipTool struct {
+	// bin is what the suite executes.
+	bin string
+	// snap is true for a snap-confined chip-tool. Confinement decides where
+	// the binary may write (only under $HOME/snap/chip-tool/common) and
+	// that it sees a private /tmp, so the key-value store must live there.
+	snap bool
+	// describe is a human-readable identity: path, real file, version or
+	// pin, and a digest of the binary.
+	describe string
+	// harness is the CHIP container when chip-tool runs inside it.
+	harness *harness
+}
+
+var (
+	chipToolOnce     sync.Once
+	chipToolResolved chipTool
+	chipToolErr      error
+)
 
 // requireChipTool resolves the chip-tool binary, skipping the test when it
 // is absent. A skip is the right outcome on a developer machine: chip-tool
 // does not run on macOS hosts at all, and the guard that matters runs in CI.
+//
+// Resolution order, first hit wins:
+//
+//  0. the CHIP harness container (harness_test.go), unless
+//     $GOFABRIC_CHIPTOOL_BIN is set or $GOFABRIC_CHIP_HARNESS=host — the
+//     default whenever Docker can run the pinned image;
+//  1. $GOFABRIC_CHIPTOOL_BIN — how CI points at the binary it extracted;
+//  2. ./bin/chip-tool under the module root — what `make chiptool-extract`
+//     writes, so an extraction is used without exporting anything;
+//  3. chip-tool on PATH — the snap (`sudo snap install chip-tool`) puts
+//     /snap/bin/chip-tool there.
+//
+// The identity of the binary is logged on every call: the CI pin and the
+// snap are different chip-tool releases, and a result is only interpretable
+// together with the build that produced it.
 func requireChipTool(t *testing.T) string {
 	t.Helper()
-	if p := os.Getenv(chipToolBinEnv); p != "" {
-		if _, err := os.Stat(p); err != nil {
-			t.Skipf("chip-tool: %s=%q not usable: %v", chipToolBinEnv, p, err)
+	ct := resolveChipTool(t)
+	return ct.bin
+}
+
+// resolveChipTool is requireChipTool returning the whole identity.
+func resolveChipTool(t *testing.T) chipTool {
+	t.Helper()
+	chipToolOnce.Do(func() { chipToolResolved, chipToolErr = findChipTool() })
+	if chipToolErr != nil {
+		t.Skip(chipToolErr.Error())
+	}
+	t.Logf("chip-tool: %s", chipToolResolved.describe)
+	return chipToolResolved
+}
+
+// findChipTool implements the resolution order of requireChipTool.
+func findChipTool() (chipTool, error) {
+	var imageErr error
+	if imageHarnessWanted() {
+		h, err := startHarness()
+		if err == nil {
+			return chipTool{bin: h.chipTool, describe: "chip-tool in " + h.describe, harness: h}, nil
 		}
-		return p
+		imageErr = err
+		if os.Getenv(chipHarnessEnv) == "image" {
+			return chipTool{}, fmt.Errorf("%s=image but the CHIP harness container did not start: %w", chipHarnessEnv, err)
+		}
 	}
-	p, err := exec.LookPath("chip-tool")
+	ct, err := findHostChipTool()
+	if err == nil && imageErr != nil {
+		ct.describe += fmt.Sprintf(" — the CHIP harness image was not usable (%v), so a host chip-tool runs instead", imageErr)
+	}
+	return ct, err
+}
+
+// findHostChipTool resolves a chip-tool on this host.
+func findHostChipTool() (chipTool, error) {
+	var bin string
+	switch p := os.Getenv(chipToolBinEnv); {
+	case p != "":
+		if _, err := os.Stat(p); err != nil {
+			return chipTool{}, fmt.Errorf("chip-tool: %s=%q not usable: %w", chipToolBinEnv, p, err)
+		}
+		bin = p
+	default:
+		local := filepath.Join(moduleRoot(), "bin", "chip-tool")
+		if st, err := os.Stat(local); err == nil && !st.IsDir() {
+			bin = local
+			break
+		}
+		found, err := exec.LookPath("chip-tool")
+		if err != nil {
+			return chipTool{}, fmt.Errorf("chip-tool not found: not in %s, not at %s, not on PATH. "+
+				"On arm64 Linux run `make chiptool-extract`; on amd64 install the snap "+
+				"(`sudo snap install chip-tool`) — see internal/chiptool/doc.go", chipToolBinEnv, local)
+		}
+		bin = found
+	}
+	return identifyChipTool(bin), nil
+}
+
+// snapChipToolRoot is where snapd mounts the chip-tool snap's current
+// revision. Its meta/snap.yaml carries the upstream tag the snap was built
+// from (snapcraft.yaml sets the version from `git describe --exact-match`).
+const snapChipToolRoot = "/snap/chip-tool/current"
+
+// identifyChipTool describes a chip-tool binary well enough to reproduce a
+// run: the path executed, the file it resolves to, the release it reports
+// and a digest of the bytes.
+//
+// A snap is recognised by its launcher — /snap/bin/<name> is a symlink to
+// /usr/bin/snap, which execs the confined binary — rather than by a version
+// string: the confinement is what changes the suite's behaviour, not the
+// release number.
+func identifyChipTool(bin string) chipTool {
+	ct := chipTool{bin: bin}
+	resolved, err := filepath.EvalSymlinks(bin)
 	if err != nil {
-		t.Skipf("chip-tool not on PATH; extract it with `make chiptool-extract` or set %s", chipToolBinEnv)
+		resolved = bin
 	}
-	return p
+	ct.snap = strings.HasPrefix(bin, "/snap/") || filepath.Base(resolved) == "snap"
+
+	payload := resolved
+	var version string
+	if ct.snap {
+		payload = filepath.Join(snapChipToolRoot, "bin", "chip-tool")
+		version = "snap " + snapVersion()
+	} else if src, err := os.ReadFile(resolved + ".source"); err == nil { //nolint:gosec // a sidecar next to the binary this suite runs
+		// Written by `make chiptool-extract`: the image the binary came out of.
+		version = strings.TrimSpace(string(src))
+	} else {
+		version = "unknown build (no " + filepath.Base(resolved) + ".source sidecar; set by `make chiptool-extract`)"
+	}
+	digest := "unreadable"
+	if data, err := os.ReadFile(payload); err == nil { //nolint:gosec // the binary this suite runs
+		sum := sha256.Sum256(data)
+		digest = hex.EncodeToString(sum[:6])
+	}
+	ct.describe = fmt.Sprintf("%s (file %s, %s, sha256 %s…)", bin, payload, version, digest)
+	return ct
+}
+
+// snapVersion reads the version and revision of the installed chip-tool snap.
+func snapVersion() string {
+	rev, _ := os.Readlink(snapChipToolRoot)
+	data, err := os.ReadFile(filepath.Join(snapChipToolRoot, "meta", "snap.yaml"))
+	if err != nil {
+		return "version unknown, revision " + rev
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if v, ok := strings.CutPrefix(line, "version:"); ok {
+			return strings.TrimSpace(v) + ", revision " + rev
+		}
+	}
+	return "version unknown, revision " + rev
+}
+
+// snapKVSBase is the one directory tree a snap-confined chip-tool can write:
+// the snap's $SNAP_USER_COMMON. Its private /tmp makes a t.TempDir()
+// invisible to it, and anything outside its home area is refused with
+// ExamplePersistentStorage.cpp:89 Error 0x000000AD.
+func snapKVSBase() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, "snap", "chip-tool", "common", "gofabric-chiptool"), nil
 }
 
 // newController creates the controller's storage directory and returns it.
@@ -87,10 +249,35 @@ func requireChipTool(t *testing.T) string {
 // The directory must exist before the first chip-tool call:
 // ExamplePersistentStorage fails Init with 0x000000AF against a missing
 // directory, and chip-tool does not create its own storage root.
+//
+// Where it lives: $GOFABRIC_CHIPTOOL_KVS_BASE when set; under the snap's
+// common directory for a snap chip-tool (created here, removed when the test
+// ends); a t.TempDir() otherwise.
 func newController(t *testing.T, bin string, nodeID uint64) *controller {
 	t.Helper()
 
 	base := os.Getenv(kvsBaseEnv)
+	if base == "" && harnessVal != nil && bin == harnessVal.chipTool {
+		// The container sees the shared directory at the same path.
+		dir := filepath.Join(harnessVal.shared, fmt.Sprintf("%s-%d", sanitizeTestName(t.Name()), time.Now().UnixNano()))
+		if err := os.MkdirAll(dir, 0o777); err != nil { //nolint:gosec // the container's root writes here
+			t.Fatalf("create chip-tool storage directory %s: %v", dir, err)
+		}
+		return &controller{bin: bin, storageDir: dir, nodeID: nodeID}
+	}
+	if base == "" && identifyChipTool(bin).snap {
+		snapBase, err := snapKVSBase()
+		if err != nil {
+			t.Fatalf("snap chip-tool: cannot locate $HOME for its storage directory: %v", err)
+		}
+		base = snapBase
+		dir := filepath.Join(base, fmt.Sprintf("%s-%d", sanitizeTestName(t.Name()), time.Now().UnixNano()))
+		t.Cleanup(func() { _ = os.RemoveAll(dir) })
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("create chip-tool storage directory %s: %v", dir, err)
+		}
+		return &controller{bin: bin, storageDir: dir, nodeID: nodeID}
+	}
 	if base == "" {
 		base = t.TempDir()
 	}
@@ -99,6 +286,18 @@ func newController(t *testing.T, bin string, nodeID uint64) *controller {
 		t.Fatalf("create chip-tool storage directory %s: %v", dir, err)
 	}
 	return &controller{bin: bin, storageDir: dir, nodeID: nodeID}
+}
+
+// sanitizeTestName turns a test name into a single path component.
+func sanitizeTestName(name string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+			return r
+		default:
+			return '_'
+		}
+	}, name)
 }
 
 // run executes chip-tool and returns its merged, ANSI-stripped output.
@@ -280,7 +479,7 @@ func findAttrUint(out, name string) (int64, bool) {
 
 // findAttrBool returns the first TRUE/FALSE value printed for the named
 // attribute.
-func findAttrBool(out, name string) (bool, bool) {
+func findAttrBool(out, name string) (value, found bool) {
 	for _, m := range reAttrBool.FindAllStringSubmatch(out, -1) {
 		if strings.EqualFold(m[1], name) {
 			return m[2] == "TRUE", true

@@ -6,6 +6,7 @@
 package chiptool
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -240,5 +241,37 @@ func TestHandshakeStage(t *testing.T) {
 				t.Errorf("handshakeStage = %q, want %q", got, tc.stage)
 			}
 		})
+	}
+}
+
+// TestResolvedPorts parses avahi-browse's parsable output: every resolved
+// ("=") line of an instance contributes its port once.
+func TestResolvedPorts(t *testing.T) {
+	out := "+;eth0;IPv6;AAAA-0000000012344321;_matter._tcp;local\n" +
+		"=;eth0;IPv6;AAAA-0000000012344321;_matter._tcp;local;H.local;fe80::1;45219;\"SII=500\"\n" +
+		"=;eth0;IPv4;AAAA-0000000012344321;_matter._tcp;local;H.local;10.0.0.1;43001;\"SII=500\"\n" +
+		"=;eth0;IPv4;AAAA-0000000012344321;_matter._tcp;local;H.local;10.0.0.1;43001;\"SII=500\"\n" +
+		"=;eth0;IPv4;BBBB-0000000000000001;_matter._tcp;local;H.local;10.0.0.1;5540;\n" +
+		"garbage\n"
+	got := resolvedPorts(out)
+	if !slices.Equal(got["AAAA-0000000012344321"]["IPv6"], []int{45219}) ||
+		!slices.Equal(got["AAAA-0000000012344321"]["IPv4"], []int{43001}) ||
+		!slices.Equal(got["BBBB-0000000000000001"]["IPv4"], []int{5540}) {
+		t.Fatalf("resolvedPorts = %v", got)
+	}
+	for _, c := range []struct {
+		by    map[string][]int
+		want  int
+		stale bool
+	}{
+		{map[string][]int{"IPv6": {43001}, "IPv4": {45219, 43001}}, 43001, false}, // a same-host stale IPv4 port is tolerated
+		{map[string][]int{"IPv6": {45219, 43001}}, 43001, true},                   // a stale IPv6 port is not
+		{map[string][]int{"IPv4": {43001}}, 43001, false},                         // IPv4-only host
+		{map[string][]int{"IPv4": {45219}}, 43001, true},
+		{nil, 43001, true},
+	} {
+		if got := staleRecord(c.by, c.want) != ""; got != c.stale {
+			t.Errorf("staleRecord(%v, %d) stale = %v, want %v", c.by, c.want, got, c.stale)
+		}
 	}
 }

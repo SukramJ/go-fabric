@@ -1,0 +1,425 @@
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2026 SukramJ.
+
+package chiptool
+
+import (
+	"regexp"
+	"time"
+)
+
+// This file carries no build tag on purpose: the family table is the
+// source of docs/certifiability.md, and TestCertifiabilityDocument (which
+// needs no harness) holds that document to it in every `go test ./...`.
+
+// gapClass is the class of a certification case this module does not pass,
+// exactly as docs/adr/0011-certifiability-is-a-goal.md names them.
+type gapClass string
+
+const (
+	// classDefect: go-fabric misbehaves or lacks mandatory behaviour. The
+	// reason names the open finding (notes/parity/matter_behaviour_findings.md,
+	// "Certification harness" section, keyed by TC id).
+	classDefect gapClass = "(a) defect"
+	// classNotSupported: optional per spec for the device types exposed and
+	// declared so in PICS; the reason names the PICS line.
+	classNotSupported gapClass = "(b) not supported"
+	// classHarness: the test case or the environment is at fault; the
+	// reason cites the evidence.
+	classHarness gapClass = "(c) harness"
+	// classOutOfScope: Bluetooth, Thread, Wi-Fi commissioning, controller
+	// role; the reason names the scope decision.
+	classOutOfScope gapClass = "(d) out of scope"
+)
+
+// gap is one case of a family that is not run, with its class and reason.
+type gap struct {
+	class  gapClass
+	reason string
+	// selfSkip marks a case that still runs and must skip itself: its
+	// PICS gate is off because the honest PICS says the element is not
+	// there (class (b)). The run fails if the case executes anything —
+	// the PICS and the case disagree — or does not skip.
+	selfSkip bool
+}
+
+// edit patches a borrowed case file in the harness container before it runs,
+// the way matter.js's chip.testFor(...).edit(...) does
+// (support/chip-testing/test/core/*.test.ts). old must occur in the file.
+// An edit is only for a case defect (class (c)) and its reason cites the
+// matter.js edit or the upstream issue.
+type edit struct {
+	old, new string
+	reason   string
+}
+
+// family is one matter.js-style family declaration.
+type family struct {
+	name string
+	// deviceType selects the endpoint the family's cluster lives on: the
+	// first endpoint advertising it. Zero targets the node as a whole (the
+	// core families), runs with the endpoint-0 PICS slice and passes no
+	// --endpoint.
+	deviceType uint32
+	// caseDeviceType overrides deviceType for single cases: a core case
+	// that exercises an application cluster on --endpoint (TC-ACE-1.4 reads
+	// OnOff there) is pointed at a bridged endpoint that serves it.
+	caseDeviceType map[string]uint32
+	// ownEndpoints cases name every endpoint they touch through PIXIT
+	// arguments and keep their own default endpoint (0) for the rest; they
+	// run with the PICS slice of deviceType's endpoint but get no
+	// --endpoint, which would retarget their root-node steps.
+	ownEndpoints map[string]bool
+	// exclude maps a case ("2.9", "10.*") to the gap it is.
+	exclude map[string]gap
+	// args are extra script arguments per case ("*" for every case).
+	args map[string][]string
+	// edits patch a case file before it runs.
+	edits map[string][]edit
+	// uncommissioned cases get a factory-fresh daemon and commission it
+	// themselves, with the daemon's discriminator and passcode.
+	uncommissioned map[string]bool
+	// multicast cases send group (IPv6 multicast) messages to the DUT; they
+	// run only on a host where an up, multicast-capable interface has IPv6,
+	// and otherwise skip naming the exact command that enables it.
+	multicast map[string]bool
+	// ipv6 cases need an IPv6 address on the host's advertising interface
+	// for another reason, named by the value; they run and skip like the
+	// multicast ones.
+	ipv6 map[string]string
+	// perEndpoint cases run once per endpoint of the daemon, each against
+	// that endpoint's PICS slice (TC-IDM-10.4, the PICS checker).
+	perEndpoint map[string]bool
+	// knownProblems lets a case whose CHIP checker reports only recorded
+	// problems pass, and only then (see knownProblems).
+	knownProblems map[string]knownProblems
+	// timeout raises the per-case budget (defaultCaseTimeout) for a case
+	// that waits longer by design.
+	timeout map[string]time.Duration
+}
+
+// knownProblems is a case that fails only on recorded gaps (by_design.md
+// or an open finding). The CHIP spec checkers report every problem they
+// find, one "problem:" line each; such a case passes only when every
+// problem matches a recorded one and every recorded one still occurs — so
+// the rest of what the checker verifies keeps failing the case, and a
+// fixed gap cannot linger in the table.
+type knownProblems struct {
+	class    gapClass
+	reason   string
+	patterns []*regexp.Regexp //nolint:unused // read by the chiptool-tagged runner (familyrun_test.go)
+}
+
+// startUpOnBridged classifies the cases that power-cycle the bridge and
+// expect a bridged light's start-up attribute applied.
+const startUpOnBridged = "the case reboots the DUT and expects the light's StartUpOnOff / StartUpColorTemperatureMireds applied; matter.js applies the start-up attributes only on an endpoint no Aggregator owns (OnOffServer.ts and ColorControlServer.ts initialize: !endpoint.ownerOfType(AggregatorEndpoint)) — a bridge restart is not the bridged device's power cycle — and every light here is bridged"
+
+// Device types of the reference daemon's bridged endpoints
+// (examples/reference-bridge/fleet*.go), named for the family table.
+const (
+	dtOnOffLight      = 0x0100
+	dtColorTempLight  = 0x010C
+	dtSpeaker         = 0x0022
+	dtTempSensor      = 0x0302
+	dtWaterValve      = 0x0042
+	dtModeSelect      = 0x0027
+	dtFan             = 0x002B
+	dtSmokeCOAlarm    = 0x0076
+	dtPump            = 0x0303
+	dtFlowSensor      = 0x0306
+	dtLaundryWasher   = 0x0073
+	dtRVC             = 0x0074
+	dtThermostat      = 0x0301
+	dtWindowCovering  = 0x0202
+	dtDoorLock        = 0x000A
+	dtHumiditySensor  = 0x0307
+	dtOccupancySensor = 0x0107
+	dtContactSensor   = 0x0015
+	dtGenericSwitch   = 0x000F
+)
+
+// chipFamilies is this module's selection of CSA certification families,
+// declared the way matter.js declares its own (support/chip-testing/test/
+// core/*.test.ts, app-fast/, app-slow/, app-cc/): the whole family runs,
+// and every case left out is a gap with its class and reason (ADR 0011).
+// The reference set is matter.js's, extended by the family of every cluster
+// server the reference daemon exposes; docs/certifiability.md lists the
+// families neither runs and why.
+var chipFamilies = []family{
+	// --- core ---------------------------------------------------------------
+	{name: "ACE", multicast: map[string]bool{"1.6": true}},
+	{
+		name: "ACL",
+		// TC-ACL-2.6 reads the AccessControlEntryChanged event the
+		// commissioning emitted. Events live in the DUT's memory, as in
+		// chip; the harness's commissioned snapshot restarts the daemon,
+		// so the case commissions the factory-fresh daemon itself, as the
+		// CHIP CI runs it.
+		uncommissioned: map[string]bool{"2.6": true},
+	},
+	{name: "BINFO"},
+	{
+		name: "BRBINFO", deviceType: dtOnOffLight,
+		exclude: map[string]gap{
+			"4.1": {classNotSupported, "TC-BRBINFO-4.1 exercises KeepActive of a bridged ICD (BridgedICDSupport, PICS BRBINFO.S.F00=0) against a LIT ICD test app the case starts itself (${LIT_ICD_APP}); the case carries no PICS gate, so it runs regardless (matter.js test/core/BRBINFO.test.ts excludes it for the same reason)", false},
+		},
+	},
+	{name: "CADMIN"},
+	{name: "CGEN"},
+	{
+		name: "CNET",
+		// The Wi-Fi cases the descriptor gates on CNET.S.F00 are not
+		// applicable through the PICS; these carry no gate at all
+		// (matter.js test/core/CNET.test.ts excludes the same set).
+		exclude: map[string]gap{
+			"4.11": {classOutOfScope, "TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; Wi-Fi commissioning is out of scope (ADR 0011 (d), docs/matterjs-comparison.md), and the case has no PICS gate (CNET.S.F00=0)", false},
+			"4.25": {classOutOfScope, "TC-CNET-4.25 verifies Wi-Fi per-device credentials; Wi-Fi commissioning is out of scope and the case skips itself on a node without the Wi-Fi feature", true},
+			"4.26": {classOutOfScope, "TC-CNET-4.26 verifies Wi-Fi QueryIdentity (per-device credentials); out of scope with Wi-Fi commissioning, and the case skips itself", true},
+			"4.27": {classOutOfScope, "TC-CNET-4.27 verifies Wi-Fi network client identities; out of scope with Wi-Fi commissioning, and the case skips itself", true},
+			"4.29": {classOutOfScope, "TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; out of scope with Wi-Fi commissioning, and the case skips itself once given the endpoint its matcher needs", true},
+		},
+		args: map[string][]string{
+			// The case's endpoint matcher needs --endpoint before it can
+			// skip itself (matter.js test/core/CNET.test.ts).
+			"4.29": {"--endpoint", "0"},
+		},
+	},
+	{
+		name: "DA",
+		// As matter.js passes them (test/core/DA.test.ts): TC_DA_1_7
+		// recommissions and needs the onboarding values; TC_DA_1_2 looks
+		// for the CD signing certificates relative to its working directory.
+		args: map[string][]string{"*": {
+			"--passcode", "{passcode}", "--discriminator", "{discriminator}",
+			"--string-arg=cd_cert_dir:/credentials/development/cd-certs",
+		}},
+	},
+	{name: "DD"},
+	{name: "DESC"},
+	{
+		name: "DGGEN",
+		edits: map[string][]edit{
+			// The YAML cases default PIXIT.DGGEN.ENABLEKEY to a key the
+			// harness does not give the DUT; the Python cases get the
+			// daemon's key through --hex-arg. matter.js aligns the YAML
+			// default the same way (test/core/DGGEN.test.ts).
+			"2.1": {{"hex:00112233445566778899aabbccddeeff", "hex:000102030405060708090a0b0c0d0e0f", "align the YAML TestEventTrigger key with the daemon's (matter.js DGGEN.test.ts)"}},
+			"2.3": {{"hex:00112233445566778899aabbccddeeff", "hex:000102030405060708090a0b0c0d0e0f", "align the YAML TestEventTrigger key with the daemon's (matter.js DGGEN.test.ts)"}},
+		},
+		// TC-DGGEN-2.1 waits 2 h 5 min and then 1 h 5 min for
+		// TotalOperationalHours to move (connectedhomeip#29580); its budget
+		// covers both waits.
+		timeout: map[string]time.Duration{"2.1": 3*time.Hour + 40*time.Minute},
+		exclude: map[string]gap{
+			"2.4": {classNotSupported, "TC-DGGEN-2.4 needs the TimeSynchronization cluster (PICS TIMESYNC.S=0); the case has no PICS gate (matter.js test/core/DGGEN.test.ts excludes it for the same reason)", false},
+		},
+	},
+	{name: "DT"},
+	{
+		name: "G", deviceType: dtOnOffLight,
+		exclude: map[string]gap{
+			"2.2": {classHarness, "TC-G-2.2 step 7a (the Groups revision 4 path) writes MaxGroupsPerFabric+1 GroupKeyMap entries and expects Success; chip's own GroupDataProviderImpl::SetGroupKeyAt refuses the entry beyond MaxGroupsPerFabric at the image commit (src/credentials/GroupDataProviderImpl.cpp:1492, CHIP_ERROR_INVALID_LIST_LENGTH), as does matter.js GroupKeyManagementServer #validateGroupKeyMap (ResourceExhausted) and this module", false},
+		},
+		edits: map[string][]edit{
+			// The case's two Groups endpoints are PIXITs; the defaults (1
+			// and 2) name the aggregator here, which has no Groups server.
+			// They are set in the case's config rather than on the command
+			// line, where the YAML runner would take them as strings and
+			// compare them with the integer endpoints the DUT reports.
+			"2.4": {
+				{"Groups.Endpoint1: 1\n", "Groups.Endpoint1: {ep:0x0100}\n", "PIXIT.G.ENDPOINT1: the on/off light"},
+				{"Groups.Endpoint2: 2\n", "Groups.Endpoint2: {ep:0x010C}\n", "PIXIT.G.ENDPOINT2: the colour-temperature light"},
+			},
+		},
+		// TC-G-2.4's KeySetWrite and GroupKeyMap steps address
+		// GroupKeyManagement on the root node through the config default.
+		ownEndpoints: map[string]bool{"2.4": true},
+	},
+	{name: "GC", multicast: map[string]bool{"2.8": true}},
+	{name: "GRPKEY"},
+	{
+		name: "IDM",
+		args: map[string][]string{
+			// The bridge mounts Identify on every bridged endpoint, including
+			// device types that do not list it; matter.js passes the same flag
+			// for its own test apps (test/core/IDM.test.ts).
+			"10.5": {"--bool-arg", "fail_on_extra_clusters:False"},
+		},
+		perEndpoint: map[string]bool{"10.4": true},
+	},
+	{name: "OPCREDS"},
+	{name: "RR"},
+	{
+		name:      "SC",
+		multicast: map[string]bool{"5.2": true, "5.3": true},
+		// TC-SC-4.3 resolves the AAAA records of the operational host
+		// name; the daemon publishes the addresses its interfaces have.
+		// TC-SC-4.1 checks that the SRV target is the MAC-derived host
+		// name; without IPv6 on the LAN the harness runs the daemon with
+		// --mdns-os-hostname (bridge_test.go), which that check refuses.
+		ipv6: map[string]string{
+			"4.1": "checks the MAC-derived SRV host name, which the daemon advertises only when the host's LAN interface has IPv6 (without it the harness passes --mdns-os-hostname),",
+			"4.3": "resolves the DUT's AAAA records, which name the advertising interface's IPv6 addresses,",
+		},
+		// TC_SC_7_1 checks the commissionable advertisement of a factory-new
+		// device and commissions it (matter.js test/core/SC.test.ts
+		// chip("SC/7.1").uncommissioned()).
+		uncommissioned: map[string]bool{"7.1": true},
+		edits: map[string][]edit{
+			// TC-SC-7.1 rejects CHIP's default discriminator and passcode,
+			// which the harness runs the daemon with; a product sets its
+			// own (docs/certifiability.md, product obligations). matter.js
+			// disables the same two checks (test/core/SC.test.ts).
+			"7.1": {
+				{", 3840,", ", 0000,", "the harness's daemon uses the default discriminator (matter.js SC.test.ts)"},
+				{", 20202021,", ", 00000000,", "the harness's daemon uses the default passcode (matter.js SC.test.ts)"},
+			},
+		},
+	},
+	{name: "SM"},
+	// --- application clusters ----------------------------------------------
+	{name: "BOOL", deviceType: dtContactSensor},
+	{
+		name: "CC", deviceType: dtColorTempLight,
+		exclude: map[string]gap{
+			// matter.js test/app-cc/CC.1.test.ts excludes the same three.
+			"9.1": {classHarness, "TC-CC-9.1 asserts transition results more exactly than a conforming device must meet; matter.js excludes it (test/app-cc/CC.1.test.ts)", false},
+			"9.2": {classHarness, "TC-CC-9.2 asserts transition results more exactly than a conforming device must meet; matter.js excludes it (test/app-cc/CC.1.test.ts)", false},
+			"9.3": {classHarness, "TC-CC-9.3 asserts transition results more exactly than a conforming device must meet; matter.js excludes it (test/app-cc/CC.1.test.ts)", false},
+			"2.2": {classDefect, "TC-CC-2.2 counts the reports of a colour transition: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
+			"6.2": {classDefect, "TC-CC-6.2 reads ColorTemperatureMireds part-way through a move: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
+			"6.3": {classDefect, "TC-CC-6.3 reads ColorTemperatureMireds part-way through a step: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
+			"6.5": {classHarness, startUpOnBridged, false},
+		},
+	},
+	{
+		name: "DRLK", deviceType: dtDoorLock,
+		exclude: map[string]gap{
+			"2.6": {classHarness, "TC-DRLK-2.6 gates every step on the Year Day Schedule feature (PICS DRLK.S.F0a=0 here) except its final \"Cleanup the created user\" ClearUser, which has no PICS gate and fails on a lock without the User feature (DRLK.S.F08=0)", false},
+		},
+	},
+	{name: "FAN", deviceType: dtFan},
+	{
+		name: "FLW", deviceType: dtFlowSensor,
+		exclude: map[string]gap{
+			"2.2": {classHarness, "TC-FLW-2.2 has an operator change the measured value between two reads (a UserPrompt under FLW.M.FlowChange); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in", false},
+		},
+	},
+	{
+		name: "I", deviceType: dtOnOffLight,
+		exclude: map[string]gap{
+			"2.4": {classHarness, "TC-I-2.4 checks the Q-quality reporting of IdentifyTime added in Matter 1.4.2 against an expectation chip has not merged yet (connectedhomeip#42128); matter.js excludes it until then (test/app-slow/I.test.ts)", false},
+		},
+	},
+	{
+		name: "LVL", deviceType: dtColorTempLight,
+		exclude: map[string]gap{
+			"2.3": {classDefect, "TC-LVL-2.3 counts the RemainingTime reports of a transition: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
+			"3.1": {classDefect, "TC-LVL-3.1 reads CurrentLevel part-way through a Move: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
+			"4.1": {classDefect, "TC-LVL-4.1 reads CurrentLevel part-way through a Step: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
+			"5.1": {classDefect, "TC-LVL-5.1 reads CurrentLevel part-way through a Move: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
+			"6.1": {classDefect, "TC-LVL-6.1 reads CurrentLevel part-way through a Move that a Stop ends: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
+		},
+	},
+	{name: "LWM", deviceType: dtLaundryWasher},
+	{
+		name: "MOD", deviceType: dtModeSelect,
+		edits: map[string][]edit{
+			// The mode TC-MOD-2.1 changes to is a PIXIT whose default (4)
+			// is a mode of CHIP's sample app; the daemon's selector offers
+			// 0-2 (examples/reference-bridge/fleet.go newDemoSelector). Set
+			// in the config, not on the command line, where the runner
+			// would compare the string "2" with the integer CurrentMode.
+			"2.1": {{"defaultValue: 4\n", "defaultValue: 2\n", "PIXIT NewMode: a mode of the daemon's selector"}},
+		},
+	},
+	{name: "OCC", deviceType: dtOccupancySensor},
+	{
+		name: "OO", deviceType: dtOnOffLight,
+		edits: map[string][]edit{
+			// chip caps OffWaitTime at 215 where the specification sets no
+			// such bound, and expects 30 s exactly; matter.js relaxes both
+			// (test/app-slow/OO.test.ts).
+			"2.3": {
+				{"maxValue: 215", "maxValue: 300", "chip's OffWaitTime cap is not in the specification (matter.js OO.test.ts)"},
+				{"value: 30000", "value: 30500", "a 30 s wait measured to the millisecond (matter.js OO.test.ts)"},
+			},
+		},
+		exclude: map[string]gap{
+			"2.4": {classHarness, startUpOnBridged, false},
+			"2.8": {classHarness, "TC-OO-2.8 expects OnTime and OffWaitTime reported only on a change larger than 10 or to 0 — chip's OnOffLightingCluster.cpp SetOnTime/SetOffWaitTime (kValueDeltaReportTrigger), an SDK choice: Matter 1.6.1 gives neither attribute the Q quality (matter.js on-off.element.ts), and matter.js OnOffServer reports every countdown tick, as the daemon now does", false},
+		},
+	},
+	{name: "OPSTATE", deviceType: dtLaundryWasher},
+	{name: "PCC", deviceType: dtPump},
+	{name: "PS", deviceType: dtSmokeCOAlarm},
+	{
+		name: "RH", deviceType: dtHumiditySensor,
+		exclude: map[string]gap{
+			"2.2": {classHarness, "TC-RH-2.2 has an operator change the measured value between two reads (a UserPrompt under RH.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in", false},
+		},
+	},
+	{
+		name: "RVCCLEANM", deviceType: dtRVC,
+		args: map[string][]string{
+			// The clean modes are PIXITs; the case's CI values name the
+			// rvc-app's (1-3). The daemon's vacuum offers Vacuum (0) and
+			// Mop (1) (examples/reference-bridge/fleet_appliances.go).
+			"2.1": {"--int-arg", "PIXIT.RVCCLEANM.MODE_CHANGE_OK:1", "--int-arg", "PIXIT.RVCCLEANM.MODE_CHANGE_FAIL:1"},
+		},
+	},
+	{name: "RVCOPSTATE", deviceType: dtRVC},
+	{name: "RVCRUNM", deviceType: dtRVC},
+	{
+		name: "S", deviceType: dtOnOffLight, multicast: map[string]bool{"2.3": true},
+		args: map[string][]string{
+			// TC-S-2.6 fills the scene table of three fabrics, one AddScene
+			// per 1 s subscription report, inside the harness's 90 s default
+			// test budget — sized for chip's 16-entry table. matter.js's
+			// table, which the module mirrors, holds 128 (3 x 63 quota,
+			// bounded by the table): ~165 s of reports. The budget is the
+			// harness's, the assertions are unchanged.
+			"2.6": {"--timeout", "600"},
+		},
+		// TC-S-2.2 and 2.4 configure a scene over every scene-capable
+		// cluster of the endpoint (OnOff, LevelControl, ColorControl): the
+		// colour-temperature light has all three, the on/off light only
+		// OnOff.
+		caseDeviceType: map[string]uint32{"2.2": dtColorTempLight, "2.4": dtColorTempLight},
+		edits: map[string][]edit{
+			// matter.js test/app-fast/S.test.ts: chip expects the unset
+			// values of a ScenesManagement server that no longer tracks
+			// CurrentScene, CurrentGroup and SceneValid; revision 1, which
+			// matter.js and this module implement, still tracks them.
+			"2.2": {
+				{"CurrentScene: 0xFF,", "CurrentScene: 0x01,", "revision 1 tracks CurrentScene (matter.js S.test.ts)"},
+				{"CurrentGroup: 0x00,", "CurrentGroup: G1,", "revision 1 tracks CurrentGroup (matter.js S.test.ts)"},
+				{"SceneValid: false,", "SceneValid: true,", "revision 1 tracks SceneValid (matter.js S.test.ts)"},
+			},
+		},
+	},
+	{name: "SMOKECO", deviceType: dtSmokeCOAlarm},
+	{
+		name: "SWTCH", deviceType: dtGenericSwitch,
+		exclude: map[string]gap{
+			"2.2": {classNotSupported, "TC-SWTCH-2.2 runs only on a latching switch (PICS SWTCH.S.F00=0: the daemon's switch is momentary)", true},
+			"2.5": {classNotSupported, "TC-SWTCH-2.5 runs only with MomentarySwitchMultiPress (PICS SWTCH.S.F04=0)", true},
+			"2.6": {classNotSupported, "TC-SWTCH-2.6 runs only with MomentarySwitchMultiPress and ActionSwitch (PICS SWTCH.S.F04=0, SWTCH.S.F05=0)", true},
+		},
+	},
+	{
+		name: "TMP", deviceType: dtTempSensor,
+		exclude: map[string]gap{
+			"2.2": {classHarness, "TC-TMP-2.2 has an operator change the measured value between two reads (a UserPrompt under TMP.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in", false},
+		},
+	},
+	{name: "TSTAT", deviceType: dtThermostat},
+	{
+		name: "VALCC", deviceType: dtWaterValve,
+		exclude: map[string]gap{
+			"3.2": {classNotSupported, "TC-VALCC-3.2 runs only with the Level feature (PICS VALCC.S.F01=0: the daemon's valve is open/closed)", true},
+			"3.3": {classNotSupported, "TC-VALCC-3.3 runs only with DefaultOpenLevel (PICS VALCC.S.A0006=0)", true},
+		},
+	},
+	{name: "WNCV", deviceType: dtWindowCovering},
+}

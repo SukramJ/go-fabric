@@ -279,6 +279,13 @@ func (b *Bridge) runCASEInitiator(ctx context.Context, addr *net.UDPAddr, init *
 		if err := statusReportSuccess(status.payload); err != nil {
 			return 0, err
 		}
+		// The responder sent its StatusReport reliably and the exchange
+		// ends here, so it is acknowledged now — matter.js
+		// MessageExchange sends the standalone ack of the last received
+		// message when an exchange is destroyed (MessageExchange.ts destroy).
+		// Unacknowledged, the responder retransmitted it until its MRP
+		// budget ran out (seen against matter.js's controller).
+		b.sendInitiatedAck(addr, exchangeID, ephemeral, status.counter)
 	case mrp.SCOpcodeSigma2Resume:
 		if perr := init.Initiator.ProcessSigma2Resume(reply.payload); perr != nil {
 			b.sendCASEError(addr, exchangeID, ephemeral, reply.counter)
@@ -399,6 +406,37 @@ func (b *Bridge) sendInitiatedUnsecured(addr *net.UDPAddr, exchangeID uint16, ep
 		tracker.Track(hdr.MessageCounter, 0, exchangeID, datagram, addr, time.Now())
 	}
 	return nil
+}
+
+// sendInitiatedAck sends the standalone acknowledgement of counter on an
+// unsecured exchange this node initiated. Best effort: a lost ack makes the
+// peer retransmit, which the unsecured handler answers by nothing worse.
+func (b *Bridge) sendInitiatedAck(addr *net.UDPAddr, exchangeID uint16, ephemeral uint64, counter uint32) {
+	b.mu.RLock()
+	listener := b.listener
+	b.mu.RUnlock()
+	if listener == nil {
+		return
+	}
+	proto := message.ProtocolHeader{
+		Initiator:  true,
+		Opcode:     mrp.StandaloneAckOpcode,
+		ExchangeID: exchangeID,
+		ProtocolID: mrp.SecureChannelProtocolID,
+		HasAck:     true,
+		AckCounter: counter,
+	}
+	hdr := message.Header{
+		SessionID:       0,
+		MessageCounter:  b.nextUnsecuredCounter(),
+		HasSourceNodeID: true,
+		SourceNodeID:    ephemeral,
+	}
+	datagram := append(hdr.Marshal(), proto.Marshal()...) //nolint:gocritic // single-allocation join
+	if err := listener.Send(addr, datagram); err != nil {
+		b.logger.Debug("matter.case.initiator.ack_send", slog.String("err", err.Error()))
+	}
+	b.dischargeOwedAck(0, exchangeID, true)
 }
 
 // randomEphemeralNodeID draws the initiator's ephemeral node id for the

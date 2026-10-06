@@ -138,38 +138,84 @@ reachability-check: reachability ## regenerate, then fail if the committed snaps
 
 # --- the real-commissioner guard ----------------------------------------
 #
-# The line below is the SINGLE SOURCE for the chip-tool build this module is
-# tested against: .github/workflows/chiptool.yml seds the 40-hex tag out of
-# this Makefile for both of its jobs, so the suite and its control leg can
-# never end up validating two different chip-tool builds, and a local
-# extraction gets the same one a CI run does.
+# CHIP_TEST_IMAGE (below) is the SINGLE SOURCE for the commissioner, the CSA
+# certification harness and the CHIP reference apps this module is tested
+# against: the suite, the certification families and the CI control leg
+# (.github/workflows/chiptool.yml) all run inside it.
 #
-# The tag is a connectedhomeip commit. Bump it deliberately — a new tag is a
-# new commissioner, which is exactly the thing this guard measures against.
-# Recent chip-cert-bins tags publish arm64-only manifests, which is why the
-# workflow runs on ubuntu-24.04-arm; an amd64 runner cannot pull the image.
+# CHIP_CERT_BINS_IMAGE is only the host fallback: `make chiptool-extract`
+# copies chip-tool out of it for a run without Docker (arm64 hosts; the image
+# publishes arm64 manifests only). Bump it deliberately, like the image pin.
 CHIP_CERT_BINS_IMAGE ?= connectedhomeip/chip-cert-bins:6feac778f196483b6355d35fc529f183b293b71f
 CHIPTOOL_BIN_DIR     ?= bin
 
+# The CHIP test harness image the chip-tool suite runs by default: matter.js's
+# own (../matter.js/support/chip), multi-arch, carrying chip-tool, the YAML
+# and Python certification cases and the CHIP reference apps at one CHIP
+# commit. Pinned by digest, never a floating tag; the CHIP commit it was
+# built from is in the image's org.opencontainers.image.revision label and
+# /etc/chip-version, recorded below; `make chiptool-setup` checks the CHIP
+# source out at that commit. Bump both together, deliberately: a new digest is
+# a new commissioner and a new case set.
+CHIP_TEST_IMAGE        ?= ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326
+CHIP_TEST_IMAGE_COMMIT ?= 6170af8461b10b1766044122ac83332c6d00ab20
+
 .PHONY: chiptool-extract
-chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into ./bin (~2.5 GiB pull)
+chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into ./bin (arm64 hosts; ~2.5 GiB pull)
+	@# The image publishes arm64 manifests only. On any other host the pull
+	@# fails with Docker's "no matching manifest for linux/amd64", which names
+	@# neither the cause nor a way out -- so say both before Docker does.
+	@arch=$$(uname -m); case "$$arch" in aarch64|arm64) ;; *) \
+		echo "chiptool-extract: $(CHIP_CERT_BINS_IMAGE) publishes linux/arm64 only; this host is $$arch."; \
+		echo "  On amd64, use the chip-tool snap instead -- the suite finds it on PATH and"; \
+		echo "  keeps its storage under ~/snap/chip-tool/common by itself:"; \
+		echo "      sudo snap install chip-tool"; \
+		echo "  or point GOFABRIC_CHIPTOOL_BIN at any other chip-tool build."; \
+		echo "  See internal/chiptool/doc.go for what differs between the snap and the CI pin."; \
+		exit 1;; esac
 	@mkdir -p $(CHIPTOOL_BIN_DIR)
 	@# /root/chip-tool in the image is a symlink; /root/apps/chip-tool is the file.
 	docker create --name gofabric-chip-cert-bins $(CHIP_CERT_BINS_IMAGE)
 	docker cp gofabric-chip-cert-bins:/root/apps/chip-tool $(CHIPTOOL_BIN_DIR)/chip-tool
 	docker rm gofabric-chip-cert-bins
 	chmod +x $(CHIPTOOL_BIN_DIR)/chip-tool
+	@# The suite logs this sidecar as the binary's identity in every run.
+	@echo "$(CHIP_CERT_BINS_IMAGE)" > $(CHIPTOOL_BIN_DIR)/chip-tool.source
+
+# Where `make chiptool-setup` puts the CHIP source: the path CLAUDE.md names
+# for the connectedhomeip checkout.
+CHIP_ROOT ?= ../connectedhomeip
+
+.PHONY: chiptool-setup
+chiptool-setup: ## sparse connectedhomeip checkout at the harness image's CHIP commit (source to read, nothing to build)
+	script/chiptool-setup.sh "$(CHIP_TEST_IMAGE_COMMIT)" "$(CHIP_ROOT)"
+
+.PHONY: chiptool-image
+chiptool-image: ## pull the pinned CHIP test harness image (the suite also pulls it on first use)
+	docker pull $(CHIP_TEST_IMAGE)
 
 .PHONY: chiptool-build
 chiptool-build: ## build the reference daemon the chip-tool guard commissions
 	$(GO) build -o $(CHIPTOOL_BIN_DIR)/reference-bridge ./examples/reference-bridge
 
+# CHIPTOOL_TIMEOUT bounds the commissioning test and the chip-tool suite;
+# CHIP_FAMILIES_TIMEOUT the certification families, which run for hours in
+# full. Raise them rather than trimming tests.
+CHIPTOOL_TIMEOUT      ?= 1500s
+CHIP_FAMILIES_TIMEOUT ?= 10h
+
 .PHONY: chiptool-test
-chiptool-test: chiptool-build ## commission the reference daemon with chip-tool (Linux host + chip-tool required)
-	@# The suite skips itself when chip-tool is missing, which is the whole
-	@# story on macOS: chip-tool has no macOS host build. It fails loudly on a
-	@# missing daemon binary instead, which chiptool-build has just produced.
-	$(GO) test -tags=chiptool -count=1 -timeout=900s -v ./internal/chiptool/...
+chiptool-test: chiptool-build ## commission the reference daemon and run the chip-tool suite (Linux + Docker, or a host chip-tool)
+	@# Skips itself, naming the missing prerequisite, without Docker or a
+	@# chip-tool; fails loudly on a missing daemon binary, which
+	@# chiptool-build has just produced.
+	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIPTOOL_TIMEOUT) -v \
+		-skip '^TestChipCertificationFamilies$$' ./internal/chiptool/...
+
+.PHONY: chiptool-families
+chiptool-families: chiptool-build ## run the CSA certification families in the CHIP harness image (GOFABRIC_CHIP_FAMILIES=IDM,ACL narrows)
+	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIP_FAMILIES_TIMEOUT) -v \
+		-run '^TestChipCertificationFamilies$$' ./internal/chiptool/...
 
 .PHONY: fmt
 fmt: ## format with gofumpt
@@ -181,6 +227,9 @@ lint: ## gofumpt check + golangci-lint + module hygiene
 	@test ! -s /tmp/gofabric-gofumpt.out || { echo "gofumpt: files need formatting (run 'make fmt')"; exit 1; }
 	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=5m ./...
+	@# The chip-tool harness builds only with the chiptool tag; lint it under
+	@# that tag so it is held to the module's standard.
+	$(GOLANGCI_LINT) run --timeout=5m --build-tags chiptool ./internal/chiptool/...
 	$(GO) mod tidy -diff
 	$(GO) mod verify
 

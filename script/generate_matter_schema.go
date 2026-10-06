@@ -8,6 +8,8 @@
 //
 //   - clusters.go  — ClusterRevisions, ClusterNames (map[uint32]uint16/string)
 //   - devicetypes.go — DeviceTypeRevisions, DeviceTypeNames, DeviceTypeServerClusters
+//   - attribute_access_gen.go — attributeWritePrivileges (writable attributes
+//     whose write privilege is above Operate)
 //   - schema_provenance_gen.go — SchemaSnapshotSHA256
 //
 // It reads the same bytes package parity embeds rather than a second copy of
@@ -37,6 +39,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -50,6 +53,7 @@ const (
 	clustersFile    = "schema/clusters.go"
 	devicetypesFile = "schema/devicetypes.go"
 	provenanceFile  = "schema/schema_provenance_gen.go"
+	accessFile      = "schema/attribute_access_gen.go"
 )
 
 // moduleRoot returns the directory holding this module's go.mod, found by
@@ -77,10 +81,19 @@ func moduleRoot() (string, error) {
 
 // snapshotCluster mirrors the cluster shape in parity/schema.json.
 type snapshotCluster struct {
-	ID         uint32 `json:"id"`
-	Name       string `json:"name"`
-	Revision   uint16 `json:"revision"`
-	FeatureMap uint32 `json:"featureMap"`
+	ID         uint32              `json:"id"`
+	Name       string              `json:"name"`
+	Revision   uint16              `json:"revision"`
+	FeatureMap uint32              `json:"featureMap"`
+	Attributes []snapshotAttribute `json:"attributes"`
+}
+
+// snapshotAttribute mirrors one attribute of a cluster in parity/schema.json.
+type snapshotAttribute struct {
+	ID      uint32 `json:"id"`
+	Name    string `json:"name"`
+	Access  string `json:"access"`
+	Quality string `json:"quality"`
 }
 
 // snapshotRequirement mirrors one cluster requirement of a device type in
@@ -166,6 +179,12 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("wrote %s (%d device types)\n", devicetypesFile, len(snap.DeviceTypes))
+
+	if err := writeAccessFile(snap.Clusters); err != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", accessFile, err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s\n", accessFile)
 
 	if err := writeProvenanceFile(snapshotSHA256); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", provenanceFile, err)
@@ -347,4 +366,102 @@ func conformanceOrNone(c string) string {
 		return "-"
 	}
 	return c
+}
+
+// writePrivilege derives an attribute's write privilege from its matter.js
+// access string the way matter.js's Access parser does
+// (packages/model/src/aspects/Access.ts): the attribute is writable when the
+// read/write token is "RW" or "R[W]"; every O, M or A in a privilege token
+// raises the write privilege to the highest of them; Operate is the default
+// (Access.Default). It returns 0 for a read-only attribute.
+func writePrivilege(access string) uint8 {
+	fields := strings.Fields(access)
+	if len(fields) == 0 || (fields[0] != "RW" && fields[0] != "R[W]") {
+		return 0
+	}
+	level := map[rune]uint8{'O': 3, 'M': 4, 'A': 5}
+	priv := uint8(3)
+	for _, f := range fields[1:] {
+		for _, r := range f {
+			if l, ok := level[r]; ok && l > priv {
+				priv = l
+			}
+		}
+	}
+	return priv
+}
+
+func writeAccessFile(clusters []snapshotCluster) error {
+	var buf bytes.Buffer
+	buf.WriteString(fileHeaderTpl)
+	buf.WriteString("// attributeWritePrivileges maps every writable attribute whose matter.js\n")
+	buf.WriteString("// write privilege is above Operate (4 Manage, 5 Administer) to that\n")
+	buf.WriteString("// privilege. Generated from the access strings in parity/schema.json.\n")
+	buf.WriteString("var attributeWritePrivileges = map[uint32]map[uint32]uint8{\n")
+	// A derived cluster (BridgedDeviceBasicInformation from
+	// BasicInformation, the mode clusters from ModeBase) lists the
+	// attributes it inherits without an access string; it takes the base's,
+	// found as the same (id, name) in a cluster that states one — as
+	// matter.js resolves an inherited element (packages/model).
+	inherited := map[string]string{}
+	for _, c := range clusters {
+		for _, a := range c.Attributes {
+			k := fmt.Sprintf("%d/%s", a.ID, a.Name)
+			if _, ok := inherited[k]; !ok && a.Access != "" {
+				inherited[k] = a.Access
+			}
+		}
+	}
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			if a.Access == "" {
+				a.Access = inherited[fmt.Sprintf("%d/%s", a.ID, a.Name)]
+			}
+			if p := writePrivilege(a.Access); p > 3 {
+				rows = append(rows, fmt.Sprintf("\t\t0x%04X: %d, // %s %q\n", a.ID, p, a.Name, a.Access))
+			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n\n")
+	buf.WriteString("// changesOmittedAttributes lists every attribute whose matter.js quality\n")
+	buf.WriteString("// carries \"C\" (changesOmitted): a change to it is never reported to a\n")
+	buf.WriteString("// subscriber. Generated from the quality strings in parity/schema.json.\n")
+	buf.WriteString("var changesOmittedAttributes = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		var rows []string
+		for _, a := range c.Attributes {
+			if hasQuality(a.Quality, "C") {
+				rows = append(rows, fmt.Sprintf("\t\t0x%04X: {}, // %s %q\n", a.ID, a.Name, a.Quality))
+			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n")
+	out, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	return writeIfChanged(accessFile, out)
+}
+
+// hasQuality reports whether a matter.js quality string carries flag as a
+// token of its own ("N C" carries "C").
+func hasQuality(quality, flag string) bool {
+	return slices.Contains(strings.Fields(quality), flag)
 }

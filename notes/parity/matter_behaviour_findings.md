@@ -448,6 +448,41 @@ defect wording.
 
 ---
 
+## Certification harness — open certifiability findings
+
+Class (a) gaps the CHIP certification families
+(`internal/chiptool`, [ADR 0011](../../docs/adr/0011-certifiability-is-a-goal.md),
+[`docs/certifiability.md`](../../docs/certifiability.md)) still report. Each
+is excluded in `internal/chiptool/families_table_test.go` with class (a) and
+a pointer here; fixing one means removing that exclusion, re-running the
+family, and deleting the entry.
+
+- **No transition engine — TC-LVL-2.3, TC-LVL-3.1, TC-LVL-4.1,
+  TC-LVL-5.1, TC-LVL-6.1, TC-CC-2.2, TC-CC-6.2, TC-CC-6.3.**
+  `cluster/levelcontrol` hands MoveToLevel / Move / Step to the host and
+  `cluster/light.ColorControlServer` applies a colour target at once; the
+  reference daemon's ceiling light jumps to the target, so RemainingTime is
+  always 0 and no intermediate CurrentLevel / ColorTemperatureMireds is ever
+  readable. **matter.js:** `packages/node/src/behavior/Transitions.ts`
+  (stepped transitions, RemainingTime with the quieter rules of
+  `#updateRemainingTime`), used by `LevelControlServer` and
+  `ColorControlServer`. `BD-Matter-LevelControl-NativeRamp` (by_design.md)
+  covers a host whose device ramps natively; a host without native ramps —
+  the reference daemon — needs the port. **Fix:** port `Transitions.ts` as
+  an optional engine the two servers drive (step interval, RemainingTime
+  reporting, `finish` / `cancel` semantics), and let the daemon's ceiling
+  light use it.
+- **Maintenance mode is not implemented — declared `WNCV.S.M.Maintenance=0`.**
+  `cluster/cover` stores Mode but does not act on its MaintenanceMode bit.
+  **matter.js:** `WindowCoveringServer` (`supportsMaintenanceMode`, default
+  true) refuses movement commands in maintenance mode and syncs
+  ConfigStatus.Operational. **Fix:** port the Mode / ConfigStatus sync and
+  the maintenance refusal, then declare the PICS code 1.
+
+The IPv6-dependent cases (TC-SC-4.1, TC-SC-4.3 and the group-messaging
+cases) are not findings: they are skipped on a host whose LAN interface has
+no IPv6, with the command that enables it, and run wherever it has.
+
 ## Verified sound (no action)
 
 TLV element codes/widths, bool/null/float shapes, string/octet length forms, tag-encode thresholds; message/protocol header field order and presence rules; Sigma KDF salts/infos/nonces, TBE/TBS tag order, destinationId HMAC, RCAC/chain validation, AddNOC rollback + fail-safe-expiry revert, RemoveFabric teardown; SPAKE2 generators/point validation/Ke/transcript, PBKDF bounds; MRP max-transmissions = 5, nonce layout, standalone-ack delay, session-id collision avoidance; timed-invoke gate, keepSubscriptions purge, sendInterval formula, subscription death after 3 failures; EP0 cluster set, full-family PartsList, ServerList, empty-ACL fail-closed, CAT matching; OnOff toggle semantics, level scaling, thermostat limit-clamp + deadband, measurement null semantics, illuminance formula, cover inversion; mDNS operational instance-name + subtypes + TXT formats, multi-fabric boot re-announce, AddNOC-time publish, shutdown withdraw.

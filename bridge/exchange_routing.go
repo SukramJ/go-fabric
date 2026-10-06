@@ -7,6 +7,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
 // timedSweepInterval bounds how often the expiry sweep walks
@@ -55,6 +58,16 @@ type exchangeRouting struct {
 	//
 	// map[mrp.ExchangeKey]exchangeReplyTarget
 	exchangeSrcs sync.Map
+
+	// writeTxs holds the [im.WriteTransaction] of every chunked write in
+	// progress, keyed by its exchange, so the chunks of one Write
+	// interaction share what chip's WriteHandler keeps for its lifetime
+	// (the last successfully written path). Created by a chunk carrying
+	// MoreChunkedMessages, dropped by the final chunk; an abandoned one
+	// is dropped after [writeTxTTL] by [exchangeRouting.writeTransaction].
+	//
+	// map[mrp.ExchangeKey]*writeTx
+	writeTxs sync.Map
 
 	// timedDeadlines maps a (sessionID, exchangeID) pair to the
 	// wall-clock deadline a TimedRequest established. The follow-up
@@ -167,4 +180,40 @@ func (r *exchangeRouting) dropSessionTimedDeadlines(sessionID uint16) {
 		}
 		return true
 	})
+}
+
+// writeTxTTL bounds how long an abandoned chunked write keeps its
+// transaction: far beyond any chunk round trip, short enough that an
+// abandoned one does not linger.
+const writeTxTTL = time.Minute
+
+type writeTx struct {
+	tx      *im.WriteTransaction
+	started time.Time
+}
+
+// writeTransaction returns the write transaction of the exchange key
+// names: the one a previous chunk of the same Write interaction started,
+// or a fresh one. more is the chunk's MoreChunkedMessages; the final
+// chunk (more=false) takes the transaction out of the table.
+func (r *exchangeRouting) writeTransaction(key mrp.ExchangeKey, more bool, now time.Time) *im.WriteTransaction {
+	r.writeTxs.Range(func(k, v any) bool {
+		if w, ok := v.(*writeTx); ok && now.Sub(w.started) > writeTxTTL {
+			r.writeTxs.Delete(k)
+		}
+		return true
+	})
+	if !more {
+		if v, ok := r.writeTxs.LoadAndDelete(key); ok {
+			if w, isTx := v.(*writeTx); isTx {
+				return w.tx
+			}
+		}
+		return &im.WriteTransaction{}
+	}
+	v, _ := r.writeTxs.LoadOrStore(key, &writeTx{tx: &im.WriteTransaction{}, started: now})
+	if w, isTx := v.(*writeTx); isTx {
+		return w.tx
+	}
+	return &im.WriteTransaction{}
 }

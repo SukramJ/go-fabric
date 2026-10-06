@@ -144,27 +144,33 @@ func TestNetcomm_ReadInterfaceEnabled_InitialTrue(t *testing.T) {
 	}
 }
 
-func TestNetcomm_ReadLastNetworkingStatus_NilInitially(t *testing.T) {
+// TestNetcomm_ReadLastNetworkingStatus_SuccessOnEthernet pins TC-CNET-4.3
+// step 5: a node on its Ethernet network reports Success, as matter.js's
+// bridge test node is configured.
+func TestNetcomm_ReadLastNetworkingStatus_SuccessOnEthernet(t *testing.T) {
 	t.Parallel()
 	nc := defaultNetcomm()
 	v, ok := nc.MatterRead(0x0005)
 	if !ok {
 		t.Fatal("LastNetworkingStatus: ok=false")
 	}
-	if v != nil {
-		t.Fatalf("LastNetworkingStatus = %v, want nil", v)
+	if v != core.NetworkingStatusSuccess {
+		t.Fatalf("LastNetworkingStatus = %v, want Success", v)
 	}
 }
 
-func TestNetcomm_ReadLastNetworkID_NilInitially(t *testing.T) {
+// TestNetcomm_ReadLastNetworkID_IsTheInterface pins TC-CNET-4.3 step 6:
+// LastNetworkID names the entry of Networks the node is connected to.
+func TestNetcomm_ReadLastNetworkID_IsTheInterface(t *testing.T) {
 	t.Parallel()
 	nc := defaultNetcomm()
 	v, ok := nc.MatterRead(0x0006)
 	if !ok {
 		t.Fatal("LastNetworkID: ok=false")
 	}
-	if v != nil {
-		t.Fatalf("LastNetworkID = %v, want nil", v)
+	nets, _ := nc.MatterRead(0x0001)
+	if id, isBytes := v.([]byte); !isBytes || !bytes.Equal(id, nets.([]core.NetworkInfoStruct)[0].NetworkID) {
+		t.Fatalf("LastNetworkID = %v, want the network id of Networks[0]", v)
 	}
 }
 

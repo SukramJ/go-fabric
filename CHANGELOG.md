@@ -12,6 +12,37 @@ pseudo-version of `main`.
 
 ### Added
 
+- **ScenesManagement (0x0062) is a real server** on the bridged lights
+  (ADR 0012), a port of matter.js's `ScenesManagementServer`:
+  `cluster/core.ScenesManagement`, `NewScenesManagement`, `ScenesConfig`,
+  `ScenesState` / `NewScenesState` / `LoadScenesState`, the request and
+  response types (`AddSceneRequest`, `SceneRef`, `ViewSceneResponse`, …) and
+  `SceneInfoStruct`. Scenes capture and recall the endpoint's OnOff,
+  LevelControl and ColorControl state; FabricSceneInfo reports every change;
+  a removed group or fabric takes its scenes along. The host persists the
+  table through `endpoint.Config.Scenes` (`endpoint.ScenesStore`);
+  `groups.Manager.StoredFabrics` lists the fabrics FabricSceneInfo covers.
+  Replaces the stub that rejected every command (`BD-Matter-P2-D18`, retired).
+
+- The reference daemon answers CHIP's `SimulateConfigurationVersionChange`
+  on its app pipe and persists the raised ConfigurationVersions.
+
+- `cluster/core` GeneralDiagnostics: `EnableTestEventTriggers(key, handler)`
+  arms TestEventTrigger with a 16-byte test enable key and a host handler
+  (`TestEventTriggerHandler`, `TestEventTriggerRequest`,
+  `TestEnableKeySize`), as matter.js's `deviceTestEnableKey` does; the
+  DataModelTest (DMTEST) feature with PayloadTestRequest / Response
+  (`PayloadTestResponse`), mandatory above a MaxPathsPerInvoke of one; and
+  DeviceLoadStatus (0x000A, `DeviceLoadStruct`, `SetDeviceLoadProvider`),
+  mandatory at cluster revision 3 — `bridge.AttachRootClusters` wires the
+  bridge's own counters into it (`Bridge.DeviceLoad`).
+- `bridge.DefaultSessionParameters`: what Sigma2 advertises when the host
+  sets nothing — matter.js `SessionParameters.defaults`, with the module's
+  revisions, SpecificationVersion and MaxPathsPerInvoke.
+  `sigma.Responder.SessionParameters` reads a responder's own.
+- `schema.IsFabricScopedInvoke`: the commands matter.js marks fabric-scoped.
+- `im.WithTimedInteraction` / `im.TimedInteractionFromContext`.
+
 - `contract.AttributeChangeNotifier`: a bridged cluster server that keeps
   its own attribute state names the attributes that moved, and the bridge
   advances the cluster's DataVersion and marks just those dirty for
@@ -251,6 +282,65 @@ pseudo-version of `main`.
 
 ### Changed
 
+- **A bridged endpoint's VendorName comes from the host.** The module
+  served `"eQ-3"` as the BridgedDeviceBasicInformation VendorName of every
+  bridged endpoint — one host's manufacturer inside the module. It now
+  serves `endpoint.Spec.VendorName`, and when the host leaves that empty the
+  node's own VendorName, `endpoint.Config.VendorName` (both new; also
+  `Topology.VendorName`, `Endpoint.VendorName` and
+  `Endpoint.BridgeVendorName`). A host that set neither now serves no
+  VendorName on its bridged endpoints, matter.js's default for a bridged
+  device; set `Config.VendorName` (or a per-device `Spec.VendorName`) to
+  keep the four vendor fields Apple Home relies on filled
+  (`BD-Matter-BridgedVendorNameFallback`).
+
+- **A fabric AddNOC installs starts with an empty Label**, as matter.js's
+  `FabricBuilder` starts one and as TC-OPCREDS-3.7 reads it right after
+  commissioning; it was `"go-fabric"`. A host that wants a label from the
+  first read sets `core.OpcredsConfig.InitialFabricLabel` (at most 32
+  bytes). Retires `L3-PFAD-1` in `notes/parity/by_design.md`.
+
+- **Certifiability is a goal; certification is still not pursued**
+  ([ADR 0011](docs/adr/0011-certifiability-is-a-goal.md)). The scope
+  statement "no CSA certification" no longer reads as "certification
+  conformance does not matter here": a product built on the module should
+  be able to pass certification. The chip-tool suite became the measure:
+  - `internal/chiptool` runs whole CHIP certification families — the core
+    families and the application family of every server the reference
+    daemon mounts, YAML and Python `TC_*` cases — in matter.js's CHIP image
+    (`ghcr.io/matter-js/chip`, pinned by digest with the CHIP commit it was
+    built from), declared the way matter.js declares its own. Every case
+    not run is a gap of one class — (a) defect, (b) not supported,
+    (c) harness, (d) out of scope — with its reason, and the steps a
+    passing case executed are pinned.
+  - The PICS are generated from the commissioned daemon per endpoint
+    (`testdata/gen_pics.py`, CHIP's own derivation helpers) and checked
+    with TC-IDM-10.4 per endpoint; only what a device cannot report is
+    declared by hand (`testdata/reference-bridge.pics`).
+  - A matter.js controller leg commissions the daemon and checks read,
+    write, invoke, reporting, a second fabric and subscription resumption
+    across a restart.
+  - [`docs/certifiability.md`](docs/certifiability.md) is the status page,
+    generated from the family table and the last run and held to them by
+    `TestCertifiabilityDocument` in every `go test ./...`; README,
+    `docs/feature-scope.md`, `docs/matterjs-comparison.md` and CLAUDE.md are
+    reworded accordingly.
+  - Make targets: `chiptool-test` (the quick suite), `chiptool-families`
+    (every family, hours); `chiptool-setup` checks out
+    `../connectedhomeip` at the image's commit. The CI workflow runs the
+    families in four groups next to the chip-tool control leg.
+
+- `examples/reference-bridge` exposes one simulated device per surface the
+  module serves (colour-temperature light, fan, smoke/CO alarm, pump, flow
+  sensor, laundry washer, robot vacuum, thermostat, blind, door lock,
+  humidity / occupancy / contact sensors, wall button), takes CHIP-style
+  test control through `--app-pipe` and `--enable-key` (off by default),
+  wires AdministratorCommissioning and the enhanced (multi-admin)
+  commissioning window, serves the test Certification Declaration — a
+  commissioner that verifies attestation no longer fails the pairing — and
+  emits StartUp / BootReason / ShutDown / Leave. It prints its endpoint
+  topology after the banner.
+
 - **Matter 1.6.1.** `parity/schema.json` is re-extracted from matter.js
   `85cf6647` (Matter 1.6.1; previously `f07365a8`, 1.6.0) and `schema/` is
   regenerated from it. This is a matter.js parity correction and bypasses the
@@ -296,6 +386,402 @@ pseudo-version of `main`.
   a failed Sigma2.
 
 ### Fixed
+
+- **Found by the CHIP Python certification harness** (`internal/chiptool`,
+  run in matter.js's CHIP image against the reference daemon):
+  - An attribute with matter.js's "C" (changesOmitted) quality — GroupKeyMap,
+    Nocs, TrustedRootCertificates, the diagnostics counters and the rest —
+    is no longer reported to subscribers when it changes, however the
+    change was made; it still reads and appears in priming reports.
+    A write of GroupKeyMap was reported back (TC-ACE-1.6 counts none). New:
+    `schema.AttributeChangesOmitted`, generated from the quality strings
+    in `parity/schema.json`.
+  - `mdns.Zeroconf` publishes an interface's link-local IPv6 address when
+    the interface has no routable IPv6, as chip and matter.js publish every
+    IPv6 address. On a host whose LAN interface is link-local-only for
+    IPv6 (GitHub's runners) the operational host name carried IPv4 records
+    only, and an IPv6-only resolver such as chip-tool never found the
+    commissioned node. Where a routable IPv6 exists, the link-local one
+    stays out as before.
+  - `mdns.Zeroconf` answers only on the interfaces its address records come
+    from. Answering on every interface sent the records over container
+    bridges too, and a local IPv6 resolver scoped the link-local address
+    to the bridge, an unreachable route (TC-BINFO-2.2 in CI).
+  - `cluster/thermo.ThermostatServer` accepts writes of
+    Min/MaxHeatSetpointLimit and Min/MaxCoolSetpointLimit (ConstraintError
+    outside the absolute range) and reconciles the setpoints and limits a
+    write leaves inconsistent — including the AutoMode deadband between
+    heating and cooling — as matter.js's `#reconcileSetpoints` (chip
+    `FixUserLimits` / `FixUserLimitDeadband` / `FixRange`) does; the
+    values it moves besides the written one are reported through
+    `contract.AttributeChangeNotifier` (TC-TSTAT-2.2). Writes of
+    ControlSequenceOfOperation and MinSetpointDeadBand are accepted and
+    ignored, as the specification ("optionally writeable … silently
+    ignored") and matter.js have it, instead of being refused.
+  - `cluster/lock.DoorLockServer` serves OperatingMode ("RW VM") as
+    writable state, as matter.js does: a supported mode (Normal,
+    NoRemoteLockUnlock) is stored, anything else is a ConstraintError. The
+    reference daemon's lock builds its server once, so the written mode
+    survives to the next request (TC-DRLK-2.1).
+  - `cluster/cover.Config.MoveStep` lets the WindowCovering server's lift
+    travel — six steps, OperationalStatus Opening or Closing until it
+    arrives, every step reported through `contract.AttributeChangeNotifier`,
+    StopMotion halting it where it is — as matter.js's CHIP test node
+    moves it; zero keeps the instant movement. The reference daemon's
+    blind travels with 950 ms steps (TC-WNCV-3.1 to 3.3).
+  - The reference daemon's blind keeps its lift position across a restart,
+    as matter.js keeps WindowCovering state non-volatile (TC-WNCV-4.5).
+  - `mdns.Zeroconf.HostName` replaces the SRV target of every published
+    record; the reference daemon sets it to the OS host name with
+    `--mdns-os-hostname` (testing only), which the chip-tool harness passes
+    on a host whose LAN interface has no IPv6 — there the MAC-derived name
+    carries only IPv4 records, and the image's chip-tool resolves
+    operational nodes over IPv6 only.
+  - The reference daemon's smoke/CO alarm builds its SmokeCoAlarm server
+    once, so the alarm events go out through the instance the bridge wired
+    its emitter into (TC-SMOKECO-2.2 to 2.5), and reports a future
+    ExpiryDate (TC-SMOKECO-2.1); its valve closes itself when a timed
+    opening ends and reports it (TC-VALCC-4.5).
+  - The reference daemon's washer counts its CountdownTime down while a
+    cycle runs (TC-OPSTATE-2.2), and its robot vacuum behaves as matter.js's
+    RVC test node: it starts Stopped, its run and clean modes refuse with
+    InvalidInMode where that node does, Resume is refused on the dock and
+    GoHome in Error, and the rvc-app pipe's Reset, ChargerFound, Charging and
+    Charged are understood (TC-RVCOPSTATE-*, TC-RVCRUNM-*, TC-RVCCLEANM-*).
+  - The reference daemon's light reports what its OnWithTimedOff countdowns
+    change on their own: OnTime and OffWaitTime as they run down, and OnOff
+    when the timed-on phase switches the light off. Before, a subscriber
+    learned of none of it (TC-OO-2.8).
+  - The reference daemon's ceiling light no longer hangs on an OnOff
+    command: switching it fired the device's change notification while the
+    command still held the light's state, and the bridge's read-back of the
+    changed paths waited on it forever (TC-CC-*, TC-LVL-*).
+  - The reference daemon's on/off light hands the bridge the same cluster
+    servers on every dispatch, so a written OnTime or OffWaitTime and a
+    running countdown survive to the next request (TC-OO-2.1 to 2.3).
+  - The reference daemon's valve travels: Open and Close set TargetState and
+    report CurrentState Transitioning, and on arrival TargetState returns to
+    null — the pair of reports TC-VALCC-3.1 waits for; OpenDuration and
+    RemainingDuration hold from the Open command on (TC-VALCC-4.1, 4.2,
+    4.5); a command for the position the valve already holds moves nothing.
+  - The reference daemon's washer refuses Start and Resume with
+    UnableToStartOrResume after the app pipe reported a fault, and a
+    cleared fault resumes the cycle, as matter.js's test node does
+    (TC-OPSTATE-2.2).
+  - The reference daemon's smoke/CO alarm ends a self-test on its own after
+    five seconds (SelfTestComplete, then AllClear), and its app pipe takes
+    CHIP's smoke-co-alarm-app `LongPress` (start a self-test) and
+    `SetUnmounted` (TC-SMOKECO-2.4, TC-SMOKECO-2.7). The test button starts
+    no self-test while the alarm sounds, the rule SelfTestRequest answers
+    with BUSY (TC-SMOKECO-2.2, 2.3), an unmounted alarm expresses
+    Inoperative, and a critical alarm cannot be muted (TC-SMOKECO-2.5).
+  - The reference daemon persists GeneralDiagnostics TotalOperationalHours
+    (every minute and on shutdown) and RebootCount — 0 on a
+    database's first boot, one more on each boot after, as matter.js counts
+    it — where it reported a fixed placeholder — and accepts the generic
+    test event trigger 0x3 the DGGEN cases send (TC-DGGEN-2.1).
+  - The reference daemon's washer counts a 30-second cycle down instead of
+    a 30-minute one, and the Stop that ends a cycle emits
+    OperationCompletion with the seconds it lasted, pauses included, and
+    the seconds it was paused
+    (TC-OPSTATE-2.5).
+  - A change notification of a host source marked every reportable
+    attribute of its endpoint dirty; the bridge now reports only the
+    attributes whose value moved, and advances only their clusters'
+    DataVersions, as matter.js's Datasource broadcasts the changed
+    properties (TC-FAN-3.2 counts the FanMode reports).
+  - `cluster/light.ColorControlServer` serves Options ("RW VO") as a
+    writable bitmap (ExecuteIfOff), as matter.js does (TC-CC-6.5); the
+    read-only divergence `BD-Matter-P1-D8` is retired.
+  - The reference daemon's CASE identity table resolves a resumed
+    session by the fabric its resumption record names
+    (`sigma.FabricIndexResolver`); a controller resuming on its fabric after
+    another fabric was installed got a session on the newest fabric and was
+    refused everything (TC-ACL-2.10).
+  - SetRegulatoryConfig accepted a configuration the LocationCapability
+    rules out; an Indoor-only or Outdoor-only node now answers
+    ValueOutsideRange for anything else, as matter.js does (TC-CGEN-2.4).
+  - A rolled-back UpdateNOC now also drops a VID verification statement,
+    VVSC or vendor id set under it, and OperationalCredentials reports
+    changes made outside its own commands — a fail-safe expiry or disarm
+    rolling back AddNOC or UpdateNOC — to subscribers
+    (`contract.ChangeNotifier`; TC-OPCREDS-3.8). The reference daemon drops
+    a removed or rolled-back fabric's CASE identity and operational record,
+    so a recommissioned fabric does not land its sessions on the stale
+    index (TC-CGEN-2.4).
+  - NetworkCommissioning reported LastNetworkingStatus and LastNetworkID
+    as null on a node that is on its Ethernet network; they are now Success
+    and the interface's network id, as TC-CNET-4.3 reads them and as
+    matter.js configures its bridge test node.
+  - An UpdateNOC whose fail-safe expired or was disarmed without
+    CommissioningComplete stayed in force. The fail-safe's expiry now
+    restores the replaced NOC, key and node id and runs the
+    fabric-updated hook, as matter.js's FailsafeContext rollback does
+    (TC-OPCREDS-3.5). The reference daemon follows an UpdateNOC — and its
+    rollback — with the CASE identity, the operational record under the
+    new instance name and the fabric's other sessions (TC-OPCREDS-3.8).
+  - RevokeCommissioning only disarmed the fail-safe, so a fabric an
+    aborted commissioning had added over PASE survived the revoke and the
+    next commissioning of the same fabric failed FabricConflict. The revoke
+    now expires the fail-safe with its timeout cleanup
+    (`core.GeneralCommissioning.ExpireFailSafe`, used by
+    `bridge.CommissioningWindow.RevokeWindow`), as matter.js's
+    `failsafeContext.close()` does (TC-CGEN-2.4).
+  - A list-append ACL write reported every entry before the appended one
+    as Changed; it now reports only the appended entry as Added, as chip's
+    list append does (`im.WithListAppendWrite`, `im.IsListAppendWrite`;
+    TC-ACL-2.6; `BD-Matter-ACLAppendEvents`).
+  - Arming the fail-safe from the disarmed state inside the stack — the
+    PASE auto-arm, the window-open arm — did not start a new fail-safe
+    context, so a trusted root an aborted attempt left pending made the
+    next attempt's AddTrustedRootCertificate fail (TC-CGEN-2.4).
+  - SetVIDVerificationStatement and SignVIDVerificationRequest, mandatory
+    OperationalCredentials commands, answered InvalidCommand. They are now
+    served as matter.js serves them: the statement and VVSC are stored per
+    fabric (through a store with `GetSetting`/`SetSetting`, in memory
+    otherwise) and reported in Fabrics and NOCs, a VendorID updates the
+    fabric (`store.Store.UpdateFabricVendorID`), and the signature covers
+    `VendorIdVerification.dataToSign` with the invoking session's
+    attestation challenge (`core.WithInvokeAttestationChallenge`,
+    `operational.Manager.AttestationChallengeFor`). AttestationRequest and
+    CSRRequest sign with the invoking session's challenge too
+    (`SetVidVerificationStatementRequest` gains `HasVendorID`,
+    `HasVidVerificationStatement`, `HasVvsc`; TC-OPCREDS-3.8, TC-RR-1.1).
+  - A second AddNOC — or an UpdateNOC — after AddNOC in the same
+    fail-safe context was processed instead of failing with ConstraintError,
+    as matter.js's `addNoc` / `updateNoc` do (TC-OPCREDS-3.1).
+  - A PASE session an AddNOC succeeded on kept no accessing fabric, so a
+    fabric-scoped command sent on it afterwards — CommissioningComplete
+    over PASE — was refused UnsupportedAccess instead of being answered
+    InvalidAuthentication. The bridge now moves the session onto the
+    installed fabric (through a session registry with `AdoptFabricIndex`,
+    as `secure/operational.Manager` has), as matter.js sets
+    `session.fabric` and chip calls `AdoptFabricIndex`; GeneralCommissioning
+    rejects CommissioningComplete on any PASE session (TC-CGEN-2.4).
+  - ArmFailSafe while the fail-safe was already armed reset the pending
+    credentials, dropping a trusted root added under it. A re-arm now only
+    extends the fail-safe in force; the armed hook runs for an arm from the
+    disarmed state, as matter.js's `failsafeContext.extend` (TC-CGEN-2.2).
+  - Removing the fabric that opened a commissioning window left
+    AdminFabricIndex naming it. `bridge.CommissioningWindow.FabricRemoved`
+    (run by `EmitFabricRemoved`) now clears it and reports the change, as
+    matter.js's AdministratorCommissioningServer does (TC-CADMIN-1.25).
+  - A controller that removed its own fabric kept being answered on the
+    removed fabric's sessions. `bridge.Bridge.EmitFabricRemovedContext`
+    (new; call it from `OperationalCredentials.SetOnFabricRemoved` with the
+    command's context) also closes every session of the removed fabric once
+    the NOCResponse is out, as matter.js's `Fabric.remove` does
+    (TC-CADMIN-1.15). `EmitFabricRemoved` is unchanged.
+  - A RevokeCommissioning sent over the PASE session it revokes closed that
+    session before answering, so the command timed out at the controller.
+    The close now waits for the response, as matter.js defers a session
+    close until its exchanges end (`im.AfterResponse`,
+    `im.WithAfterResponse`, `im.DeferAfterResponse`; TC-CADMIN-1.10).
+  - A commissioner that aborted a PASE handshake with a failure
+    StatusReport — chip's answer to a wrong passcode — left the handshake
+    holding the single-active-PASE slot for its one-minute timeout; every
+    retry in that minute was dropped as busy and the failure was not
+    counted. The report now ends the handshake and counts toward the
+    20-failure window revocation, as matter.js's PaseServer does
+    (TC-CADMIN-1.9).
+  - A chunked ACL write whose REPLACE-ALL drops the writer's own Administer
+    entry lost every following append to UnsupportedAccess. The elements of
+    one Write interaction that continue writing the attribute just written
+    successfully are no longer re-authorized, as chip's WriteHandler does —
+    across the messages of a chunked write too (`im.WriteTransaction`,
+    `im.WithWriteTransaction`; TC-ACL-2.6, 2.8;
+    `BD-Matter-ChunkedWriteAuthorizedOnce`).
+  - A list attribute too large for one message — the NOCs of three
+    fabrics, a long ACL or PartsList — went out as a single oversized
+    ReportData that a chip controller cannot authenticate and discards,
+    stalling the read or subscription. Such a list is now split into a
+    REPLACE-ALL with the leading members and ListIndex=null appends, as
+    matter.js's `chunkAttributePayload` and chip's report engine do
+    (`tlv.SplitArrayMembers`, `tlv.Encoder.PutRawElement`; TC-S-2.6).
+  - One subscription whose peer was slow to answer a report chunk held up
+    every other subscription's reports until it timed out. Each
+    subscription now reports on its own, and a subscription whose report is
+    still on the wire is not re-entered — its changes wait for the next
+    one — as matter.js's ServerSubscription does (TC-S-2.6).
+  - A command a cluster changed state with was never reported to
+    subscribers unless the server fired a change notification of its own,
+    and none of the root servers does: Breadcrumb after ArmFailSafe,
+    Fabrics after AddNOC. The bridge now compares the invoked cluster's
+    attributes before and after the command and reports what moved, as
+    matter.js's Datasource does (TC-IDM-1.5).
+  - A commissioning window that opened, timed out, was revoked or ended with
+    a commissioning never reported WindowStatus, AdminFabricIndex and
+    AdminVendorId to subscribers; the bridge now marks them changed on every
+    window transition (TC-CADMIN-1.3).
+  - OpenCommissioningWindow answered the IM-level BUSY where matter.js and
+    the spec give FAILURE with the cluster-specific status Busy (0x02)
+    (TC-CADMIN-1.5).
+  - A list-append write (null ListIndex) — how a controller writes a list too
+    large for one message, a replace followed by appends — was not
+    understood: the path lost the null, the element failed to decode as a
+    list, and the whole WriteRequest went unanswered. Appends now add the
+    element to the list as the writer sees it (`im.ConcreteAttributePath.ListAppend`),
+    as matter.js AttributeWriteResponse does (TC-ACL-2.3, 2.5).
+  - A Read, Write, Invoke, Subscribe or Timed request that does not decode is
+    answered with a StatusResponse (the error's status, FAILURE otherwise)
+    instead of being left to time out, as matter.js's InteractionMessenger
+    does.
+  - Writing an ACL or Extension list identical to the stored one emitted
+    change events; matter.js reports only an actual change, and the empty
+    replace that opens a chunked list write now reports nothing (TC-ACL-2.5).
+  - A concrete event path the subject may not read was left out of the
+    report; it is answered with UNSUPPORTED_ACCESS, a wildcard still skips
+    it silently, as matter.js EventReadResponse does (TC-ACL-2.9).
+  - The DNS-SD SRV target was the OS host name, which fails the Matter
+    host-name rule (12 or 16 uppercase hexadecimal characters from the MAC
+    address). The default host name is now the first multicast interface's
+    MAC plus "0000", as matter.js MdnsAdvertisement.ts names its host; on
+    macOS the OS host name is kept, where a separately published name lost
+    its address records (TC-SC-4.3).
+  - BooleanState served FeatureMap 0 and never emitted StateChange. The
+    ChangeEvent feature is on, and the bridge emits StateChange whenever a
+    host's notification changes StateValue, as matter.js BooleanStateServer
+    does by default (ported from matter.js BooleanStateServerTest).
+  - The CASE initiator that re-establishes former subscriptions after a
+    restart never acknowledged the responder's final StatusReport, so the
+    controller retransmitted it until its MRP budget ran out. It is
+    acknowledged when the handshake ends, as matter.js's MessageExchange
+    does on destroy. Found by the matter.js controller leg of the chip-tool
+    suite, which also confirms the resumption itself: after a daemon
+    restart matter.js's controller receives changes on its subscription
+    without subscribing again.
+  - AccessControlEntryChanged was one event per ACL write with no
+    LatestValue and no actor, and the entry AddNOC installs emitted none.
+    The events now follow matter.js AccessControlServer.ts: one per entry
+    position (Added / Changed with the new entry, Removed with the old one),
+    AdminNodeID for a CASE actor and AdminPasscodeID 0 for PASE, and the
+    AddNOC entry reported as Added by passcode 0
+    (`OperationalCredentials.SetOnAdminEntryInstalled`, wired by the bridge)
+    (TC-ACL-2.5, 2.6, 2.9). AccessControlExtensionChanged names the actor
+    too.
+  - An AccessControl Extension whose list member carries no tag was accepted;
+    matter.js decodes the extension as a tagged list and rejects it with
+    CONSTRAINT_ERROR (TC-ACL-2.3).
+  - The commissioning window stayed open after a successful
+    CommissioningComplete through it, so the next OpenCommissioningWindow was
+    answered BUSY until the window timed out. GeneralCommissioning now ends
+    it (`SetOnCommissioned`, wired by the bridge to its CommissioningWindow,
+    `CommissioningWindow.EndCommissioning`), as matter.js's DeviceCommissioner
+    does on `commissioned` (TC-CADMIN-1.3, TC-ACL-2.8).
+  - BasicInformation.ConfigurationVersion, mandatory from cluster revision
+    6, was not served on the root, and the bridged endpoints' was a constant
+    1. Both now start at 1 as in matter.js and can be raised:
+    `BasicInformation.IncreaseConfigurationVersion` /
+    `RestoreConfigurationVersion`, `endpoint.Endpoint.IncreaseConfigurationVersion`,
+    `endpoint.Spec.ConfigurationVersion` for the persisted value, and
+    `bridge.Bridge.IncreaseConfigurationVersion(scope, address)`, which raises
+    the device's endpoints and the node's version and reports both to
+    subscribers, as matter.js's increaseConfigurationVersion does
+    (TC-BINFO-3.2, TC-BRBINFO-3.2).
+  - The AccessControl Extension attribute lived in memory only and was gone
+    after a restart. It is persisted through the store's settings when the
+    store offers them (`core.ACLExtensionPersistence`, which `store.Store`
+    implements) (TC-ACL-2.10).
+  - Command and attribute privileges came from the cluster servers alone,
+    with Operate as the fallback, so every server that did not declare one
+    let an Operate subject through: Identify and TriggerEffect (Manage),
+    PayloadTestRequest (Manage), a write to
+    BridgedDeviceBasicInformation.NodeLabel, OnOff.StartUpOnOff or the
+    Thermostat setpoint limits (Manage). The dispatcher now takes matter.js's
+    privilege for every command (`schema.InvokePrivilege`, held against the
+    element files by a test) and every attribute
+    (`schema.AttributeWritePrivilege`, generated from the access strings of
+    `parity/schema.json`, inherited ones included); a server can only raise
+    it (TC-ACE-2.2, TC-ACE-2.3).
+  - A write to a global attribute (AttributeList, FeatureMap, …) reached the
+    cluster server and answered FAILURE or UNSUPPORTED_ATTRIBUTE; it answers
+    UNSUPPORTED_WRITE now, as matter.js models them read-only (TC-ACE-2.2).
+  - An event-only subscription established even when the subject may not
+    read any of the requested events (AccessControlEntryChanged without
+    Administer) or the path names no cluster the node has. Such a
+    subscription is now rejected with INVALID_ACTION, as matter.js counts
+    only readable, existent event paths (EventReadResponse.ts,
+    ServerSubscription.ts) (TC-ACE-1.2).
+  - An InvokeResponse too large for one datagram was dropped by the
+    listener. It is now chunked with MoreChunkedMessages, each chunk but
+    the last waiting for the controller's StatusResponse, as matter.js
+    InteractionMessenger.ts sendInvokeResponseChunk does; a single entry
+    that cannot fit answers RESOURCE_EXHAUSTED (TC-IDM-1.4).
+  - An ongoing subscription report that needed several chunks sent them
+    back to back without the per-chunk StatusResponse handshake and without
+    piggybacking the ack of the controller's StatusResponse; chip drops
+    such a chunk ("Dropping message without piggyback ack when we are
+    waiting for an ack") and with it every change it carried. Ongoing
+    reports now follow the same handshake as the priming report
+    (InteractionMessenger.ts sendDataReportMessage, MessageExchange.ts
+    send) (TC-IDM-4.3).
+  - The subscription engine sent keep-alives and change reports for a
+    subscription whose priming report was still streaming; a controller
+    answers those with INVALID_SUBSCRIPTION and tears the subscription
+    down. A subscription stays silent until its SubscribeResponse is sent,
+    as matter.js's ServerSubscription only starts its timers after
+    activation (TC-IDM-4.3).
+  - A write to a bridged endpoint's BridgedDeviceBasicInformation.NodeLabel
+    was accepted but not kept: the next read returned the host label again,
+    and a reassembly lost it. The written label now lives on the endpoint,
+    survives Reassemble, and reaches the host through
+    `endpoint.Config.OnNodeLabelWritten` for persistence (TC-IDM-4.3).
+  - A successful write was not reported to subscribers either: writing
+    BasicInformation.NodeLabel never reached a subscription to it. Written
+    attributes are now marked dirty (TC-IDM-2.3).
+  - A write to an attribute the cluster does not implement answered
+    UNSUPPORTED_WRITE (or reached the server); it now answers
+    UNSUPPORTED_ATTRIBUTE before writability is considered, as matter.js
+    AttributeWriteResponse.ts does (TC-IDM-3.2).
+  - AdministratorCommissioning.OpenCommissioningWindow had no field decoder,
+    so every controller's enhanced commissioning window — the multi-admin
+    "share" — answered INVALID_COMMAND. It is decoded now (TC-IDM-1.2).
+  - A fabric-scoped command on a session without an accessing fabric (PASE
+    before AddNOC) reached the server; it now answers UNSUPPORTED_ACCESS
+    (matter.js CommandInvokeResponse.ts:287, TC-IDM-1.2).
+  - An InvokeRequest or WriteRequest whose Timed flag is set without a
+    preceding TimedRequest answered NEEDS_TIMED_INTERACTION; matter.js
+    answers TIMED_REQUEST_MISMATCH. A timed-required command outside a timed
+    interaction now answers NEEDS_TIMED_INTERACTION for its own path in the
+    InvokeResponse instead of failing the whole interaction (TC-IDM-1.2).
+  - Sigma2 carried no session parameters, so a controller assumed
+    MaxPathsPerInvoke 1 against a device whose BasicInformation says 10
+    (TC-IDM-1.4).
+  - The root Descriptor and AdministratorCommissioning had no DataVersion
+    and answered every read with the sentinel, which a DataVersionFilter
+    never matches. Both now derive one from their content (TC-IDM-2.2).
+  - BasicInformation.CapabilityMinima lacked the four fields revision 6
+    makes mandatory; they default to matter.js's 20 (TC-IDM-2.3).
+  - GeneralDiagnostics TimeSnapshot answered under its request's command id
+    with an empty struct; the response is encoded now, with PosixTimeMs
+    null as matter.js reports it without TimeSynchronization.
+  - LevelControl lacked MinLevel / MaxLevel (conformance "Rev >= v7"), and
+    the CT ColorControl lacked RemainingTime, which ColorTemperatureLight
+    requires (TC-IDM-10.2).
+
+- **Found by the chip-tool data-model sweep** (`internal/chiptool`,
+  which holds every cluster a real controller reads against its own global
+  lists and the matter.js schema):
+  - `cluster/thermo`: AcceptedCommandList was empty — the server handled
+    SetpointRaiseLower, the cluster's one mandatory command, but
+    implemented no command lister, so the dispatcher synthesised `[]`. It
+    now lists SetpointRaiseLower.
+  - `cluster/cover`: AcceptedCommandList was empty for the same reason. It
+    now lists UpOrOpen, DownOrClose, StopMotion and, with LF,
+    GoToLiftPercentage — the commands the server handles and matter.js
+    mandates.
+  - `cluster/light`: the CT-only ColorControl server lacked the two
+    attributes conformance "CT" makes mandatory,
+    CoupleColorTempToLevelMinMireds (0x400D, the physical minimum, as
+    matter.js falls back to) and StartUpColorTemperatureMireds (0x4010,
+    nullable, writable at Manage, constraint 1 to 65279). New wire
+    constants `ColorCtrlAttrCoupleColorTempToLevelMinMireds` and
+    `ColorCtrlAttrStartUpColorTemperatureMireds`.
+  - `cluster/core`: OperationalCredentials, GroupKeyManagement and Groups
+    served EventList (0xFFFA) and named it in AttributeList, while the
+    dispatcher leaves it out of every other cluster and matter.js marks it
+    deprecated (conformance "D"). Groups even named it in AttributeList
+    without returning it from a wildcard read. All three now leave it out.
 
 - GroupKeyManagement GroupTable and GroupKeyMap write GroupId,
   GroupKeySetId and the endpoint ids at their smallest TLV width, as

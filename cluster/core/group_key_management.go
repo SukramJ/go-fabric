@@ -364,9 +364,6 @@ func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint3
 			groupKeyMgmtCmdKeySetRemove,         // 0x03
 			groupKeyMgmtCmdKeySetReadAllIndices, // 0x04
 		}, true
-	case cluster.AttrGlobalEventList:
-		// GKM has no events per matter.js group-key-management.element.ts.
-		return []uint32{}, true
 	case cluster.AttrGlobalAttributeList:
 		// Full attribute list per Matter §11.2.10 + global attrs.
 		return []uint32{
@@ -378,7 +375,6 @@ func (g *GroupKeyManagement) matterReadWithCtx(ctx context.Context, attrID uint3
 			cluster.AttrGlobalClusterRevision,      // 0xFFFD
 			cluster.AttrGlobalGeneratedCommandList, // 0xFFF8
 			cluster.AttrGlobalAcceptedCommandList,  // 0xFFF9
-			cluster.AttrGlobalEventList,            // 0xFFFA
 			cluster.AttrGlobalAttributeList,        // 0xFFFB
 		}, true
 	}
@@ -635,9 +631,13 @@ func (g *GroupKeyManagement) MatterReportable() []uint32 {
 // MatterAttributes implements [contract.ClusterAttributeLister]
 // so wildcard subscribe enumerates the full cluster surface.
 //
-// Global attributes 0xFFF8–0xFFFB included so Apple's initial subscribe
-// sweep can cache GeneratedCommandList, AcceptedCommandList, EventList
-// and AttributeList for cluster 0x3F.
+// The globals are included so Apple's initial subscribe sweep can cache
+// GeneratedCommandList, AcceptedCommandList and AttributeList for cluster
+// 0x3F. EventList (0xFFFA) is not: matter.js marks it deprecated
+// (event-list.element.ts conformance "D") and the dispatcher leaves it out
+// of every synthesised AttributeList (endpoint/dispatcher.go
+// synthesizeGlobalRead), so listing it here made this one cluster disagree
+// with every other — the chip-tool data-model sweep is what noticed.
 func (g *GroupKeyManagement) MatterAttributes() []uint32 {
 	return []uint32{
 		groupKeyMgmtAttrGroupKeyMap,
@@ -648,7 +648,6 @@ func (g *GroupKeyManagement) MatterAttributes() []uint32 {
 		cluster.AttrGlobalClusterRevision,
 		cluster.AttrGlobalGeneratedCommandList,
 		cluster.AttrGlobalAcceptedCommandList,
-		cluster.AttrGlobalEventList,
 		cluster.AttrGlobalAttributeList,
 	}
 }

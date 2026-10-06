@@ -474,7 +474,8 @@ func TestCheckTimedGate_UntimedRequestWithPriorRejects(t *testing.T) {
 
 // TestCheckTimedGate_TimedFlagWithoutPriorRejects verifies that a
 // timed Write/Invoke without a preceding TimedRequest rejects with
-// NEEDS_TIMED_INTERACTION (0xC6).
+// TIMED_REQUEST_MISMATCH (0xC9) — the flag claims a timed interaction the
+// exchange never opened (matter.js InteractionServer.ts:409-412, :945-948).
 func TestCheckTimedGate_TimedFlagWithoutPriorRejects(t *testing.T) {
 	t.Parallel()
 	b := &Bridge{}
@@ -482,8 +483,8 @@ func TestCheckTimedGate_TimedFlagWithoutPriorRejects(t *testing.T) {
 	if !gated {
 		t.Fatal("timed without prior: gated=false, want true")
 	}
-	if status != im.StatusNeedsTimedInteraction {
-		t.Errorf("status = %v, want StatusNeedsTimedInteraction (0xC6)", status)
+	if status != im.StatusTimedRequestMismatch {
+		t.Errorf("status = %v, want StatusTimedRequestMismatch (0xC9)", status)
 	}
 }
 
@@ -522,8 +523,8 @@ func TestCheckTimedGate_ValidDeadlineProceeds(t *testing.T) {
 	}
 	// Re-check on the same exchange now reads as missing-prior.
 	status, gated := b.checkTimedGate(true, 3, 13)
-	if !gated || status != im.StatusNeedsTimedInteraction {
-		t.Errorf("re-check: gated=%v status=%v, want gated=true status=NeedsTimedInteraction", gated, status)
+	if !gated || status != im.StatusTimedRequestMismatch {
+		t.Errorf("re-check: gated=%v status=%v, want gated=true status=TimedRequestMismatch", gated, status)
 	}
 }
 
@@ -543,13 +544,13 @@ func TestTimedRequest_SessionScopeIsolation(t *testing.T) {
 	b.routing.timedDeadlines.Store(timedKey{sessionID: sessionA, exchangeID: exchangeID}, time.Now().Add(10*time.Second))
 
 	// Attempt to consume from session B on the same exchange-ID:
-	// must hit the "no prior TimedRequest" path (NEEDS_TIMED_INTERACTION).
+	// must hit the "no prior TimedRequest" path (TIMED_REQUEST_MISMATCH).
 	status, gated := b.checkTimedGate(true, sessionB, exchangeID)
 	if !gated {
 		t.Fatal("session B: gated=false, want true (different session must not consume session A's deadline)")
 	}
-	if status != im.StatusNeedsTimedInteraction {
-		t.Errorf("session B: status=%v, want StatusNeedsTimedInteraction", status)
+	if status != im.StatusTimedRequestMismatch {
+		t.Errorf("session B: status=%v, want StatusTimedRequestMismatch", status)
 	}
 	// Session A's deadline must still be present — session B's miss must not
 	// have cleared it.

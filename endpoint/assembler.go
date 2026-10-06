@@ -24,6 +24,13 @@ type Config struct {
 	ProductID uint16
 	// NodeLabel is the user-visible bridge label.
 	NodeLabel string
+	// VendorName is the node's own BasicInformation VendorName. A bridged
+	// endpoint whose [Spec.VendorName] is empty serves it as its
+	// BridgedDeviceBasicInformation VendorName, so the vendor fields
+	// controllers rely on stay filled; empty as well, the attribute is not
+	// served — matter.js's default for a bridged device, where vendorName
+	// is optional and its bridge example sets none.
+	VendorName string
 	// Groups is the node's group state. When set, every bridged endpoint
 	// whose device type mandates the Groups cluster (on-off-light,
 	// on-off-plug-in-unit, … — schema.DeviceTypeRequiresServerCluster)
@@ -32,6 +39,28 @@ type Config struct {
 	// as in matter.js (GroupsServer keeps it in the root's
 	// GroupKeyManagementServer). nil keeps whatever the source supplies.
 	Groups *groups.Manager
+	// OnNodeLabelWritten fires after a controller wrote a bridged
+	// endpoint's BridgedDeviceBasicInformation NodeLabel, with the
+	// endpoint's stable key and the new label, so the host can persist it
+	// and hand it back as [Spec.NodeLabel] after a restart — matter.js
+	// keeps a written nodeLabel in the endpoint's persisted state. nil
+	// keeps the label for the life of the process only.
+	OnNodeLabelWritten func(key SourceKey, label string)
+	// Scenes persists the scene tables of the endpoints that serve
+	// ScenesManagement (see [ScenesStore]). With Groups set, every bridged
+	// endpoint whose device type mandates ScenesManagement (the light
+	// device types) serves the stack's ScenesManagement server, in place
+	// of any a source supplies — as matter.js mounts ScenesManagementServer
+	// for those device types. nil keeps the tables for the life of the
+	// process.
+	Scenes ScenesStore
+}
+
+// ScenesStore keeps an endpoint's scene table across restarts — matter.js
+// keeps sceneTable as nonvolatile state. key is the endpoint's stable key.
+type ScenesStore interface {
+	LoadScenes(key SourceKey) []byte
+	SaveScenes(key SourceKey, table []byte)
 }
 
 // Validate returns nil when the config is internally consistent.
@@ -113,10 +142,11 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 		Reachable:  true,
 	}
 	topology := &Topology{
-		Endpoints: []*Endpoint{root, aggregator},
-		VendorID:  a.cfg.VendorID,
-		ProductID: a.cfg.ProductID,
-		NodeLabel: a.cfg.NodeLabel,
+		Endpoints:  []*Endpoint{root, aggregator},
+		VendorID:   a.cfg.VendorID,
+		ProductID:  a.cfg.ProductID,
+		NodeLabel:  a.cfg.NodeLabel,
+		VendorName: a.cfg.VendorName,
 	}
 
 	seen := make(map[SourceKey]struct{})
@@ -160,6 +190,7 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 		}
 		ep.BridgeVendorID = topology.VendorID
 		ep.BridgeProductID = topology.ProductID
+		ep.BridgeVendorName = topology.VendorName
 	}
 	return topology, nil
 }
@@ -193,7 +224,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		Reachable:  reachable,
 		// The 32-byte NodeLabel cap is Matter's constraint, so the
 		// assembly enforces it however the label was produced.
-		FriendlyName:   truncateUTF8(spec.FriendlyName, nodeLabelMaxBytes),
+		FriendlyName:   truncateLabel(spec.FriendlyName),
 		ChannelAddress: spec.ChannelAddress,
 		Availability:   spec.Availability,
 		Source:         spec.Source,
@@ -202,10 +233,11 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		SourceKey:      spec.StableKey,
 		Scope:          scope,
 		DeviceAddress:  spec.DeviceAddress,
+		VendorName:     spec.VendorName,
 		// Reuse the state bound to this stable source key so the
 		// endpoint's per-cluster version and Identify server survive
 		// reassembly.
-		state: a.states.stateFor(spec.StableKey),
+		state: a.restoredState(spec),
 		// Bridged endpoints are children of the Aggregator (EP 1).
 		// Mirrors chip examples/bridge-app/linux/main.cpp:261-276
 		// AddDeviceEndpoint(..., parentEndpointId=1) and matter.js
@@ -213,7 +245,21 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		ParentEndpointID:    1,
 		HasParentEndpointID: true,
 		groups:              a.cfg.Groups,
+		onNodeLabelWritten:  a.cfg.OnNodeLabelWritten,
+		scenesStore:         a.cfg.Scenes,
 	}, nil
+}
+
+// restoredState returns the state bound to spec's key, with the label the
+// host restored for it (Spec.NodeLabel) installed unless a controller has
+// written one during this process.
+func (a *Assembler) restoredState(spec *Spec) *endpointState {
+	st := a.states.stateFor(spec.StableKey)
+	if spec.NodeLabel != "" {
+		st.restoreLabel(truncateLabel(spec.NodeLabel))
+	}
+	st.restoreConfigurationVersion(spec.ConfigurationVersion)
+	return st
 }
 
 // assignOrReuseID looks up the existing endpoint_id for sourceKey;
