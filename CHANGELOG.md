@@ -295,6 +295,13 @@ pseudo-version of `main`.
   parity assertions (`CheckDefinition`, `CheckServer`, the round trips).
   The bridge decodes a generated cluster's request payloads through the
   registry and encodes any `spec.Encodable` value or response.
+- **`cluster/filter`: HepaFilterMonitoring (0x0071) and
+  ActivatedCarbonFilterMonitoring (0x0072)** for the AirPurifier and
+  ExtractorHood device types — `NewHepaFilterMonitoring`,
+  `NewActivatedCarbonFilterMonitoring`, `Config`, `State`, `Resetter`,
+  `LastChangedTimeWriter`; all three features (Condition, Warning,
+  ReplacementProductList), InPlaceIndicator, the writable LastChangedTime and
+  ResetCondition. The first server built on a generated definition.
 
 ### Changed
 

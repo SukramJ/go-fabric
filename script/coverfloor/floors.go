@@ -147,6 +147,7 @@ var floors = []packageFloor{
 	// definitions. Generated code is measured like any other (schema/ is
 	// too); each generated package's generated test round-trips every codec
 	// and holds the definition against the snapshot, which covers it fully.
+	{pkg: "github.com/SukramJ/go-fabric/cluster/filter", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode", min: 100},

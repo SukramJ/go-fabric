@@ -79,6 +79,8 @@ Application clusters, grouped by the device surface they serve:
 | [`cluster/alarm`](../cluster/alarm) | SmokeCoAlarm (0x005C) — SMOKE / CO, derived ExpressedState, SelfTestRequest, all eleven events |
 | [`cluster/opstate`](../cluster/opstate) | OperationalState (0x0060) · RvcOperationalState (0x0061) — server-held state with matter.js's reactors, Pause / Stop / Start / Resume / GoHome checked as OperationalStateUtils checks them, both events, CountdownTime reported as a quieter ("Q") attribute |
 | [`cluster/modebase`](../cluster/modebase) | LaundryWasherMode (0x0051) · RvcRunMode (0x0054) · RvcCleanMode (0x0055) · DishwasherMode (0x0059) — one ModeBase server, SupportedModes validation with each derivation's required tags, ChangeToMode / ChangeToModeResponse |
+| [`cluster/filter`](../cluster/filter) | HepaFilterMonitoring (0x0071) · ActivatedCarbonFilterMonitoring (0x0072) — one ResourceMonitoring server, all three features, ResetCondition, the first server built on a generated definition from the start ([ADR 0013](./adr/0013-generated-cluster-definitions.md)) |
+| [`cluster/spec`](../cluster/spec) | The generated cluster definitions (`cluster/spec/<name>/`, written by `script/clustergen` from the snapshot) and the runtime that derives a server's lists, globals, privileges, write checks and payload codecs from one ([ADR 0013](./adr/0013-generated-cluster-definitions.md)); `cluster/spec/spectest` holds the parity assertions |
 | [`cluster/measurement`](../cluster/measurement) | Temperature (0x0402) · RelativeHumidity (0x0405) · Illuminance (0x0400) · Pressure (0x0403) · Flow (0x0404) · BooleanState (0x0045) · OccupancySensing (0x0406) · AirQuality (0x005B) · CO₂ (0x040D) · PM2.5 (0x042A) · PM10 (0x042D) · PowerSource (0x002F) · ElectricalPowerMeasurement (0x0090) · ElectricalEnergyMeasurement (0x0091) |
 | [`cluster/wire`](../cluster/wire) | Wire-format types and encoders for AdministratorCommissioning, Switch (Generic Switch), ScenesManagement, Schedules, the deprecated Groups stub, and the command payloads of the servers above |
 
@@ -125,8 +127,8 @@ from the host — `endpoint/application_device_types_test.go`):
 | --- | --- | --- |
 | SmokeCoAlarm 0x0076 | `alarm.Server` | CO concentration, temperature, humidity measurement; the PowerSource *device type* entry (see the findings register) |
 | Fan 0x002B | `fan.Server` (Groups is mounted by the assembler) | OnOff |
-| AirPurifier 0x002D | `fan.Server` | HEPA / activated-carbon filter monitoring (0x0071 / 0x0072), OnOff |
-| ExtractorHood 0x007A | `fan.Server` without RCK / WND / DIR | HEPA / activated-carbon filter monitoring |
+| AirPurifier 0x002D | `fan.Server`; optionally `filter.NewHepaFilterMonitoring` / `filter.NewActivatedCarbonFilterMonitoring` | OnOff |
+| ExtractorHood 0x007A | `fan.Server` without RCK / WND / DIR; optionally the two filter servers | — |
 | Pump 0x0303 | `pump.Server` plus the host's own OnOff server | LevelControl, ScenesManagement, the measurement servers |
 | FlowSensor 0x0306 | a `contract.MeasurementFlow` source | — |
 | LaundryWasher 0x0073 | `opstate.NewServer` (OperationCompletion is mandatory and declared for it); optionally `modebase.NewLaundryWasherMode` | LaundryWasherControls, TemperatureControl, OnOff (DeadFront) |
