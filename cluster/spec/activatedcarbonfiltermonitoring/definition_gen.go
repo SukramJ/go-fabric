@@ -41,6 +41,8 @@ const (
 )
 
 // Feature is a ActivatedCarbonFilterMonitoring FeatureMap bit.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -51,6 +53,8 @@ const (
 )
 
 // ChangeIndicationEnum is the ChangeIndicationEnum enum8.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ChangeIndicationEnum uint8
 
 // ChangeIndicationEnum values.
@@ -61,6 +65,8 @@ const (
 )
 
 // ChangeIndicationEnumDef describes ChangeIndicationEnum.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ChangeIndicationEnumDef = &spec.Enum{Name: "ChangeIndicationEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Ok", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Warning", Conformance: spec.Conformance{Text: "WRN", Op: spec.ConfName, Name: "WRN"}},
@@ -68,6 +74,8 @@ var ChangeIndicationEnumDef = &spec.Enum{Name: "ChangeIndicationEnum", Bits: 8, 
 }}
 
 // DegradationDirectionEnum is the DegradationDirectionEnum enum8.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type DegradationDirectionEnum uint8
 
 // DegradationDirectionEnum values.
@@ -77,12 +85,16 @@ const (
 )
 
 // DegradationDirectionEnumDef describes DegradationDirectionEnum.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var DegradationDirectionEnumDef = &spec.Enum{Name: "DegradationDirectionEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Up", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Down", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ProductIdentifierTypeEnum is the ProductIdentifierTypeEnum enum8.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ProductIdentifierTypeEnum uint8
 
 // ProductIdentifierTypeEnum values.
@@ -95,6 +107,8 @@ const (
 )
 
 // ProductIdentifierTypeEnumDef describes ProductIdentifierTypeEnum.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ProductIdentifierTypeEnumDef = &spec.Enum{Name: "ProductIdentifierTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Upc", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Gtin8", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
@@ -126,6 +140,8 @@ func (v *ReplacementProductStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ReplacementProductStructDef describes ReplacementProductStruct.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ReplacementProductStructDef = &spec.Struct{Name: "ReplacementProductStruct", Fields: []spec.Field{
 	{ID: 0, Name: "ProductIdentifierType", Type: spec.Type{Name: "ProductIdentifierTypeEnum", Kind: spec.KindEnum, Bits: 8, Enum: ProductIdentifierTypeEnumDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 	{ID: 1, Name: "ProductIdentifierValue", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 20", Max: &spec.Bound{Int: 20}}},

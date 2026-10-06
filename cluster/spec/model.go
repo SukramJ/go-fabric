@@ -163,6 +163,7 @@ type Field struct {
 }
 
 // NullDefault is the default of an element whose stated default is null.
+// fabric:reachable:reason="the Default of a generated attribute whose stated default is null; it is only ever a package-level initializer value, which RTA does not follow"
 type NullDefault struct{}
 
 // Mandatory mirrors ValueModel.mandatory (Conformance.isMandatory): the

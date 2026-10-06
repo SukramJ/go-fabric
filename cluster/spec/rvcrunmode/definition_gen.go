@@ -40,6 +40,8 @@ const (
 )
 
 // Feature is a RvcRunMode FeatureMap bit.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -49,6 +51,8 @@ const (
 )
 
 // ModeChangeStatus is the ModeChangeStatus enum8.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ModeChangeStatus uint8
 
 // ModeChangeStatus values.
@@ -68,6 +72,8 @@ const (
 )
 
 // ModeChangeStatusDef describes ModeChangeStatus.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ModeChangeStatusDef = &spec.Enum{Name: "ModeChangeStatus", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Success"},
 	{Value: 1, Name: "UnsupportedMode"},
@@ -109,6 +115,8 @@ func (v *ModeOptionStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ModeOptionStructDef describes ModeOptionStruct.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ModeOptionStructDef = &spec.Struct{Name: "ModeOptionStruct", Fields: []spec.Field{
 	{ID: 0, Name: "Label", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Fixed: true}, Constraint: spec.Constraint{Text: "max 64", Max: &spec.Bound{Int: 64}}},
 	{ID: 1, Name: "Mode", Type: spec.Type{Name: "uint8", Kind: spec.KindUint, Bits: 8}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Quality: spec.Quality{Fixed: true}},
@@ -138,12 +146,16 @@ func (v *ModeTagStruct) DecodeTLV(n spec.Node) error {
 }
 
 // ModeTagStructDef describes ModeTagStruct.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ModeTagStructDef = &spec.Struct{Name: "ModeTagStruct", Fields: []spec.Field{
 	{ID: 0, Name: "MfgCode", Type: spec.Type{Name: "vendor-id", Kind: spec.KindUint, Bits: 16}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "desc", Desc: true}},
 	{ID: 1, Name: "Value", Type: spec.Type{Name: "ModeTag", Kind: spec.KindEnum, Bits: 16, Enum: ModeTagDef}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
 
 // ModeTag is the ModeTag enum16.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ModeTag uint16
 
 // ModeTag values.
@@ -164,6 +176,8 @@ const (
 )
 
 // ModeTagDef describes ModeTag.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ModeTagDef = &spec.Enum{Name: "ModeTag", Bits: 16, Values: []spec.EnumValue{
 	{Value: 0, Name: "Auto"},
 	{Value: 1, Name: "Quick"},

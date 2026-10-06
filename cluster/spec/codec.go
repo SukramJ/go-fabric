@@ -103,25 +103,30 @@ func outOfRange(format string, args ...any) error {
 }
 
 // Decoder decodes one value from a node.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 type Decoder[T any] func(Node) (T, error)
 
 // Unsigned is the set of unsigned integer types, named ones included.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 type Unsigned interface {
 	~uint8 | ~uint16 | ~uint32 | ~uint64
 }
 
 // Signed is the set of signed integer types, named ones included.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 type Signed interface {
 	~int8 | ~int16 | ~int32 | ~int64
 }
 
 // DecodeUint decodes an unsigned integer of bits, enum or bitmap included.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeUint[T Unsigned](bits int) Decoder[T] {
 	return DecodeUintIn[T](bits, 0, UintMax(bits, false))
 }
 
 // DecodeUintIn decodes an unsigned integer of bits bounded by a numeric
 // constraint.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeUintIn[T Unsigned](bits int, lo, hi uint64) Decoder[T] {
 	return func(n Node) (T, error) {
 		el := n.El
@@ -136,12 +141,14 @@ func DecodeUintIn[T Unsigned](bits int, lo, hi uint64) Decoder[T] {
 }
 
 // DecodeInt decodes a signed integer of bits.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeInt[T Signed](bits int) Decoder[T] {
 	lo, hi := IntRange(bits, false)
 	return DecodeIntIn[T](bits, lo, hi)
 }
 
 // DecodeIntIn decodes a signed integer of bits bounded by a numeric constraint.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeIntIn[T Signed](bits int, lo, hi int64) Decoder[T] {
 	tlo, thi := IntRange(bits, false)
 	lo, hi = max(lo, tlo), min(hi, thi)
@@ -223,6 +230,7 @@ func DecodeBytesIn(lo, hi int) Decoder[[]byte] {
 }
 
 // DecodeStruct decodes a generated struct.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeStruct[T any, P interface {
 	*T
 	DecodeTLV(Node) error
@@ -233,9 +241,11 @@ func DecodeStruct[T any, P interface {
 }
 
 // DecodeList decodes a list.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeList[T any](entry Decoder[T]) Decoder[[]T] { return DecodeListIn(entry, 0, math.MaxInt) }
 
 // DecodeListIn decodes a list whose entry count lies in lo..hi.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeListIn[T any](entry Decoder[T], lo, hi int) Decoder[[]T] {
 	return func(n Node) ([]T, error) {
 		if n.El.Type != tlv.TypeArray && n.El.Type != tlv.TypeList {
@@ -258,6 +268,7 @@ func DecodeListIn[T any](entry Decoder[T], lo, hi int) Decoder[[]T] {
 
 // DecodeOptional decodes a field that may be absent: present, it is decoded
 // into a new value.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeOptional[T any](d Decoder[T]) Decoder[*T] {
 	return func(n Node) (*T, error) {
 		v, err := d(n)
@@ -269,18 +280,22 @@ func DecodeOptional[T any](d Decoder[T]) Decoder[*T] {
 }
 
 // Nullable is a value that may be null.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 type Nullable[T any] struct {
 	Value T
 	Null  bool
 }
 
 // NullOf returns a null T.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func NullOf[T any]() Nullable[T] { return Nullable[T]{Null: true} }
 
 // ValueOf returns a non-null T.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func ValueOf[T any](v T) Nullable[T] { return Nullable[T]{Value: v} }
 
 // DecodeNullable decodes a nullable value: TLV null, or what d decodes.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func DecodeNullable[T any](d Decoder[T]) Decoder[Nullable[T]] {
 	return func(n Node) (Nullable[T], error) {
 		if n.El.Type == tlv.TypeNull {
@@ -304,6 +319,7 @@ type FieldSpec struct {
 }
 
 // Bind binds a field to its destination and decoder.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func Bind[T any](id uint32, name string, mandatory bool, dst *T, d Decoder[T]) FieldSpec {
 	return FieldSpec{ID: id, Name: name, Mandatory: mandatory, decode: func(n Node) error {
 		v, err := d(n)
@@ -370,6 +386,7 @@ type ResponsePayload interface {
 
 // List is a list of generated values that encodes as a TLV array — what a
 // server returns for a list attribute of structs.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 type List[T Encodable] []T
 
 // EncodeTLV implements [Encodable].
@@ -382,13 +399,16 @@ func (l List[T]) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 }
 
 // Put encodes one value.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 type Put[T any] func(*tlv.Encoder, tlv.Tag, T)
 
 // PutUint encodes an unsigned integer, enum or bitmap at its smallest
 // width.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func PutUint[T Unsigned](enc *tlv.Encoder, tag tlv.Tag, v T) { enc.PutUint(tag, uint64(v)) }
 
 // PutInt encodes a signed integer at its smallest width.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func PutInt[T Signed](enc *tlv.Encoder, tag tlv.Tag, v T) { enc.PutInt(tag, int64(v)) }
 
 // PutBool encodes a boolean.
@@ -407,9 +427,11 @@ func PutString(enc *tlv.Encoder, tag tlv.Tag, v string) { enc.PutUTF8(tag, v) }
 func PutBytes(enc *tlv.Encoder, tag tlv.Tag, v []byte) { enc.PutOctets(tag, v) }
 
 // PutStruct encodes a generated struct.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func PutStruct[T Encodable](enc *tlv.Encoder, tag tlv.Tag, v T) { v.EncodeTLV(enc, tag) }
 
 // PutList returns the encoder of a list whose entries put encodes.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func PutList[T any](put Put[T]) Put[[]T] {
 	return func(enc *tlv.Encoder, tag tlv.Tag, v []T) {
 		enc.StartArray(tag)
@@ -421,6 +443,7 @@ func PutList[T any](put Put[T]) Put[[]T] {
 }
 
 // PutNullable returns the encoder of a nullable value.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func PutNullable[T any](put Put[T]) Put[Nullable[T]] {
 	return func(enc *tlv.Encoder, tag tlv.Tag, v Nullable[T]) {
 		if v.Null {
@@ -432,6 +455,7 @@ func PutNullable[T any](put Put[T]) Put[Nullable[T]] {
 }
 
 // PutOptional encodes v when present and leaves the field out when nil.
+// fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func PutOptional[T any](enc *tlv.Encoder, tag tlv.Tag, v *T, put Put[T]) {
 	if v != nil {
 		put(enc, tag, *v)

@@ -26,6 +26,7 @@ import (
 )
 
 // Ptr returns a pointer to v: the value of an optional generated field.
+// fabric:reachable:reason="generic: every generated test calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func Ptr[T any](v T) *T { return &v }
 
 var privileges = map[string]spec.Privilege{
@@ -214,6 +215,7 @@ func Decode(tb testing.TB, b []byte) spec.Node {
 }
 
 // RoundTrip encodes v, decodes the bytes with dec and wants v back.
+// fabric:reachable:reason="generic: every generated test calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func RoundTrip[T spec.Encodable](tb testing.TB, v T, dec spec.Decoder[T]) {
 	tb.Helper()
 	b := Encode(tb, v)

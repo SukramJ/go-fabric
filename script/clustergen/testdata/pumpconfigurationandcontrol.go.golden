@@ -75,6 +75,8 @@ const (
 )
 
 // Feature is a PumpConfigurationAndControl FeatureMap bit.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type Feature uint32
 
 // FeatureMap bits.
@@ -89,6 +91,8 @@ const (
 )
 
 // ControlModeEnum is the ControlModeEnum enum8.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type ControlModeEnum uint8
 
 // ControlModeEnum values.
@@ -102,6 +106,8 @@ const (
 )
 
 // ControlModeEnumDef describes ControlModeEnum.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var ControlModeEnumDef = &spec.Enum{Name: "ControlModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "ConstantSpeed", Conformance: spec.Conformance{Text: "SPD", Op: spec.ConfName, Name: "SPD"}},
 	{Value: 1, Name: "ConstantPressure", Conformance: spec.Conformance{Text: "PRSCONST", Op: spec.ConfName, Name: "PRSCONST"}},
@@ -112,6 +118,8 @@ var ControlModeEnumDef = &spec.Enum{Name: "ControlModeEnum", Bits: 8, Values: []
 }}
 
 // OperationModeEnum is the OperationModeEnum enum8.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type OperationModeEnum uint8
 
 // OperationModeEnum values.
@@ -123,6 +131,8 @@ const (
 )
 
 // OperationModeEnumDef describes OperationModeEnum.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var OperationModeEnumDef = &spec.Enum{Name: "OperationModeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Normal", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Minimum", Conformance: spec.Conformance{Text: "SPD", Op: spec.ConfName, Name: "SPD"}},
@@ -131,6 +141,8 @@ var OperationModeEnumDef = &spec.Enum{Name: "OperationModeEnum", Bits: 8, Values
 }}
 
 // PumpStatusBitmap is the PumpStatusBitmap map16.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 type PumpStatusBitmap uint16
 
 // PumpStatusBitmap bits; a member wider than one bit is its mask.
@@ -147,6 +159,8 @@ const (
 )
 
 // PumpStatusBitmapDef describes PumpStatusBitmap.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
 var PumpStatusBitmapDef = &spec.Bitmap{Name: "PumpStatusBitmap", Bits: 16, Members: []spec.BitmapMember{
 	{Name: "DeviceFault", Bit: 0, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Name: "SupplyFault", Bit: 1, Width: 1, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},

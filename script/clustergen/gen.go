@@ -533,6 +533,8 @@ func (g *generator) source() ([]byte, error) {
 		w.p("")
 	}
 	w.p("// Feature is a %s FeatureMap bit.", c.Name)
+	w.p("//")
+	w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 	w.p("type Feature uint32")
 	w.p("")
 	if len(c.Features) > 0 {
@@ -711,11 +713,14 @@ func qualityText(q map[string]bool) string {
 	return strings.Join(parts, " ")
 }
 
+//nolint:funlen // a template: one section per datatype kind
 func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 	d := di.dt
 	switch di.kind {
 	case kindEnum:
 		w.p("// %s is the %s %s.", di.goName, d.Name, d.Type)
+		w.p("//")
+		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("type %s %s", di.goName, goInt(di.bits, false))
 		w.p("")
 		if len(d.Fields) > 0 {
@@ -735,6 +740,8 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 			w.p("")
 		}
 		w.p("// %sDef describes %s.", di.goName, d.Name)
+		w.p("//")
+		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("var %sDef = &spec.Enum{Name: %q, Bits: %d, Values: []spec.EnumValue{", di.goName, d.Name, di.bits)
 		for _, f := range d.Fields {
 			if f.ID != nil {
@@ -745,6 +752,8 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 		w.p("")
 	case kindBitmap:
 		w.p("// %s is the %s %s.", di.goName, d.Name, d.Type)
+		w.p("//")
+		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("type %s %s", di.goName, goInt(di.bits, false))
 		w.p("")
 		type member struct {
@@ -779,6 +788,8 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 			w.p("")
 		}
 		w.p("// %sDef describes %s.", di.goName, d.Name)
+		w.p("//")
+		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("var %sDef = &spec.Bitmap{Name: %q, Bits: %d, Members: []spec.BitmapMember{", di.goName, d.Name, di.bits)
 		for _, m := range members {
 			w.p("\t{Name: %q, Bit: %d, Width: %d%s},", m.name, m.bit, m.width, confField(m.conformance))
@@ -788,6 +799,8 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 	case kindStruct:
 		g.writePayload(w, &payload{goName: di.goName, what: d.Name, fields: di.fields}, "the "+d.Name+" struct")
 		w.p("// %sDef describes %s.", di.goName, d.Name)
+		w.p("//")
+		w.p("// fabric:reachable:reason=\"generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow\"")
 		w.p("var %sDef = &spec.Struct{Name: %q, Fields: %s}", di.goName, d.Name, g.fieldsLiteral(di.fields))
 		w.p("")
 	default:
