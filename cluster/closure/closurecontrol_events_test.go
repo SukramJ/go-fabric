@@ -214,3 +214,57 @@ func TestClosureControlNotifiesChangedAttributes(t *testing.T) {
 		}
 	}
 }
+
+// The event payloads encode as closure-control.element.ts defines them:
+// OperationalError {0: list<enum8>}, MovementCompleted {}, EngageStateChanged
+// {0: bool}, SecureStateChanged {0: bool}.
+func TestClosureControlEventPayloadBytes(t *testing.T) {
+	t.Parallel()
+	enc := func(e interface {
+		EncodeTLV(*tlv.Encoder, tlv.Tag)
+	},
+	) []byte {
+		x := tlv.NewEncoder()
+		e.EncodeTLV(x, tlv.AnonymousTag())
+		b, err := x.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	for name, tc := range map[string]struct {
+		got, want []byte
+	}{
+		"OperationalError":   {enc(closure.OperationalErrorEvent{ErrorState: clusterwire.ClosureErrorList{1, 3}}), []byte{0x15, 0x36, 0x00, 0x04, 0x01, 0x04, 0x03, 0x18, 0x18}},
+		"MovementCompleted":  {enc(closure.MovementCompletedEvent{}), []byte{0x15, 0x18}},
+		"EngageStateChanged": {enc(closure.EngageStateChangedEvent{EngageValue: true}), []byte{0x15, 0x29, 0x00, 0x18}},
+		"SecureStateChanged": {enc(closure.SecureStateChangedEvent{SecureValue: false}), []byte{0x15, 0x28, 0x00, 0x18}},
+	} {
+		if !slices.Equal(tc.got, tc.want) {
+			t.Errorf("%s = % X, want % X", name, tc.got, tc.want)
+		}
+	}
+}
+
+// ReportError keeps at most ten errors (CurrentErrorList "max 10[all]").
+func TestClosureControlReportErrorTruncates(t *testing.T) {
+	t.Parallel()
+	srv, rec, _ := newEmittingServer(t, 0)
+	srv.ReportError(make(clusterwire.ClosureErrorList, 12))
+	if v := rec.events[0].data.(closure.OperationalErrorEvent); len(v.ErrorState) != 10 {
+		t.Errorf("event carries %d errors, want 10", len(v.ErrorState))
+	}
+	pd := clusterwire.ClosureTargetPositionMoveToPedestrianPosition
+	_, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, clusterwire.MoveToRequest{Position: &pd})
+	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusConstraintError || err.Error() == "" {
+		t.Errorf("MoveTo Pedestrian without PD: %v, want CONSTRAINT_ERROR", err)
+	}
+	_, err = srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdMoveTo, map[uint8]any{})
+	if err == nil || err.Error() == "" {
+		t.Error("an empty MoveTo carries no message")
+	}
+	_, err = srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdCalibrate, nil)
+	if err == nil || err.Error() == "" {
+		t.Error("Calibrate without CL carries no message")
+	}
+}
