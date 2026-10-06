@@ -444,6 +444,10 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHd
 		req, err := im.UnmarshalWriteRequestTLV(dec, attributeValueReader)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.write_decode", slog.String("err", err.Error()))
+			if im.SuppressResponseOf(payload) {
+				b.suppressStatus(src, requestHdr, proto, "write_decode", im.StatusInvalidAction)
+				return err
+			}
 			return b.replyDecodeError(src, requestHdr, proto, "write", err)
 		}
 		return b.dispatchWriteRequest(ctx, src, requestHdr, proto, dispatcher, req)
@@ -451,6 +455,10 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHd
 		req, err := im.UnmarshalInvokeRequestTLV(dec, commandFieldsReader)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.invoke_decode", slog.String("err", err.Error()))
+			if im.SuppressResponseOf(payload) {
+				b.suppressStatus(src, requestHdr, proto, "invoke_decode", im.StatusInvalidAction)
+				return err
+			}
 			return b.replyDecodeError(src, requestHdr, proto, "invoke", err)
 		}
 		return b.dispatchInvokeRequest(ctx, src, requestHdr, proto, dispatcher, req)
@@ -597,6 +605,34 @@ func (b *Bridge) NotifyDeviceReachable(scope, deviceAddress string, reachable bo
 // replyTimedStatus is the rejection path for a checkTimedGate hit. It
 // emits a StatusResponse with the supplied code and discharges the
 // owed ACK so the commissioner doesn't retransmit.
+// replyStatusUnlessSuppressed answers a Write or Invoke request that fails
+// before it is dispatched with a StatusResponse — unless the request set
+// SuppressResponse. Then the transaction ends silently: only the owed MRP
+// acknowledgement goes out. Mirrors matter.js InteractionMessenger.ts
+// InteractionServerMessenger (4bf21e80, #4570): #decodeRequest records the
+// request's SuppressResponse and the sendStatus override sends nothing while
+// it is set, so every error status handleRequest's catch raises for a
+// suppressed Write or Invoke — timed mismatch or timeout, a chunked or
+// batch InvalidAction, a decode failure — is suppressed, as the CHIP SDK
+// 1.6.1 does. Read, Subscribe and Timed requests have no such field.
+func (b *Bridge) replyStatusUnlessSuppressed(suppress bool, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
+	if suppress {
+		b.suppressStatus(src, requestHdr, proto, stage, status)
+		return nil
+	}
+	return b.replyTimedStatus(src, requestHdr, proto, stage, status)
+}
+
+// suppressStatus ends a suppressed request's transaction without a
+// StatusResponse, discharging the owed acknowledgement.
+func (b *Bridge) suppressStatus(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) {
+	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.logger.Debug("matter.rx.im.status_suppressed",
+		slog.String("src", srcString(src)),
+		slog.String("stage", stage),
+		slog.String("status", status.String()))
+}
+
 func (b *Bridge) replyTimedStatus(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
 	body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
 	if err != nil {

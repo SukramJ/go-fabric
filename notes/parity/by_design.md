@@ -1438,6 +1438,24 @@ keeping insertion order would mean persisting an order column, as for
 
 ---
 
+### BD-Matter-DelayReportData — DelayReportData is decoded and validated, not acted on
+
+matter.js decodes an InvokeRequest's DelayReportData (tag 3,
+`TlvInvokeRequest.ts`, 67be3a83 #4569) and refuses a malformed one; the
+deferral it asks for — holding back the next report of the subscriptions on
+the endpoints the commands target (`InteractionServer #deferReports`,
+`ServerSubscription.deferReports`) — runs only behind the
+`delay-report-data` forward feature, off at the schema pin
+(`Specification.ENABLE_FORWARD_MATTER_FEATURES`). go-fabric decodes and
+validates the field the same way (`im.UnmarshalInvokeRequestTLV`,
+`InvokeRequest.DelayReportData`: a wrong type InvalidAction, a value above
+uint16 ConstraintError) and does not defer anything, which is what matter.js
+does with the feature off. Retires when a pin bump turns the feature on
+upstream: port the deferral then. Pinned by
+`TestParityMatterJS_InvokeRequestDelayReportData`.
+
+---
+
 ### BD-Matter-AuxiliaryAccessAdminNode — AuxiliaryAccessUpdated names the acting node
 
 matter.js fills AuxiliaryAccessUpdated.AdminNodeID from the accessing

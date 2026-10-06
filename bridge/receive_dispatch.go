@@ -343,10 +343,10 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 	// InteractionServer.ts:397-402 rejects the combination with
 	// InvalidAction before any timed-interaction handling.
 	if req.MoreChunkedMessages && req.SuppressResponse {
-		return b.replyTimedStatus(src, requestHdr, proto, "write_chunked_suppress", im.StatusInvalidAction)
+		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_chunked_suppress", im.StatusInvalidAction)
 	}
 	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
-		return b.replyTimedStatus(src, requestHdr, proto, "write", status)
+		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write", status)
 	}
 	// A write inside a timed interaction may not be chunked — matter.js
 	// InteractionServer.ts:408-413 ("Write Request action that is part
@@ -354,7 +354,7 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 	// above passed, so a set TimedRequest flag means the timed window
 	// existed and was valid.
 	if req.TimedRequest && req.MoreChunkedMessages {
-		return b.replyTimedStatus(src, requestHdr, proto, "write_timed_chunked", im.StatusInvalidAction)
+		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "write_timed_chunked", im.StatusInvalidAction)
 	}
 	// Stamp the session FabricIndex onto ctx so fabric-scoped writes
 	// (AccessControl.ACL above all) resolve the caller's fabric the
@@ -450,7 +450,7 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 // (CommandInvokeResponse.ts:291), via [im.WithTimedInteraction].
 func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.InvokeRequest) error { //nolint:funlen // the invoke path's gates in their wire order, read top to bottom
 	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
-		return b.replyTimedStatus(src, requestHdr, proto, "invoke", status)
+		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "invoke", status)
 	}
 	// Batch-invoke path validation: a malformed batch (wildcard-endpoint path
 	// mixed with others, a concrete path missing its CommandRef, a duplicate
@@ -463,6 +463,9 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 	// because matter.js validates the timed window first (InteractionServer.ts
 	// handleInvokeRequest).
 	if status := im.ValidateInvokeBatch(req); status != im.StatusSuccess {
+		if req.SuppressResponse {
+			return b.replyStatusUnlessSuppressed(true, src, requestHdr, proto, "invoke_batch", status)
+		}
 		body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
 		if err != nil {
 			debugReplyError(b.logger, "encode_invoke_batch_reject", src, err)

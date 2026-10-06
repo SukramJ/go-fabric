@@ -473,6 +473,23 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- **SuppressResponse suppresses error statuses too.** A Write or Invoke
+  request with SuppressResponse set that failed before dispatch — a timed
+  mismatch or timeout, a chunked or batch InvalidAction, a request that does
+  not decode — was still answered with a StatusResponse. Such a request now
+  ends silently (only the MRP acknowledgement goes out), as matter.js
+  (`InteractionServerMessenger`, #4570) and the CHIP SDK 1.6.1 do; for a
+  request that does not decode, SuppressResponse is read on its own
+  (`im.SuppressResponseOf`). Read, Subscribe and Timed requests are
+  unaffected.
+- An InvokeRequest's DelayReportData (tag 3) is decoded and validated
+  instead of skipped: a field of the wrong type fails the request with
+  InvalidAction, one above uint16 with ConstraintError
+  (`im.InvokeRequest.DelayReportData`, `im.DelayReportData`; matter.js
+  `TlvInvokeRequest`, #4569). Report deferral itself stays off, as it is in
+  matter.js behind its `delay-report-data` forward feature
+  (`BD-Matter-DelayReportData`).
+
 - GeneralDiagnostics UpTime counts the time the host was suspended and is
   never lowered by a backward clock step: the larger of the monotonic and
   the wall-clock elapsed time, held to the highest value reported (matter.js
