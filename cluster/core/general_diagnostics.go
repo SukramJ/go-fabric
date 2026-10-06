@@ -13,6 +13,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -107,6 +108,10 @@ type GeneralDiagnostics struct {
 	// reports the zeroed struct matter.js reports before its interaction
 	// server is online.
 	deviceLoad func(fabricIndex uint8) DeviceLoadStruct
+
+	// upTimeHighWater is the highest UpTime (in nanoseconds) reported since
+	// startTime; see upTime.
+	upTimeHighWater atomic.Int64
 
 	// Event emitter + endpoint; wired by the bridge topology assembler
 	// via [SetMatterEventEmitter] + [SetEndpoint] so [EmitBootReason]
@@ -302,7 +307,7 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 		}
 		return uint16(1), true
 	case gendiagAttrUpTime:
-		return uint64(time.Since(g.startTime).Seconds()), true
+		return uint64(g.upTime().Seconds()), true
 	case gendiagAttrTotalOperationalHours:
 		// Live = persisted base hours + current process uptime hours.
 		// Daemon shutdown hooks should snapshot the value back to the
@@ -381,6 +386,32 @@ type DeviceLoadStruct struct {
 	TotalSubscriptionsEstablished         uint32
 	TotalInteractionModelMessagesSent     uint32
 	TotalInteractionModelMessagesReceived uint32
+}
+
+// upTime is the time since the node came up. Mirrors matter.js
+// GeneralDiagnosticsServer.ts upTime (c0a7978d, #4614): the larger of the
+// elapsed time on the monotonic clock and on the wall clock — Go's
+// monotonic reading, like Time.nowUs, stops while the host is suspended,
+// and the wall clock folds the suspend back in — never below the highest
+// value already reported, so a backward wall-clock step (an NTP correction)
+// cannot lower it, and never negative.
+func (g *GeneralDiagnostics) upTime() time.Duration {
+	return g.upTimeFrom(time.Since(g.startTime), time.Now().Round(0).Sub(g.startTime.Round(0)))
+}
+
+// upTimeFrom folds the elapsed monotonic and wall-clock times into UpTime
+// against the high-water mark.
+func (g *GeneralDiagnostics) upTimeFrom(mono, wall time.Duration) time.Duration {
+	up := max(mono, wall, 0)
+	for {
+		hw := g.upTimeHighWater.Load()
+		if int64(up) <= hw {
+			return time.Duration(hw)
+		}
+		if g.upTimeHighWater.CompareAndSwap(hw, int64(up)) {
+			return up
+		}
+	}
 }
 
 // SetDeviceLoadProvider wires the source of DeviceLoadStatus. The bridge

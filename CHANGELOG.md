@@ -473,6 +473,12 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- GeneralDiagnostics UpTime counts the time the host was suspended and is
+  never lowered by a backward clock step: the larger of the monotonic and
+  the wall-clock elapsed time, held to the highest value reported (matter.js
+  `GeneralDiagnosticsServer` upTime, #4614). Go's monotonic clock, like
+  CLOCK_MONOTONIC, stops during a suspend.
+
 - **mDNS: the node answers address queries for its own host name.** A
   query for the A / AAAA (or ANY) records of the SRV target
   (`<MAC>0000.local.`) went unanswered: grandcat/zeroconf's
