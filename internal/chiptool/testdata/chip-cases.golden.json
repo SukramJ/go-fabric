@@ -460,6 +460,11 @@
       "steps": 20,
       "stepsSkipped": 0
     },
+    "GC/2.8": {
+      "tests": 1,
+      "steps": 25,
+      "stepsSkipped": 0
+    },
     "GRPKEY/2.1": {
       "steps": 11,
       "stepsSkipped": 4
@@ -959,10 +964,25 @@
       "steps": 1,
       "stepsSkipped": 0
     },
+    "SC/4.1": {
+      "tests": 1,
+      "steps": 31,
+      "stepsSkipped": 26
+    },
+    "SC/4.3": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
     "SC/5.1": {
       "tests": 1,
       "steps": 74,
       "stepsSkipped": 42
+    },
+    "SC/5.2": {
+      "tests": 1,
+      "steps": 131,
+      "stepsSkipped": 162
     },
     "SC/7.1": {
       "tests": 1,
@@ -1769,7 +1789,6 @@
     "DRLK/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "G/2.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "G/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
-    "GC/2.8": "not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
     "GRPKEY/5.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "I/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "IDM/1.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
@@ -1800,13 +1819,10 @@
     "SC/2.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SC/2.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SC/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
-    "SC/4.1": "not run on the host that took the counts: the case checks the MAC-derived SRV host name, which the daemon advertises only when the host's LAN interface has IPv6 (without it the harness passes --mdns-os-hostname), and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
     "SC/4.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
-    "SC/4.3": "not run on the host that took the counts: the case resolves the DUT's AAAA records, which name the advertising interface's IPv6 addresses, and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
     "SC/4.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SC/4.8": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SC/4.9": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
-    "SC/5.2": "not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
     "SC/5.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SC/6.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SWTCH/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",

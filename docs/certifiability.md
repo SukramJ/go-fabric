@@ -110,12 +110,12 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DGGEN | 7 | 5 | 0 | 0 | 1 | 1 | 0 |
 | DT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | G | 5 | 2 | 0 | 0 | 0 | 3 | 0 |
-| GC | 8 | 7 | 0 | 0 | 0 | 1 | 0 |
+| GC | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
 | GRPKEY | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
 | IDM | 33 | 20 | 0 | 0 | 0 | 13 | 0 |
 | OPCREDS | 9 | 6 | 0 | 0 | 1 | 2 | 0 |
 | RR | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| SC | 34 | 6 | 0 | 0 | 10 | 18 | 0 |
+| SC | 34 | 9 | 0 | 0 | 10 | 15 | 0 |
 | SM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | BOOL | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | CC | 31 | 21 | 0 | 0 | 6 | 4 | 0 |
@@ -142,7 +142,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TSTAT | 6 | 3 | 0 | 0 | 2 | 1 | 0 |
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **412** | **222** | **0** | **0** | **80** | **105** | **5** |
+| **all** | **412** | **226** | **0** | **0** | **80** | **101** | **5** |
 
 ### Cases not run
 
@@ -261,7 +261,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | G/2.2 | (c) harness | TC-G-2.2 step 7a (the Groups revision 4 path) writes MaxGroupsPerFabric+1 GroupKeyMap entries and expects Success; chip's own GroupDataProviderImpl::SetGroupKeyAt refuses the entry beyond MaxGroupsPerFabric at the image commit (src/credentials/GroupDataProviderImpl.cpp:1492, CHIP_ERROR_INVALID_LIST_LENGTH), as does matter.js GroupKeyManagementServer #validateGroupKeyMap (ResourceExhausted) and this module |
 | G/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | G/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| GC/2.8 | (c) harness | not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0` |
 | GRPKEY/5.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | I/2.4 | (c) harness | TC-I-2.4 checks the Q-quality reporting of IdentifyTime added in Matter 1.4.2 against an expectation chip has not merged yet (connectedhomeip#42128); matter.js excludes it until then (test/app-slow/I.test.ts) |
 | I/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -308,15 +307,12 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SC/2.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/3.5 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
-| SC/4.1 | (c) harness | not run on the host that took the counts: the case checks the MAC-derived SRV host name, which the daemon advertises only when the host's LAN interface has IPv6 (without it the harness passes --mdns-os-hostname), and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0` |
 | SC/4.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SC/4.3 | (c) harness | not run on the host that took the counts: the case resolves the DUT's AAAA records, which name the advertising interface's IPv6 addresses, and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0` |
 | SC/4.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/4.6 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER & MCORE.DD.COMM_DISCOVERY` is false for the reference DUT |
 | SC/4.7 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & MCORE.DD.COMM_DISCOVERY` is false for the reference DUT |
 | SC/4.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/4.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SC/5.2 | (c) harness | not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0` |
 | SC/5.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/6.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/8.1 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |

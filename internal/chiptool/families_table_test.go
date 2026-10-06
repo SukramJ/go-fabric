@@ -175,8 +175,13 @@ var chipFamilies = []family{
 			"4.29": {classOutOfScope, "TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; out of scope with Wi-Fi commissioning, and the case skips itself once given the endpoint its matcher needs", true},
 		},
 		args: map[string][]string{
-			// The case's endpoint matcher needs --endpoint before it can
-			// skip itself (matter.js test/core/CNET.test.ts).
+			// These cases' endpoint matchers need --endpoint before they
+			// can skip themselves ("The --endpoint flag is required for
+			// this test"; matter.js test/core/CNET.test.ts passes it to
+			// 4.29). NetworkCommissioning lives on the root node.
+			"4.25": {"--endpoint", "0"},
+			"4.26": {"--endpoint", "0"},
+			"4.27": {"--endpoint", "0"},
 			"4.29": {"--endpoint", "0"},
 		},
 	},
