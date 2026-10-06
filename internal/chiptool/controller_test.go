@@ -156,7 +156,7 @@ func findHostChipTool() (chipTool, error) {
 	switch p := os.Getenv(chipToolBinEnv); {
 	case p != "":
 		if _, err := os.Stat(p); err != nil {
-			return chipTool{}, fmt.Errorf("chip-tool: %s=%q not usable: %v", chipToolBinEnv, p, err)
+			return chipTool{}, fmt.Errorf("chip-tool: %s=%q not usable: %w", chipToolBinEnv, p, err)
 		}
 		bin = p
 	default:
@@ -191,22 +191,22 @@ const snapChipToolRoot = "/snap/chip-tool/current"
 // release number.
 func identifyChipTool(bin string) chipTool {
 	ct := chipTool{bin: bin}
-	real, err := filepath.EvalSymlinks(bin)
+	resolved, err := filepath.EvalSymlinks(bin)
 	if err != nil {
-		real = bin
+		resolved = bin
 	}
-	ct.snap = strings.HasPrefix(bin, "/snap/") || filepath.Base(real) == "snap"
+	ct.snap = strings.HasPrefix(bin, "/snap/") || filepath.Base(resolved) == "snap"
 
-	payload := real
+	payload := resolved
 	var version string
 	if ct.snap {
 		payload = filepath.Join(snapChipToolRoot, "bin", "chip-tool")
 		version = "snap " + snapVersion()
-	} else if src, err := os.ReadFile(real + ".source"); err == nil { //nolint:gosec // a sidecar next to the binary this suite runs
+	} else if src, err := os.ReadFile(resolved + ".source"); err == nil { //nolint:gosec // a sidecar next to the binary this suite runs
 		// Written by `make chiptool-extract`: the image the binary came out of.
 		version = strings.TrimSpace(string(src))
 	} else {
-		version = "unknown build (no " + filepath.Base(real) + ".source sidecar; set by `make chiptool-extract`)"
+		version = "unknown build (no " + filepath.Base(resolved) + ".source sidecar; set by `make chiptool-extract`)"
 	}
 	digest := "unreadable"
 	if data, err := os.ReadFile(payload); err == nil { //nolint:gosec // the binary this suite runs
@@ -479,7 +479,7 @@ func findAttrUint(out, name string) (int64, bool) {
 
 // findAttrBool returns the first TRUE/FALSE value printed for the named
 // attribute.
-func findAttrBool(out, name string) (bool, bool) {
+func findAttrBool(out, name string) (value, found bool) {
 	for _, m := range reAttrBool.FindAllStringSubmatch(out, -1) {
 		if strings.EqualFold(m[1], name) {
 			return m[2] == "TRUE", true

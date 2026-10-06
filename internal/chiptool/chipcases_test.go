@@ -134,8 +134,8 @@ func loadChipCases(ctx context.Context, h *harness) (map[string][]chipCase, erro
 func addCase(out map[string][]chipCase, fam string, n descriptorNode) {
 	// The descriptor lists a Python file that holds several cases once per
 	// case, and some entries twice; one case id is one case.
-	for _, have := range out[fam] {
-		if have.Name == n.Name {
+	for i := range out[fam] {
+		if out[fam][i].Name == n.Name {
 			return
 		}
 	}
@@ -375,13 +375,6 @@ const (
 	// (0x12344321, the YAML config's nodeId and matter_testing's dut_node_id).
 	chipTestNodeID = 0x12344321
 )
-
-// caseDUT is a reference daemon prepared for one case: commissioned by the
-// Python harness into a fresh work directory, its database snapshotted.
-type caseDUT struct {
-	br   *bridgeProcess
-	work string // shared, holds admin_storage.json / chip-tool KVS / the FIFO
-}
 
 // errNotCommissioned marks a DUT commissioning failure — the case cannot say
 // anything when the device does not pair.
@@ -625,7 +618,8 @@ func verdictLines(out string) string {
 		if reVerdict.MatchString(line) {
 			b.WriteString(line)
 			b.WriteByte('\n')
-			if n++; n > 150 {
+			n++
+			if n > 150 {
 				b.WriteString("…\n")
 				break
 			}
@@ -650,7 +644,7 @@ func tail(s string, n int) string {
 // monitor restarts the daemon on the same database and port (a reboot) or on
 // a fresh database (a factory reset), then deletes the flag. It returns the
 // daemon currently running and a stop function.
-func monitorRestartFlag(t *testing.T, br *bridgeProcess, flagFile string) (func() *bridgeProcess, func()) {
+func monitorRestartFlag(t *testing.T, br *bridgeProcess, flagFile string) (current func() *bridgeProcess, stop func()) {
 	t.Helper()
 	var mu sync.Mutex
 	cur := br

@@ -331,7 +331,7 @@ func (b *bridgeProcess) endpointFor(t *testing.T, deviceType uint32) uint16 {
 			for _, m := range reTopologyLine.FindAllStringSubmatch(out, -1) {
 				for _, dt := range strings.Split(m[2], ",") {
 					v, err := strconv.ParseUint(strings.TrimPrefix(strings.TrimSpace(dt), "0x"), 16, 32)
-					if err == nil && uint32(v) == deviceType {
+					if err == nil && v == uint64(deviceType) {
 						ep, _ := strconv.Atoi(m[1])
 						return uint16(ep)
 					}

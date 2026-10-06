@@ -270,7 +270,7 @@ func (p *featureParser) skip() {
 	}
 }
 
-func (p *featureParser) or() (bool, bool) {
+func (p *featureParser) or() (value, ok bool) {
 	v, ok := p.and()
 	for ok {
 		p.skip()
@@ -285,7 +285,7 @@ func (p *featureParser) or() (bool, bool) {
 	return v, ok
 }
 
-func (p *featureParser) and() (bool, bool) {
+func (p *featureParser) and() (value, ok bool) {
 	v, ok := p.unary()
 	for ok {
 		p.skip()
@@ -300,7 +300,7 @@ func (p *featureParser) and() (bool, bool) {
 	return v, ok
 }
 
-func (p *featureParser) unary() (bool, bool) {
+func (p *featureParser) unary() (value, ok bool) {
 	p.skip()
 	if p.pos >= len(p.src) {
 		return false, false
@@ -338,6 +338,7 @@ func (p *featureParser) unary() (bool, bool) {
 
 // testDataModelSweep is the sweep leg of TestChipToolSuite.
 func testDataModelSweep(t *testing.T, f *fixture) {
+	t.Helper()
 	specs := loadSchemaClusters(t)
 
 	// One wildcard read of the whole node: every endpoint, cluster and
@@ -369,7 +370,7 @@ func testDataModelSweep(t *testing.T, f *fixture) {
 	}
 
 	t.Run("descriptor/endpoints-match-wildcard", func(t *testing.T) {
-		var wildEps []uint16
+		wildEps := make([]uint16, 0, len(wild))
 		for ep := range wild {
 			wildEps = append(wildEps, ep)
 		}
@@ -404,8 +405,9 @@ func testDataModelSweep(t *testing.T, f *fixture) {
 // checkDescriptor holds an endpoint's Descriptor against the wildcard read
 // and the schema's device-type library.
 func checkDescriptor(t *testing.T, f *fixture, ep *endpointInfo, wild map[uint32]map[uint32]any) {
+	t.Helper()
 	// ServerList names exactly the clusters the endpoint answers for.
-	var answered []uint32
+	answered := make([]uint32, 0, len(wild))
 	for cl := range wild {
 		answered = append(answered, cl)
 	}
@@ -495,6 +497,7 @@ func checkDescriptor(t *testing.T, f *fixture, ep *endpointInfo, wild map[uint32
 // checkCluster holds one cluster instance against its own global lists and
 // the schema.
 func checkCluster(t *testing.T, f *fixture, epID uint16, spec *schemaCluster, wild map[uint32]any) {
+	t.Helper()
 	attrList, ok := asInts(wild[attrAttributeList])
 	if !ok {
 		t.Fatalf("AttributeList missing or not a list in the wildcard read: %v", wild[attrAttributeList])
@@ -577,6 +580,10 @@ func checkCluster(t *testing.T, f *fixture, epID uint16, spec *schemaCluster, wi
 				t.Errorf("attribute %s (0x%04X) has conformance %q, disallowed under FeatureMap 0x%X; AttributeList names it",
 					at.Name, at.ID, at.Conformance, fm)
 			}
+		case confOptional, confUnknown:
+			// Either answer is conformant: an optional attribute may be
+			// served or not, and a conformance this sweep cannot evaluate
+			// is not held against the DUT.
 		}
 	}
 	for a := range listed {

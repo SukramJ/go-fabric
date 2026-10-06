@@ -201,18 +201,6 @@ func (s *interactive) output() string {
 	return s.out.String()
 }
 
-// outputSince returns what the server printed after offset, and the new
-// offset.
-func (s *interactive) outputSince(offset int) (string, int) {
-	s.outMu.Lock()
-	defer s.outMu.Unlock()
-	all := s.out.String()
-	if offset > len(all) {
-		offset = len(all)
-	}
-	return all[offset:], len(all)
-}
-
 // stop asks the server to quit and kills it if it does not.
 func (s *interactive) stop() {
 	if s.conn != nil {
@@ -248,35 +236,17 @@ func (s *interactive) exec(ctx context.Context, line string) (*imAnswer, error) 
 	return s.readAnswer(line)
 }
 
-// awaitReport arms chip-tool's async-report mode and waits for the next
-// subscription report or event, up to timeout. A timeout comes back as an
-// answer carrying chip-tool's own TIMEOUT error rather than as a Go error,
-// so a test can assert that nothing arrived.
-func (s *interactive) awaitReport(timeout time.Duration) (*imAnswer, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	secs := max(int(timeout/time.Second), 1)
-	_ = s.conn.SetDeadline(time.Now().Add(timeout + 15*time.Second))
-	if err := wsWriteText(s.conn, strconv.Itoa(secs)); err != nil {
-		return nil, fmt.Errorf("arm async report: %w", err)
-	}
-	return s.readAnswer(fmt.Sprintf("<await %ds>", secs))
-}
-
-// readAnswer reads frames until one parses as an answer.
+// readAnswer reads the next frame as an answer.
 func (s *interactive) readAnswer(what string) (*imAnswer, error) {
-	for {
-		payload, err := wsReadText(s.rd, s.conn)
-		if err != nil {
-			return nil, fmt.Errorf("read the answer to %q: %w\n--- chip-tool output ---\n%s", what, err, s.output())
-		}
-		var a imAnswer
-		if err := json.Unmarshal(payload, &a); err != nil {
-			return nil, fmt.Errorf("answer to %q is not JSON: %w\n%s", what, err, payload)
-		}
-		return &a, nil
+	payload, err := wsReadText(s.rd, s.conn)
+	if err != nil {
+		return nil, fmt.Errorf("read the answer to %q: %w\n--- chip-tool output ---\n%s", what, err, s.output())
 	}
+	var a imAnswer
+	if err := json.Unmarshal(payload, &a); err != nil {
+		return nil, fmt.Errorf("answer to %q is not JSON: %w\n%s", what, err, payload)
+	}
+	return &a, nil
 }
 
 // freeTCPPort returns a currently unused loopback TCP port. The window
@@ -447,7 +417,8 @@ func wsWriteControl(w io.Writer, op byte, payload []byte) error {
 	}
 	var mask [4]byte
 	_, _ = rand.Read(mask[:])
-	frame := []byte{0x80 | op, 0x80 | byte(len(payload))}
+	frame := make([]byte, 0, 2+len(mask)+len(payload))
+	frame = append(frame, 0x80|op, 0x80|byte(len(payload)))
 	frame = append(frame, mask[:]...)
 	for i, b := range payload {
 		frame = append(frame, b^mask[i%4])
@@ -472,7 +443,7 @@ func field(v any, tag int) (any, bool) {
 	}
 	want := strconv.Itoa(tag)
 	for k, x := range m {
-		if mm := reTypeSuffix.FindStringSubmatch(k); mm != nil && mm[1] == want {
+		if mm := reTypeSuffix.FindStringSubmatch(k); len(mm) > 1 && mm[1] == want {
 			return x, true
 		}
 		if k == want {

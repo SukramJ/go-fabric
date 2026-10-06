@@ -79,8 +79,8 @@
 // matter.js serves it.
 //
 // Nothing is skipped silently on a machine that has the prerequisites: a
-// missing harness skips with the command that provides it, a missing
-// reference-daemon binary fails loudly with the command to run, and a
-// chip-tool that lacks a cluster or command a subtest needs skips that
-// subtest naming the capability.
+// missing harness skips with the command that provides it, and a missing
+// reference-daemon binary fails loudly with the command to run. The
+// chip-tool is the pinned image's, so every cluster and command the suite
+// drives is there.
 package chiptool

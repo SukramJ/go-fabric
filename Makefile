@@ -227,6 +227,9 @@ lint: ## gofumpt check + golangci-lint + module hygiene
 	@test ! -s /tmp/gofabric-gofumpt.out || { echo "gofumpt: files need formatting (run 'make fmt')"; exit 1; }
 	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=5m ./...
+	@# The chip-tool harness builds only with the chiptool tag; lint it under
+	@# that tag so it is held to the module's standard.
+	$(GOLANGCI_LINT) run --timeout=5m --build-tags chiptool ./internal/chiptool/...
 	$(GO) mod tidy -diff
 	$(GO) mod verify
 

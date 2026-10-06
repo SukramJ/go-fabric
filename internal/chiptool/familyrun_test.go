@@ -6,6 +6,7 @@
 package chiptool
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"maps"
@@ -173,7 +174,7 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 			if err := os.WriteFile(filepath.Join(committed, e.Name()), data, 0o644); err != nil { //nolint:gosec // a committed fixture
 				t.Fatal(err)
 			}
-		} else if want, err := os.ReadFile(filepath.Join(committed, e.Name())); err != nil || string(want) != string(data) { //nolint:gosec // a committed fixture
+		} else if want, err := os.ReadFile(filepath.Join(committed, e.Name())); err != nil || !bytes.Equal(want, data) { //nolint:gosec // a committed fixture
 			drift = append(drift, e.Name())
 		}
 		slice, err := readPICS(filepath.Join(out, e.Name()))
@@ -263,12 +264,13 @@ func writeComposedPICS(t *testing.T, h *harness, name, base string, layers ...ma
 
 // runFamily runs every case of one family against fresh daemons.
 func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases []chipCase, pics *picsSet, bin string, flags map[string]bool) {
+	t.Helper()
 	if len(cases) == 0 {
 		t.Fatalf("family %s has no cases in this image's descriptor", fam.name)
 	}
 	names := make([]string, 0, len(cases))
-	for _, c := range cases {
-		names = append(names, c.Name)
+	for i := range cases {
+		names = append(names, cases[i].Name)
 	}
 	goldenMu.Lock()
 	familyUpdates[fam.name] = names
@@ -278,7 +280,8 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 			t.Errorf("exclusion %q matches no case of %s in this image: remove it", pattern, fam.name)
 		}
 	}
-	for _, c := range cases {
+	for i := range cases {
+		c := cases[i]
 		t.Run(c.Name, func(t *testing.T) {
 			if c.Kind == "manual" {
 				goldenMu.Lock()
@@ -362,6 +365,7 @@ elif new not in s:
 }
 
 func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c chipCase, id, pics string, ep uint16, passEP bool, epOf map[uint32]uint16, bin string, flags map[string]bool) {
+	t.Helper()
 	skipNotApplicable(t, c, id, ep)
 	work := newCaseWork(t, h)
 	if !fam.uncommissioned[c.Name] {
@@ -436,6 +440,7 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 }
 
 func runYamlCase(ctx context.Context, t *testing.T, h *harness, fam family, c chipCase, pics string, ep uint16, passEP bool, epOf map[uint32]uint16, bin string, flags map[string]bool) {
+	t.Helper()
 	skipNotApplicable(t, c, c.ID, ep)
 	if fam.uncommissioned[c.Name] {
 		t.Fatalf("%s: uncommissioned YAML cases are not supported by this runner", c.ID)

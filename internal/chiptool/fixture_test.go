@@ -8,14 +8,10 @@ package chiptool
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 )
 
 // fixture is one commissioned reference daemon plus an interactive chip-tool
@@ -113,16 +109,6 @@ func answerError(a *imAnswer) string {
 	return ""
 }
 
-// expectError runs a command that has to fail with exactly want.
-func (f *fixture) expectError(t *testing.T, line, want string) {
-	t.Helper()
-	a := f.run(t, line)
-	if got := answerError(a); got != want {
-		t.Fatalf("chip-tool %q answered %q, want %q\nresults: %v\n--- chip-tool log ---\n%s",
-			line, got, want, a.Results, a.logText())
-	}
-}
-
 // read reads one attribute (chip-tool slugs) and returns its value.
 func (f *fixture) read(t *testing.T, cluster, attr string, ep uint16) any {
 	t.Helper()
@@ -134,17 +120,6 @@ func (f *fixture) read(t *testing.T, cluster, attr string, ep uint16) any {
 	}
 	t.Fatalf("%s read %s on endpoint %d returned no value: %v", cluster, attr, ep, res)
 	return nil
-}
-
-// readInt reads an integer attribute.
-func (f *fixture) readInt(t *testing.T, cluster, attr string, ep uint16) int64 {
-	t.Helper()
-	v := f.read(t, cluster, attr, ep)
-	n, ok := asInt(v)
-	if !ok {
-		t.Fatalf("%s.%s on endpoint %d = %v (%T), want an integer", cluster, attr, ep, v, v)
-	}
-	return n
 }
 
 // readByID reads attributes by numeric id and returns them keyed by
@@ -167,33 +142,6 @@ func (f *fixture) readByID(t *testing.T, cluster uint32, attrs string, ep uint16
 	return values, errs
 }
 
-// endpointsWith returns the endpoints that serve cluster, ascending.
-func (f *fixture) endpointsWith(cluster uint32) []uint16 {
-	var out []uint16
-	for id, ep := range f.topology {
-		if ep.has(cluster) {
-			out = append(out, id)
-		}
-	}
-	slices.Sort(out)
-	return out
-}
-
-// endpointOf returns the endpoint carrying deviceType, failing the test when
-// none does: the reference daemon is expected to expose every surface the
-// suite drives.
-func (f *fixture) endpointOf(t *testing.T, deviceType uint32) uint16 {
-	t.Helper()
-	for _, id := range f.sortedEndpoints() {
-		if _, ok := f.topology[id].deviceTypes[deviceType]; ok {
-			return id
-		}
-	}
-	t.Fatalf("no endpoint advertises device type 0x%04X; the reference daemon is expected to expose it "+
-		"(examples/reference-bridge/fleet.go)", deviceType)
-	return 0
-}
-
 // sortedEndpoints lists the topology's endpoint ids ascending.
 func (f *fixture) sortedEndpoints() []uint16 {
 	out := make([]uint16, 0, len(f.topology))
@@ -211,7 +159,8 @@ func (f *fixture) readTopology(t *testing.T) {
 	t.Helper()
 	f.topology = map[uint16]*endpointInfo{}
 	rootParts, _ := asInts(f.read(t, "descriptor", "parts-list", 0))
-	ids := []uint16{0}
+	ids := make([]uint16, 0, 1+len(rootParts))
+	ids = append(ids, 0)
 	for _, p := range rootParts {
 		ids = append(ids, uint16(p))
 	}
@@ -246,53 +195,4 @@ func (f *fixture) readTopology(t *testing.T) {
 		fmt.Fprintf(&b, "\n  endpoint %2d: device types %v, %d server clusters", id, ep.deviceTypes, len(ep.servers))
 	}
 	t.Logf("daemon topology (from its Descriptors):%s", b.String())
-}
-
-// --- capability detection -------------------------------------------------
-//
-// The local chip-tool and the CI pin are different releases. Where a leg
-// needs a cluster or command a given chip-tool may not know, it asks the
-// binary — chip-tool prints the command set of a cluster when given no
-// command — and skips naming what is missing, instead of guessing from a
-// version number. (Commands.cpp RunCommand → ShowCluster when argc <= 2.)
-
-var (
-	capMu    sync.Mutex
-	capCache = map[string][]string{}
-	reCapRow = regexp.MustCompile(`\|\s+\*\s+(\S+)`)
-)
-
-// chipToolCommands returns the commands chip-tool lists for a cluster or
-// command set; nil when it does not know the name at all.
-func chipToolCommands(bin, set string) []string {
-	capMu.Lock()
-	defer capMu.Unlock()
-	if cmds, ok := capCache[set]; ok {
-		return cmds
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	out, _ := exec.CommandContext(ctx, bin, set).CombinedOutput() //nolint:gosec // bin is resolved by requireChipTool
-	text := stripANSI(string(out))
-	var cmds []string
-	if !strings.Contains(text, "Unknown cluster or command set") {
-		for _, m := range reCapRow.FindAllStringSubmatch(text, -1) {
-			cmds = append(cmds, m[1])
-		}
-	}
-	capCache[set] = cmds
-	return cmds
-}
-
-// requireCommand skips the test unless this chip-tool knows set/command.
-func (f *fixture) requireCommand(t *testing.T, set, command string) {
-	t.Helper()
-	cmds := chipToolCommands(f.tool.bin, set)
-	if cmds == nil {
-		t.Skipf("this chip-tool (%s) has no %q cluster or command set", f.tool.describe, set)
-	}
-	if command != "" && !slices.Contains(cmds, command) {
-		t.Skipf("this chip-tool (%s) has no %q command in %q (it lists: %s)",
-			f.tool.describe, command, set, strings.Join(cmds, ", "))
-	}
 }

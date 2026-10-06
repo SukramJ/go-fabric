@@ -110,12 +110,12 @@ func (c *mjsController) read() map[string]any {
 		// matter.js's logger writes to stdout too; the replies are the
 		// lines that start with {"ok".
 		for c.out.Scan() {
-			if line := c.out.Text(); strings.HasPrefix(line, `{"ok"`) {
+			line := c.out.Text()
+			if strings.HasPrefix(line, `{"ok"`) {
 				lines <- line
 				return
-			} else {
-				c.log.WriteString(line + "\n")
 			}
+			c.log.WriteString(line + "\n")
 		}
 		close(lines)
 	}()
