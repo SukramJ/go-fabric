@@ -125,10 +125,10 @@ jobs:
         run: |
           set -euo pipefail
           groups=(
-            "core=IDM,DESC,BINFO,BRBINFO,ACE,ACL,CGEN,OPCREDS,GRPKEY,DT,RR,SM"
+            "core=IDM,DESC,BINFO,BRBINFO,ACE,ACL,CGEN,OPCREDS,GRPKEY,DT,RR,SM,TIMESYNC,DLOG,ICDM,SU,BIND"
             "commissioning=CADMIN,SC,DA,DD,CNET,DGGEN,G,GC"
             "app-lights=OO,LVL,CC,I,S,SWTCH,BOOL,OCC,TMP,RH,FLW"
-            "app-appliances=DRLK,FAN,LWM,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV"
+            "app-appliances=DRLK,FAN,LWM,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV,HEPAFREMON,ACFREMON,CLCTRL"
           )
           all=true
           if [ "$EVENT" = "pull_request" ] && [ "$LABELLED" != "true" ]; then

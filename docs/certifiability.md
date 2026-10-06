@@ -24,7 +24,8 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
 - **The device under test** is the reference daemon in
   `examples/reference-bridge`: a root node, an aggregator and one bridged
   endpoint per device surface the module serves (lights, sensors, closures,
-  climate, appliances, a lock, a smoke/CO alarm, a switch).
+  climate, appliances, an air purifier with its filters, a garage door, a
+  lock, a smoke/CO alarm, a switch).
 - **The harness** is matter.js's CHIP image (`ghcr.io/matter-js/chip`),
   pinned by digest in the Makefile (`CHIP_TEST_IMAGE`) together with the CHIP
   commit it was built from (`CHIP_TEST_IMAGE_COMMIT`). It carries chip-tool,
@@ -107,7 +108,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DA | 13 | 4 | 0 | 0 | 5 | 4 | 0 |
 | DD | 30 | 2 | 0 | 0 | 1 | 27 | 0 |
 | DESC | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
-| DGGEN | 7 | 5 | 0 | 0 | 1 | 1 | 0 |
+| DGGEN | 7 | 6 | 0 | 0 | 0 | 1 | 0 |
 | DT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | G | 5 | 2 | 0 | 0 | 0 | 3 | 0 |
 | GC | 8 | 8 | 0 | 0 | 0 | 0 | 0 |
@@ -117,10 +118,18 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | RR | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | SC | 34 | 9 | 0 | 0 | 10 | 15 | 0 |
 | SM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| TIMESYNC | 14 | 3 | 0 | 0 | 11 | 0 | 0 |
+| DLOG | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
+| ICDM | 7 | 0 | 0 | 0 | 7 | 0 | 0 |
+| SU | 13 | 0 | 0 | 0 | 3 | 10 | 0 |
+| BIND | 3 | 0 | 0 | 0 | 0 | 3 | 0 |
+| ACFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | BOOL | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| CLCTRL | 12 | 5 | 0 | 0 | 7 | 0 | 0 |
 | CC | 31 | 21 | 0 | 0 | 6 | 4 | 0 |
 | DRLK | 14 | 7 | 0 | 0 | 4 | 3 | 0 |
 | FAN | 12 | 7 | 0 | 0 | 5 | 0 | 0 |
+| HEPAFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | FLW | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | I | 5 | 3 | 0 | 0 | 0 | 2 | 0 |
 | LVL | 10 | 8 | 0 | 0 | 1 | 1 | 0 |
@@ -142,13 +151,16 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TSTAT | 6 | 3 | 0 | 0 | 2 | 1 | 0 |
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **412** | **226** | **0** | **0** | **80** | **101** | **5** |
+| **all** | **464** | **237** | **0** | **0** | **107** | **115** | **5** |
 
 ### Cases not run
 
 | Case | Class | Reason |
 | --- | --- | --- |
 | ACL/2.11 | (b) not supported | not applicable: the case's PICS `ACL.S.F01` is false for the reference DUT |
+| BIND/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BIND/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BIND/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BINFO/3.1 | (b) not supported | not applicable: the case's PICS `BINFO.S.A0014` is false for the reference DUT |
 | BINFO/3.2 | (b) not supported | not applicable: the case's PICS `BINFO.S & BINFO.S.M.DeviceConfigurationChange` is false for the reference DUT |
 | BRBINFO/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -184,6 +196,13 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CGEN/2.7 | (b) not supported | not applicable: the case's PICS `CGEN.S & CGEN.S.F00` is false for the reference DUT |
 | CGEN/2.8 | (b) not supported | not applicable: the case's PICS `CGEN.S & CGEN.S.F00` is false for the reference DUT |
 | CGEN/2.9 | (b) not supported | not applicable: the case's PICS `CGEN.S & CGEN.S.F00` is false for the reference DUT |
+| CLCTRL/3.1 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F06` is false for the reference DUT |
+| CLCTRL/4.2 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F01` is false for the reference DUT |
+| CLCTRL/4.4 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.A0000` is false for the reference DUT |
+| CLCTRL/7.1 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F00 & CLCTRL.S.C03.Rsp` is false for the reference DUT |
+| CLCTRL/7.2 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F01 & CLCTRL.S.C03.Rsp` is false for the reference DUT |
+| CLCTRL/7.3 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.C03.Rsp` is false for the reference DUT |
+| CLCTRL/7.4 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.A0000 & CLCTRL.S.C03.Rsp` is false for the reference DUT |
 | CNET/4.1 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.10 | (b) not supported | not applicable: the case's PICS `CNET.S & CNET.S.F01` is false for the reference DUT |
 | CNET/4.11 | (d) out of scope | TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; Wi-Fi commissioning is out of scope (ADR 0011 (d), docs/matterjs-comparison.md), and the case has no PICS gate (CNET.S.F00=0) |
@@ -244,7 +263,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DD/3.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DESC/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DGGEN/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| DGGEN/2.4 | (b) not supported | TC-DGGEN-2.4 needs the TimeSynchronization cluster (PICS TIMESYNC.S=0); the case has no PICS gate (matter.js test/core/DGGEN.test.ts excludes it for the same reason) |
+| DLOG/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DRLK/2.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DRLK/2.11 | (b) not supported | not applicable: the case's PICS `DRLK.S & DRLK.S.F00 & DRLK.S.F01 & DRLK.S.F02` is false for the reference DUT |
 | DRLK/2.13 | (b) not supported | not applicable: the case's PICS `DRLK.S.F0d` is false for the reference DUT |
@@ -264,6 +283,13 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | GRPKEY/5.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | I/2.4 | (c) harness | TC-I-2.4 checks the Q-quality reporting of IdentifyTime added in Matter 1.4.2 against an expectation chip has not merged yet (connectedhomeip#42128); matter.js excludes it until then (test/app-slow/I.test.ts) |
 | I/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| ICDM/2.1 | (b) not supported | not applicable: the case's PICS `ICDM.S` is false for the reference DUT |
+| ICDM/3.1 | (b) not supported | not applicable: the case's PICS `ICDM.S` is false for the reference DUT |
+| ICDM/3.2 | (b) not supported | not applicable: the case's PICS `ICDM.S & ICDM.S.F00` is false for the reference DUT |
+| ICDM/3.3 | (b) not supported | not applicable: the case's PICS `ICDM.S & ICDM.S.F00` is false for the reference DUT |
+| ICDM/3.4 | (b) not supported | not applicable: the case's PICS `ICDM.S & ICDM.S.F00` is false for the reference DUT |
+| ICDM/4.1 | (b) not supported | not applicable: the case's PICS `ICDM.S & ICDM.S.F02` is false for the reference DUT |
+| ICDM/5.1 | (b) not supported | not applicable: the case's PICS `ICDM.S & ICDM.S.F02` is false for the reference DUT |
 | IDM/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -322,10 +348,34 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SC/8.5 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
 | SC/8.6 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
 | SC/8.7 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
+| SU/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/2.2 | (b) not supported | not applicable: the case's PICS `MCORE.OTA.Requestor` is false for the reference DUT |
+| SU/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/2.4 | (b) not supported | not applicable: the case's PICS `MCORE.OTA.Requestor` is false for the reference DUT |
+| SU/2.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/2.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/2.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/3.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| SU/4.1 | (b) not supported | not applicable: the case's PICS `MCORE.OTA.Requestor` is false for the reference DUT |
 | SWTCH/2.2 | (b) not supported | TC-SWTCH-2.2 runs only on a latching switch (PICS SWTCH.S.F00=0: the daemon's switch is momentary) (runs, and skips itself) |
 | SWTCH/2.5 | (b) not supported | TC-SWTCH-2.5 runs only with MomentarySwitchMultiPress (PICS SWTCH.S.F04=0) (runs, and skips itself) |
 | SWTCH/2.6 | (b) not supported | TC-SWTCH-2.6 runs only with MomentarySwitchMultiPress and ActionSwitch (PICS SWTCH.S.F04=0, SWTCH.S.F05=0) (runs, and skips itself) |
 | SWTCH/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| TIMESYNC/2.10 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
+| TIMESYNC/2.11 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
+| TIMESYNC/2.12 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
+| TIMESYNC/2.13 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F03` is false for the reference DUT |
+| TIMESYNC/2.3 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S & TIMESYNC.S.F03 & TIMESYNC.S.C01.Rsp & TIMESYNC.S.C00.Rsp & TIMESYNC.S.A0001 & TIMESYNC.S.A0000` is false for the reference DUT |
+| TIMESYNC/2.4 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
+| TIMESYNC/2.5 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
+| TIMESYNC/2.6 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F01` is false for the reference DUT |
+| TIMESYNC/2.7 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
+| TIMESYNC/2.8 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
+| TIMESYNC/2.9 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
 | TMP/2.2 | (c) harness | TC-TMP-2.2 has an operator change the measured value between two reads (a UserPrompt under TMP.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
 | TSTAT/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TSTAT/4.3 | (b) not supported | not applicable: the case's PICS `TSTAT.S & TSTAT.S.F08 & TSTAT.S.F0a` is false for the reference DUT |
@@ -352,11 +402,21 @@ The reference set is matter.js's (`support/chip-testing/test/core`,
 
 | Family | Why not | Class |
 | --- | --- | --- |
-| TIMESYNC, ICDM, DLOG, BIND, SU (OTA requestor), CLCTRL | the module ships these servers, the reference daemon does not mount them, so there is nothing to run the family against | open — mount them in the reference daemon |
 | PWRTL, LTIME, LUNIT, LCFG, ULABEL, FLABEL, and the measurement, energy, media and appliance clusters matter.js runs | no server in this module | (b) not supported |
-| ICDB, ICDM check-in | the module is not an ICD | (b) not supported |
+| ICDB | the module is not an ICD | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
 | CNET Wi-Fi and Thread cases | NetworkCommissioning is Ethernet-only | (d) out of scope |
+
+Some families run but have nothing the daemon can be tested on. The root's
+IcdManagement and OTA Software Update Requestor are not mounted
+(`examples/reference-bridge/wiring.go` buildRootClusters says why), so the
+ICDM cases and the SU requestor cases are not applicable through the
+device's own PICS (`ICDM.S=0`, `MCORE.OTA.Requestor=0`). The image lists
+the DLOG case, the BIND cases and the SU YAML cases as manual, so the
+status block records them as class (c); on substance BIND tests the binding
+client (`BIND.C`, a controller-side role, (d)), the SU provider cases an OTA
+provider (b), and DLOG and the SU requestor cases need BDX, which the module
+does not implement (`BD-chip-DiagLogs-NoBDX`).
 
 ## What a product owner must supply
 

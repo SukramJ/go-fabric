@@ -190,6 +190,13 @@ Descriptor-wide TagList decision — the two are the same switch, and this
 entry exists so that switch is not flipped for the Closure device type
 alone.
 
+Since the schema pin 85cf6647 matter.js generates the Closure, ClosurePanel
+and ElectricalEnergyTariff device types with `DescriptorServer.with("TagList")`
+(08ef820f, #4576), so the divergence is now one from matter.js's code as
+well as its model. The reference daemon's garage door
+(`examples/reference-bridge/fleet_closure.go`) is such an endpoint, and the
+CHIP families that check device-type conformance run against it.
+
 ### BD-Matter-GarageIsClosureNotWindowCovering — the garage drive left the WindowCovering projection
 
 A garage drive used to project as WindowCovering (0x0102) with its door

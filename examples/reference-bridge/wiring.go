@@ -11,9 +11,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +23,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im/subscription"
@@ -69,6 +72,9 @@ type rootRefs struct {
 	// BootReason, ShutDown, Leave) once the bridge is running.
 	basicInfo *mattercore.BasicInformation
 	genDiag   *mattercore.GeneralDiagnostics
+	// diagLogs answers RetrieveLogsRequest from the bridge's diagnostic
+	// event ring, attached in main once the ring exists.
+	diagLogs *mattercore.DiagnosticLogs
 }
 
 // buildRootClusters constructs endpoint 0's cluster surface.
@@ -222,6 +228,24 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	// the window.
 	refs.adminCom = wire.NewAdministratorCommissioning()
 
+	// TimeSynchronization (RootNode: optional) serves the host clock as
+	// UTCTime; GeneralDiagnostics TimeSnapshot then carries PosixTimeMs,
+	// as matter.js couples the two (GeneralDiagnosticsServer.timeSnapshot).
+	timeSync := mattercore.NewTimeSynchronization()
+	refs.genDiag.SetUTCClock(timeSync.UTC)
+	// DiagnosticLogs (RootNode: optional), inline transfer only — the
+	// module has no BDX (BD-chip-DiagLogs-NoBDX).
+	refs.diagLogs = mattercore.NewDiagnosticLogs()
+
+	// IcdManagement is NOT mounted: RootNode requires it under "Sit | Lit"
+	// (root-node.element.ts), which an always-on, mains-powered bridge is
+	// not, and matter.js mounts it on no node that is not an ICD (it is in
+	// neither ServerNode.RootEndpoint nor any non-ICD test app). A
+	// controller reads its presence as "this node sleeps"
+	// (NodePhysicalProperties isIntermittentlyConnected). The OTA Software
+	// Update Requestor is not mounted either: the module has no BDX and no
+	// update agent, so the node cannot take an update.
+
 	servers := []contract.ClusterServer{
 		basicInfo,
 		accessControl,
@@ -229,6 +253,8 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 		refs.adminCom,
 		mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{}),
 		refs.genDiag,
+		refs.diagLogs,
+		timeSync,
 		opCreds,
 		groupKeys,
 		groupcast,
@@ -930,3 +956,31 @@ func keepOperationalHours(ctx context.Context, st *store.Store, g *mattercore.Ge
 // no manufacturer of their own, which a host with real devices would set
 // per device through endpoint.Spec.VendorName.
 const exampleVendorName = "go-fabric example"
+
+// ringLogs serves DiagnosticLogs RetrieveLogsRequest from the bridge's
+// diagnostic event ring: the operator-facing trace of pairing, sessions and
+// subscriptions, one line per event, oldest first. The intents that ask for
+// it are EndUserSupport and NetworkDiagnostics; the daemon keeps no crash
+// log, so CrashLogs answers NoLogs.
+type ringLogs struct{ ring *diagevent.Ring }
+
+// Logs implements [mattercore.LogProvider].
+func (r ringLogs) Logs(_ context.Context, intent uint8) ([]byte, error) {
+	if intent == mattercore.IntentCrashLogs {
+		return nil, nil
+	}
+	var b strings.Builder
+	for _, e := range r.ring.Snapshot() {
+		fmt.Fprintf(&b, "%s %s %s", e.At.UTC().Format(time.RFC3339), e.Kind, e.Message)
+		keys := slices.Sorted(maps.Keys(e.Detail))
+		for _, k := range keys {
+			fmt.Fprintf(&b, " %s=%s", k, e.Detail[k])
+		}
+		b.WriteByte('\n')
+	}
+	if b.Len() == 0 {
+		// An empty ring is still a log: say so rather than answer NoLogs.
+		b.WriteString("no diagnostic events recorded\n")
+	}
+	return []byte(b.String()), nil
+}

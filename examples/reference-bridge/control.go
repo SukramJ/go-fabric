@@ -324,6 +324,9 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 	if trigger == triggerGeneric || trigger == triggerGenericAlias {
 		return nil
 	}
+	if handled, err := f.garage.testEventTrigger(trigger); handled {
+		return err
+	}
 	switch trigger & smokeTriggerMask {
 	case triggerForceSmokeWarning:
 		return set(func(s *alarm.State) { s.SmokeState = alarm.AlarmWarning })

@@ -12,6 +12,16 @@ pseudo-version of `main`.
 
 ### Added
 
+- The reference daemon mounts TimeSynchronization and DiagnosticLogs on its
+  root (the logs are its diagnostic event ring, inline, no BDX), an
+  AirPurifier endpoint with HEPA and activated-carbon filter monitoring
+  (`cluster/filter`) in the state matter.js's all-clusters test app starts
+  them, and a garage door (Closure: ClosureControl with Positioning and
+  Ventilation, a simulated drive, the CHIP ClosureControl test event
+  triggers). The certification families TIMESYNC, DLOG, ICDM, SU, BIND,
+  HEPAFREMON, ACFREMON and CLCTRL run; TC-DGGEN-2.4 runs now that
+  TimeSynchronization is there.
+
 - `core.GeneralDiagnostics.SetUTCClock`: TimeSnapshot carries
   PosixTimeMs when the node's TimeSynchronization holds a UTC time, as
   matter.js `GeneralDiagnosticsServer.timeSnapshot` couples them (and as
@@ -351,6 +361,15 @@ pseudo-version of `main`.
   ResetCondition. The first server built on a generated definition.
 
 ### Changed
+
+- IcdManagement and the OTA Software Update Requestor stay unmounted in the
+  reference daemon, and the documentation no longer says the former is
+  "mounted for conformance": RootNode requires IcdManagement only for an
+  intermittently connected node ("Sit | Lit"), matter.js mounts it on no
+  node that is not an ICD, and a controller reads its presence as "this
+  node sleeps"; the requestor cannot take an update without BDX and an
+  update agent. Their families are not applicable through the device's
+  own PICS.
 
 - `closure.ControlServer` MoveTo and Stop follow the specification text
   matter.js carries (closure-control.resource.ts): a MoveTo with none of its

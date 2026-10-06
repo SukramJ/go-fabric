@@ -128,7 +128,7 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 	for _, dt := range []uint32{
 		dtOnOffLight, dtColorTempLight, dtSpeaker, dtTempSensor, dtWaterValve, dtModeSelect, dtFan,
 		dtSmokeCOAlarm, dtPump, dtFlowSensor, dtLaundryWasher, dtRVC, dtThermostat, dtWindowCovering,
-		dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch,
+		dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch, dtAirPurifier, dtClosure,
 	} {
 		set.epOf[dt] = br.endpointFor(t, dt)
 	}
@@ -284,6 +284,12 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 	}
 	for i := range cases {
 		c := cases[i]
+		if e, ok := fam.picsEdits[c.Name]; ok {
+			if !strings.Contains(c.PICS, e.old) {
+				t.Errorf("PICS edit of %s (%s): %q is not in the case's expression %q", c.ID, e.reason, e.old, c.PICS)
+			}
+			c.PICS = strings.Replace(c.PICS, e.old, e.new, 1)
+		}
 		t.Run(c.Name, func(t *testing.T) {
 			if c.Kind == "manual" {
 				goldenMu.Lock()

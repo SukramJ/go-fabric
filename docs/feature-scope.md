@@ -59,7 +59,11 @@ Descriptor · DiagnosticLogs · GeneralCommissioning · GeneralDiagnostics ·
 GroupKeyManagement · Groups · IcdManagement · Identify · NetworkCommissioning ·
 OperationalCredentials · OtaSoftwareUpdateRequestor · TimeSynchronization.
 AccessRestriction (0x002B) is a constant and an integration point only — the
-Managed Aggregator use case is out of scope.
+Managed Aggregator use case is out of scope. Binding, IcdManagement and
+OtaSoftwareUpdateRequestor are stubs a host may mount but should not: the
+module originates no binding traffic, a mains-powered node is not an ICD
+(RootNode requires IcdManagement only for "Sit | Lit"), and the requestor has
+no BDX and no update agent. The reference daemon mounts none of the three.
 
 Application clusters, grouped by the device surface they serve:
 
