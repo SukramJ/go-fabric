@@ -12,6 +12,16 @@ pseudo-version of `main`.
 
 ### Added
 
+- `closure.ControlServer` emits the ClosureControl events —
+  OperationalError (`ReportError`, which also enters the Error state),
+  MovementCompleted (MainState Moving → Stopped), SecureStateChanged (a
+  change of OverallCurrentState.SecureState) and, with ManuallyOperable,
+  EngageStateChanged (`SetEngaged`) — lists them and its commands in
+  EventList / AcceptedCommandList (`MatterEvents`, `MatterAcceptedCommands`,
+  `SetMatterEventEmitter`, `SetEndpoint`), and tells the bridge which
+  attributes a state change moved (`OnMatterAttributesChanged`), so an
+  arrival or an error between commands reaches subscribers.
+
 - **Attribute transitions** — `cluster/transition`, a port of matter.js's
   `Transitions.ts`: `transition.New` / `Engine` (`Start`, `Stop`,
   `StopAll`, `Finish`, `FinishAll`, `Cancel`, `CancelAll`,
@@ -333,6 +343,16 @@ pseudo-version of `main`.
   ResetCondition. The first server built on a generated definition.
 
 ### Changed
+
+- `closure.ControlServer` MoveTo and Stop follow the specification text
+  matter.js carries (closure-control.resource.ts): a MoveTo with none of its
+  fields is INVALID_COMMAND; a field of a feature the server does not
+  advertise (Latch, Speed) is ignored instead of refused with
+  ConstraintError; with Positioning an absent Position falls back to
+  OverallTargetState.Position, and with that null nothing moves. Stop acts
+  only on a closure that is Moving, WaitingForMotion or Calibrating and
+  answers SUCCESS in every state; before, it set MainState Stopped from any
+  state, SetupRequired included.
 
 - `light.ColorControlServer` serves MoveColorTemperature,
   StepColorTemperature and StopMoveStep as matter.js does instead of
