@@ -160,6 +160,13 @@ CHIPTOOL_BIN_DIR     ?= bin
 CHIP_TEST_IMAGE        ?= ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996690eea82fa74d1563abd7d2b3cb326
 CHIP_TEST_IMAGE_COMMIT ?= 6170af8461b10b1766044122ac83332c6d00ab20
 
+# The CHIP data model directory the snapshot is cross-checked against
+# (internal/chipdm): data_model/<the snapshot's Matter revision>, read at
+# CHIP_TEST_IMAGE_COMMIT from a connectedhomeip checkout at test time and
+# never committed (ADR 0015). TestChipDataModelPins holds it to
+# parity/schema.json's revision.
+CHIP_DATA_MODEL_VERSION ?= 1.6.1
+
 .PHONY: chiptool-extract
 chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into ./bin (arm64 hosts; ~2.5 GiB pull)
 	@# The image publishes arm64 manifests only. On any other host the pull
@@ -188,7 +195,15 @@ CHIP_ROOT ?= ../connectedhomeip
 
 .PHONY: chiptool-setup
 chiptool-setup: ## sparse connectedhomeip checkout at the harness image's CHIP commit (source to read, nothing to build)
-	script/chiptool-setup.sh "$(CHIP_TEST_IMAGE_COMMIT)" "$(CHIP_ROOT)"
+	script/chiptool-setup.sh "$(CHIP_TEST_IMAGE_COMMIT)" "$(CHIP_ROOT)" "data_model/$(CHIP_DATA_MODEL_VERSION)"
+
+.PHONY: chipdm-check
+chipdm-check: ## run the CHIP data model cross-check against CHIP_ROOT; fails instead of skipping without the checkout
+	GOFABRIC_CHIP_ROOT="$(abspath $(CHIP_ROOT))" GOFABRIC_CHIP_REQUIRED=1 $(GO) test -count=1 -run 'TestChipDataModel|TestCompareSeededDifferences' -v ./internal/chipdm/
+
+.PHONY: chipdm-report
+chipdm-report: ## rewrite the generated block of docs/chip-datamodel-crosscheck.md from CHIP_ROOT
+	GOFABRIC_CHIP_ROOT="$(abspath $(CHIP_ROOT))" GOFABRIC_CHIP_REQUIRED=1 $(GO) test -count=1 -run 'TestChipDataModelCrosscheck' ./internal/chipdm/ -args -update-chipdm-doc
 
 .PHONY: chiptool-image
 chiptool-image: ## pull the pinned CHIP test harness image (the suite also pulls it on first use)
