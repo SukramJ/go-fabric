@@ -42,8 +42,8 @@ func TestPrimaryHostIPs_ReturnsNonNilSlice(t *testing.T) {
 // filterPrimaryHostIPs with the default (nil) filter: container/
 // virtualisation bridges are dropped by name, down/non-multicast/loopback/point-to-point interfaces are dropped
 // by flag, IPv4 sorts before IPv6, duplicates are deduplicated, and
-// link-local addresses (both families) are excluded while global IPv6
-// survives.
+// link-local addresses are excluded (IPv6 ones only where the interface
+// has a routable IPv6) while global IPv6 survives.
 func TestFilterPrimaryHostIPs(t *testing.T) {
 	t.Parallel()
 	ip := net.ParseIP
@@ -117,6 +117,23 @@ func TestFilterPrimaryHostIPs(t *testing.T) {
 				}},
 			},
 			want: []string{"192.168.1.10", "2001:db8::1"},
+		},
+		{
+			// An interface with only a link-local IPv6 still advertises
+			// it — an IPv6-only resolver (chip-tool) has nothing else to
+			// reach the node over; chip and matter.js publish every IPv6.
+			name: "IPv6 link-local kept where the interface has no routable IPv6",
+			ifaces: []hostIface{
+				{name: "eth0", up: true, multicast: true, ips: []net.IP{
+					ip("10.1.0.4"),
+					ip("fe80::20d:3aff:fe1b:2c3d"),
+				}},
+				{name: "eth1", up: true, multicast: true, ips: []net.IP{
+					ip("fe80::1"),
+					ip("2001:db8::2"),
+				}},
+			},
+			want: []string{"10.1.0.4", "fe80::20d:3aff:fe1b:2c3d", "2001:db8::2"},
 		},
 	}
 

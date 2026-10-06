@@ -389,6 +389,13 @@ pseudo-version of `main`.
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
+  - `mdns.Zeroconf` publishes an interface's link-local IPv6 address when
+    the interface has no routable IPv6, as chip and matter.js publish every
+    IPv6 address. On a host whose LAN interface is link-local-only for
+    IPv6 (GitHub's runners) the operational host name carried IPv4 records
+    only, and an IPv6-only resolver such as chip-tool never found the
+    commissioned node. Where a routable IPv6 exists, the link-local one
+    stays out as before.
   - `cluster/thermo.ThermostatServer` accepts writes of
     Min/MaxHeatSetpointLimit and Min/MaxCoolSetpointLimit (ConstraintError
     outside the absolute range) and reconciles the setpoints and limits a

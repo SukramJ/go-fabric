@@ -194,7 +194,8 @@ func parseHostIPs(ips []string) []net.IP {
 }
 
 // filterPrimaryHostIPs applies the advertise policy: the routable IPv4 +
-// globally-routable IPv6 addresses from every non-loopback, non-tunnel,
+// globally-routable IPv6 addresses (an interface's link-local IPv6 only when
+// it has no routable one) from every non-loopback, non-tunnel,
 // multicast-capable interface that is currently UP — excluding container /
 // virtualisation bridges by interface name. Apple iOS Matter daemon
 // iterates the published address list during resolve and aborts on
@@ -227,6 +228,12 @@ func filterPrimaryHostIPs(ifaces []hostIface, exclude func(string) bool) []strin
 		if exclude(ifi.name) {
 			continue
 		}
+		// An interface whose only IPv6 is link-local still publishes it:
+		// Matter is IPv6-first — chip-tool resolves operational nodes over
+		// IPv6 only — and chip and matter.js (NodeJsNetwork) publish every
+		// IPv6 address of the interface. Where a routable IPv6 exists the
+		// link-local one stays out, the policy above.
+		keepLinkLocal6 := !hasRoutableIPv6(ifi.ips)
 		for _, ip := range ifi.ips {
 			if ip == nil || ip.IsLoopback() {
 				continue
@@ -242,13 +249,28 @@ func filterPrimaryHostIPs(ifaces []hostIface, exclude func(string) bool) []strin
 				}
 				continue
 			}
-			if !ip.IsLinkLocalUnicast() && !ip.IsUnspecified() {
-				seen[s] = struct{}{}
-				v6s = append(v6s, s)
+			if ip.IsUnspecified() || (ip.IsLinkLocalUnicast() && !keepLinkLocal6) {
+				continue
 			}
+			seen[s] = struct{}{}
+			v6s = append(v6s, s)
 		}
 	}
 	return append(v4s, v6s...)
+}
+
+// hasRoutableIPv6 reports whether ips holds an IPv6 address that is
+// neither link-local, loopback nor unspecified.
+func hasRoutableIPv6(ips []net.IP) bool {
+	for _, ip := range ips {
+		if ip == nil || ip.To4() != nil {
+			continue
+		}
+		if !ip.IsLinkLocalUnicast() && !ip.IsLoopback() && !ip.IsUnspecified() {
+			return true
+		}
+	}
+	return false
 }
 
 // Publish implements [Advertiser]. Each publish call registers a
