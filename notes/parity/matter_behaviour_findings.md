@@ -464,19 +464,6 @@ certification cases judge a device by) is right and the snapshot is wrong
 None changes a shipped server's behaviour today; each entry leaves the
 table, and this list, when the snapshot is corrected.
 
-- **TemperatureAlarm (0x0064) lacks the RESET feature (bit 0).** CHIP
-  inherits it from Alarm Base, and so does matter.js's model
-  (`ClusterModel.features` visits the FeatureMap's inheritance), but
-  `script/extract-from-matter-js.ts` emits a cluster's features from the
-  element text, where TemperatureAlarm's own FeatureMap replaces the base's.
-  A defect of this module's extractor. No server or generated definition
-  uses TemperatureAlarm; a server built from the snapshot could not offer
-  RESET and the Reset command it enables. CHIP marks the cluster provisional,
-  so TC_DeviceConformance (IDM family) rejects a device serving it today in
-  any case. **Fix:** emit `features` from
-  `model.features` at the next extraction (inherited features are absent
-  from the raw FeatureMap the features loop reads); the acknowledgement then
-  goes stale and is removed.
 - **GroupKeySetStruct.GroupKeyMulticastPolicy is O, Matter 1.6.1 says D.**
   matter.js's `GroupKeyManagementOverrides.ts` (written when the field was
   "P, M") forces O for every revision; its own 1.6.1 scrape states D.

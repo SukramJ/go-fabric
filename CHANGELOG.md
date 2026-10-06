@@ -489,6 +489,16 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- **The schema snapshot carries inherited features.**
+  `script/extract-from-matter-js.ts` read a cluster's features from its own
+  FeatureMap, which in a derived cluster replaces the base's, so a feature
+  inherited without being restated was lost: TemperatureAlarm (0x0064)
+  lacked Alarm Base's RESET (bit 0, O). The extractor now emits them from
+  matter.js's operational model; re-extracted at the same matter.js pin,
+  that feature is the only change. The CHIP data model cross-check found it.
+  `schema.SchemaSnapshotSHA256` changes: **a host pinning the snapshot's
+  bytes must re-pin.** No server or generated cluster definition is
+  affected.
 - **Certification:** TC-LVL-2.3, TC-LVL-3.1, TC-LVL-4.1, TC-LVL-5.1,
   TC-LVL-6.1, TC-CC-2.2, TC-CC-6.2 and TC-CC-6.3 run and pass — they were
   excluded as class (a) gaps because no level or colour temperature was

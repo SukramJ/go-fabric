@@ -131,7 +131,7 @@ block below.
 
 | Side | Source |
 | --- | --- |
-| snapshot | `parity/schema.json`, matter.js `85cf66472b02763fe3b9c736ebab443b999a95a1`, Matter 1.6.1, SHA-256 `09d67269d2bed61dd89394100adc871c1790514c1b2315f94fa4317cfd1c5850` |
+| snapshot | `parity/schema.json`, matter.js `85cf66472b02763fe3b9c736ebab443b999a95a1`, Matter 1.6.1, SHA-256 `5b57c2878c29bb66e4283607c708f59412bae1cc178d3e618036cc2da95a9bc4` |
 | CHIP | connectedhomeip `6170af8461b10b1766044122ac83332c6d00ab20`, `data_model/1.6.1` (git tree `77969732bddf4bd12ba57eb1c6fa032eb2613425`) |
 | CHIP's source | specification `1.6.1-attempt-4` (`49f70c101b4211df3febb975a7f7f9d6e4c4bc94`), alchemy version: v1.7.10 |
 | read | at test time from a connectedhomeip checkout; nothing of it is committed (ADR 0015) |
@@ -147,18 +147,18 @@ block below.
 | datatype | 548 |
 | deviceType | 91 |
 | event | 137 |
-| feature | 346 |
+| feature | 347 |
 | field | 3927 |
 | global datatype | 19 |
 | requirement | 466 |
-| **total** | **7242** |
+| **total** | **7243** |
 
 ### Differences by class
 
 | Class | Differences |
 | --- | ---: |
 | (i) matter.js right or deliberate | 96 |
-| (ii) CHIP right, snapshot wrong | 3 |
+| (ii) CHIP right, snapshot wrong | 2 |
 | (iii) representation, normalized in code | 533 |
 | (iv) excused by the harness | 2 |
 | unexplained | 0 |
@@ -285,10 +285,6 @@ CHIP marks these cluster ids provisional. A certification run rejects a provisio
   - Why: Matter 1.6.1 deprecates the field (matter.js's own 1.6.1 scrape states D); a matter.js override written when the specification said "P, M" forces O for every revision.
   - Source: matter.js support/models/src/local/GroupKeyManagementOverrides.ts; support/models/src/v1.6.1/spec.ts GroupKeySetStruct.
   - Impact: No certification case reads the field. go-fabric's KeySetReadResponse reports field 8 as matter.js's GroupKeyManagementServer does while its model defines the field, which a D field still is, so the behaviour stays; CHIP's server omits it. Finding recorded; upstream candidate (gate the override until 1.6.1).
-- **TemperatureAlarm.RESET** (feature): CHIP `present`, snapshot `absent` — 1 difference(s).
-  - Why: TemperatureAlarm derives from Alarm Base and inherits its RESET feature (bit 0). matter.js's model has it (ClusterModel.features visits the FeatureMap's inheritance), but this module's extractor emits a cluster's features from the element text, where TemperatureAlarm's own FeatureMap replaces the base's.
-  - Source: go-fabric script/extract-from-matter-js.ts (the features loop reads the raw layer); matter.js packages/model/src/models/ClusterModel.ts features.
-  - Impact: go-fabric has no TemperatureAlarm server and generates no definition for it, so nothing depends on it. A defect of this module's extractor, not of matter.js: finding recorded, fixed with the next extraction.
 - **semtag.Label** (conformance): CHIP `mfgcode!=null,o`, snapshot `o` — 1 difference(s).
   - Why: The specification makes Label mandatory when MfgCode is not null; matter.js relaxes it to O ("TODO we do not support MfgCode != null").
   - Source: matter.js support/models/src/local/semtag.ts.

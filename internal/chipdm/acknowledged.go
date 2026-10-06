@@ -239,16 +239,6 @@ var Acknowledged = []Acknowledgement{
 			"stays; CHIP's server omits it. Finding recorded; upstream candidate (gate the override until 1.6.1).",
 	},
 	{
-		ClassCHIP, "TemperatureAlarm.RESET", "feature", "present", "absent",
-		"TemperatureAlarm derives from Alarm Base and inherits its RESET feature (bit 0). matter.js's model has it " +
-			"(ClusterModel.features visits the FeatureMap's inheritance), but this module's extractor emits a " +
-			"cluster's features from the element text, where TemperatureAlarm's own FeatureMap replaces the base's",
-		"go-fabric script/extract-from-matter-js.ts (the features loop reads the raw layer); matter.js " +
-			"packages/model/src/models/ClusterModel.ts features",
-		"go-fabric has no TemperatureAlarm server and generates no definition for it, so nothing depends on it. " +
-			"A defect of this module's extractor, not of matter.js: finding recorded, fixed with the next extraction.",
-	},
-	{
 		ClassCHIP, "semtag.Label", "conformance", "mfgcode!=null,o", "o",
 		"The specification makes Label mandatory when MfgCode is not null; matter.js relaxes it to O " +
 			"(\"TODO we do not support MfgCode != null\")",

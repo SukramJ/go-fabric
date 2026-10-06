@@ -39,7 +39,7 @@ mirror.
 - No matter.js source code is reproduced verbatim. What does ship inside every
   binary built from this module is the parity schema snapshot — the matter.js
   element model extracted from HEAD — embedded from `parity/schema.json`
-  (3,422,016 bytes) by the `//go:embed` in `parity/parity.go`.
+  (3,422,318 bytes) by the `//go:embed` in `parity/parity.go`.
 
 ### connectedhomeip — nothing distributed
 
