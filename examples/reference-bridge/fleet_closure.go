@@ -115,8 +115,6 @@ func (g *demoGarage) stop(context.Context) error {
 // state in the lower.
 const (
 	triggerClosureError         uint64 = 0x0104000000000000
-	triggerClosureProtected     uint64 = 0x0104000000000001
-	triggerClosureDisengaged    uint64 = 0x0104000000000002
 	triggerClosureSetupRequired uint64 = 0x0104000000000003
 	triggerClosureClear         uint64 = 0x0104000000000004
 )
@@ -129,7 +127,7 @@ const (
 // The CHIP harness writes the target endpoint into bits 32..47 of the
 // trigger (matter_testing.py _update_legacy_test_event_triggers); the
 // daemon has one closure, so the endpoint is masked off.
-func (g *demoGarage) testEventTrigger(trigger uint64) (handled bool, err error) {
+func (g *demoGarage) testEventTrigger(trigger uint64) (handled bool) {
 	switch trigger &^ (0xFFFF << 32) {
 	case triggerClosureError:
 		g.ctl.ReportError(clusterwire.ClosureErrorList{clusterwire.ClosureError(0)}) // PhysicallyBlocked
@@ -138,11 +136,11 @@ func (g *demoGarage) testEventTrigger(trigger uint64) (handled bool, err error) 
 	case triggerClosureClear:
 		g.ctl.SetErrorList(clusterwire.ClosureErrorList{})
 		g.ctl.SetMainState(clusterwire.ClosureMainStateStopped)
-	case triggerClosureProtected, triggerClosureDisengaged:
-		return false, nil
 	default:
-		return false, nil
+		// Protected (…01) and Disengaged (…02) too: their features are not
+		// advertised.
+		return false
 	}
 	g.notify()
-	return true, nil
+	return true
 }

@@ -183,33 +183,9 @@ func (h *hostAnswerer) answer(query *dns.Msg, ifIndex int, src *net.UDPAddr) (re
 		return hostReply{}, false
 	}
 
-	var answers []dns.RR
-	onlyAddressQuestions := true
-	for _, q := range query.Question {
-		if q.Qtype != dns.TypeA && q.Qtype != dns.TypeAAAA {
-			onlyAddressQuestions = false
-		}
-		if !strings.EqualFold(q.Name, h.name) {
-			continue
-		}
-		for _, rr := range all {
-			if q.Qtype == dns.TypeANY || q.Qtype == rr.Header().Rrtype {
-				answers = append(answers, rr)
-			}
-		}
-	}
+	answers, additional := h.collect(query, all)
 	if len(answers) == 0 {
 		return hostReply{}, false
-	}
-	// Additional records only for a query that is not purely A/AAAA:
-	// whatever of the set the answers do not carry.
-	var additional []dns.RR
-	if !onlyAddressQuestions {
-		for _, rr := range all {
-			if !slices.Contains(answers, rr) {
-				additional = append(additional, rr)
-			}
-		}
 	}
 	if len(query.Answer) > 0 {
 		answers = slices.DeleteFunc(answers, func(rr dns.RR) bool { return knownTo(query.Answer, rr) })
@@ -220,13 +196,6 @@ func (h *hostAnswerer) answer(query *dns.Msg, ifIndex int, src *net.UDPAddr) (re
 	}
 
 	now := h.now()
-	unicast := true
-	for _, q := range query.Question {
-		if q.Qclass&classCacheFlush == 0 {
-			unicast = false
-			break
-		}
-	}
 	sinceMulticast := func(rr dns.RR) time.Duration {
 		last, seen := h.lastMulticast[recordKey(rr, ifIndex)]
 		if !seen {
@@ -234,19 +203,7 @@ func (h *hostAnswerer) answer(query *dns.Msg, ifIndex int, src *net.UDPAddr) (re
 		}
 		return now.Sub(last)
 	}
-	if unicast {
-		for _, rr := range answers {
-			if sinceMulticast(rr) > time.Duration(rr.Header().Ttl)*time.Second/4 {
-				// Not multicast on this link within a quarter of the TTL:
-				// the link's caches need it, answer by multicast.
-				unicast = false
-				break
-			}
-		}
-	}
-	if src == nil {
-		unicast = false
-	}
+	unicast := src != nil && unicastAllowed(query, answers, sinceMulticast)
 	if !unicast {
 		answers = slices.DeleteFunc(answers, func(rr dns.RR) bool { return sinceMulticast(rr) < multicastRateLimit })
 		if len(answers) == 0 {
@@ -269,6 +226,53 @@ func (h *hostAnswerer) answer(query *dns.Msg, ifIndex int, src *net.UDPAddr) (re
 	resp.Answer = sendable(answers, all, unicast)
 	resp.Extra = sendable(additional, all, unicast)
 	return hostReply{msg: resp, unicast: unicast, dst: src, ifIndex: ifIndex}, true
+}
+
+// collect matches the questions against the interface's record set: the
+// answers, and — for a query that is not purely A/AAAA — the rest of the set
+// as additionals (matter.js #handleMessage).
+func (h *hostAnswerer) collect(query *dns.Msg, all []dns.RR) (answers, additional []dns.RR) {
+	onlyAddressQuestions := true
+	for _, q := range query.Question {
+		if q.Qtype != dns.TypeA && q.Qtype != dns.TypeAAAA {
+			onlyAddressQuestions = false
+		}
+		if !strings.EqualFold(q.Name, h.name) {
+			continue
+		}
+		for _, rr := range all {
+			if q.Qtype == dns.TypeANY || q.Qtype == rr.Header().Rrtype {
+				answers = append(answers, rr)
+			}
+		}
+	}
+	if !onlyAddressQuestions {
+		for _, rr := range all {
+			if !slices.Contains(answers, rr) {
+				additional = append(additional, rr)
+			}
+		}
+	}
+	return answers, additional
+}
+
+// unicastAllowed is the QU rule (RFC 6762 §5.4, matter.js #handleMessage):
+// every question asks for a unicast response, and each answer went out by
+// multicast on this link within a quarter of its TTL.
+func unicastAllowed(query *dns.Msg, answers []dns.RR, sinceMulticast func(dns.RR) time.Duration) bool {
+	for _, q := range query.Question {
+		if q.Qclass&classCacheFlush == 0 {
+			return false
+		}
+	}
+	for _, rr := range answers {
+		if sinceMulticast(rr) > time.Duration(rr.Header().Ttl)*time.Second/4 {
+			// Not multicast on this link within a quarter of the TTL:
+			// the link's caches need it, answer by multicast.
+			return false
+		}
+	}
+	return true
 }
 
 // suppressDuplicate is matter.js #shouldSuppressResponse (RFC 6762 §7.3):

@@ -30,7 +30,7 @@ func (r *recordingEmitter) MatterEmitEvent(endpoint uint16, _, event uint32, dat
 }
 
 func (r *recordingEmitter) ids() []uint32 {
-	var out []uint32
+	out := make([]uint32, 0, len(r.events))
 	for _, e := range r.events {
 		out = append(out, e.event)
 	}
