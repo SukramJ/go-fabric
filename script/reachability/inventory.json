@@ -7502,7 +7502,7 @@
       "identifier": "TestCertifiabilityDocument",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 48
+      "line": 49
     },
     {
       "package": "internal/chiptool",
@@ -7516,7 +7516,7 @@
       "identifier": "TestWorkflowRunsEveryFamily",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
-      "line": 233
+      "line": 234
     },
     {
       "package": "internal/paritytest",
