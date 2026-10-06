@@ -141,6 +141,52 @@ jobs:
       - name: reachability
         run: make reachability-check
 
+  chipdm:
+    name: chip data model cross-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # The cross-check (internal/chipdm, ADR 0015) reads connectedhomeip's
+      # data_model/<version> XML at test time; nothing derived from it is
+      # committed, because the files' CSA notice forbids publishing them or
+      # deriving works from them. Every other job sees no checkout and the
+      # cross-check skips there; this one provides it and runs the check with
+      # GOFABRIC_CHIP_REQUIRED=1 (make chipdm-check), so a skip is a failure
+      # and the comparison cannot rot unnoticed.
+      - name: read the CHIP pins
+        id: pins
+        run: |
+          echo "commit=$(sed -n 's/^CHIP_TEST_IMAGE_COMMIT *?= *//p' Makefile)" >> "$GITHUB_OUTPUT"
+          echo "version=$(sed -n 's/^CHIP_DATA_MODEL_VERSION *?= *//p' Makefile)" >> "$GITHUB_OUTPUT"
+      - name: cache the CHIP data model checkout
+        id: chip-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/connectedhomeip
+          key: chipdm-${{ steps.pins.outputs.commit }}-${{ steps.pins.outputs.version }}
+      # A blob-filtered, depth-1 partial clone of the pinned commit with only
+      # data_model/<version> checked out: a few MB, no authentication. The
+      # same fetch script/chiptool-setup.sh makes, with a narrower sparse set.
+      - name: fetch connectedhomeip data_model at the pin
+        if: steps.chip-cache.outputs.cache-hit != 'true'
+        env:
+          CHIP_DIR: ${{ runner.temp }}/connectedhomeip
+          PIN: ${{ steps.pins.outputs.commit }}
+          DM: data_model/${{ steps.pins.outputs.version }}
+        run: |
+          git init -q "$CHIP_DIR"
+          git -C "$CHIP_DIR" remote add origin https://github.com/project-chip/connectedhomeip.git
+          git -C "$CHIP_DIR" sparse-checkout set --cone "$DM"
+          git -C "$CHIP_DIR" fetch -q --depth 1 --filter=blob:none origin "$PIN"
+          git -C "$CHIP_DIR" -c advice.detachedHead=false checkout -q FETCH_HEAD
+          du -sh "$CHIP_DIR"
+      - name: cross-check
+        run: make chipdm-check CHIP_ROOT="${{ runner.temp }}/connectedhomeip"
+
   lint:
     name: lint
     runs-on: ubuntu-latest

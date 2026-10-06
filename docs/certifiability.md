@@ -63,6 +63,14 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   reports exactly the recorded problems and nothing else; it fails as soon as
   another problem appears or the recorded one disappears.
 
+A static complement runs in CI on every pull request (and in `go test ./...`
+wherever a connectedhomeip checkout is present): the
+[CHIP data model cross-check](./chip-datamodel-crosscheck.md) compares the
+whole schema snapshot — every cluster and device type, not only those the
+reference daemon mounts — with connectedhomeip's `data_model/<version>` XML,
+the model the Python cases judge a device by, and classifies every
+difference.
+
 ## PICS
 
 The PICS a case runs with is generated from the device, not written for the

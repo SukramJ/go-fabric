@@ -39,7 +39,19 @@ mirror.
 - No matter.js source code is reproduced verbatim. What does ship inside every
   binary built from this module is the parity schema snapshot — the matter.js
   element model extracted from HEAD — embedded from `parity/schema.json`
-  (516,843 bytes) by the `//go:embed` in `parity/parity.go`.
+  (3,422,318 bytes) by the `//go:embed` in `parity/parity.go`.
+
+### connectedhomeip — nothing distributed
+
+The CHIP data model cross-check (`internal/chipdm`,
+[ADR 0015](./docs/adr/0015-chip-data-model-read-at-run-time.md)) reads
+connectedhomeip's spec-derived data model, `data_model/<version>/`, from a
+checkout at test time. No file of it and nothing derived from it is in this
+tree or in any binary built from this module: the XML files carry a
+Connectivity Standards Alliance notice that forbids publishing them or
+creating derivative works from them. The XML fixtures in
+`internal/chipdm/*_test.go` are written for those tests and reproduce no
+CSA document.
 
 ---
 

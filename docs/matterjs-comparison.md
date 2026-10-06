@@ -121,6 +121,7 @@ actually mounts. The schema for all of them is present here (in `parity/` and
 | --- | --- | --- | --- | --- |
 | `packages/testing` — its own test harness | Go's `testing`, plus [`bridge/bridgetest`](../bridge/bridgetest) and [`endpoint/endpointtest`](../endpoint/endpointtest) for consumers | ✅ | — | |
 | chip-tool / CSA `Test_TC_*` execution | `internal/chiptool/`, [`conformance/`](../conformance), `.github/workflows/chiptool.yml` | ✅ | — | Three CI jobs including a control leg that separates our defects from environment failures. |
+| `support/codegen` `validate-chipdm-model` — the model against CHIP's data model XML | [`internal/chipdm`](../internal/chipdm), [`chip-datamodel-crosscheck.md`](./chip-datamodel-crosscheck.md) | ✅ | — | A port of matter.js's comparison, run against the snapshot wherever a connectedhomeip checkout is present (CI provides one; the XML is read, never committed); every difference is classified ([ADR 0015](./adr/0015-chip-data-model-read-at-run-time.md)). |
 | `packages/cli-tool`, `nodejs-shell` — interactive shells | — | ○ | **Low** | `examples/reference-bridge` covers the "run it and pair it" need. |
 | `packages/mqtt`, `react-native`, `nodejs-ws` — runtime bindings | — | ○ | **No** | Host concerns. This module is a library; the host owns its own surfaces. |
 | Diagnostics for a failed pairing | [`diagevent/`](../diagevent) | ✅ | — | A bounded trace explaining a pairing that failed without an error on the wire. No matter.js equivalent — a divergence in our favour. |

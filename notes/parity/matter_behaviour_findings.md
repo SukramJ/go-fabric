@@ -515,6 +515,44 @@ environment matter; they failed on an IPv6-capable runner because the node
 did not answer an AAAA query for its own host name, and run unconditionally
 since that was fixed.
 
+### CHIP data model cross-check — class (ii)
+
+Differences where connectedhomeip's data model (the model the Python
+certification cases judge a device by) is right and the snapshot is wrong
+(`internal/chipdm/acknowledged.go`, class `ii`;
+[`docs/chip-datamodel-crosscheck.md`](../../docs/chip-datamodel-crosscheck.md)).
+None changes a shipped server's behaviour today; each entry leaves the
+table, and this list, when the snapshot is corrected.
+
+- **GroupKeySetStruct.GroupKeyMulticastPolicy is O, Matter 1.6.1 says D.**
+  matter.js's `GroupKeyManagementOverrides.ts` (written when the field was
+  "P, M") forces O for every revision; its own 1.6.1 scrape states D.
+  `bridge/fields_reader_groupkeys.go` reports field 8 in KeySetReadResponse
+  as matter.js's server does while the model defines the field (a D field
+  still is); CHIP's server omits it. No case of the GRPKEY family reads or
+  writes it, and TC_DeviceConformance does not judge struct fields, so no
+  certification family is affected. Upstream candidate (matter.js): gate
+  the override `until: "1.6.1"`.
+- **semtag.Label is O, the specification says "MfgCode != null, O".**
+  matter.js `support/models/src/local/semtag.ts` relaxes it ("TODO we do not
+  support MfgCode != null"). go-fabric serves no Descriptor TagList, so
+  nothing depends on it; it matters once TagList is served (TC-DESC-2.2).
+
+A gap the cross-check reports rather than closes: **device-type element
+requirements and conditions are not in the snapshot.**
+`script/extract-from-matter-js.ts` keeps a device type's cluster
+requirements and skips the feature / attribute / command overrides nested in
+them, and the conditions. CHIP's model states 153 such overrides and 46
+conditions, and `device_conformance_tests.py` enforces the overrides
+(`check_feature_overrides`, `check_attribute_overrides`,
+`check_command_overrides`: TC_DeviceConformance, IDM family) — On/Off
+Light's On/Off LT feature, Extended Color Light's XY and CT features and
+RemainingTime, and so on. go-fabric's endpoint composition states them by
+hand and nothing holds it to either model. **Fix:** emit the nested
+requirements and the conditions at the next extraction and compare them as
+matter.js does (`compare.ts #requirements` recurses into a requirement's
+children).
+
 ## Verified sound (no action)
 
 TLV element codes/widths, bool/null/float shapes, string/octet length forms, tag-encode thresholds; message/protocol header field order and presence rules; Sigma KDF salts/infos/nonces, TBE/TBS tag order, destinationId HMAC, RCAC/chain validation, AddNOC rollback + fail-safe-expiry revert, RemoveFabric teardown; SPAKE2 generators/point validation/Ke/transcript, PBKDF bounds; MRP max-transmissions = 5, nonce layout, standalone-ack delay, session-id collision avoidance; timed-invoke gate, keepSubscriptions purge, sendInterval formula, subscription death after 3 failures; EP0 cluster set, full-family PartsList, ServerList, empty-ACL fail-closed, CAT matching; OnOff toggle semantics, level scaling, thermostat limit-clamp + deadband, measurement null semantics, illuminance formula, cover inversion; mDNS operational instance-name + subtypes + TXT formats, multi-fabric boot re-announce, AddNOC-time publish, shutdown withdraw.

@@ -264,6 +264,19 @@ match. `go test ./script/clustergen/...` fails when a committed cluster
 definition is stale, and generates and compiles every cluster of the new
 snapshot.
 
+The new snapshot must also pass the CHIP data model cross-check
+(`make chipdm-check`, [ADR 0015](./docs/adr/0015-chip-data-model-read-at-run-time.md)):
+it compares the whole snapshot with connectedhomeip's `data_model/<version>`
+XML, the model the CSA's Python cases judge a device by, read at test time
+from the `make chiptool-setup` checkout (CI fetches its own), and fails on a
+difference `internal/chipdm/acknowledged.go` does not classify and on an
+entry that no longer applies. A new Matter revision also moves
+`CHIP_DATA_MODEL_VERSION` in the Makefile; `make chipdm-report` rewrites
+[`docs/chip-datamodel-crosscheck.md`](./docs/chip-datamodel-crosscheck.md).
+Never commit the XML or anything extracted from it — its CSA notice forbids
+publishing and derivative works. Classify what moved — never acknowledge a
+difference to make the test pass.
+
 A host application that pins its own copy of these bytes (the reference daemon
 does, to keep a schema change from arriving unnoticed in a dependency bump)
 updates that pin after the snapshot lands here, not before.

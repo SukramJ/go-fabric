@@ -17,18 +17,24 @@
 # sparse set widened if needed); one at another commit is reported and left
 # alone — it may be somebody's working tree.
 #
-# Usage: script/chiptool-setup.sh <pin> <chip-root>
+# Further arguments widen the sparse set: the Makefile passes the data model
+# directory the schema snapshot is cross-checked against
+# (data_model/<version>, read by internal/chipdm).
+#
+# Usage: script/chiptool-setup.sh <pin> <chip-root> [extra sparse path...]
 
 set -euo pipefail
 
-pin=${1:?usage: chiptool-setup.sh <pin> <chip-root>}
-chip_root=${2:?usage: chiptool-setup.sh <pin> <chip-root>}
+pin=${1:?usage: chiptool-setup.sh <pin> <chip-root> [extra sparse path...]}
+chip_root=${2:?usage: chiptool-setup.sh <pin> <chip-root> [extra sparse path...]}
+shift 2
 
 sparse=(
 	scripts/py_matter_yamltests
 	scripts/tests
 	examples/chip-tool
 	src
+	"$@"
 )
 
 if [ -e "$chip_root" ] && [ ! -d "$chip_root/.git" ]; then
