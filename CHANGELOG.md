@@ -12,6 +12,35 @@ pseudo-version of `main`.
 
 ### Added
 
+- **Attribute transitions** — `cluster/transition`, a port of matter.js's
+  `Transitions.ts`: `transition.New` / `Engine` (`Start`, `Stop`,
+  `StopAll`, `Finish`, `FinishAll`, `Cancel`, `CancelAll`,
+  `RemainingTime`, `Active`), `Config`, `Property`, `Transition`, `Change`,
+  `HueDistance` / `HueDirection`, `DirectionalDistance`,
+  `DefaultStepInterval`, `ExternalTimeUnit`. Values step every 100 ms and
+  round half up; RemainingTime is reported by matter.js's
+  `#updateRemainingTime` rules; an idle engine owns no goroutine.
+- `levelcontrol.Config.Lighting` serves the LT feature — MinLevel 1,
+  RemainingTime, StartUpCurrentLevel, the CoupleColorTempToLevel option
+  (`AttrRemainingTime`, `AttrStartUpCurrentLevel`, `LightingLevelMin`,
+  `Server.MinWritePrivilege`). `levelcontrol.Config.Transitions`
+  (`Transitions`, `OnOff`, `ColorTemperatureCoupling`) runs the eight
+  commands on the engine for a device that cannot ramp — matter.js
+  LevelControlServer with managedTransitionTimeHandling — and hands the
+  host each level as an immediate MoveToLevel. Left nil, the commands are
+  forwarded as before (`BD-Matter-LevelControl-NativeRamp`).
+- `light.ColorControlServerConfig.ManageTransitions`,
+  `TransitionStepInterval` and `OnOff` (`light.OnOffState`):
+  gradual colour temperature transitions with a live RemainingTime, and the
+  ExecuteIfOff gate. `ColorControlServer.SyncColorTemperatureWithLevel`
+  couples the colour temperature to the level.
+- `contract.SelfReportedAttributeLister`: attributes a server reports by
+  itself, which the bridge leaves out of a command's before/after
+  comparison — a quieter ("Q") attribute such as CurrentLevel is reported
+  by its own rules. `contract.ClusterQuiescer`: the bridge stops a server's
+  timers when the server leaves the topology and on `Stop`.
+- `cluster.Quieter.EmitNow` (matter.js `QuietObservable.emitNow`).
+
 - **ScenesManagement (0x0062) is a real server** on the bridged lights
   (ADR 0012), a port of matter.js's `ScenesManagementServer`:
   `cluster/core.ScenesManagement`, `NewScenesManagement`, `ScenesConfig`,
@@ -282,6 +311,21 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `light.ColorControlServer` serves MoveColorTemperature,
+  StepColorTemperature and StopMoveStep as matter.js does instead of
+  accepting and ignoring them — at once without `ManageTransitions`, as a
+  transition with it; MoveColorTemperature with MoveMode Stop leaves a
+  colour temperature move running, as in matter.js. It reports
+  ColorTemperatureMireds and RemainingTime through
+  `OnMatterAttributesChanged` by the Q rules, and `MatterReportable` is
+  empty, so an endpoint source's change notification no longer reports the
+  colour temperature.
+- The reference daemon's ceiling light runs its LevelControl (now
+  `Config.Lighting`, replacing the daemon's own LT wrapper) and its
+  ColorControl on the transition engine; the speaker keeps the hand-off
+  path. The bridge decodes MoveToColorTemperature's OptionsMask and
+  OptionsOverride.
+
 - **A bridged endpoint's VendorName comes from the host.** The module
   served `"eQ-3"` as the BridgedDeviceBasicInformation VendorName of every
   bridged endpoint — one host's manufacturer inside the module. It now
@@ -386,6 +430,11 @@ pseudo-version of `main`.
   a failed Sigma2.
 
 ### Fixed
+
+- **Certification:** TC-LVL-2.3, TC-LVL-3.1, TC-LVL-4.1, TC-LVL-5.1,
+  TC-LVL-6.1, TC-CC-2.2, TC-CC-6.2 and TC-CC-6.3 run and pass — they were
+  excluded as class (a) gaps because no level or colour temperature was
+  ever in transition (RemainingTime always 0, nothing readable part-way).
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):

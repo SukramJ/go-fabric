@@ -118,12 +118,12 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SC | 34 | 6 | 0 | 0 | 10 | 18 | 0 |
 | SM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | BOOL | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| CC | 31 | 18 | 0 | 3 | 6 | 4 | 0 |
+| CC | 31 | 21 | 0 | 0 | 6 | 4 | 0 |
 | DRLK | 14 | 7 | 0 | 0 | 4 | 3 | 0 |
 | FAN | 12 | 7 | 0 | 0 | 5 | 0 | 0 |
 | FLW | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | I | 5 | 3 | 0 | 0 | 0 | 2 | 0 |
-| LVL | 10 | 3 | 0 | 5 | 1 | 1 | 0 |
+| LVL | 10 | 8 | 0 | 0 | 1 | 1 | 0 |
 | LWM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | MOD | 8 | 2 | 0 | 0 | 5 | 1 | 0 |
 | OCC | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
@@ -135,14 +135,14 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | RVCCLEANM | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | RVCOPSTATE | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | RVCRUNM | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| S | 7 | 5 | 0 | 0 | 0 | 2 | 0 |
+| S | 7 | 5 | 0 | 0 | 1 | 1 | 0 |
 | SMOKECO | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
 | SWTCH | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
 | TMP | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | TSTAT | 6 | 3 | 0 | 0 | 2 | 1 | 0 |
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **412** | **214** | **0** | **8** | **79** | **106** | **5** |
+| **all** | **412** | **222** | **0** | **0** | **80** | **105** | **5** |
 
 ### Cases not run
 
@@ -167,12 +167,9 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CADMIN/1.6 | (b) not supported | not applicable: the case's PICS `CADMIN.S & CADMIN.S.F00` is false for the reference DUT |
 | CADMIN/1.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CADMIN/1.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| CC/2.2 | (a) defect | TC-CC-2.2 counts the reports of a colour transition: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md) |
 | CC/3.4.Simulated | (b) not supported | not applicable: the case's PICS `CC.C` is false for the reference DUT |
 | CC/4.5.Simulated | (b) not supported | not applicable: the case's PICS `CC.C` is false for the reference DUT |
 | CC/5.4.Simulated | (b) not supported | not applicable: the case's PICS `CC.C` is false for the reference DUT |
-| CC/6.2 | (a) defect | TC-CC-6.2 reads ColorTemperatureMireds part-way through a move: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md) |
-| CC/6.3 | (a) defect | TC-CC-6.3 reads ColorTemperatureMireds part-way through a step: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md) |
 | CC/6.4.Simulated | (b) not supported | not applicable: the case's PICS `CC.C` is false for the reference DUT |
 | CC/6.5 | (c) harness | the case reboots the DUT and expects the light's StartUpOnOff / StartUpColorTemperatureMireds applied; matter.js applies the start-up attributes only on an endpoint no Aggregator owns (OnOffServer.ts and ColorControlServer.ts initialize: !endpoint.ownerOfType(AggregatorEndpoint)) — a bridge restart is not the bridged device's power cycle — and every light here is bridged |
 | CC/7.5.Simulated | (b) not supported | not applicable: the case's PICS `CC.C` is false for the reference DUT |
@@ -281,11 +278,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | IDM/6.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/7.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/8.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| LVL/2.3 | (a) defect | TC-LVL-2.3 counts the RemainingTime reports of a transition: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md) |
-| LVL/3.1 | (a) defect | TC-LVL-3.1 reads CurrentLevel part-way through a Move: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md) |
-| LVL/4.1 | (a) defect | TC-LVL-4.1 reads CurrentLevel part-way through a Step: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md) |
-| LVL/5.1 | (a) defect | TC-LVL-5.1 reads CurrentLevel part-way through a Move: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md) |
-| LVL/6.1 | (a) defect | TC-LVL-6.1 reads CurrentLevel part-way through a Move that a Stop ends: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md) |
 | LVL/7.1 | (b) not supported | not applicable: the case's PICS `LVL.S & LVL.S.F02` is false for the reference DUT |
 | LVL/8.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | MOD/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -304,7 +296,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | PS/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | PS/2.3 | (b) not supported | not applicable: the case's PICS `PWRTL.S` is false for the reference DUT |
 | RH/2.2 | (c) harness | TC-RH-2.2 has an operator change the measured value between two reads (a UserPrompt under RH.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
-| S/2.3 | (c) harness | not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0` |
+| S/2.3 | (b) not supported | not applicable: the case's PICS `S` is false for the reference DUT |
 | S/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/1.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |

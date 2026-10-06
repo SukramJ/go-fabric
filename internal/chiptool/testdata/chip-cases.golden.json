@@ -178,6 +178,11 @@
       "steps": 54,
       "stepsSkipped": 82
     },
+    "CC/2.2": {
+      "tests": 1,
+      "steps": 43,
+      "stepsSkipped": 34
+    },
     "CC/3.1": {
       "steps": 4,
       "stepsSkipped": 47
@@ -221,6 +226,14 @@
     "CC/6.1": {
       "steps": 22,
       "stepsSkipped": 0
+    },
+    "CC/6.2": {
+      "steps": 42,
+      "stepsSkipped": 0
+    },
+    "CC/6.3": {
+      "steps": 34,
+      "stepsSkipped": 1
     },
     "CC/7.1": {
       "steps": 4,
@@ -674,6 +687,27 @@
     "LVL/2.2": {
       "steps": 7,
       "stepsSkipped": 13
+    },
+    "LVL/2.3": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 2
+    },
+    "LVL/3.1": {
+      "steps": 45,
+      "stepsSkipped": 2
+    },
+    "LVL/4.1": {
+      "steps": 30,
+      "stepsSkipped": 1
+    },
+    "LVL/5.1": {
+      "steps": 21,
+      "stepsSkipped": 2
+    },
+    "LVL/6.1": {
+      "steps": 15,
+      "stepsSkipped": 3
     },
     "LVL/9.1": {
       "tests": 1,
@@ -1667,6 +1701,7 @@
     "OO/3.2.Simulated": "OO.C",
     "OPCREDS/3.9": "OPCREDS.S \u0026 OPCREDS.S.F00 \u0026 OPCREDS.S.C02.Rsp \u0026 OPCREDS.S.C03.Tx",
     "PS/2.3": "PWRTL.S",
+    "S/2.3": "S",
     "SC/3.5": "MCORE.ROLE.COMMISSIONER",
     "SC/4.6": "MCORE.ROLE.COMMISSIONER \u0026 MCORE.DD.COMM_DISCOVERY",
     "SC/4.7": "MCORE.ROLE.COMMISSIONEE \u0026 MCORE.DD.COMM_DISCOVERY",
@@ -1755,7 +1790,6 @@
     "OPCREDS/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "OPCREDS/3.6": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "PS/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
-    "S/2.3": "not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
     "S/3.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SC/1.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SC/1.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",

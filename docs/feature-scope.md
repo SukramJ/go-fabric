@@ -66,8 +66,9 @@ Application clusters, grouped by the device surface they serve:
 | Package | Clusters |
 | --- | --- |
 | [`cluster/onoff`](../cluster/onoff) | OnOff (0x0006) |
-| [`cluster/levelcontrol`](../cluster/levelcontrol) | LevelControl (0x0008) |
-| [`cluster/light`](../cluster/light) | ColorControl (0x0300) |
+| [`cluster/levelcontrol`](../cluster/levelcontrol) | LevelControl (0x0008) — OnOff and, optionally, Lighting; the commands handed to a device that ramps natively, or run on the transition engine for one that cannot (`Config.Transitions`) |
+| [`cluster/light`](../cluster/light) | ColorControl (0x0300) — ColorTemperature: the CT commands, ExecuteIfOff, the coupling to the level, gradual transitions with `ManageTransitions` |
+| [`cluster/transition`](../cluster/transition) | the attribute transition engine behind both (matter.js `Transitions.ts`): stepped values, RemainingTime by the Q rules |
 | [`cluster/cover`](../cluster/cover) | WindowCovering (0x0102) |
 | [`cluster/closure`](../cluster/closure) | ClosureControl (0x0104) |
 | [`cluster/lock`](../cluster/lock) | DoorLock (0x0101) |

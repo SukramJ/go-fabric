@@ -448,21 +448,6 @@ is excluded in `internal/chiptool/families_table_test.go` with class (a) and
 a pointer here; fixing one means removing that exclusion, re-running the
 family, and deleting the entry.
 
-- **No transition engine — TC-LVL-2.3, TC-LVL-3.1, TC-LVL-4.1,
-  TC-LVL-5.1, TC-LVL-6.1, TC-CC-2.2, TC-CC-6.2, TC-CC-6.3.**
-  `cluster/levelcontrol` hands MoveToLevel / Move / Step to the host and
-  `cluster/light.ColorControlServer` applies a colour target at once; the
-  reference daemon's ceiling light jumps to the target, so RemainingTime is
-  always 0 and no intermediate CurrentLevel / ColorTemperatureMireds is ever
-  readable. **matter.js:** `packages/node/src/behavior/Transitions.ts`
-  (stepped transitions, RemainingTime with the quieter rules of
-  `#updateRemainingTime`), used by `LevelControlServer` and
-  `ColorControlServer`. `BD-Matter-LevelControl-NativeRamp` (by_design.md)
-  covers a host whose device ramps natively; a host without native ramps —
-  the reference daemon — needs the port. **Fix:** port `Transitions.ts` as
-  an optional engine the two servers drive (step interval, RemainingTime
-  reporting, `finish` / `cancel` semantics), and let the daemon's ceiling
-  light use it.
 - **Maintenance mode is not implemented — declared `WNCV.S.M.Maintenance=0`.**
   `cluster/cover` stores Mode but does not act on its MaintenanceMode bit.
   **matter.js:** `WindowCoveringServer` (`supportsMaintenanceMode`, default

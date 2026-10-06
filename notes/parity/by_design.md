@@ -347,23 +347,36 @@ atomic on the CCU wire (press+release in one frame), so there is no
 observable position interval to report anyway; only CONT-holds would ever
 surface a transient 1.
 
-### BD-Matter-LevelControl-NativeRamp — RemainingTime stays 0 during device-native ramps
+### BD-Matter-LevelControl-NativeRamp — a host chooses, per endpoint, who ramps the level
 
-A positive MoveToLevel / MoveToLevelWithOnOff TransitionTime is delegated to
-the HM device as RAMP_TIME inside one atomic put_paramset ({LEVEL, RAMP_TIME,
-ON_TIME=NotUsed} via `Light.TurnOnWith` / `Light.TurnOffWithRamp`); the
-device performs the transition natively. matter.js's default
-LevelControlServer manages transitions host-side (`Transitions.ts`) and can
-tick RemainingTime while stepping, but explicitly sanctions delegating to
-native hardware transitions (`LevelControlServer.ts:36-41`,
-`createTransitions` override note). The CCU reports no ramp progress, so the
-bridge keeps RemainingTime at a constant 0 while a device-side ramp runs.
-Null/0 transition times keep the instant SetLevel path, matching
-`moveToLevelLogic`'s truthy-only rate derivation
-(`LevelControlServer.ts:297-303`) and the `changePerS` contract "0 or
-nullish means transition instantly" (`LevelControlServer.ts:459`). Devices
-whose channel lacks RAMP_TIME (`LightCapabilities.Transition` unset) always
-take the instant path.
+matter.js LevelControlServer manages transitions host-side only when
+`managedTransitionTimeHandling` is set (`Transitions.ts`); by default it
+applies every level at once, and it explicitly sanctions handing the ramp to
+hardware that transitions natively (`LevelControlServer.ts` class doc,
+`createTransitions` override note). The module offers the same choice per
+endpoint ([ADR 0013](../../docs/adr/0013-transitions-optional-per-endpoint.md)):
+
+- **Hand-off (default).** `levelcontrol.Server` forwards the eight commands to
+  the host's `LevelSource`, TransitionTime and Rate included, and the device
+  ramps natively — a CCU actor, say, that takes `{LEVEL, RAMP_TIME}` in one
+  put. The host reports progress, if any, through its own change
+  notification; RemainingTime (served with `Config.Lighting`) reads 0,
+  because nothing on this side knows how far the device has come. matter.js
+  would read the application's `transitionEndTime` or `remainingTime` here;
+  that application-stated remaining time is not ported — a host that knows
+  its device's ramp end would need it, none does yet.
+- **Engine (`Config.Transitions`).** For a device that cannot ramp, the
+  server runs matter.js's command logic on `cluster/transition` (the port of
+  `Transitions.ts`) and hands the host each stepped level as an immediate
+  MoveToLevel; RemainingTime is live and reported by the Q rules. The
+  reference daemon's ceiling light takes this path, its speaker the
+  hand-off one. `light.ColorControlServer` offers the same switch as
+  `ManageTransitions`; without it a colour temperature command applies at
+  once, as matter.js does by default.
+
+Null and zero transition times take the instant path either way, matching
+`moveToLevelLogic`'s truthy-only rate derivation and the `changePerS`
+contract "0 or nullish means transition instantly".
 
 ### BD-Matter-BridgedVendorNameFallback — a bridged endpoint without a vendor serves the node's
 
