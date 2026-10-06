@@ -517,6 +517,32 @@ for (const raw of out.clusters as any[]) {
         f.effective = e;
     }
 
+    // A derived cluster's own FeatureMap replaces the base's in the raw
+    // layer, so a feature it inherits without restating (TemperatureAlarm's
+    // RESET from Alarm Base) is missing from the loop above. The operational
+    // model has it — ClusterModel.features visits the FeatureMap's
+    // inheritance — so emit it from there, in bit order.
+    const rawFeatures = new Set((raw.features ?? []).map((f: any) => f.name));
+    let inherited = false;
+    for (const m of model.features) {
+        if (rawFeatures.has(m.name)) continue;
+        const bit = m.constraint === undefined ? undefined : Number(`${m.constraint}`);
+        const f: any = {
+            name: m.name,
+            conformance: m.conformance === undefined ? undefined : `${m.conformance}`,
+            description: m.description,
+            bit: Number.isInteger(bit) ? bit : undefined,
+        };
+        const e: any = {};
+        if (m.title !== undefined) e.title = m.title;
+        const conformance = conformanceOut(m.effectiveConformance);
+        if (conformance !== undefined) e.conformance = conformance;
+        f.effective = e;
+        (raw.features ??= []).push(f);
+        inherited = true;
+    }
+    if (inherited) raw.features.sort((a: any, b: any) => (a.bit ?? 0) - (b.bit ?? 0));
+
     const datatypes: any[] = [];
     for (const d of model.datatypes) datatypes.push(datatypeOut(d));
     datatypes.sort((a, b) => a.name.localeCompare(b.name));

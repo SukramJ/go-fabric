@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3690,
+  "entry_points": 3717,
   "entry_packages": [
     ".",
     "bootid",
@@ -46,6 +46,7 @@
     "groups",
     "im",
     "im/subscription",
+    "internal/chipdm",
     "internal/chiptool",
     "internal/paritytest",
     "mdns",
@@ -70,9 +71,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 4209,
-    "reachable": 2460,
-    "whitelisted": 1744,
+    "total_exported": 4266,
+    "reachable": 2490,
+    "whitelisted": 1771,
     "unreachable": 5
   },
   "by_package": [
@@ -8257,6 +8258,195 @@
       "reason": "assigned by secure/channel at init and read by bridge/seam.go:77; a function variable installed through a seam has no call edge the analyzer can follow",
       "file": "internal/channelseam/channelseam.go",
       "line": 40
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestAcknowledgedEntries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/crosscheck_test.go",
+      "line": 177
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestAsIntIsBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/chipxml_test.go",
+      "line": 526
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestChipDataModelCrosscheck",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/crosscheck_test.go",
+      "line": 122
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestChipDataModelPins",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/crosscheck_test.go",
+      "line": 191
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestCompareElementRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/compare_test.go",
+      "line": 323
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestCompareRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/compare_test.go",
+      "line": 189
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestCompareSeededDifferences",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/compare_test.go",
+      "line": 23
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestComparerPanicsOnUnknownNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/compare_test.go",
+      "line": 429
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConfFromAST",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conf_test.go",
+      "line": 71
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestConfRendering",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conf_test.go",
+      "line": 114
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestDataModelVersion",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/support_test.go",
+      "line": 124
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestLoadFilesClusters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/chipxml_test.go",
+      "line": 243
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestLoadFilesDeviceTypesAndGlobals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/chipxml_test.go",
+      "line": 354
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestLoadFilesErrors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/chipxml_test.go",
+      "line": 384
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestLoadSnapshotErrors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/support_test.go",
+      "line": 79
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestLoadSnapshotShapes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/support_test.go",
+      "line": 14
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestLoaderUnknownDirectory",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/chipxml_test.go",
+      "line": 493
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestParseConformance",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conf_test.go",
+      "line": 11
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestParseConformanceErrors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conf_test.go",
+      "line": 60
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestParseNumber",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/conf_test.go",
+      "line": 140
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestReadChipModel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/support_test.go",
+      "line": 156
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestReconcile",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/support_test.go",
+      "line": 222
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestRender",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/support_test.go",
+      "line": 256
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestRunGit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/support_test.go",
+      "line": 212
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestSnapshotDefault",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/support_test.go",
+      "line": 104
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestStatusName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/chipxml_test.go",
+      "line": 501
+    },
+    {
+      "package": "internal/chipdm",
+      "identifier": "TestTranslateValue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/chipxml_test.go",
+      "line": 508
     },
     {
       "package": "internal/chiptool",

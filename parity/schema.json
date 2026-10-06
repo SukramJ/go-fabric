@@ -48282,6 +48282,20 @@
       ],
       "features": [
         {
+          "name": "RESET",
+          "conformance": "O",
+          "bit": 0,
+          "effective": {
+            "title": "Reset",
+            "conformance": {
+              "text": "O",
+              "ast": {
+                "type": "O"
+              }
+            }
+          }
+        },
+        {
           "name": "OVER",
           "conformance": "O.a+",
           "bit": 20,

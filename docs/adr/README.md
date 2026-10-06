@@ -20,6 +20,7 @@ an oversight to the next reader — including choices to *not* do something.
 | [0012](./0012-scenesmanagement-server.md) | A real ScenesManagement server on the bridged lights, as matter.js builds it; RemainingCapacity bounded by the shared table as chip does | accepted |
 | [0013](./0013-generated-cluster-definitions.md) | Cluster definitions generated from the matter.js model (one package per cluster under `cluster/spec/`), a small runtime that derives lists, privileges, write checks and codecs from them; servers keep only the host port and the rules | accepted |
 | [0014](./0014-transitions-optional-per-endpoint.md) | Attribute transitions run in the module (`cluster/transition`, matter.js `Transitions.ts`), optional per endpoint; a host whose device ramps natively keeps the hand-off path | accepted |
+| [0015](./0015-chip-data-model-read-at-run-time.md) | The CHIP data model cross-check reads connectedhomeip's `data_model/<version>` from a checkout at test time and commits nothing derived from it (the CSA notice forbids publishing or deriving); CI provides the checkout | accepted |
 
 ## Provenance
 

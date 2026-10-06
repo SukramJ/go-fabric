@@ -41,6 +41,22 @@ pseudo-version of `main`.
   timers when the server leaves the topology and on `Stop`.
 - `cluster.Quieter.EmitNow` (matter.js `QuietObservable.emitNow`).
 
+- **The schema snapshot is cross-checked against connectedhomeip's data
+  model** (`internal/chipdm`, ADR 0015): every cluster (135) and device type
+  (91) of `parity/schema.json` is compared with CHIP's `data_model/1.6.1`
+  XML — the model the CSA's Python certification cases judge a device by —
+  at the harness image's CHIP commit. Every difference is classified
+  (matter.js right, CHIP right, representation, or excused by the harness)
+  in a reviewed table that fails when it goes stale;
+  [`docs/chip-datamodel-crosscheck.md`](./docs/chip-datamodel-crosscheck.md)
+  is the generated report. The XML is read at test time from a
+  connectedhomeip checkout and never committed (its CSA notice forbids
+  publishing or derivative works); without one the cross-check skips.
+  `make chiptool-setup` adds the data model directory to the sparse CHIP
+  checkout; `make chipdm-check` runs the check (failing instead of
+  skipping), `make chipdm-report` rewrites the report, and CI runs it in a
+  new job, "chip data model cross-check".
+
 - **ScenesManagement (0x0062) is a real server** on the bridged lights
   (ADR 0012), a port of matter.js's `ScenesManagementServer`:
   `cluster/core.ScenesManagement`, `NewScenesManagement`, `ScenesConfig`,
@@ -473,6 +489,16 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- **The schema snapshot carries inherited features.**
+  `script/extract-from-matter-js.ts` read a cluster's features from its own
+  FeatureMap, which in a derived cluster replaces the base's, so a feature
+  inherited without being restated was lost: TemperatureAlarm (0x0064)
+  lacked Alarm Base's RESET (bit 0, O). The extractor now emits them from
+  matter.js's operational model; re-extracted at the same matter.js pin,
+  that feature is the only change. The CHIP data model cross-check found it.
+  `schema.SchemaSnapshotSHA256` changes: **a host pinning the snapshot's
+  bytes must re-pin.** No server or generated cluster definition is
+  affected.
 - **Certification:** TC-LVL-2.3, TC-LVL-3.1, TC-LVL-4.1, TC-LVL-5.1,
   TC-LVL-6.1, TC-CC-2.2, TC-CC-6.2 and TC-CC-6.3 run and pass — they were
   excluded as class (a) gaps because no level or colour temperature was

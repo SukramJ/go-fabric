@@ -159,4 +159,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/spectest", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/clustergen", min: 95},
+	// The CHIP data model cross-check (internal/chipdm): measured 97.4 without
+	// a connectedhomeip checkout (as cover-check runs in CI: the cross-check
+	// skips, the synthetic-fixture unit tests carry it), 98.6 with one.
+	{pkg: "github.com/SukramJ/go-fabric/internal/chipdm", min: 96},
 }
