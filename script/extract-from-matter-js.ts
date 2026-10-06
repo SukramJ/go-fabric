@@ -5,7 +5,18 @@
 // constraints + commands + events. Output is JSON on stdout — pipe to
 // parity/schema.json, the embed every parity test and the schema generator
 // read.
-import { MatterDefinition, Specification } from "@matter/model";
+//
+// Two layers, kept apart on purpose. The raw layer (every key the extract
+// carried before the "effective" additions) is the element files' own text,
+// merged base-first for derived clusters exactly as before, so the parity
+// tests that read it keep reading the same bytes. The resolved layer is
+// matter.js's operational model (Matter, @matter/model) read through its own
+// inheritance: each attribute, command, event and feature gains an
+// "effective" object, each cluster its "datatypes" (and "base" when it
+// derives from one), and the snapshot a "globalDatatypes" list. That is what
+// script/clustergen generates cluster definitions from — see
+// docs/adr/0013-generated-cluster-definitions.md.
+import { ClusterModel, DatatypeModel, Matter, MatterDefinition, Specification } from "@matter/model";
 import { execSync } from "node:child_process";
 
 // ReqOut is one cluster requirement of a device type: which cluster the
@@ -236,6 +247,296 @@ for (const c of children) {
 
 out.deviceTypes.sort((a, b) => a.id - b.id);
 out.clusters.sort((a, b) => a.id - b.id);
+
+// ---------------------------------------------------------------------------
+// Resolved layer.
+//
+// Every value below is read through matter.js's operational model rather than
+// the element text: ClusterModel.attributes / commands / events / datatypes
+// include what a cluster inherits from its base (ModeBase, OperationalState,
+// ConcentrationMeasurement, ResourceMonitoring, AlarmBase, …), and the
+// effective* accessors (packages/model/src/models/ValueModel.ts) walk the
+// shadow chain an override leaves partial. Aspects are emitted as matter.js's
+// own ASTs (Conformance.ast, the Access / Quality / Constraint fields), so the
+// Go side evaluates the same structure matter.js evaluates instead of
+// re-parsing the text.
+
+// declaredType is the type the element text states, found by walking the
+// shadow chain: a derived cluster's override (RvcRunMode.SupportedModes)
+// states no type and takes its base's (ModeBase.SupportedModes, "list").
+function declaredType(m: any): string | undefined {
+    const seen = new Set<any>();
+    let x = m;
+    while (x !== undefined && x.type === undefined && !seen.has(x)) {
+        seen.add(x);
+        x = x.shadow;
+    }
+    return x?.type;
+}
+
+// effectiveDefault is the default the shadow chain states, as jsonable.
+function effectiveDefault(m: any): any {
+    const seen = new Set<any>();
+    let x = m;
+    while (x !== undefined && !seen.has(x)) {
+        if (x.default !== undefined) return jsonable(x.default);
+        seen.add(x);
+        x = x.shadow;
+    }
+    return undefined;
+}
+
+function conformanceOut(c: any): any {
+    if (c === undefined || c.isEmpty) return undefined;
+    return { text: String(c), ast: jsonable(c.ast) };
+}
+
+function accessOut(a: any): any {
+    const o: any = {};
+    for (const k of ["rw", "readPriv", "writePriv", "fabric", "timed"]) {
+        if (a?.[k] !== undefined) o[k] = a[k];
+    }
+    return Object.keys(o).length ? o : undefined;
+}
+
+const qualityFlags = [
+    "nullable", "nonvolatile", "fixed", "scene", "reportable", "changesOmitted",
+    "singleton", "quieter", "largeMessage", "diagnostics", "atomic",
+];
+
+function qualityOut(q: any): any {
+    const o: any = {};
+    for (const k of qualityFlags) {
+        if (q?.[k] === true) o[k] = true;
+    }
+    return Object.keys(o).length ? o : undefined;
+}
+
+// constraintOut keeps the structure matter.js parses a constraint into
+// (packages/model/src/aspects/Constraint.ts): numeric bounds stay numbers, a
+// bound naming a sibling ("minMeasuredValue to maxMeasuredValue") stays the
+// FieldValue reference matter.js resolves at validation time.
+function constraintOut(c: any): any {
+    if (c === undefined || c.isEmpty) return undefined;
+    const o: any = { text: String(c) };
+    for (const k of ["none", "desc", "value", "min", "max", "in", "cpMax"]) {
+        if (c[k] !== undefined) o[k] = jsonable(c[k]);
+    }
+    if (c.entry !== undefined) o.entry = constraintOut(c.entry);
+    if (c.parts !== undefined) o.parts = c.parts.map(constraintOut);
+    return o;
+}
+
+// typeOut describes the value type: the stated type name, matter.js's
+// metatype, the primitive it encodes as, and — for a named datatype — where
+// that datatype lives, so a generator can tell a cluster's own
+// ModeOptionStruct from the global "percent".
+function typeOut(m: any): any {
+    const o: any = {};
+    const type = declaredType(m);
+    if (type !== undefined) o.type = type;
+    const meta = m.effectiveMetatype;
+    if (meta !== undefined) o.metatype = meta;
+    const prim = m.primitiveBase?.name;
+    if (prim !== undefined) o.primitive = prim;
+    const base = m.base;
+    if (base instanceof DatatypeModel) {
+        const owner: any = base.parent;
+        if (owner instanceof ClusterModel) o.scope = "cluster";
+        else if (owner !== undefined && owner.tag === "matter" && base.children.length) o.scope = "global";
+    }
+    const entry = m.listEntry;
+    if (entry !== undefined) o.entry = valueOut(entry, "member");
+    return o;
+}
+
+// valueOut is the effective description of an attribute ("element") or of a
+// struct, command or event field or list entry ("member"). A member's access
+// is its record's — only a fabric-sensitive field ("S") states one of its
+// own that matters on the wire — so a member carries just that.
+function valueOut(m: any, role: "element" | "member" = "element"): any {
+    const o: any = typeOut(m);
+    const conformance = conformanceOut(m.effectiveConformance);
+    if (conformance !== undefined) o.conformance = conformance;
+    const access = accessOut(m.effectiveAccess);
+    if (role === "element" && access !== undefined) o.access = access;
+    if (role === "member" && access?.fabric !== undefined) o.access = { fabric: access.fabric };
+    const quality = qualityOut(m.effectiveQuality);
+    if (quality !== undefined) o.quality = quality;
+    const constraint = constraintOut(m.effectiveConstraint);
+    if (constraint !== undefined) o.constraint = constraint;
+    const def = effectiveDefault(m);
+    if (def !== undefined) o.default = def;
+    return o;
+}
+
+// enumeratedOut describes one value of an enum or one bit (range) of a
+// bitmap: its id or bits, its name, and the conformance that gates it on a
+// feature ("Warning" of ChangeIndicationEnum needs WRN).
+function enumeratedOut(f: any): any {
+    const o: any = {};
+    const id = f.effectiveId;
+    if (id !== undefined) o.id = id;
+    o.name = f.name;
+    if (f.title !== undefined) o.title = f.title;
+    const conformance = conformanceOut(f.effectiveConformance);
+    if (conformance !== undefined) o.conformance = conformance;
+    const constraint = constraintOut(f.effectiveConstraint);
+    if (constraint !== undefined) o.constraint = constraint;
+    return o;
+}
+
+// fieldsOut lists a struct's, command's, event's, enum's or bitmap's members
+// as matter.js's Scope resolves them (base members included), in a stable
+// order: by id, a bitmap's by its first bit.
+function fieldsOut(m: any): any[] {
+    const meta = m.effectiveMetatype;
+    const enumerated = meta === "enum" || meta === "bitmap";
+    const out: any[] = [];
+    for (const f of m.members) {
+        if (f.tag !== "field") continue;
+        if (enumerated) {
+            out.push(enumeratedOut(f));
+            continue;
+        }
+        const o: any = {};
+        const id = f.effectiveId;
+        if (id !== undefined) o.id = id;
+        o.name = f.name;
+        Object.assign(o, valueOut(f, "member"));
+        out.push(o);
+    }
+    const order = (o: any) => {
+        if (typeof o.id === "number") return o.id;
+        const c = o.constraint;
+        if (typeof c?.value === "number") return c.value;
+        if (typeof c?.min === "number") return c.min;
+        return Number.MAX_SAFE_INTEGER;
+    };
+    out.sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name));
+    return out;
+}
+
+function datatypeOut(d: any): any {
+    const o: any = { name: d.name, ...typeOut(d) };
+    const conformance = conformanceOut(d.effectiveConformance);
+    if (conformance !== undefined) o.conformance = conformance;
+    const constraint = constraintOut(d.effectiveConstraint);
+    if (constraint !== undefined) o.constraint = constraint;
+    o.fields = fieldsOut(d);
+    return o;
+}
+
+function eventPriority(e: any): string | undefined {
+    const seen = new Set<any>();
+    let x = e;
+    while (x !== undefined && !seen.has(x)) {
+        if (x.priority !== undefined) return x.priority;
+        seen.add(x);
+        x = x.shadow;
+    }
+    return undefined;
+}
+
+const unmatched: string[] = [];
+
+for (const raw of out.clusters as any[]) {
+    const model: any = Matter.get(ClusterModel, raw.id);
+    if (model === undefined) {
+        unmatched.push(`cluster ${raw.name}`);
+        continue;
+    }
+    if (model.type !== undefined && model.base instanceof ClusterModel) raw.base = model.type;
+
+    const attrs = new Map<number, any>();
+    for (const a of model.attributes) if (typeof a.id === "number") attrs.set(a.id, a);
+    for (const a of raw.attributes) {
+        const m = attrs.get(a.id);
+        if (m === undefined) {
+            unmatched.push(`${raw.name} attribute ${a.name}`);
+            continue;
+        }
+        a.effective = valueOut(m);
+    }
+
+    const cmds = new Map<string, any>();
+    for (const c of model.commands) cmds.set(`${c.id}:${c.effectiveDirection}`, c);
+    for (const c of raw.commands) {
+        const direction = c.direction ?? (c.name.endsWith("Response") ? "response" : "request");
+        const m = cmds.get(`${c.id}:${direction}`);
+        if (m === undefined) {
+            unmatched.push(`${raw.name} command ${c.name}`);
+            continue;
+        }
+        const e: any = {};
+        if (m.effectiveDirection !== undefined) e.direction = m.effectiveDirection;
+        if (m.effectiveResponse !== undefined) e.response = m.effectiveResponse;
+        const conformance = conformanceOut(m.effectiveConformance);
+        if (conformance !== undefined) e.conformance = conformance;
+        const access = accessOut(m.effectiveAccess);
+        if (access !== undefined) e.access = access;
+        e.fields = fieldsOut(m);
+        c.effective = e;
+    }
+
+    const evts = new Map<number, any>();
+    for (const e of model.events) if (typeof e.id === "number") evts.set(e.id, e);
+    for (const ev of raw.events) {
+        const m = evts.get(ev.id);
+        if (m === undefined) {
+            unmatched.push(`${raw.name} event ${ev.name}`);
+            continue;
+        }
+        const e: any = {};
+        const priority = eventPriority(m);
+        if (priority !== undefined) e.priority = priority;
+        const conformance = conformanceOut(m.effectiveConformance);
+        if (conformance !== undefined) e.conformance = conformance;
+        const access = accessOut(m.effectiveAccess);
+        if (access !== undefined) e.access = access;
+        e.fields = fieldsOut(m);
+        ev.effective = e;
+    }
+
+    const feats = new Map<string, any>();
+    for (const f of model.features) feats.set(f.name, f);
+    for (const f of raw.features ?? []) {
+        const m = feats.get(f.name);
+        if (m === undefined) {
+            unmatched.push(`${raw.name} feature ${f.name}`);
+            continue;
+        }
+        const e: any = {};
+        if (m.title !== undefined) e.title = m.title;
+        const conformance = conformanceOut(m.effectiveConformance);
+        if (conformance !== undefined) e.conformance = conformance;
+        f.effective = e;
+    }
+
+    const datatypes: any[] = [];
+    for (const d of model.datatypes) datatypes.push(datatypeOut(d));
+    datatypes.sort((a, b) => a.name.localeCompare(b.name));
+    raw.datatypes = datatypes;
+}
+
+// The global datatypes that carry members (the structs, enums and bitmaps
+// clusters reference by name, such as the semantic tag struct); the global
+// scalars ("percent", "epoch-s", …) are described where they are used.
+const globalDatatypes: any[] = [];
+for (const d of (Matter as any).children) {
+    if (d.tag !== "datatype" || !d.children.length) continue;
+    globalDatatypes.push(datatypeOut(d));
+}
+globalDatatypes.sort((a, b) => a.name.localeCompare(b.name));
+(out as any).globalDatatypes = globalDatatypes;
+
+if (unmatched.length) {
+    // A raw element the operational model does not know means the two layers
+    // disagree about the cluster's shape; refuse to emit a snapshot that
+    // would describe it twice, differently.
+    console.error("elements without an operational model:\n  " + unmatched.join("\n  "));
+    process.exit(1);
+}
 
 console.log(JSON.stringify(out, null, 2));
 

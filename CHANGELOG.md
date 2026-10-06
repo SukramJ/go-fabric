@@ -384,6 +384,20 @@ pseudo-version of `main`.
   Only the latter fire the new terminated hook.
 - `sigma.Initiator` is safe for concurrent use and refuses further input after
   a failed Sigma2.
+- **The matter.js extract carries the resolved model** (`parity/schema.json`,
+  same matter.js commit `85cf664`, Matter 1.6.1). Every attribute, command,
+  event and feature gains an `effective` object read through matter.js's
+  operational model — type, metatype and primitive, conformance as matter.js's
+  AST, access, quality, constraint, default, command and event fields, the
+  response linkage, event priority, feature titles — with what a derived
+  cluster inherits from its base resolved; each cluster gains its `datatypes`
+  (enums with their values and conformance, bitmaps with their bits, structs
+  with their fields) and `base`, the snapshot a `globalDatatypes` list. Every
+  key the extract carried before is byte-identical in meaning and position.
+  `schema.SchemaSnapshotSHA256` changes: **a host pinning the snapshot's bytes
+  must re-pin.** `make generate-matter-schema` also runs on a node without
+  TypeScript support, transpiling the extractor with the matter.js checkout's
+  esbuild.
 
 ### Fixed
 

@@ -244,9 +244,16 @@ generate-matter-schema: ## regenerate parity/schema.json + schema/ from a matter
 	cp script/extract-from-matter-js.ts $(MATTERJS_DIR)/.gofabric-extract.mts
 	# The snapshot is written to a temporary file and moved into place only
 	# on success: a failing extractor must not truncate the committed pin.
-	cd $(MATTERJS_DIR) && node .gofabric-extract.mts \
-		> $(CURDIR)/parity/schema.json.tmp; \
-		rc=$$?; rm -f .gofabric-extract.mts; \
+	# A node that cannot run TypeScript itself (a distribution build without
+	# type stripping) gets it transpiled by the checkout's own esbuild first.
+	cd $(MATTERJS_DIR) && { \
+		if [ -x node_modules/.bin/esbuild ]; then \
+			node_modules/.bin/esbuild --log-level=warning --format=esm --platform=node \
+				.gofabric-extract.mts --outfile=.gofabric-extract.mjs && \
+			node .gofabric-extract.mjs; \
+		else node .gofabric-extract.mts; fi; \
+	} > $(CURDIR)/parity/schema.json.tmp; \
+		rc=$$?; rm -f .gofabric-extract.mts .gofabric-extract.mjs; \
 		if [ $$rc -ne 0 ]; then rm -f $(CURDIR)/parity/schema.json.tmp; exit $$rc; fi
 	mv parity/schema.json.tmp parity/schema.json
 	$(GO) run ./script/generate_matter_schema.go
