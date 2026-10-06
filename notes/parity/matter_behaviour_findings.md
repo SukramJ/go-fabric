@@ -336,6 +336,38 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   chip-tool's `groupcast` commands encode the optional fields as matter.js
   does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
   multicast `onoff toggle`, `groupcast leave-group`).
+- **F-SWEEP-1 — the node's own commissioning window (matter.js 9397828d,
+  #4602).** matter.js `DeviceCommissioner` owns every window: one the node
+  opens itself (an uncommissioned node at start, or the application) runs
+  on its own timeout — 48 h without fabrics, 15 min once commissioned — and
+  closes at CommissioningComplete; an administrator's OpenCommissioningWindow
+  / OpenBasicCommissioningWindow *replaces* it instead of answering Busy, and
+  RevokeCommissioning closes it instead of answering WindowNotOpen
+  (`AdministratorCommissioningServer.revokeCommissioning`). go-fabric models
+  administrator windows only (`bridge.CommissioningWindow`); the node's own
+  commissionability is the host's: the reference daemon announces CM=1 at
+  every boot and after every administrator window and keeps its baseline
+  PASE acceptor for the process lifetime, so a commissioned bridge stays
+  commissionable with its configured passcode. **Fix:** a node-owned mode on
+  `CommissioningWindow` (`OpenOwnWindow(ctx, timeout)`: default timeout from
+  the fabric count, replaced by an administrator's window, closed by
+  RevokeCommissioning, EndCommissioning and its timer, with the transition
+  hook withdrawing `_matterc` and detaching the PASE acceptor), and the
+  reference daemon opening it only while uncommissioned. AdministratorCommissioning
+  WindowStatus stays WindowNotOpen for it, as matter.js keeps
+  `state.windowStatus` for administrator windows. Families: CADMIN, SC
+  (discovery of a commissioned node). The ArmFailSafe half of the commit is
+  done (`CommissioningWindow.IsOpen` wired into GeneralCommissioning).
+- **F-SWEEP-2 — TotalOperationalHours persisted in whole hours.** matter.js
+  persists a millisecond counter (`totalOperationalHoursCounter`); go-fabric
+  persists whole hours (`GeneralDiagnostics.SetPersistedCounters`,
+  `examples/reference-bridge/wiring.go` storeOperationalHours /
+  keepOperationalHours), so every run drops its part-hour and a bridge
+  restarting more often than hourly never gains one. Older than the
+  f07365a8 → 85cf6647 range (seen while sweeping 5a125377). **Fix:** persist
+  seconds (a `SetPersistedOperationalTime(time.Duration)` and an accessor).
+  Family: DGGEN (2.1 waits for the hour to move within one run, so it does
+  not see this).
 
 ## Application cluster servers — open items
 
@@ -455,9 +487,12 @@ family, and deleting the entry.
   ConfigStatus.Operational. **Fix:** port the Mode / ConfigStatus sync and
   the maintenance refusal, then declare the PICS code 1.
 
-The IPv6-dependent cases (TC-SC-4.1, TC-SC-4.3 and the group-messaging
-cases) are not findings: they are skipped on a host whose LAN interface has
-no IPv6, with the command that enables it, and run wherever it has.
+The group-messaging cases are not findings: they are skipped on a host
+whose LAN interface has no IPv6, with the command that enables it, and run
+wherever it has. TC-SC-4.1 and TC-SC-4.3 were wrongly listed here as such an
+environment matter; they failed on an IPv6-capable runner because the node
+did not answer an AAAA query for its own host name, and run unconditionally
+since that was fixed.
 
 ## Verified sound (no action)
 
