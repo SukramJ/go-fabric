@@ -139,14 +139,46 @@ jobs:
       - name: pull the pinned CHIP image
         run: make chiptool-image
 
-      # The suite skips itself when no harness is usable; in CI that would be
-      # a silent green, so the run is checked for the skip.
+      # The matter.js controller leg (TestMatterJSController) drives the
+      # daemon from matter.js's CommissioningController, built from the
+      # matter.js commit the schema snapshot was extracted from
+      # (parity/schema.json matter.sourceCommit) and checked out next to
+      # the module, where the test looks for it. The built tree is cached
+      # per commit.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: matter.js pin
+        id: matterjs
+        run: echo "sha=$(jq -r .matter.sourceCommit parity/schema.json)" >> "$GITHUB_OUTPUT"
+      - name: cache the built matter.js
+        id: matterjs-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ github.workspace }}/../matter.js
+          key: matterjs-${{ steps.matterjs.outputs.sha }}-node22
+      - name: build matter.js at the pin
+        if: steps.matterjs-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --filter=blob:none https://github.com/matter-js/matter.js "$GITHUB_WORKSPACE/../matter.js"
+          cd "$GITHUB_WORKSPACE/../matter.js"
+          git checkout --detach "${{ steps.matterjs.outputs.sha }}"
+          npm ci --no-audit --no-fund
+          npm run build
+
+      # The suite skips itself when no harness is usable, and the matter.js
+      # leg when no built matter.js is found; in CI either would be a silent
+      # green, so the run is checked for both skips.
       - name: chip-tool suite
         run: |
           set -o pipefail
           GOFABRIC_CHIP_HARNESS=image make chiptool-test 2>&1 | tee /tmp/chiptool.log
           if grep -q -- "--- SKIP: TestChipTool" /tmp/chiptool.log; then
             echo "::error::the chip-tool suite skipped itself; the harness was not usable"
+            exit 1
+          fi
+          if grep -q -- "--- SKIP: TestMatterJSController" /tmp/chiptool.log; then
+            echo "::error::the matter.js controller leg skipped itself; matter.js was not built"
             exit 1
           fi
 

@@ -50,6 +50,12 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   loopback port the way matter.js does (`internal/chiptool/accessory_test.go`).
   An operator step (a UserPrompt under `PICS_USER_PROMPT=0`) has no
   stand-in; such a case is a class (c) gap that names the step.
+- **A second controller**: the matter.js controller leg
+  (`TestMatterJSController`) commissions the daemon with matter.js's
+  CommissioningController and checks read, write, invoke, reporting, a
+  second fabric and subscription resumption across a restart. CI builds
+  matter.js at the commit the schema snapshot pins
+  (`parity/schema.json` `matter.sourceCommit`) and fails if the leg skips.
 - **What a passing case executed** is pinned per case (steps run and steps
   skipped), so a PICS change that quietly turns a case into a no-op fails it.
 - **A case that passes with a recorded gap** is one whose CHIP spec checker
