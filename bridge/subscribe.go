@@ -1024,6 +1024,9 @@ func (b *Bridge) handleSubscribeRequest(
 		// reports the bridge never sends.
 		return b.rejectSubscribeStatus(src, requestHdr, proto, "manager", subscribeRejectStatus(regErr))
 	}
+	// The priming report waits for the peer's StatusResponse per chunk,
+	// which arrives on this session: hand its turn on.
+	leaveSessionOrder(ctx)
 	if err := b.streamInitialReportChunks(src, requestHdr, proto, subID, initialReport); err != nil {
 		b.abandonPrimingSubscription(subID)
 		return err

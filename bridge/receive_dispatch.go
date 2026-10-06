@@ -273,6 +273,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 			return err
 		}
 		if waitCh != nil {
+			leaveSessionOrder(ctx) // the answer arrives on this session
 			if err := b.awaitChunkStatusResponse(waitCh, "read", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
 				return err
 			}
@@ -551,6 +552,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 			debugReplyError(b.logger, "send_invoke_chunk", src, err)
 			return err
 		}
+		leaveSessionOrder(ctx) // the answer arrives on this session
 		if err := b.awaitChunkStatusResponse(waitCh, "invoke", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, im.ReportData{MoreChunkedMessages: true}); err != nil {
 			return err
 		}

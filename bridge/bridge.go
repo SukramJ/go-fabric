@@ -714,7 +714,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if err := listener.Serve(serveCtx, b.handleDatagram); err != nil {
+		if err := listener.ServeOrdered(serveCtx, sessionOrderKey, b.handleOrderedDatagram); err != nil {
 			// Closed-listener errors during shutdown are expected; log
 			// at debug level. Real bind / IO errors come through
 			// before serveCancel fires, so they remain at warn.

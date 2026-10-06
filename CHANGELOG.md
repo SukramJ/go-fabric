@@ -536,6 +536,20 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- **A session's messages are handled in the order they arrive.** The UDP
+  listener gave every datagram its own goroutine, so two messages of one
+  session could run in either order: a Read sent right behind an Invoke
+  reported state from before the command (TC-IDM-1.2 step 7,
+  intermittently), and a report chunk could go out before the
+  StatusResponse acking its predecessor had been processed, carrying a stale
+  piggybacked acknowledgement that chip-tool drops — the chunked read then
+  stalled until the client timed out (TC-BINFO-2.1 and the PICS
+  generation's wildcard read, intermittently). The bridge now serves with
+  `udp.Listener.ServeOrdered`: the datagrams of one unicast session are
+  queued in arrival order and handled one at a time; a handler that waits
+  for the peer's StatusResponse hands its turn on first. matter.js and chip
+  handle a session's messages in order on their event loops.
+
 - A write to a read-only ClosureControl or TimeSynchronization attribute
   answers UNSUPPORTED_WRITE instead of FAILURE (TC-ACE-2.2's write-access
   checker accepts nothing else).
