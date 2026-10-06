@@ -68,23 +68,19 @@ var normalizationRules = map[string]string{
 	"superset-requirement": "A superset device type: matter.js derives it from the subset type and restates the subset's requirements, CHIP lists only its own.",
 	"type-bound":           "The snapshot's effective constraint closes a CHIP lower bound with the upper bound of the type (percent 100, percent100ths 10000).",
 	"enum-as-integer":      "CHIP types a value enumN where the snapshot states the integer of the same width.",
+	"base-device-type":     "CHIP names the Base device type \"Base Device Type\", matter.js \"Base\"; a condition requirement asserting one of its conditions names it so.",
 }
 
 // notCarried names the CHIP aspects the snapshot does not carry, so they are
 // not compared; Result.NotCompared counts the CHIP elements stating one.
 var notCarried = map[string]string{
-	"cluster classification":           "The snapshot does not record a cluster's classification (role / scope).",
 	"cluster provisional status":       "The snapshot does not record that a cluster is provisional; the clusters CHIP marks are listed below.",
 	"command quality":                  "The snapshot records no quality for commands (CHIP marks large-message commands L).",
 	"event quality":                    "The snapshot records no quality for events.",
-	"device-type conditions":           "The snapshot does not record the conditions a device type declares.",
-	"device-type element requirements": "The snapshot records a device type's cluster requirements, not its feature / attribute / command / event requirements.",
-	"device-type cluster quality":      "The snapshot does not record the quality of a device type's cluster requirement (singleton).",
 	"semantic namespaces":              "The snapshot carries no semantic namespaces.",
 	"global commands":                  "AtomicRequest / AtomicResponse: matter.js models them in the clusters that use them (load-data-model.ts globalCommands).",
 	"definitions outside the snapshot": "CHIP global types matter.js defines in a shared definitions scope (WebRtcTransportDefinitions) that the extractor does not emit.",
 	"members CHIP does not state":      "A command, event or data type whose fields CHIP leaves unstated because the specification gives them by reference (Level Control's *WithOnOff commands); the snapshot's fields have nothing to be compared with.",
-	"base device type":                 "CHIP's Base Device Type has no id and the snapshot extracts only device types with one, so its cluster requirements (counted), which the harness adds to every device type, are not compared.",
 }
 
 type comparer struct {
@@ -186,9 +182,6 @@ func (c *comparer) compareClusters() {
 			continue
 		}
 		c.res.Compared["cluster"]++
-		if chip.Classification != "" {
-			c.notCompared("cluster classification", 1)
-		}
 		if chip.Provisional {
 			c.notCompared("cluster provisional status", 1)
 			c.res.Provisional = append(c.res.Provisional, cl.Name)
@@ -197,6 +190,9 @@ func (c *comparer) compareClusters() {
 		path := []string{cl.Name}
 		c.value(path, "name", canonicalName(chip.Name), canonicalName(cl.Name))
 		c.value(path, "revision", strconv.Itoa(chip.Revision), strconv.Itoa(cl.Revision))
+		// The classification decides Base's Server and Client conditions in
+		// device type validation (ResolvedEndpoint.hasApplicationServer).
+		c.value(path, "classification", chip.Classification, cl.Classification)
 		c.members(path, c.effective(chip), cl)
 	}
 	for _, cl := range c.ours.Clusters {
@@ -814,13 +810,31 @@ func (c *comparer) memberID(model *Element, name string) string {
 func (c *comparer) compareDeviceTypes() {
 	c.cluster = nil
 	ours := map[uint32]*DeviceType{}
+	var ourBase *DeviceType
 	for _, dt := range c.ours.DeviceTypes {
+		if dt.ID == nil {
+			ourBase = dt
+			continue
+		}
 		ours[*dt.ID] = dt
 	}
 	seen := map[uint32]bool{}
+	baseSeen := false
 	for _, chip := range c.chip.DeviceTypes {
 		if chip.ID == nil {
-			c.notCompared("base device type", len(chip.Requirements))
+			// The Base device type: CHIP names it "Base Device Type",
+			// matter.js "Base"; neither has an id, so it pairs by being the
+			// one without (spec_parsing.py keys it -1).
+			baseSeen = true
+			if ourBase == nil {
+				c.report([]string{chip.Name}, "deviceType", "present", "absent")
+				continue
+			}
+			c.res.Compared["deviceType"]++
+			path := []string{ourBase.Name}
+			c.value(path, "revision", strconv.Itoa(chip.Revision), strconv.Itoa(ourBase.Revision))
+			c.requirements(path, chip, ourBase, nil)
+			c.conditions(path, chip, ourBase)
 			continue
 		}
 		seen[*chip.ID] = true
@@ -835,10 +849,120 @@ func (c *comparer) compareDeviceTypes() {
 		c.value(path, "revision", strconv.Itoa(chip.Revision), strconv.Itoa(dt.Revision))
 		c.value(path, "classification", chip.Classification, dt.Classification)
 		c.requirements(path, chip, dt, c.chipSuperset(chip))
+		c.conditions(path, chip, dt)
 	}
 	for _, dt := range c.ours.DeviceTypes {
+		if dt.ID == nil {
+			if !baseSeen {
+				c.report([]string{dt.Name}, "deviceType", "absent", "present")
+			}
+			continue
+		}
 		if !seen[*dt.ID] {
 			c.report([]string{dt.Name}, "deviceType", "absent", "present")
+		}
+	}
+}
+
+// conditions compares the conditions a device type declares and the
+// condition requirements it states. Names compare canonically ("Wi-Fi" and
+// "WiFi", "SIT" and "Sit" are one condition — matter.js
+// RequirementResolver resolves condition names regardless of case).
+func (c *comparer) conditions(path []string, chip, ours *DeviceType) {
+	declared := map[string]bool{}
+	for _, name := range ours.Conditions {
+		declared[canonicalName(name)] = true
+	}
+	stated := map[string]bool{}
+	for _, name := range chip.Conditions {
+		key := canonicalName(name)
+		stated[key] = true
+		if !declared[key] {
+			c.report(append(slices.Clone(path), name), "condition", "present", "absent")
+			continue
+		}
+		c.res.Compared["condition"]++
+	}
+	for _, name := range ours.Conditions {
+		if !stated[canonicalName(name)] {
+			c.report(append(slices.Clone(path), name), "condition", "absent", "present")
+		}
+	}
+
+	key := func(r *ConditionRequirement) string {
+		declarer := canonicalName(r.DeviceType)
+		if declarer == baseDeviceTypeCHIP {
+			declarer = "base"
+		}
+		return declarer + "." + canonicalName(r.Name)
+	}
+	label := func(r *ConditionRequirement) string { return r.DeviceType + "." + r.Name + " (condition)" }
+	asserted := map[string]*ConditionRequirement{}
+	for _, r := range ours.ConditionRequirements {
+		asserted[key(r)] = r
+	}
+	matched := map[string]bool{}
+	for _, r := range chip.ConditionRequirements {
+		k := key(r)
+		matched[k] = true
+		o := asserted[k]
+		if o == nil {
+			c.report(append(slices.Clone(path), label(r)), "conditionRequirement", "present", "absent")
+			continue
+		}
+		c.res.Compared["conditionRequirement"]++
+		if canonicalName(r.DeviceType) == baseDeviceTypeCHIP {
+			c.normalize("base-device-type")
+		}
+		p := append(slices.Clone(path), label(o))
+		if r.Conformance != nil {
+			c.value(p, "conformance", r.Conformance.Key(), o.Conformance.Key())
+		}
+		c.value(p, "constraint", normalizeConstraint(r.Constraint), normalizeConstraint(o.Constraint))
+	}
+	for _, o := range ours.ConditionRequirements {
+		if !matched[key(o)] {
+			c.report(append(slices.Clone(path), label(o)), "conditionRequirement", "absent", "present")
+		}
+	}
+}
+
+// baseDeviceTypeCHIP is the canonical name CHIP gives the Base device type
+// ("Base Device Type"); matter.js names it "Base".
+const baseDeviceTypeCHIP = "basedevicetype"
+
+// elementRequirements compares the feature, attribute, command and event
+// requirements a device type states for one cluster (matter.js compare.ts
+// #requirements, recursing into a cluster requirement's children: keyed by
+// element and canonical name, conformance and constraint compared).
+func (c *comparer) elementRequirements(path []string, chip, ours *Requirement) {
+	key := func(e *ElementRequirement) string { return e.Element + ":" + canonicalName(e.Name) }
+	index := map[string]*ElementRequirement{}
+	for _, e := range ours.Elements {
+		index[key(e)] = e
+	}
+	seen := map[string]bool{}
+	for _, e := range chip.Elements {
+		k := key(e)
+		seen[k] = true
+		o := index[k]
+		if o == nil {
+			c.report(append(slices.Clone(path), e.Name), e.Element+" requirement", "present", "absent")
+			continue
+		}
+		c.res.Compared["element requirement"]++
+		p := append(slices.Clone(path), o.Name)
+		if e.ID != nil {
+			c.value(p, "id", hexID(e.ID), hexID(o.ID))
+		}
+		if e.Conformance != nil {
+			c.value(p, "conformance", e.Conformance.Key(), o.Conformance.Key())
+		}
+		c.value(p, "constraint", normalizeConstraint(e.Constraint), normalizeConstraint(o.Constraint))
+	}
+	for _, o := range ours.Elements {
+		if !seen[key(o)] {
+			c.report(append(slices.Clone(path), o.Name), o.Element+" requirement", "absent", "present")
 		}
 	}
 }
@@ -878,6 +1002,10 @@ func (c *comparer) requirements(path []string, chip, ours, superset *DeviceType)
 		if r.Conformance != nil {
 			c.value(p, "conformance", r.Conformance.Key(), o.Conformance.Key())
 		}
+		if r.Quality != nil {
+			c.value(p, "quality", or(strings.Join(r.Quality, " "), "none"), or(strings.Join(o.Quality, " "), "none"))
+		}
+		c.elementRequirements(p, r, o)
 	}
 	for _, o := range ours.Requirements {
 		if seen[key(o)] {
