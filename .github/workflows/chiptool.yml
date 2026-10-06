@@ -188,6 +188,12 @@ jobs:
           docker run -d --name chip-control --network host --security-opt apparmor=unconfined \
             -v /run/dbus:/run/dbus --entrypoint sleep "$image" infinity
           docker exec -d chip-control sh -c '/bin/chip-all-clusters-app --KVS /tmp/kvs-app > /tmp/app.log 2>&1'
+          # chip-tool writes its KVS into --storage-directory but does not
+          # create it: PersistentStorage::CommitConfig opens
+          # <dir>/chip_tool_config.ini.tmp and fails with
+          # CHIP_ERROR_WRITE_FAILED (ExamplePersistentStorage.cpp:210) when
+          # the directory is missing.
+          docker exec chip-control mkdir -p /tmp/kvs-ctl
           sleep 5
           docker exec chip-control /bin/chip-tool pairing onnetwork-long 1 20202021 3840 \
             --storage-directory /tmp/kvs-ctl 2>&1 | tee /tmp/pair.log
