@@ -5,9 +5,12 @@ package core
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // TestTimeSnapshotPosixFollowsTimeSynchronization mirrors matter.js
@@ -48,5 +51,15 @@ func TestTimeSnapshotPosixFollowsTimeSynchronization(t *testing.T) {
 	}
 	if got := ts.MatterGeneratedCommands(); len(got) != 0 {
 		t.Errorf("GeneratedCommandList = %v, want empty", got)
+	}
+}
+
+// A write to a TimeSynchronization attribute is UNSUPPORTED_WRITE: every
+// attribute the server serves is read-only.
+func TestTimeSynchronizationWriteIsUnsupported(t *testing.T) {
+	t.Parallel()
+	err := NewTimeSynchronization().MatterWrite(context.Background(), timeSyncAttrUTCTime, uint64(1))
+	if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusUnsupportedWrite {
+		t.Errorf("write: %v, want UNSUPPORTED_WRITE", err)
 	}
 }

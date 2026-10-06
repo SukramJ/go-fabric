@@ -172,9 +172,20 @@ func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
 // Every attribute in this cluster carries access "R V" (matter.js
 // closure-control.element.ts:37-56); state changes travel through MoveTo
 // and Stop.
+//
+// The refusal is UNSUPPORTED_WRITE, the status a write to a read-only
+// attribute gets (Core §8.7.3.2; matter.js AttributeWriteResponse); a plain
+// error read as FAILURE, which TC-ACE-2.2's write-access checker refuses.
 func (s *ControlServer) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("closurecontrol: attribute 0x%04X is not writable", attrID)
+	return closureUnsupportedWriteErr{fmt.Sprintf("closurecontrol: attribute 0x%04X is not writable", attrID)}
 }
+
+// closureUnsupportedWriteErr is a typed [im.StatusCodeError] for a write
+// to a read-only attribute.
+type closureUnsupportedWriteErr struct{ msg string }
+
+func (e closureUnsupportedWriteErr) Error() string                 { return e.msg }
+func (closureUnsupportedWriteErr) MatterStatusCode() im.StatusCode { return im.StatusUnsupportedWrite }
 
 // closureUnsupportedCommandErr is a typed [im.StatusCodeError] for a
 // command the advertised feature set does not include.

@@ -111,8 +111,15 @@ func (t *TimeSynchronization) MatterRead(attrID uint32) (any, bool) {
 // attribute is read-only on the bridge — clients that try to set
 // TimeSource etc. get UnsupportedWrite.
 func (t *TimeSynchronization) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: TimeSynchronization attribute 0x%04X is read-only", attrID)
+	return timeSyncReadOnlyErr{fmt.Sprintf("matter: TimeSynchronization attribute 0x%04X is read-only", attrID)}
 }
+
+// timeSyncReadOnlyErr answers a write UNSUPPORTED_WRITE, as the comment
+// above promised; a plain error read as FAILURE.
+type timeSyncReadOnlyErr struct{ msg string }
+
+func (e timeSyncReadOnlyErr) Error() string                 { return e.msg }
+func (timeSyncReadOnlyErr) MatterStatusCode() im.StatusCode { return im.StatusUnsupportedWrite }
 
 // timeSyncCmdSetUTCTime is the SetUTCTime command ID (Matter §11.16.9.1).
 // Mirrors matter.js packages/model/src/standard/elements/time-synchronization.element.ts

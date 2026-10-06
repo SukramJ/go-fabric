@@ -536,6 +536,10 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- A write to a read-only ClosureControl or TimeSynchronization attribute
+  answers UNSUPPORTED_WRITE instead of FAILURE (TC-ACE-2.2's write-access
+  checker accepts nothing else).
+
 - The Auxiliary access-control rule (a Group entry without targets does not
   reach endpoint 0) follows the root AccessControl's advertised FeatureMap,
   not only `Bridge.AttachAuxiliaryACL`: a host that mounted Groupcast —

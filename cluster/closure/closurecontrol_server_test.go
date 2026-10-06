@@ -354,8 +354,15 @@ func TestClosureControlNoAttributeIsWritable(t *testing.T) {
 	t.Parallel()
 	s := closure.NewControlServer(closure.Config{})
 	for _, id := range s.MatterAttributes() {
-		if err := s.MatterWrite(context.Background(), id, uint8(0)); err == nil {
+		err := s.MatterWrite(context.Background(), id, uint8(0))
+		if err == nil {
 			t.Errorf("attribute 0x%04X accepted a write; every ClosureControl attribute is R V", id)
+			continue
+		}
+		// UNSUPPORTED_WRITE, not FAILURE: TC-ACE-2.2's write-access
+		// checker accepts nothing else for a read-only attribute.
+		if sce, ok := errors.AsType[im.StatusCodeError](err); !ok || sce.MatterStatusCode() != im.StatusUnsupportedWrite {
+			t.Errorf("attribute 0x%04X write refused with %v, want UNSUPPORTED_WRITE", id, err)
 		}
 	}
 }
