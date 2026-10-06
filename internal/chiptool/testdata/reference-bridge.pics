@@ -1,36 +1,199 @@
-# PICS for the reference daemon in examples/reference-bridge, as read by the
-# chip YAML test runner (matter_yamltests PICSChecker).
+# The reference daemon's (examples/reference-bridge) PICS declarations that
+# cannot be read off the device. See docs/certifiability.md and
+# docs/adr/0011-certifiability-is-a-goal.md.
 #
-# THIS IS NOT A CERTIFICATION ARTEFACT. Certification is a non-goal for this
-# module. The file exists so a handful of chip Test_TC_* cases can be used as
-# a regression harness, and it therefore declares only the items those cases
-# actually reference. Everything else is deliberately absent: the checker
-# treats an undeclared item as 0 (matter/yamltests/pics_checker.py,
-# __evaluate_sub_expression -- "if a PICS item is not defined, it is |false|"),
-# so absence is a silent skip, never a failure. A real PICS would have to
-# enumerate the whole cluster surface and be signed off against a device; this
-# one grows one line at a time, when a case that needs the line is added.
+# The PICS a case runs with is composed, in this order:
+#   1. CHIP's ci-pics-values — for the codes this file and the device do not
+#      decide (client-side .C codes the DUT never acts on, PIXIT-like
+#      switches, PICS_* runner controls);
+#   2. this file;
+#   3. the device-generated slice of the endpoint under test
+#      (testdata/pics/ep<N>.txt, written by testdata/gen_pics.py from a
+#      wildcard read with CHIP's own derivation helpers). Every server-side
+#      cluster, attribute, command, feature and event code of every spec
+#      cluster is in it, 0 or 1, together with the derivable MCORE codes.
 #
-# Every value below was read off the reference daemon's own OnOff server
-# (examples/reference-bridge/fleet.go, onOffServer) rather than assumed:
-#
-#   MatterRead            answers OnOff (0x0000), FeatureMap and
-#                         ClusterRevision, and nothing else
-#   MatterAttributes      [0x0000]
-#   MatterAcceptedCommands [Off 0x00, On 0x01, Toggle 0x02]
-#   FeatureMap            0 -- the LT (Lighting) bit is NOT advertised, so the
-#                         0x40xx attributes and the 0x4x commands do not exist
-#                         on this device and their PICS items stay off.
+# This file may not set a code the generated slices carry — the suite fails
+# if it does, so a declaration here can never contradict the device. A line
+# here is a statement about the daemon a reader can check in the code named
+# next to it. TC-IDM-10.4 (TC_pics_checker) holds slices + this file against
+# the device on every endpoint.
 
-# --- OnOff, server side, on the bridged light endpoint ------------------
-OO.S=1
-OO.S.A0000=1
-OO.S.C00.Rsp=1
-OO.S.C01.Rsp=1
-OO.S.C02.Rsp=1
+# --- Runner controls ---------------------------------------------------------
+# PICS_SDK_CI_ONLY stays 1 for the family runs: it gates steps that need the
+# CHIP sample apps' test hooks, which the daemon does not have. The TC-IDM-10.4
+# runs set it to 0, as a certification PICS must. The YAML SystemCommands
+# steps it gates (Reboot, FactoryReset) are answered by the suite's
+# accessory server (accessory_test.go). PICS_SKIP_SAMPLE_APP stays 0, the
+# value of CHIP's ci-pics-values that matter.js runs with: the steps it gates
+# are operator prompts standing in for the hooks that accessory server
+# provides (TC-GRPKEY-2.2 step 21 asks an operator to fill GroupKeyMap,
+# TC-OO-2.4 to confirm a reboot), which an unattended run cannot answer.
+PICS_USER_PROMPT=0
+PICS_SKIP_SAMPLE_APP=0
 
-# The LT feature and everything conditional on it. Spelled out as 0 rather
-# than omitted, because "the daemon does not implement this" is a fact worth
-# reading in the file; the four 0x40xx attributes and the three LT commands
-# are left undeclared and default to 0.
-OO.S.F00=0
+# --- Transport and roles (examples/reference-bridge/main.go, transport/udp) --
+# IPv6 UDP over Ethernet/IP only; no Bluetooth, Thread or Wi-Fi commissioning
+# (scope decision, CLAUDE.md), no TCP transport (mdns/service.go advertises T=0).
+MCORE.COM.ETH=1
+MCORE.COM.WIFI=0
+MCORE.COM.THR=0
+MCORE.COM.BLE=0
+MCORE.COM.WIRELESS=0
+MCORE.SC.S.TCP=0
+MCORE.ROLE.COMMISSIONER=0
+MCORE.ROLE.CONTROLLER=0
+MCORE.IDM.C=0
+MCORE.BRIDGECLIENT=0
+MCORE.DEVLIST.UseDevices=0
+MCORE.DEVLIST.UseDeviceState=0
+MCORE.DEVLIST.UseDeviceName=0
+MCORE.DEVLIST.UseBatInfo=0
+
+# --- Bridge (bridge/, examples/reference-bridge/fleet*.go) -------------------
+# Bridged endpoints carry BridgedDeviceBasicInformation with a writable
+# NodeLabel; the smoke alarm bridges a PowerSource with battery state.
+MCORE.BRIDGE.AllowDeviceRename=1
+MCORE.BRIDGE.BatInfo=1
+MCORE.BRIDGE.OtherControl=0
+
+# --- Onboarding (examples/reference-bridge/main.go printOnboarding) ---------
+# The daemon prints a QR code and an 11-digit manual code; it has no NFC tag,
+# no UI, no physical tamper or lock, and is commissionable on the network
+# right after start (standard flow).
+MCORE.DD.QR=1
+MCORE.DD.MANUAL_PC=1
+MCORE.DD.11_MANUAL_PC=1
+MCORE.DD.21_MANUAL_PC=0
+MCORE.DD.NFC=0
+MCORE.DD.PASSCODE=1
+MCORE.DD.UI=0
+MCORE.DD.CHIP_DEV=1
+MCORE.DD.DEV_LOCK=0
+MCORE.DD.DEV_BARRIER=0
+MCORE.DD.PHYSICAL_TAMPERING=0
+MCORE.DD.STANDARD_COMM_FLOW=1
+MCORE.DD.USER_INTENT_COMM_FLOW=0
+MCORE.DD.CUSTOM_COMM_FLOW=0
+MCORE.DD.DISCOVERY_BLE=0
+MCORE.DD.DISCOVERY_PAF=0
+MCORE.DD.EXTENDED_DISCOVERY=0
+MCORE.DD.CONCATENATED_QR_CODE=0
+# Controller-side DD codes: the DUT is not a commissioner.
+MCORE.DD.CONTROLLER=0
+MCORE.DD.COMM_DISCOVERY=0
+MCORE.DD.SCAN_NFC=0
+MCORE.DD.SCAN_QR_CODE=0
+MCORE.DD.MANUAL_PC_COMMISSIONING=0
+MCORE.DD.QR_COMMISSIONING=0
+MCORE.DD.CTRL_CONCATENATED_QR_CODE_1=0
+MCORE.DD.CTRL_CONCATENATED_QR_CODE_1_INORDER=0
+MCORE.DD.CTRL_CONCATENATED_QR_CODE_2=0
+
+# --- DNS-SD TXT keys and subtypes (mdns/service.go) --------------------------
+# Commissionable: D, CM, DT, VP, DN (the node label), SII/SAI/SAT, PH, RI
+# (examples/reference-bridge/main.go wires a rotating id); no PI. Subtypes
+# _L, _S, _CM, _T, _V.
+MCORE.DD.TXT_KEY_VP=1
+MCORE.DD.TXT_KEY_DT=1
+MCORE.DD.TXT_KEY_DN=1
+MCORE.DD.TXT_KEY_RI=1
+MCORE.DD.TXT_KEY_PH=1
+MCORE.DD.TXT_KEY_PI=0
+MCORE.DD.COMMISSIONING_SUBTYPE_V=1
+MCORE.DD.COMMISSIONING_SUBTYPE_T=1
+MCORE.SC.VP_KEY=1
+MCORE.SC.DT_KEY=1
+MCORE.SC.DN_KEY=1
+MCORE.SC.RI_KEY=1
+MCORE.SC.PH_KEY=1
+MCORE.SC.PI_KEY=0
+MCORE.SC.T_KEY=1
+MCORE.SC.SII_COMM_DISCOVERY_KEY=1
+MCORE.SC.SAI_COMM_DISCOVERY_KEY=1
+MCORE.SC.SII_OP_DISCOVERY_KEY=1
+MCORE.SC.SAI_OP_DISCOVERY_KEY=1
+MCORE.SC.VENDOR_SUBTYPE=1
+MCORE.SC.DEVTYPE_SUBTYPE=1
+MCORE.SC.EXTENDED_DISCOVERY=0
+MCORE.SC.SED=0
+MCORE.SC.ADV=1
+MCORE.SC.LWIP=0
+
+# --- OTA, BDX, file system ---------------------------------------------------
+# The reference daemon mounts no OTA Software Update Requestor or Provider and
+# no Diagnostic Logs, so it speaks no BDX.
+MCORE.OTA.HTTPS=0
+MCORE.OTA.RequestorConsent=0
+MCORE.OTA.Resume=0
+MCORE.OTA.VendorSpecific=0
+MCORE.OTA.Retry=0
+MCORE.BDX.Driver=0
+MCORE.BDX.BlockQueryWithSkip=0
+MCORE.FS=0
+MCORE.UI.FACTORYRESET=0
+MCORE.DT_SW_COMP=0
+
+# --- Device attestation (examples/reference-bridge/wiring.go) ---------------
+# Test DAC chain and a test Certification Declaration without dac_origin
+# fields or firmware information.
+MCORE.DA.CERTDECL_ORIGIN_VENDORID=0
+MCORE.DA.CERTDECL_ORIGIN_PRODUCTID=0
+MCORE.DA.CERTDECL_AUTH_PAA=0
+MCORE.DA.ATTESTELEMENT_FW_INFO=0
+MCORE.DA.ATTEST_WARNING=0
+
+# --- Interaction model, server side ------------------------------------------
+# Subscriptions are persisted and re-established after a restart
+# (bridge/subscription_reestablish.go).
+MCORE.IDM.S.PersistentSubscription=1
+
+# --- Optional events the daemon emits ----------------------------------------
+# The slices carry the mandatory events; these are the optional ones the
+# servers emit (EventList is not served, so they cannot be read off the
+# device). Each applies on the endpoints whose slice has the cluster.
+# BasicInformation.ShutDown / Leave: examples/reference-bridge/main.go fires
+# them on shutdown and when a fabric is removed.
+BINFO.S.E01=1
+BINFO.S.E02=1
+# OperationalState.OperationCompletion: cluster/opstate
+# Server.EmitOperationCompletion, which the laundry washer of
+# examples/reference-bridge/fleet_appliances.go fires when its cycle ends;
+# the device type mandates it (TC-OPSTATE-2.5). The robot vacuum emits none.
+OPSTATE.S.E01=1
+# The robot vacuum takes the rvc-app's manual controls through the app pipe
+# (examples/reference-bridge/control.go: Reset, ChargerFound, Charged,
+# Docked, ErrorEvent), which TC-RVCOPSTATE-2.4 drives.
+RVCOPSTATE.S.M.CAN_MANUALLY_CONTROLLED=1
+
+# --- Window covering modes -------------------------------------------------
+# The blind has no calibration procedure (cluster/cover; matter.js
+# WindowCoveringServer supportsCalibration defaults to false) and the module
+# does not implement maintenance mode (open finding, by TC id in
+# notes/parity/matter_behaviour_findings.md).
+WNCV.S.M.Calibration=0
+WNCV.S.M.Maintenance=0
+
+# --- Client roles -------------------------------------------------------------
+# The daemon is a server for every cluster it mounts and a client of none: it
+# never sends OnOff, ColorControl or WindowCovering commands. CHIP's
+# ci-pics-values declares those clients for its sample apps, which would run
+# the DUT-as-client cases (Test_TC_*_Simulated) against a DUT that issues no
+# command.
+OO.C=0
+CC.C=0
+WNCV.C=0
+
+# --- Door lock writable attributes (cluster/lock) ---------------------------
+# The lock serves LockState, LockType, ActuatorEnabled, OperatingMode
+# (writable) and SupportedOperatingModes; the optional settings attributes
+# below are not served, so none of them is writable. CHIP's ci-pics-values
+# declares them writable for its sample lock.
+DRLK.S.M.LanguageAttributeWritable=0
+DRLK.S.M.LEDSettingsAttributeWritable=0
+DRLK.S.M.AutoRelockTimeAttributeWritable=0
+DRLK.S.M.SoundVolumeAttributeWritable=0
+DRLK.S.M.LocalProgrammingFeaturesAttributeWritable=0
+DRLK.S.M.WrongCodeEntryLimitAttributeWritable=0
+DRLK.S.M.UserCodedTemporaryDisableTimeAttributeWritable=0
+DRLK.S.M.RequirePINForRemoteOperationAttributeWritable=0

@@ -139,8 +139,13 @@ are not re-opened by accident:
    CASE session to it as the initiator — what matter.js's server node does —
    and nothing else ([ADR 0008](./adr/0008-subscription-resumption.md)).
 2. **No Bluetooth.** Commissioning is on-network (DNS-SD) only.
-3. **No CSA certification.** The borrowed `Test_TC_*` cases are regression
-   tests. Nothing built on this module may be described as certified.
+3. **Certification is not pursued; certifiability is a goal.** This project
+   does not seek CSA certification, and nothing built on it may be described
+   as certified. The module is, however, meant to be in a state where a
+   product built on it could pass certification: the CSA certification
+   families run against the reference daemon, every gap is classified, and
+   the status lives in [`certifiability.md`](./certifiability.md)
+   ([ADR 0011](./adr/0011-certifiability-is-a-goal.md)).
 
 ## If you are looking for the next thing to build
 

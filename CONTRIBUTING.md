@@ -47,21 +47,26 @@ Prerequisites:
 
 ## The chip-tool suite
 
-`internal/chiptool` drives the CSA reference commissioner against
-`examples/reference-bridge` over real PASE and CASE. It needs Linux, a
-chip-tool and a running avahi-daemon, and runs locally with no exports:
+`internal/chiptool` drives the CSA reference commissioner and the CSA
+certification harness against `examples/reference-bridge` over real PASE and
+CASE. It needs Linux, Docker and a running avahi-daemon, and runs locally
+with no exports:
 
 ```sh
-make chiptool-setup   # once: connectedhomeip at the pin (../connectedhomeip) + the YAML-runner venv
-make chiptool-test
+make chiptool-test       # commission the daemon, run the chip-tool suite
+make chiptool-families   # the CSA certification families (hours in full;
+                         # GOFABRIC_CHIP_FAMILIES=IDM,ACL narrows)
+make chiptool-setup      # optional: CHIP source at ../connectedhomeip to read
 ```
 
-chip-tool comes from `$GOFABRIC_CHIPTOOL_BIN`, `./bin/chip-tool` or PATH, in
-that order. On arm64, `make chiptool-extract` copies the CI pin out of the
-chip-cert-bins image; that image has no amd64 build, so on amd64 install the
-snap (`sudo snap install chip-tool`). Every run logs which chip-tool it used.
-`internal/chiptool/doc.go` explains the rest, including what differs between
-the snap and the CI pin.
+Both run inside matter.js's CHIP image, pinned by digest in the Makefile
+(`CHIP_TEST_IMAGE`); the first run pulls it. A host chip-tool
+(`$GOFABRIC_CHIPTOOL_BIN`, `./bin/chip-tool`, PATH) is the fallback for
+`chiptool-test`. Every run logs the image digest and CHIP commit it used.
+A change that moves a family's result updates
+`internal/chiptool/testdata/chip-cases.golden.json` and
+`docs/certifiability.md` in the same commit. `internal/chiptool/doc.go`
+explains the rest.
 
 ## What a passing PR looks like
 

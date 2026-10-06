@@ -85,6 +85,8 @@ type chipTool struct {
 	// describe is a human-readable identity: path, real file, version or
 	// pin, and a digest of the binary.
 	describe string
+	// harness is the CHIP container when chip-tool runs inside it.
+	harness *harness
 }
 
 var (
@@ -99,6 +101,9 @@ var (
 //
 // Resolution order, first hit wins:
 //
+//  0. the CHIP harness container (harness_test.go), unless
+//     $GOFABRIC_CHIPTOOL_BIN is set or $GOFABRIC_CHIP_HARNESS=host — the
+//     default whenever Docker can run the pinned image;
 //  1. $GOFABRIC_CHIPTOOL_BIN — how CI points at the binary it extracted;
 //  2. ./bin/chip-tool under the module root — what `make chiptool-extract`
 //     writes, so an extraction is used without exporting anything;
@@ -127,6 +132,26 @@ func resolveChipTool(t *testing.T) chipTool {
 
 // findChipTool implements the resolution order of requireChipTool.
 func findChipTool() (chipTool, error) {
+	var imageErr error
+	if imageHarnessWanted() {
+		h, err := startHarness()
+		if err == nil {
+			return chipTool{bin: h.chipTool, describe: "chip-tool in " + h.describe, harness: h}, nil
+		}
+		imageErr = err
+		if os.Getenv(chipHarnessEnv) == "image" {
+			return chipTool{}, fmt.Errorf("%s=image but the CHIP harness container did not start: %w", chipHarnessEnv, err)
+		}
+	}
+	ct, err := findHostChipTool()
+	if err == nil && imageErr != nil {
+		ct.describe += fmt.Sprintf(" — the CHIP harness image was not usable (%v), so a host chip-tool runs instead", imageErr)
+	}
+	return ct, err
+}
+
+// findHostChipTool resolves a chip-tool on this host.
+func findHostChipTool() (chipTool, error) {
 	var bin string
 	switch p := os.Getenv(chipToolBinEnv); {
 	case p != "":
@@ -232,6 +257,14 @@ func newController(t *testing.T, bin string, nodeID uint64) *controller {
 	t.Helper()
 
 	base := os.Getenv(kvsBaseEnv)
+	if base == "" && harnessVal != nil && bin == harnessVal.chipTool {
+		// The container sees the shared directory at the same path.
+		dir := filepath.Join(harnessVal.shared, fmt.Sprintf("%s-%d", sanitizeTestName(t.Name()), time.Now().UnixNano()))
+		if err := os.MkdirAll(dir, 0o777); err != nil { //nolint:gosec // the container's root writes here
+			t.Fatalf("create chip-tool storage directory %s: %v", dir, err)
+		}
+		return &controller{bin: bin, storageDir: dir, nodeID: nodeID}
+	}
 	if base == "" && identifyChipTool(bin).snap {
 		snapBase, err := snapKVSBase()
 		if err != nil {

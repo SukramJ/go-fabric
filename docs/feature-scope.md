@@ -12,7 +12,7 @@ Scope boundaries are deliberate and are not "not yet":
 | **Controller / commissioner role** | This module answers commissioning, it does not drive it. No `PairDevice`, no OTA provider, no reading or invoking on other nodes. The one CASE *initiator* in the module re-establishes former subscriptions after a restart and reaches nothing else ([ADR 0008](./adr/0008-subscription-resumption.md)). |
 | **Bluetooth (BLE) commissioning** | On-network (DNS-SD) commissioning only. BLE would pull a platform-specific radio stack into a library that otherwise needs a UDP socket. |
 | **Thread / Wi-Fi network commissioning** | `NetworkCommissioning` presents the Ethernet/IP feature only — the host is already on the network. |
-| **CSA certification** | Borrowed `Test_TC_*` cases are used as regression tests. Certification is not pursued and nothing here may be described as certified. |
+| **CSA certification** | Not pursued by this project, and nothing here may be described as certified. Certifiability *is* a goal: the CSA certification families run against the reference daemon and every gap is classified in [`certifiability.md`](./certifiability.md) ([ADR 0011](./adr/0011-certifiability-is-a-goal.md)). |
 | **Device projection** | Which of a host's devices becomes which device type is the host's decision, behind `contract/`. |
 
 ---

@@ -37,14 +37,14 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/bootid", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/bridge", min: 84},
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 90},
-	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarm", min: 98},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 81},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/core", min: 89},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 87},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/fan", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 74},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 81},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/modebase", min: 98},
@@ -56,19 +56,19 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/onoff", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/opstate", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/pump", min: 98},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/thermo", min: 78},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/thermo", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/valve", min: 79},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
-	// The module's lowest measured package by a wide margin. contract is
-	// the host-facing interface vocabulary, and much of what is uncovered
+	// The module's lowest measured package (76.7 when last raised).
+	// contract is the host-facing interface vocabulary, and much of what is uncovered
 	// are the default implementations and kind-registry helpers a host
 	// exercises rather than this module's own tests. The floor records
 	// where it stands; whether it should be raised is a separate decision
 	// about what deserves a test, not a ratchet setting.
-	{pkg: "github.com/SukramJ/go-fabric/contract", min: 52, why: "lowest in the module; see the note above this entry"},
+	{pkg: "github.com/SukramJ/go-fabric/contract", min: 76, why: "lowest in the module; see the note above this entry"},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint", min: 86},
@@ -96,6 +96,11 @@ var floors = []packageFloor{
 		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
 	},
 	{
+		pkg: "github.com/SukramJ/go-fabric/internal/chiptool",
+		min: 0,
+		why: "the CHIP certification harness: its untagged files are the family table and the certifiability-document check, test files only, so the package holds no statement; the harness itself runs behind the chiptool build tag",
+	},
+	{
 		pkg: "github.com/SukramJ/go-fabric/internal/channelseam",
 		min: 0,
 		why: "declaration-only seam: function variables another package installs from its init, so the package holds no statement a test could execute",
@@ -103,7 +108,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
-	{pkg: "github.com/SukramJ/go-fabric/schema", min: 76},
+	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
 	// This tool. Its parser and comparison are covered; main() — flag
 	// parsing, file opening, printing, the exit codes — is not, because
 	// covering it would mean a test that runs the gate over the module the
@@ -116,7 +121,7 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/secure", min: 0, why: "package doc only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/secure/aesccm", min: 96},
-	{pkg: "github.com/SukramJ/go-fabric/secure/attestation", min: 80},
+	{pkg: "github.com/SukramJ/go-fabric/secure/attestation", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/secure/channel", min: 85},
 	// These three floors are deliberately set from the module WITHOUT its
 	// fuzz targets: secure/setup measured 84.0 without and 91.4 with,

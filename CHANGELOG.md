@@ -288,6 +288,36 @@ pseudo-version of `main`.
   first read sets `core.OpcredsConfig.InitialFabricLabel` (at most 32
   bytes). Retires `L3-PFAD-1` in `notes/parity/by_design.md`.
 
+- **Certifiability is a goal; certification is still not pursued**
+  ([ADR 0011](docs/adr/0011-certifiability-is-a-goal.md)). The scope
+  statement "no CSA certification" no longer reads as "certification
+  conformance does not matter here": a product built on the module should
+  be able to pass certification. The chip-tool suite became the measure:
+  - `internal/chiptool` runs whole CHIP certification families — the core
+    families and the application family of every server the reference
+    daemon mounts, YAML and Python `TC_*` cases — in matter.js's CHIP image
+    (`ghcr.io/matter-js/chip`, pinned by digest with the CHIP commit it was
+    built from), declared the way matter.js declares its own. Every case
+    not run is a gap of one class — (a) defect, (b) not supported,
+    (c) harness, (d) out of scope — with its reason, and the steps a
+    passing case executed are pinned.
+  - The PICS are generated from the commissioned daemon per endpoint
+    (`testdata/gen_pics.py`, CHIP's own derivation helpers) and checked
+    with TC-IDM-10.4 per endpoint; only what a device cannot report is
+    declared by hand (`testdata/reference-bridge.pics`).
+  - A matter.js controller leg commissions the daemon and checks read,
+    write, invoke, reporting, a second fabric and subscription resumption
+    across a restart.
+  - [`docs/certifiability.md`](docs/certifiability.md) is the status page,
+    generated from the family table and the last run and held to them by
+    `TestCertifiabilityDocument` in every `go test ./...`; README,
+    `docs/feature-scope.md`, `docs/matterjs-comparison.md` and CLAUDE.md are
+    reworded accordingly.
+  - Make targets: `chiptool-test` (the quick suite), `chiptool-families`
+    (every family, hours); `chiptool-setup` checks out
+    `../connectedhomeip` at the image's commit. The CI workflow runs the
+    families in four groups next to the chip-tool control leg.
+
 - `examples/reference-bridge` exposes one simulated device per surface the
   module serves (colour-temperature light, fan, smoke/CO alarm, pump, flow
   sensor, laundry washer, robot vacuum, thermostat, blind, door lock,

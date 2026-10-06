@@ -9,6 +9,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -17,6 +19,7 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -46,6 +49,8 @@ var (
 	reListenLine        = regexp.MustCompile(`listening on\s+(\S+)`)
 	rePasscodeLine      = regexp.MustCompile(`setup passcode\s+(\d+)`)
 	reDiscriminatorLine = regexp.MustCompile(`(?m)^\s*discriminator\s+(\d+)\s*$`)
+	reManualCodeLine    = regexp.MustCompile(`manual code\s+(\d+)`)
+	reQRCodeLine        = regexp.MustCompile(`QR payload\s+(MT:\S+)`)
 
 	// Go's flag package renders each flag as a line starting with two
 	// spaces and a single dash: "  -db string". Matching that shape is how
@@ -60,6 +65,10 @@ type pairingInfo struct {
 	port          int
 	passcode      uint32
 	discriminator uint16
+	// manualCode and qrCode are the onboarding payloads the banner prints
+	// ("" when an older daemon does not print them).
+	manualCode string
+	qrCode     string
 }
 
 // bridgeProcess is a running reference daemon plus its captured output.
@@ -67,8 +76,17 @@ type pairingInfo struct {
 // is the daemon-side view of a handshake and the ground truth for whether a
 // Matter command reached the device behind the cluster server.
 type bridgeProcess struct {
-	cmd  *exec.Cmd
-	info pairingInfo
+	cmd   *exec.Cmd
+	info  pairingInfo
+	bin   string
+	flags map[string]bool
+	opts  bridgeOptions
+	wg    sync.WaitGroup
+
+	controlMu sync.Mutex
+
+	// previousStderr is the log of the runs before a restart.
+	previousStderr string
 
 	mu     sync.Mutex
 	stdout bytes.Buffer
@@ -157,6 +175,28 @@ func sortedKeys(m map[string]bool) []string {
 	return out
 }
 
+// bridgeOptions are the knobs a test turns on the reference daemon.
+type bridgeOptions struct {
+	// dbPath is the daemon's database. Empty creates a fresh one in a
+	// t.TempDir(); a restart passes the previous run's path, which is what
+	// makes it the same device (fabrics, endpoint numbers, event counter).
+	dbPath string
+	// listen is the --listen value. Empty is ":0" (an ephemeral port); a
+	// restart passes the port the previous run bound, so a controller that
+	// cached the address finds the device where it left it.
+	listen string
+	// appPipe is the daemon's --app-pipe FIFO; empty leaves it off.
+	appPipe string
+	// enableKey arms TestEventTrigger (--enable-key, hex); empty leaves it
+	// off.
+	enableKey string
+}
+
+// chipTestEnableKey is the test enable key CHIP's apps and certification
+// cases use by default (PIXIT.DGGEN.TEST_EVENT_TRIGGER_KEY,
+// 000102030405060708090a0b0c0d0e0f).
+const chipTestEnableKey = "000102030405060708090a0b0c0d0e0f"
+
 // startBridge spawns the reference daemon on an ephemeral UDP port with a
 // throwaway database, waits for its pairing banner, and registers the
 // shutdown.
@@ -172,16 +212,42 @@ func sortedKeys(m map[string]bool) []string {
 // .github/workflows/chiptool.yml.
 func startBridge(t *testing.T, bin string, flags map[string]bool) *bridgeProcess {
 	t.Helper()
+	return startBridgeWith(t, bin, flags, bridgeOptions{})
+}
 
-	dir := t.TempDir()
-	args := []string{
-		"--db", filepath.Join(dir, "reference-bridge.db"),
-		"--listen", ":0",
+// startBridgeWith is startBridge with options.
+func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridgeOptions) *bridgeProcess {
+	t.Helper()
+
+	if opts.dbPath == "" {
+		opts.dbPath = filepath.Join(t.TempDir(), "reference-bridge.db")
 	}
+	if opts.listen == "" {
+		opts.listen = ":0"
+	}
+	args := []string{"--db", opts.dbPath, "--listen", opts.listen}
 	if flags["log-level"] {
 		// The daemon-side view of a failed handshake is the only thing that
 		// says which stage stopped; chip-tool's output alone cannot.
 		args = append(args, "--log-level", "debug")
+	}
+	if opts.appPipe != "" {
+		args = append(args, "--app-pipe", opts.appPipe)
+	}
+	if opts.enableKey != "" {
+		args = append(args, "--enable-key", opts.enableKey)
+	}
+	// On a host whose LAN interfaces have no IPv6, the MAC-derived SRV
+	// target carries only IPv4 address records, and the image's chip-tool
+	// resolves operational nodes over IPv6 only. The OS host name's
+	// records, published by the host's avahi for every interface, include
+	// the docker bridges' link-local addresses chip-tool reaches the
+	// daemon over. The cases that check the host name itself (TC-SC-4.3)
+	// skip on such a host.
+	if flags["mdns-os-hostname"] {
+		if has, _ := lanIPv6(); !has {
+			args = append(args, "--mdns-os-hostname")
+		}
 	}
 
 	cmd := exec.Command(bin, args...) //nolint:gosec // bin is this module's own build output
@@ -193,20 +259,18 @@ func startBridge(t *testing.T, bin string, flags map[string]bool) *bridgeProcess
 	if err != nil {
 		t.Fatalf("stderr pipe: %v", err)
 	}
-
-	b := &bridgeProcess{cmd: cmd}
+	b := &bridgeProcess{cmd: cmd, bin: bin, flags: flags, opts: opts}
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start reference daemon %s: %v", bin, err)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() { defer wg.Done(); b.drain(stdout, &b.stdout) }()
-	go func() { defer wg.Done(); b.drain(stderr, &b.stderr) }()
+	b.wg.Add(2)
+	go func() { defer b.wg.Done(); b.drain(stdout, &b.stdout) }()
+	go func() { defer b.wg.Done(); b.drain(stderr, &b.stderr) }()
 
 	t.Cleanup(func() {
 		b.stop()
-		wg.Wait()
+		b.wg.Wait()
 	})
 
 	info, ok := b.awaitBanner(bannerTimeout)
@@ -218,6 +282,114 @@ func startBridge(t *testing.T, bin string, flags map[string]bool) *bridgeProcess
 	t.Logf("reference daemon up: listen=%s port=%d discriminator=%d passcode=%08d",
 		info.listenAddr, info.port, info.discriminator, info.passcode)
 	return b
+}
+
+// restart stops the daemon the way an operator would and starts it again on
+// the same database and the same port: the same device, rebooted. The old
+// process's output stays readable through the returned value's
+// previousStderr.
+func (b *bridgeProcess) restart(t *testing.T) *bridgeProcess {
+	t.Helper()
+	b.stop()
+	b.wg.Wait()
+	opts := b.opts
+	opts.listen = fmt.Sprintf(":%d", b.info.port)
+	next := startBridgeWith(t, b.bin, b.flags, opts)
+	next.previousStderr = b.previousStderr + b.snapshotStderr()
+	return next
+}
+
+// factoryReset stops the daemon and starts it on a fresh database at the
+// same port — the device as it leaves the factory, at the address a
+// controller last saw it.
+func (b *bridgeProcess) factoryReset(t *testing.T) *bridgeProcess {
+	t.Helper()
+	b.stop()
+	b.wg.Wait()
+	opts := b.opts
+	opts.listen = fmt.Sprintf(":%d", b.info.port)
+	for _, suffix := range []string{"", "-wal", "-shm"} {
+		_ = os.Remove(opts.dbPath + suffix)
+	}
+	next := startBridgeWith(t, b.bin, b.flags, opts)
+	next.previousStderr = b.previousStderr + b.snapshotStderr()
+	return next
+}
+
+// endpointFor returns the first endpoint advertising deviceType, read from
+// the topology block the daemon prints after its banner; 0 when deviceType
+// is 0 or no endpoint carries it.
+func (b *bridgeProcess) endpointFor(t *testing.T, deviceType uint32) uint16 {
+	t.Helper()
+	if deviceType == 0 {
+		return 0
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		out := b.snapshotStdout()
+		if strings.Contains(out, "topology end") {
+			for _, m := range reTopologyLine.FindAllStringSubmatch(out, -1) {
+				for _, dt := range strings.Split(m[2], ",") {
+					v, err := strconv.ParseUint(strings.TrimPrefix(strings.TrimSpace(dt), "0x"), 16, 32)
+					if err == nil && uint32(v) == deviceType {
+						ep, _ := strconv.Atoi(m[1])
+						return uint16(ep)
+					}
+				}
+			}
+			t.Fatalf("no endpoint of the reference daemon advertises device type 0x%04X\n%s", deviceType, out)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("the reference daemon printed no topology block")
+	return 0
+}
+
+// reTopologyLine matches one line of the daemon's topology block
+// (examples/reference-bridge/main.go printTopology).
+var reTopologyLine = regexp.MustCompile(`(?m)^\s*endpoint\s+(\d+)\s+device types\s+([0-9a-fA-FxX, ]+)`)
+
+// pipe writes one CHIP-style JSON command to the daemon's --app-pipe and
+// waits for the daemon to log it as applied, failing the test on an error.
+// A FIFO has no answer channel; the daemon's log is the acknowledgement
+// (examples/reference-bridge/control.go).
+func (b *bridgeProcess) pipe(t *testing.T, command map[string]any) {
+	t.Helper()
+	if b.opts.appPipe == "" {
+		t.Fatalf("app-pipe command %v: the daemon was started without --app-pipe", command)
+	}
+	line, err := json.Marshal(command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, _ := command["Name"].(string)
+	b.controlMu.Lock()
+	defer b.controlMu.Unlock()
+	offset := len(b.snapshotStderr())
+	w, err := os.OpenFile(b.opts.appPipe, os.O_WRONLY, 0) //nolint:gosec // the daemon's own FIFO
+	if err != nil {
+		t.Fatalf("open the daemon's app pipe: %v", err)
+	}
+	_, err = w.Write(append(line, '\n'))
+	_ = w.Close()
+	if err != nil {
+		t.Fatalf("write to the daemon's app pipe: %v", err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		logs := b.snapshotStderr()
+		if offset <= len(logs) {
+			tail := logs[offset:]
+			if strings.Contains(tail, "msg=apppipe.applied name="+name) {
+				return
+			}
+			if i := strings.Index(tail, "msg=apppipe.error"); i >= 0 {
+				t.Fatalf("app-pipe command %s refused: %s", line, strings.SplitN(tail[i:], "\n", 2)[0])
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("app-pipe command %s: the daemon logged no apppipe.applied within 10s", line)
 }
 
 // drain copies one of the daemon's streams into a buffer line by line, so a
@@ -274,12 +446,19 @@ func parseBanner(out string) (pairingInfo, bool) {
 	if err != nil {
 		return pairingInfo{}, false
 	}
-	return pairingInfo{
+	info := pairingInfo{
 		listenAddr:    listen[1],
 		port:          port,
 		passcode:      uint32(passcode),
 		discriminator: uint16(discriminator),
-	}, true
+	}
+	if m := reManualCodeLine.FindStringSubmatch(out); m != nil {
+		info.manualCode = m[1]
+	}
+	if m := reQRCodeLine.FindStringSubmatch(out); m != nil {
+		info.qrCode = m[1]
+	}
+	return info, true
 }
 
 // stop asks the daemon to shut down the way an operator would — the
