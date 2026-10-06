@@ -39,6 +39,13 @@
 // in mode-base.resource.ts but does not check: the tags of one mode are
 // distinct, no two modes have the same tag set, and every mode has a
 // standard (MfgCode-less) tag.
+//
+// Each derivation is built on its generated definition
+// (cluster/spec/laundrywashermode, rvcrunmode, rvccleanmode,
+// dishwashermode; ADR 0013): the ids, the tag and status values, the
+// attribute, command and event lists, FeatureMap, ClusterRevision, the
+// feature check and the write answers come from it. The rules above are
+// what this package adds, as matter.js's mode servers add them.
 package modebase
 
 import (
@@ -50,32 +57,35 @@ import (
 	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
+	"github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
+	"github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
+	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
-// Cluster ids (laundry-washer-mode.element.ts, rvc-run-mode.element.ts,
-// rvc-clean-mode.element.ts, dishwasher-mode.element.ts).
+// Cluster ids (the generated definitions').
 const (
-	ClusterIDLaundryWasherMode = clusterwire.LaundryWasherModeClusterID
-	ClusterIDRvcRunMode        = clusterwire.RvcRunModeClusterID
-	ClusterIDRvcCleanMode      = clusterwire.RvcCleanModeClusterID
-	ClusterIDDishwasherMode    = clusterwire.DishwasherModeClusterID
+	ClusterIDLaundryWasherMode = laundrywashermode.ClusterID
+	ClusterIDRvcRunMode        = rvcrunmode.ClusterID
+	ClusterIDRvcCleanMode      = rvccleanmode.ClusterID
+	ClusterIDDishwasherMode    = dishwashermode.ClusterID
 )
 
-// Attribute ids (mode-base.element.ts:26-42). StartUpMode (0x0002) and
-// OnMode (0x0003) are "X" in every derivation served here.
+// Attribute ids, ModeBase's and so every derivation's. StartUpMode
+// (0x0002) and OnMode (0x0003) are "X" in every derivation served here.
 const (
-	AttrSupportedModes uint32 = 0x0000 // M, list[ModeOptionStruct] 2 to 255, F
-	AttrCurrentMode    uint32 = 0x0001 // M, uint8, N
+	AttrSupportedModes = rvcrunmode.AttrSupportedModes // M, list[ModeOptionStruct] 2 to 255, F
+	AttrCurrentMode    = rvcrunmode.AttrCurrentMode    // M, uint8, N
 )
 
 // Command ids.
 const (
-	CmdChangeToMode         = clusterwire.ModeBaseCmdChangeToMode
-	CmdChangeToModeResponse = clusterwire.ModeBaseCmdChangeToModeResponse
+	CmdChangeToMode         = rvcrunmode.CmdChangeToMode
+	CmdChangeToModeResponse = rvcrunmode.CmdChangeToModeResponse
 )
 
 // Feature is a FeatureMap bit.
@@ -86,60 +96,60 @@ type Feature uint32
 // rvc-clean-mode.element.ts:23): the device changes modes while the RVC
 // Run Mode is not Idle. The other derivations define no feature; DEPONOFF
 // is "X" everywhere.
-const FeatureDirectModeChange Feature = 1 << 20
+const FeatureDirectModeChange = Feature(rvcrunmode.FeatureDirectModeChange)
 
 // Status is a ModeChangeStatus value.
 type Status uint8
 
-// ModeChangeStatus (mode-base.element.ts:73-79, rvc-run-mode.element.ts:37-47,
-// rvc-clean-mode.element.ts:37).
+// ModeChangeStatus values: ModeBase's and the derivations' own, from the
+// generated ModeChangeStatus enums.
 const (
-	StatusSuccess               Status = 0x00
-	StatusUnsupportedMode       Status = 0x01
-	StatusGenericFailure        Status = 0x02
-	StatusInvalidInMode         Status = 0x03
-	StatusCleaningInProgress    Status = 0x40 // RvcCleanMode
-	StatusStuck                 Status = 0x41 // RvcRunMode
-	StatusDustBinMissing        Status = 0x42 // RvcRunMode
-	StatusDustBinFull           Status = 0x43 // RvcRunMode
-	StatusWaterTankEmpty        Status = 0x44 // RvcRunMode
-	StatusWaterTankMissing      Status = 0x45 // RvcRunMode
-	StatusWaterTankLidOpen      Status = 0x46 // RvcRunMode
-	StatusMopCleaningPadMissing Status = 0x47 // RvcRunMode
-	StatusBatteryLow            Status = 0x48 // RvcRunMode
+	StatusSuccess               = Status(rvcrunmode.ModeChangeStatusSuccess)
+	StatusUnsupportedMode       = Status(rvcrunmode.ModeChangeStatusUnsupportedMode)
+	StatusGenericFailure        = Status(rvcrunmode.ModeChangeStatusGenericFailure)
+	StatusInvalidInMode         = Status(rvcrunmode.ModeChangeStatusInvalidInMode)
+	StatusCleaningInProgress    = Status(rvccleanmode.ModeChangeStatusCleaningInProgress)  // RvcCleanMode
+	StatusStuck                 = Status(rvcrunmode.ModeChangeStatusStuck)                 // RvcRunMode
+	StatusDustBinMissing        = Status(rvcrunmode.ModeChangeStatusDustBinMissing)        // RvcRunMode
+	StatusDustBinFull           = Status(rvcrunmode.ModeChangeStatusDustBinFull)           // RvcRunMode
+	StatusWaterTankEmpty        = Status(rvcrunmode.ModeChangeStatusWaterTankEmpty)        // RvcRunMode
+	StatusWaterTankMissing      = Status(rvcrunmode.ModeChangeStatusWaterTankMissing)      // RvcRunMode
+	StatusWaterTankLidOpen      = Status(rvcrunmode.ModeChangeStatusWaterTankLidOpen)      // RvcRunMode
+	StatusMopCleaningPadMissing = Status(rvcrunmode.ModeChangeStatusMopCleaningPadMissing) // RvcRunMode
+	StatusBatteryLow            = Status(rvcrunmode.ModeChangeStatusBatteryLow)            // RvcRunMode
 )
 
-// ModeTag values: the common ModeBase tags and each derivation's own
-// (mode-base.element.ts:81-93 and the derivations' ModeTag datatypes).
+// ModeTag values: the common ModeBase tags and each derivation's own, from
+// the generated ModeTag enums.
 const (
-	TagAuto      uint16 = 0x0000
-	TagQuick     uint16 = 0x0001
-	TagQuiet     uint16 = 0x0002
-	TagLowNoise  uint16 = 0x0003
-	TagLowEnergy uint16 = 0x0004
-	TagVacation  uint16 = 0x0005
-	TagMin       uint16 = 0x0006
-	TagMax       uint16 = 0x0007
-	TagNight     uint16 = 0x0008
-	TagDay       uint16 = 0x0009
+	TagAuto      = uint16(rvcrunmode.ModeTagAuto)
+	TagQuick     = uint16(rvcrunmode.ModeTagQuick)
+	TagQuiet     = uint16(rvcrunmode.ModeTagQuiet)
+	TagLowNoise  = uint16(rvcrunmode.ModeTagLowNoise)
+	TagLowEnergy = uint16(rvcrunmode.ModeTagLowEnergy)
+	TagVacation  = uint16(rvcrunmode.ModeTagVacation)
+	TagMin       = uint16(rvcrunmode.ModeTagMin)
+	TagMax       = uint16(rvcrunmode.ModeTagMax)
+	TagNight     = uint16(rvcrunmode.ModeTagNight)
+	TagDay       = uint16(rvcrunmode.ModeTagDay)
 
-	LaundryTagNormal   uint16 = 0x4000
-	LaundryTagDelicate uint16 = 0x4001
-	LaundryTagHeavy    uint16 = 0x4002
-	LaundryTagWhites   uint16 = 0x4003
+	LaundryTagNormal   = uint16(laundrywashermode.ModeTagNormal)
+	LaundryTagDelicate = uint16(laundrywashermode.ModeTagDelicate)
+	LaundryTagHeavy    = uint16(laundrywashermode.ModeTagHeavy)
+	LaundryTagWhites   = uint16(laundrywashermode.ModeTagWhites)
 
-	DishwasherTagNormal uint16 = 0x4000
-	DishwasherTagHeavy  uint16 = 0x4001
-	DishwasherTagLight  uint16 = 0x4002
+	DishwasherTagNormal = uint16(dishwashermode.ModeTagNormal)
+	DishwasherTagHeavy  = uint16(dishwashermode.ModeTagHeavy)
+	DishwasherTagLight  = uint16(dishwashermode.ModeTagLight)
 
-	RvcRunTagIdle     uint16 = 0x4000
-	RvcRunTagCleaning uint16 = 0x4001
-	RvcRunTagMapping  uint16 = 0x4002
+	RvcRunTagIdle     = uint16(rvcrunmode.ModeTagIdle)
+	RvcRunTagCleaning = uint16(rvcrunmode.ModeTagCleaning)
+	RvcRunTagMapping  = uint16(rvcrunmode.ModeTagMapping)
 
-	RvcCleanTagDeepClean     uint16 = 0x4000
-	RvcCleanTagVacuum        uint16 = 0x4001
-	RvcCleanTagMop           uint16 = 0x4002
-	RvcCleanTagVacuumThenMop uint16 = 0x4003
+	RvcCleanTagDeepClean     = uint16(rvccleanmode.ModeTagDeepClean)
+	RvcCleanTagVacuum        = uint16(rvccleanmode.ModeTagVacuum)
+	RvcCleanTagMop           = uint16(rvccleanmode.ModeTagMop)
+	RvcCleanTagVacuumThenMop = uint16(rvccleanmode.ModeTagVacuumThenMop)
 )
 
 // Limits from the schema.
@@ -206,30 +216,20 @@ var (
 	ErrInvalidHostStatus = errors.New("modebase: the mode changer answered a reserved status")
 )
 
-// kind is one ModeBase derivation.
+// kind is one ModeBase derivation: its generated definition, its
+// ModeChangeStatus enum (ModeBase's values and its own) and the
+// SupportedModes rule its matter.js server adds.
 type kind struct {
-	clusterID uint32
-	features  Feature
-	statuses  []Status // the derivation's own ModeChangeStatus values
-	check     func([]ModeOption) error
+	def      *spec.Cluster
+	statuses *spec.Enum
+	check    func([]ModeOption) error
 }
 
 var (
-	laundryWasherKind = kind{clusterID: ClusterIDLaundryWasherMode, check: requireTag(LaundryTagNormal, "Normal")}
-	dishwasherKind    = kind{clusterID: ClusterIDDishwasherMode, check: requireTag(DishwasherTagNormal, "Normal")}
-	rvcRunKind        = kind{
-		clusterID: ClusterIDRvcRunMode, features: FeatureDirectModeChange,
-		statuses: []Status{
-			StatusStuck, StatusDustBinMissing, StatusDustBinFull, StatusWaterTankEmpty, StatusWaterTankMissing,
-			StatusWaterTankLidOpen, StatusMopCleaningPadMissing, StatusBatteryLow,
-		},
-		check: checkRvcRun,
-	}
-	rvcCleanKind = kind{
-		clusterID: ClusterIDRvcCleanMode, features: FeatureDirectModeChange,
-		statuses: []Status{StatusCleaningInProgress},
-		check:    checkRvcClean,
-	}
+	laundryWasherKind = kind{laundrywashermode.Definition, laundrywashermode.ModeChangeStatusDef, requireTag(LaundryTagNormal, "Normal")}
+	dishwasherKind    = kind{dishwashermode.Definition, dishwashermode.ModeChangeStatusDef, requireTag(DishwasherTagNormal, "Normal")}
+	rvcRunKind        = kind{rvcrunmode.Definition, rvcrunmode.ModeChangeStatusDef, checkRvcRun}
+	rvcCleanKind      = kind{rvccleanmode.Definition, rvccleanmode.ModeChangeStatusDef, checkRvcClean}
 )
 
 func hasTag(m ModeOption, values ...uint16) bool {
@@ -284,11 +284,11 @@ type Server struct {
 	cluster.AttributeChanges
 
 	k        kind
+	inst     *spec.Instance
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
 	changer  ModeChanger
 	modes    []ModeOption
-	features Feature
 
 	mu      sync.Mutex
 	current uint8
@@ -320,8 +320,10 @@ func newServer(k kind, cfg Config) (*Server, error) {
 	if cfg.Changer == nil {
 		return nil, ErrNoChanger
 	}
-	if cfg.Features&^k.features != 0 {
-		return nil, fmt.Errorf("%w: 0x%X", ErrUnknownFeature, uint32(cfg.Features&^k.features))
+	// An undefined bit, or DEPONOFF — "X" in every derivation served here.
+	inst, err := spec.New(k.def, spec.Options{Features: uint32(cfg.Features)})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrUnknownFeature, err)
 	}
 	if err := checkModes(cfg.SupportedModes); err != nil {
 		return nil, err
@@ -333,7 +335,7 @@ func newServer(k kind, cfg Config) (*Server, error) {
 	for i, m := range cfg.SupportedModes {
 		modes[i] = ModeOption{Label: m.Label, Mode: m.Mode, Tags: slices.Clone(m.Tags)}
 	}
-	s := &Server{k: k, ext: cfg.DataVersion, changer: cfg.Changer, modes: modes, features: cfg.Features, current: cfg.CurrentMode}
+	s := &Server{k: k, inst: inst, ext: cfg.DataVersion, changer: cfg.Changer, modes: modes, current: cfg.CurrentMode}
 	// The mode servers' initialize: ModeUtils.assertMode(supportedModes,
 	// currentMode).
 	if !s.supports(cfg.CurrentMode) {
@@ -421,38 +423,37 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 	return &s.embedded
 }
 
-// Revision returns the cluster revision from the generated schema.
-func (s *Server) Revision() uint16 { return schema.ClusterRevisions[s.k.clusterID] }
+// Revision returns the cluster revision of the generated definition.
+func (s *Server) Revision() uint16 { return s.inst.Revision() }
 
 // MatterClusterID returns the derivation's cluster id.
-func (s *Server) MatterClusterID() uint32 { return s.k.clusterID }
+func (s *Server) MatterClusterID() uint32 { return s.inst.MatterClusterID() }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterAttributes implements [contract.ClusterAttributeLister].
-func (*Server) MatterAttributes() []uint32 { return []uint32{AttrSupportedModes, AttrCurrentMode} }
+func (s *Server) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // MatterReportable lists CurrentMode; SupportedModes is fixed.
-func (*Server) MatterReportable() []uint32 { return []uint32{AttrCurrentMode} }
+func (s *Server) MatterReportable() []uint32 { return s.inst.MatterReportable() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
-func (*Server) MatterAcceptedCommands() []uint32 { return []uint32{CmdChangeToMode} }
+func (s *Server) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister].
-func (*Server) MatterGeneratedCommands() []uint32 { return []uint32{CmdChangeToModeResponse} }
+func (s *Server) MatterGeneratedCommands() []uint32 { return s.inst.MatterGeneratedCommands() }
 
 // MatterEvents implements [contract.ClusterEventLister]: ModeBase defines
 // no event.
-func (*Server) MatterEvents() []uint32 { return []uint32{} }
+func (s *Server) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 
 // MatterRead resolves an attribute.
 func (s *Server) MatterRead(attrID uint32) (any, bool) {
+	if v, ok := s.inst.ReadGlobal(attrID); ok {
+		return v, true
+	}
 	switch attrID {
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(s.features), true
-	case cluster.AttrGlobalClusterRevision:
-		return s.Revision(), true
 	case AttrSupportedModes:
 		out := make([]clusterwire.ModeOptionStruct, 0, len(s.modes))
 		for _, m := range s.modes {
@@ -472,12 +473,11 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 }
 
 // MatterWrite refuses every write: SupportedModes and CurrentMode are
-// read-only, StartUpMode and OnMode are not served.
-func (s *Server) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	if slices.Contains(s.MatterAttributes(), attrID) {
-		return statusError{im.StatusUnsupportedWrite, fmt.Sprintf("modebase: attribute 0x%04X is read-only", attrID)}
-	}
-	return statusError{im.StatusUnsupportedAttribute, fmt.Sprintf("modebase: attribute 0x%04X is not served", attrID)}
+// read-only, StartUpMode and OnMode are not served. The definition
+// answers each with its status.
+func (s *Server) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := s.inst.ValidateWrite(attrID, value, nil)
+	return err
 }
 
 // MatterInvoke answers ChangeToMode with a ChangeToModeResponse.
@@ -514,18 +514,15 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	return clusterwire.ChangeToModeResponse{Status: uint8(status), StatusText: truncate(text, LabelMaxBytes)}, nil
 }
 
-// validHostStatus accepts what a device may answer: Success,
-// GenericFailure, InvalidInMode, a status the derivation defines, or a
-// product-specific one (0x80 and above). UnsupportedMode is the server's
-// own answer.
+// validHostStatus accepts what a device may answer: a value of the
+// derivation's ModeChangeStatus enum — Success, GenericFailure,
+// InvalidInMode or one the derivation defines — or a product-specific one
+// (0x80 and above). UnsupportedMode is the server's own answer.
 func (s *Server) validHostStatus(st Status) bool {
-	switch {
-	case st == StatusSuccess, st == StatusGenericFailure, st == StatusInvalidInMode:
-		return true
-	case slices.Contains(s.k.statuses, st):
-		return true
+	if st == StatusUnsupportedMode {
+		return false
 	}
-	return st >= 0x80
+	return st >= 0x80 || slices.ContainsFunc(s.k.statuses.Values, func(v spec.EnumValue) bool { return v.Value == uint64(st) })
 }
 
 // truncate cuts text to at most n bytes on a rune boundary.

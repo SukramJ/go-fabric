@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3592,
+  "entry_points": 3643,
   "entry_packages": [
     ".",
     "bootid",
@@ -12,6 +12,7 @@
     "cluster/core",
     "cluster/cover",
     "cluster/fan",
+    "cluster/filter",
     "cluster/levelcontrol",
     "cluster/light",
     "cluster/lock",
@@ -21,6 +22,15 @@
     "cluster/onoff",
     "cluster/opstate",
     "cluster/pump",
+    "cluster/spec",
+    "cluster/spec/activatedcarbonfiltermonitoring",
+    "cluster/spec/dishwashermode",
+    "cluster/spec/hepafiltermonitoring",
+    "cluster/spec/laundrywashermode",
+    "cluster/spec/pumpconfigurationandcontrol",
+    "cluster/spec/rvccleanmode",
+    "cluster/spec/rvcrunmode",
+    "cluster/spec/spectest",
     "cluster/thermo",
     "cluster/valve",
     "cluster/wire",
@@ -40,6 +50,7 @@
     "mdns",
     "parity",
     "schema",
+    "script/clustergen",
     "script/coverfloor",
     "script/reachability",
     "secure",
@@ -58,9 +69,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 3646,
-    "reachable": 2004,
-    "whitelisted": 1637,
+    "total_exported": 4180,
+    "reachable": 2435,
+    "whitelisted": 1740,
     "unreachable": 5
   },
   "by_package": [
@@ -2802,6 +2813,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestFilterPayloadsMatchMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/filter_parity_matterjs_test.go",
+      "line": 29
+    },
+    {
+      "package": "bridge",
       "identifier": "TestForgetSigma1Replied_ClearsEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
@@ -2812,6 +2830,20 @@
       "identifier": "TestGeneralDiagnosticsResponsesCrossTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/gendiag_wire_test.go",
+      "line": 19
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGeneratedRequestDecoding",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/generated_payloads_test.go",
+      "line": 40
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGeneratedResponsePayload",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/generated_payloads_test.go",
       "line": 19
     },
     {
@@ -4845,6 +4877,34 @@
       "line": 55
     },
     {
+      "package": "cluster/filter",
+      "identifier": "ChangeIndication",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/filter/filter.go",
+      "line": 57
+    },
+    {
+      "package": "cluster/filter",
+      "identifier": "DegradationDirection",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/filter/filter.go",
+      "line": 59
+    },
+    {
+      "package": "cluster/filter",
+      "identifier": "Feature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/filter/filter.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/filter",
+      "identifier": "ReplacementProduct",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/filter/filter.go",
+      "line": 61
+    },
+    {
       "package": "cluster/levelcontrol",
       "identifier": "MoveRequest",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -4983,6 +5043,678 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/opstate/countdown_internal_test.go",
       "line": 18
+    },
+    {
+      "package": "cluster/pump",
+      "identifier": "ControlMode",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/pump/pump_server.go",
+      "line": 106
+    },
+    {
+      "package": "cluster/pump",
+      "identifier": "Feature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/pump/pump_server.go",
+      "line": 81
+    },
+    {
+      "package": "cluster/pump",
+      "identifier": "OperationMode",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/pump/pump_server.go",
+      "line": 95
+    },
+    {
+      "package": "cluster/pump",
+      "identifier": "Status",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/pump/pump_server.go",
+      "line": 119
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "Bind",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 323
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "DecodeInt",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 145
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "DecodeIntIn",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 152
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "DecodeList",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 245
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "DecodeListIn",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 249
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "DecodeNullable",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 299
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "DecodeOptional",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 272
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "DecodeStruct",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 234
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "DecodeUint",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 123
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "DecodeUintIn",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 130
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "Decoder",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 107
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "List",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 390
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "NullDefault",
+      "reason": "the Default of a generated attribute whose stated default is null; it is only ever a package-level initializer value, which RTA does not follow",
+      "file": "cluster/spec/model.go",
+      "line": 167
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "NullOf",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 291
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "Nullable",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 284
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "Put",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 403
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "PutInt",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 412
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "PutList",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 435
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "PutNullable",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 447
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "PutOptional",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 459
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "PutStruct",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 431
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "PutUint",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 408
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "Signed",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 117
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "Unsigned",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 111
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "ValueOf",
+      "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/codec.go",
+      "line": 295
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "ChangeIndicationEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "ChangeIndicationEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen.go",
+      "line": 70
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "DegradationDirectionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen.go",
+      "line": 79
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "DegradationDirectionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen.go",
+      "line": 90
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen.go",
+      "line": 46
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "ProductIdentifierTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen.go",
+      "line": 98
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "ProductIdentifierTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen.go",
+      "line": 112
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "ReplacementProductStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen.go",
+      "line": 145
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/activatedcarbonfiltermonitoring",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/dishwashermode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwashermode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/dishwashermode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwashermode/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/dishwashermode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwashermode/definition_gen.go",
+      "line": 68
+    },
+    {
+      "package": "cluster/spec/dishwashermode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwashermode/definition_gen.go",
+      "line": 103
+    },
+    {
+      "package": "cluster/spec/dishwashermode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwashermode/definition_gen.go",
+      "line": 142
+    },
+    {
+      "package": "cluster/spec/dishwashermode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwashermode/definition_gen.go",
+      "line": 164
+    },
+    {
+      "package": "cluster/spec/dishwashermode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwashermode/definition_gen.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/spec/dishwashermode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/dishwashermode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/dishwashermode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/dishwashermode/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "ChangeIndicationEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "ChangeIndicationEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen.go",
+      "line": 70
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "DegradationDirectionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen.go",
+      "line": 79
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "DegradationDirectionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen.go",
+      "line": 90
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen.go",
+      "line": 46
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "ProductIdentifierTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen.go",
+      "line": 98
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "ProductIdentifierTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen.go",
+      "line": 112
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "ReplacementProductStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen.go",
+      "line": 145
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/hepafiltermonitoring",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/hepafiltermonitoring/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/laundrywashermode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashermode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/laundrywashermode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashermode/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/laundrywashermode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashermode/definition_gen.go",
+      "line": 68
+    },
+    {
+      "package": "cluster/spec/laundrywashermode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashermode/definition_gen.go",
+      "line": 103
+    },
+    {
+      "package": "cluster/spec/laundrywashermode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashermode/definition_gen.go",
+      "line": 142
+    },
+    {
+      "package": "cluster/spec/laundrywashermode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashermode/definition_gen.go",
+      "line": 165
+    },
+    {
+      "package": "cluster/spec/laundrywashermode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashermode/definition_gen.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/spec/laundrywashermode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/laundrywashermode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/laundrywashermode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/laundrywashermode/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/pumpconfigurationandcontrol",
+      "identifier": "ControlModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen.go",
+      "line": 96
+    },
+    {
+      "package": "cluster/spec/pumpconfigurationandcontrol",
+      "identifier": "ControlModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen.go",
+      "line": 111
+    },
+    {
+      "package": "cluster/spec/pumpconfigurationandcontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen.go",
+      "line": 80
+    },
+    {
+      "package": "cluster/spec/pumpconfigurationandcontrol",
+      "identifier": "OperationModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen.go",
+      "line": 123
+    },
+    {
+      "package": "cluster/spec/pumpconfigurationandcontrol",
+      "identifier": "OperationModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen.go",
+      "line": 136
+    },
+    {
+      "package": "cluster/spec/pumpconfigurationandcontrol",
+      "identifier": "PumpStatusBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen.go",
+      "line": 146
+    },
+    {
+      "package": "cluster/spec/pumpconfigurationandcontrol",
+      "identifier": "PumpStatusBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen.go",
+      "line": 164
+    },
+    {
+      "package": "cluster/spec/pumpconfigurationandcontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/pumpconfigurationandcontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/rvccleanmode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvccleanmode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/rvccleanmode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvccleanmode/definition_gen.go",
+      "line": 56
+    },
+    {
+      "package": "cluster/spec/rvccleanmode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvccleanmode/definition_gen.go",
+      "line": 70
+    },
+    {
+      "package": "cluster/spec/rvccleanmode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvccleanmode/definition_gen.go",
+      "line": 106
+    },
+    {
+      "package": "cluster/spec/rvccleanmode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvccleanmode/definition_gen.go",
+      "line": 145
+    },
+    {
+      "package": "cluster/spec/rvccleanmode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvccleanmode/definition_gen.go",
+      "line": 168
+    },
+    {
+      "package": "cluster/spec/rvccleanmode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvccleanmode/definition_gen.go",
+      "line": 137
+    },
+    {
+      "package": "cluster/spec/rvccleanmode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/rvccleanmode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/rvccleanmode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/rvccleanmode/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/rvcrunmode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcrunmode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/rvcrunmode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcrunmode/definition_gen.go",
+      "line": 56
+    },
+    {
+      "package": "cluster/spec/rvcrunmode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcrunmode/definition_gen.go",
+      "line": 77
+    },
+    {
+      "package": "cluster/spec/rvcrunmode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcrunmode/definition_gen.go",
+      "line": 120
+    },
+    {
+      "package": "cluster/spec/rvcrunmode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcrunmode/definition_gen.go",
+      "line": 159
+    },
+    {
+      "package": "cluster/spec/rvcrunmode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcrunmode/definition_gen.go",
+      "line": 181
+    },
+    {
+      "package": "cluster/spec/rvcrunmode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcrunmode/definition_gen.go",
+      "line": 151
+    },
+    {
+      "package": "cluster/spec/rvcrunmode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/rvcrunmode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/rvcrunmode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/rvcrunmode/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/spectest",
+      "identifier": "Ptr",
+      "reason": "generic: every generated test calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/spectest/spectest.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/spec/spectest",
+      "identifier": "RoundTrip",
+      "reason": "generic: every generated test calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
+      "file": "cluster/spec/spectest/spectest.go",
+      "line": 219
     },
     {
       "package": "cluster/wire",

@@ -15,149 +15,144 @@
 //
 // matter.js PumpConfigurationAndControlServer
 // (packages/node/src/behaviors/pump-configuration-and-control/PumpConfigurationAndControlServer.ts)
-// adds nothing to the generated behavior, so this server mirrors what
-// that behavior enforces from the model: feature-gated attributes and
-// enum members (pump-configuration-and-control.element.ts), the nullable
-// ranges, and the write access "RW VM". The OperationMode / ControlMode
-// rule that an unsupported mode is CONSTRAINT_ERROR is the specification
-// text matter.js carries in pump-configuration-and-control.resource.ts.
+// adds nothing to the generated behavior, and neither does this server:
+// it is built on the generated definition
+// (cluster/spec/pumpconfigurationandcontrol, ADR 0013), which decides the
+// attribute list from the features and the declared optionals ("<feature>,
+// [AUTO]" limit pairs included), the feature selection ("O.a+" over the
+// five control features), the event priorities, the write privileges
+// ("RW VM") and every write check — feature-gated enum values, the
+// nullable ranges. The OperationMode / ControlMode rule that an unsupported
+// mode is CONSTRAINT_ERROR is the specification text matter.js carries in
+// pump-configuration-and-control.resource.ts, and the definition's enum
+// check answers it so. What remains here is the host port.
 package pump
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
-// ClusterID is the PumpConfigurationAndControl cluster id
-// (pump-configuration-and-control.element.ts:19).
-const ClusterID uint32 = 0x0200
+// ClusterID is the PumpConfigurationAndControl cluster id.
+const ClusterID = pumpdef.ClusterID
 
 // DeviceTypePump is the Pump device type (pump.element.ts), which
 // mandates this cluster and OnOff.
 const DeviceTypePump uint16 = 0x0303
 
-// Attribute ids (pump-configuration-and-control.element.ts:33-111).
-// AlarmMask (0x22) is deprecated ("D") and not served.
+// Attribute ids. AlarmMask (0x22) is deprecated ("D") and not served.
 const (
-	AttrMaxPressure            uint32 = 0x0000 // M, int16, X F
-	AttrMaxSpeed               uint32 = 0x0001 // M, uint16, X F
-	AttrMaxFlow                uint32 = 0x0002 // M, uint16, X F
-	AttrMinConstPressure       uint32 = 0x0003 // PRSCONST, [AUTO]
-	AttrMaxConstPressure       uint32 = 0x0004 // PRSCONST, [AUTO]
-	AttrMinCompPressure        uint32 = 0x0005 // PRSCOMP, [AUTO]
-	AttrMaxCompPressure        uint32 = 0x0006 // PRSCOMP, [AUTO]
-	AttrMinConstSpeed          uint32 = 0x0007 // SPD, [AUTO]
-	AttrMaxConstSpeed          uint32 = 0x0008 // SPD, [AUTO]
-	AttrMinConstFlow           uint32 = 0x0009 // FLW, [AUTO]
-	AttrMaxConstFlow           uint32 = 0x000A // FLW, [AUTO]
-	AttrMinConstTemp           uint32 = 0x000B // TEMP, [AUTO]
-	AttrMaxConstTemp           uint32 = 0x000C // TEMP, [AUTO]
-	AttrPumpStatus             uint32 = 0x0010 // O
-	AttrEffectiveOperationMode uint32 = 0x0011 // M
-	AttrEffectiveControlMode   uint32 = 0x0012 // M
-	AttrCapacity               uint32 = 0x0013 // M, int16, X
-	AttrSpeed                  uint32 = 0x0014 // O, uint16, X
-	AttrLifetimeRunningHours   uint32 = 0x0015 // O, uint24, RW VM, X N
-	AttrPower                  uint32 = 0x0016 // O, uint24, X
-	AttrLifetimeEnergyConsumed uint32 = 0x0017 // O, uint32, RW VM, X N
-	AttrOperationMode          uint32 = 0x0020 // M, RW VM
-	AttrControlMode            uint32 = 0x0021 // O, RW VM
+	AttrMaxPressure            = pumpdef.AttrMaxPressure
+	AttrMaxSpeed               = pumpdef.AttrMaxSpeed
+	AttrMaxFlow                = pumpdef.AttrMaxFlow
+	AttrMinConstPressure       = pumpdef.AttrMinConstPressure
+	AttrMaxConstPressure       = pumpdef.AttrMaxConstPressure
+	AttrMinCompPressure        = pumpdef.AttrMinCompPressure
+	AttrMaxCompPressure        = pumpdef.AttrMaxCompPressure
+	AttrMinConstSpeed          = pumpdef.AttrMinConstSpeed
+	AttrMaxConstSpeed          = pumpdef.AttrMaxConstSpeed
+	AttrMinConstFlow           = pumpdef.AttrMinConstFlow
+	AttrMaxConstFlow           = pumpdef.AttrMaxConstFlow
+	AttrMinConstTemp           = pumpdef.AttrMinConstTemp
+	AttrMaxConstTemp           = pumpdef.AttrMaxConstTemp
+	AttrPumpStatus             = pumpdef.AttrPumpStatus
+	AttrEffectiveOperationMode = pumpdef.AttrEffectiveOperationMode
+	AttrEffectiveControlMode   = pumpdef.AttrEffectiveControlMode
+	AttrCapacity               = pumpdef.AttrCapacity
+	AttrSpeed                  = pumpdef.AttrSpeed
+	AttrLifetimeRunningHours   = pumpdef.AttrLifetimeRunningHours
+	AttrPower                  = pumpdef.AttrPower
+	AttrLifetimeEnergyConsumed = pumpdef.AttrLifetimeEnergyConsumed
+	AttrOperationMode          = pumpdef.AttrOperationMode
+	AttrControlMode            = pumpdef.AttrControlMode
 )
 
-// Feature is a PumpConfigurationAndControl FeatureMap bit
-// (pump-configuration-and-control.element.ts:22-31). The first five
+// Feature is a PumpConfigurationAndControl FeatureMap bit. The first five
 // carry "O.a+": at least one of them is required.
-type Feature uint32
+type Feature = pumpdef.Feature
 
 // FeatureMap bits.
 const (
-	FeatureConstantPressure    Feature = 1 << 0 // PRSCONST
-	FeatureCompensatedPressure Feature = 1 << 1 // PRSCOMP
-	FeatureConstantFlow        Feature = 1 << 2 // FLW
-	FeatureConstantSpeed       Feature = 1 << 3 // SPD
-	FeatureConstantTemperature Feature = 1 << 4 // TEMP
-	FeatureAutomatic           Feature = 1 << 5 // AUTO
-	FeatureLocalOperation      Feature = 1 << 6 // LOCAL
-
-	controlFeatures = FeatureConstantPressure | FeatureCompensatedPressure | FeatureConstantFlow |
-		FeatureConstantSpeed | FeatureConstantTemperature
-	allFeatures = controlFeatures | FeatureAutomatic | FeatureLocalOperation
+	FeatureConstantPressure    = pumpdef.FeatureConstantPressure    // PRSCONST
+	FeatureCompensatedPressure = pumpdef.FeatureCompensatedPressure // PRSCOMP
+	FeatureConstantFlow        = pumpdef.FeatureConstantFlow        // FLW
+	FeatureConstantSpeed       = pumpdef.FeatureConstantSpeed       // SPD
+	FeatureConstantTemperature = pumpdef.FeatureConstantTemperature // TEMP
+	FeatureAutomatic           = pumpdef.FeatureAutomatic           // AUTO
+	FeatureLocalOperation      = pumpdef.FeatureLocalOperation      // LOCAL
 )
 
-// OperationMode is the OperationModeEnum (element :143-149).
-type OperationMode uint8
+// OperationMode is the OperationModeEnum.
+type OperationMode = pumpdef.OperationModeEnum
 
 // OperationModeEnum values; Minimum and Maximum need SPD, Local LOCAL.
 const (
-	OperationNormal  OperationMode = 0
-	OperationMinimum OperationMode = 1
-	OperationMaximum OperationMode = 2
-	OperationLocal   OperationMode = 3
+	OperationNormal  = pumpdef.OperationModeNormal
+	OperationMinimum = pumpdef.OperationModeMinimum
+	OperationMaximum = pumpdef.OperationModeMaximum
+	OperationLocal   = pumpdef.OperationModeLocal
 )
 
-// ControlMode is the ControlModeEnum (element :151-159).
-type ControlMode uint8
+// ControlMode is the ControlModeEnum.
+type ControlMode = pumpdef.ControlModeEnum
 
 // ControlModeEnum values, each gated on its feature.
 const (
-	ControlConstantSpeed        ControlMode = 0 // SPD
-	ControlConstantPressure     ControlMode = 1 // PRSCONST
-	ControlProportionalPressure ControlMode = 2 // PRSCOMP
-	ControlConstantFlow         ControlMode = 3 // FLW
-	ControlConstantTemperature  ControlMode = 5 // TEMP
-	ControlAutomatic            ControlMode = 7 // AUTO
+	ControlConstantSpeed        = pumpdef.ControlModeConstantSpeed        // SPD
+	ControlConstantPressure     = pumpdef.ControlModeConstantPressure     // PRSCONST
+	ControlProportionalPressure = pumpdef.ControlModeProportionalPressure // PRSCOMP
+	ControlConstantFlow         = pumpdef.ControlModeConstantFlow         // FLW
+	ControlConstantTemperature  = pumpdef.ControlModeConstantTemperature  // TEMP
+	ControlAutomatic            = pumpdef.ControlModeAutomatic            // AUTO
 )
 
-// Status is the PumpStatusBitmap (map16, element :130-141).
-type Status uint16
+// Status is the PumpStatusBitmap (map16).
+type Status = pumpdef.PumpStatusBitmap
 
 // PumpStatusBitmap bits.
 const (
-	StatusDeviceFault       Status = 1 << 0
-	StatusSupplyFault       Status = 1 << 1
-	StatusSpeedLow          Status = 1 << 2
-	StatusSpeedHigh         Status = 1 << 3
-	StatusLocalOverride     Status = 1 << 4
-	StatusRunning           Status = 1 << 5
-	StatusRemotePressure    Status = 1 << 6
-	StatusRemoteFlow        Status = 1 << 7
-	StatusRemoteTemperature Status = 1 << 8
-	statusAll                      = Status(1<<9 - 1)
+	StatusDeviceFault       = pumpdef.PumpStatusDeviceFault
+	StatusSupplyFault       = pumpdef.PumpStatusSupplyFault
+	StatusSpeedLow          = pumpdef.PumpStatusSpeedLow
+	StatusSpeedHigh         = pumpdef.PumpStatusSpeedHigh
+	StatusLocalOverride     = pumpdef.PumpStatusLocalOverride
+	StatusRunning           = pumpdef.PumpStatusRunning
+	StatusRemotePressure    = pumpdef.PumpStatusRemotePressure
+	StatusRemoteFlow        = pumpdef.PumpStatusRemoteFlow
+	StatusRemoteTemperature = pumpdef.PumpStatusRemoteTemperature
 )
 
-// Event ids (element :112-128). Every event is optional and fieldless.
+// Event ids. Every event is optional and fieldless; DryRunning,
+// PumpMotorFatalFailure, PumpBlocked and ElectronicFatalFailure are
+// critical, the others info.
 const (
-	EventSupplyVoltageLow          uint32 = 0x00
-	EventSupplyVoltageHigh         uint32 = 0x01
-	EventPowerMissingPhase         uint32 = 0x02
-	EventSystemPressureLow         uint32 = 0x03
-	EventSystemPressureHigh        uint32 = 0x04
-	EventDryRunning                uint32 = 0x05 // critical
-	EventMotorTemperatureHigh      uint32 = 0x06
-	EventPumpMotorFatalFailure     uint32 = 0x07 // critical
-	EventElectronicTemperatureHigh uint32 = 0x08
-	EventPumpBlocked               uint32 = 0x09 // critical
-	EventSensorFailure             uint32 = 0x0A
-	EventElectronicNonFatalFailure uint32 = 0x0B
-	EventElectronicFatalFailure    uint32 = 0x0C // critical
-	EventGeneralFault              uint32 = 0x0D
-	EventLeakage                   uint32 = 0x0E
-	EventAirDetection              uint32 = 0x0F
-	EventTurbineOperation          uint32 = 0x10
+	EventSupplyVoltageLow          = pumpdef.EventSupplyVoltageLow
+	EventSupplyVoltageHigh         = pumpdef.EventSupplyVoltageHigh
+	EventPowerMissingPhase         = pumpdef.EventPowerMissingPhase
+	EventSystemPressureLow         = pumpdef.EventSystemPressureLow
+	EventSystemPressureHigh        = pumpdef.EventSystemPressureHigh
+	EventDryRunning                = pumpdef.EventDryRunning
+	EventMotorTemperatureHigh      = pumpdef.EventMotorTemperatureHigh
+	EventPumpMotorFatalFailure     = pumpdef.EventPumpMotorFatalFailure
+	EventElectronicTemperatureHigh = pumpdef.EventElectronicTemperatureHigh
+	EventPumpBlocked               = pumpdef.EventPumpBlocked
+	EventSensorFailure             = pumpdef.EventSensorFailure
+	EventElectronicNonFatalFailure = pumpdef.EventElectronicNonFatalFailure
+	EventElectronicFatalFailure    = pumpdef.EventElectronicFatalFailure
+	EventGeneralFault              = pumpdef.EventGeneralFault
+	EventLeakage                   = pumpdef.EventLeakage
+	EventAirDetection              = pumpdef.EventAirDetection
+	EventTurbineOperation          = pumpdef.EventTurbineOperation
 )
-
-// criticalEvents are the four events matter.js declares "critical";
-// every other one is "info" (element :112-128).
-var criticalEvents = []uint32{EventDryRunning, EventPumpMotorFatalFailure, EventPumpBlocked, EventElectronicFatalFailure}
 
 // Optional names the optional attributes a host declares it serves.
 type Optional uint32
@@ -178,6 +173,23 @@ const (
 	// conformance is "<feature>, [AUTO]".
 	OptionalAutomaticLimits
 )
+
+// optionalAttributes are the attributes each Optional bit declares.
+var optionalAttributes = []struct {
+	opt   Optional
+	attrs []uint32
+}{
+	{OptionalPumpStatus, []uint32{AttrPumpStatus}},
+	{OptionalSpeed, []uint32{AttrSpeed}},
+	{OptionalLifetimeRunningHours, []uint32{AttrLifetimeRunningHours}},
+	{OptionalPower, []uint32{AttrPower}},
+	{OptionalLifetimeEnergyConsumed, []uint32{AttrLifetimeEnergyConsumed}},
+	{OptionalControlMode, []uint32{AttrControlMode}},
+	{OptionalAutomaticLimits, []uint32{
+		AttrMinConstPressure, AttrMaxConstPressure, AttrMinCompPressure, AttrMaxCompPressure, AttrMinConstSpeed,
+		AttrMaxConstSpeed, AttrMinConstFlow, AttrMaxConstFlow, AttrMinConstTemp, AttrMaxConstTemp,
+	}},
+}
 
 // Limits are the fixed (quality F), nullable limit attributes; nil is
 // null, "if the value is invalid" (resource :35-133).
@@ -272,7 +284,7 @@ type Server struct {
 	ext      *cluster.DataVersionTracker
 	src      StateSource
 	cfg      Config
-	events   []uint32
+	inst     *spec.Instance
 
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
@@ -296,11 +308,11 @@ func NewServer(cfg Config) (*Server, error) {
 	if cfg.Source == nil {
 		return nil, ErrNoSource
 	}
-	if cfg.Features&^allFeatures != 0 {
-		return nil, fmt.Errorf("%w: 0x%X", ErrUnknownFeature, uint32(cfg.Features&^allFeatures))
-	}
-	if cfg.Features&controlFeatures == 0 {
-		return nil, ErrNoControlMode
+	if err := spec.CheckFeatures(pumpdef.Definition, uint32(cfg.Features)); err != nil {
+		if errors.Is(err, spec.ErrUnknownFeature) {
+			return nil, fmt.Errorf("%w: %w", ErrUnknownFeature, err)
+		}
+		return nil, fmt.Errorf("%w: %w", ErrNoControlMode, err)
 	}
 	if cfg.Optional&OptionalAutomaticLimits != 0 && cfg.Features&FeatureAutomatic == 0 {
 		return nil, ErrAutoLimits
@@ -317,15 +329,17 @@ func NewServer(cfg Config) (*Server, error) {
 			return nil, ErrSetterMissing
 		}
 	}
-	events := slices.Clone(cfg.Events)
-	slices.Sort(events)
-	events = slices.Compact(events)
-	for _, e := range events {
-		if e > EventTurbineOperation {
-			return nil, fmt.Errorf("%w: 0x%02X", ErrUnknownEvent, e)
+	opts := spec.Options{Features: uint32(cfg.Features), Events: cfg.Events}
+	for _, o := range optionalAttributes {
+		if cfg.Optional&o.opt != 0 {
+			opts.Attributes = append(opts.Attributes, o.attrs...)
 		}
 	}
-	return &Server{src: cfg.Source, ext: cfg.DataVersion, cfg: cfg, events: events}, nil
+	inst, err := spec.New(pumpdef.Definition, opts)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrUnknownEvent, err)
+	}
+	return &Server{src: cfg.Source, ext: cfg.DataVersion, cfg: cfg, inst: inst}, nil
 }
 
 func implements[T any](v any) bool {
@@ -333,20 +347,14 @@ func implements[T any](v any) bool {
 	return ok
 }
 
-// Revision returns the cluster revision from the generated schema.
-func Revision() uint16 { return schema.ClusterRevisions[ClusterID] }
+// Revision returns the cluster revision of the generated definition.
+func Revision() uint16 { return pumpdef.Revision }
 
 func (s *Server) tracker() *cluster.DataVersionTracker {
 	if s.ext != nil {
 		return s.ext
 	}
 	return &s.embedded
-}
-
-func (s *Server) has(f Feature) bool  { return s.cfg.Features&f != 0 }
-func (s *Server) opt(o Optional) bool { return s.cfg.Optional&o != 0 }
-func (s *Server) limitPair(f Feature) bool {
-	return s.has(f) || (s.has(FeatureAutomatic) && s.opt(OptionalAutomaticLimits))
 }
 
 // MatterClusterID returns 0x0200.
@@ -357,62 +365,22 @@ func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterAttributes implements [contract.ClusterAttributeLister], in id
 // order.
-func (s *Server) MatterAttributes() []uint32 {
-	out := []uint32{AttrMaxPressure, AttrMaxSpeed, AttrMaxFlow}
-	for _, p := range []struct {
-		f        Feature
-		min, max uint32
-	}{
-		{FeatureConstantPressure, AttrMinConstPressure, AttrMaxConstPressure},
-		{FeatureCompensatedPressure, AttrMinCompPressure, AttrMaxCompPressure},
-		{FeatureConstantSpeed, AttrMinConstSpeed, AttrMaxConstSpeed},
-		{FeatureConstantFlow, AttrMinConstFlow, AttrMaxConstFlow},
-		{FeatureConstantTemperature, AttrMinConstTemp, AttrMaxConstTemp},
-	} {
-		if s.limitPair(p.f) {
-			out = append(out, p.min, p.max)
-		}
-	}
-	if s.opt(OptionalPumpStatus) {
-		out = append(out, AttrPumpStatus)
-	}
-	out = append(out, AttrEffectiveOperationMode, AttrEffectiveControlMode, AttrCapacity)
-	for _, o := range []struct {
-		opt  Optional
-		attr uint32
-	}{
-		{OptionalSpeed, AttrSpeed},
-		{OptionalLifetimeRunningHours, AttrLifetimeRunningHours},
-		{OptionalPower, AttrPower},
-		{OptionalLifetimeEnergyConsumed, AttrLifetimeEnergyConsumed},
-	} {
-		if s.opt(o.opt) {
-			out = append(out, o.attr)
-		}
-	}
-	out = append(out, AttrOperationMode)
-	if s.opt(OptionalControlMode) {
-		out = append(out, AttrControlMode)
-	}
-	return out
-}
+func (s *Server) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // MatterReportable lists the served attributes that move: everything
 // but the fixed limits (0x0000-0x000C).
-func (s *Server) MatterReportable() []uint32 {
-	return slices.DeleteFunc(s.MatterAttributes(), func(id uint32) bool { return id <= AttrMaxConstTemp })
-}
+func (s *Server) MatterReportable() []uint32 { return s.inst.MatterReportable() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]; the
 // cluster has no commands.
-func (*Server) MatterAcceptedCommands() []uint32 { return []uint32{} }
+func (s *Server) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister].
-func (*Server) MatterGeneratedCommands() []uint32 { return []uint32{} }
+func (s *Server) MatterGeneratedCommands() []uint32 { return s.inst.MatterGeneratedCommands() }
 
 // MatterEvents implements [contract.ClusterEventLister]: the declared
 // events, in id order.
-func (s *Server) MatterEvents() []uint32 { return slices.Clone(s.events) }
+func (s *Server) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 
 // MatterInvoke rejects every command: the cluster defines none.
 func (*Server) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
@@ -421,13 +389,10 @@ func (*Server) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error)
 
 // MatterRead resolves an attribute.
 func (s *Server) MatterRead(attrID uint32) (any, bool) {
-	switch attrID {
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(s.cfg.Features), true
-	case cluster.AttrGlobalClusterRevision:
-		return Revision(), true
+	if v, ok := s.inst.ReadGlobal(attrID); ok {
+		return v, true
 	}
-	if !slices.Contains(s.MatterAttributes(), attrID) {
+	if !s.inst.Serves(attrID) {
 		return nil, false
 	}
 	if v, ok := s.readLimit(attrID); ok {
@@ -436,7 +401,8 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	st := s.src.PumpState()
 	switch attrID {
 	case AttrPumpStatus:
-		return uint16(st.PumpStatus & statusAll), true
+		// A bitmap carries only its defined bits.
+		return uint16(st.PumpStatus) & uint16(pumpdef.PumpStatusBitmapDef.Defined()), true //nolint:gosec // a map16's bits
 	case AttrEffectiveOperationMode:
 		return uint8(st.EffectiveOperationMode), true
 	case AttrEffectiveControlMode:
@@ -467,12 +433,10 @@ func (s *Server) readLimit(attrID uint32) (any, bool) {
 		AttrMinConstTemp: l.MinConstTemp, AttrMaxConstTemp: l.MaxConstTemp,
 	}
 	if v, ok := signed[attrID]; ok {
-		if attrID == AttrMinConstTemp || attrID == AttrMaxConstTemp {
-			// constraint "min -27315" (element :74, :78).
-			if v != nil && *v < -27315 {
-				floor := int16(-27315)
-				v = &floor
-			}
+		// A numeric lower bound ("min -27315" on the temperature limits).
+		if b := pumpdef.Definition.Attribute(attrID).Constraint.Min; b.IsInt() && v != nil && int64(*v) < b.Int {
+			floor := int16(b.Int) //nolint:gosec // an int16 attribute's own bound
+			v = &floor
 		}
 		return nullableInt16(v), true
 	}
@@ -516,130 +480,60 @@ func nullableUint32(v *uint32, ceiling uint32) any {
 }
 
 // MatterWrite applies one of the four writable attributes (access
-// "RW VM", element :95, :100, :104, :108).
+// "RW VM"). The definition checks the write — served, writable, a
+// supported enum value or a value inside the nullable range — and the
+// setter the host implements applies it.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	if !slices.Contains(s.MatterAttributes(), attrID) {
-		return statusError{im.StatusUnsupportedAttribute, fmt.Sprintf("pump: attribute 0x%04X is not served", attrID)}
-	}
-	var err error
-	switch attrID {
-	case AttrOperationMode:
-		err = s.writeOperationMode(ctx, value)
-	case AttrControlMode:
-		err = s.writeControlMode(ctx, value)
-	case AttrLifetimeRunningHours:
-		err = s.writeCounter(ctx, value, maxUint24, func(ctx context.Context, v *uint32) error {
-			setter, _ := s.src.(RunningHoursSetter) // guaranteed by NewServer
-			return setter.SetLifetimeRunningHours(ctx, v)
-		})
-	case AttrLifetimeEnergyConsumed:
-		err = s.writeCounter(ctx, value, maxUint32, func(ctx context.Context, v *uint32) error {
-			setter, _ := s.src.(EnergyConsumedSetter) // guaranteed by NewServer
-			return setter.SetLifetimeEnergyConsumed(ctx, v)
-		})
-	default:
-		return statusError{im.StatusUnsupportedWrite, fmt.Sprintf("pump: attribute 0x%04X is read-only", attrID)}
-	}
+	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
 		return err
+	}
+	n, _ := v.(uint64) // an enum8 or a counter per ValidateWrite; nil for null
+	switch attrID {
+	case AttrOperationMode:
+		err = s.src.SetOperationMode(ctx, OperationMode(n)) //nolint:gosec // an enum8 per ValidateWrite
+	case AttrControlMode:
+		setter, _ := s.src.(ControlModeSetter)           // guaranteed by NewServer
+		err = setter.SetControlMode(ctx, ControlMode(n)) //nolint:gosec // an enum8 per ValidateWrite
+	case AttrLifetimeRunningHours:
+		setter, _ := s.src.(RunningHoursSetter) // guaranteed by NewServer
+		err = setter.SetLifetimeRunningHours(ctx, counter(v))
+	default: // AttrLifetimeEnergyConsumed, the last writable attribute
+		setter, _ := s.src.(EnergyConsumedSetter) // guaranteed by NewServer
+		err = setter.SetLifetimeEnergyConsumed(ctx, counter(v))
+	}
+	if err != nil {
+		return fmt.Errorf("pump: attribute 0x%04X write: %w", attrID, err)
 	}
 	s.tracker().Bump()
 	return nil
 }
 
+// counter is a validated nullable lifetime counter: nil for null.
+func counter(v any) *uint32 {
+	n, ok := v.(uint64)
+	if !ok {
+		return nil
+	}
+	c := uint32(n) //nolint:gosec // ≤ the uint32 null-less range per ValidateWrite
+	return &c
+}
+
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
 // every writable attribute of the cluster is "RW VM", written with
 // Manage.
-func (*Server) MinWritePrivilege(attrID uint32) uint8 {
-	switch attrID {
-	case AttrOperationMode, AttrControlMode, AttrLifetimeRunningHours, AttrLifetimeEnergyConsumed:
-		return 4 // Manage
-	}
-	return 3 // Operate
-}
+func (s *Server) MinWritePrivilege(attrID uint32) uint8 { return s.inst.MinWritePrivilege(attrID) }
 
 // SupportsOperationMode reports whether the configuration offers m:
-// Normal always, Minimum and Maximum with SPD, Local with LOCAL
-// (element :143-149).
+// Normal always, Minimum and Maximum with SPD, Local with LOCAL.
 func (s *Server) SupportsOperationMode(m OperationMode) bool {
-	switch m {
-	case OperationNormal:
-		return true
-	case OperationMinimum, OperationMaximum:
-		return s.has(FeatureConstantSpeed)
-	case OperationLocal:
-		return s.has(FeatureLocalOperation)
-	default:
-		return false
-	}
+	return s.inst.EnumSupported(pumpdef.OperationModeEnumDef, uint64(m))
 }
 
 // SupportsControlMode reports whether the configuration offers m, each
-// value gated on its feature (element :151-159).
+// value gated on its feature.
 func (s *Server) SupportsControlMode(m ControlMode) bool {
-	switch m {
-	case ControlConstantSpeed:
-		return s.has(FeatureConstantSpeed)
-	case ControlConstantPressure:
-		return s.has(FeatureConstantPressure)
-	case ControlProportionalPressure:
-		return s.has(FeatureCompensatedPressure)
-	case ControlConstantFlow:
-		return s.has(FeatureConstantFlow)
-	case ControlConstantTemperature:
-		return s.has(FeatureConstantTemperature)
-	case ControlAutomatic:
-		return s.has(FeatureAutomatic)
-	default:
-		return false
-	}
-}
-
-// writeOperationMode: "In the case a device does not support a specific
-// operation mode, the write interaction to this attribute with an
-// unsupported operation mode value shall be ignored and a response
-// containing the status of CONSTRAINT_ERROR shall be returned"
-// (resource :252-254).
-func (s *Server) writeOperationMode(ctx context.Context, value any) error {
-	n, ok := cluster.AsUintMax(value, 0xFF)
-	if !ok || !s.SupportsOperationMode(OperationMode(n)) { //nolint:gosec // ≤ 0xFF per AsUintMax
-		return statusError{im.StatusConstraintError, fmt.Sprintf("pump: OperationMode %v is not supported", value)}
-	}
-	if err := s.src.SetOperationMode(ctx, OperationMode(n)); err != nil { //nolint:gosec // ≤ 0xFF per AsUintMax
-		return fmt.Errorf("pump: OperationMode write: %w", err)
-	}
-	return nil
-}
-
-// writeControlMode mirrors writeOperationMode (resource :264-266).
-func (s *Server) writeControlMode(ctx context.Context, value any) error {
-	n, ok := cluster.AsUintMax(value, 0xFF)
-	if !ok || !s.SupportsControlMode(ControlMode(n)) { //nolint:gosec // ≤ 0xFF per AsUintMax
-		return statusError{im.StatusConstraintError, fmt.Sprintf("pump: ControlMode %v is not supported", value)}
-	}
-	setter, _ := s.src.(ControlModeSetter)                             // guaranteed by NewServer
-	if err := setter.SetControlMode(ctx, ControlMode(n)); err != nil { //nolint:gosec // ≤ 0xFF per AsUintMax
-		return fmt.Errorf("pump: ControlMode write: %w", err)
-	}
-	return nil
-}
-
-// writeCounter validates a nullable lifetime counter against the
-// largest non-null value of its width and forwards it.
-func (*Server) writeCounter(ctx context.Context, value any, ceiling uint32, set func(context.Context, *uint32) error) error {
-	var v *uint32
-	if value != nil {
-		n, ok := cluster.AsUintMax(value, uint64(ceiling))
-		if !ok {
-			return statusError{im.StatusConstraintError, fmt.Sprintf("pump: counter %v outside 0..%d", value, ceiling)}
-		}
-		c := uint32(n) //nolint:gosec // ≤ ceiling (a uint32) per AsUintMax
-		v = &c
-	}
-	if err := set(ctx, v); err != nil {
-		return fmt.Errorf("pump: lifetime counter write: %w", err)
-	}
-	return nil
+	return s.inst.EnumSupported(pumpdef.ControlModeEnumDef, uint64(m))
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
@@ -661,29 +555,14 @@ func (s *Server) SetEndpoint(endpoint uint16) {
 // the event is dropped; an event not in Config.Events is refused, so
 // EventList never under-reports what the server sends.
 func (s *Server) Emit(event uint32) error {
-	if !slices.Contains(s.events, event) {
+	if !s.inst.Emits(event) {
 		return fmt.Errorf("%w: 0x%02X", ErrEventUndeclared, event)
-	}
-	priority := contract.EventPriorityInfo
-	if slices.Contains(criticalEvents, event) {
-		priority = contract.EventPriorityCritical
 	}
 	s.mu.Lock()
 	emitter, endpoint := s.emitter, s.endpoint
 	s.mu.Unlock()
 	if emitter != nil {
-		emitter.MatterEmitEvent(endpoint, ClusterID, event, clusterwire.FieldlessEvent{}, priority)
+		emitter.MatterEmitEvent(endpoint, ClusterID, event, clusterwire.FieldlessEvent{}, s.inst.EventPriority(event))
 	}
 	return nil
 }
-
-// statusError carries an exact IM status to the dispatcher.
-type statusError struct {
-	status im.StatusCode
-	msg    string
-}
-
-func (e statusError) Error() string                   { return e.msg }
-func (e statusError) MatterStatusCode() im.StatusCode { return e.status }
-
-var _ im.StatusCodeError = statusError{}

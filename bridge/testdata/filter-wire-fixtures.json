@@ -1,0 +1,54 @@
+[
+  {
+    "label": "hepa_reset_condition",
+    "kind": "commands",
+    "cluster": 113,
+    "element": "ResetCondition",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "carbon_reset_condition",
+    "kind": "commands",
+    "cluster": 114,
+    "element": "ResetCondition",
+    "bytesHex": "1518"
+  },
+  {
+    "label": "hepa_products",
+    "kind": "attributes",
+    "cluster": 113,
+    "element": "ReplacementProductList",
+    "fixture": [
+      {
+        "productIdentifierType": 0,
+        "productIdentifierValue": "012345678905"
+      },
+      {
+        "productIdentifierType": 4,
+        "productIdentifierValue": "HEPA-H13"
+      }
+    ],
+    "bytesHex": "16152400002c010c30313233343536373839303518152400042c0108484550412d4831331818"
+  },
+  {
+    "label": "carbon_products",
+    "kind": "attributes",
+    "cluster": 114,
+    "element": "ReplacementProductList",
+    "fixture": [
+      {
+        "productIdentifierType": 2,
+        "productIdentifierValue": "4006381333931"
+      }
+    ],
+    "bytesHex": "16152400022c010d343030363338313333333933311818"
+  },
+  {
+    "label": "hepa_products_empty",
+    "kind": "attributes",
+    "cluster": 113,
+    "element": "ReplacementProductList",
+    "fixture": [],
+    "bytesHex": "1618"
+  }
+]
