@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -78,6 +79,17 @@ func (n *xmlNode) num(name string) (*uint32, error) {
 		return nil, fmt.Errorf("<%s %s=%q> is not numeric", n.tag(), name, v)
 	}
 	return u32(uint32(parsed)), nil
+}
+
+// asInt narrows a parsed XML number to int. The numbers that take this path
+// are revisions and choice counts; a value past the int32 range is not one a
+// data model states, and int is 32 bits wide on some platforms, so it is held
+// at the bound instead of wrapping.
+func asInt(v uint32) int {
+	if v > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int(v)
 }
 
 // maybeNum is matter.js xml.ts maybeNum: a non-numeric value (a "code"
@@ -242,7 +254,7 @@ func loadCluster(root *xmlNode, filename string) ([]*Cluster, error) {
 	if r, err := root.num("revision"); err != nil {
 		return nil, fmt.Errorf("%s: %w", filename, err)
 	} else if r != nil {
-		revision = int(*r)
+		revision = asInt(*r)
 	}
 	template := Cluster{Revision: revision}
 	if cl := root.child("classification"); cl != nil {
@@ -523,7 +535,7 @@ func loadDeviceType(root *xmlNode, filename string) (*DeviceType, error) {
 	if r, err := root.num("revision"); err != nil {
 		return nil, fmt.Errorf("%s: %w", filename, err)
 	} else if r != nil {
-		dt.Revision = int(*r)
+		dt.Revision = asInt(*r)
 	}
 	if cl := root.child("classification"); cl != nil {
 		dt.Classification = cl.str("class")
@@ -675,9 +687,9 @@ func withChoice(n *xmlNode, c *Conf) (*Conf, error) {
 	num := 1
 	switch {
 	case lo != nil:
-		num = int(*lo)
+		num = asInt(*lo)
 	case hi != nil:
-		num = int(*hi)
+		num = asInt(*hi)
 	}
 	more, err := n.boolean("more")
 	if err != nil {
@@ -776,7 +788,7 @@ func revisionOf(n *xmlNode) (*Conf, bool, error) {
 	if rev == nil {
 		return nil, false, errors.New("revision conformance without a revision")
 	}
-	return &Conf{Op: opRevision, Rev: int(*rev)}, true, nil
+	return &Conf{Op: opRevision, Rev: asInt(*rev)}, true, nil
 }
 
 func confName(n *xmlNode) (string, error) {

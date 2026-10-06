@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3716,
+  "entry_points": 3717,
   "entry_packages": [
     ".",
     "bootid",
@@ -71,9 +71,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 4265,
+    "total_exported": 4266,
     "reachable": 2490,
-    "whitelisted": 1770,
+    "whitelisted": 1771,
     "unreachable": 5
   },
   "by_package": [
@@ -8268,6 +8268,13 @@
     },
     {
       "package": "internal/chipdm",
+      "identifier": "TestAsIntIsBounded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chipdm/chipxml_test.go",
+      "line": 526
+    },
+    {
+      "package": "internal/chipdm",
       "identifier": "TestChipDataModelCrosscheck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/crosscheck_test.go",
@@ -8334,21 +8341,21 @@
       "identifier": "TestLoadFilesClusters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 242
+      "line": 243
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestLoadFilesDeviceTypesAndGlobals",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 353
+      "line": 354
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestLoadFilesErrors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 383
+      "line": 384
     },
     {
       "package": "internal/chipdm",
@@ -8369,7 +8376,7 @@
       "identifier": "TestLoaderUnknownDirectory",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 492
+      "line": 493
     },
     {
       "package": "internal/chipdm",
@@ -8432,14 +8439,14 @@
       "identifier": "TestStatusName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 500
+      "line": 501
     },
     {
       "package": "internal/chipdm",
       "identifier": "TestTranslateValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chipdm/chipxml_test.go",
-      "line": 507
+      "line": 508
     },
     {
       "package": "internal/chiptool",

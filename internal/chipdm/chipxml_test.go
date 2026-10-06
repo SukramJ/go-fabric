@@ -4,6 +4,7 @@
 package chipdm
 
 import (
+	"math"
 	"strings"
 	"testing"
 )
@@ -517,5 +518,17 @@ func TestTranslateValue(t *testing.T) {
 		if got := *translateValue(in); got != want {
 			t.Errorf("translateValue(%q) = %+v, want %+v", in, got, want)
 		}
+	}
+}
+
+// asInt holds a number past the int32 range at the bound rather than letting
+// it wrap on a platform whose int is 32 bits wide.
+func TestAsIntIsBounded(t *testing.T) {
+	t.Parallel()
+	if got := asInt(7); got != 7 {
+		t.Errorf("asInt(7) = %d", got)
+	}
+	if got := asInt(math.MaxUint32); got != math.MaxInt32 {
+		t.Errorf("asInt(MaxUint32) = %d, want %d", got, math.MaxInt32)
 	}
 }
