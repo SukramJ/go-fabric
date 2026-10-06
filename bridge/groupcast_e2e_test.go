@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"context"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -246,5 +247,54 @@ func TestGroupcastChangeReachesASubscriber(t *testing.T) {
 	}
 	if !slices.Contains(dirty, 0x0000) || !slices.Contains(dirty, 0x0003) {
 		t.Fatalf("dirty Groupcast attributes %v, want Membership and UsedMcastAddrCount", dirty)
+	}
+}
+
+// TestGroupcastTestingDuplicateCopiesKeepOrder delivers each group message
+// twice at once, as a controller that sends on two interfaces does (chip
+// SessionManager under CHIP_SYSTEM_CONFIG_MULTICAST_HOMING). The second copy
+// is a replay — MessageReplay, as matter.js and chip report it — and it is
+// reported after the first copy's Success, never before: TC-ACE-1.6 reads the
+// events in that order (steps 20a, 20g).
+func TestGroupcastTestingDuplicateCopiesKeepOrder(t *testing.T) {
+	t.Parallel()
+	gh := newGroupcastHarness(t, 1)
+	gh.bridge.startGroupNetworking(&fakeMulticastMember{joined: map[string]bool{}})
+	lamps := gh.lampIDs()
+	key := bytes.Repeat([]byte{0x3C}, 16)
+	if st := gh.gcStatus(t, 0x00, joinGroupFields(0x0303, []uint16{lamps[0]}, 0x0044, key, bptr(true), nil, u8ptr(groups.PolicyIanaAddr))); st != im.StatusSuccess {
+		t.Fatalf("JoinGroup: %v", st)
+	}
+	if st := gh.gcStatus(t, 0x05, func(enc *tlv.Encoder) { enc.PutUint(tlv.ContextTag(0), 1) }); st != im.StatusSuccess {
+		t.Fatalf("GroupcastTesting: %v", st)
+	}
+	sender := newGroupSender(t, key)
+	toggle := groupInvoke(t, 0x0006, 0x02, nil)
+	const rounds = 40
+	mark := gh.lastEventNumber()
+	for range rounds {
+		datagram := sender.seal(0x0303, im.OpcodeInvokeRequest, toggle)
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		for range 2 {
+			wg.Go(func() {
+				<-start
+				gh.deliver(datagram)
+			})
+		}
+		close(start)
+		wg.Wait()
+	}
+	evs := gh.groupcastTestingEvents(mark + 1)
+	if len(evs) != 2*rounds {
+		t.Fatalf("GroupcastTesting events = %d, want %d", len(evs), 2*rounds)
+	}
+	for i := 0; i < len(evs); i += 2 {
+		if evs[i].GroupcastTestResult != groups.TestResultSuccess || evs[i+1].GroupcastTestResult != groups.TestResultMessageReplay {
+			t.Fatalf("round %d: events %v then %v, want Success then MessageReplay", i/2, evs[i].GroupcastTestResult, evs[i+1].GroupcastTestResult)
+		}
+	}
+	if got := gh.counts(); got[lamps[0]] != rounds {
+		t.Fatalf("the lamp ran the Toggle %d times, want %d (once per message)", got[lamps[0]], rounds)
 	}
 }

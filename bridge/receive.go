@@ -95,6 +95,24 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src *net.UDPAddr) err
 	// type the same way). maybeUnmaskPrivacy below therefore only ever
 	// sees unicast frames, where it drops one carrying the P bit.
 	if isGroupDatagram(buf) {
+		// One group datagram at a time, in arrival order. The listener
+		// hands every datagram its own goroutine; a controller that sends
+		// a group message on each of its interfaces (chip SessionManager
+		// under CHIP_SYSTEM_CONFIG_MULTICAST_HOMING) delivers two copies
+		// microseconds apart, and run concurrently the copy that lost the
+		// replay check reported MessageReplay while the winner was still
+		// dispatching — the GroupcastTesting events came out as
+		// MessageReplay before Success (TC-ACE-1.6 steps 20a / 20g). The
+		// second copy IS a replay and is reported as one, as matter.js
+		// (ExchangeManager #receiveMessage, DuplicateMessageError →
+		// MessageReplay) and chip (SessionManager VerifyOrTrustFirstGroup)
+		// report it; what they also do is finish the first copy before
+		// looking at the second — matter.js on its single event loop, chip
+		// on its single device loop. Group messages get no response and no
+		// MRP traffic, so holding the line here cannot stall an exchange
+		// the way serialising unicast receive did (transport/udp Serve).
+		b.groupRx.Lock()
+		defer b.groupRx.Unlock()
 		return b.dispatchGroupMessage(ctx, buf, src)
 	}
 	// Privacy unmask: when Security Flags carries the P bit, the

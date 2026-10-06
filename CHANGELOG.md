@@ -489,6 +489,16 @@ pseudo-version of `main`.
   duplicate-question suppression, as matter.js `MdnsServer` does
   (`#registerResponderNames`, `#handleMessage`, `sendable`). The OS host
   name (`Zeroconf.HostName`, macOS) stays the OS responder's.
+- **Group messages are received one at a time.** Each datagram runs on its
+  own goroutine, so a controller that sends a group message on several
+  interfaces (chip's multicast homing) had both copies decoded at once; the
+  copy that lost the replay check reported MessageReplay before the other
+  copy's Success, and the GroupcastTesting event queue came out reordered
+  (TC-ACE-1.6, intermittently on a host with two IPv6 interfaces). The
+  bridge now finishes one group datagram — decode, replay check, dispatch,
+  outcome event — before the next, as matter.js and chip do on their single
+  loops. The second copy is still a replay and still reported as one.
+
 - **Certification:** TC-LVL-2.3, TC-LVL-3.1, TC-LVL-4.1, TC-LVL-5.1,
   TC-LVL-6.1, TC-CC-2.2, TC-CC-6.2 and TC-CC-6.3 run and pass — they were
   excluded as class (a) gaps because no level or colour temperature was
