@@ -536,6 +536,14 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- A reliable message is registered for retransmission before it is sent,
+  not after: an acknowledgement the peer sent at once could be handled
+  before the message was registered, was lost, and the message went out
+  again as a spurious retransmission — in a chunked read that ended with a
+  chunk carrying a stale piggybacked acknowledgement, which chip-tool drops,
+  and a stalled read (TC-BINFO-2.1, the PICS generation's wildcard read,
+  intermittently).
+
 - **A session's messages are handled in the order they arrive.** The UDP
   listener gave every datagram its own goroutine, so two messages of one
   session could run in either order: a Read sent right behind an Invoke

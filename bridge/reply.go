@@ -208,11 +208,18 @@ func (b *Bridge) sendReplyOpts(
 		respHdr.MessageCounter = counter
 		hdrBytes := respHdr.Marshal()
 		datagram := append(hdrBytes, body...) //nolint:gocritic // single-allocation join
-		if err := listener.Send(src, datagram); err != nil {
-			return fmt.Errorf("%w: %w", ErrReplySend, err)
-		}
+		// Tracked before it is sent: the peer's ack can arrive (and be
+		// handled on another goroutine) before Send returns, and an ack
+		// for an untracked message is lost — the message then goes out
+		// again as a spurious retransmission.
 		if needsAck {
 			tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, time.Now())
+		}
+		if err := listener.Send(src, datagram); err != nil {
+			if needsAck {
+				tracker.Untrack(requestHdr.SessionID, counter)
+			}
+			return fmt.Errorf("%w: %w", ErrReplySend, err)
 		}
 		return nil
 	}
@@ -257,11 +264,15 @@ func (b *Bridge) sendReplyOpts(
 	if err := applyOutboundPrivacy(sess, respHdr.SessionID, datagram); err != nil {
 		return fmt.Errorf("%w: %w", ErrReplyEncrypt, err)
 	}
-	if err := listener.Send(src, datagram); err != nil {
-		return fmt.Errorf("%w: %w", ErrReplySend, err)
-	}
+	// Tracked before it is sent, for the reason above.
 	if needsAck {
 		tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, time.Now())
+	}
+	if err := listener.Send(src, datagram); err != nil {
+		if needsAck {
+			tracker.Untrack(requestHdr.SessionID, counter)
+		}
+		return fmt.Errorf("%w: %w", ErrReplySend, err)
 	}
 	return nil
 }

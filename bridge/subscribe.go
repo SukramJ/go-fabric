@@ -898,11 +898,19 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	// ExchangeManager.ts:400-405) before routing reports through the
 	// session's current channel (ServerSubscription.ts:823).
 	dest := b.currentPeerAddr(target.sessionID, target.src)
+	// Tracked before it is sent, so an ack handled before Send returns is
+	// not lost (bridge/reply.go sendReplyReliable).
+	track := tracker != nil && respProto.NeedsAck
+	if track {
+		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, time.Now())
+	}
 	if err := listener.Send(dest, datagram); err != nil {
+		if track {
+			tracker.Untrack(target.sessionID, counter)
+		}
 		return 0, err
 	}
-	if tracker != nil && respProto.NeedsAck {
-		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, time.Now())
+	if track {
 		return counter, nil
 	}
 	return 0, nil

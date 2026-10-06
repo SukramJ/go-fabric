@@ -487,27 +487,6 @@ family, and deleting the entry.
   ConfigStatus.Operational. **Fix:** port the Mode / ConfigStatus sync and
   the maintenance refusal, then declare the PICS code 1.
 
-- **TC-IDM-1.2 step 7 is intermittent (about one run in four on this
-  module's dev host, at the baseline 1cd22ed as on this branch) — requests of
-  one session are not handled in arrival order.** The case sends ArmFailSafe
-  (Breadcrumb 2) with SuppressResponse and, 6 ms later on the same session, a
-  Read of Breadcrumb; the read can be handled first and report the old value
-  ("Breadcrumb was not correctly set on ArmFailSafe with response
-  suppressed"). The UDP listener runs every datagram on its own goroutine
-  (`transport/udp/listener.go` Serve, so a handler waiting for a
-  StatusResponse cannot stall the receive loop); nothing restores the
-  arrival order afterwards. A per-session lock taken once the request is
-  decrypted was tried and is not enough: in a failing run the invoke's
-  goroutine reached the Interaction Model 36 ms after the read's, so the
-  order is already lost before decryption. matter.js handles a session's
-  messages in arrival order on its event loop, chip on its device loop.
-  **Fix:** carry the arrival order from the listener (a sequence number
-  assigned on the read goroutine before the hand-off) and admit a session's
-  interaction requests in that order, releasing the turn when a handler
-  starts waiting for its peer (`awaitChunkStatusResponse`, the subscription
-  priming loop). Family: IDM. The case is not excluded: it passes in most
-  runs, and a failing run fails the family loudly rather than hiding.
-
 The group-messaging cases are not findings: they are skipped on a host
 whose LAN interface has no IPv6, with the command that enables it, and run
 wherever it has. TC-SC-4.1 and TC-SC-4.3 were wrongly listed here as such an

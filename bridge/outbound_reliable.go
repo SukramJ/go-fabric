@@ -152,6 +152,14 @@ func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID ui
 // an ack`). Mirrors matter.js's per-exchange cleanup in
 // `MessageExchange.ts::close` which discards every retx-pending
 // message of the exchange when the receiver advances state.
+// Untrack drops a message Track registered whose send then failed: there is
+// nothing on the wire to retransmit or to wait for.
+func (t *outboundReliableTracker) Untrack(sessionID uint16, counter uint32) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.pending, outboundKey{sessionID, counter})
+}
+
 func (t *outboundReliableTracker) AbandonExchange(exchangeID uint16) int {
 	t.mu.Lock()
 	cleared := 0
