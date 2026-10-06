@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3586,
+  "entry_points": 3588,
   "entry_packages": [
     ".",
     "bootid",
@@ -58,9 +58,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 3643,
+    "total_exported": 3644,
     "reachable": 2003,
-    "whitelisted": 1635,
+    "whitelisted": 1636,
     "unreachable": 5
   },
   "by_package": [
@@ -107,7 +107,7 @@
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 99,
+      "line": 104,
       "kind": "func"
     },
     {
@@ -5886,6 +5886,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
       "line": 292
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestBridgedDevicesServeTheNodesVendorName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_test.go",
+      "line": 271
     },
     {
       "package": "examples/reference-bridge",
