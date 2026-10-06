@@ -414,6 +414,11 @@ pseudo-version of `main`.
   must re-pin.** `make generate-matter-schema` also runs on a node without
   TypeScript support, transpiling the extractor with the matter.js checkout's
   esbuild.
+- `cluster/pump` and `cluster/modebase` are built on their generated
+  definitions; their API is unchanged. `pump.Feature`, `OperationMode`,
+  `ControlMode` and `Status` are now aliases of the generated types (same
+  values, same underlying types), and the servers' lists, globals, write
+  checks and privileges come from the definition.
 
 ### Fixed
 
