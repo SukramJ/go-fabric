@@ -1,5 +1,8 @@
-# Build output and local test artefacts.
+# Build output and local test artefacts. The reference daemon builds into
+# bin/ (make chiptool-build); a plain `go build ./examples/reference-bridge`
+# drops it at the root, which is never meant to be committed.
 /bin/
+/reference-bridge
 *.test
 *.out
 
