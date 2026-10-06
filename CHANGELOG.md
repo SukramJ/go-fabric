@@ -536,6 +536,10 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- The reference daemon's robot vacuum emits OperationCompletion when a
+  cleaning run ends; the RoboticVacuumCleaner device type mandates the event
+  and the RvcOperationalState server already listed it.
+
 - A reliable message is registered for retransmission before it is sent,
   not after: an acknowledgement the peer sent at once could be handled
   before the message was registered, was lost, and the message went out

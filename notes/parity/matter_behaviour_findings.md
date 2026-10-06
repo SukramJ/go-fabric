@@ -369,6 +369,24 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   Family: DGGEN (2.1 waits for the hour to move within one run, so it does
   not see this).
 
+- **F-COMP-1 — a bridged endpoint cannot carry parts, so the SmokeCoAlarm
+  has no PowerSource component endpoint.** The SmokeCoAlarm device type
+  (0x0076) requires a PowerSource device-type component (min 1). matter.js
+  composes it as a child endpoint: its example
+  (`examples/device-smoke-co-alarm/src/SmokeCOAlarmDeviceNode.ts` at the pin)
+  adds `parts: [new Endpoint(PowerSourceEndpoint.with(PowerSourceServer…))]`
+  to the alarm endpoint, so the PowerSource device type (0x0011) sits on its
+  own endpoint in the alarm's PartsList. go-fabric's endpoint assembler builds
+  one endpoint per `endpoint.Spec` with no children; the reference daemon's
+  alarm (endpoint 9) carries the PowerSource *cluster* on the alarm endpoint
+  itself (`Spec.PowerSource`) and no PowerSource device type anywhere. No
+  CHIP case of the families run here fails on it today; the device-type
+  validator of PR #27 reports it as `device:PowerSource` at Start. **Fix:**
+  child parts for a bridged endpoint in `endpoint.Spec` / the assembler
+  (their own stable numbers, the parent's PartsList and the aggregator's
+  full-family PartsList, a Descriptor per part), then the alarm's battery as
+  a PowerSource part. Families: SMOKECO, DESC, IDM (TC_DeviceConformance).
+
 ## Application cluster servers — open items
 
 Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
@@ -486,6 +504,19 @@ family, and deleting the entry.
   true) refuses movement commands in maintenance mode and syncs
   ConfigStatus.Operational. **Fix:** port the Mode / ConfigStatus sync and
   the maintenance refusal, then declare the PICS code 1.
+
+- **TC-FAN-3.1 is intermittent (failed once in the full family run of
+  2026-10-06, then passed 3 of 3).** Step 6 writes FanMode Off → Low → Medium
+  → High and counts the reports on a subscription to FanMode alone against
+  the one to PercentSetting alone; in the failing run the FanMode
+  subscription never reported Low (2 FanMode reports against 3
+  PercentSetting reports), although the attribute cache — fed by another
+  subscription — saw it. The first write's own attribute change was lost to
+  one of three concurrent single-attribute subscriptions; the write marks it
+  through `reportWrittenAttributes` and the fan's ChangeNotifier, so the loss
+  is between marking and the report engine. Not yet reproduced; the case is
+  not excluded. **Next step:** run TC-FAN-3.1 in a loop with debug logging of
+  the subscription engine's dirty set per subscription. Family: FAN.
 
 The group-messaging cases are not findings: they are skipped on a host
 whose LAN interface has no IPv6, with the command that enables it, and run
