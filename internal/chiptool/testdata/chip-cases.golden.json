@@ -25,6 +25,11 @@
       "steps": 13,
       "stepsSkipped": 0
     },
+    "ACE/1.6": {
+      "tests": 1,
+      "steps": 53,
+      "stepsSkipped": 26
+    },
     "ACE/2.1": {
       "tests": 1,
       "steps": 12,
@@ -1678,7 +1683,6 @@
     "WNCV/7.1.Simulated": "WNCV.C"
   },
   "hostSkipped": {
-    "ACE/1.6": "not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0`",
     "BRBINFO/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "CADMIN/1.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "CADMIN/1.12": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",

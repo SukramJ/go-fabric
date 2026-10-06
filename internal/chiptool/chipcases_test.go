@@ -303,6 +303,14 @@ func writeGolden(t *testing.T, h *harness) {
 	if g.HostSkipped == nil {
 		g.HostSkipped = map[string]string{}
 	}
+	// A case this host cannot run keeps the counts a capable host (CI)
+	// recorded: host-skipping it here says nothing about what it executes.
+	kept := map[string]caseCounts{}
+	for id := range envUpdates {
+		if c, ok := g.Cases[id]; ok {
+			kept[id] = c
+		}
+	}
 	for fam, names := range familyUpdates {
 		for id := range g.HostSkipped {
 			if strings.HasPrefix(id, fam+"/") {
@@ -325,6 +333,10 @@ func writeGolden(t *testing.T, h *harness) {
 		g.NotApplicable[id] = expr
 	}
 	for id, why := range envUpdates {
+		if c, ok := kept[id]; ok {
+			g.Cases[id] = c
+			continue
+		}
 		g.HostSkipped[id] = why
 	}
 	for id, c := range goldenUpdates {

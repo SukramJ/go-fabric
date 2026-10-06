@@ -97,7 +97,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 
 | Family | Cases | Passed | of which with a recorded gap | (a) defect | (b) not supported | (c) harness | (d) out of scope |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ACE | 10 | 9 | 0 | 0 | 0 | 1 | 0 |
+| ACE | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
 | ACL | 11 | 10 | 0 | 0 | 1 | 0 | 0 |
 | BINFO | 4 | 2 | 0 | 0 | 2 | 0 | 0 |
 | BRBINFO | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
@@ -142,13 +142,12 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TSTAT | 6 | 3 | 0 | 0 | 2 | 1 | 0 |
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **412** | **213** | **0** | **8** | **79** | **107** | **5** |
+| **all** | **412** | **214** | **0** | **8** | **79** | **106** | **5** |
 
 ### Cases not run
 
 | Case | Class | Reason |
 | --- | --- | --- |
-| ACE/1.6 | (c) harness | not run on the host that took the counts: the case sends Matter group messages (IPv6 multicast) and the host's interfaces have no IPv6; enable with `sudo sysctl -w net.ipv6.conf.ens18.disable_ipv6=0` |
 | ACL/2.11 | (b) not supported | not applicable: the case's PICS `ACL.S.F01` is false for the reference DUT |
 | BINFO/3.1 | (b) not supported | not applicable: the case's PICS `BINFO.S.A0014` is false for the reference DUT |
 | BINFO/3.2 | (b) not supported | not applicable: the case's PICS `BINFO.S & BINFO.S.M.DeviceConfigurationChange` is false for the reference DUT |
