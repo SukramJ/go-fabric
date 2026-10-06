@@ -478,20 +478,37 @@ table, and this list, when the snapshot is corrected.
   support MfgCode != null"). go-fabric serves no Descriptor TagList, so
   nothing depends on it; it matters once TagList is served (TC-DESC-2.2).
 
-A gap the cross-check reports rather than closes: **device-type element
-requirements and conditions are not in the snapshot.**
-`script/extract-from-matter-js.ts` keeps a device type's cluster
-requirements and skips the feature / attribute / command overrides nested in
-them, and the conditions. CHIP's model states 153 such overrides and 46
-conditions, and `device_conformance_tests.py` enforces the overrides
-(`check_feature_overrides`, `check_attribute_overrides`,
-`check_command_overrides`: TC_DeviceConformance, IDM family) — On/Off
-Light's On/Off LT feature, Extended Color Light's XY and CT features and
-RemainingTime, and so on. go-fabric's endpoint composition states them by
-hand and nothing holds it to either model. **Fix:** emit the nested
-requirements and the conditions at the next extraction and compare them as
-matter.js does (`compare.ts #requirements` recurses into a requirement's
-children).
+### Device type validation — open departures
+
+What `endpoint.ValidateDeviceTypes`
+([ADR 0016](../../docs/adr/0016-device-type-validation.md)) finds in what
+the module builds itself (`endpoint/devicetype_module_test.go` pins each).
+
+- **A bridged SmokeCoAlarm cannot have its PowerSource component.**
+  SmokeCoAlarm requires a PowerSource device type endpoint below it (M,
+  min 1; `smoke-co-alarm.element.ts`). A bridged endpoint has no parts of
+  its own — the assembler places every bridged endpoint flat under the
+  Aggregator, and `attachPowerSource` puts the PowerSource *cluster* on the
+  endpoint, which BridgedNode allows but which is no component endpoint.
+  matter.js reports `instanceCount device:PowerSource` for it (warn); the
+  certification harness does not judge component device types. **Fix:**
+  composed bridged endpoints (a `Spec` with parts and a PowerSource child
+  of device type 0x0011), then drop the pin.
+- **ColorControl serves CT only, so ExtendedColorLight is not servable.**
+  `cluster/light.ColorControlServer` advertises CT; ExtendedColorLight
+  requires XY (M) besides CT (`extended-color-light.element.ts`), which
+  `check_feature_overrides` enforces. The package doc no longer claims the
+  device type. **Fix:** serve XY (CurrentX / CurrentY, the XY commands and
+  their transitions) as matter.js ColorControlServer does.
+- **PICS slices mark OperationCompletion absent where the device types
+  make it mandatory.** `internal/chiptool/testdata/pics/ep12.txt` and
+  `ep13.txt` carry `OPSTATE.S.E01=0` / `RVCOPSTATE.S.E01=0` although
+  LaundryWasher and RoboticVacuumCleaner require the event and the endpoints
+  list it: `gen_pics.py` derives event codes from the cluster's own
+  conformance (`mandatory_events_by_cluster`), not from the device type's
+  override, so cases gated on E01 are skipped. Every other device-type
+  element requirement of the reference daemon's endpoints agrees with its
+  slices. For the chip-tool harness owner.
 
 The IPv6-dependent cases (TC-SC-4.1, TC-SC-4.3 and the group-messaging
 cases) are not findings: they are skipped on a host whose LAN interface has
