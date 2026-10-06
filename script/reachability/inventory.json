@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3591,
+  "entry_points": 3592,
   "entry_packages": [
     ".",
     "bootid",
@@ -58,9 +58,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 3645,
+    "total_exported": 3646,
     "reachable": 2004,
-    "whitelisted": 1636,
+    "whitelisted": 1637,
     "unreachable": 5
   },
   "by_package": [
@@ -7986,6 +7986,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
       "line": 28
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestPrimaryHostInterfaces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/zeroconf_internal_test.go",
+      "line": 650
     },
     {
       "package": "mdns",
