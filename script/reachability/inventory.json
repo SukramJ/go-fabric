@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3592,
+  "entry_points": 3639,
   "entry_packages": [
     ".",
     "bootid",
@@ -22,6 +22,7 @@
     "cluster/opstate",
     "cluster/pump",
     "cluster/thermo",
+    "cluster/transition",
     "cluster/valve",
     "cluster/wire",
     "commissioning",
@@ -58,9 +59,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 3646,
-    "reachable": 2004,
-    "whitelisted": 1637,
+    "total_exported": 3675,
+    "reachable": 2029,
+    "whitelisted": 1641,
     "unreachable": 5
   },
   "by_package": [
@@ -1276,6 +1277,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCommandLeavesSelfReportedAttributesToTheServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/transition_reporting_test.go",
+      "line": 81
+    },
+    {
+      "package": "bridge",
       "identifier": "TestCommissioningCompleteEndsTheWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/commissioned_window_test.go",
@@ -1594,7 +1602,7 @@
       "identifier": "TestDecodeMoveToColorTemperatureFields_InRangeStillDecodes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_range_test.go",
-      "line": 75
+      "line": 77
     },
     {
       "package": "bridge",
@@ -2788,6 +2796,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestFabriclessPASESessionReadsNoFabricSensitiveData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_fabricless_read_test.go",
+      "line": 36
+    },
+    {
+      "package": "bridge",
       "identifier": "TestFanControlOverTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
@@ -3050,7 +3065,7 @@
       "identifier": "TestInvokeRequestWithOverWideFieldCarriesConstraintErrorStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_range_test.go",
-      "line": 96
+      "line": 100
     },
     {
       "package": "bridge",
@@ -3863,6 +3878,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/application_clusters_wire_test.go",
       "line": 488
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestQuiescedOnRemovalAndStop",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/transition_reporting_test.go",
+      "line": 122
     },
     {
       "package": "bridge",
@@ -4849,28 +4871,28 @@
       "identifier": "MoveRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 199
+      "line": 237
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "MoveToLevelRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 197
+      "line": 235
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "StepRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 201
+      "line": 239
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "StopRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 203
+      "line": 241
     },
     {
       "package": "cluster/measurement",
@@ -5921,6 +5943,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
       "line": 268
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCeilingLightRampsThroughTheEngine",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/lighting_test.go",
+      "line": 23
     },
     {
       "package": "examples/reference-bridge",
