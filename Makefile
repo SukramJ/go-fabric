@@ -238,7 +238,7 @@ tidy: ## tidy go.mod / go.sum
 	$(GO) mod tidy
 
 .PHONY: generate-matter-schema
-generate-matter-schema: ## regenerate parity/schema.json + schema/ from a matter.js checkout
+generate-matter-schema: ## regenerate parity/schema.json, schema/ and the generated cluster definitions from a matter.js checkout
 	# The extractor runs inside the matter.js tree so its bare @matter/model
 	# import resolves; the copy is removed again even when node fails.
 	cp script/extract-from-matter-js.ts $(MATTERJS_DIR)/.gofabric-extract.mts
@@ -258,6 +258,9 @@ generate-matter-schema: ## regenerate parity/schema.json + schema/ from a matter
 	mv parity/schema.json.tmp parity/schema.json
 	$(GO) run ./script/generate_matter_schema.go
 	$(GOFUMPT) -w schema/
+	@# The cluster definitions under cluster/spec/ (ADR 0013) are generated
+	@# from the same snapshot; script/clustergen/clusters.go lists which.
+	$(GO) run ./script/clustergen
 
 .PHONY: ci
 ci: build vet test lint cover-check ## everything the pipeline runs

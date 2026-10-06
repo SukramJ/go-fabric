@@ -142,4 +142,19 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/transport/message", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/transport/mrp", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/transport/udp", min: 93},
+	// ADR 0013: the cluster-definition runtime, its test support, the
+	// generator, the first server built on it, and the committed generated
+	// definitions. Generated code is measured like any other (schema/ is
+	// too); each generated package's generated test round-trips every codec
+	// and holds the definition against the snapshot, which covers it fully.
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec", min: 97},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/spectest", min: 95},
+	{pkg: "github.com/SukramJ/go-fabric/script/clustergen", min: 95},
 }

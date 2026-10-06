@@ -279,6 +279,20 @@ pseudo-version of `main`.
     `ClearServerSubscriptions`; `*store.Store` satisfies
     `bridge.SubscriptionStore`.
   - `im`: `EventLog.DropBuffered`.
+- **Cluster definitions generated from the matter.js model** (ADR 0013).
+  `script/clustergen` writes one package per cluster under `cluster/spec/`
+  (`pumpconfigurationandcontrol`, `laundrywashermode`, `rvcrunmode`,
+  `rvccleanmode`, `dishwashermode`, `hepafiltermonitoring`,
+  `activatedcarbonfiltermonitoring`): ids, typed enums and bitmaps, structs
+  and command / event payloads with TLV codecs, and a `Definition`. The
+  runtime `cluster/spec` derives from a definition plus the host's features
+  and optional elements what matter.js derives from its model —
+  `spec.New` / `spec.Instance` (attribute, accepted / generated command and
+  event lists, FeatureMap, ClusterRevision, privileges, event priorities,
+  enum membership), `spec.CheckFeatures`, `Instance.ValidateWrite`,
+  `Conformance.Applicability`, the codec helpers, `spec.Register` /
+  `spec.Lookup` / `spec.DecodeRequest`. `cluster/spec/spectest` holds the
+  parity assertions (`CheckDefinition`, `CheckServer`, the round trips).
 
 ### Changed
 

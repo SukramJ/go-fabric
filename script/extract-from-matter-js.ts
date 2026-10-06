@@ -347,6 +347,10 @@ function typeOut(m: any): any {
     }
     const entry = m.listEntry;
     if (entry !== undefined) o.entry = valueOut(entry, "member");
+    // An anonymous struct ("struct" stated inline, as the AttributeStatus
+    // entries of Thermostat's AtomicResponse) defines its fields in place;
+    // a named one is described once, under the datatypes.
+    if (type === "struct" && meta === "object") o.fields = fieldsOut(m);
     return o;
 }
 

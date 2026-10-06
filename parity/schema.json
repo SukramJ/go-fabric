@@ -81154,7 +81154,36 @@
                 "entry": {
                   "type": "struct",
                   "metatype": "object",
-                  "primitive": "struct"
+                  "primitive": "struct",
+                  "fields": [
+                    {
+                      "id": 0,
+                      "name": "AttributeId",
+                      "type": "attrib-id",
+                      "metatype": "integer",
+                      "primitive": "uint32",
+                      "conformance": {
+                        "text": "M",
+                        "ast": {
+                          "type": "M"
+                        }
+                      }
+                    },
+                    {
+                      "id": 1,
+                      "name": "StatusCode",
+                      "type": "status",
+                      "metatype": "enum",
+                      "primitive": "uint8",
+                      "scope": "global",
+                      "conformance": {
+                        "text": "M",
+                        "ast": {
+                          "type": "M"
+                        }
+                      }
+                    }
+                  ]
                 },
                 "conformance": {
                   "text": "M",

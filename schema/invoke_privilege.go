@@ -19,9 +19,11 @@ const (
 // packages/protocol/src/action/server/CommandInvokeResponse.ts authorizes
 // with limits.writeLevel before invoking).
 //
-// Hand-written like fabricScopedInvokePaths: the extracted snapshot does not
-// carry command access. TestInvokePrivilegeMatchesMatterJS holds the table
-// against the element files named in each row.
+// Hand-written like fabricScopedInvokePaths, from before the snapshot carried
+// command access; a server built on a generated definition (ADR 0013) answers
+// MinInvokePrivilege from the definition itself.
+// TestInvokePrivilegeMatchesMatterJS holds the table against the element
+// files named in each row.
 var elevatedInvokePrivileges = map[uint32]map[uint32]uint8{
 	// Identify — Identify, TriggerEffect "M" (identify.element.ts)
 	0x0003: {0x00: PrivilegeManage, 0x40: PrivilegeManage},

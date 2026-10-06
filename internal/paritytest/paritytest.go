@@ -14,6 +14,7 @@ package paritytest
 import (
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 
 	matterparity "github.com/SukramJ/go-fabric/parity"
@@ -35,13 +36,46 @@ type Element struct {
 	Direction   string `json:"direction"`
 	Response    string `json:"response"`
 	Default     any    `json:"default"`
+	// Effective is the element as matter.js's operational model resolves
+	// it, inherited parts included (the snapshot's resolved layer).
+	Effective *Effective `json:"effective"`
+}
+
+// Effective is the resolved description of an element or a feature: the
+// parts of the snapshot's "effective" object the parity checks compare.
+type Effective struct {
+	Type        string          `json:"type"`
+	Metatype    string          `json:"metatype"`
+	Primitive   string          `json:"primitive"`
+	Conformance *Text           `json:"conformance"`
+	Access      *Access         `json:"access"`
+	Quality     map[string]bool `json:"quality"`
+	Direction   string          `json:"direction"`
+	Response    string          `json:"response"`
+	Priority    string          `json:"priority"`
+	Title       string          `json:"title"`
+}
+
+// Text is a resolved aspect's printed form.
+type Text struct {
+	Text string `json:"text"`
+}
+
+// Access is a resolved access aspect.
+type Access struct {
+	RW        string `json:"rw"`
+	ReadPriv  string `json:"readPriv"`
+	WritePriv string `json:"writePriv"`
+	Fabric    string `json:"fabric"`
+	Timed     bool   `json:"timed"`
 }
 
 // Feature is a FeatureMap bit of a cluster entry.
 type Feature struct {
-	Name        string `json:"name"`
-	Conformance string `json:"conformance"`
-	Bit         uint32 `json:"bit"`
+	Name        string     `json:"name"`
+	Conformance string     `json:"conformance"`
+	Bit         uint32     `json:"bit"`
+	Effective   *Effective `json:"effective"`
 }
 
 // Cluster is one cluster entry of the snapshot. The element lists hold
@@ -54,6 +88,8 @@ type Cluster struct {
 	Commands   []*Element `json:"commands"`
 	Events     []*Element `json:"events"`
 	Features   []Feature  `json:"features"`
+	// Base names the cluster this one derives from, empty for none.
+	Base string `json:"base"`
 }
 
 // Attribute returns the attribute named name, or fails tb.
@@ -88,20 +124,36 @@ func find(tb testing.TB, c *Cluster, kind string, list []*Element, name string) 
 // ClusterSnapshot returns the snapshot entry of cluster id, or fails tb.
 func ClusterSnapshot(tb testing.TB, id uint32) *Cluster {
 	tb.Helper()
-	var s struct {
-		Clusters []*Cluster `json:"clusters"`
+	// Each call decodes its own copy, so a test that changes what it was
+	// handed cannot change what the next one reads.
+	c := &Cluster{}
+	raw, ok := clusterIndex()[id]
+	if !ok || json.Unmarshal(raw, c) != nil {
+		tb.Fatalf("the matter.js schema snapshot has no cluster 0x%04X", id)
 	}
-	if err := json.Unmarshal(matterparity.SchemaJSON(), &s); err != nil {
-		tb.Fatalf("unmarshal schema snapshot: %v", err)
-	}
-	for _, c := range s.Clusters {
-		if c.ID == id {
-			return c
-		}
-	}
-	tb.Fatalf("the matter.js schema snapshot has no cluster 0x%04X", id)
-	return &Cluster{}
+	return c
 }
+
+// clusterIndex splits the snapshot into its cluster entries once: the
+// resolved layer makes the whole snapshot several megabytes, too much to
+// decode again for every check. A snapshot that does not parse yields an
+// empty index, and every lookup fails (package parity's own test names
+// the parse error).
+var clusterIndex = sync.OnceValue(func() map[uint32]json.RawMessage {
+	var s struct {
+		Clusters []json.RawMessage `json:"clusters"`
+	}
+	_ = json.Unmarshal(matterparity.SchemaJSON(), &s)
+	index := make(map[uint32]json.RawMessage, len(s.Clusters))
+	for _, raw := range s.Clusters {
+		var head struct {
+			ID uint32 `json:"id"`
+		}
+		_ = json.Unmarshal(raw, &head)
+		index[head.ID] = raw
+	}
+	return index
+})
 
 // Conformance decides whether a matter.js conformance expression makes an
 // element mandatory (required) or permitted (allowed), given which names
