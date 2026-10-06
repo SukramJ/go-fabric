@@ -473,6 +473,14 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- The Auxiliary access-control rule (a Group entry without targets does not
+  reach endpoint 0) follows the root AccessControl's advertised FeatureMap,
+  not only `Bridge.AttachAuxiliaryACL`: a host that mounted Groupcast —
+  which advertises the feature — without attaching the lister let such an
+  entry grant endpoint 0. It now fails closed, as matter.js
+  `AccessControlServer.#applyFabricAcl` derives the rule from the cluster's
+  own feature.
+
 - A group invoke whose command fields do not decode is reported per member
   endpoint the group may reach — GroupcastTesting Success with
   AccessAllowed true and the endpoint, the command failing there with the
