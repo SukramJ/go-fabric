@@ -233,7 +233,9 @@ overlap, and CCU wire knowledge never enters this module.
 
 The whole pipeline lives here: the extractor
 (`script/extract-from-matter-js.ts`), the snapshot it produces
-(`parity/schema.json`) and the generator (`script/generate_matter_schema.go`).
+(`parity/schema.json`) and the generators (`script/generate_matter_schema.go`
+for `schema/`, `script/clustergen` for the cluster definitions under
+`cluster/spec/`, [ADR 0013](./docs/adr/0013-generated-cluster-definitions.md)).
 
 ```sh
 cd ../matter.js/packages/model && npm run build   # once, per matter.js checkout
@@ -242,10 +244,13 @@ make generate-matter-schema                       # extract + generate + gofumpt
 ```
 
 `make generate-matter-schema` does both halves: it copies the extractor into
-the matter.js tree (so its bare `@matter/model` import resolves), runs it,
+the matter.js tree (so its bare `@matter/model` import resolves), runs it —
+transpiled by the checkout's esbuild when node cannot strip TypeScript types —
 removes the copy even on failure, then regenerates `schema/clusters.go`,
-`schema/devicetypes.go` and the `SchemaSnapshotSHA256` provenance constant.
-Override the checkout with `MATTERJS_DIR=…` if it is not at `../matter.js`.
+`schema/devicetypes.go`, the `SchemaSnapshotSHA256` provenance constant and
+the committed cluster definitions (`go run ./script/clustergen`; which
+clusters is `script/clustergen/clusters.go`). Override the checkout with
+`MATTERJS_DIR=…` if it is not at `../matter.js`.
 
 Refreshing the snapshot is a **review decision** — it changes what upstream
 says. Propagating it into Go is mechanical. Run the two consciously, not as
@@ -255,7 +260,9 @@ Then `go test ./schema/...`. `TestMatterSchemaSnapshotHashMatchesEmbedded`
 fails when the generation half was skipped, and
 `TestParityCodeMatchesGeneratedSchema` flags every cluster whose hand-coded
 revision constant has drifted from the new schema. Update those constants to
-match.
+match. `go test ./script/clustergen/...` fails when a committed cluster
+definition is stale, and generates and compiles every cluster of the new
+snapshot.
 
 A host application that pins its own copy of these bytes (the reference daemon
 does, to keep a schema change from arriving unnoticed in a dependency bump)

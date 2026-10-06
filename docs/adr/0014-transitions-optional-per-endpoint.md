@@ -1,4 +1,4 @@
-# ADR 0013 — Attribute transitions run in the module, optional per endpoint
+# ADR 0014 — Attribute transitions run in the module, optional per endpoint
 
 - **Status**: Accepted
 - **Date**: 2026-10-06

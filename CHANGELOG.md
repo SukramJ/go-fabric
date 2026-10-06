@@ -308,6 +308,29 @@ pseudo-version of `main`.
     `ClearServerSubscriptions`; `*store.Store` satisfies
     `bridge.SubscriptionStore`.
   - `im`: `EventLog.DropBuffered`.
+- **Cluster definitions generated from the matter.js model** (ADR 0013).
+  `script/clustergen` writes one package per cluster under `cluster/spec/`
+  (`pumpconfigurationandcontrol`, `laundrywashermode`, `rvcrunmode`,
+  `rvccleanmode`, `dishwashermode`, `hepafiltermonitoring`,
+  `activatedcarbonfiltermonitoring`): ids, typed enums and bitmaps, structs
+  and command / event payloads with TLV codecs, and a `Definition`. The
+  runtime `cluster/spec` derives from a definition plus the host's features
+  and optional elements what matter.js derives from its model —
+  `spec.New` / `spec.Instance` (attribute, accepted / generated command and
+  event lists, FeatureMap, ClusterRevision, privileges, event priorities,
+  enum membership), `spec.CheckFeatures`, `Instance.ValidateWrite`,
+  `Conformance.Applicability`, the codec helpers, `spec.Register` /
+  `spec.Lookup` / `spec.DecodeRequest`. `cluster/spec/spectest` holds the
+  parity assertions (`CheckDefinition`, `CheckServer`, the round trips).
+  The bridge decodes a generated cluster's request payloads through the
+  registry and encodes any `spec.Encodable` value or response.
+- **`cluster/filter`: HepaFilterMonitoring (0x0071) and
+  ActivatedCarbonFilterMonitoring (0x0072)** for the AirPurifier and
+  ExtractorHood device types — `NewHepaFilterMonitoring`,
+  `NewActivatedCarbonFilterMonitoring`, `Config`, `State`, `Resetter`,
+  `LastChangedTimeWriter`; all three features (Condition, Warning,
+  ReplacementProductList), InPlaceIndicator, the writable LastChangedTime and
+  ResetCondition. The first server built on a generated definition.
 
 ### Changed
 
@@ -428,6 +451,25 @@ pseudo-version of `main`.
   Only the latter fire the new terminated hook.
 - `sigma.Initiator` is safe for concurrent use and refuses further input after
   a failed Sigma2.
+- **The matter.js extract carries the resolved model** (`parity/schema.json`,
+  same matter.js commit `85cf664`, Matter 1.6.1). Every attribute, command,
+  event and feature gains an `effective` object read through matter.js's
+  operational model — type, metatype and primitive, conformance as matter.js's
+  AST, access, quality, constraint, default, command and event fields, the
+  response linkage, event priority, feature titles — with what a derived
+  cluster inherits from its base resolved; each cluster gains its `datatypes`
+  (enums with their values and conformance, bitmaps with their bits, structs
+  with their fields) and `base`, the snapshot a `globalDatatypes` list. Every
+  key the extract carried before is byte-identical in meaning and position.
+  `schema.SchemaSnapshotSHA256` changes: **a host pinning the snapshot's bytes
+  must re-pin.** `make generate-matter-schema` also runs on a node without
+  TypeScript support, transpiling the extractor with the matter.js checkout's
+  esbuild.
+- `cluster/pump` and `cluster/modebase` are built on their generated
+  definitions; their API is unchanged. `pump.Feature`, `OperationMode`,
+  `ControlMode` and `Status` are now aliases of the generated types (same
+  values, same underlying types), and the servers' lists, globals, write
+  checks and privileges come from the definition.
 
 ### Fixed
 

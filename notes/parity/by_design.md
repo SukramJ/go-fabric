@@ -354,7 +354,7 @@ matter.js LevelControlServer manages transitions host-side only when
 applies every level at once, and it explicitly sanctions handing the ramp to
 hardware that transitions natively (`LevelControlServer.ts` class doc,
 `createTransitions` override note). The module offers the same choice per
-endpoint ([ADR 0013](../../docs/adr/0013-transitions-optional-per-endpoint.md)):
+endpoint ([ADR 0014](../../docs/adr/0014-transitions-optional-per-endpoint.md)):
 
 - **Hand-off (default).** `levelcontrol.Server` forwards the eight commands to
   the host's `LevelSource`, TransitionTime and Rate included, and the device

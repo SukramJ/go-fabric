@@ -5,6 +5,7 @@ package bridge
 
 import (
 	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -117,6 +118,11 @@ func encodeApplianceValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 			_ = enc.EndContainer()
 		}
 		_ = enc.EndContainer()
+	case spec.Encodable:
+		// A value of a generated cluster definition (cluster/spec/...):
+		// a struct, a spec.List of structs or an event payload, which
+		// encodes itself as matter.js's TlvOfModel does.
+		x.EncodeTLV(enc, tag)
 	default:
 		return false
 	}
@@ -176,6 +182,9 @@ func encodeApplicationResponse(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 		enc.PutUint(tlv.ContextTag(0), uint64(x.Status))
 		enc.PutUTF8(tlv.ContextTag(1), x.StatusText)
 		_ = enc.EndContainer()
+	case spec.Encodable:
+		// A response payload of a generated cluster definition.
+		x.EncodeTLV(enc, tag)
 	default:
 		return false
 	}

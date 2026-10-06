@@ -18,7 +18,8 @@ an oversight to the next reader — including choices to *not* do something.
 | [0010](./0010-groupcast-and-auxiliary-acl.md) | Groupcast (Listener, PerGroup) and the AccessControl Auxiliary ACL on the root, on the ADR 0009 group state; no Sender | accepted |
 | [0011](./0011-certifiability-is-a-goal.md) | Certifiability is a goal, certification is not pursued; certification families are the yardstick, every exclusion is classified, PICS are honest, tests replace manual device testing | accepted |
 | [0012](./0012-scenesmanagement-server.md) | A real ScenesManagement server on the bridged lights, as matter.js builds it; RemainingCapacity bounded by the shared table as chip does | accepted |
-| [0013](./0013-transitions-optional-per-endpoint.md) | Attribute transitions run in the module (`cluster/transition`, matter.js `Transitions.ts`), optional per endpoint; a host whose device ramps natively keeps the hand-off path | accepted |
+| [0013](./0013-generated-cluster-definitions.md) | Cluster definitions generated from the matter.js model (one package per cluster under `cluster/spec/`), a small runtime that derives lists, privileges, write checks and codecs from them; servers keep only the host port and the rules | accepted |
+| [0014](./0014-transitions-optional-per-endpoint.md) | Attribute transitions run in the module (`cluster/transition`, matter.js `Transitions.ts`), optional per endpoint; a host whose device ramps natively keeps the hand-off path | accepted |
 
 ## Provenance
 
