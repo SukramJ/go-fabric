@@ -19,6 +19,10 @@
 //     core-package variant was a duplicate and was removed (see
 //     notes/parity/by_design.md, "Removed" table).
 //
+//   - transition/ — the attribute transition engine LevelControl and
+//     ColorControl run on where the device cannot ramp (matter.js
+//     behavior/Transitions.ts).
+//
 // All cluster implementations target Matter Core Specification 1.6.1
 // (the matter.js HEAD pin in parity/schema.json).
 // ClusterRevision constants in this package are authoritative; the

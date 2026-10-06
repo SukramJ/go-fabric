@@ -155,6 +155,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -912,6 +913,17 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 		}
 	}
 
+	// A server the new topology no longer carries stops whatever it runs
+	// on its own (a transition), as matter.js closes a removed endpoint's
+	// behaviors.
+	if prevTopology != nil {
+		keep := map[contract.ClusterQuiescer]bool{}
+		for _, q := range quiescers(topology) {
+			keep[q] = true
+		}
+		quiesceServers(prevTopology, keep)
+	}
+
 	// Reap subscriptions for endpoints that no longer exist in the new
 	// topology. Mirrors matter.js packages/node/src/node/ServerNode.ts
 	// / BridgedDeviceBasicInformation lifecycle where removing an endpoint
@@ -1425,7 +1437,45 @@ func (b *Bridge) Stop(ctx context.Context) error {
 		}
 	}
 
+	// A transition still running steps a device nobody can reach any
+	// more; stop it, as matter.js closes a behavior's transitions when the
+	// node goes offline (LevelControlServer / ColorControlServer
+	// [Symbol.asyncDispose]).
+	quiesceServers(b.Topology(), nil)
+
 	return nil
+}
+
+// quiesceServers calls [contract.ClusterQuiescer.MatterQuiesce] on every
+// server of topo that implements it, except the ones in keep — the
+// servers that stay in use.
+func quiesceServers(topo *endpoint.Topology, keep map[contract.ClusterQuiescer]bool) {
+	for _, q := range quiescers(topo) {
+		if !keep[q] {
+			q.MatterQuiesce()
+		}
+	}
+}
+
+// quiescers lists the servers of topo that implement
+// [contract.ClusterQuiescer] and can be told apart (a comparable dynamic
+// type — every pointer server).
+func quiescers(topo *endpoint.Topology) []contract.ClusterQuiescer {
+	if topo == nil {
+		return nil
+	}
+	var out []contract.ClusterQuiescer
+	for _, ep := range topo.Endpoints {
+		if ep == nil {
+			continue
+		}
+		for _, srv := range endpoint.ClusterServers(ep) {
+			if q, ok := srv.(contract.ClusterQuiescer); ok && reflect.TypeOf(q).Comparable() {
+				out = append(out, q)
+			}
+		}
+	}
+	return out
 }
 
 // Topology returns the currently assembled topology. Returns nil

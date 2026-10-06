@@ -125,3 +125,35 @@ func TestQuieterDefaultsToTheWallClock(t *testing.T) {
 		t.Fatal("the held report never went out")
 	}
 }
+
+// TestQuieterEmitNow is matter.js QuietObservable.emitNow, which a
+// transition calls when it ends: a held report goes out at once (and its
+// timer no longer fires), and with nothing held nothing is reported.
+func TestQuieterEmitNow(t *testing.T) {
+	t.Parallel()
+	clk := &fakeClock{now: time.Unix(1000, 0)}
+	reports := 0
+	q := &cluster.Quieter{Report: func() { reports++ }, Now: clk.Now, AfterFunc: clk.AfterFunc}
+
+	q.EmitNow()
+	if reports != 0 {
+		t.Fatalf("EmitNow with nothing held: %d reports", reports)
+	}
+	q.Changed(false, false) // first change: now
+	clk.advance(200 * time.Millisecond)
+	q.Changed(false, false) // held
+	q.EmitNow()
+	if reports != 2 {
+		t.Fatalf("EmitNow with a held change: %d reports, want 2", reports)
+	}
+	clk.fire(0)
+	q.EmitNow()
+	if reports != 2 {
+		t.Fatalf("the superseded timer or a second EmitNow reported: %d", reports)
+	}
+	clk.advance(300 * time.Millisecond)
+	q.Changed(false, false) // within a second of the EmitNow report: held
+	if reports != 2 {
+		t.Fatalf("EmitNow did not count as the last report: %d", reports)
+	}
+}

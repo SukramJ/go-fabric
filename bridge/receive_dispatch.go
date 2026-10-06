@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/contract"
+	endpointpkg "github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -703,9 +705,10 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 	topo := b.Topology()
 	for key, old := range before {
 		now := renderCluster(ctx, d, key)
+		selfReported := selfReportedAttributes(topo, key)
 		bumped := false
 		for attr, v := range now {
-			if attr >= 0xFFF8 {
+			if attr >= 0xFFF8 || selfReported[attr] {
 				continue
 			}
 			if prev, ok := old[attr]; ok && prev == v {
@@ -723,6 +726,37 @@ func (b *Bridge) reportInvokeChanges(ctx context.Context, d im.Dispatcher, befor
 			})
 		}
 	}
+}
+
+// selfReportedAttributes lists the attributes the invoked cluster's server
+// reports by itself ([contract.SelfReportedAttributeLister]): a quieter
+// attribute a transition moves, or RemainingTime. Their reports follow
+// the server's own rules, as matter.js reports a quieter property only
+// when its QuietEvent emits, so the before/after comparison leaves them
+// out.
+func selfReportedAttributes(topo *endpointpkg.Topology, key invokedCluster) map[uint32]bool {
+	if topo == nil {
+		return nil
+	}
+	ep := topo.FindByID(key.endpoint)
+	if ep == nil {
+		return nil
+	}
+	for _, srv := range endpointpkg.ClusterServers(ep) {
+		if srv == nil || srv.MatterClusterID() != key.cluster {
+			continue
+		}
+		lister, ok := srv.(contract.SelfReportedAttributeLister)
+		if !ok {
+			return nil
+		}
+		out := map[uint32]bool{}
+		for _, attr := range lister.MatterSelfReportedAttributes() {
+			out[attr] = true
+		}
+		return out
+	}
+	return nil
 }
 
 // renderCluster reads every attribute of one cluster instance and renders

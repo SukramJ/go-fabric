@@ -936,22 +936,46 @@ func (o *OperationalCredentials) MatterRead(attrID uint32) (any, bool) { //nolin
 // packages/node/src/behaviors/operational-credentials/
 // OperationalCredentialsServer.ts — which returns a filtered list when
 // fabric-filtered is true.
+//
+// A request from a session with no fabric yet — PASE before AddNOC,
+// FabricIndex 0 — reads CurrentFabricIndex 0 and, fabric-filtered, empty
+// NOCs and Fabrics lists; unfiltered it reads both lists whole, because
+// neither NOCStruct nor FabricDescriptorStruct carries a fabric-sensitive
+// field. matter.js answers CurrentFabricIndex with `session.fabric ??
+// FabricIndex.NO_FABRIC` (OperationalCredentialsServer.ts State
+// [Val.properties]) and serves nocs / fabrics as managed fabric-scoped
+// lists, which ListManager's FabricFilteredListProxyHandler filters to
+// `session.fabric` for a fabric-filtered session. A read with no request
+// behind it ([im.LookupFabricFilter] reports no filter) is a local one
+// and keeps [OperationalCredentials.MatterRead].
 func (o *OperationalCredentials) MatterReadFiltered(ctx context.Context, attrID uint32) (any, bool) {
-	filtered, fabricIndex := im.FabricFilterFromContext(ctx)
+	filtered, fabricIndex, request := im.LookupFabricFilter(ctx)
+	if !request {
+		return o.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
+	}
 	// CurrentFabricIndex per Matter §11.18.6.6 is the FabricIndex of
 	// the requesting session. On CASE (fabricIndex > 0) we MUST return
 	// the session-fabric — Apple Multi-Admin Hub#1 reads on its CASE
 	// session 1 and expects `1`, not Hub#2's `2` (which the global
-	// `o.currentFabric` would leak after a second AddNOC). On PASE
-	// (fabricIndex == 0) we fall through to MatterRead → o.currentFabric,
-	// which AddNOC stamps on success — Apple's Hub#1 reads PASE right
-	// after AddNOC to confirm the install and expects the fresh
-	// fabric_index.
-	if attrID == opcredsAttrCurrentFabricIndex && fabricIndex != 0 {
+	// `o.currentFabric` would leak after a second AddNOC). Apple's Hub#1
+	// also reads it on its PASE session right after AddNOC to confirm the
+	// install: AddNOC has by then bound the session to the new fabric
+	// (operational.Manager.AdoptFabricIndex, matter.js
+	// OperationalCredentialsServer addNoc), so that read is a
+	// fabricIndex > 0 read too. Only a session that has no fabric reads 0.
+	if attrID == opcredsAttrCurrentFabricIndex {
 		return fabricIndex, true
 	}
-	// When no filter is active (PASE / fabricIndex==0 / FabricFiltered=false),
-	// fall through so the unfiltered MatterRead path serves the attribute.
+	if fabricIndex == 0 && filtered {
+		switch attrID {
+		case opcredsAttrFabrics:
+			return []FabricDescriptorStruct{}, true
+		case opcredsAttrNOCs:
+			return []NOCStruct{}, true
+		}
+	}
+	// An unfiltered read, and every attribute that is not fabric-scoped,
+	// is served by the unfiltered MatterRead path.
 	if !filtered || fabricIndex == 0 {
 		return o.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
 	}

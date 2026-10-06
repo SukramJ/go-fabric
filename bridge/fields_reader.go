@@ -293,7 +293,8 @@ func decodeMoveToHueAndSaturationFields(dec *tlv.Decoder) (wire.MoveToHueAndSatu
 
 // decodeMoveToColorTemperatureFields reads ColorControl.MoveToColorTemperature
 // fields (Matter §3.2.7.21). Tags: [0] uint16 ColorTemperatureMireds,
-// [1] uint16 TransitionTime.
+// [1] uint16 TransitionTime, [2] map8 OptionsMask, [3] map8 OptionsOverride
+// — the two the ExecuteIfOff gate folds onto the Options attribute.
 func decodeMoveToColorTemperatureFields(dec *tlv.Decoder) (wire.MoveToColorTemperatureRequest, error) {
 	var req wire.MoveToColorTemperatureRequest
 	for {
@@ -314,6 +315,14 @@ func decodeMoveToColorTemperatureFields(dec *tlv.Decoder) (wire.MoveToColorTempe
 			}
 		case 1:
 			if req.TransitionTime, err = fieldUint16("MoveToColorTemperature", "TransitionTime", el); err != nil {
+				return req, err
+			}
+		case 2:
+			if req.OptionsMask, err = fieldUint8("MoveToColorTemperature", "OptionsMask", el); err != nil {
+				return req, err
+			}
+		case 3:
+			if req.OptionsOverride, err = fieldUint8("MoveToColorTemperature", "OptionsOverride", el); err != nil {
 				return req, err
 			}
 		}

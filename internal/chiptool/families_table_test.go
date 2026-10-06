@@ -286,9 +286,6 @@ var chipFamilies = []family{
 			"9.1": {classHarness, "TC-CC-9.1 asserts transition results more exactly than a conforming device must meet; matter.js excludes it (test/app-cc/CC.1.test.ts)", false},
 			"9.2": {classHarness, "TC-CC-9.2 asserts transition results more exactly than a conforming device must meet; matter.js excludes it (test/app-cc/CC.1.test.ts)", false},
 			"9.3": {classHarness, "TC-CC-9.3 asserts transition results more exactly than a conforming device must meet; matter.js excludes it (test/app-cc/CC.1.test.ts)", false},
-			"2.2": {classDefect, "TC-CC-2.2 counts the reports of a colour transition: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
-			"6.2": {classDefect, "TC-CC-6.2 reads ColorTemperatureMireds part-way through a move: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
-			"6.3": {classDefect, "TC-CC-6.3 reads ColorTemperatureMireds part-way through a step: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
 			"6.5": {classHarness, startUpOnBridged, false},
 		},
 	},
@@ -311,16 +308,7 @@ var chipFamilies = []family{
 			"2.4": {classHarness, "TC-I-2.4 checks the Q-quality reporting of IdentifyTime added in Matter 1.4.2 against an expectation chip has not merged yet (connectedhomeip#42128); matter.js excludes it until then (test/app-slow/I.test.ts)", false},
 		},
 	},
-	{
-		name: "LVL", deviceType: dtColorTempLight,
-		exclude: map[string]gap{
-			"2.3": {classDefect, "TC-LVL-2.3 counts the RemainingTime reports of a transition: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
-			"3.1": {classDefect, "TC-LVL-3.1 reads CurrentLevel part-way through a Move: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
-			"4.1": {classDefect, "TC-LVL-4.1 reads CurrentLevel part-way through a Step: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
-			"5.1": {classDefect, "TC-LVL-5.1 reads CurrentLevel part-way through a Move: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
-			"6.1": {classDefect, "TC-LVL-6.1 reads CurrentLevel part-way through a Move that a Stop ends: no transition engine: LevelControl and ColorControl move to a target at once and report RemainingTime 0, where matter.js runs behavior/Transitions.ts (open finding, Certification harness section of notes/parity/matter_behaviour_findings.md)", false},
-		},
-	},
+	{name: "LVL", deviceType: dtColorTempLight},
 	{name: "LWM", deviceType: dtLaundryWasher},
 	{
 		name: "MOD", deviceType: dtModeSelect,

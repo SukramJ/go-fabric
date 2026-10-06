@@ -347,23 +347,36 @@ atomic on the CCU wire (press+release in one frame), so there is no
 observable position interval to report anyway; only CONT-holds would ever
 surface a transient 1.
 
-### BD-Matter-LevelControl-NativeRamp — RemainingTime stays 0 during device-native ramps
+### BD-Matter-LevelControl-NativeRamp — a host chooses, per endpoint, who ramps the level
 
-A positive MoveToLevel / MoveToLevelWithOnOff TransitionTime is delegated to
-the HM device as RAMP_TIME inside one atomic put_paramset ({LEVEL, RAMP_TIME,
-ON_TIME=NotUsed} via `Light.TurnOnWith` / `Light.TurnOffWithRamp`); the
-device performs the transition natively. matter.js's default
-LevelControlServer manages transitions host-side (`Transitions.ts`) and can
-tick RemainingTime while stepping, but explicitly sanctions delegating to
-native hardware transitions (`LevelControlServer.ts:36-41`,
-`createTransitions` override note). The CCU reports no ramp progress, so the
-bridge keeps RemainingTime at a constant 0 while a device-side ramp runs.
-Null/0 transition times keep the instant SetLevel path, matching
-`moveToLevelLogic`'s truthy-only rate derivation
-(`LevelControlServer.ts:297-303`) and the `changePerS` contract "0 or
-nullish means transition instantly" (`LevelControlServer.ts:459`). Devices
-whose channel lacks RAMP_TIME (`LightCapabilities.Transition` unset) always
-take the instant path.
+matter.js LevelControlServer manages transitions host-side only when
+`managedTransitionTimeHandling` is set (`Transitions.ts`); by default it
+applies every level at once, and it explicitly sanctions handing the ramp to
+hardware that transitions natively (`LevelControlServer.ts` class doc,
+`createTransitions` override note). The module offers the same choice per
+endpoint ([ADR 0014](../../docs/adr/0014-transitions-optional-per-endpoint.md)):
+
+- **Hand-off (default).** `levelcontrol.Server` forwards the eight commands to
+  the host's `LevelSource`, TransitionTime and Rate included, and the device
+  ramps natively — a CCU actor, say, that takes `{LEVEL, RAMP_TIME}` in one
+  put. The host reports progress, if any, through its own change
+  notification; RemainingTime (served with `Config.Lighting`) reads 0,
+  because nothing on this side knows how far the device has come. matter.js
+  would read the application's `transitionEndTime` or `remainingTime` here;
+  that application-stated remaining time is not ported — a host that knows
+  its device's ramp end would need it, none does yet.
+- **Engine (`Config.Transitions`).** For a device that cannot ramp, the
+  server runs matter.js's command logic on `cluster/transition` (the port of
+  `Transitions.ts`) and hands the host each stepped level as an immediate
+  MoveToLevel; RemainingTime is live and reported by the Q rules. The
+  reference daemon's ceiling light takes this path, its speaker the
+  hand-off one. `light.ColorControlServer` offers the same switch as
+  `ManageTransitions`; without it a colour temperature command applies at
+  once, as matter.js does by default.
+
+Null and zero transition times take the instant path either way, matching
+`moveToLevelLogic`'s truthy-only rate derivation and the `changePerS`
+contract "0 or nullish means transition instantly".
 
 ### BD-Matter-BridgedVendorNameFallback — a bridged endpoint without a vendor serves the node's
 
@@ -443,7 +456,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | BD-Matter-IdleSessionReaper | matter.js keeps established operational sessions indefinitely — reclaim happens only on same-peer replacement, explicit close, or session-id exhaustion (`packages/protocol/src/session/SessionManager.ts` `findOldestInactiveSession`, ~:455-476) | go-fabric additionally runs a periodic idle reaper on the operational session manager (`cmd/openccu-loom/daemon_matter.go` — 60 s sweep, 5-min idle TTL); activity semantics mirror `Session.ts:127` `notifyActivity` exactly (refreshed on every authenticated receive including duplicates, and on every secure send), and reaped sessions ship the graceful CloseSession farewell | Headless long-running bridges accumulate dead CASE sessions from controllers that vanish without CloseSession. The TTL sits far above the subscription publisher heartbeat cadence, which `im/subscription/subscription.go` caps at `maxSendInterval` = 2 min (a deliberate divergence from matter.js, which needs no cap because it never reaps idle sessions; pinned by `TestSendInterval_LongMaxIntervalStillBeatsSessionIdleTimeout`), so live subscriptions are never evicted, and a dead controller stops earning send-side activity once the report retransmit cap reaps its subscription. Never-used sessions (lastActivity unset) stay exempt as commissioning protection. |
 | L7-D07 | matter.js `MdnsAdvertiser.ts:213-232` — `DefaultBroadcastSchedule` with exponential back-off starting at 1 s, max 90 s; chip is event-driven (re-advertise on fabric change / reconnect) | `mdns/zeroconf.go::StartReannounceLoop` + `cmd/openccu-loom/daemon_matter.go:226` — fixed 30-min `StartReannounceLoop` | The 30-min cadence keeps Apple's `mDNSResponder` cache warm (TTL=4500 s ≈ 75 min). No controller correctness issue — all known commissioners accept periodic re-announcement. Event-driven re-announce (fabric add/remove, reconnect) plus a backoff burst matching matter.js's `DefaultBroadcastSchedule` is a v1.2 milestone. Drift L7-D07 (LOW by-design for v1.0). |
 | L8-D03 | matter.js `AdministratorCommissioningServer.ts:283-290` — 48-h extended window when `FabricCount == 0`; chip `CommissioningWindowManager.cpp:313-325` — `MaxCommissioningTimeout()` extends to 48 h for uncommissioned nodes | `bridge/commissioning_window.go` — `OpenWindowParams.IsUncommissioned` flag enables the 172800 s (48 h) cap via `commissioningWindowMaxSecUncommissioned` | Implemented (C-P2-4): the constant `commissioningWindowMaxSecUncommissioned = 172800` is wired into `OpenWindow`; the daemon must set `IsUncommissioned: fabricStore.Count() == 0` before calling OpenWindow. Default (IsUncommissioned=false) retains the 900-s cap. Wiring the fabric-count query into the commissioning-window open path is a daemon-side follow-up. |
-| L9-D9 | AccessControl.MatterReadFiltered + UpdateFabricLabel + UpdateNOC fabric resolution | `cluster/core/operational_credentials.go:252-286, 1058-1065, 1003-1008` | Confirmed correct by audit 2026-05-12 (L9-D9): Bug M + Bug P fixes are wire-correct; all three paths use `im.FabricFilterFromContext` with `currentFabric` fallback. No action required. Drift L9-D9 (LOW, confirmed ✓). |
+| L9-D9 | AccessControl.MatterReadFiltered + UpdateFabricLabel + UpdateNOC fabric resolution | `cluster/core/operational_credentials.go:252-286, 1058-1065, 1003-1008` | Confirmed correct by audit 2026-05-12 (L9-D9): Bug M + Bug P fixes are wire-correct; all three paths use `im.FabricFilterFromContext` with `currentFabric` fallback. No action required. Drift L9-D9 (LOW, confirmed ✓). Revised 2026-10-06: the read path no longer falls back — a request from a session without a fabric (PASE before AddNOC) reads no fabric's entries, and `currentFabric` scopes only a read with no request behind it (`im.LookupFabricFilter`); the two commands keep the fallback, which a fabric-less request never reaches (`im.HandleInvokeRequest` refuses a fabric-scoped command without an accessing fabric). |
 | BD-Matter-Dispatcher-StringHeuristic | matter.js `InteractionServer.ts` and chip `WriteHandler.cpp` / `CommandHandler.cpp` map typed errors via `StatusCodeError` / `MatterClusterStatusError` interfaces only | `endpoint/dispatcher.go::writeErrorStatus` / `invokeErrorStatus` (lines ~447-509) keep a string-contains fallback for "read-only", "unknown attribute", "constraint", "resource exhausted", "unknown command", "invalid command argument" | The 2026-05-19 chip-audit drift M-DRIFT-02 / L4-D03 is a **defense-in-depth** entry: every production cluster server already returns typed errors that implement `im.StatusCodeError` (verified via `grep -rn 'errors.New(' cluster/` — zero hits in production paths; the matches in `tests/` and `endpoint/*_test.go` are intentional fake-server fixtures). The string heuristic survives so legacy fakes keep working; removing it would only break tests, not production wire behaviour. New cluster code is expected to return typed errors via the `StatusCodeError` pattern. |
 | BD-Matter-Groups-Already-Mounted | chip + matter.js mandate Groups (0x0004) + ScenesManagement (0x0062) on every OnOff-mapped device-type (OnOffPlugInUnit 0x010A, OnOffLight 0x0100) | Since [ADR 0009](../../docs/adr/0009-groups-and-group-messaging.md) the assembler mounts the real Groups server itself wherever a device type mandates it (`endpoint.Config.Groups`) and replaces a host-supplied Groups stub; the host still supplies the ScenesManagement stub. The record below is the reference host's former wiring: it mounted both stub servers on `Switch` (`internal/model/custom/switch/matter.go:74-75`), `Light` (both dimmable and non-dimmable branches in `internal/model/custom/light/matter.go:114-115, 120-121`), `Siren` (`internal/model/custom/siren/matter.go:131-132`), and the generic-DP OnOff projection (`internal/model/generic/switch_matter.go::MatterClusterServers`) | Audit drift L2-D01-NEW is a **false positive** for the custom-DP projections. The generic-DP projection — the assembler's Path 1, taken for any channel with a writable STATE and no custom-DP wrapper — was the one exception and mounted OnOff alone while still advertising OnOffPlugInUnit; it now mounts both stubs and advertises the mandatory LT feature with its four attributes and three commands. Climate / Cover / Lock correctly have no Groups attachment (non-OnOff device types). |
 

@@ -223,7 +223,8 @@ fmt: ## format with gofumpt
 
 .PHONY: lint
 lint: ## gofumpt check + golangci-lint + module hygiene
-	@$(GOFUMPT) -l . | tee /tmp/gofabric-gofumpt.out
+	@# .claude/worktrees holds agent worktrees: other branches' files, not this tree's.
+	@$(GOFUMPT) -l . | grep -v '^\.claude/' | tee /tmp/gofabric-gofumpt.out
 	@test ! -s /tmp/gofabric-gofumpt.out || { echo "gofumpt: files need formatting (run 'make fmt')"; exit 1; }
 	$(GOLANGCI_LINT) config verify
 	$(GOLANGCI_LINT) run --timeout=5m ./...

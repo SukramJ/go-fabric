@@ -125,6 +125,21 @@ func (q *Quieter) Changed(wasNull, isNull bool) {
 	q.mu.Unlock()
 }
 
+// EmitNow sends a report held back by the throttle at once, and nothing
+// when none is pending — matter.js QuietObservable.emitNow, which a
+// transition calls when it ends so the final value is reported without
+// waiting out the interval (Transitions.ts finish / cancel).
+func (q *Quieter) EmitNow() {
+	q.mu.Lock()
+	if !q.pending {
+		q.mu.Unlock()
+		return
+	}
+	q.emitLocked(q.now())
+	q.mu.Unlock()
+	q.Report()
+}
+
 // flush sends the deferred report of timer gen, if that timer is still
 // the armed one and a report is still pending.
 func (q *Quieter) flush(gen uint64) {

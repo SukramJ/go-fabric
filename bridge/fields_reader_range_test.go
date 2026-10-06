@@ -35,6 +35,8 @@ func TestCommandFieldDecoders_RejectOverWideIntegers(t *testing.T) {
 	}{
 		{"MoveToColorTemperature.ColorTemperatureMireds", 0, 0x10099, func(d *tlv.Decoder) error { _, err := decodeMoveToColorTemperatureFields(d); return err }},
 		{"MoveToColorTemperature.TransitionTime", 1, 0x10000, func(d *tlv.Decoder) error { _, err := decodeMoveToColorTemperatureFields(d); return err }},
+		{"MoveToColorTemperature.OptionsMask", 2, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToColorTemperatureFields(d); return err }},
+		{"MoveToColorTemperature.OptionsOverride", 3, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToColorTemperatureFields(d); return err }},
 		{"MoveToHue.Hue", 0, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToHueFields(d); return err }},
 		{"MoveToHue.Direction", 1, 0x100, func(d *tlv.Decoder) error { _, err := decodeMoveToHueFields(d); return err }},
 		{"MoveToHue.TransitionTime", 2, 0x10000, func(d *tlv.Decoder) error { _, err := decodeMoveToHueFields(d); return err }},
@@ -77,13 +79,15 @@ func TestDecodeMoveToColorTemperatureFields_InRangeStillDecodes(t *testing.T) {
 	dec := buildDecoderAfterStructOpen(func(enc *tlv.Encoder) {
 		enc.PutUint(tlv.ContextTag(0), 0xFFFF)
 		enc.PutUint(tlv.ContextTag(1), 0xFFFF)
+		enc.PutUint(tlv.ContextTag(2), 0x01)
+		enc.PutUint(tlv.ContextTag(3), 0xFF)
 	})
 	req, err := decodeMoveToColorTemperatureFields(dec)
 	if err != nil {
 		t.Fatalf("decodeMoveToColorTemperatureFields: %v", err)
 	}
-	if req.ColorTemperatureMireds != 0xFFFF || req.TransitionTime != 0xFFFF {
-		t.Errorf("decoded %+v, want both fields 0xFFFF", req)
+	if req.ColorTemperatureMireds != 0xFFFF || req.TransitionTime != 0xFFFF || req.OptionsMask != 0x01 || req.OptionsOverride != 0xFF {
+		t.Errorf("decoded %+v, want both uint16 fields 0xFFFF and the options 0x01 / 0xFF", req)
 	}
 }
 

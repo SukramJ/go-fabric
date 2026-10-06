@@ -12,6 +12,35 @@ pseudo-version of `main`.
 
 ### Added
 
+- **Attribute transitions** — `cluster/transition`, a port of matter.js's
+  `Transitions.ts`: `transition.New` / `Engine` (`Start`, `Stop`,
+  `StopAll`, `Finish`, `FinishAll`, `Cancel`, `CancelAll`,
+  `RemainingTime`, `Active`), `Config`, `Property`, `Transition`, `Change`,
+  `HueDistance` / `HueDirection`, `DirectionalDistance`,
+  `DefaultStepInterval`, `ExternalTimeUnit`. Values step every 100 ms and
+  round half up; RemainingTime is reported by matter.js's
+  `#updateRemainingTime` rules; an idle engine owns no goroutine.
+- `levelcontrol.Config.Lighting` serves the LT feature — MinLevel 1,
+  RemainingTime, StartUpCurrentLevel, the CoupleColorTempToLevel option
+  (`AttrRemainingTime`, `AttrStartUpCurrentLevel`, `LightingLevelMin`,
+  `Server.MinWritePrivilege`). `levelcontrol.Config.Transitions`
+  (`Transitions`, `OnOff`, `ColorTemperatureCoupling`) runs the eight
+  commands on the engine for a device that cannot ramp — matter.js
+  LevelControlServer with managedTransitionTimeHandling — and hands the
+  host each level as an immediate MoveToLevel. Left nil, the commands are
+  forwarded as before (`BD-Matter-LevelControl-NativeRamp`).
+- `light.ColorControlServerConfig.ManageTransitions`,
+  `TransitionStepInterval` and `OnOff` (`light.OnOffState`):
+  gradual colour temperature transitions with a live RemainingTime, and the
+  ExecuteIfOff gate. `ColorControlServer.SyncColorTemperatureWithLevel`
+  couples the colour temperature to the level.
+- `contract.SelfReportedAttributeLister`: attributes a server reports by
+  itself, which the bridge leaves out of a command's before/after
+  comparison — a quieter ("Q") attribute such as CurrentLevel is reported
+  by its own rules. `contract.ClusterQuiescer`: the bridge stops a server's
+  timers when the server leaves the topology and on `Stop`.
+- `cluster.Quieter.EmitNow` (matter.js `QuietObservable.emitNow`).
+
 - **ScenesManagement (0x0062) is a real server** on the bridged lights
   (ADR 0012), a port of matter.js's `ScenesManagementServer`:
   `cluster/core.ScenesManagement`, `NewScenesManagement`, `ScenesConfig`,
@@ -305,6 +334,21 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `light.ColorControlServer` serves MoveColorTemperature,
+  StepColorTemperature and StopMoveStep as matter.js does instead of
+  accepting and ignoring them — at once without `ManageTransitions`, as a
+  transition with it; MoveColorTemperature with MoveMode Stop leaves a
+  colour temperature move running, as in matter.js. It reports
+  ColorTemperatureMireds and RemainingTime through
+  `OnMatterAttributesChanged` by the Q rules, and `MatterReportable` is
+  empty, so an endpoint source's change notification no longer reports the
+  colour temperature.
+- The reference daemon's ceiling light runs its LevelControl (now
+  `Config.Lighting`, replacing the daemon's own LT wrapper) and its
+  ColorControl on the transition engine; the speaker keeps the hand-off
+  path. The bridge decodes MoveToColorTemperature's OptionsMask and
+  OptionsOverride.
+
 - **A bridged endpoint's VendorName comes from the host.** The module
   served `"eQ-3"` as the BridgedDeviceBasicInformation VendorName of every
   bridged endpoint — one host's manufacturer inside the module. It now
@@ -428,6 +472,11 @@ pseudo-version of `main`.
   checks and privileges come from the definition.
 
 ### Fixed
+
+- **Certification:** TC-LVL-2.3, TC-LVL-3.1, TC-LVL-4.1, TC-LVL-5.1,
+  TC-LVL-6.1, TC-CC-2.2, TC-CC-6.2 and TC-CC-6.3 run and pass — they were
+  excluded as class (a) gaps because no level or colour temperature was
+  ever in transition (RemainingTime always 0, nothing readable part-way).
 
 - **Found by the CHIP Python certification harness** (`internal/chiptool`,
   run in matter.js's CHIP image against the reference daemon):
@@ -917,6 +966,29 @@ pseudo-version of `main`.
   — and its `matter_persistent_subscriptions` table. Nothing ever wrote or
   read it. Replaced by `Store.SaveServerSubscription` and its siblings on the
   new `matter_server_subscriptions` table; removal permissible in v0.3.0.
+
+### Security
+
+- **A session with no fabric no longer reads another fabric's
+  fabric-scoped data.** A read on a PASE session before AddNOC (FabricIndex
+  0) — a second commissioner, say, while a fabric already exists — was
+  answered as a read without a request behind it: AccessControl `Acl` and
+  `Extension` returned the entries of the fabric the last ACL write
+  targeted, whole; a fabric-filtered read of OperationalCredentials `NOCs` /
+  `Fabrics` returned every fabric's entries, GroupKeyManagement `GroupKeyMap`
+  / `GroupTable` the fabric last set with `SetCurrentFabric`, and
+  `CurrentFabricIndex` the fabric of the last AddNOC. Now, as in matter.js
+  (ListManager's FabricFilteredListProxyHandler, `AccessControl.ts`
+  `mayRead`, `OperationalCredentialsServer` `currentFabricIndex`), such a
+  session's fabric-filtered read of a fabric-scoped list is empty, its
+  unfiltered read of `Acl` / `Extension` carries every entry redacted to its
+  FabricIndex, and `CurrentFabricIndex` reads 0; unfiltered `NOCs`,
+  `Fabrics`, `GroupKeyMap` and `GroupTable`, which carry no fabric-sensitive
+  field, still list every fabric. A read with no Interaction Model request
+  behind it keeps its previous scope; `im.LookupFabricFilter` (new) tells
+  the two apart. A host whose session table cannot adopt a PASE session
+  onto the fabric its AddNOC installed (`AdoptFabricIndex`) now reads
+  `CurrentFabricIndex` 0 on that session after AddNOC as well.
 
 ## [0.1.0] — 2026-10-02
 

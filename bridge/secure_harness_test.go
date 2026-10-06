@@ -88,6 +88,8 @@ type harnessLookup struct {
 	session *channel.Session
 	fabric  uint8
 	subject uint64
+	// pase makes the session a PASE session (see [secureHarness.asPASE]).
+	pase bool
 }
 
 func (h *harnessLookup) Lookup(id uint16) (*channel.Session, bool) {
@@ -103,6 +105,8 @@ func (h *harnessLookup) FabricFor(id uint16) (uint8, bool) {
 	if id != harnessLocalSessionID {
 		return 0, false
 	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.fabric, true
 }
 
@@ -110,11 +114,15 @@ func (h *harnessLookup) SubjectFor(id uint16) (nodeID uint64, cats []uint32, ok 
 	if id != harnessLocalSessionID {
 		return 0, nil, false
 	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.subject, nil, true
 }
 
 func (h *harnessLookup) IsPASE(id uint16) (pase, ok bool) {
-	return false, id == harnessLocalSessionID
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.pase, id == harnessLocalSessionID
 }
 
 // secureHarness is a started bridge plus the controller half of a CASE
@@ -126,6 +134,7 @@ type secureHarness struct {
 	fabric uint8
 	peer   *channel.Session
 	conn   *net.UDPConn
+	lookup *harnessLookup
 
 	mu         sync.Mutex
 	exchangeID uint16
@@ -192,14 +201,24 @@ func newSecureHarnessWith(t *testing.T, setup func(st *store.Store, fabric uint8
 	if err != nil {
 		t.Fatalf("channel.New (controller): %v", err)
 	}
-	b.AttachSessionLookup(&harnessLookup{session: bridgeSess, fabric: fabric, subject: harnessControllerNodeID})
+	lookup := &harnessLookup{session: bridgeSess, fabric: fabric, subject: harnessControllerNodeID}
+	b.AttachSessionLookup(lookup)
 
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
 		t.Fatalf("ListenUDP: %v", err)
 	}
 	t.Cleanup(func() { _ = conn.Close() })
-	return &secureHarness{t: t, bridge: b, store: st, fabric: fabric, peer: peerSess, conn: conn, exchangeID: 0x100}
+	return &secureHarness{t: t, bridge: b, store: st, fabric: fabric, peer: peerSess, conn: conn, lookup: lookup, exchangeID: 0x100}
+}
+
+// asPASE turns the harness session into a PASE session that has no fabric
+// yet — a second commissioner's, opened while the harness fabric already
+// exists: no subject, FabricIndex 0.
+func (h *secureHarness) asPASE() {
+	h.lookup.mu.Lock()
+	defer h.lookup.mu.Unlock()
+	h.lookup.pase, h.lookup.fabric, h.lookup.subject = true, 0, 0
 }
 
 // allowAll installs a wildcard CASE Administer entry for the harness fabric.

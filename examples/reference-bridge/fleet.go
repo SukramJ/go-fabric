@@ -1154,12 +1154,15 @@ func (s *demoSelector) supports(mode uint8) bool {
 //
 // What the model does and does not claim:
 //
-//   - There is no travel time and no transition. A Move arrives at the end
-//     of its direction and a Step lands on its target inside the command, so
-//     TransitionTime and Rate are validated by the cluster and then not
-//     honoured here, and nothing is ever in flight for Stop to halt. Stop
-//     reports success over a speaker that was already at rest — the truth
-//     for this model, not a stand-in for a halt that did not happen.
+//   - The device itself has no travel time. The speaker takes its commands
+//     on the hand-off path, as a device that ramps natively would: a Move
+//     arrives at the end of its direction and a Step lands on its target
+//     inside the command, TransitionTime and Rate are validated by the
+//     cluster and then not honoured, and Stop reports success over a
+//     speaker already at rest. The ceiling light lets the module's
+//     transition engine ramp it instead (fleet_lighting.go): its
+//     LevelControl server runs the commands and sets each step through
+//     [dimmer.MoveToLevel].
 //   - A plain (non-On/Off) command issued while the speaker is off runs only
 //     when the effective Options bitmap sets ExecuteIfOff. A gated-out
 //     command changes nothing and reports success, which is what the spec
@@ -1389,8 +1392,13 @@ func (s *dimmer) applyLevel(level uint8, withOnOff bool) {
 	}
 	on := s.on
 	s.mu.Unlock()
-	slog.Info(s.kind+".level", slog.String("device", s.name),
-		slog.Int("level", int(level)), slog.Bool("on", on))
+	attrs := []any{slog.String("device", s.name), slog.Int("level", int(level)), slog.Bool("on", on)}
+	if s.lighting != nil {
+		// The transition engine sets every step of a ramp through here.
+		slog.Debug(s.kind+".level", attrs...)
+	} else {
+		slog.Info(s.kind+".level", attrs...)
+	}
 	s.notify()
 }
 

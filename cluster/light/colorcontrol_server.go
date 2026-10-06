@@ -10,25 +10,34 @@
 // knowing the device-specific model types.
 //
 // ColorTemperatureLight (0x010C) requires ColorControl (0x0300) in CT-only
-// mode. The [ColorControlServer] here covers the minimum mandatory surface
-// for chip-tool conformance and Apple Home pairing.
+// mode. The [ColorControlServer] here serves the CT feature as matter.js
+// ColorControlServer does: MoveToColorTemperature, MoveColorTemperature,
+// StepColorTemperature and StopMoveStep, the ExecuteIfOff gate, the
+// coupling to the LevelControl level, and — with
+// [ColorControlServerConfig.ManageTransitions] — gradual transitions on
+// the module's transition engine (cluster/transition, matter.js
+// behavior/Transitions.ts) with a live RemainingTime. Hue, saturation, xy
+// and the colour loop are not served (FeatureMap CT only).
 //
-// This package is a conformance reference: the server holds its own state
-// and answers every command with Success without forwarding it anywhere,
-// so it does not drive a device. It exists to pin the cluster's wire shape
-// and attribute surface against matter.js HEAD; only the reference daemon
-// (examples/reference-bridge) mounts it, to put that surface in front of
-// chip-tool. A host that needs live control mounts its own
-// [contract.ClusterServer] on the endpoint instead.
+// The server holds the colour temperature itself and pushes every value it
+// applies — at once, or step by step — to an optional
+// [ColorTemperatureWriter], the host's device sink. The reference daemon
+// (examples/reference-bridge) mounts it in front of chip-tool; a host whose
+// lamp ramps natively and reports its own colour temperature mounts its own
+// [contract.ClusterServer] instead.
 package light
 
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/transition"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -44,6 +53,25 @@ type ColorControlServerConfig struct {
 	MaxMireds uint16
 	// InitialMireds is the starting value for CurrentColorTemperature (0x0007).
 	InitialMireds uint16
+	// ManageTransitions runs the colour temperature commands as gradual
+	// transitions, stepping the value every TransitionStepInterval and
+	// reporting RemainingTime (matter.js managedTransitionTimeHandling).
+	// Without it every command applies its target at once, as matter.js
+	// does by default.
+	ManageTransitions bool
+	// TransitionStepInterval is the time between two steps; zero is
+	// [transition.DefaultStepInterval] (matter.js transitionStepInterval).
+	TransitionStepInterval time.Duration
+	// OnOff is the On/Off state of the endpoint, read for the ExecuteIfOff
+	// gate. Nil means the endpoint has none and every command executes
+	// (matter.js #optionsAllowExecution: `!this.agent.has(OnOffServer)`).
+	OnOff OnOffState
+}
+
+// OnOffState is the On/Off state of the endpoint a [ColorControlServer]
+// gates its commands on.
+type OnOffState interface {
+	OnOff() bool
 }
 
 // DefaultColorControlServerConfig returns a sensible default: warm-cool
@@ -60,12 +88,14 @@ func DefaultColorControlServerConfig() ColorControlServerConfig {
 }
 
 // ColorTemperatureWriter is the optional sink a [ColorControlServer]
-// drives on a successful MoveToColorTemperature. Implementations translate
-// the cropped mired value into the device's native unit — HM exposes
-// COLOR_TEMPERATURE in Kelvin (mireds = 1_000_000 / Kelvin) — and push it
-// to the CCU. A write error aborts the command and leaves the in-process
-// CurrentColorTemperatureMireds attribute unchanged, so the reported state
-// never claims a value the device did not accept.
+// drives with every colour temperature it applies: the target of a command
+// that applies at once, or each step of a transition. Implementations
+// translate the cropped mired value into the device's native unit — HM
+// exposes COLOR_TEMPERATURE in Kelvin (mireds = 1_000_000 / Kelvin) — and
+// push it to the device. A write error fails the command, or ends the
+// transition, and leaves the in-process ColorTemperatureMireds attribute
+// unchanged, so the reported state never claims a value the device did not
+// accept.
 //
 // The implementation owns the southbound urgency of the write it
 // performs: the cluster contract carries no priority, so a host whose
@@ -75,31 +105,48 @@ type ColorTemperatureWriter interface {
 	SetColorTemperatureMireds(ctx context.Context, mireds uint16) error
 }
 
-// ColorControlServer is a minimal CT-only ColorControl cluster server
-// (cluster 0x0300) for the ColorTemperatureLight (0x010C) device type.
-// It holds the current CT value in-process and, when a
-// [ColorTemperatureWriter] is wired via [ColorControlServer.SetWriter],
-// pushes every MoveToColorTemperature down to the device. Without a writer
-// the server updates in-process state only and answers Success — the
-// chip-tool conformance / test path that needs no live CCU target.
+// ColorControlServer is a CT-only ColorControl cluster server (cluster
+// 0x0300) for the ColorTemperatureLight (0x010C) device type. It holds the
+// current CT value in-process and, when a [ColorTemperatureWriter] is
+// wired via [ColorControlServer.SetWriter], pushes every value it applies
+// down to the device. Without a writer the server updates in-process
+// state only and answers Success — the chip-tool conformance / test path
+// that needs no live device.
 type ColorControlServer struct {
-	cfg     ColorControlServerConfig
+	cfg    ColorControlServerConfig
+	engine *transition.Engine
+	onOff  OnOffState
+	// cmd serialises the commands.
+	cmd sync.Mutex
+	// changes and quiet report ColorTemperatureMireds and RemainingTime.
+	changes cluster.AttributeChanges
+	quiet   *cluster.Quieter
+
+	// mu guards everything below: commands, the transition's steps and
+	// subscription reports reach the server from different goroutines.
+	mu      sync.Mutex
 	current uint16
 	writer  ColorTemperatureWriter
-
-	// startUpMu guards startUpMireds, the one attribute a controller
-	// writes: a write arrives on the IM path while a subscription report
-	// may be reading it.
-	startUpMu sync.Mutex
 	// startUpMireds is StartUpColorTemperatureMireds (0x4010); nil is
 	// null, "keep the previous colour temperature at start-up" (the
 	// attribute's quality X, matter.js ColorControlServer.ts:382
 	// `startUpColorTemperatureMireds ?? null`).
 	startUpMireds *uint16
 	// options is the Options bitmap (0x000F, "RW VO"): bit 0
-	// ExecuteIfOff is the only defined bit. Guarded by startUpMu.
+	// ExecuteIfOff is the only defined bit.
 	options uint8
 }
+
+// Compile-time assertions.
+var (
+	_ contract.ClusterServer                  = (*ColorControlServer)(nil)
+	_ contract.ClusterAttributeLister         = (*ColorControlServer)(nil)
+	_ contract.ClusterCommandLister           = (*ColorControlServer)(nil)
+	_ contract.ClusterAttributeWritePrivilege = (*ColorControlServer)(nil)
+	_ contract.AttributeChangeNotifier        = (*ColorControlServer)(nil)
+	_ contract.SelfReportedAttributeLister    = (*ColorControlServer)(nil)
+	_ contract.ClusterQuiescer                = (*ColorControlServer)(nil)
+)
 
 // colorOptionsDefinedBits are the defined bits of the ColorControl
 // OptionsBitmap (color-control.element.ts: ExecuteIfOff).
@@ -110,14 +157,32 @@ const colorOptionsDefinedBits uint8 = 0x01
 // cfg.MaxMireds].
 func NewColorControlServer(cfg ColorControlServerConfig) *ColorControlServer {
 	init := min(max(cfg.InitialMireds, cfg.MinMireds), cfg.MaxMireds)
-	return &ColorControlServer{cfg: cfg, current: init}
+	s := &ColorControlServer{cfg: cfg, current: init, onOff: cfg.OnOff}
+	s.quiet = &cluster.Quieter{Report: func() { s.changes.Notify(wire.ColorCtrlAttrColorTemperatureMireds) }}
+	s.engine = transition.New(transition.Config{
+		Manage:       cfg.ManageTransitions,
+		StepInterval: cfg.TransitionStepInterval,
+		Properties: map[string]transition.Property{
+			propColorTemperature: {Min: float64(s.minimumMireds()), Max: float64(s.maximumMireds())},
+		},
+		Read: func(string) (float64, bool) {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			return float64(s.current), true
+		},
+		Apply:                s.applyMireds,
+		RemainingTimeChanged: func() { s.changes.Notify(wire.ColorCtrlAttrRemainingTime) },
+		Settled:              func(string) { s.quiet.EmitNow() },
+	})
+	return s
 }
 
 // SetWriter wires the optional write-through sink. Pass nil to detach.
-// Intended to be called once at endpoint-assembly time, before the server
-// handles any command; the IM dispatcher serializes command delivery, so
-// no further synchronisation is needed.
-func (s *ColorControlServer) SetWriter(w ColorTemperatureWriter) { s.writer = w }
+func (s *ColorControlServer) SetWriter(w ColorTemperatureWriter) {
+	s.mu.Lock()
+	s.writer = w
+	s.mu.Unlock()
+}
 
 // MatterClusterID returns the ColorControl cluster ID (0x0300).
 func (s *ColorControlServer) MatterClusterID() uint32 { return wire.ColorControlClusterID }
@@ -133,13 +198,15 @@ func (s *ColorControlServer) MatterClusterID() uint32 { return wire.ColorControl
 func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case wire.ColorCtrlAttrColorTemperatureMireds:
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		return s.current, true
 	case wire.ColorCtrlAttrColorMode, wire.ColorCtrlAttrEnhancedColorMode:
 		// ColorMode 2 = ColorTemperatureMireds is the active mode.
 		return colorModeCT, true
 	case wire.ColorCtrlAttrOptions:
-		s.startUpMu.Lock()
-		defer s.startUpMu.Unlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		return s.options, true
 	case wire.ColorCtrlAttrColorCapabilities:
 		// CT feature bit only (bit 4).
@@ -150,12 +217,12 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 		return s.cfg.MaxMireds, true
 	case wire.ColorCtrlAttrRemainingTime:
 		// The ColorTemperatureLight device type requires RemainingTime
-		// (color-temperature-light.element.ts). This server applies a
-		// colour temperature at once, so no transition is ever in flight:
-		// 0, as matter.js reports it outside a transition
-		// (ColorControlServer.ts remainingTime). Found missing by the CHIP
+		// (color-temperature-light.element.ts). The time left in the
+		// running transition, 0 outside one and whenever transitions are
+		// not managed (matter.js ColorControlServer State remainingTime →
+		// Transitions.remainingTime). Found missing by the CHIP
 		// conformance checker (TC-IDM-10.2 device-type element override).
-		return uint16(0), true
+		return uint16(min(s.engine.RemainingTime(), math.MaxUint16)), true //nolint:gosec // bounded by MaxUint16
 	case wire.ColorCtrlAttrCoupleColorTempToLevelMinMireds:
 		// CT-mandatory (color-control.element.ts:183-184). The server
 		// keeps no separate coupling floor, so the value is the one
@@ -164,8 +231,8 @@ func (s *ColorControlServer) MatterRead(attrID uint32) (any, bool) {
 		// `coupleColorTempToLevelMinMireds ?? minimumColorTemperatureMireds`).
 		return s.cfg.MinMireds, true
 	case wire.ColorCtrlAttrStartUpColorTemperatureMireds:
-		s.startUpMu.Lock()
-		defer s.startUpMu.Unlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		if s.startUpMireds == nil {
 			return nil, true
 		}
@@ -204,9 +271,9 @@ func (s *ColorControlServer) MatterWrite(_ context.Context, attrID uint32, value
 		if !ok || uint8(v)&^colorOptionsDefinedBits != 0 { //nolint:gosec // bounded by AsUintMax
 			return colorControlConstraintErr(fmt.Sprintf("colorcontrol: Options %v sets an undefined bit", value))
 		}
-		s.startUpMu.Lock()
+		s.mu.Lock()
 		s.options = uint8(v) //nolint:gosec // bounded by AsUintMax
-		s.startUpMu.Unlock()
+		s.mu.Unlock()
 		return nil
 	}
 	if attrID != wire.ColorCtrlAttrStartUpColorTemperatureMireds {
@@ -223,9 +290,9 @@ func (s *ColorControlServer) MatterWrite(_ context.Context, attrID uint32, value
 		m := uint16(v)
 		next = &m
 	}
-	s.startUpMu.Lock()
+	s.mu.Lock()
 	s.startUpMireds = next
-	s.startUpMu.Unlock()
+	s.mu.Unlock()
 	return nil
 }
 
@@ -254,62 +321,12 @@ type colorControlConstraintErr string
 func (e colorControlConstraintErr) Error() string                 { return string(e) }
 func (colorControlConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
 
-// MatterInvoke handles ColorControl commands. MoveToColorTemperature
-// (0x0A) crops the target to [MinMireds, MaxMireds] and updates the
-// in-process CT state per matter.js ColorControlServer.ts:moveToColorTemperatureLogic
-// (lines 973-980) which passes the value through #cropColorTemperature (line 221).
-// When a [ColorTemperatureWriter] is wired the cropped value is pushed to
-// the device first; a write error aborts the command and leaves the
-// reported state unchanged. The CT-move and CT-step commands (0x4B, 0x4C)
-// and StopMoveStep (0x47) are accepted as no-ops — HM devices have no
-// continuous-rate CT sweep.
-func (s *ColorControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	switch cmdID {
-	case wire.ColorCtrlCmdMoveToColorTemperature:
-		// The bridge's command-fields reader decodes the payload into the
-		// typed wire request (tag 0 = ColorTemperatureMireds); the generic
-		// tag-keyed map (uint64 values) is accepted as a fallback.
-		var target uint16
-		switch v := fields.(type) {
-		case wire.MoveToColorTemperatureRequest:
-			target = v.ColorTemperatureMireds
-		case map[uint8]any:
-			if raw, ok := v[0].(uint64); ok {
-				target = uint16(raw & 0xFFFF)
-			}
-		}
-		// Crop to [MinMireds, MaxMireds]. Mirrors matter.js
-		// ColorControlServer.ts:#cropColorTemperature (line 221):
-		//   set colorTemperatureMireds = #cropColorTemperature(value).
-		if target < s.cfg.MinMireds {
-			target = s.cfg.MinMireds
-		}
-		if target > s.cfg.MaxMireds {
-			target = s.cfg.MaxMireds
-		}
-		// Push to the device before committing the reported state, so a
-		// rejected write never leaves CurrentColorTemperatureMireds claiming
-		// a value the CCU did not accept.
-		if s.writer != nil {
-			if err := s.writer.SetColorTemperatureMireds(ctx, target); err != nil {
-				return nil, fmt.Errorf("colorcontrol: MoveToColorTemperature write-through: %w", err)
-			}
-		}
-		s.current = target
-		return nil, nil
-	case wire.ColorCtrlCmdMoveColorTemperature, wire.ColorCtrlCmdStepColorTemperature, wire.ColorCtrlCmdStopMoveStep:
-		// No continuous-rate CT sweep on HM; accept and return Success.
-		return nil, nil
-	default:
-		return nil, fmt.Errorf("colorcontrol: unknown command 0x%02X", cmdID)
-	}
-}
-
-// MatterReportable returns the CT attribute that triggers reports on
-// value change.
-func (s *ColorControlServer) MatterReportable() []uint32 {
-	return []uint32{wire.ColorCtrlAttrColorTemperatureMireds}
-}
+// MatterReportable implements [contract.ClusterServer]. It is empty: the
+// server reports ColorTemperatureMireds and RemainingTime itself
+// ([ColorControlServer.OnMatterAttributesChanged]), by the quieter rules
+// of their "Q" quality, so a change notification of the endpoint's source
+// must not report them as well.
+func (s *ColorControlServer) MatterReportable() []uint32 { return []uint32{} }
 
 // MatterAttributes lists the CT-only attribute set served by MatterRead.
 // CurrentHue / CurrentSaturation (HS conformance) and CurrentX / CurrentY
