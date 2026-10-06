@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3486,
+  "entry_points": 3586,
   "entry_packages": [
     ".",
     "bootid",
@@ -35,6 +35,7 @@
     "groups",
     "im",
     "im/subscription",
+    "internal/chiptool",
     "internal/paritytest",
     "mdns",
     "parity",
@@ -57,10 +58,10 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 3534,
-    "reachable": 1944,
-    "whitelisted": 1584,
-    "unreachable": 6
+    "total_exported": 3643,
+    "reachable": 2003,
+    "whitelisted": 1635,
+    "unreachable": 5
   },
   "by_package": [
     {
@@ -73,12 +74,6 @@
       "package": "endpoint",
       "unreachable_funcs": 1,
       "unreachable_types": 0,
-      "unreachable_other": 0
-    },
-    {
-      "package": "cluster/core",
-      "unreachable_funcs": 0,
-      "unreachable_types": 1,
       "unreachable_other": 0
     },
     {
@@ -102,24 +97,17 @@
   ],
   "unreachable": [
     {
-      "package": "cluster/core",
-      "identifier": "SignVidVerificationResponse",
-      "file": "cluster/core/operational_credentials.go",
-      "line": 972,
-      "kind": "type"
-    },
-    {
       "package": "cluster/measurement",
       "identifier": "CelsiusToInt16",
       "file": "cluster/measurement/measurement.go",
-      "line": 1733,
+      "line": 1742,
       "kind": "func"
     },
     {
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 88,
+      "line": 99,
       "kind": "func"
     },
     {
@@ -322,6 +310,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestAddNOCOverPASEAdoptsTheSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_removed_sessions_test.go",
+      "line": 81
+    },
+    {
+      "package": "bridge",
       "identifier": "TestAnnounceAndWithdrawCommissioning_RoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
@@ -368,13 +363,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
       "line": 441
-    },
-    {
-      "package": "bridge",
-      "identifier": "TestAnyTimedRequiredInvoke",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "bridge/timed_conformance_test.go",
-      "line": 29
     },
     {
       "package": "bridge",
@@ -546,6 +534,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestBooleanStateChangeEvent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/boolean_state_event_test.go",
+      "line": 56
+    },
+    {
+      "package": "bridge",
       "identifier": "TestBridgeStart_AckPumpReclaimsExpiredTimedDeadlines",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/timed_deadline_reclamation_test.go",
@@ -571,6 +566,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/eventlog_test.go",
       "line": 265
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBridge_PaseAbortedByPeerStatusReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/securechannel_bruteforce_test.go",
+      "line": 358
     },
     {
       "package": "bridge",
@@ -703,14 +705,14 @@
       "identifier": "TestCaptureSubTarget_SkipsZeroOrNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 614
+      "line": 615
     },
     {
       "package": "bridge",
       "identifier": "TestCaptureSubTarget_StoresMetadata",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 572
+      "line": 573
     },
     {
       "package": "bridge",
@@ -1004,14 +1006,14 @@
       "identifier": "TestCheckTimedGate_ExpiredDeadlineRejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 493
+      "line": 494
     },
     {
       "package": "bridge",
       "identifier": "TestCheckTimedGate_TimedFlagWithoutPriorRejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 478
+      "line": 479
     },
     {
       "package": "bridge",
@@ -1032,7 +1034,14 @@
       "identifier": "TestCheckTimedGate_ValidDeadlineProceeds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 513
+      "line": 514
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkInvokeResponseSplitsWhatDoesNotFit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_chunk_test.go",
+      "line": 21
     },
     {
       "package": "bridge",
@@ -1074,21 +1083,21 @@
       "identifier": "TestChunkReportData_OversizedSingleAttributeAmongOthers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
-      "line": 660
+      "line": 739
     },
     {
       "package": "bridge",
       "identifier": "TestChunkReportData_OversizedSingleAttributeDowngradesToStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
-      "line": 620
+      "line": 699
     },
     {
       "package": "bridge",
       "identifier": "TestChunkReportData_OversizedSingleEventDowngradesToStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
-      "line": 708
+      "line": 787
     },
     {
       "package": "bridge",
@@ -1096,6 +1105,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
       "line": 418
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkReportData_SplitsOversizedList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/reply_test.go",
+      "line": 632
     },
     {
       "package": "bridge",
@@ -1134,6 +1150,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestCommandChangedAttributeReachesASubscriber",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 87
+    },
+    {
+      "package": "bridge",
       "identifier": "TestCommandFieldDecoders_RejectOverWideIntegers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_range_test.go",
@@ -1144,42 +1167,42 @@
       "identifier": "TestCommandFieldsReader_AddNOC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 582
+      "line": 583
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_AddTrustedRootCertificate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 625
+      "line": 626
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_ArmFailSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 409
+      "line": 410
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_Attestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 664
+      "line": 665
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_CSR",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 644
+      "line": 645
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_CertificateChain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 683
+      "line": 684
     },
     {
       "package": "bridge",
@@ -1200,49 +1223,70 @@
       "identifier": "TestCommandFieldsReader_CommissioningComplete",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 479
+      "line": 480
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 510
+      "line": 511
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCommandFieldsReader_OpenCommissioningWindow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fields_reader_test.go",
+      "line": 1276
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_RemoveFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 433
+      "line": 434
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_SetRegulatoryConfig",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 702
+      "line": 703
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_UnknownCommand_GenericTagMap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 551
+      "line": 552
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_UpdateFabricLabel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 456
+      "line": 457
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_UpdateNOC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 606
+      "line": 607
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCommissioningCompleteEndsTheWindow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioned_window_test.go",
+      "line": 25
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestConcreteDeniedEventPathIsAnsweredWithAStatus",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/event_acl_test.go",
+      "line": 132
     },
     {
       "package": "bridge",
@@ -1375,175 +1419,175 @@
       "identifier": "TestDecodeAddNOCRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 183
+      "line": 184
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddNOCRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1184
+      "line": 1185
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddNOCRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 742
+      "line": 743
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddTrustedRootCertificateRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 261
+      "line": 262
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddTrustedRootCertificateRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1216
+      "line": 1217
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddTrustedRootCertificateRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 871
+      "line": 872
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeArmFailSafeRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 74
+      "line": 75
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeArmFailSafeRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1144
+      "line": 1145
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeArmFailSafeRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 763
+      "line": 764
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAttestationRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 129
+      "line": 130
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAttestationRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1160
+      "line": 1161
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAttestationRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 778
+      "line": 779
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCSRRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 162
+      "line": 163
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCSRRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1176
+      "line": 1177
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCSRRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 809
+      "line": 810
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCertificateChainRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 146
+      "line": 147
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCertificateChainRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1168
+      "line": 1169
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCertificateChainRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 794
+      "line": 795
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCommissioningCompleteRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 115
+      "line": 116
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_AllTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1016
+      "line": 1017
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1136
+      "line": 1137
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_Empty",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1104
+      "line": 1105
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_NestedContainerDrainError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1236
+      "line": 1237
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_NestedContainerDrained",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1060
+      "line": 1061
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1087
+      "line": 1088
     },
     {
       "package": "bridge",
@@ -1557,126 +1601,126 @@
       "identifier": "TestDecodeMoveToLevelRequest_AbsentTransitionTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 985
+      "line": 986
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_AllFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 925
+      "line": 926
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1128
+      "line": 1129
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 891
+      "line": 892
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_NullTransitionTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 955
+      "line": 956
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_OverflowReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 908
+      "line": 909
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeRemoveFabricRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 245
+      "line": 246
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeRemoveFabricRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1208
+      "line": 1209
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeRemoveFabricRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 856
+      "line": 857
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeSetRegulatoryConfigRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 94
+      "line": 95
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeSetRegulatoryConfigRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1152
+      "line": 1153
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeSetRegulatoryConfigRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 725
+      "line": 726
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateFabricLabelRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 229
+      "line": 230
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateFabricLabelRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1200
+      "line": 1201
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateFabricLabelRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 841
+      "line": 842
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateNOCRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 209
+      "line": 210
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateNOCRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1192
+      "line": 1193
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateNOCRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 825
+      "line": 826
     },
     {
       "package": "bridge",
@@ -1697,14 +1741,14 @@
       "identifier": "TestDefaultAttrWriter_AccessControlExtensionEntry_EmptyList",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
-      "line": 820
+      "line": 899
     },
     {
       "package": "bridge",
       "identifier": "TestDefaultAttrWriter_AccessControlExtensionEntry_PopulatedList",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
-      "line": 835
+      "line": 914
     },
     {
       "package": "bridge",
@@ -2275,6 +2319,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestDeviceLoadStatusIsWiredAndCounts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/device_load_test.go",
+      "line": 24
+    },
+    {
+      "package": "bridge",
       "identifier": "TestDiagnosticEventsRecordSessionAndDiscoveryKinds",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
@@ -2327,7 +2378,7 @@
       "identifier": "TestDispatchInvokeRequest_TimedRequiredWithoutWindow_NeedsTimedInteraction",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/timed_conformance_test.go",
-      "line": 145
+      "line": 87
     },
     {
       "package": "bridge",
@@ -2614,28 +2665,35 @@
       "identifier": "TestDrainContainer_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1226
+      "line": 1227
     },
     {
       "package": "bridge",
       "identifier": "TestDrainContainer_Empty",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 40
+      "line": 41
     },
     {
       "package": "bridge",
       "identifier": "TestDrainContainer_Nested",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 59
+      "line": 60
     },
     {
       "package": "bridge",
       "identifier": "TestDrainContainer_WithFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 48
+      "line": 49
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestEmitFabricRemovedContextClosesTheFabricsSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_removed_sessions_test.go",
+      "line": 38
     },
     {
       "package": "bridge",
@@ -2719,14 +2777,14 @@
       "identifier": "TestFabricDescriptorStruct_VidVerificationStatement_TLVOmittedWhenNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
-      "line": 765
+      "line": 844
     },
     {
       "package": "bridge",
       "identifier": "TestFabricDescriptorStruct_VidVerificationStatement_TLVPresentWhenSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
-      "line": 790
+      "line": 869
     },
     {
       "package": "bridge",
@@ -2748,6 +2806,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
       "line": 218
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestGeneralDiagnosticsResponsesCrossTheWire",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/gendiag_wire_test.go",
+      "line": 19
     },
     {
       "package": "bridge",
@@ -2975,6 +3040,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestIncreaseConfigurationVersionRaisesTheDeviceAndTheNode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/configuration_version_test.go",
+      "line": 19
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInvokeRequestWithOverWideFieldCarriesConstraintErrorStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_range_test.go",
@@ -3066,6 +3138,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestNewCaseAdapterDefaultsSessionParameters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/session_parameters_test.go",
+      "line": 21
+    },
+    {
+      "package": "bridge",
       "identifier": "TestNoopCaseHandler_ProcessSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_noop_test.go",
@@ -3126,6 +3205,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
       "line": 110
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOngoingReportChunkPiggybacksTheStatusResponseAck",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_report_chunking_test.go",
+      "line": 393
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOngoingReportWaitsForEachChunksStatusResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/subscribe_report_chunking_test.go",
+      "line": 355
     },
     {
       "package": "bridge",
@@ -3469,6 +3562,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
       "line": 579
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPathValuesReportOnlyMovedAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/boolean_state_event_test.go",
+      "line": 107
     },
     {
       "package": "bridge",
@@ -3874,14 +3974,14 @@
       "identifier": "TestReportSubscriptionChunksAnOversizedOngoingReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 210
+      "line": 244
     },
     {
       "package": "bridge",
       "identifier": "TestReportSubscriptionEventsChunksAnOversizedReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_report_chunking_test.go",
-      "line": 265
+      "line": 303
     },
     {
       "package": "bridge",
@@ -4056,49 +4156,49 @@
       "identifier": "TestRewriteInvokeResponseCommand_ArmFailSafeResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 298
+      "line": 299
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_AttestationResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 337
+      "line": 338
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_CSRResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 363
+      "line": 364
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_CertificateChainResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 350
+      "line": 351
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_CommissioningCompleteResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 324
+      "line": 325
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_NOCResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 376
+      "line": 377
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_NilResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 288
+      "line": 289
     },
     {
       "package": "bridge",
@@ -4112,7 +4212,7 @@
       "identifier": "TestRewriteInvokeResponseCommand_SetRegulatoryConfigResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 311
+      "line": 312
     },
     {
       "package": "bridge",
@@ -4126,14 +4226,14 @@
       "identifier": "TestRewriteInvokeResponseCommand_StatusOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 278
+      "line": 279
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_UnknownResponseNoChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 389
+      "line": 390
     },
     {
       "package": "bridge",
@@ -4417,6 +4517,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSubscribeRejectsEventPathsTheSubjectMayNotRead",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/event_acl_test.go",
+      "line": 105
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSubscribeRequestAbovePathCeilingIsRejectedWithPathsExhausted",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/read_limits_test.go",
@@ -4434,63 +4541,63 @@
       "identifier": "TestSubscriptionResumption_DisabledRecordsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 867
+      "line": 907
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 885
+      "line": 925
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 756
+      "line": 796
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 902
+      "line": 942
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerThatSubscribesIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 824
+      "line": 864
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 670
+      "line": 706
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEndWithMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 678
+      "line": 714
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 928
+      "line": 968
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_UnreachablePeerIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 789
+      "line": 829
     },
     {
       "package": "bridge",
@@ -4532,7 +4639,7 @@
       "identifier": "TestTimedRequest_SessionScopeIsolation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/receive_test.go",
-      "line": 534
+      "line": 535
     },
     {
       "package": "bridge",
@@ -4585,6 +4692,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestUndecodableRequestIsAnsweredWithAStatusResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/decode_error_reply_test.go",
+      "line": 21
+    },
+    {
+      "package": "bridge",
       "identifier": "TestWaitForAck_AckClosesChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
@@ -4603,6 +4717,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
       "line": 454
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWindowTransitionsReachSubscribers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioned_window_test.go",
+      "line": 69
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWriteTransactionSpansTheChunksOfOneWrite",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_transaction_test.go",
+      "line": 17
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWrittenAttributeReachesASubscriber",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/write_report_test.go",
+      "line": 23
     },
     {
       "package": "cluster",
@@ -4714,49 +4849,49 @@
       "identifier": "MoveRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 189
+      "line": 199
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "MoveToLevelRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 187
+      "line": 197
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "StepRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 191
+      "line": 201
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "StopRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 193
+      "line": 203
     },
     {
       "package": "cluster/measurement",
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 932
+      "line": 941
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewElectricalPowerServerFromReadings",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 924
+      "line": 933
     },
     {
       "package": "cluster/measurement",
       "identifier": "NewPowerTopologyServer",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
       "file": "cluster/measurement/measurement.go",
-      "line": 1668
+      "line": 1677
     },
     {
       "package": "cluster/measurement",
@@ -4848,6 +4983,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/opstate/countdown_internal_test.go",
       "line": 18
+    },
+    {
+      "package": "cluster/wire",
+      "identifier": "TestAdmCommBusyIsTheClusterSpecificStatus",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/wire/admincommissioning_busy_status_test.go",
+      "line": 17
     },
     {
       "package": "cluster/wire",
@@ -5232,49 +5374,49 @@
       "identifier": "TestHandleInvokeRequest_AdministerPrivilegeNotBlockedByGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 323
+      "line": 328
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 275
+      "line": 280
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_AdministerPrivilegeNotBlockedByGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 301
+      "line": 306
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_EnforcesElevatedWritePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 249
+      "line": 254
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_OperateAttributeNotBlockedByPrivilegeGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 350
+      "line": 355
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_RejectsWildcardAttributePath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 380
+      "line": 385
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 431
+      "line": 436
     },
     {
       "package": "endpoint",
@@ -5502,10 +5644,10 @@
     },
     {
       "package": "endpoint",
-      "identifier": "TestScenesStubStaysBesideTheGroupsServer",
+      "identifier": "TestScenesServerReplacesTheStub",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 203
+      "line": 202
     },
     {
       "package": "endpoint",
@@ -5547,7 +5689,7 @@
       "identifier": "TestTopologyDispatcher_MinInvokePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 186
+      "line": 187
     },
     {
       "package": "endpoint",
@@ -5628,6 +5770,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestWrite_GlobalAttributesAreNeverWritable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/dispatcher_write_gate_test.go",
+      "line": 201
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestWrite_IdentifyTimeSurvivesToTheNextDispatch",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_identify_test.go",
@@ -5639,6 +5788,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
       "line": 861
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestWrite_ListAppendAppendsToTheCurrentList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/dispatcher_write_gate_test.go",
+      "line": 255
     },
     {
       "package": "endpoint",
@@ -5677,6 +5833,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestWrite_UnlistedAttributeIsUnsupportedAttribute",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/dispatcher_write_gate_test.go",
+      "line": 181
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestWrite_UnsupportedCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
@@ -5712,24 +5875,59 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestAppPipeCommandsReachTheDevices",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/control_test.go",
+      "line": 27
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestBlindPositionSurvivesARestart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/wiring_test.go",
+      "line": 292
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestBridgedEndpointsMeetTheirDeviceTypeConformance",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 40
+      "line": 44
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCaseIdentitiesResolveAndForget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/wiring_test.go",
+      "line": 240
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCaseInitiatorProviderNeedsALoadedIdentity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 180
+      "line": 183
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestCeilingLightOnDoesNotDeadlockItsNotifier",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/conformance_test.go",
+      "line": 268
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 67
+      "line": 70
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestDelayedOffReportsItsCountdown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/conformance_test.go",
+      "line": 222
     },
     {
       "package": "examples/reference-bridge",
@@ -5740,24 +5938,87 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestLightKeepsItsOnOffStateAcrossDispatches",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/conformance_test.go",
+      "line": 307
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestOnWithTimedOffCountsDownAndTurnsTheLightOff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 156
+      "line": 160
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestOperationalHoursSurviveARestart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/wiring_test.go",
+      "line": 331
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestRebootCountCountsBoots",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/wiring_test.go",
+      "line": 266
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestRootMountsGroupcastWithTheAuxiliaryACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 205
+      "line": 208
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 112
+      "line": 115
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestSmokeSelfTestEndsOnItsOwn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/control_test.go",
+      "line": 156
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestSmokeTestButtonIsIgnoredWhileAlarming",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/control_test.go",
+      "line": 241
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestSmokeTestEventTriggers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/control_test.go",
+      "line": 84
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestValveTravelsThroughATarget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/conformance_test.go",
+      "line": 323
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestWasherFaultBlocksStart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/control_test.go",
+      "line": 134
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestWasherStopReportsTheCycleTimes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/control_test.go",
+      "line": 176
     },
     {
       "package": "groups",
@@ -5935,6 +6196,20 @@
       "line": 182
     },
     {
+      "package": "groups",
+      "identifier": "TestStoredFabricsSeesAFabricAddedSince",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/manager_test.go",
+      "line": 439
+    },
+    {
+      "package": "im",
+      "identifier": "TestAfterResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/after_response_test.go",
+      "line": 13
+    },
+    {
       "package": "im",
       "identifier": "TestAttributePathRoundTripConcrete",
       "reason": "auto-whitelist:pattern=test-file",
@@ -5960,7 +6235,7 @@
       "identifier": "TestAuthorityAtParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/authority_test.go",
-      "line": 48
+      "line": 78
     },
     {
       "package": "im",
@@ -6038,6 +6313,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_report_test.go",
       "line": 680
+    },
+    {
+      "package": "im",
+      "identifier": "TestChunkedWriteIsAuthorizedOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/write_chunked_acl_test.go",
+      "line": 46
     },
     {
       "package": "im",
@@ -6237,6 +6519,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestFabricScopedInvokeNeedsAFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/authority_test.go",
+      "line": 52
+    },
+    {
+      "package": "im",
       "identifier": "TestGroupInteractionsFailClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/group_parity_matterjs_test.go",
@@ -6254,7 +6543,7 @@
       "identifier": "TestGroupInvokeReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/authority_test.go",
-      "line": 81
+      "line": 111
     },
     {
       "package": "im",
@@ -6268,7 +6557,7 @@
       "identifier": "TestGroupcastEventsAreAdministerAndFabricSensitive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/authority_test.go",
-      "line": 114
+      "line": 144
     },
     {
       "package": "im",
@@ -6566,6 +6855,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestListAppendWriteMark",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/write_chunked_acl_test.go",
+      "line": 81
+    },
+    {
+      "package": "im",
       "identifier": "TestMatchDataVersionFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/dataversion_test.go",
@@ -6850,6 +7146,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/event_report_test.go",
       "line": 624
+    },
+    {
+      "package": "im",
+      "identifier": "TestRequestsWithoutInteractionModelRevision",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/imrevision_absent_parity_matterjs_test.go",
+      "line": 16
     },
     {
       "package": "im",
@@ -7188,6 +7491,27 @@
       "line": 40
     },
     {
+      "package": "internal/chiptool",
+      "identifier": "TestCertifiabilityDocument",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/certifiability_doc_test.go",
+      "line": 48
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestPICSExpression",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/pics_expr_test.go",
+      "line": 131
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestWorkflowRunsEveryFamily",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/certifiability_doc_test.go",
+      "line": 233
+    },
+    {
       "package": "internal/paritytest",
       "identifier": "TestClusterSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
@@ -7339,7 +7663,7 @@
       "identifier": "TestFilterPrimaryHostIPs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 46
+      "line": 47
     },
     {
       "package": "mdns",
@@ -7654,7 +7978,7 @@
       "identifier": "TestPrimaryHostIPs_ReturnsNonNilSlice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 27
+      "line": 28
     },
     {
       "package": "mdns",
@@ -7836,91 +8160,98 @@
       "identifier": "TestZeroconfInternal_CloseClosesAttachedResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 547
+      "line": 549
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Close_WithResponder_SubFQDNs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 296
+      "line": 297
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_NewSubtypeResponder_Logger_NonNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 413
+      "line": 415
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestZeroconfInternal_Publish_HostNameOverride",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/zeroconf_internal_test.go",
+      "line": 613
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_HostName_Empty_FallsBack",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 392
+      "line": 394
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_RecordsAdvertisedAddresses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 434
+      "line": 436
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_UnchangedSkipsReRegister",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 235
+      "line": 236
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_WithResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 139
+      "line": 140
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_WithResponder_Domain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 206
+      "line": 207
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Publish_WithResponder_EmptySubtype",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 179
+      "line": 180
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_RepublishAllDoesNotResurrectWithdrawn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 484
+      "line": 486
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_RepublishAll_WithItems",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 362
+      "line": 363
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_ResponderCloseIsIdempotentUnderTwoOwners",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 573
+      "line": 575
     },
     {
       "package": "mdns",
       "identifier": "TestZeroconfInternal_Withdraw_WithResponder_SubFQDNs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
-      "line": 328
+      "line": 329
     },
     {
       "package": "schema",
@@ -7928,6 +8259,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "schema/writable_test.go",
       "line": 142
+    },
+    {
+      "package": "schema",
+      "identifier": "TestAttributeWritePrivilege",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "schema/writable_test.go",
+      "line": 202
     },
     {
       "package": "schema",
@@ -7956,6 +8294,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "schema/schema_lookup_test.go",
       "line": 136
+    },
+    {
+      "package": "schema",
+      "identifier": "TestDeviceTypeAllowsServerCluster",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "schema/writable_test.go",
+      "line": 222
     },
     {
       "package": "schema",
