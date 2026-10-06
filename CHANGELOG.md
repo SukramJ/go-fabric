@@ -876,6 +876,29 @@ pseudo-version of `main`.
   read it. Replaced by `Store.SaveServerSubscription` and its siblings on the
   new `matter_server_subscriptions` table; removal permissible in v0.3.0.
 
+### Security
+
+- **A session with no fabric no longer reads another fabric's
+  fabric-scoped data.** A read on a PASE session before AddNOC (FabricIndex
+  0) — a second commissioner, say, while a fabric already exists — was
+  answered as a read without a request behind it: AccessControl `Acl` and
+  `Extension` returned the entries of the fabric the last ACL write
+  targeted, whole; a fabric-filtered read of OperationalCredentials `NOCs` /
+  `Fabrics` returned every fabric's entries, GroupKeyManagement `GroupKeyMap`
+  / `GroupTable` the fabric last set with `SetCurrentFabric`, and
+  `CurrentFabricIndex` the fabric of the last AddNOC. Now, as in matter.js
+  (ListManager's FabricFilteredListProxyHandler, `AccessControl.ts`
+  `mayRead`, `OperationalCredentialsServer` `currentFabricIndex`), such a
+  session's fabric-filtered read of a fabric-scoped list is empty, its
+  unfiltered read of `Acl` / `Extension` carries every entry redacted to its
+  FabricIndex, and `CurrentFabricIndex` reads 0; unfiltered `NOCs`,
+  `Fabrics`, `GroupKeyMap` and `GroupTable`, which carry no fabric-sensitive
+  field, still list every fabric. A read with no Interaction Model request
+  behind it keeps its previous scope; `im.LookupFabricFilter` (new) tells
+  the two apart. A host whose session table cannot adopt a PASE session
+  onto the fabric its AddNOC installed (`AdoptFabricIndex`) now reads
+  `CurrentFabricIndex` 0 on that session after AddNOC as well.
+
 ## [0.1.0] — 2026-10-02
 
 The first tagged release. It is the state of `main` the reference daemon

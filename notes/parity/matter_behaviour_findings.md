@@ -336,15 +336,6 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   chip-tool's `groupcast` commands encode the optional fields as matter.js
   does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
   multicast `onoff toggle`, `groupcast leave-group`).
-- **AccessControl Acl / Extension read without an accessing fabric.** A
-  read on a session that has no fabric yet (PASE before AddNOC, FabricIndex
-  0) still answers with the entries of the fabric the last ACL write
-  targeted, whole. matter.js answers such a session's unfiltered read with
-  every entry redacted (`AccessControl.ts` mayRead: no `session.fabric`)
-  and its filtered read with no entry. Kept because the commissioning
-  flows exercised so far read the ACL only over CASE; fix package: the
-  `fabricIndex == 0` branch of `core.AccessControl.MatterReadFiltered`,
-  with a PASE-session read test.
 
 ## Application cluster servers — open items
 

@@ -397,10 +397,17 @@ type fabricLister interface {
 // fabric-scoped list only for `session.fabricFiltered ||
 // config.fabricSensitive`, the way OperationalCredentials.Fabrics and NOCs
 // already read here.
+//
+// Only a direct read — [GroupKeyManagement.MatterRead], no request behind
+// it — falls back to the SetCurrentFabric value. A fabric-filtered request
+// from a session that has no fabric yet (PASE before AddNOC, FabricIndex
+// 0) covers no fabric at all: matter.js ListManager's
+// FabricFilteredListProxyHandler shows a fabric-filtered session only the
+// entries of `session.fabric`, and such a session has none.
 func (g *GroupKeyManagement) readFabrics(ctx context.Context, direct bool) ([]uint8, error) {
 	filtered, fabric := im.FabricFilterFromContext(ctx)
 	if direct || filtered {
-		if fabric == 0 {
+		if fabric == 0 && direct {
 			g.mu.RLock()
 			fabric = g.currentFabric
 			g.mu.RUnlock()

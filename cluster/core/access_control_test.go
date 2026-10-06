@@ -1036,8 +1036,14 @@ func TestAccessControl_MatterWrite_UnknownAttr(t *testing.T) {
 	}
 }
 
-// TestAccessControl_MatterReadFiltered_ACL_FabricZero verifies that
-// MatterReadFiltered(ACL) with fabricIndex=0 falls through to MatterRead.
+// TestAccessControl_MatterReadFiltered_ACL_FabricZero separates the two
+// reads a FabricIndex of 0 used to stand for. A read with no request
+// behind it (no fabric filter stamped) falls through to MatterRead; a
+// request from a session that has no fabric yet does not, and owns no
+// entry — matter.js ListManager FabricFilteredListProxyHandler and
+// protocol/src/action/server/AccessControl.ts mayRead give a session
+// without `session.fabric` nothing fabric-sensitive. This store cannot
+// enumerate fabrics, so the fabric-less unfiltered read lists none.
 func TestAccessControl_MatterReadFiltered_ACL_FabricZero(t *testing.T) {
 	t.Parallel()
 	store := &aclStoreWithEntries{
@@ -1049,17 +1055,25 @@ func TestAccessControl_MatterReadFiltered_ACL_FabricZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAccessControl: %v", err)
 	}
-	ctx := im.WithFabricFilter(context.Background(), false, 0)
-	v, ok := ac.MatterReadFiltered(ctx, 0x0000)
-	if !ok {
-		t.Fatal("MatterReadFiltered(ACL, fabricIndex=0): ok=false")
+	read := func(ctx context.Context) []core.AccessControlEntryStruct {
+		t.Helper()
+		v, ok := ac.MatterReadFiltered(ctx, 0x0000)
+		if !ok {
+			t.Fatal("MatterReadFiltered(ACL): ok=false")
+		}
+		entries, ok := v.([]core.AccessControlEntryStruct)
+		if !ok {
+			t.Fatalf("type=%T, want []AccessControlEntryStruct", v)
+		}
+		return entries
 	}
-	entries, ok2 := v.([]core.AccessControlEntryStruct)
-	if !ok2 {
-		t.Fatalf("type=%T, want []AccessControlEntryStruct", v)
+	if entries := read(context.Background()); len(entries) != 1 {
+		t.Errorf("local read: len(entries)=%d, want 1", len(entries))
 	}
-	if len(entries) != 1 {
-		t.Errorf("len(entries)=%d, want 1", len(entries))
+	for _, filtered := range []bool{false, true} {
+		if entries := read(im.WithFabricFilter(context.Background(), filtered, 0)); len(entries) != 0 {
+			t.Errorf("fabric-less request (filtered=%v): len(entries)=%d, want 0", filtered, len(entries))
+		}
 	}
 }
 

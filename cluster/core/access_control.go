@@ -499,6 +499,20 @@ func (a *AccessControl) MatterRead(attrID uint32) (any, bool) {
 // A non-fabric-filtered read returns every fabric's entries, another
 // fabric's redacted to its FabricIndex (see unfilteredFabrics).
 //
+// A request from a session with no fabric yet — PASE before AddNOC,
+// FabricIndex 0 — owns no entry: its fabric-filtered read is empty and
+// its unfiltered read carries every fabric's entries redacted to their
+// FabricIndex. matter.js gives such a session nothing fabric-sensitive:
+// ListManager's FabricFilteredListProxyHandler shows a fabric-filtered
+// session only the entries of `session.fabric`, and AccessControl.ts
+// mayRead refuses every fabric-sensitive field to a session without
+// `session.fabric` (packages/node/src/behavior/state/managed/values/
+// ListManager.ts, packages/protocol/src/action/server/AccessControl.ts).
+// A read with no request behind it ([im.LookupFabricFilter] reports no
+// filter) is a local one and keeps [AccessControl.MatterRead]; the two
+// are not allowed to stand for one another, because the local read
+// answers with the entries of the fabric the last write targeted, whole.
+//
 // Mirrors matter.js packages/node/src/behaviors/access-control/
 // AccessControlServer.ts: every read of `acl` and `extension` consults
 // the FabricFilter from the IM context. The non-fabric-scoped attributes
@@ -513,14 +527,19 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 	if attrID != accessControlAttrACL && attrID != accessControlAttrExtension {
 		return a.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
 	}
-	filtered, fabricIndex := im.FabricFilterFromContext(ctx)
-	if fabricIndex == 0 {
-		// PASE (pre-AddNOC) or no FabricFilter set: fall through to
-		// MatterRead which uses a.currentFabric (the last write target).
+	filtered, fabricIndex, request := im.LookupFabricFilter(ctx)
+	if !request {
+		// No Interaction Model request behind the read: a local caller,
+		// served by MatterRead's scope.
 		return a.MatterRead(attrID) //nolint:contextcheck // MatterRead is the unfiltered cluster-interface read; it takes no ctx by the Matter cluster-server contract
 	}
-	fabrics := []uint8{fabricIndex}
-	if !filtered {
+	var fabrics []uint8
+	switch {
+	case filtered && fabricIndex == 0:
+		// A session without a fabric owns no entry.
+	case filtered:
+		fabrics = []uint8{fabricIndex}
+	default:
 		var err error
 		if fabrics, err = a.unfilteredFabrics(ctx, fabricIndex); err != nil {
 			return nil, false
@@ -568,10 +587,14 @@ func (a *AccessControl) MatterReadFiltered(ctx context.Context, attrID uint32) (
 // AuxiliaryType; Data) from a session whose fabric does not own the entry
 // (protocol/src/action/server/AccessControl.ts mayRead), and
 // InteractionMessenger encodes the entry without them. A store that
-// cannot enumerate fabrics leaves the accessing one, as before.
+// cannot enumerate fabrics leaves the accessing one, as before. A session
+// without a fabric (accessing 0) adds none of its own.
 func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) ([]uint8, error) {
 	lister, ok := a.store.(fabricLister)
 	if !ok {
+		if accessing == 0 {
+			return nil, nil
+		}
 		return []uint8{accessing}, nil
 	}
 	recs, err := lister.ListFabrics(ctx)
@@ -584,10 +607,14 @@ func (a *AccessControl) unfilteredFabrics(ctx context.Context, accessing uint8) 
 	}
 	a.mu.RLock()
 	for fabric := range a.extensions {
-		out = append(out, fabric)
+		if fabric != 0 {
+			out = append(out, fabric)
+		}
 	}
 	a.mu.RUnlock()
-	out = append(out, accessing)
+	if accessing != 0 {
+		out = append(out, accessing)
+	}
 	slices.Sort(out)
 	return slices.Compact(out), nil
 }

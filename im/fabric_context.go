@@ -24,8 +24,16 @@ type fabricFilterCtxKey struct{}
 // attributes (OperationalCredentials.Fabrics, AccessControl.ACL) read
 // this via [FabricFilterFromContext] inside their MatterReadFiltered and
 // project the underlying list down to the requesting fabric when
-// filtered=true. fabricIndex==0 means "pre-fabric / PASE session" —
-// matter.js treats reads from such sessions as if FabricFiltered=false.
+// filtered=true. fabricIndex==0 means a session with no fabric yet — a
+// PASE session before AddNOC. matter.js gives such a session no
+// fabric of its own: a fabric-filtered read of a fabric-scoped list
+// shows it no entry, and an unfiltered one withholds every entry's
+// fabric-sensitive fields (packages/node/src/behavior/state/managed/
+// values/ListManager.ts FabricFilteredListProxyHandler,
+// packages/protocol/src/action/server/AccessControl.ts mayRead, which
+// refuses a fabric-sensitive field to a session without
+// `session.fabric`). [LookupFabricFilter] tells such a request apart
+// from a read with no request behind it.
 func WithFabricFilter(ctx context.Context, filtered bool, fabricIndex uint8) context.Context {
 	return context.WithValue(ctx, fabricFilterCtxKey{}, fabricFilterContext{filtered: filtered, fabricIndex: fabricIndex})
 }
@@ -40,6 +48,21 @@ func FabricFilterFromContext(ctx context.Context) (filtered bool, fabricIndex ui
 		return false, 0
 	}
 	return v.filtered, v.fabricIndex
+}
+
+// LookupFabricFilter is [FabricFilterFromContext] that also reports
+// whether a filter was stamped at all. ok=false means no Interaction
+// Model request is behind the read — a local caller, which matter.js
+// models as a local actor that sees every entry whole (AccessControl.ts
+// hasLocalActor). ok=true with fabricIndex 0 is a remote session that
+// has no fabric yet; the two must not stand for one another, because the
+// first may see what the second may not.
+func LookupFabricFilter(ctx context.Context) (filtered bool, fabricIndex uint8, ok bool) {
+	v, ok := ctx.Value(fabricFilterCtxKey{}).(fabricFilterContext)
+	if !ok {
+		return false, 0, false
+	}
+	return v.filtered, v.fabricIndex, true
 }
 
 // subjectContext carries the requesting peer's identity for ACL

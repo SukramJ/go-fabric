@@ -88,9 +88,12 @@ func TestFabricFilteredFabricsRead(t *testing.T) {
 		}
 	})
 
-	t.Run("fabricIndex_zero_returns_all_fabrics", func(t *testing.T) {
+	t.Run("fabricIndex_zero_filtered_returns_no_fabric", func(t *testing.T) {
 		t.Parallel()
-		// fabricIndex==0 means PASE; matter.js treats this as unfiltered.
+		// fabricIndex==0 is a session with no fabric yet (PASE before
+		// AddNOC). matter.js ListManager FabricFilteredListProxyHandler
+		// filters a fabric-filtered read to `session.fabric`, which such a
+		// session does not have: the list is empty.
 		ctx2 := im.WithFabricFilter(context.Background(), true, 0)
 		v, ok := oc.MatterReadFiltered(ctx2, 0x0001 /* opcredsAttrFabrics */)
 		if !ok {
@@ -100,8 +103,27 @@ func TestFabricFilteredFabricsRead(t *testing.T) {
 		if !ok {
 			t.Fatalf("expected []FabricDescriptorStruct, got %T", v)
 		}
+		if len(fabrics) != 0 {
+			t.Fatalf("PASE fabric-filtered list length: got %d, want 0", len(fabrics))
+		}
+	})
+
+	t.Run("fabricIndex_zero_unfiltered_returns_all_fabrics", func(t *testing.T) {
+		t.Parallel()
+		// FabricDescriptorStruct carries no fabric-sensitive field, so
+		// an unfiltered read shows every fabric whole, to a fabric-less
+		// session too (matter.js ListManager createProxy).
+		ctx2 := im.WithFabricFilter(context.Background(), false, 0)
+		v, ok := oc.MatterReadFiltered(ctx2, 0x0001 /* opcredsAttrFabrics */)
+		if !ok {
+			t.Fatal("MatterReadFiltered(Fabrics) pase unfiltered: ok=false")
+		}
+		fabrics, ok := v.([]core.FabricDescriptorStruct)
+		if !ok {
+			t.Fatalf("expected []FabricDescriptorStruct, got %T", v)
+		}
 		if len(fabrics) != 2 {
-			t.Fatalf("PASE path list length: got %d, want 2 (unfiltered)", len(fabrics))
+			t.Fatalf("PASE unfiltered list length: got %d, want 2", len(fabrics))
 		}
 	})
 
