@@ -473,6 +473,14 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- A group invoke whose command fields do not decode is reported per member
+  endpoint the group may reach — GroupcastTesting Success with
+  AccessAllowed true and the endpoint, the command failing there with the
+  decode status — instead of as one access-denied outcome without an
+  endpoint. Access is checked before the fields are decoded, as matter.js
+  `CommandInvokeResponse` does (#4526, Core §11.27.7.6.3); the command
+  still runs nowhere.
+
 - ArmFailSafe over CASE answers BusyWithOtherAdmin while an administrator's
   commissioning window is open and the fail-safe is not armed: the bridge
   now hands the window's state to GeneralCommissioning

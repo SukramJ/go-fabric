@@ -132,10 +132,22 @@ func TestGroupInvokeReport(t *testing.T) {
 			t.Errorf("%s: %+v, want an unprocessed failure", name, r)
 		}
 	}
+	// Fields that do not decode: the command fails on each endpoint access
+	// control lets it reach (2, not the denied 3) with the decode status,
+	// and runs nowhere. matter.js CommandInvokeResponse authorises before
+	// it decodes the fields (3e4c88b8, #4526); this expectation used to
+	// be "nothing dispatched", which reported the decode failure as an
+	// access denial.
 	bad := toggle
 	bad.DecodeStatus = StatusConstraintError
-	if r := HandleGroupInvoke(groupCtx(2), d, InvokeRequest{Invokes: []CommandInvocation{bad}}, nil); !r.Processed || r.Status != StatusConstraintError || len(r.Dispatched) != 0 {
+	invokedBefore := len(d.invoked)
+	r = HandleGroupInvoke(groupCtx(2, 3), d, InvokeRequest{Invokes: []CommandInvocation{bad}}, nil)
+	if !r.Processed || r.Status != StatusConstraintError || len(r.Dispatched) != 1 ||
+		r.Dispatched[0].Path.Endpoint != 2 || !r.Dispatched[0].Path.HasEndpoint || r.Dispatched[0].Status != StatusConstraintError {
 		t.Errorf("rejected fields: %+v", r)
+	}
+	if len(d.invoked) != invokedBefore {
+		t.Errorf("a command whose fields did not decode ran on %v", d.invoked[invokedBefore:])
 	}
 }
 
