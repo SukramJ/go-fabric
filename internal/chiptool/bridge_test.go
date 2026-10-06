@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -215,6 +216,22 @@ func startBridge(t *testing.T, bin string, flags map[string]bool) *bridgeProcess
 	return startBridgeWith(t, bin, flags, bridgeOptions{})
 }
 
+// defaultListen is the --listen of a daemon whose options name none: an
+// ephemeral port, or the Matter port for the certification families
+// (TestChipCertificationFamilies sets it).
+//
+// The family run starts one daemon per case on the same commissioned
+// database, so every one publishes the same operational instance. A resolver
+// on the same host keeps a stopped daemon's record — its goodbye reaches
+// avahi on another host (checked with two containers) but not the avahi
+// beside it — and a controller that picked that record sent Sigma1 to a port
+// nobody listened on any more (TC-CC-4.1 and TC-CC-7.3 in CI). On one stable
+// port a stale record still names a live daemon, which makes the race
+// impossible. The Matter port is the one to take: the cases address group
+// messages to it (CHIP_PORT), and the daemon receives those on its
+// operational socket, as chip and matter.js do.
+var defaultListen = ":0"
+
 // startBridgeWith is startBridge with options.
 func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridgeOptions) *bridgeProcess {
 	t.Helper()
@@ -223,7 +240,7 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 		opts.dbPath = filepath.Join(t.TempDir(), "reference-bridge.db")
 	}
 	if opts.listen == "" {
-		opts.listen = ":0"
+		opts.listen = defaultListen
 	}
 	args := []string{"--db", opts.dbPath, "--listen", opts.listen}
 	if flags["log-level"] {
@@ -281,7 +298,145 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	b.info = info
 	t.Logf("reference daemon up: listen=%s port=%d discriminator=%d passcode=%08d",
 		info.listenAddr, info.port, info.discriminator, info.passcode)
+	b.awaitOperationalRecords(t)
 	return b
+}
+
+// reFabricPublished is the daemon's log line for an operational record it
+// published: one per installed fabric, at start and after AddNOC.
+var reFabricPublished = regexp.MustCompile(`msg=matter\.mdns\.fabric_published .*?instance=([0-9A-F]{16}-[0-9A-F]{16})`)
+
+// operationalRecordWait bounds how long a started daemon's operational
+// records may take to reach the resolver.
+const operationalRecordWait = 30 * time.Second
+
+// awaitOperationalRecords holds a daemon that starts on a database with
+// fabrics until the resolver the cases use — avahi, through the harness
+// container or the host — hands out its operational instances at the port
+// it listens on now, and over IPv6 at no other.
+//
+// Each restarted daemon publishes the same operational instances. On the
+// stable port of a family run ([defaultListen]) that is all there is to
+// wait for: the announcement reaching the resolver. A daemon on a new port
+// beside a stale record of an old one would fail here, naming both ports,
+// instead of failing a case at random with a Sigma1 to the old port.
+func (b *bridgeProcess) awaitOperationalRecords(t *testing.T) {
+	t.Helper()
+	browse := avahiBrowser()
+	if browse == nil {
+		return
+	}
+	// The daemon logs its operational records right after the banner; a
+	// daemon without fabrics logs none.
+	var instances []string
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		instances = instances[:0]
+		for _, m := range reFabricPublished.FindAllStringSubmatch(b.snapshotStderr(), -1) {
+			if !slices.Contains(instances, m[1]) {
+				instances = append(instances, m[1])
+			}
+		}
+		if len(instances) > 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(instances) == 0 {
+		return
+	}
+	want := b.info.port
+	var stale map[string]string
+	deadline = time.Now().Add(operationalRecordWait)
+	for time.Now().Before(deadline) {
+		ports := resolvedPorts(browse())
+		stale = map[string]string{}
+		for _, inst := range instances {
+			if why := staleRecord(ports[inst], want); why != "" {
+				stale[inst] = why
+			}
+		}
+		if len(stale) == 0 {
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	t.Fatalf("after %s the resolver still does not hand out port %d, the one the daemon listens on, for its operational "+
+		"instances: %v", operationalRecordWait, want, stale)
+}
+
+// staleRecord says what is wrong with an instance's resolved records for a
+// daemon on port want, or "" when a controller resolving it now reaches the
+// daemon. Controllers prefer the IPv6 records (chip-tool resolves
+// operational nodes over IPv6 only, and chip scores an IPv6 address above
+// an IPv4 one), so every IPv6 record must name want. Over IPv4 the record
+// for want must be present; a same-host avahi keeps an IPv4 record a stopped
+// daemon withdrew (its goodbye reaches a resolver on another host — checked
+// with two containers — but not avahi on the host the daemon runs on), so a
+// stale IPv4 port alongside it cannot be waited away.
+func staleRecord(byProto map[string][]int, want int) string {
+	v6, v4 := byProto["IPv6"], byProto["IPv4"]
+	switch {
+	case len(v6) > 0 && slices.ContainsFunc(v6, func(p int) bool { return p != want }):
+		return fmt.Sprintf("IPv6 resolves to %v (stale port)", v6)
+	case len(v6) > 0:
+		return ""
+	case slices.Contains(v4, want):
+		return ""
+	case len(v4) > 0:
+		return fmt.Sprintf("IPv4 resolves to %v only (stale port)", v4)
+	}
+	return "not resolved yet"
+}
+
+// avahiBrowser returns a function that lists the resolved _matter._tcp
+// services as `avahi-browse -r -p -t` prints them — in the harness
+// container when there is one, else on the host — or nil without avahi.
+func avahiBrowser() func() string {
+	args := []string{"avahi-browse", "-r", "-p", "-t", "_matter._tcp"}
+	run := func(argv ...string) string {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		out, _ := exec.CommandContext(ctx, argv[0], argv[1:]...).Output() //nolint:gosec // fixed argv
+		return string(out)
+	}
+	if harnessVal != nil {
+		h := harnessVal
+		return func() string {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			out, _ := h.exec(ctx, args...)
+			return out
+		}
+	}
+	if _, err := exec.LookPath("avahi-browse"); err == nil {
+		return func() string { return run(args...) }
+	}
+	return nil
+}
+
+// resolvedPorts maps each resolved instance in avahi-browse's parsable
+// output ("=;iface;proto;instance;type;domain;host;address;port;txt") to the
+// ports it resolved to, per protocol ("IPv4", "IPv6").
+func resolvedPorts(out string) map[string]map[string][]int {
+	ports := map[string]map[string][]int{}
+	for _, line := range strings.Split(out, "\n") {
+		f := strings.Split(line, ";")
+		if len(f) < 9 || f[0] != "=" {
+			continue
+		}
+		p, err := strconv.Atoi(f[8])
+		if err != nil {
+			continue
+		}
+		if ports[f[3]] == nil {
+			ports[f[3]] = map[string][]int{}
+		}
+		if !slices.Contains(ports[f[3]][f[2]], p) {
+			ports[f[3]][f[2]] = append(ports[f[3]][f[2]], p)
+		}
+	}
+	return ports
 }
 
 // restart stops the daemon the way an operator would and starts it again on

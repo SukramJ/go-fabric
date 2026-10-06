@@ -33,6 +33,8 @@ func TestChipCertificationFamilies(t *testing.T) {
 	h := tool.harness
 	bin := requireBridgeBinary(t)
 	flags := requireBridgeFlags(t, bin, "db", "listen")
+	defaultListen = fmt.Sprintf(":%d", matterPort)
+	defer func() { defaultListen = ":0" }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Hour)
 	defer cancel()
@@ -375,7 +377,6 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 		dbPath:    filepath.Join(work, "dut.db"),
 		appPipe:   filepath.Join(work, "app.fifo"),
 		enableKey: chipTestEnableKey,
-		listen:    caseListen(fam, c),
 	})
 
 	args := []string{
@@ -452,7 +453,6 @@ func runYamlCase(ctx context.Context, t *testing.T, h *harness, fam family, c ch
 		dbPath:    filepath.Join(work, "dut.db"),
 		appPipe:   filepath.Join(work, "app.fifo"),
 		enableKey: chipTestEnableKey,
-		listen:    caseListen(fam, c),
 	})
 	kvs := filepath.Join(work, "kvs")
 	args := []string{
@@ -660,18 +660,6 @@ func (f family) deviceTypeOf(name string) uint32 {
 		return dt
 	}
 	return f.deviceType
-}
-
-// caseListen is the daemon's listen address for a case. A case that sends
-// group messages needs the Matter port: the test harness addresses a group
-// at the IANA port 5540 (CHIP_PORT), and the daemon receives group messages
-// on its operational socket, as chip and matter.js do. Every other case
-// takes an ephemeral port.
-func caseListen(fam family, c chipCase) string {
-	if fam.multicast[c.Name] {
-		return fmt.Sprintf(":%d", matterPort)
-	}
-	return ""
 }
 
 // matterPort is the IANA Matter port (transport/udp.MatterPort).
