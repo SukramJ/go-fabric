@@ -21,6 +21,7 @@ an oversight to the next reader — including choices to *not* do something.
 | [0013](./0013-generated-cluster-definitions.md) | Cluster definitions generated from the matter.js model (one package per cluster under `cluster/spec/`), a small runtime that derives lists, privileges, write checks and codecs from them; servers keep only the host port and the rules | accepted |
 | [0014](./0014-transitions-optional-per-endpoint.md) | Attribute transitions run in the module (`cluster/transition`, matter.js `Transitions.ts`), optional per endpoint; a host whose device ramps natively keeps the hand-off path | accepted |
 | [0015](./0015-chip-data-model-read-at-run-time.md) | The CHIP data model cross-check reads connectedhomeip's `data_model/<version>` from a checkout at test time and commits nothing derived from it (the CSA notice forbids publishing or deriving); CI provides the checkout | accepted |
+| [0016](./0016-device-type-validation.md) | Assembled topologies are validated against their device types — a port of matter.js's `DeviceTypeConformance` and its service's modes (warn by default, strict, off) — on every bridge assembly, with a structured verdict for the host | accepted |
 
 ## Provenance
 

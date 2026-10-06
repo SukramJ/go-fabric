@@ -92,8 +92,8 @@ func deviceTypeNamed(t *testing.T, f layerFile, name string) layerDeviceType {
 
 func requirementNamed(t *testing.T, reqs []layerRequirement, element, name string) layerRequirement {
 	t.Helper()
-	for _, r := range reqs {
-		if r.Element == element && r.Name == name {
+	for i := range reqs {
+		if r := reqs[i]; r.Element == element && r.Name == name {
 			return r
 		}
 	}
