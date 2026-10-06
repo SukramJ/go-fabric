@@ -232,7 +232,9 @@ jobs:
           if-no-files-found: ignore
 
   chiptool-control:
-    name: control leg — chip-tool pairs CHIP's all-clusters app
+    # The name is a required status check on main (branch protection); keep
+    # it byte-for-byte, or every pull request waits on a check nobody reports.
+    name: chip-tool control leg (CHIP app, no go-fabric)
     needs: changes
     if: |
       github.event_name == 'schedule' ||
@@ -352,3 +354,26 @@ jobs:
             /tmp/families.log
             bin/chip-harness/logs
           if-no-files-found: ignore
+
+  # The required status check for the certification families. Branch
+  # protection on main names it, and a matrix job cannot serve: its check
+  # names depend on the groups an event runs, and a skipped matrix job
+  # reports under its unexpanded name. This job always reports, under one
+  # fixed name: green when every family group that ran passed (or the suite
+  # was not due at all), red when one failed or was cancelled.
+  chip-families-gate:
+    name: chip certification cases against the reference daemon
+    needs: [changes, chip-families]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          FAMILIES: ${{ needs.chip-families.result }}
+          CHANGES: ${{ needs.changes.result }}
+        run: |
+          echo "code touched: $CHANGES; certification families: $FAMILIES"
+          case "$CHANGES/$FAMILIES" in
+            success/success|success/skipped) exit 0 ;;
+            *) echo "::error::a certification family group did not pass ($FAMILIES)"; exit 1 ;;
+          esac
