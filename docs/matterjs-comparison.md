@@ -169,3 +169,7 @@ In rough order of value to a real bridge:
 
 Everything else in this document is either deliberately out of scope or worth
 doing only when a specific consumer asks for it.
+
+The complete list of what is unfinished, across this document, the
+certifiability status and the findings register, is
+[`open-items.md`](./open-items.md).
