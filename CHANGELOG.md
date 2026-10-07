@@ -10,6 +10,44 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-07
+
+Six pull requests since `v0.1.0` (#22–#28): the matter.js pin at Matter
+1.6.1, subscription resumption, real groups and Groupcast, a transition
+engine, fourteen more cluster servers, cluster definitions generated from
+the matter.js model, device-type validation of every topology, and the CSA
+certification families as the certifiability gate (ADR 0011: certification
+is not pursued, certifiability is). The full entries follow this summary.
+
+**What a host must do when moving from `v0.1.0`:**
+
+- **Re-pin the schema snapshot** if the host pins `parity/schema.json` by
+  hash: `schema.SchemaSnapshotSHA256` changed three times (Matter 1.6.1, the
+  resolved model, the device-type requirements). Pin once, after upgrading.
+- **Expect the Interaction Model revision 12** (was 13) on every IM message,
+  as matter.js sends it.
+- **Supply `endpoint.Config.VendorName`** (or a per-endpoint
+  `Spec.VendorName`); the module no longer fills in a vendor name of its own,
+  and a host that sets neither serves no VendorName on bridged endpoints.
+- **Renumber host-registered measurement kinds**: the built-in
+  `contract.MeasurementFlow` shifts every value `RegisterMeasurementKind`
+  hands out by one.
+- **Drop any host-supplied Groups server**: the assembler mounts the module's
+  Groups server wherever a device type mandates it, replacing a host's.
+- **Watch for `matter.devicetype.violation` warnings** at Start and
+  Reassemble, and for a refused topology when a singleton cluster is
+  misplaced (matter.js's warn mode; `Bridge.SetDeviceTypeValidation` selects
+  strict or off).
+- **New fabrics start with an empty Label** (`OpcredsConfig.InitialFabricLabel`
+  to override).
+- **Subscription resumption is on by default** (`Bridge.SetSubscriptionPersistence`
+  to disable); a host that wants it must attach the store, the operational
+  resolver and the CASE-initiator provider (ADR 0008).
+- **Deprecated, removable in v0.3.0:** `wire.Groups`, the two removed status
+  codes, and the never-wired `PersistentSubscription*` store API.
+
+What is still open is tracked in [`docs/open-items.md`](./docs/open-items.md).
+
 ### Added
 
 - The reference daemon mounts TimeSynchronization and DiagnosticLogs on its
