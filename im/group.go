@@ -125,17 +125,42 @@ func HandleGroupInvoke(ctx context.Context, d Dispatcher, req InvokeRequest, tim
 	if len(subject.Endpoints) == 0 {
 		return report // "No endpoints mapped to group, skipping wildcard invoke"
 	}
-	if !inv.DecodeStatus.IsSuccess() {
-		report.Status = inv.DecodeStatus
-		return report
-	}
 	authorize := groupAuthorizer(ctx, d, subject)
-	report.Dispatched = invoker.InvokeAuthorized(ctx, inv.Path, inv.Fields, func(endpoint uint16, clusterID, commandID uint32) StatusCode {
+	check := func(endpoint uint16, clusterID, commandID uint32) StatusCode {
 		if timedRequired != nil && timedRequired(clusterID, commandID) {
 			return StatusNeedsTimedInteraction
 		}
 		return authorize(endpoint, clusterID, invokePrivilegeOf(d, endpoint, clusterID, commandID))
-	})
+	}
+	if !inv.DecodeStatus.IsSuccess() {
+		// Fields that do not decode fail the command on every endpoint
+		// access control lets it reach — after the access check, not
+		// instead of it. matter.js CommandInvokeResponse authorises each
+		// member endpoint (#processEndpointForWildcard) before
+		// #invokeCommand decodes and validates the fields, so the decode
+		// failure is a per-endpoint command status, and
+		// InteractionServer.handleInvokeRequest reports each as a
+		// GroupcastTesting outcome with AccessAllowed true (3e4c88b8,
+		// #4526; Core §11.27.7.6.3). The command itself never runs: the
+		// authoriser answers the decode status for an allowed endpoint,
+		// which the dispatcher treats as "do not invoke".
+		var allowed []uint16
+		invoker.InvokeAuthorized(ctx, inv.Path, nil, func(endpoint uint16, clusterID, commandID uint32) StatusCode {
+			if st := check(endpoint, clusterID, commandID); !st.IsSuccess() {
+				return st
+			}
+			allowed = append(allowed, endpoint)
+			return inv.DecodeStatus
+		})
+		report.Status = inv.DecodeStatus
+		for _, ep := range allowed {
+			p := inv.Path
+			p.Endpoint, p.HasEndpoint = ep, true
+			report.Dispatched = append(report.Dispatched, InvokeResult{Path: p, Status: inv.DecodeStatus})
+		}
+		return report
+	}
+	report.Dispatched = invoker.InvokeAuthorized(ctx, inv.Path, inv.Fields, check)
 	return report
 }
 

@@ -190,6 +190,16 @@ Descriptor-wide TagList decision — the two are the same switch, and this
 entry exists so that switch is not flipped for the Closure device type
 alone.
 
+Since the schema pin 85cf6647 matter.js generates the Closure, ClosurePanel
+and ElectricalEnergyTariff device types with `DescriptorServer.with("TagList")`
+(08ef820f, #4576), so the divergence is now one from matter.js's code as
+well as its model. The reference daemon's garage door
+(`examples/reference-bridge/fleet_closure.go`) is such an endpoint, and the
+CHIP families that check device-type conformance run against it. The
+device-type validator (ADR 0016, warn mode) reports it at every start as
+`matter.devicetype.violation … requirement=Descriptor.TAGLIST`; that warning
+is this entry, not a new defect.
+
 ### BD-Matter-GarageIsClosureNotWindowCovering — the garage drive left the WindowCovering projection
 
 A garage drive used to project as WindowCovering (0x0102) with its door
@@ -433,7 +443,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | L5-Apple-Width | `packages/types/src/tlv/TlvCodec.ts::encodeTlv` — SubscriptionID and DataVersion encoded as `TypeUnsignedInt` with magnitude-driven byte width (1/2/4 bytes) | `tlv/encode.go::PutUint32` — always encodes as explicit 4-byte unsigned integer | Apple MTRDevice rejected the magnitude-driven 1-byte encoding of SubscriptionID values below 256, causing Subscribe-Initial to be dropped with no error. The 4-byte explicit form is valid per Matter Core Spec §A.7.1 Table 74 (`UInt32` tag) and accepted by all tested commissioners (Apple Home, chip-tool). Verified via pair-debug session. |
 | L3-FQ64-Decoder | `packages/types/src/tlv/TlvCodec.ts:175-176` — `default: throw new NotImplementedError("Unexpected tagControl …")` — FullyQualified64 (TagControl 7) falls to the default throw branch; matter.js never decodes FQ64 tags | `tlv/decode.go::readTag` — `case TagKindFullyQualified8:` reads vendor+profile+uint32 tag number per Matter Core Spec §A.7.3 | go-fabric is more spec-compliant than matter.js for this tag form. FullyQualified64 is a valid Matter TLV tag class and chip's TLVReader.cpp supports it. No live impact: no IM message in a standard bridge exchange uses FQ64 tags. By design: go-fabric mirrors the spec; matter.js omits it. |
 | L3-ContainerTypeValidation | `chip TLVWriter.cpp:686-699` — `WriteElementHead` returns `CHIP_ERROR_INVALID_TLV_TAG` when a context-specific tag is used outside Structure/List, or a non-anonymous tag inside Array | `tlv/encode.go::writeControlAndTag` — emits tag bytes unconditionally; no container-type stack | Defensive-coding gap: chip rejects wire-invalid tag/container combinations at write time; go-fabric does not. All struct-building call sites in `bridge/reply.go` and cluster servers are hand-typed and correct, so no active interop breakage exists. A container-type stack will be added if a fuzz regression surfaces the gap; until then the cost-benefit does not justify the overhead. |
-| L3-ImplicitProfile-Decode | `packages/types/src/tlv/TlvCodec.ts:170-172` — `case TagControl.ImplicitProfile16: case TagControl.ImplicitProfile32: throw new NotImplementedError(…)` | `tlv/decode.go::readTag` — silently decodes ImplicitProfile tags as raw `Tag{Kind, Number}` without profile resolution | go-fabric acts only as a TLV responder (never as an initiator that would need to generate ImplicitProfile tags); no incoming IM message in a standard commissioning or subscription exchange uses ImplicitProfile tags. Profile resolution (chip's `ImplicitProfileId` pattern) is deferred until a code path that needs it materialises. matter.js throws; go-fabric decodes without error and without resolution — both are non-breaking divergences from chip's conditional resolution. |
+| L3-ImplicitProfile-Decode | `packages/types/src/tlv/TlvCodec.ts:169-171` — `case TagControl.ImplicitProfile16: case TagControl.ImplicitProfile32: throw new UnexpectedDataError("Implicit profile tag … cannot be resolved")` (`NotImplementedError` until e21a1e72, #4514: the tag is now malformed peer data, so a message carrying one is rejected) | `tlv/decode.go::readTag` — silently decodes ImplicitProfile tags as raw `Tag{Kind, Number}` without profile resolution | go-fabric acts only as a TLV responder (never as an initiator that would need to generate ImplicitProfile tags); no incoming IM message in a standard commissioning or subscription exchange uses ImplicitProfile tags. Profile resolution (chip's `ImplicitProfileId` pattern) is deferred until a code path that needs it materialises. matter.js throws; go-fabric decodes without error and without resolution — both are non-breaking divergences from chip's conditional resolution. |
 
 | L7-D03 | matter.js `MdnsAdvertisement.ts:153` — MAC-derived hostname `<12hexUC>0000.local`; chip `ServiceNaming.cpp:89` `MakeHostName` from MAC/EUI-64 | `mdns/service.go::defaultHostName` — the first up, multicast-capable interface's MAC plus `0000`, as matter.js does (TC-SC-4.3); without a usable MAC a stable 16-hex-digit name hashed from the OS host name. **On macOS** the OS host name is kept | The macOS exception is the divergence: there mDNSResponder owns the host's A/AAAA records, and a separately published name lost its address records, so Apple Home tore the fabric down after CommissioningComplete (`mdns/zeroconf.go` Publish). A product certifies on its own platform; a macOS-hosted product sets `Config.HostName` to a MAC-derived name it publishes addresses for. Drift L7-D03 (LOW, macOS only). |
 | BD-Matter-UniqueID-Stable | matter.js `BasicInformationServer.createUniqueId()` — 32-char random persisted with Quality "FN" so the value survives bridge restarts | `cluster/core/basic_information.go::uniqueID` mixes `bootid.Salt()` into a deterministic SHA-256 derivation; `bootid/bootid.go` defaults `rotationEnabled = false`, so `Salt()` returns `[16]byte{}` and the hash collapses to a stable function of vendor/product/nodeLabel/serialNumber | go-fabric produces a stable UniqueID across daemon restarts by default. Rotation is opt-in via `matter.dev_rotate_unique_ids=true` and is intended for the dev/debug workflow where pair-iteration has corrupted Apple's HMHome state. Audit drift L1-D19 (in `audit_runs/2026-05-18_resolution_status.md`) is a **false positive**: it assumes `bootid.Salt()` rotates unconditionally, but the default zeroed salt means the production daemon's UniqueID is stable. The bootid package docstring spells out the contract; no code change required. |
@@ -704,8 +714,9 @@ when Actions or another optional cluster lands.
 **L3 — TLV Wire Codec (Systematic Parity Run #02 — 2026-05-12):**
 
 - **L3-D2 ImplicitProfile-tag pass-through:** matter.js throws
-  `NotImplementedError` for `ImplicitProfile16`/`ImplicitProfile32` tags
-  (TlvCodec.ts:171-172); chip resolves them against `ImplicitProfileId` and
+  `UnexpectedDataError` for `ImplicitProfile16`/`ImplicitProfile32` tags
+  (TlvCodec.ts:169-171 at the schema pin; `NotImplementedError` before
+  e21a1e72, #4514, which classifies the tag as malformed peer data); chip resolves them against `ImplicitProfileId` and
   returns `CHIP_ERROR_UNKNOWN_IMPLICIT_TLV_TAG` when no profile ID is set
   (TLVReader.cpp:872-879). go-fabric's `Decoder.readTag` silently surfaces
   them as `Tag{Kind: TagKindImplicitProfile2/4, Number: n}` without
@@ -1435,6 +1446,24 @@ lists every one of these by fabric index, then group id. The lists are sets
 on the wire — each entry carries its own GroupId and FabricIndex — and
 keeping insertion order would mean persisting an order column, as for
 `BD-Matter-KeySetReadAllIndicesOrder`.
+
+---
+
+### BD-Matter-DelayReportData — DelayReportData is decoded and validated, not acted on
+
+matter.js decodes an InvokeRequest's DelayReportData (tag 3,
+`TlvInvokeRequest.ts`, 67be3a83 #4569) and refuses a malformed one; the
+deferral it asks for — holding back the next report of the subscriptions on
+the endpoints the commands target (`InteractionServer #deferReports`,
+`ServerSubscription.deferReports`) — runs only behind the
+`delay-report-data` forward feature, off at the schema pin
+(`Specification.ENABLE_FORWARD_MATTER_FEATURES`). go-fabric decodes and
+validates the field the same way (`im.UnmarshalInvokeRequestTLV`,
+`InvokeRequest.DelayReportData`: a wrong type InvalidAction, a value above
+uint16 ConstraintError) and does not defer anything, which is what matter.js
+does with the feature off. Retires when a pin bump turns the feature on
+upstream: port the deferral then. Pinned by
+`TestParityMatterJS_InvokeRequestDelayReportData`.
 
 ---
 

@@ -115,6 +115,29 @@ When a parity sweep is genuinely warranted, prefer extending these guards over
 producing a throw-away report: a guard catches the *next* regression, a report
 catches only today's.
 
+### Sweeping a pin bump
+
+Moving `parity/schema.json` to a newer matter.js commit propagates the
+schema mechanically; the behaviour that changed between the two pins does
+not follow by itself. Every pin bump is therefore followed by a sweep of the
+commits in between, the way
+[`notes/parity/sweeps/2026-10-f07365a8-85cf6647.md`](../notes/parity/sweeps/2026-10-f07365a8-85cf6647.md)
+was made:
+
+1. List the commits, not just the files:
+   `git -C ../matter.js log --oneline <old>..<new> -- packages/node/src
+   packages/protocol/src packages/types/src`. A commit message carries the
+   reason a file diff hides.
+2. Read each commit at its pin (`git -C ../matter.js show <commit>`) and give
+   it one verdict: (1) not applicable to a device-side responder or to a
+   feature the module does not have — say which; (2) already matches — cite
+   the Go code; (3) go-fabric differs — fix it through the workflow above
+   (read, mirror, cite, unit or parity test, CHANGELOG), or, if it is large,
+   record a finding in the open-gap register.
+3. Commit the table as `notes/parity/sweeps/<yyyy-mm>-<old>-<new>.md`
+   (commit, subject, verdict, Go reference / fix commit / finding), and
+   re-run every certification family that covers a verdict-3 change.
+
 ## 5. Where the host's own parity obligation begins
 
 This module owns the wire format. A bridge is this module *plus* a host that

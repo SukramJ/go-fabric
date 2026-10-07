@@ -88,3 +88,30 @@ func TestCheckACLWithTheAuxiliaryFeature(t *testing.T) {
 	}
 	(*TopologyDispatcher)(nil).SetAuxiliaryACL(nil) // nil-safe
 }
+
+// TestCheckACLAuxiliaryFollowsTheAdvertisedFeature: the endpoint 0 rule of
+// the Auxiliary feature follows the root AccessControl's FeatureMap, as
+// matter.js AccessControlServer.#applyFabricAcl derives
+// auxiliaryFeatureEnabled from the cluster's own feature. A host that
+// advertises AUX (mounting Groupcast turns it on) but never attaches the
+// auxiliary lister used to let a target-less Group entry reach endpoint 0;
+// it now fails closed.
+func TestCheckACLAuxiliaryFollowsTheAdvertisedFeature(t *testing.T) {
+	t.Parallel()
+	wildcard := []store.ACLEntry{{FabricIndex: 1, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeGroup}}
+	ctx := im.WithGroupSubject(context.Background(), im.GroupSubject{GroupID: 0x0101, HasValidMapping: true, Endpoints: []uint16{0}})
+	for _, tc := range []struct {
+		featureMap uint32
+		want       im.StatusCode
+	}{
+		{0x1, im.StatusSuccess},                 // EXTS only: no Auxiliary rule
+		{0x1 | 0x4, im.StatusUnsupportedAccess}, // AUX advertised, no lister attached
+	} {
+		root := rootEndpointWith(&fakeServerFull{id: 0x001F, readVal: tc.featureMap, readOK: true})
+		d := &TopologyDispatcher{topology: &Topology{Endpoints: []*Endpoint{root}}}
+		d.SetACLLister(fakeACLLister{entries: wildcard})
+		if got := d.CheckACL(ctx, 1, 0x1B669, nil, 0, 0x0006, privOperate); got != tc.want {
+			t.Errorf("FeatureMap 0x%X: a wildcard Group entry at endpoint 0 got %v, want %v", tc.featureMap, got, tc.want)
+		}
+	}
+}

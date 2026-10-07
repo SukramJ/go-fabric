@@ -11,7 +11,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/closure"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -139,13 +138,16 @@ func TestClosureControlMoveToRejectsAPayloadItCannotRead(t *testing.T) {
 }
 
 // TestClosureControlMoveToTagMapCarriesLatchAndSpeed verifies the two
-// fields that are read but cannot act on their own. Latch (tag 1) and
-// Speed (tag 2) belong to MotionLatching and Speed
-// (closure-control.element.ts:80-81); this server advertises neither, so
-// a request carrying only them is a ConstraintError rather than a silent
-// success. The tag map must still decode them — a decoder that dropped
-// Latch would make this request look like an empty one, which is a
-// different error.
+// fields that cannot act on their own. Latch (tag 1) and Speed (tag 2)
+// belong to MotionLatching and Speed (closure-control.element.ts:80-81),
+// which this server does not advertise. The specification text matter.js
+// carries (closure-control.resource.ts, MoveTo) says a field of an
+// unsupported feature is ignored, not refused, and with Positioning an
+// absent Position falls back to OverallTargetState.Position — null here,
+// so nothing moves. Expectation changed from ConstraintError to that
+// silent success when the server was aligned with the text. The tag map
+// must still decode both fields: a decoder that dropped them would make
+// the request look empty, which is INVALID_COMMAND.
 func TestClosureControlMoveToTagMapCarriesLatchAndSpeed(t *testing.T) {
 	t.Parallel()
 	h := &recordingHandlers{}
@@ -155,20 +157,11 @@ func TestClosureControlMoveToTagMapCarriesLatchAndSpeed(t *testing.T) {
 		1: true,
 		2: uint64(2),
 	})
-	if err == nil {
-		t.Fatal("MoveTo with only Latch and Speed was accepted")
+	if err != nil {
+		t.Fatalf("MoveTo with only Latch and Speed: %v, want the fields ignored", err)
 	}
-	var status im.StatusCodeError
-	if !errors.As(err, &status) {
-		t.Fatalf("err = %v (%T), want an im.StatusCodeError", err, err)
-	}
-	if got := status.MatterStatusCode(); got != im.StatusConstraintError {
-		t.Errorf("status = %v, want ConstraintError", got)
-	}
-	// Not the malformed-payload error: the fields decoded fine, the
-	// feature set is what cannot serve them.
-	if errors.Is(err, clusterwire.ErrClosureControlMalformed) {
-		t.Error("a decodable Latch+Speed request must not report as malformed")
+	if len(h.moved) != 0 {
+		t.Errorf("MoveTo with no Position and no target moved the drive: %v", h.moved)
 	}
 }
 
@@ -187,15 +180,21 @@ func TestClosureControlMoveToAndStopFailWithoutAHandler(t *testing.T) {
 	); err == nil {
 		t.Error("MoveTo without a handler reported success")
 	}
-	if _, err := srv.MatterInvoke(
-		context.Background(), clusterwire.ClosureControlCmdStop, nil,
-	); err == nil {
-		t.Error("Stop without a handler reported success")
-	}
 	// The state must not claim a move that never left the process.
 	if raw, ok := srv.MatterRead(clusterwire.ClosureControlAttrMainState); !ok ||
 		raw.(uint8) != uint8(clusterwire.ClosureMainStateSetupRequired) {
-		t.Errorf("MainState = %v, want SetupRequired after two failed commands", raw)
+		t.Errorf("MainState = %v, want SetupRequired after a failed MoveTo", raw)
+	}
+	// Stop acts only on a closure in motion (cluster§5.4.8.1); in
+	// SetupRequired it changes nothing and answers SUCCESS, handler or not.
+	if _, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdStop, nil); err != nil {
+		t.Errorf("Stop outside a motion: %v, want SUCCESS", err)
+	}
+	srv.SetMainState(clusterwire.ClosureMainStateMoving)
+	if _, err := srv.MatterInvoke(
+		context.Background(), clusterwire.ClosureControlCmdStop, nil,
+	); err == nil {
+		t.Error("Stop of a moving closure without a handler reported success")
 	}
 }
 
@@ -208,14 +207,15 @@ func TestClosureControlStopReportsADeviceRefusal(t *testing.T) {
 	sentinel := errors.New("drive is jammed")
 	h := &recordingHandlers{stopErr: sentinel}
 	srv := closure.NewControlServer(h.config())
+	srv.SetMainState(clusterwire.ClosureMainStateMoving) // Stop acts on a closure in motion only
 
 	_, err := srv.MatterInvoke(context.Background(), clusterwire.ClosureControlCmdStop, nil)
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("err = %v, want it to wrap %v", err, sentinel)
 	}
 	if raw, ok := srv.MatterRead(clusterwire.ClosureControlAttrMainState); !ok ||
-		raw.(uint8) != uint8(clusterwire.ClosureMainStateSetupRequired) {
-		t.Errorf("MainState = %v, want SetupRequired — a refused Stop is not a stop", raw)
+		raw.(uint8) != uint8(clusterwire.ClosureMainStateMoving) {
+		t.Errorf("MainState = %v, want Moving — a refused Stop is not a stop", raw)
 	}
 }
 

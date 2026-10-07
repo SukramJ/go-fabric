@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3768,
+  "entry_points": 3805,
   "entry_packages": [
     ".",
     "bootid",
@@ -72,9 +72,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 4358,
-    "reachable": 2546,
-    "whitelisted": 1807,
+    "total_exported": 4395,
+    "reachable": 2553,
+    "whitelisted": 1837,
     "unreachable": 5
   },
   "by_package": [
@@ -2557,17 +2557,17 @@
     },
     {
       "package": "bridge",
-      "identifier": "TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsInvalidAction",
+      "identifier": "TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsSilently",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_chunked_dispatch_test.go",
-      "line": 115
+      "line": 123
     },
     {
       "package": "bridge",
       "identifier": "TestDispatchWriteRequest_ChunkedUntimedNotSuppressed_DispatchesAndRepliesWriteResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_chunked_dispatch_test.go",
-      "line": 177
+      "line": 206
     },
     {
       "package": "bridge",
@@ -2581,7 +2581,7 @@
       "identifier": "TestDispatchWriteRequest_TimedWithMoreChunked_RejectsInvalidActionAndConsumesWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/write_chunked_dispatch_test.go",
-      "line": 142
+      "line": 171
     },
     {
       "package": "bridge",
@@ -2938,7 +2938,7 @@
       "identifier": "TestGroupcastChangeReachesASubscriber",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/groupcast_e2e_test.go",
-      "line": 221
+      "line": 222
     },
     {
       "package": "bridge",
@@ -2952,7 +2952,7 @@
       "identifier": "TestGroupcastEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/groupcast_e2e_test.go",
-      "line": 47
+      "line": 48
     },
     {
       "package": "bridge",
@@ -2970,10 +2970,17 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestGroupcastTestingDuplicateCopiesKeepOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/groupcast_e2e_test.go",
+      "line": 259
+    },
+    {
+      "package": "bridge",
       "identifier": "TestGroupcastWithoutTheAuxiliaryPortFailsClosed",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/groupcast_e2e_test.go",
-      "line": 201
+      "line": 202
     },
     {
       "package": "bridge",
@@ -3362,6 +3369,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestOutboundReliableUntrack",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/outbound_untrack_test.go",
+      "line": 13
+    },
+    {
+      "package": "bridge",
       "identifier": "TestOutboundReliable_AbandonExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
@@ -3415,6 +3429,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_reliable_test.go",
       "line": 20
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestParityMatterJS_SuppressResponseSuppressesErrorStatuses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/suppress_response_parity_matterjs_test.go",
+      "line": 66
     },
     {
       "package": "bridge",
@@ -4461,6 +4482,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSessionOrderKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/session_order_test.go",
+      "line": 14
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSigma1Replied_PrunedOnSigma3",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_test.go",
@@ -4779,7 +4807,14 @@
       "identifier": "TestWindowTransitionsReachSubscribers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/commissioned_window_test.go",
-      "line": 69
+      "line": 75
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestWireCommissioned_ArmFailSafeOverCASEWhileWindowOpen",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/commissioning_window_armfailsafe_test.go",
+      "line": 22
     },
     {
       "package": "bridge",
@@ -4846,6 +4881,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestGeneralDiagnosticsUpTimeCountsSuspendNeverLowered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/general_diagnostics_uptime_test.go",
+      "line": 16
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestParityMatterJS_ClusterIDsAndRevisions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
@@ -4899,6 +4941,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_diagnostics_internal_test.go",
       "line": 55
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestTimeSnapshotPosixFollowsTimeSynchronization",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/time_synchronization_snapshot_test.go",
+      "line": 20
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestTimeSynchronizationWriteIsUnsupported",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/time_synchronization_snapshot_test.go",
+      "line": 59
     },
     {
       "package": "cluster/filter",
@@ -6008,6 +6064,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestCheckACLAuxiliaryFollowsTheAdvertisedFeature",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/dispatcher_auxiliary_acl_test.go",
+      "line": 99
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestCheckACLForAGroupMessage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_group_test.go",
@@ -6974,6 +7037,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestRingLogs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/ringlogs_test.go",
+      "line": 17
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestRootMountsGroupcastWithTheAuxiliaryACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
@@ -7565,7 +7635,7 @@
       "identifier": "TestGroupcastEventsAreAdministerAndFabricSensitive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/authority_test.go",
-      "line": 144
+      "line": 156
     },
     {
       "package": "im",
@@ -7944,6 +8014,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/pase_authmode_acl_test.go",
       "line": 84
+    },
+    {
+      "package": "im",
+      "identifier": "TestParityMatterJS_InvokeRequestDelayReportData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/suppress_response_parity_matterjs_test.go",
+      "line": 67
+    },
+    {
+      "package": "im",
+      "identifier": "TestParityMatterJS_SuppressResponseOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/suppress_response_parity_matterjs_test.go",
+      "line": 30
     },
     {
       "package": "im",
@@ -8941,6 +9025,97 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestHostAddrsFor_Policy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 356
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_AAAAQueryInSelectionPreferenceOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 124
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_ANYQueryAnswersAll",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 133
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_AQueryAnswersARecordsOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 108
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_DuplicateQuestionSuppression",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 239
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_KnownAnswerNeedsMoreThanHalfTTL",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 194
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_KnownAnswerSuppressionAndCacheFlush",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 179
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_MixedQueryAddsTheRestAsAdditionals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 142
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_QUThenQMGetsOneMulticast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 258
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_UnicastOnlyAfterRecentMulticast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 211
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostAnswer_UnknownNameOtherInterfaceOrStopped",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 154
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostResponder_LiveMulticastV4",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_live_test.go",
+      "line": 67
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestHostResponder_LiveMulticastV6",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_live_test.go",
+      "line": 103
+    },
+    {
+      "package": "mdns",
       "identifier": "TestIsPrimaryV4_AllSystemInterfaces",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/subtype_internal_test.go",
@@ -9277,6 +9452,13 @@
     },
     {
       "package": "mdns",
+      "identifier": "TestSubtypeResponder_AnswersHostThroughTransport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 296
+    },
+    {
+      "package": "mdns",
       "identifier": "TestSubtypeResponder_Close_Idempotent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/subtype_internal_test.go",
@@ -9470,6 +9652,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/zeroconf_internal_test.go",
       "line": 346
+    },
+    {
+      "package": "mdns",
+      "identifier": "TestZeroconf_HandsHostNameToResponder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "mdns/host_responder_parity_matterjs_test.go",
+      "line": 331
     },
     {
       "package": "schema",
@@ -12763,6 +12952,13 @@
     },
     {
       "package": "transport/udp",
+      "identifier": "TestOrderedBacklogBound",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/ordered_test.go",
+      "line": 128
+    },
+    {
+      "package": "transport/udp",
       "identifier": "TestPanicInHandlerIsRecoveredCountedAndLogged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
@@ -12795,6 +12991,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
       "line": 132
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestServeOrderedKeepsAStreamInOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/ordered_test.go",
+      "line": 27
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestServeOrderedUnkeyedAndNil",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/ordered_test.go",
+      "line": 99
     }
   ],
   "variant_disagreements": 0

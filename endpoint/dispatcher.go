@@ -956,8 +956,16 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		ep = d.topology.FindByID(endpoint)
 	}
 	if group, isGroup := im.GroupSubjectFromContext(ctx); isGroup {
-		auxEnabled := d.aux != nil
-		if auxEnabled {
+		// The Auxiliary feature is on when the root's AccessControl
+		// advertises it, whether or not a lister is attached: matter.js
+		// AccessControlServer.#applyFabricAcl derives
+		// auxiliaryFeatureEnabled from the cluster's own feature, so the
+		// advertised feature and the endpoint 0 rule cannot disagree. A
+		// host that mounts Groupcast (which turns AUX on) without
+		// AttachAuxiliaryACL now gets the endpoint 0 restriction and no
+		// auxiliary grants — closed, not open.
+		auxEnabled := d.aux != nil || d.auxiliaryAdvertised()
+		if d.aux != nil {
 			// Auxiliary entries are all Group entries, so only a group
 			// subject can match one. An auxiliary source that cannot be
 			// read fails closed like the stored ACL.
@@ -990,6 +998,34 @@ func (d *TopologyDispatcher) CheckACL(ctx context.Context, fabricIndex uint8, su
 		return im.StatusSuccess
 	}
 	return im.StatusUnsupportedAccess
+}
+
+// accessControlFeatureAuxiliary is AccessControl's AUX feature bit
+// (access-control.element.ts: Auxiliary, constraint 2).
+const accessControlFeatureAuxiliary = 1 << 2
+
+// auxiliaryAdvertised reports whether the root endpoint's AccessControl
+// server advertises the Auxiliary feature.
+func (d *TopologyDispatcher) auxiliaryAdvertised() bool {
+	if d.topology == nil {
+		return false
+	}
+	root := d.topology.FindByID(0)
+	if root == nil {
+		return false
+	}
+	for _, srv := range ClusterServers(root) {
+		if srv == nil || srv.MatterClusterID() != 0x001F {
+			continue
+		}
+		v, ok := srv.MatterRead(0xFFFC)
+		if !ok {
+			return false
+		}
+		fm, ok := v.(uint32)
+		return ok && fm&accessControlFeatureAuxiliary != 0
+	}
+	return false
 }
 
 // checkGroupACL is the access check for a group message (Matter §9.10.5.6

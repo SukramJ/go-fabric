@@ -23,7 +23,7 @@ Startup prints the pairing information on stdout:
   go-fabric reference bridge
   --------------------------------------------------------------
   listening on     [::]:5540
-  bridged devices  19
+  bridged devices  21
   vendor/product   0xFFF1 / 0x8001  (CSA TEST identity — not shippable)
 
   discriminator    3840
@@ -57,6 +57,12 @@ Startup prints the pairing information on stdout:
 | 16 | DoorLock `0x000A` | `demoLock`, host port of `cluster/lock` |
 | 17-19 | Humidity, Occupancy, Contact sensors | `demoReading` / `demoBinary` measurement sources |
 | 20 | GenericSwitch `0x000F` | `demoButton`, a momentary press source with long-press |
+| 21 | AirPurifier `0x002D` | `demoAirPurifier`: the fan's FanControl plus `cluster/filter` HEPA and activated-carbon filter monitoring |
+| 22 | Closure `0x0230` | `demoGarage`: `cluster/closure` ClosureControl (Positioning, Ventilation) with a simulated drive (`fleet_closure.go`) |
+
+The root endpoint carries the node's own clusters, TimeSynchronization and
+DiagnosticLogs among them (`wiring.go` buildRootClusters, which also says why
+IcdManagement and the OTA requestor are left out).
 
 The shapes are deliberately different. A device with commands has to serve
 `contract.ClusterServer` itself; a read-only measurement does not, and the
@@ -81,7 +87,7 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   `SetLocalTemperature`, `SetLockJammed`, `PumpEvent`, …). The CHIP Python
   certification cases drive a device through exactly this pipe.
 - `--enable-key <hex>` arms GeneralDiagnostics TestEventTrigger with that
-  test enable key; the SmokeCoAlarm triggers are CHIP's.
+  test enable key; the SmokeCoAlarm and ClosureControl triggers are CHIP's.
 - `--mdns-os-hostname` advertises the OS host name as the SRV target instead
   of the MAC-derived one, for a test host whose LAN interface has no IPv6:
   the OS responder then publishes the address records — the IPv6 link-local

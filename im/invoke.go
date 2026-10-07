@@ -18,6 +18,11 @@ const (
 	tagInvokeReqSuppressResponse uint8 = 0
 	tagInvokeReqTimedRequest     uint8 = 1
 	tagInvokeReqInvokeRequests   uint8 = 2
+	// tagInvokeReqDelayReportData is Matter 1.7's DelayReportData
+	// (matter.js packages/types/src/protocol/messages/TlvInvokeRequest.ts,
+	// 67be3a83 #4569): decoded and validated, not acted on — see
+	// [InvokeRequest.DelayReportData].
+	tagInvokeReqDelayReportData uint8 = 3
 )
 
 // InvokeResponseMessage tag numbers.
@@ -64,6 +69,74 @@ type InvokeRequest struct {
 	SuppressResponse bool
 	TimedRequest     bool
 	Invokes          []CommandInvocation
+	// DelayReportData is the request's DelayReportData field, nil when
+	// absent. matter.js always decodes it and refuses a malformed one; the
+	// deferral of subscription reports it asks for runs only behind
+	// matter.js's "delay-report-data" forward feature, off at the schema
+	// pin, so the bridge does not act on it either
+	// (BD-Matter-DelayReportData).
+	DelayReportData *DelayReportData
+}
+
+// DelayReportData is the DelayReportData structure of an InvokeRequest
+// (matter.js TlvDelayReportData): both fields uint16 milliseconds,
+// default 0.
+type DelayReportData struct {
+	DelayMinMs          uint16
+	DelayJitterWindowMs uint16
+}
+
+// invokeDecodeStatusError is a malformed InvokeRequest field with the
+// status matter.js answers it with: a wrong type is a
+// ValidationDatatypeMismatchError (InvalidAction), a value outside the
+// field's range a ValidationError (ConstraintError).
+type invokeDecodeStatusError struct {
+	msg    string
+	status StatusCode
+}
+
+func (e invokeDecodeStatusError) Error() string                { return e.msg }
+func (e invokeDecodeStatusError) MatterStatusCode() StatusCode { return e.status }
+func (invokeDecodeStatusError) Is(target error) bool           { return target == ErrInvalidInvokeRequest }
+
+// readDelayReportData decodes the DelayReportData structure whose opening
+// element el is.
+func readDelayReportData(dec *tlv.Decoder, el tlv.Element) (*DelayReportData, error) {
+	if !el.IsContainer || el.Type != tlv.TypeStructure {
+		if el.IsContainer {
+			_ = skipContainer(dec)
+		}
+		return nil, invokeDecodeStatusError{"im: invalid InvokeRequest: DelayReportData not a structure", StatusInvalidAction}
+	}
+	out := &DelayReportData{}
+	for {
+		f, err := dec.Next()
+		if err != nil {
+			return nil, fmt.Errorf("%w: DelayReportData: %w", ErrInvalidInvokeRequest, err)
+		}
+		if f.IsEndContainer {
+			return out, nil
+		}
+		if f.IsContainer {
+			if err := skipContainer(dec); err != nil {
+				return nil, err
+			}
+		}
+		if f.Tag.Kind != tlv.TagKindContext || f.Tag.Number > 1 {
+			continue
+		}
+		if f.Type < tlv.TypeUnsignedInt1 || f.Type > tlv.TypeUnsignedInt8 {
+			return nil, invokeDecodeStatusError{"im: invalid InvokeRequest: DelayReportData field is not an unsigned integer", StatusInvalidAction}
+		}
+		if f.Uint > 0xFFFF {
+			return nil, invokeDecodeStatusError{"im: invalid InvokeRequest: DelayReportData field exceeds uint16", StatusConstraintError}
+		}
+		if f.Tag.Number == 0 {
+			out.DelayMinMs = uint16(f.Uint)
+		} else {
+			out.DelayJitterWindowMs = uint16(f.Uint)
+		}
+	}
 }
 
 // CommandInvocation is one entry in InvokeRequests.
@@ -155,6 +228,12 @@ func UnmarshalInvokeRequestTLV(dec *tlv.Decoder, fieldsReader CommandFieldsReade
 				return InvokeRequest{}, err
 			}
 			req.Invokes = invokes
+		case tagInvokeReqDelayReportData:
+			drd, err := readDelayReportData(dec, el)
+			if err != nil {
+				return InvokeRequest{}, err
+			}
+			req.DelayReportData = drd
 		default:
 			if el.IsContainer {
 				if err := skipContainer(dec); err != nil {

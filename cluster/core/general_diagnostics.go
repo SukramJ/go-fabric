@@ -13,6 +13,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
@@ -107,6 +108,14 @@ type GeneralDiagnostics struct {
 	// reports the zeroed struct matter.js reports before its interaction
 	// server is online.
 	deviceLoad func(fabricIndex uint8) DeviceLoadStruct
+
+	// upTimeHighWater is the highest UpTime (in nanoseconds) reported since
+	// startTime; see upTime.
+	upTimeHighWater atomic.Int64
+
+	// utcClock is the node's TimeSynchronization UTC time; nil when the
+	// node has no TimeSynchronization cluster (see SetUTCClock).
+	utcClock func() (time.Time, bool)
 
 	// Event emitter + endpoint; wired by the bridge topology assembler
 	// via [SetMatterEventEmitter] + [SetEndpoint] so [EmitBootReason]
@@ -302,7 +311,7 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 		}
 		return uint16(1), true
 	case gendiagAttrUpTime:
-		return uint64(time.Since(g.startTime).Seconds()), true
+		return uint64(g.upTime().Seconds()), true
 	case gendiagAttrTotalOperationalHours:
 		// Live = persisted base hours + current process uptime hours.
 		// Daemon shutdown hooks should snapshot the value back to the
@@ -357,11 +366,21 @@ func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	switch cmdID {
 	case gendiagCmdTimeSnapshot:
 		systemMs := uint64(time.Since(g.startTime).Milliseconds()) //nolint:gosec // G115: wall-clock millis are non-negative for any valid host time; see #20
-		// PosixTimeMs stays null: matter.js GeneralDiagnosticsServer.ts
-		// timeSnapshot sets it only when a TimeSynchronization cluster holds
-		// a UTC time, which this server cannot see — and TC-DGGEN-2.4 fails
-		// a node that reports one without it (the reason matter.js gives).
-		return TimeSnapshotResponse{SystemTimeMs: systemMs}, nil
+		// PosixTimeMs only when the node's TimeSynchronization cluster holds
+		// a UTC time: matter.js GeneralDiagnosticsServer.ts timeSnapshot
+		// (agent.has(TimeSynchronizationBehavior) && utcTime !== null), and
+		// TC-DGGEN-2.4 fails a node that reports one without it.
+		resp := TimeSnapshotResponse{SystemTimeMs: systemMs}
+		g.mu.RLock()
+		clock := g.utcClock
+		g.mu.RUnlock()
+		if clock != nil {
+			if now, ok := clock(); ok && now.UnixMilli() >= 0 {
+				posix := uint64(now.UnixMilli()) //nolint:gosec // non-negative, checked above
+				resp.PosixTimeMs = &posix
+			}
+		}
+		return resp, nil
 	case gendiagCmdPayloadTestRequest:
 		return g.payloadTestRequest(fields)
 	case gendiagCmdTestEventTrigger:
@@ -381,6 +400,43 @@ type DeviceLoadStruct struct {
 	TotalSubscriptionsEstablished         uint32
 	TotalInteractionModelMessagesSent     uint32
 	TotalInteractionModelMessagesReceived uint32
+}
+
+// upTime is the time since the node came up. Mirrors matter.js
+// GeneralDiagnosticsServer.ts upTime (c0a7978d, #4614): the larger of the
+// elapsed time on the monotonic clock and on the wall clock — Go's
+// monotonic reading, like Time.nowUs, stops while the host is suspended,
+// and the wall clock folds the suspend back in — never below the highest
+// value already reported, so a backward wall-clock step (an NTP correction)
+// cannot lower it, and never negative.
+func (g *GeneralDiagnostics) upTime() time.Duration {
+	return g.upTimeFrom(time.Since(g.startTime), time.Now().Round(0).Sub(g.startTime.Round(0)))
+}
+
+// upTimeFrom folds the elapsed monotonic and wall-clock times into UpTime
+// against the high-water mark.
+func (g *GeneralDiagnostics) upTimeFrom(mono, wall time.Duration) time.Duration {
+	up := max(mono, wall, 0)
+	for {
+		hw := g.upTimeHighWater.Load()
+		if int64(up) <= hw {
+			return time.Duration(hw)
+		}
+		if g.upTimeHighWater.CompareAndSwap(hw, int64(up)) {
+			return up
+		}
+	}
+}
+
+// SetUTCClock couples TimeSnapshot to the node's TimeSynchronization
+// cluster: clock returns its UTC time, false while it is null. Without a
+// clock (no TimeSynchronization on the node) PosixTimeMs stays null, as
+// matter.js GeneralDiagnosticsServer.timeSnapshot leaves it. Pass
+// [TimeSynchronization.UTC] when both are mounted.
+func (g *GeneralDiagnostics) SetUTCClock(clock func() (time.Time, bool)) {
+	g.mu.Lock()
+	g.utcClock = clock
+	g.mu.Unlock()
 }
 
 // SetDeviceLoadProvider wires the source of DeviceLoadStatus. The bridge

@@ -480,6 +480,15 @@ func (c rvcRunChanger) ChangeToMode(_ context.Context, newMode uint8) (modebase.
 			return modebase.StatusGenericFailure, "", err
 		}
 	}
+	if current == rvcCleaning && newMode == rvcIdle {
+		// The cleaning run is over: OperationCompletion, which the
+		// RoboticVacuumCleaner device type mandates (its element
+		// requirement on RvcOperationalState; matter.js's RVC test node
+		// enables the event, TestRvcOperationalStateServer.ts).
+		if err := v.ops.EmitOperationCompletion(opstate.OperationCompletion{Code: opstate.ErrorNoError}); err != nil {
+			return modebase.StatusGenericFailure, "", err
+		}
+	}
 	return modebase.StatusSuccess, "", nil
 }
 

@@ -11,8 +11,10 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/fan"
+	"github.com/SukramJ/go-fabric/cluster/filter"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/pump"
+	hepaspec "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -318,4 +320,81 @@ func (p *demoPump) reportEvent(event uint32) error {
 	}
 	slog.Info("pump.event", slog.String("device", p.name), slog.Int("event", int(event)))
 	return srv.Emit(event)
+}
+
+// --- device: an air purifier -------------------------------------------------
+
+// demoAirPurifier is an air purifier: its fan (FanControl, mandatory for the
+// AirPurifier device type) and two filters it monitors, a HEPA filter and an
+// activated-carbon filter (HepaFilterMonitoring and
+// ActivatedCarbonFilterMonitoring, both optional for the device type). The
+// filters start where matter.js's all-clusters test app starts them
+// (support/chip-testing/src/cluster/TestHEPAFilterMonitoringServer.ts and
+// TestActivatedCarbonFilterMonitoringServer.ts): 20 % left, degrading
+// downwards, one replacement product; the HEPA filter with the Warning
+// feature in Warning, the carbon filter without it in Critical. Replacing a
+// filter (ResetCondition) brings it back to 100 % and Ok.
+type demoAirPurifier struct {
+	*demoFan
+	hepa   *filter.Server
+	carbon *filter.Server
+}
+
+var _ contract.EndpointSource = (*demoAirPurifier)(nil)
+
+func newDemoAirPurifier(name string) *demoAirPurifier {
+	p := &demoAirPurifier{demoFan: newDemoFan(name)}
+	products := []filter.ReplacementProduct{{ProductIdentifierType: hepaspec.ProductIdentifierTypeEan, ProductIdentifierValue: "1234567890123"}}
+	optional := filter.OptionalInPlaceIndicator | filter.OptionalLastChangedTime | filter.OptionalResetCondition
+	var err error
+	p.hepa, err = filter.NewHepaFilterMonitoring(filter.Config{
+		Features:             filter.FeatureCondition | filter.FeatureWarning | filter.FeatureReplacementProductList,
+		Optional:             optional,
+		DegradationDirection: hepaspec.DegradationDirectionDown,
+		ReplacementProducts:  products,
+		Initial:              filter.State{Condition: 20, ChangeIndication: filter.ChangeIndicationWarning, InPlaceIndicator: true},
+		Resetter:             filterReset{name: name + " HEPA filter"},
+	})
+	if err != nil {
+		panic(fmt.Sprintf("air purifier HEPA filter: %v", err))
+	}
+	p.carbon, err = filter.NewActivatedCarbonFilterMonitoring(filter.Config{
+		Features:             filter.FeatureCondition | filter.FeatureReplacementProductList,
+		Optional:             optional,
+		DegradationDirection: hepaspec.DegradationDirectionDown,
+		ReplacementProducts:  products,
+		Initial:              filter.State{Condition: 20, ChangeIndication: filter.ChangeIndicationCritical, InPlaceIndicator: true},
+		Resetter:             filterReset{name: name + " carbon filter"},
+	})
+	if err != nil {
+		panic(fmt.Sprintf("air purifier carbon filter: %v", err))
+	}
+	return p
+}
+
+// MatterDeviceType implements [contract.EndpointSource].
+func (p *demoAirPurifier) MatterDeviceType() uint16 { return fan.DeviceTypeAirPurifier }
+
+// MatterClusterServers implements [contract.EndpointSource].
+func (p *demoAirPurifier) MatterClusterServers() []contract.ClusterServer {
+	srv, err := fan.NewServer(fan.Config{
+		Source:      p.demoFan,
+		Features:    fan.FeatureMultiSpeed | fan.FeatureAuto | fan.FeatureStep,
+		Sequence:    fan.SequenceOffLowMedHighAuto,
+		SpeedMax:    fanSpeedMax,
+		DeviceType:  fan.DeviceTypeAirPurifier,
+		DataVersion: &p.version,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("air purifier FanControl: %v", err))
+	}
+	return []contract.ClusterServer{srv, p.hepa, p.carbon}
+}
+
+// filterReset is the purifier's side of ResetCondition: a new filter is in.
+type filterReset struct{ name string }
+
+func (f filterReset) ResetCondition(context.Context) error {
+	slog.Info("filter.replaced", slog.String("filter", f.name))
+	return nil
 }

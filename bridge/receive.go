@@ -95,6 +95,24 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src *net.UDPAddr) err
 	// type the same way). maybeUnmaskPrivacy below therefore only ever
 	// sees unicast frames, where it drops one carrying the P bit.
 	if isGroupDatagram(buf) {
+		// One group datagram at a time, in arrival order. The listener
+		// hands every datagram its own goroutine; a controller that sends
+		// a group message on each of its interfaces (chip SessionManager
+		// under CHIP_SYSTEM_CONFIG_MULTICAST_HOMING) delivers two copies
+		// microseconds apart, and run concurrently the copy that lost the
+		// replay check reported MessageReplay while the winner was still
+		// dispatching — the GroupcastTesting events came out as
+		// MessageReplay before Success (TC-ACE-1.6 steps 20a / 20g). The
+		// second copy IS a replay and is reported as one, as matter.js
+		// (ExchangeManager #receiveMessage, DuplicateMessageError →
+		// MessageReplay) and chip (SessionManager VerifyOrTrustFirstGroup)
+		// report it; what they also do is finish the first copy before
+		// looking at the second — matter.js on its single event loop, chip
+		// on its single device loop. Group messages get no response and no
+		// MRP traffic, so holding the line here cannot stall an exchange
+		// the way serialising unicast receive did (transport/udp Serve).
+		b.groupRx.Lock()
+		defer b.groupRx.Unlock()
 		return b.dispatchGroupMessage(ctx, buf, src)
 	}
 	// Privacy unmask: when Security Flags carries the P bit, the
@@ -426,6 +444,10 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHd
 		req, err := im.UnmarshalWriteRequestTLV(dec, attributeValueReader)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.write_decode", slog.String("err", err.Error()))
+			if im.SuppressResponseOf(payload) {
+				b.suppressStatus(src, requestHdr, proto, "write_decode", im.StatusInvalidAction)
+				return err
+			}
 			return b.replyDecodeError(src, requestHdr, proto, "write", err)
 		}
 		return b.dispatchWriteRequest(ctx, src, requestHdr, proto, dispatcher, req)
@@ -433,6 +455,10 @@ func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHd
 		req, err := im.UnmarshalInvokeRequestTLV(dec, commandFieldsReader)
 		if err != nil {
 			b.logger.Warn("matter.rx.im.invoke_decode", slog.String("err", err.Error()))
+			if im.SuppressResponseOf(payload) {
+				b.suppressStatus(src, requestHdr, proto, "invoke_decode", im.StatusInvalidAction)
+				return err
+			}
 			return b.replyDecodeError(src, requestHdr, proto, "invoke", err)
 		}
 		return b.dispatchInvokeRequest(ctx, src, requestHdr, proto, dispatcher, req)
@@ -579,6 +605,34 @@ func (b *Bridge) NotifyDeviceReachable(scope, deviceAddress string, reachable bo
 // replyTimedStatus is the rejection path for a checkTimedGate hit. It
 // emits a StatusResponse with the supplied code and discharges the
 // owed ACK so the commissioner doesn't retransmit.
+// replyStatusUnlessSuppressed answers a Write or Invoke request that fails
+// before it is dispatched with a StatusResponse — unless the request set
+// SuppressResponse. Then the transaction ends silently: only the owed MRP
+// acknowledgement goes out. Mirrors matter.js InteractionMessenger.ts
+// InteractionServerMessenger (4bf21e80, #4570): #decodeRequest records the
+// request's SuppressResponse and the sendStatus override sends nothing while
+// it is set, so every error status handleRequest's catch raises for a
+// suppressed Write or Invoke — timed mismatch or timeout, a chunked or
+// batch InvalidAction, a decode failure — is suppressed, as the CHIP SDK
+// 1.6.1 does. Read, Subscribe and Timed requests have no such field.
+func (b *Bridge) replyStatusUnlessSuppressed(suppress bool, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
+	if suppress {
+		b.suppressStatus(src, requestHdr, proto, stage, status)
+		return nil
+	}
+	return b.replyTimedStatus(src, requestHdr, proto, stage, status)
+}
+
+// suppressStatus ends a suppressed request's transaction without a
+// StatusResponse, discharging the owed acknowledgement.
+func (b *Bridge) suppressStatus(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) {
+	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
+	b.logger.Debug("matter.rx.im.status_suppressed",
+		slog.String("src", srcString(src)),
+		slog.String("stage", stage),
+		slog.String("status", status.String()))
+}
+
 func (b *Bridge) replyTimedStatus(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
 	body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
 	if err != nil {
@@ -746,6 +800,13 @@ func wireCommissioned(servers []contract.ClusterServer, w *CommissioningWindow) 
 	for _, s := range servers {
 		if gc, ok := s.(*core.GeneralCommissioning); ok {
 			gc.SetOnCommissioned(w.EndCommissioning)
+			// ArmFailSafe over CASE answers BusyWithOtherAdmin while a
+			// window is open and the fail-safe is not armed: matter.js
+			// GeneralCommissioningServer.#armFailSafe consults
+			// commissioner.windowStatus (9397828d, #4602). The predicate
+			// existed in GeneralCommissioning but was never wired, so the
+			// check never ran outside its unit tests.
+			gc.SetIsCommissioningWindowOpen(w.IsOpen)
 		}
 	}
 }

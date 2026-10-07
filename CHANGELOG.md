@@ -12,6 +12,34 @@ pseudo-version of `main`.
 
 ### Added
 
+- The reference daemon mounts TimeSynchronization and DiagnosticLogs on its
+  root (the logs are its diagnostic event ring, inline, no BDX), an
+  AirPurifier endpoint with HEPA and activated-carbon filter monitoring
+  (`cluster/filter`) in the state matter.js's all-clusters test app starts
+  them, and a garage door (Closure: ClosureControl with Positioning and
+  Ventilation, a simulated drive, the CHIP ClosureControl test event
+  triggers). The certification families TIMESYNC, DLOG, ICDM, SU, BIND,
+  HEPAFREMON, ACFREMON and CLCTRL run; TC-DGGEN-2.4 runs now that
+  TimeSynchronization is there.
+
+- `core.GeneralDiagnostics.SetUTCClock`: TimeSnapshot carries
+  PosixTimeMs when the node's TimeSynchronization holds a UTC time, as
+  matter.js `GeneralDiagnosticsServer.timeSnapshot` couples them (and as
+  TC-DGGEN-2.4 requires). `core.TimeSynchronization.UTC` is that clock.
+- `core.TimeSynchronization` lists SetUTCTime in AcceptedCommandList
+  (`MatterAcceptedCommands`); the list was empty, although the command is
+  mandatory.
+
+- `closure.ControlServer` emits the ClosureControl events —
+  OperationalError (`ReportError`, which also enters the Error state),
+  MovementCompleted (MainState Moving → Stopped), SecureStateChanged (a
+  change of OverallCurrentState.SecureState) and, with ManuallyOperable,
+  EngageStateChanged (`SetEngaged`) — lists them and its commands in
+  EventList / AcceptedCommandList (`MatterEvents`, `MatterAcceptedCommands`,
+  `SetMatterEventEmitter`, `SetEndpoint`), and tells the bridge which
+  attributes a state change moved (`OnMatterAttributesChanged`), so an
+  arrival or an error between commands reaches subscribers.
+
 - **Attribute transitions** — `cluster/transition`, a port of matter.js's
   `Transitions.ts`: `transition.New` / `Engine` (`Start`, `Stop`,
   `StopAll`, `Finish`, `FinishAll`, `Cancel`, `CancelAll`,
@@ -392,6 +420,25 @@ pseudo-version of `main`.
 
 ### Changed
 
+- IcdManagement and the OTA Software Update Requestor stay unmounted in the
+  reference daemon, and the documentation no longer says the former is
+  "mounted for conformance": RootNode requires IcdManagement only for an
+  intermittently connected node ("Sit | Lit"), matter.js mounts it on no
+  node that is not an ICD, and a controller reads its presence as "this
+  node sleeps"; the requestor cannot take an update without BDX and an
+  update agent. Their families are not applicable through the device's
+  own PICS.
+
+- `closure.ControlServer` MoveTo and Stop follow the specification text
+  matter.js carries (closure-control.resource.ts): a MoveTo with none of its
+  fields is INVALID_COMMAND; a field of a feature the server does not
+  advertise (Latch, Speed) is ignored instead of refused with
+  ConstraintError; with Positioning an absent Position falls back to
+  OverallTargetState.Position, and with that null nothing moves. Stop acts
+  only on a closure that is Moving, WaitingForMotion or Calibrating and
+  answers SUCCESS in every state; before, it set MainState Stopped from any
+  state, SetupRequired included.
+
 - `light.ColorControlServer` serves MoveColorTemperature,
   StepColorTemperature and StopMoveStep as matter.js does instead of
   accepting and ignoring them — at once without `ManageTransitions`, as a
@@ -546,6 +593,107 @@ pseudo-version of `main`.
   changes: **a host pinning the snapshot's bytes must re-pin.**
 
 ### Fixed
+
+- The reference daemon's robot vacuum emits OperationCompletion when a
+  cleaning run ends; the RoboticVacuumCleaner device type mandates the event
+  and the RvcOperationalState server already listed it.
+
+- A reliable message is registered for retransmission before it is sent,
+  not after: an acknowledgement the peer sent at once could be handled
+  before the message was registered, was lost, and the message went out
+  again as a spurious retransmission — in a chunked read that ended with a
+  chunk carrying a stale piggybacked acknowledgement, which chip-tool drops,
+  and a stalled read (TC-BINFO-2.1, the PICS generation's wildcard read,
+  intermittently).
+
+- **A session's messages are handled in the order they arrive.** The UDP
+  listener gave every datagram its own goroutine, so two messages of one
+  session could run in either order: a Read sent right behind an Invoke
+  reported state from before the command (TC-IDM-1.2 step 7,
+  intermittently), and a report chunk could go out before the
+  StatusResponse acking its predecessor had been processed, carrying a stale
+  piggybacked acknowledgement that chip-tool drops — the chunked read then
+  stalled until the client timed out (TC-BINFO-2.1 and the PICS
+  generation's wildcard read, intermittently). The bridge now serves with
+  `udp.Listener.ServeOrdered`: the datagrams of one unicast session are
+  queued in arrival order and handled one at a time; a handler that waits
+  for the peer's StatusResponse hands its turn on first. matter.js and chip
+  handle a session's messages in order on their event loops.
+
+- A write to a read-only ClosureControl or TimeSynchronization attribute
+  answers UNSUPPORTED_WRITE instead of FAILURE (TC-ACE-2.2's write-access
+  checker accepts nothing else).
+
+- The Auxiliary access-control rule (a Group entry without targets does not
+  reach endpoint 0) follows the root AccessControl's advertised FeatureMap,
+  not only `Bridge.AttachAuxiliaryACL`: a host that mounted Groupcast —
+  which advertises the feature — without attaching the lister let such an
+  entry grant endpoint 0. It now fails closed, as matter.js
+  `AccessControlServer.#applyFabricAcl` derives the rule from the cluster's
+  own feature.
+
+- A group invoke whose command fields do not decode is reported per member
+  endpoint the group may reach — GroupcastTesting Success with
+  AccessAllowed true and the endpoint, the command failing there with the
+  decode status — instead of as one access-denied outcome without an
+  endpoint. Access is checked before the fields are decoded, as matter.js
+  `CommandInvokeResponse` does (#4526, Core §11.27.7.6.3); the command
+  still runs nowhere.
+
+- ArmFailSafe over CASE answers BusyWithOtherAdmin while an administrator's
+  commissioning window is open and the fail-safe is not armed: the bridge
+  now hands the window's state to GeneralCommissioning
+  (`CommissioningWindow.IsOpen`), whose check was never wired outside its
+  unit tests (matter.js `GeneralCommissioningServer.#armFailSafe`, #4602).
+
+- **SuppressResponse suppresses error statuses too.** A Write or Invoke
+  request with SuppressResponse set that failed before dispatch — a timed
+  mismatch or timeout, a chunked or batch InvalidAction, a request that does
+  not decode — was still answered with a StatusResponse. Such a request now
+  ends silently (only the MRP acknowledgement goes out), as matter.js
+  (`InteractionServerMessenger`, #4570) and the CHIP SDK 1.6.1 do; for a
+  request that does not decode, SuppressResponse is read on its own
+  (`im.SuppressResponseOf`). Read, Subscribe and Timed requests are
+  unaffected.
+- An InvokeRequest's DelayReportData (tag 3) is decoded and validated
+  instead of skipped: a field of the wrong type fails the request with
+  InvalidAction, one above uint16 with ConstraintError
+  (`im.InvokeRequest.DelayReportData`, `im.DelayReportData`; matter.js
+  `TlvInvokeRequest`, #4569). Report deferral itself stays off, as it is in
+  matter.js behind its `delay-report-data` forward feature
+  (`BD-Matter-DelayReportData`).
+
+- GeneralDiagnostics UpTime counts the time the host was suspended and is
+  never lowered by a backward clock step: the larger of the monotonic and
+  the wall-clock elapsed time, held to the highest value reported (matter.js
+  `GeneralDiagnosticsServer` upTime, #4614). Go's monotonic clock, like
+  CLOCK_MONOTONIC, stops during a suspend.
+
+- **mDNS: the node answers address queries for its own host name.** A
+  query for the A / AAAA (or ANY) records of the SRV target
+  (`<MAC>0000.local.`) went unanswered: grandcat/zeroconf's
+  `Server.handleQuestion` answers only service-type, service and instance
+  questions and sends the host's addresses solely as additionals of an SRV
+  answer, so a resolver that follows the SRV target with its own address
+  query found nothing (TC-SC-4.1 / TC-SC-4.3: "No AAAA addresses were
+  resolved for hostname"). The `SubtypeResponder` side-car now answers
+  them (`SubtypeResponder.SetHost`, set by `Zeroconf.Publish`), from the
+  addresses the advertise policy publishes for the interface the query
+  arrived on — none, and no answer, on an excluded interface — with the
+  120 s TTL and the cache-flush bit, known-answer suppression, the
+  unicast-response rule, the 900 ms multicast rate limit and RFC 6762 §7.3
+  duplicate-question suppression, as matter.js `MdnsServer` does
+  (`#registerResponderNames`, `#handleMessage`, `sendable`). The OS host
+  name (`Zeroconf.HostName`, macOS) stays the OS responder's.
+- **Group messages are received one at a time.** Each datagram runs on its
+  own goroutine, so a controller that sends a group message on several
+  interfaces (chip's multicast homing) had both copies decoded at once; the
+  copy that lost the replay check reported MessageReplay before the other
+  copy's Success, and the GroupcastTesting event queue came out reordered
+  (TC-ACE-1.6, intermittently on a host with two IPv6 interfaces). The
+  bridge now finishes one group datagram — decode, replay check, dispatch,
+  outcome event — before the next, as matter.js and chip do on their single
+  loops. The second copy is still a replay and still reported as one.
 
 - **BooleanState lists its StateChange event** (`measurement.BooleanStateServer.MatterEvents`,
   `measurement.BooleanStateEventStateChange`). The server advertises CHGEVENT,

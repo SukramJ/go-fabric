@@ -161,6 +161,27 @@ BINFO.S.E02=1
 # examples/reference-bridge/fleet_appliances.go fires when its cycle ends;
 # the device type mandates it (TC-OPSTATE-2.5). The robot vacuum emits none.
 OPSTATE.S.E01=1
+# RvcOperationalState.OperationCompletion: the robot vacuum emits it when a
+# cleaning run ends (RvcRunMode Cleaning -> Idle,
+# examples/reference-bridge/fleet_appliances.go); the device type mandates it.
+# CHIP's slice derivation (gen_pics.py, matter/testing/pics.py) decides event
+# codes from cluster conformance only — EventList is not read back — so an
+# event a device type mandates is declared here, as OperationCompletion is
+# above.
+RVCOPSTATE.S.E01=1
+# PumpConfigurationAndControl DryRunning (0x05) and PumpBlocked (0x09): the
+# pump declares both (examples/reference-bridge/fleet_climate.go Events) and
+# raises them through the app pipe (PumpEvent, control.go).
+PCC.S.E05=1
+PCC.S.E09=1
+# SmokeCoAlarm AlarmMuted, MuteEnded, InterconnectSmokeAlarm and
+# InterconnectCoAlarm: the alarm serves DeviceMuted and both interconnect
+# attributes (fleet_safety.go), so cluster/alarm lists and emits the events
+# (smokecoalarm_server.go MatterEvents, Refresh).
+SMOKECO.S.E06=1
+SMOKECO.S.E07=1
+SMOKECO.S.E08=1
+SMOKECO.S.E09=1
 # The robot vacuum takes the rvc-app's manual controls through the app pipe
 # (examples/reference-bridge/control.go: Reset, ChargerFound, Charged,
 # Docked, ErrorEvent), which TC-RVCOPSTATE-2.4 drives.

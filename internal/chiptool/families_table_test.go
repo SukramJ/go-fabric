@@ -76,6 +76,11 @@ type family struct {
 	args map[string][]string
 	// edits patch a case file before it runs.
 	edits map[string][]edit
+	// picsEdits patch a case's descriptor PICS expression, the one the
+	// runner decides applicability with (skipNotApplicable), for a case
+	// whose own gate names a code no PICS defines; the matching file edit
+	// goes in edits. Same rules as edits: a case defect, cited.
+	picsEdits map[string]edit //nolint:unused // read by the chiptool-tagged runner (familyrun_test.go)
 	// uncommissioned cases get a factory-fresh daemon and commission it
 	// themselves, with the daemon's discriminator and passcode.
 	uncommissioned map[string]bool
@@ -83,10 +88,6 @@ type family struct {
 	// run only on a host where an up, multicast-capable interface has IPv6,
 	// and otherwise skip naming the exact command that enables it.
 	multicast map[string]bool
-	// ipv6 cases need an IPv6 address on the host's advertising interface
-	// for another reason, named by the value; they run and skip like the
-	// multicast ones.
-	ipv6 map[string]string
 	// perEndpoint cases run once per endpoint of the daemon, each against
 	// that endpoint's PICS slice (TC-IDM-10.4, the PICS checker).
 	perEndpoint map[string]bool
@@ -136,6 +137,8 @@ const (
 	dtOccupancySensor = 0x0107
 	dtContactSensor   = 0x0015
 	dtGenericSwitch   = 0x000F
+	dtAirPurifier     = 0x002D
+	dtClosure         = 0x0230
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -179,8 +182,13 @@ var chipFamilies = []family{
 			"4.29": {classOutOfScope, "TC-CNET-4.29 verifies Wi-Fi ConnectNetwork with per-device credentials; out of scope with Wi-Fi commissioning, and the case skips itself once given the endpoint its matcher needs", true},
 		},
 		args: map[string][]string{
-			// The case's endpoint matcher needs --endpoint before it can
-			// skip itself (matter.js test/core/CNET.test.ts).
+			// These cases' endpoint matchers need --endpoint before they
+			// can skip themselves ("The --endpoint flag is required for
+			// this test"; matter.js test/core/CNET.test.ts passes it to
+			// 4.29). NetworkCommissioning lives on the root node.
+			"4.25": {"--endpoint", "0"},
+			"4.26": {"--endpoint", "0"},
+			"4.27": {"--endpoint", "0"},
 			"4.29": {"--endpoint", "0"},
 		},
 	},
@@ -210,9 +218,6 @@ var chipFamilies = []family{
 		// TotalOperationalHours to move (connectedhomeip#29580); its budget
 		// covers both waits.
 		timeout: map[string]time.Duration{"2.1": 3*time.Hour + 40*time.Minute},
-		exclude: map[string]gap{
-			"2.4": {classNotSupported, "TC-DGGEN-2.4 needs the TimeSynchronization cluster (PICS TIMESYNC.S=0); the case has no PICS gate (matter.js test/core/DGGEN.test.ts excludes it for the same reason)", false},
-		},
 	},
 	{name: "DT"},
 	{
@@ -252,15 +257,11 @@ var chipFamilies = []family{
 	{
 		name:      "SC",
 		multicast: map[string]bool{"5.2": true, "5.3": true},
-		// TC-SC-4.3 resolves the AAAA records of the operational host
-		// name; the daemon publishes the addresses its interfaces have.
-		// TC-SC-4.1 checks that the SRV target is the MAC-derived host
-		// name; without IPv6 on the LAN the harness runs the daemon with
-		// --mdns-os-hostname (bridge_test.go), which that check refuses.
-		ipv6: map[string]string{
-			"4.1": "checks the MAC-derived SRV host name, which the daemon advertises only when the host's LAN interface has IPv6 (without it the harness passes --mdns-os-hostname),",
-			"4.3": "resolves the DUT's AAAA records, which name the advertising interface's IPv6 addresses,",
-		},
+		// TC-SC-4.1 and TC-SC-4.3 follow the SRV target with a bare
+		// host-name AAAA query; the daemon's mDNS side-car answers it
+		// (mdns/host_responder.go). Both run unconditionally: they failed
+		// on an IPv6-capable runner because that answer was missing, not
+		// because of the host.
 		// TC_SC_7_1 checks the commissionable advertisement of a factory-new
 		// device and commissions it (matter.js test/core/SC.test.ts
 		// chip("SC/7.1").uncommissioned()).
@@ -277,8 +278,35 @@ var chipFamilies = []family{
 		},
 	},
 	{name: "SM"},
+	// The root's optional clusters. TimeSynchronization and DiagnosticLogs
+	// are mounted; IcdManagement and the OTA Software Update Requestor are
+	// not (examples/reference-bridge/wiring.go buildRootClusters says why),
+	// so the ICDM and SU cases are not applicable through the device's own
+	// PICS. Every DLOG case and the BIND cases are manual in the image's
+	// descriptor; BIND tests the binding client (BIND.C), a role the module
+	// does not take.
+	{name: "TIMESYNC"},
+	{name: "DLOG"},
+	{name: "ICDM"},
+	{name: "SU"},
+	{name: "BIND"},
 	// --- application clusters ----------------------------------------------
+	{name: "ACFREMON", deviceType: dtAirPurifier},
 	{name: "BOOL", deviceType: dtContactSensor},
+	{
+		name: "CLCTRL", deviceType: dtClosure,
+		// TC_CLCTRL_5_1 gates on "CLCTRL.S.C00", a code no PICS defines:
+		// an accepted command's code is CLCTRL.S.C00.Rsp (CHIP's own
+		// derivation, matter/testing/pics.py, and every other case of the
+		// family). As written the case never runs against a DUT whose Stop
+		// is accepted; the gate is corrected, the steps are unchanged.
+		picsEdits: map[string]edit{
+			"5.1": {"CLCTRL.S.C00", "CLCTRL.S.C00.Rsp", "TC_CLCTRL_5_1 gates on the undefined code CLCTRL.S.C00; Stop is CLCTRL.S.C00.Rsp"},
+		},
+		edits: map[string][]edit{
+			"5.1": {{`"CLCTRL.S", "CLCTRL.S.C00"`, `"CLCTRL.S", "CLCTRL.S.C00.Rsp"`, "TC_CLCTRL_5_1 gates on the undefined code CLCTRL.S.C00; Stop is CLCTRL.S.C00.Rsp"}},
+		},
+	},
 	{
 		name: "CC", deviceType: dtColorTempLight,
 		exclude: map[string]gap{
@@ -296,6 +324,7 @@ var chipFamilies = []family{
 		},
 	},
 	{name: "FAN", deviceType: dtFan},
+	{name: "HEPAFREMON", deviceType: dtAirPurifier},
 	{
 		name: "FLW", deviceType: dtFlowSensor,
 		exclude: map[string]gap{

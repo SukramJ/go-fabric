@@ -83,6 +83,10 @@ type Listener struct {
 	// leaving the operator with an unexplained silence.
 	recoveredPanics atomic.Uint64
 
+	// order, when set by [Listener.ServeOrdered], keeps the datagrams
+	// that share an order key in arrival order (ordered.go).
+	order *orderedDispatch
+
 	mu     sync.Mutex
 	closed bool
 }
@@ -186,6 +190,12 @@ func (l *Listener) Serve(ctx context.Context, handler Handler) error {
 		// copy before handing off.
 		datagram := make([]byte, n)
 		copy(datagram, buf[:n])
+		if l.order != nil {
+			if key, ok := l.order.key(datagram); ok {
+				l.order.enqueue(l, key, datagram, src)
+				continue
+			}
+		}
 		// Bound concurrent dispatch: acquire a slot without blocking so the
 		// read loop never stalls. When the pool is saturated (flood or genuine
 		// burst) drop the datagram — UDP is unreliable and peers retransmit.

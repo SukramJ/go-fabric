@@ -273,6 +273,12 @@ func (c Config) validate() error {
 // topology / dispatcher pair is swapped atomically on [Reassemble]
 // so in-flight IM dispatches see a consistent view.
 type Bridge struct {
+	// groupRx serialises the group-message receive path: decode, replay
+	// check, dispatch and the GroupcastTesting outcome of one datagram
+	// complete before the next group datagram is looked at. See
+	// [Bridge.dispatch].
+	groupRx sync.Mutex
+
 	// load counts the Interaction Model traffic GeneralDiagnostics'
 	// DeviceLoadStatus reports (see device_load.go).
 	load deviceLoadCounters
@@ -720,7 +726,7 @@ func (b *Bridge) Start(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if err := listener.Serve(serveCtx, b.handleDatagram); err != nil {
+		if err := listener.ServeOrdered(serveCtx, sessionOrderKey, b.handleOrderedDatagram); err != nil {
 			// Closed-listener errors during shutdown are expected; log
 			// at debug level. Real bind / IO errors come through
 			// before serveCancel fires, so they remain at warn.

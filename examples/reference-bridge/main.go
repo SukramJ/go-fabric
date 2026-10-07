@@ -225,7 +225,8 @@ func run() error {
 	// A bounded trace of the moments that explain a failed pairing. Attached
 	// before Start because the first of those moments is the first
 	// commissioner datagram.
-	br.AttachDiagnosticEvents(diagevent.NewRing(256))
+	diagRing := diagevent.NewRing(256)
+	br.AttachDiagnosticEvents(diagRing)
 
 	// --- root + aggregator endpoints -----------------------------------
 	caseIDs := newCaseIdentities(logger)
@@ -385,6 +386,7 @@ func run() error {
 			return fmt.Errorf("--enable-key: %w", err)
 		}
 	}
+	refs.diagLogs.AttachProvider(ringLogs{diagRing})
 	refs.basicInfo.EmitStartUp()
 	refs.genDiag.EmitBootReason()
 	go keepOperationalHours(ctx, credentials, refs.genDiag, time.Minute, logger)

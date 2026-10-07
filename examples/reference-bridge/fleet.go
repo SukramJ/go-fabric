@@ -1456,6 +1456,8 @@ type fleet struct {
 	occupancy  *demoBinary
 	contact    *demoBinary
 	button     *demoButton
+	purifier   *demoAirPurifier
+	garage     *demoGarage
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1494,6 +1496,8 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		occupancy:   newDemoBinary("Hall Motion", contract.MeasurementOccupancy, false),
 		contact:     newDemoBinary("Window Contact", contract.MeasurementContact, true),
 		button:      newDemoButton("Wall Button"),
+		purifier:    newDemoAirPurifier("Air Purifier"),
+		garage:      newDemoGarage("Garage Door"),
 		assembler:   asm,
 	}, nil
 }
@@ -1617,5 +1621,7 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		sensor("occupancy", f.occupancy.name, f.occupancy),
 		sensor("contact", f.contact.name, f.contact),
 		sensor("button", f.button.name, f.button),
+		spec("purifier", f.purifier.name, f.purifier.MatterDeviceType(), f.purifier),
+		spec("garage", f.garage.name, f.garage.MatterDeviceType(), f.garage),
 	}
 }

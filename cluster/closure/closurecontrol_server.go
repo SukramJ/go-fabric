@@ -23,6 +23,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/wire"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
@@ -77,6 +78,11 @@ type Config struct {
 // the handlers in [Config]; the mapping between a Matter position and the
 // device's own vocabulary lives in the rich-model projection, not here.
 type ControlServer struct {
+	// AttributeChanges tells the bridge which attributes moved, so a
+	// change the drive reports between commands (an arrival, an error)
+	// reaches subscribers for exactly those attributes.
+	cluster.AttributeChanges
+
 	mu sync.RWMutex
 
 	featureMap uint32
@@ -92,6 +98,11 @@ type ControlServer struct {
 	currentPosition *wire.ClosureCurrentPosition
 	targetPosition  *wire.ClosureTargetPosition
 	secureState     *bool
+
+	// emitter and endpoint address the events (closurecontrol_events.go);
+	// the bridge wires both at reassembly.
+	emitter  contract.EventEmitter
+	endpoint uint16
 }
 
 // NewControlServer constructs a [ControlServer] from cfg.
@@ -161,9 +172,20 @@ func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
 // Every attribute in this cluster carries access "R V" (matter.js
 // closure-control.element.ts:37-56); state changes travel through MoveTo
 // and Stop.
+//
+// The refusal is UNSUPPORTED_WRITE, the status a write to a read-only
+// attribute gets (Core §8.7.3.2; matter.js AttributeWriteResponse); a plain
+// error read as FAILURE, which TC-ACE-2.2's write-access checker refuses.
 func (s *ControlServer) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("closurecontrol: attribute 0x%04X is not writable", attrID)
+	return closureUnsupportedWriteErr{fmt.Sprintf("closurecontrol: attribute 0x%04X is not writable", attrID)}
 }
+
+// closureUnsupportedWriteErr is a typed [im.StatusCodeError] for a write
+// to a read-only attribute.
+type closureUnsupportedWriteErr struct{ msg string }
+
+func (e closureUnsupportedWriteErr) Error() string                 { return e.msg }
+func (closureUnsupportedWriteErr) MatterStatusCode() im.StatusCode { return im.StatusUnsupportedWrite }
 
 // closureUnsupportedCommandErr is a typed [im.StatusCodeError] for a
 // command the advertised feature set does not include.
@@ -173,6 +195,14 @@ func (e closureUnsupportedCommandErr) Error() string { return e.msg }
 func (closureUnsupportedCommandErr) MatterStatusCode() im.StatusCode {
 	return im.StatusUnsupportedCommand
 }
+
+// closureInvalidCommandErr is a typed [im.StatusCodeError] for a MoveTo
+// that carries none of its fields.
+type closureInvalidCommandErr struct{ msg string }
+
+func (e closureInvalidCommandErr) Error() string                 { return e.msg }
+func (closureInvalidCommandErr) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }
+func (closureInvalidCommandErr) Unwrap() error                   { return wire.ErrClosureControlMalformed }
 
 // closureConstraintErr is a typed [im.StatusCodeError] for a MoveTo
 // carrying a position outside the advertised feature set.
@@ -211,42 +241,71 @@ func (s *ControlServer) MatterInvoke(
 	}
 }
 
-// invokeMoveTo applies a MoveTo request.
+// invokeMoveTo applies a MoveTo request, as the specification text
+// matter.js carries describes it (closure-control.resource.ts, MoveTo,
+// cluster§5.4.8.2): a request with none of the three "O.a+" fields is
+// INVALID_COMMAND; a field of a feature the server does not advertise is
+// ignored rather than refused; with Positioning, an absent Position falls
+// back to OverallTargetState.Position, and with that null too the closure
+// does not change its position; a Position outside the advertised set is
+// CONSTRAINT_ERROR.
 func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 	req, err := moveToRequest(fields)
+	if errors.Is(err, wire.ErrClosureControlMalformed) {
+		return closureInvalidCommandErr{"closurecontrol: MoveTo carries none of Position, Latch and Speed"}
+	}
 	if err != nil {
 		return err
 	}
-	if req.Position == nil {
-		// Latch and Speed belong to MotionLatching and Speed, neither of
-		// which this server advertises. A request carrying only those
-		// asks for something the advertised feature set cannot do.
-		return closureConstraintErr{
-			"closurecontrol: MoveTo without a Position, and neither Latch nor Speed is supported by this feature set",
-		}
+	s.mu.RLock()
+	fm := s.featureMap
+	fallback := s.targetPosition
+	s.mu.RUnlock()
+	if fm&wire.ClosureControlFeaturePositioning == 0 {
+		// Position belongs to Positioning; Latch and Speed to features this
+		// server does not carry (no LT, no SP): all ignored.
+		return nil
 	}
-	if err := s.checkPositionSupported(*req.Position); err != nil {
+	target := req.Position
+	if target == nil {
+		target = fallback
+	}
+	if target == nil {
+		return nil
+	}
+	if err := s.checkPositionSupported(*target); err != nil {
 		return err
 	}
 	if s.move == nil {
 		return errors.New("closurecontrol: MoveTo has no handler")
 	}
-	if err := s.move(ctx, *req.Position); err != nil {
+	if err := s.move(ctx, *target); err != nil {
 		// Deliberately no state change: recording a target the device
 		// refused would leave the controller reading a move that never
 		// happened.
 		return fmt.Errorf("closurecontrol: MoveTo: %w", err)
 	}
 	s.mu.Lock()
-	target := *req.Position
-	s.targetPosition = &target
+	t := *target
+	s.targetPosition = &t
 	s.mainState = wire.ClosureMainStateMoving
 	s.mu.Unlock()
+	s.Notify(wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
 	return nil
 }
 
-// invokeStop halts motion.
+// invokeStop halts motion (cluster§5.4.8.1): only a closure that is
+// Moving, WaitingForMotion or Calibrating stops and becomes Stopped; in
+// any other state the command changes nothing. SUCCESS either way.
 func (s *ControlServer) invokeStop(ctx context.Context) error {
+	s.mu.RLock()
+	state := s.mainState
+	s.mu.RUnlock()
+	switch state {
+	case wire.ClosureMainStateMoving, wire.ClosureMainStateWaitingForMotion, wire.ClosureMainStateCalibrating:
+	default:
+		return nil
+	}
 	if s.stop == nil {
 		return errors.New("closurecontrol: Stop has no handler")
 	}
@@ -259,6 +318,7 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 	s.targetPosition = nil
 	s.mainState = wire.ClosureMainStateStopped
 	s.mu.Unlock()
+	s.Notify(wire.ClosureControlAttrMainState, wire.ClosureControlAttrOverallTargetState)
 	return nil
 }
 
@@ -302,12 +362,15 @@ func (s *ControlServer) checkPositionSupported(p wire.ClosureTargetPosition) err
 func moveToRequest(fields any) (wire.MoveToRequest, error) {
 	switch v := fields.(type) {
 	case wire.MoveToRequest:
+		if v.Position == nil && v.Latch == nil && v.Speed == nil {
+			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+		}
 		return v, nil
 	case *wire.MoveToRequest:
 		if v == nil {
 			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
 		}
-		return *v, nil
+		return moveToRequest(*v)
 	case []byte:
 		return wire.DecodeClosureMoveTo(v)
 	case map[uint8]any:
@@ -401,9 +464,25 @@ func (s *ControlServer) FeatureMap() uint32 {
 // pos nil means the drive is somewhere between its named stops — mid
 // travel, most often — which the spec expresses as a null Position rather
 // than a nearest-stop guess.
+//
+// A change of SecureState — true exactly at FullyClosed — emits
+// SecureStateChanged.
 func (s *ControlServer) SetCurrentPosition(pos *wire.ClosureCurrentPosition) {
+	var events []pendingEvent
+	defer func() { s.emit(events) }()
+	defer s.Notify(wire.ClosureControlAttrOverallCurrentState, wire.ClosureControlAttrOverallTargetState)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	prevSecure := s.secureState
+	defer func() {
+		if s.secureState != nil && (prevSecure == nil || *prevSecure != *s.secureState) {
+			events = append(events, pendingEvent{
+				wire.ClosureControlEventSecureStateChanged,
+				SecureStateChangedEvent{SecureValue: *s.secureState},
+				contract.EventPriorityInfo,
+			})
+		}
+	}()
 	s.currentPosition = pos
 	// SecureState is "the closure is in a position that secures the
 	// opening" — true only when fully closed (matter.js
@@ -429,21 +508,31 @@ func (s *ControlServer) SetCurrentPosition(pos *wire.ClosureCurrentPosition) {
 	s.targetPosition = nil
 }
 
-// SetMainState overrides the operational state.
+// SetMainState overrides the operational state. A motion that ends —
+// Moving to Stopped — emits MovementCompleted (conformance !IS).
 func (s *ControlServer) SetMainState(state wire.ClosureMainState) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	prev := s.mainState
 	s.mainState = state
+	fm := s.featureMap
+	s.mu.Unlock()
+	if prev != state {
+		s.Notify(wire.ClosureControlAttrMainState)
+	}
+	if prev == wire.ClosureMainStateMoving && state == wire.ClosureMainStateStopped && fm&wire.ClosureControlFeatureInstantaneous == 0 {
+		s.emit([]pendingEvent{{wire.ClosureControlEventMovementCompleted, MovementCompletedEvent{}, contract.EventPriorityInfo}})
+	}
 }
 
 // SetErrorList replaces CurrentErrorList, truncating to the spec's
 // "max 10[all]" constraint.
 func (s *ControlServer) SetErrorList(list wire.ClosureErrorList) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if len(list) > wire.ClosureErrorListMax {
 		list = list[:wire.ClosureErrorListMax]
 	}
+	s.mu.Lock()
 	s.errorList = make(wire.ClosureErrorList, len(list))
 	copy(s.errorList, list)
+	s.mu.Unlock()
+	s.Notify(wire.ClosureControlAttrCurrentErrorList)
 }

@@ -13,12 +13,17 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"net"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/tlv"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
@@ -103,18 +108,32 @@ func decodeWriteChunkedStatusResponse(t *testing.T, got []byte) im.StatusCode {
 	return decodeStatusResponseCode(t, got[hdrLen+protoLen:])
 }
 
-// TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsInvalidAction
-// mirrors matter.js InteractionServer.ts:397-402: a WriteRequest that
-// sets both MoreChunkedMessages and SuppressResponse must be rejected
-// with StatusResponse(InvalidAction) before any timed-interaction
-// handling or dispatch. This is a meaningful regression guard: were
-// the guard missing, dispatchWriteRequest would run
-// HandleWriteRequest and then honor SuppressResponse by sending NO
-// reply at all — this test would then fail on ReadFromUDP timing out
-// rather than on a wrong status code.
-func TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsInvalidAction(t *testing.T) {
+// TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsSilently mirrors
+// matter.js InteractionServer.ts:397-402: a WriteRequest that sets both
+// MoreChunkedMessages and SuppressResponse is rejected with InvalidAction
+// before any timed-interaction handling or dispatch — and since matter.js
+// 4bf21e80 (#4570, the CHIP SDK 1.6.1 behaviour) that error status is
+// suppressed like every other one of a SuppressResponse request
+// (InteractionMessenger.ts sendStatus): nothing goes on the wire.
+//
+// Expectation changed with #4570: the test used to require a
+// StatusResponse(InvalidAction). It now requires silence, and that the
+// rejection — not a dispatched write whose WriteResponse was suppressed —
+// is what produced it (the suppression is logged with its stage).
+func TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsSilently(t *testing.T) {
 	t.Parallel()
-	b := newStartedBridge(t)
+	var logs syncBuffer
+	b, err := New(wbEmptySnapshotter, mdns.NewNoop(), Config{Listen: ":0", VendorID: 0x1234, ProductID: 0x5678, NodeLabel: "wb-test"},
+		slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := b.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	t.Cleanup(func() { _ = b.Stop(context.Background()) })
 
 	hdr := buildHeader(0, 40)
 	proto := buildProtocolHeader(im.InteractionModelProtocolID, im.OpcodeWriteRequest)
@@ -124,10 +143,20 @@ func TestDispatchWriteRequest_ChunkedSuppressResponse_RejectsInvalidAction(t *te
 	})
 	buf := buildDatagram(hdr, proto, payload)
 
-	got := dispatchWriteChunkedTestRequest(t, b, buf)
-	status := decodeWriteChunkedStatusResponse(t, got)
-	if status != im.StatusInvalidAction {
-		t.Errorf("StatusResponse status = %v, want StatusInvalidAction (0x80)", status)
+	peerConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	if err != nil {
+		t.Fatalf("ListenUDP: %v", err)
+	}
+	t.Cleanup(func() { _ = peerConn.Close() })
+	if err := b.dispatch(context.Background(), buf, peerConn.LocalAddr().(*net.UDPAddr)); err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	_ = peerConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	if n, _, err := peerConn.ReadFromUDP(make([]byte, 1500)); err == nil {
+		t.Fatalf("the bridge answered a suppressed chunked write with a %d-byte datagram", n)
+	}
+	if !strings.Contains(logs.String(), "stage=write_chunked_suppress") {
+		t.Errorf("no suppressed write_chunked_suppress rejection logged; log:\n%s", logs.String())
 	}
 }
 
@@ -188,4 +217,22 @@ func TestDispatchWriteRequest_ChunkedUntimedNotSuppressed_DispatchesAndRepliesWr
 
 	got := dispatchWriteChunkedTestRequest(t, b, buf)
 	decodeReliabilityTestReply(t, got, im.OpcodeWriteResponse)
+}
+
+// syncBuffer is a bytes.Buffer safe for the bridge's concurrent logging.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
 }
