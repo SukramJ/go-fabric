@@ -27,4 +27,6 @@ var committed = []string{
 	"ValveConfigurationAndControl",
 	// cluster/modeselect
 	"ModeSelect",
+	// cluster/alarm
+	"SmokeCoAlarm",
 }

@@ -29,6 +29,13 @@
 // instance the bridge wired an emitter into at reassembly, so a host
 // returns the same *Server from every MatterClusterServers call and
 // calls [Server.Refresh] after each change to its device state.
+//
+// The cluster's identity is the generated definition (cluster/spec/
+// smokecoalarm, ADR 0013): ids, revision, the enums, the feature
+// selection check, the attribute, command and event lists the selection
+// and the declared optionals yield, the event priorities, the write check
+// and the write privileges. ExpressedState derivation, the SelfTestRequest
+// gate and the event diffing stay here.
 package alarm
 
 import (
@@ -39,15 +46,15 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	sdef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
-// ClusterID is the SmokeCoAlarm cluster id
-// (matter.js smoke-co-alarm-cluster.element.ts:20).
-const ClusterID uint32 = 0x005C
+// ClusterID is the SmokeCoAlarm cluster id.
+const ClusterID = sdef.ClusterID
 
 // DeviceTypeSmokeCoAlarm is the device type the cluster is mandatory on
 // (matter.js smoke-co-alarm-device.element.ts).
@@ -55,122 +62,122 @@ const DeviceTypeSmokeCoAlarm uint16 = 0x0076
 
 // Attribute ids (smoke-co-alarm-cluster.element.ts:27-46).
 const (
-	AttrExpressedState         uint32 = 0x0000 // M
-	AttrSmokeState             uint32 = 0x0001 // SMOKE
-	AttrCOState                uint32 = 0x0002 // CO
-	AttrBatteryAlert           uint32 = 0x0003 // M
-	AttrDeviceMuted            uint32 = 0x0004 // O
-	AttrTestInProgress         uint32 = 0x0005 // M
-	AttrHardwareFaultAlert     uint32 = 0x0006 // M
-	AttrEndOfServiceAlert      uint32 = 0x0007 // M
-	AttrInterconnectSmokeAlarm uint32 = 0x0008 // O
-	AttrInterconnectCOAlarm    uint32 = 0x0009 // O
-	AttrContaminationState     uint32 = 0x000A // [SMOKE]
-	AttrSmokeSensitivityLevel  uint32 = 0x000B // [SMOKE], RW VM
-	AttrExpiryDate             uint32 = 0x000C // O
-	AttrUnmounted              uint32 = 0x000D // [Rev >= v2]
+	AttrExpressedState         = sdef.AttrExpressedState         // M
+	AttrSmokeState             = sdef.AttrSmokeState             // SMOKE
+	AttrCOState                = sdef.AttrCoState                // CO
+	AttrBatteryAlert           = sdef.AttrBatteryAlert           // M
+	AttrDeviceMuted            = sdef.AttrDeviceMuted            // O
+	AttrTestInProgress         = sdef.AttrTestInProgress         // M
+	AttrHardwareFaultAlert     = sdef.AttrHardwareFaultAlert     // M
+	AttrEndOfServiceAlert      = sdef.AttrEndOfServiceAlert      // M
+	AttrInterconnectSmokeAlarm = sdef.AttrInterconnectSmokeAlarm // O
+	AttrInterconnectCOAlarm    = sdef.AttrInterconnectCoAlarm    // O
+	AttrContaminationState     = sdef.AttrContaminationState     // [SMOKE]
+	AttrSmokeSensitivityLevel  = sdef.AttrSmokeSensitivityLevel  // [SMOKE], RW VM
+	AttrExpiryDate             = sdef.AttrExpiryDate             // O
+	AttrUnmounted              = sdef.AttrUnmounted              // [Rev >= v2]
 )
 
 // Event ids (smoke-co-alarm-cluster.element.ts:47-72).
 const (
-	EventSmokeAlarm             uint32 = 0x00 // SMOKE, critical
-	EventCOAlarm                uint32 = 0x01 // CO, critical
-	EventLowBattery             uint32 = 0x02 // M, info
-	EventHardwareFault          uint32 = 0x03 // M, info
-	EventEndOfService           uint32 = 0x04 // M, info
-	EventSelfTestComplete       uint32 = 0x05 // M, info
-	EventAlarmMuted             uint32 = 0x06 // O, info
-	EventMuteEnded              uint32 = 0x07 // O, info
-	EventInterconnectSmokeAlarm uint32 = 0x08 // [SMOKE], critical
-	EventInterconnectCOAlarm    uint32 = 0x09 // [CO], critical
-	EventAllClear               uint32 = 0x0A // M, info
+	EventSmokeAlarm             = sdef.EventSmokeAlarm             // SMOKE, critical
+	EventCOAlarm                = sdef.EventCoAlarm                // CO, critical
+	EventLowBattery             = sdef.EventLowBattery             // M, info
+	EventHardwareFault          = sdef.EventHardwareFault          // M, info
+	EventEndOfService           = sdef.EventEndOfService           // M, info
+	EventSelfTestComplete       = sdef.EventSelfTestComplete       // M, info
+	EventAlarmMuted             = sdef.EventAlarmMuted             // O, info
+	EventMuteEnded              = sdef.EventMuteEnded              // O, info
+	EventInterconnectSmokeAlarm = sdef.EventInterconnectSmokeAlarm // [SMOKE], critical
+	EventInterconnectCOAlarm    = sdef.EventInterconnectCoAlarm    // [CO], critical
+	EventAllClear               = sdef.EventAllClear               // M, info
 )
 
 // CmdSelfTestRequest is the cluster's one command: conformance O,
 // response "status" (smoke-co-alarm-cluster.element.ts:73).
-const CmdSelfTestRequest uint32 = 0x00
+const CmdSelfTestRequest = sdef.CmdSelfTestRequest
 
 // Feature is a SmokeCoAlarm FeatureMap bit.
-type Feature uint32
+type Feature = sdef.Feature
 
 // FeatureMap bits (smoke-co-alarm-cluster.element.ts:24-25). Both carry
 // conformance "O.a+": at least one of the two is required.
 const (
-	FeatureSmokeAlarm Feature = 1 << 0 // SMOKE
-	FeatureCOAlarm    Feature = 1 << 1 // CO
+	FeatureSmokeAlarm = sdef.FeatureSmokeAlarm // SMOKE
+	FeatureCOAlarm    = sdef.FeatureCoAlarm    // CO
 )
 
 // AlarmState is the AlarmStateEnum (element :75-80).
 //
 //nolint:revive // AlarmState mirrors the Matter AlarmStateEnum name verbatim.
-type AlarmState uint8
+type AlarmState = sdef.AlarmStateEnum
 
 // AlarmStateEnum values.
 const (
-	AlarmNormal   AlarmState = 0
-	AlarmWarning  AlarmState = 1
-	AlarmCritical AlarmState = 2
+	AlarmNormal   = sdef.AlarmStateNormal
+	AlarmWarning  = sdef.AlarmStateWarning
+	AlarmCritical = sdef.AlarmStateCritical
 )
 
 // alarming reports whether the state is Warning or Critical — the two
 // values every "changes to either Warning or Critical state" event rule
 // is written against (resource :124, :136, :142).
-func (a AlarmState) alarming() bool { return a == AlarmWarning || a == AlarmCritical }
+func alarming(a AlarmState) bool { return a == AlarmWarning || a == AlarmCritical }
 
 // Sensitivity is the SensitivityEnum (element :82-87).
-type Sensitivity uint8
+type Sensitivity = sdef.SensitivityEnum
 
 // SensitivityEnum values. Standard is the mandatory one.
 const (
-	SensitivityHigh     Sensitivity = 0
-	SensitivityStandard Sensitivity = 1
-	SensitivityLow      Sensitivity = 2
+	SensitivityHigh     = sdef.SensitivityHigh
+	SensitivityStandard = sdef.SensitivityStandard
+	SensitivityLow      = sdef.SensitivityLow
 )
 
 // ExpressedState is the ExpressedStateEnum (element :89-101).
-type ExpressedState uint8
+type ExpressedState = sdef.ExpressedStateEnum
 
 // ExpressedStateEnum values.
 const (
-	ExpressedNormal            ExpressedState = 0
-	ExpressedSmokeAlarm        ExpressedState = 1 // SMOKE
-	ExpressedCOAlarm           ExpressedState = 2 // CO
-	ExpressedBatteryAlert      ExpressedState = 3
-	ExpressedTesting           ExpressedState = 4
-	ExpressedHardwareFault     ExpressedState = 5
-	ExpressedEndOfService      ExpressedState = 6
-	ExpressedInterconnectSmoke ExpressedState = 7 // O
-	ExpressedInterconnectCO    ExpressedState = 8 // O
-	ExpressedInoperative       ExpressedState = 9 // [Rev >= v2]
+	ExpressedNormal            = sdef.ExpressedStateNormal
+	ExpressedSmokeAlarm        = sdef.ExpressedStateSmokeAlarm // SMOKE
+	ExpressedCOAlarm           = sdef.ExpressedStateCoAlarm    // CO
+	ExpressedBatteryAlert      = sdef.ExpressedStateBatteryAlert
+	ExpressedTesting           = sdef.ExpressedStateTesting
+	ExpressedHardwareFault     = sdef.ExpressedStateHardwareFault
+	ExpressedEndOfService      = sdef.ExpressedStateEndOfService
+	ExpressedInterconnectSmoke = sdef.ExpressedStateInterconnectSmoke // O
+	ExpressedInterconnectCO    = sdef.ExpressedStateInterconnectCo    // O
+	ExpressedInoperative       = sdef.ExpressedStateInoperative       // [Rev >= v2]
 )
 
 // MuteState is the MuteStateEnum (element :103-107).
-type MuteState uint8
+type MuteState = sdef.MuteStateEnum
 
 // MuteStateEnum values.
 const (
-	NotMuted MuteState = 0
-	Muted    MuteState = 1
+	NotMuted = sdef.MuteStateNotMuted
+	Muted    = sdef.MuteStateMuted
 )
 
 // EndOfService is the EndOfServiceEnum (element :108-112).
-type EndOfService uint8
+type EndOfService = sdef.EndOfServiceEnum
 
 // EndOfServiceEnum values.
 const (
-	EndOfServiceNormal  EndOfService = 0
-	EndOfServiceExpired EndOfService = 1
+	EndOfServiceNormal  = sdef.EndOfServiceNormal
+	EndOfServiceExpired = sdef.EndOfServiceExpired
 )
 
 // ContaminationState is the ContaminationStateEnum (element :114-120).
-type ContaminationState uint8
+type ContaminationState = sdef.ContaminationStateEnum
 
 // ContaminationStateEnum values.
 const (
-	ContaminationNormal   ContaminationState = 0
-	ContaminationLow      ContaminationState = 1
-	ContaminationWarning  ContaminationState = 2
-	ContaminationCritical ContaminationState = 3
+	ContaminationNormal   = sdef.ContaminationStateNormal
+	ContaminationLow      = sdef.ContaminationStateLow
+	ContaminationWarning  = sdef.ContaminationStateWarning
+	ContaminationCritical = sdef.ContaminationStateCritical
 )
 
 // Optional names the optional attributes a host declares it serves.
@@ -205,6 +212,20 @@ const (
 	// "[Rev >= v2]", optional at the revision matter.js HEAD ships.
 	OptionalUnmounted
 )
+
+// optionalAttributes are the attributes each Optional bit declares.
+var optionalAttributes = []struct {
+	opt  Optional
+	attr uint32
+}{
+	{OptionalDeviceMuted, AttrDeviceMuted},
+	{OptionalInterconnectSmokeAlarm, AttrInterconnectSmokeAlarm},
+	{OptionalInterconnectCOAlarm, AttrInterconnectCOAlarm},
+	{OptionalContaminationState, AttrContaminationState},
+	{OptionalSmokeSensitivityLevel, AttrSmokeSensitivityLevel},
+	{OptionalExpiryDate, AttrExpiryDate},
+	{OptionalUnmounted, AttrUnmounted},
+}
 
 // State is one observation of the host's alarm. Its zero value is the
 // state matter.js SmokeCoAlarmBaseServer.initialize seeds
@@ -304,6 +325,7 @@ type Server struct {
 	features Feature
 	optional Optional
 	priority []ExpressedState
+	inst     *spec.Instance
 
 	mu       sync.Mutex
 	emitter  contract.EventEmitter
@@ -344,11 +366,11 @@ var (
 // NewServer validates cfg against the cluster's conformance and returns
 // the server.
 func NewServer(cfg Config) (*Server, error) {
-	if cfg.Features&(FeatureSmokeAlarm|FeatureCOAlarm) == 0 {
-		return nil, ErrNoAlarmFeature
-	}
-	if cfg.Features&^(FeatureSmokeAlarm|FeatureCOAlarm) != 0 {
-		return nil, fmt.Errorf("alarm: unknown feature bits 0x%X", uint32(cfg.Features&^(FeatureSmokeAlarm|FeatureCOAlarm)))
+	if err := spec.CheckFeatures(sdef.Definition, uint32(cfg.Features)); err != nil {
+		if errors.Is(err, spec.ErrUnknownFeature) {
+			return nil, fmt.Errorf("alarm: %w", err)
+		}
+		return nil, fmt.Errorf("%w: %w", ErrNoAlarmFeature, err)
 	}
 	if cfg.Optional&(OptionalContaminationState|OptionalSmokeSensitivityLevel) != 0 && cfg.Features&FeatureSmokeAlarm == 0 {
 		return nil, ErrOptionalNeedsSmoke
@@ -358,7 +380,12 @@ func NewServer(cfg Config) (*Server, error) {
 			return nil, ErrSensitivityNotWritable
 		}
 	}
+	inst, err := spec.New(sdef.Definition, instanceOptions(cfg))
+	if err != nil {
+		return nil, fmt.Errorf("alarm: %w", err)
+	}
 	s := &Server{
+		inst:     inst,
 		src:      cfg.Source,
 		ext:      cfg.DataVersion,
 		features: cfg.Features,
@@ -377,8 +404,34 @@ func NewServer(cfg Config) (*Server, error) {
 	return s, nil
 }
 
-// Revision returns the cluster revision from the generated schema.
-func Revision() uint16 { return schema.ClusterRevisions[ClusterID] }
+// instanceOptions declares the optional elements cfg serves: the optional
+// attributes, SelfTestRequest when the source can run one, AlarmMuted and
+// MuteEnded with DeviceMuted, and each Interconnect event with its
+// attribute while its feature is advertised ("[SMOKE]" / "[CO]").
+func instanceOptions(cfg Config) spec.Options {
+	opts := spec.Options{Features: uint32(cfg.Features)}
+	for _, o := range optionalAttributes {
+		if cfg.Optional&o.opt != 0 {
+			opts.Attributes = append(opts.Attributes, o.attr)
+		}
+	}
+	if _, ok := cfg.Source.(SelfTester); ok {
+		opts.Commands = []uint32{CmdSelfTestRequest}
+	}
+	if cfg.Optional&OptionalDeviceMuted != 0 {
+		opts.Events = append(opts.Events, EventAlarmMuted, EventMuteEnded)
+	}
+	if cfg.Features&FeatureSmokeAlarm != 0 && cfg.Optional&OptionalInterconnectSmokeAlarm != 0 {
+		opts.Events = append(opts.Events, EventInterconnectSmokeAlarm)
+	}
+	if cfg.Features&FeatureCOAlarm != 0 && cfg.Optional&OptionalInterconnectCOAlarm != 0 {
+		opts.Events = append(opts.Events, EventInterconnectCOAlarm)
+	}
+	return opts
+}
+
+// Revision returns the cluster revision of the generated definition.
+func Revision() uint16 { return sdef.Revision }
 
 func (s *Server) tracker() *cluster.DataVersionTracker {
 	if s.ext != nil {
@@ -428,11 +481,11 @@ func (s *Server) state() State {
 func holds(e ExpressedState, st State) bool {
 	switch e {
 	case ExpressedSmokeAlarm:
-		return st.SmokeState.alarming()
+		return alarming(st.SmokeState)
 	case ExpressedCOAlarm:
-		return st.COState.alarming()
+		return alarming(st.COState)
 	case ExpressedBatteryAlert:
-		return st.BatteryAlert.alarming()
+		return alarming(st.BatteryAlert)
 	case ExpressedTesting:
 		return st.TestInProgress
 	case ExpressedHardwareFault:
@@ -440,9 +493,9 @@ func holds(e ExpressedState, st State) bool {
 	case ExpressedEndOfService:
 		return st.EndOfServiceAlert == EndOfServiceExpired
 	case ExpressedInterconnectSmoke:
-		return st.InterconnectSmokeAlarm.alarming()
+		return alarming(st.InterconnectSmokeAlarm)
 	case ExpressedInterconnectCO:
-		return st.InterconnectCOAlarm.alarming()
+		return alarming(st.InterconnectCOAlarm)
 	default:
 		return false
 	}
@@ -475,13 +528,10 @@ func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 // a value is always returned; an attribute this configuration does not
 // serve reads as unsupported.
 func (s *Server) MatterRead(attrID uint32) (any, bool) {
-	switch attrID {
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(s.features), true
-	case cluster.AttrGlobalClusterRevision:
-		return Revision(), true
+	if v, ok := s.inst.ReadGlobal(attrID); ok {
+		return v, true
 	}
-	if !slices.Contains(s.MatterAttributes(), attrID) {
+	if !s.inst.Serves(attrID) {
 		return nil, false
 	}
 	st := s.state()
@@ -518,23 +568,17 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 }
 
 // MatterWrite applies the one writable attribute, SmokeSensitivityLevel
-// (access "RW VM", element :44). Its value must be a SensitivityEnum
-// member — matter.js validates an enum write against the enum's values
-// before any behavior runs and answers ConstraintError otherwise.
+// (access "RW VM"). The definition checks the write — served, writable, a
+// SensitivityEnum member, as matter.js validates an enum write before any
+// behavior runs and answers ConstraintError otherwise.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	if !slices.Contains(s.MatterAttributes(), attrID) {
-		return statusError{im.StatusUnsupportedAttribute, fmt.Sprintf("alarm: attribute 0x%04X is not served", attrID)}
+	v, err := s.inst.ValidateWrite(attrID, value, nil)
+	if err != nil {
+		return err
 	}
-	if attrID != AttrSmokeSensitivityLevel {
-		return statusError{im.StatusUnsupportedWrite, fmt.Sprintf("alarm: attribute 0x%04X is read-only", attrID)}
-	}
-	n, ok := cluster.AsUintMax(value, uint64(SensitivityLow))
-	if !ok {
-		return statusError{im.StatusConstraintError, fmt.Sprintf("alarm: SmokeSensitivityLevel %v is not a SensitivityEnum value", value)}
-	}
-	setter, _ := s.src.(SensitivitySetter) // guaranteed by NewServer
-	level := Sensitivity(n)                //nolint:gosec // range-checked against SensitivityLow by AsUintMax above
-	if err := setter.SetSmokeSensitivityLevel(ctx, level); err != nil {
+	n, _ := v.(uint64)                                                           // an enum8 per ValidateWrite
+	setter, _ := s.src.(SensitivitySetter)                                       // guaranteed by NewServer
+	if err := setter.SetSmokeSensitivityLevel(ctx, Sensitivity(n)); err != nil { //nolint:gosec // an enum8 per ValidateWrite
 		return fmt.Errorf("alarm: SmokeSensitivityLevel write: %w", err)
 	}
 	s.tracker().Bump()
@@ -543,12 +587,7 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
 // SmokeSensitivityLevel is written with Manage ("RW VM").
-func (*Server) MinWritePrivilege(attrID uint32) uint8 {
-	if attrID == AttrSmokeSensitivityLevel {
-		return 4 // Manage
-	}
-	return 3 // Operate
-}
+func (s *Server) MinWritePrivilege(attrID uint32) uint8 { return s.inst.MinWritePrivilege(attrID) }
 
 // selfTestBusy lists the ExpressedState values under which a self-test
 // is refused with BUSY (resource :201-204).
@@ -583,80 +622,24 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, _ any) (any, er
 
 // MatterReportable lists every served attribute except the fixed
 // ExpiryDate (quality F).
-func (s *Server) MatterReportable() []uint32 {
-	attrs := s.MatterAttributes()
-	return slices.DeleteFunc(attrs, func(id uint32) bool { return id == AttrExpiryDate })
-}
+func (s *Server) MatterReportable() []uint32 { return s.inst.MatterReportable() }
 
 // MatterAttributes implements [contract.ClusterAttributeLister]: the
 // mandatory attributes, the feature-gated ones for the advertised
 // features, and the declared optional ones, in id order.
-func (s *Server) MatterAttributes() []uint32 {
-	out := []uint32{AttrExpressedState}
-	if s.hasFeature(FeatureSmokeAlarm) {
-		out = append(out, AttrSmokeState)
-	}
-	if s.hasFeature(FeatureCOAlarm) {
-		out = append(out, AttrCOState)
-	}
-	out = append(out, AttrBatteryAlert)
-	if s.has(OptionalDeviceMuted) {
-		out = append(out, AttrDeviceMuted)
-	}
-	out = append(out, AttrTestInProgress, AttrHardwareFaultAlert, AttrEndOfServiceAlert)
-	for _, o := range []struct {
-		opt  Optional
-		attr uint32
-	}{
-		{OptionalInterconnectSmokeAlarm, AttrInterconnectSmokeAlarm},
-		{OptionalInterconnectCOAlarm, AttrInterconnectCOAlarm},
-		{OptionalContaminationState, AttrContaminationState},
-		{OptionalSmokeSensitivityLevel, AttrSmokeSensitivityLevel},
-		{OptionalExpiryDate, AttrExpiryDate},
-		{OptionalUnmounted, AttrUnmounted},
-	} {
-		if s.has(o.opt) {
-			out = append(out, o.attr)
-		}
-	}
-	return out
-}
+func (s *Server) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:
 // SelfTestRequest when the source can run one.
-func (s *Server) MatterAcceptedCommands() []uint32 {
-	if _, ok := s.src.(SelfTester); ok {
-		return []uint32{CmdSelfTestRequest}
-	}
-	return []uint32{}
-}
+func (s *Server) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister];
 // SelfTestRequest answers with a status.
-func (*Server) MatterGeneratedCommands() []uint32 { return []uint32{} }
+func (s *Server) MatterGeneratedCommands() []uint32 { return s.inst.MatterGeneratedCommands() }
 
 // MatterEvents implements [contract.ClusterEventLister] — the events
 // whose conformance this configuration satisfies, in id order.
-func (s *Server) MatterEvents() []uint32 {
-	var out []uint32
-	if s.hasFeature(FeatureSmokeAlarm) {
-		out = append(out, EventSmokeAlarm)
-	}
-	if s.hasFeature(FeatureCOAlarm) {
-		out = append(out, EventCOAlarm)
-	}
-	out = append(out, EventLowBattery, EventHardwareFault, EventEndOfService, EventSelfTestComplete)
-	if s.has(OptionalDeviceMuted) {
-		out = append(out, EventAlarmMuted, EventMuteEnded)
-	}
-	if s.hasFeature(FeatureSmokeAlarm) && s.has(OptionalInterconnectSmokeAlarm) {
-		out = append(out, EventInterconnectSmokeAlarm)
-	}
-	if s.hasFeature(FeatureCOAlarm) && s.has(OptionalInterconnectCOAlarm) {
-		out = append(out, EventInterconnectCOAlarm)
-	}
-	return append(out, EventAllClear)
-}
+func (s *Server) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
 func (s *Server) SetMatterEventEmitter(emitter contract.EventEmitter) {
@@ -704,7 +687,7 @@ type pendingEvent struct {
 // EndOfServiceAlert is set to Expired (:157); SelfTestComplete when
 // TestInProgress changes to false (:161); AlarmMuted / MuteEnded on the
 // DeviceMuted flips (:166, :171); AllClear when ExpressedState returns to
-// Normal (:195). Priorities are the element's.
+// Normal (:195). Priorities are the element's, read from the definition.
 //
 // Without an emitter the baseline still advances: a change nobody could
 // be told about is not replayed later as if it had just happened.
@@ -731,23 +714,23 @@ func (s *Server) Refresh() {
 // with AllClear last.
 func (s *Server) transitions(prev, cur State, prevExpr, curExpr ExpressedState) []pendingEvent {
 	var out []pendingEvent
-	severity := func(id uint32, was, now AlarmState, priority contract.EventPriority) {
-		if now != was && now.alarming() {
-			out = append(out, pendingEvent{id, AlarmSeverityEvent{AlarmSeverityLevel: now}, priority})
+	severity := func(id uint32, was, now AlarmState) {
+		if now != was && alarming(now) {
+			out = append(out, pendingEvent{id, AlarmSeverityEvent{AlarmSeverityLevel: now}, s.inst.EventPriority(id)})
 		}
 	}
 	fieldless := func(id uint32, fire bool) {
 		if fire {
-			out = append(out, pendingEvent{id, clusterwire.FieldlessEvent{}, contract.EventPriorityInfo})
+			out = append(out, pendingEvent{id, clusterwire.FieldlessEvent{}, s.inst.EventPriority(id)})
 		}
 	}
 	if s.hasFeature(FeatureSmokeAlarm) {
-		severity(EventSmokeAlarm, prev.SmokeState, cur.SmokeState, contract.EventPriorityCritical)
+		severity(EventSmokeAlarm, prev.SmokeState, cur.SmokeState)
 	}
 	if s.hasFeature(FeatureCOAlarm) {
-		severity(EventCOAlarm, prev.COState, cur.COState, contract.EventPriorityCritical)
+		severity(EventCOAlarm, prev.COState, cur.COState)
 	}
-	severity(EventLowBattery, prev.BatteryAlert, cur.BatteryAlert, contract.EventPriorityInfo)
+	severity(EventLowBattery, prev.BatteryAlert, cur.BatteryAlert)
 	fieldless(EventHardwareFault, !prev.HardwareFaultAlert && cur.HardwareFaultAlert)
 	fieldless(EventEndOfService, prev.EndOfServiceAlert != EndOfServiceExpired && cur.EndOfServiceAlert == EndOfServiceExpired)
 	fieldless(EventSelfTestComplete, prev.TestInProgress && !cur.TestInProgress)
@@ -756,10 +739,10 @@ func (s *Server) transitions(prev, cur State, prevExpr, curExpr ExpressedState) 
 		fieldless(EventMuteEnded, prev.DeviceMuted == Muted && cur.DeviceMuted == NotMuted)
 	}
 	if s.hasFeature(FeatureSmokeAlarm) && s.has(OptionalInterconnectSmokeAlarm) {
-		severity(EventInterconnectSmokeAlarm, prev.InterconnectSmokeAlarm, cur.InterconnectSmokeAlarm, contract.EventPriorityCritical)
+		severity(EventInterconnectSmokeAlarm, prev.InterconnectSmokeAlarm, cur.InterconnectSmokeAlarm)
 	}
 	if s.hasFeature(FeatureCOAlarm) && s.has(OptionalInterconnectCOAlarm) {
-		severity(EventInterconnectCOAlarm, prev.InterconnectCOAlarm, cur.InterconnectCOAlarm, contract.EventPriorityCritical)
+		severity(EventInterconnectCOAlarm, prev.InterconnectCOAlarm, cur.InterconnectCOAlarm)
 	}
 	fieldless(EventAllClear, prevExpr != ExpressedNormal && curExpr == ExpressedNormal)
 	return out
