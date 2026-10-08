@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3837,
+  "entry_points": 3841,
   "entry_packages": [
     ".",
     "bootid",
@@ -73,9 +73,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 4586,
+    "total_exported": 4587,
     "reachable": 2716,
-    "whitelisted": 1865,
+    "whitelisted": 1866,
     "unreachable": 5
   },
   "by_package": [
@@ -2855,7 +2855,7 @@
       "identifier": "TestForgetSigma1Replied_ClearsEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 218
+      "line": 217
     },
     {
       "package": "bridge",
@@ -3115,6 +3115,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/configuration_version_test.go",
       "line": 19
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestInvokeDelayReportDataDefersSubscriptions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/delay_report_data_test.go",
+      "line": 21
     },
     {
       "package": "bridge",
@@ -3681,7 +3688,7 @@
       "identifier": "TestPerExchangeCaseProvider_EvictHookForgetsSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 249
+      "line": 248
     },
     {
       "package": "bridge",
@@ -7146,7 +7153,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 271
+      "line": 270
     },
     {
       "package": "examples/reference-bridge",
