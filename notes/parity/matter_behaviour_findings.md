@@ -358,17 +358,6 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   `state.windowStatus` for administrator windows. Families: CADMIN, SC
   (discovery of a commissioned node). The ArmFailSafe half of the commit is
   done (`CommissioningWindow.IsOpen` wired into GeneralCommissioning).
-- **F-SWEEP-2 — TotalOperationalHours persisted in whole hours.** matter.js
-  persists a millisecond counter (`totalOperationalHoursCounter`); go-fabric
-  persists whole hours (`GeneralDiagnostics.SetPersistedCounters`,
-  `examples/reference-bridge/wiring.go` storeOperationalHours /
-  keepOperationalHours), so every run drops its part-hour and a bridge
-  restarting more often than hourly never gains one. Older than the
-  f07365a8 → 85cf6647 range (seen while sweeping 5a125377). **Fix:** persist
-  seconds (a `SetPersistedOperationalTime(time.Duration)` and an accessor).
-  Family: DGGEN (2.1 waits for the hour to move within one run, so it does
-  not see this).
-
 - **F-COMP-1 — a bridged endpoint cannot carry parts, so the SmokeCoAlarm
   has no PowerSource component endpoint.** The SmokeCoAlarm device type
   (0x0076) requires a PowerSource device-type component (min 1). matter.js

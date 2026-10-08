@@ -50,6 +50,12 @@ the same `ColorTemperatureWriter` as before.
 - `cluster/transition.AddWithOverflow` (matter.js `addValueWithOverflow`).
 - The reference daemon has an ExtendedColorLight ("Color Bulb") with every
   ColorControl feature, and the CHIP ColorControl family runs against it.
+- `cluster/core.GeneralDiagnostics.SetPersistedOperationalTime` and
+  `TotalOperationalTime`: the operational time at full resolution, which a
+  host persists and seeds back instead of the TotalOperationalHours
+  attribute, as matter.js persists its millisecond
+  `totalOperationalHoursCounter`. `SetPersistedCounters` keeps its whole-hour
+  seed (and now saturates instead of overflowing on a huge one).
 
 ### Changed
 
@@ -94,6 +100,17 @@ the same `ColorTemperatureWriter` as before.
 - `light.ColorControlClusterRevision` is the generated definition's
   `colorcontrol.Revision` (still 9).
 
+### Fixed
+
+- **TotalOperationalHours keeps the part-hours of every run.** The reference
+  daemon persisted the attribute in whole hours, so each restart dropped its
+  part-hour and a bridge restarting more often than hourly never gained one.
+  It now persists milliseconds under the settings key `gendiag.operational_ms`
+  (matter.js `totalOperationalHoursCounter`); a database of an earlier
+  release is migrated on first start — its `gendiag.operational_hours` count
+  is read as hours × 3,600,000 ms and the next store writes the new key. A
+  host that persisted the attribute itself should switch to
+  `TotalOperationalTime` the same way.
 
 ## [0.2.0] — 2026-10-07
 

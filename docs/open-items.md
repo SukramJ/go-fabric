@@ -31,7 +31,6 @@ last family run and held by `TestCertifiabilityDocument`.
 | Item | Where | What |
 | --- | --- | --- |
 | **F-SWEEP-1 — the node's own commissioning window** | findings register | matter.js owns a node-opened window (48 h uncommissioned, 15 min once commissioned) that CommissioningComplete closes and an administrator's window replaces instead of answering Busy. go-fabric wires only the ArmFailSafe guard. |
-| **F-SWEEP-2 — TotalOperationalHours in whole hours** | findings register | matter.js persists a millisecond counter; go-fabric persists whole hours and loses up to an hour per restart. |
 | **F-COMP-1 — a bridged endpoint cannot carry parts** | findings register, `docs/certifiability.md` | The SmokeCoAlarm device type requires a PowerSource component endpoint; matter.js composes it as a child part. The reference daemon's smoke alarm logs a `matter.devicetype.violation` warning at Start for this. |
 | **Hand-off transitions report RemainingTime 0** | [ADR 0014](./adr/0014-transitions-optional-per-endpoint.md), `BD-Matter-LevelControl-NativeRamp` | A host whose device ramps natively has no way to state the end time; matter.js's application-stated `transitionEndTime` is not ported. |
 | **Per-attribute timed-write enforcement** | `BD-Matter-TimedAndQuotaDeferred`, `docs/matterjs-comparison.md` §4 | Enforced for commands; no exposed attribute carries the T quality yet. |
