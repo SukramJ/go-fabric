@@ -78,17 +78,22 @@ func TestNewManager_ZeroConfig_AppliesDefaults(t *testing.T) {
 	t.Parallel()
 	// Subscribe with a valid cadence to confirm the manager accepted floor/ceiling defaults.
 	m := newManager(subscription.Config{}, nil)
-	// MinIntervalFloor default = 1; MinInterval < 1 must be floored, not rejected.
+	// The default floor honours the request: a MinIntervalFloor of 0 stays
+	// 0, as matter.js ServerSubscription keeps the requested floor.
 	args := defaultArgs()
-	args.MinIntervalFloor = 0 // below default floor
+	args.MinIntervalFloor = 0
 	args.MaxIntervalCeiling = 60
 	sub, err := m.Subscribe(args)
 	if err != nil {
 		t.Fatalf("Subscribe with zeroed MinInterval: %v", err)
 	}
-	// The manager should have floored MinIntervalFloor to 1 (default).
-	if sub.MinIntervalFloor != 1 {
-		t.Errorf("MinIntervalFloor = %d, want 1 (floored to default)", sub.MinIntervalFloor)
+	if sub.MinIntervalFloor != 0 {
+		t.Errorf("MinIntervalFloor = %d, want the requested 0", sub.MinIntervalFloor)
+	}
+	// A host floor still lifts it.
+	lifted, err := newManager(subscription.Config{MinIntervalFloorSeconds: 1}, nil).Subscribe(args)
+	if err != nil || lifted.MinIntervalFloor != 1 {
+		t.Errorf("host floor 1: MinIntervalFloor = %v (%v), want 1", lifted, err)
 	}
 	// Active should be 1.
 	if n := m.Active(); n != 1 {
@@ -1733,5 +1738,149 @@ func TestOnAttributeChanged_ChangesOmittedNeverReports(t *testing.T) {
 	m.Tick(ctx, t0.Add(4*time.Second))
 	if len(ch) != 1 {
 		t.Fatalf("got %d reports after a GroupTable change, want 1", len(ch))
+	}
+}
+
+// TestZeroFloorReportsAChangeRightAfterAReport pins the report timing
+// TC-CC-2.2 depends on: a subscription that requests MinIntervalFloor 0
+// reports a change made 150 ms after its previous report on the next
+// tick, not a second later. matter.js ServerSubscription
+// #prepareDataUpdate holds a report only until lastUpdateTime + the
+// requested minIntervalFloor, then sends 50 ms later; the module's
+// default once lifted every floor to 1 s, so a RemainingTime reported at
+// a command's time went out up to 1.25 s late and read 12 tenths short.
+func TestZeroFloorReportsAChangeRightAfterAReport(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var reports [][]im.ConcreteAttributePath
+	m := newManager(subscription.Config{}, func(_ context.Context, _ *subscription.Subscription, paths []im.ConcreteAttributePath) {
+		mu.Lock()
+		reports = append(reports, paths)
+		mu.Unlock()
+	})
+	args := defaultArgs()
+	args.MinIntervalFloor = 0
+	if _, err := m.Subscribe(args); err != nil {
+		t.Fatal(err)
+	}
+	p := args.AttributePaths[0]
+	start := time.Now()
+	m.OnAttributeChanged(p)
+	m.Tick(context.Background(), start.Add(250*time.Millisecond)) // the previous report
+	m.OnAttributeChanged(p)                                       // a change 150 ms later
+	m.Tick(context.Background(), start.Add(500*time.Millisecond)) // the next tick
+	mu.Lock()
+	defer mu.Unlock()
+	if len(reports) != 2 {
+		t.Fatalf("%d reports within 500 ms, want 2: a requested floor of 0 must not hold the second", len(reports))
+	}
+
+	// A floor the subscriber asked for still holds it.
+	held := newManager(subscription.Config{}, func(context.Context, *subscription.Subscription, []im.ConcreteAttributePath) {
+		t.Error("a report inside the requested 1 s floor")
+	})
+	args.MinIntervalFloor = 1
+	if _, err := held.Subscribe(args); err != nil {
+		t.Fatal(err)
+	}
+	held.OnAttributeChanged(p)
+	held.Tick(context.Background(), time.Now().Add(250*time.Millisecond))
+}
+
+// TestDeferReports ports matter.js packages/node/test/node/DelayReportDataTest.ts:
+// a DelayReportData holds the next report by its delay; a running
+// deferral is only shortened; none outlasts the send interval; a
+// subscription that selects none of the endpoints is not held; a
+// critical event still goes out (urgent events bypass the hold, as they
+// bypass the floor).
+func TestDeferReports(t *testing.T) {
+	t.Parallel()
+	p := defaultArgs().AttributePaths[0]
+
+	run := func(name string, defer1 func(sub *subscription.Subscription, start time.Time), want time.Duration) {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var reports []time.Duration
+			var start time.Time
+			var mu sync.Mutex
+			var now time.Duration
+			m := newManager(subscription.Config{}, func(context.Context, *subscription.Subscription, []im.ConcreteAttributePath) {
+				mu.Lock()
+				reports = append(reports, now)
+				mu.Unlock()
+			})
+			args := defaultArgs()
+			args.MinIntervalFloor = 0
+			args.MaxIntervalCeiling = 10
+			sub, err := m.Subscribe(args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			start = time.Now()
+			sub.TouchLastReport(start)
+			defer1(sub, start)
+			m.OnAttributeChanged(p)
+			for d := time.Duration(0); d <= 10*time.Second; d += 50 * time.Millisecond {
+				mu.Lock()
+				now = d
+				mu.Unlock()
+				m.Tick(context.Background(), start.Add(d))
+				mu.Lock()
+				n := len(reports)
+				mu.Unlock()
+				if n > 0 {
+					break
+				}
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if len(reports) == 0 || reports[0] != want {
+				t.Errorf("first report at %v, want %v", reports, want)
+			}
+		})
+	}
+	run("defers by DelayMinMs", func(sub *subscription.Subscription, start time.Time) {
+		sub.DeferReports(start, time.Second)
+	}, time.Second)
+	run("keeps a deferral that ends earlier", func(sub *subscription.Subscription, start time.Time) {
+		sub.DeferReports(start, 2*time.Second)
+		sub.DeferReports(start.Add(500*time.Millisecond), 5*time.Second)
+	}, 2*time.Second)
+	run("shortens a deferral that ends later", func(sub *subscription.Subscription, start time.Time) {
+		sub.DeferReports(start, 5*time.Second)
+		sub.DeferReports(start.Add(time.Second), time.Second)
+	}, 2*time.Second)
+	run("never past the send interval", func(sub *subscription.Subscription, start time.Time) {
+		sub.DeferReports(start, time.Minute)
+	}, 8*time.Second-50*time.Millisecond)
+	run("no deferral", func(*subscription.Subscription, time.Time) {}, 0)
+
+	// Manager.DeferReports holds only the subscriptions that select an
+	// endpoint of the invoke.
+	var mu sync.Mutex
+	n := 0
+	m := newManager(subscription.Config{}, func(context.Context, *subscription.Subscription, []im.ConcreteAttributePath) {
+		mu.Lock()
+		n++
+		mu.Unlock()
+	})
+	args := defaultArgs()
+	args.MinIntervalFloor = 0
+	sub, err := m.Subscribe(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	sub.TouchLastReport(start)
+	m.DeferReports(map[uint16]bool{9: true}, time.Hour) // endpoint 1 is not selected
+	m.OnAttributeChanged(p)
+	m.Tick(context.Background(), start.Add(100*time.Millisecond))
+	m.DeferReports(map[uint16]bool{1: true}, time.Hour)
+	m.OnAttributeChanged(p)
+	m.Tick(context.Background(), start.Add(200*time.Millisecond))
+	mu.Lock()
+	defer mu.Unlock()
+	if n != 1 {
+		t.Errorf("%d reports, want 1: the other endpoint's deferral must not hold it, its own must", n)
 	}
 }

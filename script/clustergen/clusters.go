@@ -19,4 +19,6 @@ var committed = []string{
 	// cluster/filter
 	"HepaFilterMonitoring",
 	"ActivatedCarbonFilterMonitoring",
+	// cluster/light
+	"ColorControl",
 }

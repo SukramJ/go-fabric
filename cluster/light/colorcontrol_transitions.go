@@ -7,15 +7,51 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"slices"
 
-	"github.com/SukramJ/go-fabric/cluster"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	"github.com/SukramJ/go-fabric/cluster/transition"
-	"github.com/SukramJ/go-fabric/cluster/wire"
-	"github.com/SukramJ/go-fabric/im"
 )
 
-// propColorTemperature names ColorTemperatureMireds in the engine.
-const propColorTemperature = "colorTemperatureMireds"
+// The transitionable properties, named as matter.js names them in its
+// Transitions configuration (ColorControlServer.ts #initializeTransitions).
+const (
+	propHue              = "currentHue"
+	propEnhancedHue      = "enhancedCurrentHue"
+	propSaturation       = "currentSaturation"
+	propColorTemperature = "colorTemperatureMireds"
+	propX                = "currentX"
+	propY                = "currentY"
+)
+
+// propAttribute maps a property to its attribute.
+var propAttribute = map[string]uint32{
+	propHue:              ccdef.AttrCurrentHue,
+	propEnhancedHue:      ccdef.AttrEnhancedCurrentHue,
+	propSaturation:       ccdef.AttrCurrentSaturation,
+	propColorTemperature: ccdef.AttrColorTemperatureMireds,
+	propX:                ccdef.AttrCurrentX,
+	propY:                ccdef.AttrCurrentY,
+}
+
+// quietAttributes are the attributes with the "Q" quality the server
+// changes (color-control.element.ts): reported at most once a second
+// while they change, the end of a transition flushing the last value.
+var quietAttributes = []uint32{
+	ccdef.AttrCurrentHue, ccdef.AttrCurrentSaturation, ccdef.AttrCurrentX, ccdef.AttrCurrentY,
+	ccdef.AttrColorTemperatureMireds, ccdef.AttrEnhancedCurrentHue,
+}
+
+// The value ranges of ColorControlServer.ts (MIN_/MAX_ constants).
+const (
+	minCIEXYValue       = 0
+	maxCIEXYValue       = 0xFEFF // "comes directly from the ZCL specification table 5.3"
+	minHueValue         = 0
+	maxHueValue         = 0xFE
+	maxEnhancedHueValue = 0xFFFF
+	minSaturationValue  = 0
+	maxSaturationValue  = 0xFE
+)
 
 // The bounds matter.js puts on a colour temperature whose physical bound
 // is unset (ColorControlServer.ts MIN_TEMPERATURE_VALUE /
@@ -32,16 +68,46 @@ const (
 	maxCurrentLevel = 0xFE
 )
 
-// MoveModeEnum and StepModeEnum (color-control.element.ts): Stop 0, Up 1,
-// Down 3.
-const (
-	colorModeStop uint8 = 0
-	colorModeUp   uint8 = 1
-	colorModeDown uint8 = 3
-)
-
 // optionExecuteIfOff is the ColorControl OptionsBitmap's only bit.
 const optionExecuteIfOff uint8 = 0x01
+
+// property reads a transitionable property.
+func (st colorState) property(name string) (float64, bool) {
+	switch name {
+	case propHue:
+		return float64(st.hue), true
+	case propEnhancedHue:
+		return float64(st.enhancedHue), true
+	case propSaturation:
+		return float64(st.saturation), true
+	case propColorTemperature:
+		return float64(st.mireds), true
+	case propX:
+		return float64(st.x), true
+	case propY:
+		return float64(st.y), true
+	}
+	return 0, false
+}
+
+// setProperty writes a transitionable property; v is rounded and within
+// the property's bounds (the engine keeps it there).
+func (st *colorState) setProperty(name string, v float64) {
+	switch name {
+	case propHue:
+		st.hue = uint8(cropValue(v, minHueValue, maxHueValue))
+	case propEnhancedHue:
+		st.enhancedHue = uint16(cropValue(v, minHueValue, maxEnhancedHueValue))
+	case propSaturation:
+		st.saturation = uint8(cropValue(v, minSaturationValue, maxSaturationValue))
+	case propColorTemperature:
+		st.mireds = uint16(cropValue(v, 0, float64(maxTemperatureMireds)))
+	case propX:
+		st.x = uint16(cropValue(v, minCIEXYValue, maxCIEXYValue))
+	case propY:
+		st.y = uint16(cropValue(v, minCIEXYValue, maxCIEXYValue))
+	}
+}
 
 // minimumMireds is matter.js minimumColorTemperatureMireds: the physical
 // minimum, or 0 when none is set.
@@ -63,48 +129,118 @@ func (s *ColorControlServer) maximumMireds() uint16 {
 
 // cropMireds is matter.js #cropColorTemperature.
 func (s *ColorControlServer) cropMireds(v float64) float64 {
-	return min(max(v, float64(s.minimumMireds())), float64(s.maximumMireds()))
+	return cropValue(v, float64(s.minimumMireds()), float64(s.maximumMireds()))
 }
 
-// applyMireds pushes a colour temperature the engine applies to the
-// device sink, then makes it the attribute's value and reports it by the
-// quieter rules of its "Q" quality. A refused value leaves the attribute
-// where it was.
-func (s *ColorControlServer) applyMireds(changes []transition.Change) error {
-	for _, c := range changes {
-		mireds := uint16(c.Value) //nolint:gosec // the engine keeps the value between the physical bounds
-		s.mu.Lock()
-		w := s.writer
-		s.mu.Unlock()
-		if w != nil {
-			if err := w.SetColorTemperatureMireds(context.Background(), mireds); err != nil {
-				return fmt.Errorf("colorcontrol: ColorTemperatureMireds write-through: %w", err)
-			}
+// applyChanges is the engine's Apply: the values of one step, or of a
+// transition that applies at once.
+func (s *ColorControlServer) applyChanges(changes []transition.Change) error {
+	return s.update(context.Background(), func(st *colorState) {
+		for _, c := range changes {
+			st.setProperty(c.Name, c.Value)
 		}
-		s.mu.Lock()
-		changed := s.current != mireds
-		s.current = mireds
-		s.mu.Unlock()
-		if changed {
-			s.quiet.Changed(false, false)
+	})
+}
+
+// update changes the colour state: it pushes the new colour temperature to
+// the [ColorTemperatureWriter] and the new colour to the [ColorWriter],
+// then makes the state the attributes' values and reports what changed —
+// the "Q" attributes by their quieter rules, the rest at once. A refused
+// value leaves every attribute where it was.
+func (s *ColorControlServer) update(ctx context.Context, change func(st *colorState)) error {
+	s.commit.Lock()
+	defer s.commit.Unlock()
+	s.mu.Lock()
+	prev := s.st
+	next := prev
+	change(&next)
+	ct, cw := s.writer, s.colorWriter
+	s.mu.Unlock()
+	if next == prev {
+		return nil
+	}
+	if ct != nil && next.mireds != prev.mireds {
+		if err := ct.SetColorTemperatureMireds(ctx, next.mireds); err != nil {
+			return fmt.Errorf("colorcontrol: ColorTemperatureMireds write-through: %w", err)
 		}
 	}
+	if cw != nil && next.color() != prev.color() {
+		if err := cw.SetColor(ctx, next.color()); err != nil {
+			return fmt.Errorf("colorcontrol: colour write-through: %w", err)
+		}
+	}
+	s.mu.Lock()
+	s.st = next
+	s.mu.Unlock()
+	s.report(prev, next)
 	return nil
 }
 
+// report reports the attributes that differ between prev and next.
+func (s *ColorControlServer) report(prev, next colorState) {
+	quiet := func(id uint32, changed bool) {
+		if changed && s.inst.Serves(id) {
+			s.quiet[id].Changed(false, false)
+		}
+	}
+	quiet(ccdef.AttrCurrentHue, prev.hue != next.hue)
+	quiet(ccdef.AttrCurrentSaturation, prev.saturation != next.saturation)
+	quiet(ccdef.AttrCurrentX, prev.x != next.x)
+	quiet(ccdef.AttrCurrentY, prev.y != next.y)
+	quiet(ccdef.AttrColorTemperatureMireds, prev.mireds != next.mireds)
+	quiet(ccdef.AttrEnhancedCurrentHue, prev.enhancedHue != next.enhancedHue)
+
+	var ids []uint32
+	add := func(id uint32, changed bool) {
+		if changed && s.inst.Serves(id) {
+			ids = append(ids, id)
+		}
+	}
+	add(ccdef.AttrColorMode, prev.mode != next.mode)
+	add(ccdef.AttrEnhancedColorMode, prev.enhancedMode != next.enhancedMode)
+	add(ccdef.AttrColorLoopActive, prev.loopActive != next.loopActive)
+	add(ccdef.AttrColorLoopDirection, prev.loopDirection != next.loopDirection)
+	add(ccdef.AttrColorLoopTime, prev.loopTime != next.loopTime)
+	add(ccdef.AttrColorLoopStartEnhancedHue, prev.loopStart != next.loopStart)
+	add(ccdef.AttrColorLoopStoredEnhancedHue, prev.loopStored != next.loopStored)
+	if len(ids) > 0 {
+		s.changes.Notify(ids...)
+	}
+}
+
 // OnMatterAttributesChanged implements [contract.AttributeChangeNotifier]:
-// ColorTemperatureMireds by the quieter rules of its "Q" quality — at most
-// once a second while a transition runs, the end flushing the last value
-// — and RemainingTime when matter.js's #updateRemainingTime would report
-// it.
+// the "Q" attributes by their quieter rules — at most once a second while
+// a transition runs, the end flushing the last value — RemainingTime when
+// matter.js's #updateRemainingTime would report it, and the colour mode
+// and colour loop attributes when they change.
 func (s *ColorControlServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
 	return s.changes.OnMatterAttributesChanged(cb)
 }
 
 // MatterSelfReportedAttributes implements
-// [contract.SelfReportedAttributeLister].
-func (*ColorControlServer) MatterSelfReportedAttributes() []uint32 {
-	return []uint32{wire.ColorCtrlAttrColorTemperatureMireds, wire.ColorCtrlAttrRemainingTime}
+// [contract.SelfReportedAttributeLister]: every attribute the server
+// changes is reported by the server — the "Q" ones, RemainingTime, the
+// colour modes where the server has more than one, and the colour loop's.
+func (s *ColorControlServer) MatterSelfReportedAttributes() []uint32 {
+	ids := append(slices.Clone(quietAttributes), ccdef.AttrRemainingTime)
+	modes := 0
+	for _, m := range []ColorMode{ColorModeHueSaturation, ColorModeXY, ColorModeColorTemperature, ColorModeEnhancedHueSaturation} {
+		if s.supportsColorMode(m) {
+			modes++
+		}
+	}
+	if modes > 1 {
+		ids = append(ids, ccdef.AttrColorMode, ccdef.AttrEnhancedColorMode)
+	}
+	ids = append(ids, ccdef.AttrColorLoopActive, ccdef.AttrColorLoopDirection, ccdef.AttrColorLoopTime,
+		ccdef.AttrColorLoopStartEnhancedHue, ccdef.AttrColorLoopStoredEnhancedHue)
+	out := []uint32{}
+	for _, id := range ids {
+		if s.inst.Serves(id) {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // MatterQuiesce implements [contract.ClusterQuiescer]: a transition stops
@@ -115,169 +251,54 @@ func (s *ColorControlServer) MatterQuiesce() { s.engine.StopAll() }
 // executes is matter.js #optionsAllowExecution.
 func (s *ColorControlServer) executes(mask, override uint8) bool {
 	s.mu.Lock()
-	options := ((s.options &^ mask) | (override & mask)) & colorOptionsDefinedBits
+	options := ((s.options &^ mask) | (override & mask)) & optionExecuteIfOff
 	s.mu.Unlock()
 	return options&optionExecuteIfOff != 0 || s.onOff == nil || s.onOff.OnOff()
 }
 
-// MatterInvoke handles the CT commands as matter.js ColorControlServer
-// does. Every one switches the colour mode to ColorTemperatureMireds,
-// which is the only mode a CT-only server has.
-func (s *ColorControlServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) (any, error) {
-	s.cmd.Lock()
-	defer s.cmd.Unlock()
-	switch cmdID {
-	case wire.ColorCtrlCmdMoveToColorTemperature:
-		return nil, s.moveToColorTemperature(fields)
-	case wire.ColorCtrlCmdMoveColorTemperature:
-		return nil, s.moveColorTemperature(fields)
-	case wire.ColorCtrlCmdStepColorTemperature:
-		return nil, s.stepColorTemperature(fields)
-	case wire.ColorCtrlCmdStopMoveStep:
-		s.stopMoveStep(fields)
-		return nil, nil
-	default:
-		return nil, fmt.Errorf("colorcontrol: unknown command 0x%02X", cmdID)
-	}
-}
-
-// moveToColorTemperature is matter.js moveToColorTemperature and
-// moveToColorTemperatureLogic: a rate from TransitionTime (a zero one is
-// infinite, so the target applies at once), the target cropped to the
-// physical range where it lies beyond it.
-func (s *ColorControlServer) moveToColorTemperature(fields any) error {
-	var req wire.MoveToColorTemperatureRequest
-	switch v := fields.(type) {
-	case wire.MoveToColorTemperatureRequest:
-		req = v
-	case map[uint8]any:
-		req.ColorTemperatureMireds = uint16(tagUint(v, 0, 0xFFFF)) //nolint:gosec // bounded by tagUint
-		req.TransitionTime = uint16(tagUint(v, 1, 0xFFFF))         //nolint:gosec // bounded by tagUint
-		req.OptionsMask = uint8(tagUint(v, 2, 0xFF))               //nolint:gosec // bounded by tagUint
-		req.OptionsOverride = uint8(tagUint(v, 3, 0xFF))           //nolint:gosec // bounded by tagUint
-	default:
-		return colorControlInvalidCommandErr(fmt.Sprintf("colorcontrol: MoveToColorTemperature carried %T", fields))
-	}
-	if !s.executes(req.OptionsMask, req.OptionsOverride) {
-		return nil
-	}
-	return s.moveToColorTemperatureLogic(float64(req.ColorTemperatureMireds), float64(req.TransitionTime))
-}
-
-// moveToColorTemperatureLogic is matter.js moveToColorTemperatureLogic.
-func (s *ColorControlServer) moveToColorTemperatureLogic(target, transitionTime float64) error {
+// state returns a copy of the colour state.
+func (s *ColorControlServer) state() colorState {
 	s.mu.Lock()
-	current := float64(s.current)
-	s.mu.Unlock()
-	return s.engine.Start(transition.Transition{
-		Name: propColorTemperature, Rate: (target - current) / transitionTime * 10, Target: target,
-	})
+	defer s.mu.Unlock()
+	return s.st
 }
 
-// moveColorTemperature is matter.js moveColorTemperature and
-// moveColorTemperatureLogic: Up or Down at Rate mireds per second towards
-// the bound the command names (0 is the physical one), a zero Rate
-// refused. Stop ends hue and saturation moves only, which a CT-only
-// server has none of — so, as in matter.js, it leaves a colour temperature
-// move running.
-func (s *ColorControlServer) moveColorTemperature(fields any) error {
-	m, ok := fields.(map[uint8]any)
-	if !ok {
-		return colorControlInvalidCommandErr(fmt.Sprintf("colorcontrol: MoveColorTemperature carried %T", fields))
+// startTransition is matter.js #startTransition: a hue transition stops
+// the other hue's, then the engine starts it.
+func (s *ColorControlServer) startTransition(t transition.Transition) error {
+	switch t.Name {
+	case propHue:
+		s.engine.Stop(propEnhancedHue)
+	case propEnhancedHue:
+		s.engine.Stop(propHue)
 	}
-	mode := uint8(tagUint(m, 0, 0xFF))     //nolint:gosec // bounded by tagUint
-	rate := float64(tagUint(m, 1, 0xFFFF)) //nolint:gosec // bounded by tagUint
-	minimum, maximum := tagUint(m, 2, 0xFFFF), tagUint(m, 3, 0xFFFF)
-	mask, override := uint8(tagUint(m, 4, 0xFF)), uint8(tagUint(m, 5, 0xFF)) //nolint:gosec // bounded by tagUint
-	if err := checkColorMode("MoveColorTemperature MoveMode", mode, true); err != nil {
-		return err
-	}
-	// matter.js #assertRate.
-	if mode != colorModeStop && rate == 0 {
-		return colorControlInvalidCommandErr("colorcontrol: Rate must not be 0 when moving Up or Down")
-	}
-	if !s.executes(mask, override) || mode == colorModeStop {
-		return nil
-	}
-	lower, upper := s.commandBounds(minimum, maximum)
-	target, sign := upper, 1.0
-	if mode == colorModeDown {
-		target, sign = lower, -1
-	}
-	return s.engine.Start(transition.Transition{Name: propColorTemperature, Rate: rate * sign, Target: target})
+	return s.engine.Start(t)
 }
 
-// stepColorTemperature is matter.js stepColorTemperature and
-// stepColorTemperatureLogic: StepSize from the current value, cropped to
-// the bounds the command names, over TransitionTime; a zero StepSize is
-// refused.
-func (s *ColorControlServer) stepColorTemperature(fields any) error {
-	m, ok := fields.(map[uint8]any)
-	if !ok {
-		return colorControlInvalidCommandErr(fmt.Sprintf("colorcontrol: StepColorTemperature carried %T", fields))
-	}
-	mode := uint8(tagUint(m, 0, 0xFF)) //nolint:gosec // bounded by tagUint
-	step := float64(tagUint(m, 1, 0xFFFF))
-	transitionTime := float64(tagUint(m, 2, 0xFFFF))
-	minimum, maximum := tagUint(m, 3, 0xFFFF), tagUint(m, 4, 0xFFFF)
-	mask, override := uint8(tagUint(m, 5, 0xFF)), uint8(tagUint(m, 6, 0xFF)) //nolint:gosec // bounded by tagUint
-	// The request's enum is validated before the command runs (matter.js
-	// ValueValidator, ConstraintError), the step size by the command
-	// (#assertStepSize).
-	if err := checkColorMode("StepColorTemperature StepMode", mode, false); err != nil {
-		return err
-	}
-	if step == 0 {
-		return colorControlInvalidCommandErr("colorcontrol: ColorTemperature step size must not be 0")
-	}
-	if !s.executes(mask, override) {
-		return nil
-	}
-	lower, upper := s.commandBounds(minimum, maximum)
-	sign := 1.0
-	if mode == colorModeDown {
-		sign = -1
-	}
-	s.mu.Lock()
-	current := float64(s.current)
-	s.mu.Unlock()
-	return s.engine.Start(transition.Transition{
-		Name: propColorTemperature, Rate: step / transitionTime * 10 * sign,
-		Target: min(max(current+step*sign, lower), upper),
-	})
+// stopHueAndSaturationMovement is matter.js stopHueAndSaturationMovement.
+func (s *ColorControlServer) stopHueAndSaturationMovement() {
+	s.engine.Stop(propHue)
+	s.engine.Stop(propEnhancedHue)
+	s.engine.Stop(propSaturation)
 }
 
-// commandBounds is the colour temperature range a Move / Step command
-// names: a zero bound is the physical one, and both are cropped to the
-// physical range (matter.js moveColorTemperature / stepColorTemperature).
-func (s *ColorControlServer) commandBounds(minimum, maximum uint64) (lower, upper float64) {
-	if minimum == 0 {
-		minimum = uint64(s.minimumMireds())
-	}
-	if maximum == 0 {
-		maximum = uint64(s.maximumMireds())
-	}
-	return s.cropMireds(float64(minimum)), s.cropMireds(float64(maximum))
-}
-
-// stopMoveStep is matter.js stopMoveStep and stopMoveStepLogic: every
-// movement stops where it is and RemainingTime reports 0 (no colour loop
-// runs on a CT-only server).
-func (s *ColorControlServer) stopMoveStep(fields any) {
-	var mask, override uint8
-	if m, ok := fields.(map[uint8]any); ok {
-		mask, override = uint8(tagUint(m, 0, 0xFF)), uint8(tagUint(m, 1, 0xFF)) //nolint:gosec // bounded by tagUint
-	}
-	if !s.executes(mask, override) {
-		return
-	}
+// stopAllColorMovement is matter.js stopAllColorMovement.
+func (s *ColorControlServer) stopAllColorMovement() {
+	s.engine.Stop(propX)
+	s.engine.Stop(propY)
 	s.engine.Stop(propColorTemperature)
-	s.engine.CancelAll()
+	s.stopHueAndSaturationMovement()
 }
+
+// endTransitions is matter.js #endTransitions: the remaining time becomes
+// zero and is reported. (The application-stated transitionEndTime it also
+// clears is not ported, BD-Matter-LevelControl-NativeRamp.)
+func (s *ColorControlServer) endTransitions() { s.engine.CancelAll() }
 
 // SyncColorTemperatureWithLevel moves the colour temperature to the value
 // level maps to while LevelControl's CoupleColorTempToLevel option is in
-// effect: matter.js ColorControlServer.syncColorTemperatureWithLevel and
+// effect and the light is in the colour temperature mode: matter.js
+// ColorControlServer.syncColorTemperatureWithLevel and
 // syncColorTemperatureWithLevelLogic. The minimum level maps to the
 // physical maximum, the maximum level to CoupleColorTempToLevelMinMireds,
 // a level in between linearly; the value applies at once. It implements
@@ -285,6 +306,9 @@ func (s *ColorControlServer) stopMoveStep(fields any) {
 func (s *ColorControlServer) SyncColorTemperatureWithLevel(_ context.Context, level uint8) error {
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
+	if st := s.state(); st.mode != ColorModeColorTemperature && st.enhancedMode != ColorModeColorTemperature {
+		return nil
+	}
 	coupleMin := float64(s.minimumMireds()) // CoupleColorTempToLevelMinMireds reads the physical minimum
 	physMax := float64(s.maximumMireds())
 	var mireds float64
@@ -298,29 +322,3 @@ func (s *ColorControlServer) SyncColorTemperatureWithLevel(_ context.Context, le
 	}
 	return s.moveToColorTemperatureLogic(mireds, 0)
 }
-
-// checkColorMode refuses a MoveModeEnum / StepModeEnum value the enum
-// does not define (Stop only for MoveMode).
-func checkColorMode(field string, mode uint8, allowStop bool) error {
-	if mode == colorModeUp || mode == colorModeDown || (allowStop && mode == colorModeStop) {
-		return nil
-	}
-	return colorControlConstraintErr(fmt.Sprintf("colorcontrol: %s %d is not defined", field, mode))
-}
-
-// tagUint reads an unsigned field of the generic tag map the bridge hands
-// over, 0 when absent or wider than the field (the bridge decodes the
-// payload with the field's own width, so a wider value is malformed).
-func tagUint(m map[uint8]any, tag uint8, limit uint64) uint64 {
-	v, ok := cluster.AsUintMax(m[tag], limit)
-	if !ok {
-		return 0
-	}
-	return v
-}
-
-// colorControlInvalidCommandErr answers a command with INVALID_COMMAND.
-type colorControlInvalidCommandErr string
-
-func (e colorControlInvalidCommandErr) Error() string                 { return string(e) }
-func (colorControlInvalidCommandErr) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }

@@ -43,7 +43,7 @@ func TestHandlerParity_SendInterval_HalfUnder60s_Uses80Percent(t *testing.T) {
 	m := newManager(subscription.Config{}, chanReporter(ch))
 
 	args := defaultArgs()
-	args.MinIntervalFloor = 0    // floored to 1 by manager default; use 1 below
+	args.MinIntervalFloor = 0    // kept as requested; the send interval is 0.8 × max
 	args.MaxIntervalCeiling = 60 // half=30s < 60s → 0.8×60 = 48 s sendInterval
 	if _, err := m.Subscribe(args); err != nil {
 		t.Fatalf("Subscribe: %v", err)

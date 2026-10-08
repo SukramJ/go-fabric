@@ -647,3 +647,21 @@ func TestStopFinishAndEdgeCases(t *testing.T) {
 		quiet.StopAll()
 	})
 }
+
+// TestAddWithOverflow is matter.js addValueWithOverflow
+// (packages/general/src/util/Number.ts): one wrap past either bound,
+// counting from the other bound.
+func TestAddWithOverflow(t *testing.T) {
+	t.Parallel()
+	for _, v := range []struct{ value, add, want float64 }{
+		{10, -20, 244}, // -10 - 0 + 254
+		{250, 10, 6},   // 260 - 254 + 0
+		{100, 54, 154}, // inside
+		{0, 254, 254},  // at the bound
+		{254, 1, 1},    // 255 - 254
+	} {
+		if got := transition.AddWithOverflow(v.value, v.add, 0, 254); got != v.want {
+			t.Errorf("AddWithOverflow(%v, %v) = %v, want %v", v.value, v.add, got, v.want)
+		}
+	}
+}

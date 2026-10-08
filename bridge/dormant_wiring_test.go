@@ -193,9 +193,8 @@ func TestNotifyDeviceReachable_DirtiesReachableAttribute(t *testing.T) {
 	// Drive the engine synchronously with a wall-clock offset rather than
 	// waiting in real time: Manager.Subscribe stamps lastReport=now at
 	// admission (so the very first tick after Subscribe never fires a
-	// spurious keepalive — see manager.go) and the manager floors
-	// MinIntervalFloor to 1s even for a request of 0, so the dirty-path
-	// drain gate needs `now` to be at least that far past admission.
+	// spurious keepalive — see manager.go); a tick well past admission
+	// drains the dirty paths whatever floor a host configures.
 	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
 
 	spy.mu.Lock()

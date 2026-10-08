@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3805,
+  "entry_points": 3841,
   "entry_packages": [
     ".",
     "bootid",
@@ -24,6 +24,7 @@
     "cluster/pump",
     "cluster/spec",
     "cluster/spec/activatedcarbonfiltermonitoring",
+    "cluster/spec/colorcontrol",
     "cluster/spec/dishwashermode",
     "cluster/spec/hepafiltermonitoring",
     "cluster/spec/laundrywashermode",
@@ -72,9 +73,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 4395,
-    "reachable": 2553,
-    "whitelisted": 1837,
+    "total_exported": 4587,
+    "reachable": 2716,
+    "whitelisted": 1866,
     "unreachable": 5
   },
   "by_package": [
@@ -1161,6 +1162,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_extra_test.go",
       "line": 155
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestColorControlPayloadsMatchMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/colorcontrol_parity_matterjs_test.go",
+      "line": 78
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestColorControlRequestsRefusedAsMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/colorcontrol_parity_matterjs_test.go",
+      "line": 174
     },
     {
       "package": "bridge",
@@ -2840,7 +2855,7 @@
       "identifier": "TestForgetSigma1Replied_ClearsEntry",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 218
+      "line": 217
     },
     {
       "package": "bridge",
@@ -3100,6 +3115,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/configuration_version_test.go",
       "line": 19
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestInvokeDelayReportDataDefersSubscriptions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/delay_report_data_test.go",
+      "line": 21
     },
     {
       "package": "bridge",
@@ -3666,7 +3688,7 @@
       "identifier": "TestPerExchangeCaseProvider_EvictHookForgetsSigma1",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/dormant_wiring_test.go",
-      "line": 249
+      "line": 248
     },
     {
       "package": "bridge",
@@ -5013,6 +5035,13 @@
       "line": 241
     },
     {
+      "package": "cluster/light",
+      "identifier": "ColorFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/light/colorcontrol_server.go",
+      "line": 70
+    },
+    {
       "package": "cluster/measurement",
       "identifier": "ElectricalReadingsSource",
       "reason": "called from electricalSensorServers in materializers.go:142-150, which reaches it as a function value in the measurement-kind registry map — an indirect call RTA cannot follow",
@@ -5396,6 +5425,181 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/activatedcarbonfiltermonitoring/definition_gen_test.go",
       "line": 19
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "ColorCapabilitiesBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 124
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "ColorCapabilitiesBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 138
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "ColorLoopActionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 149
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "ColorLoopActionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 161
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "ColorLoopDirectionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 170
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "ColorLoopDirectionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 181
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "ColorModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 189
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "ColorModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 201
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "DirectionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 210
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "DirectionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 223
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "DriftCompensationEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 233
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "DriftCompensationEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 247
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "EnhancedColorModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 258
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "EnhancedColorModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 271
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 110
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "MoveModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 281
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "MoveModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 293
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "OptionsBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 302
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "OptionsBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 312
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "StepModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 319
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "StepModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 330
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/colorcontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/colorcontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "UpdateFlagsBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 338
+    },
+    {
+      "package": "cluster/spec/colorcontrol",
+      "identifier": "UpdateFlagsBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/colorcontrol/definition_gen.go",
+      "line": 351
     },
     {
       "package": "cluster/spec/dishwashermode",
@@ -6053,7 +6257,7 @@
       "identifier": "TestBooleanStateServerMeetsTheDetectorDeviceTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 145
+      "line": 159
     },
     {
       "package": "endpoint",
@@ -6410,7 +6614,7 @@
       "identifier": "TestLightServersMeetTheLightDeviceTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 113
+      "line": 116
     },
     {
       "package": "endpoint",
@@ -6949,7 +7153,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 271
+      "line": 270
     },
     {
       "package": "examples/reference-bridge",

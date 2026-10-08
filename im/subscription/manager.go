@@ -60,9 +60,15 @@ type Config struct {
 	// subscriptions per fabric. Matter floor is 3 (§8.5.4); v1.1
 	// defaults to 16.
 	MaxSubscriptionsPerFabric int
-	// MinIntervalFloorSeconds is the spec-mandated lowest cadence
-	// the bridge will accept. Matter §10.6.9 says ≥ 0; we set 1 s
-	// to keep busy-looping commissioners off the wire.
+	// MinIntervalFloorSeconds lifts the MinIntervalFloor a subscriber
+	// requests to at least this many seconds. Zero (the default) honours
+	// the request as it is, as matter.js does: ServerSubscription holds a
+	// report only until lastUpdateTime + the requested minIntervalFloor
+	// (packages/node/src/node/server/ServerSubscription.ts
+	// #prepareDataUpdate). A floor the subscriber did not ask for delays
+	// every report that follows another within it — TC-CC-2.2 read a
+	// RemainingTime reported 1.1 s after its command, 12 tenths short.
+	// The shared tick (TickInterval) still batches what changes within it.
 	MinIntervalFloorSeconds uint16
 	// MaxIntervalCeilingSeconds is the upper bound the bridge will
 	// accept. The bridge negotiates *down* to this value if the
@@ -172,9 +178,6 @@ func NewManager(cfg Config, reporter Reporter, logger *slog.Logger) *Manager {
 	if cfg.MaxSubscriptionsPerFabric == 0 {
 		cfg.MaxSubscriptionsPerFabric = 16
 	}
-	if cfg.MinIntervalFloorSeconds == 0 {
-		cfg.MinIntervalFloorSeconds = 1
-	}
 	if cfg.MaxIntervalCeilingSeconds == 0 {
 		cfg.MaxIntervalCeilingSeconds = 3600
 	}
@@ -270,7 +273,8 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// further clamps to min(subscriptionMaxInterval, maxIntervalCeiling) and
 	// also lifts by minIntervalFloor. go-fabric clamps maxCeil down to
 	// cfg.MaxIntervalCeilingSeconds (default 3600 s, matching chip) and
-	// minFloor up to cfg.MinIntervalFloorSeconds. The post-clamp inversion
+	// minFloor up to cfg.MinIntervalFloorSeconds (default 0: the request
+	// as it is). The post-clamp inversion
 	// check (ErrCadenceInvertedAfterClamp) rejects requests where the floored
 	// minimum exceeds the capped ceiling — equivalent to matter.js's lower-bound
 	// guarantee. The negotiated MaxIntervalCeiling stored on the Subscription is
@@ -577,6 +581,23 @@ func (m *Manager) OnAttributeChanged(path im.ConcreteAttributePath) {
 	m.mu.RUnlock()
 	for _, sub := range matches {
 		sub.markDirty(path)
+	}
+}
+
+// DeferReports holds off the next report of every subscription, of any
+// session or fabric, that selects one of endpoints, by delay: matter.js
+// InteractionServer #deferReports for an InvokeRequest's DelayReportData
+// (DelayMinMs plus the jitter the caller picked), run before the invoke
+// dispatches, whether or not its commands succeed.
+func (m *Manager) DeferReports(endpoints map[uint16]bool, delay time.Duration) {
+	if len(endpoints) == 0 {
+		return
+	}
+	now := time.Now()
+	for _, sub := range m.snapshot() {
+		if sub.selectsAnyEndpoint(endpoints) {
+			sub.DeferReports(now, delay)
+		}
 	}
 }
 

@@ -175,57 +175,57 @@
     "CC/10.1": {
       "tests": 1,
       "steps": 46,
-      "stepsSkipped": 60
+      "stepsSkipped": 4
     },
     "CC/2.1": {
       "tests": 1,
       "steps": 54,
-      "stepsSkipped": 82
+      "stepsSkipped": 62
     },
     "CC/2.2": {
       "tests": 1,
       "steps": 43,
-      "stepsSkipped": 34
+      "stepsSkipped": 0
     },
     "CC/3.1": {
-      "steps": 4,
-      "stepsSkipped": 47
+      "steps": 51,
+      "stepsSkipped": 0
     },
     "CC/3.2": {
-      "steps": 4,
-      "stepsSkipped": 30
+      "steps": 34,
+      "stepsSkipped": 0
     },
     "CC/3.3": {
-      "steps": 4,
-      "stepsSkipped": 23
+      "steps": 27,
+      "stepsSkipped": 0
     },
     "CC/4.1": {
-      "steps": 4,
-      "stepsSkipped": 14
+      "steps": 18,
+      "stepsSkipped": 0
     },
     "CC/4.2": {
-      "steps": 4,
-      "stepsSkipped": 33
+      "steps": 37,
+      "stepsSkipped": 0
     },
     "CC/4.3": {
-      "steps": 4,
-      "stepsSkipped": 29
+      "steps": 33,
+      "stepsSkipped": 0
     },
     "CC/4.4": {
-      "steps": 4,
-      "stepsSkipped": 17
+      "steps": 21,
+      "stepsSkipped": 0
     },
     "CC/5.1": {
-      "steps": 12,
-      "stepsSkipped": 49
+      "steps": 61,
+      "stepsSkipped": 0
     },
     "CC/5.2": {
-      "steps": 4,
-      "stepsSkipped": 19
+      "steps": 23,
+      "stepsSkipped": 0
     },
     "CC/5.3": {
-      "steps": 4,
-      "stepsSkipped": 16
+      "steps": 20,
+      "stepsSkipped": 0
     },
     "CC/6.1": {
       "steps": 22,
@@ -240,24 +240,24 @@
       "stepsSkipped": 1
     },
     "CC/7.1": {
-      "steps": 4,
-      "stepsSkipped": 47
+      "steps": 51,
+      "stepsSkipped": 0
     },
     "CC/7.2": {
-      "steps": 4,
-      "stepsSkipped": 30
+      "steps": 34,
+      "stepsSkipped": 0
     },
     "CC/7.3": {
-      "steps": 4,
-      "stepsSkipped": 27
+      "steps": 31,
+      "stepsSkipped": 0
     },
     "CC/7.4": {
-      "steps": 4,
-      "stepsSkipped": 17
+      "steps": 21,
+      "stepsSkipped": 0
     },
     "CC/8.1": {
-      "steps": 27,
-      "stepsSkipped": 12
+      "steps": 39,
+      "stepsSkipped": 0
     },
     "CGEN/2.1": {
       "tests": 1,
@@ -629,6 +629,11 @@
       "stepsSkipped": 4
     },
     "IDM/10.4@ep22": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep23": {
       "tests": 1,
       "steps": 12,
       "stepsSkipped": 4
@@ -1024,13 +1029,13 @@
     },
     "SC/5.1": {
       "tests": 1,
-      "steps": 74,
-      "stepsSkipped": 42
+      "steps": 98,
+      "stepsSkipped": 56
     },
     "SC/5.2": {
       "tests": 1,
-      "steps": 131,
-      "stepsSkipped": 162
+      "steps": 174,
+      "stepsSkipped": 216
     },
     "SC/7.1": {
       "tests": 1,

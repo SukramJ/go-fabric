@@ -108,32 +108,46 @@ func lightingOnOff() contract.ClusterServer {
 }
 
 // TestLightServersMeetTheLightDeviceTypes: the module's LevelControl (with
-// Lighting) and ColorControl servers carry ColorTemperatureLight; the
-// ColorControl server serves CT only, so an ExtendedColorLight lacks XY.
+// Lighting) and ColorControl servers carry ColorTemperatureLight with CT
+// and ExtendedColorLight with XY and CT (matter.js
+// devices/extended-color-light.ts: ColorControlServer.with("Xy",
+// "ColorTemperature")) or every feature; a CT-only server still lacks the
+// XY an ExtendedColorLight requires.
 func TestLightServersMeetTheLightDeviceTypes(t *testing.T) {
 	t.Parallel()
-	servers := func() []contract.ClusterServer {
+	const (
+		ct  = lightcluster.ColorFeatureColorTemperature
+		xy  = lightcluster.ColorFeatureXY
+		all = ct | xy | lightcluster.ColorFeatureHueSaturation | lightcluster.ColorFeatureEnhancedHue | lightcluster.ColorFeatureColorLoop
+	)
+	servers := func(features lightcluster.ColorFeature) []contract.ClusterServer {
 		return []contract.ClusterServer{
 			lightingOnOff(),
 			levelcontrol.NewServer(levelcontrol.Config{Lighting: true}),
-			lightcluster.NewColorControlServer(lightcluster.ColorControlServerConfig{MinMireds: 153, MaxMireds: 500, InitialMireds: 300}),
+			lightcluster.NewColorControlServer(lightcluster.ColorControlServerConfig{
+				Features: features, MinMireds: 153, MaxMireds: 500, InitialMireds: 300,
+			}),
 		}
 	}
 	for _, tc := range []struct {
-		name string
-		dt   uint16
-		want []string
+		name     string
+		dt       uint16
+		features lightcluster.ColorFeature
+		want     []string
 	}{
-		{"ColorTemperatureLight", 0x010C, nil},
-		// XY is mandatory for ExtendedColorLight; the server does not
-		// serve it (package light doc; matter_behaviour_findings.md).
-		{"ExtendedColorLight", 0x010D, []string{"missing ColorControl.XY"}},
+		{"ColorTemperatureLight", 0x010C, 0, nil},
+		{"ColorTemperatureLight/all", 0x010C, all, nil},
+		// XY is mandatory for ExtendedColorLight; a CT-only server does not
+		// serve it.
+		{"ExtendedColorLight/CT", 0x010D, ct, []string{"missing ColorControl.XY"}},
+		{"ExtendedColorLight/XY+CT", 0x010D, xy | ct, nil},
+		{"ExtendedColorLight/all", 0x010D, all, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			wantKinds(t, bridgedViolations(t, Spec{
 				StableKey: StringKey(tc.name), DeviceType: tc.dt, FriendlyName: tc.name,
-				Source: deviceTypeSource{dt: tc.dt, servers: servers()},
+				Source: deviceTypeSource{dt: tc.dt, servers: servers(tc.features)},
 			}), tc.want...)
 		})
 	}

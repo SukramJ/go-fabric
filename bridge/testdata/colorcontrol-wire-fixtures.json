@@ -1,0 +1,424 @@
+[
+  {
+    "label": "move_to_hue",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "MoveToHue",
+    "id": 0,
+    "fixture": {
+      "hue": 200,
+      "direction": 2,
+      "transitionTime": 150,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "152400c824010224029624030124040018"
+  },
+  {
+    "label": "move_hue",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "MoveHue",
+    "id": 1,
+    "fixture": {
+      "moveMode": 3,
+      "rate": 25,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "1524000324011924020124030018"
+  },
+  {
+    "label": "step_hue",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "StepHue",
+    "id": 2,
+    "fixture": {
+      "stepMode": 1,
+      "stepSize": 60,
+      "transitionTime": 20,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "1524000124013c24021424030124040018"
+  },
+  {
+    "label": "move_to_saturation",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "MoveToSaturation",
+    "id": 3,
+    "fixture": {
+      "saturation": 254,
+      "transitionTime": 100,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "152400fe24016424020124030018"
+  },
+  {
+    "label": "move_saturation",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "MoveSaturation",
+    "id": 4,
+    "fixture": {
+      "moveMode": 1,
+      "rate": 10,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "1524000124010a24020124030018"
+  },
+  {
+    "label": "step_saturation",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "StepSaturation",
+    "id": 5,
+    "fixture": {
+      "stepMode": 3,
+      "stepSize": 15,
+      "transitionTime": 10,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "1524000324010f24020a24030124040018"
+  },
+  {
+    "label": "move_to_hue_and_saturation",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "MoveToHueAndSaturation",
+    "id": 6,
+    "fixture": {
+      "hue": 40,
+      "saturation": 120,
+      "transitionTime": 0,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "1524002824017824020024030124040018"
+  },
+  {
+    "label": "move_to_color",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "MoveToColor",
+    "id": 7,
+    "fixture": {
+      "colorX": 32768,
+      "colorY": 19660,
+      "transitionTime": 100,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "15250000802501cc4c24026424030124040018"
+  },
+  {
+    "label": "move_color",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "MoveColor",
+    "id": 8,
+    "fixture": {
+      "rateX": -1000,
+      "rateY": 2500,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "15210018fc2101c40924020124030018"
+  },
+  {
+    "label": "step_color",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "StepColor",
+    "id": 9,
+    "fixture": {
+      "stepX": 6000,
+      "stepY": -3000,
+      "transitionTime": 50,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "1521007017210148f424023224030124040018"
+  },
+  {
+    "label": "move_to_color_temperature",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "MoveToColorTemperature",
+    "id": 10,
+    "fixture": {
+      "colorTemperatureMireds": 370,
+      "transitionTime": 100,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "152500720124016424020124030018"
+  },
+  {
+    "label": "enhanced_move_to_hue",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "EnhancedMoveToHue",
+    "id": 64,
+    "fixture": {
+      "enhancedHue": 12000,
+      "direction": 0,
+      "transitionTime": 30,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "152500e02e24010024021e24030124040018"
+  },
+  {
+    "label": "enhanced_move_hue",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "EnhancedMoveHue",
+    "id": 65,
+    "fixture": {
+      "moveMode": 1,
+      "rate": 2048,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "152400012501000824020124030018"
+  },
+  {
+    "label": "enhanced_step_hue",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "EnhancedStepHue",
+    "id": 66,
+    "fixture": {
+      "stepMode": 3,
+      "stepSize": 4096,
+      "transitionTime": 5,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "152400032501001024020524030124040018"
+  },
+  {
+    "label": "enhanced_move_to_hue_and_saturation",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "EnhancedMoveToHueAndSaturation",
+    "id": 67,
+    "fixture": {
+      "enhancedHue": 50000,
+      "saturation": 70,
+      "transitionTime": 0,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "15250050c324014624020024030124040018"
+  },
+  {
+    "label": "color_loop_set",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "ColorLoopSet",
+    "id": 68,
+    "fixture": {
+      "updateFlags": {
+        "updateAction": true,
+        "updateDirection": true,
+        "updateTime": true,
+        "updateStartHue": true
+      },
+      "action": 1,
+      "direction": 1,
+      "time": 30,
+      "startHue": 8960,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "1524000f24010124020124031e2504002324050124060018"
+  },
+  {
+    "label": "stop_move_step",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "StopMoveStep",
+    "id": 71,
+    "fixture": {
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "1524000124010018"
+  },
+  {
+    "label": "move_color_temperature",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "MoveColorTemperature",
+    "id": 75,
+    "fixture": {
+      "moveMode": 1,
+      "rate": 20,
+      "colorTemperatureMinimumMireds": 160,
+      "colorTemperatureMaximumMireds": 360,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "152400012401142402a02503680124040124050018"
+  },
+  {
+    "label": "step_color_temperature",
+    "kind": "commands",
+    "cluster": 768,
+    "element": "StepColorTemperature",
+    "id": 76,
+    "fixture": {
+      "stepMode": 3,
+      "stepSize": 50,
+      "transitionTime": 10,
+      "colorTemperatureMinimumMireds": 0,
+      "colorTemperatureMaximumMireds": 0,
+      "optionsMask": {
+        "executeIfOff": true
+      },
+      "optionsOverride": {
+        "executeIfOff": false
+      }
+    },
+    "bytesHex": "1524000324013224020a24030024040024050124060018"
+  },
+  {
+    "label": "current_x",
+    "kind": "attributes",
+    "cluster": 768,
+    "element": "CurrentX",
+    "id": 3,
+    "fixture": 24939,
+    "bytesHex": "056b61"
+  },
+  {
+    "label": "current_hue",
+    "kind": "attributes",
+    "cluster": 768,
+    "element": "CurrentHue",
+    "id": 0,
+    "fixture": 254,
+    "bytesHex": "04fe"
+  },
+  {
+    "label": "enhanced_current_hue",
+    "kind": "attributes",
+    "cluster": 768,
+    "element": "EnhancedCurrentHue",
+    "id": 16384,
+    "fixture": 65535,
+    "bytesHex": "05ffff"
+  },
+  {
+    "label": "enhanced_color_mode",
+    "kind": "attributes",
+    "cluster": 768,
+    "element": "EnhancedColorMode",
+    "id": 16385,
+    "fixture": 3,
+    "bytesHex": "0403"
+  },
+  {
+    "label": "color_loop_active",
+    "kind": "attributes",
+    "cluster": 768,
+    "element": "ColorLoopActive",
+    "id": 16386,
+    "fixture": 1,
+    "bytesHex": "0401"
+  },
+  {
+    "label": "color_capabilities",
+    "kind": "attributes",
+    "cluster": 768,
+    "element": "ColorCapabilities",
+    "id": 16394,
+    "fixture": {
+      "hueSaturation": true,
+      "enhancedHue": true,
+      "colorLoop": true,
+      "xy": true,
+      "colorTemperature": true
+    },
+    "bytesHex": "041f"
+  }
+]

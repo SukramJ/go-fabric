@@ -543,6 +543,12 @@ table, and this list, when the snapshot is corrected.
   writes it, and TC_DeviceConformance does not judge struct fields, so no
   certification family is affected. Upstream candidate (matter.js): gate
   the override `until: "1.6.1"`.
+- **ColorControl XY → hue/saturation converts with the wrong function in
+  matter.js.** `ColorControlServer.ts:1493` (`switchColorMode`) calls
+  `hsvToXy(this.x, this.y)` where `xyToHsv` is meant; the module converts
+  correctly and records the departure as `BD-Matter-ColorControl-XYToHS`.
+  Not a data-model difference, listed here as an upstream candidate
+  (matter.js): call `xyToHsv`.
 - **semtag.Label is O, the specification says "MfgCode != null, O".**
   matter.js `support/models/src/local/semtag.ts` relaxes it ("TODO we do not
   support MfgCode != null"). go-fabric serves no Descriptor TagList, so
@@ -564,12 +570,6 @@ the module builds itself (`endpoint/devicetype_module_test.go` pins each).
   certification harness does not judge component device types. **Fix:**
   composed bridged endpoints (a `Spec` with parts and a PowerSource child
   of device type 0x0011), then drop the pin.
-- **ColorControl serves CT only, so ExtendedColorLight is not servable.**
-  `cluster/light.ColorControlServer` advertises CT; ExtendedColorLight
-  requires XY (M) besides CT (`extended-color-light.element.ts`), which
-  `check_feature_overrides` enforces. The package doc no longer claims the
-  device type. **Fix:** serve XY (CurrentX / CurrentY, the XY commands and
-  their transitions) as matter.js ColorControlServer does.
 - **PICS slices mark OperationCompletion absent where the device types
   make it mandatory.** `internal/chiptool/testdata/pics/ep12.txt` and
   `ep13.txt` carry `OPSTATE.S.E01=0` / `RVCOPSTATE.S.E01=0` although

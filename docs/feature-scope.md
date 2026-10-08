@@ -71,7 +71,7 @@ Application clusters, grouped by the device surface they serve:
 | --- | --- |
 | [`cluster/onoff`](../cluster/onoff) | OnOff (0x0006) |
 | [`cluster/levelcontrol`](../cluster/levelcontrol) | LevelControl (0x0008) — OnOff and, optionally, Lighting; the commands handed to a device that ramps natively, or run on the transition engine for one that cannot (`Config.Transitions`) |
-| [`cluster/light`](../cluster/light) | ColorControl (0x0300) — ColorTemperature: the CT commands, ExecuteIfOff, the coupling to the level, gradual transitions with `ManageTransitions` |
+| [`cluster/light`](../cluster/light) | ColorControl (0x0300) — every feature matter.js implements, chosen per endpoint: XY, ColorTemperature, HueSaturation, EnhancedHue, ColorLoop; every command, the colour-mode switching with its conversions, ExecuteIfOff, the coupling to the level, the scene recall, gradual transitions with `ManageTransitions`. Carries ColorTemperatureLight (CT) and ExtendedColorLight (XY + CT) |
 | [`cluster/transition`](../cluster/transition) | the attribute transition engine behind both (matter.js `Transitions.ts`): stepped values, RemainingTime by the Q rules |
 | [`cluster/cover`](../cluster/cover) | WindowCovering (0x0102) |
 | [`cluster/closure`](../cluster/closure) | ClosureControl (0x0104) |
@@ -131,9 +131,8 @@ refuse them (`Bridge.SetDeviceTypeValidation`, `endpoint.ValidateDeviceTypes`,
 [ADR 0016](./adr/0016-device-type-validation.md)). Conditions that describe
 the product rather than the topology (LanguageLocale, PhysicalInputs, …) are
 the host's to state (`Spec.DeviceConditions`, `Config.RootDeviceConditions`).
-Not servable as the module stands: ExtendedColorLight (the ColorControl
-server has no XY) and a SmokeCoAlarm's PowerSource component endpoint
-(bridged endpoints have no parts).
+Not servable as the module stands: a SmokeCoAlarm's PowerSource component
+endpoint (bridged endpoints have no parts).
 
 Device types a host builds from the application servers, each assembled
 with its full mandatory server set (Identify, Groups where mandated,

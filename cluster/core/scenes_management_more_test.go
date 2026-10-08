@@ -259,3 +259,36 @@ func TestScenesCommandGates(t *testing.T) {
 		t.Error("a corrupt table was loaded")
 	}
 }
+
+// sceneApplier is a ColorControl server that recalls its scene values
+// itself (core.SceneValuesApplier, matter.js implementScenes).
+type sceneApplier struct {
+	sceneColor
+	values map[uint32]uint64
+	ms     uint32
+}
+
+func (s *sceneApplier) MatterApplySceneValues(_ context.Context, values map[uint32]uint64, transitionMs uint32) {
+	s.values, s.ms = values, transitionMs
+}
+
+// TestScenesRecallThroughTheServersApplier: a server that implements
+// SceneValuesApplier receives the scene's non-null values and the
+// transition in milliseconds instead of the module's commands.
+func TestScenesRecallThroughTheServersApplier(t *testing.T) {
+	t.Parallel()
+	color := &sceneApplier{sceneColor: sceneColor{mode: 2, mired: 300}}
+	s, _ := scenesWith(t, color)
+	ctx := im.WithFabricFilter(context.Background(), true, 1)
+	s.MatterInvoke(ctx, 0x04, core.SceneRef{SceneID: 1})
+	tt := uint32(1500)
+	if _, err := s.MatterInvoke(ctx, 0x05, core.RecallSceneRequest{SceneID: 1, TransitionTime: &tt}); err != nil {
+		t.Fatal(err)
+	}
+	if len(color.cmds) != 0 {
+		t.Fatalf("commands %v reached a server that applies its scene itself", color.cmds)
+	}
+	if color.ms != 1500 || color.values[0x0007] != 300 || color.values[0x4001] != 2 || color.values[0x0001] != 100 || color.values[0x4000] != 0x2000 {
+		t.Fatalf("applied %v over %d ms", color.values, color.ms)
+	}
+}

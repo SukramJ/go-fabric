@@ -10,6 +10,91 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+**ColorControl serves every feature matter.js implements; ExtendedColorLight
+is servable.** A CT-only host keeps working unchanged: a
+`light.ColorControlServerConfig` without `Features` is CT only, serves the
+same attribute and command lists, reports the same attributes and drives
+the same `ColorTemperatureWriter` as before.
+
+### Added
+
+- `cluster/light.ColorControlServer` serves XY (CurrentX / CurrentY,
+  MoveToColor, MoveColor, StepColor), HS (CurrentHue / CurrentSaturation and
+  the seven hue and saturation commands), EHUE (EnhancedCurrentHue and the
+  Enhanced* commands) and CL (ColorLoopSet and the colour loop attributes)
+  besides CT, as matter.js `ColorControlServer` does: every command on the
+  transition engine with `ManageTransitions`, the colour-mode switching with
+  matter.js's colour-space conversions, StopMoveStep over every mode, the
+  feature-dependent attribute and command lists of the element file. It
+  carries ExtendedColorLight (0x010D, XY and CT; matter.js
+  `devices/extended-color-light.ts`) as well as ColorTemperatureLight.
+- New host-facing API in `cluster/light`: `ColorControlServerConfig.Features`
+  (`ColorFeature`: `ColorFeatureHueSaturation`, `ColorFeatureEnhancedHue`,
+  `ColorFeatureColorLoop`, `ColorFeatureXY`, `ColorFeatureColorTemperature`),
+  `InitialColorMode` (`ColorMode`), `InitialX` / `InitialY`, `InitialHue`,
+  `InitialSaturation`, `InitialEnhancedHue`; `NewColorControl` (returns
+  `ErrColorFeatures` for a selection the conformance forbids — CL without
+  EHUE, EHUE without HS; `NewColorControlServer` panics on one, never on a
+  configuration without `Features`); the colour sink `ColorWriter` /
+  `Color` with `SetColorWriter`, and `ColorControlServer.Color`; the ported
+  conversions `HSVToXY`, `XYToHSV`, `HSVToMireds`, `MiredsToHSV`,
+  `HSVToRGB`, `RGBToHSV`, `RGBToXY`, `XYToRGB`, `XYToMireds`, `MiredsToXY`,
+  `MiredsToKelvin`, `KelvinToMireds`; `ColorControlServer.MatterApplySceneValues`.
+- `cluster/spec/colorcontrol`: the generated ColorControl definition. Linking
+  it (any binary that imports `cluster/light` does) makes the bridge decode
+  ColorControl requests through it, with matter.js's statuses.
+- `cluster/core.SceneValuesApplier`: a scene-able server that recalls a
+  scene's values itself (matter.js `implementScenes`); the module's
+  ColorControl server does, so a recall moves x/y, the enhanced hue and the
+  colour loop too (`BD-Matter-ColorControl-SceneRecall`).
+- `cluster/transition.AddWithOverflow` (matter.js `addValueWithOverflow`).
+- The reference daemon has an ExtendedColorLight ("Color Bulb") with every
+  ColorControl feature, and the CHIP ColorControl family runs against it.
+
+### Changed
+
+- **Host ColorControl servers:** the ColorControl requests other than
+  MoveToHue, MoveToSaturation, MoveToHueAndSaturation and
+  MoveToColorTemperature now reach `MatterInvoke` as the generated
+  `cluster/spec/colorcontrol` request structs (for example
+  `colorcontrol.MoveColorTemperatureRequest`) instead of a generic
+  `map[uint8]any` whenever that package is linked, and a request missing a
+  mandatory field is answered INVALID_COMMAND before the server runs. The
+  four keep their `cluster/wire` structs
+  (`BD-Matter-ColorControl-LegacyDecoders`); MoveToHue, MoveToSaturation and
+  MoveToHueAndSaturation now carry their OptionsMask / OptionsOverride,
+  which the bridge dropped.
+- `light.ColorControlServer` answers a write to a read-only attribute with
+  UNSUPPORTED_WRITE and one to an attribute it does not serve with
+  UNSUPPORTED_ATTRIBUTE (was a plain error), and a command its features do
+  not serve with UNSUPPORTED_COMMAND.
+- `light.ColorControlServer.SyncColorTemperatureWithLevel` couples the colour
+  temperature to the level only in the colour temperature mode, as matter.js
+  `syncColorTemperatureWithLevel` does (a CT-only server is always in it).
+- `light.ColorControlServer` deliberately departs from matter.js in one
+  conversion: a switch from the XY mode to hue and saturation converts the
+  colour with `xyToHsv` (`XYToHSV`), where matter.js calls `hsvToXy` with x
+  and y and starts from a hue near 0 (`BD-Matter-ColorControl-XYToHS`, an
+  upstream matter.js issue candidate).
+- **Subscriptions honour the MinIntervalFloor the subscriber requests.**
+  `subscription.Config.MinIntervalFloorSeconds` defaulted to 1 s and lifted
+  every request to it; the default is now 0, as matter.js
+  `ServerSubscription` keeps the requested floor. A subscriber that asks for
+  0 gets a change on the next engine tick (250 ms) even right after another
+  report; before, it waited out a second, and a value read at sending time
+  — RemainingTime — went out up to 12 tenths short (TC-CC-2.2). A host that
+  wants the old floor sets `MinIntervalFloorSeconds: 1`.
+- **An InvokeRequest's DelayReportData now defers subscription reports**:
+  every subscription that selects an endpoint the commands target holds its
+  next report by DelayMinMs plus a jitter below DelayJitterWindowMs, as
+  matter.js does with its `delay-report-data` forward feature on
+  (`BD-Matter-DelayReportData`; `subscription.Manager.DeferReports`,
+  `Subscription.DeferReports`). TC-IDM-1.5 had passed only through the 1 s
+  floor above.
+- `light.ColorControlClusterRevision` is the generated definition's
+  `colorcontrol.Revision` (still 9).
+
+
 ## [0.2.0] — 2026-10-07
 
 Six pull requests since `v0.1.0` (#22–#28): the matter.js pin at Matter

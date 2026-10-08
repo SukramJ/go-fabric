@@ -388,6 +388,73 @@ Null and zero transition times take the instant path either way, matching
 `moveToLevelLogic`'s truthy-only rate derivation and the `changePerS`
 contract "0 or nullish means transition instantly".
 
+### BD-Matter-ColorControl-SceneRecall — a recalled colour is applied in every mode the light has
+
+matter.js ColorControlServer `#applySceneValues`
+(`packages/node/src/behaviors/color-control/ColorControlServer.ts`) recalls a
+scene's colour, and `light.ColorControlServer.MatterApplySceneValues` ports
+it — the colour loop restarted through ColorLoopSet when the scene has it
+active, otherwise the scene's EnhancedColorMode choosing which values move.
+Three departures, each where matter.js would leave a recalled colour
+unapplied:
+
+- **The scene's EnhancedColorMode counts on every light.** matter.js reads
+  it only with the EHUE feature and otherwise recalls in the hue and
+  saturation mode, so a light without EHUE — every ColorTemperatureLight,
+  every XY-and-CT ExtendedColorLight — never recalls its colour
+  temperature or x/y. The module honours the stored mode wherever the
+  server supports it; a CT-only light also recalls a scene stored without
+  a mode as a colour temperature, as this module did before.
+- **Every mode's transition is in tenths of a second.** ScenesManagement
+  hands the apply function milliseconds; matter.js divides by 100 for the
+  saturation only and passes milliseconds to the XY, CT and enhanced-hue
+  logic, which reads tenths — a one-second scene transition would take a
+  hundred. LevelControl divides, and so does the module for every mode.
+- **The light switches to the scene's mode.** matter.js calls the `*Logic`
+  methods, which move values without touching ColorMode; the module
+  switches the mode first (`setEnhancedColorMode`), as the commands do, so
+  ColorMode never contradicts the colour shown. A hue-and-saturation scene
+  also moves the hue from its EnhancedCurrentHue (the hue attribute with
+  the "S" quality), as the module recalled it before; matter.js moves the
+  saturation alone.
+
+Pinned by `TestSceneRecall` (`cluster/light`) and
+`TestScenesRecallThroughTheServersApplier` (`cluster/core`). Retire each
+bullet when matter.js changes the corresponding line.
+
+### BD-Matter-ColorControl-XYToHS — a switch from x/y to hue and saturation converts with xyToHsv
+
+matter.js ColorControlServer `switchColorMode`
+(`packages/node/src/behaviors/color-control/ColorControlServer.ts:1493` at
+the schema pin, unchanged at matter.js HEAD) converts the XY colour into
+hue and saturation with `hsvToXy(this.x, this.y)` — the inverse function,
+handed x as a hue in degrees and y as a saturation — although `xyToHsv`
+exists next to it (`ColorConversionUtils.ts:30`). Every switch from the XY
+mode to hue and saturation therefore starts from a hue near 0 and a
+saturation of about y × 254, and a controller sees those values reported.
+It is a transcription error, not a behaviour an ecosystem was found to
+need, so `light.ColorControlServer` converts with `XYToHSV` (the port of
+`xyToHsv`); every other conversion follows matter.js. Pinned by
+`TestXYToHueSaturationConvertsTheColour` (`cluster/light`), which fails on
+matter.js's call. Upstream matter.js issue candidate: call `xyToHsv`
+there. Retire this entry when matter.js does.
+
+### BD-Matter-ColorControl-LegacyDecoders — four ColorControl requests keep their hand-written decoders
+
+matter.js decodes every request against its schema and answers a missing
+mandatory field with INVALID_COMMAND (`CommandInvokeResponse.ts`,
+`ValidationMandatoryFieldMissingError`). The module decodes every
+ColorControl request through the generated definition
+(`cluster/spec/colorcontrol`, ADR 0013) — except MoveToHue,
+MoveToSaturation, MoveToHueAndSaturation and MoveToColorTemperature, which
+keep the bridge's hand-written decoders (`bridge/fields_reader.go`) and
+arrive as the `cluster/wire` structs host ColorControl servers were
+written against. Those four check each field's width (CONSTRAINT_ERROR) and
+`light.ColorControlServer` checks its constraint, but a missing field
+reads as 0 instead of failing the command. Retire when the four move to
+the generated decoders in a release that announces the changed field type
+to host servers.
+
 ### BD-Matter-BridgedVendorNameFallback — a bridged endpoint without a vendor serves the node's
 
 matter.js treats BridgedDeviceBasicInformation `vendorName` as optional on a
@@ -861,7 +928,9 @@ the subscriber's MaxInterval and bounds it by `kSubscriptionMaxIntervalPublisher
 (3600 s). matter.js `packages/node/src/node/server/ServerSubscription.ts:269-282`
 additionally lifts by `minIntervalFloor`. go-fabric clamps `maxCeil` down to
 `cfg.MaxIntervalCeilingSeconds` (default 3600 s) and `minFloor` up to
-`cfg.MinIntervalFloorSeconds`; the post-clamp inversion check
+`cfg.MinIntervalFloorSeconds` (default 0: the requested floor, as matter.js
+keeps it — a default of 1 s once delayed TC-CC-2.2's RemainingTime report
+past its tolerance); the post-clamp inversion check
 (`ErrCadenceInvertedAfterClamp`) rejects inverted cadences — equivalent to
 matter.js's lower-bound guarantee. The advertised MaxInterval in SubscribeResponse
 satisfies §10.6.3.2. Classified as ✓ (chip-aligned, no code change needed).
@@ -1449,21 +1518,30 @@ keeping insertion order would mean persisting an order column, as for
 
 ---
 
-### BD-Matter-DelayReportData — DelayReportData is decoded and validated, not acted on
+### BD-Matter-DelayReportData — DelayReportData defers reports without matter.js's forward-feature gate
 
 matter.js decodes an InvokeRequest's DelayReportData (tag 3,
 `TlvInvokeRequest.ts`, 67be3a83 #4569) and refuses a malformed one; the
-deferral it asks for — holding back the next report of the subscriptions on
-the endpoints the commands target (`InteractionServer #deferReports`,
+deferral it asks for — holding back the next report of every subscription
+that selects an endpoint the commands dispatch to by DelayMinMs plus a
+random jitter below DelayJitterWindowMs (`InteractionServer #deferReports`,
 `ServerSubscription.deferReports`) — runs only behind the
-`delay-report-data` forward feature, off at the schema pin
-(`Specification.ENABLE_FORWARD_MATTER_FEATURES`). go-fabric decodes and
-validates the field the same way (`im.UnmarshalInvokeRequestTLV`,
-`InvokeRequest.DelayReportData`: a wrong type InvalidAction, a value above
-uint16 ConstraintError) and does not defer anything, which is what matter.js
-does with the feature off. Retires when a pin bump turns the feature on
-upstream: port the deferral then. Pinned by
-`TestParityMatterJS_InvokeRequestDelayReportData`.
+`delay-report-data` forward feature, off by default at the schema pin
+(`Specification.ENABLE_FORWARD_MATTER_FEATURES`) and switched on by
+matter.js's own CHIP test support for TC-IDM-1.5
+(`support/chip-testing/test/core/IDM.test.ts`). go-fabric decodes and
+validates the field the same way (`im.UnmarshalInvokeRequestTLV`: a wrong
+type InvalidAction, a value above uint16 ConstraintError) and always
+defers: `Bridge.deferReportsFor` before dispatch, `Manager.DeferReports` /
+`Subscription.DeferReports` with matter.js's rules (a running deferral only
+shortened, none past the send interval less 50 ms, a critical event not
+held). The module has no forward-feature switch, and a controller that
+sends the field asks for the deferral. TC-IDM-1.5 passed before only
+because every subscription's floor was lifted to 1 s, which the module no
+longer does. Pinned by `TestParityMatterJS_InvokeRequestDelayReportData`,
+`TestDeferReports` (`im/subscription`, matter.js DelayReportDataTest.ts)
+and `TestInvokeDelayReportDataDefersSubscriptions` (`bridge`). Retires
+when matter.js enables the feature by default.
 
 ---
 

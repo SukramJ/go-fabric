@@ -71,9 +71,7 @@ type InvokeRequest struct {
 	Invokes          []CommandInvocation
 	// DelayReportData is the request's DelayReportData field, nil when
 	// absent. matter.js always decodes it and refuses a malformed one; the
-	// deferral of subscription reports it asks for runs only behind
-	// matter.js's "delay-report-data" forward feature, off at the schema
-	// pin, so the bridge does not act on it either
+	// bridge defers the subscription reports it asks for
 	// (BD-Matter-DelayReportData).
 	DelayReportData *DelayReportData
 }

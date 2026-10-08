@@ -77,4 +77,6 @@ the bridge's reporting rules.
   (`BD-Matter-LevelControl-NativeRamp`).
 - ColorControl remains CT-only. The engine already carries what hue needs
   (cyclic properties, `HueDistance`); serving HS / XY / the colour loop is
-  a server feature, not an engine change.
+  a server feature, not an engine change. *(Since done: the server serves
+  XY, HS, EHUE and CL on the same engine, with no engine change beyond
+  exporting `AddWithOverflow`.)*

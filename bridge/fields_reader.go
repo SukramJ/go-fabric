@@ -91,6 +91,11 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.E
 			return decodeMoveToLevelRequest(dec)
 		}
 	case 0x0300: // ColorControl
+		// These four keep their hand-written decoders and cluster/wire
+		// structs, the shape host ColorControl servers were written
+		// against; the other ColorControl commands decode through the
+		// generated definition below (cluster/spec/colorcontrol) —
+		// notes/parity/by_design.md BD-Matter-ColorControl-LegacyDecoders.
 		switch path.Command {
 		case wire.ColorCtrlCmdMoveToHue:
 			return decodeMoveToHueFields(dec)
@@ -199,7 +204,8 @@ func decodeMoveToLevelRequest(dec *tlv.Decoder) (wire.MoveToLevelRequest, error)
 }
 
 // decodeMoveToHueFields reads ColorControl.MoveToHue fields (Matter §3.2.7.4).
-// Tags: [0] uint8 Hue, [1] enum8 Direction, [2] uint16 TransitionTime.
+// Tags: [0] uint8 Hue, [1] enum8 Direction, [2] uint16 TransitionTime,
+// [3] map8 OptionsMask, [4] map8 OptionsOverride.
 func decodeMoveToHueFields(dec *tlv.Decoder) (wire.MoveToHueRequest, error) {
 	var req wire.MoveToHueRequest
 	for {
@@ -226,12 +232,21 @@ func decodeMoveToHueFields(dec *tlv.Decoder) (wire.MoveToHueRequest, error) {
 			if req.TransitionTime, err = fieldUint16("MoveToHue", "TransitionTime", el); err != nil {
 				return req, err
 			}
+		case 3:
+			if req.OptionsMask, err = fieldUint8("MoveToHue", "OptionsMask", el); err != nil {
+				return req, err
+			}
+		case 4:
+			if req.OptionsOverride, err = fieldUint8("MoveToHue", "OptionsOverride", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }
 
 // decodeMoveToSaturationFields reads ColorControl.MoveToSaturation fields
-// (Matter §3.2.7.7). Tags: [0] uint8 Saturation, [1] uint16 TransitionTime.
+// (Matter §3.2.7.7). Tags: [0] uint8 Saturation, [1] uint16 TransitionTime,
+// [2] map8 OptionsMask, [3] map8 OptionsOverride.
 func decodeMoveToSaturationFields(dec *tlv.Decoder) (wire.MoveToSaturationRequest, error) {
 	var req wire.MoveToSaturationRequest
 	for {
@@ -254,13 +269,21 @@ func decodeMoveToSaturationFields(dec *tlv.Decoder) (wire.MoveToSaturationReques
 			if req.TransitionTime, err = fieldUint16("MoveToSaturation", "TransitionTime", el); err != nil {
 				return req, err
 			}
+		case 2:
+			if req.OptionsMask, err = fieldUint8("MoveToSaturation", "OptionsMask", el); err != nil {
+				return req, err
+			}
+		case 3:
+			if req.OptionsOverride, err = fieldUint8("MoveToSaturation", "OptionsOverride", el); err != nil {
+				return req, err
+			}
 		}
 	}
 }
 
 // decodeMoveToHueAndSaturationFields reads ColorControl.MoveToHueAndSaturation
 // fields (Matter §3.2.7.10). Tags: [0] uint8 Hue, [1] uint8 Saturation,
-// [2] uint16 TransitionTime.
+// [2] uint16 TransitionTime, [3] map8 OptionsMask, [4] map8 OptionsOverride.
 func decodeMoveToHueAndSaturationFields(dec *tlv.Decoder) (wire.MoveToHueAndSaturationRequest, error) {
 	var req wire.MoveToHueAndSaturationRequest
 	for {
@@ -285,6 +308,14 @@ func decodeMoveToHueAndSaturationFields(dec *tlv.Decoder) (wire.MoveToHueAndSatu
 			}
 		case 2:
 			if req.TransitionTime, err = fieldUint16("MoveToHueAndSaturation", "TransitionTime", el); err != nil {
+				return req, err
+			}
+		case 3:
+			if req.OptionsMask, err = fieldUint8("MoveToHueAndSaturation", "OptionsMask", el); err != nil {
+				return req, err
+			}
+		case 4:
+			if req.OptionsOverride, err = fieldUint8("MoveToHueAndSaturation", "OptionsOverride", el); err != nil {
 				return req, err
 			}
 		}
