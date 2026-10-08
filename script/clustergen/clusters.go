@@ -29,4 +29,6 @@ var committed = []string{
 	"ModeSelect",
 	// cluster/alarm
 	"SmokeCoAlarm",
+	// cluster/fan
+	"FanControl",
 }
