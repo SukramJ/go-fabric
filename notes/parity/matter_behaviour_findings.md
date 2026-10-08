@@ -455,19 +455,6 @@ family, and deleting the entry.
   ConfigStatus.Operational. **Fix:** port the Mode / ConfigStatus sync and
   the maintenance refusal, then declare the PICS code 1.
 
-- **TC-FAN-3.1 is intermittent (failed once in the full family run of
-  2026-10-06, then passed 3 of 3).** Step 6 writes FanMode Off → Low → Medium
-  → High and counts the reports on a subscription to FanMode alone against
-  the one to PercentSetting alone; in the failing run the FanMode
-  subscription never reported Low (2 FanMode reports against 3
-  PercentSetting reports), although the attribute cache — fed by another
-  subscription — saw it. The first write's own attribute change was lost to
-  one of three concurrent single-attribute subscriptions; the write marks it
-  through `reportWrittenAttributes` and the fan's ChangeNotifier, so the loss
-  is between marking and the report engine. Not yet reproduced; the case is
-  not excluded. **Next step:** run TC-FAN-3.1 in a loop with debug logging of
-  the subscription engine's dirty set per subscription. Family: FAN.
-
 The group-messaging cases are not findings: they are skipped on a host
 whose LAN interface has no IPv6, with the command that enables it, and run
 wherever it has. TC-SC-4.1 and TC-SC-4.3 were wrongly listed here as such an

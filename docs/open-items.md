@@ -38,7 +38,6 @@ last family run and held by `TestCertifiabilityDocument`.
 
 | Item | Where | What |
 | --- | --- | --- |
-| **TC-FAN-3.1 is intermittent** | findings register | Failed once in a full family run (a FanMode report lost on one of three single-attribute subscriptions), passed every rerun and the next full run. Root cause not found; the case is not excluded. Next step is recorded in the register. |
 | **Manual operator cases** | `docs/certifiability.md`, class (c) | 89 cases have a test-lab operator perform a step (`PICS_USER_PROMPT`). They have no stand-in and stay unrun. |
 | **Families without a mounted server** | `docs/certifiability.md` | ICDManagement (a mains-powered bridge is not an ICD), OTA requestor (no BDX, no update agent) and Binding (no endpoint declares a client cluster) are classified, not run. Mounting any of them is a product decision, not a module gap. |
 | **Local multicast cases need IPv6 on the LAN interface** | `internal/chiptool/doc.go` | On a host whose interface has no IPv6 the group-messaging and SC-4.x cases host-skip with the command that enables it; CI runs them. |
