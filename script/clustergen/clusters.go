@@ -31,4 +31,7 @@ var committed = []string{
 	"SmokeCoAlarm",
 	// cluster/fan
 	"FanControl",
+	// cluster/opstate
+	"OperationalState",
+	"RvcOperationalState",
 }
