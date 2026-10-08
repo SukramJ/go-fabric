@@ -673,6 +673,13 @@ func (e *Engine) advanceLocked(st *state, now time.Time) (next float64, done, va
 	return next, next == target, true
 }
 
+// AddWithOverflow is matter.js addValueWithOverflow (@matter/general): value
+// plus add, wrapped round [minValue, maxValue] once — what a cyclic step
+// (ColorControl StepHue) aims at.
+func AddWithOverflow(value, add, minValue, maxValue float64) float64 {
+	return addWithOverflow(value, add, minValue, maxValue)
+}
+
 // addWithOverflow is matter.js addValueWithOverflow.
 func addWithOverflow(value, add, minValue, maxValue float64) float64 {
 	v := value + add

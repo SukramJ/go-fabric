@@ -269,11 +269,35 @@ func asUint64(v any) (uint64, bool) {
 	return 0, false
 }
 
+// SceneValuesApplier is the optional capability of a scene-able cluster
+// server that recalls a scene's values itself: matter.js's
+// ScenesManagementServer.implementScenes(behavior, applyFunc), where each
+// cluster registers its own #applySceneValues. values holds the scene's
+// non-null values by attribute id (matter.js passes them as a struct and
+// each apply function tests `typeof value === "number"`); transitionMs is
+// the scene's transition in milliseconds. light.ColorControlServer
+// implements it.
+type SceneValuesApplier interface {
+	MatterApplySceneValues(ctx context.Context, values map[uint32]uint64, transitionMs uint32)
+}
+
+// presentValues returns a scene's non-null values by attribute id.
+func presentValues(cv SceneClusterValues) map[uint32]uint64 {
+	out := make(map[uint32]uint64, len(cv.Values))
+	for _, v := range cv.Values {
+		if !v.Null {
+			out[v.AttributeID] = v.Unsigned
+		}
+	}
+	return out
+}
+
 // applyValues recalls a scene through the clusters' own commands, as
 // matter.js's per-cluster apply functions do (OnOffServer, LevelControlServer
 // and ColorControlServer #applySceneValues): OnOff On/Off, LevelControl
 // MoveToLevel with ExecuteIfOff, ColorControl MoveToColorTemperature or
-// MoveToHueAndSaturation for the stored color mode. transitionMs is the
+// MoveToHueAndSaturation for the stored color mode — unless the server
+// recalls its values itself ([SceneValuesApplier]). transitionMs is the
 // scene's transition in milliseconds; the commands take tenths of a second.
 func (s *ScenesManagement) applyValues(ctx context.Context, values []SceneClusterValues, transitionMs uint32) {
 	if s.cfg.Siblings == nil {
@@ -295,6 +319,10 @@ func (s *ScenesManagement) applyValues(ctx context.Context, values []SceneCluste
 	for _, cv := range values {
 		srv := servers[cv.ClusterID]
 		if srv == nil {
+			continue
+		}
+		if applier, ok := srv.(SceneValuesApplier); ok {
+			applier.MatterApplySceneValues(ctx, presentValues(cv), transitionMs)
 			continue
 		}
 		switch cv.ClusterID {
