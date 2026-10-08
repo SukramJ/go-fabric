@@ -78,17 +78,22 @@ func TestNewManager_ZeroConfig_AppliesDefaults(t *testing.T) {
 	t.Parallel()
 	// Subscribe with a valid cadence to confirm the manager accepted floor/ceiling defaults.
 	m := newManager(subscription.Config{}, nil)
-	// MinIntervalFloor default = 1; MinInterval < 1 must be floored, not rejected.
+	// The default floor honours the request: a MinIntervalFloor of 0 stays
+	// 0, as matter.js ServerSubscription keeps the requested floor.
 	args := defaultArgs()
-	args.MinIntervalFloor = 0 // below default floor
+	args.MinIntervalFloor = 0
 	args.MaxIntervalCeiling = 60
 	sub, err := m.Subscribe(args)
 	if err != nil {
 		t.Fatalf("Subscribe with zeroed MinInterval: %v", err)
 	}
-	// The manager should have floored MinIntervalFloor to 1 (default).
-	if sub.MinIntervalFloor != 1 {
-		t.Errorf("MinIntervalFloor = %d, want 1 (floored to default)", sub.MinIntervalFloor)
+	if sub.MinIntervalFloor != 0 {
+		t.Errorf("MinIntervalFloor = %d, want the requested 0", sub.MinIntervalFloor)
+	}
+	// A host floor still lifts it.
+	lifted, err := newManager(subscription.Config{MinIntervalFloorSeconds: 1}, nil).Subscribe(args)
+	if err != nil || lifted.MinIntervalFloor != 1 {
+		t.Errorf("host floor 1: MinIntervalFloor = %v (%v), want 1", lifted, err)
 	}
 	// Active should be 1.
 	if n := m.Active(); n != 1 {
@@ -1734,4 +1739,50 @@ func TestOnAttributeChanged_ChangesOmittedNeverReports(t *testing.T) {
 	if len(ch) != 1 {
 		t.Fatalf("got %d reports after a GroupTable change, want 1", len(ch))
 	}
+}
+
+// TestZeroFloorReportsAChangeRightAfterAReport pins the report timing
+// TC-CC-2.2 depends on: a subscription that requests MinIntervalFloor 0
+// reports a change made 150 ms after its previous report on the next
+// tick, not a second later. matter.js ServerSubscription
+// #prepareDataUpdate holds a report only until lastUpdateTime + the
+// requested minIntervalFloor, then sends 50 ms later; the module's
+// default once lifted every floor to 1 s, so a RemainingTime reported at
+// a command's time went out up to 1.25 s late and read 12 tenths short.
+func TestZeroFloorReportsAChangeRightAfterAReport(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	var reports [][]im.ConcreteAttributePath
+	m := newManager(subscription.Config{}, func(_ context.Context, _ *subscription.Subscription, paths []im.ConcreteAttributePath) {
+		mu.Lock()
+		reports = append(reports, paths)
+		mu.Unlock()
+	})
+	args := defaultArgs()
+	args.MinIntervalFloor = 0
+	if _, err := m.Subscribe(args); err != nil {
+		t.Fatal(err)
+	}
+	p := args.AttributePaths[0]
+	start := time.Now()
+	m.OnAttributeChanged(p)
+	m.Tick(context.Background(), start.Add(250*time.Millisecond)) // the previous report
+	m.OnAttributeChanged(p)                                       // a change 150 ms later
+	m.Tick(context.Background(), start.Add(500*time.Millisecond)) // the next tick
+	mu.Lock()
+	defer mu.Unlock()
+	if len(reports) != 2 {
+		t.Fatalf("%d reports within 500 ms, want 2: a requested floor of 0 must not hold the second", len(reports))
+	}
+
+	// A floor the subscriber asked for still holds it.
+	held := newManager(subscription.Config{}, func(context.Context, *subscription.Subscription, []im.ConcreteAttributePath) {
+		t.Error("a report inside the requested 1 s floor")
+	})
+	args.MinIntervalFloor = 1
+	if _, err := held.Subscribe(args); err != nil {
+		t.Fatal(err)
+	}
+	held.OnAttributeChanged(p)
+	held.Tick(context.Background(), time.Now().Add(250*time.Millisecond))
 }

@@ -633,3 +633,45 @@ func TestXYToHueSaturationConvertsTheColour(t *testing.T) {
 		t.Errorf("green x/y switched to CurrentSaturation %d, want about 254", s)
 	}
 }
+
+// TestRemainingTimeReportsAtCommandTime is TC-CC-2.2 steps 36-39 on the
+// server: MoveToColorTemperature over 10 s, 5 s later another over 15 s.
+// RemainingTime is reported three times — 100 and 150 at the instant of
+// each command, with that value, and 0 at the end — as matter.js
+// Transitions.start / #updateRemainingTime emit it (a command's remaining
+// time of at least a second that differs by more than one from the last
+// reported one). Neither the transition's 100 ms steps nor the colour
+// temperature's quieter reports move or add a RemainingTime report.
+func TestRemainingTimeReportsAtCommandTime(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mode := light.ColorModeColorTemperature
+		srv := light.NewColorControlServer(light.ColorControlServerConfig{
+			Features: allColorFeatures, MinMireds: 153, MaxMireds: 500, InitialMireds: 153,
+			InitialColorMode: &mode, ManageTransitions: true,
+		})
+		r := watch(srv, ccdef.AttrRemainingTime)
+		invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 250, TransitionTime: 100})
+		time.Sleep(5 * time.Second)
+		invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 500, TransitionTime: 150})
+		time.Sleep(20 * time.Second)
+		synctest.Wait()
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		want := []report{
+			{ccdef.AttrRemainingTime, 100, 0},
+			{ccdef.AttrRemainingTime, 150, 5 * time.Second},
+			{ccdef.AttrRemainingTime, 0, 0}, // time checked below
+		}
+		if len(r.entries) != len(want) {
+			t.Fatalf("RemainingTime reports %+v, want three", r.entries)
+		}
+		for i := range 2 {
+			if r.entries[i] != want[i] {
+				t.Errorf("report %d = %+v, want %+v", i, r.entries[i], want[i])
+			}
+		}
+		if e := r.entries[2]; e.value != 0 || e.at < 19*time.Second || e.at > 20*time.Second {
+			t.Errorf("last report %+v, want 0 about 15 s after the second command", e)
+		}
+	})
+}

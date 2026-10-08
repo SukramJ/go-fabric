@@ -76,6 +76,14 @@ the same `ColorTemperatureWriter` as before.
   colour with `xyToHsv` (`XYToHSV`), where matter.js calls `hsvToXy` with x
   and y and starts from a hue near 0 (`BD-Matter-ColorControl-XYToHS`, an
   upstream matter.js issue candidate).
+- **Subscriptions honour the MinIntervalFloor the subscriber requests.**
+  `subscription.Config.MinIntervalFloorSeconds` defaulted to 1 s and lifted
+  every request to it; the default is now 0, as matter.js
+  `ServerSubscription` keeps the requested floor. A subscriber that asks for
+  0 gets a change on the next engine tick (250 ms) even right after another
+  report; before, it waited out a second, and a value read at sending time
+  — RemainingTime — went out up to 12 tenths short (TC-CC-2.2). A host that
+  wants the old floor sets `MinIntervalFloorSeconds: 1`.
 - `light.ColorControlClusterRevision` is the generated definition's
   `colorcontrol.Revision` (still 9).
 

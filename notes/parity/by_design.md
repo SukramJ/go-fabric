@@ -928,7 +928,9 @@ the subscriber's MaxInterval and bounds it by `kSubscriptionMaxIntervalPublisher
 (3600 s). matter.js `packages/node/src/node/server/ServerSubscription.ts:269-282`
 additionally lifts by `minIntervalFloor`. go-fabric clamps `maxCeil` down to
 `cfg.MaxIntervalCeilingSeconds` (default 3600 s) and `minFloor` up to
-`cfg.MinIntervalFloorSeconds`; the post-clamp inversion check
+`cfg.MinIntervalFloorSeconds` (default 0: the requested floor, as matter.js
+keeps it — a default of 1 s once delayed TC-CC-2.2's RemainingTime report
+past its tolerance); the post-clamp inversion check
 (`ErrCadenceInvertedAfterClamp`) rejects inverted cadences — equivalent to
 matter.js's lower-bound guarantee. The advertised MaxInterval in SubscribeResponse
 satisfies §10.6.3.2. Classified as ✓ (chip-aligned, no code change needed).

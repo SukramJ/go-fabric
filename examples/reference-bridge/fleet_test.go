@@ -132,9 +132,8 @@ func TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint(t *testing.
 			tc.change(t)
 
 			// Drive the engine with a wall-clock offset rather than waiting:
-			// Subscribe stamps lastReport at admission and the manager
-			// floors MinIntervalFloor to one second, so the dirty-path drain
-			// gate needs `now` to be that far past it.
+			// Subscribe stamps lastReport at admission; a tick well past it
+			// drains the dirty paths whatever floor applies.
 			mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
 
 			paths := spy.reported()
