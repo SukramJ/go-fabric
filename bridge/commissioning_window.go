@@ -110,6 +110,18 @@ type CommissioningWindow struct {
 	adminFabricSet bool
 	adminVendor    uint16
 	adminVendorSet bool
+	// own marks a window the node opened itself ([CommissioningWindow.OpenOwnWindow])
+	// rather than an administrator. It is open (IsOpen) but reads as
+	// WindowNotOpen on the AdministratorCommissioning cluster, an
+	// administrator's window replaces it instead of answering Busy, and
+	// RevokeCommissioning closes it. Mirrors matter.js
+	// DeviceCommissioner.ts CommissioningWindow.byAdministrator == false.
+	own bool
+
+	// fabricCounter, when set, gives OpenOwnWindow its default timeout
+	// (see [CommissioningWindow.SetFabricCounter]).
+	fabricCounter func(context.Context) (int, error)
+
 	// isBasicWindow records whether the window was opened via
 	// OpenBasicCommissioningWindow (BC feature). When false, the
 	// status reported by CurrentWindow is EnhancedWindowOpen (1);
@@ -263,11 +275,147 @@ func (w *CommissioningWindow) SetTransitionHook(fn func()) {
 	w.mu.Unlock()
 }
 
-// IsOpen reports whether an administrator's commissioning window is open.
+// IsOpen reports whether a commissioning window is open, whoever opened it:
+// an administrator, the host's opener or the node itself
+// ([CommissioningWindow.OpenOwnWindow]). Mirrors matter.js
+// DeviceCommissioner.windowStatus, which GeneralCommissioningServer's
+// ArmFailSafe guard and AdministratorCommissioningServer.revokeCommissioning
+// consult.
 func (w *CommissioningWindow) IsOpen() bool {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.open
+}
+
+// IsOwnWindow reports whether the open window is one the node opened itself
+// ([CommissioningWindow.OpenOwnWindow]). A host's transition hook reads it to
+// tell the node's own window — commissionable with the configured passcode,
+// advertised CM=1 — from an administrator's.
+func (w *CommissioningWindow) IsOwnWindow() bool {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.open && w.own
+}
+
+// SetFabricCounter wires (or clears, when nil) the fabric count
+// [CommissioningWindow.OpenOwnWindow] derives its default timeout from.
+// Without it the node counts as uncommissioned.
+func (w *CommissioningWindow) SetFabricCounter(fn func(context.Context) (int, error)) {
+	w.mu.Lock()
+	w.fabricCounter = fn
+	w.mu.Unlock()
+}
+
+// Timeouts of a window the node opens itself, matter.js
+// DeviceCommissioner.ts #ownWindowTimeout: MAXIMUM_COMMISSIONING_TIMEOUT
+// (48 h, Extended Announcement) while the node has no fabric,
+// STANDARD_COMMISSIONING_TIMEOUT (15 min) once it has one (Matter §5.4.2.3).
+const (
+	OwnWindowTimeoutUncommissioned = 48 * time.Hour
+	OwnWindowTimeoutCommissioned   = 15 * time.Minute
+)
+
+// ErrAdministratorWindowOpen is returned by [CommissioningWindow.OpenOwnWindow]
+// while an administrator's window is open: the node's own window never
+// replaces one (matter.js DeviceCommissioner #open throws MatterFlowError).
+var ErrAdministratorWindowOpen = errors.New("bridge: an administrator's commissioning window is open")
+
+// OpenOwnWindow opens the node's own commissioning window — the window an
+// uncommissioned node opens at start, or one the application opens — for
+// timeout, or, when timeout is 0, for 48 h while the node has no fabric and
+// 15 min once it has one. Invoked again while the node's own window is open,
+// it restarts it. It is closed by its timer, by CommissioningComplete
+// ([CommissioningWindow.EndCommissioning]) and by RevokeCommissioning; an
+// administrator's OpenCommissioningWindow replaces it instead of answering
+// Busy. The AdministratorCommissioning attributes keep reading
+// WindowNotOpen, which matter.js keeps for administrator windows only.
+//
+// The window owns no PASE acceptor and no advertisement: the transition hook
+// ([CommissioningWindow.SetTransitionHook]) fires on open and close, and the
+// host attaches its configured-passcode acceptor and announces CM=1 while
+// [CommissioningWindow.IsOwnWindow] holds, as matter.js
+// DeviceCommissioner.allowBasicCommissioning sets the PASE commissioner and
+// enters commissioning mode.
+//
+// Mirrors matter.js packages/protocol/src/protocol/DeviceCommissioner.ts
+// (allowBasicCommissioning without byAdministrator, #ownWindowTimeout) and
+// packages/node/src/behavior/system/commissioning/CommissioningServer.ts
+// enterCommissionableMode.
+func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
+	w.mu.RLock()
+	counter := w.fabricCounter
+	w.mu.RUnlock()
+	if timeout <= 0 {
+		timeout = OwnWindowTimeoutUncommissioned
+		if counter != nil {
+			if n, err := counter(ctx); err == nil && n > 0 {
+				timeout = OwnWindowTimeoutCommissioned
+			}
+		}
+	}
+
+	w.mu.Lock()
+	if w.open && !w.own {
+		w.mu.Unlock()
+		return ErrAdministratorWindowOpen
+	}
+	if w.closeTimer != nil {
+		// A window the node restarts is replaced without closing it.
+		w.closeTimer.Stop()
+	}
+	w.open = true
+	w.own = true
+	w.expiresAt = time.Now().Add(timeout)
+	w.durationSec = uint16(min(timeout/time.Second, 1<<16-1)) //nolint:gosec // clamped to uint16
+	var timer *time.Timer
+	timer = time.AfterFunc(timeout, func() {
+		w.mu.Lock()
+		if w.closeTimer != timer {
+			// Restarted or closed since.
+			w.mu.Unlock()
+			return
+		}
+		hook, restore := w.closeLocked()
+		w.mu.Unlock()
+		runClose(hook, restore)
+	})
+	w.closeTimer = timer
+	hook := w.transitionHooks()
+	w.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	return nil
+}
+
+// closeLocked closes the window and returns what the transition fires:
+// the hooks and the restore closure of the opener. Caller holds w.mu.
+func (w *CommissioningWindow) closeLocked() (hook, restore func()) {
+	w.open = false
+	w.own = false
+	w.adminFabricSet = false
+	w.adminVendorSet = false
+	w.isBasicWindow = false
+	w.hasVerifier = false
+	if w.closeTimer != nil {
+		w.closeTimer.Stop()
+		w.closeTimer = nil
+	}
+	hook = w.transitionHooks()
+	restore = w.restore
+	w.restore = nil
+	return hook, restore
+}
+
+// runClose runs what [CommissioningWindow.closeLocked] returned, outside the
+// lock: the restore first, so the hook sees the host's standing acceptor.
+func runClose(hook, restore func()) {
+	if restore != nil {
+		restore()
+	}
+	if hook != nil {
+		hook()
+	}
 }
 
 // CurrentWindow implements [wire.WindowController]. Returns the
@@ -277,7 +425,9 @@ func (w *CommissioningWindow) CurrentWindow() wire.WindowStatusSnapshot {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
-	if !w.open {
+	if !w.open || w.own {
+		// The node's own window is not an administrator's: matter.js keeps
+		// AdministratorCommissioning state.windowStatus for those only.
 		return wire.WindowStatusSnapshot{
 			Status:            wire.WindowStatusClosed,
 			AdminFabricIsNull: true,
@@ -333,7 +483,7 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	}
 
 	w.mu.Lock()
-	if w.open {
+	if w.open && !w.own {
 		w.mu.Unlock()
 		return wire.ErrAdmCommBusy
 	}
@@ -349,6 +499,16 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	if uint32(params.CommissioningTimeoutSeconds) < 180 || uint32(params.CommissioningTimeoutSeconds) > maxTimeout {
 		w.mu.Unlock()
 		return ErrCommissioningWindowDurationInvalid
+	}
+	var replaced func()
+	if w.open {
+		// An administrator's window replaces the one the node opened itself
+		// (matter.js DeviceCommissioner #open with byAdministrator: the
+		// node's window is closed — PASE commissioner removed, commissioning
+		// mode exited — before the administrator's opens). The close's
+		// hooks run before the open's, below.
+		hook, restore := w.closeLocked()
+		replaced = func() { runClose(hook, restore) }
 	}
 	w.open = true
 	w.discriminator = params.Discriminator
@@ -369,25 +529,23 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 	}
 	hook := w.transitionHooks()
 	armer := w.failSafeArmer
-	w.closeTimer = time.AfterFunc(time.Duration(params.CommissioningTimeoutSeconds)*time.Second, func() {
+	var timer *time.Timer
+	timer = time.AfterFunc(time.Duration(params.CommissioningTimeoutSeconds)*time.Second, func() {
 		w.mu.Lock()
-		w.open = false
-		w.adminFabricSet = false
-		w.adminVendorSet = false
-		w.isBasicWindow = false
-		w.hasVerifier = false
-		closeHook := w.transitionHooks()
-		restore := w.restore
-		w.restore = nil
+		if w.closeTimer != timer {
+			// Closed (or replaced) since.
+			w.mu.Unlock()
+			return
+		}
+		closeHook, restore := w.closeLocked()
 		w.mu.Unlock()
-		if restore != nil {
-			restore()
-		}
-		if closeHook != nil {
-			closeHook()
-		}
+		runClose(closeHook, restore)
 	})
+	w.closeTimer = timer
 	w.mu.Unlock()
+	if replaced != nil {
+		replaced()
+	}
 	// Defensive fail-safe arm for the window duration (fabricIndex=0 —
 	// window opened pre-commissioning). Note: matter.js does NOT arm the
 	// fail-safe on OpenCommissioningWindow (AdministratorCommissioningServer.ts
@@ -522,25 +680,9 @@ func (w *CommissioningWindow) RevokeWindow(ctx context.Context) error {
 		// error on a no-op revoke.
 		return nil
 	}
-	w.open = false
-	w.adminFabricSet = false
-	w.adminVendorSet = false
-	w.isBasicWindow = false
-	w.hasVerifier = false
-	if w.closeTimer != nil {
-		w.closeTimer.Stop()
-		w.closeTimer = nil
-	}
-	hook := w.transitionHooks()
-	restore := w.restore
-	w.restore = nil
+	hook, restore := w.closeLocked()
 	w.mu.Unlock()
-	if restore != nil {
-		restore()
-	}
-	if hook != nil {
-		hook()
-	}
+	runClose(hook, restore)
 	return nil
 }
 
@@ -859,25 +1001,9 @@ func (w *CommissioningWindow) EndCommissioning() {
 		w.mu.Unlock()
 		return
 	}
-	w.open = false
-	w.adminFabricSet = false
-	w.adminVendorSet = false
-	w.isBasicWindow = false
-	w.hasVerifier = false
-	if w.closeTimer != nil {
-		w.closeTimer.Stop()
-		w.closeTimer = nil
-	}
-	hook := w.transitionHooks()
-	restore := w.restore
-	w.restore = nil
+	hook, restore := w.closeLocked()
 	w.mu.Unlock()
-	if restore != nil {
-		restore()
-	}
-	if hook != nil {
-		hook()
-	}
+	runClose(hook, restore)
 }
 
 // FabricRemoved clears AdminFabricIndex when the fabric that opened the

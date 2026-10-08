@@ -610,7 +610,9 @@ func wireSecurity(
 		return adapter
 	})
 	paseProvider.StartReaper(ctx, 30*time.Second, time.Minute)
-	br.AttachPaseHandlerProvider(paseProvider.Resolve)
+	// Not attached here: it accepts PASE only while the node's own
+	// commissioning window is open (commissioning.go), as matter.js sets
+	// its PASE commissioner per window (DeviceCommissioner).
 
 	// CASE, likewise per exchange. A single responder lands in `Finished`
 	// after the first Sigma3 and rejects every later Sigma1.

@@ -291,9 +291,11 @@ func run() error {
 		salt:       []byte(*salt),
 		iterations: *iterations,
 	}, logger)
-	// The commissionable advertisement: published at the end of start-up
-	// with the configured passcode's discriminator (CM=1), and replaced by
-	// the enhanced window's own (CM=2) while an admin has one open.
+	// The commissionable advertisement: published with the configured
+	// passcode's discriminator (CM=1) while the node's own window is open —
+	// from the end of start-up of an uncommissioned node until it is
+	// commissioned — and replaced by the enhanced window's own (CM=2) while
+	// an admin has one open.
 	var instanceID [8]byte
 	if _, err := rand.Read(instanceID[:]); err != nil {
 		return fmt.Errorf("commissioning instance id: %w", err)
@@ -332,6 +334,10 @@ func run() error {
 		}
 		// The fabric's sessions end once the NOCResponse is out.
 		br.EmitFabricRemovedContext(ctx, fabricIndex)
+		// The last fabric gone, the node is commissionable again: matter.js
+		// CommissioningServer resets a decommissioned node, which then
+		// opens its own window as at a first start.
+		commissioning.reopenIfDecommissioned(ctx, credentials)
 	})
 
 	// UpdateNOC rewrites the fabric's operational identity, possibly with a
@@ -436,8 +442,15 @@ func run() error {
 	}
 
 	// --- commissionable advertisement + pairing information -------------
-	if err := br.AnnounceCommissioning(ctx, advert); err != nil {
-		logger.Warn("mdns.commissioning_announce", slog.String("err", err.Error()))
+	// An uncommissioned node opens its own commissioning window (48 h,
+	// CM=1, the configured passcode); a commissioned one is not
+	// commissionable until an administrator opens a window. Mirrors
+	// matter.js CommissioningServer's start-up: enterOperationalMode when
+	// commissioned, enterCommissionableMode otherwise.
+	if len(loaded) == 0 {
+		if err := br.CommissioningWindow().OpenOwnWindow(ctx, 0); err != nil {
+			logger.Warn("commissioning.own_window", slog.String("err", err.Error()))
+		}
 	}
 
 	if err := printPairingInfo(br, identity, discriminator, passcode); err != nil {

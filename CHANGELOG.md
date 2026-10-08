@@ -56,6 +56,16 @@ the same `ColorTemperatureWriter` as before.
   attribute, as matter.js persists its millisecond
   `totalOperationalHoursCounter`. `SetPersistedCounters` keeps its whole-hour
   seed (and now saturates instead of overflowing on a huge one).
+- **The node's own commissioning window** (matter.js `DeviceCommissioner`,
+  9397828d): `bridge.CommissioningWindow.OpenOwnWindow` opens the window an
+  uncommissioned node opens at start (or the application opens) — 48 h
+  without a fabric, 15 min with one (`OwnWindowTimeoutUncommissioned` /
+  `OwnWindowTimeoutCommissioned`, from `SetFabricCounter`); restarted by a
+  second call, closed by CommissioningComplete, RevokeCommissioning and its
+  timer; `IsOwnWindow` tells it apart for a host's transition hook,
+  `ErrAdministratorWindowOpen` refuses it over an administrator's window.
+  `cluster/wire.AnyWindowReporter` is the optional controller capability
+  RevokeCommissioning consults.
 
 ### Changed
 
@@ -99,6 +109,22 @@ the same `ColorTemperatureWriter` as before.
   floor above.
 - `light.ColorControlClusterRevision` is the generated definition's
   `colorcontrol.Revision` (still 9).
+- **Commissionability follows the node's own window.** An administrator's
+  OpenCommissioningWindow replaces a window the node opened itself instead of
+  answering Busy, and RevokeCommissioning closes it instead of answering
+  WindowNotOpen; WindowStatus keeps reading WindowNotOpen for it, as matter.js
+  keeps it for administrator windows only. `CommissioningWindow.IsOpen` — the
+  ArmFailSafe-over-CASE guard — counts the node's own window too, as matter.js
+  `DeviceCommissioner.windowStatus` does.
+- **The reference daemon is commissionable only while uncommissioned.** It
+  opens its own window at start when it has no fabric, attaches its
+  configured-passcode PASE acceptor and announces CM=1 only while that window
+  is open, and withdraws both when the window closes (commissioning
+  complete, revoked, timed out); losing its last fabric reopens it. Before, a
+  commissioned daemon stayed commissionable with its passcode for its whole
+  lifetime. A host that embedded the same pattern (baseline acceptor
+  attached once, CM=1 announced at every boot) should move to
+  `OpenOwnWindow`.
 
 ### Fixed
 

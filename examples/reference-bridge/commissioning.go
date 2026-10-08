@@ -64,10 +64,12 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st *stor
 		}
 		return rec.VendorID
 	})
-	admin.SetFabricCounter(func(ctx context.Context) (int, error) {
+	fabrics := func(ctx context.Context) (int, error) {
 		recs, err := st.ListFabrics(ctx)
 		return len(recs), err
-	})
+	}
+	admin.SetFabricCounter(fabrics)
+	window.SetFabricCounter(fabrics)
 
 	window.SetFailSafeChecker(h.refs.generalCom)
 	window.SetFailSafeArmer(h.refs.generalCom)
@@ -76,6 +78,16 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st *stor
 	window.SetTransitionHook(func() {
 		snap := window.CurrentWindow()
 		//nolint:contextcheck // the hook fires on a window transition, outside any request; the announce is bounded by the daemon's lifetime
+		if window.IsOwnWindow() {
+			// The node's own window: PASE with the configured passcode,
+			// advertised CM=1 (matter.js allowBasicCommissioning).
+			h.attachPase(h.baseline)
+			if err := h.br.AnnounceCommissioning(ctx, h.advert); err != nil {
+				h.logger.Warn("commissioning.own_window.announce", slog.String("err", err.Error()))
+			}
+			h.logger.Info("commissioning.own_window.open")
+			return
+		}
 		if snap.Status == wire.WindowStatusEnhanced && window.HasSuppliedVerifier() {
 			adv := h.advert
 			adv.Discriminator = window.Discriminator()
@@ -87,14 +99,45 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st *stor
 			return
 		}
 		if snap.Status == wire.WindowStatusClosed {
-			// Back to this daemon's standing state: the configured
-			// passcode's CM=1 record (see main.go).
-			if err := h.br.AnnounceCommissioning(ctx, h.advert); err != nil {
-				h.logger.Warn("commissioning.window.reannounce", slog.String("err", err.Error()))
-			}
+			// No window: no PASE acceptor and no commissionable record
+			// (matter.js #closeWindow: removePaseCommissioner,
+			// exitCommissioningMode).
+			h.attachPase(nil)
+			h.br.WithdrawCommissioning(ctx)
 			h.logger.Info("commissioning.window.closed")
 		}
 	})
+}
+
+// attachPase makes p the bridge's PASE acceptor (nil: none) unless an
+// administrator's verifier window has its own installed.
+func (h *commissioningHost) attachPase(p *matterbridge.PerExchangePaseProvider) {
+	h.installMu.Lock()
+	defer h.installMu.Unlock()
+	if h.active != nil {
+		return
+	}
+	if p == nil {
+		h.br.AttachPaseHandlerProvider(nil)
+		return
+	}
+	h.br.AttachPaseHandlerProvider(p.Resolve)
+}
+
+// reopenIfDecommissioned opens the node's own window once its last fabric is
+// gone and no window is open (a rolled-back first commissioning leaves the
+// node's own window open, which keeps its timer).
+func (h *commissioningHost) reopenIfDecommissioned(ctx context.Context, st *store.Store) {
+	win := h.br.CommissioningWindow()
+	if win == nil || win.IsOpen() {
+		return
+	}
+	if recs, err := st.ListFabrics(ctx); err != nil || len(recs) > 0 {
+		return
+	}
+	if err := win.OpenOwnWindow(ctx, 0); err != nil {
+		h.logger.Warn("commissioning.own_window", slog.String("err", err.Error()))
+	}
 }
 
 // InstallVerifier implements [matterbridge.PaseVerifierInstaller]: for the
@@ -131,8 +174,10 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 		h.installMu.Lock()
 		defer h.installMu.Unlock()
 		if h.active == provider {
+			// Back to no acceptor; the window's close hook attaches the
+			// configured one again if the node's own window is open.
 			h.active = nil
-			h.br.AttachPaseHandlerProvider(h.baseline.Resolve)
+			h.br.AttachPaseHandlerProvider(nil)
 		}
 		provider.Stop()
 		h.logger.Info("pase.window.verifier_restored")

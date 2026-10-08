@@ -336,28 +336,6 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   chip-tool's `groupcast` commands encode the optional fields as matter.js
   does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
   multicast `onoff toggle`, `groupcast leave-group`).
-- **F-SWEEP-1 — the node's own commissioning window (matter.js 9397828d,
-  #4602).** matter.js `DeviceCommissioner` owns every window: one the node
-  opens itself (an uncommissioned node at start, or the application) runs
-  on its own timeout — 48 h without fabrics, 15 min once commissioned — and
-  closes at CommissioningComplete; an administrator's OpenCommissioningWindow
-  / OpenBasicCommissioningWindow *replaces* it instead of answering Busy, and
-  RevokeCommissioning closes it instead of answering WindowNotOpen
-  (`AdministratorCommissioningServer.revokeCommissioning`). go-fabric models
-  administrator windows only (`bridge.CommissioningWindow`); the node's own
-  commissionability is the host's: the reference daemon announces CM=1 at
-  every boot and after every administrator window and keeps its baseline
-  PASE acceptor for the process lifetime, so a commissioned bridge stays
-  commissionable with its configured passcode. **Fix:** a node-owned mode on
-  `CommissioningWindow` (`OpenOwnWindow(ctx, timeout)`: default timeout from
-  the fabric count, replaced by an administrator's window, closed by
-  RevokeCommissioning, EndCommissioning and its timer, with the transition
-  hook withdrawing `_matterc` and detaching the PASE acceptor), and the
-  reference daemon opening it only while uncommissioned. AdministratorCommissioning
-  WindowStatus stays WindowNotOpen for it, as matter.js keeps
-  `state.windowStatus` for administrator windows. Families: CADMIN, SC
-  (discovery of a commissioned node). The ArmFailSafe half of the commit is
-  done (`CommissioningWindow.IsOpen` wired into GeneralCommissioning).
 - **F-COMP-1 — a bridged endpoint cannot carry parts, so the SmokeCoAlarm
   has no PowerSource component endpoint.** The SmokeCoAlarm device type
   (0x0076) requires a PowerSource device-type component (min 1). matter.js
