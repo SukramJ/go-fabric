@@ -66,6 +66,18 @@ the same `ColorTemperatureWriter` as before.
   `ErrAdministratorWindowOpen` refuses it over an administrator's window.
   `cluster/wire.AnyWindowReporter` is the optional controller capability
   RevokeCommissioning consults.
+- **Parts of a bridged endpoint** (matter.js Endpoint `parts`):
+  `endpoint.Spec.Parts` declares child endpoints of a bridged endpoint, each
+  with its own persisted number from its `StableKey`, listed in the parent's
+  Descriptor PartsList (`Endpoint.PartIDs`) and in the Aggregator's
+  full-family one, with the parent as its ParentEndpoint. A part
+  (`Endpoint.Part`) is a component, not a bridged node: its DeviceTypeList is
+  its own device type alone, it serves no BridgedDeviceBasicInformation, and
+  Identify only where its device type mandates it. `ValidateDeviceTypes`
+  counts it, so a SmokeCoAlarm with a PowerSource (0x0011) part meets its
+  component requirement. The reference daemon's smoke alarm carries its
+  battery as such a part, as matter.js's `device-smoke-co-alarm` example
+  does.
 
 ### Changed
 
@@ -125,6 +137,8 @@ the same `ColorTemperatureWriter` as before.
   lifetime. A host that embedded the same pattern (baseline acceptor
   attached once, CM=1 announced at every boot) should move to
   `OpenOwnWindow`.
+- `endpoint.Topology.Bridged` leaves out parts (`Endpoint.Part`): they are
+  components of a bridged device, not bridged devices.
 
 ### Fixed
 

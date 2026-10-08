@@ -30,7 +30,7 @@ func bridgedViolations(t *testing.T, spec Spec) []DeviceTypeViolation {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := New(&oneEndpointStore{}, Config{VendorID: 1, ProductID: 1, NodeLabel: "x", Groups: mgr}, nil)
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x", Groups: mgr}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,19 +53,20 @@ func TestApplicationDeviceTypesMeetTheirDeviceTypeRequirements(t *testing.T) {
 	for _, tc := range applicationDeviceCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := bridgedViolations(t, Spec{
+			spec := Spec{
 				StableKey: StringKey(tc.name), DeviceType: tc.deviceType, FriendlyName: tc.name,
 				Source: tc.source, Measurement: tc.measurement,
-			})
-			var want []string
-			if tc.name == "SmokeCoAlarm" {
-				// SmokeCoAlarm requires a PowerSource component endpoint (M, min
-				// 1); a bridged endpoint has no parts of its own, so no host
-				// can satisfy it here. Recorded in
-				// notes/parity/matter_behaviour_findings.md.
-				want = []string{"instanceCount device:PowerSource"}
 			}
-			wantKinds(t, got, want...)
+			if tc.name == "SmokeCoAlarm" {
+				// SmokeCoAlarm requires a PowerSource component endpoint (M,
+				// min 1): a part, as matter.js composes it
+				// (examples/device-smoke-co-alarm).
+				spec.Parts = []Spec{{
+					StableKey: StringKey(tc.name + ":battery"), DeviceType: 0x0011,
+					PowerSource: measurementSource{contract.MeasurementBattery},
+				}}
+			}
+			wantKinds(t, bridgedViolations(t, spec))
 		})
 	}
 }

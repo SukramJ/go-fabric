@@ -30,7 +30,6 @@ last family run and held by `TestCertifiabilityDocument`.
 
 | Item | Where | What |
 | --- | --- | --- |
-| **F-COMP-1 — a bridged endpoint cannot carry parts** | findings register, `docs/certifiability.md` | The SmokeCoAlarm device type requires a PowerSource component endpoint; matter.js composes it as a child part. The reference daemon's smoke alarm logs a `matter.devicetype.violation` warning at Start for this. |
 | **Hand-off transitions report RemainingTime 0** | [ADR 0014](./adr/0014-transitions-optional-per-endpoint.md), `BD-Matter-LevelControl-NativeRamp` | A host whose device ramps natively has no way to state the end time; matter.js's application-stated `transitionEndTime` is not ported. |
 | **Per-attribute timed-write enforcement** | `BD-Matter-TimedAndQuotaDeferred`, `docs/matterjs-comparison.md` §4 | Enforced for commands; no exposed attribute carries the T quality yet. |
 | **Subscription quota eviction** | same | A bridge on a home LAN does not reach the cap; unbuilt. |

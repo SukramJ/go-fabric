@@ -1609,8 +1609,14 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		}
 	}
 	smoke := spec("smoke", f.smoke.name, f.smoke.MatterDeviceType(), f.smoke)
-	// SmokeCoAlarm mandates PowerSource; the alarm's battery is it.
-	smoke.PowerSource = f.smoke.battery
+	// SmokeCoAlarm requires a PowerSource device-type component: the
+	// alarm's battery is a part of its own, as matter.js composes it
+	// (examples/device-smoke-co-alarm, parts: [PowerSourceEndpoint]).
+	smoke.Parts = []endpoint.Spec{{
+		StableKey:   endpoint.StringKey("demo:smoke:battery"),
+		DeviceType:  deviceTypePowerSource,
+		PowerSource: f.smoke.battery,
+	}}
 	return []endpoint.Spec{
 		spec("ceiling", f.ceiling.name, f.ceiling.MatterDeviceType(), f.ceiling),
 		spec("fan", f.fan.name, f.fan.MatterDeviceType(), f.fan),

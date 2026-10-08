@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"strings"
 
@@ -161,12 +162,14 @@ func (a *Assembler) Assemble(ctx context.Context, snapshots []Snapshot) (*Topolo
 			return nil, errors.New("endpoint: snapshot Scope is required")
 		}
 		for i := range snap.Endpoints {
-			ep, err := a.buildEndpoint(ctx, snap.Scope, &snap.Endpoints[i])
+			eps, err := a.buildEndpointTree(ctx, snap.Scope, &snap.Endpoints[i], 1, false)
 			if err != nil {
 				return nil, err
 			}
-			seen[ep.SourceKey] = struct{}{}
-			topology.Endpoints = append(topology.Endpoints, ep)
+			for _, ep := range eps {
+				seen[ep.SourceKey] = struct{}{}
+			}
+			topology.Endpoints = append(topology.Endpoints, eps...)
 		}
 	}
 
@@ -211,6 +214,30 @@ const deviceTypeRootNode = 0x0016
 // Descriptor.PartsList. Mirrors Matter Device Library §13.2
 // ("Aggregator" / 0x000E) and matter.js's `AggregatorDt.id`.
 const deviceTypeAggregator = 0x000E
+
+// buildEndpointTree assembles spec under parent and its [Spec.Parts] under
+// it, depth first: the spec's endpoint first, then its parts' endpoints.
+// Mirrors matter.js Endpoint parts: a part is a child endpoint, numbered
+// like any other, in its parent's PartsList.
+func (a *Assembler) buildEndpointTree(ctx context.Context, scope string, spec *Spec, parent uint16, part bool) ([]*Endpoint, error) {
+	ep, err := a.buildEndpoint(ctx, scope, spec)
+	if err != nil {
+		return nil, err
+	}
+	ep.ParentEndpointID = parent
+	ep.Part = part
+	out := []*Endpoint{ep}
+	for i := range spec.Parts {
+		children, err := a.buildEndpointTree(ctx, scope, &spec.Parts[i], ep.ID, true)
+		if err != nil {
+			return nil, err
+		}
+		ep.PartIDs = append(ep.PartIDs, children[0].ID)
+		out = append(out, children...)
+	}
+	slices.Sort(ep.PartIDs)
+	return out, nil
+}
 
 // buildEndpoint turns one [Spec] into the assembled endpoint:
 // it resolves the persisted endpoint id for the spec's stable key and

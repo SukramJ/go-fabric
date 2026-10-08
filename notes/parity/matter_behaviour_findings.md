@@ -336,23 +336,6 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   chip-tool's `groupcast` commands encode the optional fields as matter.js
   does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
   multicast `onoff toggle`, `groupcast leave-group`).
-- **F-COMP-1 — a bridged endpoint cannot carry parts, so the SmokeCoAlarm
-  has no PowerSource component endpoint.** The SmokeCoAlarm device type
-  (0x0076) requires a PowerSource device-type component (min 1). matter.js
-  composes it as a child endpoint: its example
-  (`examples/device-smoke-co-alarm/src/SmokeCOAlarmDeviceNode.ts` at the pin)
-  adds `parts: [new Endpoint(PowerSourceEndpoint.with(PowerSourceServer…))]`
-  to the alarm endpoint, so the PowerSource device type (0x0011) sits on its
-  own endpoint in the alarm's PartsList. go-fabric's endpoint assembler builds
-  one endpoint per `endpoint.Spec` with no children; the reference daemon's
-  alarm (endpoint 9) carries the PowerSource *cluster* on the alarm endpoint
-  itself (`Spec.PowerSource`) and no PowerSource device type anywhere. No
-  CHIP case of the families run here fails on it today; the device-type
-  validator of PR #27 reports it as `device:PowerSource` at Start. **Fix:**
-  child parts for a bridged endpoint in `endpoint.Spec` / the assembler
-  (their own stable numbers, the parent's PartsList and the aggregator's
-  full-family PartsList, a Descriptor per part), then the alarm's battery as
-  a PowerSource part. Families: SMOKECO, DESC, IDM (TC_DeviceConformance).
 
 ## Application cluster servers — open items
 
@@ -527,16 +510,6 @@ What `endpoint.ValidateDeviceTypes`
 ([ADR 0016](../../docs/adr/0016-device-type-validation.md)) finds in what
 the module builds itself (`endpoint/devicetype_module_test.go` pins each).
 
-- **A bridged SmokeCoAlarm cannot have its PowerSource component.**
-  SmokeCoAlarm requires a PowerSource device type endpoint below it (M,
-  min 1; `smoke-co-alarm.element.ts`). A bridged endpoint has no parts of
-  its own — the assembler places every bridged endpoint flat under the
-  Aggregator, and `attachPowerSource` puts the PowerSource *cluster* on the
-  endpoint, which BridgedNode allows but which is no component endpoint.
-  matter.js reports `instanceCount device:PowerSource` for it (warn); the
-  certification harness does not judge component device types. **Fix:**
-  composed bridged endpoints (a `Spec` with parts and a PowerSource child
-  of device type 0x0011), then drop the pin.
 - **PICS slices mark OperationCompletion absent where the device types
   make it mandatory.** `internal/chiptool/testdata/pics/ep12.txt` and
   `ep13.txt` carry `OPSTATE.S.E01=0` / `RVCOPSTATE.S.E01=0` although

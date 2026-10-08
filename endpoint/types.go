@@ -156,6 +156,17 @@ type Endpoint struct {
 	// meaningful value (i.e. for any bridged endpoint with ID ≥ 2).
 	HasParentEndpointID bool
 
+	// Part is true for an endpoint assembled from a [Spec.Parts] entry: a
+	// component of the endpoint ParentEndpointID names, not a bridged node
+	// of its own (no BridgedNode device type, no
+	// BridgedDeviceBasicInformation).
+	Part bool
+	// PartIDs are the ids of the endpoint's parts ([Spec.Parts]),
+	// ascending — its Descriptor PartsList. matter.js DescriptorServer
+	// #currentPartsListNumbers lists the direct parts of an endpoint whose
+	// device type does not compose its full family.
+	PartIDs []uint16
+
 	// DeviceConditions are the device-type conditions the host states for
 	// this endpoint (Core § 9.2.6), as declared ("PhysicalInputs",
 	// "LanguageLocale"): what describes the product rather than the
@@ -562,17 +573,19 @@ func (t *Topology) FindByID(id uint16) *Endpoint {
 	return nil
 }
 
-// Bridged returns endpoints with ID >= 2 (everything except root and
-// the aggregator). Apple's HAP service mapper iterates this set when
-// it builds the per-device list; the aggregator itself is structural
-// scaffolding and never surfaces as a HomeKit accessory.
+// Bridged returns the bridged endpoints: everything except the root, the
+// aggregator and the parts of a bridged endpoint ([Endpoint.Part]), which
+// are components of it rather than bridged devices. Apple's HAP service
+// mapper iterates this set when it builds the per-device list; the
+// aggregator itself is structural scaffolding and never surfaces as a
+// HomeKit accessory.
 func (t *Topology) Bridged() []*Endpoint {
 	if len(t.Endpoints) <= 2 {
 		return nil
 	}
 	out := make([]*Endpoint, 0, len(t.Endpoints)-2)
 	for _, ep := range t.Endpoints {
-		if ep.IsRoot() || ep.IsAggregator() {
+		if ep.IsRoot() || ep.IsAggregator() || ep.Part {
 			continue
 		}
 		out = append(out, ep)

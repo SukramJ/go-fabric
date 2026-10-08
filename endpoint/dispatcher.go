@@ -1171,6 +1171,8 @@ func endpointHasDeviceType(ep *Endpoint, deviceType uint32) bool {
 		return deviceType == deviceTypeRootNode
 	case ep.IsAggregator():
 		return deviceType == deviceTypeAggregator
+	case ep.Part:
+		return deviceType == uint32(ep.DeviceType)
 	default:
 		return deviceType == uint32(ep.DeviceType) || deviceType == matterDeviceTypeBridgedNode
 	}

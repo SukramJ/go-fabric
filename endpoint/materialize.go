@@ -95,6 +95,9 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// first, ahead of the source's own clusters (see mountGroups).
 	inner = mountGroups(ep, ep.identifyServer(), inner)
 	inner = mountScenes(ep, inner)
+	if ep.Part {
+		return partClusterServers(ep, inner)
+	}
 
 	// Spec §9.5 + §9.13: every bridged endpoint MUST advertise both
 	// the Descriptor cluster (DeviceTypeList containing BridgedNode +
@@ -298,7 +301,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// pattern in daemon.go). A static buildServerList call here would
 	// silently drift whenever clusters are added before or after the
 	// Descriptor construction.
-	descriptor, derr := mattercore.NewDescriptor(deviceTypes, nil, nil, nil)
+	descriptor, derr := mattercore.NewDescriptor(deviceTypes, nil, nil, ep.PartIDs)
 	if derr != nil {
 		return append(clusters, bridged)
 	}
@@ -306,12 +309,38 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	out := make([]contract.ClusterServer, 0, len(clusters)+2)
 	out = append(out, clusters...)
 	out = append(out, descriptor, bridged)
+	installServerList(descriptor, out)
+	return out
+}
 
-	// Install the server-list provider after `out` is fully assembled so
-	// the closure captures the final, immutable slice. Every ServerList
-	// read returns the IDs of the clusters actually mounted on this
-	// endpoint — no duplicates, deterministic order.
-	mounted := out
+// partClusterServers is the surface of a [Spec.Parts] endpoint: its own
+// clusters, Identify when its device type mandates it, and a Descriptor
+// listing its device type alone — a component is no bridged node (matter.js
+// examples/device-smoke-co-alarm: the PowerSourceEndpoint part carries
+// PowerSourceServer and its Descriptor only).
+func partClusterServers(ep *Endpoint, inner []contract.ClusterServer) []contract.ClusterServer {
+	out := make([]contract.ClusterServer, 0, len(inner)+2)
+	if schema.DeviceTypeRequiresServerCluster(uint32(ep.DeviceType), identifyClusterID) {
+		out = append(out, ep.identifyServer())
+	}
+	out = append(out, inner...)
+	descriptor, err := mattercore.NewDescriptor([]mattercore.DeviceTypeStruct{{
+		DeviceType: uint32(ep.DeviceType), Revision: deviceTypeRevision(ep.DeviceType),
+	}}, nil, nil, ep.PartIDs)
+	if err != nil {
+		return out
+	}
+	out = append(out, descriptor)
+	installServerList(descriptor, out)
+	return out
+}
+
+// installServerList derives the Descriptor's ServerList from the final
+// mounted set, so the advertised list cannot drift from the clusters
+// actually returned. Called once mounted is complete: the closure captures
+// the final, immutable slice, and every ServerList read returns the IDs of
+// the clusters mounted on the endpoint — no duplicates, deterministic order.
+func installServerList(descriptor *mattercore.Descriptor, mounted []contract.ClusterServer) {
 	descriptor.SetServerListProvider(func() []uint32 {
 		ids := make([]uint32, 0, len(mounted))
 		seen := make(map[uint32]struct{}, len(mounted))
@@ -328,7 +357,6 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 		}
 		return ids
 	})
-	return out
 }
 
 // uniqueIDFor derives a stable 32-character hex string from the
@@ -500,3 +528,6 @@ func bridgedVendorName(ep *Endpoint) string {
 	}
 	return truncateLabel(name)
 }
+
+// identifyClusterID is the Identify cluster (identify.element.ts, 0x0003).
+const identifyClusterID uint32 = 0x0003

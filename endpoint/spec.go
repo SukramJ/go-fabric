@@ -95,6 +95,18 @@ type Spec struct {
 	// DeviceConditions are the device-type conditions the host states for
 	// the endpoint ([Endpoint.DeviceConditions]); nil states none.
 	DeviceConditions []string
+	// Parts are the endpoint's child endpoints — matter.js Endpoint
+	// `parts` — such as the PowerSource (0x0011) component a SmokeCoAlarm
+	// requires (matter.js examples/device-smoke-co-alarm). Each part is an
+	// endpoint of its own: its StableKey (unique like any other) persists
+	// its number, it sits in this endpoint's Descriptor PartsList and in
+	// the Aggregator's full-family one, and its ParentEndpoint is this
+	// endpoint. A part is a component, not a bridged node: its Descriptor
+	// lists its DeviceType alone, it serves no BridgedDeviceBasicInformation,
+	// and Identify only when its device type mandates it. Parts may carry
+	// parts; FriendlyName, VendorName, NodeLabel and ConfigurationVersion
+	// of a part are not served.
+	Parts []Spec
 }
 
 // ComposeNodeLabel appends the parameter suffix to the base label and
