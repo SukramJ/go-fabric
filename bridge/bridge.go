@@ -1155,8 +1155,10 @@ func (b *Bridge) emitFabricRemoved(ctx context.Context, fabricIndex uint8) {
 	b.groupMessagingPort().ForgetFabric(fabricIndex)
 	// And its scenes (fabric-scoped scene table entries).
 	if topo := b.Topology(); topo != nil {
-		for _, ep := range topo.Bridged() {
-			ep.ForgetFabricScenes(fabricIndex)
+		for _, ep := range topo.Endpoints {
+			if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+				ep.ForgetFabricScenes(fabricIndex) // parts included
+			}
 		}
 	}
 	b.mu.RLock()

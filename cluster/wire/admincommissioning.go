@@ -84,6 +84,17 @@ type WindowController interface {
 	RevokeWindow(ctx context.Context) error
 }
 
+// AnyWindowReporter is the optional capability of a [WindowController]
+// that also tracks a commissioning window the node opened itself — one
+// WindowStatus does not report. RevokeCommissioning closes such a window
+// instead of answering WindowNotOpen. bridge.CommissioningWindow implements
+// it.
+type AnyWindowReporter interface {
+	// IsOpen reports whether any commissioning window is open, the node's
+	// own included.
+	IsOpen() bool
+}
+
 // WindowStatusSnapshot captures every attribute the cluster's read
 // side surfaces. AdminFabricIsNull / AdminVendorIsNull encode "not
 // applicable" (Matter NULL TLV) — controllers expect both to be null
@@ -408,11 +419,21 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 		// fires when the window is already closed — matter.js
 		// AdministratorCommissioningServer.ts:140-147 + chip
 		// AdministratorCommissioningLogic.cpp:108-119.
-		preStatus := c.CurrentWindow().Status
+		//
+		// A window the node opened itself counts as open although
+		// WindowStatus reads WindowNotOpen for it (matter.js
+		// revokeCommissioning consults DeviceCommissioner.windowStatus,
+		// 9397828d): a controller that reports it through
+		// [AnyWindowReporter] has it closed here, not answered
+		// WindowNotOpen.
+		wasOpen := c.CurrentWindow().Status != WindowStatusClosed
+		if r, ok := c.(AnyWindowReporter); ok {
+			wasOpen = r.IsOpen()
+		}
 		if err := c.RevokeWindow(ctx); err != nil {
 			return nil, err
 		}
-		if preStatus == WindowStatusClosed {
+		if !wasOpen {
 			return nil, ErrAdmCommWindowNotOpen
 		}
 		return nil, nil

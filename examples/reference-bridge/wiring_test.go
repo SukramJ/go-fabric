@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -325,9 +326,11 @@ func TestBlindPositionSurvivesARestart(t *testing.T) {
 	}
 }
 
-// TestOperationalHoursSurviveARestart: TotalOperationalHours is seeded from
-// the settings table and stored back, so a reboot does not reset it
-// (TC-DGGEN-2.1 step 10c).
+// TestOperationalHoursSurviveARestart: the operational time is seeded from
+// the settings table and stored back in milliseconds, so a reboot does not
+// reset it (TC-DGGEN-2.1 step 10c) and a run shorter than an hour still
+// counts (matter.js totalOperationalHoursCounter). A database of an earlier
+// release, which kept whole hours, is migrated.
 func TestOperationalHoursSurviveARestart(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -337,27 +340,57 @@ func TestOperationalHoursSurviveARestart(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	st := store.New(db)
-	if h, err := loadOperationalHours(ctx, st); err != nil || h != 0 {
-		t.Fatalf("hours on a new database = %d, %v", h, err)
+	if d, err := loadOperationalTime(ctx, st); err != nil || d != 0 {
+		t.Fatalf("operational time on a new database = %v, %v", d, err)
 	}
-	g := mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
-	g.SetPersistedCounters(0, 3)
-	if err := storeOperationalHours(ctx, st, g); err != nil {
+
+	// An earlier release's whole hours migrate to milliseconds.
+	if err := st.SetSetting(ctx, legacyOperationalHoursSetting, "3"); err != nil {
 		t.Fatal(err)
 	}
-	if h, err := loadOperationalHours(ctx, st); err != nil || h != 3 {
-		t.Fatalf("hours after a store = %d, %v; want 3", h, err)
+	d, err := loadOperationalTime(ctx, st)
+	if err != nil || d != 3*time.Hour {
+		t.Fatalf("legacy hours loaded as %v, %v; want 3h", d, err)
 	}
+	g := mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
+	g.SetPersistedOperationalTime(d + 59*time.Minute)
+	if err := storeOperationalTime(ctx, st, g); err != nil {
+		t.Fatal(err)
+	}
+	if raw, _, _ := st.GetSetting(ctx, operationalTimeSetting); !strings.HasPrefix(raw, "14340") {
+		t.Fatalf("stored %q ms; want 3h59m = 14340000 ms and change", raw)
+	}
+	// The part-hour survives: a restart starting at 3h59m reads 3 hours,
+	// and the next minute makes it 4.
+	d, err = loadOperationalTime(ctx, st)
+	if err != nil || d < 3*time.Hour+59*time.Minute || d > 4*time.Hour {
+		t.Fatalf("operational time after a store = %v, %v; want 3h59m", d, err)
+	}
+	g2 := mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
+	g2.SetPersistedOperationalTime(d + time.Minute)
+	if v, _ := g2.MatterRead(0x0003); v != uint32(4) {
+		t.Fatalf("TotalOperationalHours = %v after 3h59m + 1m; want 4", v)
+	}
+
 	runCtx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
-	go func() { keepOperationalHours(runCtx, st, g, time.Millisecond, slog.Default()); close(done) }()
+	go func() { keepOperationalTime(runCtx, st, g, time.Millisecond, slog.Default()); close(done) }()
 	time.Sleep(10 * time.Millisecond)
 	cancel()
 	<-done
-	if err := st.SetSetting(ctx, operationalHoursSetting, "x"); err != nil {
+	if err := st.SetSetting(ctx, operationalTimeSetting, "x"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadOperationalHours(ctx, st); err == nil {
-		t.Fatal("a corrupt hour count was accepted")
+	if _, err := loadOperationalTime(ctx, st); err == nil {
+		t.Fatal("a corrupt millisecond count was accepted")
+	}
+	if err := st.SetSetting(ctx, operationalTimeSetting, "1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSetting(ctx, legacyOperationalHoursSetting, "x"); err != nil {
+		t.Fatal(err)
+	}
+	if d, err := loadOperationalTime(ctx, st); err != nil || d != time.Millisecond {
+		t.Fatalf("the millisecond count must win over the legacy hours: %v, %v", d, err)
 	}
 }

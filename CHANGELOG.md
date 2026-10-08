@@ -50,6 +50,34 @@ the same `ColorTemperatureWriter` as before.
 - `cluster/transition.AddWithOverflow` (matter.js `addValueWithOverflow`).
 - The reference daemon has an ExtendedColorLight ("Color Bulb") with every
   ColorControl feature, and the CHIP ColorControl family runs against it.
+- `cluster/core.GeneralDiagnostics.SetPersistedOperationalTime` and
+  `TotalOperationalTime`: the operational time at full resolution, which a
+  host persists and seeds back instead of the TotalOperationalHours
+  attribute, as matter.js persists its millisecond
+  `totalOperationalHoursCounter`. `SetPersistedCounters` keeps its whole-hour
+  seed (and now saturates instead of overflowing on a huge one).
+- **The node's own commissioning window** (matter.js `DeviceCommissioner`,
+  9397828d): `bridge.CommissioningWindow.OpenOwnWindow` opens the window an
+  uncommissioned node opens at start (or the application opens) — 48 h
+  without a fabric, 15 min with one (`OwnWindowTimeoutUncommissioned` /
+  `OwnWindowTimeoutCommissioned`, from `SetFabricCounter`); restarted by a
+  second call, closed by CommissioningComplete, RevokeCommissioning and its
+  timer; `IsOwnWindow` tells it apart for a host's transition hook,
+  `ErrAdministratorWindowOpen` refuses it over an administrator's window.
+  `cluster/wire.AnyWindowReporter` is the optional controller capability
+  RevokeCommissioning consults.
+- **Parts of a bridged endpoint** (matter.js Endpoint `parts`):
+  `endpoint.Spec.Parts` declares child endpoints of a bridged endpoint, each
+  with its own persisted number from its `StableKey`, listed in the parent's
+  Descriptor PartsList (`Endpoint.PartIDs`) and in the Aggregator's
+  full-family one, with the parent as its ParentEndpoint. A part
+  (`Endpoint.Part`) is a component, not a bridged node: its DeviceTypeList is
+  its own device type alone, it serves no BridgedDeviceBasicInformation, and
+  Identify only where its device type mandates it. `ValidateDeviceTypes`
+  counts it, so a SmokeCoAlarm with a PowerSource (0x0011) part meets its
+  component requirement. The reference daemon's smoke alarm carries its
+  battery as such a part, as matter.js's `device-smoke-co-alarm` example
+  does.
 
 ### Changed
 
@@ -93,7 +121,36 @@ the same `ColorTemperatureWriter` as before.
   floor above.
 - `light.ColorControlClusterRevision` is the generated definition's
   `colorcontrol.Revision` (still 9).
+- **Commissionability follows the node's own window.** An administrator's
+  OpenCommissioningWindow replaces a window the node opened itself instead of
+  answering Busy, and RevokeCommissioning closes it instead of answering
+  WindowNotOpen; WindowStatus keeps reading WindowNotOpen for it, as matter.js
+  keeps it for administrator windows only. `CommissioningWindow.IsOpen` — the
+  ArmFailSafe-over-CASE guard — counts the node's own window too, as matter.js
+  `DeviceCommissioner.windowStatus` does.
+- **The reference daemon is commissionable only while uncommissioned.** It
+  opens its own window at start when it has no fabric, attaches its
+  configured-passcode PASE acceptor and announces CM=1 only while that window
+  is open, and withdraws both when the window closes (commissioning
+  complete, revoked, timed out); losing its last fabric reopens it. Before, a
+  commissioned daemon stayed commissionable with its passcode for its whole
+  lifetime. A host that embedded the same pattern (baseline acceptor
+  attached once, CM=1 announced at every boot) should move to
+  `OpenOwnWindow`.
+- `endpoint.Topology.Bridged` leaves out parts (`Endpoint.Part`): they are
+  components of a bridged device, not bridged devices.
 
+### Fixed
+
+- **TotalOperationalHours keeps the part-hours of every run.** The reference
+  daemon persisted the attribute in whole hours, so each restart dropped its
+  part-hour and a bridge restarting more often than hourly never gained one.
+  It now persists milliseconds under the settings key `gendiag.operational_ms`
+  (matter.js `totalOperationalHoursCounter`); a database of an earlier
+  release is migrated on first start — its `gendiag.operational_hours` count
+  is read as hours × 3,600,000 ms and the next store writes the new key. A
+  host that persisted the attribute itself should switch to
+  `TotalOperationalTime` the same way.
 
 ## [0.2.0] — 2026-10-07
 

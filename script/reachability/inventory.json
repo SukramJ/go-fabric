@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3841,
+  "entry_points": 3849,
   "entry_packages": [
     ".",
     "bootid",
@@ -73,9 +73,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 4587,
-    "reachable": 2716,
-    "whitelisted": 1866,
+    "total_exported": 4593,
+    "reachable": 2720,
+    "whitelisted": 1868,
     "unreachable": 5
   },
   "by_package": [
@@ -122,7 +122,7 @@
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 107,
+      "line": 119,
       "kind": "func"
     },
     {
@@ -6257,7 +6257,7 @@
       "identifier": "TestBooleanStateServerMeetsTheDetectorDeviceTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 159
+      "line": 160
     },
     {
       "package": "endpoint",
@@ -6614,14 +6614,14 @@
       "identifier": "TestLightServersMeetTheLightDeviceTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 116
+      "line": 117
     },
     {
       "package": "endpoint",
       "identifier": "TestMeasurementKindsMeetTheirDeviceTypeRequirements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 88
+      "line": 89
     },
     {
       "package": "endpoint",
@@ -6898,6 +6898,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestSpecPartsComposeAChildEndpoint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/parts_test.go",
+      "line": 23
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestSynthesizeGlobalRead_AcceptedCommandList_WithLister",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
@@ -7146,7 +7153,7 @@
       "identifier": "TestBlindPositionSurvivesARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 292
+      "line": 293
     },
     {
       "package": "examples/reference-bridge",
@@ -7167,14 +7174,14 @@
       "identifier": "TestCaseIdentitiesResolveAndForget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 240
+      "line": 241
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCaseInitiatorProviderNeedsALoadedIdentity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 183
+      "line": 184
     },
     {
       "package": "examples/reference-bridge",
@@ -7195,7 +7202,7 @@
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 70
+      "line": 71
     },
     {
       "package": "examples/reference-bridge",
@@ -7230,14 +7237,14 @@
       "identifier": "TestOperationalHoursSurviveARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 331
+      "line": 334
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestRebootCountCountsBoots",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 266
+      "line": 267
     },
     {
       "package": "examples/reference-bridge",
@@ -7251,14 +7258,21 @@
       "identifier": "TestRootMountsGroupcastWithTheAuxiliaryACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 208
+      "line": 209
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 115
+      "line": 116
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestSmokeAlarmHasItsPowerSourcePart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_test.go",
+      "line": 287
     },
     {
       "package": "examples/reference-bridge",

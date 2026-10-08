@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"strings"
 	"sync"
@@ -80,12 +81,13 @@ type GeneralDiagnostics struct {
 	// Persistence-seeded counters; populated by [SetPersistedCounters].
 	// rebootCount survives across daemon restarts (incremented on each
 	// fresh boot before being seeded into the cluster).
-	// baseOperationalHours is the accumulated TotalOperationalHours
-	// from prior process lifetimes; the live attribute adds the
-	// current process's uptime to this base.
-	rebootCount          uint16
-	baseOperationalHours uint32
-	persistedSeeded      bool
+	// baseOperationalTime is the operational time accumulated by prior
+	// process lifetimes, kept at the resolution matter.js persists
+	// (totalOperationalHoursCounter, milliseconds); the attribute adds the
+	// current process's uptime and floors the sum to whole hours.
+	rebootCount         uint16
+	baseOperationalTime time.Duration
+	persistedSeeded     bool
 
 	// dataVersion tracks the per-cluster monotonic counter per Matter
 	// §10.6.5. Bumped at construction and when persisted counters are seeded
@@ -223,15 +225,47 @@ func (g *GeneralDiagnostics) UpTimeSeconds() uint64 {
 // stamped from persistent state at construction. The wiring side is
 // the daemon's responsibility; this method makes the cluster
 // persistence-aware without forcing the wiring to land in lockstep.
+//
+// baseOperationalHours seeds the operational time in whole hours, the
+// resolution a host persisted before [GeneralDiagnostics.SetPersistedOperationalTime]
+// existed; a host that persists [GeneralDiagnostics.TotalOperationalTime]
+// seeds it with that method afterwards instead.
 func (g *GeneralDiagnostics) SetPersistedCounters(rebootCount uint16, baseOperationalHours uint32) {
 	g.mu.Lock()
 	g.rebootCount = rebootCount
-	g.baseOperationalHours = baseOperationalHours
+	// time.Duration holds ~2.56 million hours; a larger count saturates.
+	g.baseOperationalTime = time.Duration(min(int64(baseOperationalHours), int64(math.MaxInt64/time.Hour))) * time.Hour
 	g.persistedSeeded = true
 	g.mu.Unlock()
 	// Bump DataVersion after counter seed so subscribers that cached the
 	// pre-seed values get a version change notification.
 	g.dataVersion.Bump()
+}
+
+// SetPersistedOperationalTime seeds the operational time earlier process
+// lifetimes accumulated, at full resolution, so a node restarting more often
+// than hourly still accrues TotalOperationalHours. A host persists
+// [GeneralDiagnostics.TotalOperationalTime] and hands it back here at the
+// next start; negative values are taken as zero.
+//
+// Mirrors matter.js packages/node/src/behaviors/general-diagnostics/
+// GeneralDiagnosticsServer.ts: the persisted totalOperationalHoursCounter
+// (milliseconds, updated every 5 min and on going offline) from which the
+// totalOperationalHours getter derives Hours.of(counter + elapsed).
+func (g *GeneralDiagnostics) SetPersistedOperationalTime(d time.Duration) {
+	g.mu.Lock()
+	g.baseOperationalTime = max(d, 0)
+	g.mu.Unlock()
+}
+
+// TotalOperationalTime is the node's operational time: the persisted base
+// plus this process's uptime. TotalOperationalHours is its floor in hours
+// (matter.js Hours.of). Persist it, not the attribute, to keep the
+// part-hour across a restart.
+func (g *GeneralDiagnostics) TotalOperationalTime() time.Duration {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.baseOperationalTime + time.Since(g.startTime)
 }
 
 // BootReasonEvent is the payload for the Matter §11.12.8.1 BootReason
@@ -313,11 +347,11 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 	case gendiagAttrUpTime:
 		return uint64(g.upTime().Seconds()), true
 	case gendiagAttrTotalOperationalHours:
-		// Live = persisted base hours + current process uptime hours.
-		// Daemon shutdown hooks should snapshot the value back to the
-		// store; without that, the base portion stays at zero.
-		live := uint32(time.Since(g.startTime).Hours()) //nolint:gosec // hours since startTime fits uint32 for any realistic uptime; see #20
-		return g.baseOperationalHours + live, true
+		// Hours.of(base + uptime): the floor of the whole operational
+		// time, so the part-hours of earlier runs add up (matter.js
+		// GeneralDiagnosticsServer.ts totalOperationalHours getter).
+		total := g.baseOperationalTime + time.Since(g.startTime)
+		return uint32(total / time.Hour), true //nolint:gosec // 2^32 hours is ~490,000 years
 	// BootReason / ActiveHardwareFaults / ActiveRadioFaults /
 	// ActiveNetworkFaults are OPTIONAL on GeneralDiagnostics. matter.js's
 	// `examples/device-bridge-onoff` Sample (Apple-pair-success byte-

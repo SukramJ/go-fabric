@@ -113,11 +113,12 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	if err != nil {
 		return nil, refs, fmt.Errorf("general diagnostics: %w", err)
 	}
-	hours, err := loadOperationalHours(context.Background(), st)
+	opTime, err := loadOperationalTime(context.Background(), st)
 	if err != nil {
 		return nil, refs, fmt.Errorf("general diagnostics: %w", err)
 	}
-	refs.genDiag.SetPersistedCounters(reboots, hours)
+	refs.genDiag.SetPersistedCounters(reboots, 0)
+	refs.genDiag.SetPersistedOperationalTime(opTime)
 
 	generalCom, err := mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
 		LocationCapability:           mattercore.RegulatoryIndoor,
@@ -609,7 +610,9 @@ func wireSecurity(
 		return adapter
 	})
 	paseProvider.StartReaper(ctx, 30*time.Second, time.Minute)
-	br.AttachPaseHandlerProvider(paseProvider.Resolve)
+	// Not attached here: it accepts PASE only while the node's own
+	// commissioning window is open (commissioning.go), as matter.js sets
+	// its PASE commissioner per window (DeviceCommissioner).
 
 	// CASE, likewise per exchange. A single responder lands in `Finished`
 	// after the first Sigma3 and rejects every later Sigma1.
@@ -899,43 +902,55 @@ func countBoot(ctx context.Context, st *store.Store) (uint16, error) {
 	return count, nil
 }
 
-// operationalHoursSetting is the settings key TotalOperationalHours is
-// kept under across boots.
-const operationalHoursSetting = "gendiag.operational_hours"
+// operationalTimeSetting is the settings key the node's operational time is
+// kept under across boots, in milliseconds — matter.js's persisted
+// totalOperationalHoursCounter (GeneralDiagnosticsServer.ts), so a run
+// shorter than an hour still counts.
+const operationalTimeSetting = "gendiag.operational_ms"
 
-// loadOperationalHours is the TotalOperationalHours earlier boots
-// accumulated (0 for a new database).
-func loadOperationalHours(ctx context.Context, st *store.Store) (uint32, error) {
-	raw, ok, err := st.GetSetting(ctx, operationalHoursSetting)
+// legacyOperationalHoursSetting is where releases up to 0.2.0 kept the
+// count, in whole hours. It is read only when operationalTimeSetting is
+// absent, and migrated to milliseconds (hours × 3,600,000) by the next store.
+const legacyOperationalHoursSetting = "gendiag.operational_hours"
+
+// loadOperationalTime is the operational time earlier boots accumulated (0
+// for a new database).
+func loadOperationalTime(ctx context.Context, st *store.Store) (time.Duration, error) {
+	raw, ok, err := st.GetSetting(ctx, operationalTimeSetting)
+	if err != nil {
+		return 0, err
+	}
+	if ok {
+		ms, err := strconv.ParseUint(raw, 10, 63)
+		if err != nil || ms > uint64(math.MaxInt64/int64(time.Millisecond)) {
+			return 0, fmt.Errorf("%s %q: not a millisecond count", operationalTimeSetting, raw)
+		}
+		return time.Duration(ms) * time.Millisecond, nil //nolint:gosec // bounded above
+	}
+	raw, ok, err = st.GetSetting(ctx, legacyOperationalHoursSetting)
 	if err != nil || !ok {
 		return 0, err
 	}
 	h, err := strconv.ParseUint(raw, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("%s %q: %w", operationalHoursSetting, raw, err)
+		return 0, fmt.Errorf("%s %q: %w", legacyOperationalHoursSetting, raw, err)
 	}
-	return uint32(h), nil
+	// time.Duration holds ~2.56 million hours; a larger count saturates.
+	return time.Duration(min(h, uint64(math.MaxInt64/int64(time.Hour)))) * time.Hour, nil //nolint:gosec // bounded above
 }
 
-// storeOperationalHours persists the node's current TotalOperationalHours.
-func storeOperationalHours(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics) error {
-	v, ok := g.MatterRead(gendiagTotalOperationalHours) //nolint:contextcheck // the contract's context-free read
-	h, isU32 := v.(uint32)
-	if !ok || !isU32 {
-		return fmt.Errorf("TotalOperationalHours read as %T", v)
-	}
-	return st.SetSetting(ctx, operationalHoursSetting, strconv.FormatUint(uint64(h), 10))
+// storeOperationalTime persists the node's operational time in
+// milliseconds (matter.js's counter floors to whole milliseconds too).
+func storeOperationalTime(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics) error {
+	ms := g.TotalOperationalTime().Milliseconds()
+	return st.SetSetting(ctx, operationalTimeSetting, strconv.FormatInt(ms, 10))
 }
 
-// gendiagTotalOperationalHours is GeneralDiagnostics TotalOperationalHours
-// (general-diagnostics.element.ts, 0x0003).
-const gendiagTotalOperationalHours uint32 = 0x0003
-
-// keepOperationalHours persists TotalOperationalHours every interval until
+// keepOperationalTime persists the operational time every interval until
 // ctx ends, so the count survives a restart — chip and matter.js keep it in
 // non-volatile storage, and TC-DGGEN-2.1 reads it back after a reboot. The
 // daemon stores it once more on shutdown.
-func keepOperationalHours(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics, interval time.Duration, logger *slog.Logger) {
+func keepOperationalTime(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics, interval time.Duration, logger *slog.Logger) {
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 	for {
@@ -943,7 +958,7 @@ func keepOperationalHours(ctx context.Context, st *store.Store, g *mattercore.Ge
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			if err := storeOperationalHours(ctx, st, g); err != nil {
+			if err := storeOperationalTime(ctx, st, g); err != nil {
 				logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
 			}
 		}

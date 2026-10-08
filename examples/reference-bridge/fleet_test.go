@@ -279,3 +279,29 @@ func TestBridgedDevicesServeTheNodesVendorName(t *testing.T) {
 		}
 	}
 }
+
+// TestSmokeAlarmHasItsPowerSourcePart: the SmokeCoAlarm's PowerSource
+// component is a part of the alarm endpoint (matter.js
+// examples/device-smoke-co-alarm), so the device-type validator no longer
+// reports the missing component.
+func TestSmokeAlarmHasItsPowerSourcePart(t *testing.T) {
+	_, br := startFleetBridge(t)
+	topo := br.Topology()
+	var alarm *endpoint.Endpoint
+	for _, ep := range topo.Bridged() {
+		if ep.DeviceType == 0x0076 {
+			alarm = ep
+		}
+	}
+	if alarm == nil || len(alarm.PartIDs) != 1 {
+		t.Fatalf("smoke alarm %+v: want one part", alarm)
+	}
+	if part := topo.FindByID(alarm.PartIDs[0]); part == nil || part.DeviceType != deviceTypePowerSource {
+		t.Fatalf("the alarm's part is %+v, want a PowerSource endpoint", part)
+	}
+	for _, v := range endpoint.ValidateDeviceTypes(topo) {
+		if v.Endpoint == alarm.ID || v.Endpoint == alarm.PartIDs[0] {
+			t.Errorf("device type violation: %s", v)
+		}
+	}
+}

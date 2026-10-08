@@ -336,56 +336,6 @@ and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
   chip-tool's `groupcast` commands encode the optional fields as matter.js
   does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
   multicast `onoff toggle`, `groupcast leave-group`).
-- **F-SWEEP-1 — the node's own commissioning window (matter.js 9397828d,
-  #4602).** matter.js `DeviceCommissioner` owns every window: one the node
-  opens itself (an uncommissioned node at start, or the application) runs
-  on its own timeout — 48 h without fabrics, 15 min once commissioned — and
-  closes at CommissioningComplete; an administrator's OpenCommissioningWindow
-  / OpenBasicCommissioningWindow *replaces* it instead of answering Busy, and
-  RevokeCommissioning closes it instead of answering WindowNotOpen
-  (`AdministratorCommissioningServer.revokeCommissioning`). go-fabric models
-  administrator windows only (`bridge.CommissioningWindow`); the node's own
-  commissionability is the host's: the reference daemon announces CM=1 at
-  every boot and after every administrator window and keeps its baseline
-  PASE acceptor for the process lifetime, so a commissioned bridge stays
-  commissionable with its configured passcode. **Fix:** a node-owned mode on
-  `CommissioningWindow` (`OpenOwnWindow(ctx, timeout)`: default timeout from
-  the fabric count, replaced by an administrator's window, closed by
-  RevokeCommissioning, EndCommissioning and its timer, with the transition
-  hook withdrawing `_matterc` and detaching the PASE acceptor), and the
-  reference daemon opening it only while uncommissioned. AdministratorCommissioning
-  WindowStatus stays WindowNotOpen for it, as matter.js keeps
-  `state.windowStatus` for administrator windows. Families: CADMIN, SC
-  (discovery of a commissioned node). The ArmFailSafe half of the commit is
-  done (`CommissioningWindow.IsOpen` wired into GeneralCommissioning).
-- **F-SWEEP-2 — TotalOperationalHours persisted in whole hours.** matter.js
-  persists a millisecond counter (`totalOperationalHoursCounter`); go-fabric
-  persists whole hours (`GeneralDiagnostics.SetPersistedCounters`,
-  `examples/reference-bridge/wiring.go` storeOperationalHours /
-  keepOperationalHours), so every run drops its part-hour and a bridge
-  restarting more often than hourly never gains one. Older than the
-  f07365a8 → 85cf6647 range (seen while sweeping 5a125377). **Fix:** persist
-  seconds (a `SetPersistedOperationalTime(time.Duration)` and an accessor).
-  Family: DGGEN (2.1 waits for the hour to move within one run, so it does
-  not see this).
-
-- **F-COMP-1 — a bridged endpoint cannot carry parts, so the SmokeCoAlarm
-  has no PowerSource component endpoint.** The SmokeCoAlarm device type
-  (0x0076) requires a PowerSource device-type component (min 1). matter.js
-  composes it as a child endpoint: its example
-  (`examples/device-smoke-co-alarm/src/SmokeCOAlarmDeviceNode.ts` at the pin)
-  adds `parts: [new Endpoint(PowerSourceEndpoint.with(PowerSourceServer…))]`
-  to the alarm endpoint, so the PowerSource device type (0x0011) sits on its
-  own endpoint in the alarm's PartsList. go-fabric's endpoint assembler builds
-  one endpoint per `endpoint.Spec` with no children; the reference daemon's
-  alarm (endpoint 9) carries the PowerSource *cluster* on the alarm endpoint
-  itself (`Spec.PowerSource`) and no PowerSource device type anywhere. No
-  CHIP case of the families run here fails on it today; the device-type
-  validator of PR #27 reports it as `device:PowerSource` at Start. **Fix:**
-  child parts for a bridged endpoint in `endpoint.Spec` / the assembler
-  (their own stable numbers, the parent's PartsList and the aggregator's
-  full-family PartsList, a Descriptor per part), then the alarm's battery as
-  a PowerSource part. Families: SMOKECO, DESC, IDM (TC_DeviceConformance).
 
 ## Application cluster servers — open items
 
@@ -505,19 +455,6 @@ family, and deleting the entry.
   ConfigStatus.Operational. **Fix:** port the Mode / ConfigStatus sync and
   the maintenance refusal, then declare the PICS code 1.
 
-- **TC-FAN-3.1 is intermittent (failed once in the full family run of
-  2026-10-06, then passed 3 of 3).** Step 6 writes FanMode Off → Low → Medium
-  → High and counts the reports on a subscription to FanMode alone against
-  the one to PercentSetting alone; in the failing run the FanMode
-  subscription never reported Low (2 FanMode reports against 3
-  PercentSetting reports), although the attribute cache — fed by another
-  subscription — saw it. The first write's own attribute change was lost to
-  one of three concurrent single-attribute subscriptions; the write marks it
-  through `reportWrittenAttributes` and the fan's ChangeNotifier, so the loss
-  is between marking and the report engine. Not yet reproduced; the case is
-  not excluded. **Next step:** run TC-FAN-3.1 in a loop with debug logging of
-  the subscription engine's dirty set per subscription. Family: FAN.
-
 The group-messaging cases are not findings: they are skipped on a host
 whose LAN interface has no IPv6, with the command that enables it, and run
 wherever it has. TC-SC-4.1 and TC-SC-4.3 were wrongly listed here as such an
@@ -560,16 +497,6 @@ What `endpoint.ValidateDeviceTypes`
 ([ADR 0016](../../docs/adr/0016-device-type-validation.md)) finds in what
 the module builds itself (`endpoint/devicetype_module_test.go` pins each).
 
-- **A bridged SmokeCoAlarm cannot have its PowerSource component.**
-  SmokeCoAlarm requires a PowerSource device type endpoint below it (M,
-  min 1; `smoke-co-alarm.element.ts`). A bridged endpoint has no parts of
-  its own — the assembler places every bridged endpoint flat under the
-  Aggregator, and `attachPowerSource` puts the PowerSource *cluster* on the
-  endpoint, which BridgedNode allows but which is no component endpoint.
-  matter.js reports `instanceCount device:PowerSource` for it (warn); the
-  certification harness does not judge component device types. **Fix:**
-  composed bridged endpoints (a `Spec` with parts and a PowerSource child
-  of device type 0x0011), then drop the pin.
 - **PICS slices mark OperationCompletion absent where the device types
   make it mandatory.** `internal/chiptool/testdata/pics/ep12.txt` and
   `ep13.txt` carry `OPSTATE.S.E01=0` / `RVCOPSTATE.S.E01=0` although

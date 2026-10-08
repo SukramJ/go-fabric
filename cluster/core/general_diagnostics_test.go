@@ -470,6 +470,39 @@ func TestGenDiag_NetworkInterfacesHardwareAddressConstraint(t *testing.T) {
 	}
 }
 
+// TestGenDiag_TotalOperationalTimeKeepsPartHours pins matter.js
+// GeneralDiagnosticsServer.ts: the persisted counter is a duration and the
+// attribute is Hours.of(counter + elapsed), floored — so 30 minutes from
+// each of two runs make an hour. The whole-hour seed of SetPersistedCounters
+// stays, and saturates instead of overflowing.
+func TestGenDiag_TotalOperationalTimeKeepsPartHours(t *testing.T) {
+	t.Parallel()
+	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)
+	g.SetPersistedOperationalTime(59*time.Minute + 59*time.Second)
+	if v, _ := g.MatterRead(0x0003); v != uint32(0) {
+		t.Fatalf("TotalOperationalHours = %v at 59m59s; want 0", v)
+	}
+	if d := g.TotalOperationalTime(); d < 59*time.Minute+59*time.Second || d > time.Hour {
+		t.Fatalf("TotalOperationalTime = %v", d)
+	}
+	g.SetPersistedOperationalTime(2*time.Hour + 30*time.Minute)
+	if v, _ := g.MatterRead(0x0003); v != uint32(2) {
+		t.Fatalf("TotalOperationalHours = %v at 2h30m; want 2", v)
+	}
+	g.SetPersistedOperationalTime(-time.Hour)
+	if d := g.TotalOperationalTime(); d < 0 || d > time.Minute {
+		t.Fatalf("a negative seed must count as zero; TotalOperationalTime = %v", d)
+	}
+	g.SetPersistedCounters(1, 7)
+	if v, _ := g.MatterRead(0x0003); v != uint32(7) {
+		t.Fatalf("TotalOperationalHours = %v after SetPersistedCounters(_, 7)", v)
+	}
+	g.SetPersistedCounters(1, 0xFFFFFFFF)
+	if v, _ := g.MatterRead(0x0003); v.(uint32) < 2_562_000 {
+		t.Fatalf("a huge hour seed overflowed: %v", v)
+	}
+}
+
 func TestGenDiag_TotalOperationalHoursReadable(t *testing.T) {
 	t.Parallel()
 	g := core.NewGeneralDiagnostics(core.BootReasonPowerOnReboot)

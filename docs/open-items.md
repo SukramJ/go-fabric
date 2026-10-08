@@ -30,9 +30,6 @@ last family run and held by `TestCertifiabilityDocument`.
 
 | Item | Where | What |
 | --- | --- | --- |
-| **F-SWEEP-1 — the node's own commissioning window** | findings register | matter.js owns a node-opened window (48 h uncommissioned, 15 min once commissioned) that CommissioningComplete closes and an administrator's window replaces instead of answering Busy. go-fabric wires only the ArmFailSafe guard. |
-| **F-SWEEP-2 — TotalOperationalHours in whole hours** | findings register | matter.js persists a millisecond counter; go-fabric persists whole hours and loses up to an hour per restart. |
-| **F-COMP-1 — a bridged endpoint cannot carry parts** | findings register, `docs/certifiability.md` | The SmokeCoAlarm device type requires a PowerSource component endpoint; matter.js composes it as a child part. The reference daemon's smoke alarm logs a `matter.devicetype.violation` warning at Start for this. |
 | **Hand-off transitions report RemainingTime 0** | [ADR 0014](./adr/0014-transitions-optional-per-endpoint.md), `BD-Matter-LevelControl-NativeRamp` | A host whose device ramps natively has no way to state the end time; matter.js's application-stated `transitionEndTime` is not ported. |
 | **Per-attribute timed-write enforcement** | `BD-Matter-TimedAndQuotaDeferred`, `docs/matterjs-comparison.md` §4 | Enforced for commands; no exposed attribute carries the T quality yet. |
 | **Subscription quota eviction** | same | A bridge on a home LAN does not reach the cap; unbuilt. |
@@ -41,7 +38,6 @@ last family run and held by `TestCertifiabilityDocument`.
 
 | Item | Where | What |
 | --- | --- | --- |
-| **TC-FAN-3.1 is intermittent** | findings register | Failed once in a full family run (a FanMode report lost on one of three single-attribute subscriptions), passed every rerun and the next full run. Root cause not found; the case is not excluded. Next step is recorded in the register. |
 | **Manual operator cases** | `docs/certifiability.md`, class (c) | 89 cases have a test-lab operator perform a step (`PICS_USER_PROMPT`). They have no stand-in and stay unrun. |
 | **Families without a mounted server** | `docs/certifiability.md` | ICDManagement (a mains-powered bridge is not an ICD), OTA requestor (no BDX, no update agent) and Binding (no endpoint declares a client cluster) are classified, not run. Mounting any of them is a product decision, not a module gap. |
 | **Local multicast cases need IPv6 on the LAN interface** | `internal/chiptool/doc.go` | On a host whose interface has no IPv6 the group-messaging and SC-4.x cases host-skip with the command that enables it; CI runs them. |

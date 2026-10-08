@@ -68,9 +68,13 @@ func newDemoSmokeAlarm(name string) *demoSmokeAlarm {
 // MatterDeviceType implements [contract.EndpointSource].
 func (a *demoSmokeAlarm) MatterDeviceType() uint16 { return alarm.DeviceTypeSmokeCoAlarm }
 
-// MatterClusterServers implements [contract.EndpointSource]. PowerSource,
-// which SmokeCoAlarm also mandates, comes from the Spec's PowerSource
-// reading (the battery) rather than from here.
+// deviceTypePowerSource is the PowerSource device type
+// (power-source.element.ts, 0x0011), the component the alarm's battery is.
+const deviceTypePowerSource uint16 = 0x0011
+
+// MatterClusterServers implements [contract.EndpointSource]. The
+// PowerSource component SmokeCoAlarm requires is a part of the alarm's
+// endpoint carrying the battery reading (fleet.go), not served from here.
 //
 // The server is built once: it carries the event emitter the bridge wires
 // at reassembly, and Refresh must emit through that same instance — a

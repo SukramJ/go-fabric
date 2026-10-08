@@ -131,8 +131,8 @@ refuse them (`Bridge.SetDeviceTypeValidation`, `endpoint.ValidateDeviceTypes`,
 [ADR 0016](./adr/0016-device-type-validation.md)). Conditions that describe
 the product rather than the topology (LanguageLocale, PhysicalInputs, …) are
 the host's to state (`Spec.DeviceConditions`, `Config.RootDeviceConditions`).
-Not servable as the module stands: a SmokeCoAlarm's PowerSource component
-endpoint (bridged endpoints have no parts).
+A component endpoint — the PowerSource a SmokeCoAlarm requires — is a part
+of its bridged endpoint (`Spec.Parts`), as matter.js composes it.
 
 Device types a host builds from the application servers, each assembled
 with its full mandatory server set (Identify, Groups where mandated,
