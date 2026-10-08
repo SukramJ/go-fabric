@@ -71,6 +71,11 @@ the same `ColorTemperatureWriter` as before.
 - `light.ColorControlServer.SyncColorTemperatureWithLevel` couples the colour
   temperature to the level only in the colour temperature mode, as matter.js
   `syncColorTemperatureWithLevel` does (a CT-only server is always in it).
+- `light.ColorControlServer` deliberately departs from matter.js in one
+  conversion: a switch from the XY mode to hue and saturation converts the
+  colour with `xyToHsv` (`XYToHSV`), where matter.js calls `hsvToXy` with x
+  and y and starts from a hue near 0 (`BD-Matter-ColorControl-XYToHS`, an
+  upstream matter.js issue candidate).
 - `light.ColorControlClusterRevision` is the generated definition's
   `colorcontrol.Revision` (still 9).
 

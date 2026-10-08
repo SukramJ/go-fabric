@@ -50,11 +50,11 @@ func (s *ColorControlServer) setEnhancedColorMode(ctx context.Context, mode Colo
 // colour temperature outside 1000 K to 20009 K has no x/y and converts to
 // nothing; so does a value the arithmetic cannot carry.
 //
-// The XY → hue and saturation branch is ported as matter.js has it at the
-// schema pin: it calls hsvToXy with the x and y, not xyToHsv, so the hue
-// becomes x read as degrees and the saturation y read as a fraction. The
-// command that switched the mode then moves hue or saturation to its own
-// target.
+// The XY → hue and saturation branch converts with xyToHsv. matter.js
+// calls hsvToXy with the x and y there (ColorControlServer.ts:1493 at the
+// schema pin, unchanged at HEAD), a transcription error that reads x as
+// degrees and y as a saturation; the module does not carry it over
+// (notes/parity/by_design.md BD-Matter-ColorControl-XYToHS).
 func (s *ColorControlServer) switchColorMode(st *colorState, oldMode, newMode ColorMode) {
 	if oldMode == newMode {
 		return
@@ -74,7 +74,7 @@ func (s *ColorControlServer) switchColorMode(st *colorState, oldMode, newMode Co
 	case ColorModeXY:
 		switch newMode {
 		case ColorModeHueSaturation:
-			h, sat := HSVToXY(x, y) // sic, see above
+			h, sat := XYToHSV(x, y) // matter.js: hsvToXy, see above
 			st.hue, st.saturation = hueAttribute(h), saturationAttribute(sat)
 		case ColorModeColorTemperature:
 			s.setMireds(st, XYToMireds(x, y))

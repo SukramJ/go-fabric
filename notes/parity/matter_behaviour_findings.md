@@ -543,6 +543,12 @@ table, and this list, when the snapshot is corrected.
   writes it, and TC_DeviceConformance does not judge struct fields, so no
   certification family is affected. Upstream candidate (matter.js): gate
   the override `until: "1.6.1"`.
+- **ColorControl XY → hue/saturation converts with the wrong function in
+  matter.js.** `ColorControlServer.ts:1493` (`switchColorMode`) calls
+  `hsvToXy(this.x, this.y)` where `xyToHsv` is meant; the module converts
+  correctly and records the departure as `BD-Matter-ColorControl-XYToHS`.
+  Not a data-model difference, listed here as an upstream candidate
+  (matter.js): call `xyToHsv`.
 - **semtag.Label is O, the specification says "MfgCode != null, O".**
   matter.js `support/models/src/local/semtag.ts` relaxes it ("TODO we do not
   support MfgCode != null"). go-fabric serves no Descriptor TagList, so

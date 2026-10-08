@@ -422,6 +422,23 @@ Pinned by `TestSceneRecall` (`cluster/light`) and
 `TestScenesRecallThroughTheServersApplier` (`cluster/core`). Retire each
 bullet when matter.js changes the corresponding line.
 
+### BD-Matter-ColorControl-XYToHS — a switch from x/y to hue and saturation converts with xyToHsv
+
+matter.js ColorControlServer `switchColorMode`
+(`packages/node/src/behaviors/color-control/ColorControlServer.ts:1493` at
+the schema pin, unchanged at matter.js HEAD) converts the XY colour into
+hue and saturation with `hsvToXy(this.x, this.y)` — the inverse function,
+handed x as a hue in degrees and y as a saturation — although `xyToHsv`
+exists next to it (`ColorConversionUtils.ts:30`). Every switch from the XY
+mode to hue and saturation therefore starts from a hue near 0 and a
+saturation of about y × 254, and a controller sees those values reported.
+It is a transcription error, not a behaviour an ecosystem was found to
+need, so `light.ColorControlServer` converts with `XYToHSV` (the port of
+`xyToHsv`); every other conversion follows matter.js. Pinned by
+`TestXYToHueSaturationConvertsTheColour` (`cluster/light`), which fails on
+matter.js's call. Upstream matter.js issue candidate: call `xyToHsv`
+there. Retire this entry when matter.js does.
+
 ### BD-Matter-ColorControl-LegacyDecoders — four ColorControl requests keep their hand-written decoders
 
 matter.js decodes every request against its schema and answers a missing

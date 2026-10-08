@@ -495,12 +495,12 @@ func TestColorModeSwitchConverts(t *testing.T) {
 	if c := sink.last(); c.Mode != light.ColorModeXY {
 		t.Errorf("the ColorWriter's last colour is in mode %d, want XY", c.Mode)
 	}
-	// XY → HS, as matter.js has it: hsvToXy with x and y.
+	// XY → HS through xyToHsv (BD-Matter-ColorControl-XYToHS).
 	x, y := read(t, srv, ccdef.AttrCurrentX), read(t, srv, ccdef.AttrCurrentY)
 	invoke(t, srv, ccdef.CmdMoveHue, ccdef.MoveHueRequest{MoveMode: ccdef.MoveModeStop})
-	ch, cs := light.HSVToXY(float64(x)/65536, float64(y)/65536)
+	ch, cs := light.XYToHSV(float64(x)/65536, float64(y)/65536)
 	if read(t, srv, ccdef.AttrCurrentHue) != uint64(jsRound(ch*254/360)) || read(t, srv, ccdef.AttrCurrentSaturation) != uint64(jsRound(cs*254)) {
-		t.Error("XY → HS does not follow matter.js's switchColorMode")
+		t.Error("XY → HS does not convert with xyToHsv")
 	}
 }
 
@@ -610,4 +610,26 @@ func jsRound(v float64) float64 {
 		return -jsRound(-v)
 	}
 	return float64(int64(v + 0.5))
+}
+
+// TestXYToHueSaturationConvertsTheColour pins the XY → hue and saturation
+// switch on one known colour: the x/y of full green (hue 120°, saturation
+// 1) switches back to CurrentHue 85 (120° of 254) and a saturation near
+// 254. matter.js's hsvToXy(x, y) (ColorControlServer.ts:1493) would give a
+// hue near 0 — x read as degrees (BD-Matter-ColorControl-XYToHS).
+func TestXYToHueSaturationConvertsTheColour(t *testing.T) {
+	t.Parallel()
+	gx, gy := light.HSVToXY(120, 1)
+	mode := light.ColorModeXY
+	srv := light.NewColorControlServer(light.ColorControlServerConfig{
+		Features: allColorFeatures, InitialColorMode: &mode,
+		InitialX: uint16(jsRound(gx * 65536)), InitialY: uint16(jsRound(gy * 65536)),
+	})
+	invoke(t, srv, ccdef.CmdMoveHue, ccdef.MoveHueRequest{MoveMode: ccdef.MoveModeStop})
+	if h := read(t, srv, ccdef.AttrCurrentHue); h < 84 || h > 86 {
+		t.Errorf("green x/y switched to CurrentHue %d, want 85", h)
+	}
+	if s := read(t, srv, ccdef.AttrCurrentSaturation); s < 245 {
+		t.Errorf("green x/y switched to CurrentSaturation %d, want about 254", s)
+	}
 }
