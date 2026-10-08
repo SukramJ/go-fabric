@@ -94,7 +94,8 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.E
 		// These four keep their hand-written decoders and cluster/wire
 		// structs, the shape host ColorControl servers were written
 		// against; the other ColorControl commands decode through the
-		// generated definition below (cluster/spec/colorcontrol).
+		// generated definition below (cluster/spec/colorcontrol) —
+		// notes/parity/by_design.md BD-Matter-ColorControl-LegacyDecoders.
 		switch path.Command {
 		case wire.ColorCtrlCmdMoveToHue:
 			return decodeMoveToHueFields(dec)

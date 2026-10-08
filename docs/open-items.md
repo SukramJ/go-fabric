@@ -30,7 +30,6 @@ last family run and held by `TestCertifiabilityDocument`.
 
 | Item | Where | What |
 | --- | --- | --- |
-| **ExtendedColorLight is not servable** | findings register, "ColorControl serves CT only" | `cluster/light.ColorControlServer` serves colour temperature only; the device type requires XY (CurrentX / CurrentY, the XY and hue/saturation commands and their transitions, as matter.js `ColorControlServer` has them). Affects every colour light a host wants to expose. The transition engine ([ADR 0014](./adr/0014-transitions-optional-per-endpoint.md)) already handles hue wrap-around. |
 | **F-SWEEP-1 — the node's own commissioning window** | findings register | matter.js owns a node-opened window (48 h uncommissioned, 15 min once commissioned) that CommissioningComplete closes and an administrator's window replaces instead of answering Busy. go-fabric wires only the ArmFailSafe guard. |
 | **F-SWEEP-2 — TotalOperationalHours in whole hours** | findings register | matter.js persists a millisecond counter; go-fabric persists whole hours and loses up to an hour per restart. |
 | **F-COMP-1 — a bridged endpoint cannot carry parts** | findings register, `docs/certifiability.md` | The SmokeCoAlarm device type requires a PowerSource component endpoint; matter.js composes it as a child part. The reference daemon's smoke alarm logs a `matter.devicetype.violation` warning at Start for this. |
@@ -52,7 +51,7 @@ last family run and held by `TestCertifiabilityDocument`.
 | Item | Where | What |
 | --- | --- | --- |
 | **Two cross-check differences where CHIP is right** | [`docs/chip-datamodel-crosscheck.md`](./chip-datamodel-crosscheck.md), class (ii) | `GroupKeySetStruct.GroupKeyMulticastPolicy` is optional in the snapshot through a stale matter.js override (Matter 1.6.1 deprecates it) — an upstream matter.js issue candidate; `semtag.Label` is relaxed on purpose in matter.js and becomes relevant once a TagList is served. No shipped behaviour depends on either. |
-| **Servers not yet on the generated definitions** | [ADR 0013](./adr/0013-generated-cluster-definitions.md), "Migration list" | `cluster/pump`, `cluster/modebase` and `cluster/filter` are built on `cluster/spec`; the rest are hand-written. The ADR lists each server with what blocks it. |
+| **Servers not yet on the generated definitions** | [ADR 0013](./adr/0013-generated-cluster-definitions.md), "Migration list" | `cluster/pump`, `cluster/modebase`, `cluster/filter` and `cluster/light` (ColorControl) are built on `cluster/spec`; the rest are hand-written. The ADR lists each server with what blocks it. |
 | **Hand-written schema tables** | [ADR 0013](./adr/0013-generated-cluster-definitions.md) | `schema/writable.go`, `timed.go`, `invoke_privilege.go` could be generated; replacing them changes behaviour for every cluster at once and is deferred. |
 | **Bridge path still on hand-written wire types** | [ADR 0013](./adr/0013-generated-cluster-definitions.md) | The migrated servers decode and encode through `cluster/wire` and the bridge's hand-written codecs; moving them onto the generated codecs is per cluster. |
 
@@ -73,8 +72,6 @@ records what those ecosystems demanded before.
 - **ADR 0012** (ScenesManagement server) and the real Groups server replaced
   the stubs that [ADR 0004](./adr/0004-groups-cluster-stays-stub.md) kept;
   0004 is superseded and stays for the record.
-- The `cluster/light` package doc no longer claims ExtendedColorLight; the
-  claim returns with the XY work above.
 - Deprecated in `v0.2.0`, removable in `v0.3.0`: `wire.Groups`,
   `im.StatusUnreportableAttr`, `im.StatusNoUpstreamSubscription`, the
   `PersistentSubscription*` store API.

@@ -388,6 +388,56 @@ Null and zero transition times take the instant path either way, matching
 `moveToLevelLogic`'s truthy-only rate derivation and the `changePerS`
 contract "0 or nullish means transition instantly".
 
+### BD-Matter-ColorControl-SceneRecall — a recalled colour is applied in every mode the light has
+
+matter.js ColorControlServer `#applySceneValues`
+(`packages/node/src/behaviors/color-control/ColorControlServer.ts`) recalls a
+scene's colour, and `light.ColorControlServer.MatterApplySceneValues` ports
+it — the colour loop restarted through ColorLoopSet when the scene has it
+active, otherwise the scene's EnhancedColorMode choosing which values move.
+Three departures, each where matter.js would leave a recalled colour
+unapplied:
+
+- **The scene's EnhancedColorMode counts on every light.** matter.js reads
+  it only with the EHUE feature and otherwise recalls in the hue and
+  saturation mode, so a light without EHUE — every ColorTemperatureLight,
+  every XY-and-CT ExtendedColorLight — never recalls its colour
+  temperature or x/y. The module honours the stored mode wherever the
+  server supports it; a CT-only light also recalls a scene stored without
+  a mode as a colour temperature, as this module did before.
+- **Every mode's transition is in tenths of a second.** ScenesManagement
+  hands the apply function milliseconds; matter.js divides by 100 for the
+  saturation only and passes milliseconds to the XY, CT and enhanced-hue
+  logic, which reads tenths — a one-second scene transition would take a
+  hundred. LevelControl divides, and so does the module for every mode.
+- **The light switches to the scene's mode.** matter.js calls the `*Logic`
+  methods, which move values without touching ColorMode; the module
+  switches the mode first (`setEnhancedColorMode`), as the commands do, so
+  ColorMode never contradicts the colour shown. A hue-and-saturation scene
+  also moves the hue from its EnhancedCurrentHue (the hue attribute with
+  the "S" quality), as the module recalled it before; matter.js moves the
+  saturation alone.
+
+Pinned by `TestSceneRecall` (`cluster/light`) and
+`TestScenesRecallThroughTheServersApplier` (`cluster/core`). Retire each
+bullet when matter.js changes the corresponding line.
+
+### BD-Matter-ColorControl-LegacyDecoders — four ColorControl requests keep their hand-written decoders
+
+matter.js decodes every request against its schema and answers a missing
+mandatory field with INVALID_COMMAND (`CommandInvokeResponse.ts`,
+`ValidationMandatoryFieldMissingError`). The module decodes every
+ColorControl request through the generated definition
+(`cluster/spec/colorcontrol`, ADR 0013) — except MoveToHue,
+MoveToSaturation, MoveToHueAndSaturation and MoveToColorTemperature, which
+keep the bridge's hand-written decoders (`bridge/fields_reader.go`) and
+arrive as the `cluster/wire` structs host ColorControl servers were
+written against. Those four check each field's width (CONSTRAINT_ERROR) and
+`light.ColorControlServer` checks its constraint, but a missing field
+reads as 0 instead of failing the command. Retire when the four move to
+the generated decoders in a release that announces the changed field type
+to host servers.
+
 ### BD-Matter-BridgedVendorNameFallback — a bridged endpoint without a vendor serves the node's
 
 matter.js treats BridgedDeviceBasicInformation `vendorName` as optional on a
