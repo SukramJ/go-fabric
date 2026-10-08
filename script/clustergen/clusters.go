@@ -21,4 +21,6 @@ var committed = []string{
 	"ActivatedCarbonFilterMonitoring",
 	// cluster/light
 	"ColorControl",
+	// cluster/onoff
+	"OnOff",
 }

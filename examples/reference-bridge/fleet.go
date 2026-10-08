@@ -15,6 +15,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
@@ -619,9 +620,19 @@ func (l *lightingState) stopDelayedOff() {
 // onWithTimedOffFields pulls OnWithTimedOff's three fields out of the
 // bridge-decoded payload, tags per on-off.element.ts:52-55: [0]
 // OnOffControl (bitmap8), [1] OnTime (uint16), [2] OffWaitTime (uint16).
-// The bridge hands command fields over as a tag-keyed map; an absent field
-// reads as 0.
+// The bridge decodes the payload through the generated OnOff definition
+// into an [onoffdef.OnWithTimedOffRequest], already checked against
+// matter.js's request schema; an in-process caller may still hand over a
+// tag-keyed map, in which an absent field reads as 0.
 func onWithTimedOffFields(fields any) (control uint8, onTime, offWaitTime uint16, err error) {
+	switch r := fields.(type) {
+	case onoffdef.OnWithTimedOffRequest:
+		return uint8(r.OnOffControl), r.OnTime, r.OffWaitTime, nil
+	case *onoffdef.OnWithTimedOffRequest:
+		if r != nil {
+			return uint8(r.OnOffControl), r.OnTime, r.OffWaitTime, nil
+		}
+	}
 	m, ok := fields.(map[uint8]any)
 	if !ok {
 		if fields == nil {
