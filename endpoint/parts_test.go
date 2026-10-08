@@ -94,8 +94,9 @@ func TestSpecPartsComposeAChildEndpoint(t *testing.T) {
 	}
 
 	// A wildcard read reaches the part like any endpoint.
-	var wild []uint16
-	for _, ep := range NewTopologyDispatcher(topo).resolveEndpoints(im.ConcreteAttributePath{}) {
+	resolved := NewTopologyDispatcher(topo).resolveEndpoints(im.ConcreteAttributePath{})
+	wild := make([]uint16, 0, len(resolved))
+	for _, ep := range resolved {
 		wild = append(wild, ep.ID)
 	}
 	if !slices.Contains(wild, part.ID) {
