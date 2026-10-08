@@ -157,6 +157,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/onoff", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/modeselect", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/operationalstate", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol", min: 100},

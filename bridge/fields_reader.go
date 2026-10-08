@@ -90,6 +90,13 @@ func commandFieldsReader(path im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.E
 		case 0x00, 0x04: // MoveToLevel, MoveToLevelWithOnOff
 			return decodeMoveToLevelRequest(dec)
 		}
+		// Move, Step, Stop and their WithOnOff forms stay on the lenient
+		// tag map, ahead of the generated LevelControl definition: Google
+		// Home omits the mandatory-but-nullable TransitionTime of Step
+		// entirely, which the generated decoder answers INVALID_COMMAND
+		// (notes/parity/by_design.md, the permissive command-field
+		// decoding; BD-Matter-LevelControl-LenientDecoders).
+		return decodeGenericTagMap(dec)
 	case 0x0300: // ColorControl
 		// These four keep their hand-written decoders and cluster/wire
 		// structs, the shape host ColorControl servers were written
