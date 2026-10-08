@@ -10,6 +10,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/im"
 )
 
 // TestSpecPartsComposeAChildEndpoint pins the composition of matter.js
@@ -90,6 +91,15 @@ func TestSpecPartsComposeAChildEndpoint(t *testing.T) {
 		if v.Endpoint == part.ID {
 			t.Errorf("part violation: %s", v)
 		}
+	}
+
+	// A wildcard read reaches the part like any endpoint.
+	var wild []uint16
+	for _, ep := range NewTopologyDispatcher(topo).resolveEndpoints(im.ConcreteAttributePath{}) {
+		wild = append(wild, ep.ID)
+	}
+	if !slices.Contains(wild, part.ID) {
+		t.Errorf("wildcard endpoints %v leave out the part %d", wild, part.ID)
 	}
 
 	// Numbers persist across reassembly.

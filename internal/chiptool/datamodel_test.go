@@ -455,8 +455,10 @@ func checkDescriptor(t *testing.T, f *fixture, ep *endpointInfo, wild map[uint32
 		}
 	}
 
-	// The three-tier shape: root and aggregator are full-family, bridged
-	// endpoints are leaves.
+	// The three-tier shape: root and aggregator are full-family, a bridged
+	// endpoint lists its parts (Spec.Parts, matter.js Endpoint parts), and
+	// a part is a component — no BridgedNode, no
+	// BridgedDeviceBasicInformation.
 	var others []uint16
 	for _, id := range f.sortedEndpoints() {
 		if id != 0 {
@@ -481,6 +483,15 @@ func checkDescriptor(t *testing.T, f *fixture, ep *endpointInfo, wild map[uint32
 		if parts := sortedU16(ep.parts); !slices.Equal(parts, bridged) {
 			t.Errorf("aggregator PartsList %v, want every bridged endpoint %v", parts, bridged)
 		}
+	case componentOf(f, ep.id) != 0:
+		if hasDeviceType(ep, deviceTypeBridgedNode) || ep.has(clusterBridgedBasicInfo) {
+			t.Errorf("part of endpoint %d presents itself as a bridged node: %v", componentOf(f, ep.id), ep.deviceTypes)
+		}
+		for _, p := range ep.parts {
+			if componentOf(f, p) != ep.id {
+				t.Errorf("PartsList names %d, which is no part of this endpoint", p)
+			}
+		}
 	default:
 		if !hasDeviceType(ep, deviceTypeBridgedNode) {
 			t.Errorf("bridged endpoint does not advertise BridgedNode (0x0013): %v", ep.deviceTypes)
@@ -488,10 +499,27 @@ func checkDescriptor(t *testing.T, f *fixture, ep *endpointInfo, wild map[uint32
 		if !ep.has(clusterBridgedBasicInfo) {
 			t.Errorf("bridged endpoint does not serve BridgedDeviceBasicInformation")
 		}
-		if len(ep.parts) != 0 {
-			t.Errorf("bridged endpoint PartsList %v, want empty (a leaf)", ep.parts)
+		for _, p := range ep.parts {
+			if componentOf(f, p) != ep.id {
+				t.Errorf("bridged endpoint PartsList names %d, which is no part of it", p)
+			}
 		}
 	}
+}
+
+// componentOf is the bridged endpoint (or part) whose PartsList names id,
+// 0 when none does: the root and the aggregator list their full family and
+// are no component's parent.
+func componentOf(f *fixture, id uint16) uint16 {
+	for _, other := range f.topology {
+		if other.id == 0 || other.id == id || hasDeviceType(other, deviceTypeAggregator) {
+			continue
+		}
+		if slices.Contains(other.parts, id) {
+			return other.id
+		}
+	}
+	return 0
 }
 
 // checkCluster holds one cluster instance against its own global lists and

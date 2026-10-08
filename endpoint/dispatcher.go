@@ -456,8 +456,9 @@ func (d *TopologyDispatcher) resolveEndpoints(path im.ConcreteAttributePath) []*
 	// `_attributeValueDictionaryForAttributePath` log "PartsList absent
 	// from cache" and Apple aborts the pair with HAPErrorDomain Code 14
 	// ("Could not construct any of the services of node ...").
-	// `Topology.Bridged()` excludes both root and aggregator, so we
-	// surface the aggregator explicitly here.
+	// Every other endpoint follows in topology order — the parts of a
+	// bridged endpoint ([Spec.Parts]) included, which `Topology.Bridged()`
+	// leaves out.
 	out := make([]*Endpoint, 0, len(d.topology.Endpoints))
 	if root := d.topology.FindByID(0); root != nil {
 		out = append(out, root)
@@ -465,7 +466,11 @@ func (d *TopologyDispatcher) resolveEndpoints(path im.ConcreteAttributePath) []*
 	if agg := d.topology.FindByID(1); agg != nil {
 		out = append(out, agg)
 	}
-	out = append(out, d.topology.Bridged()...)
+	for _, ep := range d.topology.Endpoints {
+		if ep != nil && !ep.IsRoot() && !ep.IsAggregator() {
+			out = append(out, ep)
+		}
+	}
 	return out
 }
 
