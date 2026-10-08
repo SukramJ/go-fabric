@@ -120,6 +120,7 @@ const startUpOnBridged = "the case reboots the DUT and expects the light's Start
 const (
 	dtOnOffLight      = 0x0100
 	dtColorTempLight  = 0x010C
+	dtExtColorLight   = 0x010D
 	dtSpeaker         = 0x0022
 	dtTempSensor      = 0x0302
 	dtWaterValve      = 0x0042
@@ -308,7 +309,13 @@ var chipFamilies = []family{
 		},
 	},
 	{
-		name: "CC", deviceType: dtColorTempLight,
+		// The extended colour light serves every ColorControl feature (XY,
+		// CT, HS, EHUE, CL), as matter.js's own CHIP test endpoint does
+		// (support/chip-testing/src/devices/ExtendedColorLightEndpoint.ts),
+		// so every CC case runs against the features it gates on; the
+		// colour-temperature light keeps CT-only ColorControl under the
+		// LVL family's coupling cases and TC-S-2.2 / 2.4.
+		name: "CC", deviceType: dtExtColorLight,
 		exclude: map[string]gap{
 			// matter.js test/app-cc/CC.1.test.ts excludes the same three.
 			"9.1": {classHarness, "TC-CC-9.1 asserts transition results more exactly than a conforming device must meet; matter.js excludes it (test/app-cc/CC.1.test.ts)", false},

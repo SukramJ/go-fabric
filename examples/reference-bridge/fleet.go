@@ -1207,6 +1207,9 @@ func newDemoSpeaker(name string, level uint8) *dimmer {
 
 // MatterDeviceType implements [contract.EndpointSource].
 func (s *dimmer) MatterDeviceType() uint16 {
+	if s.lighting != nil && s.lighting.extended {
+		return deviceTypeExtendedColorLight
+	}
 	if s.lighting != nil {
 		return deviceTypeColorTemperatureLight
 	}
@@ -1458,6 +1461,7 @@ type fleet struct {
 	button     *demoButton
 	purifier   *demoAirPurifier
 	garage     *demoGarage
+	colorLight *dimmer
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1498,6 +1502,7 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		button:      newDemoButton("Wall Button"),
 		purifier:    newDemoAirPurifier("Air Purifier"),
 		garage:      newDemoGarage("Garage Door"),
+		colorLight:  newDemoColorLight("Color Bulb"),
 		assembler:   asm,
 	}, nil
 }
@@ -1623,5 +1628,6 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		sensor("button", f.button.name, f.button),
 		spec("purifier", f.purifier.name, f.purifier.MatterDeviceType(), f.purifier),
 		spec("garage", f.garage.name, f.garage.MatterDeviceType(), f.garage),
+		spec("colorlight", f.colorLight.name, f.colorLight.MatterDeviceType(), f.colorLight),
 	}
 }

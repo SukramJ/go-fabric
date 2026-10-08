@@ -126,7 +126,7 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 
 	set := &picsSet{byEP: map[uint16]string{}, values: map[uint16]map[string]string{}, honest: map[uint16]string{}, epOf: map[uint32]uint16{}}
 	for _, dt := range []uint32{
-		dtOnOffLight, dtColorTempLight, dtSpeaker, dtTempSensor, dtWaterValve, dtModeSelect, dtFan,
+		dtOnOffLight, dtColorTempLight, dtExtColorLight, dtSpeaker, dtTempSensor, dtWaterValve, dtModeSelect, dtFan,
 		dtSmokeCOAlarm, dtPump, dtFlowSensor, dtLaundryWasher, dtRVC, dtThermostat, dtWindowCovering,
 		dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch, dtAirPurifier, dtClosure,
 	} {
