@@ -84,6 +84,13 @@ the same `ColorTemperatureWriter` as before.
   report; before, it waited out a second, and a value read at sending time
   — RemainingTime — went out up to 12 tenths short (TC-CC-2.2). A host that
   wants the old floor sets `MinIntervalFloorSeconds: 1`.
+- **An InvokeRequest's DelayReportData now defers subscription reports**:
+  every subscription that selects an endpoint the commands target holds its
+  next report by DelayMinMs plus a jitter below DelayJitterWindowMs, as
+  matter.js does with its `delay-report-data` forward feature on
+  (`BD-Matter-DelayReportData`; `subscription.Manager.DeferReports`,
+  `Subscription.DeferReports`). TC-IDM-1.5 had passed only through the 1 s
+  floor above.
 - `light.ColorControlClusterRevision` is the generated definition's
   `colorcontrol.Revision` (still 9).
 

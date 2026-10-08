@@ -68,8 +68,11 @@ type Subscription struct {
 	// priming is set while the subscription's priming report and
 	// SubscribeResponse are still going out ([SubscribeArgs.Priming]);
 	// the engine reports nothing for it until [Subscription.EndPriming].
-	priming       bool
-	lastReport    time.Time
+	priming    bool
+	lastReport time.Time
+	// deferredUntil holds every report but a critical event until then
+	// (DelayReportData, [Subscription.DeferReports]).
+	deferredUntil time.Time
 	pendingDirty  map[im.ConcreteAttributePath]struct{}
 	pendingEvents []pendingEvent
 	closed        bool
@@ -275,6 +278,9 @@ func (s *Subscription) drainDirtyIfElapsed(now time.Time) []im.ConcreteAttribute
 	if !s.lastReport.IsZero() && now.Sub(s.lastReport) < time.Duration(s.MinIntervalFloor)*time.Second {
 		return nil
 	}
+	if now.Before(s.deferredUntil) {
+		return nil
+	}
 	out := make([]im.ConcreteAttributePath, 0, len(s.pendingDirty))
 	for p := range s.pendingDirty {
 		out = append(out, p)
@@ -317,8 +323,52 @@ func (s *Subscription) drainEventsIfElapsed(now time.Time) []pendingEvent {
 	if !hasCritical && !s.lastReport.IsZero() && now.Sub(s.lastReport) < time.Duration(s.MinIntervalFloor)*time.Second {
 		return nil
 	}
+	if !hasCritical && now.Before(s.deferredUntil) {
+		return nil
+	}
 	out := s.pendingEvents
 	s.pendingEvents = nil
 	s.lastReport = now
 	return out
+}
+
+// deferSendSlack is how far before its send interval a deferral ends at
+// the latest: matter.js ServerSubscription SEND_DELAY.
+const deferSendSlack = 50 * time.Millisecond
+
+// DeferReports holds the subscription's next report off by delay, once:
+// matter.js ServerSubscription.deferReports, which an InvokeRequest's
+// DelayReportData triggers. A deferral that is still running is only ever
+// shortened, and none holds a report past the send interval after the
+// last report (the keep-alive due then).
+func (s *Subscription) DeferReports(now time.Time, delay time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	until := now.Add(delay)
+	if !s.lastReport.IsZero() {
+		if due := s.lastReport.Add(s.sendIntervalLocked() - deferSendSlack); due.Before(until) {
+			until = due
+		}
+	}
+	if s.deferredUntil.After(now) && s.deferredUntil.Before(until) {
+		until = s.deferredUntil
+	}
+	s.deferredUntil = until
+}
+
+// selectsAnyEndpoint reports whether a path of the subscription selects
+// one of endpoints, or every endpoint (matter.js
+// ServerSubscription.selectsAnyEndpoint).
+func (s *Subscription) selectsAnyEndpoint(endpoints map[uint16]bool) bool {
+	for _, p := range s.AttributePaths {
+		if !p.HasEndpoint || endpoints[p.Endpoint] {
+			return true
+		}
+	}
+	for _, p := range s.EventPaths {
+		if !p.HasEndpoint || endpoints[p.Endpoint] {
+			return true
+		}
+	}
+	return false
 }

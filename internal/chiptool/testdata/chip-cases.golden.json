@@ -1029,13 +1029,13 @@
     },
     "SC/5.1": {
       "tests": 1,
-      "steps": 74,
-      "stepsSkipped": 42
+      "steps": 98,
+      "stepsSkipped": 56
     },
     "SC/5.2": {
       "tests": 1,
-      "steps": 131,
-      "stepsSkipped": 162
+      "steps": 174,
+      "stepsSkipped": 216
     },
     "SC/7.1": {
       "tests": 1,

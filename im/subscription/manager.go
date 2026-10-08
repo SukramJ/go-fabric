@@ -584,6 +584,23 @@ func (m *Manager) OnAttributeChanged(path im.ConcreteAttributePath) {
 	}
 }
 
+// DeferReports holds off the next report of every subscription, of any
+// session or fabric, that selects one of endpoints, by delay: matter.js
+// InteractionServer #deferReports for an InvokeRequest's DelayReportData
+// (DelayMinMs plus the jitter the caller picked), run before the invoke
+// dispatches, whether or not its commands succeed.
+func (m *Manager) DeferReports(endpoints map[uint16]bool, delay time.Duration) {
+	if len(endpoints) == 0 {
+		return
+	}
+	now := time.Now()
+	for _, sub := range m.snapshot() {
+		if sub.selectsAnyEndpoint(endpoints) {
+			sub.DeferReports(now, delay)
+		}
+	}
+}
+
 // SubscribeArgs is the input to [Manager.Subscribe].
 type SubscribeArgs struct {
 	FabricIndex        uint8

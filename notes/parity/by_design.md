@@ -1518,21 +1518,30 @@ keeping insertion order would mean persisting an order column, as for
 
 ---
 
-### BD-Matter-DelayReportData — DelayReportData is decoded and validated, not acted on
+### BD-Matter-DelayReportData — DelayReportData defers reports without matter.js's forward-feature gate
 
 matter.js decodes an InvokeRequest's DelayReportData (tag 3,
 `TlvInvokeRequest.ts`, 67be3a83 #4569) and refuses a malformed one; the
-deferral it asks for — holding back the next report of the subscriptions on
-the endpoints the commands target (`InteractionServer #deferReports`,
+deferral it asks for — holding back the next report of every subscription
+that selects an endpoint the commands dispatch to by DelayMinMs plus a
+random jitter below DelayJitterWindowMs (`InteractionServer #deferReports`,
 `ServerSubscription.deferReports`) — runs only behind the
-`delay-report-data` forward feature, off at the schema pin
-(`Specification.ENABLE_FORWARD_MATTER_FEATURES`). go-fabric decodes and
-validates the field the same way (`im.UnmarshalInvokeRequestTLV`,
-`InvokeRequest.DelayReportData`: a wrong type InvalidAction, a value above
-uint16 ConstraintError) and does not defer anything, which is what matter.js
-does with the feature off. Retires when a pin bump turns the feature on
-upstream: port the deferral then. Pinned by
-`TestParityMatterJS_InvokeRequestDelayReportData`.
+`delay-report-data` forward feature, off by default at the schema pin
+(`Specification.ENABLE_FORWARD_MATTER_FEATURES`) and switched on by
+matter.js's own CHIP test support for TC-IDM-1.5
+(`support/chip-testing/test/core/IDM.test.ts`). go-fabric decodes and
+validates the field the same way (`im.UnmarshalInvokeRequestTLV`: a wrong
+type InvalidAction, a value above uint16 ConstraintError) and always
+defers: `Bridge.deferReportsFor` before dispatch, `Manager.DeferReports` /
+`Subscription.DeferReports` with matter.js's rules (a running deferral only
+shortened, none past the send interval less 50 ms, a critical event not
+held). The module has no forward-feature switch, and a controller that
+sends the field asks for the deferral. TC-IDM-1.5 passed before only
+because every subscription's floor was lifted to 1 s, which the module no
+longer does. Pinned by `TestParityMatterJS_InvokeRequestDelayReportData`,
+`TestDeferReports` (`im/subscription`, matter.js DelayReportDataTest.ts)
+and `TestInvokeDelayReportDataDefersSubscriptions` (`bridge`). Retires
+when matter.js enables the feature by default.
 
 ---
 

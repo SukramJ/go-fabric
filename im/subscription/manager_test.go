@@ -1786,3 +1786,101 @@ func TestZeroFloorReportsAChangeRightAfterAReport(t *testing.T) {
 	held.OnAttributeChanged(p)
 	held.Tick(context.Background(), time.Now().Add(250*time.Millisecond))
 }
+
+// TestDeferReports ports matter.js packages/node/test/node/DelayReportDataTest.ts:
+// a DelayReportData holds the next report by its delay; a running
+// deferral is only shortened; none outlasts the send interval; a
+// subscription that selects none of the endpoints is not held; a
+// critical event still goes out (urgent events bypass the hold, as they
+// bypass the floor).
+func TestDeferReports(t *testing.T) {
+	t.Parallel()
+	p := defaultArgs().AttributePaths[0]
+
+	run := func(name string, defer1 func(sub *subscription.Subscription, start time.Time), want time.Duration) {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var reports []time.Duration
+			var start time.Time
+			var mu sync.Mutex
+			var now time.Duration
+			m := newManager(subscription.Config{}, func(context.Context, *subscription.Subscription, []im.ConcreteAttributePath) {
+				mu.Lock()
+				reports = append(reports, now)
+				mu.Unlock()
+			})
+			args := defaultArgs()
+			args.MinIntervalFloor = 0
+			args.MaxIntervalCeiling = 10
+			sub, err := m.Subscribe(args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			start = time.Now()
+			sub.TouchLastReport(start)
+			defer1(sub, start)
+			m.OnAttributeChanged(p)
+			for d := time.Duration(0); d <= 10*time.Second; d += 50 * time.Millisecond {
+				mu.Lock()
+				now = d
+				mu.Unlock()
+				m.Tick(context.Background(), start.Add(d))
+				mu.Lock()
+				n := len(reports)
+				mu.Unlock()
+				if n > 0 {
+					break
+				}
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if len(reports) == 0 || reports[0] != want {
+				t.Errorf("first report at %v, want %v", reports, want)
+			}
+		})
+	}
+	run("defers by DelayMinMs", func(sub *subscription.Subscription, start time.Time) {
+		sub.DeferReports(start, time.Second)
+	}, time.Second)
+	run("keeps a deferral that ends earlier", func(sub *subscription.Subscription, start time.Time) {
+		sub.DeferReports(start, 2*time.Second)
+		sub.DeferReports(start.Add(500*time.Millisecond), 5*time.Second)
+	}, 2*time.Second)
+	run("shortens a deferral that ends later", func(sub *subscription.Subscription, start time.Time) {
+		sub.DeferReports(start, 5*time.Second)
+		sub.DeferReports(start.Add(time.Second), time.Second)
+	}, 2*time.Second)
+	run("never past the send interval", func(sub *subscription.Subscription, start time.Time) {
+		sub.DeferReports(start, time.Minute)
+	}, 8*time.Second-50*time.Millisecond)
+	run("no deferral", func(*subscription.Subscription, time.Time) {}, 0)
+
+	// Manager.DeferReports holds only the subscriptions that select an
+	// endpoint of the invoke.
+	var mu sync.Mutex
+	n := 0
+	m := newManager(subscription.Config{}, func(context.Context, *subscription.Subscription, []im.ConcreteAttributePath) {
+		mu.Lock()
+		n++
+		mu.Unlock()
+	})
+	args := defaultArgs()
+	args.MinIntervalFloor = 0
+	sub, err := m.Subscribe(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	sub.TouchLastReport(start)
+	m.DeferReports(map[uint16]bool{9: true}, time.Hour) // endpoint 1 is not selected
+	m.OnAttributeChanged(p)
+	m.Tick(context.Background(), start.Add(100*time.Millisecond))
+	m.DeferReports(map[uint16]bool{1: true}, time.Hour)
+	m.OnAttributeChanged(p)
+	m.Tick(context.Background(), start.Add(200*time.Millisecond))
+	mu.Lock()
+	defer mu.Unlock()
+	if n != 1 {
+		t.Errorf("%d reports, want 1: the other endpoint's deferral must not hold it, its own must", n)
+	}
+}
