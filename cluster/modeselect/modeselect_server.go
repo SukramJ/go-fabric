@@ -10,6 +10,13 @@
 // [ModeSource], and this package owns only the Matter projection of
 // them. Nothing here knows what a mode means to the device, which is why
 // ChangeToMode reaches the host rather than mutating state kept locally.
+//
+// The cluster's identity is the generated definition (cluster/spec/
+// modeselect, ADR 0013): ids, revision, the attribute and command lists of
+// the empty feature selection, the write statuses, the ModeOptionStruct /
+// SemanticTagStruct / ChangeToModeRequest types and the decoding of
+// ChangeToMode. The SupportedModes membership rule and the host port stay
+// here.
 package modeselect
 
 import (
@@ -17,16 +24,15 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	msdef "github.com/SukramJ/go-fabric/cluster/spec/modeselect"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // ClusterID is the ModeSelect cluster identifier.
-//
-// Mirrors matter.js packages/model/src/standard/elements/mode-select-cluster.element.ts:19.
-const ClusterID uint32 = 0x0050
+const ClusterID = msdef.ClusterID
 
 // Attribute IDs.
 //
@@ -35,19 +41,19 @@ const ClusterID uint32 = 0x0050
 // are named for completeness; this server implements neither, which is
 // why it advertises an empty FeatureMap — see [featureMap].
 const (
-	AttrDescription       uint32 = 0x0000
-	AttrStandardNamespace uint32 = 0x0001
-	AttrSupportedModes    uint32 = 0x0002
-	AttrCurrentMode       uint32 = 0x0003
-	AttrStartUpMode       uint32 = 0x0004
-	AttrOnMode            uint32 = 0x0005
+	AttrDescription       = msdef.AttrDescription
+	AttrStandardNamespace = msdef.AttrStandardNamespace
+	AttrSupportedModes    = msdef.AttrSupportedModes
+	AttrCurrentMode       = msdef.AttrCurrentMode
+	AttrStartUpMode       = msdef.AttrStartUpMode
+	AttrOnMode            = msdef.AttrOnMode
 )
 
 // CmdChangeToMode is the only command the cluster defines
 // (conformance M).
 //
 // Mirrors matter.js mode-select-cluster.element.ts:51-54.
-const CmdChangeToMode uint32 = 0x00
+const CmdChangeToMode = msdef.CmdChangeToMode
 
 // featureMap is what this server advertises: nothing.
 //
@@ -59,6 +65,12 @@ const CmdChangeToMode uint32 = 0x00
 // OnMode nor StartUpMode, so advertising the bit would promise an
 // attribute that is not there. There is deliberately no knob to set it.
 const featureMap uint32 = 0
+
+// instance is the definition bound to [featureMap] with no optional
+// element declared: the four mandatory attributes and ChangeToMode. The
+// selection is conformant, so New has nothing to refuse; the parity test
+// holds the server against it (spectest.CheckServer).
+var instance, _ = spec.New(msdef.Definition, spec.Options{Features: featureMap})
 
 // DescriptionMaxBytes is the Description constraint "max 64"
 // (matter.js mode-select-cluster.element.ts:25-28). The bound is applied
@@ -111,35 +123,21 @@ const (
 const ChangeToModeFieldNewMode uint8 = 0x00
 
 // SemanticTagStruct is one semantic tag on a mode: a value within a
-// namespace, either a standard namespace (MfgCode absent from the host's
-// point of view) or the vendor's own.
-//
-// Mirrors matter.js mode-select-cluster.element.ts:55-59.
-type SemanticTagStruct struct {
-	// MfgCode is the vendor id owning the namespace (vendor-id → uint16).
-	MfgCode uint16
-	// Value is the tag value within that namespace.
-	Value uint16
-}
+// namespace, either a standard namespace or the vendor's own (MfgCode, a
+// vendor-id). It is the generated struct of mode-select-cluster.element.ts.
+type SemanticTagStruct = msdef.SemanticTagStruct
 
 // ModeOptionStruct is one selectable mode: the label a user picks from,
 // the mode value ChangeToMode carries, and the semantic tags a client
-// can interpret without reading the label.
-//
-// Mirrors matter.js mode-select-cluster.element.ts:61-69. SemanticTags
-// is conformance M, so an option with no tags encodes as an empty list,
-// never as an absent field — the list being empty is what says "this
-// mode is anonymous".
-type ModeOptionStruct struct {
-	Label        string
-	Mode         uint8
-	SemanticTags []SemanticTagStruct
-}
+// can interpret without reading the label. It is the generated struct of
+// mode-select-cluster.element.ts. SemanticTags is conformance M, so an
+// option with no tags encodes as an empty list, never as an absent field —
+// the list being empty is what says "this mode is anonymous".
+type ModeOptionStruct = msdef.ModeOptionStruct
 
-// ChangeToModeRequest is the cluster-native payload of ChangeToMode.
-type ChangeToModeRequest struct {
-	NewMode uint8
-}
+// ChangeToModeRequest is the payload of ChangeToMode, the generated
+// request struct the bridge decodes it into.
+type ChangeToModeRequest = msdef.ChangeToModeRequest
 
 // ModeSource is the narrow host port this server projects.
 //
@@ -244,11 +242,10 @@ func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	})
 }
 
-// Revision returns the cluster revision from the generated matter.js
-// schema snapshot (default 2 at mode-select-cluster.element.ts:20).
+// Revision returns the cluster revision of the generated definition.
 // Reading it rather than restating it is the point: a regeneration moves
 // this value, and a hand-written copy would not follow.
-func Revision() uint16 { return schema.ClusterRevisions[ClusterID] }
+func Revision() uint16 { return msdef.Revision }
 
 // MatterClusterID returns 0x0050 (ModeSelect).
 func (*Server) MatterClusterID() uint32 { return ClusterID }
@@ -272,12 +269,8 @@ func (s *Server) MatterRead(attrID uint32) (value any, ok bool) {
 			return nil, true
 		}
 		return s.readFromSource(attrID)
-	case cluster.AttrGlobalFeatureMap:
-		return featureMap, true
-	case cluster.AttrGlobalClusterRevision:
-		return Revision(), true
 	default:
-		return nil, false
+		return instance.ReadGlobal(attrID)
 	}
 }
 
@@ -318,20 +311,6 @@ func copyModes(in []ModeOptionStruct) []ModeOptionStruct {
 	return out
 }
 
-// unsupportedWriteErr is a typed [im.StatusCodeError] for a write to an
-// attribute this cluster exposes read-only.
-type unsupportedWriteErr struct{ msg string }
-
-func (e unsupportedWriteErr) Error() string                 { return e.msg }
-func (unsupportedWriteErr) MatterStatusCode() im.StatusCode { return im.StatusUnsupportedWrite }
-
-// unsupportedAttributeErr is a typed [im.StatusCodeError] for a write to
-// an attribute this server does not implement at all.
-type unsupportedAttributeErr struct{ msg string }
-
-func (e unsupportedAttributeErr) Error() string                 { return e.msg }
-func (unsupportedAttributeErr) MatterStatusCode() im.StatusCode { return im.StatusUnsupportedAttribute }
-
 // invalidCommandErr is a typed [im.StatusCodeError] for a ChangeToMode
 // naming a mode outside SupportedModes.
 type invalidCommandErr struct{ msg string }
@@ -339,29 +318,18 @@ type invalidCommandErr struct{ msg string }
 func (e invalidCommandErr) Error() string                 { return e.msg }
 func (invalidCommandErr) MatterStatusCode() im.StatusCode { return im.StatusInvalidCommand }
 
-var (
-	_ im.StatusCodeError = unsupportedWriteErr{}
-	_ im.StatusCodeError = unsupportedAttributeErr{}
-	_ im.StatusCodeError = invalidCommandErr{}
-)
+var _ im.StatusCodeError = invalidCommandErr{}
 
 // MatterWrite reports that nothing on this server is writable.
 //
-// The four implemented attributes all carry access "R V"
-// (mode-select-cluster.element.ts:25-42); the two writable ones,
-// StartUpMode and OnMode ("RW VO", :43-50), belong to surfaces this
-// server does not implement, so a write to them is UnsupportedAttribute
-// rather than UnsupportedWrite — the attribute is absent, not
-// read-only.
-func (*Server) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	switch attrID {
-	case AttrDescription, AttrStandardNamespace, AttrSupportedModes, AttrCurrentMode:
-		return unsupportedWriteErr{fmt.Sprintf("modeselect: attribute 0x%04X is read-only", attrID)}
-	default:
-		return unsupportedAttributeErr{
-			fmt.Sprintf("modeselect: attribute 0x%04X is not implemented by this server", attrID),
-		}
-	}
+// The four implemented attributes all carry access "R V", so a write to
+// one is UNSUPPORTED_WRITE; the two writable ones, StartUpMode and OnMode
+// ("RW VO"), belong to surfaces this server does not implement, so a write
+// to them is UNSUPPORTED_ATTRIBUTE — the attribute is absent, not
+// read-only. The definition answers both.
+func (*Server) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := instance.ValidateWrite(attrID, value, nil)
+	return err
 }
 
 // MatterInvoke handles ChangeToMode.
@@ -413,11 +381,11 @@ func (s *Server) isSupported(mode uint8) bool {
 	return false
 }
 
-// changeToModeRequest normalises the decoded command payload the bridge
-// hands over. The bridge has no typed decoder for this cluster, so the
-// real wire path arrives as the generic tag map its fields reader
-// salvages; the typed shapes are accepted so a host or a test can invoke
-// the server directly.
+// changeToModeRequest normalises the decoded command payload. The bridge
+// decodes it through the generated definition into a [ChangeToModeRequest]
+// (a missing NewMode is INVALID_COMMAND there, as matter.js's request
+// schema answers it); the tag map is accepted so an in-process caller can
+// invoke the server directly.
 func changeToModeRequest(fields any) (ChangeToModeRequest, error) {
 	switch v := fields.(type) {
 	case ChangeToModeRequest:
@@ -456,14 +424,12 @@ func (*Server) MatterReportable() []uint32 { return []uint32{AttrCurrentMode} }
 
 // MatterAttributes implements [contract.ClusterAttributeLister], in
 // attribute-ID order.
-func (*Server) MatterAttributes() []uint32 {
-	return []uint32{AttrDescription, AttrStandardNamespace, AttrSupportedModes, AttrCurrentMode}
-}
+func (*Server) MatterAttributes() []uint32 { return instance.MatterAttributes() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
-func (*Server) MatterAcceptedCommands() []uint32 { return []uint32{CmdChangeToMode} }
+func (*Server) MatterAcceptedCommands() []uint32 { return instance.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister].
-// ChangeToMode has response "status" (element :52), so the server emits
-// no command of its own.
+// ChangeToMode has response "status", so the server emits no command of
+// its own.
 func (*Server) MatterGeneratedCommands() []uint32 { return nil }

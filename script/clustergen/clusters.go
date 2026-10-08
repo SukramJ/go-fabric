@@ -25,4 +25,6 @@ var committed = []string{
 	"OnOff",
 	// cluster/valve
 	"ValveConfigurationAndControl",
+	// cluster/modeselect
+	"ModeSelect",
 }
