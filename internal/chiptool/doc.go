@@ -29,7 +29,9 @@
 //     interactive chip-tool session (`make chiptool-test`);
 //   - TestChipCertificationFamilies — the CSA certification families, run
 //     by family the way matter.js runs them (`make chiptool-families`,
-//     narrowed with GOFABRIC_CHIP_FAMILIES=IDM,ACL,…).
+//     narrowed with GOFABRIC_CHIP_FAMILIES=IDM,ACL,…, further to single
+//     cases with GOFABRIC_CHIP_CASES=FAN/3.1,… and repeated with
+//     GOFABRIC_CHIP_REPEAT=20 — a narrowed run cannot -update-chip-cases).
 //
 // # The harness
 //

@@ -23,8 +23,26 @@ import (
 	"time"
 )
 
+// chipCasesEnv narrows the families further to a comma-separated list of
+// case ids ("FAN/3.1,DGGEN/2.3"); chipRepeatEnv runs the selection that many
+// times over one PICS derivation. Both are for chasing one case: a narrowed
+// run cannot rewrite the golden file, which holds whole families.
+const (
+	chipCasesEnv  = "GOFABRIC_CHIP_CASES"
+	chipRepeatEnv = "GOFABRIC_CHIP_REPEAT"
+)
+
+// caseFilter is chipCasesEnv split, nil when unset.
+var caseFilter []string
+
 // TestChipCertificationFamilies runs chipFamilies in the CHIP harness image.
 func TestChipCertificationFamilies(t *testing.T) {
+	if v := os.Getenv(chipCasesEnv); v != "" {
+		caseFilter = strings.Split(v, ",")
+		if *updateChipCases {
+			t.Fatalf("%s narrows a family to some of its cases; -update-chip-cases rewrites whole families", chipCasesEnv)
+		}
+	}
 	tool := resolveChipTool(t)
 	if tool.harness == nil {
 		t.Skipf("the certification families run inside the CHIP harness image; this run uses a host chip-tool (%s). "+
@@ -48,13 +66,21 @@ func TestChipCertificationFamilies(t *testing.T) {
 	if v := os.Getenv(chipFamilyEnv); v != "" {
 		only = strings.Split(v, ",")
 	}
-	for _, fam := range chipFamilies {
-		if only != nil && !slices.Contains(only, fam.name) {
-			continue
+	repeat := 1
+	if v := os.Getenv(chipRepeatEnv); v != "" {
+		if repeat, err = strconv.Atoi(v); err != nil || repeat < 1 {
+			t.Fatalf("%s=%q: want a positive count", chipRepeatEnv, v)
 		}
-		t.Run(fam.name, func(t *testing.T) {
-			runFamily(ctx, t, h, fam, cases[fam.name], pics, bin, flags)
-		})
+	}
+	for range repeat {
+		for _, fam := range chipFamilies {
+			if only != nil && !slices.Contains(only, fam.name) {
+				continue
+			}
+			t.Run(fam.name, func(t *testing.T) {
+				runFamily(ctx, t, h, fam, cases[fam.name], pics, bin, flags)
+			})
+		}
 	}
 	writeGolden(t, h)
 }
@@ -284,6 +310,9 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 	}
 	for i := range cases {
 		c := cases[i]
+		if caseFilter != nil && !slices.Contains(caseFilter, c.ID) {
+			continue
+		}
 		if e, ok := fam.picsEdits[c.Name]; ok {
 			if !strings.Contains(c.PICS, e.old) {
 				t.Errorf("PICS edit of %s (%s): %q is not in the case's expression %q", c.ID, e.reason, e.old, c.PICS)
@@ -433,7 +462,7 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 			checkCounts(t, h, id, counts)
 			return
 		}
-		t.Logf("daemon log: %s", tail(current().snapshotStderr(), 40))
+		t.Logf("daemon log: %s (whole log: %s)", tail(current().snapshotStderr(), 40), saveCaseLog(id+"-daemon", current().snapshotStderr()))
 		t.Fatalf("%s failed (%v): %+v\nfull output: %s\n--- verdict lines ---\n%s", id, err, counts, logFile, verdictLines(out))
 	}
 	if known, ok := fam.knownProblems[c.Name]; ok {
@@ -485,7 +514,7 @@ func runYamlCase(ctx context.Context, t *testing.T, h *harness, fam family, c ch
 	logFile := saveCaseLog(c.ID, out)
 	m := reYamlSummary.FindStringSubmatch(out)
 	if err != nil || m == nil || !regexp.MustCompile(`Test finished.+ 0 errors`).MatchString(out) {
-		t.Logf("daemon log: %s", tail(current().snapshotStderr(), 40))
+		t.Logf("daemon log: %s (whole log: %s)", tail(current().snapshotStderr(), 40), saveCaseLog(c.ID+"-daemon", current().snapshotStderr()))
 		t.Fatalf("%s failed (%v)\nfull output: %s\n--- runner output (tail) ---\n%s", c.ID, err, logFile, tail(out, 80))
 	}
 	run, _ := strconv.Atoi(m[1])
