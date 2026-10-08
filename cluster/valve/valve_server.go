@@ -18,6 +18,12 @@
 // empty FeatureMap. A host that needs a positionable valve extends the
 // port and the FeatureMap together; advertising LVL without the two
 // attributes would be the broken half of that pair.
+//
+// The cluster's identity is the generated definition
+// (cluster/spec/valveconfigurationandcontrol, ADR 0013): ids, revision,
+// the attribute and command lists the empty feature selection yields, the
+// write checks and the decoding of the Open request. What stays here is
+// the host port and the OpenDuration presence rule.
 package valve
 
 import (
@@ -25,14 +31,14 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	valvedef "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
-// ClusterID is the ValveConfigurationAndControl cluster id
-// (matter.js valve-configuration-and-control.element.ts:20).
-const ClusterID uint32 = 0x0081
+// ClusterID is the ValveConfigurationAndControl cluster id.
+const ClusterID = valvedef.ClusterID
 
 // Attribute ids. Only the conformance-M attributes are listed: the five
 // this server serves. AutoCloseTime (0x2) is "TS"-gated
@@ -44,35 +50,36 @@ const (
 	// AttrOpenDuration is the duration the valve stays open for the
 	// current opening, in seconds; null means "until closed by the user
 	// or some other automation" (element :27-30, resource :37-43).
-	AttrOpenDuration uint32 = 0x0000
+	AttrOpenDuration = valvedef.AttrOpenDuration
 	// AttrDefaultOpenDuration is the duration applied when an Open
 	// command carries no OpenDuration field (element :31-34,
 	// resource :46-52). It is the cluster's only writable attribute
 	// here: access "RW VO" (:32).
-	AttrDefaultOpenDuration uint32 = 0x0001
+	AttrDefaultOpenDuration = valvedef.AttrDefaultOpenDuration
 	// AttrRemainingDuration is the time left until the valve closes;
 	// null while OpenDuration is null or the valve is closed
 	// (element :36, resource :77-105).
-	AttrRemainingDuration uint32 = 0x0003
+	AttrRemainingDuration = valvedef.AttrRemainingDuration
 	// AttrCurrentState is the valve's current [State]; null means the
 	// state is not known (element :37, resource :109-113).
-	AttrCurrentState uint32 = 0x0004
+	AttrCurrentState = valvedef.AttrCurrentState
 	// AttrTargetState is the state the valve is moving towards; null
 	// means no target is set because the change is done or failed
 	// (element :38, resource :116-120).
-	AttrTargetState uint32 = 0x0005
+	AttrTargetState = valvedef.AttrTargetState
 )
 
 // Command ids. Both carry conformance "M" and response "status"
 // (element :60, :64), so neither produces a generated command.
 const (
 	// CmdOpen sets the valve to its open position (element :60).
-	CmdOpen uint32 = 0x00
+	CmdOpen = valvedef.CmdOpen
 	// CmdClose sets the valve to its closed position (element :64).
-	CmdClose uint32 = 0x01
+	CmdClose = valvedef.CmdClose
 )
 
-// Open command field tags (element :61-62).
+// Open command field tags of the tag map an in-process caller hands over
+// (element :61-62).
 const (
 	openFieldOpenDuration uint8 = 0
 	openFieldTargetLevel  uint8 = 1
@@ -87,10 +94,10 @@ const (
 	// FeatureTimeSync is the TS bit — the valve expresses durations and
 	// AutoCloseTime against synchronized UTC time. Not advertised: it
 	// requires the Time Synchronization cluster (resource :21-26).
-	FeatureTimeSync uint32 = 1 << 0
+	FeatureTimeSync = uint32(valvedef.FeatureTimeSync)
 	// FeatureLevel is the LVL bit — the valve can be driven to a
 	// percentage of its range (resource :29-32).
-	FeatureLevel uint32 = 1 << 1
+	FeatureLevel = uint32(valvedef.FeatureLevel)
 )
 
 // featureMapNone is the FeatureMap this server advertises: no optional
@@ -98,19 +105,25 @@ const (
 // conformant value for a valve that only opens and closes.
 const featureMapNone uint32 = 0
 
+// instance is the definition bound to [featureMapNone] with no optional
+// element declared: the five mandatory attributes, Open and Close. The
+// selection is conformant, so New has nothing to refuse; the parity test
+// holds the server against it (spectest.CheckServer).
+var instance, _ = spec.New(valvedef.Definition, spec.Options{Features: featureMapNone})
+
 // State is the ValveStateEnum (enum8) a controller reads from
 // CurrentState and TargetState.
-type State uint8
+type State = valvedef.ValveStateEnum
 
 // ValveStateEnum values (element :76-81).
 const (
 	// StateClosed — valve is in closed position (resource :250).
-	StateClosed State = 0x0
+	StateClosed = valvedef.ValveStateClosed
 	// StateOpen — valve is in open position (resource :251).
-	StateOpen State = 0x1
+	StateOpen = valvedef.ValveStateOpen
 	// StateTransitioning — valve is moving between positions
 	// (resource :252-255).
-	StateTransitioning State = 0x2
+	StateTransitioning = valvedef.ValveStateTransitioning
 )
 
 // OpenRequest is the cluster-native payload of the Open command
@@ -207,10 +220,10 @@ func (s *Server) tracker() *cluster.DataVersionTracker {
 	return &s.embedded
 }
 
-// Revision returns the cluster revision from the generated matter.js
-// schema snapshot. Reading it rather than restating it is the point: a
-// regeneration moves this value and a hand-written copy would not follow.
-func Revision() uint16 { return schema.ClusterRevisions[ClusterID] }
+// Revision returns the cluster revision of the generated definition. Reading
+// it rather than restating it is the point: a regeneration moves this value
+// and a hand-written copy would not follow.
+func Revision() uint16 { return valvedef.Revision }
 
 // MatterClusterID returns 0x0081.
 func (*Server) MatterClusterID() uint32 { return ClusterID }
@@ -228,12 +241,8 @@ func (s *Server) MatterRead(attrID uint32) (value any, ok bool) {
 			return nil, true
 		}
 		return s.readFromSource(attrID)
-	case cluster.AttrGlobalFeatureMap:
-		return featureMapNone, true
-	case cluster.AttrGlobalClusterRevision:
-		return Revision(), true
 	default:
-		return nil, false
+		return instance.ReadGlobal(attrID)
 	}
 }
 
@@ -277,35 +286,21 @@ func nullableState(state State, known bool) (any, bool) {
 
 // MatterWrite applies the one writable attribute this cluster has.
 //
-// DefaultOpenDuration carries access "RW VO" (element :32); the other
-// four are "R V" (:28, :36-38) and are rejected as unwritable rather
-// than silently dropped.
+// DefaultOpenDuration carries access "RW VO"; the other four are "R V" and
+// are rejected as UNSUPPORTED_WRITE rather than silently dropped, an id the
+// cluster does not serve as UNSUPPORTED_ATTRIBUTE. The definition checks the
+// value: a null clears the default (resource :50-52), any other value must
+// satisfy constraint "min 1", so zero is a CONSTRAINT_ERROR rather than a
+// duration of no seconds.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	switch attrID {
-	case AttrDefaultOpenDuration:
-		return s.writeDefaultOpenDuration(ctx, value)
-	case AttrOpenDuration, AttrRemainingDuration, AttrCurrentState, AttrTargetState:
-		return unsupportedWriteError{fmt.Sprintf("valve: attribute 0x%04X is read-only", attrID)}
-	default:
-		return unsupportedAttributeError{fmt.Sprintf("valve: unknown attribute 0x%04X", attrID)}
+	v, err := instance.ValidateWrite(attrID, value, nil)
+	if err != nil {
+		return err
 	}
-}
-
-// writeDefaultOpenDuration validates and forwards a DefaultOpenDuration
-// write. A null clears the default (resource :50-52); any other value
-// must satisfy constraint "min 1" (element :33), so zero is a
-// constraint error rather than a duration of no seconds.
-func (s *Server) writeDefaultOpenDuration(ctx context.Context, value any) error {
 	var seconds *uint32
-	if value != nil {
-		v, ok := asUint32(value)
-		if !ok {
-			return constraintError{fmt.Sprintf("valve: DefaultOpenDuration expected a number, got %T", value)}
-		}
-		if v < 1 {
-			return constraintError{"valve: DefaultOpenDuration violates constraint min 1"}
-		}
-		seconds = &v
+	if n, ok := v.(uint64); ok {
+		sec := uint32(n) //nolint:gosec // a nullable uint32 per ValidateWrite
+		seconds = &sec
 	}
 	if s.src == nil {
 		return errNoSource("DefaultOpenDuration write")
@@ -354,15 +349,22 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 }
 
 // openRequestFrom normalises the payload the bridge hands over. The
-// bridge has no typed decoder for this cluster, so a real invocation
-// arrives as the tag-keyed map its generic salvage path produces
-// (bridge/fields_reader.go decodeGenericTagMap); a host that decodes the
-// command itself may pass [OpenRequest] directly, and a parameterless
-// Open arrives as nil.
+// bridge decodes the request through the generated definition into a
+// [valvedef.OpenRequest], with matter.js's field checks (OpenDuration "min
+// 1", TargetLevel "1 to 100"); an in-process caller may hand over the
+// tag-keyed map, a host that decodes the command itself [OpenRequest]
+// directly, and a parameterless Open arrives as nil.
 func openRequestFrom(fields any) (OpenRequest, error) {
 	switch v := fields.(type) {
 	case nil:
 		return OpenRequest{}, nil
+	case valvedef.OpenRequest:
+		return openRequestFromGenerated(v)
+	case *valvedef.OpenRequest:
+		if v == nil {
+			return OpenRequest{}, nil
+		}
+		return openRequestFromGenerated(*v)
 	case OpenRequest:
 		return v, nil
 	case *OpenRequest:
@@ -379,6 +381,31 @@ func openRequestFrom(fields any) (OpenRequest, error) {
 	}
 }
 
+// openRequestFromGenerated carries the decoded request over to the host's
+// [OpenRequest], keeping an absent OpenDuration apart from a null one.
+func openRequestFromGenerated(r valvedef.OpenRequest) (OpenRequest, error) {
+	if r.TargetLevel != nil {
+		return OpenRequest{}, errTargetLevel
+	}
+	if r.OpenDuration == nil {
+		return OpenRequest{}, nil
+	}
+	req := OpenRequest{HasOpenDuration: true}
+	if !r.OpenDuration.Null {
+		seconds := r.OpenDuration.Value
+		req.OpenDuration = &seconds
+	}
+	return req, nil
+}
+
+// errTargetLevel refuses an Open that carries TargetLevel: it is
+// conformance "[LVL]" (element :62) and this server advertises no LVL.
+// Ignoring the field would open the valve to a level the controller never
+// got told was impossible.
+var errTargetLevel = constraintError{
+	"valve: Open carries TargetLevel, which needs the Level feature this server does not advertise",
+}
+
 // openRequestFromTagMap reads the Open command's two fields out of the
 // generic tag map. Unsigned TLV integers surface as uint64 there
 // (bridge/fields_reader.go decodeGenericTagMap), and an explicit null
@@ -387,12 +414,7 @@ func openRequestFrom(fields any) (OpenRequest, error) {
 func openRequestFromTagMap(m map[uint8]any) (OpenRequest, error) {
 	var req OpenRequest
 	if _, present := m[openFieldTargetLevel]; present {
-		// TargetLevel is conformance "[LVL]" (element :62) and this
-		// server advertises no LVL. Ignoring the field would open the
-		// valve to a level the controller never got told was impossible.
-		return req, constraintError{
-			"valve: Open carries TargetLevel, which needs the Level feature this server does not advertise",
-		}
+		return req, errTargetLevel
 	}
 	raw, present := m[openFieldOpenDuration]
 	if !present {
@@ -468,25 +490,15 @@ func (*Server) MatterReportable() []uint32 {
 
 // MatterAttributes implements [contract.ClusterAttributeLister], in id
 // order and without the universal globals — the dispatcher merges those.
-func (*Server) MatterAttributes() []uint32 {
-	return []uint32{
-		AttrOpenDuration,
-		AttrDefaultOpenDuration,
-		AttrRemainingDuration,
-		AttrCurrentState,
-		AttrTargetState,
-	}
-}
+func (*Server) MatterAttributes() []uint32 { return instance.MatterAttributes() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
-func (*Server) MatterAcceptedCommands() []uint32 {
-	return []uint32{CmdOpen, CmdClose}
-}
+func (*Server) MatterAcceptedCommands() []uint32 { return instance.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister].
-// Open and Close both declare response "status" (element :60, :64), so
-// the server emits no command payloads.
-func (*Server) MatterGeneratedCommands() []uint32 { return nil }
+// Open and Close both declare response "status", so the server emits no
+// command payloads.
+func (*Server) MatterGeneratedCommands() []uint32 { return instance.MatterGeneratedCommands() }
 
 // errNoSource reports that the server has no host port to reach.
 func errNoSource(what string) error {
@@ -499,25 +511,5 @@ type constraintError struct{ msg string }
 func (e constraintError) Error() string                 { return e.msg }
 func (constraintError) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
 
-// unsupportedWriteError maps onto UnsupportedWrite for an attribute
-// that exists but is read-only.
-type unsupportedWriteError struct{ msg string }
-
-func (e unsupportedWriteError) Error() string                 { return e.msg }
-func (unsupportedWriteError) MatterStatusCode() im.StatusCode { return im.StatusUnsupportedWrite }
-
-// unsupportedAttributeError maps onto UnsupportedAttribute for an id
-// this cluster does not carry.
-type unsupportedAttributeError struct{ msg string }
-
-func (e unsupportedAttributeError) Error() string { return e.msg }
-func (unsupportedAttributeError) MatterStatusCode() im.StatusCode {
-	return im.StatusUnsupportedAttribute
-}
-
-// Compile-time assertions for the typed status carriers.
-var (
-	_ im.StatusCodeError = constraintError{}
-	_ im.StatusCodeError = unsupportedWriteError{}
-	_ im.StatusCodeError = unsupportedAttributeError{}
-)
+// Compile-time assertion for the typed status carrier.
+var _ im.StatusCodeError = constraintError{}

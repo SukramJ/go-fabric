@@ -23,4 +23,6 @@ var committed = []string{
 	"ColorControl",
 	// cluster/onoff
 	"OnOff",
+	// cluster/valve
+	"ValveConfigurationAndControl",
 }

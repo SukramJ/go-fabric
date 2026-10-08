@@ -159,6 +159,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/valveconfigurationandcontrol", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/spectest", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/clustergen", min: 95},
 	// The CHIP data model cross-check (internal/chipdm): measured 97.4 without
