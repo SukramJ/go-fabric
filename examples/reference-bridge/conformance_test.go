@@ -16,6 +16,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -370,4 +371,22 @@ func TestValveTravelsThroughATarget(t *testing.T) {
 			t.Fatalf("closing a closed valve notified %d times, want 1 (the command)", n)
 		}
 	})
+}
+
+// TestOnWithTimedOffFieldsTakesTheGeneratedRequest pins the shape the
+// bridge now hands over: the OnOff definition is registered once
+// cluster/onoff is linked, so OnWithTimedOff arrives as the generated
+// request struct, by value or pointer; the tag map stays accepted.
+func TestOnWithTimedOffFieldsTakesTheGeneratedRequest(t *testing.T) {
+	t.Parallel()
+	req := onoffdef.OnWithTimedOffRequest{OnOffControl: onoffdef.OnOffControlAcceptOnlyWhenOn, OnTime: 30, OffWaitTime: 7}
+	for _, fields := range []any{req, &req, map[uint8]any{0: uint8(1), 1: uint16(30), 2: uint16(7)}} {
+		control, onTime, offWait, err := onWithTimedOffFields(fields)
+		if err != nil || control != 1 || onTime != 30 || offWait != 7 {
+			t.Errorf("%T: (%d, %d, %d, %v), want (1, 30, 7, nil)", fields, control, onTime, offWait, err)
+		}
+	}
+	if _, _, _, err := onWithTimedOffFields((*onoffdef.OnWithTimedOffRequest)(nil)); err == nil {
+		t.Error("a nil request pointer was accepted")
+	}
 }

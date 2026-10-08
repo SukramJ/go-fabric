@@ -21,4 +21,19 @@ var committed = []string{
 	"ActivatedCarbonFilterMonitoring",
 	// cluster/light
 	"ColorControl",
+	// cluster/onoff
+	"OnOff",
+	// cluster/valve
+	"ValveConfigurationAndControl",
+	// cluster/modeselect
+	"ModeSelect",
+	// cluster/alarm
+	"SmokeCoAlarm",
+	// cluster/fan
+	"FanControl",
+	// cluster/opstate
+	"OperationalState",
+	"RvcOperationalState",
+	// cluster/levelcontrol
+	"LevelControl",
 }

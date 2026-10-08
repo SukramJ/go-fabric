@@ -118,7 +118,23 @@ without their types and access.
   the same facts, and a server built on one answers them itself
   (`MinWritePrivilege`, `MinInvokePrivilege`, `ValidateWrite`), but the
   dispatcher's schema-side gates cover servers that are not, and replacing
-  them is a change to every cluster at once.
+  them is a change to every cluster at once. Diffing the three against
+  tables computed from the snapshot's effective access over every cluster
+  the module ships (2026-10) found them not identical, so they stay:
+  `invoke_privilege.go` matches exactly; `timed.go` omits eight DoorLock
+  requests matter.js marks "T" (Toggle, UnlockWithTimeout, SetUser,
+  ClearUser, SetCredential, ClearCredential, SetAliroReaderConfig,
+  ClearAliroReaderConfig — the server serves none of them, and a generated
+  gate would answer NEEDS_TIMED_INTERACTION where the server answers
+  UNSUPPORTED_COMMAND); `writable.go` matches on every cluster it lists
+  except FeatureMap and ClusterRevision, which it leaves to the dispatcher
+  on purpose, and lists no read-only attributes for fifteen shipped
+  clusters (Binding, LocalizationConfiguration, DiagnosticLogs,
+  BridgedDeviceBasicInformation, ModeSelect, the four ModeBase clusters,
+  Groupcast, the two filter-monitoring clusters, ValveConfigurationAndControl,
+  ClosureControl), whose servers answer such a write themselves — a
+  generated gate would also skip their read-only attributes on a wildcard
+  write, which today reach the server.
 - The migrated servers keep their hand-written wire types where the bridge
   and their tests already speak them (`cluster/wire.ChangeToModeRequest` /
   `Response`, `ModeOptionStruct`); a generated equivalent exists and round-
@@ -154,19 +170,19 @@ generated definition, and what blocks it.
 | PumpConfigurationAndControl | `cluster/pump` | **migrated** | host projection of state and limits stays |
 | LaundryWasherMode, RvcRunMode, RvcCleanMode, DishwasherMode | `cluster/modebase` | **migrated** | the SupportedModes rules stay; the wire types stay `cluster/wire`'s |
 | HepaFilterMonitoring, ActivatedCarbonFilterMonitoring | `cluster/filter` | **generated from the start** | — |
-| SmokeCoAlarm | `cluster/alarm` | yes | ExpressedState derivation and SelfTestRequest are rules; the rest is transcription |
-| FanControl | `cluster/fan` | yes | the FanMode / percent / speed coupling and Step stay; the Step decoder could move to the generated one |
-| OperationalState, RvcOperationalState | `cluster/opstate` | yes | the reactors and command checks stay; the generator's ErrorStateStruct / OperationalStateStruct codecs already round-trip matter.js's fixtures in the compile test |
-| ModeSelect | `cluster/modeselect` | yes | predates ModeBase; its SemanticTag struct is a global datatype the generator copies |
-| ValveConfigurationAndControl | `cluster/valve` | yes | — |
-| ClosureControl | `cluster/closure` | yes | its overall-state structs are hand-encoded today |
-| WindowCovering | `cluster/cover` | yes | the lift / tilt arithmetic stays |
-| DoorLock | `cluster/lock` | yes, large | credentials and schedules are host-backed; the generated payload codecs would replace most of `cluster/wire/doorlock.go` |
-| Thermostat | `cluster/thermo` | yes, large | setpoint deadband rules stay; the generator covers the AtomicRequest / AtomicResponse payloads, anonymous entry struct included |
-| Temperature, Humidity, Illuminance, Pressure, Flow, BooleanState, OccupancySensing, AirQuality, CO₂, PM2.5, PM10, PowerSource, PowerTopology, ElectricalPower / EnergyMeasurement | `cluster/measurement` | partly | built by materializers from the host's measurement classes; the definitions can supply lists and constraints, the projection of a host reading onto Matter units is the host's |
-| OnOff | `cluster/onoff` | yes | small; lighting-feature rules stay |
+| SmokeCoAlarm | `cluster/alarm` | **migrated** | ids, enums (aliased), lists, event priorities, write check and privileges from the definition; ExpressedState derivation, the SelfTestRequest gate and the event diffing stay |
+| FanControl | `cluster/fan` | **migrated** | lists, enums and bitmaps (aliased), the FanModeSequence / Auto pairing and every write check but FanMode's from the definition (it refuses the deprecated On / Smart the server maps as connectedhomeip does); Step keeps the hand-written decoder, whose `cluster/wire.FanStepRequest` a `Stepper` host receives (`BD-Matter-LevelControl-LenientDecoders`); the coupling rules stay |
+| OperationalState, RvcOperationalState | `cluster/opstate` | **migrated** | ids, revisions, the state and error enums per derivation, lists, event priorities and write statuses from the two definitions; the reactors, command checks and `cluster/wire` payloads stay |
+| ModeSelect | `cluster/modeselect` | **migrated** | `ModeOptionStruct`, `SemanticTagStruct` and `ChangeToModeRequest` are aliases of the generated structs; ChangeToMode decodes through the definition; the SupportedModes rule stays |
+| ValveConfigurationAndControl | `cluster/valve` | **migrated** | Open decodes through the definition and is carried over to the host's `OpenRequest` (absence and null kept apart) |
+| ClosureControl | `cluster/closure` | **skipped** | the server serves one fixed profile (the Positioning + Ventilation attribute set) whatever `Config.FeatureMap` says, and lists FeatureMap and ClusterRevision in AttributeList; lists from the definition would add the LT / SP / CL elements it cannot read for other FeatureMaps and drop the two globals `TestClosureControlNoAttributeIsWritable` writes to — a behaviour change that wants its own decision (and per-feature read support) first |
+| WindowCovering | `cluster/cover` | **skipped** | the same shape as ClosureControl: a fixed position-aware-lift profile under a free `Config.FeatureMap` (a TL-only server would list tilt attributes it cannot read), and a plain error for a write to a read-only attribute that ValidateWrite would turn into UNSUPPORTED_WRITE; the lift arithmetic stays either way |
+| DoorLock | `cluster/lock` | yes, large — not started | credentials and schedules are host-backed; the generated payload codecs would replace most of `cluster/wire/doorlock.go` |
+| Thermostat | `cluster/thermo` | yes, large — not started | setpoint deadband rules stay; the generator covers the AtomicRequest / AtomicResponse payloads, anonymous entry struct included |
+| Temperature, Humidity, Illuminance, Pressure, Flow, BooleanState, OccupancySensing, AirQuality, CO₂, PM2.5, PM10, PowerSource, PowerTopology, ElectricalPower / EnergyMeasurement | `cluster/measurement` | partly, a later pass | built by materializers from the host's measurement classes; the definitions can supply lists and constraints, the projection of a host reading onto Matter units is the host's |
+| OnOff | `cluster/onoff` | **migrated** | identity only (the server is the host's — the reference daemon's): ids, revision and the two Lighting lists from the definition; linking it makes the bridge decode OnOff requests into the generated structs |
 | ColorControl | `cluster/light` | **migrated** | the lists, write checks and the decoding of every request but the four whose hand-written `cluster/wire` structs host servers were written against (MoveToHue, MoveToSaturation, MoveToHueAndSaturation, MoveToColorTemperature); the transition, colour-mode and scene rules stay |
-| LevelControl | `cluster/levelcontrol` | yes, later | the scene and transition rules are rules |
+| LevelControl | `cluster/levelcontrol` | **migrated** | lists, Options bits, write checks and privileges from the definition; every request keeps the bridge's lenient decoding (MoveToLevel pair: hand-written decoder; the other six: tag map), because Google Home omits TransitionTime (`BD-Matter-LevelControl-LenientDecoders`); the scene and transition rules stay |
 | GenericSwitch, AdministratorCommissioning, Schedules, the Groups and ScenesManagement wire types | `cluster/wire` | partly | the payload codecs are what the generator emits; the servers carry stack state |
 | AccessControl, BasicInformation, BridgedDeviceBasicInformation, Binding, Descriptor, DiagnosticLogs, GeneralCommissioning, GeneralDiagnostics, GroupKeyManagement, Groupcast, Groups, IcdManagement, Identify, NetworkCommissioning, OperationalCredentials, OtaSoftwareUpdateRequestor, ScenesManagement, TimeSynchronization | `cluster/core` | later, case by case | system clusters whose state is the stack's (fabrics, sessions, ACLs, group keys) and whose quirks were found against real controllers; their lists and codecs are generatable, their behaviour is not, and each move wants its own chip-tool run |
 | AccessRestriction | `cluster/core` | no | constant and integration point only |

@@ -12,15 +12,23 @@
 // A revision bump or a newly feature-gated attribute had four edit sites and
 // nothing tying them together.
 //
-// The revision is not restated here either: it is read from the generated
-// matter.js snapshot ([schema.ClusterRevisions]), which is the only copy in
-// the repository that a regeneration keeps current.
+// Nothing here is transcribed any more: the ids, the revision and the two
+// Lighting lists come from the generated OnOff definition
+// (cluster/spec/onoff, generated from matter.js on-off.element.ts, ADR 0013).
+// Linking this package registers that definition, so the bridge decodes the
+// OnOff request payloads into its typed request structs
+// ([onoffdef.OnWithTimedOffRequest], [onoffdef.OffWithEffectRequest], …)
+// with the statuses matter.js's request schema answers a rejected payload
+// with.
 package onoff
 
-import "github.com/SukramJ/go-fabric/schema"
+import (
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+)
 
 // ClusterID is the OnOff cluster id.
-const ClusterID uint32 = 0x0006
+const ClusterID = onoffdef.ClusterID
 
 // Device types whose projections carry this cluster.
 const (
@@ -34,46 +42,47 @@ const (
 )
 
 // Attribute ids. The four 0x40xx attributes carry conformance "LT"
-// (matter.js packages/model/src/standard/elements/on-off.element.ts:30-36),
-// so they exist exactly while [FeatureLighting] is advertised.
+// (matter.js packages/model/src/standard/elements/on-off.element.ts), so
+// they exist exactly while [FeatureLighting] is advertised.
 const (
-	AttrOnOff              uint32 = 0x0000
-	AttrGlobalSceneControl uint32 = 0x4000
-	AttrOnTime             uint32 = 0x4001
-	AttrOffWaitTime        uint32 = 0x4002
-	AttrStartUpOnOff       uint32 = 0x4003
+	AttrOnOff              = onoffdef.AttrOnOff
+	AttrGlobalSceneControl = onoffdef.AttrGlobalSceneControl
+	AttrOnTime             = onoffdef.AttrOnTime
+	AttrOffWaitTime        = onoffdef.AttrOffWaitTime
+	AttrStartUpOnOff       = onoffdef.AttrStartUpOnOff
 )
 
-// FeatureLighting is the LT (Lighting) FeatureMap bit: constraint "0" → bit 0
-// (matter.js on-off.element.ts:24).
-const FeatureLighting uint32 = 0x01
+// FeatureLighting is the LT (Lighting) FeatureMap bit, as the uint32 a
+// FeatureMap read carries.
+const FeatureLighting = uint32(onoffdef.FeatureLighting)
 
 // Command ids. Off is mandatory unconditionally; On and Toggle carry
 // conformance "!OFFONLY" and so are mandatory unless the cluster advertises
-// the OffOnly feature (on-off.element.ts:37-39); the three 0x4x commands
-// carry "LT" (:41,:46,:51).
+// the OffOnly feature; the three 0x4x commands carry "LT".
 const (
-	CmdOff                     uint32 = 0x00
-	CmdOn                      uint32 = 0x01
-	CmdToggle                  uint32 = 0x02
-	CmdOffWithEffect           uint32 = 0x40
-	CmdOnWithRecallGlobalScene uint32 = 0x41
-	CmdOnWithTimedOff          uint32 = 0x42
+	CmdOff                     = onoffdef.CmdOff
+	CmdOn                      = onoffdef.CmdOn
+	CmdToggle                  = onoffdef.CmdToggle
+	CmdOffWithEffect           = onoffdef.CmdOffWithEffect
+	CmdOnWithRecallGlobalScene = onoffdef.CmdOnWithRecallGlobalScene
+	CmdOnWithTimedOff          = onoffdef.CmdOnWithTimedOff
 )
 
-// Revision returns the cluster revision from the generated matter.js schema
-// snapshot. Reading it rather than restating it is the point: a regeneration
-// moves this value, and a hand-written copy would not follow.
-func Revision() uint16 { return schema.ClusterRevisions[ClusterID] }
+// Revision returns the cluster revision of the generated definition, which
+// a regeneration from the matter.js snapshot moves; a hand-written copy
+// would not follow.
+func Revision() uint16 { return onoffdef.Revision }
+
+// lighting is the definition bound to the LT feature: the mandatory
+// elements of a Lighting OnOff cluster that is not OffOnly. The generated
+// definition admits LT on its own, so New has nothing to refuse;
+// TestLightingSetsAreOrderedAndComplete holds the lists it yields.
+var lighting, _ = spec.New(onoffdef.Definition, spec.Options{Features: FeatureLighting})
 
 // LightingAttributes returns the attribute ids an OnOff cluster advertising
 // [FeatureLighting] must expose, in id order.
-func LightingAttributes() []uint32 {
-	return []uint32{AttrOnOff, AttrGlobalSceneControl, AttrOnTime, AttrOffWaitTime, AttrStartUpOnOff}
-}
+func LightingAttributes() []uint32 { return lighting.MatterAttributes() }
 
 // LightingCommands returns the accepted command ids for an OnOff cluster
 // advertising [FeatureLighting] and not OffOnly, in id order.
-func LightingCommands() []uint32 {
-	return []uint32{CmdOff, CmdOn, CmdToggle, CmdOffWithEffect, CmdOnWithRecallGlobalScene, CmdOnWithTimedOff}
-}
+func LightingCommands() []uint32 { return lighting.MatterAcceptedCommands() }

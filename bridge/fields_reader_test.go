@@ -12,6 +12,9 @@ import (
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	// Linked so the LevelControl Step case runs against the registry the
+	// reference daemon has.
+	_ "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -1312,5 +1315,39 @@ func TestCommandFieldsReader_OpenCommissioningWindow(t *testing.T) {
 	opener, _ = dec.Next()
 	if _, err := commandFieldsReader(cmdPath(0x003C, 0x00), dec, opener); err == nil {
 		t.Error("a 13-bit discriminator decoded")
+	}
+}
+
+// TestCommandFieldsReader_LevelControlStepAbsentTransitionTime pins that
+// LevelControl's Step / StepWithOnOff keep decoding Google Home's shape —
+// TransitionTime absent, not null — after the generated LevelControl
+// definition is linked: the bridge hands the lenient tag map over instead
+// of the generated decoder's INVALID_COMMAND.
+func TestCommandFieldsReader_LevelControlStepAbsentTransitionTime(t *testing.T) {
+	t.Parallel()
+	for _, command := range []uint32{0x02, 0x06} {
+		enc := tlv.NewEncoder()
+		enc.StartStruct(tlv.AnonymousTag())
+		enc.PutUint(tlv.ContextTag(0), 0)  // StepMode Up
+		enc.PutUint(tlv.ContextTag(1), 10) // StepSize
+		// Context tag 2 (TransitionTime) intentionally absent.
+		enc.PutUint(tlv.ContextTag(3), 0) // OptionsMask
+		enc.PutUint(tlv.ContextTag(4), 0) // OptionsOverride
+		_ = enc.EndContainer()
+		raw, _ := enc.Bytes()
+		dec := tlv.NewDecoder(raw)
+		opener, _ := dec.Next()
+
+		v, err := commandFieldsReader(cmdPath(0x0008, command), dec, opener)
+		if err != nil {
+			t.Fatalf("command 0x%02X: %v", command, err)
+		}
+		m, ok := v.(map[uint8]any)
+		if !ok {
+			t.Fatalf("command 0x%02X: got %T, want the tag map", command, v)
+		}
+		if _, present := m[2]; present {
+			t.Errorf("command 0x%02X: TransitionTime present in %v", command, m)
+		}
 	}
 }

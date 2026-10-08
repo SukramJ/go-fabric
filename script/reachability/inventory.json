@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3849,
+  "entry_points": 3880,
   "entry_packages": [
     ".",
     "bootid",
@@ -26,12 +26,20 @@
     "cluster/spec/activatedcarbonfiltermonitoring",
     "cluster/spec/colorcontrol",
     "cluster/spec/dishwashermode",
+    "cluster/spec/fancontrol",
     "cluster/spec/hepafiltermonitoring",
     "cluster/spec/laundrywashermode",
+    "cluster/spec/levelcontrol",
+    "cluster/spec/modeselect",
+    "cluster/spec/onoff",
+    "cluster/spec/operationalstate",
     "cluster/spec/pumpconfigurationandcontrol",
     "cluster/spec/rvccleanmode",
+    "cluster/spec/rvcoperationalstate",
     "cluster/spec/rvcrunmode",
+    "cluster/spec/smokecoalarm",
     "cluster/spec/spectest",
+    "cluster/spec/valveconfigurationandcontrol",
     "cluster/thermo",
     "cluster/transition",
     "cluster/valve",
@@ -73,9 +81,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 4593,
-    "reachable": 2720,
-    "whitelisted": 1868,
+    "total_exported": 5044,
+    "reachable": 3066,
+    "whitelisted": 1973,
     "unreachable": 5
   },
   "by_package": [
@@ -1196,42 +1204,42 @@
       "identifier": "TestCommandFieldsReader_AddNOC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 583
+      "line": 586
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_AddTrustedRootCertificate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 626
+      "line": 629
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_ArmFailSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 410
+      "line": 413
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_Attestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 665
+      "line": 668
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_CSR",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 645
+      "line": 648
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_CertificateChain",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 684
+      "line": 687
     },
     {
       "package": "bridge",
@@ -1252,56 +1260,63 @@
       "identifier": "TestCommandFieldsReader_CommissioningComplete",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 480
+      "line": 483
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCommandFieldsReader_LevelControlStepAbsentTransitionTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fields_reader_test.go",
+      "line": 1326
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_MoveToLevelVariants_AbsentTransitionTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 511
+      "line": 514
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_OpenCommissioningWindow",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1276
+      "line": 1279
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_RemoveFabric",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 434
+      "line": 437
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_SetRegulatoryConfig",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 703
+      "line": 706
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_UnknownCommand_GenericTagMap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 552
+      "line": 555
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_UpdateFabricLabel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 457
+      "line": 460
     },
     {
       "package": "bridge",
       "identifier": "TestCommandFieldsReader_UpdateNOC",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 607
+      "line": 610
     },
     {
       "package": "bridge",
@@ -1455,175 +1470,175 @@
       "identifier": "TestDecodeAddNOCRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 184
+      "line": 187
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddNOCRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1185
+      "line": 1188
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddNOCRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 743
+      "line": 746
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddTrustedRootCertificateRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 262
+      "line": 265
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddTrustedRootCertificateRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1217
+      "line": 1220
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAddTrustedRootCertificateRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 872
+      "line": 875
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeArmFailSafeRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 75
+      "line": 78
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeArmFailSafeRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1145
+      "line": 1148
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeArmFailSafeRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 764
+      "line": 767
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAttestationRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 130
+      "line": 133
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAttestationRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1161
+      "line": 1164
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeAttestationRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 779
+      "line": 782
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCSRRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 163
+      "line": 166
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCSRRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1177
+      "line": 1180
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCSRRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 810
+      "line": 813
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCertificateChainRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 147
+      "line": 150
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCertificateChainRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1169
+      "line": 1172
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCertificateChainRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 795
+      "line": 798
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeCommissioningCompleteRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 116
+      "line": 119
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_AllTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1017
+      "line": 1020
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1137
+      "line": 1140
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_Empty",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1105
+      "line": 1108
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_NestedContainerDrainError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1237
+      "line": 1240
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_NestedContainerDrained",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1061
+      "line": 1064
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeGenericTagMap_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1088
+      "line": 1091
     },
     {
       "package": "bridge",
@@ -1637,126 +1652,126 @@
       "identifier": "TestDecodeMoveToLevelRequest_AbsentTransitionTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 986
+      "line": 989
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_AllFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 926
+      "line": 929
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1129
+      "line": 1132
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 892
+      "line": 895
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_NullTransitionTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 956
+      "line": 959
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeMoveToLevelRequest_OverflowReturnsError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 909
+      "line": 912
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeRemoveFabricRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 246
+      "line": 249
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeRemoveFabricRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1209
+      "line": 1212
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeRemoveFabricRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 857
+      "line": 860
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeSetRegulatoryConfigRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 95
+      "line": 98
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeSetRegulatoryConfigRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1153
+      "line": 1156
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeSetRegulatoryConfigRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 726
+      "line": 729
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateFabricLabelRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 230
+      "line": 233
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateFabricLabelRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1201
+      "line": 1204
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateFabricLabelRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 842
+      "line": 845
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateNOCRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 210
+      "line": 213
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateNOCRequest_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1193
+      "line": 1196
     },
     {
       "package": "bridge",
       "identifier": "TestDecodeUpdateNOCRequest_NonContextTagSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 826
+      "line": 829
     },
     {
       "package": "bridge",
@@ -2701,28 +2716,28 @@
       "identifier": "TestDrainContainer_DecNextError",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 1227
+      "line": 1230
     },
     {
       "package": "bridge",
       "identifier": "TestDrainContainer_Empty",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 41
+      "line": 44
     },
     {
       "package": "bridge",
       "identifier": "TestDrainContainer_Nested",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 60
+      "line": 63
     },
     {
       "package": "bridge",
       "identifier": "TestDrainContainer_WithFields",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 49
+      "line": 52
     },
     {
       "package": "bridge",
@@ -4255,49 +4270,49 @@
       "identifier": "TestRewriteInvokeResponseCommand_ArmFailSafeResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 299
+      "line": 302
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_AttestationResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 338
+      "line": 341
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_CSRResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 364
+      "line": 367
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_CertificateChainResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 351
+      "line": 354
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_CommissioningCompleteResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 325
+      "line": 328
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_NOCResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 377
+      "line": 380
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_NilResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 289
+      "line": 292
     },
     {
       "package": "bridge",
@@ -4311,7 +4326,7 @@
       "identifier": "TestRewriteInvokeResponseCommand_SetRegulatoryConfigResponse",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 312
+      "line": 315
     },
     {
       "package": "bridge",
@@ -4325,14 +4340,14 @@
       "identifier": "TestRewriteInvokeResponseCommand_StatusOnly",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 279
+      "line": 282
     },
     {
       "package": "bridge",
       "identifier": "TestRewriteInvokeResponseCommand_UnknownResponseNoChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
-      "line": 390
+      "line": 393
     },
     {
       "package": "bridge",
@@ -4881,6 +4896,55 @@
       "line": 30
     },
     {
+      "package": "cluster/alarm",
+      "identifier": "AlarmState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 113
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "ContaminationState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 173
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "EndOfService",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 164
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "ExpressedState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 138
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "Feature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 101
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "MuteState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 155
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "Sensitivity",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 128
+    },
+    {
       "package": "cluster/core",
       "identifier": "TestBasicInfoSerialFromUniqueID_Long",
       "reason": "auto-whitelist:pattern=test-file",
@@ -4979,6 +5043,48 @@
       "line": 59
     },
     {
+      "package": "cluster/fan",
+      "identifier": "AirflowDirection",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/fan/fancontrol_server.go",
+      "line": 150
+    },
+    {
+      "package": "cluster/fan",
+      "identifier": "FanMode",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/fan/fancontrol_server.go",
+      "line": 102
+    },
+    {
+      "package": "cluster/fan",
+      "identifier": "Feature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/fan/fancontrol_server.go",
+      "line": 87
+    },
+    {
+      "package": "cluster/fan",
+      "identifier": "RockBitmap",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/fan/fancontrol_server.go",
+      "line": 130
+    },
+    {
+      "package": "cluster/fan",
+      "identifier": "Sequence",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/fan/fancontrol_server.go",
+      "line": 116
+    },
+    {
+      "package": "cluster/fan",
+      "identifier": "WindBitmap",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/fan/fancontrol_server.go",
+      "line": 140
+    },
+    {
       "package": "cluster/filter",
       "identifier": "ChangeIndication",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -5011,28 +5117,28 @@
       "identifier": "MoveRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 237
+      "line": 248
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "MoveToLevelRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 235
+      "line": 246
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "StepRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 239
+      "line": 250
     },
     {
       "package": "cluster/levelcontrol",
       "identifier": "StopRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/levelcontrol/levelcontrol_server.go",
-      "line": 241
+      "line": 252
     },
     {
       "package": "cluster/light",
@@ -5145,6 +5251,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/parity_matterjs_test.go",
       "line": 114
+    },
+    {
+      "package": "cluster/modeselect",
+      "identifier": "ChangeToModeRequest",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/modeselect/modeselect_server.go",
+      "line": 140
+    },
+    {
+      "package": "cluster/modeselect",
+      "identifier": "ModeOptionStruct",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/modeselect/modeselect_server.go",
+      "line": 136
+    },
+    {
+      "package": "cluster/modeselect",
+      "identifier": "SemanticTagStruct",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/modeselect/modeselect_server.go",
+      "line": 128
     },
     {
       "package": "cluster/opstate",
@@ -5665,6 +5792,111 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "AirflowDirectionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 67
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "AirflowDirectionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 78
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "FanModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 86
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "FanModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 102
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "FanModeSequenceEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 115
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "FanModeSequenceEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 130
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "RockBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 142
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "RockBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 154
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "StepDirectionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 163
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "StepDirectionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 174
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/fancontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/fancontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "WindBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 182
+    },
+    {
+      "package": "cluster/spec/fancontrol",
+      "identifier": "WindBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fancontrol/definition_gen.go",
+      "line": 193
+    },
+    {
       "package": "cluster/spec/hepafiltermonitoring",
       "identifier": "ChangeIndicationEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -5798,6 +6030,272 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/levelcontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/levelcontrol/definition_gen.go",
+      "line": 62
+    },
+    {
+      "package": "cluster/spec/levelcontrol",
+      "identifier": "MoveModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/levelcontrol/definition_gen.go",
+      "line": 74
+    },
+    {
+      "package": "cluster/spec/levelcontrol",
+      "identifier": "MoveModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/levelcontrol/definition_gen.go",
+      "line": 85
+    },
+    {
+      "package": "cluster/spec/levelcontrol",
+      "identifier": "OptionsBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/levelcontrol/definition_gen.go",
+      "line": 93
+    },
+    {
+      "package": "cluster/spec/levelcontrol",
+      "identifier": "OptionsBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/levelcontrol/definition_gen.go",
+      "line": 104
+    },
+    {
+      "package": "cluster/spec/levelcontrol",
+      "identifier": "StepModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/levelcontrol/definition_gen.go",
+      "line": 112
+    },
+    {
+      "package": "cluster/spec/levelcontrol",
+      "identifier": "StepModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/levelcontrol/definition_gen.go",
+      "line": 123
+    },
+    {
+      "package": "cluster/spec/levelcontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/levelcontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/levelcontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/levelcontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/modeselect",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/modeselect/definition_gen.go",
+      "line": 46
+    },
+    {
+      "package": "cluster/spec/modeselect",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/modeselect/definition_gen.go",
+      "line": 81
+    },
+    {
+      "package": "cluster/spec/modeselect",
+      "identifier": "Namespace",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/modeselect/definition_gen.go",
+      "line": 120
+    },
+    {
+      "package": "cluster/spec/modeselect",
+      "identifier": "NamespaceDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/modeselect/definition_gen.go",
+      "line": 157
+    },
+    {
+      "package": "cluster/spec/modeselect",
+      "identifier": "SemanticTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/modeselect/definition_gen.go",
+      "line": 112
+    },
+    {
+      "package": "cluster/spec/modeselect",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/modeselect/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/modeselect",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/modeselect/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "DelayedAllOffEffectVariantEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 62
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "DelayedAllOffEffectVariantEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 74
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "DyingLightEffectVariantEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "DyingLightEffectVariantEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 93
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "EffectIdentifierEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 100
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "EffectIdentifierEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 111
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 50
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "OnOffControlBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 119
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "OnOffControlBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 129
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "StartUpOnOffEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 136
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "StartUpOnOffEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/onoff/definition_gen.go",
+      "line": 148
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/onoff/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/onoff",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/onoff/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/operationalstate",
+      "identifier": "ErrorStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/operationalstate/definition_gen.go",
+      "line": 61
+    },
+    {
+      "package": "cluster/spec/operationalstate",
+      "identifier": "ErrorStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/operationalstate/definition_gen.go",
+      "line": 74
+    },
+    {
+      "package": "cluster/spec/operationalstate",
+      "identifier": "ErrorStateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/operationalstate/definition_gen.go",
+      "line": 109
+    },
+    {
+      "package": "cluster/spec/operationalstate",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/operationalstate/definition_gen.go",
+      "line": 56
+    },
+    {
+      "package": "cluster/spec/operationalstate",
+      "identifier": "OperationalStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/operationalstate/definition_gen.go",
+      "line": 118
+    },
+    {
+      "package": "cluster/spec/operationalstate",
+      "identifier": "OperationalStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/operationalstate/definition_gen.go",
+      "line": 131
+    },
+    {
+      "package": "cluster/spec/operationalstate",
+      "identifier": "OperationalStateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/operationalstate/definition_gen.go",
+      "line": 163
+    },
+    {
+      "package": "cluster/spec/operationalstate",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/operationalstate/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/operationalstate",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/operationalstate/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/pumpconfigurationandcontrol",
       "identifier": "ControlModeEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -5924,6 +6422,69 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/rvcoperationalstate",
+      "identifier": "ErrorStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
+      "line": 62
+    },
+    {
+      "package": "cluster/spec/rvcoperationalstate",
+      "identifier": "ErrorStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
+      "line": 90
+    },
+    {
+      "package": "cluster/spec/rvcoperationalstate",
+      "identifier": "ErrorStateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
+      "line": 140
+    },
+    {
+      "package": "cluster/spec/rvcoperationalstate",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
+      "line": 57
+    },
+    {
+      "package": "cluster/spec/rvcoperationalstate",
+      "identifier": "OperationalStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
+      "line": 149
+    },
+    {
+      "package": "cluster/spec/rvcoperationalstate",
+      "identifier": "OperationalStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
+      "line": 169
+    },
+    {
+      "package": "cluster/spec/rvcoperationalstate",
+      "identifier": "OperationalStateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
+      "line": 208
+    },
+    {
+      "package": "cluster/spec/rvcoperationalstate",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/rvcoperationalstate/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/rvcoperationalstate",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/rvcoperationalstate/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/rvcrunmode",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -5987,6 +6548,111 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "AlarmStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 80
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "AlarmStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 92
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "ContaminationStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 101
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "ContaminationStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 114
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "EndOfServiceEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 124
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "EndOfServiceEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 135
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "ExpressedStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 143
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "ExpressedStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 162
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 69
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "MuteStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 178
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "MuteStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 189
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "SensitivityEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 197
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "SensitivityEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/smokecoalarm/definition_gen.go",
+      "line": 209
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/smokecoalarm/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/smokecoalarm",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/smokecoalarm/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/spectest",
       "identifier": "Ptr",
       "reason": "generic: every generated test calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
@@ -5999,6 +6665,76 @@
       "reason": "generic: every generated test calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/spectest/spectest.go",
       "line": 219
+    },
+    {
+      "package": "cluster/spec/valveconfigurationandcontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/valveconfigurationandcontrol",
+      "identifier": "StatusCodeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
+      "line": 69
+    },
+    {
+      "package": "cluster/spec/valveconfigurationandcontrol",
+      "identifier": "StatusCodeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
+      "line": 79
+    },
+    {
+      "package": "cluster/spec/valveconfigurationandcontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/valveconfigurationandcontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/valveconfigurationandcontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/valveconfigurationandcontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/valveconfigurationandcontrol",
+      "identifier": "ValveFaultBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
+      "line": 86
+    },
+    {
+      "package": "cluster/spec/valveconfigurationandcontrol",
+      "identifier": "ValveFaultBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
+      "line": 101
+    },
+    {
+      "package": "cluster/spec/valveconfigurationandcontrol",
+      "identifier": "ValveStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
+      "line": 113
+    },
+    {
+      "package": "cluster/spec/valveconfigurationandcontrol",
+      "identifier": "ValveStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
+      "line": 125
+    },
+    {
+      "package": "cluster/valve",
+      "identifier": "State",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/valve/valve_server.go",
+      "line": 116
     },
     {
       "package": "cluster/wire",
@@ -7167,7 +7903,7 @@
       "identifier": "TestBridgedEndpointsMeetTheirDeviceTypeConformance",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 44
+      "line": 45
     },
     {
       "package": "examples/reference-bridge",
@@ -7188,7 +7924,7 @@
       "identifier": "TestCeilingLightOnDoesNotDeadlockItsNotifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 268
+      "line": 269
     },
     {
       "package": "examples/reference-bridge",
@@ -7209,7 +7945,7 @@
       "identifier": "TestDelayedOffReportsItsCountdown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 222
+      "line": 223
     },
     {
       "package": "examples/reference-bridge",
@@ -7223,14 +7959,21 @@
       "identifier": "TestLightKeepsItsOnOffStateAcrossDispatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 307
+      "line": 308
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestOnWithTimedOffCountsDownAndTurnsTheLightOff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 160
+      "line": 161
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestOnWithTimedOffFieldsTakesTheGeneratedRequest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/conformance_test.go",
+      "line": 380
     },
     {
       "package": "examples/reference-bridge",
@@ -7300,7 +8043,7 @@
       "identifier": "TestValveTravelsThroughATarget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 323
+      "line": 324
     },
     {
       "package": "examples/reference-bridge",

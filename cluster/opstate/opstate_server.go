@@ -42,6 +42,13 @@
 // reports a quieter attribute (see [cluster.Quieter]); every other
 // attribute change is reported at once, through
 // [contract.AttributeChangeNotifier].
+//
+// The clusters' identity is their generated definitions
+// (cluster/spec/operationalstate, cluster/spec/rvcoperationalstate, ADR
+// 0013): ids, revisions, the state and error enums each derivation
+// defines, the attribute, command and event lists, the event priorities
+// and the write statuses. The reactors, the command checks and the
+// cluster/wire payloads the bridge encodes stay here.
 package opstate
 
 import (
@@ -53,17 +60,18 @@ import (
 	"unicode/utf8"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
+	rvcdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
-// Cluster ids (operational-state.element.ts:19,
-// rvc-operational-state.element.ts:19).
+// Cluster ids.
 const (
-	ClusterIDOperationalState    = clusterwire.OperationalStateClusterID
-	ClusterIDRvcOperationalState = clusterwire.RvcOperationalStateClusterID
+	ClusterIDOperationalState    = opdef.ClusterID
+	ClusterIDRvcOperationalState = rvcdef.ClusterID
 )
 
 // Device types built on these clusters (laundry-washer.element.ts,
@@ -79,28 +87,28 @@ const (
 
 // Attribute ids (operational-state.element.ts:23-44).
 const (
-	AttrPhaseList            uint32 = 0x0000 // M, list[string max 64] max 32, X
-	AttrCurrentPhase         uint32 = 0x0001 // M, uint8, X
-	AttrCountdownTime        uint32 = 0x0002 // O, elapsed-s max 259200, X Q
-	AttrOperationalStateList uint32 = 0x0003 // M, list[OperationalStateStruct]
-	AttrOperationalState     uint32 = 0x0004 // M, OperationalStateEnum
-	AttrOperationalError     uint32 = 0x0005 // M, ErrorStateStruct
+	AttrPhaseList            = opdef.AttrPhaseList            // M, list[string max 64] max 32, X
+	AttrCurrentPhase         = opdef.AttrCurrentPhase         // M, uint8, X
+	AttrCountdownTime        = opdef.AttrCountdownTime        // O, elapsed-s max 259200, X Q
+	AttrOperationalStateList = opdef.AttrOperationalStateList // M, list[OperationalStateStruct]
+	AttrOperationalState     = opdef.AttrOperationalState     // M, OperationalStateEnum
+	AttrOperationalError     = opdef.AttrOperationalError     // M, ErrorStateStruct
 )
 
 // Command ids.
 const (
-	CmdPause                      = clusterwire.OperationalStateCmdPause
-	CmdStop                       = clusterwire.OperationalStateCmdStop
-	CmdStart                      = clusterwire.OperationalStateCmdStart
-	CmdResume                     = clusterwire.OperationalStateCmdResume
-	CmdOperationalCommandResponse = clusterwire.OperationalStateCmdOperationalCommandResponse
-	CmdGoHome                     = clusterwire.RvcOperationalStateCmdGoHome
+	CmdPause                      = opdef.CmdPause
+	CmdStop                       = opdef.CmdStop
+	CmdStart                      = opdef.CmdStart
+	CmdResume                     = opdef.CmdResume
+	CmdOperationalCommandResponse = opdef.CmdOperationalCommandResponse
+	CmdGoHome                     = rvcdef.CmdGoHome
 )
 
 // Event ids (operational-state.element.ts:45-55).
 const (
-	EventOperationalError    uint32 = 0x00 // M, critical
-	EventOperationCompletion uint32 = 0x01 // O, info
+	EventOperationalError    = opdef.EventOperationalError    // M, critical
+	EventOperationCompletion = opdef.EventOperationCompletion // O, info
 )
 
 // Limits from the element's constraints.
@@ -123,17 +131,17 @@ type State uint8
 // OperationalStateEnum (operational-state.element.ts:82-88,
 // rvc-operational-state.element.ts:31-44).
 const (
-	StateStopped          State = 0x00
-	StateRunning          State = 0x01
-	StatePaused           State = 0x02
-	StateError            State = 0x03
-	StateSeekingCharger   State = 0x40 // RVC
-	StateCharging         State = 0x41 // RVC
-	StateDocked           State = 0x42 // RVC
-	StateEmptyingDustBin  State = 0x43 // RVC, O
-	StateCleaningMop      State = 0x44 // RVC, O
-	StateFillingWaterTank State = 0x45 // RVC, O
-	StateUpdatingMaps     State = 0x46 // RVC, O
+	StateStopped          = State(opdef.OperationalStateStopped)
+	StateRunning          = State(opdef.OperationalStateRunning)
+	StatePaused           = State(opdef.OperationalStatePaused)
+	StateError            = State(opdef.OperationalStateError)
+	StateSeekingCharger   = State(rvcdef.OperationalStateSeekingCharger)   // RVC
+	StateCharging         = State(rvcdef.OperationalStateCharging)         // RVC
+	StateDocked           = State(rvcdef.OperationalStateDocked)           // RVC
+	StateEmptyingDustBin  = State(rvcdef.OperationalStateEmptyingDustBin)  // RVC, O
+	StateCleaningMop      = State(rvcdef.OperationalStateCleaningMop)      // RVC, O
+	StateFillingWaterTank = State(rvcdef.OperationalStateFillingWaterTank) // RVC, O
+	StateUpdatingMaps     = State(rvcdef.OperationalStateUpdatingMaps)     // RVC, O
 )
 
 // ErrorID is an ErrorStateEnum value. RvcOperationalState adds the 0x40
@@ -143,25 +151,25 @@ type ErrorID uint8
 // ErrorStateEnum (operational-state.element.ts:99-105,
 // rvc-operational-state.element.ts:46-66).
 const (
-	ErrorNoError                   ErrorID = 0x00
-	ErrorUnableToStartOrResume     ErrorID = 0x01
-	ErrorUnableToCompleteOperation ErrorID = 0x02
-	ErrorCommandInvalidInState     ErrorID = 0x03
-	ErrorFailedToFindChargingDock  ErrorID = 0x40 // RVC
-	ErrorStuck                     ErrorID = 0x41 // RVC
-	ErrorDustBinMissing            ErrorID = 0x42 // RVC
-	ErrorDustBinFull               ErrorID = 0x43 // RVC
-	ErrorWaterTankEmpty            ErrorID = 0x44 // RVC
-	ErrorWaterTankMissing          ErrorID = 0x45 // RVC
-	ErrorWaterTankLidOpen          ErrorID = 0x46 // RVC
-	ErrorMopCleaningPadMissing     ErrorID = 0x47 // RVC
-	ErrorLowBattery                ErrorID = 0x48 // RVC
-	ErrorCannotReachTargetArea     ErrorID = 0x49 // RVC
-	ErrorDirtyWaterTankFull        ErrorID = 0x4A // RVC
-	ErrorDirtyWaterTankMissing     ErrorID = 0x4B // RVC
-	ErrorWheelsJammed              ErrorID = 0x4C // RVC
-	ErrorBrushJammed               ErrorID = 0x4D // RVC
-	ErrorNavigationSensorObscured  ErrorID = 0x4E // RVC
+	ErrorNoError                   = ErrorID(opdef.ErrorStateNoError)
+	ErrorUnableToStartOrResume     = ErrorID(opdef.ErrorStateUnableToStartOrResume)
+	ErrorUnableToCompleteOperation = ErrorID(opdef.ErrorStateUnableToCompleteOperation)
+	ErrorCommandInvalidInState     = ErrorID(opdef.ErrorStateCommandInvalidInState)
+	ErrorFailedToFindChargingDock  = ErrorID(rvcdef.ErrorStateFailedToFindChargingDock) // RVC
+	ErrorStuck                     = ErrorID(rvcdef.ErrorStateStuck)                    // RVC
+	ErrorDustBinMissing            = ErrorID(rvcdef.ErrorStateDustBinMissing)           // RVC
+	ErrorDustBinFull               = ErrorID(rvcdef.ErrorStateDustBinFull)              // RVC
+	ErrorWaterTankEmpty            = ErrorID(rvcdef.ErrorStateWaterTankEmpty)           // RVC
+	ErrorWaterTankMissing          = ErrorID(rvcdef.ErrorStateWaterTankMissing)         // RVC
+	ErrorWaterTankLidOpen          = ErrorID(rvcdef.ErrorStateWaterTankLidOpen)         // RVC
+	ErrorMopCleaningPadMissing     = ErrorID(rvcdef.ErrorStateMopCleaningPadMissing)    // RVC
+	ErrorLowBattery                = ErrorID(rvcdef.ErrorStateLowBattery)               // RVC
+	ErrorCannotReachTargetArea     = ErrorID(rvcdef.ErrorStateCannotReachTargetArea)    // RVC
+	ErrorDirtyWaterTankFull        = ErrorID(rvcdef.ErrorStateDirtyWaterTankFull)       // RVC
+	ErrorDirtyWaterTankMissing     = ErrorID(rvcdef.ErrorStateDirtyWaterTankMissing)    // RVC
+	ErrorWheelsJammed              = ErrorID(rvcdef.ErrorStateWheelsJammed)             // RVC
+	ErrorBrushJammed               = ErrorID(rvcdef.ErrorStateBrushJammed)              // RVC
+	ErrorNavigationSensorObscured  = ErrorID(rvcdef.ErrorStateNavigationSensorObscured) // RVC
 )
 
 // StateEntry is one OperationalStateList entry. Label is sent for a
@@ -278,10 +286,10 @@ var (
 
 // variant is what distinguishes OperationalState from its RVC derivation.
 type variant struct {
-	clusterID   uint32
+	def         *spec.Cluster
 	commands    Command
-	extraStates [2]State   // the derivation's own state range, inclusive
-	extraErrors [2]ErrorID // the derivation's own error range, inclusive
+	states      *spec.Enum // the derivation's OperationalStateEnum
+	errors      *spec.Enum // the derivation's ErrorStateEnum
 	deviceTypes []uint16
 	// pause / resume / goHome return CommandInvalidInState for a state
 	// the command is not valid in, NoError otherwise — matter.js
@@ -291,18 +299,19 @@ type variant struct {
 
 var (
 	baseVariant = variant{
-		clusterID:   ClusterIDOperationalState,
+		def:         opdef.Definition,
 		commands:    CommandPause | CommandStop | CommandStart | CommandResume,
-		extraStates: [2]State{1, 0}, extraErrors: [2]ErrorID{1, 0}, // empty ranges
+		states:      opdef.OperationalStateEnumDef,
+		errors:      opdef.ErrorStateEnumDef,
 		deviceTypes: []uint16{DeviceTypeLaundryWasher, DeviceTypeDishwasher, DeviceTypeLaundryDryer},
 		pause:       assertPause,
 		resume:      assertResume,
 	}
 	rvcVariant = variant{
-		clusterID:   ClusterIDRvcOperationalState,
+		def:         rvcdef.Definition,
 		commands:    CommandPause | CommandResume | CommandGoHome,
-		extraStates: [2]State{StateSeekingCharger, StateUpdatingMaps},
-		extraErrors: [2]ErrorID{ErrorFailedToFindChargingDock, ErrorNavigationSensorObscured},
+		states:      rvcdef.OperationalStateEnumDef,
+		errors:      rvcdef.ErrorStateEnumDef,
 		deviceTypes: []uint16{DeviceTypeRoboticVacuumCleaner},
 		pause:       assertRvcPause,
 		resume:      assertRvcResume,
@@ -361,14 +370,17 @@ func assertRvcGoHome(st State) ErrorID {
 	return ErrorNoError
 }
 
+// validState reports whether s is a state of the derivation: a value of
+// its OperationalStateEnum, or a manufacturer-specific one (0x80-0xBF).
+// No enum value carries a feature conformance, so an empty context
+// decides them.
 func (v variant) validState(s State) bool {
-	return s <= StateError || (s >= v.extraStates[0] && s <= v.extraStates[1]) ||
-		clusterwire.HasOperationalStateLabel(uint8(s))
+	return spec.EnumSupported(v.states, uint64(s), spec.Context(v.def, 0)) || clusterwire.HasOperationalStateLabel(uint8(s))
 }
 
+// validError is validState for the ErrorStateEnum.
 func (v variant) validError(e ErrorID) bool {
-	return e <= ErrorCommandInvalidInState || (e >= v.extraErrors[0] && e <= v.extraErrors[1]) ||
-		clusterwire.HasOperationalStateLabel(uint8(e))
+	return spec.EnumSupported(v.errors, uint64(e), spec.Context(v.def, 0)) || clusterwire.HasOperationalStateLabel(uint8(e))
 }
 
 // Server implements [contract.ClusterServer] for OperationalState or
@@ -377,12 +389,12 @@ type Server struct {
 	cluster.AttributeChanges
 
 	v        variant
+	inst     *spec.Instance
 	embedded cluster.DataVersionTracker
 	ext      *cluster.DataVersionTracker
 	handler  CommandHandler
 	commands Command
 	states   []StateEntry
-	events   []uint32
 	countOn  bool
 	quiet    *cluster.Quieter
 
@@ -431,13 +443,25 @@ func newServer(v variant, cfg Config) (*Server, error) {
 		// <device>.element.ts: Requirement OperationCompletion, "M".
 		required = true
 	}
-	events := []uint32{EventOperationalError}
+	opts := spec.Options{}
 	if cfg.OperationCompletion || required {
-		events = append(events, EventOperationCompletion)
+		opts.Events = []uint32{EventOperationCompletion}
 	}
+	if cfg.CountdownTime {
+		opts.Attributes = []uint32{AttrCountdownTime}
+	}
+	for _, c := range commandIDs {
+		if cfg.Commands&c.cmd != 0 {
+			opts.Commands = append(opts.Commands, c.id)
+		}
+	}
+	// checkCommands has refused every command the derivation disallows
+	// (Start and Stop are "X" on RvcOperationalState); nothing else is
+	// left for New to refuse.
+	inst, _ := spec.New(v.def, opts)
 	s := &Server{
-		v: v, ext: cfg.DataVersion, handler: cfg.Handler, commands: cfg.Commands,
-		states: slices.Clone(cfg.States), events: events, countOn: cfg.CountdownTime,
+		v: v, inst: inst, ext: cfg.DataVersion, handler: cfg.Handler, commands: cfg.Commands,
+		states: slices.Clone(cfg.States), countOn: cfg.CountdownTime,
 		state: cfg.State, phases: slices.Clone(cfg.Phases), currentPhase: syncedPhase(cfg.Phases, cfg.CurrentPhase),
 	}
 	s.quiet = &cluster.Quieter{Report: func() { s.changed(AttrCountdownTime) }}
@@ -541,12 +565,13 @@ func syncedPhase(phases []string, current *uint8) *uint8 {
 	return &c
 }
 
-// Revision returns OperationalState's revision from the generated schema.
-func Revision() uint16 { return schema.ClusterRevisions[ClusterIDOperationalState] }
+// Revision returns OperationalState's revision from its generated
+// definition.
+func Revision() uint16 { return opdef.Revision }
 
-// RvcRevision returns RvcOperationalState's revision from the generated
-// schema.
-func RvcRevision() uint16 { return schema.ClusterRevisions[ClusterIDRvcOperationalState] }
+// RvcRevision returns RvcOperationalState's revision from its generated
+// definition.
+func RvcRevision() uint16 { return rvcdef.Revision }
 
 func (s *Server) tracker() *cluster.DataVersionTracker {
 	if s.ext != nil {
@@ -565,19 +590,13 @@ func (s *Server) changed(attrs ...uint32) {
 }
 
 // MatterClusterID returns 0x0060 or 0x0061.
-func (s *Server) MatterClusterID() uint32 { return s.v.clusterID }
+func (s *Server) MatterClusterID() uint32 { return s.inst.MatterClusterID() }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterAttributes implements [contract.ClusterAttributeLister].
-func (s *Server) MatterAttributes() []uint32 {
-	out := []uint32{AttrPhaseList, AttrCurrentPhase}
-	if s.countOn {
-		out = append(out, AttrCountdownTime)
-	}
-	return append(out, AttrOperationalStateList, AttrOperationalState, AttrOperationalError)
-}
+func (s *Server) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // MatterReportable lists the attributes whose change is reported at once.
 // CountdownTime is not among them: its quality is Q, and it is reported
@@ -588,41 +607,28 @@ func (*Server) MatterReportable() []uint32 {
 	return []uint32{AttrPhaseList, AttrCurrentPhase, AttrOperationalState, AttrOperationalError}
 }
 
+// commandIDs pairs each Command with its id.
+var commandIDs = []struct {
+	cmd Command
+	id  uint32
+}{{CommandPause, CmdPause}, {CommandStop, CmdStop}, {CommandStart, CmdStart}, {CommandResume, CmdResume}, {CommandGoHome, CmdGoHome}}
+
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
-func (s *Server) MatterAcceptedCommands() []uint32 {
-	out := []uint32{}
-	for _, c := range []struct {
-		cmd Command
-		id  uint32
-	}{{CommandPause, CmdPause}, {CommandStop, CmdStop}, {CommandStart, CmdStart}, {CommandResume, CmdResume}, {CommandGoHome, CmdGoHome}} {
-		if s.commands&c.cmd != 0 {
-			out = append(out, c.id)
-		}
-	}
-	return out
-}
+func (s *Server) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]:
-// OperationalCommandResponse, "Pause | Stop | Start | Resume"
-// (operational-state.element.ts:74-80) — and GoHome's response too.
-func (s *Server) MatterGeneratedCommands() []uint32 {
-	if s.commands == 0 {
-		return []uint32{}
-	}
-	return []uint32{CmdOperationalCommandResponse}
-}
+// OperationalCommandResponse, the response of every accepted command.
+func (s *Server) MatterGeneratedCommands() []uint32 { return s.inst.MatterGeneratedCommands() }
 
 // MatterEvents implements [contract.ClusterEventLister].
-func (s *Server) MatterEvents() []uint32 { return slices.Clone(s.events) }
+func (s *Server) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 
 // MatterRead resolves an attribute.
 func (s *Server) MatterRead(attrID uint32) (any, bool) {
-	switch attrID {
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return schema.ClusterRevisions[s.v.clusterID], true
-	case AttrOperationalStateList:
+	if v, ok := s.inst.ReadGlobal(attrID); ok {
+		return v, true
+	}
+	if attrID == AttrOperationalStateList {
 		out := make([]clusterwire.OperationalStateStruct, 0, len(s.states))
 		for _, e := range s.states {
 			out = append(out, clusterwire.OperationalStateStruct{OperationalStateID: uint8(e.ID), OperationalStateLabel: e.Label})
@@ -658,12 +664,11 @@ func (s *Server) MatterRead(attrID uint32) (any, bool) {
 	return nil, false
 }
 
-// MatterWrite refuses every write: each attribute is "R V".
-func (s *Server) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	if slices.Contains(s.MatterAttributes(), attrID) {
-		return statusError{im.StatusUnsupportedWrite, fmt.Sprintf("opstate: attribute 0x%04X is read-only", attrID)}
-	}
-	return statusError{im.StatusUnsupportedAttribute, fmt.Sprintf("opstate: attribute 0x%04X is not served", attrID)}
+// MatterWrite refuses every write: each attribute is "R V"
+// (UNSUPPORTED_WRITE), and one not served is UNSUPPORTED_ATTRIBUTE.
+func (s *Server) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := s.inst.ValidateWrite(attrID, value, nil)
+	return err
 }
 
 // MatterInvoke answers Pause, Stop, Start, Resume and GoHome with an
@@ -787,8 +792,8 @@ func (s *Server) SetOperationalError(e ErrorState) error {
 	s.mu.Unlock()
 	s.changed(changed...)
 	if e.ID != ErrorNoError && emitter != nil {
-		emitter.MatterEmitEvent(endpoint, s.v.clusterID, EventOperationalError,
-			clusterwire.OperationalErrorEvent{ErrorState: e.wire()}, contract.EventPriorityCritical)
+		emitter.MatterEmitEvent(endpoint, s.inst.MatterClusterID(), EventOperationalError,
+			clusterwire.OperationalErrorEvent{ErrorState: e.wire()}, s.inst.EventPriority(EventOperationalError))
 	}
 	return nil
 }
@@ -874,7 +879,7 @@ func (s *Server) SetCountdownTime(seconds *uint32) error {
 // EmitOperationCompletion raises the OperationCompletion event (info). Its
 // Code must be one of the cluster's error states (NoError for success).
 func (s *Server) EmitOperationCompletion(ev OperationCompletion) error {
-	if !slices.Contains(s.events, EventOperationCompletion) {
+	if !s.inst.Emits(EventOperationCompletion) {
 		return ErrEventNotDeclared
 	}
 	if !s.v.validError(ev.Code) {
@@ -884,9 +889,9 @@ func (s *Server) EmitOperationCompletion(ev OperationCompletion) error {
 	emitter, endpoint := s.emitter, s.endpoint
 	s.mu.Unlock()
 	if emitter != nil {
-		emitter.MatterEmitEvent(endpoint, s.v.clusterID, EventOperationCompletion, clusterwire.OperationCompletionEvent{
+		emitter.MatterEmitEvent(endpoint, s.inst.MatterClusterID(), EventOperationCompletion, clusterwire.OperationCompletionEvent{
 			CompletionErrorCode: uint8(ev.Code), TotalOperationalTime: ev.TotalOperationalTime, PausedTime: ev.PausedTime,
-		}, contract.EventPriorityInfo)
+		}, s.inst.EventPriority(EventOperationCompletion))
 	}
 	return nil
 }

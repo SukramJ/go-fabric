@@ -1588,3 +1588,23 @@ The code itself is in Git history.
 | Removed | What it was | Why removed / where the live twin is |
 |---|---|---|
 | `cluster/core/power_source.go` | PowerSource (0x002F) cluster server, core-package variant | Duplicate of the production `measurement.PowerSourceServer` (mounted via the measurement cluster factory). Schema parity for PowerSource is held by the measurement package's parity tests. Removed in the 2026-07-04 wiring audit, while the stack still lived in OpenCCU-Loom. |
+
+### BD-Matter-LevelControl-LenientDecoders — LevelControl requests stay off the generated decoder
+
+The module decodes LevelControl requests leniently although the generated
+LevelControl definition (`cluster/spec/levelcontrol`, ADR 0013) is linked
+wherever `cluster/levelcontrol` is: MoveToLevel and MoveToLevelWithOnOff
+through the bridge's hand-written `decodeMoveToLevelRequest`, Move, Step,
+Stop and their WithOnOff forms through the generic tag map
+(`bridge/fields_reader.go`, case 0x0008). matter.js validates every request
+against its schema and answers a missing mandatory field with
+INVALID_COMMAND (`CommandInvokeResponse.ts`); Google Home omits the
+mandatory-but-nullable TransitionTime entirely (the permissive
+command-field decoding above), and the generated decoder would refuse its
+Step. `levelcontrol.Server` reads an absent nullable field as null and an
+absent OptionsMask / OptionsOverride as 0, as it did. The same holds for
+FanControl Step, which keeps `decodeFanStepRequest` because a `Stepper`
+host receives its `cluster/wire.FanStepRequest`. Pinned by
+`TestCommandFieldsReader_LevelControlStepAbsentTransitionTime`. Retire
+when the generated decoders can be told which absent fields a controller
+in the field omits.

@@ -77,6 +77,21 @@
 // bitmap rule. With the engine the host names its On/Off state in
 // [Transitions.OnOff] and the server applies the gate and the coupling
 // itself.
+//
+// # The generated definition
+//
+// The cluster's identity is the generated definition (cluster/spec/
+// levelcontrol, ADR 0013): ids, revision, the attribute and command lists
+// of the selection, the Options bits the selection makes conformant, the
+// write checks (OnLevel's "minLevel to maxLevel" through the definition's
+// peer bound) and the write privileges. The requests keep the bridge's
+// lenient decoding — MoveToLevel and MoveToLevelWithOnOff its hand-written
+// decoder, the other six the tag map — because Google Home omits the
+// mandatory-but-nullable TransitionTime, which the generated decoder
+// refuses (notes/parity/by_design.md
+// BD-Matter-LevelControl-LenientDecoders); the generated request structs
+// are accepted from an in-process caller and carried over to the
+// cluster/wire structs the [LevelSource] methods take.
 package levelcontrol
 
 import (
@@ -85,16 +100,16 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	lvldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/transition"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
-// ClusterID is the LevelControl cluster id
-// (matter.js level-control.element.ts:19).
-const ClusterID uint32 = 0x0008
+// ClusterID is the LevelControl cluster id.
+const ClusterID = lvldef.ClusterID
 
 // Attribute ids of the served attributes; the package doc names the gated
 // and optional ones this server leaves out.
@@ -103,45 +118,44 @@ const (
 	// quality "X N S Q" — the X is why an unobserved level reads as TLV
 	// null rather than as 0, which is a real level
 	// (element :29-30).
-	AttrCurrentLevel uint32 = 0x0000
+	AttrCurrentLevel = lvldef.AttrCurrentLevel
 	// AttrOptions is the OptionsBitmap that sets the default behaviour of
 	// the commands that consult it, access "RW VO" (element :65).
-	AttrOptions uint32 = 0x000F
+	AttrOptions = lvldef.AttrOptions
 	// AttrMinLevel and AttrMaxLevel carry conformance "Rev >= v7, O"
 	// (element :34-41): mandatory at the revision this server advertises.
 	// matter.js sets both on every LevelControl (LevelControlServer.ts:
 	// 114-120 initialize: "Spec 1.5.1 made minLevel/maxLevel mandatory at
 	// rev 7"), to 0 (1 with LT) and 254. Found missing by the CHIP
 	// conformance checker (TC-IDM-10.2).
-	AttrMinLevel uint32 = 0x0002
-	AttrMaxLevel uint32 = 0x0003
+	AttrMinLevel = lvldef.AttrMinLevel
+	AttrMaxLevel = lvldef.AttrMaxLevel
 	// AttrOnLevel is the level CurrentLevel is set to when an On/Off
 	// cluster on the same endpoint turns on, access "RW VO", quality "X"
 	// — null means "no effect" (element :49-50, resource :144-153).
-	AttrOnLevel uint32 = 0x0011
+	AttrOnLevel = lvldef.AttrOnLevel
 	// AttrRemainingTime is the time left in the current transition, in
 	// tenths of a second, access "R V", quality "Q", conformance "LT"
 	// (element :33). Served with [Config.Lighting].
-	AttrRemainingTime uint32 = 0x0001
+	AttrRemainingTime = lvldef.AttrRemainingTime
 	// AttrStartUpCurrentLevel is the level the device takes at power-up,
 	// access "RW VM", quality "X N", conformance "LT" (element :68-71).
 	// Served with [Config.Lighting].
-	AttrStartUpCurrentLevel uint32 = 0x4000
+	AttrStartUpCurrentLevel = lvldef.AttrStartUpCurrentLevel
 )
 
-// Command ids, taken from the wire package so the repository carries one
-// set. All eight are conformance "M" with response "status", so none of
+// Command ids, from the generated definition. All eight are conformance "M" with response "status", so none of
 // them produces a generated command
 // (element :72, :80, :88, :97, :101, :105, :109, :113).
 const (
-	CmdMoveToLevel          = wire.LevelCtrlCmdMoveToLevel
-	CmdMove                 = wire.LevelCtrlCmdMove
-	CmdStep                 = wire.LevelCtrlCmdStep
-	CmdStop                 = wire.LevelCtrlCmdStop
-	CmdMoveToLevelWithOnOff = wire.LevelCtrlCmdMoveToLevelWithOnOff
-	CmdMoveWithOnOff        = wire.LevelCtrlCmdMoveWithOnOff
-	CmdStepWithOnOff        = wire.LevelCtrlCmdStepWithOnOff
-	CmdStopWithOnOff        = wire.LevelCtrlCmdStopWithOnOff
+	CmdMoveToLevel          = lvldef.CmdMoveToLevel
+	CmdMove                 = lvldef.CmdMove
+	CmdStep                 = lvldef.CmdStep
+	CmdStop                 = lvldef.CmdStop
+	CmdMoveToLevelWithOnOff = lvldef.CmdMoveToLevelWithOnOff
+	CmdMoveWithOnOff        = lvldef.CmdMoveWithOnOff
+	CmdStepWithOnOff        = lvldef.CmdStepWithOnOff
+	CmdStopWithOnOff        = lvldef.CmdStopWithOnOff
 )
 
 // FeatureMap bits, named so a later projection has the verified bit
@@ -150,13 +164,13 @@ const (
 const (
 	// FeatureOnOff is the OO bit — this cluster is coupled to an OnOff
 	// cluster on the same endpoint. Conformance "O", default 1 (:24).
-	FeatureOnOff uint32 = 1 << 0
+	FeatureOnOff = uint32(lvldef.FeatureOnOff)
 	// FeatureLighting is the LT bit — the lighting profile, which adds
 	// RemainingTime and StartUpCurrentLevel. Conformance "O" (:25).
-	FeatureLighting uint32 = 1 << 1
+	FeatureLighting = uint32(lvldef.FeatureLighting)
 	// FeatureFrequency is the FQ bit — a frequency axis alongside the
 	// level one. Conformance "P" (:26).
-	FeatureFrequency uint32 = 1 << 2
+	FeatureFrequency = uint32(lvldef.FeatureFrequency)
 )
 
 // featureMap is what this server advertises by default: OO alone.
@@ -175,23 +189,20 @@ const featureMap uint32 = FeatureOnOff
 const (
 	// OptionExecuteIfOff, when set, lets a plain (non-On/Off) command run
 	// even while the device is off (resource :190-199).
-	OptionExecuteIfOff uint8 = 1 << 0
+	OptionExecuteIfOff = uint8(lvldef.OptionsExecuteIfOff)
 	// OptionCoupleColorTempToLevel, when set, moves the ColorControl
 	// colour temperature along with the level. LT-gated: accepted with
 	// [Config.Lighting] only.
-	OptionCoupleColorTempToLevel uint8 = 1 << 1
+	OptionCoupleColorTempToLevel = uint8(lvldef.OptionsCoupleColorTempToLevel)
 )
 
 // optionsSupportedMask is the set of Options bits that are conformant
 // under [featureMap]: ExecuteIfOff exists under "LT | OO" and OO is
-// advertised; CoupleColorTempToLevel needs LT (lightingOptionsMask). A
+// advertised; CoupleColorTempToLevel needs LT ([Server.optionsMask]). A
 // write carrying any other bit is refused rather than stored, because a
 // stored bit would be read back as a capability the cluster does not
 // have.
 const optionsSupportedMask = OptionExecuteIfOff
-
-// lightingOptionsMask is optionsSupportedMask under OO | LT.
-const lightingOptionsMask = OptionExecuteIfOff | OptionCoupleColorTempToLevel
 
 // MoveMode values, taken from the wire package (MoveModeEnum, element
 // :131-135).
@@ -355,6 +366,7 @@ type Config struct {
 type Server struct {
 	src      LevelSource
 	lighting bool
+	inst     *spec.Instance
 
 	embedded cluster.DataVersionTracker // used when Config.DataVersion is nil
 	ext      *cluster.DataVersionTracker
@@ -402,6 +414,13 @@ var (
 // NewServer constructs a LevelControl server over the host port in cfg.
 func NewServer(cfg Config) *Server {
 	s := &Server{src: cfg.Source, ext: cfg.DataVersion, lighting: cfg.Lighting}
+	// MinLevel and MaxLevel are "Rev >= v7, O": served at the revision
+	// advertised. OO and OO | LT are conformant selections, so New has
+	// nothing to refuse.
+	s.inst, _ = spec.New(lvldef.Definition, spec.Options{
+		Features:   s.features(),
+		Attributes: []uint32{AttrMinLevel, AttrMaxLevel},
+	})
 	if cfg.Transitions != nil {
 		s.initTransitions(*cfg.Transitions)
 	}
@@ -418,12 +437,17 @@ func (s *Server) minLevel() uint8 {
 }
 
 // optionsMask is the set of Options bits the advertised FeatureMap makes
-// conformant.
+// conformant: the OptionsBitmap members whose conformance ("LT | OO",
+// "LT") the selection does not disallow.
 func (s *Server) optionsMask() uint8 {
-	if s.lighting {
-		return lightingOptionsMask
+	var mask uint64
+	ctx := s.inst.Context()
+	for i := range lvldef.OptionsBitmapDef.Members {
+		if m := &lvldef.OptionsBitmapDef.Members[i]; m.Conformance.Applicability(ctx) != spec.ApplicabilityNone {
+			mask |= m.Mask()
+		}
 	}
-	return optionsSupportedMask
+	return uint8(mask) //nolint:gosec // a map8's members
 }
 
 // features is the advertised FeatureMap.
@@ -468,11 +492,10 @@ func (s *Server) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	})
 }
 
-// Revision returns the cluster revision from the generated matter.js
-// schema snapshot (default 7 at level-control.element.ts:20). Reading it
-// rather than restating it is the point: a regeneration moves this
-// value, and a hand-written copy would not follow.
-func Revision() uint16 { return schema.ClusterRevisions[ClusterID] }
+// Revision returns the cluster revision of the generated definition.
+// Reading it rather than restating it is the point: a regeneration moves
+// this value, and a hand-written copy would not follow.
+func Revision() uint16 { return lvldef.Revision }
 
 // MatterClusterID returns 0x0008.
 func (*Server) MatterClusterID() uint32 { return ClusterID }
@@ -514,12 +537,8 @@ func (s *Server) MatterRead(attrID uint32) (value any, ok bool) {
 			return nil, true
 		}
 		return *s.startUp, true
-	case cluster.AttrGlobalFeatureMap:
-		return s.features(), true
-	case cluster.AttrGlobalClusterRevision:
-		return Revision(), true
 	default:
-		return nil, false
+		return s.inst.ReadGlobal(attrID)
 	}
 }
 
@@ -551,47 +570,56 @@ func nullableLevel(level uint8, known bool) (any, bool) {
 	return level, true
 }
 
-// MatterWrite applies the two writable attributes.
-//
-// Options and OnLevel carry access "RW VO" (element :65, :49);
-// CurrentLevel is "R V" (:29) and is rejected as unwritable rather than
-// silently dropped.
+// MatterWrite applies the writable attributes: Options and OnLevel
+// ("RW VO"), and StartUpCurrentLevel ("RW VM") with [Config.Lighting].
+// The definition checks the write — served (UNSUPPORTED_ATTRIBUTE
+// otherwise), writable (UNSUPPORTED_WRITE), the type and null, the
+// OptionsBitmap's defined bits, OnLevel's "minLevel to maxLevel", the
+// nullable uint8 range of StartUpCurrentLevel; the Options bits the
+// FeatureMap does not make conformant are the server's to refuse.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
+	v, err := s.inst.ValidateWrite(attrID, value, s.peer)
+	if err != nil {
+		return err
+	}
 	switch attrID {
 	case AttrOptions:
-		return s.writeOptions(ctx, value)
+		n, _ := v.(uint64)                   // a map8 per ValidateWrite
+		return s.writeOptions(ctx, uint8(n)) //nolint:gosec // a map8 per ValidateWrite
 	case AttrOnLevel:
-		return s.writeOnLevel(ctx, value)
-	case AttrStartUpCurrentLevel:
-		if s.lighting {
-			return s.writeStartUpCurrentLevel(value)
-		}
-		return unsupportedAttributeErr{
-			fmt.Sprintf("levelcontrol: attribute 0x%04X is not implemented by this server", attrID),
-		}
-	case AttrCurrentLevel:
-		return unsupportedWriteErr{fmt.Sprintf("levelcontrol: attribute 0x%04X is read-only", attrID)}
-	default:
-		return unsupportedAttributeErr{
-			fmt.Sprintf("levelcontrol: attribute 0x%04X is not implemented by this server", attrID),
-		}
+		return s.writeOnLevel(ctx, nullableUint8Of(v))
+	default: // AttrStartUpCurrentLevel, the last writable attribute
+		s.mu.Lock()
+		s.startUp = nullableUint8Of(v)
+		s.mu.Unlock()
+		s.tracker().Bump()
+		return nil
 	}
 }
 
-// writeOptions validates and forwards an Options write. The bitmap
-// carries constraint "desc" (element :65); what "desc" resolves to here
-// is [optionsSupportedMask] — the bits whose conformance the advertised
-// FeatureMap satisfies.
-func (s *Server) writeOptions(ctx context.Context, value any) error {
-	if value == nil {
-		// Options carries no X quality (element :65), so null is not a
-		// value it can hold.
-		return constraintErr{"levelcontrol: Options is not nullable"}
+// peer resolves the MinLevel and MaxLevel bounds of OnLevel's
+// "minLevel to maxLevel".
+func (s *Server) peer(attrID uint32) (any, bool) {
+	if attrID == AttrMinLevel {
+		return s.minLevel(), true
 	}
-	options, ok := asUint8(value)
+	return LevelMax, true
+}
+
+// nullableUint8Of is a validated nullable uint8: nil for null.
+func nullableUint8Of(v any) *uint8 {
+	n, ok := v.(uint64)
 	if !ok {
-		return constraintErr{fmt.Sprintf("levelcontrol: Options expected a map8, got %T", value)}
+		return nil
 	}
+	b := uint8(n) //nolint:gosec // a nullable uint8 per ValidateWrite
+	return &b
+}
+
+// writeOptions forwards an Options write. The bitmap carries constraint
+// "desc"; what "desc" resolves to here is [Server.optionsMask] — the bits
+// whose conformance the advertised FeatureMap satisfies.
+func (s *Server) writeOptions(ctx context.Context, options uint8) error {
 	if options&^s.optionsMask() != 0 {
 		return constraintErr{fmt.Sprintf(
 			"levelcontrol: Options 0x%02X sets a bit that is not conformant under FeatureMap 0x%02X", options, s.features(),
@@ -607,25 +635,9 @@ func (s *Server) writeOptions(ctx context.Context, value any) error {
 	return nil
 }
 
-// writeOnLevel validates and forwards an OnLevel write. A null clears
-// the on-level, which the spec reads as "it has no effect"
-// (resource :146-149); any other value must satisfy constraint
-// "minLevel to maxLevel" (element :49-50), resolved here to MinLevel
-// ([LevelMin], or [LightingLevelMin] under LT) .. [LevelMax].
-func (s *Server) writeOnLevel(ctx context.Context, value any) error {
-	var level *uint8
-	if value != nil {
-		v, ok := asUint8(value)
-		if !ok {
-			return constraintErr{fmt.Sprintf("levelcontrol: OnLevel expected a number, got %T", value)}
-		}
-		if v < s.minLevel() || v > LevelMax {
-			return constraintErr{fmt.Sprintf(
-				"levelcontrol: OnLevel %d violates constraint minLevel to maxLevel (%d to %d)", v, s.minLevel(), LevelMax,
-			)}
-		}
-		level = &v
-	}
+// writeOnLevel forwards an OnLevel write. A null clears the on-level,
+// which the spec reads as "it has no effect" (resource :146-149).
+func (s *Server) writeOnLevel(ctx context.Context, level *uint8) error {
 	if s.src == nil {
 		return errNoSource("OnLevel write")
 	}
@@ -636,40 +648,9 @@ func (s *Server) writeOnLevel(ctx context.Context, value any) error {
 	return nil
 }
 
-// writeStartUpCurrentLevel stores StartUpCurrentLevel: null, or a level
-// the uint8 range allows up to [LevelMax] (0 is "the minimum level", 0xFF
-// is the null of the wire).
-func (s *Server) writeStartUpCurrentLevel(value any) error {
-	var next *uint8
-	if value != nil {
-		v, ok := asUint8(value)
-		if !ok || v > LevelMax {
-			return constraintErr{fmt.Sprintf("levelcontrol: StartUpCurrentLevel %v is outside 0 to %d", value, LevelMax)}
-		}
-		next = &v
-	}
-	s.mu.Lock()
-	s.startUp = next
-	s.mu.Unlock()
-	s.tracker().Bump()
-	return nil
-}
-
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
-// StartUpCurrentLevel is "RW VM" (element :68), Options and OnLevel
-// "RW VO" (:65, :49).
-func (*Server) MinWritePrivilege(attrID uint32) uint8 {
-	if attrID == AttrStartUpCurrentLevel {
-		return privilegeManage
-	}
-	return privilegeOperate
-}
-
-// Access-control privileges (Matter §9.10.5.2, AccessControlEntryPrivilegeEnum).
-const (
-	privilegeOperate uint8 = 3
-	privilegeManage  uint8 = 4
-)
+// StartUpCurrentLevel is "RW VM", Options and OnLevel "RW VO".
+func (s *Server) MinWritePrivilege(attrID uint32) uint8 { return s.inst.MinWritePrivilege(attrID) }
 
 // MatterInvoke dispatches the eight conformance-M commands. Forwarded,
 // each one reaches the host port; none reports Success on its own, and a
@@ -852,19 +833,29 @@ func checkStepMode(name string, mode uint8) error {
 
 // moveToLevelRequestFrom normalises the payload the bridge hands over.
 //
-// Three shapes arrive in practice. The bridge decodes MoveToLevel and
-// MoveToLevelWithOnOff into the typed request already
-// (bridge/fields_reader.go commandFieldsReader, case 0x0008), every
-// other LevelControl command falls through to the generic tag map its
-// fields reader salvages, and a host holding the raw command payload can
-// pass the bytes — which go through [wire.DecodeMoveToLevel] rather than
-// through a second parser written here.
+// The bridge decodes MoveToLevel and MoveToLevelWithOnOff into the
+// cluster/wire request (bridge/fields_reader.go commandFieldsReader, case
+// 0x0008) and hands every other LevelControl command over as the lenient
+// tag map; the generated request structs (cluster/spec/levelcontrol) an
+// in-process caller builds are carried over to the cluster/wire struct
+// the [LevelSource] takes, and the raw payload goes through
+// [wire.DecodeMoveToLevel].
 func moveToLevelRequestFrom(name string, fields any) (MoveToLevelRequest, error) {
 	switch v := fields.(type) {
 	case nil:
 		return MoveToLevelRequest{}, missingFields(name)
 	case MoveToLevelRequest:
 		return v, nil
+	case lvldef.MoveToLevelRequest:
+		return MoveToLevelRequest{
+			Level: v.Level, TransitionTime: nullablePtr(v.TransitionTime),
+			OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride),
+		}, nil
+	case lvldef.MoveToLevelWithOnOffRequest:
+		return MoveToLevelRequest{
+			Level: v.Level, TransitionTime: nullablePtr(v.TransitionTime),
+			OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride),
+		}, nil
 	case *MoveToLevelRequest:
 		if v == nil {
 			return MoveToLevelRequest{}, missingFields(name)
@@ -910,6 +901,10 @@ func moveRequestFrom(name string, fields any) (MoveRequest, error) {
 		return MoveRequest{}, missingFields(name)
 	case MoveRequest:
 		return v, nil
+	case lvldef.MoveRequest:
+		return MoveRequest{MoveMode: uint8(v.MoveMode), Rate: nullablePtr(v.Rate), OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
+	case lvldef.MoveWithOnOffRequest:
+		return MoveRequest{MoveMode: uint8(v.MoveMode), Rate: nullablePtr(v.Rate), OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
 	case *MoveRequest:
 		if v == nil {
 			return MoveRequest{}, missingFields(name)
@@ -955,6 +950,16 @@ func stepRequestFrom(name string, fields any) (StepRequest, error) {
 		return StepRequest{}, missingFields(name)
 	case StepRequest:
 		return v, nil
+	case lvldef.StepRequest:
+		return StepRequest{
+			StepMode: uint8(v.StepMode), StepSize: v.StepSize, TransitionTime: nullablePtr(v.TransitionTime),
+			OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride),
+		}, nil
+	case lvldef.StepWithOnOffRequest:
+		return StepRequest{
+			StepMode: uint8(v.StepMode), StepSize: v.StepSize, TransitionTime: nullablePtr(v.TransitionTime),
+			OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride),
+		}, nil
 	case *StepRequest:
 		if v == nil {
 			return StepRequest{}, missingFields(name)
@@ -1003,6 +1008,10 @@ func stopRequestFrom(name string, fields any) (StopRequest, error) {
 		return StopRequest{}, missingFields(name)
 	case StopRequest:
 		return v, nil
+	case lvldef.StopRequest:
+		return StopRequest{OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
+	case lvldef.StopWithOnOffRequest:
+		return StopRequest{OptionsMask: uint8(v.OptionsMask), OptionsOverride: uint8(v.OptionsOverride)}, nil
 	case *StopRequest:
 		if v == nil {
 			return StopRequest{}, missingFields(name)
@@ -1148,6 +1157,16 @@ func asInt64(v any) (int64, bool) {
 	}
 }
 
+// nullablePtr carries a decoded nullable field over to the pointer form
+// the cluster/wire structs use: nil for null.
+func nullablePtr[T any](n spec.Nullable[T]) *T {
+	if n.Null {
+		return nil
+	}
+	v := n.Value
+	return &v
+}
+
 // missingFields reports an invocation that carried no payload at all.
 // Every one of the eight commands has at least one conformance-M field,
 // so nil is malformed rather than "take the defaults".
@@ -1182,24 +1201,11 @@ func (s *Server) MatterReportable() []uint32 {
 
 // MatterAttributes implements [contract.ClusterAttributeLister], in id
 // order and without the universal globals — the dispatcher merges those.
-func (s *Server) MatterAttributes() []uint32 {
-	if s.lighting {
-		return []uint32{
-			AttrCurrentLevel, AttrRemainingTime, AttrMinLevel, AttrMaxLevel,
-			AttrOptions, AttrOnLevel, AttrStartUpCurrentLevel,
-		}
-	}
-	return []uint32{AttrCurrentLevel, AttrMinLevel, AttrMaxLevel, AttrOptions, AttrOnLevel}
-}
+func (s *Server) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister], in
 // command-id order.
-func (*Server) MatterAcceptedCommands() []uint32 {
-	return []uint32{
-		CmdMoveToLevel, CmdMove, CmdStep, CmdStop,
-		CmdMoveToLevelWithOnOff, CmdMoveWithOnOff, CmdStepWithOnOff, CmdStopWithOnOff,
-	}
-}
+func (s *Server) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister].
 // All eight commands declare response "status", so the server emits no
@@ -1212,22 +1218,6 @@ type constraintErr struct{ msg string }
 func (e constraintErr) Error() string                 { return e.msg }
 func (constraintErr) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
 
-// unsupportedWriteErr maps onto UnsupportedWrite for an attribute that
-// exists but is read-only.
-type unsupportedWriteErr struct{ msg string }
-
-func (e unsupportedWriteErr) Error() string                 { return e.msg }
-func (unsupportedWriteErr) MatterStatusCode() im.StatusCode { return im.StatusUnsupportedWrite }
-
-// unsupportedAttributeErr maps onto UnsupportedAttribute for an id this
-// server does not carry.
-type unsupportedAttributeErr struct{ msg string }
-
-func (e unsupportedAttributeErr) Error() string { return e.msg }
-func (unsupportedAttributeErr) MatterStatusCode() im.StatusCode {
-	return im.StatusUnsupportedAttribute
-}
-
 // invalidCommandErr maps onto InvalidCommand for a malformed or
 // unacceptable command payload.
 type invalidCommandErr struct{ msg string }
@@ -1238,7 +1228,5 @@ func (invalidCommandErr) MatterStatusCode() im.StatusCode { return im.StatusInva
 // Compile-time assertions for the typed status carriers.
 var (
 	_ im.StatusCodeError = constraintErr{}
-	_ im.StatusCodeError = unsupportedWriteErr{}
-	_ im.StatusCodeError = unsupportedAttributeErr{}
 	_ im.StatusCodeError = invalidCommandErr{}
 )

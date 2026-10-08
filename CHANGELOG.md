@@ -81,6 +81,49 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- **Seven more servers are built on their generated definitions** (ADR 0013):
+  `cluster/onoff` (identity), `cluster/valve`, `cluster/modeselect`,
+  `cluster/alarm`, `cluster/fan`, `cluster/opstate` and
+  `cluster/levelcontrol` read their ids, revisions, enums, attribute /
+  command / event lists, write checks and privileges from the new
+  `cluster/spec/onoff`, `valveconfigurationandcontrol`, `modeselect`,
+  `smokecoalarm`, `fancontrol`, `operationalstate`, `rvcoperationalstate`
+  and `levelcontrol` packages. Every exported name keeps compiling: the
+  enum and struct types are now aliases of the generated ones
+  (`valve.State`, `modeselect.ModeOptionStruct` / `SemanticTagStruct` /
+  `ChangeToModeRequest`, `alarm.AlarmState` / `Sensitivity` /
+  `ExpressedState` / `MuteState` / `EndOfService` / `ContaminationState` /
+  `Feature`, `fan.Feature` / `FanMode` / `Sequence` / `RockBitmap` /
+  `WindBitmap` / `AirflowDirection`). `fan.Server` gains
+  `MinWritePrivilege`.
+- **Host servers of these clusters receive typed requests.** Linking one of
+  the packages above makes the bridge decode that cluster's requests through
+  the generated definition, so a host's own server now receives the
+  generated request struct instead of a generic `map[uint8]any`, and a
+  request missing a mandatory field is answered INVALID_COMMAND before the
+  server runs:
+  - OnOff: `onoff.OffRequest`, `OnRequest`, `ToggleRequest`,
+    `OffWithEffectRequest`, `OnWithRecallGlobalSceneRequest`,
+    `OnWithTimedOffRequest` (`cluster/spec/onoff`). OnWithTimedOff's
+    OnTime / OffWaitTime "max 65534" is CONSTRAINT_ERROR there. The
+    reference daemon's OnOff server takes `OnWithTimedOffRequest`.
+  - ValveConfigurationAndControl: `OpenRequest`, `CloseRequest`
+    (`cluster/spec/valveconfigurationandcontrol`); `valve.Server` carries
+    Open over to the host's `valve.OpenRequest` unchanged.
+  - ModeSelect: `ChangeToModeRequest` (= `modeselect.ChangeToModeRequest`).
+  - OperationalState / RvcOperationalState: `PauseRequest`, `StopRequest`,
+    `StartRequest`, `ResumeRequest`, `GoHomeRequest`.
+  - SmokeCoAlarm: `SelfTestRequestRequest`.
+  - FanControl Step and every LevelControl request keep their previous
+    shapes (`cluster/wire.FanStepRequest`, `wire.MoveToLevelRequest`, the
+    tag map): the bridge decodes them ahead of the generated definition
+    (`BD-Matter-LevelControl-LenientDecoders` — Google Home omits
+    LevelControl's TransitionTime).
+- Writes answered from the definitions: `levelcontrol.Server` answers a
+  write to MinLevel or MaxLevel with UNSUPPORTED_WRITE (was
+  UNSUPPORTED_ATTRIBUTE; both are served read-only attributes);
+  `valve.Server` refuses a DefaultOpenDuration of 0xFFFFFFFF (the null of a
+  nullable elapsed-s) with CONSTRAINT_ERROR.
 - **Host ColorControl servers:** the ColorControl requests other than
   MoveToHue, MoveToSaturation, MoveToHueAndSaturation and
   MoveToColorTemperature now reach `MatterInvoke` as the generated

@@ -27,6 +27,15 @@
 // connectedhomeip's fan-control-server applies, and are flagged as such
 // in notes/parity/matter_behaviour_findings.md until they are checked
 // against a connectedhomeip checkout.
+//
+// The cluster's identity is the generated definition (cluster/spec/
+// fancontrol, ADR 0013): ids, revision, the enums and bitmaps, the
+// FanModeSequence / Auto pairing ("[!AUT].a" / "[AUT].b"), the attribute
+// and command lists, the write privileges and every write check but
+// FanMode's — the definition refuses the deprecated On and Smart, which
+// this server maps the way connectedhomeip does. Step keeps its
+// hand-written decoder: [clusterwire.FanStepRequest] is what a [Stepper]
+// host receives.
 package fan
 
 import (
@@ -36,14 +45,15 @@ import (
 	"slices"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	fandef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
 // ClusterID is the FanControl cluster id.
-const ClusterID = clusterwire.FanControlClusterID
+const ClusterID = fandef.ClusterID
 
 // Device types that mandate FanControl (schema/devicetypes.go, from
 // matter.js fan.element.ts, air-purifier.element.ts,
@@ -56,103 +66,100 @@ const (
 
 // Attribute ids (fan-control.element.ts:32-67).
 const (
-	AttrFanMode          uint32 = 0x0000 // M, RW VO
-	AttrFanModeSequence  uint32 = 0x0001 // M, fixed
-	AttrPercentSetting   uint32 = 0x0002 // M, RW VO, nullable, max 100
-	AttrPercentCurrent   uint32 = 0x0003 // M, max 100
-	AttrSpeedMax         uint32 = 0x0004 // SPD, fixed, 1 to 100
-	AttrSpeedSetting     uint32 = 0x0005 // SPD, RW VO, nullable, max speedMax
-	AttrSpeedCurrent     uint32 = 0x0006 // SPD, max speedMax
-	AttrRockSupport      uint32 = 0x0007 // RCK, fixed, min 1
-	AttrRockSetting      uint32 = 0x0008 // RCK, RW VO
-	AttrWindSupport      uint32 = 0x0009 // WND, fixed, min 1
-	AttrWindSetting      uint32 = 0x000A // WND, RW VO
-	AttrAirflowDirection uint32 = 0x000B // DIR, RW VO
+	AttrFanMode          = fandef.AttrFanMode          // M, RW VO
+	AttrFanModeSequence  = fandef.AttrFanModeSequence  // M, fixed
+	AttrPercentSetting   = fandef.AttrPercentSetting   // M, RW VO, nullable, max 100
+	AttrPercentCurrent   = fandef.AttrPercentCurrent   // M, max 100
+	AttrSpeedMax         = fandef.AttrSpeedMax         // SPD, fixed, 1 to 100
+	AttrSpeedSetting     = fandef.AttrSpeedSetting     // SPD, RW VO, nullable, max speedMax
+	AttrSpeedCurrent     = fandef.AttrSpeedCurrent     // SPD, max speedMax
+	AttrRockSupport      = fandef.AttrRockSupport      // RCK, fixed, min 1
+	AttrRockSetting      = fandef.AttrRockSetting      // RCK, RW VO
+	AttrWindSupport      = fandef.AttrWindSupport      // WND, fixed, min 1
+	AttrWindSetting      = fandef.AttrWindSetting      // WND, RW VO
+	AttrAirflowDirection = fandef.AttrAirflowDirection // DIR, RW VO
 )
 
 // CmdStep is the Step command (STEP feature).
-const CmdStep = clusterwire.FanControlCmdStep
+const CmdStep = fandef.CmdStep
 
 // Feature is a FanControl FeatureMap bit (fan-control.element.ts:22-30).
-type Feature uint32
+type Feature = fandef.Feature
 
 // FeatureMap bits; all six are conformance "O".
 const (
-	FeatureMultiSpeed       Feature = 1 << 0 // SPD
-	FeatureAuto             Feature = 1 << 1 // AUT
-	FeatureRocking          Feature = 1 << 2 // RCK
-	FeatureWind             Feature = 1 << 3 // WND
-	FeatureStep             Feature = 1 << 4 // STEP
-	FeatureAirflowDirection Feature = 1 << 5 // DIR
+	FeatureMultiSpeed       = fandef.FeatureMultiSpeed       // SPD
+	FeatureAuto             = fandef.FeatureAuto             // AUT
+	FeatureRocking          = fandef.FeatureRocking          // RCK
+	FeatureWind             = fandef.FeatureWind             // WND
+	FeatureStep             = fandef.FeatureStep             // STEP
+	FeatureAirflowDirection = fandef.FeatureAirflowDirection // DIR
 )
-
-const allFeatures = FeatureMultiSpeed | FeatureAuto | FeatureRocking | FeatureWind | FeatureStep | FeatureAirflowDirection
 
 // FanMode is the FanModeEnum (fan-control.element.ts:99-108).
 //
 //nolint:revive // FanMode mirrors the Matter FanModeEnum and the FanMode attribute verbatim.
-type FanMode uint8
+type FanMode = fandef.FanModeEnum
 
 // FanModeEnum values. On and Smart are deprecated (conformance "D").
 const (
-	FanModeOff    FanMode = 0
-	FanModeLow    FanMode = 1
-	FanModeMedium FanMode = 2
-	FanModeHigh   FanMode = 3
-	FanModeOn     FanMode = 4
-	FanModeAuto   FanMode = 5
-	FanModeSmart  FanMode = 6
+	FanModeOff    = fandef.FanModeOff
+	FanModeLow    = fandef.FanModeLow
+	FanModeMedium = fandef.FanModeMedium
+	FanModeHigh   = fandef.FanModeHigh
+	FanModeOn     = fandef.FanModeOn
+	FanModeAuto   = fandef.FanModeAuto
+	FanModeSmart  = fandef.FanModeSmart
 )
 
 // Sequence is the FanModeSequenceEnum (fan-control.element.ts:110-118).
-type Sequence uint8
+type Sequence = fandef.FanModeSequenceEnum
 
 // FanModeSequenceEnum values. The three without Auto carry "[!AUT].a",
 // the three with it "[AUT].b".
 const (
-	SequenceOffLowMedHigh     Sequence = 0
-	SequenceOffLowHigh        Sequence = 1
-	SequenceOffLowMedHighAuto Sequence = 2
-	SequenceOffLowHighAuto    Sequence = 3
-	SequenceOffHighAuto       Sequence = 4
-	SequenceOffHigh           Sequence = 5
+	SequenceOffLowMedHigh     = fandef.FanModeSequenceOffLowMedHigh
+	SequenceOffLowHigh        = fandef.FanModeSequenceOffLowHigh
+	SequenceOffLowMedHighAuto = fandef.FanModeSequenceOffLowMedHighAuto
+	SequenceOffLowHighAuto    = fandef.FanModeSequenceOffLowHighAuto
+	SequenceOffHighAuto       = fandef.FanModeSequenceOffHighAuto
+	SequenceOffHigh           = fandef.FanModeSequenceOffHigh
 )
 
 // RockBitmap is the RockBitmap (fan-control.element.ts:76-81).
-type RockBitmap uint8
+type RockBitmap = fandef.RockBitmap
 
 // RockBitmap bits.
 const (
-	RockLeftRight RockBitmap = 1 << 0
-	RockUpDown    RockBitmap = 1 << 1
-	RockRound     RockBitmap = 1 << 2
-	rockAll                  = RockLeftRight | RockUpDown | RockRound
+	RockLeftRight = fandef.RockRockLeftRight
+	RockUpDown    = fandef.RockRockUpDown
+	RockRound     = fandef.RockRockRound
 )
 
 // WindBitmap is the WindBitmap (fan-control.element.ts:83-87).
-type WindBitmap uint8
+type WindBitmap = fandef.WindBitmap
 
 // WindBitmap bits.
 const (
-	WindSleep   WindBitmap = 1 << 0
-	WindNatural WindBitmap = 1 << 1
-	windAll                = WindSleep | WindNatural
+	WindSleep   = fandef.WindSleepWind
+	WindNatural = fandef.WindNaturalWind
 )
 
 // AirflowDirection is the AirflowDirectionEnum
 // (fan-control.element.ts:93-97).
-type AirflowDirection uint8
+type AirflowDirection = fandef.AirflowDirectionEnum
 
 // AirflowDirectionEnum values.
 const (
-	AirflowForward AirflowDirection = 0
-	AirflowReverse AirflowDirection = 1
+	AirflowForward = fandef.AirflowDirectionForward
+	AirflowReverse = fandef.AirflowDirectionReverse
 )
 
-// StepDirectionEnum values (fan-control.element.ts:88-92).
+// StepDirectionEnum values, as the uint8 [clusterwire.FanStepRequest]
+// carries.
 const (
-	StepIncrease uint8 = 0
-	StepDecrease uint8 = 1
+	StepIncrease = uint8(fandef.StepDirectionIncrease)
+	StepDecrease = uint8(fandef.StepDirectionDecrease)
 )
 
 // State is one observation of the host's fan.
@@ -281,6 +288,7 @@ type Server struct {
 	ext      *cluster.DataVersionTracker
 	src      StateSource
 	cfg      Config
+	inst     *spec.Instance
 }
 
 // Compile-time assertions.
@@ -297,25 +305,24 @@ func NewServer(cfg Config) (*Server, error) {
 	if cfg.Source == nil {
 		return nil, ErrNoSource
 	}
-	if cfg.Features&^allFeatures != 0 {
-		return nil, fmt.Errorf("%w: 0x%X", ErrUnknownFeature, uint32(cfg.Features&^allFeatures))
+	if err := spec.CheckFeatures(fandef.Definition, uint32(cfg.Features)); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrUnknownFeature, err)
 	}
-	withAuto := []Sequence{SequenceOffLowMedHighAuto, SequenceOffLowHighAuto, SequenceOffHighAuto}
-	withoutAuto := []Sequence{SequenceOffLowMedHigh, SequenceOffLowHigh, SequenceOffHigh}
-	if (cfg.Features&FeatureAuto != 0 && !slices.Contains(withAuto, cfg.Sequence)) ||
-		(cfg.Features&FeatureAuto == 0 && !slices.Contains(withoutAuto, cfg.Sequence)) {
+	// FanModeSequenceEnum: the three sequences without Auto are
+	// "[!AUT].a", the three with it "[AUT].b".
+	if !spec.EnumSupported(fandef.FanModeSequenceEnumDef, uint64(cfg.Sequence), spec.Context(fandef.Definition, uint32(cfg.Features))) {
 		return nil, fmt.Errorf("%w: sequence %d", ErrSequence, cfg.Sequence)
 	}
 	if cfg.Features&FeatureMultiSpeed != 0 && (cfg.SpeedMax < 1 || cfg.SpeedMax > 100) {
 		return nil, ErrSpeedMax
 	}
 	if cfg.Features&FeatureRocking != 0 {
-		if _, ok := cfg.Source.(RockSetter); !ok || cfg.RockSupport == 0 || cfg.RockSupport&^rockAll != 0 {
+		if _, ok := cfg.Source.(RockSetter); !ok || cfg.RockSupport == 0 || uint64(cfg.RockSupport)&^fandef.RockBitmapDef.Defined() != 0 {
 			return nil, ErrRockSupport
 		}
 	}
 	if cfg.Features&FeatureWind != 0 {
-		if _, ok := cfg.Source.(WindSetter); !ok || cfg.WindSupport == 0 || cfg.WindSupport&^windAll != 0 {
+		if _, ok := cfg.Source.(WindSetter); !ok || cfg.WindSupport == 0 || uint64(cfg.WindSupport)&^fandef.WindBitmapDef.Defined() != 0 {
 			return nil, ErrWindSupport
 		}
 	}
@@ -327,11 +334,14 @@ func NewServer(cfg Config) (*Server, error) {
 	if cfg.DeviceType == DeviceTypeExtractorHood && cfg.Features&(FeatureRocking|FeatureWind|FeatureAirflowDirection) != 0 {
 		return nil, ErrDeviceTypeFeature
 	}
-	return &Server{src: cfg.Source, ext: cfg.DataVersion, cfg: cfg}, nil
+	// Without declared optionals the feature check above is the only
+	// refusal New can make.
+	inst, _ := spec.New(fandef.Definition, spec.Options{Features: uint32(cfg.Features)})
+	return &Server{src: cfg.Source, ext: cfg.DataVersion, cfg: cfg, inst: inst}, nil
 }
 
-// Revision returns the cluster revision from the generated schema.
-func Revision() uint16 { return schema.ClusterRevisions[ClusterID] }
+// Revision returns the cluster revision of the generated definition.
+func Revision() uint16 { return fandef.Revision }
 
 func (s *Server) tracker() *cluster.DataVersionTracker {
 	if s.ext != nil {
@@ -350,54 +360,32 @@ func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterAttributes implements [contract.ClusterAttributeLister]: the four
 // mandatory attributes and those of each advertised feature, in id order.
-func (s *Server) MatterAttributes() []uint32 {
-	out := []uint32{AttrFanMode, AttrFanModeSequence, AttrPercentSetting, AttrPercentCurrent}
-	if s.has(FeatureMultiSpeed) {
-		out = append(out, AttrSpeedMax, AttrSpeedSetting, AttrSpeedCurrent)
-	}
-	if s.has(FeatureRocking) {
-		out = append(out, AttrRockSupport, AttrRockSetting)
-	}
-	if s.has(FeatureWind) {
-		out = append(out, AttrWindSupport, AttrWindSetting)
-	}
-	if s.has(FeatureAirflowDirection) {
-		out = append(out, AttrAirflowDirection)
-	}
-	return out
-}
+func (s *Server) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // MatterReportable lists the served attributes that move; the fixed ones
 // (FanModeSequence, SpeedMax, RockSupport, WindSupport — quality F) are
 // left out.
-func (s *Server) MatterReportable() []uint32 {
-	fixed := []uint32{AttrFanModeSequence, AttrSpeedMax, AttrRockSupport, AttrWindSupport}
-	return slices.DeleteFunc(s.MatterAttributes(), func(id uint32) bool { return slices.Contains(fixed, id) })
-}
+func (s *Server) MatterReportable() []uint32 { return s.inst.MatterReportable() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
-func (s *Server) MatterAcceptedCommands() []uint32 {
-	if s.has(FeatureStep) {
-		return []uint32{CmdStep}
-	}
-	return []uint32{}
-}
+func (s *Server) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]; Step
 // answers with a status.
-func (*Server) MatterGeneratedCommands() []uint32 { return []uint32{} }
+func (s *Server) MatterGeneratedCommands() []uint32 { return s.inst.MatterGeneratedCommands() }
+
+// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
+// every writable attribute is "RW VO".
+func (s *Server) MinWritePrivilege(attrID uint32) uint8 { return s.inst.MinWritePrivilege(attrID) }
 
 // MatterRead resolves an attribute. Host values are clamped to the
 // attribute constraints on the way out, so a device reporting 120 % or a
 // speed above SpeedMax cannot put a constraint violation on the wire.
 func (s *Server) MatterRead(attrID uint32) (any, bool) {
-	switch attrID {
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(s.cfg.Features), true
-	case cluster.AttrGlobalClusterRevision:
-		return Revision(), true
+	if v, ok := s.inst.ReadGlobal(attrID); ok {
+		return v, true
 	}
-	if !slices.Contains(s.MatterAttributes(), attrID) {
+	if !s.inst.Serves(attrID) {
 		return nil, false
 	}
 	st := s.src.FanState()
@@ -437,27 +425,17 @@ func nullableCapped(v *uint8, ceiling uint8) (any, bool) {
 }
 
 // MatterWrite applies a write to one of the six writable attributes
-// (access "RW VO", fan-control.element.ts:32-67).
+// (access "RW VO"). The definition checks every write but FanMode's —
+// served, writable, the type, "max 100", "max speedMax", the defined bits
+// of RockBitmap / WindBitmap, the AirflowDirectionEnum values; the rules
+// beyond it (FanMode's deprecated values and sequence, the Support masks,
+// the coupling) are the server's.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	if !slices.Contains(s.MatterAttributes(), attrID) {
-		return statusError{im.StatusUnsupportedAttribute, fmt.Sprintf("fan: attribute 0x%04X is not served", attrID)}
-	}
 	var err error
-	switch attrID {
-	case AttrFanMode:
+	if attrID == AttrFanMode {
 		err = s.writeFanMode(ctx, value)
-	case AttrPercentSetting:
-		err = s.writePercentSetting(ctx, value)
-	case AttrSpeedSetting:
-		err = s.writeSpeedSetting(ctx, value)
-	case AttrRockSetting:
-		err = s.writeRockSetting(ctx, value)
-	case AttrWindSetting:
-		err = s.writeWindSetting(ctx, value)
-	case AttrAirflowDirection:
-		err = s.writeAirflowDirection(ctx, value)
-	default:
-		return statusError{im.StatusUnsupportedWrite, fmt.Sprintf("fan: attribute 0x%04X is read-only", attrID)}
+	} else {
+		err = s.writeChecked(ctx, attrID, value)
 	}
 	if err != nil {
 		return err
@@ -465,6 +443,41 @@ func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) erro
 	s.tracker().Bump()
 	return nil
 }
+
+// writeChecked applies a write the definition has checked.
+func (s *Server) writeChecked(ctx context.Context, attrID uint32, value any) error {
+	v, err := s.inst.ValidateWrite(attrID, value, s.peer)
+	if err != nil {
+		return err
+	}
+	n, isNum := v.(uint64) // per ValidateWrite: nil only for a nullable null
+	switch attrID {
+	case AttrPercentSetting:
+		if !isNum {
+			return nil // null: "the attribute value shall NOT change" (resource :86-87)
+		}
+		return s.apply(ctx, "PercentSetting write", s.percentSettings(uint8(n))) //nolint:gosec // ≤ 100 per ValidateWrite
+	case AttrSpeedSetting:
+		if !isNum {
+			return nil // null, as PercentSetting
+		}
+		return s.apply(ctx, "SpeedSetting write", s.speedSettings(uint8(n))) //nolint:gosec // ≤ SpeedMax per ValidateWrite
+	case AttrRockSetting:
+		return s.writeRockSetting(ctx, RockBitmap(n)) //nolint:gosec // a map8 per ValidateWrite
+	case AttrWindSetting:
+		return s.writeWindSetting(ctx, WindBitmap(n)) //nolint:gosec // a map8 per ValidateWrite
+	default: // AttrAirflowDirection, the last writable attribute
+		setter, _ := s.src.(AirflowDirectionSetter)                                  // guaranteed by NewServer
+		if err := setter.SetAirflowDirection(ctx, AirflowDirection(n)); err != nil { //nolint:gosec // an enum8 per ValidateWrite
+			return fmt.Errorf("fan: AirflowDirection write: %w", err)
+		}
+		return nil
+	}
+}
+
+// peer resolves the one sibling a FanControl constraint names: SpeedMax,
+// for SpeedSetting's "max speedMax".
+func (s *Server) peer(uint32) (any, bool) { return s.cfg.SpeedMax, true }
 
 // supports reports whether FanMode m is one the FanModeSequence offers:
 // Off and High always, Low "if and only if the FanModeSequence attribute
@@ -576,75 +589,31 @@ func (s *Server) writeFanMode(ctx context.Context, value any) error {
 	return s.apply(ctx, "FanMode write", s.fanModeSettings(m))
 }
 
-// writePercentSetting: a null write leaves the attribute unchanged
-// ("If a client writes null to this attribute, the attribute value shall
-// NOT change", resource :86-87) and succeeds; a value above 100 violates
-// "max 100" (element :39).
-func (s *Server) writePercentSetting(ctx context.Context, value any) error {
-	if value == nil {
-		return nil
-	}
-	n, ok := cluster.AsUintMax(value, 100)
-	if !ok {
-		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: PercentSetting %v violates max 100", value)}
-	}
-	return s.apply(ctx, "PercentSetting write", s.percentSettings(uint8(n))) //nolint:gosec // ≤ 100 per AsUintMax
-}
-
-// writeSpeedSetting mirrors writePercentSetting against "max speedMax"
-// (element :48).
-func (s *Server) writeSpeedSetting(ctx context.Context, value any) error {
-	if value == nil {
-		return nil
-	}
-	n, ok := cluster.AsUintMax(value, uint64(s.cfg.SpeedMax))
-	if !ok {
-		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: SpeedSetting %v violates max speedMax %d", value, s.cfg.SpeedMax)}
-	}
-	return s.apply(ctx, "SpeedSetting write", s.speedSettings(uint8(n))) //nolint:gosec // ≤ SpeedMax per AsUintMax
-}
-
 // writeRockSetting: "Each bit shall only be set to 1, if the
 // corresponding bit in the RockSupport attribute is set to 1, otherwise a
 // status code of CONSTRAINT_ERROR shall be returned" (resource :162-164).
 // Picking the lowest bit of a supported-but-impossible combination
 // (:166-168) needs to know which combinations the device runs, so the
 // host does that.
-func (s *Server) writeRockSetting(ctx context.Context, value any) error {
-	n, ok := cluster.AsUintMax(value, 0xFF)
-	if !ok || RockBitmap(n)&^s.cfg.RockSupport != 0 { //nolint:gosec // ≤ 0xFF per AsUintMax
-		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: RockSetting %v outside RockSupport 0x%02X", value, s.cfg.RockSupport)}
+func (s *Server) writeRockSetting(ctx context.Context, rock RockBitmap) error {
+	if rock&^s.cfg.RockSupport != 0 {
+		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: RockSetting 0x%02X outside RockSupport 0x%02X", rock, s.cfg.RockSupport)}
 	}
-	setter, _ := s.src.(RockSetter)                                   // guaranteed by NewServer
-	if err := setter.SetRockSetting(ctx, RockBitmap(n)); err != nil { //nolint:gosec // ≤ 0xFF per AsUintMax
+	setter, _ := s.src.(RockSetter) // guaranteed by NewServer
+	if err := setter.SetRockSetting(ctx, rock); err != nil {
 		return fmt.Errorf("fan: RockSetting write: %w", err)
 	}
 	return nil
 }
 
 // writeWindSetting is writeRockSetting for WindSetting (resource :186-188).
-func (s *Server) writeWindSetting(ctx context.Context, value any) error {
-	n, ok := cluster.AsUintMax(value, 0xFF)
-	if !ok || WindBitmap(n)&^s.cfg.WindSupport != 0 { //nolint:gosec // ≤ 0xFF per AsUintMax
-		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: WindSetting %v outside WindSupport 0x%02X", value, s.cfg.WindSupport)}
+func (s *Server) writeWindSetting(ctx context.Context, wind WindBitmap) error {
+	if wind&^s.cfg.WindSupport != 0 {
+		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: WindSetting 0x%02X outside WindSupport 0x%02X", wind, s.cfg.WindSupport)}
 	}
-	setter, _ := s.src.(WindSetter)                                   // guaranteed by NewServer
-	if err := setter.SetWindSetting(ctx, WindBitmap(n)); err != nil { //nolint:gosec // ≤ 0xFF per AsUintMax
+	setter, _ := s.src.(WindSetter) // guaranteed by NewServer
+	if err := setter.SetWindSetting(ctx, wind); err != nil {
 		return fmt.Errorf("fan: WindSetting write: %w", err)
-	}
-	return nil
-}
-
-// writeAirflowDirection: "shall be set to one of the values in the
-// AirflowDirectionEnum table" (resource :202-204).
-func (s *Server) writeAirflowDirection(ctx context.Context, value any) error {
-	n, ok := cluster.AsUintMax(value, uint64(AirflowReverse))
-	if !ok {
-		return statusError{im.StatusConstraintError, fmt.Sprintf("fan: AirflowDirection %v is not an AirflowDirectionEnum value", value)}
-	}
-	setter, _ := s.src.(AirflowDirectionSetter)                                  // guaranteed by NewServer
-	if err := setter.SetAirflowDirection(ctx, AirflowDirection(n)); err != nil { //nolint:gosec // ≤ 1 per AsUintMax
-		return fmt.Errorf("fan: AirflowDirection write: %w", err)
 	}
 	return nil
 }
@@ -764,7 +733,10 @@ func (s *Server) stepMode(current FanMode, req clusterwire.FanStepRequest) FanMo
 }
 
 // stepRequestFrom normalises the Step payload: the bridge's typed
-// decoder hands over a [clusterwire.FanStepRequest]; a generic tag map
+// decoder hands over a [clusterwire.FanStepRequest] (the shape a [Stepper]
+// host receives, so the bridge keeps that decoder ahead of the generated
+// one); the generated [fandef.StepRequest] of an in-process caller is
+// carried over with the element defaults for the absent fields; a generic tag map
 // (a host decoding the command itself) is read with the element defaults
 // for the two optional fields. Direction is mandatory, and must be a
 // StepDirectionEnum value.
@@ -773,6 +745,14 @@ func stepRequestFrom(fields any) (clusterwire.FanStepRequest, error) {
 	switch v := fields.(type) {
 	case clusterwire.FanStepRequest:
 		req = v
+	case fandef.StepRequest:
+		req.Direction = uint8(v.Direction)
+		if v.Wrap != nil {
+			req.Wrap = *v.Wrap
+		}
+		if v.LowestOff != nil {
+			req.LowestOff = *v.LowestOff
+		}
 	case map[uint8]any:
 		raw, present := v[clusterwire.FanStepFieldDirection]
 		if !present {

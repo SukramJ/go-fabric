@@ -10,6 +10,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/alarm"
+	sdef "github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
+	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/internal/paritytest"
 	"github.com/SukramJ/go-fabric/schema"
@@ -236,5 +238,27 @@ func TestParityMatterJS_SmokeCoAlarmEnumValues(t *testing.T) {
 	want := []uint8{0, 1, 2, 0, 1, 2, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 0, 1, 0, 1, 2, 3}
 	if !slices.Equal(got, want) {
 		t.Errorf("enum values %v, want %v", got, want)
+	}
+}
+
+// TestServerMatchesTheGeneratedDefinition holds every feature selection,
+// bare and with every optional element its features admit, against
+// matter.js smoke-co-alarm-cluster.element.ts (spectest.CheckServer).
+func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
+	t.Parallel()
+	all := alarm.OptionalDeviceMuted | alarm.OptionalInterconnectSmokeAlarm | alarm.OptionalInterconnectCOAlarm |
+		alarm.OptionalExpiryDate | alarm.OptionalUnmounted
+	for _, f := range []alarm.Feature{alarm.FeatureSmokeAlarm, alarm.FeatureCOAlarm, alarm.FeatureSmokeAlarm | alarm.FeatureCOAlarm} {
+		opts := []alarm.Optional{0, all}
+		if f&alarm.FeatureSmokeAlarm != 0 {
+			opts = append(opts, all|alarm.OptionalContaminationState|alarm.OptionalSmokeSensitivityLevel)
+		}
+		for _, o := range opts {
+			srv, err := alarm.NewServer(alarm.Config{Source: &device{}, Features: f, Optional: o})
+			if err != nil {
+				t.Fatalf("features 0x%X optional 0x%X: %v", f, o, err)
+			}
+			spectest.CheckServer(t, srv, sdef.Definition, uint32(f))
+		}
 	}
 }
