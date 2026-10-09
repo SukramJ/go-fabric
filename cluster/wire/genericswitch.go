@@ -242,8 +242,6 @@ func (s *GenericSwitch) MatterAttributes() []uint32 { return s.inst().MatterAttr
 // ShortRelease (MSR), LongPress and LongRelease (MSL).
 func (s *GenericSwitch) MatterEvents() []uint32 { return s.inst().MatterEvents() }
 
-func (s *GenericSwitch) featureMap() uint32 { return s.inst().FeatureMap() }
-
 // inst is the definition bound to the features the source supports.
 func (s *GenericSwitch) inst() *spec.Instance {
 	if s.src.MatterSwitchSupportsLongPress() {

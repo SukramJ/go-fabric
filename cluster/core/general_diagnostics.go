@@ -605,7 +605,7 @@ func (g *GeneralDiagnostics) payloadTestRequest(fields any) (any, error) {
 	if count > payloadTestMaxResponse {
 		return nil, gendiagStatusErr{im.StatusResourceExhausted, "PayloadTestRequest: response too large"}
 	}
-	return PayloadTestResponse{Payload: bytes.Repeat([]byte{byte(value)}, int(count))}, nil
+	return PayloadTestResponse{Payload: bytes.Repeat([]byte{value}, int(count))}, nil
 }
 
 // TestEventTriggerRequest is the decoded TestEventTrigger command, the
