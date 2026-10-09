@@ -65,4 +65,17 @@ var committed = []string{
 	"AdministratorCommissioning",
 	"Groups",
 	"ScenesManagement",
+	// cluster/core
+	"Identify",
+	"Descriptor",
+	"BasicInformation",
+	"BridgedDeviceBasicInformation",
+	"GeneralDiagnostics",
+	"GeneralCommissioning",
+	"TimeSynchronization",
+	"Binding",
+	"IcdManagement",
+	"OtaSoftwareUpdateRequestor",
+	"NetworkCommissioning",
+	"DiagnosticLogs",
 }

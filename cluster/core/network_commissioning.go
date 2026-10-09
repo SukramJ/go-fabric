@@ -9,6 +9,8 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -50,42 +52,49 @@ type NetworkCommissioning struct {
 
 // FeatureMap bits per Matter §11.9.4.
 const (
-	NetworkCommFeatureWiFi     uint32 = 1 << 0
-	NetworkCommFeatureThread   uint32 = 1 << 1
-	NetworkCommFeatureEthernet uint32 = 1 << 2
+	NetworkCommFeatureWiFi     = uint32(netcommdef.FeatureWiFiNetworkInterface)
+	NetworkCommFeatureThread   = uint32(netcommdef.FeatureThreadNetworkInterface)
+	NetworkCommFeatureEthernet = uint32(netcommdef.FeatureEthernetNetworkInterface)
 )
 
 // NetworkCommissioningStatusEnum values per Matter §11.9.5.5.
 const (
-	NetworkingStatusSuccess                uint8 = 0
-	NetworkingStatusOutOfRange             uint8 = 1
-	NetworkingStatusBoundsExceeded         uint8 = 2
-	NetworkingStatusNetworkIDNotFound      uint8 = 3
-	NetworkingStatusDuplicateNetworkID     uint8 = 4
-	NetworkingStatusNetworkNotFound        uint8 = 5
-	NetworkingStatusRegulatoryError        uint8 = 6
-	NetworkingStatusAuthFailure            uint8 = 7
-	NetworkingStatusUnsupportedSecurity    uint8 = 8
-	NetworkingStatusOtherConnectionFailure uint8 = 9
-	NetworkingStatusIPV6Failed             uint8 = 10
-	NetworkingStatusIPBindFailed           uint8 = 11
-	NetworkingStatusUnknownError           uint8 = 12
+	NetworkingStatusSuccess                = uint8(netcommdef.NetworkCommissioningStatusSuccess)
+	NetworkingStatusOutOfRange             = uint8(netcommdef.NetworkCommissioningStatusOutOfRange)
+	NetworkingStatusBoundsExceeded         = uint8(netcommdef.NetworkCommissioningStatusBoundsExceeded)
+	NetworkingStatusNetworkIDNotFound      = uint8(netcommdef.NetworkCommissioningStatusNetworkIdNotFound)
+	NetworkingStatusDuplicateNetworkID     = uint8(netcommdef.NetworkCommissioningStatusDuplicateNetworkId)
+	NetworkingStatusNetworkNotFound        = uint8(netcommdef.NetworkCommissioningStatusNetworkNotFound)
+	NetworkingStatusRegulatoryError        = uint8(netcommdef.NetworkCommissioningStatusRegulatoryError)
+	NetworkingStatusAuthFailure            = uint8(netcommdef.NetworkCommissioningStatusAuthFailure)
+	NetworkingStatusUnsupportedSecurity    = uint8(netcommdef.NetworkCommissioningStatusUnsupportedSecurity)
+	NetworkingStatusOtherConnectionFailure = uint8(netcommdef.NetworkCommissioningStatusOtherConnectionFailure)
+	NetworkingStatusIPV6Failed             = uint8(netcommdef.NetworkCommissioningStatusIpv6Failed)
+	NetworkingStatusIPBindFailed           = uint8(netcommdef.NetworkCommissioningStatusIpBindFailed)
+	NetworkingStatusUnknownError           = uint8(netcommdef.NetworkCommissioningStatusUnknownError)
 )
 
 // Cluster ID + revision per Matter §11.9.
 const (
-	netcommClusterID       uint32 = 0x0031
-	netcommClusterRevision uint16 = 2
+	netcommClusterID       = netcommdef.ClusterID
+	netcommClusterRevision = netcommdef.Revision
 
-	netcommAttrMaxNetworks           uint32 = 0x0000
-	netcommAttrNetworks              uint32 = 0x0001
-	netcommAttrScanMaxTimeSeconds    uint32 = 0x0002
-	netcommAttrConnectMaxTimeSeconds uint32 = 0x0003
-	netcommAttrInterfaceEnabled      uint32 = 0x0004
-	netcommAttrLastNetworkingStatus  uint32 = 0x0005
-	netcommAttrLastNetworkID         uint32 = 0x0006
-	netcommAttrLastConnectErrorValue uint32 = 0x0007
+	netcommAttrMaxNetworks           = netcommdef.AttrMaxNetworks
+	netcommAttrNetworks              = netcommdef.AttrNetworks
+	netcommAttrScanMaxTimeSeconds    = netcommdef.AttrScanMaxTimeSeconds
+	netcommAttrConnectMaxTimeSeconds = netcommdef.AttrConnectMaxTimeSeconds
+	netcommAttrInterfaceEnabled      = netcommdef.AttrInterfaceEnabled
+	netcommAttrLastNetworkingStatus  = netcommdef.AttrLastNetworkingStatus
+	netcommAttrLastNetworkID         = netcommdef.AttrLastNetworkId
+	netcommAttrLastConnectErrorValue = netcommdef.AttrLastConnectErrorValue
 )
+
+// netcommInst is the definition (cluster/spec/networkcommissioning, ADR
+// 0013, from matter.js network-commissioning.element.ts) bound to the
+// Ethernet feature: the six mandatory attributes, no command. The lists,
+// the read and write privileges and the statuses of a refused write come
+// from it.
+var netcommInst = mustInstance(netcommdef.Definition, spec.Options{Features: NetworkCommFeatureEthernet})
 
 // Command IDs (Matter §11.9.7), kept inline rather than as constants:
 // go-fabric rejects every one (Ethernet-only). 0x00 ScanNetworks,
@@ -166,16 +175,7 @@ func (n *NetworkCommissioning) MatterClusterID() uint32 { return netcommClusterI
 // Mirrors matter.js
 // packages/model/src/standard/elements/network-commissioning.element.ts:29-59.
 func (n *NetworkCommissioning) MinReadPrivilege(attrID uint32) uint8 {
-	switch attrID {
-	case netcommAttrMaxNetworks,
-		netcommAttrNetworks,
-		netcommAttrLastNetworkingStatus,
-		netcommAttrLastNetworkID,
-		netcommAttrLastConnectErrorValue:
-		return 5 // Administer
-	default:
-		return 1 // View
-	}
+	return netcommInst.MinReadPrivilege(attrID)
 }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege].
@@ -183,12 +183,7 @@ func (n *NetworkCommissioning) MinReadPrivilege(attrID uint32) uint8 {
 // (access "RW VA"). Mirrors matter.js
 // packages/model/src/standard/elements/network-commissioning.element.ts:47.
 func (n *NetworkCommissioning) MinWritePrivilege(attrID uint32) uint8 {
-	switch attrID {
-	case netcommAttrInterfaceEnabled:
-		return 5 // Administer
-	default:
-		return 3 // Operate — standard default
-	}
+	return netcommInst.MinWritePrivilege(attrID)
 }
 
 // MatterRead implements [contract.ClusterServer].
@@ -220,10 +215,8 @@ func (n *NetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 			return nil, true
 		}
 		return *n.lastConnectErrorVal, true
-	case cluster.AttrGlobalFeatureMap:
-		return NetworkCommFeatureEthernet, true
-	case cluster.AttrGlobalClusterRevision:
-		return netcommClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return netcommInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
@@ -232,7 +225,8 @@ func (n *NetworkCommissioning) MatterRead(attrID uint32) (any, bool) {
 // Other attributes are read-only.
 func (n *NetworkCommissioning) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	if attrID != netcommAttrInterfaceEnabled {
-		return fmt.Errorf("matter: NetworkCommissioning attribute 0x%04X is read-only", attrID)
+		_, err := netcommInst.ValidateWrite(attrID, value, nil)
+		return refusedWrite{sentinel: fmt.Errorf("matter: NetworkCommissioning attribute 0x%04X is read-only", attrID), status: err}
 	}
 	v, ok := value.(bool)
 	if !ok {
@@ -268,13 +262,4 @@ func (n *NetworkCommissioning) MatterReportable() []uint32 {
 // conformance WI|TH in Matter §11.9 — they apply only to Wi-Fi and
 // Thread interfaces. go-fabric is Ethernet-only (FeatureMap=ETH)
 // so these two attributes are excluded from the advertised set.
-func (n *NetworkCommissioning) MatterAttributes() []uint32 {
-	return []uint32{
-		netcommAttrMaxNetworks,
-		netcommAttrNetworks,
-		netcommAttrInterfaceEnabled,
-		netcommAttrLastNetworkingStatus,
-		netcommAttrLastNetworkID,
-		netcommAttrLastConnectErrorValue,
-	}
-}
+func (n *NetworkCommissioning) MatterAttributes() []uint32 { return netcommInst.MatterAttributes() }

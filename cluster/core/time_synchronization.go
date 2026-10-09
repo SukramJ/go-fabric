@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	timesyncdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -27,12 +29,18 @@ import (
 type TimeSynchronization struct{}
 
 const (
-	timeSyncClusterID       uint32 = 0x0038
-	timeSyncClusterRevision uint16 = 2 // Matter 1.5.1 §11.16
+	timeSyncClusterID       = timesyncdef.ClusterID
+	timeSyncClusterRevision = timesyncdef.Revision
 
-	timeSyncAttrUTCTime     uint32 = 0x0000
-	timeSyncAttrGranularity uint32 = 0x0001
+	timeSyncAttrUTCTime     = timesyncdef.AttrUtcTime
+	timeSyncAttrGranularity = timesyncdef.AttrGranularity
 )
+
+// timeSyncInst is the definition bound to what the server serves: no
+// feature (cluster/spec/timesynchronization, ADR 0013, from matter.js
+// time-synchronization.element.ts) — UTCTime, Granularity and SetUTCTime.
+// The lists and the write statuses come from it; the clock is the host's.
+var timeSyncInst = mustInstance(timesyncdef.Definition, spec.Options{})
 
 // GranularityEnum values per Matter §11.16.5.1.
 const (
@@ -63,7 +71,7 @@ func (t *TimeSynchronization) UTC() (time.Time, bool) {
 // SetUTCTime (0x00, conformance M). Without it the dispatcher answered an
 // empty AcceptedCommandList for a mandatory command (TC-IDM-10.x).
 func (t *TimeSynchronization) MatterAcceptedCommands() []uint32 {
-	return []uint32{timeSyncCmdSetUTCTime}
+	return timeSyncInst.MatterAcceptedCommands()
 }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]:
@@ -99,10 +107,8 @@ func (t *TimeSynchronization) MatterRead(attrID uint32) (any, bool) {
 		return uint64(now.UnixMicro() - matterEpochOffsetSec*1_000_000), true //nolint:gosec // non-negative, UTC checked it
 	case timeSyncAttrGranularity:
 		return GranularityMillisecGran, true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true // no optional features advertised
-	case cluster.AttrGlobalClusterRevision:
-		return timeSyncClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return timeSyncInst.ReadGlobal(attrID) // no optional features advertised
 	}
 	return nil, false
 }
@@ -110,7 +116,11 @@ func (t *TimeSynchronization) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite implements [contract.ClusterServer]. Every
 // attribute is read-only on the bridge — clients that try to set
 // TimeSource etc. get UnsupportedWrite.
-func (t *TimeSynchronization) MatterWrite(_ context.Context, attrID uint32, _ any) error {
+func (t *TimeSynchronization) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	if !timeSyncInst.Serves(attrID) {
+		_, err := timeSyncInst.ValidateWrite(attrID, value, nil)
+		return err
+	}
 	return timeSyncReadOnlyErr{fmt.Sprintf("matter: TimeSynchronization attribute 0x%04X is read-only", attrID)}
 }
 
@@ -124,7 +134,7 @@ func (timeSyncReadOnlyErr) MatterStatusCode() im.StatusCode { return im.StatusUn
 // timeSyncCmdSetUTCTime is the SetUTCTime command ID (Matter §11.16.9.1).
 // Mirrors matter.js packages/model/src/standard/elements/time-synchronization.element.ts
 // command id 0x00.
-const timeSyncCmdSetUTCTime uint32 = 0x00
+const timeSyncCmdSetUTCTime = timesyncdef.CmdSetUtcTime
 
 // MatterInvoke implements [contract.ClusterServer].
 // SetUTCTime (0x00) is a mandatory command per Matter §11.16.9.1 when the
@@ -157,5 +167,5 @@ func (t *TimeSynchronization) MatterReportable() []uint32 {
 // rebuild reads the full attribute set; without this the dispatcher
 // falls back to MatterReportable's two-attribute surface.
 func (t *TimeSynchronization) MatterAttributes() []uint32 {
-	return []uint32{timeSyncAttrUTCTime, timeSyncAttrGranularity}
+	return timeSyncInst.MatterAttributes()
 }

@@ -718,45 +718,6 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		enc.PutUint16(tlv.ContextTag(0), x.FailSafeExpiryLengthSeconds)
 		enc.PutUint16(tlv.ContextTag(1), x.MaxCumulativeFailsafeSeconds)
 		_ = enc.EndContainer()
-	case mattercore.CapabilityMinimaStruct:
-		// BasicInformation attribute 0x0013 (Matter §11.1.5.20). Two
-		// uint16 fields under context tags 0 / 1.
-		// Tags 2-5 are the rev-6 fields (basic-information.element.ts:
-		// 173-184); BasicInformation fills them with matter.js's defaults.
-		enc.StartStruct(tag)
-		enc.PutUint16(tlv.ContextTag(0), x.CaseSessionsPerFabric)
-		enc.PutUint16(tlv.ContextTag(1), x.SubscriptionsPerFabric)
-		for i, v := range []uint16{x.SimultaneousInvocationsSupported, x.SimultaneousWritesSupported, x.ReadPathsSupported, x.SubscribePathsSupported} {
-			if v != 0 {
-				enc.PutUint16(tlv.ContextTag(uint8(2+i)), v) //nolint:gosec // i < 4
-			}
-		}
-		_ = enc.EndContainer()
-	case mattercore.DeviceLoadStruct:
-		// GeneralDiagnostics DeviceLoadStatus (general-diagnostics.element.ts
-		// :202-207): two uint16 then three uint32 fields, tags 0-4, each at
-		// its smallest TLV width as matter.js's TlvUInt16 / TlvUInt32 write
-		// them.
-		enc.StartStruct(tag)
-		enc.PutUint(tlv.ContextTag(0), uint64(x.CurrentSubscriptions))
-		enc.PutUint(tlv.ContextTag(1), uint64(x.CurrentSubscriptionsForFabric))
-		enc.PutUint(tlv.ContextTag(2), uint64(x.TotalSubscriptionsEstablished))
-		enc.PutUint(tlv.ContextTag(3), uint64(x.TotalInteractionModelMessagesSent))
-		enc.PutUint(tlv.ContextTag(4), uint64(x.TotalInteractionModelMessagesReceived))
-		_ = enc.EndContainer()
-	case mattercore.ProductAppearanceStruct:
-		// BasicInformation attribute 0x0014. Finish (tag 0) is a plain
-		// enum8; PrimaryColor (tag 1) has Quality "X" (nullable) per the
-		// spec element definition. Encode PrimaryColorAbsent (0xFF) as
-		// TLV-Null so strict controllers see a well-formed nullable field.
-		enc.StartStruct(tag)
-		enc.PutUint(tlv.ContextTag(0), uint64(x.Finish))
-		if x.PrimaryColor == mattercore.PrimaryColorAbsent {
-			enc.PutNull(tlv.ContextTag(1))
-		} else {
-			enc.PutUint(tlv.ContextTag(1), uint64(x.PrimaryColor))
-		}
-		_ = enc.EndContainer()
 	case *clusterwire.ClosureOverallCurrentState:
 		// ClosureControl attribute 0x0003 (matter.js
 		// closure-control.element.ts:127-138). Position (tag 0) is
@@ -879,52 +840,12 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		}
 		_ = enc.EndContainer()
 	case []mattercore.NetworkInterfaceStruct:
-		// GeneralDiagnostics.NetworkInterfaces (Matter §11.12.4.1).
-		// list of struct; each entry:
-		//   [0] Name                            char_string<32>
-		//   [1] IsOperational                   bool
-		//   [2] OffPremiseServicesReachableIPv4 bool? (nullable)
-		//   [3] OffPremiseServicesReachableIPv6 bool? (nullable)
-		//   [4] HardwareAddress                 octet_string (6 or 8)
-		//   [5] IPv4Addresses                   list[octet_string<4>]
-		//   [6] IPv6Addresses                   list[octet_string<16>]
-		//   [7] InterfaceType                   enum8
-		// Without this case Apple Home logs "No enumeration/topology
-		// dictionary found" + "Nil supported link layer types" and
-		// tears the fabric down via RemoveFabric ~5 s after
-		// Subscribe-Initial. Mirrors matter.js
-		// packages/types/src/clusters/general-diagnostics.ts:
-		// NetworkInterface.
-		enc.StartArray(tag)
-		for _, n := range x {
-			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutUTF8(tlv.ContextTag(0), n.Name)
-			enc.PutBool(tlv.ContextTag(1), n.IsOperational)
-			if n.OffPremiseServicesReachableIPv4 == nil {
-				enc.PutNull(tlv.ContextTag(2))
-			} else {
-				enc.PutBool(tlv.ContextTag(2), *n.OffPremiseServicesReachableIPv4)
-			}
-			if n.OffPremiseServicesReachableIPv6 == nil {
-				enc.PutNull(tlv.ContextTag(3))
-			} else {
-				enc.PutBool(tlv.ContextTag(3), *n.OffPremiseServicesReachableIPv6)
-			}
-			enc.PutOctets(tlv.ContextTag(4), n.HardwareAddress)
-			enc.StartArray(tlv.ContextTag(5))
-			for _, a := range n.IPv4Addresses {
-				enc.PutOctets(tlv.AnonymousTag(), a)
-			}
-			_ = enc.EndContainer()
-			enc.StartArray(tlv.ContextTag(6))
-			for _, a := range n.IPv6Addresses {
-				enc.PutOctets(tlv.AnonymousTag(), a)
-			}
-			_ = enc.EndContainer()
-			enc.PutUint(tlv.ContextTag(7), uint64(n.InterfaceType))
-			_ = enc.EndContainer()
-		}
-		_ = enc.EndContainer()
+		// GeneralDiagnostics.NetworkInterfaces, encoded by the generated
+		// NetworkInterface codec (core.NetworkInterfaceList). Without it
+		// Apple Home logs "No enumeration/topology dictionary found" +
+		// "Nil supported link layer types" and tears the fabric down via
+		// RemoveFabric ~5 s after Subscribe-Initial.
+		mattercore.NetworkInterfaceList(x).EncodeTLV(enc, tag)
 	case []mattercore.FabricDescriptorStruct:
 		// OperationalCredentials.Fabrics (Matter §11.18.5.6).
 		// fabric-sensitive list of struct; each entry:
@@ -1188,35 +1109,6 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// (measurement.AccuracyList). EnergyMeasurementStruct is the
 		// generated struct itself and takes the spec.Encodable case below.
 		mattermeasure.AccuracyList(x).EncodeTLV(enc, tag)
-	case mattercore.StartUpEvent:
-		// BasicInformation §11.1.8.1 — single field SoftwareVersion (uint32).
-		// matter.js packages/model/src/standard/elements/basic-information.element.ts:84-90.
-		enc.StartStruct(tag)
-		enc.PutUint32(tlv.ContextTag(0), x.SoftwareVersion)
-		_ = enc.EndContainer()
-	case mattercore.ShutDownEvent:
-		// BasicInformation §11.1.8.2 — no fields. Empty struct keeps the
-		// EventDataIB.Data slot at tag 7 well-formed for chip-tool's
-		// StructDecodeIterator.
-		enc.StartStruct(tag)
-		_ = enc.EndContainer()
-	case mattercore.LeaveEvent:
-		// BasicInformation §11.1.8.3 — single field FabricIndex (uint8).
-		// matter.js basic-information.element.ts:96-105.
-		enc.StartStruct(tag)
-		enc.PutUint(tlv.ContextTag(0), uint64(x.FabricIndex))
-		_ = enc.EndContainer()
-	case mattercore.BootReasonEvent:
-		// GeneralDiagnostics §11.12.8.1 — single field BootReason (enum8).
-		enc.StartStruct(tag)
-		enc.PutUint(tlv.ContextTag(0), uint64(x.BootReason))
-		_ = enc.EndContainer()
-	case mattercore.ReachableChangedEvent:
-		// BridgedDeviceBasicInformation §9.13.6.1 — single field
-		// ReachableNewValue (bool).
-		enc.StartStruct(tag)
-		enc.PutBool(tlv.ContextTag(0), x.ReachableNewValue)
-		_ = enc.EndContainer()
 	case matterlock.LockOperationEvent:
 		// DoorLock §5.2.10.3 LockOperation. Field tags per matter.js
 		// door-lock-cluster.element.ts:181-195:
@@ -1454,22 +1346,6 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) { //nolint
 			enc.PutUint(tlv.AnonymousTag(), uint64(id))
 		}
 		_ = enc.EndContainer()
-		_ = enc.EndContainer()
-	case mattercore.TimeSnapshotResponse:
-		// TimeSnapshotResponse (general-diagnostics.element.ts:103-105):
-		// [0] SystemTimeMs systime-ms, [1] PosixTimeMs posix-ms nullable.
-		enc.StartStruct(tag)
-		enc.PutUint(tlv.ContextTag(0), x.SystemTimeMs)
-		if x.PosixTimeMs != nil {
-			enc.PutUint(tlv.ContextTag(1), *x.PosixTimeMs)
-		} else {
-			enc.PutNull(tlv.ContextTag(1))
-		}
-		_ = enc.EndContainer()
-	case mattercore.PayloadTestResponse:
-		// PayloadTestResponse (element :119): [0] Payload octets.
-		enc.StartStruct(tag)
-		enc.PutOctets(tlv.ContextTag(0), x.Payload)
 		_ = enc.EndContainer()
 	default:
 		if encodeGroupsResponse(enc, tag, v) || encodeGroupcastResponse(enc, tag, v) || encodeScenesResponse(enc, tag, v) || encodeApplicationResponse(enc, tag, v) {

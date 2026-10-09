@@ -9,6 +9,8 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -46,11 +48,17 @@ type TargetStruct struct {
 
 // Cluster ID + revision per Matter §9.6.
 const (
-	bindingClusterID       uint32 = 0x001E
-	bindingClusterRevision uint16 = 1
+	bindingClusterID       = bindingdef.ClusterID
+	bindingClusterRevision = bindingdef.Revision
 
-	bindingAttrBinding uint32 = 0x0000
+	bindingAttrBinding = bindingdef.AttrBinding
 )
+
+// bindingInst is the definition (cluster/spec/binding, ADR 0013, from
+// matter.js binding.element.ts): the attribute list and the status of a
+// write to anything but Binding come from it. TargetStruct keeps its
+// sentinel encoding of the absent fields.
+var bindingInst = mustInstance(bindingdef.Definition, spec.Options{})
 
 // NewBinding returns a Binding cluster server with an empty list.
 func NewBinding() *Binding {
@@ -75,10 +83,8 @@ func (b *Binding) MatterRead(attrID uint32) (any, bool) {
 		out := append([]TargetStruct(nil), b.bindings...)
 		b.mu.RUnlock()
 		return out, true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return bindingClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return bindingInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
@@ -89,7 +95,8 @@ func (b *Binding) MatterRead(attrID uint32) (any, bool) {
 // before this call (go-fabric relies on the IM layer to enforce that).
 func (b *Binding) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	if attrID != bindingAttrBinding {
-		return fmt.Errorf("matter: Binding has no writable attribute 0x%04X", attrID)
+		_, err := bindingInst.ValidateWrite(attrID, value, nil)
+		return refusedWrite{sentinel: fmt.Errorf("matter: Binding has no writable attribute 0x%04X", attrID), status: err}
 	}
 	list, ok := value.([]TargetStruct)
 	if !ok {
@@ -116,5 +123,5 @@ func (b *Binding) MatterReportable() []uint32 {
 // the full attribute set; without this the dispatcher falls back to
 // MatterReportable's single attribute.
 func (b *Binding) MatterAttributes() []uint32 {
-	return []uint32{bindingAttrBinding}
+	return bindingInst.MatterAttributes()
 }

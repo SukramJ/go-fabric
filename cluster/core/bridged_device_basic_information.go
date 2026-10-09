@@ -11,6 +11,8 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -28,6 +30,9 @@ import (
 //   - Reachable is mutable based on bridged-device availability.
 //   - UniqueID is mandatory (vs. optional on BasicInformation).
 type BridgedDeviceBasicInformation struct {
+	// def is the generated definition bound to the optional attributes
+	// this instance serves (see instanceOptions).
+	def           *spec.Instance
 	configVersion uint32
 	mu            sync.RWMutex
 
@@ -71,41 +76,40 @@ type BridgedDeviceBasicInformation struct {
 }
 
 // Cluster ID + revision per Matter §9.13.
+// Cluster ID, revision, attribute and event ids: the generated
+// definition's (cluster/spec/bridgeddevicebasicinformation, ADR 0013,
+// from matter.js bridged-device-basic-information.element.ts). The
+// attribute and event lists, the ReachableChanged priority, the write
+// privilege and the statuses of a refused write come from it as well.
 const (
-	bridgedBasicInfoClusterID       uint32 = 0x0039
-	bridgedBasicInfoClusterRevision uint16 = 6 // matter.js HEAD bridged-device-basic-information.element.ts:20 default=6
+	bridgedBasicInfoClusterID       = bdbidef.ClusterID
+	bridgedBasicInfoClusterRevision = bdbidef.Revision
 
-	bridgedBasicInfoAttrVendorName         uint32 = 0x0001
-	bridgedBasicInfoAttrVendorID           uint32 = 0x0002
-	bridgedBasicInfoAttrProductName        uint32 = 0x0003
-	bridgedBasicInfoAttrProductID          uint32 = 0x0004
-	bridgedBasicInfoAttrNodeLabel          uint32 = 0x0005
-	bridgedBasicInfoAttrHardwareVersion    uint32 = 0x0007
-	bridgedBasicInfoAttrHardwareVersionStr uint32 = 0x0008
-	bridgedBasicInfoAttrSoftwareVersion    uint32 = 0x0009
-	bridgedBasicInfoAttrSoftwareVersionStr uint32 = 0x000A
-	bridgedBasicInfoAttrManufacturingDate  uint32 = 0x000B
-	bridgedBasicInfoAttrPartNumber         uint32 = 0x000C
-	bridgedBasicInfoAttrProductURL         uint32 = 0x000D
-	bridgedBasicInfoAttrProductLabel       uint32 = 0x000E
-	bridgedBasicInfoAttrSerialNumber       uint32 = 0x000F
-	bridgedBasicInfoAttrReachable          uint32 = 0x0011
-	bridgedBasicInfoAttrUniqueID           uint32 = 0x0012
-	bridgedBasicInfoAttrProductAppearance  uint32 = 0x0014
-	// ConfigurationVersion (Attr 0x0018) per Matter Core Spec §9.13 and
-	// matter.js HEAD packages/model/src/standard/elements/
-	// bridged-device-basic-information.element.ts:48, conformance "P,
-	// [Rev >= v5]". Apple iOS 18.4+ probes for it via HMHome's bridge-
-	// validator and surfaces an "Outdated configuration" warning when
-	// absent. Static value `1` is sufficient — we have no runtime
-	// configuration revisions to track.
-	bridgedBasicInfoAttrConfigurationVersion uint32 = 0x0018
+	bridgedBasicInfoAttrVendorName         = bdbidef.AttrVendorName
+	bridgedBasicInfoAttrVendorID           = bdbidef.AttrVendorId
+	bridgedBasicInfoAttrProductName        = bdbidef.AttrProductName
+	bridgedBasicInfoAttrProductID          = bdbidef.AttrProductId
+	bridgedBasicInfoAttrNodeLabel          = bdbidef.AttrNodeLabel
+	bridgedBasicInfoAttrHardwareVersion    = bdbidef.AttrHardwareVersion
+	bridgedBasicInfoAttrHardwareVersionStr = bdbidef.AttrHardwareVersionString
+	bridgedBasicInfoAttrSoftwareVersion    = bdbidef.AttrSoftwareVersion
+	bridgedBasicInfoAttrSoftwareVersionStr = bdbidef.AttrSoftwareVersionString
+	bridgedBasicInfoAttrManufacturingDate  = bdbidef.AttrManufacturingDate
+	bridgedBasicInfoAttrPartNumber         = bdbidef.AttrPartNumber
+	bridgedBasicInfoAttrProductURL         = bdbidef.AttrProductUrl
+	bridgedBasicInfoAttrProductLabel       = bdbidef.AttrProductLabel
+	bridgedBasicInfoAttrSerialNumber       = bdbidef.AttrSerialNumber
+	bridgedBasicInfoAttrReachable          = bdbidef.AttrReachable
+	bridgedBasicInfoAttrUniqueID           = bdbidef.AttrUniqueId
+	bridgedBasicInfoAttrProductAppearance  = bdbidef.AttrProductAppearance
+	// ConfigurationVersion, conformance "[Rev >= v6]". Apple iOS 18.4+
+	// probes for it via HMHome's bridge-validator and surfaces an
+	// "Outdated configuration" warning when absent.
+	bridgedBasicInfoAttrConfigurationVersion = bdbidef.AttrConfigurationVersion
 
-	// bridgedBasicInfoEventReachableChanged is the spec-mandated Matter
-	// §9.13.6 / matter.js HEAD bridged-device-basic-information.element.ts
-	// line 55 event id (0x0003, priority Critical, conformance "M") that
-	// fires when [SetReachable] flips the reachable flag.
-	bridgedBasicInfoEventReachableChanged uint32 = 0x0003
+	// bridgedBasicInfoEventReachableChanged is the event (0x03, info,
+	// "M") that fires when [SetReachable] flips the reachable flag.
+	bridgedBasicInfoEventReachableChanged = bdbidef.EventReachableChanged
 )
 
 // Exported cluster / event identifiers so the bridge can address the
@@ -120,15 +124,10 @@ const (
 	EventReachableChanged = bridgedBasicInfoEventReachableChanged
 )
 
-// ReachableChangedEvent is the cluster-native payload for event
-// 0x0003. Mirrors matter.js basic-information.element.ts:117 +
-// bridged-device-basic-information.element.ts:55. The ReachableNewValue
-// field is encoded as a single TLV bool at ContextTag(0).
-type ReachableChangedEvent struct {
-	// ReachableNewValue is the post-flip reachable state. ContextTag(0)
-	// per Matter §9.13.6.4.
-	ReachableNewValue bool
-}
+// ReachableChangedEvent is the payload of ReachableChanged (0x03) on both
+// BridgedDeviceBasicInformation and BasicInformation: the generated
+// payload, ReachableNewValue as a TLV bool at tag 0.
+type ReachableChangedEvent = bdbidef.ReachableChangedEvent
 
 // errBridgedBasicInfoUnknown is returned for unsupported writes /
 // unknown attributes.
@@ -222,7 +221,52 @@ func NewBridgedDeviceBasicInformation(cfg BridgedConfig) (*BridgedDeviceBasicInf
 		configVersion:     max(cfg.ConfigurationVersion, 1),
 	}
 	validateBridgedBasicInfoAttributes(cfg, serialNumber)
+	b.def = mustInstance(bdbidef.Definition, b.instanceOptions())
 	return b, nil
+}
+
+// instanceOptions declares the optional attributes this instance serves:
+// NodeLabel (writable, persisted through OnNodeLabelWrite), UniqueID ("Rev >= v4, O") and ConfigurationVersion ("[Rev >= v6]")
+// always, every other optional one only when the host set it — Apple
+// Home's HAP service mapper validates per-attribute constraints (e.g.
+// ManufacturingDate min=8) against every attribute the cluster
+// advertises, even if it would surface as the empty string; matter.js's
+// bridged sample owns an attribute only when the application set it.
+func (b *BridgedDeviceBasicInformation) instanceOptions() spec.Options {
+	opts := spec.Options{Attributes: []uint32{bridgedBasicInfoAttrNodeLabel, bridgedBasicInfoAttrUniqueID, bridgedBasicInfoAttrConfigurationVersion}}
+	for _, o := range []struct {
+		set  bool
+		attr uint32
+	}{
+		{b.vendorName != "", bridgedBasicInfoAttrVendorName},
+		{b.vendorID != 0, bridgedBasicInfoAttrVendorID},
+		{b.productName != "", bridgedBasicInfoAttrProductName},
+		{b.productID != 0, bridgedBasicInfoAttrProductID},
+		{b.hardwareVersion != 0, bridgedBasicInfoAttrHardwareVersion},
+		{b.hardwareString != "", bridgedBasicInfoAttrHardwareVersionStr},
+		{b.softwareVersion != 0, bridgedBasicInfoAttrSoftwareVersion},
+		{b.softwareString != "", bridgedBasicInfoAttrSoftwareVersionStr},
+		{b.manufacturingDate != "", bridgedBasicInfoAttrManufacturingDate},
+		{b.partNumber != "", bridgedBasicInfoAttrPartNumber},
+		{b.productURL != "", bridgedBasicInfoAttrProductURL},
+		{b.productLabel != "", bridgedBasicInfoAttrProductLabel},
+		{b.serialNumber != "", bridgedBasicInfoAttrSerialNumber},
+		{b.productAppearance != (ProductAppearanceStruct{}), bridgedBasicInfoAttrProductAppearance},
+	} {
+		if o.set {
+			opts.Attributes = append(opts.Attributes, o.attr)
+		}
+	}
+	return opts
+}
+
+// inst returns the bound definition; an instance not built by
+// NewBridgedDeviceBasicInformation binds it on first use.
+func (b *BridgedDeviceBasicInformation) inst() *spec.Instance {
+	if b.def == nil {
+		return mustInstance(bdbidef.Definition, b.instanceOptions())
+	}
+	return b.def
 }
 
 // validateBridgedBasicInfoAttributes emits slog warnings for suspicious
@@ -386,10 +430,8 @@ func (b *BridgedDeviceBasicInformation) MatterRead(attrID uint32) (any, bool) { 
 		// changes (endpoint.Endpoint.IncreaseConfigurationVersion), as
 		// matter.js's increaseConfigurationVersion does.
 		return b.configVersion, true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return bridgedBasicInfoClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return b.inst().ReadGlobal(attrID)
 	}
 	return nil, false
 }
@@ -398,7 +440,10 @@ func (b *BridgedDeviceBasicInformation) MatterRead(attrID uint32) (any, bool) { 
 // [BridgedDeviceBasicInformation.SetReachable] from the bridge core.
 func (b *BridgedDeviceBasicInformation) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	if attrID != bridgedBasicInfoAttrNodeLabel {
-		return fmt.Errorf("%w: 0x%04X", errBridgedBasicInfoUnknown, attrID)
+		// UNSUPPORTED_WRITE for a served read-only attribute,
+		// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
+		_, err := b.inst().ValidateWrite(attrID, value, nil)
+		return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBridgedBasicInfoUnknown, attrID), status: err}
 	}
 	s, ok := value.(string)
 	if !ok {
@@ -435,76 +480,15 @@ func (b *BridgedDeviceBasicInformation) MatterReportable() []uint32 {
 // MatterEvents implements [contract.ClusterEventLister] so the
 // dispatcher synthesises the global EventList (0xFFFA) attribute correctly
 // for this cluster. ReachableChanged (0x0003) is the only event in this cluster.
-func (b *BridgedDeviceBasicInformation) MatterEvents() []uint32 {
-	return []uint32{bridgedBasicInfoEventReachableChanged}
-}
+func (b *BridgedDeviceBasicInformation) MatterEvents() []uint32 { return b.inst().MatterEvents() }
 
 // MatterAttributes implements [contract.ClusterAttributeLister]
 // so wildcard subscribe / read enumerates every attribute the cluster
-// exposes. Apple Home reads this set on every bridged endpoint to
-// build its HAP service map; missing attributes leave Apple's
-// MTRDevice with VID/PID Unknown and abort pairing.
+// exposes (see instanceOptions). Apple Home reads this set on every
+// bridged endpoint to build its HAP service map; missing attributes leave
+// Apple's MTRDevice with VID/PID Unknown and abort pairing.
 func (b *BridgedDeviceBasicInformation) MatterAttributes() []uint32 {
-	// Mandatory attributes always reported. Optional ones gate on the
-	// underlying value being non-empty — Apple Home's HAP service mapper
-	// validates per-attribute constraints (e.g. ManufacturingDate min=8)
-	// against every attribute the cluster advertises, even if the
-	// attribute would surface as the empty string. Skipping un-set
-	// optional attributes mirrors matter.js's behaviour-layer pattern of
-	// "the cluster only owns the attribute when the application set it".
-	// AttributeList enumerates only the attributes the cluster *actually*
-	// implements — see MatterRead. Optional attributes that are
-	// zero/empty are omitted so wildcard subscribe doesn't carry them on
-	// the wire (matter.js bridged-sample pattern).
-	out := []uint32{
-		bridgedBasicInfoAttrNodeLabel,
-		bridgedBasicInfoAttrReachable,
-		bridgedBasicInfoAttrUniqueID,
-		bridgedBasicInfoAttrConfigurationVersion,
-	}
-	if b.vendorName != "" {
-		out = append(out, bridgedBasicInfoAttrVendorName)
-	}
-	if b.vendorID != 0 {
-		out = append(out, bridgedBasicInfoAttrVendorID)
-	}
-	if b.productName != "" {
-		out = append(out, bridgedBasicInfoAttrProductName)
-	}
-	if b.productID != 0 {
-		out = append(out, bridgedBasicInfoAttrProductID)
-	}
-	if b.hardwareVersion != 0 {
-		out = append(out, bridgedBasicInfoAttrHardwareVersion)
-	}
-	if b.hardwareString != "" {
-		out = append(out, bridgedBasicInfoAttrHardwareVersionStr)
-	}
-	if b.softwareVersion != 0 {
-		out = append(out, bridgedBasicInfoAttrSoftwareVersion)
-	}
-	if b.softwareString != "" {
-		out = append(out, bridgedBasicInfoAttrSoftwareVersionStr)
-	}
-	if b.manufacturingDate != "" {
-		out = append(out, bridgedBasicInfoAttrManufacturingDate)
-	}
-	if b.partNumber != "" {
-		out = append(out, bridgedBasicInfoAttrPartNumber)
-	}
-	if b.productURL != "" {
-		out = append(out, bridgedBasicInfoAttrProductURL)
-	}
-	if b.productLabel != "" {
-		out = append(out, bridgedBasicInfoAttrProductLabel)
-	}
-	if b.serialNumber != "" {
-		out = append(out, bridgedBasicInfoAttrSerialNumber)
-	}
-	if b.productAppearance != (ProductAppearanceStruct{}) {
-		out = append(out, bridgedBasicInfoAttrProductAppearance)
-	}
-	return out
+	return b.inst().MatterAttributes()
 }
 
 // SetReachable updates the reachable flag. Returns true when the
@@ -539,7 +523,7 @@ func (b *BridgedDeviceBasicInformation) SetReachable(reachable bool) (changed bo
 			emitter.MatterEmitEvent(endpoint, bridgedBasicInfoClusterID,
 				bridgedBasicInfoEventReachableChanged,
 				ReachableChangedEvent{ReachableNewValue: reachable},
-				contract.EventPriorityInfo)
+				b.inst().EventPriority(bridgedBasicInfoEventReachableChanged))
 		}
 	}
 	return changed

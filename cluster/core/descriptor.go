@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -70,24 +72,27 @@ func (d *Descriptor) MatterDataVersion() uint32 {
 	return d.version.Current()
 }
 
-// DeviceTypeStruct mirrors the Matter Descriptor.DeviceTypeList entry
-// shape (Matter §9.5.5.1). Each entry is (DeviceTypeID, Revision).
-type DeviceTypeStruct struct {
-	DeviceType uint32
-	Revision   uint16
-}
+// DeviceTypeStruct is the Descriptor.DeviceTypeList entry, the generated
+// struct of descriptor.element.ts: (DeviceType, Revision).
+type DeviceTypeStruct = descdef.DeviceTypeStruct
 
-// Cluster ID and revision per Matter §9.5.
+// Cluster ID, revision and attribute ids: the generated definition's
+// (cluster/spec/descriptor, ADR 0013). The attribute list and the write
+// statuses come from it as well; the lists' content is the topology's.
 const (
-	descriptorClusterID       uint32 = 0x001D
-	descriptorClusterRevision uint16 = 3 // matter.js HEAD (@matter/model 0.16.11)
+	descriptorClusterID       = descdef.ClusterID
+	descriptorClusterRevision = descdef.Revision
 
-	descriptorAttrDeviceTypeList uint32 = 0x0000
-	descriptorAttrServerList     uint32 = 0x0001
-	descriptorAttrClientList     uint32 = 0x0002
-	descriptorAttrPartsList      uint32 = 0x0003
-	descriptorAttrTagList        uint32 = 0x0004
+	descriptorAttrDeviceTypeList = descdef.AttrDeviceTypeList
+	descriptorAttrServerList     = descdef.AttrServerList
+	descriptorAttrClientList     = descdef.AttrClientList
+	descriptorAttrPartsList      = descdef.AttrPartsList
+	descriptorAttrTagList        = descdef.AttrTagList
 )
+
+// descriptorInst is the definition bound to what the server serves: no
+// feature, so TagList (conformance TAGLIST) is not served.
+var descriptorInst = mustInstance(descdef.Definition, spec.Options{})
 
 // errDescriptorReadOnly is returned for any write attempt — the
 // Descriptor cluster has no writable attributes.
@@ -180,17 +185,19 @@ func (d *Descriptor) MatterRead(attrID uint32) (any, bool) {
 		// aborts with HAPErrorDomain Code=14. matter.js / chip-tool
 		// tolerate the absence; re-enable when we surface tags.
 		return nil, false
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return descriptorClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return descriptorInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite always rejects — Descriptor has no writable attributes.
-func (d *Descriptor) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("%w: 0x%04X", errDescriptorReadOnly, attrID)
+// MatterWrite always rejects — Descriptor has no writable attributes: a
+// served one answers UNSUPPORTED_WRITE and any other
+// UNSUPPORTED_ATTRIBUTE, as the definition judges them; the error still
+// matches errDescriptorReadOnly.
+func (d *Descriptor) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := descriptorInst.ValidateWrite(attrID, value, nil)
+	return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errDescriptorReadOnly, attrID), status: err}
 }
 
 // MatterInvoke always rejects — Descriptor has no commands.
@@ -227,14 +234,7 @@ func (d *Descriptor) MatterAttributes() []uint32 {
 	// `semtag` struct schema and rejects the whole Descriptor cluster
 	// when TagList shows up in the wildcard expansion → HAP build
 	// fails with Code=14.
-	return []uint32{
-		descriptorAttrDeviceTypeList,
-		descriptorAttrServerList,
-		descriptorAttrClientList,
-		descriptorAttrPartsList,
-		cluster.AttrGlobalFeatureMap,
-		cluster.AttrGlobalClusterRevision,
-	}
+	return append(descriptorInst.MatterAttributes(), cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision)
 }
 
 // SetPartsList replaces the parts list under a copy. Used by the

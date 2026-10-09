@@ -11,30 +11,37 @@ import (
 	"unicode/utf16"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/schema"
 )
 
-// Groups cluster (0x0004) identifiers, group.element.ts.
+// Groups cluster (0x0004) identifiers: the generated definition's
+// (cluster/spec/groups, ADR 0013, from matter.js groups.element.ts). The
+// attribute and command lists, FeatureMap, ClusterRevision, the invoke
+// privileges and the statuses of a refused write come from it as well. The
+// requests keep the bridge's hand-written decoders into the request
+// structs below (notes/parity/by_design.md BD-Matter-Groups-HandDecoders);
+// the group table is the groups.Manager's.
 const (
 	// GroupsClusterID is the Groups cluster id.
-	GroupsClusterID uint32 = 0x0004
+	GroupsClusterID = groupsdef.ClusterID
 
-	groupsAttrNameSupport uint32 = 0x0000
+	groupsAttrNameSupport = groupsdef.AttrNameSupport
 
-	groupsCmdAddGroup              uint32 = 0x00
-	groupsCmdViewGroup             uint32 = 0x01
-	groupsCmdGetGroupMembership    uint32 = 0x02
-	groupsCmdRemoveGroup           uint32 = 0x03
-	groupsCmdRemoveAllGroups       uint32 = 0x04
-	groupsCmdAddGroupIfIdentifying uint32 = 0x05
+	groupsCmdAddGroup              = groupsdef.CmdAddGroup
+	groupsCmdViewGroup             = groupsdef.CmdViewGroup
+	groupsCmdGetGroupMembership    = groupsdef.CmdGetGroupMembership
+	groupsCmdRemoveGroup           = groupsdef.CmdRemoveGroup
+	groupsCmdRemoveAllGroups       = groupsdef.CmdRemoveAllGroups
+	groupsCmdAddGroupIfIdentifying = groupsdef.CmdAddGroupIfIdentifying
 
 	// groupsNameSupportGroupNames is NameSupportBitmap bit 7 (GroupNames).
-	groupsNameSupportGroupNames uint8 = 0x80
+	groupsNameSupportGroupNames = uint8(groupsdef.NameSupportGroupNames)
 	// groupsFeatureGroupNames is FeatureMap bit 0 (GN).
-	groupsFeatureGroupNames uint32 = 0x01
+	groupsFeatureGroupNames = uint32(groupsdef.FeatureGroupNames)
 	// groupsMaxNameLength is GroupName's "max 16" constraint.
 	groupsMaxNameLength = 16
 	// groupsCapacityBase is the 0xFE matter.js reports Capacity against.
@@ -143,6 +150,10 @@ func NewGroups(endpoint uint16, m *groups.Manager, identifyTime func() uint16) (
 	return &Groups{endpoint: endpoint, groups: m, identifyTime: identifyTime}, nil
 }
 
+// groupsInst is the definition bound to GN, the feature the default
+// GroupsServer enables.
+var groupsInst = mustInstance(groupsdef.Definition, spec.Options{Features: groupsFeatureGroupNames})
+
 // Compile-time assertions.
 var (
 	_ contract.ClusterServer                 = (*Groups)(nil)
@@ -161,66 +172,50 @@ func (s *Groups) MatterRead(attrID uint32) (any, bool) {
 		// GroupsServer.initialize: nameSupport.groupNames follows the
 		// GroupNames feature, which the default server enables.
 		return groupsNameSupportGroupNames, true
-	case cluster.AttrGlobalFeatureMap:
-		return groupsFeatureGroupNames, true
-	case cluster.AttrGlobalClusterRevision:
-		rev, _ := schema.ClusterRevision(GroupsClusterID)
-		return rev, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return groupsInst.ReadGlobal(attrID)
 	case cluster.AttrGlobalAcceptedCommandList:
 		return s.MatterAcceptedCommands(), true
 	case cluster.AttrGlobalGeneratedCommandList:
 		return s.MatterGeneratedCommands(), true
 	case cluster.AttrGlobalAttributeList:
-		return []uint32{
-			groupsAttrNameSupport,
+		return append(
+			groupsInst.MatterAttributes(),
 			cluster.AttrGlobalGeneratedCommandList,
 			cluster.AttrGlobalAcceptedCommandList,
 			cluster.AttrGlobalAttributeList,
 			cluster.AttrGlobalFeatureMap,
 			cluster.AttrGlobalClusterRevision,
-		}, true
+		), true
 	}
 	return nil, false
 }
 
 // MatterWrite implements [contract.ClusterServer]: Groups has no writable
 // attribute.
-func (s *Groups) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: Groups attribute 0x%04X is read-only", attrID)
+func (s *Groups) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := groupsInst.ValidateWrite(attrID, value, nil)
+	return refusedWrite{sentinel: fmt.Errorf("matter: Groups attribute 0x%04X is read-only", attrID), status: err}
 }
 
 // MatterReportable implements [contract.ClusterServer].
 func (s *Groups) MatterReportable() []uint32 { return []uint32{groupsAttrNameSupport} }
 
 // MatterAttributes implements [contract.ClusterAttributeLister].
-func (s *Groups) MatterAttributes() []uint32 { return []uint32{groupsAttrNameSupport} }
+func (s *Groups) MatterAttributes() []uint32 { return groupsInst.MatterAttributes() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
-func (s *Groups) MatterAcceptedCommands() []uint32 {
-	return []uint32{
-		groupsCmdAddGroup, groupsCmdViewGroup, groupsCmdGetGroupMembership,
-		groupsCmdRemoveGroup, groupsCmdRemoveAllGroups, groupsCmdAddGroupIfIdentifying,
-	}
-}
+func (s *Groups) MatterAcceptedCommands() []uint32 { return groupsInst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]: the
 // four responses share their request's id.
-func (s *Groups) MatterGeneratedCommands() []uint32 {
-	return []uint32{groupsCmdAddGroup, groupsCmdViewGroup, groupsCmdGetGroupMembership, groupsCmdRemoveGroup}
-}
+func (s *Groups) MatterGeneratedCommands() []uint32 { return groupsInst.MatterGeneratedCommands() }
 
 // MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege]:
-// AddGroup, RemoveGroup, RemoveAllGroups and AddGroupIfIdentifying need
-// Manage, ViewGroup and GetGroupMembership Operate (groups.element.ts
-// access "F M" / "F O").
-func (s *Groups) MinInvokePrivilege(cmdID uint32) uint8 {
-	switch cmdID {
-	case groupsCmdViewGroup, groupsCmdGetGroupMembership:
-		return 3 // Operate
-	default:
-		return 4 // Manage
-	}
-}
+// the definition's — AddGroup, RemoveGroup, RemoveAllGroups and
+// AddGroupIfIdentifying need Manage, ViewGroup and GetGroupMembership
+// Operate (access "F M" / "F O").
+func (s *Groups) MinInvokePrivilege(cmdID uint32) uint8 { return groupsInst.MinInvokePrivilege(cmdID) }
 
 // MatterInvoke implements [contract.ClusterServer]. Every command is
 // fabric-scoped; without an accessing fabric it answers UnsupportedAccess,

@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -28,13 +30,19 @@ import (
 type ICDManagement struct{}
 
 const (
-	icdClusterID       uint32 = 0x0046
-	icdClusterRevision uint16 = 3 // Matter 1.5.1 §9.17
+	icdClusterID       = icddef.ClusterID
+	icdClusterRevision = icddef.Revision
 
-	icdAttrIdleModeDuration   uint32 = 0x0000
-	icdAttrActiveModeDuration uint32 = 0x0001
-	icdAttrActiveModeThresh   uint32 = 0x0002
+	icdAttrIdleModeDuration   = icddef.AttrIdleModeDuration
+	icdAttrActiveModeDuration = icddef.AttrActiveModeDuration
+	icdAttrActiveModeThresh   = icddef.AttrActiveModeThreshold
 )
+
+// icdInst is the definition (cluster/spec/icdmanagement, ADR 0013, from
+// matter.js icd-management.element.ts) bound to no feature (no CIP, UAT,
+// LITS): the three mandatory durations. The lists and the write statuses
+// come from it.
+var icdInst = mustInstance(icddef.Definition, spec.Options{})
 
 // NewICDManagement returns the cluster server. Stateless.
 func NewICDManagement() *ICDManagement { return &ICDManagement{} }
@@ -66,18 +74,17 @@ func (i *ICDManagement) MatterRead(attrID uint32) (any, bool) {
 		// out-of-range per spec (`uint16` field, conformance `M`,
 		// default 300).
 		return uint16(300), true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true // no LITS/CIP/UAT features
-	case cluster.AttrGlobalClusterRevision:
-		return icdClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return icdInst.ReadGlobal(attrID) // no LITS/CIP/UAT features
 	}
 	return nil, false
 }
 
 // MatterWrite implements [contract.ClusterServer]. Attributes
 // are read-only on the bridge.
-func (i *ICDManagement) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: ICDManagement attribute 0x%04X is read-only", attrID)
+func (i *ICDManagement) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := icdInst.ValidateWrite(attrID, value, nil)
+	return refusedWrite{sentinel: fmt.Errorf("matter: ICDManagement attribute 0x%04X is read-only", attrID), status: err}
 }
 
 // MatterInvoke implements [contract.ClusterServer]. ICD
@@ -96,6 +103,4 @@ func (i *ICDManagement) MatterReportable() []uint32 {
 // server implements via MatterRead. Apple Home's HAP service rebuild
 // reads the full attribute set; without this the dispatcher falls back
 // to MatterReportable's three-attribute surface.
-func (i *ICDManagement) MatterAttributes() []uint32 {
-	return []uint32{icdAttrIdleModeDuration, icdAttrActiveModeDuration, icdAttrActiveModeThresh}
-}
+func (i *ICDManagement) MatterAttributes() []uint32 { return icdInst.MatterAttributes() }
