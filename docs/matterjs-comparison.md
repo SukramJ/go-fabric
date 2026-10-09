@@ -47,7 +47,7 @@ matter.js HEAD as checked out at `../matter.js`.
 | DNS-SD advertisement + `MdnsServer` (`protocol/src/mdns`) | `mdns/` | ✅ | — | Operational + commissionable records, subtype PTRs, rotating device id, re-announce loop. |
 | `CommissionableMdnsScanner` — *browsing* for other nodes | — | ○ | **No** | Controller-side discovery. |
 | BLE / BTP (`protocol/src/ble`, `packages/nodejs-ble`) | — | ○ | **No** | Declared non-goal. BLE commissioning pulls a platform radio stack (BlueZ/CoreBluetooth) into a library whose only other OS dependency is a UDP socket, and it exists to solve a problem a LAN-attached bridge does not have: getting network credentials onto a device that has none. |
-| TCP transport (`protocol/src/transport/tcp`) | — | ○ | **Low** | Matter 1.4's large-payload path. It matters for BDX-heavy features (OTA images, diagnostic log downloads, camera streams) — none of which are in scope. Revisit only if BDX lands. |
+| TCP transport (`protocol/src/transport/tcp`) + BDX (`protocol/src/bdx`) | — | ○ | **Med** | Matter 1.4's large-payload path and the bulk transfer on it. Decided in for the DiagnosticLogs transfer (phase 3 of [`concept-matter-1.6.1-and-device-layer.md`](./concept-matter-1.6.1-and-device-layer.md)); OTA and camera streams, its other consumers, stay out (concept, Appendix F). |
 | Thread border-router client (`packages/thread-br-client`, `thread-network-*`) | — | ○ | **No** | The host is on Ethernet/Wi-Fi already; `NetworkCommissioning` advertises the Ethernet feature. |
 | Group (multicast) messaging (`protocol/src/groups`, `GroupSession`, `ServerGroupNetworking`, `groupcast` behavior) | [`groups`](../groups) authenticates group messages (privacy, AES-CCM, per-key per-sender rollover window); `bridge` routes a group Invoke / SuppressResponse Write to the member endpoints under the Group ACL auth mode — auxiliary entries included — answers nothing, and joins / leaves the multicast addresses on the UDP socket: the per-group address, or FF05::FA for a Groupcast IanaAddr group ([ADR 0009](./adr/0009-groups-and-group-messaging.md), [ADR 0010](./adr/0010-groupcast-and-auxiliary-acl.md)). [`core.Groupcast`](../cluster/core/groupcast.go) (Listener, PerGroup) and the AccessControl Auxiliary ACL on the root; every group message's outcome feeds GroupcastTesting. Read/Subscribe/Timed over a group are still dropped per §8.5.7. No Groupcast Sender feature, no group sending | ◐ | **Med** | Reception and Groupcast are complete and pinned against messages and payloads matter.js produced; neither has met a real controller yet. Sender (`BD-Matter-GroupcastNoSender`) stays out of scope with the controller role. |
 
@@ -81,10 +81,16 @@ matter.js HEAD as checked out at `../matter.js`.
 
 ## 5. Clusters
 
-matter.js ships roughly **140** cluster behaviours generated from `@matter/model`;
-`go-fabric` implements **~41** servers by hand, chosen by what a bridge
-actually mounts. The schema for all of them is present here (in `parity/` and
-`schema/`) — what is missing is server logic, not identifiers.
+matter.js ships **143** cluster behaviours generated from `@matter/model`;
+`go-fabric` serves **55** of the snapshot's 135 clusters (measured on
+2026-10-08 against `cluster/`), chosen so far by what a bridge actually
+mounts. The schema for all of them is present here (in `parity/` and
+`schema/`) — what is missing is server logic, not identifiers. The target
+since 2026-10-08 is every cluster a home-automation device type mandates or
+allows, 101 of the 135, through a generated default server
+([ADR 0017](./adr/0017-generated-default-cluster-server.md)); the
+measured gap and the four tranches are in
+[`concept-matter-1.6.1-and-device-layer.md`](./concept-matter-1.6.1-and-device-layer.md) §A.2–A.3.
 
 | Cluster family | matter.js | go-fabric | State | Interest | Assessment |
 | --- | --- | --- | --- | --- | --- |
@@ -102,14 +108,15 @@ actually mounts. The schema for all of them is present here (in `parity/` and
 | OTA Software Update **Requestor** | ✅ | stub (`cluster/core/ota_software_update_requestor.go`): DefaultOTAProviders not kept, UpdatePossible false, no BDX, no update agent; not mounted | ◐ | **Low** | A requestor that cannot download or apply an image is not mounted in the reference daemon; the SU family's requestor cases need BDX and are not applicable without it. A product that ships OTA brings its own update path (`docs/certifiability.md`). |
 | OTA Software Update **Provider** | ✅ | — | ○ | **No** | `BD-Matter-OTAProvider-NotExposed`. A bridge that offers firmware to other nodes is a distribution role, not a device role, and it needs BDX. |
 | Network diagnostics (Ethernet / Wi-Fi / Thread / Software) | ✅ | GeneralDiagnostics only | ○ | **Low** | All optional. Useful telemetry, no controller depends on them. |
-| Further appliance (microwave oven, oven cavity, laundry / dishwasher controls and alarm, TemperatureControl), media, energy, camera, TLS, WebRTC, closure-dimension, service-area, concentration extras, … (~95 behaviours) | ✅ | — | ○ | **Low** | Add on demand: a cluster server here is worth writing when a host has something to project onto it, and not before. The schema is already available for whichever one that turns out to be. |
+| Home-automation remainder: energy (DeviceEnergyManagement + Mode, EnergyEvse + Mode, WaterHeaterManagement + Mode, EnergyPreference, MeterIdentification, Commodity*, ElectricalGridConditions, PowerSourceConfiguration), appliance extras (TemperatureControl, MicrowaveOven*, Oven*, Refrigerator*, Laundry*Controls, DishwasherAlarm, TemperatureAlarm, ServiceArea), the seven further concentration clusters, BooleanStateConfiguration, ClosureDimension, SoilMeasurement, ThermostatUserInterfaceConfiguration, labels, localization, Software / Ethernet / WiFi diagnostics, Actions, EcosystemInformation (46 clusters) | ✅ (30 of them generated only) | — | ○ | **High** | In scope since 2026-10-08. 11 are mandated by a device type in scope, 35 allowed. Built in four tranches on the generated default server ([ADR 0017](./adr/0017-generated-default-cluster-server.md)); concept §A.3. |
+| Camera (7), media / content (15), TLS (2), Joint Fabric and CommissionerControl (3), Thread / network infrastructure (4), OTA Provider (32 clusters) | ✅ | — | ○ | **No** | Out of scope by decision, each with its reason in the concept's Appendix F.2: streams need WebRTC and a media path in the host, media players are not bridge devices, Joint Fabric is a controller task, Thread needs hardware, OTA provision is a distribution role. The schema and `script/clustergen` cover them should a host appear. AmbientContextSensing and WaterTankLevelMonitoring, which no device type mandates, await a decision. |
 
 ## 6. Device model and composition
 
 | matter.js | go-fabric | State | Interest | Assessment |
 | --- | --- | --- | --- | --- |
 | Element model / schema (`packages/model`) | embedded extract in [`parity/`](../parity) + generated lookups in [`schema/`](../schema) | ✅ | — | Same bytes, pinned and hash-guarded; refreshed by `make generate-matter-schema`. |
-| 81 device-type definitions (`packages/node/src/devices`) | revisions and the full requirement tree — cluster, feature, attribute, command and event requirements, components, conditions — via `schema.DeviceTypeDefinitionOf` and its lookups; the host picks the type per endpoint | ◐ | **Low** | The host composes each endpoint; the module does not build a device type's default behaviours as matter.js's device definitions do. |
+| 81 device-type definitions (`packages/node/src/devices`) and the endpoint types (`endpoints/`) | revisions and the full requirement tree — cluster, feature, attribute, command and event requirements, components, conditions — via `schema.DeviceTypeDefinitionOf` and its lookups; the host picks the type per endpoint | ◐ | **High** | The host composes each endpoint; the module does not build a device type's default behaviours as matter.js's device definitions do. Decided in: a generated `device/` package and a `node/` facade ([ADR 0018](./adr/0018-device-layer-and-node-facade.md), concept Part B), phase 4; the snapshot already carries the device files' feature and constraint overrides in `effective.requirements`. 65 of the 91 device types are in scope (concept, Appendix F.3). |
 | Device type validation (`DeviceTypeConformance`, `DeviceTypeConformanceService`) | [`endpoint.ValidateDeviceTypes`](../endpoint/devicetype_validation.go), run by the bridge on every assembly in matter.js's modes (warn by default, strict, off); `endpointtest.AssertDeviceTypeConformance` for a host's tests | ✅ | — | [ADR 0016](./adr/0016-device-type-validation.md). A port of matter.js's checks and condition derivation; the bridge judges and refuses whole topologies where matter.js does endpoints (`BD-Matter-DeviceTypeValidationPerTopology`). |
 | Aggregator / bridged-device composition | [`endpoint/`](../endpoint) — Root → Aggregator → BridgedNode | ✅ | — | Endpoint ids are stable across restarts via a host-supplied store. |
 | Behaviour layer: state, transactions, events, `Behavior.with(...)` mixins | Go structs implementing `contract.ClusterServer` | ◐ | — | A deliberate idiom translation, not a gap. matter.js's transaction machinery exists to make a JS event loop safe; Go's mutex-and-context model covers the same ground. |
@@ -151,7 +158,13 @@ are not re-opened by accident:
 
 ## If you are looking for the next thing to build
 
-In rough order of value to a real bridge:
+Since 2026-10-08 the order is set by
+[`concept-matter-1.6.1-and-device-layer.md`](./concept-matter-1.6.1-and-device-layer.md)
+§A.3: the generated default server and the composed bridged endpoint first
+(phase 0), the protocol remainder (phase 1), the cluster breadth (phase 2),
+TCP and BDX (phase 3), the device layer (phase 4), the real-controller
+evidence and `v1.0.0` (phase 5). The three items below are phase 1 and 5
+work and keep their reasoning:
 
 1. **Prove group messaging and Groupcast against a real controller** (§2) —
    chip-tool's `groupcast` / `groups` / `groupkeymanagement` commands and a

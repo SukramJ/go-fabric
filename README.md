@@ -44,6 +44,7 @@ supply that a library cannot is in
 | [`docs/matter-parity-contract.md`](./docs/matter-parity-contract.md) | What parity means and which standing guards enforce it. Read before your first change. |
 | [`docs/matter-ecosystem-observations.md`](./docs/matter-ecosystem-observations.md) | What Apple Home, Google Home and Alexa were actually observed to do. |
 | [`docs/open-items.md`](./docs/open-items.md) | What is known to be unfinished, in one place, with a pointer to the detail. |
+| [`docs/concept-matter-1.6.1-and-device-layer.md`](./docs/concept-matter-1.6.1-and-device-layer.md) | The target "Matter 1.6.1 complete" for the home-automation scope: the measured gap, the phases, the planned `device/` layer, and what stays out (in German; its ADRs 0017 and 0018 are in English). |
 | [`docs/adr/`](./docs/adr) | Architecture decision records. |
 | [`notes/parity/by_design.md`](./notes/parity/by_design.md) | The catalogue of intentional divergences from matter.js. |
 | [`notes/parity/matter_behaviour_findings.md`](./notes/parity/matter_behaviour_findings.md) | Known behaviour gaps that are *not* intentional, as scoped fix packages. |
