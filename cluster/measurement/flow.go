@@ -94,19 +94,16 @@ func (s *FlowServer) MatterRead(attrID uint32) (any, bool) {
 		// Optional, default 0 (flow-measurement.element.ts:28-31) —
 		// published like the neighbouring measurement servers do.
 		return uint16(0), true
-	case cluster.AttrGlobalFeatureMap:
-		// FlowMeasurement defines no features.
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return FlowRevision(), true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return flowInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — every FlowMeasurement attribute is
+// MatterWrite refuses the write as the definition answers it (see refuseWrite) — every FlowMeasurement attribute is
 // access "R V".
-func (*FlowServer) MatterWrite(context.Context, uint32, any) error {
-	return errReadOnly
+func (s *FlowServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(flowInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — FlowMeasurement has no commands.
@@ -119,9 +116,7 @@ func (*FlowServer) MatterReportable() []uint32 { return []uint32{attrMeasuredVal
 
 // MatterAttributes lists every FlowMeasurement attribute the server
 // answers, in id order and without the globals.
-func (*FlowServer) MatterAttributes() []uint32 {
-	return []uint32{attrMeasuredValue, attrMinMeasuredValue, attrMaxMeasuredValue, attrTolerance}
-}
+func (s *FlowServer) MatterAttributes() []uint32 { return flowInst.MatterAttributes() }
 
 // flowToMatter converts m³/h to the wire's 0.1 m³/h unit, rounded and
 // clamped to the representable non-null range.

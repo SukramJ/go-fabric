@@ -44,4 +44,20 @@ var committed = []string{
 	"DoorLock",
 	// cluster/thermo
 	"Thermostat",
+	// cluster/measurement
+	"TemperatureMeasurement",
+	"RelativeHumidityMeasurement",
+	"IlluminanceMeasurement",
+	"PressureMeasurement",
+	"FlowMeasurement",
+	"BooleanState",
+	"OccupancySensing",
+	"AirQuality",
+	"CarbonDioxideConcentrationMeasurement",
+	"Pm25ConcentrationMeasurement",
+	"Pm10ConcentrationMeasurement",
+	"PowerSource",
+	"PowerTopology",
+	"ElectricalPowerMeasurement",
+	"ElectricalEnergyMeasurement",
 }

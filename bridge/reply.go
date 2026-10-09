@@ -1181,55 +1181,13 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 			_ = enc.EndContainer()
 		}
 		_ = enc.EndContainer()
-	case mattermeasure.EnergyMeasurementStruct:
-		// ElectricalEnergyMeasurement Cumulative/PeriodicEnergy*
-		// attribute payload per Matter §2.14.5.2: struct{ [0] Energy
-		// int64 mWh }. The period fields (tags 1-4) describe PERIODIC
-		// recordings and are omitted for cumulative readings. A bare
-		// int64 here is wire-invalid — chip-tool's typed
-		// StructDecodeIterator rejects it with "Wrong TLV type".
-		// matter.js ref: packages/model/src/standard/elements/
-		// electrical-energy-measurement.element.ts:88-96.
-		enc.StartStruct(tag)
-		enc.PutInt64(tlv.ContextTag(0), x.Energy)
-		_ = enc.EndContainer()
 	case []mattermeasure.AccuracyStruct:
 		// ElectricalPowerMeasurement.Accuracy (0x0090:0x0002) and
-		// ElectricalEnergyMeasurement.Accuracy (0x0091:0x0000) per
-		// Matter §2.13.6.3 / §2.14.6.1. Each entry is a
-		// MeasurementAccuracyStruct:
-		//   [0] MeasurementType  enum16
-		//   [1] Measured         bool
-		//   [2] MinMeasuredValue int64
-		//   [3] MaxMeasuredValue int64
-		//   [4] AccuracyRanges   list[MeasurementAccuracyRangeStruct]
-		// MeasurementAccuracyRangeStruct (inner):
-		//   [0] RangeMin int64, [1] RangeMax int64, [5] FixedMax uint64
-		// Tags 2/3 are the measurement range and are signed: an unsigned
-		// element makes chip's TLVReader::Get(int64_t&) return
-		// WRONG_TLV_TYPE and the whole attribute fails to decode.
-		// matter.js ref: packages/model/src/standard/elements/
-		// measurement-accuracy-struct.element.ts and
-		// measurement-accuracy-range-struct.element.ts.
-		enc.StartArray(tag)
-		for _, a := range x {
-			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutUint16(tlv.ContextTag(0), a.MeasurementType)
-			enc.PutBool(tlv.ContextTag(1), a.Measured)
-			enc.PutInt64(tlv.ContextTag(2), a.MinMeasuredValue)
-			enc.PutInt64(tlv.ContextTag(3), a.MaxMeasuredValue)
-			enc.StartArray(tlv.ContextTag(4))
-			for _, r := range a.AccuracyRanges {
-				enc.StartStruct(tlv.AnonymousTag())
-				enc.PutInt64(tlv.ContextTag(0), r.RangeMin)
-				enc.PutInt64(tlv.ContextTag(1), r.RangeMax)
-				enc.PutUint64(tlv.ContextTag(5), r.FixedMax)
-				_ = enc.EndContainer()
-			}
-			_ = enc.EndContainer() // AccuracyRanges array
-			_ = enc.EndContainer() // MeasurementAccuracyStruct
-		}
-		_ = enc.EndContainer() // outer list
+		// ElectricalEnergyMeasurement.Accuracy (0x0091:0x0000): a list of
+		// MeasurementAccuracyStruct, encoded by the generated codec
+		// (measurement.AccuracyList). EnergyMeasurementStruct is the
+		// generated struct itself and takes the spec.Encodable case below.
+		mattermeasure.AccuracyList(x).EncodeTLV(enc, tag)
 	case mattercore.StartUpEvent:
 		// BasicInformation §11.1.8.1 — single field SoftwareVersion (uint32).
 		// matter.js packages/model/src/standard/elements/basic-information.element.ts:84-90.
@@ -1252,12 +1210,6 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		// GeneralDiagnostics §11.12.8.1 — single field BootReason (enum8).
 		enc.StartStruct(tag)
 		enc.PutUint(tlv.ContextTag(0), uint64(x.BootReason))
-		_ = enc.EndContainer()
-	case mattermeasure.BooleanStateChangeEvent:
-		// BooleanState StateChange — single field StateValue (bool),
-		// boolean-state.element.ts.
-		enc.StartStruct(tag)
-		enc.PutBool(tlv.ContextTag(0), x.StateValue)
 		_ = enc.EndContainer()
 	case mattercore.ReachableChangedEvent:
 		// BridgedDeviceBasicInformation §9.13.6.1 — single field
