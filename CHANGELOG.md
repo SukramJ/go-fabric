@@ -79,6 +79,21 @@ the same `ColorTemperatureWriter` as before.
   battery as such a part, as matter.js's `device-smoke-co-alarm` example
   does.
 
+- Thirty-one more generated definitions under `cluster/spec` (ADR 0013): the
+  fifteen measurement clusters (`temperaturemeasurement` …
+  `electricalenergymeasurement`), `switchcluster`,
+  `administratorcommissioning`, `groups`, `scenesmanagement`, and the system
+  clusters `identify`, `descriptor`, `basicinformation`,
+  `bridgeddevicebasicinformation`, `generaldiagnostics`,
+  `generalcommissioning`, `networkcommissioning`, `timesynchronization`,
+  `diagnosticlogs`, `binding`, `icdmanagement` and
+  `otasoftwareupdaterequestor`.
+- `measurement.AccuracyList` and `core.NetworkInterfaceList` (the attribute
+  values the bridge encodes through the generated codecs);
+  `measurement.AccuracyStruct`, `core.CapabilityMinimaStruct`,
+  `core.ProductAppearanceStruct`, `core.BootReasonEvent`,
+  `core.TimeSnapshotResponse` and `core.RetrieveLogsResponse` gain
+  `EncodeTLV` (and the two responses `ResponseCommand`).
 - `cluster/spec/closurecontrol`, `windowcovering`, `doorlock` and
   `thermostat`: the generated definitions of four more servers (ADR 0013),
   the AtomicRequest / AtomicResponse codecs of Thermostat — anonymous
@@ -94,6 +109,61 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- **The measurement servers, GenericSwitch, AdministratorCommissioning and
+  fourteen system servers are built on their generated definitions** (ADR
+  0013): `cluster/measurement` (every server), `cluster/wire`'s
+  GenericSwitch and AdministratorCommissioning, and `cluster/core`'s
+  Identify, Descriptor, BasicInformation, BridgedDeviceBasicInformation,
+  GeneralDiagnostics, GeneralCommissioning, NetworkCommissioning,
+  TimeSynchronization, DiagnosticLogs, Binding, ICDManagement,
+  OTASoftwareUpdateRequestor, Groups and ScenesManagement read their ids,
+  revisions, FeatureMaps, lists, event priorities, privileges and write
+  statuses from the packages above. Exported names keep compiling; these
+  are now aliases of the generated types: `measurement.EnergyMeasurementStruct`,
+  `measurement.BooleanStateChangeEvent`, `wire.SwitchInitialPressEvent` /
+  `SwitchLongPressEvent` / `SwitchShortReleaseEvent` /
+  `SwitchLongReleaseEvent`, `core.DeviceTypeStruct`, `core.StartUpEvent` /
+  `ShutDownEvent` / `LeaveEvent`, `core.ReachableChangedEvent`,
+  `core.DeviceLoadStruct`, `core.TestEventTriggerRequest` and
+  `core.PayloadTestResponse` (same fields). The exported cluster, feature
+  and enum constants of these packages read the definitions' values
+  (unchanged). PowerSource's, BasicInformation's and
+  BridgedDeviceBasicInformation's AttributeLists are in id order; the
+  AdministratorCommissioning AttributeList no longer names FeatureMap and
+  ClusterRevision itself (the dispatcher adds every global, so the wire is
+  unchanged).
+- **Host servers of these clusters receive typed requests.** Linking the
+  packages makes the bridge decode their requests through the generated
+  definitions, so a host's own server of one of them now receives the
+  generated request struct instead of a generic `map[uint8]any`, and a
+  request missing a mandatory field is answered INVALID_COMMAND (a value
+  outside its bounds CONSTRAINT_ERROR) before the server runs:
+  - Identify: `identify.IdentifyRequest`, `TriggerEffectRequest` (a missing
+    IdentifyTime is INVALID_COMMAND, where the server read it as 0).
+  - GeneralDiagnostics: `generaldiagnostics.TestEventTriggerRequest`
+    (= `core.TestEventTriggerRequest`), `TimeSnapshotRequest`,
+    `PayloadTestRequestRequest` (a Value above 255 is CONSTRAINT_ERROR,
+    where the server answered INVALID_COMMAND).
+  - TimeSynchronization: `timesynchronization.SetUtcTimeRequest` and the
+    unserved feature requests.
+  - DiagnosticLogs: `diagnosticlogs.RetrieveLogsRequestRequest` (an Intent
+    outside IntentEnum or a TransferFileDesignator over 32 bytes is
+    CONSTRAINT_ERROR).
+  - OTASoftwareUpdateRequestor: `otasoftwareupdaterequestor.AnnounceOtaProviderRequest`.
+  - ICDManagement, AdministratorCommissioning's RevokeCommissioning and
+    OpenBasicCommissioningWindow, and the unserved NetworkCommissioning
+    requests decode through their definitions too.
+  - OpenCommissioningWindow, the GeneralCommissioning requests and the core
+    Groups and ScenesManagement requests keep their hand-written decoders
+    and `cluster/wire` / `cluster/core` structs
+    (`BD-Matter-AdminCommissioning-OpenWindowParams`,
+    `BD-Matter-Commissioning-HandDecoders`).
+- Writes answered from the definitions: every migrated server answers a
+  write to a served read-only attribute with UNSUPPORTED_WRITE and one to
+  an attribute it does not serve with UNSUPPORTED_ATTRIBUTE (was a plain
+  error, read as FAILURE; TimeSynchronization answered UNSUPPORTED_WRITE for
+  both). The servers' own sentinel errors stay in the chain
+  (`errors.Is` / `errors.Unwrap` as before).
 - **ClosureControl, WindowCovering and Thermostat refuse a feature
   selection they do not serve** (owner decision recorded in ADR 0013: a
   server derives its FeatureMap from what it serves). A host whose
@@ -261,6 +331,19 @@ the same `ColorTemperatureWriter` as before.
 
 ### Fixed
 
+- **ElectricalEnergyMeasurement.Accuracy is one MeasurementAccuracyStruct,**
+  not a list (matter.js electrical-energy-measurement.element.ts and
+  connectedhomeip's cluster XML agree); the server reported a one-entry
+  list, which a typed controller fails to decode. `MatterRead` now returns
+  a `measurement.AccuracyStruct` for it.
+- **The electrical Accuracy entries name the right MeasurementType:**
+  ActivePower (0x05) and ElectricalEnergy (0x0E) per
+  measurement-type-enum.element.ts, where they named RmsVoltage (0x08) and
+  RmsCurrent (0x09).
+- **RetrieveLogsResponse is encoded.** The bridge had no encoder for
+  `core.RetrieveLogsResponse` and answered RetrieveLogsRequest with an
+  empty structure; it now carries Status, LogContent, UTCTimeStamp and
+  TimeSinceBoot under RetrieveLogsResponse (0x01).
 - **Thermostat SystemMode follows SystemModeEnum.** A heating-only
   thermostat refused SystemMode 7 as "Precooling" and accepted Precooling
   (6); 7 is FanOnly (conformance O), which matter.js accepts, and Precooling

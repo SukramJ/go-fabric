@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -134,24 +136,35 @@ const (
 	CommissioningErrorTCMinVersionNotMet            uint8 = 7
 )
 
-// Cluster ID + revision per Matter §11.10.
+// Cluster ID, revision, attribute and command ids: the generated
+// definition's (cluster/spec/generalcommissioning, ADR 0013, from matter.js
+// general-commissioning.element.ts). The lists, the read, write and invoke
+// privileges and the statuses of a refused write come from it as well. The
+// requests keep the bridge's hand-written decoders into the request
+// structs below (notes/parity/by_design.md
+// BD-Matter-Commissioning-HandDecoders); the fail-safe is this server's.
 const (
-	gencommClusterID       uint32 = 0x0030
-	gencommClusterRevision uint16 = 2 // matter.js HEAD (@matter/model 0.16.11)
+	gencommClusterID       = gencommdef.ClusterID
+	gencommClusterRevision = gencommdef.Revision
 
-	gencommAttrBreadcrumb                   uint32 = 0x0000
-	gencommAttrBasicCommissioningInfo       uint32 = 0x0001
-	gencommAttrRegulatoryConfig             uint32 = 0x0002
-	gencommAttrLocationCapability           uint32 = 0x0003
-	gencommAttrSupportsConcurrentConnection uint32 = 0x0004
+	gencommAttrBreadcrumb                   = gencommdef.AttrBreadcrumb
+	gencommAttrBasicCommissioningInfo       = gencommdef.AttrBasicCommissioningInfo
+	gencommAttrRegulatoryConfig             = gencommdef.AttrRegulatoryConfig
+	gencommAttrLocationCapability           = gencommdef.AttrLocationCapability
+	gencommAttrSupportsConcurrentConnection = gencommdef.AttrSupportsConcurrentConnection
 
-	gencommCmdArmFailSafe                   uint32 = 0x00
-	gencommCmdArmFailSafeResponse           uint32 = 0x01
-	gencommCmdSetRegulatoryConfig           uint32 = 0x02
-	gencommCmdSetRegulatoryConfigResponse   uint32 = 0x03
-	gencommCmdCommissioningComplete         uint32 = 0x04
-	gencommCmdCommissioningCompleteResponse uint32 = 0x05
+	gencommCmdArmFailSafe                   = gencommdef.CmdArmFailSafe
+	gencommCmdArmFailSafeResponse           = gencommdef.CmdArmFailSafeResponse
+	gencommCmdSetRegulatoryConfig           = gencommdef.CmdSetRegulatoryConfig
+	gencommCmdSetRegulatoryConfigResponse   = gencommdef.CmdSetRegulatoryConfigResponse
+	gencommCmdCommissioningComplete         = gencommdef.CmdCommissioningComplete
+	gencommCmdCommissioningCompleteResponse = gencommdef.CmdCommissioningCompleteResponse
 )
+
+// gencommInst is the definition bound to what the server serves: no
+// feature (TC, the terms-and-conditions flow, is not advertised, so
+// SetTCAcknowledgements and the TC attributes stay out).
+var gencommInst = mustInstance(gencommdef.Definition, spec.Options{})
 
 // errGencommInvalidArg is returned for malformed command payloads.
 var errGencommInvalidArg = errors.New("matter: GeneralCommissioning invalid argument")
@@ -313,30 +326,17 @@ func (g *GeneralCommissioning) MatterDataVersion() uint32 { return g.dataVersion
 // MatterClusterID implements [contract.ClusterServer].
 func (g *GeneralCommissioning) MatterClusterID() uint32 { return gencommClusterID }
 
-// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege].
-// ArmFailSafe, SetRegulatoryConfig, and CommissioningComplete require
-// Administer (5) per Matter §11.10 (access "A"). Mirrors matter.js
-// packages/model/src/standard/elements/general-commissioning.element.ts:63,78,92.
+// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege]:
+// the definition's — ArmFailSafe, SetRegulatoryConfig and
+// CommissioningComplete require Administer (access "A").
 func (g *GeneralCommissioning) MinInvokePrivilege(cmdID uint32) uint8 {
-	switch cmdID {
-	case gencommCmdArmFailSafe, gencommCmdSetRegulatoryConfig, gencommCmdCommissioningComplete:
-		return 5 // Administer
-	default:
-		return 3 // Operate — standard default
-	}
+	return gencommInst.MinInvokePrivilege(cmdID)
 }
 
-// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege].
-// Breadcrumb (0x0000) requires Administer (5) per Matter §11.10 (access
-// "RW VA"). Mirrors matter.js packages/model/src/standard/elements/
-// general-commissioning.element.ts:26.
+// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
+// the definition's — Breadcrumb requires Administer ("RW VA").
 func (g *GeneralCommissioning) MinWritePrivilege(attrID uint32) uint8 {
-	switch attrID {
-	case gencommAttrBreadcrumb:
-		return 5 // Administer
-	default:
-		return 3 // Operate — standard default
-	}
+	return gencommInst.MinWritePrivilege(attrID)
 }
 
 // BasicCommissioningInfoStruct mirrors Matter §11.10.5.3.
@@ -363,10 +363,8 @@ func (g *GeneralCommissioning) MatterRead(attrID uint32) (any, bool) {
 		return g.locationCapability, true
 	case gencommAttrSupportsConcurrentConnection:
 		return g.supportsConcurrentConnection, true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return gencommClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return gencommInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
@@ -375,7 +373,10 @@ func (g *GeneralCommissioning) MatterRead(attrID uint32) (any, bool) {
 // attributes are read-only.
 func (g *GeneralCommissioning) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	if attrID != gencommAttrBreadcrumb {
-		return fmt.Errorf("matter: GeneralCommissioning attribute 0x%04X is read-only", attrID)
+		// UNSUPPORTED_WRITE for a served read-only attribute,
+		// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
+		_, err := gencommInst.ValidateWrite(attrID, value, nil)
+		return refusedWrite{sentinel: fmt.Errorf("matter: GeneralCommissioning attribute 0x%04X is read-only", attrID), status: err}
 	}
 	v, ok := value.(uint64)
 	if !ok {
@@ -469,41 +470,20 @@ func (g *GeneralCommissioning) MatterReportable() []uint32 {
 
 // MatterAttributes implements [contract.ClusterAttributeLister]
 // so wildcard subscribe enumerates the full cluster surface.
-func (g *GeneralCommissioning) MatterAttributes() []uint32 {
-	return []uint32{
-		gencommAttrBreadcrumb,
-		gencommAttrBasicCommissioningInfo,
-		gencommAttrRegulatoryConfig,
-		gencommAttrLocationCapability,
-		gencommAttrSupportsConcurrentConnection,
-	}
-}
+func (g *GeneralCommissioning) MatterAttributes() []uint32 { return gencommInst.MatterAttributes() }
 
-// MatterAcceptedCommands implements [contract.ClusterCommandLister].
-// Lists the command IDs the server handles via MatterInvoke.
-// Mirrors matter.js packages/model/src/standard/elements/
-// general-commissioning.element.ts accepted commands.
-//
-// Note: SetTCAcknowledgments (0x05) is Matter 1.3+ and not implemented
-// in v1.1 — it is intentionally omitted.
+// MatterAcceptedCommands implements [contract.ClusterCommandLister]:
+// ArmFailSafe, SetRegulatoryConfig and CommissioningComplete.
+// SetTCAcknowledgements (0x06) is conformance TC, which the FeatureMap
+// does not advertise.
 func (g *GeneralCommissioning) MatterAcceptedCommands() []uint32 {
-	return []uint32{
-		gencommCmdArmFailSafe,           // 0x00
-		gencommCmdSetRegulatoryConfig,   // 0x02
-		gencommCmdCommissioningComplete, // 0x04
-	}
+	return gencommInst.MatterAcceptedCommands()
 }
 
-// MatterGeneratedCommands implements [contract.ClusterCommandLister].
-// Lists the response command IDs this server may emit.
-// Mirrors matter.js packages/model/src/standard/elements/
-// general-commissioning.element.ts generated commands.
+// MatterGeneratedCommands implements [contract.ClusterCommandLister]: the
+// three responses.
 func (g *GeneralCommissioning) MatterGeneratedCommands() []uint32 {
-	return []uint32{
-		gencommCmdArmFailSafeResponse,           // 0x01
-		gencommCmdSetRegulatoryConfigResponse,   // 0x03
-		gencommCmdCommissioningCompleteResponse, // 0x05
-	}
+	return gencommInst.MatterGeneratedCommands()
 }
 
 func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any) (any, error) {

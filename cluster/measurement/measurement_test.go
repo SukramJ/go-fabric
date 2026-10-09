@@ -1644,14 +1644,13 @@ func TestElectricalEnergyServerAccuracyRangesNonEmpty(t *testing.T) {
 	if !ok {
 		t.Fatal("MatterRead(0x0000 Accuracy) ok = false, want true")
 	}
-	list, ok := v.([]measurement.AccuracyStruct)
+	// One struct, not a list: electrical-energy-measurement.element.ts
+	// types Accuracy "MeasurementAccuracyStruct".
+	acc, ok := v.(measurement.AccuracyStruct)
 	if !ok {
-		t.Fatalf("Accuracy value is %T, want []AccuracyStruct", v)
+		t.Fatalf("Accuracy value is %T, want AccuracyStruct", v)
 	}
-	if len(list) == 0 {
-		t.Fatal("Accuracy list is empty; Matter §2.14.5.2 requires ≥ 1 AccuracyRanges entry")
-	}
-	if len(list[0].AccuracyRanges) == 0 {
+	if len(acc.AccuracyRanges) == 0 {
 		t.Fatalf("AccuracyRanges[0] is empty; Matter §2.14.5.2 requires ≥ 1 AccuracyRangeStruct entry")
 	}
 }

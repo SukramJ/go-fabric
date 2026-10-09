@@ -16,6 +16,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/bootid"
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -37,6 +39,10 @@ import (
 //     topology).
 type BasicInformation struct {
 	mu sync.RWMutex
+
+	// def is the generated definition bound to the optional attributes
+	// this instance serves (see instanceOptions).
+	def *spec.Instance
 
 	dataModelRevision uint16
 	vendorName        string
@@ -129,43 +135,48 @@ type CapabilityMinimaStruct struct {
 	SubscribePathsSupported          uint16
 }
 
-// Cluster ID + revision per Matter §11.1.
+// Cluster ID, revision, attribute and event ids: the generated
+// definition's (cluster/spec/basicinformation, ADR 0013, from matter.js
+// basic-information.element.ts). The attribute and event lists, the event
+// priorities, the write privileges and the statuses of a refused write
+// come from it as well; the node's identity and its persistence hooks are
+// this server's.
 const (
-	basicInfoClusterID       uint32 = 0x0028
-	basicInfoClusterRevision uint16 = 6 // matter.js HEAD basic-information.element.ts:20 default=6
+	basicInfoClusterID       = bidef.ClusterID
+	basicInfoClusterRevision = bidef.Revision
 
-	basicInfoAttrDataModelRevision    uint32 = 0x0000
-	basicInfoAttrVendorName           uint32 = 0x0001
-	basicInfoAttrVendorID             uint32 = 0x0002
-	basicInfoAttrProductName          uint32 = 0x0003
-	basicInfoAttrProductID            uint32 = 0x0004
-	basicInfoAttrNodeLabel            uint32 = 0x0005
-	basicInfoAttrLocation             uint32 = 0x0006
-	basicInfoAttrHardwareVersion      uint32 = 0x0007
-	basicInfoAttrHardwareVersionStr   uint32 = 0x0008
-	basicInfoAttrSoftwareVersion      uint32 = 0x0009
-	basicInfoAttrSoftwareVersionStr   uint32 = 0x000A
-	basicInfoAttrManufacturingDate    uint32 = 0x000B
-	basicInfoAttrPartNumber           uint32 = 0x000C
-	basicInfoAttrProductURL           uint32 = 0x000D
-	basicInfoAttrProductLabel         uint32 = 0x000E
-	basicInfoAttrSerialNumber         uint32 = 0x000F
-	basicInfoAttrLocalConfigDisabled  uint32 = 0x0010
-	basicInfoAttrReachable            uint32 = 0x0011
-	basicInfoAttrUniqueID             uint32 = 0x0012
-	basicInfoAttrCapabilityMinima     uint32 = 0x0013
-	basicInfoAttrProductAppearance    uint32 = 0x0014
-	basicInfoAttrSpecificationVersion uint32 = 0x0015
-	basicInfoAttrMaxPathsPerInvoke    uint32 = 0x0016
-	basicInfoAttrConfigurationVersion uint32 = 0x0018 // Matter 1.5
+	basicInfoAttrDataModelRevision    = bidef.AttrDataModelRevision
+	basicInfoAttrVendorName           = bidef.AttrVendorName
+	basicInfoAttrVendorID             = bidef.AttrVendorId
+	basicInfoAttrProductName          = bidef.AttrProductName
+	basicInfoAttrProductID            = bidef.AttrProductId
+	basicInfoAttrNodeLabel            = bidef.AttrNodeLabel
+	basicInfoAttrLocation             = bidef.AttrLocation
+	basicInfoAttrHardwareVersion      = bidef.AttrHardwareVersion
+	basicInfoAttrHardwareVersionStr   = bidef.AttrHardwareVersionString
+	basicInfoAttrSoftwareVersion      = bidef.AttrSoftwareVersion
+	basicInfoAttrSoftwareVersionStr   = bidef.AttrSoftwareVersionString
+	basicInfoAttrManufacturingDate    = bidef.AttrManufacturingDate
+	basicInfoAttrPartNumber           = bidef.AttrPartNumber
+	basicInfoAttrProductURL           = bidef.AttrProductUrl
+	basicInfoAttrProductLabel         = bidef.AttrProductLabel
+	basicInfoAttrSerialNumber         = bidef.AttrSerialNumber
+	basicInfoAttrLocalConfigDisabled  = bidef.AttrLocalConfigDisabled
+	basicInfoAttrReachable            = bidef.AttrReachable
+	basicInfoAttrUniqueID             = bidef.AttrUniqueId
+	basicInfoAttrCapabilityMinima     = bidef.AttrCapabilityMinima
+	basicInfoAttrProductAppearance    = bidef.AttrProductAppearance
+	basicInfoAttrSpecificationVersion = bidef.AttrSpecificationVersion
+	basicInfoAttrMaxPathsPerInvoke    = bidef.AttrMaxPathsPerInvoke
+	basicInfoAttrConfigurationVersion = bidef.AttrConfigurationVersion // Matter 1.5
 )
 
-// Events per Matter §11.1.8.
+// Events, the definition's.
 const (
-	basicInfoEventStartUp          uint32 = 0x0000
-	basicInfoEventShutDown         uint32 = 0x0001
-	basicInfoEventLeave            uint32 = 0x0002
-	basicInfoEventReachableChanged uint32 = 0x0003
+	basicInfoEventStartUp          = bidef.EventStartUp
+	basicInfoEventShutDown         = bidef.EventShutDown
+	basicInfoEventLeave            = bidef.EventLeave
+	basicInfoEventReachableChanged = bidef.EventReachableChanged
 )
 
 // errBasicInfoUnknown is returned when a write hits an unwritable or
@@ -331,7 +342,54 @@ func NewBasicInformation(cfg Config) (*BasicInformation, error) {
 		maxPathsPerInvoke:    maxPaths,
 	}
 	validateBasicInfoAttributes(cfg)
+	bi.def = mustInstance(bidef.Definition, bi.instanceOptions())
 	return bi, nil
+}
+
+// instanceOptions declares the optional elements this instance serves:
+// the revision-gated attributes, Reachable (Apple's HMAccessory.Reachable signal depends on it),
+// SerialNumber (served with a UniqueID-derived fallback), the four
+// optional strings and ProductAppearance when the host set them, and the
+// ShutDown, Leave and ReachableChanged events the server emits.
+// LocalConfigDisabled is not listed — matter.js's bridge sample does not
+// emit it — though a write to it is accepted.
+func (b *BasicInformation) instanceOptions() spec.Options {
+	opts := spec.Options{
+		// UniqueID ("Rev >= v4, O"), SpecificationVersion and
+		// MaxPathsPerInvoke ("Rev >= v3") and ConfigurationVersion
+		// ("Rev >= v6") are mandatory at the revision served; the
+		// runtime leaves revision conditions to the server, so they are
+		// declared.
+		Attributes: []uint32{
+			basicInfoAttrReachable, basicInfoAttrSerialNumber, basicInfoAttrUniqueID,
+			basicInfoAttrSpecificationVersion, basicInfoAttrMaxPathsPerInvoke, basicInfoAttrConfigurationVersion,
+		},
+		Events: []uint32{basicInfoEventShutDown, basicInfoEventLeave, basicInfoEventReachableChanged},
+	}
+	for _, o := range []struct {
+		set  bool
+		attr uint32
+	}{
+		{b.manufacturingDate != "", basicInfoAttrManufacturingDate},
+		{b.partNumber != "", basicInfoAttrPartNumber},
+		{b.productURL != "", basicInfoAttrProductURL},
+		{b.productLabel != "", basicInfoAttrProductLabel},
+		{b.productAppearance != (ProductAppearanceStruct{}), basicInfoAttrProductAppearance},
+	} {
+		if o.set {
+			opts.Attributes = append(opts.Attributes, o.attr)
+		}
+	}
+	return opts
+}
+
+// inst returns the bound definition; an instance not built by
+// NewBasicInformation binds it on first use.
+func (b *BasicInformation) inst() *spec.Instance {
+	if b.def == nil {
+		return mustInstance(bidef.Definition, b.instanceOptions())
+	}
+	return b.def
 }
 
 // SoftwareVersionFromString derives the numeric SoftwareVersion
@@ -461,32 +519,54 @@ func defaultCapabilityMinima(in CapabilityMinimaStruct) CapabilityMinimaStruct {
 	return out
 }
 
+// EncodeTLV implements spec.Encodable with the generated codec of
+// basic-information.element.ts; a zero rev-6 field is left out, as the
+// bridge's encoder did.
+func (c CapabilityMinimaStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	opt := func(v uint16) *uint16 {
+		if v == 0 {
+			return nil
+		}
+		return &v
+	}
+	bidef.CapabilityMinimaStruct{
+		CaseSessionsPerFabric:            c.CaseSessionsPerFabric,
+		SubscriptionsPerFabric:           c.SubscriptionsPerFabric,
+		SimultaneousInvocationsSupported: opt(c.SimultaneousInvocationsSupported),
+		SimultaneousWritesSupported:      opt(c.SimultaneousWritesSupported),
+		ReadPathsSupported:               opt(c.ReadPathsSupported),
+		SubscribePathsSupported:          opt(c.SubscribePathsSupported),
+	}.EncodeTLV(enc, tag)
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec of
+// basic-information.element.ts: [PrimaryColorAbsent] encodes as null
+// (quality X).
+func (p ProductAppearanceStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	color := spec.ValueOf(bidef.ColorEnum(p.PrimaryColor))
+	if p.PrimaryColor == PrimaryColorAbsent {
+		color = spec.NullOf[bidef.ColorEnum]()
+	}
+	bidef.ProductAppearanceStruct{Finish: bidef.ProductFinishEnum(p.Finish), PrimaryColor: color}.EncodeTLV(enc, tag)
+}
+
 // capabilityMinimaRev6Default is matter.js's default for the four rev-6
 // CapabilityMinima fields (DEFAULT_SIMULTANEOUS_INVOCATIONS_SUPPORTED …
 // DEFAULT_SUBSCRIBE_PATHS_SUPPORTED, all 20).
 const capabilityMinimaRev6Default uint16 = 20
 
-// StartUpEvent is the payload for the Matter §11.1.8.1 StartUp event
-// (id 0x0000, priority Critical). Mirrors matter.js
-// packages/model/src/standard/elements/basic-information.element.ts:84-90.
-type StartUpEvent struct {
-	// SoftwareVersion carries the current SoftwareVersion attribute
-	// value (conformance M, field id 0x0).
-	SoftwareVersion uint32
-}
+// StartUpEvent is the payload of StartUp (0x00, critical): the
+// generated payload of basic-information.element.ts, SoftwareVersion at
+// tag 0.
+type StartUpEvent = bidef.StartUpEvent
 
-// ShutDownEvent is the payload for the Matter §11.1.8.2 ShutDown event
-// (id 0x0001, priority Critical). No fields (conformance O). Mirrors
-// matter.js basic-information.element.ts:91-95.
-type ShutDownEvent struct{}
+// ShutDownEvent is the payload of ShutDown (0x01, critical): an empty
+// structure, which keeps the EventDataIB.Data slot well-formed for
+// chip-tool's StructDecodeIterator.
+type ShutDownEvent = bidef.ShutDownEvent
 
-// LeaveEvent is the payload for the Matter §11.1.8.3 Leave event
-// (id 0x0002, priority Info).
-type LeaveEvent struct {
-	// FabricIndex identifies the fabric that was removed (conformance M,
-	// field id 0x0).
-	FabricIndex uint8
-}
+// LeaveEvent is the payload of Leave (0x02, info): FabricIndex at tag 0.
+type LeaveEvent = bidef.LeaveEvent
 
 // Compile-time assertions.
 var (
@@ -500,21 +580,11 @@ var (
 // MatterClusterID implements [contract.ClusterServer].
 func (b *BasicInformation) MatterClusterID() uint32 { return basicInfoClusterID }
 
-// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege].
-// NodeLabel and LocalConfigDisabled require Manage (4); Location
-// requires Administer (5). Mirrors matter.js
-// packages/model/src/standard/elements/basic-information.element.ts:36
-// (NodeLabel "RW VM"), :40 (Location "RW VA"), :79
-// (LocalConfigDisabled "RW VM").
+// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
+// the definition's — NodeLabel and LocalConfigDisabled "RW VM" (Manage),
+// Location "RW VA" (Administer).
 func (b *BasicInformation) MinWritePrivilege(attrID uint32) uint8 {
-	switch attrID {
-	case basicInfoAttrNodeLabel, basicInfoAttrLocalConfigDisabled:
-		return 4 // Manage
-	case basicInfoAttrLocation:
-		return 5 // Administer
-	default:
-		return 3 // Operate — standard default
-	}
+	return b.inst().MinWritePrivilege(attrID)
 }
 
 // MatterRead implements [contract.ClusterServer].
@@ -618,10 +688,8 @@ func (b *BasicInformation) MatterRead(attrID uint32) (any, bool) { //nolint:gocy
 		return b.maxPathsPerInvoke, true
 	case basicInfoAttrConfigurationVersion:
 		return b.configurationVersion, true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return basicInfoClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return b.inst().ReadGlobal(attrID)
 	}
 	return nil, false
 }
@@ -720,7 +788,10 @@ func (b *BasicInformation) MatterWrite(_ context.Context, attrID uint32, value a
 		b.dataVersion.Bump()
 		return nil
 	}
-	return fmt.Errorf("%w: 0x%04X", errBasicInfoUnknown, attrID)
+	// Any other attribute: UNSUPPORTED_WRITE for a served read-only one,
+	// UNSUPPORTED_ATTRIBUTE otherwise, as the definition judges them.
+	_, err := b.inst().ValidateWrite(attrID, value, nil)
+	return refusedWrite{sentinel: fmt.Errorf("%w: 0x%04X", errBasicInfoUnknown, attrID), status: err}
 }
 
 // MatterInvoke always rejects — BasicInformation has no commands.
@@ -745,52 +816,7 @@ func (b *BasicInformation) MatterReportable() []uint32 {
 // HMMTRAccessoryPairingStep_BuildingHAPServicesAndCharacteristicsFromCHIP
 // with HAPErrorDomain Code 24. Globals (FeatureMap + ClusterRevision)
 // are merged in by the dispatcher.
-func (b *BasicInformation) MatterAttributes() []uint32 {
-	// LocalConfigDisabled (0x10) is intentionally OMITTED — optional, and
-	// matter.js's bridge sample does not emit it. ConfigurationVersion
-	// (0x18) is mandatory from revision 6 (TC-BINFO-3.2). Reachable (0x11)
-	// IS emitted because Apple's HMAccessory.Reachable signal depends
-	// on it (Run 15 vs Run 16 verification, empirically confirmed).
-	out := []uint32{
-		basicInfoAttrDataModelRevision,
-		basicInfoAttrVendorName,
-		basicInfoAttrVendorID,
-		basicInfoAttrProductName,
-		basicInfoAttrProductID,
-		basicInfoAttrNodeLabel,
-		basicInfoAttrLocation,
-		basicInfoAttrHardwareVersion,
-		basicInfoAttrHardwareVersionStr,
-		basicInfoAttrSoftwareVersion,
-		basicInfoAttrSoftwareVersionStr,
-		basicInfoAttrReachable,
-		basicInfoAttrUniqueID,
-		basicInfoAttrCapabilityMinima,
-		basicInfoAttrSpecificationVersion,
-		basicInfoAttrMaxPathsPerInvoke,
-		basicInfoAttrConfigurationVersion,
-	}
-	if b.manufacturingDate != "" {
-		out = append(out, basicInfoAttrManufacturingDate)
-	}
-	if b.partNumber != "" {
-		out = append(out, basicInfoAttrPartNumber)
-	}
-	if b.productURL != "" {
-		out = append(out, basicInfoAttrProductURL)
-	}
-	if b.productLabel != "" {
-		out = append(out, basicInfoAttrProductLabel)
-	}
-	// SerialNumber is always enumerated — when no value is configured,
-	// MatterRead serves the UniqueID-derived fallback so Apple's HAP-mapper
-	// cache for EP0:0x28:0x000F is pre-populated by the initial Subscribe.
-	out = append(out, basicInfoAttrSerialNumber)
-	if b.productAppearance != (ProductAppearanceStruct{}) {
-		out = append(out, basicInfoAttrProductAppearance)
-	}
-	return out
-}
+func (b *BasicInformation) MatterAttributes() []uint32 { return b.inst().MatterAttributes() }
 
 // SetNodeLabel updates NodeLabel out-of-band (e.g. from the config
 // UI or the boot-time restore of a persisted commissioner write, not
@@ -852,14 +878,7 @@ func (b *BasicInformation) firePersistentWrite() {
 // attribute is always exposed on Root BasicInformation and BDBI, and the
 // event's conformance is "Reachable" — present exactly when the attribute
 // is present.
-func (b *BasicInformation) MatterEvents() []uint32 {
-	return []uint32{
-		basicInfoEventStartUp,
-		basicInfoEventShutDown,
-		basicInfoEventLeave,
-		basicInfoEventReachableChanged,
-	}
-}
+func (b *BasicInformation) MatterEvents() []uint32 { return b.inst().MatterEvents() }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
 // Bumped on every successful NodeLabel / Location / LocalConfigDisabled
@@ -913,7 +932,7 @@ func (b *BasicInformation) EmitStartUp() {
 		slog.Any("endpoint", endpoint), slog.Any("sw_version", swVersion))
 	emitter.MatterEmitEvent(endpoint, basicInfoClusterID, basicInfoEventStartUp,
 		StartUpEvent{SoftwareVersion: swVersion},
-		contract.EventPriorityCritical)
+		b.inst().EventPriority(basicInfoEventStartUp))
 }
 
 // EmitShutDown fires the Matter §11.1.8.2 ShutDown event (id 0x0001,
@@ -930,7 +949,7 @@ func (b *BasicInformation) EmitShutDown() {
 	}
 	emitter.MatterEmitEvent(endpoint, basicInfoClusterID, basicInfoEventShutDown,
 		ShutDownEvent{},
-		contract.EventPriorityCritical)
+		b.inst().EventPriority(basicInfoEventShutDown))
 }
 
 // EmitLeave fires the Matter §11.1.8.3 Leave event (id 0x0002, priority
@@ -947,7 +966,7 @@ func (b *BasicInformation) EmitLeave(fabricIndex uint8) {
 	}
 	emitter.MatterEmitEvent(endpoint, basicInfoClusterID, basicInfoEventLeave,
 		LeaveEvent{FabricIndex: fabricIndex},
-		contract.EventPriorityInfo)
+		b.inst().EventPriority(basicInfoEventLeave))
 }
 
 // EmitReachableChanged fires the Matter §11.1.8.4 ReachableChanged event
@@ -967,7 +986,7 @@ func (b *BasicInformation) EmitReachableChanged(reachable bool) {
 	}
 	emitter.MatterEmitEvent(endpoint, basicInfoClusterID, basicInfoEventReachableChanged,
 		ReachableChangedEvent{ReachableNewValue: reachable},
-		contract.EventPriorityInfo)
+		b.inst().EventPriority(basicInfoEventReachableChanged))
 }
 
 // IncreaseConfigurationVersion raises ConfigurationVersion by one — call it

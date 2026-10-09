@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -39,16 +41,21 @@ type OTASoftwareUpdateRequestor struct{}
 // this cluster); the constant is read only by the parity-snapshot test
 // which now resolves the correct Requestor entry.
 const (
-	otaRequestorClusterID       uint32 = 0x002A
-	otaRequestorClusterRevision uint16 = 1
+	otaRequestorClusterID       = otadef.ClusterID
+	otaRequestorClusterRevision = otadef.Revision
 
-	otaRequestorAttrDefaultOTAProviders uint32 = 0x0000
-	otaRequestorAttrUpdatePossible      uint32 = 0x0001
-	otaRequestorAttrUpdateState         uint32 = 0x0002
-	otaRequestorAttrUpdateStateProgress uint32 = 0x0003
+	otaRequestorAttrDefaultOTAProviders = otadef.AttrDefaultOtaProviders
+	otaRequestorAttrUpdatePossible      = otadef.AttrUpdatePossible
+	otaRequestorAttrUpdateState         = otadef.AttrUpdateState
+	otaRequestorAttrUpdateStateProgress = otadef.AttrUpdateStateProgress
 
-	otaRequestorCmdAnnounceOTAProvider uint32 = 0x00
+	otaRequestorCmdAnnounceOTAProvider = otadef.CmdAnnounceOtaProvider
 )
+
+// otaRequestorInst is the definition (cluster/spec/otasoftwareupdaterequestor,
+// ADR 0013, from matter.js ota-software-update-requestor.element.ts): the
+// attribute list and the statuses of a refused write come from it.
+var otaRequestorInst = mustInstance(otadef.Definition, spec.Options{})
 
 // UpdateStateEnum values (Matter §11.20.5.1).
 const (
@@ -90,10 +97,8 @@ func (o *OTASoftwareUpdateRequestor) MatterRead(attrID uint32) (any, bool) {
 	case otaRequestorAttrUpdateStateProgress:
 		// nullable uint8 — return nil to indicate "no update in flight".
 		return nil, true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return otaRequestorClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return otaRequestorInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
@@ -101,9 +106,10 @@ func (o *OTASoftwareUpdateRequestor) MatterRead(attrID uint32) (any, bool) {
 // MatterWrite accepts DefaultOTAProviders writes and silently
 // discards them — the bridge does not act on Matter OTA providers
 // in v1.1.
-func (o *OTASoftwareUpdateRequestor) MatterWrite(_ context.Context, attrID uint32, _ any) error {
+func (o *OTASoftwareUpdateRequestor) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	if attrID != otaRequestorAttrDefaultOTAProviders {
-		return fmt.Errorf("matter: OTASoftwareUpdateRequestor is read-only (got attr 0x%04X)", attrID)
+		_, err := otaRequestorInst.ValidateWrite(attrID, value, nil)
+		return refusedWrite{sentinel: fmt.Errorf("matter: OTASoftwareUpdateRequestor is read-only (got attr 0x%04X)", attrID), status: err}
 	}
 	return nil
 }
@@ -127,10 +133,5 @@ func (o *OTASoftwareUpdateRequestor) MatterReportable() []uint32 {
 // service rebuild reads the full attribute set; without this the
 // dispatcher falls back to MatterReportable's single attribute.
 func (o *OTASoftwareUpdateRequestor) MatterAttributes() []uint32 {
-	return []uint32{
-		otaRequestorAttrDefaultOTAProviders,
-		otaRequestorAttrUpdatePossible,
-		otaRequestorAttrUpdateState,
-		otaRequestorAttrUpdateStateProgress,
-	}
+	return otaRequestorInst.MatterAttributes()
 }

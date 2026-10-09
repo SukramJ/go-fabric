@@ -10,8 +10,11 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	diaglogsdef "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // DiagnosticLogs implements the Matter DiagnosticLogs cluster (0x0032)
@@ -47,13 +50,18 @@ type LogProvider interface {
 	Logs(ctx context.Context, intent uint8) ([]byte, error)
 }
 
-// Cluster ID + revision per Matter §11.11.
+// Cluster ID, revision and command ids: the generated definition's
+// (cluster/spec/diagnosticlogs, ADR 0013, from matter.js
+// diagnostic-logs.element.ts). The command lists, the statuses of a
+// refused write, the request the bridge decodes and the response codec
+// come from it as well; the log provider and the BDX-less inline transfer
+// are this server's.
 const (
-	diaglogsClusterID       uint32 = 0x0032
-	diaglogsClusterRevision uint16 = 1
+	diaglogsClusterID       = diaglogsdef.ClusterID
+	diaglogsClusterRevision = diaglogsdef.Revision
 
-	diaglogsCmdRetrieveLogsRequest  uint32 = 0x00
-	diaglogsCmdRetrieveLogsResponse uint32 = 0x01
+	diaglogsCmdRetrieveLogsRequest  = diaglogsdef.CmdRetrieveLogsRequest
+	diaglogsCmdRetrieveLogsResponse = diaglogsdef.CmdRetrieveLogsResponse
 
 	// MatterDiagnosticLogsInlineCap is the upper bound on the
 	// LogContent octet-string size the bridge ships in a single
@@ -66,18 +74,18 @@ const (
 
 // IntentEnum values (Matter §11.11.5.1).
 const (
-	IntentEndUserSupport uint8 = 0
-	IntentNetworkDiag    uint8 = 1
-	IntentCrashLogs      uint8 = 2
+	IntentEndUserSupport = uint8(diaglogsdef.IntentEndUserSupport)
+	IntentNetworkDiag    = uint8(diaglogsdef.IntentNetworkDiag)
+	IntentCrashLogs      = uint8(diaglogsdef.IntentCrashLogs)
 )
 
 // StatusEnum values (Matter §11.11.5.2).
 const (
-	LogStatusSuccess   uint8 = 0
-	LogStatusExhausted uint8 = 1
-	LogStatusNoLogs    uint8 = 2
-	LogStatusBusy      uint8 = 3
-	LogStatusDenied    uint8 = 4
+	LogStatusSuccess   = uint8(diaglogsdef.StatusSuccess)
+	LogStatusExhausted = uint8(diaglogsdef.StatusExhausted)
+	LogStatusNoLogs    = uint8(diaglogsdef.StatusNoLogs)
+	LogStatusBusy      = uint8(diaglogsdef.StatusBusy)
+	LogStatusDenied    = uint8(diaglogsdef.StatusDenied)
 )
 
 // RetrieveLogsResponse mirrors the response shape (Matter §11.11.7.2).
@@ -91,6 +99,25 @@ type RetrieveLogsResponse struct {
 	// TimeSinceBoot is systime-us (diagnostic-logs.element.ts:37):
 	// microseconds since the boot epoch.
 	TimeSinceBoot uint64
+}
+
+// EncodeTLV implements spec.Encodable with the generated response codec
+// (diagnostic-logs.element.ts RetrieveLogsResponse): Status, LogContent,
+// and the two optional timestamps, which this server always fills.
+func (r RetrieveLogsResponse) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	utc, boot := r.UTCTimeStamp, r.TimeSinceBoot
+	diaglogsdef.RetrieveLogsResponse{
+		Status:        diaglogsdef.StatusEnum(r.Status),
+		LogContent:    r.LogContent,
+		UtcTimeStamp:  &utc,
+		TimeSinceBoot: &boot,
+	}.EncodeTLV(enc, tag)
+}
+
+// ResponseCommand implements spec.ResponsePayload: RetrieveLogsResponse
+// (0x01).
+func (RetrieveLogsResponse) ResponseCommand() (clusterID, commandID uint32) {
+	return diaglogsClusterID, diaglogsCmdRetrieveLogsResponse
 }
 
 // matterEpochMicros converts a wall-clock instant to Matter epoch-us
@@ -146,18 +173,21 @@ func (d *DiagnosticLogs) MatterClusterID() uint32 { return diaglogsClusterID }
 // has no readable attributes other than the global ones.
 func (d *DiagnosticLogs) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return diaglogsClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return diaglogsInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
 // MatterWrite always rejects — DiagnosticLogs has no writable attributes.
-func (d *DiagnosticLogs) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: DiagnosticLogs is read-only (got attr 0x%04X)", attrID)
+func (d *DiagnosticLogs) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := diaglogsInst.ValidateWrite(attrID, value, nil)
+	return refusedWrite{sentinel: fmt.Errorf("matter: DiagnosticLogs is read-only (got attr 0x%04X)", attrID), status: err}
 }
+
+// diaglogsInst is the definition bound to what the server serves: no
+// attribute but the globals, RetrieveLogsRequest and its response.
+var diaglogsInst = mustInstance(diaglogsdef.Definition, spec.Options{})
 
 // MatterInvoke implements RetrieveLogsRequest. Looks up the configured
 // [LogProvider]; without one (default), or when the provider returns
@@ -204,16 +234,25 @@ func (d *DiagnosticLogs) MatterInvoke(ctx context.Context, cmdID uint32, fields 
 	return resp, nil
 }
 
-// decodeRetrieveLogsIntent extracts the intent enum from a generic
-// command-fields decoded value. The bridge passes `fields` as the
-// decoded TLV struct (or nil); we tolerate both nil and a
-// `map[uint8]any`-shaped struct so test fixtures can drive the
-// cluster without going through the full TLV decoder. Unknown
+// decodeRetrieveLogsIntent extracts the intent enum from the command
+// fields. The bridge decodes the request into the generated
+// RetrieveLogsRequestRequest (an Intent outside the enum, a missing
+// RequestedProtocol or an over-long TransferFileDesignator are answered
+// there, as matter.js's request schema answers them); nil and a
+// `map[uint8]any`-shaped struct are tolerated so test fixtures can drive
+// the cluster without going through the full TLV decoder. Unknown
 // shapes default to EndUserSupport — Matter §11.11.6.1 lists it as
 // the safe fallback for malformed requests.
 func decodeRetrieveLogsIntent(fields any) uint8 {
 	switch f := fields.(type) {
 	case nil:
+		return IntentEndUserSupport
+	case diaglogsdef.RetrieveLogsRequestRequest:
+		return uint8(f.Intent)
+	case *diaglogsdef.RetrieveLogsRequestRequest:
+		if f != nil {
+			return uint8(f.Intent)
+		}
 		return IntentEndUserSupport
 	case map[uint8]any:
 		if raw, ok := f[0]; ok {
@@ -234,19 +273,13 @@ func decodeRetrieveLogsIntent(fields any) uint8 {
 // Mirrors matter.js packages/model/src/standard/elements/
 // diagnostic-logs.element.ts accepted commands.
 func (d *DiagnosticLogs) MatterAcceptedCommands() []uint32 {
-	return []uint32{
-		diaglogsCmdRetrieveLogsRequest, // 0x00
-	}
+	return diaglogsInst.MatterAcceptedCommands()
 }
 
-// MatterGeneratedCommands implements [contract.ClusterCommandLister].
-// Lists the response command IDs this server may emit.
-// Mirrors matter.js packages/model/src/standard/elements/
-// diagnostic-logs.element.ts generated commands.
+// MatterGeneratedCommands implements [contract.ClusterCommandLister]:
+// RetrieveLogsResponse.
 func (d *DiagnosticLogs) MatterGeneratedCommands() []uint32 {
-	return []uint32{
-		diaglogsCmdRetrieveLogsResponse, // 0x01
-	}
+	return diaglogsInst.MatterGeneratedCommands()
 }
 
 // MatterReportable returns no attributes — nothing on this cluster

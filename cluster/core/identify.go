@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -77,20 +79,29 @@ type Identify struct {
 	done chan struct{}
 }
 
-// Cluster ID + revision per Matter §1.2.
+// Cluster ID, revision, attribute and command ids: the generated
+// definition's (cluster/spec/identify, ADR 0013, from matter.js
+// identify.element.ts). The lists, FeatureMap and the write status of the
+// read-only IdentifyType come from it as well; the countdown is this
+// server's.
 const (
-	identifyClusterID       uint32 = 0x0003
-	identifyClusterRevision uint16 = 6 // matter.js HEAD (@matter/model 0.16.11)
+	identifyClusterID       = identifydef.ClusterID
+	identifyClusterRevision = identifydef.Revision
 
-	identifyAttrTime uint32 = 0x0000 // IdentifyTime  (uint16, RW, default 0)
-	identifyAttrType uint32 = 0x0001 // IdentifyType  (enum8,  R, default 0/None)
+	identifyAttrTime = identifydef.AttrIdentifyTime // IdentifyTime  (uint16, RW, default 0)
+	identifyAttrType = identifydef.AttrIdentifyType // IdentifyType  (enum8,  R, default 0/None)
 
-	identifyCmdIdentify      uint32 = 0x00 // Identify(IdentifyTime)
-	identifyCmdTriggerEffect uint32 = 0x40 // TriggerEffect(EffectIdentifier, EffectVariant)
+	identifyCmdIdentify      = identifydef.CmdIdentify      // Identify(IdentifyTime)
+	identifyCmdTriggerEffect = identifydef.CmdTriggerEffect // TriggerEffect(EffectIdentifier, EffectVariant)
 
-	// IdentifyType values per Matter §1.2.5.2.
-	identifyTypeNone uint8 = 0
+	// identifyTypeNone is IdentifyTypeEnum None.
+	identifyTypeNone = uint8(identifydef.IdentifyTypeNone)
 )
+
+// identifyInst is the definition bound to what the server serves: no
+// feature, both attributes, and the optional TriggerEffect, accepted as a
+// no-op.
+var identifyInst = mustInstance(identifydef.Definition, spec.Options{Commands: []uint32{identifyCmdTriggerEffect}})
 
 // NewIdentify constructs a fresh Identify cluster instance with
 // IdentifyTime = 0 and IdentifyType = None.
@@ -146,10 +157,8 @@ func (i *Identify) MatterRead(attrID uint32) (any, bool) {
 		return uint16(i.identifyTime.Load() & 0xFFFF), true // value capped at uint16 by every writer
 	case identifyAttrType:
 		return identifyTypeNone, true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return identifyClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return identifyInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
@@ -160,7 +169,10 @@ func (i *Identify) MatterRead(attrID uint32) (any, bool) {
 // either via the command or by setting the attribute directly.
 func (i *Identify) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	if attrID != identifyAttrTime {
-		return fmt.Errorf("matter: Identify attribute 0x%04X is read-only", attrID)
+		// IdentifyType is "R V": UNSUPPORTED_WRITE; any other id
+		// UNSUPPORTED_ATTRIBUTE, as the definition judges them.
+		_, err := identifyInst.ValidateWrite(attrID, value, nil)
+		return err
 	}
 	t, err := coerceUint16(value)
 	if err != nil {
@@ -211,9 +223,7 @@ func (i *Identify) MatterReportable() []uint32 {
 // MatterAttributes implements
 // [contract.ClusterAttributeLister] so wildcard subscribe /
 // read enumerates the full Identify surface.
-func (i *Identify) MatterAttributes() []uint32 {
-	return []uint32{identifyAttrTime, identifyAttrType}
-}
+func (i *Identify) MatterAttributes() []uint32 { return identifyInst.MatterAttributes() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
 // Returns the command IDs handled by MatterInvoke so the dispatcher
@@ -221,12 +231,10 @@ func (i *Identify) MatterAttributes() []uint32 {
 // is optional per spec but accepted as a visual no-op; including it here
 // prevents strict commissioners from flagging an AcceptedCommandList
 // mismatch against the Identify element.ts command table.
-func (i *Identify) MatterAcceptedCommands() []uint32 {
-	return []uint32{identifyCmdIdentify, identifyCmdTriggerEffect}
-}
+func (i *Identify) MatterAcceptedCommands() []uint32 { return identifyInst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands returns nil; Identify commands carry no
-// response payload.
+// response payload (the definition generates none).
 func (i *Identify) MatterGeneratedCommands() []uint32 { return nil }
 
 // maybeStartCountdown starts a background goroutine that decrements
@@ -270,15 +278,24 @@ func (i *Identify) maybeStartCountdown() {
 const identifyFieldIdentifyTime uint8 = 0
 
 // coerceUint16 best-effort reads a uint16 out of TLV-decoded values.
-// The bridge has no typed decoder for this cluster, so a real Identify
-// arrives as the tag-keyed map its generic salvage path produces
-// (bridge/fields_reader.go decodeGenericTagMap) with IdentifyTime under
-// tag 0 as a uint64; a bare uint64 / uint32 / uint16 is what a host that
-// decoded the scalar itself hands over. Unrecognised shapes coerce to 0,
+// The bridge decodes a real Identify into the generated IdentifyRequest
+// (a missing or out-of-range IdentifyTime is answered INVALID_COMMAND /
+// CONSTRAINT_ERROR there, as matter.js's request schema answers it); the
+// tag-keyed map of the generic salvage path (bridge/fields_reader.go
+// decodeGenericTagMap) with IdentifyTime under tag 0 and a bare uint64 /
+// uint32 / uint16 are what a host that decoded the payload itself hands
+// over. Unrecognised shapes coerce to 0,
 // which is the spec's "clear identify" semantic — safer than rejecting
 // the command outright.
 func coerceUint16(v any) (uint16, error) {
 	switch x := v.(type) {
+	case identifydef.IdentifyRequest:
+		return x.IdentifyTime, nil
+	case *identifydef.IdentifyRequest:
+		if x == nil {
+			return 0, nil
+		}
+		return x.IdentifyTime, nil
 	case map[uint8]any:
 		raw, ok := x[identifyFieldIdentifyTime]
 		if !ok {

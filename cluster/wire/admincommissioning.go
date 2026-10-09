@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	admdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -39,21 +41,43 @@ import (
 //   - 0x01 OpenBasicCommissioningWindow (BC feature; not in v1.1
 //     FeatureMap, returns UnsupportedCommand)
 //   - 0x02 RevokeCommissioning          (no fields)
+//
+// The cluster's identity is its generated definition (cluster/spec/
+// administratorcommissioning, ADR 0013, from matter.js
+// administrator-commissioning.element.ts): ids, revision, FeatureMap, the
+// attribute and command lists, the write statuses and the invoke
+// privileges. The window state, the PAKE checks, the session and
+// fail-safe gates and the [WindowController] port stay here.
+// OpenCommissioningWindow keeps the bridge's hand-written decoder into
+// [OpenWindowParams], the struct the WindowController port takes
+// (notes/parity/by_design.md BD-Matter-AdminCommissioning-OpenWindowParams).
 const (
-	matterClusterAdminCommissioning uint32 = 0x003C
+	matterClusterAdminCommissioning = admdef.ClusterID
 
-	matterAttrAdmCommWindowStatus    uint32 = 0x0000
-	matterAttrAdmCommAdminFabric     uint32 = 0x0001
-	matterAttrAdmCommAdminVendorID   uint32 = 0x0002
-	matterAttrAdmCommFeatureMap      uint32 = 0xFFFC
-	matterAttrAdmCommClusterRevision uint32 = 0xFFFD
+	matterAttrAdmCommWindowStatus    = admdef.AttrWindowStatus
+	matterAttrAdmCommAdminFabric     = admdef.AttrAdminFabricIndex
+	matterAttrAdmCommAdminVendorID   = admdef.AttrAdminVendorId
+	matterAttrAdmCommFeatureMap      = spec.AttrFeatureMap
+	matterAttrAdmCommClusterRevision = spec.AttrClusterRevision
 
-	matterCmdAdmCommOpenWindow      uint32 = 0x00
-	matterCmdAdmCommOpenBasicWindow uint32 = 0x01
-	matterCmdAdmCommRevoke          uint32 = 0x02
+	matterCmdAdmCommOpenWindow      = admdef.CmdOpenCommissioningWindow
+	matterCmdAdmCommOpenBasicWindow = admdef.CmdOpenBasicCommissioningWindow
+	matterCmdAdmCommRevoke          = admdef.CmdRevokeCommissioning
 
-	admCommClusterRevision uint16 = 1
+	admCommClusterRevision = admdef.Revision
 )
+
+// admCommInst is the definition bound to what the server serves: no
+// feature (BC, the basic commissioning method, is not advertised), so
+// OpenCommissioningWindow and RevokeCommissioning are accepted and
+// OpenBasicCommissioningWindow is not.
+var admCommInst = func() *spec.Instance {
+	inst, err := spec.New(admdef.Definition, spec.Options{})
+	if err != nil {
+		panic(fmt.Sprintf("wire: AdministratorCommissioning: %v", err))
+	}
+	return inst
+}()
 
 // CommissioningWindowStatus mirrors the Matter §11.19.6.1 enum.
 type CommissioningWindowStatus uint8
@@ -254,18 +278,11 @@ func (a *AdministratorCommissioning) MatterClusterID() uint32 {
 	return matterClusterAdminCommissioning
 }
 
-// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege].
-// OpenCommissioningWindow, OpenBasicCommissioningWindow, and
-// RevokeCommissioning all require Administer (5) per Matter §11.19
-// (access "A T"). Mirrors matter.js
-// packages/model/src/standard/elements/administrator-commissioning.element.ts:31,43,49.
+// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege]:
+// every command carries access "A T" (Administer) in the definition;
+// any other id answers Operate.
 func (a *AdministratorCommissioning) MinInvokePrivilege(cmdID uint32) uint8 {
-	switch cmdID {
-	case matterCmdAdmCommOpenWindow, matterCmdAdmCommOpenBasicWindow, matterCmdAdmCommRevoke:
-		return 5 // Administer
-	default:
-		return 3 // Operate — standard default
-	}
+	return admCommInst.MinInvokePrivilege(cmdID)
 }
 
 // MatterRead resolves attribute reads.
@@ -300,22 +317,23 @@ func (a *AdministratorCommissioning) MatterRead(attrID uint32) (any, bool) {
 			return nil, true
 		}
 		return snap.AdminVendorID, true
-	case matterAttrAdmCommFeatureMap:
+	case matterAttrAdmCommFeatureMap, matterAttrAdmCommClusterRevision:
 		// FeatureMap = 0: basic-commissioning-method (BC feature) not
 		// advertised. Enhanced commissioning (the default) does not
 		// require a feature bit.
-		return uint32(0), true
-	case matterAttrAdmCommClusterRevision:
-		return admCommClusterRevision, true
+		return admCommInst.ReadGlobal(attrID)
 	default:
 		return nil, false
 	}
 }
 
-// MatterWrite rejects every attribute write — every Matter §11.19.5
-// attribute is read-only.
-func (a *AdministratorCommissioning) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: AdministratorCommissioning attribute 0x%04X is read-only", attrID)
+// MatterWrite rejects every attribute write — every attribute is access
+// "R V", so a served one answers UNSUPPORTED_WRITE and any other
+// UNSUPPORTED_ATTRIBUTE, as the definition judges them (matter.js
+// AttributeWriteResponse).
+func (a *AdministratorCommissioning) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := admCommInst.ValidateWrite(attrID, value, nil)
+	return err
 }
 
 // MatterInvoke routes the OpenCommissioningWindow / RevokeCommissioning
@@ -330,15 +348,9 @@ func (a *AdministratorCommissioning) MatterInvoke(ctx context.Context, cmdID uin
 
 	switch cmdID {
 	case matterCmdAdmCommOpenWindow:
-		params, ok := fields.(OpenWindowParams)
+		params, ok := openWindowParams(fields)
 		if !ok {
-			// fields can be a pointer in some dispatcher paths; be
-			// liberal in what we accept here.
-			if p, okp := fields.(*OpenWindowParams); okp && p != nil {
-				params = *p
-			} else {
-				return nil, errAdmCommInvalidFields
-			}
+			return nil, errAdmCommInvalidFields
 		}
 		// Validate PAKE parameters per Matter §11.19.8.1.2 FIRST — before
 		// the PASE / Busy / fail-safe gates. Mirrors matter.js
@@ -453,23 +465,38 @@ func (a *AdministratorCommissioning) MatterReportable() []uint32 {
 	}
 }
 
-// MatterAttributes lists every AdministratorCommissioning (0x003C)
-// attribute the server implements via MatterRead. Apple Home's HAP
-// service rebuild reads the full attribute set; without this the
-// dispatcher falls back to MatterReportable's three-attribute surface.
-// FeatureMap (0xFFFC) and ClusterRevision (0xFFFD) must be enumerated
-// so the initial Subscribe pre-populates Apple's cache. Mirrors chip
-// AdministratorCommissioningCluster.cpp:53-56 ReadAttribute(FeatureMap,
-// ClusterRevision) and matter.js cluster-behavior inheritance of global
-// attributes.
+// MatterAttributes lists the AdministratorCommissioning (0x003C)
+// attributes, all mandatory: WindowStatus, AdminFabricIndex,
+// AdminVendorId. The globals are the dispatcher's.
 func (a *AdministratorCommissioning) MatterAttributes() []uint32 {
-	return []uint32{
-		matterAttrAdmCommWindowStatus,
-		matterAttrAdmCommAdminFabric,
-		matterAttrAdmCommAdminVendorID,
-		matterAttrAdmCommFeatureMap,
-		matterAttrAdmCommClusterRevision,
+	return admCommInst.MatterAttributes()
+}
+
+// openWindowParams takes the OpenCommissioningWindow fields: the
+// [OpenWindowParams] the bridge decodes, by value or pointer, or the
+// generated request a caller in process may hand over.
+func openWindowParams(fields any) (OpenWindowParams, bool) {
+	switch f := fields.(type) {
+	case OpenWindowParams:
+		return f, true
+	case *OpenWindowParams:
+		if f != nil {
+			return *f, true
+		}
+	case admdef.OpenCommissioningWindowRequest:
+		return OpenWindowParams{
+			CommissioningTimeoutSeconds: f.CommissioningTimeout,
+			PAKEPasscodeVerifier:        f.PakePasscodeVerifier,
+			Discriminator:               f.Discriminator,
+			Iterations:                  f.Iterations,
+			Salt:                        f.Salt,
+		}, true
+	case *admdef.OpenCommissioningWindowRequest:
+		if f != nil {
+			return openWindowParams(*f)
+		}
 	}
+	return OpenWindowParams{}, false
 }
 
 // Typed error values that implement [im.StatusCodeError] so the
@@ -592,27 +619,18 @@ const (
 	pakeVerifierBytes        = 97     // spec §3.10.5 — fixed length
 )
 
-// MatterAcceptedCommands implements [contract.ClusterCommandLister].
-// Lists the command IDs the server handles via MatterInvoke.
-// Mirrors matter.js packages/model/src/standard/elements/
-// administrator-commissioning.element.ts accepted commands.
-//
-// Note: OpenBasicCommissioningWindow (0x01) is NOT listed — the BC feature
-// is not advertised in our FeatureMap and the handler returns UnsupportedCommand.
+// MatterAcceptedCommands implements [contract.ClusterCommandLister]:
+// OpenCommissioningWindow and RevokeCommissioning. OpenBasicCommissioningWindow
+// (0x01) is conformance BC, which the FeatureMap does not advertise; its
+// handler answers UnsupportedCommand.
 func (a *AdministratorCommissioning) MatterAcceptedCommands() []uint32 {
-	return []uint32{
-		matterCmdAdmCommOpenWindow, // 0x00
-		matterCmdAdmCommRevoke,     // 0x02
-	}
+	return admCommInst.MatterAcceptedCommands()
 }
 
-// MatterGeneratedCommands implements [contract.ClusterCommandLister].
-// AdministratorCommissioning has no generated response commands — all outcomes
-// are communicated via Matter StatusResponse.
-// Mirrors matter.js packages/model/src/standard/elements/
-// administrator-commissioning.element.ts generated commands (none for 0x003C).
+// MatterGeneratedCommands implements [contract.ClusterCommandLister]:
+// none — every command answers with a status.
 func (a *AdministratorCommissioning) MatterGeneratedCommands() []uint32 {
-	return []uint32{}
+	return admCommInst.MatterGeneratedCommands()
 }
 
 // Compile-time assertions: [AdministratorCommissioning] satisfies the

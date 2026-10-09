@@ -18,8 +18,11 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // NetworkInterfaceStruct mirrors Matter §11.12.4.1 (NetworkInterface
@@ -137,40 +140,44 @@ const (
 	BootReasonSoftwareReset    uint8 = 6
 )
 
-// Cluster ID + revision per Matter §11.12.
+// Cluster ID, revision, attribute, command and event ids: the generated
+// definition's (cluster/spec/generaldiagnostics, ADR 0013, from matter.js
+// general-diagnostics.element.ts). The lists, FeatureMap, the invoke
+// privileges, the BootReason priority, the write statuses, the request
+// payloads the bridge decodes and the response and struct codecs come from
+// it as well; the counters, the clocks and the test-event gate are this
+// server's.
 const (
-	gendiagClusterID       uint32 = 0x0033
-	gendiagClusterRevision uint16 = 3 // matter.js HEAD general-diagnostics.element.ts:21 default=3
+	gendiagClusterID       = gendiagdef.ClusterID
+	gendiagClusterRevision = gendiagdef.Revision
 
-	gendiagAttrNetworkInterfaces        uint32 = 0x0000
-	gendiagAttrRebootCount              uint32 = 0x0001
-	gendiagAttrUpTime                   uint32 = 0x0002
-	gendiagAttrTotalOperationalHours    uint32 = 0x0003
-	gendiagAttrBootReason               uint32 = 0x0004
-	gendiagAttrActiveHardwareFaults     uint32 = 0x0005
-	gendiagAttrActiveRadioFaults        uint32 = 0x0006
-	gendiagAttrActiveNetworkFaults      uint32 = 0x0007
-	gendiagAttrTestEventTriggersEnabled uint32 = 0x0008
-	// gendiagAttrDeviceLoadStatus is DeviceLoadStatus (0x000A, conformance
-	// "Rev >= v3", quality C — general-diagnostics.element.ts:49-50):
-	// mandatory at the revision this server advertises.
-	gendiagAttrDeviceLoadStatus uint32 = 0x000A
+	gendiagAttrNetworkInterfaces        = gendiagdef.AttrNetworkInterfaces
+	gendiagAttrRebootCount              = gendiagdef.AttrRebootCount
+	gendiagAttrUpTime                   = gendiagdef.AttrUpTime
+	gendiagAttrTotalOperationalHours    = gendiagdef.AttrTotalOperationalHours
+	gendiagAttrBootReason               = gendiagdef.AttrBootReason
+	gendiagAttrActiveHardwareFaults     = gendiagdef.AttrActiveHardwareFaults
+	gendiagAttrActiveRadioFaults        = gendiagdef.AttrActiveRadioFaults
+	gendiagAttrActiveNetworkFaults      = gendiagdef.AttrActiveNetworkFaults
+	gendiagAttrTestEventTriggersEnabled = gendiagdef.AttrTestEventTriggersEnabled
+	// gendiagAttrDeviceLoadStatus is DeviceLoadStatus (conformance
+	// "Rev >= v3", quality C): mandatory at the revision this server
+	// advertises.
+	gendiagAttrDeviceLoadStatus = gendiagdef.AttrDeviceLoadStatus
 
-	// Commands per Matter §11.12.7.
-	gendiagCmdTestEventTrigger uint32 = 0x0000
-	gendiagCmdTimeSnapshot     uint32 = 0x0001
-	gendiagCmdTimeSnapshotResp uint32 = 0x0002
-	// PayloadTestRequest / PayloadTestResponse carry conformance DMTEST
-	// (general-diagnostics.element.ts:110-119).
-	gendiagCmdPayloadTestRequest  uint32 = 0x0003
-	gendiagCmdPayloadTestResponse uint32 = 0x0004
+	// Commands. PayloadTestRequest / PayloadTestResponse carry
+	// conformance DMTEST.
+	gendiagCmdTestEventTrigger    = gendiagdef.CmdTestEventTrigger
+	gendiagCmdTimeSnapshot        = gendiagdef.CmdTimeSnapshot
+	gendiagCmdTimeSnapshotResp    = gendiagdef.CmdTimeSnapshotResponse
+	gendiagCmdPayloadTestRequest  = gendiagdef.CmdPayloadTestRequest
+	gendiagCmdPayloadTestResponse = gendiagdef.CmdPayloadTestResponse
 
-	// gendiagFeatureDataModelTest is the DMTEST bit (element :24,
-	// constraint "0"). Mandatory above a MaxPathsPerInvoke of one
-	// (Matter 1.6.1 Core §11.12.4.1, matter.js
+	// gendiagFeatureDataModelTest is the DMTEST bit. Mandatory above a
+	// MaxPathsPerInvoke of one (Matter 1.6.1 Core §11.12.4.1, matter.js
 	// GeneralDiagnosticsServer.ts #assertDataModelTest) — and this module's
 	// BasicInformation advertises im.DefaultMaxPathsPerInvoke (10).
-	gendiagFeatureDataModelTest uint32 = 1 << 0
+	gendiagFeatureDataModelTest = uint32(gendiagdef.FeatureDataModelTest)
 
 	// payloadTestMaxCount is PayloadTestRequest.Count's constraint "max 2048".
 	payloadTestMaxCount = 2048
@@ -181,12 +188,21 @@ const (
 	// 1280 minus the message and security overhead.
 	payloadTestMaxResponse = 1100
 
-	// Events per Matter §11.12.8 / matter.js general-diagnostics.element.ts:74-79.
 	// BootReason is event 0x03; the lower three (HardwareFaultChange,
 	// RadioFaultChange, NetworkFaultChange) are optional and not emitted
 	// by the bridge.
-	gendiagEventBootReason uint32 = 0x0003
+	gendiagEventBootReason = gendiagdef.EventBootReason
 )
+
+// gendiagInst is the definition bound to what the server serves: DMTEST,
+// TotalOperationalHours (optional, from the persisted counters) and
+// DeviceLoadStatus ("Rev >= v3", declared because the runtime leaves
+// revision conditions to the server). BootReason and the three fault
+// lists stay out — matter.js's bridge sample does not advertise them.
+var gendiagInst = mustInstance(gendiagdef.Definition, spec.Options{
+	Features:   gendiagFeatureDataModelTest,
+	Attributes: []uint32{gendiagAttrTotalOperationalHours, gendiagAttrDeviceLoadStatus},
+})
 
 // NewGeneralDiagnostics returns the cluster with startTime captured
 // at construction. bootReason is supplied by the daemon's bootstrap
@@ -268,13 +284,17 @@ func (g *GeneralDiagnostics) TotalOperationalTime() time.Duration {
 	return g.baseOperationalTime + time.Since(g.startTime)
 }
 
-// BootReasonEvent is the payload for the Matter §11.12.8.1 BootReason
-// event (id 0x0000, priority Critical). Mirrors matter.js
-// packages/model/src/standard/elements/general-diagnostics.element.ts:74-79.
+// BootReasonEvent is the payload for the BootReason event (0x03,
+// critical).
 type BootReasonEvent struct {
 	// BootReason carries the BootReasonEnum value that caused the
 	// current boot (conformance M, field id 0x0).
 	BootReason uint8
+}
+
+// EncodeTLV implements spec.Encodable with the generated payload codec.
+func (e BootReasonEvent) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	gendiagdef.BootReasonEvent{BootReason: gendiagdef.BootReasonEnum(e.BootReason)}.EncodeTLV(enc, tag)
 }
 
 // Compile-time assertions: GeneralDiagnostics satisfies MatterClusterServer,
@@ -303,17 +323,11 @@ func (g *GeneralDiagnostics) MatterDataVersion() uint32 {
 // MatterClusterID implements [contract.ClusterServer].
 func (g *GeneralDiagnostics) MatterClusterID() uint32 { return gendiagClusterID }
 
-// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege].
-// TestEventTrigger requires Manage (4) per Matter §11.12 (access "M").
-// Mirrors matter.js packages/model/src/standard/elements/
-// general-diagnostics.element.ts:90.
+// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege]:
+// the definition's — TestEventTrigger and PayloadTestRequest require
+// Manage (access "M"), TimeSnapshot Operate.
 func (g *GeneralDiagnostics) MinInvokePrivilege(cmdID uint32) uint8 {
-	switch cmdID {
-	case gendiagCmdTestEventTrigger:
-		return 4 // Manage
-	default:
-		return 3 // Operate — standard default
-	}
+	return gendiagInst.MinInvokePrivilege(cmdID)
 }
 
 // MatterRead implements [contract.ClusterServer].
@@ -373,17 +387,18 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 	case gendiagAttrTestEventTriggersEnabled:
 		return g.testTrigger != nil, true
 
-	case cluster.AttrGlobalFeatureMap:
-		return gendiagFeatureDataModelTest, true
-	case cluster.AttrGlobalClusterRevision:
-		return gendiagClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return gendiagInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite always rejects — GeneralDiagnostics is read-only.
-func (g *GeneralDiagnostics) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: GeneralDiagnostics is read-only (got attr 0x%04X)", attrID)
+// MatterWrite always rejects — GeneralDiagnostics is read-only: a served
+// attribute answers UNSUPPORTED_WRITE and any other UNSUPPORTED_ATTRIBUTE,
+// as the definition judges them.
+func (g *GeneralDiagnostics) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := gendiagInst.ValidateWrite(attrID, value, nil)
+	return refusedWrite{sentinel: fmt.Errorf("matter: GeneralDiagnostics is read-only (got attr 0x%04X)", attrID), status: err}
 }
 
 // MatterInvoke handles GeneralDiagnostics commands per Matter §11.12.7.
@@ -423,18 +438,12 @@ func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	return nil, im.UnsupportedCommandf("matter: GeneralDiagnostics command 0x%02X not supported", cmdID)
 }
 
-// DeviceLoadStruct is DeviceLoadStatus' value
-// (general-diagnostics.element.ts:202-207): the node's subscription and
-// Interaction Model message load, as matter.js computes it from its
-// InteractionServer counters and SessionManager
-// (GeneralDiagnosticsServer.ts deviceLoadStatus).
-type DeviceLoadStruct struct {
-	CurrentSubscriptions                  uint16
-	CurrentSubscriptionsForFabric         uint16
-	TotalSubscriptionsEstablished         uint32
-	TotalInteractionModelMessagesSent     uint32
-	TotalInteractionModelMessagesReceived uint32
-}
+// DeviceLoadStruct is DeviceLoadStatus' value, the generated struct of
+// general-diagnostics.element.ts: the node's subscription and Interaction
+// Model message load, as matter.js computes it from its InteractionServer
+// counters and SessionManager (GeneralDiagnosticsServer.ts
+// deviceLoadStatus).
+type DeviceLoadStruct = gendiagdef.DeviceLoadStruct
 
 // upTime is the time since the node came up. Mirrors matter.js
 // GeneralDiagnosticsServer.ts upTime (c0a7978d, #4614): the larger of the
@@ -566,11 +575,9 @@ func (g *GeneralDiagnostics) testEventTrigger(ctx context.Context, fields any) e
 	return nil
 }
 
-// PayloadTestResponse is the DMTEST response: Payload is Count copies of
-// Value (general-diagnostics.element.ts:119).
-type PayloadTestResponse struct {
-	Payload []byte
-}
+// PayloadTestResponse is the DMTEST response, the generated payload:
+// Payload is Count copies of Value.
+type PayloadTestResponse = gendiagdef.PayloadTestResponse
 
 // payloadTestRequest implements PayloadTestRequest, mirroring matter.js
 // GeneralDiagnosticsServer.ts payloadTestRequest: the enable key is checked
@@ -579,14 +586,8 @@ type PayloadTestResponse struct {
 // ResourceExhausted. Fields: [0] EnableKey octets, [1] Value uint8,
 // [2] Count uint16 (max 2048).
 func (g *GeneralDiagnostics) payloadTestRequest(fields any) (any, error) {
-	m, ok := fields.(map[uint8]any)
+	key, value, count, ok := decodePayloadTestRequest(fields)
 	if !ok {
-		return nil, gendiagStatusErr{im.StatusInvalidCommand, "PayloadTestRequest: malformed fields"}
-	}
-	key, _ := m[0].([]byte)
-	value, ok1 := m[1].(uint64)
-	count, ok2 := m[2].(uint64)
-	if !ok1 || !ok2 || value > 0xFF {
 		return nil, gendiagStatusErr{im.StatusInvalidCommand, "PayloadTestRequest: malformed fields"}
 	}
 	if count > payloadTestMaxCount {
@@ -604,14 +605,33 @@ func (g *GeneralDiagnostics) payloadTestRequest(fields any) (any, error) {
 	if count > payloadTestMaxResponse {
 		return nil, gendiagStatusErr{im.StatusResourceExhausted, "PayloadTestRequest: response too large"}
 	}
-	return PayloadTestResponse{Payload: bytes.Repeat([]byte{byte(value)}, int(count))}, nil
+	return PayloadTestResponse{Payload: bytes.Repeat([]byte{value}, int(count))}, nil
 }
 
-// TestEventTriggerRequest is the decoded TestEventTrigger command
-// (general-diagnostics.element.ts: EnableKey tag 0, EventTrigger tag 1).
-type TestEventTriggerRequest struct {
-	EnableKey    []byte
-	EventTrigger uint64
+// TestEventTriggerRequest is the decoded TestEventTrigger command, the
+// generated request (EnableKey tag 0, EventTrigger tag 1) the bridge now
+// decodes.
+type TestEventTriggerRequest = gendiagdef.TestEventTriggerRequest
+
+// decodePayloadTestRequest accepts the generated request the bridge
+// decodes or the generic tag-keyed map a host hands over.
+func decodePayloadTestRequest(fields any) (key []byte, value uint8, count uint64, ok bool) {
+	switch f := fields.(type) {
+	case gendiagdef.PayloadTestRequestRequest:
+		return f.EnableKey, f.Value, uint64(f.Count), true
+	case *gendiagdef.PayloadTestRequestRequest:
+		if f != nil {
+			return f.EnableKey, f.Value, uint64(f.Count), true
+		}
+	case map[uint8]any:
+		key, _ := f[0].([]byte)
+		v, ok1 := f[1].(uint64)
+		c, ok2 := f[2].(uint64)
+		if ok1 && ok2 && v <= 0xFF {
+			return key, uint8(v), c, true
+		}
+	}
+	return nil, 0, 0, false
 }
 
 // decodeTestEventTrigger accepts the typed request or the generic
@@ -654,9 +674,7 @@ func (e gendiagStatusErr) MatterStatusCode() im.StatusCode { return e.code }
 
 var _ im.StatusCodeError = gendiagStatusErr{}
 
-// TimeSnapshotResponse mirrors Matter §11.12.7.3.
-// Mirrors matter.js packages/model/src/standard/elements/
-// general-diagnostics.element.ts:99-102.
+// TimeSnapshotResponse is the TimeSnapshot response.
 type TimeSnapshotResponse struct {
 	// SystemTimeMs is the bridge's monotonic time since boot,
 	// expressed in milliseconds.
@@ -664,6 +682,50 @@ type TimeSnapshotResponse struct {
 	// PosixTimeMs is wall-clock time (Unix epoch ms), nullable. Set
 	// to nil when the bridge has no synchronised wall clock yet.
 	PosixTimeMs *uint64
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec: a nil
+// PosixTimeMs is null.
+func (r TimeSnapshotResponse) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	posix := spec.NullOf[uint64]()
+	if r.PosixTimeMs != nil {
+		posix = spec.ValueOf(*r.PosixTimeMs)
+	}
+	gendiagdef.TimeSnapshotResponse{SystemTimeMs: r.SystemTimeMs, PosixTimeMs: posix}.EncodeTLV(enc, tag)
+}
+
+// ResponseCommand implements spec.ResponsePayload.
+func (TimeSnapshotResponse) ResponseCommand() (clusterID, commandID uint32) {
+	return gendiagdef.TimeSnapshotResponse{}.ResponseCommand()
+}
+
+// NetworkInterfaceList is the NetworkInterfaces attribute value; its
+// EncodeTLV is the generated NetworkInterface codec, so the bridge encodes
+// a []NetworkInterfaceStruct by converting it.
+type NetworkInterfaceList []NetworkInterfaceStruct
+
+// EncodeTLV implements spec.Encodable: a nil reachability is null.
+func (l NetworkInterfaceList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	nullable := func(b *bool) spec.Nullable[bool] {
+		if b == nil {
+			return spec.NullOf[bool]()
+		}
+		return spec.ValueOf(*b)
+	}
+	out := make(spec.List[gendiagdef.NetworkInterface], len(l))
+	for i, n := range l {
+		out[i] = gendiagdef.NetworkInterface{
+			Name:                            n.Name,
+			IsOperational:                   n.IsOperational,
+			OffPremiseServicesReachableIPv4: nullable(n.OffPremiseServicesReachableIPv4),
+			OffPremiseServicesReachableIPv6: nullable(n.OffPremiseServicesReachableIPv6),
+			HardwareAddress:                 n.HardwareAddress,
+			IPv4Addresses:                   n.IPv4Addresses,
+			IPv6Addresses:                   n.IPv6Addresses,
+			Type:                            gendiagdef.InterfaceTypeEnum(n.InterfaceType),
+		}
+	}
+	out.EncodeTLV(enc, tag)
 }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
@@ -675,22 +737,14 @@ type TimeSnapshotResponse struct {
 // the handler always rejects it with ConstraintError (no enable key). Only
 // PayloadTestRequest (0x03, DMTEST) stays unlisted.
 func (g *GeneralDiagnostics) MatterAcceptedCommands() []uint32 {
-	return []uint32{
-		gendiagCmdTestEventTrigger,   // 0x00
-		gendiagCmdTimeSnapshot,       // 0x01
-		gendiagCmdPayloadTestRequest, // 0x03, DMTEST
-	}
+	return gendiagInst.MatterAcceptedCommands()
 }
 
-// MatterGeneratedCommands implements [contract.ClusterCommandLister].
-// Lists the response command IDs this server may emit.
-// Mirrors matter.js packages/model/src/standard/elements/
-// general-diagnostics.element.ts generated commands.
+// MatterGeneratedCommands implements [contract.ClusterCommandLister]: the
+// responses of the accepted requests, TimeSnapshotResponse and (DMTEST)
+// PayloadTestResponse.
 func (g *GeneralDiagnostics) MatterGeneratedCommands() []uint32 {
-	return []uint32{
-		gendiagCmdTimeSnapshotResp,    // 0x02
-		gendiagCmdPayloadTestResponse, // 0x04, DMTEST
-	}
+	return gendiagInst.MatterGeneratedCommands()
 }
 
 // MatterReportable returns the subscribe-able attributes.
@@ -710,22 +764,13 @@ func (g *GeneralDiagnostics) MatterAttributes() []uint32 {
 	// Subscribe-Initial via EmitBootReason() — Apple parses that event
 	// into the `estimated start time` log line and the BootReason
 	// attribute on the wire is redundant.
-	return []uint32{
-		gendiagAttrNetworkInterfaces,
-		gendiagAttrRebootCount,
-		gendiagAttrUpTime,
-		gendiagAttrTotalOperationalHours,
-		gendiagAttrTestEventTriggersEnabled,
-		gendiagAttrDeviceLoadStatus,
-	}
+	return gendiagInst.MatterAttributes()
 }
 
 // MatterEvents implements [contract.ClusterEventLister] so the
 // dispatcher synthesises the global EventList (0xFFFA) attribute
 // correctly for this cluster.
-func (g *GeneralDiagnostics) MatterEvents() []uint32 {
-	return []uint32{gendiagEventBootReason}
-}
+func (g *GeneralDiagnostics) MatterEvents() []uint32 { return gendiagInst.MatterEvents() }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
 // Called by the bridge during topology assembly so [EmitBootReason]
@@ -771,7 +816,7 @@ func (g *GeneralDiagnostics) EmitBootReason() {
 		slog.Any("endpoint", endpoint), slog.Any("boot_reason", bootReason))
 	emitter.MatterEmitEvent(endpoint, gendiagClusterID, gendiagEventBootReason,
 		BootReasonEvent{BootReason: bootReason},
-		contract.EventPriorityCritical)
+		gendiagInst.EventPriority(gendiagEventBootReason))
 }
 
 // enumerateNetworkInterfaces walks net.Interfaces() and projects every

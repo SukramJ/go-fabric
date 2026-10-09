@@ -13,6 +13,8 @@ import (
 	"unicode/utf16"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	scenesdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -30,24 +32,31 @@ import (
 // rebuilt per dispatch, so the table lives in a ScenesState the endpoint
 // keeps.
 
-// Cluster ID, revision, attributes and commands (scenes-management.element.ts).
+// Cluster ID, revision, attributes and commands: the generated
+// definition's (cluster/spec/scenesmanagement, ADR 0013, from matter.js
+// scenes-management.element.ts). The attribute and command lists,
+// FeatureMap, ClusterRevision, the invoke privileges and the statuses of a
+// refused write come from it as well. The requests keep the bridge's
+// hand-written decoders into the request structs below
+// (notes/parity/by_design.md BD-Matter-Groups-HandDecoders); the scene
+// table is this package's ScenesState.
 const (
-	ScenesManagementClusterID uint32 = 0x0062
+	ScenesManagementClusterID = scenesdef.ClusterID
 
-	scenesClusterRevision   uint16 = 1
-	scenesFeatureSceneNames uint32 = 0x1
+	scenesClusterRevision   = scenesdef.Revision
+	scenesFeatureSceneNames = uint32(scenesdef.FeatureSceneNames)
 
-	scenesAttrSceneTableSize  uint32 = 0x0001
-	scenesAttrFabricSceneInfo uint32 = 0x0002
+	scenesAttrSceneTableSize  = scenesdef.AttrSceneTableSize
+	scenesAttrFabricSceneInfo = scenesdef.AttrFabricSceneInfo
 
-	scenesCmdAddScene           uint32 = 0x00
-	scenesCmdViewScene          uint32 = 0x01
-	scenesCmdRemoveScene        uint32 = 0x02
-	scenesCmdRemoveAllScenes    uint32 = 0x03
-	scenesCmdStoreScene         uint32 = 0x04
-	scenesCmdRecallScene        uint32 = 0x05
-	scenesCmdGetSceneMembership uint32 = 0x06
-	scenesCmdCopyScene          uint32 = 0x40
+	scenesCmdAddScene           = scenesdef.CmdAddScene
+	scenesCmdViewScene          = scenesdef.CmdViewScene
+	scenesCmdRemoveScene        = scenesdef.CmdRemoveScene
+	scenesCmdRemoveAllScenes    = scenesdef.CmdRemoveAllScenes
+	scenesCmdStoreScene         = scenesdef.CmdStoreScene
+	scenesCmdRecallScene        = scenesdef.CmdRecallScene
+	scenesCmdGetSceneMembership = scenesdef.CmdGetSceneMembership
+	scenesCmdCopyScene          = scenesdef.CmdCopyScene
 
 	// scenesDefaultTableSize is matter.js's default SceneTableSize
 	// (ScenesManagementServer.ts initialize).
@@ -390,17 +399,23 @@ func (s *ScenesManagement) MatterReadFiltered(ctx context.Context, attrID uint32
 			out = append(out, *st.infoFor(f))
 		}
 		return out, true
-	case cluster.AttrGlobalFeatureMap:
-		return scenesFeatureSceneNames, true
-	case cluster.AttrGlobalClusterRevision:
-		return scenesClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return scenesInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
+// scenesInst is the definition bound to SN (scene names) and the optional
+// CopyScene, as the default ScenesManagementServer serves them.
+var scenesInst = mustInstance(scenesdef.Definition, spec.Options{
+	Features: scenesFeatureSceneNames,
+	Commands: []uint32{scenesCmdCopyScene},
+})
+
 // MatterWrite implements [contract.ClusterServer]: nothing is writable.
-func (s *ScenesManagement) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return fmt.Errorf("matter: ScenesManagement attribute 0x%04X is read-only", attrID)
+func (s *ScenesManagement) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := scenesInst.ValidateWrite(attrID, value, nil)
+	return refusedWrite{sentinel: fmt.Errorf("matter: ScenesManagement attribute 0x%04X is read-only", attrID), status: err}
 }
 
 // MatterReportable implements [contract.ClusterServer].
@@ -409,36 +424,24 @@ func (s *ScenesManagement) MatterReportable() []uint32 {
 }
 
 // MatterAttributes implements [contract.ClusterAttributeLister].
-func (s *ScenesManagement) MatterAttributes() []uint32 {
-	return []uint32{scenesAttrSceneTableSize, scenesAttrFabricSceneInfo}
-}
+func (s *ScenesManagement) MatterAttributes() []uint32 { return scenesInst.MatterAttributes() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister].
 func (s *ScenesManagement) MatterAcceptedCommands() []uint32 {
-	return []uint32{
-		scenesCmdAddScene, scenesCmdViewScene, scenesCmdRemoveScene, scenesCmdRemoveAllScenes,
-		scenesCmdStoreScene, scenesCmdRecallScene, scenesCmdGetSceneMembership, scenesCmdCopyScene,
-	}
+	return scenesInst.MatterAcceptedCommands()
 }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]:
 // every request but RecallScene has a response of its own id.
 func (s *ScenesManagement) MatterGeneratedCommands() []uint32 {
-	return []uint32{
-		scenesCmdAddScene, scenesCmdViewScene, scenesCmdRemoveScene, scenesCmdRemoveAllScenes,
-		scenesCmdStoreScene, scenesCmdGetSceneMembership, scenesCmdCopyScene,
-	}
+	return scenesInst.MatterGeneratedCommands()
 }
 
 // MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege]:
-// Manage for the table-changing commands, Operate otherwise
-// (scenes-management.element.ts "F M" / "F O").
+// the definition's — Manage for the table-changing commands, Operate
+// otherwise ("F M" / "F O").
 func (s *ScenesManagement) MinInvokePrivilege(cmdID uint32) uint8 {
-	switch cmdID {
-	case scenesCmdAddScene, scenesCmdRemoveScene, scenesCmdRemoveAllScenes, scenesCmdStoreScene, scenesCmdCopyScene:
-		return 4
-	}
-	return 3
+	return scenesInst.MinInvokePrivilege(cmdID)
 }
 
 // Command payloads (scenes-management.element.ts field ids).

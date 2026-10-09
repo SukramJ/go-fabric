@@ -23,203 +23,192 @@ import (
 	"math"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	aqdef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
+	booldef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
+	co2def "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
+	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
+	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
+	flowdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
+	illdef "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement"
+	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
+	pm10def "github.com/SukramJ/go-fabric/cluster/spec/pm10concentrationmeasurement"
+	pm25def "github.com/SukramJ/go-fabric/cluster/spec/pm25concentrationmeasurement"
+	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
+	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
+	prsdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
+	rhdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
+	tmpdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
-// Cluster IDs handled by this package per Matter Application Cluster
-// Specification 1.5.1. Listed here for cross-reference; cluster
-// servers expose them via [contract.ClusterServer.MatterClusterID].
+// Cluster IDs handled by this package. Each one is its generated
+// definition's (cluster/spec/<name>, ADR 0013); servers expose them via
+// [contract.ClusterServer.MatterClusterID].
 const (
-	ClusterTemperatureMeasurement uint32 = 0x0402
-	ClusterHumidityMeasurement    uint32 = 0x0405
-	ClusterIlluminanceMeasurement uint32 = 0x0400
-	ClusterPressureMeasurement    uint32 = 0x0403
-	ClusterFlowMeasurement        uint32 = 0x0404
-	ClusterBooleanState           uint32 = 0x0045
-	ClusterOccupancySensing       uint32 = 0x0406
-	ClusterAirQuality             uint32 = 0x005B // mandatory on AirQualitySensor (0x002C)
-	ClusterCO2Concentration       uint32 = 0x040D // ADR 0012 §"Tier P2"
-	ClusterPM25Concentration      uint32 = 0x042A // ADR 0012 §"Tier P2"
-	ClusterPM10Concentration      uint32 = 0x042D // ADR 0012 §"Tier P2"
-	ClusterPowerSource            uint32 = 0x002F
-	ClusterElectricalPower        uint32 = 0x0090 // ADR 0012 §"Tier P2"
-	ClusterElectricalEnergy       uint32 = 0x0091 // ADR 0012 §"Tier P2"
+	ClusterTemperatureMeasurement = tmpdef.ClusterID
+	ClusterHumidityMeasurement    = rhdef.ClusterID
+	ClusterIlluminanceMeasurement = illdef.ClusterID
+	ClusterPressureMeasurement    = prsdef.ClusterID
+	ClusterFlowMeasurement        = flowdef.ClusterID
+	ClusterBooleanState           = booldef.ClusterID
+	ClusterOccupancySensing       = occdef.ClusterID
+	ClusterAirQuality             = aqdef.ClusterID   // mandatory on AirQualitySensor (0x002C)
+	ClusterCO2Concentration       = co2def.ClusterID  // ADR 0012 §"Tier P2"
+	ClusterPM25Concentration      = pm25def.ClusterID // ADR 0012 §"Tier P2"
+	ClusterPM10Concentration      = pm10def.ClusterID // ADR 0012 §"Tier P2"
+	ClusterPowerSource            = psdef.ClusterID
+	ClusterElectricalPower        = epmdef.ClusterID // ADR 0012 §"Tier P2"
+	ClusterElectricalEnergy       = eemdef.ClusterID // ADR 0012 §"Tier P2"
 )
 
-// Common attribute IDs. Most measurement clusters carry the same set:
+// Common attribute IDs. The single-value measurement clusters
+// (Temperature, Humidity, Illuminance, Pressure, Flow) share the layout
 // MeasuredValue (0x0000), MinMeasuredValue (0x0001), MaxMeasuredValue
-// (0x0002), Tolerance (0x0003).
+// (0x0002), Tolerance (0x0003); the ids are TemperatureMeasurement's.
 const (
-	attrMeasuredValue    uint32 = 0x0000
-	attrMinMeasuredValue uint32 = 0x0001
-	attrMaxMeasuredValue uint32 = 0x0002
-	attrTolerance        uint32 = 0x0003
+	attrMeasuredValue    = tmpdef.AttrMeasuredValue
+	attrMinMeasuredValue = tmpdef.AttrMinMeasuredValue
+	attrMaxMeasuredValue = tmpdef.AttrMaxMeasuredValue
+	attrTolerance        = tmpdef.AttrTolerance
 
 	// BooleanState (0x0045) attribute IDs.
-	attrBoolStateValue uint32 = 0x0000
+	attrBoolStateValue = booldef.AttrStateValue
 
 	// OccupancySensing (0x0406) attribute IDs.
-	attrOccupancy           uint32 = 0x0000
-	attrOccupancySensorType uint32 = 0x0001
-	attrOccupancySensorBmp  uint32 = 0x0002
+	attrOccupancy           = occdef.AttrOccupancy
+	attrOccupancySensorType = occdef.AttrOccupancySensorType
+	attrOccupancySensorBmp  = occdef.AttrOccupancySensorTypeBitmap
 )
 
-// OccupancySensing FeatureMap bit for the passive-infrared sensor type.
-// matter.js `occupancy-sensing.element.ts` gives OTHER constraint "0" and
-// PIR constraint "1", so PIR is bit 1. Bit 0 would advertise OTHER and
-// contradict the two sensor-type attributes, both of which report PIR.
-const occupancyFeaturePIR uint32 = 1 << 1
-
-// Cluster revisions. Matched against the model-layer constants in
-// a host's own device projections.
+// Cluster revisions, each the generated definition's (matter.js HEAD).
 const (
-	tempMeasClusterRevision      uint16 = 6 // matter.js HEAD `temperature-measurement.element.ts:14` default=6
-	humidityClusterRevision      uint16 = 5 // matter.js HEAD `relative-humidity-measurement.element.ts:14` default=5
-	illuminanceClusterRevision   uint16 = 5 // matter.js HEAD `illuminance-measurement.element.ts:19` default=5
-	pressureClusterRevision      uint16 = 5 // matter.js HEAD `pressure-measurement.element.ts:18` default=5
-	booleanStateClusterRevision  uint16 = 3 // matter.js HEAD `boolean-state.element.ts:19` default=3
-	occupancyClusterRevision     uint16 = 7 // matter.js HEAD `occupancy-sensing.element.ts:20` default=7
-	concentrationClusterRevision uint16 = 5 // CO2 / PM2.5 / PM10 base cluster — matter.js HEAD `concentration-measurement.element.ts:19` default=5
-	airQualityClusterRevision    uint16 = 1 // matter.js HEAD `air-quality.element.ts:19` default=1
-	powerSourceClusterRevision   uint16 = 3 // matter.js HEAD (@matter/model 0.16.11)
+	tempMeasClusterRevision      = tmpdef.Revision
+	humidityClusterRevision      = rhdef.Revision
+	illuminanceClusterRevision   = illdef.Revision
+	pressureClusterRevision      = prsdef.Revision
+	booleanStateClusterRevision  = booldef.Revision
+	occupancyClusterRevision     = occdef.Revision
+	concentrationClusterRevision = co2def.Revision // CO2 / PM2.5 / PM10 share the base cluster's revision
+	airQualityClusterRevision    = aqdef.Revision
+	powerSourceClusterRevision   = psdef.Revision
 )
 
 // AirQuality (0x005B) attribute ID per Matter §2.9.6.1.
-const attrAirQualityLevel uint32 = 0x0000
+const attrAirQualityLevel = aqdef.AttrAirQuality
 
-// AirQualityEnum members per Matter §2.9.5.1, mirroring matter.js
-// `packages/model/src/standard/elements/air-quality.element.ts`. Only
-// Unknown, Good and Poor carry conformance "M" — Fair, Moderate,
+// AirQualityEnum members the server reports. Only Unknown, Good and Poor
+// carry conformance "M" (air-quality.element.ts) — Fair, Moderate,
 // VeryPoor and ExtremelyPoor are each gated on an optional FeatureMap
 // bit (FAIR / MOD / VPOOR / XPOOR) that [AirQualityServer] does not
 // advertise, so they never appear on the wire.
 const (
-	airQualityUnknown uint8 = 0
-	airQualityGood    uint8 = 1
-	airQualityPoor    uint8 = 4
+	airQualityUnknown = uint8(aqdef.AirQualityUnknown)
+	airQualityGood    = uint8(aqdef.AirQualityGood)
+	airQualityPoor    = uint8(aqdef.AirQualityPoor)
 )
 
-// Concentration Measurement (CO2 / PM2.5 / PM10) attribute IDs per
-// Matter §2.10.5 (the three clusters share the cluster-shape).
+// Concentration Measurement (CO2 / PM2.5 / PM10) attribute IDs; the
+// three clusters share the layout of the base cluster.
 const (
-	attrConcMeasuredValue     uint32 = 0x0000
-	attrConcMinMeasuredValue  uint32 = 0x0001
-	attrConcMaxMeasuredValue  uint32 = 0x0002
-	attrConcMeasurementUnit   uint32 = 0x0008
-	attrConcMeasurementMedium uint32 = 0x0009
+	attrConcMeasuredValue     = co2def.AttrMeasuredValue
+	attrConcMinMeasuredValue  = co2def.AttrMinMeasuredValue
+	attrConcMaxMeasuredValue  = co2def.AttrMaxMeasuredValue
+	attrConcMeasurementUnit   = co2def.AttrMeasurementUnit
+	attrConcMeasurementMedium = co2def.AttrMeasurementMedium
 )
 
-// Concentration cluster MeasurementUnit enum values per Matter §2.10.7.1.
+// Concentration cluster MeasurementUnit and MeasurementMedium values.
 const (
-	concUnitPPM                    uint8 = 0
-	concUnitMicroGramPerCubicMeter uint8 = 4
+	concUnitPPM                    = uint8(co2def.MeasurementUnitPpm)
+	concUnitMicroGramPerCubicMeter = uint8(co2def.MeasurementUnitUgm3)
+	concMediumAir                  = uint8(co2def.MeasurementMediumAir)
 )
 
-// Concentration cluster MeasurementMedium enum values per §2.10.7.2.
-const (
-	concMediumAir uint8 = 0
-)
+// concFeatureMEA is the Numeric Measurement feature — what is always
+// advertised when projecting a Generic.Sensor[float64] onto a
+// concentration cluster. Other bits (LEV, MED, CRI, PEA, AVG) stay off.
+const concFeatureMEA = uint32(co2def.FeatureNumericMeasurement)
 
-// Concentration cluster FeatureMap bits per §2.10.4.
-//   - MEA (Numeric Measurement) at bit 0 — what we always advertise
-//     when projecting a Generic.Sensor[float64] onto a concentration
-//     cluster. Other bits (LEV, MED, NUM) stay off.
-const concFeatureMEA uint32 = 1 << 0
-
-// PowerSource (0x002F) attribute IDs per Matter §11.7.6.
-// EndpointList (0x001F) is mandatory per matter.js
-// packages/model/src/standard/elements/power-source.element.ts — the
-// list identifies which endpoints this power source serves.
+// PowerSource (0x002F) attribute IDs. EndpointList (0x001F) is mandatory:
+// the list identifies which endpoints this power source serves.
 const (
-	attrPwrStatus              uint32 = 0x0000
-	attrPwrOrder               uint32 = 0x0001
-	attrPwrDescription         uint32 = 0x0002
-	attrPwrBatPercentRemaining uint32 = 0x000C
+	attrPwrStatus              = psdef.AttrStatus
+	attrPwrOrder               = psdef.AttrOrder
+	attrPwrDescription         = psdef.AttrDescription
+	attrPwrBatPercentRemaining = psdef.AttrBatPercentRemaining
 	// attrPwrBatChargeLevel and the two IDs below it are conformance
 	// "BAT" (unconditionally mandatory once the BAT feature is set);
 	// BatPercentRemaining above is conformance "[BAT]" (optional even
-	// with BAT set) per matter.js power-source-cluster.element.ts:68-71
-	// — only advertised by [PowerSourceServer] instances constructed via
-	// [NewPowerSourceServerFromFloat].
-	attrPwrBatChargeLevel       uint32 = 0x000E
-	attrPwrBatReplacementNeeded uint32 = 0x000F
-	attrPwrBatReplaceability    uint32 = 0x0010
-	attrPwrEndpointList         uint32 = 0x001F // mandatory — list of endpoints served by this source
+	// with BAT set) — only advertised by [PowerSourceServer] instances
+	// constructed via [NewPowerSourceServerFromFloat].
+	attrPwrBatChargeLevel       = psdef.AttrBatChargeLevel
+	attrPwrBatReplacementNeeded = psdef.AttrBatReplacementNeeded
+	attrPwrBatReplaceability    = psdef.AttrBatReplaceability
+	attrPwrEndpointList         = psdef.AttrEndpointList // mandatory — list of endpoints served by this source
 )
 
-// PowerSource Status enum (Matter §11.7.6.5.1).
+// PowerSource values the server reports.
 const (
-	pwrStatusUnspecified uint8 = 0
-	pwrStatusActive      uint8 = 1
+	pwrStatusActive  = uint8(psdef.PowerSourceStatusActive)
+	batChargeOK      = uint8(psdef.BatChargeLevelOk)
+	batChargeWarning = uint8(psdef.BatChargeLevelWarning)
+	// batReplaceUserReplaceable — HM batteries are always
+	// user-replaceable.
+	batReplaceUserReplaceable = uint8(psdef.BatReplaceabilityUserReplaceable)
 )
 
-// PowerSource BatChargeLevel enum (§11.7.6.5.4).
+// pwrFeatureBAT is the FeatureMap of a battery-backed source. RECHG and
+// REPLC stay clear because each makes attributes mandatory that a
+// LOWBAT-driven projection cannot fill — REPLC requires
+// BatReplacementDescription (0x13) and BatQuantity (0x19), neither of
+// which the CCU reports. BatReplaceability (0x10) is served under the BAT
+// feature: matter.js records its conformance as "BAT", not "REPLC".
+const pwrFeatureBAT = uint32(psdef.FeatureBattery)
+
+// ElectricalPowerMeasurement (0x0090) attribute IDs.
 const (
-	batChargeOK       uint8 = 0
-	batChargeWarning  uint8 = 1
-	batChargeCritical uint8 = 2
+	attrElPwrPowerMode                = epmdef.AttrPowerMode
+	attrElPwrNumberOfMeasurementTypes = epmdef.AttrNumberOfMeasurementTypes // count of AccuracyStruct entries in Accuracy list (NOT "number of phases")
+	attrElPwrAccuracy                 = epmdef.AttrAccuracy
+	attrElPwrActivePower              = epmdef.AttrActivePower   // int64 mW
+	attrElPwrVoltage                  = epmdef.AttrVoltage       // int64 mV
+	attrElPwrActiveCurrnt             = epmdef.AttrActiveCurrent // int64 mA
+	attrElPwrFrequency                = epmdef.AttrFrequency     // int64 mHz (0x000A is ApparentPower)
 )
 
-// PowerSource BatReplaceability enum (§11.7.6.5.6) — HM batteries are
-// always user-replaceable.
-const batReplaceUserReplaceable uint8 = 2
-
-// PowerSource FeatureMap bit for a battery-backed source. matter.js
-// `power-source-cluster.element.ts` gives WIRED constraint "0" and BAT
-// constraint "1"; RECHG ("2") and REPLC ("3") stay clear because each
-// makes attributes mandatory that a LOWBAT-driven projection cannot
-// fill — REPLC requires BatReplacementDescription (0x13) and BatQuantity
-// (0x19), neither of which the CCU reports. BatReplaceability (0x10) is
-// served under the BAT feature: matter.js records its conformance as
-// "BAT", not "REPLC".
-const pwrFeatureBAT uint32 = 1 << 1
-
-// ElectricalPowerMeasurement (0x0090) attribute IDs per Matter §2.13.6.
-const (
-	attrElPwrPowerMode                uint32 = 0x0000
-	attrElPwrNumberOfMeasurementTypes uint32 = 0x0001 // count of AccuracyStruct entries in Accuracy list (NOT "number of phases") — matter.js electrical-power-measurement.element.ts:25
-	attrElPwrAccuracy                 uint32 = 0x0002
-	attrElPwrActivePower              uint32 = 0x0008 // int64 mW
-	attrElPwrVoltage                  uint32 = 0x0004 // int64 mV — spec ElectricalPowerMeasurement §2.13.6.4
-	attrElPwrActiveCurrnt             uint32 = 0x0005 // int64 mA — spec §2.13.6.5
-	attrElPwrFrequency                uint32 = 0x000E // int64 mHz — spec §2.13.6.14 (0x000A collides with ApparentPower)
-)
-
-// ElectricalEnergyMeasurement (0x0091) attribute IDs per Matter §2.14.6.
+// ElectricalEnergyMeasurement (0x0091) attribute IDs.
 // CumulativeEnergyExported (0x0002) is deliberately absent: matter.js
 // gates it on "EXPE & CUME" and HM metering hardware has no exported-energy
 // path, so serving it would advertise an attribute whose feature is clear.
 const (
-	attrElEnAccuracy           uint32 = 0x0000
-	attrElEnCumulativeImported uint32 = 0x0001 // int64 mWh, struct EnergyMeasurementStruct.energy
+	attrElEnAccuracy           = eemdef.AttrAccuracy
+	attrElEnCumulativeImported = eemdef.AttrCumulativeEnergyImported // int64 mWh, struct EnergyMeasurementStruct.energy
 )
 
-// ElectricalPower / ElectricalEnergy ClusterRevisions per matter.js HEAD
-// (@matter/model 0.16.11). ElectricalPowerMeasurement was bumped 1→3
-// in Matter 1.4 with the addition of harmonics + per-phase reporting;
-// ElectricalEnergyMeasurement was bumped 1→2 in Matter 1.5.
+// ElectricalPower / ElectricalEnergy ClusterRevisions, the generated
+// definitions'.
 const (
-	electricalPowerClusterRevision  uint16 = 3
-	electricalEnergyClusterRevision uint16 = 2
+	electricalPowerClusterRevision  = epmdef.Revision
+	electricalEnergyClusterRevision = eemdef.Revision
 )
 
-// ElectricalPower FeatureMap bits per Matter §2.13.4 — only the
-// ALTC (Alternating-Current) feature is advertised for HmIP-PSM and
-// similar mains-AC switch-meters; DCV/DCM are off because HM has no
-// DC measurement hardware.
-const elPwrFeatureAltC uint32 = 1 << 1
+// elPwrFeatureAltC is the ElectricalPower FeatureMap: only the ALTC
+// (Alternating-Current) feature is advertised for HmIP-PSM and similar
+// mains-AC switch-meters; DIRC is off because HM has no DC measurement
+// hardware.
+const elPwrFeatureAltC = uint32(epmdef.FeatureAlternatingCurrent)
 
-// ElectricalEnergy FeatureMap bits. matter.js
-// `electrical-energy-measurement.element.ts` puts IMPE at constraint "0"
-// and CUME at constraint "2". Both are advertised: the imported/exported
-// pair and the cumulative/periodic pair form two separate
-// at-least-one-required choice groups, and CumulativeEnergyImported —
-// the only value-bearing attribute the bridge serves — has conformance
-// "IMPE & CUME". EXPE stays clear because HM metering hardware has no
-// exported-energy path, PERE because no periodic accumulator exists.
+// ElectricalEnergy FeatureMap bits. Both IMPE and CUME are advertised: the
+// imported/exported pair and the cumulative/periodic pair form two
+// separate at-least-one-required choice groups, and
+// CumulativeEnergyImported — the only value-bearing attribute the bridge
+// serves — has conformance "IMPE & CUME". EXPE stays clear because HM
+// metering hardware has no exported-energy path, PERE because no periodic
+// accumulator exists.
 const (
-	elEnFeatureIMPE uint32 = 1 << 0
-	elEnFeatureCUME uint32 = 1 << 2
+	elEnFeatureIMPE = uint32(eemdef.FeatureImportedEnergy)
+	elEnFeatureCUME = uint32(eemdef.FeatureCumulativeEnergy)
 )
 
 // AccuracyRangeStruct is one range entry inside an [AccuracyStruct].
@@ -255,7 +244,7 @@ type AccuracyRangeStruct struct {
 // matter.js itself demonstrates in its measuring-socket template: the
 // full permitted measurement range with a one-unit fixed accuracy.
 type AccuracyStruct struct {
-	MeasurementType  uint16 // enum16: 0x0008=ActivePower, 0x0009=ActiveEnergyImported
+	MeasurementType  uint16 // MeasurementTypeEnum (measurement-type-enum.element.ts): 0x05 ActivePower, 0x0E ElectricalEnergy
 	Measured         bool
 	MinMeasuredValue int64
 	MaxMeasuredValue int64
@@ -274,18 +263,6 @@ const (
 	// choice group; matter.js uses the same placeholder.
 	accuracyFixedMax uint64 = 1
 )
-
-// EnergyMeasurementStruct is the wire payload of the
-// ElectricalEnergyMeasurement Cumulative/PeriodicEnergy* attributes per
-// Matter §2.14.5.2. Only the mandatory Energy field (tag 0, int64 mWh,
-// "0 to 2^62") is emitted: the StartTimestamp/EndTimestamp/StartSystime/
-// EndSystime fields (tags 1-4) describe the recording period of PERIODIC
-// measurements and are omitted for cumulative readings per their field
-// descriptions. matter.js ref: packages/model/src/standard/elements/
-// electrical-energy-measurement.element.ts:88-96 (EnergyMeasurementStruct).
-type EnergyMeasurementStruct struct {
-	Energy int64
-}
 
 // errReadOnly surfaces from MatterWrite — every server in this
 // package is read-only at the cluster level (writes flow through the
@@ -359,17 +336,15 @@ func (s *TemperatureServer) MatterRead(attrID uint32) (any, bool) {
 		return int16(32766), true
 	case attrTolerance:
 		return uint16(0), true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return tempMeasClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return tempInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — the Matter Temperature Measurement cluster is read-only at the wire layer.
-func (s *TemperatureServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the Temperature Measurement cluster is read-only at the wire layer.
+func (s *TemperatureServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(tempInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Temperature Measurement cluster has no commands.
@@ -384,9 +359,7 @@ func (s *TemperatureServer) MatterReportable() []uint32 { return []uint32{attrMe
 // attribute the server implements via MatterRead. Apple Home's HAP
 // service rebuild reads the full attribute set; without this the
 // dispatcher falls back to MatterReportable's single attribute.
-func (s *TemperatureServer) MatterAttributes() []uint32 {
-	return []uint32{attrMeasuredValue, attrMinMeasuredValue, attrMaxMeasuredValue, attrTolerance}
-}
+func (s *TemperatureServer) MatterAttributes() []uint32 { return tempInst.MatterAttributes() }
 
 // celsiusToInt16 converts a Celsius temperature to the Matter wire
 // encoding (int16 × 0.01 °C). Clamps to [−27315, 32766] rather than
@@ -460,17 +433,15 @@ func (s *HumidityServer) MatterRead(attrID uint32) (any, bool) {
 		return uint16(10000), true
 	case attrTolerance:
 		return uint16(0), true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return humidityClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return humidityInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — the Matter Relative Humidity Measurement cluster is read-only at the wire layer.
-func (s *HumidityServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the Relative Humidity Measurement cluster is read-only at the wire layer.
+func (s *HumidityServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(humidityInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Relative Humidity Measurement cluster has no commands.
@@ -485,9 +456,7 @@ func (s *HumidityServer) MatterReportable() []uint32 { return []uint32{attrMeasu
 // attribute the server implements via MatterRead. Apple Home's HAP
 // service rebuild reads the full attribute set; without this the
 // dispatcher falls back to MatterReportable's single attribute.
-func (s *HumidityServer) MatterAttributes() []uint32 {
-	return []uint32{attrMeasuredValue, attrMinMeasuredValue, attrMaxMeasuredValue, attrTolerance}
-}
+func (s *HumidityServer) MatterAttributes() []uint32 { return humidityInst.MatterAttributes() }
 
 func humidityToUint16(p float64) uint16 {
 	v := math.Round(p * 100)
@@ -547,17 +516,15 @@ func (s *IlluminanceServer) MatterRead(attrID uint32) (any, bool) {
 		return uint16(0xFFFE), true
 	case attrTolerance:
 		return uint16(0), true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return illuminanceClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return illuminanceInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — the Matter Illuminance Measurement cluster is read-only at the wire layer.
-func (s *IlluminanceServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the Illuminance Measurement cluster is read-only at the wire layer.
+func (s *IlluminanceServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(illuminanceInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Illuminance Measurement cluster has no commands.
@@ -572,9 +539,7 @@ func (s *IlluminanceServer) MatterReportable() []uint32 { return []uint32{attrMe
 // attribute the server implements via MatterRead. Apple Home's HAP
 // service rebuild reads the full attribute set; without this the
 // dispatcher falls back to MatterReportable's single attribute.
-func (s *IlluminanceServer) MatterAttributes() []uint32 {
-	return []uint32{attrMeasuredValue, attrMinMeasuredValue, attrMaxMeasuredValue, attrTolerance}
-}
+func (s *IlluminanceServer) MatterAttributes() []uint32 { return illuminanceInst.MatterAttributes() }
 
 func luxToMatter(lux float64) uint16 {
 	if lux <= 1 {
@@ -652,17 +617,15 @@ func (s *PressureServer) MatterRead(attrID uint32) (any, bool) {
 		return int16(32766), true
 	case attrTolerance:
 		return uint16(0), true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return pressureClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return pressureInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — the Matter Pressure Measurement cluster is read-only at the wire layer.
-func (s *PressureServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the Pressure Measurement cluster is read-only at the wire layer.
+func (s *PressureServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(pressureInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Pressure Measurement cluster has no commands.
@@ -677,9 +640,7 @@ func (s *PressureServer) MatterReportable() []uint32 { return []uint32{attrMeasu
 // attribute the server implements via MatterRead. Apple Home's HAP
 // service rebuild reads the full attribute set; without this the
 // dispatcher falls back to MatterReportable's single attribute.
-func (s *PressureServer) MatterAttributes() []uint32 {
-	return []uint32{attrMeasuredValue, attrMinMeasuredValue, attrMaxMeasuredValue, attrTolerance}
-}
+func (s *PressureServer) MatterAttributes() []uint32 { return pressureInst.MatterAttributes() }
 
 func hPaToMatter(hpa float64) int16 {
 	v := math.Round(hpa) // 1 hPa = 0.1 kPa = 1 deci-kPa wire unit
@@ -740,20 +701,15 @@ func (s *BooleanStateServer) MatterRead(attrID uint32) (any, bool) {
 			return false, true
 		}
 		return v, true
-	case cluster.AttrGlobalFeatureMap:
-		// ChangeEvent (CHGEVENT, bit 0): the StateChange event is emitted
-		// on every StateValue change, the feature matter.js
-		// BooleanStateServer enables by default.
-		return uint32(1), true
-	case cluster.AttrGlobalClusterRevision:
-		return booleanStateClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return booleanStateInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — the Matter Boolean State cluster is read-only at the wire layer.
-func (s *BooleanStateServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the Boolean State cluster is read-only at the wire layer.
+func (s *BooleanStateServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(booleanStateInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Boolean State cluster has no commands.
@@ -768,13 +724,11 @@ func (s *BooleanStateServer) MatterReportable() []uint32 { return []uint32{attrB
 // server implements via MatterRead. Apple Home's HAP service rebuild
 // reads the full attribute set; without this the dispatcher falls back
 // to MatterReportable's single attribute.
-func (s *BooleanStateServer) MatterAttributes() []uint32 {
-	return []uint32{attrBoolStateValue}
-}
+func (s *BooleanStateServer) MatterAttributes() []uint32 { return booleanStateInst.MatterAttributes() }
 
 // BooleanStateEventStateChange is the StateChange event (0x00) the bridge
 // emits on every StateValue change.
-const BooleanStateEventStateChange uint32 = 0x00
+const BooleanStateEventStateChange = booldef.EventStateChange
 
 // Compile-time assertion: BooleanStateServer lists its events.
 var _ contract.ClusterEventLister = (*BooleanStateServer)(nil)
@@ -785,15 +739,7 @@ var _ contract.ClusterEventLister = (*BooleanStateServer)(nil)
 // change. Water Freeze Detector, Water Leak Detector and Rain Sensor require
 // it of the endpoint (the device types' event requirement, M); matter.js
 // BooleanStateServer emits it with the feature enabled by default.
-func (s *BooleanStateServer) MatterEvents() []uint32 {
-	return []uint32{BooleanStateEventStateChange}
-}
-
-// BooleanStateChangeEvent is the payload of BooleanState.StateChange
-// (event 0x00, priority Info, field 0 StateValue), boolean-state.element.ts.
-type BooleanStateChangeEvent struct {
-	StateValue bool
-}
+func (s *BooleanStateServer) MatterEvents() []uint32 { return booleanStateInst.MatterEvents() }
 
 // --- OccupancySensing (0x0406) -----------------------------------------
 
@@ -841,22 +787,15 @@ func (s *OccupancySensingServer) MatterRead(attrID uint32) (any, bool) {
 		return uint8(0), true // 0 = PIR
 	case attrOccupancySensorBmp:
 		return uint8(1 << 0), true // bit 0 = PIR
-	case cluster.AttrGlobalFeatureMap:
-		// All HM motion detectors use PIR (passive infrared). From
-		// cluster revision 5 on, matter.js requires one sensor-type
-		// feature to be selected, and controllers that branch on it
-		// (matter.js OccupancySensingServer.ts `features.passiveInfrared`)
-		// classify the sensor from this bit alone.
-		return occupancyFeaturePIR, true
-	case cluster.AttrGlobalClusterRevision:
-		return occupancyClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return occupancyInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — the Matter Occupancy Sensing cluster is read-only at the wire layer.
-func (s *OccupancySensingServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the Occupancy Sensing cluster is read-only at the wire layer.
+func (s *OccupancySensingServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(occupancyInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Occupancy Sensing cluster has no commands.
@@ -871,14 +810,7 @@ func (s *OccupancySensingServer) MatterReportable() []uint32 { return []uint32{a
 // server implements via MatterRead. Apple Home's HAP service rebuild
 // reads the full attribute set; without this the dispatcher falls back
 // to MatterReportable's single attribute.
-func (s *OccupancySensingServer) MatterAttributes() []uint32 {
-	// PirOccupiedToUnoccupiedDelay (0x10) is intentionally NOT advertised:
-	// per matter.js occupancy-sensing.element.ts it is deprecated (D) and
-	// conformance-gated on the optional HoldTime (0x3) attribute, which the
-	// bridge does not serve. The rev-6 surface for a simple PIR sensor is
-	// Occupancy + OccupancySensorType + OccupancySensorTypeBitmap.
-	return []uint32{attrOccupancy, attrOccupancySensorType, attrOccupancySensorBmp}
-}
+func (s *OccupancySensingServer) MatterAttributes() []uint32 { return occupancyInst.MatterAttributes() }
 
 // --- Materializer ------------------------------------------------------
 
@@ -993,7 +925,7 @@ func (s *ElectricalPowerServer) MatterRead(attrID uint32) (any, bool) {
 		// and strict validators (chip CHIP Error 0x26) reject it.
 		// See [AccuracyStruct] for the stub-entry rationale.
 		return []AccuracyStruct{{
-			MeasurementType:  0x0008, // ActivePower
+			MeasurementType:  uint16(epmdef.MeasurementTypeActivePower), // 0x05; 0x08 is RmsVoltage
 			Measured:         true,
 			MinMeasuredValue: accuracyRangeMin,
 			MaxMeasuredValue: accuracyRangeMax,
@@ -1022,17 +954,15 @@ func (s *ElectricalPowerServer) MatterRead(attrID uint32) (any, bool) {
 		return s.scaled(func() (float64, bool) { return s.readings.Current() }, 1), true
 	case attrElPwrFrequency:
 		return s.scaled(func() (float64, bool) { return s.readings.Frequency() }, 1000), true
-	case cluster.AttrGlobalFeatureMap:
-		return elPwrFeatureAltC, true
-	case cluster.AttrGlobalClusterRevision:
-		return electricalPowerClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return electricalPowerInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — the Matter Electrical Power Measurement cluster is read-only at the wire layer.
-func (s *ElectricalPowerServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the Electrical Power Measurement cluster is read-only at the wire layer.
+func (s *ElectricalPowerServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(electricalPowerInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Electrical Power Measurement cluster has no commands.
@@ -1048,15 +978,7 @@ func (s *ElectricalPowerServer) MatterReportable() []uint32 { return []uint32{at
 // service rebuild reads the full attribute set; without this the
 // dispatcher falls back to MatterReportable's single attribute.
 func (s *ElectricalPowerServer) MatterAttributes() []uint32 {
-	return []uint32{
-		attrElPwrPowerMode,
-		attrElPwrNumberOfMeasurementTypes,
-		attrElPwrAccuracy,
-		attrElPwrVoltage,
-		attrElPwrActiveCurrnt,
-		attrElPwrActivePower,
-		attrElPwrFrequency,
-	}
+	return electricalPowerInst.MatterAttributes()
 }
 
 // scaled reads one optional attribute from the readings surface and converts
@@ -1139,11 +1061,17 @@ func (s *ElectricalEnergyServer) OnMatterValueChanged(cb func()) func() {
 func (s *ElectricalEnergyServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
 	case attrElEnAccuracy:
-		// Matter §2.14.5.2 requires AccuracyRanges to have at least ONE
-		// AccuracyRangeStruct; an empty list is schema-invalid.
-		// See [AccuracyStruct] for the stub-entry rationale.
-		return []AccuracyStruct{{
-			MeasurementType:  0x0009, // ActiveEnergyImported
+		// One MeasurementAccuracyStruct, not a list: unlike
+		// ElectricalPowerMeasurement.Accuracy, this attribute's type is the
+		// struct itself (matter.js electrical-energy-measurement.element.ts
+		// Accuracy, type "MeasurementAccuracyStruct"; chip
+		// electrical-energy-measurement-cluster.xml agrees). A list here
+		// fails a typed controller's struct decode. Matter §2.14.5.2
+		// requires AccuracyRanges to have at least ONE AccuracyRangeStruct;
+		// an empty list is schema-invalid. See [AccuracyStruct] for the
+		// stub-entry rationale.
+		return AccuracyStruct{
+			MeasurementType:  uint16(eemdef.MeasurementTypeElectricalEnergy), // 0x0E; 0x09 is RmsCurrent
 			Measured:         true,
 			MinMeasuredValue: accuracyRangeMin,
 			MaxMeasuredValue: accuracyRangeMax,
@@ -1152,7 +1080,7 @@ func (s *ElectricalEnergyServer) MatterRead(attrID uint32) (any, bool) {
 				RangeMax: accuracyRangeMax,
 				FixedMax: accuracyFixedMax,
 			}},
-		}}, true
+		}, true
 	case attrElEnCumulativeImported:
 		// Value temporarily unavailable — return (nil, true); see TemperatureServer.MatterRead.
 		v, ok := s.src.MatterFloatValue()
@@ -1164,17 +1092,15 @@ func (s *ElectricalEnergyServer) MatterRead(attrID uint32) (any, bool) {
 		// rejects a plain int64 here with "Wrong TLV type" (the report
 		// path's generic logger masked that for a while).
 		return EnergyMeasurementStruct{Energy: whToMilliWattHours(v)}, true
-	case cluster.AttrGlobalFeatureMap:
-		return elEnFeatureIMPE | elEnFeatureCUME, true
-	case cluster.AttrGlobalClusterRevision:
-		return electricalEnergyClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return electricalEnergyInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — the Matter Electrical Energy Measurement cluster is read-only at the wire layer.
-func (s *ElectricalEnergyServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the Electrical Energy Measurement cluster is read-only at the wire layer.
+func (s *ElectricalEnergyServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(electricalEnergyInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Electrical Energy Measurement cluster has no commands.
@@ -1192,7 +1118,7 @@ func (s *ElectricalEnergyServer) MatterReportable() []uint32 {
 // service rebuild reads the full attribute set; without this the
 // dispatcher falls back to MatterReportable's single attribute.
 func (s *ElectricalEnergyServer) MatterAttributes() []uint32 {
-	return []uint32{attrElEnAccuracy, attrElEnCumulativeImported}
+	return electricalEnergyInst.MatterAttributes()
 }
 
 func whToMilliWattHours(wh float64) int64 {
@@ -1294,10 +1220,8 @@ func (s *AirQualityServer) MatterRead(attrID uint32) (any, bool) {
 		// nullable — the enum carries its own Unknown member, so a
 		// source without a reading yet reports Unknown rather than nil.
 		return s.level(), true
-	case cluster.AttrGlobalFeatureMap:
-		return uint32(0), true
-	case cluster.AttrGlobalClusterRevision:
-		return airQualityClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return airQualityInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
@@ -1314,9 +1238,9 @@ func (s *AirQualityServer) level() uint8 {
 	return airQualityPoor
 }
 
-// MatterWrite returns errReadOnly — AirQuality carries a single "R V" attribute.
-func (s *AirQualityServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite) — AirQuality carries a single "R V" attribute.
+func (s *AirQualityServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(airQualityInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Air Quality cluster has no commands.
@@ -1330,7 +1254,7 @@ func (s *AirQualityServer) MatterReportable() []uint32 { return []uint32{attrAir
 // MatterAttributes lists every AirQuality (0x005B) attribute the server
 // implements via MatterRead, so the dispatcher advertises the full
 // AttributeList rather than falling back to MatterReportable.
-func (s *AirQualityServer) MatterAttributes() []uint32 { return []uint32{attrAirQualityLevel} }
+func (s *AirQualityServer) MatterAttributes() []uint32 { return airQualityInst.MatterAttributes() }
 
 // --- Concentration Measurement (CO2 / PM2.5 / PM10) ------------------
 
@@ -1353,6 +1277,7 @@ type concentrationServer struct {
 	src       contract.FloatMeasurementSource
 	clusterID uint32
 	unit      uint8 // MeasurementUnit enum (PPM = 0, µg/m³ = 4)
+	inst      *spec.Instance
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
@@ -1380,16 +1305,14 @@ func (s *concentrationServer) MatterRead(attrID uint32) (any, bool) {
 		return s.unit, true
 	case attrConcMeasurementMedium:
 		return concMediumAir, true
-	case cluster.AttrGlobalFeatureMap:
-		return concFeatureMEA, true
-	case cluster.AttrGlobalClusterRevision:
-		return concentrationClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return s.inst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-func (s *concentrationServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+func (s *concentrationServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(s.inst, attrID, value)
 }
 
 func (s *concentrationServer) MatterInvoke(_ context.Context, cmdID uint32, _ any) (any, error) {
@@ -1402,15 +1325,7 @@ func (s *concentrationServer) MatterReportable() []uint32 { return []uint32{attr
 // server implements via MatterRead. Apple Home's HAP service rebuild
 // reads the full attribute set; without this the dispatcher falls back
 // to MatterReportable's single attribute.
-func (s *concentrationServer) MatterAttributes() []uint32 {
-	return []uint32{
-		attrConcMeasuredValue,
-		attrConcMinMeasuredValue,
-		attrConcMaxMeasuredValue,
-		attrConcMeasurementUnit,
-		attrConcMeasurementMedium,
-	}
-}
+func (s *concentrationServer) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // CO2ConcentrationServer projects a [contract.FloatMeasurementSource]
 // onto Matter CarbonDioxideConcentrationMeasurement (0x040D). Model
@@ -1423,7 +1338,7 @@ var _ contract.ClusterDataVersion = (*CO2ConcentrationServer)(nil)
 
 // NewCO2ConcentrationServer constructs a CO2ConcentrationServer backed by src.
 func NewCO2ConcentrationServer(src contract.FloatMeasurementSource) *CO2ConcentrationServer {
-	return &CO2ConcentrationServer{concentrationServer{src: src, clusterID: ClusterCO2Concentration, unit: concUnitPPM}}
+	return &CO2ConcentrationServer{concentrationServer{src: src, clusterID: ClusterCO2Concentration, unit: concUnitPPM, inst: co2Inst}}
 }
 
 // PM25ConcentrationServer projects a [contract.FloatMeasurementSource]
@@ -1437,7 +1352,7 @@ var _ contract.ClusterDataVersion = (*PM25ConcentrationServer)(nil)
 
 // NewPM25ConcentrationServer constructs a PM25ConcentrationServer backed by src.
 func NewPM25ConcentrationServer(src contract.FloatMeasurementSource) *PM25ConcentrationServer {
-	return &PM25ConcentrationServer{concentrationServer{src: src, clusterID: ClusterPM25Concentration, unit: concUnitMicroGramPerCubicMeter}}
+	return &PM25ConcentrationServer{concentrationServer{src: src, clusterID: ClusterPM25Concentration, unit: concUnitMicroGramPerCubicMeter, inst: pm25Inst}}
 }
 
 // PM10ConcentrationServer projects a [contract.FloatMeasurementSource]
@@ -1451,7 +1366,7 @@ var _ contract.ClusterDataVersion = (*PM10ConcentrationServer)(nil)
 
 // NewPM10ConcentrationServer constructs a PM10ConcentrationServer backed by src.
 func NewPM10ConcentrationServer(src contract.FloatMeasurementSource) *PM10ConcentrationServer {
-	return &PM10ConcentrationServer{concentrationServer{src: src, clusterID: ClusterPM10Concentration, unit: concUnitMicroGramPerCubicMeter}}
+	return &PM10ConcentrationServer{concentrationServer{src: src, clusterID: ClusterPM10Concentration, unit: concUnitMicroGramPerCubicMeter, inst: pm10Inst}}
 }
 
 // --- PowerSource (0x002F) — battery-only flavour ----------------------
@@ -1511,6 +1426,15 @@ func NewPowerSourceServer(src contract.BoolMeasurementSource) *PowerSourceServer
 // no-observation fallback for the bool path.
 func NewPowerSourceServerFromFloat(src contract.FloatMeasurementSource) *PowerSourceServer {
 	return &PowerSourceServer{floatSrc: src}
+}
+
+// inst is the definition bound to what this instance serves:
+// BatPercentRemaining joins the attributes with a percentage source.
+func (s *PowerSourceServer) inst() *spec.Instance {
+	if s.floatSrc != nil {
+		return powerSourceFloatInst
+	}
+	return powerSourceInst
 }
 
 // SetEndpoint stamps the endpoint id this power source is mounted on so
@@ -1585,18 +1509,15 @@ func (s *PowerSourceServer) MatterRead(attrID uint32) (any, bool) {
 			return []uint16{}, true
 		}
 		return []uint16{s.endpoint}, true
-	case cluster.AttrGlobalFeatureMap:
-		// BAT (bit 1) alone — see [pwrFeatureBAT] for why REPLC stays clear.
-		return pwrFeatureBAT, true
-	case cluster.AttrGlobalClusterRevision:
-		return powerSourceClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return s.inst().ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — the Matter Power Source cluster is read-only at the wire layer.
-func (s *PowerSourceServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the Power Source cluster is read-only at the wire layer.
+func (s *PowerSourceServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(s.inst(), attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — the Matter Power Source cluster has no commands.
@@ -1622,21 +1543,7 @@ func (s *PowerSourceServer) MatterReportable() []uint32 {
 // [NewPowerSourceServerFromFloat] — matching the way a bool-constructed
 // instance genuinely does not implement it rather than reporting null
 // forever.
-func (s *PowerSourceServer) MatterAttributes() []uint32 {
-	attrs := []uint32{
-		attrPwrStatus,
-		attrPwrOrder,
-		attrPwrDescription,
-		attrPwrBatChargeLevel,
-		attrPwrBatReplacementNeeded,
-		attrPwrBatReplaceability,
-		attrPwrEndpointList,
-	}
-	if s.floatSrc != nil {
-		attrs = append(attrs, attrPwrBatPercentRemaining)
-	}
-	return attrs
-}
+func (s *PowerSourceServer) MatterAttributes() []uint32 { return s.inst().MatterAttributes() }
 
 // percentToHalfPercent converts a 0-100 battery percentage to Matter's
 // BatPercentRemaining wire encoding — half-percent units, uint8
@@ -1657,11 +1564,7 @@ func percentToHalfPercent(pct float64) uint8 {
 }
 
 // ClusterPowerTopology is the Matter PowerTopology cluster ID (0x009C).
-const ClusterPowerTopology uint32 = 0x009C
-
-// powerTopologyClusterRevision per matter.js HEAD
-// packages/model/src/standard/elements/power-topology.element.ts (revision 1).
-const powerTopologyClusterRevision uint16 = 1
+const ClusterPowerTopology = ptdef.ClusterID
 
 // powerTopologyFeatureNode is the NODE (NodeTopology) feature, bit 0: the
 // cluster describes the power of the whole node — the endpoint's readings
@@ -1672,7 +1575,7 @@ const powerTopologyClusterRevision uint16 = 1
 // NODE neither attribute is conformant and the cluster's whole surface is its
 // globals. A metering plug measures one socket; there is no topology to
 // enumerate.
-const powerTopologyFeatureNode uint32 = 1 << 0
+const powerTopologyFeatureNode = uint32(ptdef.FeatureNodeTopology)
 
 // PowerTopologyServer implements the PowerTopology cluster (0x009C), which
 // the Device Library makes MANDATORY on an ElectricalSensor endpoint
@@ -1703,17 +1606,15 @@ func (s *PowerTopologyServer) MatterClusterID() uint32 { return ClusterPowerTopo
 // conformant attributes.
 func (s *PowerTopologyServer) MatterRead(attrID uint32) (any, bool) {
 	switch attrID {
-	case cluster.AttrGlobalFeatureMap:
-		return powerTopologyFeatureNode, true
-	case cluster.AttrGlobalClusterRevision:
-		return powerTopologyClusterRevision, true
+	case cluster.AttrGlobalFeatureMap, cluster.AttrGlobalClusterRevision:
+		return powerTopologyInst.ReadGlobal(attrID)
 	}
 	return nil, false
 }
 
-// MatterWrite returns errReadOnly — PowerTopology is read-only at the wire layer.
-func (s *PowerTopologyServer) MatterWrite(_ context.Context, _ uint32, _ any) error {
-	return errReadOnly
+// MatterWrite refuses the write as the definition answers it (see refuseWrite): the PowerTopology is read-only at the wire layer.
+func (s *PowerTopologyServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	return refuseWrite(powerTopologyInst, attrID, value)
 }
 
 // MatterInvoke returns errNoCommands — PowerTopology has no commands.
@@ -1726,7 +1627,9 @@ func (s *PowerTopologyServer) MatterReportable() []uint32 { return nil }
 
 // MatterAttributes returns an empty list: under NODE the cluster's only
 // attributes are the globals, which the dispatcher answers itself.
-func (s *PowerTopologyServer) MatterAttributes() []uint32 { return []uint32{} }
+func (s *PowerTopologyServer) MatterAttributes() []uint32 {
+	return powerTopologyInst.MatterAttributes()
+}
 
 // energyOf adapts a consolidated electrical group to the single-value surface
 // ElectricalEnergyServer reads, so the energy cluster sees the counter rather
