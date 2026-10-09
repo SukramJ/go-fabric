@@ -4,6 +4,7 @@
 package closure
 
 import (
+	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -38,68 +39,37 @@ func (e OperationalErrorEvent) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	_ = enc.EndContainer()
 }
 
-// MovementCompletedEvent is the field-less MovementCompleted payload.
-type MovementCompletedEvent struct{}
+// MovementCompletedEvent is the field-less MovementCompleted payload,
+// generated from the definition.
+type MovementCompletedEvent = closuredef.MovementCompletedEvent
 
-// EncodeTLV implements spec.Encodable.
-func (MovementCompletedEvent) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
-	enc.StartStruct(tag)
-	_ = enc.EndContainer()
-}
+// EngageStateChangedEvent is the EngageStateChanged payload, generated from
+// the definition.
+type EngageStateChangedEvent = closuredef.EngageStateChangedEvent
 
-// EngageStateChangedEvent is the EngageStateChanged payload.
-type EngageStateChangedEvent struct{ EngageValue bool }
-
-// EncodeTLV implements spec.Encodable.
-func (e EngageStateChangedEvent) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
-	enc.StartStruct(tag)
-	enc.PutBool(tlv.ContextTag(0), e.EngageValue)
-	_ = enc.EndContainer()
-}
-
-// SecureStateChangedEvent is the SecureStateChanged payload.
-type SecureStateChangedEvent struct{ SecureValue bool }
-
-// EncodeTLV implements spec.Encodable.
-func (e SecureStateChangedEvent) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
-	enc.StartStruct(tag)
-	enc.PutBool(tlv.ContextTag(0), e.SecureValue)
-	_ = enc.EndContainer()
-}
+// SecureStateChangedEvent is the SecureStateChanged payload, generated from
+// the definition.
+type SecureStateChangedEvent = closuredef.SecureStateChangedEvent
 
 // MatterEvents implements [contract.ClusterEventLister]: the events the
-// advertised feature set carries.
-func (s *ControlServer) MatterEvents() []uint32 {
-	fm := s.FeatureMap()
-	out := []uint32{wire.ClosureControlEventOperationalError}
-	if fm&wire.ClosureControlFeatureInstantaneous == 0 {
-		out = append(out, wire.ClosureControlEventMovementCompleted)
-	}
-	if fm&wire.ClosureControlFeatureManuallyOperable != 0 {
-		out = append(out, wire.ClosureControlEventEngageStateChanged)
-	}
-	return append(out, wire.ClosureControlEventSecureStateChanged)
-}
+// advertised feature set carries — OperationalError and SecureStateChanged
+// (M), MovementCompleted (!IS), EngageStateChanged (MO).
+func (s *ControlServer) MatterEvents() []uint32 { return s.inst.MatterEvents() }
 
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:
-// MoveTo (M), Stop (!IS) and Calibrate (CL). Without it the dispatcher
-// answered an empty AcceptedCommandList.
-func (s *ControlServer) MatterAcceptedCommands() []uint32 {
-	fm := s.FeatureMap()
-	var out []uint32
-	if fm&wire.ClosureControlFeatureInstantaneous == 0 {
-		out = append(out, wire.ClosureControlCmdStop)
-	}
-	out = append(out, wire.ClosureControlCmdMoveTo)
-	if fm&wire.ClosureControlFeatureCalibration != 0 {
-		out = append(out, wire.ClosureControlCmdCalibrate)
-	}
-	return out
-}
+// MoveTo (M) and Stop (!IS); Calibrate (CL) is never served. Without it the
+// dispatcher answered an empty AcceptedCommandList.
+func (s *ControlServer) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]: every
 // ClosureControl command answers with a status.
-func (s *ControlServer) MatterGeneratedCommands() []uint32 { return []uint32{} }
+func (s *ControlServer) MatterGeneratedCommands() []uint32 { return s.inst.MatterGeneratedCommands() }
+
+// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege]:
+// Stop and MoveTo are Operate (MoveTo timed), Calibrate Manage.
+func (s *ControlServer) MinInvokePrivilege(cmdID uint32) uint8 {
+	return s.inst.MinInvokePrivilege(cmdID)
+}
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
 func (s *ControlServer) SetMatterEventEmitter(emitter contract.EventEmitter) {
@@ -135,7 +105,7 @@ func (s *ControlServer) emit(events []pendingEvent) {
 		return
 	}
 	for _, ev := range events {
-		emitter.MatterEmitEvent(endpoint, wire.ClosureControlClusterID, ev.id, ev.data, ev.priority)
+		emitter.MatterEmitEvent(endpoint, closuredef.ClusterID, ev.id, ev.data, ev.priority)
 	}
 }
 
@@ -156,14 +126,14 @@ func (s *ControlServer) ReportError(errs wire.ClosureErrorList) {
 	s.mainState = wire.ClosureMainStateError
 	s.mu.Unlock()
 	s.Notify(wire.ClosureControlAttrMainState, wire.ClosureControlAttrCurrentErrorList)
-	s.emit([]pendingEvent{{wire.ClosureControlEventOperationalError, OperationalErrorEvent{ErrorState: list}, contract.EventPriorityCritical}})
+	s.emit([]pendingEvent{{closuredef.EventOperationalError, OperationalErrorEvent{ErrorState: list}, s.inst.EventPriority(closuredef.EventOperationalError)}})
 }
 
 // SetEngaged records whether a manually operable closure is engaged
 // (MainState leaves or enters Disengaged) and emits EngageStateChanged on a
 // change. Without the ManuallyOperable feature it does nothing.
 func (s *ControlServer) SetEngaged(engaged bool) {
-	if s.FeatureMap()&wire.ClosureControlFeatureManuallyOperable == 0 {
+	if !s.inst.Emits(closuredef.EventEngageStateChanged) {
 		return
 	}
 	s.mu.Lock()
@@ -177,6 +147,6 @@ func (s *ControlServer) SetEngaged(engaged bool) {
 	s.mu.Unlock()
 	s.Notify(wire.ClosureControlAttrMainState)
 	if was != engaged {
-		s.emit([]pendingEvent{{wire.ClosureControlEventEngageStateChanged, EngageStateChangedEvent{EngageValue: engaged}, contract.EventPriorityInfo}})
+		s.emit([]pendingEvent{{closuredef.EventEngageStateChanged, EngageStateChangedEvent{EngageValue: engaged}, s.inst.EventPriority(closuredef.EventEngageStateChanged)}})
 	}
 }
