@@ -496,6 +496,17 @@ func (ent InvokeResponseEntry) marshal(enc *tlv.Encoder, fieldsWriter CommandFie
 	_ = enc.EndContainer()
 }
 
+// pathStatusEntry is the CommandStatusIB answering inv with status.
+func pathStatusEntry(inv CommandInvocation, status StatusCode) InvokeResponseEntry {
+	return InvokeResponseEntry{
+		Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
+		CommandRef:    inv.CommandRef,
+		HasCommandRef: inv.HasCommandRef,
+		IsStatus:      true,
+		Status:        StatusIB{Status: status},
+	}
+}
+
 // HandleInvokeRequest dispatches a parsed InvokeRequest through d and
 // returns the assembled InvokeResponse.
 //
@@ -519,6 +530,7 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	pase := IsPASEFromContext(ctx)
 	aclChecker, hasACL := d.(ACLChecker)
 	privProvider, hasPrivProvider := d.(CommandInvokePrivilegeProvider)
+	pathChecker, hasPathChecker := d.(CommandPathChecker)
 
 	// invokePrivilege returns the minimum privilege needed to invoke the
 	// given command. Falls back to Operate (3) — the Matter §9.10.4.4
@@ -605,18 +617,26 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 			})
 			continue
 		}
+		// Existence before the payload check: matter.js
+		// CommandInvokeResponse.ts #processConcrete answers
+		// UnsupportedEndpoint / UnsupportedCluster / UnsupportedCommand
+		// before it validates the request, so a payload a generated decoder
+		// refused on a cluster the endpoint does not serve still answers
+		// UnsupportedCluster (TC-IDM-1.2). matter.js checks existence ahead
+		// of the fabric-scope and timed gates above too; those keep their
+		// place here, pinned by the bridge's timed conformance tests.
+		if hasPathChecker && inv.Path.HasEndpoint {
+			if status := pathChecker.CommandPathStatus(inv.Path); !status.IsSuccess() {
+				ir.Responses = append(ir.Responses, pathStatusEntry(inv, status))
+				continue
+			}
+		}
 		// Fields the reader rejected never reach the cluster server: the
 		// command owes the status the reader attached (ConstraintError for
 		// an out-of-range value), the way matter.js answers a failed
 		// requestTlv.validate (CommandInvokeResponse.ts:472-496).
 		if !inv.DecodeStatus.IsSuccess() {
-			ir.Responses = append(ir.Responses, InvokeResponseEntry{
-				Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
-				CommandRef:    inv.CommandRef,
-				HasCommandRef: inv.HasCommandRef,
-				IsStatus:      true,
-				Status:        StatusIB{Status: inv.DecodeStatus},
-			})
+			ir.Responses = append(ir.Responses, pathStatusEntry(inv, inv.DecodeStatus))
 			continue
 		}
 		res := d.Invoke(ctx, inv.Path, inv.Fields)

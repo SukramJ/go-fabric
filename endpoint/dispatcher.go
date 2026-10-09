@@ -390,6 +390,29 @@ func (d *TopologyDispatcher) Invoke(ctx context.Context, path im.ConcreteCommand
 	return im.InvokeResult{Path: path, Status: im.StatusUnsupportedCluster}
 }
 
+// CommandPathStatus implements [im.CommandPathChecker]: UNSUPPORTED_ENDPOINT
+// for an endpoint the topology lacks, UNSUPPORTED_CLUSTER for a cluster the
+// endpoint does not serve, UNSUPPORTED_COMMAND for a command its server
+// lists as not accepted (a server without a command lister answers for
+// itself), Success otherwise — the existence checks of matter.js
+// CommandInvokeResponse.ts #processConcrete, in their order.
+func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.StatusCode {
+	ep := d.topology.FindByID(path.Endpoint)
+	if ep == nil {
+		return im.StatusUnsupportedEndpoint
+	}
+	for _, srv := range ClusterServers(ep) {
+		if srv == nil || srv.MatterClusterID() != path.Cluster {
+			continue
+		}
+		if lister, ok := srv.(contract.ClusterCommandLister); ok && !slices.Contains(lister.MatterAcceptedCommands(), path.Command) {
+			return im.StatusUnsupportedCommand
+		}
+		return im.StatusSuccess
+	}
+	return im.StatusUnsupportedCluster
+}
+
 // InvokeAuthorized implements [im.AuthorizingInvoker]: a command whose
 // endpoint is a wildcard runs on every endpoint that hosts the cluster and
 // accepts the command, in ascending endpoint order, each location gated by
