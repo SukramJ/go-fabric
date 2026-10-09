@@ -4,6 +4,15 @@
 // Package lock contains the standalone DoorLock cluster server for the
 // Matter bridge. The server wraps a [StateSource] that a host's own lock
 // type satisfies, keeping cluster logic separate from the domain model.
+//
+// The cluster's identity is the generated definition (cluster/spec/
+// doorlock, ADR 0013): ids, revision, the enums the server reports, the
+// attribute, command and event lists for its one feature (Unbolting), the
+// event priorities, the write statuses and checks and the privileges.
+// LockDoor, UnlockDoor and UnboltDoor decode through the definition; the
+// server reads none of their fields (no PIN credential). The lock-state
+// projection, the SupportedOperatingModes rule and the LockOperation event
+// are the server's.
 package lock
 
 import (
@@ -13,43 +22,44 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// DoorLock cluster revision 10 per matter.js HEAD (@matter/model 0.16.11).
-const doorLockClusterRevision uint16 = 10
+// DoorLock FeatureMap: only Unbolting (UBOLT, bit 12) is advertised —
+// the server serves UnboltDoor and nothing of PIN, RID, USR, DPS or the
+// schedules.
+const doorLockFeatureUnbolt = uint32(lockdef.FeatureUnbolting)
 
-// DoorLock FeatureMap: only the Unbolting bit is advertised. UBOLT is
-// feature bit 12 per matter.js door-lock-cluster.element.ts (UBOLT
-// constraint "12"); bit 4 is WeekDayAccessSchedules.
-const doorLockFeatureUnbolt uint32 = 1 << 12
+// instance is the definition bound to the one selection the server
+// serves. UBOLT alone satisfies every feature conformance and nothing
+// optional is declared, so spec.New cannot refuse it.
+var instance, _ = spec.New(lockdef.Definition, spec.Options{Features: doorLockFeatureUnbolt})
 
-// LockState enum per Matter §5.2.6.2.
+// LockStateEnum values the server reports (door-lock-cluster.element.ts).
 const (
-	lockStateNotFullyLocked uint8 = 0
-	lockStateLocked         uint8 = 1
-	lockStateUnlocked       uint8 = 2
+	lockStateNotFullyLocked = uint8(lockdef.LockStateNotFullyLocked)
+	lockStateLocked         = uint8(lockdef.LockStateLocked)
+	lockStateUnlocked       = uint8(lockdef.LockStateUnlocked)
 )
 
-// LockType enum: 0 = DeadBolt.
-const lockTypeDeadBolt uint8 = 0
+// LockType is DeadBolt.
+const lockTypeDeadBolt = uint8(lockdef.LockTypeDeadBolt)
 
-// LockOperationTypeEnum values per Matter §5.2.6.14. Mirrors matter.js
-// door-lock-cluster.element.ts:704-709 (Lock 0x0, Unlock 0x1,
-// Unlatch 0x4).
+// LockOperationTypeEnum values of the LockOperation event: Lock, Unlock,
+// Unlatch.
 const (
-	lockOperationTypeLock    uint8 = 0
-	lockOperationTypeUnlock  uint8 = 1
-	lockOperationTypeUnlatch uint8 = 4
+	lockOperationTypeLock    = uint8(lockdef.LockOperationTypeLock)
+	lockOperationTypeUnlock  = uint8(lockdef.LockOperationTypeUnlock)
+	lockOperationTypeUnlatch = uint8(lockdef.LockOperationTypeUnlatch)
 )
 
 // operationSourceRemote is the OperationSourceEnum value for a
-// controller-driven operation per Matter §5.2.6.15. Mirrors matter.js
-// door-lock-cluster.element.ts:739 (Remote 0x7, the only
-// conformance-M source).
-const operationSourceRemote uint8 = 7
+// controller-driven operation (Remote, the only conformance-M source).
+const operationSourceRemote = uint8(lockdef.OperationSourceRemote)
 
 // LockOperationEvent is the cluster-native payload for the DoorLock
 // LockOperation event (id 0x02, priority critical) per Matter §5.2.10.3.
@@ -67,10 +77,7 @@ type LockOperationEvent struct {
 	SourceNode        *uint64
 }
 
-var (
-	errUnknownAttribute = errors.New("doorlock: unknown attribute")
-	errUnknownCommand   = errors.New("doorlock: unknown command")
-)
+var errUnknownCommand = errors.New("doorlock: unknown command")
 
 // StateSource is the read-side interface a model-layer lock DP must
 // satisfy so DoorLockServer can project its Matter attribute surface.
@@ -149,13 +156,16 @@ func (s *DoorLockServer) tracker() *cluster.DataVersionTracker {
 }
 
 // MatterClusterID returns 0x0101 (DoorLock).
-func (*DoorLockServer) MatterClusterID() uint32 { return wire.DoorLockClusterID }
+func (*DoorLockServer) MatterClusterID() uint32 { return lockdef.ClusterID }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
 func (s *DoorLockServer) MatterDataVersion() uint32 { return s.tracker().Current() }
 
 // MatterRead implements [contract.ClusterServer].
 func (s *DoorLockServer) MatterRead(attrID uint32) (any, bool) {
+	if v, ok := instance.ReadGlobal(attrID); ok {
+		return v, true
+	}
 	switch attrID {
 	case wire.DoorLockAttrLockState:
 		if s.src.IsJammed() {
@@ -183,10 +193,6 @@ func (s *DoorLockServer) MatterRead(attrID uint32) (any, bool) {
 		// NoRemoteLockUnlock (bit 3) clear = supported.
 		// Mirrors matter.js DoorLockServer.ts:69.
 		return supportedOperatingModes, true
-	case cluster.AttrGlobalFeatureMap:
-		return doorLockFeatureUnbolt, true
-	case cluster.AttrGlobalClusterRevision:
-		return doorLockClusterRevision, true
 	default:
 		return nil, false
 	}
@@ -197,23 +203,22 @@ func (s *DoorLockServer) MatterRead(attrID uint32) (any, bool) {
 // DoorLockServer.ts:69 default).
 const supportedOperatingModes uint16 = 0xFFF6
 
-// operatingModeMax is the highest OperatingModeEnum value (Passage, 4).
-const operatingModeMax = 4
-
-// MatterWrite implements [contract.ClusterServer]. OperatingMode ("RW VM",
-// door-lock.element.ts) is the one writable attribute: matter.js keeps it
-// as plain writable state. A value outside the enum, or a mode whose bit
-// in SupportedOperatingModes is set (not supported — the bitmap inverts),
-// is a ConstraintError.
+// MatterWrite implements [contract.ClusterServer]. OperatingMode ("R[W] VM",
+// door-lock-cluster.element.ts) is the one writable attribute the server
+// serves: matter.js keeps it as plain writable state. The definition
+// checks the write (matter.js AttributeWriteResponse + ValueValidator): a
+// served read-only attribute is UNSUPPORTED_WRITE, an unserved one
+// UNSUPPORTED_ATTRIBUTE, a value outside OperatingModeEnum CONSTRAINT_ERROR;
+// a mode whose bit in SupportedOperatingModes is set (not supported — the
+// bitmap inverts) is the server's CONSTRAINT_ERROR.
 func (s *DoorLockServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	if attrID != wire.DoorLockAttrOperatingMode {
-		return fmt.Errorf("%w: 0x%04X", errUnknownAttribute, attrID)
+	n, err := instance.ValidateWrite(attrID, value, nil)
+	if err != nil {
+		return err
 	}
-	v, ok := cluster.AsUint8(value)
-	if !ok {
-		return fmt.Errorf("doorlock: OperatingMode expects enum8, got %T", value)
-	}
-	if v > operatingModeMax || supportedOperatingModes&(1<<v) != 0 {
+	m, _ := n.(uint64) // an enum8 per ValidateWrite, OperatingMode the one writable attribute
+	v := uint8(m)      //nolint:gosec // an enum8 per ValidateWrite
+	if supportedOperatingModes&(1<<v) != 0 {
 		return doorLockConstraintErr{fmt.Sprintf("doorlock: OperatingMode %d is not a supported mode", v)}
 	}
 	s.mu.Lock()
@@ -221,6 +226,17 @@ func (s *DoorLockServer) MatterWrite(_ context.Context, attrID uint32, value any
 	s.mu.Unlock()
 	s.tracker().Bump()
 	return nil
+}
+
+// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
+// OperatingMode is "R[W] VM".
+func (*DoorLockServer) MinWritePrivilege(attrID uint32) uint8 {
+	return instance.MinWritePrivilege(attrID)
+}
+
+// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege].
+func (*DoorLockServer) MinInvokePrivilege(cmdID uint32) uint8 {
+	return instance.MinInvokePrivilege(cmdID)
 }
 
 // doorLockConstraintErr surfaces as CONSTRAINT_ERROR.
@@ -234,7 +250,7 @@ func (doorLockConstraintErr) MatterStatusCode() im.StatusCode { return im.Status
 // the LockOperation event on success.
 func (s *DoorLockServer) MatterInvoke(ctx context.Context, cmdID uint32, _ any) (any, error) {
 	switch cmdID {
-	case wire.DoorLockCmdLockDoor, wire.DoorLockCmdUnlockDoor, wire.DoorLockCmdUnboltDoor:
+	case lockdef.CmdLockDoor, lockdef.CmdUnlockDoor, lockdef.CmdUnboltDoor:
 		if err := s.src.LockInvoke(ctx, cmdID); err != nil {
 			return nil, err
 		}
@@ -284,9 +300,9 @@ func (s *DoorLockServer) emitLockOperation(ctx context.Context, cmdID uint32) {
 	if nodeID, _ := im.SubjectFromContext(ctx); nodeID != 0 {
 		ev.SourceNode = &nodeID
 	}
-	emitter.MatterEmitEvent(endpoint, wire.DoorLockClusterID,
-		wire.DoorLockEventLockOperation, ev,
-		contract.EventPriorityCritical)
+	emitter.MatterEmitEvent(endpoint, lockdef.ClusterID,
+		lockdef.EventLockOperation, ev,
+		instance.EventPriority(lockdef.EventLockOperation))
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
@@ -314,43 +330,26 @@ func (*DoorLockServer) MatterReportable() []uint32 {
 	return []uint32{wire.DoorLockAttrLockState}
 }
 
-// MatterAttributes implements [contract.ClusterAttributeLister].
-func (*DoorLockServer) MatterAttributes() []uint32 {
-	return []uint32{
-		wire.DoorLockAttrLockState,
-		wire.DoorLockAttrLockType,
-		wire.DoorLockAttrActuatorEnabled,
-		wire.DoorLockAttrOperatingMode,
-		wire.DoorLockAttrSupportedOperatingModes,
-	}
-}
+// MatterAttributes implements [contract.ClusterAttributeLister]: the
+// attributes UBOLT makes mandatory — LockState, LockType, ActuatorEnabled,
+// OperatingMode, SupportedOperatingModes.
+func (*DoorLockServer) MatterAttributes() []uint32 { return instance.MatterAttributes() }
 
-// MatterAcceptedCommands implements [contract.ClusterCommandLister].
-func (*DoorLockServer) MatterAcceptedCommands() []uint32 {
-	return []uint32{
-		wire.DoorLockCmdLockDoor,
-		wire.DoorLockCmdUnlockDoor,
-		wire.DoorLockCmdUnboltDoor,
-	}
-}
+// MatterAcceptedCommands implements [contract.ClusterCommandLister]:
+// LockDoor, UnlockDoor (M) and UnboltDoor (UBOLT).
+func (*DoorLockServer) MatterAcceptedCommands() []uint32 { return instance.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister].
 // DoorLock commands produce status-only InvokeResponses; no generated command
 // IDs are advertised.
-func (*DoorLockServer) MatterGeneratedCommands() []uint32 { return nil }
+func (*DoorLockServer) MatterGeneratedCommands() []uint32 { return instance.MatterGeneratedCommands() }
 
 // MatterEvents implements [contract.ClusterEventLister]. The
-// three conformance-M DoorLock events are advertised (matter.js
-// door-lock-cluster.element.ts:172/181/198); DoorStateChange (DPS) and
+// three conformance-M DoorLock events are advertised (DoorLockAlarm,
+// LockOperation, LockOperationError); DoorStateChange (DPS) and
 // LockUserChange (USR) are feature-gated and absent. The server emits
 // LockOperation on successful remote operations; DoorLockAlarm and
 // LockOperationError have no emission path without PIN-credential
 // support, matching matter.js where they fire only from the wrong-code
 // path (DoorLockServer.ts:889 / :941).
-func (*DoorLockServer) MatterEvents() []uint32 {
-	return []uint32{
-		wire.DoorLockEventDoorLockAlarm,
-		wire.DoorLockEventLockOperation,
-		wire.DoorLockEventLockOperationError,
-	}
-}
+func (*DoorLockServer) MatterEvents() []uint32 { return instance.MatterEvents() }

@@ -40,4 +40,6 @@ var committed = []string{
 	"ClosureControl",
 	// cluster/cover
 	"WindowCovering",
+	// cluster/lock
+	"DoorLock",
 }
