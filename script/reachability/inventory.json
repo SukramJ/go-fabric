@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3880,
+  "entry_points": 3900,
   "entry_packages": [
     ".",
     "bootid",
@@ -24,8 +24,10 @@
     "cluster/pump",
     "cluster/spec",
     "cluster/spec/activatedcarbonfiltermonitoring",
+    "cluster/spec/closurecontrol",
     "cluster/spec/colorcontrol",
     "cluster/spec/dishwashermode",
+    "cluster/spec/doorlock",
     "cluster/spec/fancontrol",
     "cluster/spec/hepafiltermonitoring",
     "cluster/spec/laundrywashermode",
@@ -39,7 +41,9 @@
     "cluster/spec/rvcrunmode",
     "cluster/spec/smokecoalarm",
     "cluster/spec/spectest",
+    "cluster/spec/thermostat",
     "cluster/spec/valveconfigurationandcontrol",
+    "cluster/spec/windowcovering",
     "cluster/thermo",
     "cluster/transition",
     "cluster/valve",
@@ -81,9 +85,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 5044,
-    "reachable": 3066,
-    "whitelisted": 1973,
+    "total_exported": 5923,
+    "reachable": 3793,
+    "whitelisted": 2125,
     "unreachable": 5
   },
   "by_package": [
@@ -2430,6 +2434,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/timed_conformance_test.go",
       "line": 87
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDispatchInvoke_ExistenceBeforePayload",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_existence_order_test.go",
+      "line": 27
     },
     {
       "package": "bridge",
@@ -4945,6 +4956,27 @@
       "line": 128
     },
     {
+      "package": "cluster/closure",
+      "identifier": "EngageStateChangedEvent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closurecontrol_events.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "MovementCompletedEvent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closurecontrol_events.go",
+      "line": 44
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "SecureStateChangedEvent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closurecontrol_events.go",
+      "line": 52
+    },
+    {
       "package": "cluster/core",
       "identifier": "TestBasicInfoSerialFromUniqueID_Long",
       "reason": "auto-whitelist:pattern=test-file",
@@ -5554,6 +5586,125 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "ClosureErrorEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 74
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "ClosureErrorEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 88
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "CurrentPositionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 99
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "CurrentPositionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 114
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 56
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "LatchControlModesBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 126
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "LatchControlModesBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 137
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "MainStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 145
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "MainStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 162
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "OverallCurrentStateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 204
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "OverallTargetStateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 262
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "TargetPositionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 271
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "TargetPositionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 285
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/closurecontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/closurecontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "ThreeLevelAutoEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 214
+    },
+    {
+      "package": "cluster/spec/closurecontrol",
+      "identifier": "ThreeLevelAutoEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closurecontrol/definition_gen.go",
+      "line": 227
+    },
+    {
       "package": "cluster/spec/colorcontrol",
       "identifier": "ColorCapabilitiesBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -5790,6 +5941,384 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/dishwashermode/definition_gen_test.go",
       "line": 19
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "AlarmCodeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 144
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "AlarmCodeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 161
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "AlarmMaskBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 175
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "AlarmMaskBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 190
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "ConfigurationRegisterBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 202
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "ConfigurationRegisterBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 217
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "CredentialRuleEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 229
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "CredentialRuleEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 241
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "CredentialRulesBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 250
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "CredentialRulesBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 262
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "CredentialStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 293
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "CredentialTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 301
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "CredentialTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 319
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "DataOperationTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 334
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "DataOperationTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 346
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "DaysMaskBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 355
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "DaysMaskBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 371
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "DoorStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 384
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "DoorStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 399
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "EventTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 411
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "EventTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 423
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 122
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LEDSettingEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 432
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LEDSettingEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 444
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LocalProgrammingFeaturesBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 453
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LocalProgrammingFeaturesBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 466
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LockDataTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 476
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LockDataTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 499
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LockOperationTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 519
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LockOperationTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 533
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LockStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 544
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LockStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 557
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LockTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 567
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "LockTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 588
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "OperatingModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 606
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "OperatingModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 620
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "OperatingModesBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 631
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "OperatingModesBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 646
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "OperationErrorEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 658
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "OperationErrorEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 672
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "OperationSourceEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 683
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "OperationSourceEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 703
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "SoundVolumeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 720
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "SoundVolumeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 733
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "Status",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 818
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "StatusCodeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 743
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "StatusCodeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 754
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "StatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 860
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/doorlock/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/doorlock/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "UserStatusEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 762
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "UserStatusEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 774
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "UserTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 783
+    },
+    {
+      "package": "cluster/spec/doorlock",
+      "identifier": "UserTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/doorlock/definition_gen.go",
+      "line": 802
     },
     {
       "package": "cluster/spec/fancontrol",
@@ -6667,6 +7196,426 @@
       "line": 219
     },
     {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACCapacityFormatEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 139
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACCapacityFormatEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 149
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACCompressorTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 156
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACCompressorTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 169
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACErrorCodeBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 179
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACErrorCodeBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 193
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACLouverPositionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 204
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACLouverPositionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 218
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACRefrigerantTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 229
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACRefrigerantTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 242
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 252
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ACTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 266
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ControlSequenceOfOperationEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 277
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ControlSequenceOfOperationEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 292
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 120
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "HVACSystemTypeBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 304
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "HVACSystemTypeBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 317
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "OccupancyBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 327
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "OccupancyBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 337
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "PresetScenarioEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 344
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "PresetScenarioEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 360
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "PresetStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 407
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "PresetTypeFeaturesBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 419
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "PresetTypeFeaturesBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 430
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "PresetTypeStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 463
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ProgrammingOperationModeBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 472
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ProgrammingOperationModeBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 484
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "RelayStateBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 493
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "RelayStateBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 509
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "RemoteSensingBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 522
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "RemoteSensingBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 534
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ScheduleDayOfWeekBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 543
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ScheduleDayOfWeekBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 560
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ScheduleModeBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 574
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ScheduleModeBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 585
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ScheduleStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 627
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ScheduleTransitionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 706
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ScheduleTypeFeaturesBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 718
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ScheduleTypeFeaturesBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 731
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ScheduleTypeStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 766
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "SetpointChangeSourceEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 775
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "SetpointChangeSourceEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 787
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "SetpointRaiseLowerModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 796
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "SetpointRaiseLowerModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 808
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "StartOfWeekEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 817
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "StartOfWeekEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 833
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "Status",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 989
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "StatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 1031
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "SystemModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 639
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "SystemModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 657
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "TemperatureSetpointHoldEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 846
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "TemperatureSetpointHoldEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 857
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/thermostat/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/thermostat/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ThermostatRunningModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 865
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ThermostatRunningModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 877
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ThermostatSuggestionNotFollowingReasonBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 886
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ThermostatSuggestionNotFollowingReasonBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 903
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "ThermostatSuggestionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 945
+    },
+    {
+      "package": "cluster/spec/thermostat",
+      "identifier": "WeeklyScheduleTransitionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostat/definition_gen.go",
+      "line": 980
+    },
+    {
       "package": "cluster/spec/valveconfigurationandcontrol",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -6728,6 +7677,125 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/valveconfigurationandcontrol/definition_gen.go",
       "line": 125
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "ConfigStatusBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 71
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "ConfigStatusBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 87
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "EndProductTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 100
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "EndProductTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "ModeBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 165
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "ModeBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 178
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "MovementStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 188
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "MovementStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 200
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "OperationalStatusBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 209
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "OperationalStatusBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 221
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "SafetyStatusBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 230
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "SafetyStatusBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 251
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/windowcovering/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/windowcovering/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "TypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 269
+    },
+    {
+      "package": "cluster/spec/windowcovering",
+      "identifier": "TypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/windowcovering/definition_gen.go",
+      "line": 289
     },
     {
       "package": "cluster/valve",

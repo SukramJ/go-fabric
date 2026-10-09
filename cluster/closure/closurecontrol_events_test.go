@@ -65,20 +65,27 @@ func TestClosureControlListsFollowTheFeatures(t *testing.T) {
 	if got := pv.MatterGeneratedCommands(); len(got) != 0 {
 		t.Errorf("generated commands = %v, want none", got)
 	}
-	full := closure.NewControlServer(closure.Config{FeatureMap: clusterwire.ClosureControlFeaturePositioning |
-		clusterwire.ClosureControlFeatureCalibration | clusterwire.ClosureControlFeatureManuallyOperable})
-	if got := full.MatterEvents(); !slices.Equal(got, []uint32{0x00, 0x01, 0x02, 0x03}) {
-		t.Errorf("PS+CL+MO events = %v", got)
+	// ManuallyOperable adds EngageStateChanged and nothing else.
+	mo := closure.NewControlServer(closure.Config{FeatureMap: clusterwire.ClosureControlFeaturePositioning |
+		clusterwire.ClosureControlFeatureManuallyOperable})
+	if got := mo.MatterEvents(); !slices.Equal(got, []uint32{0x00, 0x01, 0x02, 0x03}) {
+		t.Errorf("PS+MO events = %v", got)
 	}
-	if got := full.MatterAcceptedCommands(); !slices.Equal(got, []uint32{0x00, 0x01, 0x02}) {
-		t.Errorf("PS+CL+MO accepted commands = %v", got)
+	if got := mo.MatterAcceptedCommands(); !slices.Equal(got, []uint32{0x00, 0x01}) {
+		t.Errorf("PS+MO accepted commands = %v", got)
 	}
-	instant := closure.NewControlServer(closure.Config{FeatureMap: clusterwire.ClosureControlFeatureMotionLatching | clusterwire.ClosureControlFeatureInstantaneous})
-	if got := instant.MatterEvents(); !slices.Equal(got, []uint32{0x00, 0x03}) {
-		t.Errorf("LT+IS events = %v", got)
-	}
-	if got := instant.MatterAcceptedCommands(); !slices.Equal(got, []uint32{0x01}) {
-		t.Errorf("LT+IS accepted commands = %v", got)
+	// Calibration (Calibrate), MotionLatching (LatchControlModes) and
+	// Instantaneous (no Stop) name elements the server does not serve, so
+	// it derives a different FeatureMap and refuses them (the owner's
+	// decision recorded in ADR 0013: the server derives FeatureMap from what
+	// it serves).
+	for _, fm := range []uint32{
+		clusterwire.ClosureControlFeaturePositioning | clusterwire.ClosureControlFeatureCalibration | clusterwire.ClosureControlFeatureManuallyOperable,
+		clusterwire.ClosureControlFeatureMotionLatching | clusterwire.ClosureControlFeatureInstantaneous,
+	} {
+		if _, err := closure.New(closure.Config{FeatureMap: fm}); !errors.Is(err, closure.ErrFeatureMap) {
+			t.Errorf("FeatureMap 0x%X: New error %v, want ErrFeatureMap", fm, err)
+		}
 	}
 }
 

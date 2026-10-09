@@ -12,6 +12,16 @@
 // drive's ventilation position had to be expressed as a percentage
 // somewhere between open and closed, which no controller can label and
 // no user can find.
+//
+// The cluster's identity is the generated definition (cluster/spec/
+// closurecontrol, ADR 0013): ids, revision, the feature check, the
+// attribute, command and event lists, the event priorities, the write
+// statuses and the TargetPositionEnum values the selection allows. The
+// FeatureMap is derived from what the server serves ([DerivedFeatureMap]),
+// not taken on trust: a host FeatureMap naming a feature whose elements
+// the server does not serve is refused at construction. MoveTo decodes
+// through the definition; the MoveTo and Stop rules, the state and the
+// events are the server's.
 package closure
 
 import (
@@ -19,18 +29,21 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// ClusterRevision is the ClosureControl cluster revision this server
-// implements. Pinned against matter.js HEAD by
+// ClusterRevision is the ClosureControl cluster revision of the generated
+// definition. Pinned against matter.js HEAD by
 // TestParityMatterJS_ClosureControlClusterRevision.
-const ClusterRevision uint16 = 1
+const ClusterRevision = closuredef.Revision
 
 // PositioningVentilationFeatureMap is the feature set a garage drive with
 // a ventilation stop advertises: Positioning plus Ventilation.
@@ -39,6 +52,27 @@ const ClusterRevision uint16 = 1
 // closure-control.element.ts:31), so it is never advertised alone.
 const PositioningVentilationFeatureMap = wire.ClosureControlFeaturePositioning |
 	wire.ClosureControlFeatureVentilation
+
+// servedFeatures are the features whose elements this server serves.
+//
+// Positioning is fixed: OverallCurrentState / OverallTargetState carry a
+// Position and MoveTo moves to one. Ventilation and Pedestrian add only a
+// TargetPositionEnum / CurrentPositionEnum value each, ManuallyOperable
+// only EngageStateChanged (served by [ControlServer.SetEngaged]),
+// Protection only MainState Protected — so a host may select them for a
+// drive that has them (closure-control.element.ts, conformance of every
+// element). The others are not served: MotionLatching needs
+// LatchControlModes and the Latch fields, Speed the Speed fields,
+// Calibration the Calibrate command, and Instantaneous withdraws Stop and
+// MovementCompleted, which this server serves.
+const servedFeatures = wire.ClosureControlFeaturePositioning |
+	wire.ClosureControlFeatureVentilation |
+	wire.ClosureControlFeaturePedestrian |
+	wire.ClosureControlFeatureProtection |
+	wire.ClosureControlFeatureManuallyOperable
+
+// ErrFeatureMap reports a Config.FeatureMap the server does not serve.
+var ErrFeatureMap = errors.New("closurecontrol: FeatureMap names features this server does not serve")
 
 // MoveHandler applies a target position to the underlying device.
 //
@@ -61,7 +95,10 @@ type StopHandler func(ctx context.Context) error
 // [ControlServer].
 type Config struct {
 	// FeatureMap is the advertised feature set. Zero selects
-	// [PositioningVentilationFeatureMap].
+	// [PositioningVentilationFeatureMap]. Any other value must be the one
+	// [DerivedFeatureMap] derives from it — Positioning plus a choice of
+	// Ventilation, Pedestrian, Protection and ManuallyOperable — or
+	// [New] refuses it.
 	FeatureMap uint32
 	// Move applies a MoveTo. Nil makes MoveTo report Failure rather than
 	// accepting a command that reaches nothing.
@@ -85,9 +122,9 @@ type ControlServer struct {
 
 	mu sync.RWMutex
 
-	featureMap uint32
-	move       MoveHandler
-	stop       StopHandler
+	inst *spec.Instance
+	move MoveHandler
+	stop StopHandler
 
 	mainState wire.ClosureMainState
 	errorList wire.ClosureErrorList
@@ -105,36 +142,72 @@ type ControlServer struct {
 	endpoint uint16
 }
 
-// NewControlServer constructs a [ControlServer] from cfg.
-func NewControlServer(cfg Config) *ControlServer {
-	featureMap := cfg.FeatureMap
-	if featureMap == 0 {
-		featureMap = PositioningVentilationFeatureMap
+// DerivedFeatureMap is the FeatureMap the server advertises for cfg: what
+// it serves. Zero selects [PositioningVentilationFeatureMap]; otherwise
+// Positioning is always served and Ventilation, Pedestrian, Protection and
+// ManuallyOperable are taken from cfg.FeatureMap (see servedFeatures). It
+// differs from a non-zero cfg.FeatureMap exactly when that one names a
+// feature the server does not serve, or leaves out Positioning.
+func DerivedFeatureMap(cfg Config) uint32 {
+	if cfg.FeatureMap == 0 {
+		return PositioningVentilationFeatureMap
 	}
+	return wire.ClosureControlFeaturePositioning | cfg.FeatureMap&servedFeatures
+}
+
+// New constructs a [ControlServer] from cfg. A cfg.FeatureMap other than
+// zero and the one [DerivedFeatureMap] derives is refused with
+// [ErrFeatureMap]: advertising it would list attributes, commands or events
+// the server does not serve.
+func New(cfg Config) (*ControlServer, error) {
+	fm := DerivedFeatureMap(cfg)
+	if cfg.FeatureMap != 0 && cfg.FeatureMap != fm {
+		return nil, fmt.Errorf("%w: 0x%X, the server serves 0x%X", ErrFeatureMap, cfg.FeatureMap, fm)
+	}
+	// The derived selection satisfies every feature conformance
+	// (Positioning, so "O.a+" and "[PS]" hold), and no optional element is
+	// declared, so spec.New cannot refuse it.
+	inst, _ := spec.New(closuredef.Definition, spec.Options{Features: fm})
 	return &ControlServer{
-		featureMap: featureMap,
-		move:       cfg.Move,
-		stop:       cfg.Stop,
+		inst: inst,
+		move: cfg.Move,
+		stop: cfg.Stop,
 		// SetupRequired, not Stopped: the drive has reported nothing yet,
 		// and Stopped is a claim about a device we have not heard from.
 		// Mirrors matter.js closure-control.element.ts:113 MainStateEnum.
 		mainState: wire.ClosureMainStateSetupRequired,
 		errorList: wire.ClosureErrorList{},
+	}, nil
+}
+
+// NewControlServer constructs a [ControlServer] from cfg, as [New] does; it
+// panics on a cfg.FeatureMap [New] refuses — a wiring error, not a runtime
+// condition. A host that builds its FeatureMap at run time calls [New].
+func NewControlServer(cfg Config) *ControlServer {
+	s, err := New(cfg)
+	if err != nil {
+		panic(err)
 	}
+	return s
 }
 
 // MatterClusterID returns the ClosureControl cluster ID (0x0104).
-func (s *ControlServer) MatterClusterID() uint32 {
-	return wire.ClosureControlClusterID
-}
+func (s *ControlServer) MatterClusterID() uint32 { return closuredef.ClusterID }
 
-// MatterRead resolves the mandatory ClosureControl attributes for the
-// Positioning + Ventilation profile.
+// MatterRead resolves the mandatory ClosureControl attributes and the two
+// globals.
 //
 // CountdownTime (conformance "[PS & !IS]") and LatchControlModes
-// (conformance "LT") are absent: the first is optional under this feature
-// set and the second belongs to a feature this server does not advertise.
+// (conformance "LT") are absent: the first is optional and not served, the
+// second belongs to a feature the server does not serve.
 func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
+	// FeatureMap and ClusterRevision: every cluster server answers the two
+	// universal globals itself; nothing upstream fills them in. Without
+	// FeatureMap a controller cannot see the Ventilation feature, which is
+	// the whole reason this cluster is here.
+	if v, ok := s.inst.ReadGlobal(attrID); ok {
+		return v, true
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -154,38 +227,21 @@ func (s *ControlServer) MatterRead(attrID uint32) (value any, ok bool) {
 		}, true
 	case wire.ClosureControlAttrOverallTargetState:
 		return &wire.ClosureOverallTargetState{Position: s.targetPosition}, true
-	case cluster.AttrGlobalFeatureMap:
-		// Every cluster server answers the two universal globals itself;
-		// nothing upstream fills them in. Without FeatureMap a controller
-		// cannot see the Ventilation feature, which is the whole reason
-		// this cluster is here.
-		return s.featureMap, true
-	case cluster.AttrGlobalClusterRevision:
-		return ClusterRevision, true
 	default:
 		return nil, false
 	}
 }
 
-// MatterWrite reports that no ClosureControl attribute is writable.
-//
-// Every attribute in this cluster carries access "R V" (matter.js
-// closure-control.element.ts:37-56); state changes travel through MoveTo
-// and Stop.
-//
-// The refusal is UNSUPPORTED_WRITE, the status a write to a read-only
-// attribute gets (Core §8.7.3.2; matter.js AttributeWriteResponse); a plain
-// error read as FAILURE, which TC-ACE-2.2's write-access checker refuses.
-func (s *ControlServer) MatterWrite(_ context.Context, attrID uint32, _ any) error {
-	return closureUnsupportedWriteErr{fmt.Sprintf("closurecontrol: attribute 0x%04X is not writable", attrID)}
+// MatterWrite refuses every write, as the definition answers it: every
+// ClosureControl attribute carries access "R V" (closure-control.element.ts),
+// so a served one is UNSUPPORTED_WRITE (Core §8.7.3.2; matter.js
+// AttributeWriteResponse — a plain error read as FAILURE, which TC-ACE-2.2's
+// write-access checker refuses) and any other UNSUPPORTED_ATTRIBUTE. State
+// changes travel through MoveTo and Stop.
+func (s *ControlServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	_, err := s.inst.ValidateWrite(attrID, value, nil)
+	return err
 }
-
-// closureUnsupportedWriteErr is a typed [im.StatusCodeError] for a write
-// to a read-only attribute.
-type closureUnsupportedWriteErr struct{ msg string }
-
-func (e closureUnsupportedWriteErr) Error() string                 { return e.msg }
-func (closureUnsupportedWriteErr) MatterStatusCode() im.StatusCode { return im.StatusUnsupportedWrite }
 
 // closureUnsupportedCommandErr is a typed [im.StatusCodeError] for a
 // command the advertised feature set does not include.
@@ -228,11 +284,11 @@ func (s *ControlServer) MatterInvoke(
 	ctx context.Context, cmdID uint32, fields any,
 ) (response any, err error) {
 	switch cmdID {
-	case wire.ClosureControlCmdMoveTo:
+	case closuredef.CmdMoveTo:
 		return nil, s.invokeMoveTo(ctx, fields)
-	case wire.ClosureControlCmdStop:
+	case closuredef.CmdStop:
 		return nil, s.invokeStop(ctx)
-	case wire.ClosureControlCmdCalibrate:
+	case closuredef.CmdCalibrate:
 		return nil, closureUnsupportedCommandErr{
 			"closurecontrol: Calibrate requires the Calibration feature, which this server does not advertise",
 		}
@@ -258,14 +314,10 @@ func (s *ControlServer) invokeMoveTo(ctx context.Context, fields any) error {
 		return err
 	}
 	s.mu.RLock()
-	fm := s.featureMap
 	fallback := s.targetPosition
 	s.mu.RUnlock()
-	if fm&wire.ClosureControlFeaturePositioning == 0 {
-		// Position belongs to Positioning; Latch and Speed to features this
-		// server does not carry (no LT, no SP): all ignored.
-		return nil
-	}
+	// Position belongs to Positioning, which the server always serves;
+	// Latch and Speed to features it does not (LT, SP): both ignored.
 	target := req.Position
 	if target == nil {
 		target = fallback
@@ -323,30 +375,16 @@ func (s *ControlServer) invokeStop(ctx context.Context) error {
 }
 
 // checkPositionSupported rejects a target the advertised feature set does
-// not carry.
-//
-// MoveToPedestrianPosition is conformance PD and MoveToVentilationPosition
-// is conformance VT (matter.js closure-control.element.ts:97-104).
-// Accepting one whose feature is not advertised would move the drive
-// somewhere the controller was never told about.
+// not carry, by the TargetPositionEnum conformance of the definition:
+// MoveToPedestrianPosition is PD, MoveToVentilationPosition VT, the other
+// three M (closure-control.element.ts, TargetPositionEnum). Accepting one
+// whose feature is not advertised would move the drive somewhere the
+// controller was never told about.
 func (s *ControlServer) checkPositionSupported(p wire.ClosureTargetPosition) error {
-	var need uint32
-	switch p {
-	case wire.ClosureTargetPositionMoveToPedestrianPosition:
-		need = wire.ClosureControlFeaturePedestrian
-	case wire.ClosureTargetPositionMoveToVentilationPosition:
-		need = wire.ClosureControlFeatureVentilation
-	case wire.ClosureTargetPositionMoveToFullyClosed,
-		wire.ClosureTargetPositionMoveToFullyOpen,
-		wire.ClosureTargetPositionMoveToSignaturePosition:
-		return nil
-	default:
+	if !slices.ContainsFunc(closuredef.TargetPositionEnumDef.Values, func(v spec.EnumValue) bool { return v.Value == uint64(p) }) {
 		return closureConstraintErr{fmt.Sprintf("closurecontrol: MoveTo position %d is not a TargetPositionEnum value", p)}
 	}
-	s.mu.RLock()
-	advertised := s.featureMap
-	s.mu.RUnlock()
-	if advertised&need == 0 {
+	if !s.inst.EnumSupported(closuredef.TargetPositionEnumDef, uint64(p)) {
 		return closureConstraintErr{
 			fmt.Sprintf("closurecontrol: MoveTo position %d needs a feature this server does not advertise", p),
 		}
@@ -354,13 +392,26 @@ func (s *ControlServer) checkPositionSupported(p wire.ClosureTargetPosition) err
 	return nil
 }
 
-// moveToRequest normalises the command payload the bridge hands over.
-// The bridge has no typed decoder for this cluster, so a real invocation
-// arrives as the tag-keyed map its generic salvage path produces
-// (bridge/fields_reader.go decodeGenericTagMap); a host that decodes the
-// command itself may pass [wire.MoveToRequest] or the raw TLV.
+// moveToRequest normalises the command payload the bridge hands over. The
+// bridge decodes MoveTo through the generated definition, so a real
+// invocation arrives as [closuredef.MoveToRequest] (a field of the wrong
+// TLV type already answered INVALID_COMMAND there, as matter.js's request
+// schema answers it); a host that decodes the command itself may pass
+// [wire.MoveToRequest], the raw TLV or the tag-keyed map of the bridge's
+// generic salvage path (bridge/fields_reader.go decodeGenericTagMap).
 func moveToRequest(fields any) (wire.MoveToRequest, error) {
 	switch v := fields.(type) {
+	case closuredef.MoveToRequest:
+		return moveToRequest(wire.MoveToRequest{
+			Position: (*wire.ClosureTargetPosition)(v.Position),
+			Latch:    v.Latch,
+			Speed:    (*uint8)(v.Speed),
+		})
+	case *closuredef.MoveToRequest:
+		if v == nil {
+			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
+		}
+		return moveToRequest(*v)
 	case wire.MoveToRequest:
 		if v.Position == nil && v.Latch == nil && v.Speed == nil {
 			return wire.MoveToRequest{}, wire.ErrClosureControlMalformed
@@ -429,35 +480,20 @@ func moveToRequestFromTagMap(m map[uint8]any) (wire.MoveToRequest, error) {
 	return req, nil
 }
 
-// MatterReportable lists the attributes that change at runtime and need
-// Matter subscription reports.
-func (s *ControlServer) MatterReportable() []uint32 {
-	return []uint32{
-		wire.ClosureControlAttrMainState,
-		wire.ClosureControlAttrOverallCurrentState,
-		wire.ClosureControlAttrOverallTargetState,
-	}
-}
+// MatterReportable lists the served attributes (none is fixed). The
+// dispatcher reports CurrentErrorList like the others now: it moves with
+// [ControlServer.SetErrorList] and [ControlServer.ReportError].
+func (s *ControlServer) MatterReportable() []uint32 { return s.inst.MatterReportable() }
 
-// MatterAttributes lists every attribute the server resolves in
-// MatterRead.
-func (s *ControlServer) MatterAttributes() []uint32 {
-	return []uint32{
-		wire.ClosureControlAttrMainState,
-		wire.ClosureControlAttrCurrentErrorList,
-		wire.ClosureControlAttrOverallCurrentState,
-		wire.ClosureControlAttrOverallTargetState,
-		cluster.AttrGlobalFeatureMap,
-		cluster.AttrGlobalClusterRevision,
-	}
-}
+// MatterAttributes implements [contract.ClusterAttributeLister]: the
+// attributes the derived feature set makes mandatory. The dispatcher adds
+// the globals, FeatureMap and ClusterRevision among them, to AttributeList
+// (Core §7.13; matter.js lists them as every cluster's), and answers a
+// write to one with UNSUPPORTED_WRITE before it reaches the server.
+func (s *ControlServer) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
-// FeatureMap reports the advertised feature set.
-func (s *ControlServer) FeatureMap() uint32 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.featureMap
-}
+// FeatureMap reports the advertised (derived) feature set.
+func (s *ControlServer) FeatureMap() uint32 { return s.inst.FeatureMap() }
 
 // SetCurrentPosition records a position the device reported.
 //
@@ -477,9 +513,9 @@ func (s *ControlServer) SetCurrentPosition(pos *wire.ClosureCurrentPosition) {
 	defer func() {
 		if s.secureState != nil && (prevSecure == nil || *prevSecure != *s.secureState) {
 			events = append(events, pendingEvent{
-				wire.ClosureControlEventSecureStateChanged,
+				closuredef.EventSecureStateChanged,
 				SecureStateChangedEvent{SecureValue: *s.secureState},
-				contract.EventPriorityInfo,
+				s.inst.EventPriority(closuredef.EventSecureStateChanged),
 			})
 		}
 	}()
@@ -514,13 +550,12 @@ func (s *ControlServer) SetMainState(state wire.ClosureMainState) {
 	s.mu.Lock()
 	prev := s.mainState
 	s.mainState = state
-	fm := s.featureMap
 	s.mu.Unlock()
 	if prev != state {
 		s.Notify(wire.ClosureControlAttrMainState)
 	}
-	if prev == wire.ClosureMainStateMoving && state == wire.ClosureMainStateStopped && fm&wire.ClosureControlFeatureInstantaneous == 0 {
-		s.emit([]pendingEvent{{wire.ClosureControlEventMovementCompleted, MovementCompletedEvent{}, contract.EventPriorityInfo}})
+	if prev == wire.ClosureMainStateMoving && state == wire.ClosureMainStateStopped && s.inst.Emits(closuredef.EventMovementCompleted) {
+		s.emit([]pendingEvent{{closuredef.EventMovementCompleted, MovementCompletedEvent{}, s.inst.EventPriority(closuredef.EventMovementCompleted)}})
 	}
 }
 

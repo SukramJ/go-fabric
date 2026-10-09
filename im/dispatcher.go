@@ -151,6 +151,19 @@ type CommandInvokePrivilegeProvider interface {
 	MinInvokePrivilege(endpoint uint16, clusterID, cmdID uint32) uint8
 }
 
+// CommandPathChecker is the optional [Dispatcher] capability
+// [HandleInvokeRequest] consults for a concrete command path's existence
+// before the payload check: UNSUPPORTED_ENDPOINT,
+// UNSUPPORTED_CLUSTER or UNSUPPORTED_COMMAND for a path the node does not
+// serve, Success otherwise. A command whose payload failed to decode on a
+// cluster the endpoint does not serve owes the existence status, not the
+// decode one — matter.js CommandInvokeResponse.ts #processConcrete checks
+// endpoint, cluster and command before it validates the request
+// (TC-IDM-1.2).
+type CommandPathChecker interface {
+	CommandPathStatus(path ConcreteCommandPath) StatusCode
+}
+
 // Dispatcher is the cluster-server-side surface the IM layer routes
 // Read / Write / Invoke requests through. The endpoint assembler in
 // [..]/north/matter/endpoint constructs and registers a Dispatcher

@@ -409,18 +409,16 @@ func TestThermostatCoolOnlySystemModeGuard(t *testing.T) {
 	}
 }
 
-// TestThermostatWithoutHeatOrCoolIsOff pins the default arm of the
-// initial-SystemMode choice. A server advertising neither HEAT nor COOL
-// can perform nothing, so it must start in Off (0) rather than claim a
-// mode it has no feature for.
-func TestThermostatWithoutHeatOrCoolIsOff(t *testing.T) {
+// TestThermostatWithoutHeatOrCoolIsRefused pins the construction of a
+// server advertising neither HEAT nor COOL: matter.js refuses that feature
+// selection (FeatureSelectionErrors — HEAT and COOL are "AUTO, O.a+",
+// thermostat-cluster.element.ts, so at least one is required), so New
+// does too. It used to start such a server in SystemMode Off.
+func TestThermostatWithoutHeatOrCoolIsRefused(t *testing.T) {
 	t.Parallel()
-	srv := thermo.NewThermostatServer(thermo.ThermostatConfig{})
-	raw, ok := srv.MatterRead(attrSystemMode)
-	if !ok {
-		t.Fatal("SystemMode: ok = false")
-	}
-	if got := raw.(uint8); got != 0 {
-		t.Errorf("SystemMode = %d, want 0 (Off) without HEAT or COOL", got)
+	for _, f := range []uint32{0, thermo.ThermostatFeatureLTNE, thermo.ThermostatFeatureAUTO} {
+		if _, err := thermo.New(thermo.ThermostatConfig{Features: f}); !errors.Is(err, thermo.ErrFeatures) {
+			t.Errorf("Features 0x%X: New error %v, want ErrFeatures", f, err)
+		}
 	}
 }

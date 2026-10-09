@@ -36,4 +36,12 @@ var committed = []string{
 	"RvcOperationalState",
 	// cluster/levelcontrol
 	"LevelControl",
+	// cluster/closure
+	"ClosureControl",
+	// cluster/cover
+	"WindowCovering",
+	// cluster/lock
+	"DoorLock",
+	// cluster/thermo
+	"Thermostat",
 }

@@ -13,6 +13,15 @@
 // (examples/reference-bridge) mounts it, to put that surface in front of
 // chip-tool. A host that needs live control mounts its own
 // [contract.ClusterServer] on the endpoint instead.
+//
+// The cluster's identity is the generated definition (cluster/spec/
+// thermostat, ADR 0013): ids, revision, the feature check, the attribute
+// and command lists, the write statuses and type checks, the
+// ControlSequenceOfOperation / SystemMode enum conformance and the
+// privileges. SetpointRaiseLower decodes through the definition. The
+// setpoint, limit and deadband rules (setpoints.go), the SystemMode /
+// ControlSequenceOfOperation coupling and SetpointRaiseLower's arithmetic
+// are the server's.
 package thermo
 
 import (
@@ -23,44 +32,53 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	tdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// Thermostat cluster ID and revision per Matter §4.3.
+// Thermostat cluster ID and revision of the generated definition
+// (thermostat-cluster.element.ts).
 const (
-	ThermostatClusterID       uint32 = 0x0201
-	ThermostatClusterRevision uint16 = 11 // Mirrors matter.js packages/model/src/standard/elements/thermostat-cluster.element.ts:21 (revision 11)
+	ThermostatClusterID       = tdef.ClusterID
+	ThermostatClusterRevision = tdef.Revision
 )
 
-// Feature bits per Matter §4.3.4
-// (packages/model/src/standard/elements/thermostat-cluster.element.ts).
+// Feature bits (thermostat-cluster.element.ts).
 const (
-	ThermostatFeatureHEAT uint32 = 1 << 0 // bit 0 — Heating
-	ThermostatFeatureCOOL uint32 = 1 << 1 // bit 1 — Cooling
-	ThermostatFeatureAUTO uint32 = 1 << 5 // bit 5 — AutoMode (requires HEAT+COOL)
-	ThermostatFeatureLTNE uint32 = 1 << 6 // bit 6 — LocalTemperatureNotExposed
+	ThermostatFeatureHEAT = uint32(tdef.FeatureHeating)                    // bit 0 — Heating
+	ThermostatFeatureCOOL = uint32(tdef.FeatureCooling)                    // bit 1 — Cooling
+	ThermostatFeatureAUTO = uint32(tdef.FeatureAutoMode)                   // bit 5 — AutoMode (requires HEAT+COOL)
+	ThermostatFeatureLTNE = uint32(tdef.FeatureLocalTemperatureNotExposed) // bit 6 — LocalTemperatureNotExposed
 )
 
-// Thermostat attribute IDs per Matter §4.3.6.
+// servedFeatures are the features whose elements the server serves.
+// Occupancy (the Unoccupied setpoints), MatterScheduleConfiguration and
+// Presets (their attributes and commands) and the rest are not.
+const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | ThermostatFeatureAUTO | ThermostatFeatureLTNE
+
+// ErrFeatures reports a ThermostatConfig.Features the server refuses.
+var ErrFeatures = errors.New("thermostat: feature selection not served")
+
+// Thermostat attribute IDs.
 const (
-	thermoAttrLocalTemperature            uint32 = 0x0000
-	thermoAttrAbsMinHeatSetpointLimit     uint32 = 0x0003
-	thermoAttrAbsMaxHeatSetpointLimit     uint32 = 0x0004
-	thermoAttrAbsMinCoolSetpointLimit     uint32 = 0x0005
-	thermoAttrAbsMaxCoolSetpointLimit     uint32 = 0x0006
-	thermoAttrLocalTemperatureCalibration uint32 = 0x0010
-	thermoAttrOccupiedCoolingSetpoint     uint32 = 0x0011
-	thermoAttrOccupiedHeatingSetpoint     uint32 = 0x0012
-	thermoAttrMinHeatSetpointLimit        uint32 = 0x0015
-	thermoAttrMaxHeatSetpointLimit        uint32 = 0x0016
-	thermoAttrMinCoolSetpointLimit        uint32 = 0x0017
-	thermoAttrMaxCoolSetpointLimit        uint32 = 0x0018
-	thermoAttrMinSetpointDeadBand         uint32 = 0x0019
-	thermoAttrControlSequenceOfOperation  uint32 = 0x001B
-	thermoAttrSystemMode                  uint32 = 0x001C
-	thermoAttrThermostatRunningMode       uint32 = 0x001E
+	thermoAttrLocalTemperature            = tdef.AttrLocalTemperature
+	thermoAttrAbsMinHeatSetpointLimit     = tdef.AttrAbsMinHeatSetpointLimit
+	thermoAttrAbsMaxHeatSetpointLimit     = tdef.AttrAbsMaxHeatSetpointLimit
+	thermoAttrAbsMinCoolSetpointLimit     = tdef.AttrAbsMinCoolSetpointLimit
+	thermoAttrAbsMaxCoolSetpointLimit     = tdef.AttrAbsMaxCoolSetpointLimit
+	thermoAttrLocalTemperatureCalibration = tdef.AttrLocalTemperatureCalibration
+	thermoAttrOccupiedCoolingSetpoint     = tdef.AttrOccupiedCoolingSetpoint
+	thermoAttrOccupiedHeatingSetpoint     = tdef.AttrOccupiedHeatingSetpoint
+	thermoAttrMinHeatSetpointLimit        = tdef.AttrMinHeatSetpointLimit
+	thermoAttrMaxHeatSetpointLimit        = tdef.AttrMaxHeatSetpointLimit
+	thermoAttrMinCoolSetpointLimit        = tdef.AttrMinCoolSetpointLimit
+	thermoAttrMaxCoolSetpointLimit        = tdef.AttrMaxCoolSetpointLimit
+	thermoAttrMinSetpointDeadBand         = tdef.AttrMinSetpointDeadBand
+	thermoAttrControlSequenceOfOperation  = tdef.AttrControlSequenceOfOperation
+	thermoAttrSystemMode                  = tdef.AttrSystemMode
 )
 
 // ThermostatConfig holds the static configuration for a Thermostat
@@ -68,7 +86,9 @@ const (
 // 0.01°C (Matter signed int16), e.g. 2000 = 20.00°C.
 type ThermostatConfig struct {
 	// Features selects the active feature set. Use the
-	// ThermostatFeature* constants. AUTO requires HEAT+COOL.
+	// ThermostatFeature* constants: HEAT, COOL or both (matter.js's
+	// "AUTO, O.a+" — at least one), optionally AUTO (cleared without
+	// HEAT+COOL) and LTNE. [New] refuses any other selection.
 	Features uint32
 	// AbsMinHeatSetpointLimit is the absolute minimum heating setpoint
 	// (conformance [HEAT]). Default: 700 (7.00°C).
@@ -112,6 +132,7 @@ func DefaultThermostatConfig() ThermostatConfig {
 type ThermostatServer struct {
 	mu       sync.RWMutex
 	features uint32
+	inst     *spec.Instance
 
 	localTemp      *int16 // nullable per Matter §4.3.6.1
 	localTempCalib int16
@@ -139,9 +160,13 @@ type ThermostatServer struct {
 	changes cluster.AttributeChanges
 }
 
-// NewThermostatServer constructs the cluster. AUTO is silently cleared
-// from the feature set when HEAT+COOL are not both present.
-func NewThermostatServer(cfg ThermostatConfig) *ThermostatServer {
+// New constructs the cluster. AUTO is silently cleared from the feature
+// set when HEAT+COOL are not both present. A selection with neither HEAT
+// nor COOL — which matter.js's FeatureSelectionErrors refuses, HEAT and
+// COOL being "AUTO, O.a+" (thermostat-cluster.element.ts) — or naming a
+// feature the server does not serve (Occupancy, Setback, the schedule,
+// preset, event and suggestion features) is refused with [ErrFeatures].
+func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	features := cfg.Features
 	// AUTO requires HEAT+COOL — clear it if either is missing.
 	if features&ThermostatFeatureAUTO != 0 {
@@ -149,9 +174,17 @@ func NewThermostatServer(cfg ThermostatConfig) *ThermostatServer {
 			features &^= ThermostatFeatureAUTO
 		}
 	}
+	if features&^servedFeatures != 0 {
+		return nil, fmt.Errorf("%w: 0x%X names features the server does not serve", ErrFeatures, features&^servedFeatures)
+	}
+	inst, err := spec.New(tdef.Definition, spec.Options{Features: features, Attributes: servedOptional(features)})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrFeatures, err)
+	}
 
 	s := &ThermostatServer{
 		features:            features,
+		inst:                inst,
 		localTempCalib:      0,
 		minSetpointDeadBand: 20, // 2.0°C default per matter.js packages/model/src/standard/elements/thermostat-cluster.element.ts MinSetpointDeadBand default
 	}
@@ -171,19 +204,47 @@ func NewThermostatServer(cfg ThermostatConfig) *ThermostatServer {
 		s.maxCool = cfg.AbsMaxCoolSetpointLimit
 	}
 
-	// SystemMode default: 1 (Auto) when AUTO feature; 4 (Heat) when HEAT-only;
-	// 3 (Cool) when COOL-only.
+	// SystemMode default: Auto with the AUTO feature, Heat with HEAT,
+	// Cool when COOL-only.
 	switch {
 	case features&ThermostatFeatureAUTO != 0:
-		s.systemMode = 1 // Auto
+		s.systemMode = uint8(tdef.SystemModeAuto)
 	case features&ThermostatFeatureHEAT != 0:
-		s.systemMode = 4 // Heat
-	case features&ThermostatFeatureCOOL != 0:
-		s.systemMode = 3 // Cool
-	default:
-		s.systemMode = 0 // Off
+		s.systemMode = uint8(tdef.SystemModeHeat)
+	default: // COOL-only; New refused a selection with neither
+		s.systemMode = uint8(tdef.SystemModeCool)
+	}
+	return s, nil
+}
+
+// NewThermostatServer constructs the cluster as [New] does; it panics on a
+// selection [New] refuses — a wiring error, not a runtime condition.
+func NewThermostatServer(cfg ThermostatConfig) *ThermostatServer {
+	s, err := New(cfg)
+	if err != nil {
+		panic(err)
 	}
 	return s
+}
+
+// servedOptional lists the optional attributes the server serves for a
+// selection: the absolute and user setpoint limits of each of HEAT and
+// COOL ("[HEAT]" / "[COOL]"), LocalTemperatureCalibration without LTNE
+// ("[!LTNE]").
+func servedOptional(features uint32) []uint32 {
+	var out []uint32
+	if features&ThermostatFeatureHEAT != 0 {
+		out = append(out, thermoAttrAbsMinHeatSetpointLimit, thermoAttrAbsMaxHeatSetpointLimit,
+			thermoAttrMinHeatSetpointLimit, thermoAttrMaxHeatSetpointLimit)
+	}
+	if features&ThermostatFeatureCOOL != 0 {
+		out = append(out, thermoAttrAbsMinCoolSetpointLimit, thermoAttrAbsMaxCoolSetpointLimit,
+			thermoAttrMinCoolSetpointLimit, thermoAttrMaxCoolSetpointLimit)
+	}
+	if features&ThermostatFeatureLTNE == 0 {
+		out = append(out, thermoAttrLocalTemperatureCalibration)
+	}
+	return out
 }
 
 // MatterClusterID returns 0x0201.
@@ -197,10 +258,16 @@ func (s *ThermostatServer) SetLocalTemperature(t *int16) {
 	s.mu.Unlock()
 }
 
-// MatterRead implements [contract.ClusterServer].
-// Feature-gated attributes return (nil, false) when their required feature
-// is absent — the IM dispatcher handles the UnsupportedAttribute response.
-func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) { //nolint:gocyclo,funlen // wire/dispatch table over many attribute/opcode cases
+// MatterRead implements [contract.ClusterServer]. An attribute the
+// selection does not serve returns (nil, false) — the IM dispatcher
+// handles the UnsupportedAttribute response.
+func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) {
+	if v, ok := s.inst.ReadGlobal(attrID); ok {
+		return v, true
+	}
+	if !s.inst.Serves(attrID) {
+		return nil, false
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -210,105 +277,61 @@ func (s *ThermostatServer) MatterRead(attrID uint32) (any, bool) { //nolint:gocy
 			return nil, true // nullable quality X: null value, attribute present
 		}
 		return *s.localTemp, true
-
 	case thermoAttrAbsMinHeatSetpointLimit:
-		if s.features&ThermostatFeatureHEAT == 0 {
-			return nil, false
-		}
 		return s.absMinHeat, true
 	case thermoAttrAbsMaxHeatSetpointLimit:
-		if s.features&ThermostatFeatureHEAT == 0 {
-			return nil, false
-		}
 		return s.absMaxHeat, true
-
 	case thermoAttrAbsMinCoolSetpointLimit:
-		if s.features&ThermostatFeatureCOOL == 0 {
-			return nil, false
-		}
 		return s.absMinCool, true
 	case thermoAttrAbsMaxCoolSetpointLimit:
-		if s.features&ThermostatFeatureCOOL == 0 {
-			return nil, false
-		}
 		return s.absMaxCool, true
-
 	case thermoAttrLocalTemperatureCalibration:
-		// Conformance [!LTNE]: only served when LTNE feature is NOT set.
-		if s.features&ThermostatFeatureLTNE != 0 {
-			return nil, false
-		}
 		return s.localTempCalib, true
-
 	case thermoAttrOccupiedCoolingSetpoint:
-		if s.features&ThermostatFeatureCOOL == 0 {
-			return nil, false
-		}
 		return s.occupCool, true
-
 	case thermoAttrOccupiedHeatingSetpoint:
-		if s.features&ThermostatFeatureHEAT == 0 {
-			return nil, false
-		}
 		return s.occupHeat, true
-
 	case thermoAttrMinHeatSetpointLimit:
-		if s.features&ThermostatFeatureHEAT == 0 {
-			return nil, false
-		}
 		return s.minHeat, true
 	case thermoAttrMaxHeatSetpointLimit:
-		if s.features&ThermostatFeatureHEAT == 0 {
-			return nil, false
-		}
 		return s.maxHeat, true
-
 	case thermoAttrMinCoolSetpointLimit:
-		if s.features&ThermostatFeatureCOOL == 0 {
-			return nil, false
-		}
 		return s.minCool, true
 	case thermoAttrMaxCoolSetpointLimit:
-		if s.features&ThermostatFeatureCOOL == 0 {
-			return nil, false
-		}
 		return s.maxCool, true
-
 	case thermoAttrMinSetpointDeadBand:
-		// Conformance AUTO.
-		if s.features&ThermostatFeatureAUTO == 0 {
-			return nil, false
-		}
 		return s.minSetpointDeadBand, true
-
 	case thermoAttrControlSequenceOfOperation:
-		// Mandatory (M conformance) per matter.js
-		// thermostat-cluster.element.ts (id 0x1b). Derived from the
-		// supported modes: 4=CoolingAndHeating, 2=HeatingOnly, 0=CoolingOnly.
-		// The value follows the device's immutable HEAT/COOL capability; a
-		// write is accepted and ignored, as the specification and matter.js
-		// have it (see MatterWrite). Being immutable it is (correctly) not
-		// in MatterReportable.
+		// Mandatory (M conformance). Derived from the supported modes:
+		// 4=CoolingAndHeating, 2=HeatingOnly, 0=CoolingOnly. The value
+		// follows the device's immutable HEAT/COOL capability; a write is
+		// accepted and ignored, as the specification and matter.js have it
+		// (see MatterWrite). Being immutable it is (correctly) not in
+		// MatterReportable.
 		return controlSequenceOfOperation(s.features), true
-	case thermoAttrSystemMode:
+	default: // thermoAttrSystemMode, the last served attribute
 		return s.systemMode, true
-
-	case cluster.AttrGlobalFeatureMap:
-		return s.features, true
-	case cluster.AttrGlobalClusterRevision:
-		return ThermostatClusterRevision, true
 	}
-	return nil, false
 }
 
 // MatterWrite handles writable attributes (setpoints, setpoint limits,
-// SystemMode).
+// LocalTemperatureCalibration, SystemMode, and the two optionally writable
+// ones it ignores). The definition checks every write first (matter.js
+// AttributeWriteResponse + ValueValidator): an attribute the selection does
+// not serve is UNSUPPORTED_ATTRIBUTE, a read-only one UNSUPPORTED_WRITE, a
+// value outside its type, its constraint or its enum's conformant values
+// CONSTRAINT_ERROR. The rules beyond it are the server's.
 func (s *ThermostatServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
+	v, err := s.inst.ValidateWrite(attrID, value, nil)
+	if err != nil {
+		return err
+	}
 	switch attrID {
 	case thermoAttrOccupiedHeatingSetpoint, thermoAttrOccupiedCoolingSetpoint,
 		thermoAttrMinHeatSetpointLimit, thermoAttrMaxHeatSetpointLimit,
 		thermoAttrMinCoolSetpointLimit, thermoAttrMaxCoolSetpointLimit:
-		coupled, err := s.writeSetpoint(attrID, value)
+		n, _ := v.(int64) // an int16 per ValidateWrite
+		coupled, err := s.writeSetpoint(attrID, int(n))
 		if err != nil {
 			return err
 		}
@@ -316,72 +339,46 @@ func (s *ThermostatServer) MatterWrite(_ context.Context, attrID uint32, value a
 		// reconcile moved besides it is reported here.
 		s.changes.Notify(coupled...)
 		return nil
-	}
-	switch attrID {
 	case thermoAttrControlSequenceOfOperation:
 		// "For backwards compatibility, this attribute is optionally
 		// writeable. However, any writes to this attribute SHALL be
 		// silently ignored" — matter.js ThermostatServer.ts
 		// #ensureControlSequenceOfOperationNotWritable accepts the write
-		// and reverts it (TC-TSTAT-2.2 step 12). The enum is still checked.
-		v, ok := cluster.AsUint8(value)
-		if !ok {
-			return fmt.Errorf("thermostat: ControlSequenceOfOperation: expected numeric, got %T", value)
-		}
-		if v > 5 {
-			return thermoConstraintErr{fmt.Sprintf("thermostat: ControlSequenceOfOperation %d is not a ControlSequenceOfOperationEnum value", v)}
-		}
+		// and reverts it (TC-TSTAT-2.2 step 12). The definition checked the
+		// enum.
 		return nil
 	case thermoAttrMinSetpointDeadBand:
 		// Likewise optionally writable and silently ignored (matter.js
-		// #ensureMinSetpointDeadBandNotWritable); the constraint (0 to
-		// 127) still applies.
-		if s.features&ThermostatFeatureAUTO == 0 {
-			return errors.New("thermostat: MinSetpointDeadBand not supported (no AUTO feature)")
-		}
-		v, ok := cluster.AsInt16(value)
-		if !ok {
-			return fmt.Errorf("thermostat: MinSetpointDeadBand: expected numeric, got %T", value)
-		}
-		if v < 0 || v > 127 {
-			return thermoConstraintErr{fmt.Sprintf("thermostat: MinSetpointDeadBand %d outside 0 to 127", v)}
-		}
+		// #ensureMinSetpointDeadBandNotWritable); the definition checked
+		// "0 to 12.7°C" (0 to 127).
+		return nil
+	case thermoAttrLocalTemperatureCalibration:
+		// "RW VM", plain state in matter.js.
+		n, _ := v.(int64) // an int8 per ValidateWrite
+		s.mu.Lock()
+		s.localTempCalib = int16(n) //nolint:gosec // an int8 per ValidateWrite
+		s.mu.Unlock()
+		return nil
+	default: // thermoAttrSystemMode, the last writable attribute
+		n, _ := v.(uint64)          // an enum8 per ValidateWrite, its conformance checked
+		s.writeSystemMode(uint8(n)) //nolint:gosec // an enum8 per ValidateWrite
 		return nil
 	}
+}
+
+// writeSystemMode applies a SystemMode the definition admitted for the
+// selection: Auto needs AUTO, Cool and Precooling "[COOL]", Heat and
+// EmergencyHeat "[HEAT]" (thermostat-cluster.element.ts SystemModeEnum).
+// That covers matter.js ThermostatServer.ts #assertSystemModeChanging too:
+// CoolingOnly forbids Heat and EmergencyHeat, HeatingOnly Cool and
+// Precooling, and controlSequenceOfOperation derives CoolingOnly exactly
+// without HEAT and HeatingOnly exactly without COOL — the reheat sequences
+// and CoolingAndHeating (which forbids nothing) aside, which it never
+// derives or which forbid nothing the enum allows.
+func (s *ThermostatServer) writeSystemMode(v uint8) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	switch attrID {
-	case thermoAttrSystemMode:
-		v, ok := cluster.AsUint8(value)
-		if !ok {
-			return fmt.Errorf("thermostat: SystemMode: expected numeric, got %T", value)
-		}
-		// Validate mode against ControlSequenceOfOperation per matter.js
-		// ThermostatServer.ts:#assertSystemModeChanging (lines 615-634):
-		// CoolingOnly forbids Heat (4) and EmergencyHeat (5); HeatingOnly
-		// forbids Cool (3) and Precooling (7). matter.js also groups
-		// CoolingAndHeatingWithReheat (5) with CoolingOnly and
-		// HeatingWithReheat (3) with HeatingOnly, but controlSequenceOfOperation
-		// only ever derives 0 (CoolingOnly), 2 (HeatingOnly), or 4
-		// (CoolingAndHeating — forbids nothing) from this bridge's heating /
-		// cooling feature bits, so the reheat sequences never arise and need
-		// no arm here.
-		csoo := controlSequenceOfOperation(s.features)
-		switch csoo {
-		case 0: // CoolingOnly
-			if v == 4 || v == 5 { // Heat, EmergencyHeat
-				return thermoConstraintErr{fmt.Sprintf("thermostat: SystemMode %d not allowed in CoolingOnly sequence", v)}
-			}
-		case 2: // HeatingOnly
-			if v == 3 || v == 7 { // Cool, Precooling
-				return thermoConstraintErr{fmt.Sprintf("thermostat: SystemMode %d not allowed in HeatingOnly sequence", v)}
-			}
-		}
-		s.systemMode = v
-		return nil
-	default:
-		return fmt.Errorf("thermostat: attribute 0x%04X is not writable", attrID)
-	}
+	s.systemMode = v
+	s.mu.Unlock()
 }
 
 // writeSetpoint writes an occupied setpoint or a user setpoint limit and
@@ -390,31 +387,22 @@ func (s *ThermostatServer) MatterWrite(_ context.Context, attrID uint32, value a
 // #reconcileSetpoints) and on the limits' $Changing
 // (#assertLimitWithinAbs, then #reconcileSetpoints). It returns the
 // attributes the reconcile moved besides the written one.
-func (s *ThermostatServer) writeSetpoint(attrID uint32, value any) ([]uint32, error) {
-	type target struct {
+func (s *ThermostatServer) writeSetpoint(attrID uint32, v int) ([]uint32, error) {
+	t := map[uint32]struct {
 		heat  bool
 		limit bool
 		key   string
-		name  string
-	}
-	t := map[uint32]target{
-		thermoAttrOccupiedHeatingSetpoint: {true, false, spOccupiedHeating, "OccupiedHeatingSetpoint"},
-		thermoAttrOccupiedCoolingSetpoint: {false, false, spOccupiedCooling, "OccupiedCoolingSetpoint"},
-		thermoAttrMinHeatSetpointLimit:    {true, true, spMinHeatLimit, "MinHeatSetpointLimit"},
-		thermoAttrMaxHeatSetpointLimit:    {true, true, spMaxHeatLimit, "MaxHeatSetpointLimit"},
-		thermoAttrMinCoolSetpointLimit:    {false, true, spMinCoolLimit, "MinCoolSetpointLimit"},
-		thermoAttrMaxCoolSetpointLimit:    {false, true, spMaxCoolLimit, "MaxCoolSetpointLimit"},
+	}{
+		thermoAttrOccupiedHeatingSetpoint: {true, false, spOccupiedHeating},
+		thermoAttrOccupiedCoolingSetpoint: {false, false, spOccupiedCooling},
+		thermoAttrMinHeatSetpointLimit:    {true, true, spMinHeatLimit},
+		thermoAttrMaxHeatSetpointLimit:    {true, true, spMaxHeatLimit},
+		thermoAttrMinCoolSetpointLimit:    {false, true, spMinCoolLimit},
+		thermoAttrMaxCoolSetpointLimit:    {false, true, spMaxCoolLimit},
 	}[attrID]
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if (t.heat && s.features&ThermostatFeatureHEAT == 0) || (!t.heat && s.features&ThermostatFeatureCOOL == 0) {
-		return nil, fmt.Errorf("thermostat: %s not supported (feature absent)", t.name)
-	}
-	v16, ok := cluster.AsInt16(value)
-	if !ok {
-		return nil, fmt.Errorf("thermostat: %s: expected numeric, got %T", t.name, value)
-	}
-	v := int(v16)
+	// Served only with its feature, per ValidateWrite.
 	st := s.setpointState()
 	if t.limit {
 		if err := st.assertLimitWithinAbs(t.heat, v); err != nil {
@@ -458,7 +446,7 @@ func (s *ThermostatServer) OnMatterAttributesChanged(cb func(attrIDs []uint32)) 
 // MatterInvoke handles SetpointRaiseLower and weekly-schedule commands.
 func (s *ThermostatServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
-	case thermoCmdSetpointRaiseLower:
+	case tdef.CmdSetpointRaiseLower:
 		return nil, s.handleSetpointRaiseLower(fields)
 	default:
 		return nil, im.UnsupportedCommandf("thermostat: command 0x%02X not supported", cmdID)
@@ -491,7 +479,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(fields any) error { //nolint
 
 	// matter.js ThermostatServer.ts:186-196: reject Heat/Cool modes when feature absent.
 	switch mode {
-	case wire.ThermostatSetpointModeHeat:
+	case uint8(tdef.SetpointRaiseLowerModeHeat):
 		if s.features&ThermostatFeatureHEAT == 0 {
 			return thermoInvalidCommandErr{"thermostat: SetpointRaiseLower mode=Heat requires HEAT feature"}
 		}
@@ -575,17 +563,27 @@ const (
 )
 
 // setpointRaiseLowerRequest normalises the command payload the bridge
-// hands over. The bridge has no typed decoder for this cluster, so a
-// real invocation arrives as the tag-keyed map its generic salvage path
-// produces (bridge/fields_reader.go decodeGenericTagMap: unsigned as
-// uint64, signed as int64); a host that decodes the command itself may
-// pass [wire.SetpointRaiseLowerRequest] or the raw TLV. The "mode" /
+// hands over. The bridge decodes the command through the generated
+// definition, so a real invocation arrives as
+// [tdef.SetpointRaiseLowerRequest] (a missing field already answered
+// INVALID_COMMAND there, as matter.js's request schema answers it); a host
+// that decodes the command itself may pass [wire.SetpointRaiseLowerRequest],
+// the raw TLV or the tag-keyed map of the bridge's generic salvage path
+// (bridge/fields_reader.go decodeGenericTagMap: unsigned as uint64, signed
+// as int64). The "mode" /
 // "amount" string-keyed map stays accepted for direct callers.
 //
 // Both fields are conformance M (element :322-323), so a payload without
 // Mode is refused rather than acknowledged as a no-op.
 func setpointRaiseLowerRequest(fields any) (wire.SetpointRaiseLowerRequest, error) {
 	switch v := fields.(type) {
+	case tdef.SetpointRaiseLowerRequest:
+		return wire.SetpointRaiseLowerRequest{Mode: uint8(v.Mode), Amount: v.Amount}, nil
+	case *tdef.SetpointRaiseLowerRequest:
+		if v == nil {
+			return wire.SetpointRaiseLowerRequest{}, thermoInvalidCommandErr{"thermostat: SetpointRaiseLower carried no fields"}
+		}
+		return setpointRaiseLowerRequest(*v)
 	case wire.SetpointRaiseLowerRequest:
 		return v, nil
 	case *wire.SetpointRaiseLowerRequest:
@@ -644,41 +642,48 @@ func setpointRaiseLowerRequest(fields any) (wire.SetpointRaiseLowerRequest, erro
 }
 
 // controlSequenceOfOperation derives the ControlSequenceOfOperationEnum
-// (Matter Thermostat §4.3.7) from the advertised feature set.
+// from the advertised feature set.
 func controlSequenceOfOperation(features uint32) uint8 {
 	hasHeat := features&ThermostatFeatureHEAT != 0
 	hasCool := features&ThermostatFeatureCOOL != 0
 	switch {
 	case hasHeat && hasCool:
-		return 4 // CoolingAndHeating
+		return uint8(tdef.ControlSequenceOfOperationCoolingAndHeating)
 	case hasCool:
-		return 0 // CoolingOnly
+		return uint8(tdef.ControlSequenceOfOperationCoolingOnly)
 	default:
-		return 2 // HeatingOnly (HM thermostats are heating by default)
+		return uint8(tdef.ControlSequenceOfOperationHeatingOnly)
 	}
 }
 
-// thermoCmdSetpointRaiseLower is SetpointRaiseLower, the cluster's one
-// conformance-M command (thermostat-cluster.element.ts).
-const thermoCmdSetpointRaiseLower uint32 = 0x00
-
-// MatterAcceptedCommands implements [contract.ClusterCommandLister].
-// SetpointRaiseLower is the only command the server handles, and the only
-// mandatory one: the schedule and preset commands carry MSCH / PRES /
-// TSUGGEST conformance, features this server never advertises. Without the
-// lister the dispatcher synthesised an empty AcceptedCommandList, and a
-// controller that reads the list before invoking — Apple Home and Google
-// Home both do — saw a thermostat that accepts nothing. Found by the
-// chip-tool data-model sweep.
-func (s *ThermostatServer) MatterAcceptedCommands() []uint32 {
-	return []uint32{thermoCmdSetpointRaiseLower}
-}
+// MatterAcceptedCommands implements [contract.ClusterCommandLister]:
+// SetpointRaiseLower, the only mandatory command; the schedule, preset and
+// atomic commands carry MSCH / PRES conformance, features the server never
+// serves. Without the lister the dispatcher synthesised an empty
+// AcceptedCommandList, and a controller that reads the list before
+// invoking — Apple Home and Google Home both do — saw a thermostat that
+// accepts nothing. Found by the chip-tool data-model sweep.
+func (s *ThermostatServer) MatterAcceptedCommands() []uint32 { return s.inst.MatterAcceptedCommands() }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister].
 // SetpointRaiseLower answers with a status only.
-func (s *ThermostatServer) MatterGeneratedCommands() []uint32 { return []uint32{} }
+func (s *ThermostatServer) MatterGeneratedCommands() []uint32 {
+	return s.inst.MatterGeneratedCommands()
+}
 
-// MatterReportable returns attributes that emit reports on change.
+// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
+// the occupied setpoints are "RW VO", the rest "RW VM".
+func (s *ThermostatServer) MinWritePrivilege(attrID uint32) uint8 {
+	return s.inst.MinWritePrivilege(attrID)
+}
+
+// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege].
+func (s *ThermostatServer) MinInvokePrivilege(cmdID uint32) uint8 {
+	return s.inst.MinInvokePrivilege(cmdID)
+}
+
+// MatterReportable returns attributes that emit reports on change outside
+// a write: the room temperature and SystemMode.
 func (s *ThermostatServer) MatterReportable() []uint32 {
 	return []uint32{
 		thermoAttrLocalTemperature,
@@ -686,47 +691,10 @@ func (s *ThermostatServer) MatterReportable() []uint32 {
 	}
 }
 
-// MatterAttributes returns the feature-gated attribute set this server
-// advertises. Only attributes whose feature requirements are met are
-// included — chip-tool and Apple Home validate AttributeList conformance.
-func (s *ThermostatServer) MatterAttributes() []uint32 {
-	s.mu.RLock()
-	f := s.features
-	s.mu.RUnlock()
-
-	attrs := []uint32{
-		thermoAttrLocalTemperature,
-		thermoAttrControlSequenceOfOperation,
-		thermoAttrSystemMode,
-	}
-	if f&ThermostatFeatureHEAT != 0 {
-		attrs = append(
-			attrs,
-			thermoAttrAbsMinHeatSetpointLimit,
-			thermoAttrAbsMaxHeatSetpointLimit,
-			thermoAttrOccupiedHeatingSetpoint,
-			thermoAttrMinHeatSetpointLimit,
-			thermoAttrMaxHeatSetpointLimit,
-		)
-	}
-	if f&ThermostatFeatureCOOL != 0 {
-		attrs = append(
-			attrs,
-			thermoAttrAbsMinCoolSetpointLimit,
-			thermoAttrAbsMaxCoolSetpointLimit,
-			thermoAttrOccupiedCoolingSetpoint,
-			thermoAttrMinCoolSetpointLimit,
-			thermoAttrMaxCoolSetpointLimit,
-		)
-	}
-	if f&ThermostatFeatureAUTO != 0 {
-		attrs = append(attrs, thermoAttrMinSetpointDeadBand)
-	}
-	if f&ThermostatFeatureLTNE == 0 {
-		attrs = append(attrs, thermoAttrLocalTemperatureCalibration)
-	}
-	return attrs
-}
+// MatterAttributes returns the attributes the selection makes mandatory
+// and the optional ones the server serves for it (servedOptional) —
+// chip-tool and Apple Home validate AttributeList conformance.
+func (s *ThermostatServer) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // thermoConstraintErr is a typed [im.StatusCodeError] returned when a
 // setpoint or SystemMode write violates limit constraints.
