@@ -79,8 +79,84 @@ the same `ColorTemperatureWriter` as before.
   battery as such a part, as matter.js's `device-smoke-co-alarm` example
   does.
 
+- `cluster/spec/closurecontrol`, `windowcovering`, `doorlock` and
+  `thermostat`: the generated definitions of four more servers (ADR 0013),
+  the AtomicRequest / AtomicResponse codecs of Thermostat — anonymous
+  attribute-status entry struct included — among them.
+- Error-returning constructors for the servers that now refuse a feature
+  selection: `closure.New` (with `closure.DerivedFeatureMap` and
+  `closure.ErrFeatureMap`), `cover.New` (with `cover.ServedFeatureMap` and
+  `cover.ErrFeatureMap`) and `thermo.New` (with `thermo.ErrFeatures`).
+  `closure.ControlServer`, `cover.WindowCoveringServer`,
+  `lock.DoorLockServer` and `thermo.ThermostatServer` answer
+  `MinInvokePrivilege` (and, where an attribute is writable,
+  `MinWritePrivilege`) from their definitions.
+
 ### Changed
 
+- **ClosureControl, WindowCovering and Thermostat refuse a feature
+  selection they do not serve** (owner decision recorded in ADR 0013: a
+  server derives its FeatureMap from what it serves). A host whose
+  FeatureMap matches — or that leaves it zero — is unaffected. Otherwise
+  `NewControlServer`, `NewWindowCoveringServer` and `NewThermostatServer`
+  now **panic**, and the new `New` constructors return the error:
+  - `closure.Config.FeatureMap`: Positioning plus any of Ventilation,
+    Pedestrian, Protection and ManuallyOperable (zero still means
+    Positioning + Ventilation). MotionLatching, Speed, Calibration,
+    Instantaneous or a selection without Positioning advertised elements the
+    server never served (LatchControlModes, the Speed fields, Calibrate, no
+    Stop) and are refused.
+  - `cover.Config.FeatureMap`: Lift + PositionAwareLift (0x05) only; zero
+    now means that, where it advertised 0. A Tilt or Lift-only FeatureMap
+    listed attributes the server has no state for, or disallowed the
+    position attributes it serves.
+  - `thermo.ThermostatConfig.Features`: HEAT and / or COOL with optional
+    AUTO (still cleared without both) and LTNE. Neither HEAT nor COOL —
+    which matter.js refuses, both being "AUTO, O.a+" — and Occupancy,
+    Setback, MatterScheduleConfiguration, Presets, Events and
+    ThermostatSuggestions are refused; such a server used to start in
+    SystemMode Off, or advertise features whose attributes it never served.
+- **Four more servers are built on their generated definitions** (ADR 0013):
+  `cluster/closure`, `cluster/cover`, `cluster/lock` and `cluster/thermo`
+  read their ids, revisions, attribute / command / event lists, event
+  priorities, write checks and privileges from the four packages above.
+  ClosureControl's AttributeList no longer names FeatureMap and
+  ClusterRevision from the server (the dispatcher adds every global, so
+  the wire is unchanged); `closure.MovementCompletedEvent`,
+  `EngageStateChangedEvent` and `SecureStateChangedEvent` are aliases of
+  the generated payloads; `cover.ClusterRevision`, `closure.ClusterRevision`,
+  `thermo.ThermostatClusterID` / `ThermostatClusterRevision` and the
+  `thermo.ThermostatFeature*` constants read the definitions' values
+  (unchanged). The ClosureControl, WindowCovering and Thermostat
+  MatterReportable lists name every served attribute that moves.
+- **Host servers of these clusters receive typed requests.** Linking one of
+  the four packages (any binary that imports the server package does) makes
+  the bridge decode that cluster's requests through the generated
+  definition, so a host's own server now receives the generated request
+  struct instead of a generic `map[uint8]any`, and a request missing a
+  mandatory field or a field of the wrong TLV type is answered
+  INVALID_COMMAND (a value outside its bounds CONSTRAINT_ERROR) before the
+  server runs:
+  - ClosureControl: `closurecontrol.StopRequest`, `MoveToRequest`,
+    `CalibrateRequest` — a null MoveTo field is now INVALID_COMMAND, as
+    matter.js's request schema answers it, where the tag map read it as
+    absent. `closure.ControlServer` carries MoveTo over to the
+    `cluster/wire.MoveToRequest` it took before.
+  - WindowCovering: `windowcovering.UpOrOpenRequest`, `DownOrCloseRequest`,
+    `StopMotionRequest`, `GoToLiftPercentageRequest` (a value above 10000
+    CONSTRAINT_ERROR), `GoToTiltPercentageRequest`.
+  - DoorLock: `doorlock.LockDoorRequest`, `UnlockDoorRequest`,
+    `UnboltDoorRequest` and the rest of the cluster's requests;
+    `lock.DoorLockServer` reads none of their fields, as before.
+    `cluster/wire.DoorLockRequest` / `DecodeDoorLockRequest` stay.
+  - Thermostat: `thermostat.SetpointRaiseLowerRequest` and the schedule,
+    preset and atomic requests.
+- Writes answered from the definitions: `cover.WindowCoveringServer`,
+  `lock.DoorLockServer` and `thermo.ThermostatServer` answer a write to a
+  served read-only attribute with UNSUPPORTED_WRITE and one to an attribute
+  they do not serve with UNSUPPORTED_ATTRIBUTE (was a plain error, read as
+  FAILURE); a value of the wrong type is CONSTRAINT_ERROR. A Thermostat
+  setpoint of an absent feature is UNSUPPORTED_ATTRIBUTE.
 - **Seven more servers are built on their generated definitions** (ADR 0013):
   `cluster/onoff` (identity), `cluster/valve`, `cluster/modeselect`,
   `cluster/alarm`, `cluster/fan`, `cluster/opstate` and
@@ -185,6 +261,13 @@ the same `ColorTemperatureWriter` as before.
 
 ### Fixed
 
+- **Thermostat SystemMode follows SystemModeEnum.** A heating-only
+  thermostat refused SystemMode 7 as "Precooling" and accepted Precooling
+  (6); 7 is FanOnly (conformance O), which matter.js accepts, and Precooling
+  is refused. SystemMode Auto without the AUTO feature is CONSTRAINT_ERROR,
+  as the enum's conformance makes it.
+- **Thermostat LocalTemperatureCalibration is writable** ("RW VM", plain
+  state in matter.js); the server listed it and refused every write.
 - **TotalOperationalHours keeps the part-hours of every run.** The reference
   daemon persisted the attribute in whole hours, so each restart dropped its
   part-hour and a bridge restarting more often than hourly never gained one.
