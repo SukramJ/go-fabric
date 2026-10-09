@@ -185,6 +185,10 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/powertopology", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/switchcluster", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/groups", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/spectest", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/clustergen", min: 95},
 	// The CHIP data model cross-check (internal/chipdm): measured 97.4 without

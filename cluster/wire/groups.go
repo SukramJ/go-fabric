@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -25,12 +26,16 @@ import (
 // source still supplies it (docs/adr/0009). Removal permissible in v0.3.0.
 type Groups struct{}
 
-// Cluster ID + revision per matter.js HEAD.
+// Cluster ID, revision, the attribute id and the GroupNames feature bit,
+// the generated definition's (cluster/spec/groups, ADR 0013). The stub
+// serves no command, so it takes nothing else from it: the real server is
+// cluster/core's.
 const (
-	groupsClusterID       uint32 = 0x0004
-	groupsClusterRevision uint16 = 4
+	groupsClusterID       = groupsdef.ClusterID
+	groupsClusterRevision = groupsdef.Revision
 
-	groupsAttrNameSupport uint32 = 0x0000
+	groupsAttrNameSupport = groupsdef.AttrNameSupport
+	groupsFeatureGN       = uint32(groupsdef.FeatureGroupNames)
 )
 
 // errGroupsReadOnly surfaces from Write / Invoke on the Groups stub.
@@ -61,7 +66,7 @@ func (Groups) MatterRead(attrID uint32) (any, bool) {
 		// groups.element.ts:23 declares the bit with M conformance and
 		// default 1; chip's GroupsCluster.cpp:223 encodes
 		// Feature::kGroupNames unconditionally.
-		return uint32(1), true
+		return groupsFeatureGN, true
 	case cluster.AttrGlobalClusterRevision:
 		return groupsClusterRevision, true
 	}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	scenesdef "github.com/SukramJ/go-fabric/cluster/spec/scenesmanagement"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -24,13 +25,16 @@ import (
 // at 0x0001, FabricSceneInfo list at 0x0002.
 type ScenesManagement struct{}
 
-// Cluster ID + revision per matter.js HEAD.
+// Cluster ID, revision and attribute ids, the generated definition's
+// (cluster/spec/scenesmanagement, ADR 0013). The stub serves no feature
+// and no command, so it takes nothing else from it: the real server is
+// cluster/core's.
 const (
-	scenesManagementClusterID       uint32 = 0x0062
-	scenesManagementClusterRevision uint16 = 1
+	scenesManagementClusterID       = scenesdef.ClusterID
+	scenesManagementClusterRevision = scenesdef.Revision
 
-	scenesManagementAttrSceneTableSize  uint32 = 0x0001
-	scenesManagementAttrFabricSceneInfo uint32 = 0x0002
+	scenesManagementAttrSceneTableSize  = scenesdef.AttrSceneTableSize
+	scenesManagementAttrFabricSceneInfo = scenesdef.AttrFabricSceneInfo
 )
 
 // errScenesStub surfaces from Write / Invoke on the stub.

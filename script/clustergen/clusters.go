@@ -60,4 +60,9 @@ var committed = []string{
 	"PowerTopology",
 	"ElectricalPowerMeasurement",
 	"ElectricalEnergyMeasurement",
+	// cluster/wire
+	"Switch",
+	"AdministratorCommissioning",
+	"Groups",
+	"ScenesManagement",
 }
