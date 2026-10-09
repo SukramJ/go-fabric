@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3899,
+  "entry_points": 3900,
   "entry_packages": [
     ".",
     "bootid",
@@ -85,9 +85,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 5921,
-    "reachable": 3792,
-    "whitelisted": 2124,
+    "total_exported": 5923,
+    "reachable": 3793,
+    "whitelisted": 2125,
     "unreachable": 5
   },
   "by_package": [
@@ -2434,6 +2434,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/timed_conformance_test.go",
       "line": 87
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestDispatchInvoke_ExistenceBeforePayload",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/invoke_existence_order_test.go",
+      "line": 27
     },
     {
       "package": "bridge",
