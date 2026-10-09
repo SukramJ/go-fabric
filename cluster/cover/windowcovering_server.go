@@ -12,6 +12,14 @@
 // (examples/reference-bridge) mounts it, to put that surface in front of
 // chip-tool. A host that needs live control mounts its own
 // [contract.ClusterServer] on the endpoint instead.
+//
+// The cluster's identity is the generated definition (cluster/spec/
+// windowcovering, ADR 0013): ids, revision, the attribute and command
+// lists, the write statuses and checks and the privileges. The FeatureMap
+// is derived from what the server serves — Lift and PositionAwareLift
+// ([ServedFeatureMap]) — not taken on trust: a host FeatureMap other than
+// that one is refused at construction. GoToLiftPercentage decodes through
+// the definition; the lift arithmetic and the travel are the server's.
 package cover
 
 import (
@@ -23,13 +31,31 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// ClusterRevision is the WindowCovering cluster revision this server
-// implements. Matched against matter.js HEAD window-covering.element.ts.
-const ClusterRevision uint16 = 8
+// ClusterRevision is the WindowCovering cluster revision of the generated
+// definition (window-covering-cluster.element.ts).
+const ClusterRevision = wcdef.Revision
+
+// ServedFeatureMap is the one FeatureMap the server serves: Lift and
+// PositionAwareLift (0x05). Its attributes are exactly those the
+// selection makes mandatory — TargetPositionLiftPercent100ths and
+// CurrentPositionLiftPercent100ths are "LF & PA_LF" — plus the optional
+// CurrentPositionLiftPercentage ("[LF & PA_LF]") and SafetyStatus ("O").
+// Tilt would add tilt attributes the server has no state for, and Lift
+// without PositionAwareLift would disallow the two position attributes it
+// serves.
+const ServedFeatureMap = uint32(wcdef.FeatureLift | wcdef.FeaturePositionAwareLift)
+
+// ErrFeatureMap reports a Config.FeatureMap other than [ServedFeatureMap].
+var ErrFeatureMap = errors.New("windowcovering: FeatureMap names features this server does not serve")
+
+// servedOptional are the optional attributes the server serves.
+var servedOptional = []uint32{wcdef.AttrCurrentPositionLiftPercentage, wcdef.AttrSafetyStatus}
 
 // goToLiftPercentageFieldValue is the LiftPercent100thsValue context tag
 // (window-covering-cluster.element.ts:95, id 0x0).
@@ -43,9 +69,9 @@ type Config struct {
 	// EndProductType is the Matter WindowCovering EndProductType
 	// attribute value (enum8).
 	EndProductType uint8
-	// FeatureMap is the Matter FeatureMap bitmask for this server
-	// instance. Callers set lift / tilt / position-aware bits according
-	// to what the device supports.
+	// FeatureMap is the Matter FeatureMap. The server derives it from
+	// what it serves, [ServedFeatureMap]; zero selects that, and any other
+	// value but it is refused by [New].
 	FeatureMap uint32
 	// InitialPositionPercent100ths is the starting value for
 	// CurrentPositionLiftPercent100ths and
@@ -76,9 +102,9 @@ const moveSteps = 6
 type WindowCoveringServer struct {
 	mu sync.RWMutex
 
+	inst           *spec.Instance
 	wcType         uint8
 	endProductType uint8
-	featureMap     uint32
 	wcMode         uint8 // Mode attribute (0x0017), RW VM, constraint max 15.
 
 	currentPositionPercent100ths uint16
@@ -119,27 +145,50 @@ func (s *WindowCoveringServer) OnMatterAttributesChanged(cb func(attrIDs []uint3
 	return s.changes.OnMatterAttributesChanged(cb)
 }
 
-// NewWindowCoveringServer constructs a [WindowCoveringServer] from cfg.
-func NewWindowCoveringServer(cfg Config) *WindowCoveringServer {
+// New constructs a [WindowCoveringServer] from cfg. A cfg.FeatureMap other
+// than zero and [ServedFeatureMap] is refused with [ErrFeatureMap]:
+// advertising it would list attributes or commands the server does not
+// serve.
+func New(cfg Config) (*WindowCoveringServer, error) {
+	if cfg.FeatureMap != 0 && cfg.FeatureMap != ServedFeatureMap {
+		return nil, fmt.Errorf("%w: 0x%X, the server serves 0x%X", ErrFeatureMap, cfg.FeatureMap, ServedFeatureMap)
+	}
+	// LF | PA_LF satisfies "O.a+" and "[LF]", and both optional attributes
+	// are allowed under it, so spec.New cannot refuse it.
+	inst, _ := spec.New(wcdef.Definition, spec.Options{Features: ServedFeatureMap, Attributes: servedOptional})
 	return &WindowCoveringServer{
+		inst:                         inst,
 		wcType:                       cfg.Type,
 		endProductType:               cfg.EndProductType,
-		featureMap:                   cfg.FeatureMap,
 		currentPositionPercent100ths: cfg.InitialPositionPercent100ths,
 		targetPositionPercent100ths:  cfg.InitialPositionPercent100ths,
 		operationalStatus:            0,
 		moveStep:                     cfg.MoveStep,
+	}, nil
+}
+
+// NewWindowCoveringServer constructs a [WindowCoveringServer] from cfg, as
+// [New] does; it panics on a cfg.FeatureMap [New] refuses — a wiring
+// error, not a runtime condition.
+func NewWindowCoveringServer(cfg Config) *WindowCoveringServer {
+	s, err := New(cfg)
+	if err != nil {
+		panic(err)
 	}
+	return s
 }
 
 // MatterClusterID returns the WindowCovering cluster ID (0x0102).
-func (s *WindowCoveringServer) MatterClusterID() uint32 {
-	return wire.WindowCoveringClusterID
-}
+func (s *WindowCoveringServer) MatterClusterID() uint32 { return wcdef.ClusterID }
 
-// MatterRead resolves mandatory WindowCovering attributes for the
-// position-aware lift profile.
+// MatterRead resolves the served WindowCovering attributes and the two
+// globals. The dispatcher synthesises only the list-valued globals; a
+// server that leaves FeatureMap and ClusterRevision to it answers
+// UnsupportedAttribute on every wildcard read.
 func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
+	if v, ok := s.inst.ReadGlobal(attrID); ok {
+		return v, true
+	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -164,13 +213,6 @@ func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
 		return s.wcMode, true
 	case wire.WindowCoveringAttrSafetyStatus:
 		return uint16(0), true
-	case cluster.AttrGlobalFeatureMap:
-		// The dispatcher synthesises only the list-valued globals; a
-		// server that leaves FeatureMap and ClusterRevision to it answers
-		// UnsupportedAttribute on every wildcard read.
-		return s.featureMap, true
-	case cluster.AttrGlobalClusterRevision:
-		return ClusterRevision, true
 	default:
 		return nil, false
 	}
@@ -203,25 +245,30 @@ func (windowCoveringConstraintErr) MatterStatusCode() im.StatusCode { return im.
 // Compile-time assertion.
 var _ im.StatusCodeError = windowCoveringConstraintErr{}
 
-// MatterWrite accepts Mode (0x0017) writes; all other attributes are
-// controlled via commands. Mode is RW with constraint max 15 per
-// matter.js window-covering-cluster.element.ts:79.
+// MatterWrite accepts Mode (0x0017), the one writable attribute ("RW VM");
+// all others are controlled via commands. The definition checks the write
+// (matter.js AttributeWriteResponse + ValueValidator): a served read-only
+// attribute is UNSUPPORTED_WRITE, an unserved one UNSUPPORTED_ATTRIBUTE,
+// a Mode outside "max 15" — the four ModeBitmap bits — CONSTRAINT_ERROR.
 func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
-	if attrID != wire.WindowCoveringAttrMode {
-		return fmt.Errorf("windowcovering: attribute 0x%04X is not writable", attrID)
+	v, err := s.inst.ValidateWrite(attrID, value, nil)
+	if err != nil {
+		if attrID == wcdef.AttrMode {
+			return windowCoveringConstraintErr{fmt.Sprintf("windowcovering: Mode %v exceeds constraint max 15: %v", value, err)}
+		}
+		return err
 	}
-	v, ok := cluster.AsUint8(value)
-	if !ok {
-		return fmt.Errorf("windowcovering: Mode: expected numeric, got %T", value)
-	}
-	// Constraint max 15 per matter.js window-covering-cluster.element.ts:79.
-	if v > 15 {
-		return windowCoveringConstraintErr{fmt.Sprintf("windowcovering: Mode %d exceeds constraint max 15", v)}
-	}
+	n, _ := v.(uint64) // a map8 ≤ 15 per ValidateWrite
 	s.mu.Lock()
-	s.wcMode = v
+	s.wcMode = uint8(n) //nolint:gosec // ≤ 15 per ValidateWrite
 	s.mu.Unlock()
 	return nil
+}
+
+// MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
+// Mode is "RW VM".
+func (s *WindowCoveringServer) MinWritePrivilege(attrID uint32) uint8 {
+	return s.inst.MinWritePrivilege(attrID)
 }
 
 // MatterInvoke handles the mandatory WindowCovering commands. All four
@@ -233,7 +280,7 @@ func (s *WindowCoveringServer) MatterInvoke(_ context.Context, cmdID uint32, fie
 	defer s.mu.Unlock()
 
 	switch cmdID {
-	case wire.WindowCoveringCmdUpOrOpen:
+	case wcdef.CmdUpOrOpen:
 		s.moveToLocked(0)
 		return nil, nil
 	case wire.WindowCoveringCmdDownOrClose:
@@ -317,61 +364,45 @@ func (s *WindowCoveringServer) tick(m *movement) {
 	s.changes.Notify(changed...)
 }
 
-// coverFeatureLift is the LF bit of the WindowCovering FeatureMap
-// (window-covering-cluster.element.ts, feature "LF", bit 0).
-const coverFeatureLift uint32 = 1 << 0
-
 // MatterAcceptedCommands implements [contract.ClusterCommandLister]:
 // UpOrOpen, DownOrClose and StopMotion (conformance M), and
-// GoToLiftPercentage when the FeatureMap carries LF (conformance
-// "LF & PA_LF, [LF]"). The value and tilt commands are not handled, so
-// they are not listed. Without the lister the dispatcher synthesised an
-// empty AcceptedCommandList — a covering that, read by the book, accepts
-// no command at all. Found by the chip-tool data-model sweep.
+// GoToLiftPercentage ("LF & PA_LF, [LF]"). Without the lister the
+// dispatcher synthesised an empty AcceptedCommandList — a covering that,
+// read by the book, accepts no command at all. Found by the chip-tool
+// data-model sweep.
 func (s *WindowCoveringServer) MatterAcceptedCommands() []uint32 {
-	cmds := []uint32{wire.WindowCoveringCmdUpOrOpen, wire.WindowCoveringCmdDownOrClose, wire.WindowCoveringCmdStopMotion}
-	if s.featureMap&coverFeatureLift != 0 {
-		cmds = append(cmds, wire.WindowCoveringCmdGoToLiftPercentage)
-	}
-	return cmds
+	return s.inst.MatterAcceptedCommands()
 }
 
 // MatterGeneratedCommands implements [contract.ClusterCommandLister]: every
 // command answers with a status only.
-func (s *WindowCoveringServer) MatterGeneratedCommands() []uint32 { return []uint32{} }
-
-// MatterReportable lists the attributes that change at runtime and
-// require Matter subscription reports.
-func (s *WindowCoveringServer) MatterReportable() []uint32 {
-	return []uint32{
-		wire.WindowCoveringAttrCurrentPositionLiftPercent100ths,
-		wire.WindowCoveringAttrOperationalStatus,
-	}
+func (s *WindowCoveringServer) MatterGeneratedCommands() []uint32 {
+	return s.inst.MatterGeneratedCommands()
 }
 
-// MatterAttributes lists every attribute the server implements via
-// MatterRead.
-func (s *WindowCoveringServer) MatterAttributes() []uint32 {
-	return []uint32{
-		wire.WindowCoveringAttrType,
-		wire.WindowCoveringAttrConfigStatus,
-		wire.WindowCoveringAttrCurrentPositionLiftPercentage,
-		wire.WindowCoveringAttrOperationalStatus,
-		wire.WindowCoveringAttrTargetPositionLiftPercent100ths,
-		wire.WindowCoveringAttrEndProductType,
-		wire.WindowCoveringAttrCurrentPositionLiftPercent100ths,
-		wire.WindowCoveringAttrMode,
-		wire.WindowCoveringAttrSafetyStatus,
-	}
+// MinInvokePrivilege implements [contract.ClusterCommandInvokePrivilege].
+func (s *WindowCoveringServer) MinInvokePrivilege(cmdID uint32) uint8 {
+	return s.inst.MinInvokePrivilege(cmdID)
 }
+
+// MatterReportable lists the served attributes that move: all but the
+// fixed Type and EndProductType.
+func (s *WindowCoveringServer) MatterReportable() []uint32 { return s.inst.MatterReportable() }
+
+// MatterAttributes implements [contract.ClusterAttributeLister]: the
+// attributes LF | PA_LF makes mandatory and the two optional ones served.
+func (s *WindowCoveringServer) MatterAttributes() []uint32 { return s.inst.MatterAttributes() }
 
 // extractPercent100ths pulls the LiftPercent100thsValue (field 0,
 // window-covering-cluster.element.ts:95) out of the GoToLiftPercentage
-// command fields. The bridge has no typed decoder for this cluster, so a
-// real invocation arrives as the tag-keyed map its generic salvage path
-// produces (bridge/fields_reader.go decodeGenericTagMap) with the value as
-// uint64; a host that decodes the command itself may pass
-// [wire.GoToLiftPercentageRequest], and the bare uint16 and the
+// command fields. The bridge decodes the command through the generated
+// definition, so a real invocation arrives as
+// [wcdef.GoToLiftPercentageRequest] (a missing field already answered
+// INVALID_COMMAND there, a value above 10000 CONSTRAINT_ERROR, as
+// matter.js's request schema answers them); a host that decodes the
+// command itself may pass [wire.GoToLiftPercentageRequest] or the tag-keyed
+// map of the bridge's generic salvage path (bridge/fields_reader.go
+// decodeGenericTagMap, the value a uint64), and the bare uint16 and the
 // "percent"-keyed map stay accepted for direct callers. Values > 10000
 // are rejected with ConstraintError per
 // window-covering-cluster.element.ts:72 constraint "max 10000".
@@ -380,6 +411,13 @@ func extractPercent100ths(fields any) (uint16, error) {
 	switch v := fields.(type) {
 	case uint16:
 		pct = v
+	case wcdef.GoToLiftPercentageRequest:
+		pct = v.LiftPercent100thsValue
+	case *wcdef.GoToLiftPercentageRequest:
+		if v == nil {
+			return 0, errors.New("windowcovering: GoToLiftPercentage carried no fields")
+		}
+		pct = v.LiftPercent100thsValue
 	case wire.GoToLiftPercentageRequest:
 		pct = v.LiftPercent100thsValue
 	case *wire.GoToLiftPercentageRequest:

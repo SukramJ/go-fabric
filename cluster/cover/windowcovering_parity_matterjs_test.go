@@ -512,9 +512,11 @@ func TestParityMatterJS_WindowCoveringAcceptedCommands(t *testing.T) {
 	if got, want := lift.MatterAcceptedCommands(), []uint32{0x00, 0x01, 0x02, 0x05}; !slices.Equal(got, want) {
 		t.Errorf("LF|PA_LF AcceptedCommandList = %v, want %v", got, want)
 	}
-	tiltOnly := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 1 << 1})
-	if got, want := tiltOnly.MatterAcceptedCommands(), []uint32{0x00, 0x01, 0x02}; !slices.Equal(got, want) {
-		t.Errorf("TL AcceptedCommandList = %v, want %v (no lift command without LF)", got, want)
+	// A Tilt-only FeatureMap names tilt attributes the server has no state
+	// for: it derives LF|PA_LF from what it serves and refuses TL (the
+	// owner's decision recorded in ADR 0013).
+	if _, err := cover.New(cover.Config{FeatureMap: 1 << 1}); !errors.Is(err, cover.ErrFeatureMap) {
+		t.Errorf("TL: New error %v, want ErrFeatureMap", err)
 	}
 	if got := lift.MatterGeneratedCommands(); len(got) != 0 {
 		t.Errorf("GeneratedCommandList = %v, want empty (every command answers with a status)", got)
