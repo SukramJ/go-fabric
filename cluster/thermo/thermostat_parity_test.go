@@ -163,7 +163,9 @@ func TestParityMatterJS_Thermostat_SystemModeConstraintError(t *testing.T) {
 		{"cooling-only forbids Heat(4)", newCoolOnly(), 4},
 		{"cooling-only forbids EmergencyHeat(5)", newCoolOnly(), 5},
 		{"heating-only forbids Cool(3)", newHeatOnly(), 3},
-		{"heating-only forbids Precooling(7)", newHeatOnly(), 7},
+		// Precooling is 6, not 7 (FanOnly, conformance O, which matter.js
+		// allows): thermostat-cluster.element.ts SystemModeEnum.
+		{"heating-only forbids Precooling(6)", newHeatOnly(), 6},
 	}
 
 	for _, tc := range cases {

@@ -42,4 +42,6 @@ var committed = []string{
 	"WindowCovering",
 	// cluster/lock
 	"DoorLock",
+	// cluster/thermo
+	"Thermostat",
 }
