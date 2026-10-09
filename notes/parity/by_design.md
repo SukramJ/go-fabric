@@ -1608,3 +1608,55 @@ host receives its `cluster/wire.FanStepRequest`. Pinned by
 `TestCommandFieldsReader_LevelControlStepAbsentTransitionTime`. Retire
 when the generated decoders can be told which absent fields a controller
 in the field omits.
+
+### BD-Matter-AdminCommissioning-OpenWindowParams — OpenCommissioningWindow keeps its hand-written decoder
+
+`cluster/wire.AdministratorCommissioning` is built on its generated
+definition (`cluster/spec/administratorcommissioning`, ADR 0013), but the
+bridge decodes OpenCommissioningWindow with its own
+`decodeOpenCommissioningWindowRequest` (`bridge/fields_reader_admincomm.go`)
+into `cluster/wire.OpenWindowParams`, ahead of the definition. Two reasons:
+the `WindowController` port a host implements takes `OpenWindowParams`, and
+matter.js extends the request schema before it validates — its
+`AdministratorCommissioningServer.ts` relaxes the PakePasscodeVerifier,
+Iterations and Salt constraints to "none" so the behavior answers
+PakeParameterError (cluster status 0x03) rather than the interaction layer
+answering CONSTRAINT_ERROR. The generated decoder carries the element
+file's constraints without that extension; the hand-written one enforces
+only CommissioningTimeout's width and the Discriminator bound, as matter.js
+does, and leaves the PAKE checks to the server. The server also accepts the
+generated `OpenCommissioningWindowRequest` in process. Retire when the
+generator can apply a behavior's schema extension.
+
+### BD-Matter-Commissioning-HandDecoders — the commissioning and group requests keep their hand-written decoders
+
+GeneralCommissioning, the core Groups and ScenesManagement servers are
+built on their generated definitions (ids, revisions, FeatureMap, lists,
+privileges, write statuses — ADR 0013), but their requests still decode
+through the bridge's hand-written readers into the `cluster/core` request
+structs (`ArmFailSafeRequest`, `SetRegulatoryConfigRequest`,
+`AddGroupRequest` …, `AddSceneRequest` with its `SceneRef` and extension
+field sets), which run ahead of the generated decoders in
+`bridge/fields_reader.go`. Those structs are what the fail-safe, the group
+table and the scene table are written against; re-pointing the servers at
+the generated structs is a rewrite of the commissioning and scene logic,
+not a codec swap, and the CGEN, G and S families hold the readers' statuses
+as they are. Registering the definitions changes no decoding: every request
+they define is answered by a hand-written reader first. Retire per server
+when its logic is moved onto the generated request structs.
+
+### BD-Matter-FixedWidthStructs — DeviceTypeList and BasicCommissioningInfo keep their fixed-width encoders
+
+The generated codecs encode every integer at its smallest TLV width, as
+matter.js's `TlvNumber` does, and the measurement, BasicInformation,
+GeneralDiagnostics and DiagnosticLogs values now encode through them. Two
+hand-written encoders in `bridge/reply.go` stay: Descriptor's
+`DeviceTypeList` (`[]core.DeviceTypeStruct`, now an alias of the generated
+struct) writes DeviceType as a 4-byte and Revision as a 2-byte integer, and
+GeneralCommissioning's `BasicCommissioningInfoStruct` writes both fields as
+2-byte integers. Both record controller-side findings — Apple Home's
+topology decoding and a typed decoder rejecting a narrowed width — that no
+run of this round re-verified, and both are read by every controller during
+commissioning. The wire values are the same; only the widths differ from
+matter.js's. Retire after a commissioning run against Apple Home with the
+generated encoders.
