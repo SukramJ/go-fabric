@@ -361,6 +361,20 @@ the same `ColorTemperatureWriter` as before.
   host that persisted the attribute itself should switch to
   `TotalOperationalTime` the same way.
 
+### Documentation
+
+- The target of the module is now stated: Matter 1.6.1 complete for the
+  home-automation scope, measured against the snapshot and phased in
+  [`docs/concept-matter-1.6.1-and-device-layer.md`](./docs/concept-matter-1.6.1-and-device-layer.md)
+  (Appendix F lists every exclusion with its reason). Two planning ADRs
+  record the decisions it rests on:
+  [ADR 0017](./docs/adr/0017-generated-default-cluster-server.md), a
+  generated default cluster server, and
+  [ADR 0018](./docs/adr/0018-device-layer-and-node-facade.md), a generated
+  `device/` layer with a `node/` facade. `docs/matterjs-comparison.md`,
+  `docs/open-items.md` and `docs/feature-scope.md` point at them; TCP and
+  BDX leave the non-goal list. No code changes.
+
 ## [0.2.0] — 2026-10-07
 
 Six pull requests since `v0.1.0` (#22–#28): the matter.js pin at Matter
