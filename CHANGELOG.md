@@ -372,6 +372,16 @@ the same `ColorTemperatureWriter` as before.
 
 ### Fixed
 
+- **A transition's rate and its RemainingTime came from two reads of the
+  current value.** `cluster/light` (MoveToSaturation, MoveToColorTemperature)
+  and `cluster/levelcontrol` read the current value, computed the rate, and
+  then called `transition.Engine.Start`, which read the value again under
+  the engine's lock; a step of the running transition landing in between
+  gave a rate from the old value and a RemainingTime from the new one, one
+  tenth short (149 for 150), visible as `TestRemainingTimeReportsAtCommandTime`
+  failing in about a third of `-race` runs. `transition.Transition.RateFrom`
+  computes the rate inside `Start` from the engine's own read, as matter.js
+  reads and starts in one synchronous handler; the three callers use it.
 - **ElectricalEnergyMeasurement.Accuracy is one MeasurementAccuracyStruct,**
   not a list (matter.js electrical-energy-measurement.element.ts and
   connectedhomeip's cluster XML agree); the server reported a one-entry

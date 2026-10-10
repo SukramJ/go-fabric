@@ -337,19 +337,20 @@ func (s *Server) transition(ctx context.Context, target float64, rate func(curre
 	if err != nil {
 		return err
 	}
-	var r float64
 	if rate != nil {
-		current, err := s.currentLevel()
-		if err != nil {
+		// The level is read here only for its error; the rate itself is
+		// computed from the value the engine reads under its lock
+		// (transition.Transition.RateFrom), as matter.js's moveToLevelLogic
+		// reads and starts in one synchronous handler.
+		if _, err := s.currentLevel(); err != nil {
 			return err
 		}
-		r = rate(float64(current))
 	}
 	// The steps run after the command is answered, so they keep its
 	// context's values but not its cancellation.
 	stepCtx := context.WithoutCancel(ctx)
 	if err := s.engine.Start(transition.Transition{
-		Name: propCurrentLevel, Rate: r, Target: target,
+		Name: propCurrentLevel, RateFrom: rate, Target: target,
 		OnStep: func(float64) { _, _ = s.couple(stepCtx, withOnOff, options, target) },
 	}); err != nil {
 		return err
