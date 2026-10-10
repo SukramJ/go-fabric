@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4024,
+  "entry_points": 4057,
   "entry_packages": [
     ".",
     "bootid",
@@ -22,6 +22,7 @@
     "cluster/onoff",
     "cluster/opstate",
     "cluster/pump",
+    "cluster/servicearea",
     "cluster/spec",
     "cluster/spec/activatedcarbonfiltermonitoring",
     "cluster/spec/administratorcommissioning",
@@ -32,6 +33,7 @@
     "cluster/spec/bridgeddevicebasicinformation",
     "cluster/spec/carbondioxideconcentrationmeasurement",
     "cluster/spec/closurecontrol",
+    "cluster/spec/closuredimension",
     "cluster/spec/colorcontrol",
     "cluster/spec/descriptor",
     "cluster/spec/deviceenergymanagementmode",
@@ -73,12 +75,14 @@
     "cluster/spec/rvcoperationalstate",
     "cluster/spec/rvcrunmode",
     "cluster/spec/scenesmanagement",
+    "cluster/spec/servicearea",
     "cluster/spec/smokecoalarm",
     "cluster/spec/spectest",
     "cluster/spec/switchcluster",
     "cluster/spec/temperaturecontrol",
     "cluster/spec/temperaturemeasurement",
     "cluster/spec/thermostat",
+    "cluster/spec/thermostatuserinterfaceconfiguration",
     "cluster/spec/timesynchronization",
     "cluster/spec/valveconfigurationandcontrol",
     "cluster/spec/waterheatermode",
@@ -124,9 +128,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 7820,
-    "reachable": 5340,
-    "whitelisted": 2475,
+    "total_exported": 8073,
+    "reachable": 5524,
+    "whitelisted": 2544,
     "unreachable": 5
   },
   "by_package": [
@@ -5003,10 +5007,38 @@
     },
     {
       "package": "cluster/closure",
+      "identifier": "DimensionFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closuredimension_server.go",
+      "line": 77
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "DimensionState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closuredimension_server.go",
+      "line": 80
+    },
+    {
+      "package": "cluster/closure",
       "identifier": "EngageStateChangedEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closurecontrol_events.go",
       "line": 48
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "LatchControlModes",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closuredimension_server.go",
+      "line": 90
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "LimitRange",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closuredimension_server.go",
+      "line": 84
     },
     {
       "package": "cluster/closure",
@@ -5021,6 +5053,27 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/closure/closurecontrol_events.go",
       "line": 52
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "StepDirection",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closuredimension_server.go",
+      "line": 88
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "ThreeLevelAuto",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closuredimension_server.go",
+      "line": 86
+    },
+    {
+      "package": "cluster/closure",
+      "identifier": "UnitRange",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/closure/closuredimension_server.go",
+      "line": 82
     },
     {
       "package": "cluster/core",
@@ -5532,6 +5585,76 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/pump/pump_server.go",
       "line": 119
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "Area",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "AreaInfo",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 85
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "Feature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 81
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "LandmarkInfo",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 89
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "LocationInfo",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 87
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "Map",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 91
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "OperationalStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 95
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "Progress",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 93
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "SelectAreasStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 97
+    },
+    {
+      "package": "cluster/servicearea",
+      "identifier": "SkipAreaStatus",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/servicearea/servicearea.go",
+      "line": 99
     },
     {
       "package": "cluster/spec",
@@ -6246,6 +6369,160 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
       "line": 227
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "ClosureUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 70
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "ClosureUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 81
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "DimensionStateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 114
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 53
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "LatchControlModesBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 146
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "LatchControlModesBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 157
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "ModulationTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 165
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "ModulationTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 179
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "OverflowEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 190
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "OverflowEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 210
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "RangePercent100thsStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 249
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "RotationAxisEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 257
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "RotationAxisEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 277
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "StepDirectionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 294
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "StepDirectionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 305
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/closuredimension/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/closuredimension/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "ThreeLevelAutoEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 123
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "ThreeLevelAutoEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 136
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "TranslationDirectionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 313
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "TranslationDirectionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 334
+    },
+    {
+      "package": "cluster/spec/closuredimension",
+      "identifier": "UnitRangeStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/closuredimension/definition_gen.go",
+      "line": 374
     },
     {
       "package": "cluster/spec/colorcontrol",
@@ -9293,6 +9570,111 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/servicearea",
+      "identifier": "AreaInfoStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "AreaStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 180
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 49
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "LandmarkInfoStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 147
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "LocationdescDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 116
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "MapStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 211
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "OperationalStatusEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 219
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "OperationalStatusEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 232
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "ProgressStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 270
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "SelectAreasStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 280
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "SelectAreasStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 293
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "SkipAreaStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 303
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "SkipAreaStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/servicearea/definition_gen.go",
+      "line": 316
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/servicearea/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/servicearea",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/servicearea/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/smokecoalarm",
       "identifier": "AlarmStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -9895,6 +10277,69 @@
       "line": 980
     },
     {
+      "package": "cluster/spec/thermostatuserinterfaceconfiguration",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen.go",
+      "line": 35
+    },
+    {
+      "package": "cluster/spec/thermostatuserinterfaceconfiguration",
+      "identifier": "KeypadLockoutEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen.go",
+      "line": 40
+    },
+    {
+      "package": "cluster/spec/thermostatuserinterfaceconfiguration",
+      "identifier": "KeypadLockoutEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/thermostatuserinterfaceconfiguration",
+      "identifier": "ScheduleProgrammingVisibilityEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen.go",
+      "line": 67
+    },
+    {
+      "package": "cluster/spec/thermostatuserinterfaceconfiguration",
+      "identifier": "ScheduleProgrammingVisibilityEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen.go",
+      "line": 78
+    },
+    {
+      "package": "cluster/spec/thermostatuserinterfaceconfiguration",
+      "identifier": "TemperatureDisplayModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen.go",
+      "line": 86
+    },
+    {
+      "package": "cluster/spec/thermostatuserinterfaceconfiguration",
+      "identifier": "TemperatureDisplayModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen.go",
+      "line": 97
+    },
+    {
+      "package": "cluster/spec/thermostatuserinterfaceconfiguration",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/thermostatuserinterfaceconfiguration",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/thermostatuserinterfaceconfiguration/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/timesynchronization",
       "identifier": "DSTOffsetStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -10246,10 +10691,31 @@
     },
     {
       "package": "cluster/thermo",
+      "identifier": "KeypadLockout",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
+      "line": 42
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "ScheduleProgrammingVisibility",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/thermo",
       "identifier": "TemperatureControlFeature",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/temperaturecontrol.go",
       "line": 56
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TemperatureDisplayMode",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
+      "line": 40
     },
     {
       "package": "cluster/valve",
@@ -11541,6 +12007,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestPanelUnlatchesAndMoves",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/area_closure_test.go",
+      "line": 98
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestRebootCountCountsBoots",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
@@ -11594,6 +12067,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
       "line": 84
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestThermostatHasItsUIConfiguration",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/area_closure_test.go",
+      "line": 137
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestVacuumServesItsAreas",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/area_closure_test.go",
+      "line": 39
     },
     {
       "package": "examples/reference-bridge",

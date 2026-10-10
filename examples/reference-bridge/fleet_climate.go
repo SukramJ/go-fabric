@@ -163,11 +163,14 @@ func copyUint8(v *uint8) *uint8 {
 // server holds its setpoints itself (cluster/thermo is a conformance
 // reference that drives no device); this endpoint puts it in front of a real
 // controller. The room temperature is the one thing the device reports, via
-// the control hook.
+// the control hook. Its display settings are a
+// ThermostatUserInterfaceConfiguration, the optional cluster the Thermostat
+// device type offers (thermostat.element.ts), with matter.js's defaults.
 type demoThermostat struct {
 	name string
 	once sync.Once
 	srv  *thermo.ThermostatServer
+	ui   *thermo.ThermostatUIServer
 }
 
 var _ contract.EndpointSource = (*demoThermostat)(nil)
@@ -184,7 +187,7 @@ func (t *demoThermostat) MatterDeviceType() uint16 { return deviceTypeThermostat
 // holds the setpoints, so the same instance serves every reassembly.
 func (t *demoThermostat) MatterClusterServers() []contract.ClusterServer {
 	t.build()
-	return []contract.ClusterServer{t.srv}
+	return []contract.ClusterServer{t.srv, t.ui}
 }
 
 func (t *demoThermostat) build() {
@@ -194,6 +197,11 @@ func (t *demoThermostat) build() {
 		t.srv = thermo.NewThermostatServer(cfg)
 		room := int16(2150)
 		t.srv.SetLocalTemperature(&room)
+		ui, err := thermo.NewThermostatUserInterfaceConfiguration(thermo.ThermostatUIConfig{})
+		if err != nil {
+			panic(fmt.Sprintf("thermostat ThermostatUserInterfaceConfiguration: %v", err))
+		}
+		t.ui = ui
 	})
 }
 

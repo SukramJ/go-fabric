@@ -459,12 +459,12 @@ func (s *DimensionServer) MatterInvoke(ctx context.Context, cmdID uint32, fields
 // dimRequest takes a generated request by value or by pointer.
 func dimRequest[T any](fields any) (T, bool) {
 	switch f := fields.(type) {
-	case T:
-		return f, true
 	case *T:
 		if f != nil {
 			return *f, true
 		}
+	case T:
+		return f, true
 	}
 	var zero T
 	return zero, false
@@ -571,7 +571,7 @@ func (s *DimensionServer) step(ctx context.Context, req cd.StepRequest) error {
 	pos := uint32(current.Position.Value)
 	lm := s.has(cd.FeatureLimitation)
 	if req.Direction == cd.StepDirectionDecrease {
-		pos = pos - min(pos, delta)
+		pos -= min(pos, delta)
 		if lm {
 			pos = max(pos, uint32(limit.Min))
 		}

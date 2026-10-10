@@ -199,7 +199,7 @@ func TestDimensionReads(t *testing.T) {
 	if v, _ := md.MatterRead(cd.AttrModulationType); v != uint8(cd.ModulationTypeOpacity) {
 		t.Errorf("ModulationType %v", v)
 	}
-	if v, ok := md.MatterRead(0xFFFC); !ok || v != uint32(md.FeatureMap()) {
+	if v, ok := md.MatterRead(0xFFFC); !ok || v != md.FeatureMap() {
 		t.Errorf("FeatureMap %v", v)
 	}
 }

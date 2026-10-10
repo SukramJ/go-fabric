@@ -544,12 +544,12 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 // request takes a generated request by value or by pointer.
 func request[T any](fields any) (T, bool) {
 	switch f := fields.(type) {
-	case T:
-		return f, true
 	case *T:
 		if f != nil {
 			return *f, true
 		}
+	case T:
+		return f, true
 	}
 	var zero T
 	return zero, false

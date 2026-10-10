@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	tsuic "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
+	tsuic "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/paritytest"

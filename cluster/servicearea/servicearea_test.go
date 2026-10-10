@@ -59,14 +59,14 @@ type device struct {
 	err        error
 }
 
-func (d *device) SelectAreas(_ context.Context, areas []uint32) (servicearea.SelectAreasStatus, string, error) {
+func (d *device) SelectAreas(_ context.Context, areas []uint32) (status servicearea.SelectAreasStatus, text string, err error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.selections = append(d.selections, areas)
 	return d.selStatus, "", d.err
 }
 
-func (d *device) SkipArea(_ context.Context, a uint32) (servicearea.SkipAreaStatus, string, error) {
+func (d *device) SkipArea(_ context.Context, a uint32) (status servicearea.SkipAreaStatus, text string, err error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.skips = append(d.skips, a)

@@ -1474,6 +1474,8 @@ type fleet struct {
 	garage     *demoGarage
 	colorLight *dimmer
 	fridge     *demoFridge
+	vacuumArea *vacuumArea
+	panel      *demoPanel
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1492,6 +1494,7 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 	if err != nil {
 		return nil, fmt.Errorf("endpoint assembler: %w", err)
 	}
+	vacuum := newDemoVacuum("Robot Vacuum")
 	return &fleet{
 		light:       newDemoLight("Desk Lamp"),
 		thermometer: newDemoThermometer(21.5),
@@ -1504,7 +1507,7 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		pump:        newDemoPump("Heating Pump"),
 		flow:        newDemoReading("Water Meter", contract.MeasurementFlow, 0.8),
 		washer:      newDemoWasher("Washing Machine"),
-		vacuum:      newDemoVacuum("Robot Vacuum"),
+		vacuum:      vacuum,
 		thermostat:  newDemoThermostat("Living Room Thermostat"),
 		blind:       newDemoBlind("Bedroom Blind"),
 		lock:        newDemoLock("Front Door"),
@@ -1516,6 +1519,8 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		garage:      newDemoGarage("Garage Door"),
 		colorLight:  newDemoColorLight("Color Bulb"),
 		fridge:      newDemoFridge("Kitchen Fridge"),
+		vacuumArea:  newVacuumArea(vacuum),
+		panel:       newDemoPanel("Patio Door Panel"),
 		assembler:   asm,
 	}, nil
 }
@@ -1641,7 +1646,9 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("pump", f.pump.name, f.pump.MatterDeviceType(), f.pump),
 		sensor("flow", f.flow.name, f.flow),
 		spec("washer", f.washer.name, f.washer.MatterDeviceType(), f.washer),
-		spec("vacuum", f.vacuum.name, f.vacuum.MatterDeviceType(), f.vacuum),
+		// The vacuum's endpoint carries its ServiceArea too
+		// (fleet_servicearea.go).
+		spec("vacuum", f.vacuum.name, f.vacuum.MatterDeviceType(), vacuumWithArea{f.vacuum, f.vacuumArea}),
 		spec("thermostat", f.thermostat.name, f.thermostat.MatterDeviceType(), f.thermostat),
 		spec("blind", f.blind.name, f.blind.MatterDeviceType(), f.blind),
 		spec("lock", f.lock.name, f.lock.MatterDeviceType(), f.lock),
@@ -1653,5 +1660,6 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("garage", f.garage.name, f.garage.MatterDeviceType(), f.garage),
 		spec("colorlight", f.colorLight.name, f.colorLight.MatterDeviceType(), f.colorLight),
 		fridge,
+		spec("panel", f.panel.name, f.panel.MatterDeviceType(), f.panel),
 	}
 }
