@@ -6,6 +6,9 @@ package spec
 import (
 	"fmt"
 	"math"
+	"reflect"
+	"strings"
+	"unicode"
 	"unicode/utf16"
 
 	"github.com/SukramJ/go-fabric/im"
@@ -40,7 +43,9 @@ type Peers func(attrID uint32) (any, bool)
 // attribute's ValueValidator), and returns the value normalised: nil for
 // null, uint64 for an unsigned integer, enum or bitmap, int64 for a signed
 // one, float64, bool, string or []byte. Struct and list values are
-// returned as given; their checks are the server's.
+// returned as given, after their checks: a list's length against the
+// constraint ("max 5") and each entry against the entry type and entry
+// constraint; a struct's fields against their types and constraints.
 //
 // The statuses: an attribute the server does not serve is
 // UNSUPPORTED_ATTRIBUTE; one that is not writable (access "R", or quality
@@ -62,6 +67,24 @@ func (i *Instance) ValidateWrite(attrID uint32, value any, peers Peers) (any, er
 		return nil, err
 	}
 	return v, nil
+}
+
+// CheckValue holds a value of the attribute attrID to its type, its
+// nullability and its constraint — the checks [Instance.ValidateWrite]
+// makes after access — whether the attribute is served or not, and
+// returns it normalised as ValidateWrite does. matter.js validates a
+// behavior's state against the model on every commit, not only on a
+// controller's write (packages/node/src/behavior/state/validation/
+// ValueValidator.ts, constraint.ts); a server holds the values its host
+// sets to the same checks. A refusal is a [StatusError] with
+// CONSTRAINT_ERROR, UNSUPPORTED_ATTRIBUTE for an attribute the cluster
+// does not define.
+func (i *Instance) CheckValue(attrID uint32, value any, peers Peers) (any, error) {
+	a := i.def.Attribute(attrID)
+	if a == nil {
+		return nil, Errorf(im.StatusUnsupportedAttribute, "%s: attribute 0x%04X is not defined", i.def.Name, attrID)
+	}
+	return i.checkValue(a.Name, a.Type, a.Quality.Nullable, a.Constraint, underlying(value), peers)
 }
 
 func (i *Instance) checkValue(name string, t Type, nullable bool, c Constraint, value any, peers Peers) (any, error) {
@@ -89,8 +112,17 @@ func (i *Instance) checkValue(name string, t Type, nullable bool, c Constraint, 
 		v = value
 	case KindString, KindBytes:
 		v, why = i.checkLength(t, c, value, peers)
+	case KindList:
+		if err := i.checkList(name, t, c, value, peers); err != nil {
+			return nil, err
+		}
+		return value, nil
+	case KindStruct:
+		if err := i.checkStruct(name, t.Struct, value); err != nil {
+			return nil, err
+		}
+		return value, nil
 	default:
-		// Struct and list values are the server's to check.
 		return value, nil
 	}
 	if why != "" {
@@ -160,6 +192,113 @@ func (i *Instance) checkLength(t Type, c Constraint, value any, peers Peers) (v 
 		return nil, fmt.Sprintf("length %d violates %q", n, c.Text)
 	}
 	return value, ""
+}
+
+// checkList checks a list value: a Go slice or array whose length meets
+// the constraint, and whose entries meet the entry type and the entry
+// constraint ("max 16[2]", "all[min 1]") — the list checks of matter.js's
+// packages/node/src/behavior/state/validation/ValueValidator.ts and
+// constraint.ts.
+func (i *Instance) checkList(name string, t Type, c Constraint, value any, peers Peers) error {
+	rv := reflect.ValueOf(value)
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return Errorf(im.StatusConstraintError, "%s: %s %v is not a list", i.def.Name, name, value)
+	}
+	if !i.satisfies(c, float64(rv.Len()), peers) {
+		return Errorf(im.StatusConstraintError, "%s: %s length %d violates %q", i.def.Name, name, rv.Len(), c.Text)
+	}
+	if t.Entry == nil {
+		return nil
+	}
+	entry := t.Entry.Constraint
+	if c.Entry != nil {
+		entry = *c.Entry
+	}
+	for n := range rv.Len() {
+		if _, err := i.checkValue(fmt.Sprintf("%s[%d]", name, n), t.Entry.Type, t.Entry.Quality.Nullable, entry, entryValue(rv.Index(n).Interface()), nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkStruct checks a struct value, a generated struct: each field the
+// definition states against its type, nullability and constraint. The Go
+// field of a definition field is named as script/clustergen names it
+// (exportName in script/clustergen/names.go, assigned to fieldInfo.goName
+// in script/clustergen/gen.go); an optional field is a pointer, nil when
+// absent (gen.go writePayload); a nullable one a [Nullable]
+// (fieldInfo.goType). A field constraint naming a sibling is not resolved.
+func (i *Instance) checkStruct(name string, s *Struct, value any) error {
+	rv := reflect.ValueOf(value)
+	if rv.Kind() == reflect.Pointer && !rv.IsNil() {
+		rv = rv.Elem()
+	}
+	if rv.Kind() != reflect.Struct {
+		return Errorf(im.StatusConstraintError, "%s: %s %v is not a struct", i.def.Name, name, value)
+	}
+	if s == nil {
+		return nil
+	}
+	for fi := range s.Fields {
+		f := &s.Fields[fi]
+		fv := rv.FieldByName(goFieldName(f.Name))
+		if !fv.IsValid() {
+			return Errorf(im.StatusConstraintError, "%s: %s has no field %s", i.def.Name, name, f.Name)
+		}
+		if fv.Kind() == reflect.Pointer {
+			if fv.IsNil() {
+				continue
+			}
+			fv = fv.Elem()
+		}
+		if _, err := i.checkValue(name+"."+f.Name, f.Type, f.Quality.Nullable, f.Constraint, entryValue(fv.Interface()), nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// entryValue is a list entry or a struct field in the form the checks
+// read: a [Nullable] unwrapped (nil for null), a named scalar type turned
+// into its underlying type.
+func entryValue(v any) any {
+	if n, ok := v.(nullable); ok {
+		x, isNull := n.nullValue()
+		if isNull {
+			return nil
+		}
+		v = x
+	}
+	return underlying(v)
+}
+
+// goFieldName is the Go name script/clustergen gives a field named name,
+// its exportName (script/clustergen/names.go): the first letter
+// upper-cased, every character that is not a letter or a digit dropped and
+// the next one upper-cased, a leading digit prefixed with "V".
+func goFieldName(name string) string {
+	var b strings.Builder
+	upper := true
+	for _, r := range name {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			upper = true
+			continue
+		}
+		if upper {
+			r = unicode.ToUpper(r)
+			upper = false
+		}
+		b.WriteRune(r)
+	}
+	out := b.String()
+	if out == "" {
+		return "X"
+	}
+	if unicode.IsDigit(rune(out[0])) {
+		out = "V" + out
+	}
+	return out
 }
 
 func isString(v any) bool { _, ok := v.(string); return ok }
