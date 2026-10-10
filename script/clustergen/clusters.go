@@ -67,6 +67,9 @@ var committed = []string{
 	"PowerTopology",
 	"ElectricalPowerMeasurement",
 	"ElectricalEnergyMeasurement",
+	// cluster/energy
+	"DeviceEnergyManagement",
+	"EnergyEvse",
 	// cluster/wire
 	"Switch",
 	"AdministratorCommissioning",
