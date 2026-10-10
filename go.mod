@@ -1,12 +1,12 @@
 module github.com/SukramJ/go-fabric
 
-go 1.27.1
+go 1.27.2
 
 require (
 	filippo.io/nistec v0.0.4
 	github.com/grandcat/zeroconf v1.0.0
 	github.com/miekg/dns v1.1.73
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/tools v0.50.0
 	modernc.org/sqlite v1.59.0
 )

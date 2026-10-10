@@ -136,7 +136,7 @@ func TestEveryClusterGeneratesAndCompiles(t *testing.T) {
 	if len(entries) != len(snap.Clusters) {
 		t.Fatalf("%d packages for %d clusters", len(entries), len(snap.Clusters))
 	}
-	goMod := fmt.Sprintf("module gentest\n\ngo 1.27.1\n\nrequire github.com/SukramJ/go-fabric v0.0.0\n\nreplace github.com/SukramJ/go-fabric => %s\n", root)
+	goMod := fmt.Sprintf("module gentest\n\ngo 1.27.2\n\nrequire github.com/SukramJ/go-fabric v0.0.0\n\nreplace github.com/SukramJ/go-fabric => %s\n", root)
 	sum, err := os.ReadFile(filepath.Join(root, "go.sum"))
 	if err != nil {
 		t.Fatal(err)

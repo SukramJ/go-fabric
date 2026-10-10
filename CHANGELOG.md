@@ -375,6 +375,13 @@ the same `ColorTemperatureWriter` as before.
   `docs/open-items.md` and `docs/feature-scope.md` point at them; TCP and
   BDX leave the non-goal list. No code changes.
 
+### Security
+
+- Built with Go 1.27.2, which fixes Go standard-library vulnerabilities
+  (net/http and HTTP/2, crypto/tls, net/textproto, html/template).
+  `golang.org/x/net` moves to v0.60.0 and `golangci-lint` to v2.14.0 (reads
+  Go 1.27.2's export data).
+
 ## [0.2.0] — 2026-10-07
 
 Six pull requests since `v0.1.0` (#22–#28): the matter.js pin at Matter

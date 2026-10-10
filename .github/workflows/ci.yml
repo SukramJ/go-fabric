@@ -15,7 +15,7 @@ concurrency:
 
 env:
   CGO_ENABLED: "0"
-  GO_VERSION: "1.27.1"
+  GO_VERSION: "1.27.2"
   # The lint tools are pinned on purpose, and pinned to the same versions
   # the reference daemon uses. A new lint release adds checks that are style
   # decisions, and floating on @latest makes this gate report on the calendar
@@ -27,7 +27,7 @@ env:
   # step below runs the standalone formatter, which is stricter than the one
   # golangci-lint bundles, so check `gofumpt -l .` against GOFUMPT_VERSION too.
   GOFUMPT_VERSION: "v0.10.0"
-  GOLANGCI_LINT_VERSION: "v2.13.0"
+  GOLANGCI_LINT_VERSION: "v2.14.0"
 
 jobs:
   build:

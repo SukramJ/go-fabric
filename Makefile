@@ -12,7 +12,7 @@ MATTERJS_DIR    ?= ../matter.js
 # drifted behind its own CI; do not copy that here. Bump deliberately: raise
 # both, run the linter locally, fix what it finds, in one commit.
 GOFUMPT_VERSION       ?= v0.10.0
-GOLANGCI_LINT_VERSION ?= v2.13.0
+GOLANGCI_LINT_VERSION ?= v2.14.0
 
 # govulncheck is deliberately NOT pinned (setup installs @latest, and so does
 # the nightly workflow). The inverse of the lint argument: a newly published

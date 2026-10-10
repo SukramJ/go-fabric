@@ -35,7 +35,11 @@ type packageFloor struct {
 var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric", min: 0, why: "module doc only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/bootid", min: 89},
-	{pkg: "github.com/SukramJ/go-fabric/bridge", min: 84},
+	{
+		pkg: "github.com/SukramJ/go-fabric/bridge",
+		min: 83,
+		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (84.9 % to 83.6 %)",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarm", min: 98},
@@ -57,7 +61,11 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/opstate", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/pump", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/thermo", min: 95},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/transition", min: 94},
+	{
+		pkg: "github.com/SukramJ/go-fabric/cluster/transition",
+		min: 93,
+		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (94.2 % to 93.8 %)",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/valve", min: 79},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
@@ -122,7 +130,11 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/secure", min: 0, why: "package doc only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/secure/aesccm", min: 96},
-	{pkg: "github.com/SukramJ/go-fabric/secure/attestation", min: 85},
+	{
+		pkg: "github.com/SukramJ/go-fabric/secure/attestation",
+		min: 80,
+		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (85.7 % to 80.2 %)",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/secure/channel", min: 85},
 	// These three floors are deliberately set from the module WITHOUT its
 	// fuzz targets: secure/setup measured 84.0 without and 91.4 with,
@@ -136,7 +148,11 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/secure/mattercert", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/secure/operational", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/secure/setup", min: 84},
-	{pkg: "github.com/SukramJ/go-fabric/secure/sigma", min: 88},
+	{
+		pkg: "github.com/SukramJ/go-fabric/secure/sigma",
+		min: 86,
+		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (89.1 % to 86.7 %)",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/secure/spake2", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/store", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/tlv", min: 91},
