@@ -22,7 +22,7 @@ an oversight to the next reader — including choices to *not* do something.
 | [0014](./0014-transitions-optional-per-endpoint.md) | Attribute transitions run in the module (`cluster/transition`, matter.js `Transitions.ts`), optional per endpoint; a host whose device ramps natively keeps the hand-off path | accepted |
 | [0015](./0015-chip-data-model-read-at-run-time.md) | The CHIP data model cross-check reads connectedhomeip's `data_model/<version>` from a checkout at test time and commits nothing derived from it (the CSA notice forbids publishing or deriving); CI provides the checkout | accepted |
 | [0016](./0016-device-type-validation.md) | Assembled topologies are validated against their device types — a port of matter.js's `DeviceTypeConformance` and its service's modes (warn by default, strict, off) — on every bridge assembly, with a structured verdict for the host | accepted |
-| [0017](./0017-generated-default-cluster-server.md) | A generated default cluster server in `cluster/spec`, so a cluster without matter.js logic costs its definition and a host port; the hand-written schema tables are generated too | proposed (concept phase 0) |
+| [0017](./0017-generated-default-cluster-server.md) | A generated default cluster server in `cluster/spec`, so a cluster without matter.js logic costs its definition and a host port; the hand-written schema tables are generated too | accepted, implemented in #40 |
 | [0018](./0018-device-layer-and-node-facade.md) | A device layer `device/` generated from the device-type model and a `node/` facade — the port of matter.js `devices/`, `endpoints/` and `ServerNode`; the existing `contract/` level stays beneath it, foreign-source projection stays outside | proposed (concept phase 4) |
 
 ## Provenance
