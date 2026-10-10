@@ -18,6 +18,14 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- Reference daemon, for the certification harness: FixedLabel and UserLabel
+  on the Aggregator endpoint and FixedLabel on the first bridged light (the
+  CSA cases written against the CHIP all-clusters app address endpoint 1);
+  the BooleanStateConfiguration and MeterIdentification test event triggers
+  as chip's handlers define them; the demo meter starts with MeterType null,
+  as chip's `meter-identification-server.cpp` does. DGSW/3.2 and DGETH/3.2
+  "Simulated" are declared not applicable (`DGSW.C=0`, `DGETH.C=0`: the
+  daemon is no client).
 - `cluster/measurement` serves seven more concentration clusters on the
   existing kind pattern, each with its `contract.MeasurementClass`
   (`MeasurementCO`, `MeasurementNO2`, `MeasurementOzone`,
