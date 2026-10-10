@@ -191,6 +191,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/booleanstate", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/airquality", min: 100},

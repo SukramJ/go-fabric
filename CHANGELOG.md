@@ -106,6 +106,21 @@ the same `ColorTemperatureWriter` as before.
   `lock.DoorLockServer` and `thermo.ThermostatServer` answer
   `MinInvokePrivilege` (and, where an attribute is writable,
   `MinWritePrivilege`) from their definitions.
+- `cluster/spec.Server` (`spec.NewServer(def, opts, spec.ServerConfig)`):
+  the generated default cluster server (ADR 0017, phase 0). A generated
+  definition plus a feature selection becomes a complete
+  `contract.ClusterServer` — stored attribute values with an optional read
+  port (`spec.Source`) and write port (`spec.Sink`), controller writes
+  checked by `ValidateWrite`, device-side `Set` / `SetAttributes` checked
+  against type and constraint, data-version bumps and change
+  notifications, command dispatch through `Handle`, events through
+  `SetMatterEventEmitter` / `Emit` with the definition's priority. New
+  errors `spec.ErrFabricScoped` (a definition with a fabric-scoped
+  attribute is refused), `spec.ErrNotServed`, `spec.ErrInvalidValue`,
+  `spec.ErrNotEmitted`.
+- `cluster/core.NewFixedLabel(labels)`: a FixedLabel (0x0040) server on the
+  generated server, with the new generated definition
+  `cluster/spec/fixedlabel`. Not mounted by the reference bridge.
 
 ### Changed
 
@@ -122,6 +137,11 @@ the same `ColorTemperatureWriter` as before.
   `wire.OperationalStateList` and `wire.ModeOptionList`.
   `cluster/alarm.AlarmSeverityEvent` is now an alias of the generated
   `cluster/spec/smokecoalarm.SmokeAlarmEvent` (same field, same use).
+- `cluster/filter` is built on `spec.Server`; its exported API and
+  behaviour are unchanged, except that constructing a server now bumps its
+  data version once (the initial values are stored as a device-side
+  change), which is visible only on a host-owned `Config.DataVersion`.
+
 - **The measurement servers, GenericSwitch, AdministratorCommissioning and
   fourteen system servers are built on their generated definitions** (ADR
   0013): `cluster/measurement` (every server), `cluster/wire`'s

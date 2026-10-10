@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3980,
+  "entry_points": 3993,
   "entry_packages": [
     ".",
     "bootid",
@@ -40,6 +40,7 @@
     "cluster/spec/electricalenergymeasurement",
     "cluster/spec/electricalpowermeasurement",
     "cluster/spec/fancontrol",
+    "cluster/spec/fixedlabel",
     "cluster/spec/flowmeasurement",
     "cluster/spec/generalcommissioning",
     "cluster/spec/generaldiagnostics",
@@ -116,9 +117,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 7466,
-    "reachable": 5054,
-    "whitelisted": 2407,
+    "total_exported": 7490,
+    "reachable": 5071,
+    "whitelisted": 2414,
     "unreachable": 5
   },
   "by_package": [
@@ -5184,6 +5185,13 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestParityMatterJS_FixedLabel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/fixed_label_test.go",
+      "line": 22
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestParityMatterJS_MandatoryAttributeCoverage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
@@ -5678,6 +5686,20 @@
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
       "line": 117
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "TestStoredForm",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/server_internal_test.go",
+      "line": 10
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "TestUnderlying",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/server_internal_test.go",
+      "line": 40
     },
     {
       "package": "cluster/spec",
@@ -7176,6 +7198,34 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/fancontrol/definition_gen.go",
       "line": 193
+    },
+    {
+      "package": "cluster/spec/fixedlabel",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fixedlabel/definition_gen.go",
+      "line": 36
+    },
+    {
+      "package": "cluster/spec/fixedlabel",
+      "identifier": "LabelStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/fixedlabel/definition_gen.go",
+      "line": 63
+    },
+    {
+      "package": "cluster/spec/fixedlabel",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/fixedlabel/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/fixedlabel",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/fixedlabel/definition_gen_test.go",
+      "line": 19
     },
     {
       "package": "cluster/spec/flowmeasurement",

@@ -78,4 +78,5 @@ var committed = []string{
 	"OtaSoftwareUpdateRequestor",
 	"NetworkCommissioning",
 	"DiagnosticLogs",
+	"FixedLabel",
 }

@@ -46,8 +46,8 @@ type emitted struct {
 
 type emitter struct{ events []emitted }
 
-func (e *emitter) MatterEmitEvent(endpoint uint16, cluster, event uint32, data any, priority contract.EventPriority) {
-	e.events = append(e.events, emitted{endpoint, cluster, event, data, priority})
+func (e *emitter) MatterEmitEvent(endpoint uint16, clusterID, event uint32, data any, priority contract.EventPriority) {
+	e.events = append(e.events, emitted{endpoint, clusterID, event, data, priority})
 }
 
 var products = spec.List[hepa.ReplacementProductStruct]{
