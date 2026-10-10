@@ -94,4 +94,10 @@ var committed = []string{
 	"NetworkCommissioning",
 	"DiagnosticLogs",
 	"FixedLabel",
+	"UserLabel",
+	"LocalizationConfiguration",
+	"TimeFormatLocalization",
+	"UnitLocalization",
+	"SoftwareDiagnostics",
+	"EthernetNetworkDiagnostics",
 }
