@@ -4,7 +4,6 @@
 package bridge
 
 import (
-	matteralarm "github.com/SukramJ/go-fabric/cluster/alarm"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -14,99 +13,29 @@ import (
 // cluster servers (cluster/alarm, cluster/fan, cluster/pump,
 // cluster/opstate, cluster/modebase) and the Switch events: event
 // payloads, whose EventDataIB Data slot goes through the same value
-// writer as attribute data, and the list / struct attributes. Integers
-// inside a structure go out at their smallest width, as matter.js's
-// TlvOfModel writes them (application-wire-fixtures.json). It reports
-// false for a value it does not know, which the caller then encodes as
-// null. Kept out of
-// defaultAttributeValueWriter's own switch so each cluster's shapes sit
+// writer as attribute data, and the list / struct attributes. Every one
+// of them encodes through a generated codec (spec.Encodable), as
+// matter.js's TlvOfModel writes it (application-wire-fixtures.json,
+// appliance-wire-fixtures.json); the event and struct types of
+// cluster/wire and cluster/alarm implement it themselves. A list arrives
+// as a plain slice, which carries no method, so the three list shapes
+// are converted to their generated list here. It reports false for a
+// value it does not know, which the caller then encodes as null. Kept out
+// of defaultAttributeValueWriter's own switch so each cluster's shapes sit
 // next to each other rather than among the root clusters'.
 func encodeApplicationValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 	switch x := v.(type) {
-	case clusterwire.FieldlessEvent:
-		// An event that declares no fields still carries a structure in
-		// the Data slot (see clusterwire.FieldlessEvent).
-		enc.StartStruct(tag)
-		_ = enc.EndContainer()
-	case matteralarm.AlarmSeverityEvent:
-		// SmokeCoAlarm SmokeAlarm / CoAlarm / LowBattery /
-		// InterconnectSmokeAlarm / InterconnectCoAlarm: [0]
-		// AlarmSeverityLevel, AlarmStateEnum (enum8). matter.js
-		// smoke-co-alarm-cluster.element.ts:47-71.
-		enc.StartStruct(tag)
-		enc.PutUint(tlv.ContextTag(0), uint64(x.AlarmSeverityLevel))
-		_ = enc.EndContainer()
-	default:
-		return encodeApplianceValue(enc, tag, v)
-	}
-	return true
-}
-
-// encodeApplianceValue writes the attribute and event values of the
-// appliance servers (cluster/opstate, cluster/modebase); it reports false
-// for a value it does not know.
-func encodeApplianceValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
-	switch x := v.(type) {
 	case []string:
 		// A list of strings: OperationalState.PhaseList (a null list is
-		// a nil value and never reaches here).
-		enc.StartArray(tag)
-		for _, str := range x {
-			enc.PutUTF8(tlv.AnonymousTag(), str)
-		}
-		_ = enc.EndContainer()
+		// a nil value and never reaches here), list[string] in the
+		// generated codec.
+		spec.PutList(spec.PutString)(enc, tag, x)
 	case []clusterwire.OperationalStateStruct:
-		// OperationalState.OperationalStateList: [0] OperationalStateID,
-		// [1] OperationalStateLabel for a manufacturer-specific id
-		// (operational-state.element.ts:90-97).
-		enc.StartArray(tag)
-		for _, e := range x {
-			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutUint(tlv.ContextTag(0), uint64(e.OperationalStateID))
-			if clusterwire.HasOperationalStateLabel(e.OperationalStateID) {
-				enc.PutUTF8(tlv.ContextTag(1), e.OperationalStateLabel)
-			}
-			_ = enc.EndContainer()
-		}
-		_ = enc.EndContainer()
-	case clusterwire.ErrorStateStruct:
-		// OperationalState.OperationalError.
-		encodeErrorState(enc, tag, x)
-	case clusterwire.OperationalErrorEvent:
-		// OperationalError event: [0] ErrorState.
-		enc.StartStruct(tag)
-		encodeErrorState(enc, tlv.ContextTag(0), x.ErrorState)
-		_ = enc.EndContainer()
-	case clusterwire.OperationCompletionEvent:
-		// OperationCompletion event: [0] CompletionErrorCode, [1]
-		// TotalOperationalTime and [2] PausedTime, each optional and
-		// nullable (operational-state.element.ts:50-55).
-		enc.StartStruct(tag)
-		enc.PutUint(tlv.ContextTag(0), uint64(x.CompletionErrorCode))
-		putElapsed(enc, tlv.ContextTag(1), x.TotalOperationalTime)
-		putElapsed(enc, tlv.ContextTag(2), x.PausedTime)
-		_ = enc.EndContainer()
+		// OperationalState.OperationalStateList.
+		clusterwire.OperationalStateList(x).EncodeTLV(enc, tag)
 	case []clusterwire.ModeOptionStruct:
-		// ModeBase SupportedModes: [0] Label, [1] Mode, [2] ModeTags of
-		// {[0] MfgCode (optional), [1] Value} (mode-base.element.ts:57-71).
-		enc.StartArray(tag)
-		for _, m := range x {
-			enc.StartStruct(tlv.AnonymousTag())
-			enc.PutUTF8(tlv.ContextTag(0), m.Label)
-			enc.PutUint(tlv.ContextTag(1), uint64(m.Mode))
-			enc.StartArray(tlv.ContextTag(2))
-			for _, t := range m.ModeTags {
-				enc.StartStruct(tlv.AnonymousTag())
-				if t.MfgCode != nil {
-					enc.PutUint(tlv.ContextTag(0), uint64(*t.MfgCode))
-				}
-				enc.PutUint(tlv.ContextTag(1), uint64(t.Value))
-				_ = enc.EndContainer()
-			}
-			_ = enc.EndContainer()
-			_ = enc.EndContainer()
-		}
-		_ = enc.EndContainer()
+		// ModeBase SupportedModes.
+		clusterwire.ModeOptionList(x).EncodeTLV(enc, tag)
 	case spec.Encodable:
 		// A value of a generated cluster definition (cluster/spec/...):
 		// a struct, a spec.List of structs or an event payload, which
@@ -118,56 +47,15 @@ func encodeApplianceValue(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
 	return true
 }
 
-// encodeErrorState writes an OperationalState ErrorStateStruct: [0]
-// ErrorStateID, [1] ErrorStateLabel for a manufacturer-specific id, [2]
-// ErrorStateDetails when set (operational-state.element.ts:107-115).
-func encodeErrorState(enc *tlv.Encoder, tag tlv.Tag, e clusterwire.ErrorStateStruct) {
-	enc.StartStruct(tag)
-	enc.PutUint(tlv.ContextTag(0), uint64(e.ErrorStateID))
-	if clusterwire.HasOperationalStateLabel(e.ErrorStateID) {
-		enc.PutUTF8(tlv.ContextTag(1), e.ErrorStateLabel)
-	}
-	if e.ErrorStateDetails != "" {
-		enc.PutUTF8(tlv.ContextTag(2), e.ErrorStateDetails)
-	}
-	_ = enc.EndContainer()
-}
-
-// putElapsed writes an optional, nullable elapsed-s field; nil leaves it
-// out.
-func putElapsed(enc *tlv.Encoder, tag tlv.Tag, v *clusterwire.ElapsedS) {
-	switch {
-	case v == nil:
-	case v.Null:
-		enc.PutNull(tag)
-	default:
-		enc.PutUint(tag, uint64(v.Seconds))
-	}
-}
-
 // encodeApplicationResponse writes the command responses of the
-// application cluster servers; it reports false for a value it does not
-// know.
+// application cluster servers — OperationalCommandResponse,
+// ChangeToModeResponse and every generated response payload — through
+// their generated codecs; it reports false for a value it does not know.
 func encodeApplicationResponse(enc *tlv.Encoder, tag tlv.Tag, v any) bool {
-	switch x := v.(type) {
-	case clusterwire.OperationalCommandResponse:
-		// OperationalCommandResponse: [0] CommandResponseState
-		// (operational-state.element.ts:74-80).
-		enc.StartStruct(tag)
-		encodeErrorState(enc, tlv.ContextTag(0), x.CommandResponseState)
-		_ = enc.EndContainer()
-	case clusterwire.ChangeToModeResponse:
-		// ChangeToModeResponse: [0] Status, [1] StatusText
-		// (mode-base.element.ts:52-56).
-		enc.StartStruct(tag)
-		enc.PutUint(tlv.ContextTag(0), uint64(x.Status))
-		enc.PutUTF8(tlv.ContextTag(1), x.StatusText)
-		_ = enc.EndContainer()
-	case spec.Encodable:
-		// A response payload of a generated cluster definition.
-		x.EncodeTLV(enc, tag)
-	default:
+	x, ok := v.(spec.Encodable)
+	if !ok {
 		return false
 	}
+	x.EncodeTLV(enc, tag)
 	return true
 }

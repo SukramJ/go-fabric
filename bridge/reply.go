@@ -14,7 +14,6 @@ import (
 	matterlock "github.com/SukramJ/go-fabric/cluster/lock"
 	mattermeasure "github.com/SukramJ/go-fabric/cluster/measurement"
 	mattermodeselect "github.com/SukramJ/go-fabric/cluster/modeselect"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -717,54 +716,6 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		enc.StartStruct(tag)
 		enc.PutUint16(tlv.ContextTag(0), x.FailSafeExpiryLengthSeconds)
 		enc.PutUint16(tlv.ContextTag(1), x.MaxCumulativeFailsafeSeconds)
-		_ = enc.EndContainer()
-	case *clusterwire.ClosureOverallCurrentState:
-		// ClosureControl attribute 0x0003 (matter.js
-		// closure-control.element.ts:127-138). Position (tag 0) is
-		// conformance PS and SecureState (tag 3) is mandatory; both carry
-		// quality X, so a nil pointer encodes as TLV-Null. Latch (tag 1)
-		// and Speed (tag 2) belong to features this server does not
-		// advertise and are absent from the struct entirely — a null
-		// would claim the field exists and has no value, which is a
-		// different statement to a controller checking conformance.
-		if x == nil {
-			enc.PutNull(tag)
-			break
-		}
-		enc.StartStruct(tag)
-		if x.Position != nil {
-			enc.PutUint(tlv.ContextTag(clusterwire.ClosureOverallStateFieldPosition), uint64(*x.Position))
-		} else {
-			enc.PutNull(tlv.ContextTag(clusterwire.ClosureOverallStateFieldPosition))
-		}
-		if x.SecureState != nil {
-			enc.PutBool(tlv.ContextTag(clusterwire.ClosureOverallStateFieldSecureState), *x.SecureState)
-		} else {
-			enc.PutNull(tlv.ContextTag(clusterwire.ClosureOverallStateFieldSecureState))
-		}
-		_ = enc.EndContainer()
-	case *clusterwire.ClosureOverallTargetState:
-		// ClosureControl attribute 0x0004 (matter.js
-		// closure-control.element.ts:140-145).
-		if x == nil {
-			enc.PutNull(tag)
-			break
-		}
-		enc.StartStruct(tag)
-		if x.Position != nil {
-			enc.PutUint(tlv.ContextTag(clusterwire.ClosureOverallStateFieldPosition), uint64(*x.Position))
-		} else {
-			enc.PutNull(tlv.ContextTag(clusterwire.ClosureOverallStateFieldPosition))
-		}
-		_ = enc.EndContainer()
-	case clusterwire.ClosureErrorList:
-		// ClosureControl attribute 0x0002: a TLV array of ClosureErrorEnum.
-		// The named type is what routes it here — as a bare []uint8 the
-		// `case []byte` above would claim it and write an octet string.
-		enc.StartArray(tag)
-		for _, e := range x {
-			enc.PutUint(tlv.AnonymousTag(), uint64(e))
-		}
 		_ = enc.EndContainer()
 	case []mattercore.AccessControlEntryStruct:
 		// AccessControl.acl (Matter §9.10.4.4). TLV array of
