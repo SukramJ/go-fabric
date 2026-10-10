@@ -13,6 +13,8 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	mtrid "github.com/SukramJ/go-fabric/cluster/spec/meteridentification"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -378,12 +380,24 @@ const deviceTypeElectricalUtilityMeter uint16 = 0x0511
 // demoMeter is the utility's electricity meter, identified and nothing
 // more: the energy readings it may carry are ElectricalMeter parts
 // ("[ElectricalEnergy].a+", optional) it does not have.
+//
+// MeterType starts null, as CHIP's server starts every attribute
+// (meter-identification-server.cpp:59-65, Instance::Init): TC-MTRID-3.1
+// requires the first test event to change MeterType, PointOfDelivery and
+// MeterSerialNumber (TC_MTRIDTestBase.py:113-120, :152-158), and the
+// first preset's MeterType is Utility (MeterIdentificationEventTriggers.cpp:56).
 type demoMeter struct {
 	name string
 
 	once    sync.Once
-	srv     contract.ClusterServer
+	srv     *spec.Server
 	version cluster.DataVersionTracker
+
+	mu sync.Mutex
+	// saved holds the identification before the first test event; nil
+	// when none is pending (the app's mInstance, EventTriggers.cpp:32).
+	saved      map[uint32]any
+	presetsIdx int
 }
 
 var _ contract.EndpointSource = (*demoMeter)(nil)
@@ -395,10 +409,14 @@ func (m *demoMeter) MatterDeviceType() uint16 { return deviceTypeElectricalUtili
 
 // MatterClusterServers implements [contract.EndpointSource].
 func (m *demoMeter) MatterClusterServers() []contract.ClusterServer {
+	m.build()
+	return []contract.ClusterServer{m.srv}
+}
+
+func (m *demoMeter) build() {
 	m.once.Do(func() {
-		utility, serial := energy.MeterTypeUtility, "DEMO-0001"
+		serial := "DEMO-0001"
 		srv, err := energy.NewMeterIdentification(energy.MeterConfig{
-			MeterType:         &utility,
 			MeterSerialNumber: &serial,
 			DataVersion:       &m.version,
 		})
@@ -407,5 +425,73 @@ func (m *demoMeter) MatterClusterServers() []contract.ClusterServer {
 		}
 		m.srv = srv
 	})
-	return []contract.ClusterServer{m.srv}
+}
+
+// The MeterIdentification test event triggers (connectedhomeip
+// src/app/clusters/meter-identification-server/
+// MeterIdentificationTestEventTriggerHandler.h:44-51). The handler clears
+// the endpoint bits first (:64, clearEndpointInEventTrigger), the same
+// mask the SmokeCoAlarm triggers use here (control.go smokeTriggerMask).
+const (
+	triggerMeterAttributesValueUpdate      uint64 = 0x0b06_0000_0000_0000
+	triggerMeterAttributesValueUpdateClear uint64 = 0x0b06_0000_0000_0001
+)
+
+// meterPresets are the energy-gateway app's TestsDataPresets
+// (examples/energy-gateway-app/meter-identification/src/
+// MeterIdentificationEventTriggers.cpp:55-68), for the attributes this
+// meter serves: ProtocolVersion and PowerThreshold (the PTH feature) are
+// not served, so their preset values have nowhere to go.
+var meterPresets = [2]map[uint32]any{
+	{
+		mtrid.AttrMeterType:         energy.MeterTypeUtility,
+		mtrid.AttrPointOfDelivery:   "Test delivery point",
+		mtrid.AttrMeterSerialNumber: "TST-123456789",
+	},
+	{
+		mtrid.AttrMeterType:         energy.MeterTypePrivate,
+		mtrid.AttrPointOfDelivery:   "New delivery point",
+		mtrid.AttrMeterSerialNumber: "NEW-987654321",
+	},
+}
+
+// testEventTrigger handles the MeterIdentification triggers as the
+// energy-gateway app's HandleMeterIdentificationTestEventTrigger does
+// (MeterIdentificationEventTriggers.cpp:219-238). AttributesValueUpdate
+// saves the identification on the first update after a clear (Update,
+// :199-207; SaveAttributes, :151-160), then applies the next preset,
+// alternating between the two (UpdAttrsByPresetIdx, :184-193).
+// AttributesValueUpdateClear restores what was saved, if anything, and
+// forgets it (Clear, :209-213; RestoreAttributes, :172-182); the preset
+// index is not reset. The app ignores the setters' results
+// (TEMPORARY_RETURN_IGNORED) and reports the trigger handled; so does
+// this. False for a trigger that is not one of them.
+func (m *demoMeter) testEventTrigger(trigger uint64) bool {
+	m.build()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	switch trigger & smokeTriggerMask {
+	case triggerMeterAttributesValueUpdate:
+		if m.saved == nil {
+			m.saved = make(map[uint32]any, len(meterPresets[0]))
+			for id := range meterPresets[0] {
+				v, _ := m.srv.MatterRead(id)
+				m.saved[id] = v
+			}
+		}
+		if err := m.srv.SetAttributes(meterPresets[m.presetsIdx]); err != nil {
+			slog.Warn("meter.trigger", slog.String("device", m.name), slog.Any("err", err))
+		}
+		m.presetsIdx = 1 - m.presetsIdx
+	case triggerMeterAttributesValueUpdateClear:
+		if m.saved != nil {
+			if err := m.srv.SetAttributes(m.saved); err != nil {
+				slog.Warn("meter.trigger", slog.String("device", m.name), slog.Any("err", err))
+			}
+		}
+		m.saved = nil
+	default:
+		return false
+	}
+	return true
 }

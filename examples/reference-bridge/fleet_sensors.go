@@ -281,6 +281,39 @@ func (c *demoContactSensor) MatterClusterServers() []contract.ClusterServer {
 	return []contract.ClusterServer{measurement.NewBooleanStateServer(c.demoBinary), c.config}
 }
 
+// The BooleanStateConfiguration test event triggers (connectedhomeip
+// src/app/clusters/boolean-state-configuration-server/
+// BooleanStateConfigurationTestEventTriggerHandler.h:25-29). The handler
+// clears the endpoint bits first (.cpp:26, clearEndpointInEventTrigger),
+// the same mask the SmokeCoAlarm triggers use here (control.go
+// smokeTriggerMask).
+const (
+	triggerBoolCfgSensorTrigger   uint64 = 0x0080_0000_0000_0000
+	triggerBoolCfgSensorUntrigger uint64 = 0x0080_0000_0000_0001
+)
+
+// testEventTrigger handles the BooleanStateConfiguration triggers as the
+// all-clusters app's HandleBooleanStateConfigurationTestEventTrigger does
+// (examples/all-clusters-app/all-clusters-common/src/boolcfg-stub.cpp:
+// 27-49): SensorTrigger raises every enabled alarm
+// (SetAllEnabledAlarmsActive, :35), SensorUntrigger clears the active and
+// suppressed alarms (ClearAllAlarms, :40). The app ignores the result of
+// either call (TEMPORARY_RETURN_IGNORED) and reports the trigger handled;
+// so does this. False for a trigger that is not one of them.
+func (c *demoContactSensor) testEventTrigger(trigger uint64) bool {
+	switch trigger & smokeTriggerMask {
+	case triggerBoolCfgSensorTrigger:
+		if err := c.config.SetAllEnabledAlarmsActive(); err != nil {
+			slog.Warn("contact.trigger", slog.String("device", c.name), slog.Any("err", err))
+		}
+	case triggerBoolCfgSensorUntrigger:
+		c.config.ClearAllAlarms()
+	default:
+		return false
+	}
+	return true
+}
+
 // contactConfigLog is the contact sensor's side of a controller's
 // configuration change: the daemon has no device to tell, so it logs it.
 type contactConfigLog struct{ name string }
