@@ -138,15 +138,15 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SU | 13 | 0 | 0 | 0 | 3 | 10 | 0 |
 | BIND | 3 | 0 | 0 | 0 | 0 | 3 | 0 |
 | FLABEL | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
-| ULABEL | 4 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ULABEL | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | LCFG | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | LTIME | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | LUNIT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| DGSW | 4 | 1 | 0 | 0 | 1 | 1 | 0 |
-| DGETH | 3 | 2 | 0 | 0 | 0 | 0 | 0 |
+| DGSW | 4 | 1 | 0 | 0 | 2 | 1 | 0 |
+| DGETH | 3 | 2 | 0 | 0 | 1 | 0 | 0 |
 | ACFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | BOOL | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| BOOLCFG | 9 | 4 | 0 | 0 | 0 | 0 | 0 |
+| BOOLCFG | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
 | CDOCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | CMOCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | AIRQUAL | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -163,7 +163,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DRLK | 14 | 7 | 0 | 0 | 4 | 3 | 0 |
 | EPREF | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | EWATERHTR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| MTRID | 2 | 1 | 0 | 0 | 0 | 0 | 0 |
+| MTRID | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | FAN | 12 | 7 | 0 | 0 | 5 | 0 | 0 |
 | HEPAFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | FLW | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
@@ -190,7 +190,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WHM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **514** | **269** | **0** | **0** | **110** | **117** | **5** |
+| **all** | **514** | **279** | **0** | **0** | **112** | **117** | **5** |
 
 ### Cases not run
 
@@ -301,9 +301,11 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DD/3.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DESC/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DGETH/3.2.Simulated | (b) not supported | not applicable: the case's PICS `DGETH.C` is false for the reference DUT |
 | DGGEN/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DGSW/2.2 | (b) not supported | not applicable: the case's PICS `DGSW.S.E00` is false for the reference DUT |
 | DGSW/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DGSW/3.2.Simulated | (b) not supported | not applicable: the case's PICS `DGSW.C` is false for the reference DUT |
 | DLOG/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DRLK/2.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DRLK/2.11 | (b) not supported | not applicable: the case's PICS `DRLK.S & DRLK.S.F00 & DRLK.S.F01 & DRLK.S.F02` is false for the reference DUT |

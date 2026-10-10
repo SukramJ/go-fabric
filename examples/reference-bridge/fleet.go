@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/cluster/wire"
@@ -148,6 +150,16 @@ func (d *demoLight) MatterClusterServers() []contract.ClusterServer {
 		d.servers = []contract.ClusterServer{
 			&onOffServer{dev: d, logMessage: "light.set", lt: newLightingState()},
 			wire.ScenesManagement{},
+		}
+		// FixedLabel on the first light as well: the harness points the
+		// certification cases written against the CHIP all-clusters app's
+		// endpoint 1 (TC_FLABEL_2_1.py `--endpoint 1`) at the daemon's first
+		// bridged light, and that app serves FixedLabel there. Base allows
+		// the cluster on any endpoint.
+		if fixedLabel, err := mattercore.NewFixedLabel([]fixedlabeldef.LabelStruct{
+			{Label: "room", Value: "demo"},
+		}); err == nil {
+			d.servers = append(d.servers, fixedLabel)
 		}
 	})
 	return d.servers

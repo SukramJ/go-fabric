@@ -141,6 +141,31 @@
       "steps": 7,
       "stepsSkipped": 0
     },
+    "BOOLCFG/4.2": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 0
+    },
+    "BOOLCFG/4.3": {
+      "tests": 1,
+      "steps": 27,
+      "stepsSkipped": 0
+    },
+    "BOOLCFG/4.4": {
+      "tests": 1,
+      "steps": 19,
+      "stepsSkipped": 0
+    },
+    "BOOLCFG/5.1": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
+    "BOOLCFG/5.2": {
+      "tests": 1,
+      "steps": 13,
+      "stepsSkipped": 0
+    },
     "BOOLCFG/6.1": {
       "tests": 1,
       "steps": 14,
@@ -909,6 +934,11 @@
       "steps": 6,
       "stepsSkipped": 8
     },
+    "MTRID/3.1": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 16
+    },
     "NDOCONC/2.1": {
       "steps": 6,
       "stepsSkipped": 6
@@ -1288,6 +1318,22 @@
     "TVOCCONC/2.1": {
       "steps": 6,
       "stepsSkipped": 6
+    },
+    "ULABEL/2.1": {
+      "steps": 2,
+      "stepsSkipped": 0
+    },
+    "ULABEL/2.2": {
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "ULABEL/2.3": {
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "ULABEL/2.4": {
+      "steps": 5,
+      "stepsSkipped": 0
     },
     "VALCC/2.1": {
       "tests": 1,
@@ -2119,7 +2165,9 @@
     "DA/1.13": "MCORE.ROLE.COMMISSIONER",
     "DA/1.9": "MCORE.ROLE.COMMISSIONER",
     "DD/3.11": "MCORE.ROLE.COMMISSIONER \u0026 MCORE.DD.QR_COMMISSIONING \u0026 MCORE.DD.STANDARD_COMM_FLOW",
+    "DGETH/3.2.Simulated": "DGETH.C",
     "DGSW/2.2": "DGSW.S.E00",
+    "DGSW/3.2.Simulated": "DGSW.C",
     "DRLK/2.11": "DRLK.S \u0026 DRLK.S.F00 \u0026 DRLK.S.F01 \u0026 DRLK.S.F02",
     "DRLK/2.13": "DRLK.S.F0d",
     "DRLK/2.5": "DRLK.S \u0026 DRLK.S.F04",
