@@ -85,6 +85,11 @@ func TestTrancheConstructionChecks(t *testing.T) {
 		// MicrowaveOvenMode: exactly one Normal, never with Defrost.
 		{"microwave without Normal", modebase.NewMicrowaveOvenMode, []modebase.ModeOption{mode("D", 0, modebase.MicrowaveTagDefrost), mode("Q", 1, modebase.TagQuick)}, modebase.ErrRequiredTag},
 		{"microwave with two Normal", modebase.NewMicrowaveOvenMode, []modebase.ModeOption{mode("N", 0, modebase.MicrowaveTagNormal), mode("NQ", 1, modebase.MicrowaveTagNormal, modebase.TagQuick)}, modebase.ErrRequiredTag},
+		// MicrowaveOvenMode's ModeTags is "max 8": a mode without tags is
+		// allowed there, and nowhere else.
+		{"microwave mode without tags", modebase.NewMicrowaveOvenMode, append(microwaveModes[:2:2], mode("Plain", 2)), nil},
+		{"microwave mode with nine tags", modebase.NewMicrowaveOvenMode, append(microwaveModes[:2:2], mode("Many", 2, 0, 1, 2, 3, 4, 5, 6, 7, 8)), modebase.ErrTagCount},
+		{"oven mode without tags", modebase.NewOvenMode, append(ovenModes[:2:2], mode("Plain", 2)), modebase.ErrTagCount},
 		{"microwave Normal with Defrost", modebase.NewMicrowaveOvenMode, []modebase.ModeOption{mode("ND", 0, modebase.MicrowaveTagNormal, modebase.MicrowaveTagDefrost), mode("Q", 1, modebase.TagQuick)}, modebase.ErrTagCombination},
 		// EnergyEvseMode: a Manual mode without TimeOfUse and SolarCharging.
 		{"evse without Manual", modebase.NewEnergyEvseMode, []modebase.ModeOption{mode("T", 0, modebase.EvseTagTimeOfUse), mode("S", 1, modebase.EvseTagSolarCharging)}, modebase.ErrRequiredTag},

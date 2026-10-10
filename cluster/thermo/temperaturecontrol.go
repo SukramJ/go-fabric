@@ -34,6 +34,26 @@ import (
 //     SupportedTemperatureLevels is CONSTRAINT_ERROR;
 //   - the field of the feature the server does not have is
 //     INVALID_COMMAND.
+//
+// Where the brief that introduced the server left a case open, the
+// answer follows connectedhomeip's TemperatureControl server
+// (src/app/clusters/temperature-control-server/TemperatureControlCluster.cpp
+// at the harness pin 6170af8461b10b1766044122ac83332c6d00ab20), the
+// authority for a cluster matter.js has no server logic for:
+//
+//   - the field of the server's own feature missing is INVALID_COMMAND
+//     (HandleSetTemperature, :176 TargetTemperature, :196
+//     TargetTemperatureLevel);
+//   - on success TemperatureSetpoint / SelectedTemperatureLevel become the
+//     requested value (SetTemperatureSetpoint :127,
+//     SetSelectedTemperatureLevel :138);
+//   - MaxTemperature need not lie on a Step from MinTemperature: the
+//     constructor checks Step only against 1..Max-Min (:48-51).
+//
+// One rule differs from chip: chip's HandleSetTemperature (:174-217) reads
+// only the field of the feature it has and ignores the other one; this
+// server answers that other field with INVALID_COMMAND, as the brief
+// specifies (BD-Matter-TemperatureControl-RulesInServer).
 
 // ClusterIDTemperatureControl is the TemperatureControl cluster id, from the
 // generated definition.
@@ -148,7 +168,9 @@ func (s *TemperatureControlServer) checkConfig() error {
 			return fmt.Errorf("%w: MinTemperature %d, MaxTemperature %d", ErrTemperatureControlValue, c.MinTemperature, c.MaxTemperature)
 		}
 		if s.Serves(tc.AttrStep) {
-			// Step "1 to maxTemperature - minTemperature".
+			// Step "1 to maxTemperature - minTemperature"; MaxTemperature
+			// need not be on a step, as chip's constructor does not ask it
+			// to be (TemperatureControlCluster.cpp:48-51).
 			if c.Step < 1 || int32(c.Step) > int32(c.MaxTemperature)-int32(c.MinTemperature) {
 				return fmt.Errorf("%w: Step %d", ErrTemperatureControlValue, c.Step)
 			}
@@ -257,6 +279,8 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 		return nil, invalidCommand("temperaturecontrol: TargetTemperatureLevel without the TL feature")
 	case !number && req.TargetTemperature != nil:
 		return nil, invalidCommand("temperaturecontrol: TargetTemperature without the TN feature")
+	// A missing field of the own feature: INVALID_COMMAND, as chip
+	// answers it (TemperatureControlCluster.cpp:176, :196).
 	case number && req.TargetTemperature == nil:
 		return nil, invalidCommand("temperaturecontrol: TargetTemperature missing")
 	case !number && req.TargetTemperatureLevel == nil:
@@ -274,6 +298,9 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 	if err := s.cfg.Setter.SetTemperature(ctx, req.TargetTemperature, req.TargetTemperatureLevel); err != nil {
 		return nil, fmt.Errorf("temperaturecontrol: SetTemperature: %w", err)
 	}
+	// The requested value becomes the attribute's, as chip's
+	// SetTemperatureSetpoint / SetSelectedTemperatureLevel set it
+	// (TemperatureControlCluster.cpp:127, :138).
 	if number {
 		s.apply(tc.AttrTemperatureSetpoint, func() bool { return swap(&s.setpoint, *req.TargetTemperature) })
 	} else {

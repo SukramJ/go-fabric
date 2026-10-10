@@ -218,7 +218,7 @@ const (
 	SupportedModesMin = 2 // SupportedModes "2 to 255"
 	SupportedModesMax = 255
 	LabelMaxBytes     = 64 // ModeOptionStruct Label, StatusText "max 64"
-	ModeTagsMin       = 1  // the derivations' ModeTags "1 to 8"
+	ModeTagsMin       = 1  // ModeTags "1 to 8"; MicrowaveOvenMode's is "max 8" (0 to 8)
 	ModeTagsMax       = 8
 )
 
@@ -268,7 +268,7 @@ var (
 	ErrDuplicateLabel    = errors.New("modebase: duplicate label in supportedModes")
 	ErrDuplicateMode     = errors.New("modebase: duplicate mode in supportedModes")
 	ErrLabel             = errors.New("modebase: label exceeds 64 bytes")
-	ErrTagCount          = errors.New("modebase: a mode needs 1 to 8 mode tags")
+	ErrTagCount          = errors.New("modebase: a mode has more or fewer mode tags than its ModeTags constraint allows")
 	ErrDuplicateTag      = errors.New("modebase: a mode lists a tag twice")
 	ErrDuplicateTagSet   = errors.New("modebase: two modes have the same set of tags")
 	ErrNoStandardTag     = errors.New("modebase: a mode needs at least one standard tag")
@@ -493,7 +493,8 @@ func newServer(k kind, cfg Config) (*Server, error) {
 	if cfg.Changer == nil && inst.Accepts(CmdChangeToMode) {
 		return nil, ErrNoChanger
 	}
-	if err := checkModes(cfg.SupportedModes); err != nil {
+	tagMin, tagMax := modeTagBounds(k.def)
+	if err := checkModes(cfg.SupportedModes, tagMin, tagMax); err != nil {
 		return nil, err
 	}
 	if err := k.check(cfg.SupportedModes); err != nil {
@@ -512,9 +513,26 @@ func newServer(k kind, cfg Config) (*Server, error) {
 	return s, nil
 }
 
+// modeTagBounds reads the ModeOptionStruct ModeTags constraint from the
+// derivation's generated definition: "1 to 8" in every derivation but
+// MicrowaveOvenMode, whose "max 8" has no lower bound. matter.js's
+// ModeUtils.assertSupportedModes
+// (packages/node/src/behaviors/mode-base/ModeUtils.ts:16-29) checks only
+// duplicate labels and modes, so the tag count is the schema's alone.
+func modeTagBounds(def *spec.Cluster) (lo, hi int) {
+	fields := def.Attribute(AttrSupportedModes).Type.Entry.Type.Struct.Fields
+	i := slices.IndexFunc(fields, func(f spec.Field) bool { return f.Name == "ModeTags" })
+	c := fields[i].Constraint
+	if c.Min != nil {
+		lo = int(c.Min.Int)
+	}
+	return lo, int(c.Max.Int)
+}
+
 // checkModes validates SupportedModes against ModeUtils.assertSupportedModes,
-// the schema constraints and the ModeBase specification text.
-func checkModes(modes []ModeOption) error {
+// the schema constraints (ModeTags within tagMin..tagMax) and the ModeBase
+// specification text.
+func checkModes(modes []ModeOption, tagMin, tagMax int) error {
 	if len(modes) < SupportedModesMin || len(modes) > SupportedModesMax {
 		return fmt.Errorf("%w: %d", ErrModeCount, len(modes))
 	}
@@ -532,13 +550,14 @@ func checkModes(modes []ModeOption) error {
 		if len(m.Label) > LabelMaxBytes || !utf8.ValidString(m.Label) {
 			return fmt.Errorf("%w: mode %d", ErrLabel, m.Mode)
 		}
-		if len(m.Tags) < ModeTagsMin || len(m.Tags) > ModeTagsMax {
+		if len(m.Tags) < tagMin || len(m.Tags) > tagMax {
 			return fmt.Errorf("%w: mode %d has %d", ErrTagCount, m.Mode, len(m.Tags))
 		}
 		// "Each mode tag in this field shall be distinct from other mode
 		// tags in this field" and "A mode option shall be associated with
 		// at least one standard mode tag" (mode-base.resource.ts,
-		// ModeOptionStruct.ModeTags).
+		// ModeOptionStruct.ModeTags) — for a mode that lists tags: an empty
+		// list is what MicrowaveOvenMode's "max 8" allows.
 		standard := false
 		for i, t := range m.Tags {
 			if slices.ContainsFunc(m.Tags[:i], func(u ModeTag) bool { return sameTag(t, u) }) {
@@ -546,7 +565,7 @@ func checkModes(modes []ModeOption) error {
 			}
 			standard = standard || t.MfgCode == nil
 		}
-		if !standard {
+		if !standard && len(m.Tags) > 0 {
 			return fmt.Errorf("%w: mode %d", ErrNoStandardTag, m.Mode)
 		}
 		// "The set of ModeTags listed in each entry in this list shall be

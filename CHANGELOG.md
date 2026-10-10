@@ -29,7 +29,9 @@ the same `ColorTemperatureWriter` as before.
   `#assertSupportedModes` refuses (`ErrRequiredTag`, and the new
   `ErrTagCombination` for tags a derivation forbids in one mode).
   MicrowaveOvenMode's definition disallows ChangeToMode: that server
-  accepts no command and needs no `ModeChanger`.
+  accepts no command and needs no `ModeChanger`. The ModeTags count of a
+  mode is held to each definition's constraint: 1 to 8, and 0 to 8 on
+  MicrowaveOvenMode ("max 8"), where a mode without tags is accepted.
 - `modebase.Server.MatterInvoke` takes the generated
   `ChangeToModeRequest` of every derivation's definition as well as
   `cluster/wire.ChangeToModeRequest`.
