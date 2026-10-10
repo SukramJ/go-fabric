@@ -232,6 +232,12 @@ chiptool-families: chiptool-build ## run the CSA certification families in the C
 	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIP_FAMILIES_TIMEOUT) -v \
 		-run '^TestChipCertificationFamilies$$' ./internal/chiptool/...
 
+.PHONY: chiptool-families-update
+chiptool-families-update: chiptool-build ## the families run that rewrites its fixtures: PICS slices, chip-cases golden, docs/certifiability.md (read the diff before committing)
+	$(GO) test -tags=chiptool -count=1 -timeout=$(CHIP_FAMILIES_TIMEOUT) -v \
+		-run '^TestChipCertificationFamilies$$' ./internal/chiptool/... \
+		-args -update-chip-cases -update-certifiability-doc
+
 .PHONY: fmt
 fmt: ## format with gofumpt
 	$(GOFUMPT) -w .

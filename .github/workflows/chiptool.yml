@@ -51,6 +51,16 @@ on:
     # own change failing to trigger itself.
     types: [opened, labeled, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      families:
+        description: "Certification families to run, comma-separated (empty: every group)"
+        required: false
+        default: ""
+      update_fixtures:
+        description: "Rewrite the PICS slices, the chip-cases golden and docs/certifiability.md and upload them as an artifact (a Linux harness run nobody has locally)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -122,8 +132,16 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'needs-chiptool') }}
+          FAMILIES_INPUT: ${{ github.event.inputs.families }}
         run: |
           set -euo pipefail
+          # A dispatch that names families runs exactly those, as one group.
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$FAMILIES_INPUT" ]; then
+            include=$(jq -c -n --arg f "$FAMILIES_INPUT" '[{group: "custom", families: $f}]')
+            echo "matrix={\"include\":$include}" >> "$GITHUB_OUTPUT"
+            echo "family groups this event runs: custom ($FAMILIES_INPUT)"
+            exit 0
+          fi
           groups=(
             "core=IDM,DESC,BINFO,BRBINFO,ACE,ACL,CGEN,OPCREDS,GRPKEY,DT,RR,SM,TIMESYNC,DLOG,ICDM,SU,BIND"
             "commissioning=CADMIN,SC,DA,DD,CNET,DGGEN,G,GC"
@@ -338,13 +356,26 @@ jobs:
         env:
           GOFABRIC_CHIP_FAMILIES: ${{ matrix.families }}
           GOFABRIC_CHIP_HARNESS: image
+          UPDATE_FIXTURES: ${{ github.event.inputs.update_fixtures }}
         run: |
           set -o pipefail
-          make chiptool-families 2>&1 | tee /tmp/families.log
+          target=chiptool-families
+          if [ "$UPDATE_FIXTURES" = "true" ]; then target=chiptool-families-update; fi
+          make "$target" 2>&1 | tee /tmp/families.log
           if grep -q -- "--- SKIP: TestChipCertificationFamilies " /tmp/families.log; then
             echo "::error::the certification families skipped themselves; the harness was not usable"
             exit 1
           fi
+      - name: upload rewritten fixtures
+        if: always() && github.event.inputs.update_fixtures == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: chip-fixtures-${{ matrix.group }}
+          path: |
+            internal/chiptool/testdata/pics
+            internal/chiptool/testdata/chip-cases.golden.json
+            docs/certifiability.md
+          if-no-files-found: error
       - name: upload case logs
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
