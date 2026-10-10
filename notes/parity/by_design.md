@@ -166,6 +166,34 @@ host's to apply in its `ModeChanger`, as matter.js leaves it to the device.
 **Rationale.** A bridge cannot accept a mode change on the device's behalf;
 the tag rules are the specification's and the same for every host.
 
+
+### BD-Matter-TemperatureControl-RulesInServer — SetTemperature checked as connectedhomeip checks it; matter.js has no server logic
+
+matter.js `TemperatureControlServer.ts` adds nothing to the generated
+behaviour; SetTemperature is the host's. `cluster/thermo.TemperatureControlServer`
+checks the request before it calls the host, following Matter Application
+Cluster Specification 1.6.1 §8.8 as connectedhomeip implements it
+(`src/app/clusters/temperature-control-server/TemperatureControlCluster.cpp`,
+harness pin 6170af84):
+
+- only the field of the server's own feature is read; the other one is
+  ignored (`HandleSetTemperature` :174-217);
+- a missing own field is INVALID_COMMAND (:176, :196);
+- a TargetTemperature outside MinTemperature..MaxTemperature, or with STEP
+  not on a step from MinTemperature, is CONSTRAINT_ERROR
+  (`SetTemperatureSetpoint` :119-125);
+- a TargetTemperatureLevel not below the length of
+  SupportedTemperatureLevels is CONSTRAINT_ERROR (:135);
+- a change the device cannot accept now is INVALID_IN_STATE (:191, :215);
+  the host signals it with `thermo.ErrTemperatureRefused`, any other host
+  error is FAILURE.
+
+On success the setpoint or level becomes the requested value (:127, :138);
+MaxTemperature is not required to lie on a Step (:48-51). chip is the
+authority here because matter.js models no behaviour for this cluster.
+Guards: `TestTemperatureControlSetTemperature`,
+`TestParityMatterJS_TemperatureControl` (PR #41).
+
 ### BD-Matter-ClosureWithoutTagList — the Closure endpoint omits the TAGLIST feature its device type marks mandatory
 
 A garage drive projects as the Closure device type (0x0230) carrying
