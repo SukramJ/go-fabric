@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3975,
+  "entry_points": 3980,
   "entry_packages": [
     ".",
     "bootid",
@@ -116,9 +116,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 7464,
-    "reachable": 5053,
-    "whitelisted": 2406,
+    "total_exported": 7466,
+    "reachable": 5054,
+    "whitelisted": 2407,
     "unreachable": 5
   },
   "by_package": [
@@ -4936,6 +4936,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/coerce_test.go",
       "line": 30
+    },
+    {
+      "package": "cluster/alarm",
+      "identifier": "AlarmSeverityEvent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/alarm/smokecoalarm_server.go",
+      "line": 673
     },
     {
       "package": "cluster/alarm",

@@ -109,6 +109,19 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- The bridge encodes the OperationalState, RvcOperationalState, ModeBase,
+  SmokeCoAlarm, PumpConfigurationAndControl and ClosureControl values
+  through the generated codecs (ADR 0013): the hand-written cases in
+  `bridge/application_values.go` and the three ClosureControl cases in
+  `defaultAttributeValueWriter` are gone, the wire bytes are unchanged.
+  `cluster/wire`'s `ErrorStateStruct`, `OperationalStateStruct`,
+  `OperationalCommandResponse`, `OperationalErrorEvent`,
+  `OperationCompletionEvent`, `ModeOptionStruct`, `ChangeToModeResponse`,
+  `FieldlessEvent`, `ClosureErrorList`, `*ClosureOverallCurrentState` and
+  `*ClosureOverallTargetState` implement `spec.Encodable`; new list types
+  `wire.OperationalStateList` and `wire.ModeOptionList`.
+  `cluster/alarm.AlarmSeverityEvent` is now an alias of the generated
+  `cluster/spec/smokecoalarm.SmokeAlarmEvent` (same field, same use).
 - **The measurement servers, GenericSwitch, AdministratorCommissioning and
   fourteen system servers are built on their generated definitions** (ADR
   0013): `cluster/measurement` (every server), `cluster/wire`'s
