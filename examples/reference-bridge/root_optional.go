@@ -23,6 +23,10 @@ import (
 // (persist.go): matter.js keeps labelList nonvolatile.
 const rootUserLabelsKey = "user_label.root"
 
+// aggregatorUserLabelsKey is rootUserLabelsKey for the Aggregator
+// endpoint's UserLabel list.
+const aggregatorUserLabelsKey = "user_label.aggregator"
+
 // buildRootLabelsAndDiagnostics constructs the root's optional label,
 // localization and diagnostics clusters: FixedLabel, UserLabel (persisted),
 // LocalizationConfiguration, TimeFormatLocalization, UnitLocalization,
@@ -31,29 +35,9 @@ const rootUserLabelsKey = "user_label.root"
 // this host's choice here: en-US (de-DE supported), 24-hour, Gregorian,
 // Celsius.
 func buildRootLabelsAndDiagnostics(ctx context.Context, st *store.Store) ([]contract.ClusterServer, error) {
-	fixedLabel, err := mattercore.NewFixedLabel([]fixedlabeldef.LabelStruct{
+	fixedLabel, userLabel, err := buildLabels(ctx, st, rootUserLabelsKey, []fixedlabeldef.LabelStruct{
 		{Label: "role", Value: "bridge"},
 		{Label: "example", Value: "reference"},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var labels []userlabeldef.LabelStruct
-	if v, ok, err := st.GetSetting(ctx, rootUserLabelsKey); err == nil && ok {
-		if err := json.Unmarshal([]byte(v), &labels); err != nil {
-			labels = nil
-		}
-	}
-	userLabel, err := mattercore.NewUserLabel(mattercore.UserLabelConfig{
-		Labels: labels,
-		OnWrite: func(ctx context.Context, l []userlabeldef.LabelStruct) error {
-			b, err := json.Marshal(l)
-			if err != nil {
-				return fmt.Errorf("user labels: %w", err)
-			}
-			return st.SetSetting(context.WithoutCancel(ctx), rootUserLabelsKey, string(b))
-		},
 	})
 	if err != nil {
 		return nil, err
@@ -95,6 +79,37 @@ func buildRootLabelsAndDiagnostics(ctx context.Context, st *store.Store) ([]cont
 		return nil, err
 	}
 	return []contract.ClusterServer{fixedLabel, userLabel, localization, timeFormat, units, software, ethernet}, nil
+}
+
+// buildLabels constructs one endpoint's FixedLabel, holding fixed, and
+// UserLabel, its list restored from and persisted under key in the
+// store's settings table. The root and the Aggregator each get a pair.
+func buildLabels(ctx context.Context, st *store.Store, key string, fixed []fixedlabeldef.LabelStruct) (fixedLabel, userLabel contract.ClusterServer, err error) {
+	fixedLabel, err = mattercore.NewFixedLabel(fixed)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var labels []userlabeldef.LabelStruct
+	if v, ok, err := st.GetSetting(ctx, key); err == nil && ok {
+		if err := json.Unmarshal([]byte(v), &labels); err != nil {
+			labels = nil
+		}
+	}
+	userLabel, err = mattercore.NewUserLabel(mattercore.UserLabelConfig{
+		Labels: labels,
+		OnWrite: func(ctx context.Context, l []userlabeldef.LabelStruct) error {
+			b, err := json.Marshal(l)
+			if err != nil {
+				return fmt.Errorf("user labels: %w", err)
+			}
+			return st.SetSetting(context.WithoutCancel(ctx), key, string(b))
+		},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return fixedLabel, userLabel, nil
 }
 
 // runtimeHeap reports the Go heap from runtime.MemStats: used is HeapAlloc

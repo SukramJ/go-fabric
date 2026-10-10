@@ -117,7 +117,12 @@ func TestRootPartsListNamesEveryDescendantEndpoint(t *testing.T) {
 	_, br := startFleetBridge(t)
 	rootServers, _ := testRootClusters(t)
 	br.AttachRootClusters(rootServers)
-	aggregatorServers, err := buildAggregatorClusters()
+	db, err := openDB(context.Background(), filepath.Join(t.TempDir(), "aggregator.db"))
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	aggregatorServers, err := buildAggregatorClusters(context.Background(), store.New(db))
 	if err != nil {
 		t.Fatalf("buildAggregatorClusters: %v", err)
 	}
