@@ -1474,6 +1474,10 @@ type fleet struct {
 	garage     *demoGarage
 	colorLight *dimmer
 	fridge     *demoFridge
+	dishwasher *demoDishwasher
+	oven       *demoOven
+	microwave  *demoMicrowave
+	dryer      *demoDryer
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1516,6 +1520,10 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		garage:      newDemoGarage("Garage Door"),
 		colorLight:  newDemoColorLight("Color Bulb"),
 		fridge:      newDemoFridge("Kitchen Fridge"),
+		dishwasher:  newDemoDishwasher("Dishwasher"),
+		oven:        newDemoOven("Oven"),
+		microwave:   newDemoMicrowave("Microwave"),
+		dryer:       newDemoDryer("Tumble Dryer"),
 		assembler:   asm,
 	}, nil
 }
@@ -1634,6 +1642,10 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 	// compartment is a part of the fridge's endpoint.
 	fridge := spec("fridge", f.fridge.name, f.fridge.MatterDeviceType(), f.fridge)
 	fridge.Parts = f.fridge.parts()
+	// Oven requires a TemperatureControlledCabinet part with the Heater
+	// condition: the cavity is a part of the oven's endpoint.
+	oven := spec("oven", f.oven.name, f.oven.MatterDeviceType(), f.oven)
+	oven.Parts = f.oven.parts()
 	return []endpoint.Spec{
 		spec("ceiling", f.ceiling.name, f.ceiling.MatterDeviceType(), f.ceiling),
 		spec("fan", f.fan.name, f.fan.MatterDeviceType(), f.fan),
@@ -1653,5 +1665,9 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("garage", f.garage.name, f.garage.MatterDeviceType(), f.garage),
 		spec("colorlight", f.colorLight.name, f.colorLight.MatterDeviceType(), f.colorLight),
 		fridge,
+		spec("dishwasher", f.dishwasher.name, f.dishwasher.MatterDeviceType(), f.dishwasher),
+		oven,
+		spec("microwave", f.microwave.name, f.microwave.MatterDeviceType(), f.microwave),
+		spec("dryer", f.dryer.name, f.dryer.MatterDeviceType(), f.dryer),
 	}
 }

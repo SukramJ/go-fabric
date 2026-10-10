@@ -109,3 +109,45 @@ func TestSpecPartsComposeAChildEndpoint(t *testing.T) {
 		t.Fatal("reassembly renumbered the alarm or its part")
 	}
 }
+
+// TestComposedSourceWithoutClustersIsBridged: a source that serves no
+// cluster of its own — an Oven, whose device type mandates none and whose
+// cavity is a part — still mounts the bridged node's surface (Identify,
+// Descriptor with its PartsList, BridgedDeviceBasicInformation).
+func TestComposedSourceWithoutClustersIsBridged(t *testing.T) {
+	t.Parallel()
+	const dtOven, dtCabinet = 0x007B, 0x0071
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []Spec{{
+		StableKey: StringKey("oven"), DeviceType: dtOven, FriendlyName: "Oven",
+		Source: deviceTypeSource{dt: dtOven},
+		Parts: []Spec{{
+			StableKey: StringKey("oven:cavity"), DeviceType: dtCabinet,
+			Source: deviceTypeSource{dt: dtCabinet, servers: []contract.ClusterServer{dtServer{id: 0x0056}}},
+		}},
+	}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oven, cavity := topo.Endpoints[2], topo.Endpoints[3]
+	ids := clusterIDs(ClusterServers(oven))
+	for _, want := range []uint32{0x0003, 0x001D, 0x0039} {
+		if !slices.Contains(ids, want) {
+			t.Errorf("oven mounts %v, missing 0x%04X", ids, want)
+		}
+	}
+	for _, srv := range ClusterServers(oven) {
+		if srv.MatterClusterID() == 0x001D {
+			if v, _ := srv.MatterRead(0x0003); !slices.Equal(v.([]uint16), []uint16{cavity.ID}) {
+				t.Errorf("oven PartsList = %v", v)
+			}
+		}
+	}
+	// No source at all is still malformed and mounts nothing.
+	if got := ClusterServers(&Endpoint{ID: 9}); got != nil {
+		t.Errorf("sourceless endpoint mounts %v", got)
+	}
+}

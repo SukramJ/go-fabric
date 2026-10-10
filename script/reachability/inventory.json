@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4024,
+  "entry_points": 4071,
   "entry_packages": [
     ".",
     "bootid",
@@ -8,6 +8,8 @@
     "bridge/bridgetest",
     "cluster",
     "cluster/alarm",
+    "cluster/alarmbase",
+    "cluster/appliance",
     "cluster/closure",
     "cluster/core",
     "cluster/cover",
@@ -36,6 +38,7 @@
     "cluster/spec/descriptor",
     "cluster/spec/deviceenergymanagementmode",
     "cluster/spec/diagnosticlogs",
+    "cluster/spec/dishwasheralarm",
     "cluster/spec/dishwashermode",
     "cluster/spec/doorlock",
     "cluster/spec/electricalenergymeasurement",
@@ -51,8 +54,11 @@
     "cluster/spec/icdmanagement",
     "cluster/spec/identify",
     "cluster/spec/illuminancemeasurement",
+    "cluster/spec/laundrydryercontrols",
+    "cluster/spec/laundrywashercontrols",
     "cluster/spec/laundrywashermode",
     "cluster/spec/levelcontrol",
+    "cluster/spec/microwaveovencontrol",
     "cluster/spec/microwaveovenmode",
     "cluster/spec/modeselect",
     "cluster/spec/networkcommissioning",
@@ -60,6 +66,7 @@
     "cluster/spec/onoff",
     "cluster/spec/operationalstate",
     "cluster/spec/otasoftwareupdaterequestor",
+    "cluster/spec/ovencavityoperationalstate",
     "cluster/spec/ovenmode",
     "cluster/spec/pm10concentrationmeasurement",
     "cluster/spec/pm25concentrationmeasurement",
@@ -67,6 +74,7 @@
     "cluster/spec/powertopology",
     "cluster/spec/pressuremeasurement",
     "cluster/spec/pumpconfigurationandcontrol",
+    "cluster/spec/refrigeratoralarm",
     "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
     "cluster/spec/relativehumiditymeasurement",
     "cluster/spec/rvccleanmode",
@@ -76,6 +84,7 @@
     "cluster/spec/smokecoalarm",
     "cluster/spec/spectest",
     "cluster/spec/switchcluster",
+    "cluster/spec/temperaturealarm",
     "cluster/spec/temperaturecontrol",
     "cluster/spec/temperaturemeasurement",
     "cluster/spec/thermostat",
@@ -124,9 +133,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 7820,
-    "reachable": 5340,
-    "whitelisted": 2475,
+    "total_exported": 8071,
+    "reachable": 5548,
+    "whitelisted": 2518,
     "unreachable": 5
   },
   "by_package": [
@@ -5002,6 +5011,20 @@
       "line": 128
     },
     {
+      "package": "cluster/appliance",
+      "identifier": "DrynessLevel",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/appliance/laundry.go",
+      "line": 37
+    },
+    {
+      "package": "cluster/appliance",
+      "identifier": "NumberOfRinses",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/appliance/laundry.go",
+      "line": 34
+    },
+    {
       "package": "cluster/closure",
       "identifier": "EngageStateChangedEvent",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -6598,6 +6621,41 @@
       "line": 99
     },
     {
+      "package": "cluster/spec/dishwasheralarm",
+      "identifier": "AlarmBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwasheralarm/definition_gen.go",
+      "line": 60
+    },
+    {
+      "package": "cluster/spec/dishwasheralarm",
+      "identifier": "AlarmBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwasheralarm/definition_gen.go",
+      "line": 75
+    },
+    {
+      "package": "cluster/spec/dishwasheralarm",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/dishwasheralarm/definition_gen.go",
+      "line": 50
+    },
+    {
+      "package": "cluster/spec/dishwasheralarm",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/dishwasheralarm/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/dishwasheralarm",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/dishwasheralarm/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/dishwashermode",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -7858,6 +7916,76 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/laundrydryercontrols",
+      "identifier": "DrynessLevelEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrydryercontrols/definition_gen.go",
+      "line": 39
+    },
+    {
+      "package": "cluster/spec/laundrydryercontrols",
+      "identifier": "DrynessLevelEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrydryercontrols/definition_gen.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/spec/laundrydryercontrols",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrydryercontrols/definition_gen.go",
+      "line": 34
+    },
+    {
+      "package": "cluster/spec/laundrydryercontrols",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/laundrydryercontrols/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/laundrydryercontrols",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/laundrydryercontrols/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/laundrywashercontrols",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashercontrols/definition_gen.go",
+      "line": 36
+    },
+    {
+      "package": "cluster/spec/laundrywashercontrols",
+      "identifier": "NumberOfRinsesEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashercontrols/definition_gen.go",
+      "line": 47
+    },
+    {
+      "package": "cluster/spec/laundrywashercontrols",
+      "identifier": "NumberOfRinsesEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/laundrywashercontrols/definition_gen.go",
+      "line": 60
+    },
+    {
+      "package": "cluster/spec/laundrywashercontrols",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/laundrywashercontrols/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/laundrywashercontrols",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/laundrywashercontrols/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/laundrywashermode",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -7981,6 +8109,27 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/levelcontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/microwaveovencontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/microwaveovencontrol/definition_gen.go",
+      "line": 50
+    },
+    {
+      "package": "cluster/spec/microwaveovencontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/microwaveovencontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/microwaveovencontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/microwaveovencontrol/definition_gen_test.go",
       "line": 19
     },
     {
@@ -8488,6 +8637,69 @@
       "line": 154
     },
     {
+      "package": "cluster/spec/ovencavityoperationalstate",
+      "identifier": "ErrorStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
+      "line": 61
+    },
+    {
+      "package": "cluster/spec/ovencavityoperationalstate",
+      "identifier": "ErrorStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
+      "line": 74
+    },
+    {
+      "package": "cluster/spec/ovencavityoperationalstate",
+      "identifier": "ErrorStateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
+      "line": 109
+    },
+    {
+      "package": "cluster/spec/ovencavityoperationalstate",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
+      "line": 56
+    },
+    {
+      "package": "cluster/spec/ovencavityoperationalstate",
+      "identifier": "OperationalStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
+      "line": 118
+    },
+    {
+      "package": "cluster/spec/ovencavityoperationalstate",
+      "identifier": "OperationalStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
+      "line": 131
+    },
+    {
+      "package": "cluster/spec/ovencavityoperationalstate",
+      "identifier": "OperationalStateStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
+      "line": 163
+    },
+    {
+      "package": "cluster/spec/ovencavityoperationalstate",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ovencavityoperationalstate/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/ovencavityoperationalstate",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ovencavityoperationalstate/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/ovenmode",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -8940,6 +9152,41 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/refrigeratoralarm",
+      "identifier": "AlarmBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratoralarm/definition_gen.go",
+      "line": 60
+    },
+    {
+      "package": "cluster/spec/refrigeratoralarm",
+      "identifier": "AlarmBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratoralarm/definition_gen.go",
+      "line": 70
+    },
+    {
+      "package": "cluster/spec/refrigeratoralarm",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratoralarm/definition_gen.go",
+      "line": 50
+    },
+    {
+      "package": "cluster/spec/refrigeratoralarm",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/refrigeratoralarm/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/refrigeratoralarm",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/refrigeratoralarm/definition_gen_test.go",
       "line": 19
     },
     {
@@ -9430,6 +9677,41 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/switchcluster/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/temperaturealarm",
+      "identifier": "AlarmBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/temperaturealarm/definition_gen.go",
+      "line": 77
+    },
+    {
+      "package": "cluster/spec/temperaturealarm",
+      "identifier": "AlarmBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/temperaturealarm/definition_gen.go",
+      "line": 92
+    },
+    {
+      "package": "cluster/spec/temperaturealarm",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/temperaturealarm/definition_gen.go",
+      "line": 57
+    },
+    {
+      "package": "cluster/spec/temperaturealarm",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/temperaturealarm/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/temperaturealarm",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/temperaturealarm/definition_gen_test.go",
       "line": 19
     },
     {
@@ -10638,6 +10920,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestComposedSourceWithoutClustersIsBridged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/parts_test.go",
+      "line": 117
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestCurrentDataVersion_BridgedIgnoresInstanceTracker",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
@@ -11513,10 +11802,24 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestKitchenAlarmsAndControls",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/kitchen_test.go",
+      "line": 121
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestLightKeepsItsOnOffStateAcrossDispatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
       "line": 310
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestMicrowaveCooks",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/kitchen_test.go",
+      "line": 80
     },
     {
       "package": "examples/reference-bridge",
@@ -11538,6 +11841,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
       "line": 334
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestOvenHasItsHeatingCavityPart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/kitchen_test.go",
+      "line": 40
     },
     {
       "package": "examples/reference-bridge",

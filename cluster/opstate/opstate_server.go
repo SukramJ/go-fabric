@@ -2,16 +2,24 @@
 // Copyright (C) 2026 SukramJ.
 
 // Package opstate contains the Matter OperationalState cluster server
-// (0x0060) and its derived RvcOperationalState (0x0061): the state
-// machine of a laundry washer, laundry dryer or dishwasher, and of a
-// robotic vacuum cleaner.
+// (0x0060) and its derivations RvcOperationalState (0x0061) and
+// OvenCavityOperationalState (0x0048): the state machine of a laundry
+// washer, laundry dryer, dishwasher or microwave oven, of a robotic vacuum
+// cleaner, and of an oven's heating cabinet.
 //
-// One [Server] serves both. [NewServer] builds OperationalState,
-// [NewRvcServer] RvcOperationalState; the derivation only widens the
-// state and error enums, swaps Start / Stop for GoHome and tightens which
-// state Pause and Resume accept — exactly the parts matter.js's
+// One [Server] serves all three. [NewServer] builds OperationalState,
+// [NewRvcServer] RvcOperationalState, [NewOvenCavityServer]
+// OvenCavityOperationalState. The RVC derivation only widens the state and
+// error enums, swaps Start / Stop for GoHome and tightens which state
+// Pause and Resume accept — exactly the parts matter.js's
 // OperationalStateUtils parameterises (assertPause / assertRvcPause,
-// assertResume / assertRvcResume, assertRvcGoHome).
+// assertResume / assertRvcResume, assertRvcGoHome). The oven derivation
+// disallows Pause and Resume ("X") and adds one reactor of its own:
+// matter.js's OvenCavityOperationalStateServer
+// (packages/node/src/behaviors/oven-cavity-operational-state/
+// OvenCavityOperationalStateServer.ts) is OperationalStateServer plus
+// #assertPhaseList (:35-46) — at initialization (:24) every PhaseList
+// entry must be "pre-heating", "pre-heated" or "cooling down".
 //
 // The server holds the cluster's state, as matter.js's
 // OperationalStateServer does (packages/node/src/behaviors/
@@ -62,6 +70,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
+	ovendef "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate"
 	rvcdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
@@ -70,20 +79,31 @@ import (
 
 // Cluster ids.
 const (
-	ClusterIDOperationalState    = opdef.ClusterID
-	ClusterIDRvcOperationalState = rvcdef.ClusterID
+	ClusterIDOperationalState           = opdef.ClusterID
+	ClusterIDRvcOperationalState        = rvcdef.ClusterID
+	ClusterIDOvenCavityOperationalState = ovendef.ClusterID
 )
 
 // Device types built on these clusters (laundry-washer.element.ts,
 // robotic-vacuum-cleaner.element.ts, dishwasher.element.ts,
-// laundry-dryer.element.ts). Each mandates its OperationalState cluster
-// with the OperationCompletion event.
+// laundry-dryer.element.ts, microwave-oven.element.ts,
+// temperature-controlled-cabinet.element.ts). Each mandates its
+// OperationalState cluster with the OperationCompletion event; the
+// MicrowaveOven also mandates CountdownTime, and the
+// TemperatureControlledCabinet's OvenCavityOperationalState is "[Heater]"
+// (parity/schema.json, the device types' effective requirements).
 const (
-	DeviceTypeLaundryWasher        uint16 = 0x0073
-	DeviceTypeRoboticVacuumCleaner uint16 = 0x0074
-	DeviceTypeDishwasher           uint16 = 0x0075
-	DeviceTypeLaundryDryer         uint16 = 0x007C
+	DeviceTypeLaundryWasher                uint16 = 0x0073
+	DeviceTypeRoboticVacuumCleaner         uint16 = 0x0074
+	DeviceTypeDishwasher                   uint16 = 0x0075
+	DeviceTypeLaundryDryer                 uint16 = 0x007C
+	DeviceTypeMicrowaveOven                uint16 = 0x0079
+	DeviceTypeTemperatureControlledCabinet uint16 = 0x0071
 )
+
+// OvenCavityPhases are the PhaseList entries OvenCavityOperationalState
+// allows (OvenCavityOperationalStateServer.ts:36 allowedPhases).
+var OvenCavityPhases = []string{"pre-heating", "pre-heated", "cooling down"}
 
 // Attribute ids (operational-state.element.ts:23-44).
 const (
@@ -249,7 +269,9 @@ type Config struct {
 	Phases       []string
 	CurrentPhase *uint8
 	// CountdownTime serves the optional CountdownTime attribute, null
-	// until [Server.SetCountdownTime].
+	// until [Server.SetCountdownTime]. The MicrowaveOven device type
+	// mandates it, and a server built with it as DeviceType serves it
+	// anyway.
 	CountdownTime bool
 	// OperationCompletion declares the optional OperationCompletion
 	// event. The four appliance device types make it mandatory, and a
@@ -282,6 +304,7 @@ var (
 	ErrDeviceType          = errors.New("opstate: device type does not use this cluster")
 	ErrEventNotDeclared    = errors.New("opstate: OperationCompletion is not declared")
 	ErrInvalidHandlerReply = errors.New("opstate: the command handler answered an undefined error state")
+	ErrPhaseNotAllowed     = errors.New("opstate: phase is not allowed by this cluster")
 )
 
 // variant is what distinguishes OperationalState from its RVC derivation.
@@ -291,6 +314,9 @@ type variant struct {
 	states      *spec.Enum // the derivation's OperationalStateEnum
 	errors      *spec.Enum // the derivation's ErrorStateEnum
 	deviceTypes []uint16
+	// phases, when set, are the only PhaseList entries the derivation
+	// allows at construction.
+	phases []string
 	// pause / resume / goHome return CommandInvalidInState for a state
 	// the command is not valid in, NoError otherwise — matter.js
 	// OperationalStateUtils.
@@ -303,7 +329,7 @@ var (
 		commands:    CommandPause | CommandStop | CommandStart | CommandResume,
 		states:      opdef.OperationalStateEnumDef,
 		errors:      opdef.ErrorStateEnumDef,
-		deviceTypes: []uint16{DeviceTypeLaundryWasher, DeviceTypeDishwasher, DeviceTypeLaundryDryer},
+		deviceTypes: []uint16{DeviceTypeLaundryWasher, DeviceTypeDishwasher, DeviceTypeLaundryDryer, DeviceTypeMicrowaveOven},
 		pause:       assertPause,
 		resume:      assertResume,
 	}
@@ -316,6 +342,17 @@ var (
 		pause:       assertRvcPause,
 		resume:      assertRvcResume,
 		goHome:      assertRvcGoHome,
+	}
+	// ovenVariant: Pause and Resume are "X"; Start and Stop keep their
+	// base conformance (ovencavityoperationalstate.CmdStart "O", CmdStop
+	// "Start, O").
+	ovenVariant = variant{
+		def:         ovendef.Definition,
+		commands:    CommandStop | CommandStart,
+		states:      ovendef.OperationalStateEnumDef,
+		errors:      ovendef.ErrorStateEnumDef,
+		deviceTypes: []uint16{DeviceTypeTemperatureControlledCabinet},
+		phases:      OvenCavityPhases,
 	}
 )
 
@@ -425,6 +462,10 @@ func NewServer(cfg Config) (*Server, error) { return newServer(baseVariant, cfg)
 // NewRvcServer builds an RvcOperationalState (0x0061) server.
 func NewRvcServer(cfg Config) (*Server, error) { return newServer(rvcVariant, cfg) }
 
+// NewOvenCavityServer builds an OvenCavityOperationalState (0x0048)
+// server. Its PhaseList may hold only [OvenCavityPhases].
+func NewOvenCavityServer(cfg Config) (*Server, error) { return newServer(ovenVariant, cfg) }
+
 func newServer(v variant, cfg Config) (*Server, error) {
 	if err := checkCommands(v, cfg); err != nil {
 		return nil, err
@@ -435,6 +476,15 @@ func newServer(v variant, cfg Config) (*Server, error) {
 	if err := checkPhases(cfg.Phases, cfg.CurrentPhase); err != nil {
 		return nil, err
 	}
+	// OvenCavityOperationalStateServer #assertPhaseList, at initialization
+	// only (OvenCavityOperationalStateServer.ts:24, :35-46).
+	if v.phases != nil {
+		for _, p := range cfg.Phases {
+			if !slices.Contains(v.phases, p) {
+				return nil, fmt.Errorf("%w: %q", ErrPhaseNotAllowed, p)
+			}
+		}
+	}
 	required := false
 	if cfg.DeviceType != 0 {
 		if !slices.Contains(v.deviceTypes, cfg.DeviceType) {
@@ -442,6 +492,10 @@ func newServer(v variant, cfg Config) (*Server, error) {
 		}
 		// <device>.element.ts: Requirement OperationCompletion, "M".
 		required = true
+		// microwave-oven.element.ts: Requirement CountdownTime, "M".
+		if cfg.DeviceType == DeviceTypeMicrowaveOven {
+			cfg.CountdownTime = true
+		}
 	}
 	opts := spec.Options{}
 	if cfg.OperationCompletion || required {
@@ -456,8 +510,8 @@ func newServer(v variant, cfg Config) (*Server, error) {
 		}
 	}
 	// checkCommands has refused every command the derivation disallows
-	// (Start and Stop are "X" on RvcOperationalState); nothing else is
-	// left for New to refuse.
+	// (Start and Stop are "X" on RvcOperationalState, Pause and Resume on
+	// OvenCavityOperationalState); nothing else is left for New to refuse.
 	inst, _ := spec.New(v.def, opts)
 	s := &Server{
 		v: v, inst: inst, ext: cfg.DataVersion, handler: cfg.Handler, commands: cfg.Commands,
@@ -573,6 +627,10 @@ func Revision() uint16 { return opdef.Revision }
 // definition.
 func RvcRevision() uint16 { return rvcdef.Revision }
 
+// OvenCavityRevision returns OvenCavityOperationalState's revision from its
+// generated definition.
+func OvenCavityRevision() uint16 { return ovendef.Revision }
+
 func (s *Server) tracker() *cluster.DataVersionTracker {
 	if s.ext != nil {
 		return s.ext
@@ -589,7 +647,7 @@ func (s *Server) changed(attrs ...uint32) {
 	s.Notify(attrs...)
 }
 
-// MatterClusterID returns 0x0060 or 0x0061.
+// MatterClusterID returns 0x0060, 0x0061 or 0x0048.
 func (s *Server) MatterClusterID() uint32 { return s.inst.MatterClusterID() }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
