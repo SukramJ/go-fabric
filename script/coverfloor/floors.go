@@ -218,6 +218,13 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/energyevsemode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/waterheatermode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagementmode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/microwaveovenmode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/ovenmode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/spectest", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/clustergen", min: 95},
 	// The CHIP data model cross-check (internal/chipdm): measured 97.4 without
