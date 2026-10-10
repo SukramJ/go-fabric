@@ -103,6 +103,10 @@
       "steps": 14,
       "stepsSkipped": 0
     },
+    "AIRQUAL/2.1": {
+      "steps": 2,
+      "stepsSkipped": 0
+    },
     "BINFO/2.1": {
       "tests": 1,
       "steps": 30,
@@ -121,6 +125,26 @@
       "tests": 1,
       "steps": 15,
       "stepsSkipped": 0
+    },
+    "BOOLCFG/2.1": {
+      "tests": 1,
+      "steps": 10,
+      "stepsSkipped": 0
+    },
+    "BOOLCFG/3.1": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "BOOLCFG/4.1": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "BOOLCFG/6.1": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 20
     },
     "BRBINFO/2.1": {
       "tests": 1,
@@ -259,6 +283,10 @@
       "steps": 39,
       "stepsSkipped": 0
     },
+    "CDOCONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
+    },
     "CGEN/2.1": {
       "tests": 1,
       "steps": 8,
@@ -298,6 +326,10 @@
       "tests": 1,
       "steps": 64,
       "stepsSkipped": 72
+    },
+    "CMOCONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
     },
     "CNET/1.4": {
       "tests": 1,
@@ -349,6 +381,14 @@
       "steps": 4,
       "stepsSkipped": 0
     },
+    "DGETH/2.1": {
+      "steps": 6,
+      "stepsSkipped": 9
+    },
+    "DGETH/2.2": {
+      "steps": 11,
+      "stepsSkipped": 11
+    },
     "DGGEN/2.1": {
       "steps": 30,
       "stepsSkipped": 14
@@ -375,6 +415,11 @@
       "tests": 1,
       "steps": 3,
       "stepsSkipped": 0
+    },
+    "DGSW/2.1": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 4
     },
     "DRLK/2.1": {
       "steps": 29,
@@ -413,6 +458,26 @@
       "steps": 3,
       "stepsSkipped": 0
     },
+    "EPREF/2.1": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 8
+    },
+    "EWATERHTR/2.1": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "EWATERHTR/2.2": {
+      "tests": 1,
+      "steps": 66,
+      "stepsSkipped": 0
+    },
+    "EWATERHTR/2.3": {
+      "tests": 1,
+      "steps": 44,
+      "stepsSkipped": 0
+    },
     "FAN/2.1": {
       "tests": 1,
       "steps": 6,
@@ -446,6 +511,10 @@
       "tests": 1,
       "steps": 29,
       "stepsSkipped": 0
+    },
+    "FLDCONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
     },
     "FLW/2.1": {
       "steps": 5,
@@ -653,6 +722,21 @@
       "steps": 12,
       "stepsSkipped": 4
     },
+    "IDM/10.4@ep27": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep28": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep29": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
     "IDM/10.4@ep3": {
       "tests": 1,
       "steps": 12,
@@ -711,7 +795,7 @@
     "IDM/13.1": {
       "tests": 1,
       "steps": 12,
-      "stepsSkipped": 14
+      "stepsSkipped": 10
     },
     "IDM/14.1": {
       "tests": 1,
@@ -752,6 +836,21 @@
       "tests": 1,
       "steps": 3,
       "stepsSkipped": 0
+    },
+    "LCFG/2.1": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 0
+    },
+    "LTIME/3.1": {
+      "tests": 1,
+      "steps": 16,
+      "stepsSkipped": 0
+    },
+    "LUNIT/3.1": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 2
     },
     "LVL/2.1": {
       "steps": 9,
@@ -804,6 +903,15 @@
     "MOD/2.1": {
       "steps": 6,
       "stepsSkipped": 0
+    },
+    "MTRID/2.1": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 8
+    },
+    "NDOCONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
     },
     "OCC/2.1": {
       "tests": 1,
@@ -906,6 +1014,10 @@
       "steps": 11,
       "stepsSkipped": 6
     },
+    "OZCONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
+    },
     "PCC/2.1": {
       "steps": 11,
       "stepsSkipped": 13
@@ -922,6 +1034,18 @@
       "steps": 1,
       "stepsSkipped": 12
     },
+    "PMHCONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
+    },
+    "PMICONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
+    },
+    "PMKCONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
+    },
     "PS/2.1": {
       "steps": 9,
       "stepsSkipped": 24
@@ -934,6 +1058,10 @@
     "RH/2.1": {
       "steps": 5,
       "stepsSkipped": 0
+    },
+    "RNCONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
     },
     "RR/1.1": {
       "tests": 1,
@@ -1157,6 +1285,10 @@
       "steps": 18,
       "stepsSkipped": 34
     },
+    "TVOCCONC/2.1": {
+      "steps": 6,
+      "stepsSkipped": 6
+    },
     "VALCC/2.1": {
       "tests": 1,
       "steps": 13,
@@ -1195,6 +1327,16 @@
     "VALCC/4.5": {
       "tests": 1,
       "steps": 9,
+      "stepsSkipped": 0
+    },
+    "WHM/1.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "WHM/2.1": {
+      "tests": 1,
+      "steps": 14,
       "stepsSkipped": 0
     },
     "WNCV/2.1": {
@@ -1287,6 +1429,9 @@
       "2.10",
       "2.11"
     ],
+    "AIRQUAL": [
+      "2.1"
+    ],
     "BIND": [
       "2.1",
       "2.2",
@@ -1301,6 +1446,17 @@
     "BOOL": [
       "2.1",
       "2.2"
+    ],
+    "BOOLCFG": [
+      "2.1",
+      "3.1",
+      "4.1",
+      "4.2",
+      "4.3",
+      "4.4",
+      "5.1",
+      "5.2",
+      "6.1"
     ],
     "BRBINFO": [
       "2.1",
@@ -1365,6 +1521,9 @@
       "9.4.Simulated",
       "10.1"
     ],
+    "CDOCONC": [
+      "2.1"
+    ],
     "CGEN": [
       "2.1",
       "2.2",
@@ -1390,6 +1549,9 @@
       "7.2",
       "7.3",
       "7.4"
+    ],
+    "CMOCONC": [
+      "2.1"
     ],
     "CNET": [
       "1.4",
@@ -1468,6 +1630,11 @@
       "2.2",
       "2.3"
     ],
+    "DGETH": [
+      "2.1",
+      "2.2",
+      "3.2.Simulated"
+    ],
     "DGGEN": [
       "2.1",
       "2.2",
@@ -1476,6 +1643,12 @@
       "2.5",
       "3.1",
       "3.2"
+    ],
+    "DGSW": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "3.2.Simulated"
     ],
     "DLOG": [
       "2.1"
@@ -1499,6 +1672,14 @@
     "DT": [
       "1.1"
     ],
+    "EPREF": [
+      "2.1"
+    ],
+    "EWATERHTR": [
+      "2.1",
+      "2.2",
+      "2.3"
+    ],
     "FAN": [
       "2.1",
       "2.2",
@@ -1512,6 +1693,12 @@
       "3.5",
       "3.6",
       "4.1"
+    ],
+    "FLABEL": [
+      "2.1"
+    ],
+    "FLDCONC": [
+      "2.1"
     ],
     "FLW": [
       "2.1",
@@ -1593,6 +1780,15 @@
       "13.1",
       "14.1"
     ],
+    "LCFG": [
+      "2.1"
+    ],
+    "LTIME": [
+      "3.1"
+    ],
+    "LUNIT": [
+      "3.1"
+    ],
     "LVL": [
       "2.1",
       "2.2",
@@ -1618,6 +1814,13 @@
       "3.2",
       "3.3",
       "3.4"
+    ],
+    "MTRID": [
+      "2.1",
+      "3.1"
+    ],
+    "NDOCONC": [
+      "2.1"
     ],
     "OCC": [
       "2.1",
@@ -1655,11 +1858,23 @@
       "2.5",
       "2.6"
     ],
+    "OZCONC": [
+      "2.1"
+    ],
     "PCC": [
       "2.1",
       "2.2",
       "2.3",
       "2.4"
+    ],
+    "PMHCONC": [
+      "2.1"
+    ],
+    "PMICONC": [
+      "2.1"
+    ],
+    "PMKCONC": [
+      "2.1"
     ],
     "PS": [
       "2.1",
@@ -1670,6 +1885,9 @@
     "RH": [
       "2.1",
       "2.2"
+    ],
+    "RNCONC": [
+      "2.1"
     ],
     "RR": [
       "1.1"
@@ -1809,6 +2027,15 @@
       "4.3",
       "4.4"
     ],
+    "TVOCCONC": [
+      "2.1"
+    ],
+    "ULABEL": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4"
+    ],
     "VALCC": [
       "2.1",
       "3.1",
@@ -1820,6 +2047,10 @@
       "4.3",
       "4.4",
       "4.5"
+    ],
+    "WHM": [
+      "1.2",
+      "2.1"
     ],
     "WNCV": [
       "2.1",
@@ -1888,6 +2119,7 @@
     "DA/1.13": "MCORE.ROLE.COMMISSIONER",
     "DA/1.9": "MCORE.ROLE.COMMISSIONER",
     "DD/3.11": "MCORE.ROLE.COMMISSIONER \u0026 MCORE.DD.QR_COMMISSIONING \u0026 MCORE.DD.STANDARD_COMM_FLOW",
+    "DGSW/2.2": "DGSW.S.E00",
     "DRLK/2.11": "DRLK.S \u0026 DRLK.S.F00 \u0026 DRLK.S.F01 \u0026 DRLK.S.F02",
     "DRLK/2.13": "DRLK.S.F0d",
     "DRLK/2.5": "DRLK.S \u0026 DRLK.S.F04",
@@ -1997,6 +2229,7 @@
     "DD/3.9": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DESC/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DGGEN/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DGSW/2.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DLOG/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DRLK/2.10": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DRLK/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
