@@ -130,7 +130,11 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/secure", min: 0, why: "package doc only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/secure/aesccm", min: 96},
-	{pkg: "github.com/SukramJ/go-fabric/secure/attestation", min: 85},
+	{
+		pkg: "github.com/SukramJ/go-fabric/secure/attestation",
+		min: 80,
+		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (85.7 % to 80.2 %)",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/secure/channel", min: 85},
 	// These three floors are deliberately set from the module WITHOUT its
 	// fuzz targets: secure/setup measured 84.0 without and 91.4 with,
