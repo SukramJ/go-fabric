@@ -46,6 +46,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/core", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 98},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/energy", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/fan", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 81},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 94},
@@ -225,6 +226,9 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/ovenmode", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/energypreference", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/meteridentification", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/spectest", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/clustergen", min: 95},
 	// The CHIP data model cross-check (internal/chipdm): measured 97.4 without
