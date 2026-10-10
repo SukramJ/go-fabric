@@ -281,6 +281,23 @@ A host application that pins its own copy of these bytes (the reference daemon
 does, to keep a schema change from arriving unnoticed in a dependency bump)
 updates that pin after the snapshot lands here, not before.
 
+## Which model does which work
+
+Set on 2026-10-10. The rule follows from the parity discipline above: a
+statement about matter.js or chip behaviour that lands in the repo is cited
+later as fact, so the work that produces such statements gets the strongest
+model, and the work a guard checks may use a cheaper one.
+
+| Work | Model |
+| --- | --- |
+| Analysis, planning, parity audits, reviews; anything written into `notes/parity/by_design.md`, the findings register, an ADR, or a `// Mirrors matter.js …` comment; rebases and merge conflicts where upstream may have overtaken the change; `secure/`, `commissioning/`, ACL and the four `cluster/core` servers ADR 0013 skips | **Fable** (the default for this repo) |
+| Implementation of a finished plan with guards behind it: a tranche of generated servers after the first exists as the pattern, a server migration whose parity tests already hold the definition against the snapshot, a CHANGELOG entry for a finished diff | **Opus** (also what fast mode runs on) |
+| Work a test or generator checks immediately: `make generate-matter-schema`, `gofumpt`, regenerating a ratchet, adding a parity case to an existing pattern; search and first reading of a source tree whose result a stronger model or the owner reads again | **Sonnet**, including as the model of a delegated search subagent |
+
+Sonnet never writes a fact about matter.js or chip into the repo, and never
+touches the security-relevant paths named in the first row. When in doubt
+about which row a task is in, it is in the first.
+
 ## Conventions worth knowing before the linter tells you
 
 - Every new `.go` file opens with the MIT header, or
