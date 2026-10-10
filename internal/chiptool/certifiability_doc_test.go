@@ -161,7 +161,7 @@ func renderCertifiability(g docGolden) string {
 			if expr, na := g.NotApplicable[id]; na {
 				if _, ex := fam.gapFor(n); !ex {
 					counts[classNotSupported]++
-					r.gaps = append(r.gaps, fmt.Sprintf("| %s | %s | not applicable: the case's PICS `%s` is false for the reference DUT |", id, classNotSupported, mdCell(expr)))
+					r.gaps = append(r.gaps, fmt.Sprintf("| %s | %s | not applicable: the case's PICS %#q is false for the reference DUT |", id, classNotSupported, mdCell(expr)))
 					continue
 				}
 			}
