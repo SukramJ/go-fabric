@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4092,
+  "entry_points": 4094,
   "entry_packages": [
     ".",
     "bootid",
@@ -143,9 +143,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 8503,
+    "total_exported": 8505,
     "reachable": 5880,
-    "whitelisted": 2618,
+    "whitelisted": 2620,
     "unreachable": 5
   },
   "by_package": [
@@ -12431,7 +12431,14 @@
       "identifier": "TestBlindPositionSurvivesARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 293
+      "line": 298
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestBoolCfgTestEventTriggers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_triggers_test.go",
+      "line": 19
     },
     {
       "package": "examples/reference-bridge",
@@ -12452,14 +12459,14 @@
       "identifier": "TestCaseIdentitiesResolveAndForget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 241
+      "line": 246
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCaseInitiatorProviderNeedsALoadedIdentity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 184
+      "line": 189
     },
     {
       "package": "examples/reference-bridge",
@@ -12512,6 +12519,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestMeterTestEventTriggers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_triggers_test.go",
+      "line": 39
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestOnWithTimedOffCountsDownAndTurnsTheLightOff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
@@ -12529,14 +12543,14 @@
       "identifier": "TestOperationalHoursSurviveARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 334
+      "line": 339
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestRebootCountCountsBoots",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 267
+      "line": 272
     },
     {
       "package": "examples/reference-bridge",
@@ -12550,7 +12564,7 @@
       "identifier": "TestRootMountsGroupcastWithTheAuxiliaryACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 209
+      "line": 214
     },
     {
       "package": "examples/reference-bridge",
