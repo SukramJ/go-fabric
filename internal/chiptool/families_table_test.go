@@ -144,6 +144,13 @@ const (
 	// (examples/reference-bridge/fleet_appliances.go): TemperatureControl
 	// and RefrigeratorAndTemperatureControlledCabinetMode.
 	dtTempControlledCabinet = 0x0071
+	// dtEnergyEvse is the reference EV charger
+	// (examples/reference-bridge/fleet_evse.go): EnergyEvse and
+	// EnergyEvseMode; dtDeviceEnergyManagement is its
+	// DeviceEnergyManagement part (DeviceEnergyManagement with
+	// PA|PFR|STA|PAU|FA|CON and DeviceEnergyManagementMode).
+	dtEnergyEvse             = 0x050C
+	dtDeviceEnergyManagement = 0x050D
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -334,6 +341,16 @@ var chipFamilies = []family{
 			"2.6": {classHarness, "TC-DRLK-2.6 gates every step on the Year Day Schedule feature (PICS DRLK.S.F0a=0 here) except its final \"Cleanup the created user\" ClearUser, which has no PICS gate and fails on a lock without the User feature (DRLK.S.F08=0)", false},
 		},
 	},
+	// DEM, DEMM, EEVSE and EEVSEM run on the EV charger and its
+	// DeviceEnergyManagement part; TC_EEVSE_2_x and TC_DEM_2_x drive them
+	// through the EnergyEvse (0x0099...) and DeviceEnergyManagement
+	// (0x0098...) test event triggers, which the charger answers as
+	// connectedhomeip's evse-app does (examples/reference-bridge/
+	// fleet_evse.go).
+	{name: "DEM", deviceType: dtDeviceEnergyManagement},
+	{name: "DEMM", deviceType: dtDeviceEnergyManagement},
+	{name: "EEVSE", deviceType: dtEnergyEvse},
+	{name: "EEVSEM", deviceType: dtEnergyEvse},
 	{name: "FAN", deviceType: dtFan},
 	{name: "HEPAFREMON", deviceType: dtAirPurifier},
 	{

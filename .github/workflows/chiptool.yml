@@ -147,6 +147,7 @@ jobs:
             "commissioning=CADMIN,SC,DA,DD,CNET,DGGEN,G,GC"
             "app-lights=OO,LVL,CC,I,S,SWTCH,BOOL,OCC,TMP,RH,FLW"
             "app-appliances=DRLK,FAN,LWM,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV,HEPAFREMON,ACFREMON,CLCTRL,TCCM,TCTL"
+            "app-energy=DEM,DEMM,EEVSE,EEVSEM"
           )
           all=true
           if [ "$EVENT" = "pull_request" ] && [ "$LABELLED" != "true" ]; then
