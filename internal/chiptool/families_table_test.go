@@ -143,6 +143,9 @@ const (
 	// dtAirQualitySensor carries AirQuality and the ten concentration
 	// clusters (examples/reference-bridge/fleet_sensors.go).
 	dtAirQualitySensor = 0x002C
+	// dtElectricalUtilityMeter is the reference daemon's electricity meter
+	// (MeterIdentification, brief F).
+	dtElectricalUtilityMeter = 0x0511
 	// dtTempControlledCabinet is the reference fridge's cabinet part
 	// (examples/reference-bridge/fleet_appliances.go): TemperatureControl
 	// and RefrigeratorAndTemperatureControlledCabinetMode.
@@ -323,6 +326,13 @@ var chipFamilies = []family{
 	// Test_TC_CMOCONC_2_1.yaml:22).
 	{name: "CDOCONC", deviceType: dtAirQualitySensor},
 	{name: "CMOCONC", deviceType: dtAirQualitySensor},
+	// AIRQUAL, PMICONC (PM2.5) and PMKCONC (PM10): the AirQuality, Pm25 and
+	// Pm10 clusters the air quality sensor also serves (connectedhomeip
+	// Test_TC_AIRQUAL_2_1.yaml, Test_TC_PMICONC_2_1.yaml,
+	// Test_TC_PMKCONC_2_1.yaml).
+	{name: "AIRQUAL", deviceType: dtAirQualitySensor},
+	{name: "PMICONC", deviceType: dtAirQualitySensor},
+	{name: "PMKCONC", deviceType: dtAirQualitySensor},
 	{name: "FLDCONC", deviceType: dtAirQualitySensor},
 	{name: "NDOCONC", deviceType: dtAirQualitySensor},
 	{name: "OZCONC", deviceType: dtAirQualitySensor},
@@ -372,6 +382,9 @@ var chipFamilies = []family{
 	// daemon's tank model answers as connectedhomeip's water-heater app
 	// does (examples/reference-bridge/fleet_energy.go).
 	{name: "EWATERHTR", deviceType: dtWaterHeater},
+	// MTRID: MeterIdentification on the electricity meter (connectedhomeip
+	// TC_MTRID_2_1.py, TC_MTRID_3_1.py).
+	{name: "MTRID", deviceType: dtElectricalUtilityMeter},
 	{name: "FAN", deviceType: dtFan},
 	{name: "HEPAFREMON", deviceType: dtAirPurifier},
 	{

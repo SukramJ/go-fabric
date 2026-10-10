@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4044,
+  "entry_points": 4092,
   "entry_packages": [
     ".",
     "bootid",
@@ -8,6 +8,7 @@
     "bridge/bridgetest",
     "cluster",
     "cluster/alarm",
+    "cluster/boolcfg",
     "cluster/closure",
     "cluster/core",
     "cluster/cover",
@@ -30,8 +31,10 @@
     "cluster/spec/basicinformation",
     "cluster/spec/binding",
     "cluster/spec/booleanstate",
+    "cluster/spec/booleanstateconfiguration",
     "cluster/spec/bridgeddevicebasicinformation",
     "cluster/spec/carbondioxideconcentrationmeasurement",
+    "cluster/spec/carbonmonoxideconcentrationmeasurement",
     "cluster/spec/closurecontrol",
     "cluster/spec/colorcontrol",
     "cluster/spec/descriptor",
@@ -43,9 +46,11 @@
     "cluster/spec/electricalpowermeasurement",
     "cluster/spec/energyevsemode",
     "cluster/spec/energypreference",
+    "cluster/spec/ethernetnetworkdiagnostics",
     "cluster/spec/fancontrol",
     "cluster/spec/fixedlabel",
     "cluster/spec/flowmeasurement",
+    "cluster/spec/formaldehydeconcentrationmeasurement",
     "cluster/spec/generalcommissioning",
     "cluster/spec/generaldiagnostics",
     "cluster/spec/groups",
@@ -55,21 +60,26 @@
     "cluster/spec/illuminancemeasurement",
     "cluster/spec/laundrywashermode",
     "cluster/spec/levelcontrol",
+    "cluster/spec/localizationconfiguration",
     "cluster/spec/meteridentification",
     "cluster/spec/microwaveovenmode",
     "cluster/spec/modeselect",
     "cluster/spec/networkcommissioning",
+    "cluster/spec/nitrogendioxideconcentrationmeasurement",
     "cluster/spec/occupancysensing",
     "cluster/spec/onoff",
     "cluster/spec/operationalstate",
     "cluster/spec/otasoftwareupdaterequestor",
     "cluster/spec/ovenmode",
+    "cluster/spec/ozoneconcentrationmeasurement",
     "cluster/spec/pm10concentrationmeasurement",
+    "cluster/spec/pm1concentrationmeasurement",
     "cluster/spec/pm25concentrationmeasurement",
     "cluster/spec/powersource",
     "cluster/spec/powertopology",
     "cluster/spec/pressuremeasurement",
     "cluster/spec/pumpconfigurationandcontrol",
+    "cluster/spec/radonconcentrationmeasurement",
     "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
     "cluster/spec/relativehumiditymeasurement",
     "cluster/spec/rvccleanmode",
@@ -77,12 +87,17 @@
     "cluster/spec/rvcrunmode",
     "cluster/spec/scenesmanagement",
     "cluster/spec/smokecoalarm",
+    "cluster/spec/softwarediagnostics",
     "cluster/spec/spectest",
     "cluster/spec/switchcluster",
     "cluster/spec/temperaturecontrol",
     "cluster/spec/temperaturemeasurement",
     "cluster/spec/thermostat",
+    "cluster/spec/timeformatlocalization",
     "cluster/spec/timesynchronization",
+    "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+    "cluster/spec/unitlocalization",
+    "cluster/spec/userlabel",
     "cluster/spec/valveconfigurationandcontrol",
     "cluster/spec/waterheatermanagement",
     "cluster/spec/waterheatermode",
@@ -128,9 +143,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 7949,
-    "reachable": 5436,
-    "whitelisted": 2508,
+    "total_exported": 8503,
+    "reachable": 5880,
+    "whitelisted": 2618,
     "unreachable": 5
   },
   "by_package": [
@@ -580,6 +595,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/attribute_value_reader_test.go",
       "line": 679
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAttributeValueReader_UserLabel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/attribute_value_reader_userlabel_test.go",
+      "line": 28
     },
     {
       "package": "bridge",
@@ -5006,6 +5028,27 @@
       "line": 128
     },
     {
+      "package": "cluster/boolcfg",
+      "identifier": "AlarmMode",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/boolcfg/boolcfg.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/boolcfg",
+      "identifier": "Feature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/boolcfg/boolcfg.go",
+      "line": 41
+    },
+    {
+      "package": "cluster/boolcfg",
+      "identifier": "SensorFault",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/boolcfg/boolcfg.go",
+      "line": 45
+    },
+    {
       "package": "cluster/closure",
       "identifier": "EngageStateChangedEvent",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -5196,10 +5239,24 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestParityMatterJS_EthernetNetworkDiagnostics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/diagnostics_root_test.go",
+      "line": 97
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestParityMatterJS_FixedLabel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/fixed_label_test.go",
       "line": 22
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_LocalizationConfiguration",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/localization_test.go",
+      "line": 25
     },
     {
       "package": "cluster/core",
@@ -5214,6 +5271,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
       "line": 411
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_SoftwareDiagnostics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/diagnostics_root_test.go",
+      "line": 38
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_TimeFormatLocalization",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/localization_test.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_UnitLocalization",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/localization_test.go",
+      "line": 141
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_UserLabel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/user_label_test.go",
+      "line": 32
     },
     {
       "package": "cluster/core",
@@ -5444,7 +5529,7 @@
       "identifier": "TestElectricalValuesDecodeThroughTheGeneratedCodecs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 84
+      "line": 98
     },
     {
       "package": "cluster/measurement",
@@ -5535,7 +5620,7 @@
       "identifier": "TestServersMatchTheGeneratedDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 44
+      "line": 51
     },
     {
       "package": "cluster/modeselect",
@@ -6063,6 +6148,55 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/booleanstateconfiguration",
+      "identifier": "AlarmModeBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/booleanstateconfiguration/definition_gen.go",
+      "line": 69
+    },
+    {
+      "package": "cluster/spec/booleanstateconfiguration",
+      "identifier": "AlarmModeBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/booleanstateconfiguration/definition_gen.go",
+      "line": 80
+    },
+    {
+      "package": "cluster/spec/booleanstateconfiguration",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/booleanstateconfiguration/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/booleanstateconfiguration",
+      "identifier": "SensorFaultBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/booleanstateconfiguration/definition_gen.go",
+      "line": 88
+    },
+    {
+      "package": "cluster/spec/booleanstateconfiguration",
+      "identifier": "SensorFaultBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/booleanstateconfiguration/definition_gen.go",
+      "line": 98
+    },
+    {
+      "package": "cluster/spec/booleanstateconfiguration",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/booleanstateconfiguration/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/booleanstateconfiguration",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/booleanstateconfiguration/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/bridgeddevicebasicinformation",
       "identifier": "CapabilityMinimaStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -6186,6 +6320,69 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/carbondioxideconcentrationmeasurement/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
+      "identifier": "LevelValueEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
+      "identifier": "LevelValueEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen.go",
+      "line": 72
+    },
+    {
+      "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen.go",
+      "line": 95
+    },
+    {
+      "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen.go",
+      "line": 104
+    },
+    {
+      "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen.go",
+      "line": 121
+    },
+    {
+      "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/carbonmonoxideconcentrationmeasurement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/carbonmonoxideconcentrationmeasurement/definition_gen_test.go",
       "line": 19
     },
     {
@@ -7344,6 +7541,41 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/ethernetnetworkdiagnostics",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ethernetnetworkdiagnostics/definition_gen.go",
+      "line": 49
+    },
+    {
+      "package": "cluster/spec/ethernetnetworkdiagnostics",
+      "identifier": "PHYRateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ethernetnetworkdiagnostics/definition_gen.go",
+      "line": 60
+    },
+    {
+      "package": "cluster/spec/ethernetnetworkdiagnostics",
+      "identifier": "PHYRateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ethernetnetworkdiagnostics/definition_gen.go",
+      "line": 79
+    },
+    {
+      "package": "cluster/spec/ethernetnetworkdiagnostics",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ethernetnetworkdiagnostics/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/ethernetnetworkdiagnostics",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ethernetnetworkdiagnostics/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/fancontrol",
       "identifier": "AirflowDirectionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -7495,6 +7727,69 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/flowmeasurement/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/formaldehydeconcentrationmeasurement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/formaldehydeconcentrationmeasurement",
+      "identifier": "LevelValueEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/formaldehydeconcentrationmeasurement",
+      "identifier": "LevelValueEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen.go",
+      "line": 72
+    },
+    {
+      "package": "cluster/spec/formaldehydeconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/spec/formaldehydeconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen.go",
+      "line": 95
+    },
+    {
+      "package": "cluster/spec/formaldehydeconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen.go",
+      "line": 104
+    },
+    {
+      "package": "cluster/spec/formaldehydeconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen.go",
+      "line": 121
+    },
+    {
+      "package": "cluster/spec/formaldehydeconcentrationmeasurement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/formaldehydeconcentrationmeasurement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/formaldehydeconcentrationmeasurement/definition_gen_test.go",
       "line": 19
     },
     {
@@ -8086,6 +8381,27 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/localizationconfiguration",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/localizationconfiguration/definition_gen.go",
+      "line": 34
+    },
+    {
+      "package": "cluster/spec/localizationconfiguration",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/localizationconfiguration/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/localizationconfiguration",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/localizationconfiguration/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/meteridentification",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -8350,6 +8666,69 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/networkcommissioning/definition_gen.go",
       "line": 308
+    },
+    {
+      "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
+      "identifier": "LevelValueEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
+      "identifier": "LevelValueEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen.go",
+      "line": 72
+    },
+    {
+      "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen.go",
+      "line": 95
+    },
+    {
+      "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen.go",
+      "line": 104
+    },
+    {
+      "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen.go",
+      "line": 121
+    },
+    {
+      "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/nitrogendioxideconcentrationmeasurement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/nitrogendioxideconcentrationmeasurement/definition_gen_test.go",
+      "line": 19
     },
     {
       "package": "cluster/spec/occupancysensing",
@@ -8709,6 +9088,69 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/ozoneconcentrationmeasurement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/ozoneconcentrationmeasurement",
+      "identifier": "LevelValueEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/ozoneconcentrationmeasurement",
+      "identifier": "LevelValueEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen.go",
+      "line": 72
+    },
+    {
+      "package": "cluster/spec/ozoneconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/spec/ozoneconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen.go",
+      "line": 95
+    },
+    {
+      "package": "cluster/spec/ozoneconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen.go",
+      "line": 104
+    },
+    {
+      "package": "cluster/spec/ozoneconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen.go",
+      "line": 121
+    },
+    {
+      "package": "cluster/spec/ozoneconcentrationmeasurement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/ozoneconcentrationmeasurement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ozoneconcentrationmeasurement/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/pm10concentrationmeasurement",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -8769,6 +9211,69 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pm10concentrationmeasurement/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/pm1concentrationmeasurement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pm1concentrationmeasurement/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/pm1concentrationmeasurement",
+      "identifier": "LevelValueEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pm1concentrationmeasurement/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/pm1concentrationmeasurement",
+      "identifier": "LevelValueEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pm1concentrationmeasurement/definition_gen.go",
+      "line": 72
+    },
+    {
+      "package": "cluster/spec/pm1concentrationmeasurement",
+      "identifier": "MeasurementMediumEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pm1concentrationmeasurement/definition_gen.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/spec/pm1concentrationmeasurement",
+      "identifier": "MeasurementMediumEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pm1concentrationmeasurement/definition_gen.go",
+      "line": 95
+    },
+    {
+      "package": "cluster/spec/pm1concentrationmeasurement",
+      "identifier": "MeasurementUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pm1concentrationmeasurement/definition_gen.go",
+      "line": 104
+    },
+    {
+      "package": "cluster/spec/pm1concentrationmeasurement",
+      "identifier": "MeasurementUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/pm1concentrationmeasurement/definition_gen.go",
+      "line": 121
+    },
+    {
+      "package": "cluster/spec/pm1concentrationmeasurement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/pm1concentrationmeasurement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/pm1concentrationmeasurement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/pm1concentrationmeasurement/definition_gen_test.go",
       "line": 19
     },
     {
@@ -9098,6 +9603,69 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/radonconcentrationmeasurement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/radonconcentrationmeasurement/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/radonconcentrationmeasurement",
+      "identifier": "LevelValueEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/radonconcentrationmeasurement/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/radonconcentrationmeasurement",
+      "identifier": "LevelValueEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/radonconcentrationmeasurement/definition_gen.go",
+      "line": 72
+    },
+    {
+      "package": "cluster/spec/radonconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/radonconcentrationmeasurement/definition_gen.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/spec/radonconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/radonconcentrationmeasurement/definition_gen.go",
+      "line": 95
+    },
+    {
+      "package": "cluster/spec/radonconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/radonconcentrationmeasurement/definition_gen.go",
+      "line": 104
+    },
+    {
+      "package": "cluster/spec/radonconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/radonconcentrationmeasurement/definition_gen.go",
+      "line": 121
+    },
+    {
+      "package": "cluster/spec/radonconcentrationmeasurement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/radonconcentrationmeasurement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/radonconcentrationmeasurement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/radonconcentrationmeasurement/definition_gen_test.go",
       "line": 19
     },
     {
@@ -9554,6 +10122,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/smokecoalarm/definition_gen_test.go",
       "line": 19
+    },
+    {
+      "package": "cluster/spec/softwarediagnostics",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/softwarediagnostics/definition_gen.go",
+      "line": 49
+    },
+    {
+      "package": "cluster/spec/softwarediagnostics",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/softwarediagnostics/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/softwarediagnostics",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/softwarediagnostics/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/softwarediagnostics",
+      "identifier": "ThreadMetricsStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/softwarediagnostics/definition_gen.go",
+      "line": 90
     },
     {
       "package": "cluster/spec/spectest",
@@ -10053,6 +10649,55 @@
       "line": 980
     },
     {
+      "package": "cluster/spec/timeformatlocalization",
+      "identifier": "CalendarTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/timeformatlocalization/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/timeformatlocalization",
+      "identifier": "CalendarTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/timeformatlocalization/definition_gen.go",
+      "line": 67
+    },
+    {
+      "package": "cluster/spec/timeformatlocalization",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/timeformatlocalization/definition_gen.go",
+      "line": 35
+    },
+    {
+      "package": "cluster/spec/timeformatlocalization",
+      "identifier": "HourFormatEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/timeformatlocalization/definition_gen.go",
+      "line": 86
+    },
+    {
+      "package": "cluster/spec/timeformatlocalization",
+      "identifier": "HourFormatEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/timeformatlocalization/definition_gen.go",
+      "line": 98
+    },
+    {
+      "package": "cluster/spec/timeformatlocalization",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/timeformatlocalization/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/timeformatlocalization",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/timeformatlocalization/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/timesynchronization",
       "identifier": "DSTOffsetStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -10156,6 +10801,132 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/timesynchronization/definition_gen.go",
       "line": 315
+    },
+    {
+      "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+      "identifier": "LevelValueEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+      "identifier": "LevelValueEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen.go",
+      "line": 72
+    },
+    {
+      "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+      "identifier": "MeasurementMediumEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen.go",
+      "line": 95
+    },
+    {
+      "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen.go",
+      "line": 104
+    },
+    {
+      "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+      "identifier": "MeasurementUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen.go",
+      "line": 121
+    },
+    {
+      "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/unitlocalization",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/unitlocalization/definition_gen.go",
+      "line": 34
+    },
+    {
+      "package": "cluster/spec/unitlocalization",
+      "identifier": "TempUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/unitlocalization/definition_gen.go",
+      "line": 44
+    },
+    {
+      "package": "cluster/spec/unitlocalization",
+      "identifier": "TempUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/unitlocalization/definition_gen.go",
+      "line": 56
+    },
+    {
+      "package": "cluster/spec/unitlocalization",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/unitlocalization/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/unitlocalization",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/unitlocalization/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/userlabel",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/userlabel/definition_gen.go",
+      "line": 36
+    },
+    {
+      "package": "cluster/spec/userlabel",
+      "identifier": "LabelStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/userlabel/definition_gen.go",
+      "line": 63
+    },
+    {
+      "package": "cluster/spec/userlabel",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/userlabel/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/userlabel",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/userlabel/definition_gen_test.go",
+      "line": 19
     },
     {
       "package": "cluster/spec/valveconfigurationandcontrol",
@@ -11643,6 +12414,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestAirQualitySensorMountsEveryConcentrationCluster",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_test.go",
+      "line": 337
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestAppPipeCommandsReachTheDevices",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
@@ -11660,7 +12438,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 270
+      "line": 295
     },
     {
       "package": "examples/reference-bridge",
@@ -11716,7 +12494,7 @@
       "identifier": "TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 49
+      "line": 51
     },
     {
       "package": "examples/reference-bridge",
@@ -11776,6 +12554,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestRootMountsLabelsLocalizationAndDiagnostics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/root_optional_test.go",
+      "line": 27
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
@@ -11786,7 +12571,7 @@
       "identifier": "TestSmokeAlarmHasItsPowerSourcePart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 287
+      "line": 312
     },
     {
       "package": "examples/reference-bridge",
