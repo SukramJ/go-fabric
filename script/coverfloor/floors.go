@@ -136,7 +136,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/secure/mattercert", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/secure/operational", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/secure/setup", min: 84},
-	{pkg: "github.com/SukramJ/go-fabric/secure/sigma", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/secure/sigma", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/secure/spake2", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/store", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/tlv", min: 91},
