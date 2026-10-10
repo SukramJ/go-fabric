@@ -29,6 +29,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"sync"
@@ -38,7 +39,6 @@ import (
 	carbon "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/im"
 )
 
 // Cluster ids.
@@ -141,18 +141,21 @@ var (
 )
 
 // Server implements [contract.ClusterServer] for one ResourceMonitoring
-// derivation. The lists, globals and privileges are the embedded
-// [spec.Instance]'s.
+// derivation. Reads, the controller's LastChangedTime write, the command
+// dispatch, the data version and the change notifications are the
+// generated server's ([spec.Server]); the lists, globals and privileges
+// its embedded [spec.Instance]'s. What stays here are the cluster's rules:
+// the values the host sets, and ResetCondition.
 type Server struct {
 	*spec.Instance
-	cluster.AttributeChanges
 
-	embedded cluster.DataVersionTracker
-	ext      *cluster.DataVersionTracker
-	cfg      Config
+	srv *spec.Server
+	cfg Config
 
-	mu    sync.Mutex
-	state State
+	mu sync.Mutex
+	// last is the state the host set last; it answers State for the
+	// fields whose attribute the server does not serve.
+	last State
 }
 
 // Compile-time assertions.
@@ -190,22 +193,38 @@ func newServer(def *spec.Cluster, cfg Config) (*Server, error) {
 		}
 		opts.Commands = []uint32{hepa.CmdResetCondition}
 	}
-	inst, err := spec.New(def, opts)
+	sc := spec.ServerConfig{DataVersion: cfg.DataVersion}
+	if cfg.LastChangedTimeWriter != nil {
+		sc.Sink = lastChangedSink{cfg.LastChangedTimeWriter}
+	}
+	srv, err := spec.NewServer(def, opts, sc)
 	if err != nil {
 		return nil, fmt.Errorf("filter: %w", err)
 	}
-	s := &Server{Instance: inst, ext: cfg.DataVersion, cfg: cfg}
-	if !inst.EnumSupported(hepa.DegradationDirectionEnumDef, uint64(cfg.DegradationDirection)) {
+	s := &Server{Instance: srv.Instance, srv: srv, cfg: cfg}
+	if !s.EnumSupported(hepa.DegradationDirectionEnumDef, uint64(cfg.DegradationDirection)) {
 		return nil, fmt.Errorf("%w: DegradationDirection %d", ErrInvalidValue, cfg.DegradationDirection)
 	}
 	if err := s.checkProducts(); err != nil {
 		return nil, err
 	}
 	s.cfg.ReplacementProducts = slices.Clone(cfg.ReplacementProducts)
-	if err := s.check(cfg.Initial); err != nil {
+	fixed := map[uint32]any{}
+	if s.Serves(hepa.AttrDegradationDirection) {
+		fixed[hepa.AttrDegradationDirection] = cfg.DegradationDirection
+	}
+	if s.Serves(hepa.AttrReplacementProductList) {
+		fixed[hepa.AttrReplacementProductList] = spec.List[ReplacementProduct](s.cfg.ReplacementProducts)
+	}
+	// The initial values go in as a device-side change: the server holds
+	// no value before, so this is the one data-version bump construction
+	// makes.
+	if err := s.setState(cfg.Initial, fixed); err != nil {
 		return nil, err
 	}
-	s.state = cfg.Initial
+	if cfg.Optional&OptionalResetCondition != 0 {
+		srv.Handle(hepa.CmdResetCondition, s.resetCondition)
+	}
 	return s, nil
 }
 
@@ -242,122 +261,121 @@ func (s *Server) check(st State) error {
 	return nil
 }
 
-func (s *Server) tracker() *cluster.DataVersionTracker {
-	if s.ext != nil {
-		return s.ext
+// values maps the served attributes of st to their values.
+func (s *Server) values(st State) map[uint32]any {
+	all := map[uint32]any{
+		hepa.AttrCondition:        st.Condition,
+		hepa.AttrChangeIndication: st.ChangeIndication,
+		hepa.AttrInPlaceIndicator: st.InPlaceIndicator,
+		hepa.AttrLastChangedTime:  nil,
 	}
-	return &s.embedded
+	if st.LastChangedTime != nil {
+		all[hepa.AttrLastChangedTime] = *st.LastChangedTime
+	}
+	out := make(map[uint32]any, len(all))
+	for id, v := range all {
+		if s.Serves(id) {
+			out[id] = v
+		}
+	}
+	return out
 }
 
 // MatterDataVersion implements [contract.ClusterDataVersion].
-func (s *Server) MatterDataVersion() uint32 { return s.tracker().Current() }
+func (s *Server) MatterDataVersion() uint32 { return s.srv.MatterDataVersion() }
+
+// OnMatterAttributesChanged implements [contract.AttributeChangeNotifier].
+func (s *Server) OnMatterAttributesChanged(cb func(attrIDs []uint32)) (unsubscribe func()) {
+	return s.srv.OnMatterAttributesChanged(cb)
+}
+
+// Notify tells the listeners that attrIDs changed.
+func (s *Server) Notify(attrIDs ...uint32) { s.srv.Notify(attrIDs...) }
 
 // State returns the current state.
 func (s *Server) State() State {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.state
+	st := s.last
+	s.mu.Unlock()
+	if v, ok := s.srv.Value(hepa.AttrCondition); ok {
+		st.Condition, _ = v.(uint8)
+	}
+	if v, ok := s.srv.Value(hepa.AttrChangeIndication); ok {
+		n, _ := v.(uint8)
+		st.ChangeIndication = ChangeIndication(n)
+	}
+	if v, ok := s.srv.Value(hepa.AttrInPlaceIndicator); ok {
+		st.InPlaceIndicator, _ = v.(bool)
+	}
+	if v, ok := s.srv.Value(hepa.AttrLastChangedTime); ok {
+		st.LastChangedTime = nil
+		if t, isTime := v.(uint32); isTime {
+			st.LastChangedTime = &t
+		}
+	}
+	return st
 }
 
 // SetState records a change the device made — the resource wearing down,
 // a filter swapped. It is refused when the state breaks the model.
-func (s *Server) SetState(st State) error {
+func (s *Server) SetState(st State) error { return s.setState(st, nil) }
+
+// setState holds st to the model and stores it with the extra attribute
+// values; the generated server reports the served attributes that
+// changed. It cannot refuse what check admits: the definition's own
+// checks of these attributes (the percent's "max 100", the enum's
+// conformance, the nullable range) are the same ones.
+func (s *Server) setState(st State, extra map[uint32]any) error {
 	if err := s.check(st); err != nil {
 		return err
 	}
-	s.apply(st)
-	return nil
-}
-
-// apply stores st and reports the served attributes that changed.
-func (s *Server) apply(st State) {
+	values := s.values(st)
+	maps.Copy(values, extra)
 	s.mu.Lock()
-	old := s.state
-	s.state = st
+	s.last = st
 	s.mu.Unlock()
-	var changed []uint32
-	for id, differs := range map[uint32]bool{
-		hepa.AttrCondition:        old.Condition != st.Condition,
-		hepa.AttrChangeIndication: old.ChangeIndication != st.ChangeIndication,
-		hepa.AttrInPlaceIndicator: old.InPlaceIndicator != st.InPlaceIndicator,
-		hepa.AttrLastChangedTime:  !equalTime(old.LastChangedTime, st.LastChangedTime),
-	} {
-		if differs && s.Serves(id) {
-			changed = append(changed, id)
-		}
-	}
-	if len(changed) == 0 {
-		return
-	}
-	slices.Sort(changed)
-	s.tracker().Bump()
-	s.Notify(changed...)
+	return s.srv.SetAttributes(values)
 }
-
-func equalTime(a, b *uint32) bool { return (a == nil) == (b == nil) && (a == nil || *a == *b) }
 
 // MatterRead resolves an attribute.
-func (s *Server) MatterRead(attrID uint32) (any, bool) {
-	if v, ok := s.ReadGlobal(attrID); ok {
-		return v, true
-	}
-	if !s.Serves(attrID) {
-		return nil, false
-	}
-	st := s.State()
-	switch attrID {
-	case hepa.AttrCondition:
-		return st.Condition, true
-	case hepa.AttrDegradationDirection:
-		return uint8(s.cfg.DegradationDirection), true
-	case hepa.AttrChangeIndication:
-		return uint8(st.ChangeIndication), true
-	case hepa.AttrInPlaceIndicator:
-		return st.InPlaceIndicator, true
-	case hepa.AttrLastChangedTime:
-		if st.LastChangedTime == nil {
-			return nil, true
-		}
-		return *st.LastChangedTime, true
-	}
-	// ReplacementProductList, the last attribute Serves admits.
-	return spec.List[ReplacementProduct](slices.Clone(s.cfg.ReplacementProducts)), true
-}
+func (s *Server) MatterRead(attrID uint32) (any, bool) { return s.srv.MatterRead(attrID) }
 
 // MatterWrite applies a LastChangedTime write, the one writable attribute;
 // the definition answers every other write and every value outside the
 // nullable epoch-s range.
 func (s *Server) MatterWrite(ctx context.Context, attrID uint32, value any) error {
-	v, err := s.ValidateWrite(attrID, value, nil)
-	if err != nil {
-		return err
-	}
+	return s.srv.MatterWrite(ctx, attrID, value)
+}
+
+// lastChangedSink hands a controller's LastChangedTime write to the host.
+type lastChangedSink struct{ w LastChangedTimeWriter }
+
+// MatterWriteAttribute implements [spec.Sink]. The value is the stored
+// form of the nullable epoch-s, a uint32 or nil.
+func (l lastChangedSink) MatterWriteAttribute(ctx context.Context, _ uint32, value any) error {
 	var t *uint32
-	if n, ok := v.(uint64); ok { // within the nullable epoch-s range per ValidateWrite; nil for null
-		at := uint32(n) //nolint:gosec // ≤ 0xFFFFFFFE per ValidateWrite
-		t = &at
+	if n, ok := value.(uint32); ok {
+		t = &n
 	}
-	if w := s.cfg.LastChangedTimeWriter; w != nil {
-		if err := w.WriteLastChangedTime(ctx, t); err != nil {
-			return fmt.Errorf("filter: LastChangedTime write: %w", err)
-		}
+	if err := l.w.WriteLastChangedTime(ctx, t); err != nil {
+		return fmt.Errorf("filter: LastChangedTime write: %w", err)
 	}
-	st := s.State()
-	st.LastChangedTime = t
-	s.apply(st)
 	return nil
 }
 
-// MatterInvoke carries out ResetCondition: the host resets the resource,
-// then Condition shows full availability and ChangeIndication Ok. Full
-// availability is 100 % for a condition that degrades downwards and 0 % for
-// one that degrades upwards (DegradationDirectionEnum Up: "the degradation
-// of the resource is indicated by an upwards moving/increasing value").
-// The command answers with a status only.
-func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, _ any) (any, error) {
-	if !s.Accepts(cmdID) {
-		return nil, im.UnsupportedCommandf("filter: command 0x%02X is not supported", cmdID)
-	}
+// MatterInvoke dispatches an accepted command; the generated server
+// answers any other with UNSUPPORTED_COMMAND.
+func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	return s.srv.MatterInvoke(ctx, cmdID, fields)
+}
+
+// resetCondition carries out ResetCondition: the host resets the
+// resource, then Condition shows full availability and ChangeIndication
+// Ok. Full availability is 100 % for a condition that degrades downwards
+// and 0 % for one that degrades upwards (DegradationDirectionEnum Up: "the
+// degradation of the resource is indicated by an upwards
+// moving/increasing value"). The command answers with a status only.
+func (s *Server) resetCondition(ctx context.Context, _ any) (any, error) {
 	if err := s.cfg.Resetter.ResetCondition(ctx); err != nil {
 		return nil, fmt.Errorf("filter: ResetCondition: %w", err)
 	}
@@ -369,6 +387,5 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, _ any) (any, er
 		}
 	}
 	st.ChangeIndication = ChangeIndicationOk
-	s.apply(st)
-	return nil, nil
+	return nil, s.setState(st, nil)
 }
