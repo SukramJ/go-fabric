@@ -27,7 +27,7 @@ env:
   # step below runs the standalone formatter, which is stricter than the one
   # golangci-lint bundles, so check `gofumpt -l .` against GOFUMPT_VERSION too.
   GOFUMPT_VERSION: "v0.10.0"
-  GOLANGCI_LINT_VERSION: "v2.13.0"
+  GOLANGCI_LINT_VERSION: "v2.14.0"
 
 jobs:
   build:
