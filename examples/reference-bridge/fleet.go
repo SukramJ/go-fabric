@@ -1474,6 +1474,7 @@ type fleet struct {
 	garage     *demoGarage
 	colorLight *dimmer
 	fridge     *demoFridge
+	evse       *demoEvse
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1516,6 +1517,7 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		garage:      newDemoGarage("Garage Door"),
 		colorLight:  newDemoColorLight("Color Bulb"),
 		fridge:      newDemoFridge("Kitchen Fridge"),
+		evse:        newDemoEvse("EV Charger"),
 		assembler:   asm,
 	}, nil
 }
@@ -1634,6 +1636,10 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 	// compartment is a part of the fridge's endpoint.
 	fridge := spec("fridge", f.fridge.name, f.fridge.MatterDeviceType(), f.fridge)
 	fridge.Parts = f.fridge.parts()
+	// EnergyEvse requires PowerSource, DeviceEnergyManagement and
+	// ElectricalSensor device types: the charger's parts (fleet_evse.go).
+	charger := spec("evse", f.evse.name, f.evse.MatterDeviceType(), f.evse)
+	charger.Parts = f.evse.parts()
 	return []endpoint.Spec{
 		spec("ceiling", f.ceiling.name, f.ceiling.MatterDeviceType(), f.ceiling),
 		spec("fan", f.fan.name, f.fan.MatterDeviceType(), f.fan),
@@ -1653,5 +1659,6 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("garage", f.garage.name, f.garage.MatterDeviceType(), f.garage),
 		spec("colorlight", f.colorLight.name, f.colorLight.MatterDeviceType(), f.colorLight),
 		fridge,
+		charger,
 	}
 }
