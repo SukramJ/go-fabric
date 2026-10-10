@@ -536,15 +536,12 @@ func withinRange(power int64, duration uint32, c PowerAdjustCapability) bool {
 }
 
 // powerAdjustReason is AdjustmentCauseToPowerAdjustReason (Cluster.cpp:
-// 51-62).
-func powerAdjustReason(cause AdjustmentCause) (PowerAdjustReason, bool) {
-	switch cause {
-	case dem.AdjustmentCauseLocalOptimization:
-		return dem.PowerAdjustReasonLocalOptimizationAdjustment, true
-	case dem.AdjustmentCauseGridOptimization:
-		return dem.PowerAdjustReasonGridOptimizationAdjustment, true
+// 51-62) for the two causes the cluster lets through (:280-284).
+func powerAdjustReason(cause AdjustmentCause) PowerAdjustReason {
+	if cause == dem.AdjustmentCauseLocalOptimization {
+		return dem.PowerAdjustReasonLocalOptimizationAdjustment
 	}
-	return 0, false
+	return dem.PowerAdjustReasonGridOptimizationAdjustment
 }
 
 // forecastReason is the delegate's cause-to-reason switch
@@ -585,7 +582,7 @@ func (s *DeviceEnergyManagementServer) powerAdjustRequest(ctx context.Context, f
 		return nil, err
 	}
 	// The cluster verifies the delegate's post-condition (:362-376).
-	want, _ := powerAdjustReason(r.Cause)
+	want := powerAdjustReason(r.Cause)
 	if c := s.PowerAdjustmentCapability(); c == nil || c.Cause != want {
 		return nil, demConstraint("PowerAdjustmentCapability cause not updated")
 	}
@@ -606,32 +603,21 @@ func (s *DeviceEnergyManagementServer) delegatePowerAdjustLocked(ctx context.Con
 	if err := s.setLocked(dem.AttrEsaState, EsaStatePowerAdjustActive); err != nil { // :134
 		return err
 	}
-	reason, ok := powerAdjustReason(r.Cause)
-	if !ok { // :148-150
-		s.powerAdjustFailureLocked()
-		return demFailure("PowerAdjustRequest: cause %d", r.Cause)
-	}
+	// The delegate's default case (:148-150) is unreachable here: the
+	// cluster refused a cause outside the enum first (Cluster.cpp:280-284).
+	reason := powerAdjustReason(r.Cause)
 	if err := s.setCapabilityCauseLocked(reason); err != nil { // :138-146
 		return err
 	}
 	s.powerAdjustInProgress = true                                                                   // :155
 	s.powerAdjustTimer = time.AfterFunc(time.Duration(r.Duration)*time.Second, s.powerAdjustExpired) // :157
-	if generateEvent {                                                                               // :166-178
-		if err := s.emitLocked(dem.EventPowerAdjustStart, dem.PowerAdjustStartEvent{}); err != nil {
-			s.powerAdjustFailureLocked()
-			return demFailure("PowerAdjustStart: %v", err)
-		}
+	// chip undoes the request when logging the event fails (:166-178,
+	// HandlePowerAdjustRequestFailure :188-200); PowerAdjustStart is in
+	// the EventList whenever the command is (both "PA"), so it cannot.
+	if generateEvent {
+		_ = s.emitLocked(dem.EventPowerAdjustStart, dem.PowerAdjustStartEvent{})
 	}
 	return nil
-}
-
-// powerAdjustFailureLocked is HandlePowerAdjustRequestFailure
-// (DelegateImpl.cpp:188-200).
-func (s *DeviceEnergyManagementServer) powerAdjustFailureLocked() {
-	s.stopPowerAdjustTimerLocked()
-	_ = s.setLocked(dem.AttrEsaState, EsaStateOnline)
-	s.powerAdjustInProgress = false
-	_ = s.setCapabilityCauseLocked(dem.PowerAdjustReasonNoAdjustment)
 }
 
 func (s *DeviceEnergyManagementServer) stopPowerAdjustTimerLocked() {
@@ -734,11 +720,9 @@ func (s *DeviceEnergyManagementServer) startTimeAdjustRequest(ctx context.Contex
 	}
 	originalID := f.ForecastId // :478
 
-	// The delegate (DelegateImpl.cpp:352-406).
-	reason, ok := forecastReason(r.Cause)
-	if !ok { // :367-370
-		return nil, demFailure("StartTimeAdjustRequest: cause %d", r.Cause)
-	}
+	// The delegate (DelegateImpl.cpp:352-406); its default case
+	// (:367-370) is unreachable after the cluster's cause check.
+	reason, _ := forecastReason(r.Cause)
 	f.ForecastUpdateReason = reason
 	f.ForecastId++ // :373
 	savedStart, savedEnd := f.StartTime, f.EndTime
@@ -813,11 +797,8 @@ func (s *DeviceEnergyManagementServer) pauseRequest(ctx context.Context, fields 
 		s.pauseFailureLocked()
 		return nil, demFailure("PauseRequest: %v", herr)
 	}
-	if generateEvent { // :462-473
-		if err := s.emitLocked(dem.EventPaused, dem.PausedEvent{}); err != nil {
-			s.pauseFailureLocked()
-			return nil, demFailure("Paused: %v", err)
-		}
+	if generateEvent { // :462-473; Paused is listed whenever PauseRequest is (both "PAU")
+		_ = s.emitLocked(dem.EventPaused, dem.PausedEvent{})
 	}
 	if err := s.setLocked(dem.AttrEsaState, EsaStatePaused); err != nil { // :475
 		return nil, err

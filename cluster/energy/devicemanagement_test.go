@@ -88,6 +88,10 @@ func (h *demHost) StartTimeAdjust(context.Context, uint32, energy.AdjustmentCaus
 	return h.count("StartTimeAdjust")
 }
 
+func (h *demHost) RequestConstraintBasedForecast(context.Context, []energy.ForecastConstraint, energy.AdjustmentCause) error {
+	return h.count("RequestConstraintBasedForecast")
+}
+
 func (h *demHost) ModifyForecast(context.Context, uint32, []energy.SlotAdjustment, energy.AdjustmentCause) error {
 	return h.count("ModifyForecast")
 }

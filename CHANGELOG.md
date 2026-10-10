@@ -18,6 +18,36 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `cluster/energy.NewDeviceEnergyManagement`: a DeviceEnergyManagement
+  (0x0098) server on the generated definition, any feature selection the
+  definition allows (PA, PFR, SFR, STA, PAU, FA, CON). The eight requests
+  carry connectedhomeip's checks (opt-out, ESAState, the capability and
+  forecast bounds, its post-conditions); ESAState, the PowerAdjustStart /
+  PowerAdjustEnd / Paused / Resumed events, the adjustment and pause
+  timers and the opt-out cancellation follow chip's shared DEM delegate.
+  The host port `DemManager` is chip's DEMManufacturerDelegate
+  (`NopDemManager` for its defaults); the device side sets ESAState, the
+  power bounds, PowerAdjustmentCapability, Forecast and OptOutState.
+- `cluster/energy.NewEnergyEvse`: an EnergyEvse (0x0099) server on the
+  generated definition (PREF, SOC, PNC, RFID, V2X; the optional
+  UserMaximumChargeCurrent, RandomizationDelayWindow,
+  ApproximateEvEfficiency and StartDiagnostics). Disable, EnableCharging,
+  EnableDischarging, StartDiagnostics, SetTargets, GetTargets and
+  ClearTargets carry chip's checks; chip's EVSE state machine drives
+  State, SupplyState, FaultState, the current limits, the session
+  attributes, the ChargingEnabledUntil timer and the EVConnected,
+  EVNotDetected, EnergyTransferStarted / Stopped, Fault and RFID events
+  from the device-side inputs (`SetHardwareState`, `SetFault`,
+  `ReportRFID`, `SetVehicleID`, `DiagnosticsComplete`, the hardware,
+  circuit and cable limits). The host port `EvseHost` reads the energy
+  meter and is told of state, limit and charging-preference changes.
+- The reference daemon serves an EV charger: EnergyEvse (0x050C) with
+  EnergyEvse and EnergyEvseMode, and PowerSource (wired),
+  DeviceEnergyManagement (with DeviceEnergyManagementMode, condition
+  ControllableEsa) and ElectricalSensor parts; it answers the EnergyEvse
+  (0x0099…) and DeviceEnergyManagement (0x0098…) test event triggers as
+  connectedhomeip's evse-app does. The chip-tool suite runs the DEM, DEMM,
+  EEVSE and EEVSEM families against it (workflow group `app-energy`).
 - `cluster/modebase` serves six more ModeBase derivations, each on its
   generated definition: `NewOvenMode`,
   `NewRefrigeratorAndTemperatureControlledCabinetMode`,
