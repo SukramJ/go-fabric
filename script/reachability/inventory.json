@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 3998,
+  "entry_points": 4024,
   "entry_packages": [
     ".",
     "bootid",
@@ -34,11 +34,13 @@
     "cluster/spec/closurecontrol",
     "cluster/spec/colorcontrol",
     "cluster/spec/descriptor",
+    "cluster/spec/deviceenergymanagementmode",
     "cluster/spec/diagnosticlogs",
     "cluster/spec/dishwashermode",
     "cluster/spec/doorlock",
     "cluster/spec/electricalenergymeasurement",
     "cluster/spec/electricalpowermeasurement",
+    "cluster/spec/energyevsemode",
     "cluster/spec/fancontrol",
     "cluster/spec/fixedlabel",
     "cluster/spec/flowmeasurement",
@@ -51,18 +53,21 @@
     "cluster/spec/illuminancemeasurement",
     "cluster/spec/laundrywashermode",
     "cluster/spec/levelcontrol",
+    "cluster/spec/microwaveovenmode",
     "cluster/spec/modeselect",
     "cluster/spec/networkcommissioning",
     "cluster/spec/occupancysensing",
     "cluster/spec/onoff",
     "cluster/spec/operationalstate",
     "cluster/spec/otasoftwareupdaterequestor",
+    "cluster/spec/ovenmode",
     "cluster/spec/pm10concentrationmeasurement",
     "cluster/spec/pm25concentrationmeasurement",
     "cluster/spec/powersource",
     "cluster/spec/powertopology",
     "cluster/spec/pressuremeasurement",
     "cluster/spec/pumpconfigurationandcontrol",
+    "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
     "cluster/spec/relativehumiditymeasurement",
     "cluster/spec/rvccleanmode",
     "cluster/spec/rvcoperationalstate",
@@ -71,10 +76,12 @@
     "cluster/spec/smokecoalarm",
     "cluster/spec/spectest",
     "cluster/spec/switchcluster",
+    "cluster/spec/temperaturecontrol",
     "cluster/spec/temperaturemeasurement",
     "cluster/spec/thermostat",
     "cluster/spec/timesynchronization",
     "cluster/spec/valveconfigurationandcontrol",
+    "cluster/spec/waterheatermode",
     "cluster/spec/windowcovering",
     "cluster/thermo",
     "cluster/transition",
@@ -117,9 +124,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 7492,
-    "reachable": 5071,
-    "whitelisted": 2416,
+    "total_exported": 7820,
+    "reachable": 5340,
+    "whitelisted": 2475,
     "unreachable": 5
   },
   "by_package": [
@@ -6465,6 +6472,69 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/deviceenergymanagementmode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/deviceenergymanagementmode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/deviceenergymanagementmode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
+      "line": 68
+    },
+    {
+      "package": "cluster/spec/deviceenergymanagementmode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
+      "line": 103
+    },
+    {
+      "package": "cluster/spec/deviceenergymanagementmode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
+      "line": 142
+    },
+    {
+      "package": "cluster/spec/deviceenergymanagementmode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
+      "line": 165
+    },
+    {
+      "package": "cluster/spec/deviceenergymanagementmode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/spec/deviceenergymanagementmode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/deviceenergymanagementmode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/deviceenergymanagementmode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/deviceenergymanagementmode/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/diagnosticlogs",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -7106,6 +7176,69 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalpowermeasurement/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/energyevsemode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energyevsemode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/energyevsemode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energyevsemode/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/energyevsemode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energyevsemode/definition_gen.go",
+      "line": 68
+    },
+    {
+      "package": "cluster/spec/energyevsemode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energyevsemode/definition_gen.go",
+      "line": 103
+    },
+    {
+      "package": "cluster/spec/energyevsemode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energyevsemode/definition_gen.go",
+      "line": 142
+    },
+    {
+      "package": "cluster/spec/energyevsemode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energyevsemode/definition_gen.go",
+      "line": 165
+    },
+    {
+      "package": "cluster/spec/energyevsemode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energyevsemode/definition_gen.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/spec/energyevsemode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/energyevsemode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/energyevsemode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/energyevsemode/definition_gen_test.go",
       "line": 19
     },
     {
@@ -7851,6 +7984,69 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/microwaveovenmode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/microwaveovenmode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/microwaveovenmode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/microwaveovenmode/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/microwaveovenmode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/microwaveovenmode/definition_gen.go",
+      "line": 68
+    },
+    {
+      "package": "cluster/spec/microwaveovenmode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/microwaveovenmode/definition_gen.go",
+      "line": 103
+    },
+    {
+      "package": "cluster/spec/microwaveovenmode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/microwaveovenmode/definition_gen.go",
+      "line": 142
+    },
+    {
+      "package": "cluster/spec/microwaveovenmode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/microwaveovenmode/definition_gen.go",
+      "line": 163
+    },
+    {
+      "package": "cluster/spec/microwaveovenmode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/microwaveovenmode/definition_gen.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/spec/microwaveovenmode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/microwaveovenmode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/microwaveovenmode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/microwaveovenmode/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/modeselect",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -8292,6 +8488,69 @@
       "line": 154
     },
     {
+      "package": "cluster/spec/ovenmode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovenmode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/ovenmode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovenmode/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/ovenmode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovenmode/definition_gen.go",
+      "line": 68
+    },
+    {
+      "package": "cluster/spec/ovenmode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovenmode/definition_gen.go",
+      "line": 103
+    },
+    {
+      "package": "cluster/spec/ovenmode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovenmode/definition_gen.go",
+      "line": 142
+    },
+    {
+      "package": "cluster/spec/ovenmode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovenmode/definition_gen.go",
+      "line": 174
+    },
+    {
+      "package": "cluster/spec/ovenmode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ovenmode/definition_gen.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/spec/ovenmode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ovenmode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/ovenmode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ovenmode/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/pm10concentrationmeasurement",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -8681,6 +8940,69 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/pumpconfigurationandcontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
+      "line": 68
+    },
+    {
+      "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
+      "line": 103
+    },
+    {
+      "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
+      "line": 142
+    },
+    {
+      "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
+      "line": 163
+    },
+    {
+      "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen_test.go",
       "line": 19
     },
     {
@@ -9108,6 +9430,27 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/switchcluster/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/temperaturecontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/temperaturecontrol/definition_gen.go",
+      "line": 46
+    },
+    {
+      "package": "cluster/spec/temperaturecontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/temperaturecontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/temperaturecontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/temperaturecontrol/definition_gen_test.go",
       "line": 19
     },
     {
@@ -9720,6 +10063,69 @@
       "line": 125
     },
     {
+      "package": "cluster/spec/waterheatermode",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermode/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/waterheatermode",
+      "identifier": "ModeChangeStatus",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermode/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/waterheatermode",
+      "identifier": "ModeChangeStatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermode/definition_gen.go",
+      "line": 68
+    },
+    {
+      "package": "cluster/spec/waterheatermode",
+      "identifier": "ModeOptionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermode/definition_gen.go",
+      "line": 103
+    },
+    {
+      "package": "cluster/spec/waterheatermode",
+      "identifier": "ModeTag",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermode/definition_gen.go",
+      "line": 142
+    },
+    {
+      "package": "cluster/spec/waterheatermode",
+      "identifier": "ModeTagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermode/definition_gen.go",
+      "line": 164
+    },
+    {
+      "package": "cluster/spec/waterheatermode",
+      "identifier": "ModeTagStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermode/definition_gen.go",
+      "line": 134
+    },
+    {
+      "package": "cluster/spec/waterheatermode",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/waterheatermode/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/waterheatermode",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/waterheatermode/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/windowcovering",
       "identifier": "ConfigStatusBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -9837,6 +10243,13 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/windowcovering/definition_gen.go",
       "line": 289
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TemperatureControlFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/thermo/temperaturecontrol.go",
+      "line": 56
     },
     {
       "package": "cluster/valve",
@@ -11040,7 +11453,7 @@
       "identifier": "TestBridgedEndpointsMeetTheirDeviceTypeConformance",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 45
+      "line": 47
     },
     {
       "package": "examples/reference-bridge",
@@ -11061,7 +11474,7 @@
       "identifier": "TestCeilingLightOnDoesNotDeadlockItsNotifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 269
+      "line": 271
     },
     {
       "package": "examples/reference-bridge",
@@ -11082,7 +11495,7 @@
       "identifier": "TestDelayedOffReportsItsCountdown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 223
+      "line": 225
     },
     {
       "package": "examples/reference-bridge",
@@ -11093,24 +11506,31 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestFridgeHasItsCoolingCabinetPart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/conformance_test.go",
+      "line": 402
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestLightKeepsItsOnOffStateAcrossDispatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 308
+      "line": 310
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestOnWithTimedOffCountsDownAndTurnsTheLightOff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 161
+      "line": 163
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestOnWithTimedOffFieldsTakesTheGeneratedRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 380
+      "line": 382
     },
     {
       "package": "examples/reference-bridge",
@@ -11180,7 +11600,7 @@
       "identifier": "TestValveTravelsThroughATarget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 324
+      "line": 326
     },
     {
       "package": "examples/reference-bridge",
