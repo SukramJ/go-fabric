@@ -18,6 +18,25 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `cluster/measurement` serves seven more concentration clusters on the
+  existing kind pattern, each with its `contract.MeasurementClass`
+  (`MeasurementCO`, `MeasurementNO2`, `MeasurementOzone`,
+  `MeasurementFormaldehyde`, `MeasurementPM1`, `MeasurementTVOC`,
+  `MeasurementRadon`; AirQualitySensor 0x002C) and constructor
+  (`NewCOConcentrationServer`, …, `NewRadonConcentrationServer`). Model
+  units: ppm for CO, NO2, ozone, formaldehyde and TVOC, µg/m³ for PM1,
+  Bq/m³ for radon. The materialiser mounts AirQuality next to each, which
+  reads Unknown for these seven (no grading guideline).
+- `cluster/boolcfg`: a BooleanStateConfiguration (0x0080) server on the
+  generated definition — sensitivity level, visual / audible alarms with
+  EnableDisableAlarm and SuppressAlarm, sensor faults, the
+  AlarmsStateChanged and SensorFault events — with the command rules of
+  connectedhomeip's BooleanStateConfigurationCluster and a `Delegate` host
+  port.
+- The reference daemon has an AirQualitySensor carrying AirQuality and all
+  ten concentration clusters, and its contact sensor carries
+  BooleanStateConfiguration (SENSLVL, VIS, SPRS); the certification table
+  declares BOOLCFG and the concentration families for them.
 - `cluster/modebase` serves six more ModeBase derivations, each on its
   generated definition: `NewOvenMode`,
   `NewRefrigeratorAndTemperatureControlledCabinetMode`,
@@ -162,6 +181,12 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- `contract.MeasurementClass` gains seven built-in classes after
+  `MeasurementFlow`. The built-in values keep their numbers; the classes
+  `RegisterMeasurementKind` hands out start seven higher, so a host that
+  persisted a registered class value must re-register rather than reuse it.
+- The reference daemon's contact sensor is assembled from a Source instead
+  of a Measurement (same StableKey, device type and BooleanState surface).
 - The bridge encodes the OperationalState, RvcOperationalState, ModeBase,
   SmokeCoAlarm, PumpConfigurationAndControl and ClosureControl values
   through the generated codecs (ADR 0013): the hand-written cases in

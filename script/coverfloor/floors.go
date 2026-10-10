@@ -165,6 +165,9 @@ var floors = []packageFloor{
 	// too); each generated package's generated test round-trips every codec
 	// and holds the definition against the snapshot, which covers it fully.
 	{pkg: "github.com/SukramJ/go-fabric/cluster/filter", min: 100},
+	// The two unreachable error returns of boolcfg.New (a definition
+	// spec.NewServer refuses, an initial value SetAttributes refuses).
+	{pkg: "github.com/SukramJ/go-fabric/cluster/boolcfg", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol", min: 100},
@@ -198,6 +201,14 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/pm25concentrationmeasurement", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/pm10concentrationmeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/nitrogendioxideconcentrationmeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/ozoneconcentrationmeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/formaldehydeconcentrationmeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/pm1concentrationmeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/radonconcentrationmeasurement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/booleanstateconfiguration", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/powersource", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/powertopology", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement", min: 100},
