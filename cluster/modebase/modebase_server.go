@@ -5,7 +5,10 @@
 // family, instantiated for the derivations the appliance device types
 // use: LaundryWasherMode (0x0051, LaundryWasher and LaundryDryer),
 // RvcRunMode (0x0054, mandatory on RoboticVacuumCleaner), RvcCleanMode
-// (0x0055) and DishwasherMode (0x0059).
+// (0x0055), DishwasherMode (0x0059), OvenMode, MicrowaveOvenMode,
+// RefrigeratorAndTemperatureControlledCabinetMode, EnergyEvseMode,
+// WaterHeaterMode and DeviceEnergyManagementMode (ids from their
+// generated definitions).
 //
 // ModeSelect (0x0050) is not a ModeBase cluster and stays in
 // cluster/modeselect.
@@ -19,7 +22,14 @@
 //     tags — RvcRunMode at least one Idle and one Cleaning mode, Idle,
 //     Cleaning and Mapping never together in one mode; RvcCleanMode at
 //     least one Vacuum or Mop mode; LaundryWasherMode and DishwasherMode
-//     at least one Normal mode;
+//     at least one Normal mode; OvenMode at least one Bake mode;
+//     RefrigeratorAndTemperatureControlledCabinetMode at least one Auto
+//     mode; MicrowaveOvenMode exactly one Normal mode and Normal never
+//     with Defrost; EnergyEvseMode a Manual mode without TimeOfUse and
+//     SolarCharging; WaterHeaterMode a Manual and an Off mode, and Off,
+//     Manual and Timed only in single-tag modes; DeviceEnergyManagementMode
+//     a NoOptimization, a LocalOptimization and a GridOptimization mode,
+//     and NoOptimization never with an optimization tag;
 //   - CurrentMode is always a supported mode (ModeUtils.assertMode);
 //   - ChangeToMode answers UnsupportedMode for a mode not in
 //     SupportedModes and Success for the current one
@@ -30,8 +40,10 @@
 //     CleaningInProgress, …). On Success CurrentMode becomes NewMode.
 //
 // StartUpMode and OnMode — and with OnMode the DEPONOFF feature — are
-// disallowed ("X") by all four derivations in Matter 1.6.1, so they are
-// neither served nor configurable.
+// disallowed ("X") by every derivation served here in Matter 1.6.1, so
+// they are neither served nor configurable. MicrowaveOvenMode's
+// definition also disallows ChangeToMode and its response: that server
+// accepts no command and needs no [ModeChanger].
 //
 // The schema constraints matter.js validates the state against
 // (SupportedModes "2 to 255", Label "max 64", ModeTags "1 to 8") hold at
@@ -42,7 +54,9 @@
 //
 // Each derivation is built on its generated definition
 // (cluster/spec/laundrywashermode, rvcrunmode, rvccleanmode,
-// dishwashermode; ADR 0013): the ids, the tag and status values, the
+// dishwashermode, ovenmode, refrigeratorandtemperaturecontrolledcabinetmode,
+// microwaveovenmode, energyevsemode, waterheatermode,
+// deviceenergymanagementmode; ADR 0013): the ids, the tag and status values, the
 // attribute, command and event lists, FeatureMap, ClusterRevision, the
 // feature check and the write answers come from it. The rules above are
 // what this package adds, as matter.js's mode servers add them.
@@ -58,10 +72,16 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagementmode"
 	"github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
+	"github.com/SukramJ/go-fabric/cluster/spec/energyevsemode"
 	"github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
+	"github.com/SukramJ/go-fabric/cluster/spec/microwaveovenmode"
+	"github.com/SukramJ/go-fabric/cluster/spec/ovenmode"
+	rtcc "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode"
 	"github.com/SukramJ/go-fabric/cluster/spec/rvccleanmode"
 	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
+	"github.com/SukramJ/go-fabric/cluster/spec/waterheatermode"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -73,6 +93,13 @@ const (
 	ClusterIDRvcRunMode        = rvcrunmode.ClusterID
 	ClusterIDRvcCleanMode      = rvccleanmode.ClusterID
 	ClusterIDDishwasherMode    = dishwashermode.ClusterID
+
+	ClusterIDOvenMode                                        = ovenmode.ClusterID
+	ClusterIDRefrigeratorAndTemperatureControlledCabinetMode = rtcc.ClusterID
+	ClusterIDMicrowaveOvenMode                               = microwaveovenmode.ClusterID
+	ClusterIDEnergyEvseMode                                  = energyevsemode.ClusterID
+	ClusterIDWaterHeaterMode                                 = waterheatermode.ClusterID
+	ClusterIDDeviceEnergyManagementMode                      = deviceenergymanagementmode.ClusterID
 )
 
 // Attribute ids, ModeBase's and so every derivation's. StartUpMode
@@ -150,6 +177,40 @@ const (
 	RvcCleanTagVacuum        = uint16(rvccleanmode.ModeTagVacuum)
 	RvcCleanTagMop           = uint16(rvccleanmode.ModeTagMop)
 	RvcCleanTagVacuumThenMop = uint16(rvccleanmode.ModeTagVacuumThenMop)
+
+	OvenTagBake            = uint16(ovenmode.ModeTagBake)
+	OvenTagConvection      = uint16(ovenmode.ModeTagConvection)
+	OvenTagGrill           = uint16(ovenmode.ModeTagGrill)
+	OvenTagRoast           = uint16(ovenmode.ModeTagRoast)
+	OvenTagClean           = uint16(ovenmode.ModeTagClean)
+	OvenTagConvectionBake  = uint16(ovenmode.ModeTagConvectionBake)
+	OvenTagConvectionRoast = uint16(ovenmode.ModeTagConvectionRoast)
+	OvenTagWarming         = uint16(ovenmode.ModeTagWarming)
+	OvenTagProofing        = uint16(ovenmode.ModeTagProofing)
+	OvenTagSteam           = uint16(ovenmode.ModeTagSteam)
+	OvenTagAirFry          = uint16(ovenmode.ModeTagAirFry)
+	OvenTagAirSousVide     = uint16(ovenmode.ModeTagAirSousVide)
+	OvenTagFrozenFood      = uint16(ovenmode.ModeTagFrozenFood)
+
+	RefrigeratorTagRapidCool   = uint16(rtcc.ModeTagRapidCool)
+	RefrigeratorTagRapidFreeze = uint16(rtcc.ModeTagRapidFreeze)
+
+	MicrowaveTagNormal  = uint16(microwaveovenmode.ModeTagNormal)
+	MicrowaveTagDefrost = uint16(microwaveovenmode.ModeTagDefrost)
+
+	EvseTagManual        = uint16(energyevsemode.ModeTagManual)
+	EvseTagTimeOfUse     = uint16(energyevsemode.ModeTagTimeOfUse)
+	EvseTagSolarCharging = uint16(energyevsemode.ModeTagSolarCharging)
+	EvseTagV2X           = uint16(energyevsemode.ModeTagV2X)
+
+	WaterHeaterTagOff    = uint16(waterheatermode.ModeTagOff)
+	WaterHeaterTagManual = uint16(waterheatermode.ModeTagManual)
+	WaterHeaterTagTimed  = uint16(waterheatermode.ModeTagTimed)
+
+	DemTagNoOptimization     = uint16(deviceenergymanagementmode.ModeTagNoOptimization)
+	DemTagDeviceOptimization = uint16(deviceenergymanagementmode.ModeTagDeviceOptimization)
+	DemTagLocalOptimization  = uint16(deviceenergymanagementmode.ModeTagLocalOptimization)
+	DemTagGridOptimization   = uint16(deviceenergymanagementmode.ModeTagGridOptimization)
 )
 
 // Limits from the schema.
@@ -157,7 +218,7 @@ const (
 	SupportedModesMin = 2 // SupportedModes "2 to 255"
 	SupportedModesMax = 255
 	LabelMaxBytes     = 64 // ModeOptionStruct Label, StatusText "max 64"
-	ModeTagsMin       = 1  // the derivations' ModeTags "1 to 8"
+	ModeTagsMin       = 1  // ModeTags "1 to 8"; MicrowaveOvenMode's is "max 8" (0 to 8)
 	ModeTagsMax       = 8
 )
 
@@ -186,7 +247,8 @@ type ModeChanger interface {
 
 // Config carries the construction parameters.
 type Config struct {
-	// Changer applies a ChangeToMode; required.
+	// Changer applies a ChangeToMode; required where the definition
+	// accepts ChangeToMode (every derivation but MicrowaveOvenMode).
 	Changer ModeChanger
 	// SupportedModes is fixed for the server's life (quality F).
 	SupportedModes []ModeOption
@@ -206,12 +268,13 @@ var (
 	ErrDuplicateLabel    = errors.New("modebase: duplicate label in supportedModes")
 	ErrDuplicateMode     = errors.New("modebase: duplicate mode in supportedModes")
 	ErrLabel             = errors.New("modebase: label exceeds 64 bytes")
-	ErrTagCount          = errors.New("modebase: a mode needs 1 to 8 mode tags")
+	ErrTagCount          = errors.New("modebase: a mode has more or fewer mode tags than its ModeTags constraint allows")
 	ErrDuplicateTag      = errors.New("modebase: a mode lists a tag twice")
 	ErrDuplicateTagSet   = errors.New("modebase: two modes have the same set of tags")
 	ErrNoStandardTag     = errors.New("modebase: a mode needs at least one standard tag")
 	ErrRequiredTag       = errors.New("modebase: supportedModes lacks a tag the cluster requires")
 	ErrExclusiveTags     = errors.New("modebase: provided supportedModes must not have Idle, Cleaning and Mapping mode tags together in one mode")
+	ErrTagCombination    = errors.New("modebase: supportedModes combine tags the cluster forbids together")
 	ErrUnsupportedMode   = errors.New("modebase: can not use unsupported mode")
 	ErrInvalidHostStatus = errors.New("modebase: the mode changer answered a reserved status")
 )
@@ -230,6 +293,12 @@ var (
 	dishwasherKind    = kind{dishwashermode.Definition, dishwashermode.ModeChangeStatusDef, requireTag(DishwasherTagNormal, "Normal")}
 	rvcRunKind        = kind{rvcrunmode.Definition, rvcrunmode.ModeChangeStatusDef, checkRvcRun}
 	rvcCleanKind      = kind{rvccleanmode.Definition, rvccleanmode.ModeChangeStatusDef, checkRvcClean}
+	ovenKind          = kind{ovenmode.Definition, ovenmode.ModeChangeStatusDef, requireTag(OvenTagBake, "Bake")}
+	refrigeratorKind  = kind{rtcc.Definition, rtcc.ModeChangeStatusDef, requireTag(uint16(rtcc.ModeTagAuto), "Auto")}
+	microwaveKind     = kind{microwaveovenmode.Definition, microwaveovenmode.ModeChangeStatusDef, checkMicrowaveOven}
+	evseKind          = kind{energyevsemode.Definition, energyevsemode.ModeChangeStatusDef, checkEnergyEvse}
+	waterHeaterKind   = kind{waterheatermode.Definition, waterheatermode.ModeChangeStatusDef, checkWaterHeater}
+	demKind           = kind{deviceenergymanagementmode.Definition, deviceenergymanagementmode.ModeChangeStatusDef, checkDeviceEnergyManagement}
 )
 
 func hasTag(m ModeOption, values ...uint16) bool {
@@ -238,7 +307,9 @@ func hasTag(m ModeOption, values ...uint16) bool {
 
 // requireTag mirrors LaundryWasherModeServer / DishwasherModeServer
 // #assertSupportedModes: "Provided supportedModes need to include at least
-// Normal mode tag".
+// Normal mode tag"; with Bake it mirrors OvenModeServer's, with Auto
+// RefrigeratorAndTemperatureControlledCabinetModeServer's
+// (packages/node/src/behaviors/<derivation>-mode/*ModeServer.ts).
 func requireTag(value uint16, name string) func([]ModeOption) error {
 	return func(modes []ModeOption) error {
 		if !slices.ContainsFunc(modes, func(m ModeOption) bool { return hasTag(m, value) }) {
@@ -275,6 +346,81 @@ func checkRvcRun(modes []ModeOption) error {
 func checkRvcClean(modes []ModeOption) error {
 	if !slices.ContainsFunc(modes, func(m ModeOption) bool { return hasTag(m, RvcCleanTagVacuum, RvcCleanTagMop) }) {
 		return fmt.Errorf("%w: at least one Vacuum or Mop mode", ErrRequiredTag)
+	}
+	return nil
+}
+
+// someMode reports whether a mode satisfies f.
+func someMode(modes []ModeOption, f func(ModeOption) bool) bool { return slices.ContainsFunc(modes, f) }
+
+// checkMicrowaveOven mirrors MicrowaveOvenModeServer #assertSupportedModes
+// (packages/node/src/behaviors/microwave-oven-mode/MicrowaveOvenModeServer.ts):
+// "exactly one Normal mode tag", and "must not have Normal and Defrost
+// mode tags together in one mode".
+func checkMicrowaveOven(modes []ModeOption) error {
+	normal := 0
+	for _, m := range modes {
+		if hasTag(m, MicrowaveTagNormal) {
+			normal++
+		}
+	}
+	if normal != 1 {
+		return fmt.Errorf("%w: exactly one Normal mode, have %d", ErrRequiredTag, normal)
+	}
+	if someMode(modes, func(m ModeOption) bool { return hasTag(m, MicrowaveTagNormal) && hasTag(m, MicrowaveTagDefrost) }) {
+		return fmt.Errorf("%w: Normal and Defrost in one mode", ErrTagCombination)
+	}
+	return nil
+}
+
+// checkEnergyEvse mirrors EnergyEvseModeServer #assertSupportedModes
+// (packages/node/src/behaviors/energy-evse-mode/EnergyEvseModeServer.ts):
+// "Provided supportedModes need to include at least one Manual mode tag,
+// but not together with TimeOfUse or SolarCharging".
+func checkEnergyEvse(modes []ModeOption) error {
+	if !someMode(modes, func(m ModeOption) bool {
+		return hasTag(m, EvseTagManual) && !hasTag(m, EvseTagTimeOfUse, EvseTagSolarCharging)
+	}) {
+		return fmt.Errorf("%w: at least one Manual mode without TimeOfUse or SolarCharging", ErrRequiredTag)
+	}
+	return nil
+}
+
+// checkWaterHeater mirrors WaterHeaterModeServer #assertSupportedModes
+// (packages/node/src/behaviors/water-heater-mode/WaterHeaterModeServer.ts)
+// as its code reads, not its message: every one of Manual and Off occurs
+// in some mode, and no mode with Off, Manual or Timed has more than one
+// tag.
+func checkWaterHeater(modes []ModeOption) error {
+	for _, v := range []uint16{WaterHeaterTagManual, WaterHeaterTagOff} {
+		if !someMode(modes, func(m ModeOption) bool { return hasTag(m, v) }) {
+			return fmt.Errorf("%w: a Manual and an Off mode", ErrRequiredTag)
+		}
+	}
+	for _, v := range []uint16{WaterHeaterTagOff, WaterHeaterTagManual, WaterHeaterTagTimed} {
+		if someMode(modes, func(m ModeOption) bool { return hasTag(m, v) && len(m.Tags) > 1 }) {
+			return fmt.Errorf("%w: Off, Manual or Timed in a mode with more than one tag", ErrTagCombination)
+		}
+	}
+	return nil
+}
+
+// checkDeviceEnergyManagement mirrors DeviceEnergyManagementModeServer
+// #assertSupportedModes
+// (packages/node/src/behaviors/device-energy-management-mode/DeviceEnergyManagementModeServer.ts):
+// each of NoOptimization, LocalOptimization and GridOptimization occurs in
+// some mode, and none of DeviceOptimization, LocalOptimization and
+// GridOptimization occurs in a mode that also has NoOptimization.
+func checkDeviceEnergyManagement(modes []ModeOption) error {
+	for _, v := range []uint16{DemTagNoOptimization, DemTagLocalOptimization, DemTagGridOptimization} {
+		if !someMode(modes, func(m ModeOption) bool { return hasTag(m, v) }) {
+			return fmt.Errorf("%w: a NoOptimization, a LocalOptimization and a GridOptimization mode", ErrRequiredTag)
+		}
+	}
+	for _, v := range []uint16{DemTagDeviceOptimization, DemTagLocalOptimization, DemTagGridOptimization} {
+		if someMode(modes, func(m ModeOption) bool { return hasTag(m, v) && hasTag(m, DemTagNoOptimization) }) {
+			return fmt.Errorf("%w: NoOptimization with an optimization tag in one mode", ErrTagCombination)
+		}
 	}
 	return nil
 }
@@ -316,16 +462,39 @@ func NewRvcRunMode(cfg Config) (*Server, error) { return newServer(rvcRunKind, c
 // NewRvcCleanMode builds an RvcCleanMode (0x0055) server.
 func NewRvcCleanMode(cfg Config) (*Server, error) { return newServer(rvcCleanKind, cfg) }
 
+// NewOvenMode builds an OvenMode server.
+func NewOvenMode(cfg Config) (*Server, error) { return newServer(ovenKind, cfg) }
+
+// NewRefrigeratorAndTemperatureControlledCabinetMode builds a
+// RefrigeratorAndTemperatureControlledCabinetMode server.
+func NewRefrigeratorAndTemperatureControlledCabinetMode(cfg Config) (*Server, error) {
+	return newServer(refrigeratorKind, cfg)
+}
+
+// NewMicrowaveOvenMode builds a MicrowaveOvenMode server. Its definition
+// disallows ChangeToMode, so Config.Changer is not used.
+func NewMicrowaveOvenMode(cfg Config) (*Server, error) { return newServer(microwaveKind, cfg) }
+
+// NewEnergyEvseMode builds an EnergyEvseMode server.
+func NewEnergyEvseMode(cfg Config) (*Server, error) { return newServer(evseKind, cfg) }
+
+// NewWaterHeaterMode builds a WaterHeaterMode server.
+func NewWaterHeaterMode(cfg Config) (*Server, error) { return newServer(waterHeaterKind, cfg) }
+
+// NewDeviceEnergyManagementMode builds a DeviceEnergyManagementMode server.
+func NewDeviceEnergyManagementMode(cfg Config) (*Server, error) { return newServer(demKind, cfg) }
+
 func newServer(k kind, cfg Config) (*Server, error) {
-	if cfg.Changer == nil {
-		return nil, ErrNoChanger
-	}
 	// An undefined bit, or DEPONOFF — "X" in every derivation served here.
 	inst, err := spec.New(k.def, spec.Options{Features: uint32(cfg.Features)})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrUnknownFeature, err)
 	}
-	if err := checkModes(cfg.SupportedModes); err != nil {
+	if cfg.Changer == nil && inst.Accepts(CmdChangeToMode) {
+		return nil, ErrNoChanger
+	}
+	tagMin, tagMax := modeTagBounds(k.def)
+	if err := checkModes(cfg.SupportedModes, tagMin, tagMax); err != nil {
 		return nil, err
 	}
 	if err := k.check(cfg.SupportedModes); err != nil {
@@ -344,9 +513,26 @@ func newServer(k kind, cfg Config) (*Server, error) {
 	return s, nil
 }
 
+// modeTagBounds reads the ModeOptionStruct ModeTags constraint from the
+// derivation's generated definition: "1 to 8" in every derivation but
+// MicrowaveOvenMode, whose "max 8" has no lower bound. matter.js's
+// ModeUtils.assertSupportedModes
+// (packages/node/src/behaviors/mode-base/ModeUtils.ts:16-29) checks only
+// duplicate labels and modes, so the tag count is the schema's alone.
+func modeTagBounds(def *spec.Cluster) (lo, hi int) {
+	fields := def.Attribute(AttrSupportedModes).Type.Entry.Type.Struct.Fields
+	i := slices.IndexFunc(fields, func(f spec.Field) bool { return f.Name == "ModeTags" })
+	c := fields[i].Constraint
+	if c.Min != nil {
+		lo = int(c.Min.Int)
+	}
+	return lo, int(c.Max.Int)
+}
+
 // checkModes validates SupportedModes against ModeUtils.assertSupportedModes,
-// the schema constraints and the ModeBase specification text.
-func checkModes(modes []ModeOption) error {
+// the schema constraints (ModeTags within tagMin..tagMax) and the ModeBase
+// specification text.
+func checkModes(modes []ModeOption, tagMin, tagMax int) error {
 	if len(modes) < SupportedModesMin || len(modes) > SupportedModesMax {
 		return fmt.Errorf("%w: %d", ErrModeCount, len(modes))
 	}
@@ -364,13 +550,14 @@ func checkModes(modes []ModeOption) error {
 		if len(m.Label) > LabelMaxBytes || !utf8.ValidString(m.Label) {
 			return fmt.Errorf("%w: mode %d", ErrLabel, m.Mode)
 		}
-		if len(m.Tags) < ModeTagsMin || len(m.Tags) > ModeTagsMax {
+		if len(m.Tags) < tagMin || len(m.Tags) > tagMax {
 			return fmt.Errorf("%w: mode %d has %d", ErrTagCount, m.Mode, len(m.Tags))
 		}
 		// "Each mode tag in this field shall be distinct from other mode
 		// tags in this field" and "A mode option shall be associated with
 		// at least one standard mode tag" (mode-base.resource.ts,
-		// ModeOptionStruct.ModeTags).
+		// ModeOptionStruct.ModeTags) — for a mode that lists tags: an empty
+		// list is what MicrowaveOvenMode's "max 8" allows.
 		standard := false
 		for i, t := range m.Tags {
 			if slices.ContainsFunc(m.Tags[:i], func(u ModeTag) bool { return sameTag(t, u) }) {
@@ -378,7 +565,7 @@ func checkModes(modes []ModeOption) error {
 			}
 			standard = standard || t.MfgCode == nil
 		}
-		if !standard {
+		if !standard && len(m.Tags) > 0 {
 			return fmt.Errorf("%w: mode %d", ErrNoStandardTag, m.Mode)
 		}
 		// "The set of ModeTags listed in each entry in this list shall be
@@ -480,12 +667,13 @@ func (s *Server) MatterWrite(_ context.Context, attrID uint32, value any) error 
 	return err
 }
 
-// MatterInvoke answers ChangeToMode with a ChangeToModeResponse.
+// MatterInvoke answers ChangeToMode with a ChangeToModeResponse where the
+// definition accepts it (MicrowaveOvenMode's does not).
 func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
-	if cmdID != CmdChangeToMode {
+	if cmdID != CmdChangeToMode || !s.inst.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("modebase: command 0x%02X is not supported", cmdID)
 	}
-	req, ok := fields.(clusterwire.ChangeToModeRequest)
+	req, ok := changeToModeRequest(fields)
 	if !ok {
 		return nil, statusError{im.StatusInvalidCommand, fmt.Sprintf("modebase: ChangeToMode fields %T", fields)}
 	}
@@ -512,6 +700,40 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		s.setCurrent(req.NewMode)
 	}
 	return clusterwire.ChangeToModeResponse{Status: uint8(status), StatusText: truncate(text, LabelMaxBytes)}, nil
+}
+
+// changeToModeRequest reads the fields the bridge hands over: cluster/wire's
+// ChangeToModeRequest, which its hand-written reader decodes for
+// LaundryWasherMode, RvcRunMode, RvcCleanMode and DishwasherMode, or a
+// generated definition's, which spec.DecodeRequest decodes for the other
+// derivations. The payload is ModeBase's in every derivation.
+func changeToModeRequest(fields any) (clusterwire.ChangeToModeRequest, bool) {
+	var mode uint8
+	switch r := fields.(type) {
+	case clusterwire.ChangeToModeRequest:
+		return r, true
+	case laundrywashermode.ChangeToModeRequest:
+		mode = r.NewMode
+	case rvcrunmode.ChangeToModeRequest:
+		mode = r.NewMode
+	case rvccleanmode.ChangeToModeRequest:
+		mode = r.NewMode
+	case dishwashermode.ChangeToModeRequest:
+		mode = r.NewMode
+	case ovenmode.ChangeToModeRequest:
+		mode = r.NewMode
+	case rtcc.ChangeToModeRequest:
+		mode = r.NewMode
+	case energyevsemode.ChangeToModeRequest:
+		mode = r.NewMode
+	case waterheatermode.ChangeToModeRequest:
+		mode = r.NewMode
+	case deviceenergymanagementmode.ChangeToModeRequest:
+		mode = r.NewMode
+	default:
+		return clusterwire.ChangeToModeRequest{}, false
+	}
+	return clusterwire.ChangeToModeRequest{NewMode: mode}, true
 }
 
 // validHostStatus accepts what a device may answer: a value of the

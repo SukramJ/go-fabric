@@ -140,6 +140,10 @@ const (
 	dtGenericSwitch   = 0x000F
 	dtAirPurifier     = 0x002D
 	dtClosure         = 0x0230
+	// dtTempControlledCabinet is the reference fridge's cabinet part
+	// (examples/reference-bridge/fleet_appliances.go): TemperatureControl
+	// and RefrigeratorAndTemperatureControlledCabinetMode.
+	dtTempControlledCabinet = 0x0071
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -393,6 +397,12 @@ var chipFamilies = []family{
 		},
 	},
 	{name: "RVCOPSTATE", deviceType: dtRVC},
+	// TCCM and TCTL set no PIXIT: connectedhomeip TC_TCCM_1_2.py and
+	// TC_TCTL_2_3.py (at the harness pin) and Test_TC_TCTL_*.yaml name none;
+	// Test_TC_TCCM_2_1.yaml names PIXIT.TCCM.MODE_CHANGE_* only in its
+	// steps' verification text, not in its config.
+	{name: "TCCM", deviceType: dtTempControlledCabinet},
+	{name: "TCTL", deviceType: dtTempControlledCabinet},
 	{name: "RVCRUNM", deviceType: dtRVC},
 	{
 		name: "S", deviceType: dtOnOffLight, multicast: map[string]bool{"2.3": true},

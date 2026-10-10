@@ -16,6 +16,12 @@ var committed = []string{
 	"RvcRunMode",
 	"RvcCleanMode",
 	"DishwasherMode",
+	"EnergyEvseMode",
+	"WaterHeaterMode",
+	"DeviceEnergyManagementMode",
+	"MicrowaveOvenMode",
+	"OvenMode",
+	"RefrigeratorAndTemperatureControlledCabinetMode",
 	// cluster/filter
 	"HepaFilterMonitoring",
 	"ActivatedCarbonFilterMonitoring",
@@ -44,6 +50,7 @@ var committed = []string{
 	"DoorLock",
 	// cluster/thermo
 	"Thermostat",
+	"TemperatureControl",
 	// cluster/measurement
 	"TemperatureMeasurement",
 	"RelativeHumidityMeasurement",

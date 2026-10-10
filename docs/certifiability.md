@@ -157,6 +157,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | RH | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | RVCCLEANM | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | RVCOPSTATE | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
+| TCCM | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
+| TCTL | 5 | 3 | 0 | 0 | 2 | 0 | 0 |
 | RVCRUNM | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | S | 7 | 5 | 0 | 0 | 1 | 1 | 0 |
 | SMOKECO | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
@@ -165,7 +167,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TSTAT | 6 | 3 | 0 | 0 | 2 | 1 | 0 |
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **464** | **237** | **0** | **0** | **107** | **115** | **5** |
+| **all** | **471** | **241** | **0** | **0** | **109** | **116** | **5** |
 
 ### Cases not run
 
@@ -379,6 +381,9 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SWTCH/2.5 | (b) not supported | TC-SWTCH-2.5 runs only with MomentarySwitchMultiPress (PICS SWTCH.S.F04=0) (runs, and skips itself) |
 | SWTCH/2.6 | (b) not supported | TC-SWTCH-2.6 runs only with MomentarySwitchMultiPress and ActionSwitch (PICS SWTCH.S.F04=0, SWTCH.S.F05=0) (runs, and skips itself) |
 | SWTCH/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| TCCM/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| TCTL/2.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
+| TCTL/3.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
 | TIMESYNC/2.10 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
 | TIMESYNC/2.11 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
 | TIMESYNC/2.12 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |

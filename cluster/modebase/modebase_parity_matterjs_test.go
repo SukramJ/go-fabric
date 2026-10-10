@@ -46,7 +46,7 @@ var modeBase = struct {
 	},
 }
 
-// derivations are the four served clusters with a server built for each.
+// derivations are the served clusters with a server built for each.
 func derivations(t *testing.T) []struct {
 	name string
 	srv  *modebase.Server
@@ -67,13 +67,21 @@ func derivations(t *testing.T) []struct {
 		{"RvcRunMode", build(modebase.NewRvcRunMode, runModes)},
 		{"RvcCleanMode", build(modebase.NewRvcCleanMode, cleanModes)},
 		{"DishwasherMode", build(modebase.NewDishwasherMode, dishModes)},
+		{"OvenMode", build(modebase.NewOvenMode, ovenModes)},
+		{"RefrigeratorAndTemperatureControlledCabinetMode", build(modebase.NewRefrigeratorAndTemperatureControlledCabinetMode, fridgeModes)},
+		{"MicrowaveOvenMode", build(modebase.NewMicrowaveOvenMode, microwaveModes)},
+		{"EnergyEvseMode", build(modebase.NewEnergyEvseMode, evseModes)},
+		{"WaterHeaterMode", build(modebase.NewWaterHeaterMode, waterHeaterModes)},
+		{"DeviceEnergyManagementMode", build(modebase.NewDeviceEnergyManagementMode, demModes)},
 	}
 }
 
 // TestParityMatterJS_ModeBaseDerivations checks each derivation's
 // revision, name, attribute and command ids, and the attribute list
 // against the derivation's conformance (the base's where the derivation
-// does not override it): StartUpMode and OnMode are "X" and not served.
+// does not override it): StartUpMode and OnMode are "X" and not served,
+// and the command lists follow the commands' conformance —
+// MicrowaveOvenMode's "X" ChangeToMode is neither accepted nor generated.
 func TestParityMatterJS_ModeBaseDerivations(t *testing.T) {
 	t.Parallel()
 	for _, d := range derivations(t) {
@@ -104,15 +112,33 @@ func TestParityMatterJS_ModeBaseDerivations(t *testing.T) {
 				t.Errorf("%s %s overrides access %q", d.name, a.Name, a.Access)
 			}
 		}
+		var accepted, generated []uint32
 		for _, cmd := range js.Commands {
 			base, ok := modeBase.commands[cmd.Name]
-			if !ok || base.id != cmd.ID || (cmd.Conformance != "" && cmd.Conformance != base.conformance) {
-				t.Errorf("%s command %+v differs from ModeBase", d.name, cmd)
+			if !ok || base.id != cmd.ID {
+				t.Errorf("%s command %+v is not ModeBase's", d.name, cmd)
+				continue
+			}
+			conformance := cmd.Conformance
+			if conformance == "" {
+				conformance = base.conformance
+			}
+			if required, _ := paritytest.Conformance(conformance, features); !required {
+				continue
+			}
+			if cmd.Name == "ChangeToMode" {
+				accepted = append(accepted, cmd.ID)
+			} else {
+				generated = append(generated, cmd.ID)
 			}
 		}
-		if !slices.Equal(d.srv.MatterAcceptedCommands(), []uint32{modeBase.commands["ChangeToMode"].id}) ||
-			!slices.Equal(d.srv.MatterGeneratedCommands(), []uint32{modeBase.commands["ChangeToModeResponse"].id}) {
-			t.Errorf("%s command lists", d.name)
+		if len(js.Commands) == 0 { // the derivation inherits ModeBase's commands unchanged
+			accepted = []uint32{modeBase.commands["ChangeToMode"].id}
+			generated = []uint32{modeBase.commands["ChangeToModeResponse"].id}
+		}
+		if !slices.Equal(d.srv.MatterAcceptedCommands(), accepted) || !slices.Equal(d.srv.MatterGeneratedCommands(), generated) {
+			t.Errorf("%s command lists %v / %v, matter.js %v / %v", d.name,
+				d.srv.MatterAcceptedCommands(), d.srv.MatterGeneratedCommands(), accepted, generated)
 		}
 		if len(js.Events) != 0 || len(d.srv.MatterEvents()) != 0 {
 			t.Errorf("%s events %v / %v", d.name, js.Events, d.srv.MatterEvents())

@@ -18,6 +18,42 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `cluster/modebase` serves six more ModeBase derivations, each on its
+  generated definition: `NewOvenMode`,
+  `NewRefrigeratorAndTemperatureControlledCabinetMode`,
+  `NewMicrowaveOvenMode`, `NewEnergyEvseMode`, `NewWaterHeaterMode` and
+  `NewDeviceEnergyManagementMode`, with their cluster ids
+  (`ClusterIDOvenMode`, …) and tag constants (`OvenTag…`,
+  `RefrigeratorTag…`, `MicrowaveTag…`, `EvseTag…`, `WaterHeaterTag…`,
+  `DemTag…`). Each refuses the SupportedModes its matter.js server's
+  `#assertSupportedModes` refuses (`ErrRequiredTag`, and the new
+  `ErrTagCombination` for tags a derivation forbids in one mode).
+  MicrowaveOvenMode's definition disallows ChangeToMode: that server
+  accepts no command and needs no `ModeChanger`. The ModeTags count of a
+  mode is held to each definition's constraint: 1 to 8, and 0 to 8 on
+  MicrowaveOvenMode ("max 8"), where a mode without tags is accepted.
+- `modebase.Server.MatterInvoke` takes the generated
+  `ChangeToModeRequest` of every derivation's definition as well as
+  `cluster/wire.ChangeToModeRequest`.
+- `cluster/thermo.NewTemperatureControl`: a TemperatureControl (0x0056)
+  server on the generated definition — TemperatureNumber (with optional
+  TemperatureStep) or TemperatureLevel, the host port `TemperatureSetter`,
+  `SetTemperatureSetpoint` / `SetSelectedTemperatureLevel` for changes the
+  device makes. SetTemperature answers CONSTRAINT_ERROR for a target
+  outside MinTemperature..MaxTemperature or off a Step, or a level past
+  SupportedTemperatureLevels, INVALID_COMMAND for a missing field of its
+  own feature, and INVALID_IN_STATE when the host refuses with
+  `thermo.ErrTemperatureRefused`; the field of the other feature is
+  ignored — all as connectedhomeip's TemperatureControl server answers.
+- Generated definitions under `cluster/spec/` for EnergyEvseMode,
+  WaterHeaterMode, DeviceEnergyManagementMode, MicrowaveOvenMode,
+  OvenMode, RefrigeratorAndTemperatureControlledCabinetMode and
+  TemperatureControl.
+- The reference daemon bridges a Refrigerator with a
+  TemperatureControlledCabinet (Cooler) part: RefrigeratorAndTemperature-
+  ControlledCabinetMode on both, TemperatureControl (TN + STEP) on the
+  cabinet.
+
 - `cluster/light.ColorControlServer` serves XY (CurrentX / CurrentY,
   MoveToColor, MoveColor, StepColor), HS (CurrentHue / CurrentSaturation and
   the seven hue and saturation commands), EHUE (EnhancedCurrentHue and the
