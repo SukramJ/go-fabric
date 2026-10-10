@@ -1096,6 +1096,23 @@
       "steps": 3,
       "stepsSkipped": 1
     },
+    "TCCM/1.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "TCTL/2.1": {
+      "steps": 7,
+      "stepsSkipped": 0
+    },
+    "TCTL/2.2": {
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "TCTL/3.2": {
+      "steps": 10,
+      "stepsSkipped": 4
+    },
     "TIMESYNC/2.1": {
       "tests": 1,
       "steps": 15,
@@ -1743,6 +1760,17 @@
       "2.6",
       "3.2"
     ],
+    "TCCM": [
+      "1.2",
+      "2.1"
+    ],
+    "TCTL": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "3.2",
+      "3.3"
+    ],
     "TIMESYNC": [
       "2.1",
       "2.2",
@@ -1890,6 +1918,8 @@
     "SU/2.2": "MCORE.OTA.Requestor",
     "SU/2.4": "MCORE.OTA.Requestor",
     "SU/4.1": "MCORE.OTA.Requestor",
+    "TCTL/2.3": "TCTL.S \u0026 TCTL.S.F01",
+    "TCTL/3.3": "TCTL.S \u0026 TCTL.S.F01",
     "TIMESYNC/2.10": "TIMESYNC.S.F00",
     "TIMESYNC/2.11": "TIMESYNC.S.F00",
     "TIMESYNC/2.12": "TIMESYNC.S.F00",
@@ -2009,6 +2039,7 @@
     "SU/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SU/3.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SWTCH/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "TCCM/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "TSTAT/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate"
   }
 }
