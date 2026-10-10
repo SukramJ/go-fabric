@@ -324,7 +324,7 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 	if trigger == triggerGeneric || trigger == triggerGenericAlias {
 		return nil
 	}
-	if f.garage.testEventTrigger(trigger) {
+	if f.garage.testEventTrigger(trigger) || f.heater.testEventTrigger(trigger) {
 		return nil
 	}
 	switch trigger & smokeTriggerMask {

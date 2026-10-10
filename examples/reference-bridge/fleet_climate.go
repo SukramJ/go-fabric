@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/fan"
 	"github.com/SukramJ/go-fabric/cluster/filter"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
@@ -164,13 +165,22 @@ func copyUint8(v *uint8) *uint8 {
 // reference that drives no device); this endpoint puts it in front of a real
 // controller. The room temperature is the one thing the device reports, via
 // the control hook.
+//
+// It also serves EnergyPreference with the EnergyBalance feature, which the
+// Thermostat device type offers as optional (parity/schema.json): three
+// balances from efficient to comfortable, and the two priorities they
+// trade between.
 type demoThermostat struct {
 	name string
 	once sync.Once
 	srv  *thermo.ThermostatServer
+	pref *energy.PreferenceServer
 }
 
-var _ contract.EndpointSource = (*demoThermostat)(nil)
+var (
+	_ contract.EndpointSource  = (*demoThermostat)(nil)
+	_ energy.PreferenceChanger = (*demoThermostat)(nil)
+)
 
 // deviceTypeThermostat is Thermostat (matter.js thermostat.element.ts).
 const deviceTypeThermostat uint16 = 0x0301
@@ -184,7 +194,7 @@ func (t *demoThermostat) MatterDeviceType() uint16 { return deviceTypeThermostat
 // holds the setpoints, so the same instance serves every reassembly.
 func (t *demoThermostat) MatterClusterServers() []contract.ClusterServer {
 	t.build()
-	return []contract.ClusterServer{t.srv}
+	return []contract.ClusterServer{t.srv, t.pref}
 }
 
 func (t *demoThermostat) build() {
@@ -194,7 +204,28 @@ func (t *demoThermostat) build() {
 		t.srv = thermo.NewThermostatServer(cfg)
 		room := int16(2150)
 		t.srv.SetLocalTemperature(&room)
+		efficient, comfort := "Efficient", "Comfort"
+		pref, err := energy.NewEnergyPreference(energy.PreferenceConfig{
+			Features: energy.PreferenceFeatureEnergyBalance,
+			EnergyBalances: []energy.Balance{
+				{Step: 0, Label: &efficient}, {Step: 50}, {Step: 100, Label: &comfort},
+			},
+			EnergyPriorities:     []energy.Priority{energy.PriorityEfficiency, energy.PriorityComfort},
+			CurrentEnergyBalance: 1,
+			Changer:              t,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("thermostat EnergyPreference: %v", err))
+		}
+		t.pref = pref
 	})
+}
+
+// ChangePreference implements [energy.PreferenceChanger]: the thermostat
+// takes every balance the server has let through.
+func (t *demoThermostat) ChangePreference(_ context.Context, attrID uint32, index uint8) error {
+	slog.Info("thermostat.preference", slog.String("device", t.name), slog.Int("attribute", int(attrID)), slog.Int("index", int(index)))
+	return nil
 }
 
 // reportTemperature is the device's room sensor reporting, in 0.01 °C.
