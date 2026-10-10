@@ -22,6 +22,10 @@
 // the server does not serve is refused at construction. MoveTo decodes
 // through the definition; the MoveTo and Stop rules, the state and the
 // events are the server's.
+//
+// The package also holds the ClosureDimension server (0x0105,
+// [DimensionServer]) of a ClosurePanel: one movable part of a closure,
+// with a continuous position, a latch, or both.
 package closure
 
 import (
