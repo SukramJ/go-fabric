@@ -242,9 +242,12 @@ func (s *ColorControlServer) moveToSaturation(ctx context.Context, fields any) e
 
 // moveToSaturationLogic is matter.js moveToSaturationLogic.
 func (s *ColorControlServer) moveToSaturationLogic(target, transitionTime float64) error {
-	current := float64(s.state().saturation)
+	// The rate is computed from the value the engine reads under its lock
+	// (transition.Transition.RateFrom), as matter.js computes it in the
+	// same synchronous handler that starts the transition.
 	return s.startTransition(transition.Transition{
-		Name: propSaturation, Rate: (target - current) / transitionTime * 10, Target: target,
+		Name: propSaturation, Target: target,
+		RateFrom: func(current float64) float64 { return (target - current) / transitionTime * 10 },
 	})
 }
 
@@ -481,9 +484,11 @@ func (s *ColorControlServer) moveToColorTemperature(ctx context.Context, fields 
 
 // moveToColorTemperatureLogic is matter.js moveToColorTemperatureLogic.
 func (s *ColorControlServer) moveToColorTemperatureLogic(target, transitionTime float64) error {
-	current := float64(s.state().mireds)
+	// Rate from the engine's own read of the current value, see
+	// moveToSaturationLogic.
 	return s.startTransition(transition.Transition{
-		Name: propColorTemperature, Rate: (target - current) / transitionTime * 10, Target: target,
+		Name: propColorTemperature, Target: target,
+		RateFrom: func(current float64) float64 { return (target - current) / transitionTime * 10 },
 	})
 }
 

@@ -127,6 +127,17 @@ type Transition struct {
 	// Rate is the change per second, signed. 0, NaN and ±Inf apply the
 	// target at once.
 	Rate float64
+	// RateFrom computes Rate from the property's current value, read
+	// inside [Engine.Start] under the engine's lock, and replaces Rate
+	// when set. matter.js reads the current value and starts the
+	// transition in one synchronous handler (moveToColorTemperatureLogic,
+	// moveToSaturationLogic, LevelControl moveToLevelLogic), so a running
+	// step can never land between the two; a Go caller that reads the
+	// value itself and then calls Start races the step goroutine, and a
+	// step landing in between yields a rate from the old value and a
+	// RemainingTime from the new one (one tenth of a second short).
+	// Optional; a property whose value is unknown keeps Rate.
+	RateFrom func(current float64) float64
 	// Target is the value the transition ends at. ±Inf is allowed and
 	// means the bound in that direction (LevelControl Move).
 	Target float64
@@ -203,6 +214,9 @@ func (e *Engine) Start(t Transition) error {
 	e.stopLocked(t.Name)
 
 	current, known := e.cfg.Read(t.Name)
+	if t.RateFrom != nil && known {
+		t.Rate = t.RateFrom(current)
+	}
 	if known && !t.NoTarget && current == t.Target {
 		return nil
 	}
