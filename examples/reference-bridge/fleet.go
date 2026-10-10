@@ -1468,12 +1468,13 @@ type fleet struct {
 	lock       *demoLock
 	humidity   *demoReading
 	occupancy  *demoBinary
-	contact    *demoBinary
+	contact    *demoContactSensor
 	button     *demoButton
 	purifier   *demoAirPurifier
 	garage     *demoGarage
 	colorLight *dimmer
 	fridge     *demoFridge
+	airQuality *demoAirQualitySensor
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1510,12 +1511,13 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		lock:        newDemoLock("Front Door"),
 		humidity:    newDemoReading("Bathroom Humidity", contract.MeasurementHumidity, 48),
 		occupancy:   newDemoBinary("Hall Motion", contract.MeasurementOccupancy, false),
-		contact:     newDemoBinary("Window Contact", contract.MeasurementContact, true),
+		contact:     newDemoContactSensor("Window Contact"),
 		button:      newDemoButton("Wall Button"),
 		purifier:    newDemoAirPurifier("Air Purifier"),
 		garage:      newDemoGarage("Garage Door"),
 		colorLight:  newDemoColorLight("Color Bulb"),
 		fridge:      newDemoFridge("Kitchen Fridge"),
+		airQuality:  newDemoAirQualitySensor("Air Quality Sensor"),
 		assembler:   asm,
 	}, nil
 }
@@ -1647,11 +1649,12 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("lock", f.lock.name, f.lock.MatterDeviceType(), f.lock),
 		sensor("humidity", f.humidity.name, f.humidity),
 		sensor("occupancy", f.occupancy.name, f.occupancy),
-		sensor("contact", f.contact.name, f.contact),
+		spec("contact", f.contact.name, f.contact.MatterDeviceType(), f.contact),
 		sensor("button", f.button.name, f.button),
 		spec("purifier", f.purifier.name, f.purifier.MatterDeviceType(), f.purifier),
 		spec("garage", f.garage.name, f.garage.MatterDeviceType(), f.garage),
 		spec("colorlight", f.colorLight.name, f.colorLight.MatterDeviceType(), f.colorLight),
 		fridge,
+		spec("airquality", f.airQuality.name, f.airQuality.MatterDeviceType(), f.airQuality),
 	}
 }

@@ -4,9 +4,13 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/boolcfg"
+	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -182,4 +186,121 @@ func (b *demoButton) press(long bool) bool {
 	}
 	slog.Info("button.press", slog.String("device", b.name), slog.Bool("long", long))
 	return true
+}
+
+// --- device: an air quality sensor -------------------------------------------
+
+// demoAirQualitySensor is an AirQualitySensor (0x002C) carrying AirQuality,
+// the cluster the device type mandates, and all ten concentration clusters
+// it lists as optional. Each reading is in the model's unit for its class
+// ([contract.FloatMeasurementSource]); AirQuality grades the CO2 reading.
+// The endpoint is assembled from a Source rather than a Measurement
+// because a measurement endpoint carries one class, and this one carries
+// ten.
+type demoAirQualitySensor struct {
+	name     string
+	readings []*demoReading
+}
+
+var _ contract.EndpointSource = (*demoAirQualitySensor)(nil)
+
+func newDemoAirQualitySensor(name string) *demoAirQualitySensor {
+	return &demoAirQualitySensor{name: name, readings: []*demoReading{
+		newDemoReading(name+" CO2", contract.MeasurementCO2, 650),
+		newDemoReading(name+" CO", contract.MeasurementCO, 0.5),
+		newDemoReading(name+" NO2", contract.MeasurementNO2, 0.01),
+		newDemoReading(name+" Ozone", contract.MeasurementOzone, 0.02),
+		newDemoReading(name+" PM2.5", contract.MeasurementPM25, 8),
+		newDemoReading(name+" Formaldehyde", contract.MeasurementFormaldehyde, 0.01),
+		newDemoReading(name+" PM1", contract.MeasurementPM1, 5),
+		newDemoReading(name+" PM10", contract.MeasurementPM10, 14),
+		newDemoReading(name+" TVOC", contract.MeasurementTVOC, 0.1),
+		newDemoReading(name+" Radon", contract.MeasurementRadon, 40),
+	}}
+}
+
+// MatterDeviceType implements [contract.EndpointSource].
+func (a *demoAirQualitySensor) MatterDeviceType() uint16 {
+	return contract.MeasurementClassDeviceType(contract.MeasurementCO2)
+}
+
+// MatterClusterServers implements [contract.EndpointSource]: AirQuality
+// first, then each concentration cluster as its class materialises it
+// (the class's materialiser returns AirQuality and the concentration
+// cluster; the AirQuality copies are dropped).
+func (a *demoAirQualitySensor) MatterClusterServers() []contract.ClusterServer {
+	servers := []contract.ClusterServer{measurement.NewAirQualityServer(contract.MeasurementCO2, a.readings[0])}
+	for _, r := range a.readings {
+		for _, srv := range measurement.FromMeasurementClass(r.class, r, contract.MeasurementContext{}) {
+			if srv.MatterClusterID() != measurement.ClusterAirQuality {
+				servers = append(servers, srv)
+			}
+		}
+	}
+	return servers
+}
+
+// --- device: a contact sensor with alarm configuration -----------------------
+
+// demoContactSensor is a window contact: BooleanState from the binary
+// reading, plus BooleanStateConfiguration (optional for ContactSensor) with
+// a three-step sensitivity level and a visual alarm a controller can
+// enable, disable and suppress. Its endpoint is assembled from a Source so
+// it can carry the second cluster; the binary reading stays the notifier a
+// subscribed controller's StateValue reports come from.
+type demoContactSensor struct {
+	*demoBinary
+	config *boolcfg.Server
+}
+
+var _ contract.EndpointSource = (*demoContactSensor)(nil)
+
+func newDemoContactSensor(name string) *demoContactSensor {
+	cfg, err := boolcfg.New(boolcfg.Config{
+		Features:                   boolcfg.FeatureSensitivityLevel | boolcfg.FeatureVisual | boolcfg.FeatureAlarmSuppress,
+		Optional:                   boolcfg.OptionalDefaultSensitivityLevel | boolcfg.OptionalAlarmsEnabled,
+		SupportedSensitivityLevels: 3,
+		DefaultSensitivityLevel:    1,
+		AlarmsSupported:            boolcfg.AlarmVisual,
+		AlarmsEnabled:              boolcfg.AlarmVisual,
+		Delegate:                   contactConfigLog{name: name},
+	})
+	if err != nil {
+		panic(fmt.Sprintf("contact sensor BooleanStateConfiguration: %v", err))
+	}
+	return &demoContactSensor{demoBinary: newDemoBinary(name, contract.MeasurementContact, true), config: cfg}
+}
+
+// MatterDeviceType implements [contract.EndpointSource].
+func (c *demoContactSensor) MatterDeviceType() uint16 {
+	return contract.MeasurementClassDeviceType(contract.MeasurementContact)
+}
+
+// MatterClusterServers implements [contract.EndpointSource].
+func (c *demoContactSensor) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{measurement.NewBooleanStateServer(c.demoBinary), c.config}
+}
+
+// contactConfigLog is the contact sensor's side of a controller's
+// configuration change: the daemon has no device to tell, so it logs it.
+type contactConfigLog struct{ name string }
+
+func (l contactConfigLog) CurrentSensitivityLevelChanged(_ context.Context, level uint8) error {
+	slog.Info("contact.sensitivity", slog.String("device", l.name), slog.Int("level", int(level)))
+	return nil
+}
+
+func (l contactConfigLog) AlarmsEnabledChanged(_ context.Context, enabled boolcfg.AlarmMode) error {
+	slog.Info("contact.alarms_enabled", slog.String("device", l.name), slog.Int("alarms", int(enabled)))
+	return nil
+}
+
+func (l contactConfigLog) AlarmsActiveChanged(_ context.Context, active boolcfg.AlarmMode) error {
+	slog.Info("contact.alarms_active", slog.String("device", l.name), slog.Int("alarms", int(active)))
+	return nil
+}
+
+func (l contactConfigLog) AlarmsSuppressedChanged(_ context.Context, suppressed boolcfg.AlarmMode) error {
+	slog.Info("contact.alarms_suppressed", slog.String("device", l.name), slog.Int("alarms", int(suppressed)))
+	return nil
 }
