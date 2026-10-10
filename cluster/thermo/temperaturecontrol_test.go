@@ -6,6 +6,7 @@ package thermo_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -163,7 +164,6 @@ func TestTemperatureControlSetTemperature(t *testing.T) {
 		{"below Min", tc.SetTemperatureRequest{TargetTemperature: ptr[int16](-2100)}, im.StatusConstraintError},
 		{"above Max", tc.SetTemperatureRequest{TargetTemperature: ptr[int16](600)}, im.StatusConstraintError},
 		{"off step", tc.SetTemperatureRequest{TargetTemperature: ptr[int16](-1950)}, im.StatusConstraintError},
-		{"level on TN", tc.SetTemperatureRequest{TargetTemperature: ptr[int16](-1900), TargetTemperatureLevel: ptr[uint8](0)}, im.StatusInvalidCommand},
 		{"no target", tc.SetTemperatureRequest{}, im.StatusInvalidCommand},
 		{"untyped fields", map[uint8]any{0: int64(0)}, im.StatusInvalidCommand},
 	} {
@@ -186,11 +186,24 @@ func TestTemperatureControlSetTemperature(t *testing.T) {
 			t.Errorf("edge %d: %v", edge, err)
 		}
 	}
+	// The TL field on a TN server is ignored, as chip's
+	// HandleSetTemperature ignores it; the device never sees it.
+	if _, err := num.MatterInvoke(ctx, tc.CmdSetTemperature, tc.SetTemperatureRequest{TargetTemperature: ptr[int16](-1900), TargetTemperatureLevel: ptr[uint8](9)}); err != nil || len(s.levels) != 0 {
+		t.Errorf("TN with a level field: %v, levels asked %v", err, s.levels)
+	}
+	// The device refusing the change now: INVALID_IN_STATE, nothing moves.
+	s.err = fmt.Errorf("running: %w", thermo.ErrTemperatureRefused)
+	if _, err := num.MatterInvoke(ctx, tc.CmdSetTemperature, tc.SetTemperatureRequest{TargetTemperature: ptr[int16](0)}); statusOf(err) != im.StatusInvalidInState {
+		t.Errorf("refused change: %v", err)
+	}
+	if v, _ := num.MatterRead(tc.AttrTemperatureSetpoint); v != int16(-1900) {
+		t.Errorf("setpoint moved on a refused change: %v", v)
+	}
 	s.err = errors.New("offline")
 	if _, err := num.MatterInvoke(ctx, tc.CmdSetTemperature, tc.SetTemperatureRequest{TargetTemperature: ptr[int16](0)}); err == nil || statusOf(err) != 0xFF {
 		t.Errorf("device error: %v", err)
 	}
-	if v, _ := num.MatterRead(tc.AttrTemperatureSetpoint); v != int16(500) {
+	if v, _ := num.MatterRead(tc.AttrTemperatureSetpoint); v != int16(-1900) {
 		t.Errorf("setpoint moved on a device error: %v", v)
 	}
 	if _, err := num.MatterInvoke(ctx, 0x01, nil); statusOf(err) != im.StatusUnsupportedCommand {
@@ -205,18 +218,22 @@ func TestTemperatureControlSetTemperature(t *testing.T) {
 		want im.StatusCode
 	}{
 		{"level past the list", tc.SetTemperatureRequest{TargetTemperatureLevel: ptr[uint8](3)}, im.StatusConstraintError},
-		{"temperature on TL", tc.SetTemperatureRequest{TargetTemperature: ptr[int16](0), TargetTemperatureLevel: ptr[uint8](0)}, im.StatusInvalidCommand},
 		{"no level", tc.SetTemperatureRequest{}, im.StatusInvalidCommand},
 	} {
 		if _, err := lvl.MatterInvoke(ctx, tc.CmdSetTemperature, c.req); statusOf(err) != c.want {
 			t.Errorf("%s: %v, want %v", c.name, err, c.want)
 		}
 	}
-	if _, err := lvl.MatterInvoke(ctx, tc.CmdSetTemperature, tc.SetTemperatureRequest{TargetTemperatureLevel: ptr[uint8](2)}); err != nil {
+	// The TN field on a TL server is ignored.
+	if _, err := lvl.MatterInvoke(ctx, tc.CmdSetTemperature, tc.SetTemperatureRequest{TargetTemperature: ptr[int16](-30000), TargetTemperatureLevel: ptr[uint8](2)}); err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := lvl.MatterRead(tc.AttrSelectedTemperatureLevel); v != uint8(2) || !slices.Equal(ls.levels, []uint8{2}) {
-		t.Errorf("level %v, asked %v", v, ls.levels)
+	if v, _ := lvl.MatterRead(tc.AttrSelectedTemperatureLevel); v != uint8(2) || !slices.Equal(ls.levels, []uint8{2}) || len(ls.targets) != 0 {
+		t.Errorf("level %v, asked %v, targets %v", v, ls.levels, ls.targets)
+	}
+	ls.err = thermo.ErrTemperatureRefused
+	if _, err := lvl.MatterInvoke(ctx, tc.CmdSetTemperature, tc.SetTemperatureRequest{TargetTemperatureLevel: ptr[uint8](0)}); statusOf(err) != im.StatusInvalidInState {
+		t.Errorf("refused level change: %v", err)
 	}
 }
 

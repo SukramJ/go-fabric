@@ -24,36 +24,29 @@ import (
 // privileges and the write answers come from it. matter.js's
 // TemperatureControlServer (packages/node/src/behaviors/temperature-control/
 // TemperatureControlServer.ts) adds nothing to the generated behavior, and
-// SetTemperature is the host's. The rules this server adds are the
-// specification's (Matter Application Cluster Specification 1.6.1 §8.8
-// TemperatureControl), since matter.js has no server logic to mirror:
-//
-//   - a TargetTemperature outside MinTemperature..MaxTemperature, or with
-//     STEP not on a step from MinTemperature, is CONSTRAINT_ERROR;
-//   - a TargetTemperatureLevel not below the length of
-//     SupportedTemperatureLevels is CONSTRAINT_ERROR;
-//   - the field of the feature the server does not have is
-//     INVALID_COMMAND.
-//
-// Where the brief that introduced the server left a case open, the
-// answer follows connectedhomeip's TemperatureControl server
+// SetTemperature is the host's. The rules this server adds are those of
+// Matter Application Cluster Specification 1.6.1 §8.8 TemperatureControl
+// as connectedhomeip's server implements them — the authority for a
+// cluster matter.js has no server logic for
 // (src/app/clusters/temperature-control-server/TemperatureControlCluster.cpp
-// at the harness pin 6170af8461b10b1766044122ac83332c6d00ab20), the
-// authority for a cluster matter.js has no server logic for:
+// at the harness pin 6170af8461b10b1766044122ac83332c6d00ab20):
 //
-//   - the field of the server's own feature missing is INVALID_COMMAND
-//     (HandleSetTemperature, :176 TargetTemperature, :196
-//     TargetTemperatureLevel);
+//   - only the field of the server's own feature is read; the other one is
+//     ignored (HandleSetTemperature :174-217 reads TargetTemperature under
+//     TN, TargetTemperatureLevel under TL);
+//   - the own field missing is INVALID_COMMAND (:176, :196);
+//   - a TargetTemperature outside MinTemperature..MaxTemperature, or with
+//     STEP not on a step from MinTemperature, is CONSTRAINT_ERROR
+//     (SetTemperatureSetpoint :119-125);
+//   - a TargetTemperatureLevel not below the length of
+//     SupportedTemperatureLevels is CONSTRAINT_ERROR (:135);
+//   - a change the device cannot accept now is INVALID_IN_STATE (:191,
+//     :215) — the host says so with [ErrTemperatureRefused]; any other
+//     host error is FAILURE;
 //   - on success TemperatureSetpoint / SelectedTemperatureLevel become the
-//     requested value (SetTemperatureSetpoint :127,
-//     SetSelectedTemperatureLevel :138);
+//     requested value (:127, :138);
 //   - MaxTemperature need not lie on a Step from MinTemperature: the
 //     constructor checks Step only against 1..Max-Min (:48-51).
-//
-// One rule differs from chip: chip's HandleSetTemperature (:174-217) reads
-// only the field of the feature it has and ignores the other one; this
-// server answers that other field with INVALID_COMMAND, as the brief
-// specifies (BD-Matter-TemperatureControl-RulesInServer).
 
 // ClusterIDTemperatureControl is the TemperatureControl cluster id, from the
 // generated definition.
@@ -73,8 +66,10 @@ const (
 // target (TN, in 0.01 °C) and level (TL, an index into
 // SupportedTemperatureLevels) is set, already checked against the
 // cluster's rules. A nil error makes the value the new
-// TemperatureSetpoint or SelectedTemperatureLevel; an error answers the
-// invoke with FAILURE and changes nothing.
+// TemperatureSetpoint or SelectedTemperatureLevel. An error wrapping
+// [ErrTemperatureRefused] — the device cannot accept the change now —
+// answers INVALID_IN_STATE; any other error answers FAILURE. Either way
+// nothing changes.
 type TemperatureSetter interface {
 	SetTemperature(ctx context.Context, target *int16, level *uint8) error
 }
@@ -111,6 +106,14 @@ var (
 	ErrNoTemperatureSetter     = errors.New("temperaturecontrol: a TemperatureSetter is required")
 	ErrTemperatureControlValue = errors.New("temperaturecontrol: value outside the cluster's model")
 )
+
+// ErrTemperatureRefused is what a [TemperatureSetter] returns (or wraps)
+// when the device cannot accept a temperature change at the time — "due
+// to the design of a device it cannot accept a change in its temperature
+// setting after it has begun operation". The server answers
+// INVALID_IN_STATE, as connectedhomeip's HandleSetTemperature does
+// (TemperatureControlCluster.cpp:191, :215).
+var ErrTemperatureRefused = errors.New("temperaturecontrol: the device cannot accept the change now")
 
 // TemperatureControlServer implements [contract.ClusterServer] for
 // TemperatureControl. The lists, globals and privileges are the embedded
@@ -274,11 +277,14 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 		return nil, invalidCommand(fmt.Sprintf("temperaturecontrol: SetTemperature fields %T", fields))
 	}
 	number := s.HasFeature("TN")
+	// Only the own feature's field is read; the other is ignored, as chip's
+	// HandleSetTemperature does (TemperatureControlCluster.cpp:174-217).
+	if number {
+		req.TargetTemperatureLevel = nil
+	} else {
+		req.TargetTemperature = nil
+	}
 	switch {
-	case number && req.TargetTemperatureLevel != nil:
-		return nil, invalidCommand("temperaturecontrol: TargetTemperatureLevel without the TL feature")
-	case !number && req.TargetTemperature != nil:
-		return nil, invalidCommand("temperaturecontrol: TargetTemperature without the TN feature")
 	// A missing field of the own feature: INVALID_COMMAND, as chip
 	// answers it (TemperatureControlCluster.cpp:176, :196).
 	case number && req.TargetTemperature == nil:
@@ -296,6 +302,11 @@ func (s *TemperatureControlServer) MatterInvoke(ctx context.Context, cmdID uint3
 		return nil, err
 	}
 	if err := s.cfg.Setter.SetTemperature(ctx, req.TargetTemperature, req.TargetTemperatureLevel); err != nil {
+		if errors.Is(err, ErrTemperatureRefused) {
+			// INVALID_IN_STATE, as chip answers a change the device
+			// cannot accept (TemperatureControlCluster.cpp:191, :215).
+			return nil, tcStatusError{im.StatusInvalidInState, fmt.Sprintf("temperaturecontrol: SetTemperature: %v", err)}
+		}
 		return nil, fmt.Errorf("temperaturecontrol: SetTemperature: %w", err)
 	}
 	// The requested value becomes the attribute's, as chip's

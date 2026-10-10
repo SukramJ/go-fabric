@@ -41,8 +41,10 @@ the same `ColorTemperatureWriter` as before.
   `SetTemperatureSetpoint` / `SetSelectedTemperatureLevel` for changes the
   device makes. SetTemperature answers CONSTRAINT_ERROR for a target
   outside MinTemperature..MaxTemperature or off a Step, or a level past
-  SupportedTemperatureLevels, and INVALID_COMMAND for the field of the
-  feature the server lacks or a missing one.
+  SupportedTemperatureLevels, INVALID_COMMAND for a missing field of its
+  own feature, and INVALID_IN_STATE when the host refuses with
+  `thermo.ErrTemperatureRefused`; the field of the other feature is
+  ignored — all as connectedhomeip's TemperatureControl server answers.
 - Generated definitions under `cluster/spec/` for EnergyEvseMode,
   WaterHeaterMode, DeviceEnergyManagementMode, MicrowaveOvenMode,
   OvenMode, RefrigeratorAndTemperatureControlledCabinetMode and
