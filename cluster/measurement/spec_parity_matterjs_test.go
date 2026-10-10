@@ -10,19 +10,26 @@ import (
 	aqdef "github.com/SukramJ/go-fabric/cluster/spec/airquality"
 	booldef "github.com/SukramJ/go-fabric/cluster/spec/booleanstate"
 	co2def "github.com/SukramJ/go-fabric/cluster/spec/carbondioxideconcentrationmeasurement"
+	codef "github.com/SukramJ/go-fabric/cluster/spec/carbonmonoxideconcentrationmeasurement"
 	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	flowdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
+	hchodef "github.com/SukramJ/go-fabric/cluster/spec/formaldehydeconcentrationmeasurement"
 	illdef "github.com/SukramJ/go-fabric/cluster/spec/illuminancemeasurement"
+	no2def "github.com/SukramJ/go-fabric/cluster/spec/nitrogendioxideconcentrationmeasurement"
 	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
+	o3def "github.com/SukramJ/go-fabric/cluster/spec/ozoneconcentrationmeasurement"
 	pm10def "github.com/SukramJ/go-fabric/cluster/spec/pm10concentrationmeasurement"
+	pm1def "github.com/SukramJ/go-fabric/cluster/spec/pm1concentrationmeasurement"
 	pm25def "github.com/SukramJ/go-fabric/cluster/spec/pm25concentrationmeasurement"
 	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
 	prsdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
+	radondef "github.com/SukramJ/go-fabric/cluster/spec/radonconcentrationmeasurement"
 	rhdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	tmpdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
+	tvocdef "github.com/SukramJ/go-fabric/cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -62,6 +69,13 @@ func TestServersMatchTheGeneratedDefinitions(t *testing.T) {
 		{"CO2", NewCO2ConcentrationServer(f), co2def.Definition, uint32(co2def.FeatureNumericMeasurement)},
 		{"PM2.5", NewPM25ConcentrationServer(f), pm25def.Definition, uint32(pm25def.FeatureNumericMeasurement)},
 		{"PM10", NewPM10ConcentrationServer(f), pm10def.Definition, uint32(pm10def.FeatureNumericMeasurement)},
+		{"CO", NewCOConcentrationServer(f), codef.Definition, uint32(codef.FeatureNumericMeasurement)},
+		{"NO2", NewNO2ConcentrationServer(f), no2def.Definition, uint32(no2def.FeatureNumericMeasurement)},
+		{"Ozone", NewOzoneConcentrationServer(f), o3def.Definition, uint32(o3def.FeatureNumericMeasurement)},
+		{"Formaldehyde", NewFormaldehydeConcentrationServer(f), hchodef.Definition, uint32(hchodef.FeatureNumericMeasurement)},
+		{"PM1", NewPM1ConcentrationServer(f), pm1def.Definition, uint32(pm1def.FeatureNumericMeasurement)},
+		{"TVOC", NewTVOCConcentrationServer(f), tvocdef.Definition, uint32(tvocdef.FeatureNumericMeasurement)},
+		{"Radon", NewRadonConcentrationServer(f), radondef.Definition, uint32(radondef.FeatureNumericMeasurement)},
 		{"PowerSource bool", NewPowerSourceServer(b), psdef.Definition, uint32(psdef.FeatureBattery)},
 		{"PowerSource float", NewPowerSourceServerFromFloat(f), psdef.Definition, uint32(psdef.FeatureBattery)},
 		{"PowerTopology", NewPowerTopologyServer(), ptdef.Definition, uint32(ptdef.FeatureNodeTopology)},

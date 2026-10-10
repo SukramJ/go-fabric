@@ -747,6 +747,13 @@ func TestFromMeasurementClassAirQualityMountsMandatoryCluster(t *testing.T) {
 		{name: "co2", class: contract.MeasurementCO2, concentrID: measurement.ClusterCO2Concentration},
 		{name: "pm25", class: contract.MeasurementPM25, concentrID: measurement.ClusterPM25Concentration},
 		{name: "pm10", class: contract.MeasurementPM10, concentrID: measurement.ClusterPM10Concentration},
+		{name: "co", class: contract.MeasurementCO, concentrID: measurement.ClusterCOConcentration},
+		{name: "no2", class: contract.MeasurementNO2, concentrID: measurement.ClusterNO2Concentration},
+		{name: "ozone", class: contract.MeasurementOzone, concentrID: measurement.ClusterOzoneConcentration},
+		{name: "formaldehyde", class: contract.MeasurementFormaldehyde, concentrID: measurement.ClusterFormaldehydeConcentration},
+		{name: "pm1", class: contract.MeasurementPM1, concentrID: measurement.ClusterPM1Concentration},
+		{name: "tvoc", class: contract.MeasurementTVOC, concentrID: measurement.ClusterTVOCConcentration},
+		{name: "radon", class: contract.MeasurementRadon, concentrID: measurement.ClusterRadonConcentration},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -793,6 +800,9 @@ func TestAirQualityServerClassifiesAgainstGuideline(t *testing.T) {
 		{name: "pm10 clean", class: contract.MeasurementPM10, val: 20, obs: true, want: 1},
 		{name: "pm10 above guideline", class: contract.MeasurementPM10, val: 90, obs: true, want: 4},
 		{name: "no reading yet", class: contract.MeasurementCO2, val: 0, obs: false, want: 0},
+		// The seven further classes carry no guideline: Unknown.
+		{name: "radon ungraded", class: contract.MeasurementRadon, val: 50, obs: true, want: 0},
+		{name: "tvoc ungraded", class: contract.MeasurementTVOC, val: 0.2, obs: true, want: 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

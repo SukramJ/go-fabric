@@ -53,6 +53,13 @@ func TestBuiltinMeasurementKindsAnswerUnchanged(t *testing.T) {
 		{"MomentarySwitch", contract.MeasurementMomentarySwitch, 0x000F, 0x003B, false},
 		{"Electrical", contract.MeasurementElectrical, 0x0510, 0x0090, false},
 		{"Flow", contract.MeasurementFlow, 0x0306, 0x0404, false},
+		{"CO", contract.MeasurementCO, 0x002C, 0x040C, false},
+		{"NO2", contract.MeasurementNO2, 0x002C, 0x0413, false},
+		{"Ozone", contract.MeasurementOzone, 0x002C, 0x0415, false},
+		{"Formaldehyde", contract.MeasurementFormaldehyde, 0x002C, 0x042B, false},
+		{"PM1", contract.MeasurementPM1, 0x002C, 0x042C, false},
+		{"TVOC", contract.MeasurementTVOC, 0x002C, 0x042E, false},
+		{"Radon", contract.MeasurementRadon, 0x002C, 0x042F, false},
 	}
 
 	for _, tc := range cases {
@@ -97,7 +104,7 @@ func TestRegisterMeasurementKindIsAnsweredByBothLookups(t *testing.T) {
 	}
 	class := contract.RegisterMeasurementKind(want)
 
-	if class <= contract.MeasurementFlow {
+	if class <= contract.MeasurementRadon {
 		t.Fatalf("RegisterMeasurementKind returned %d, want a class above the built-in range", class)
 	}
 	if got := contract.MeasurementClassDeviceType(class); got != want.DeviceType {

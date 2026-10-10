@@ -17,7 +17,7 @@ import (
 // does not import this package.
 //
 // The three classes marked false are empty on purpose and each for its
-// own reason (see the file comment in materializers.go); the fourteen
+// own reason (see the file comment in materializers.go); the twenty-one
 // marked true are the ones a bridged endpoint's cluster surface comes
 // from. A class flipping either way changes what a bridged device
 // advertises on the wire, which is never a refactor.
@@ -46,6 +46,13 @@ func TestBuiltinMaterializersAreInstalled(t *testing.T) {
 		{"MomentarySwitch", contract.MeasurementMomentarySwitch, true},
 		{"Electrical", contract.MeasurementElectrical, true},
 		{"Flow", contract.MeasurementFlow, true},
+		{"CO", contract.MeasurementCO, true},
+		{"NO2", contract.MeasurementNO2, true},
+		{"Ozone", contract.MeasurementOzone, true},
+		{"Formaldehyde", contract.MeasurementFormaldehyde, true},
+		{"PM1", contract.MeasurementPM1, true},
+		{"TVOC", contract.MeasurementTVOC, true},
+		{"Radon", contract.MeasurementRadon, true},
 	}
 
 	for _, tc := range cases {

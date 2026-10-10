@@ -265,13 +265,20 @@ const (
 	MeasurementMomentarySwitch                  // 0x003B Switch (Generic Switch endpoint)
 	MeasurementElectrical                       // 0x0090 + 0x0091 + 0x009C (ElectricalSensor endpoint)
 	MeasurementFlow                             // 0x0404 FlowMeasurement (FlowSensor endpoint)
+	MeasurementCO                               // 0x040C CarbonMonoxideConcentrationMeasurement
+	MeasurementNO2                              // 0x0413 NitrogenDioxideConcentrationMeasurement
+	MeasurementOzone                            // 0x0415 OzoneConcentrationMeasurement
+	MeasurementFormaldehyde                     // 0x042B FormaldehydeConcentrationMeasurement
+	MeasurementPM1                              // 0x042C Pm1ConcentrationMeasurement
+	MeasurementTVOC                             // 0x042E TotalVolatileOrganicCompoundsConcentrationMeasurement
+	MeasurementRadon                            // 0x042F RadonConcentrationMeasurement
 )
 
 // measurementClassBuiltinEnd is one past the last built-in class, and
 // the first class [RegisterMeasurementKind] hands out. Keeping the two
 // ranges apart is what lets the constants above keep their numeric
 // values while the set stays open.
-const measurementClassBuiltinEnd = MeasurementFlow + 1
+const measurementClassBuiltinEnd = MeasurementRadon + 1
 
 // MeasurementMaterializer builds the cluster server(s) that carry one
 // source's readings for a measurement kind — the same job the library's
@@ -510,6 +517,17 @@ func builtinMeasurementKinds() map[MeasurementClass]MeasurementKind {
 		// FlowSensor (0x0306) mandates Identify plus FlowMeasurement
 		// (0x0404) and nothing else (matter.js flow-sensor.element.ts).
 		MeasurementFlow: {Name: "Flow", DeviceType: 0x0306, ClusterID: 0x0404},
+		// The seven further concentration kinds share AirQualitySensor
+		// (0x002C) with CO2 / PM2.5 / PM10 and differ only in their
+		// cluster; the ids are the generated definitions'
+		// (cluster/spec/<name>, from parity/schema.json).
+		MeasurementCO:           {Name: "Carbon Monoxide", DeviceType: 0x002C, ClusterID: 0x040C},
+		MeasurementNO2:          {Name: "Nitrogen Dioxide", DeviceType: 0x002C, ClusterID: 0x0413},
+		MeasurementOzone:        {Name: "Ozone", DeviceType: 0x002C, ClusterID: 0x0415},
+		MeasurementFormaldehyde: {Name: "Formaldehyde", DeviceType: 0x002C, ClusterID: 0x042B},
+		MeasurementPM1:          {Name: "PM1", DeviceType: 0x002C, ClusterID: 0x042C},
+		MeasurementTVOC:         {Name: "Total Volatile Organic Compounds", DeviceType: 0x002C, ClusterID: 0x042E},
+		MeasurementRadon:        {Name: "Radon", DeviceType: 0x002C, ClusterID: 0x042F},
 	}
 }
 
@@ -558,13 +576,14 @@ type MeasurementSource interface {
 
 // FloatMeasurementSource is the typed read surface for scalar
 // measurement classes (Temperature, Humidity, Illuminance, Pressure,
-// CO2, PM2.5, PM10, Flow). Implemented by Generic.Sensor[float64] and the
+// Flow and the ten concentration classes). Implemented by Generic.Sensor[float64] and the
 // equivalent calculated-DP types.
 //
 // MatterFloatValue returns the current observed value in the model's
 // native unit (°C for temperature, % RH for humidity, lux for
-// illuminance, hPa for pressure, ppm for CO2, µg/m³ for particulates,
-// m³/h for flow).
+// illuminance, hPa for pressure, ppm for CO2, CO, NO2, ozone,
+// formaldehyde and TVOC, µg/m³ for particulates (PM1, PM2.5, PM10),
+// Bq/m³ for radon, m³/h for flow).
 // `observed` is false when no measurement has been received yet — the
 // bridge maps that to a Matter-spec NULL response (e.g. -32768 sentinel
 // for nullable int16 attributes).
