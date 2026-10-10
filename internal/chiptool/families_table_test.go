@@ -140,6 +140,9 @@ const (
 	dtGenericSwitch   = 0x000F
 	dtAirPurifier     = 0x002D
 	dtClosure         = 0x0230
+	// dtAirQualitySensor carries AirQuality and the ten concentration
+	// clusters (examples/reference-bridge/fleet_sensors.go).
+	dtAirQualitySensor = 0x002C
 	// dtTempControlledCabinet is the reference fridge's cabinet part
 	// (examples/reference-bridge/fleet_appliances.go): TemperatureControl
 	// and RefrigeratorAndTemperatureControlledCabinetMode.
@@ -298,6 +301,20 @@ var chipFamilies = []family{
 	// --- application clusters ----------------------------------------------
 	{name: "ACFREMON", deviceType: dtAirPurifier},
 	{name: "BOOL", deviceType: dtContactSensor},
+	{name: "BOOLCFG", deviceType: dtContactSensor},
+	// The concentration families, one case each (TC-<FAM>-2.1), all on
+	// the reference AirQualitySensor. CDOCONC is CarbonDioxide and
+	// CMOCONC CarbonMonoxide (connectedhomeip
+	// src/app/tests/suites/certification/Test_TC_CDOCONC_2_1.yaml:29,
+	// Test_TC_CMOCONC_2_1.yaml:22).
+	{name: "CDOCONC", deviceType: dtAirQualitySensor},
+	{name: "CMOCONC", deviceType: dtAirQualitySensor},
+	{name: "FLDCONC", deviceType: dtAirQualitySensor},
+	{name: "NDOCONC", deviceType: dtAirQualitySensor},
+	{name: "OZCONC", deviceType: dtAirQualitySensor},
+	{name: "PMHCONC", deviceType: dtAirQualitySensor},
+	{name: "RNCONC", deviceType: dtAirQualitySensor},
+	{name: "TVOCCONC", deviceType: dtAirQualitySensor},
 	{
 		name: "CLCTRL", deviceType: dtClosure,
 		// TC_CLCTRL_5_1 gates on "CLCTRL.S.C00", a code no PICS defines:
