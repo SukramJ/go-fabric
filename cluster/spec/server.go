@@ -41,6 +41,11 @@ type Source interface {
 // Sink is the optional write port: told about every controller write that
 // passed the definition's checks, before the server stores it; an error
 // refuses the write and leaves the stored value as it was.
+//
+// value is the stored form described on [Server] — the Go type of the
+// attribute's width (a uint32 for an epoch-s, a uint8 for an enum8), nil
+// for null, a struct or list as decoded — not the uint64 / int64 /
+// float64 [Instance.ValidateWrite] normalises to.
 type Sink interface {
 	MatterWriteAttribute(ctx context.Context, attrID uint32, value any) error
 }
@@ -71,11 +76,12 @@ type ServerConfig struct {
 // (`export class FixedLabelServer extends FixedLabelBehavior {}`): the
 // element lists come from the definition and the feature selection
 // (packages/node/src/behavior/cluster/ValidatedElements.ts, the embedded
-// [Instance]), a controller write is
-// checked against the model, and the state is the attribute values. It
-// stores them, dispatches commands to registered handlers, emits events
-// with the definition's priority and reports changes with a data-version
-// bump and an attribute-change notification.
+// [Instance]), a value — written by a controller or set by the host — is
+// checked against the model, and the state is the attribute values,
+// starting at the model's defaults. It stores them, dispatches commands
+// to registered handlers, emits events with the definition's priority and
+// reports changes with a data-version bump and an attribute-change
+// notification.
 //
 // Values are kept in the Go type of the attribute's width: uint8 to
 // uint64 for an unsigned integer, enum or bitmap, int8 to int64 for a
@@ -112,19 +118,19 @@ var (
 )
 
 // NewServer binds def to opts as [New] does and returns a server holding
-// cfg.Initial. A definition with a fabric-scoped attribute is refused
-// ([ErrFabricScoped]).
+// cfg.Initial; a served attribute cfg.Initial leaves out starts at the
+// definition's default, and is absent when the definition states none.
+// A selection that serves a fabric-scoped attribute is refused
+// ([ErrFabricScoped]); an unserved one does not matter.
 func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
-	if def != nil {
-		for ai := range def.Attributes {
-			if a := &def.Attributes[ai]; a.Access.Fabric == "F" {
-				return nil, fmt.Errorf("%w: %s attribute %s", ErrFabricScoped, def.Name, a.Name)
-			}
-		}
-	}
 	inst, err := New(def, opts)
 	if err != nil {
 		return nil, err
+	}
+	for _, id := range inst.attrs {
+		if a := def.Attribute(id); a.Access.Fabric == "F" {
+			return nil, fmt.Errorf("%w: %s attribute %s", ErrFabricScoped, def.Name, a.Name)
+		}
 	}
 	s := &Server{
 		Instance: inst,
@@ -133,6 +139,11 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 		sink:     cfg.Sink,
 		values:   map[uint32]any{},
 		handlers: map[uint32]CommandHandler{},
+	}
+	for _, id := range inst.attrs {
+		if v, ok := defaultValue(def.Attribute(id)); ok {
+			s.values[id] = v
+		}
 	}
 	for _, id := range slices.Sorted(maps.Keys(cfg.Initial)) {
 		v, err := s.check(id, cfg.Initial[id])
@@ -228,17 +239,53 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 }
 
 // check holds a device-side value to the served attribute's type and
-// constraint and returns it in its stored form.
+// constraint — the checks of [Instance.CheckValue], list length and list
+// entries and struct fields included — and returns it in its stored form.
 func (s *Server) check(attrID uint32, value any) (any, error) {
-	a := s.def.Attribute(attrID)
-	if a == nil || !s.Serves(attrID) {
+	if !s.Serves(attrID) {
 		return nil, fmt.Errorf("%w: %s attribute 0x%04X", ErrNotServed, s.def.Name, attrID)
 	}
-	v, err := s.checkValue(a.Name, a.Type, a.Quality.Nullable, a.Constraint, underlying(value), s.peers)
+	v, err := s.CheckValue(attrID, value, s.peers)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
 	}
-	return stored(a.Type, v), nil
+	return stored(s.def.Attribute(attrID).Type, v), nil
+}
+
+// defaultValue is the attribute's model default in its stored form: what
+// matter.js starts a behavior's state with (packages/model/src/logic/
+// DefaultValue.ts, SelectDefaultValue.ts). The generator renders a
+// default as a float64, bool or string, or [NullDefault] for null
+// (script/clustergen/gen.go defaultLiteral); one it does not render (a
+// list, an object) or one that does not fit the attribute's kind leaves
+// the attribute without a value.
+func defaultValue(a *Attribute) (any, bool) {
+	t := a.Type
+	switch d := a.Default.(type) {
+	case NullDefault:
+		return nil, true
+	case float64:
+		switch t.Kind {
+		case KindUint, KindEnum, KindBitmap:
+			if d >= 0 {
+				return stored(t, uint64(d)), true
+			}
+		case KindInt:
+			return stored(t, int64(d)), true
+		case KindFloat32, KindFloat64:
+			return stored(t, d), true
+		default:
+		}
+	case bool:
+		if t.Kind == KindBool {
+			return d, true
+		}
+	case string:
+		if t.Kind == KindString {
+			return d, true
+		}
+	}
+	return nil, false
 }
 
 // store keeps values and reports the ones that changed.

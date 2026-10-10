@@ -109,15 +109,17 @@ the same `ColorTemperatureWriter` as before.
 - `cluster/spec.Server` (`spec.NewServer(def, opts, spec.ServerConfig)`):
   the generated default cluster server (ADR 0017, phase 0). A generated
   definition plus a feature selection becomes a complete
-  `contract.ClusterServer` — stored attribute values with an optional read
-  port (`spec.Source`) and write port (`spec.Sink`), controller writes
-  checked by `ValidateWrite`, device-side `Set` / `SetAttributes` checked
-  against type and constraint, data-version bumps and change
-  notifications, command dispatch through `Handle`, events through
-  `SetMatterEventEmitter` / `Emit` with the definition's priority. New
-  errors `spec.ErrFabricScoped` (a definition with a fabric-scoped
-  attribute is refused), `spec.ErrNotServed`, `spec.ErrInvalidValue`,
-  `spec.ErrNotEmitted`.
+  `contract.ClusterServer` — attribute values starting at the model's
+  defaults, an optional read port (`spec.Source`) and write port
+  (`spec.Sink`), controller writes checked by `ValidateWrite`, device-side
+  `Set` / `SetAttributes` checked against the same type and constraint
+  checks, data-version bumps and change notifications, command dispatch
+  through `Handle`, events through `SetMatterEventEmitter` / `Emit` with
+  the definition's priority. New errors `spec.ErrFabricScoped` (a
+  selection that serves a fabric-scoped attribute is refused),
+  `spec.ErrNotServed`, `spec.ErrInvalidValue`, `spec.ErrNotEmitted`.
+- `spec.Instance.CheckValue`: an attribute value against its type and
+  constraint, without the access check.
 - `cluster/core.NewFixedLabel(labels)`: a FixedLabel (0x0040) server on the
   generated server, with the new generated definition
   `cluster/spec/fixedlabel`. Not mounted by the reference bridge.
@@ -141,6 +143,12 @@ the same `ColorTemperatureWriter` as before.
   behaviour are unchanged, except that constructing a server now bumps its
   data version once (the initial values are stored as a device-side
   change), which is visible only on a host-owned `Config.DataVersion`.
+- `spec.Instance.ValidateWrite` checks list and struct values too: a
+  list's length against its constraint ("max 5"), each entry against the
+  entry type and entry constraint, a struct's fields against their types
+  and constraints (matter.js `ValueValidator.ts`, `constraint.ts`). A
+  write of such a value that was accepted before can now be answered
+  CONSTRAINT_ERROR.
 
 - **The measurement servers, GenericSwitch, AdministratorCommissioning and
   fourteen system servers are built on their generated definitions** (ADR

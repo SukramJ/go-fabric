@@ -41,4 +41,13 @@ func TestParityMatterJS_FixedLabel(t *testing.T) {
 	if empty, err := NewFixedLabel(nil); err != nil || len(empty.MatterAttributes()) != 1 {
 		t.Errorf("no labels: %v", err)
 	}
+	// LabelStruct's Label and Value are "max 16".
+	for _, l := range []fixedlabeldef.LabelStruct{{Label: "seventeen-chars-x"}, {Value: "seventeen-chars-x"}} {
+		if _, err := NewFixedLabel([]fixedlabeldef.LabelStruct{l}); !errors.Is(err, spec.ErrInvalidValue) {
+			t.Errorf("label %+v: %v", l, err)
+		}
+	}
+	if _, err := NewFixedLabel([]fixedlabeldef.LabelStruct{{Label: "sixteen-chars-xx", Value: "sixteen-chars-xx"}}); err != nil {
+		t.Errorf("16 characters: %v", err)
+	}
 }

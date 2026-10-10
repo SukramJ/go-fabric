@@ -230,18 +230,12 @@ func newServer(def *spec.Cluster, cfg Config) (*Server, error) {
 
 // checkProducts holds ReplacementProductList to its constraints, read from
 // the definition: at most five entries ("max 5"), a known identifier type,
-// an identifier of at most 20 characters ("max 20").
+// an identifier of at most 20 characters ("max 20"). The definition's
+// value check ([spec.Instance.CheckValue]) holds all three, whether REP
+// serves the list or not.
 func (s *Server) checkProducts() error {
-	list := s.Definition().Attribute(hepa.AttrReplacementProductList)
-	if n := int64(len(s.cfg.ReplacementProducts)); n > list.Constraint.Max.Int {
-		return fmt.Errorf("%w: %d replacement products, at most %d", ErrInvalidValue, n, list.Constraint.Max.Int)
-	}
-	value := hepa.ReplacementProductStructDef.Fields[1].Constraint.Max.Int
-	for _, p := range s.cfg.ReplacementProducts {
-		if !s.EnumSupported(hepa.ProductIdentifierTypeEnumDef, uint64(p.ProductIdentifierType)) ||
-			int64(spec.StringLength(p.ProductIdentifierValue)) > value {
-			return fmt.Errorf("%w: replacement product %+v", ErrInvalidValue, p)
-		}
+	if _, err := s.CheckValue(hepa.AttrReplacementProductList, spec.List[ReplacementProduct](s.cfg.ReplacementProducts), nil); err != nil {
+		return fmt.Errorf("%w: replacement products: %w", ErrInvalidValue, err)
 	}
 	return nil
 }

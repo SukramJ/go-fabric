@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/binding"
 	hepa "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
+	"github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	"github.com/SukramJ/go-fabric/cluster/spec/smokecoalarm"
 	"github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	"github.com/SukramJ/go-fabric/contract"
@@ -88,6 +89,8 @@ func TestNewServerRefuses(t *testing.T) {
 		{"no definition", nil, spec.Options{}, spec.ServerConfig{}, spec.ErrNoDefinition},
 		{"unknown feature", hepa.Definition, spec.Options{Features: 1 << 3}, spec.ServerConfig{}, spec.ErrUnknownFeature},
 		{"fabric-scoped", binding.Definition, spec.Options{}, spec.ServerConfig{}, spec.ErrFabricScoped},
+		{"fabric-scoped by feature", icdmanagement.Definition, spec.Options{Features: uint32(icdmanagement.FeatureCheckInProtocolSupport)}, spec.ServerConfig{}, spec.ErrFabricScoped},
+		{"initial list too long", hepa.Definition, spec.Options{Features: uint32(hepa.FeatureReplacementProductList)}, spec.ServerConfig{Initial: map[uint32]any{hepa.AttrReplacementProductList: slices.Repeat(products, 6)}}, spec.ErrInvalidValue},
 		{"initial not served", hepa.Definition, spec.Options{}, spec.ServerConfig{Initial: map[uint32]any{hepa.AttrCondition: uint8(1)}}, spec.ErrNotServed},
 		{"initial out of constraint", hepa.Definition, spec.Options{Features: uint32(hepa.FeatureCondition)}, spec.ServerConfig{Initial: map[uint32]any{hepa.AttrCondition: uint8(101)}}, spec.ErrInvalidValue},
 		{"initial enum without its feature", hepa.Definition, spec.Options{}, spec.ServerConfig{Initial: map[uint32]any{hepa.AttrChangeIndication: hepa.ChangeIndicationWarning}}, spec.ErrInvalidValue},
@@ -119,8 +122,8 @@ func TestServerRead(t *testing.T) {
 	if l, ok := srv.MatterRead(hepa.AttrReplacementProductList); !ok || !slices.Equal(l.(spec.List[hepa.ReplacementProductStruct]), products) {
 		t.Errorf("ReplacementProductList %#v", l)
 	}
-	if v, ok := srv.MatterRead(hepa.AttrLastChangedTime); ok {
-		t.Errorf("a served attribute with no value is absent, got %#v", v)
+	if v, ok := srv.MatterRead(hepa.AttrLastChangedTime); !ok || v != nil {
+		t.Errorf("LastChangedTime starts at its model default, null; got %#v (%v)", v, ok)
 	}
 	if v, ok := srv.MatterRead(hepa.AttrInPlaceIndicator); ok {
 		t.Errorf("an attribute not served is absent, got %#v", v)
