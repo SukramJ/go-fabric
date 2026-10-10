@@ -286,6 +286,12 @@ type Nullable[T any] struct {
 	Null  bool
 }
 
+// nullable is a [Nullable] of any T, for the struct and list checks.
+type nullable interface{ nullValue() (any, bool) }
+
+// nullValue returns the value, and whether it is null.
+func (n Nullable[T]) nullValue() (any, bool) { return n.Value, n.Null }
+
 // NullOf returns a null T.
 // fabric:reachable:reason="generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration"
 func NullOf[T any]() Nullable[T] { return Nullable[T]{Null: true} }
