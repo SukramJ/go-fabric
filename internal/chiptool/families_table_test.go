@@ -295,6 +295,16 @@ var chipFamilies = []family{
 	{name: "ICDM"},
 	{name: "SU"},
 	{name: "BIND"},
+	// The root's label, localization and diagnostics clusters (all
+	// optional on RootNode), mounted by buildRootLabelsAndDiagnostics in
+	// examples/reference-bridge/root_optional.go.
+	{name: "FLABEL"},
+	{name: "ULABEL"},
+	{name: "LCFG"},
+	{name: "LTIME"},
+	{name: "LUNIT"},
+	{name: "DGSW"},
+	{name: "DGETH"},
 	// --- application clusters ----------------------------------------------
 	{name: "ACFREMON", deviceType: dtAirPurifier},
 	{name: "BOOL", deviceType: dtContactSensor},

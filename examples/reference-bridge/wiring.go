@@ -247,7 +247,13 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	// Update Requestor is not mounted either: the module has no BDX and no
 	// update agent, so the node cannot take an update.
 
-	servers := []contract.ClusterServer{
+	// FixedLabel, UserLabel, the three localization clusters, Software- and
+	// EthernetNetworkDiagnostics (RootNode: all optional).
+	optional, err := buildRootLabelsAndDiagnostics(context.Background(), st)
+	if err != nil {
+		return nil, refs, fmt.Errorf("root labels and diagnostics: %w", err)
+	}
+	servers := slices.Concat([]contract.ClusterServer{
 		basicInfo,
 		accessControl,
 		generalCom,
@@ -260,7 +266,7 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 		groupKeys,
 		groupcast,
 		descriptor,
-	}
+	}, optional)
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
 	return servers, refs, nil
 }

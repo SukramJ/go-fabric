@@ -18,6 +18,28 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `cluster/core` serves six more root (or any-endpoint) clusters, each on
+  its generated definition: `NewUserLabel` (LabelList longer than
+  `MaxLabels`, default 255, is RESOURCE_EXHAUSTED; `OnWrite` persists),
+  `NewLocalizationConfiguration`, `NewTimeFormatLocalization` (with
+  CalendarFormat) and `NewUnitLocalization` (with TemperatureUnit) —
+  each takes the host's detected values, defaults its supported list as
+  matter.js does and answers a written active value outside that list
+  CONSTRAINT_ERROR — plus `NewSoftwareDiagnostics` (host port
+  `HeapReporter`; WTRMRK and ResetWatermarks with a `WatermarkReporter`)
+  and `NewEthernetNetworkDiagnostics` (host port `EthernetReporter`;
+  PHYRate, FullDuplex, CarrierDetect null and TimeSinceReset 0 where the
+  host cannot tell; no PKTCNT / ERRCNT). `ErrLocalizationConfig`,
+  `ErrUserLabelConfig` and `ErrNilReporter` reject a configuration.
+- The bridge decodes a UserLabel LabelList write — whole list or
+  list-append entry — with the generated decoder; a label over "max 16"
+  is answered CONSTRAINT_ERROR without failing the rest of the request.
+- The reference daemon mounts FixedLabel (two labels), UserLabel
+  (persisted in the settings table), the three localization clusters
+  (en-US with de-DE, 24-hour, Gregorian, Celsius), SoftwareDiagnostics
+  (Go runtime heap) and EthernetNetworkDiagnostics on the root; the
+  chip-tool families FLABEL, ULABEL, LCFG, LTIME, LUNIT, DGSW and DGETH
+  are declared and run in the core group.
 - `cluster/modebase` serves six more ModeBase derivations, each on its
   generated definition: `NewOvenMode`,
   `NewRefrigeratorAndTemperatureControlledCabinetMode`,
