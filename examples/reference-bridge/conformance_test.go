@@ -15,8 +15,10 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	tcdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -388,5 +390,54 @@ func TestOnWithTimedOffFieldsTakesTheGeneratedRequest(t *testing.T) {
 	}
 	if _, _, _, err := onWithTimedOffFields((*onoffdef.OnWithTimedOffRequest)(nil)); err == nil {
 		t.Error("a nil request pointer was accepted")
+	}
+}
+
+// TestFridgeHasItsCoolingCabinetPart: the Refrigerator's mandatory
+// TemperatureControlledCabinet is a part of the fridge's endpoint, states
+// the Cooler condition the Refrigerator requires of a descendant, and
+// serves TemperatureControl (TN + STEP) and the cabinet's
+// RefrigeratorAndTemperatureControlledCabinetMode; the device-type
+// validator reports nothing for either endpoint.
+func TestFridgeHasItsCoolingCabinetPart(t *testing.T) {
+	for id, want := range map[uint16]string{deviceTypeRefrigerator: "Refrigerator", deviceTypeTemperatureControlledCabinet: "TemperatureControlledCabinet"} {
+		if name, _ := schema.DeviceTypeName(uint32(id)); name != want {
+			t.Errorf("device type 0x%04X is %q in the snapshot, want %q", id, name, want)
+		}
+	}
+	_, br := startFleetBridge(t)
+	topo := br.Topology()
+	fridge := mountedEndpoint(t, br, "demo-fridge-1")
+	if fridge.DeviceType != deviceTypeRefrigerator || len(fridge.PartIDs) != 1 {
+		t.Fatalf("fridge %+v: want a Refrigerator with one part", fridge)
+	}
+	cabinet := topo.FindByID(fridge.PartIDs[0])
+	if cabinet == nil || cabinet.DeviceType != deviceTypeTemperatureControlledCabinet ||
+		!slices.Equal(cabinet.DeviceConditions, []string{conditionCooler}) {
+		t.Fatalf("the fridge's part is %+v, want a Cooler TemperatureControlledCabinet", cabinet)
+	}
+	for _, v := range endpoint.ValidateDeviceTypes(topo) {
+		if v.Endpoint == fridge.ID || v.Endpoint == cabinet.ID {
+			t.Errorf("device type violation: %s", v)
+		}
+	}
+	if fm := readMounted(t, cabinet, tcdef.ClusterID, cluster.AttrGlobalFeatureMap); fm != uint32(tcdef.FeatureTemperatureNumber|tcdef.FeatureTemperatureStep) {
+		t.Errorf("cabinet TemperatureControl FeatureMap = %v, want TN | STEP", fm)
+	}
+	readMounted(t, cabinet, modebase.ClusterIDRefrigeratorAndTemperatureControlledCabinetMode, modebase.AttrCurrentMode)
+	readMounted(t, fridge, modebase.ClusterIDRefrigeratorAndTemperatureControlledCabinetMode, modebase.AttrCurrentMode)
+
+	// SetTemperature through the mounted server moves the setpoint.
+	for _, srv := range endpoint.ClusterServers(cabinet) {
+		if srv.MatterClusterID() != tcdef.ClusterID {
+			continue
+		}
+		target := cabinetSetpoint + cabinetStep
+		if _, err := srv.MatterInvoke(context.Background(), tcdef.CmdSetTemperature, tcdef.SetTemperatureRequest{TargetTemperature: &target}); err != nil {
+			t.Fatalf("SetTemperature: %v", err)
+		}
+	}
+	if v := readMounted(t, cabinet, tcdef.ClusterID, tcdef.AttrTemperatureSetpoint); v != cabinetSetpoint+cabinetStep {
+		t.Errorf("TemperatureSetpoint after SetTemperature = %v", v)
 	}
 }

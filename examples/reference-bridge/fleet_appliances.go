@@ -13,8 +13,10 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
+	"github.com/SukramJ/go-fabric/cluster/thermo"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/endpoint"
 )
 
 // The two appliances below run a programme: an OperationalState (or
@@ -553,4 +555,176 @@ func (v *demoVacuum) reportState(st opstate.State) error {
 	v.build()
 	slog.Info("vacuum.dock", slog.String("device", v.name), slog.Int("state", int(st)))
 	return v.ops.SetOperationalState(st)
+}
+
+// --- device: a refrigerator ------------------------------------------------
+
+// Device types of the refrigerator and its compartment (parity/schema.json):
+// Refrigerator (0x0070) requires a TemperatureControlledCabinet (0x0071)
+// part, and a descendant with the Cooler condition.
+const (
+	deviceTypeRefrigerator                 uint16 = 0x0070
+	deviceTypeTemperatureControlledCabinet uint16 = 0x0071
+)
+
+// conditionCooler is the TemperatureControlledCabinet condition a cooling
+// compartment states; with it the cabinet's
+// RefrigeratorAndTemperatureControlledCabinetMode ("[Cooler]") is in
+// scope, and the Refrigerator's descendant requirement is met.
+const conditionCooler = "Cooler"
+
+// Refrigerator modes (RefrigeratorAndTemperatureControlledCabinetMode
+// SupportedModes). The numbers are this host's own; Auto is the tag the
+// derivation requires.
+const (
+	fridgeAuto      uint8 = 0
+	fridgeRapidCool uint8 = 1
+)
+
+// Cabinet temperatures, in 0.01 °C: a cooling compartment from 1 °C to
+// 8 °C in half-degree steps.
+const (
+	cabinetMin      int16 = 100
+	cabinetMax      int16 = 800
+	cabinetStep     int16 = 50
+	cabinetSetpoint int16 = 400
+)
+
+// demoFridge is a refrigerator: its own endpoint serves the appliance's
+// RefrigeratorAndTemperatureControlledCabinetMode, and its one cabinet —
+// a part of its own — serves TemperatureControl and the cabinet's mode.
+type demoFridge struct {
+	name    string
+	cabinet *demoCabinet
+
+	once    sync.Once
+	modes   *modebase.Server
+	version cluster.DataVersionTracker
+}
+
+var (
+	_ contract.EndpointSource = (*demoFridge)(nil)
+	_ modebase.ModeChanger    = (*demoFridge)(nil)
+)
+
+func newDemoFridge(name string) *demoFridge {
+	return &demoFridge{name: name, cabinet: &demoCabinet{name: name + " cabinet"}}
+}
+
+// MatterDeviceType implements [contract.EndpointSource].
+func (r *demoFridge) MatterDeviceType() uint16 { return deviceTypeRefrigerator }
+
+// MatterClusterServers implements [contract.EndpointSource].
+func (r *demoFridge) MatterClusterServers() []contract.ClusterServer {
+	r.build()
+	return []contract.ClusterServer{r.modes}
+}
+
+func (r *demoFridge) build() {
+	r.once.Do(func() {
+		modes, err := modebase.NewRefrigeratorAndTemperatureControlledCabinetMode(modebase.Config{
+			Changer:        r,
+			SupportedModes: fridgeModes(),
+			CurrentMode:    fridgeAuto,
+			DataVersion:    &r.version,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("fridge RefrigeratorAndTemperatureControlledCabinetMode: %v", err))
+		}
+		r.modes = modes
+	})
+}
+
+// ChangeToMode implements [modebase.ModeChanger]: the appliance takes
+// every supported mode.
+func (r *demoFridge) ChangeToMode(_ context.Context, newMode uint8) (modebase.Status, string, error) {
+	slog.Info("fridge.mode", slog.String("device", r.name), slog.Int("mode", int(newMode)))
+	return modebase.StatusSuccess, "", nil
+}
+
+// parts is the refrigerator's one compartment, a TemperatureControlledCabinet
+// stating the Cooler condition.
+func (r *demoFridge) parts() []endpoint.Spec {
+	return []endpoint.Spec{{
+		StableKey:        endpoint.StringKey("demo:fridge:cabinet"),
+		DeviceType:       deviceTypeTemperatureControlledCabinet,
+		Source:           r.cabinet,
+		DeviceConditions: []string{conditionCooler},
+	}}
+}
+
+func fridgeModes() []modebase.ModeOption {
+	return []modebase.ModeOption{
+		{Label: "Auto", Mode: fridgeAuto, Tags: []modebase.ModeTag{{Value: modebase.TagAuto}}},
+		{Label: "Rapid Cool", Mode: fridgeRapidCool, Tags: []modebase.ModeTag{{Value: modebase.RefrigeratorTagRapidCool}}},
+	}
+}
+
+// demoCabinet is the refrigerator's cooling compartment:
+// TemperatureControl with a numeric setpoint in steps (TN + STEP), and the
+// compartment's own RefrigeratorAndTemperatureControlledCabinetMode.
+type demoCabinet struct {
+	name string
+
+	once    sync.Once
+	temp    *thermo.TemperatureControlServer
+	modes   *modebase.Server
+	version struct{ temp, modes cluster.DataVersionTracker }
+}
+
+var (
+	_ contract.EndpointSource  = (*demoCabinet)(nil)
+	_ thermo.TemperatureSetter = (*demoCabinet)(nil)
+	_ modebase.ModeChanger     = (*demoCabinet)(nil)
+)
+
+// MatterDeviceType implements [contract.EndpointSource].
+func (c *demoCabinet) MatterDeviceType() uint16 { return deviceTypeTemperatureControlledCabinet }
+
+// MatterClusterServers implements [contract.EndpointSource].
+func (c *demoCabinet) MatterClusterServers() []contract.ClusterServer {
+	c.build()
+	return []contract.ClusterServer{c.temp, c.modes}
+}
+
+func (c *demoCabinet) build() {
+	c.once.Do(func() {
+		temp, err := thermo.NewTemperatureControl(thermo.TemperatureControlConfig{
+			Features:            thermo.TemperatureControlFeatureNumber | thermo.TemperatureControlFeatureStep,
+			Setter:              c,
+			MinTemperature:      cabinetMin,
+			MaxTemperature:      cabinetMax,
+			Step:                cabinetStep,
+			TemperatureSetpoint: cabinetSetpoint,
+			DataVersion:         &c.version.temp,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("cabinet TemperatureControl: %v", err))
+		}
+		modes, err := modebase.NewRefrigeratorAndTemperatureControlledCabinetMode(modebase.Config{
+			Changer:        c,
+			SupportedModes: fridgeModes(),
+			CurrentMode:    fridgeAuto,
+			DataVersion:    &c.version.modes,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("cabinet RefrigeratorAndTemperatureControlledCabinetMode: %v", err))
+		}
+		c.temp, c.modes = temp, modes
+	})
+}
+
+// SetTemperature implements [thermo.TemperatureSetter]: the compartment
+// takes every setpoint the server has let through.
+func (c *demoCabinet) SetTemperature(_ context.Context, target *int16, _ *uint8) error {
+	if target != nil {
+		slog.Info("cabinet.setpoint", slog.String("device", c.name), slog.Int("centi_celsius", int(*target)))
+	}
+	return nil
+}
+
+// ChangeToMode implements [modebase.ModeChanger].
+func (c *demoCabinet) ChangeToMode(_ context.Context, newMode uint8) (modebase.Status, string, error) {
+	slog.Info("cabinet.mode", slog.String("device", c.name), slog.Int("mode", int(newMode)))
+	return modebase.StatusSuccess, "", nil
 }

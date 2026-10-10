@@ -81,14 +81,14 @@ Application clusters, grouped by the device surface they serve:
 | [`cluster/cover`](../cluster/cover) | WindowCovering (0x0102) |
 | [`cluster/closure`](../cluster/closure) | ClosureControl (0x0104) |
 | [`cluster/lock`](../cluster/lock) | DoorLock (0x0101) |
-| [`cluster/thermo`](../cluster/thermo) | Thermostat (0x0201) |
+| [`cluster/thermo`](../cluster/thermo) | Thermostat (0x0201) · TemperatureControl (0x0056: TN with optional STEP, or TL; SetTemperature checked, then the host's) |
 | [`cluster/valve`](../cluster/valve) | ValveConfigurationAndControl (0x0081) |
 | [`cluster/modeselect`](../cluster/modeselect) | ModeSelect (0x0050) |
 | [`cluster/fan`](../cluster/fan) | FanControl (0x0202) — all six features, the FanMode / PercentSetting / SpeedSetting coupling, Step |
 | [`cluster/pump`](../cluster/pump) | PumpConfigurationAndControl (0x0200) — all seven features, host-raised alarm events |
 | [`cluster/alarm`](../cluster/alarm) | SmokeCoAlarm (0x005C) — SMOKE / CO, derived ExpressedState, SelfTestRequest, all eleven events |
 | [`cluster/opstate`](../cluster/opstate) | OperationalState (0x0060) · RvcOperationalState (0x0061) — server-held state with matter.js's reactors, Pause / Stop / Start / Resume / GoHome checked as OperationalStateUtils checks them, both events, CountdownTime reported as a quieter ("Q") attribute |
-| [`cluster/modebase`](../cluster/modebase) | LaundryWasherMode (0x0051) · RvcRunMode (0x0054) · RvcCleanMode (0x0055) · DishwasherMode (0x0059) — one ModeBase server, SupportedModes validation with each derivation's required tags, ChangeToMode / ChangeToModeResponse |
+| [`cluster/modebase`](../cluster/modebase) | LaundryWasherMode (0x0051) · RvcRunMode (0x0054) · RvcCleanMode (0x0055) · DishwasherMode (0x0059) · OvenMode (0x0049) · RefrigeratorAndTemperatureControlledCabinetMode (0x0052) · MicrowaveOvenMode (0x005E, no ChangeToMode) · EnergyEvseMode (0x009D) · WaterHeaterMode (0x009E) · DeviceEnergyManagementMode (0x009F) — one ModeBase server, SupportedModes validation with each derivation's required tags, ChangeToMode / ChangeToModeResponse |
 | [`cluster/filter`](../cluster/filter) | HepaFilterMonitoring (0x0071) · ActivatedCarbonFilterMonitoring (0x0072) — one ResourceMonitoring server, all three features, ResetCondition, the first server built on a generated definition from the start ([ADR 0013](./adr/0013-generated-cluster-definitions.md)) |
 | [`cluster/spec`](../cluster/spec) | The generated cluster definitions (`cluster/spec/<name>/`, written by `script/clustergen` from the snapshot) and the runtime that derives a server's lists, globals, privileges, write checks and payload codecs from one ([ADR 0013](./adr/0013-generated-cluster-definitions.md)); `cluster/spec/spectest` holds the parity assertions |
 | [`cluster/measurement`](../cluster/measurement) | Temperature (0x0402) · RelativeHumidity (0x0405) · Illuminance (0x0400) · Pressure (0x0403) · Flow (0x0404) · BooleanState (0x0045) · OccupancySensing (0x0406) · AirQuality (0x005B) · CO₂ (0x040D) · PM2.5 (0x042A) · PM10 (0x042D) · PowerSource (0x002F) · ElectricalPowerMeasurement (0x0090) · ElectricalEnergyMeasurement (0x0091) |
@@ -159,9 +159,12 @@ device-type requirement by `endpoint/devicetype_module_test.go`):
 | RoboticVacuumCleaner 0x0074 | `opstate.NewRvcServer` and `modebase.NewRvcRunMode`; optionally `modebase.NewRvcCleanMode` | ServiceArea |
 
 Not built in the appliance pass, because none of the four device types
-mandates them: the microwave-oven clusters, OvenCavityOperationalState,
-ServiceArea, LaundryWasherControls, LaundryDryerControls, DishwasherAlarm
-and TemperatureControl.
+mandates them: MicrowaveOvenControl, OvenCavityOperationalState,
+ServiceArea, LaundryWasherControls, LaundryDryerControls and
+DishwasherAlarm. TemperatureControl and the remaining ModeBase derivations
+followed with the Refrigerator; the servers EnergyEvse, WaterHeater,
+DeviceEnergyManagement and MicrowaveOven also mandate are not built yet, so
+those device types stay unmounted.
 
 ## Operations and testing
 

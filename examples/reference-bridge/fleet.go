@@ -1473,6 +1473,7 @@ type fleet struct {
 	purifier   *demoAirPurifier
 	garage     *demoGarage
 	colorLight *dimmer
+	fridge     *demoFridge
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1514,6 +1515,7 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		purifier:    newDemoAirPurifier("Air Purifier"),
 		garage:      newDemoGarage("Garage Door"),
 		colorLight:  newDemoColorLight("Color Bulb"),
+		fridge:      newDemoFridge("Kitchen Fridge"),
 		assembler:   asm,
 	}, nil
 }
@@ -1628,6 +1630,10 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		DeviceType:  deviceTypePowerSource,
 		PowerSource: f.smoke.battery,
 	}}
+	// Refrigerator requires a TemperatureControlledCabinet part: the
+	// compartment is a part of the fridge's endpoint.
+	fridge := spec("fridge", f.fridge.name, f.fridge.MatterDeviceType(), f.fridge)
+	fridge.Parts = f.fridge.parts()
 	return []endpoint.Spec{
 		spec("ceiling", f.ceiling.name, f.ceiling.MatterDeviceType(), f.ceiling),
 		spec("fan", f.fan.name, f.fan.MatterDeviceType(), f.fan),
@@ -1646,5 +1652,6 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("purifier", f.purifier.name, f.purifier.MatterDeviceType(), f.purifier),
 		spec("garage", f.garage.name, f.garage.MatterDeviceType(), f.garage),
 		spec("colorlight", f.colorLight.name, f.colorLight.MatterDeviceType(), f.colorLight),
+		fridge,
 	}
 }
