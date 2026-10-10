@@ -147,6 +147,10 @@ const (
 	// (examples/reference-bridge/fleet_appliances.go): TemperatureControl
 	// and RefrigeratorAndTemperatureControlledCabinetMode.
 	dtTempControlledCabinet = 0x0071
+	// dtWaterHeater is the reference water heater
+	// (examples/reference-bridge/fleet_energy.go): WaterHeaterManagement
+	// (EM, TP), WaterHeaterMode and a HEAT Thermostat.
+	dtWaterHeater = 0x050F
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -361,6 +365,13 @@ var chipFamilies = []family{
 			"2.6": {classHarness, "TC-DRLK-2.6 gates every step on the Year Day Schedule feature (PICS DRLK.S.F0a=0 here) except its final \"Cleanup the created user\" ClearUser, which has no PICS gate and fails on a lock without the User feature (DRLK.S.F08=0)", false},
 		},
 	},
+	// EPREF runs on the thermostat, which serves EnergyPreference (BALA).
+	{name: "EPREF", deviceType: dtThermostat},
+	// EWATERHTR 2.2 and 2.3 drive the tank through the
+	// WaterHeaterManagement test event triggers (0x0094...), which the
+	// daemon's tank model answers as connectedhomeip's water-heater app
+	// does (examples/reference-bridge/fleet_energy.go).
+	{name: "EWATERHTR", deviceType: dtWaterHeater},
 	{name: "FAN", deviceType: dtFan},
 	{name: "HEPAFREMON", deviceType: dtAirPurifier},
 	{
@@ -482,5 +493,6 @@ var chipFamilies = []family{
 			"3.3": {classNotSupported, "TC-VALCC-3.3 runs only with DefaultOpenLevel (PICS VALCC.S.A0006=0)", true},
 		},
 	},
+	{name: "WHM", deviceType: dtWaterHeater},
 	{name: "WNCV", deviceType: dtWindowCovering},
 }

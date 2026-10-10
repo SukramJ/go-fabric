@@ -1475,6 +1475,8 @@ type fleet struct {
 	colorLight *dimmer
 	fridge     *demoFridge
 	airQuality *demoAirQualitySensor
+	heater     *demoWaterHeater
+	meter      *demoMeter
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1518,6 +1520,8 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		colorLight:  newDemoColorLight("Color Bulb"),
 		fridge:      newDemoFridge("Kitchen Fridge"),
 		airQuality:  newDemoAirQualitySensor("Air Quality Sensor"),
+		heater:      newDemoWaterHeater("Water Heater"),
+		meter:       newDemoMeter("Electricity Meter"),
 		assembler:   asm,
 	}, nil
 }
@@ -1656,5 +1660,7 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("colorlight", f.colorLight.name, f.colorLight.MatterDeviceType(), f.colorLight),
 		fridge,
 		spec("airquality", f.airQuality.name, f.airQuality.MatterDeviceType(), f.airQuality),
+		spec("waterheater", f.heater.name, f.heater.MatterDeviceType(), f.heater),
+		spec("meter", f.meter.name, f.meter.MatterDeviceType(), f.meter),
 	}
 }

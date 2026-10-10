@@ -75,6 +75,10 @@ var committed = []string{
 	"PowerTopology",
 	"ElectricalPowerMeasurement",
 	"ElectricalEnergyMeasurement",
+	// cluster/energy
+	"WaterHeaterManagement",
+	"EnergyPreference",
+	"MeterIdentification",
 	// cluster/wire
 	"Switch",
 	"AdministratorCommissioning",

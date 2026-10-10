@@ -17,11 +17,16 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	eprefdef "github.com/SukramJ/go-fabric/cluster/spec/energypreference"
+	mtriddef "github.com/SukramJ/go-fabric/cluster/spec/meteridentification"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	tcdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
+	thermostatdef "github.com/SukramJ/go-fabric/cluster/spec/thermostat"
+	whmdef "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
 	"github.com/SukramJ/go-fabric/parity"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -439,5 +444,50 @@ func TestFridgeHasItsCoolingCabinetPart(t *testing.T) {
 	}
 	if v := readMounted(t, cabinet, tcdef.ClusterID, tcdef.AttrTemperatureSetpoint); v != cabinetSetpoint+cabinetStep {
 		t.Errorf("TemperatureSetpoint after SetTemperature = %v", v)
+	}
+}
+
+// TestWaterHeaterAndThermostatEnergyPreference: the electricity meter
+// advertises ElectricalUtilityMeter (0x0511) and serves
+// MeterIdentification; the water heater
+// advertises WaterHeater (0x050F) and mounts what the device type
+// mandates — WaterHeaterManagement, WaterHeaterMode, Thermostat with HEAT
+// (parity/schema.json, the device type's effective requirements) — the
+// thermostat serves EnergyPreference with BALA, and the device-type
+// validator reports nothing for either endpoint. The two are held alone:
+// the root's system clusters are the bridge's, not the assembled
+// topology's, so the whole topology is not what this test judges.
+func TestWaterHeaterAndThermostatEnergyPreference(t *testing.T) {
+	if name, _ := schema.DeviceTypeName(uint32(deviceTypeWaterHeater)); name != "WaterHeater" {
+		t.Errorf("device type 0x%04X is %q in the snapshot", deviceTypeWaterHeater, name)
+	}
+	_, br := startFleetBridge(t)
+	heater := mountedEndpoint(t, br, "demo-waterheater-1")
+	thermostat := mountedEndpoint(t, br, "demo-thermostat-1")
+	meter := mountedEndpoint(t, br, "demo-meter-1")
+	endpointtest.AssertDeviceTypeConformance(t, &endpoint.Topology{Endpoints: []*endpoint.Endpoint{heater, thermostat, meter}})
+	if v := readMounted(t, meter, mtriddef.ClusterID, mtriddef.AttrMeterSerialNumber); v != "DEMO-0001" {
+		t.Errorf("meter serial number %v", v)
+	}
+	if v := readMounted(t, meter, mtriddef.ClusterID, mtriddef.AttrPointOfDelivery); v != nil {
+		t.Errorf("meter point of delivery %v, want null", v)
+	}
+
+	if heater.DeviceType != deviceTypeWaterHeater {
+		t.Fatalf("water heater advertises 0x%04X", heater.DeviceType)
+	}
+	if fm := readMounted(t, heater, whmdef.ClusterID, cluster.AttrGlobalFeatureMap); fm != uint32(whmdef.FeatureEnergyManagement|whmdef.FeatureTankPercent) {
+		t.Errorf("WaterHeaterManagement FeatureMap = %v, want EM | TP", fm)
+	}
+	if fm := readMounted(t, heater, thermostatdef.ClusterID, cluster.AttrGlobalFeatureMap); fm != uint32(thermostatdef.FeatureHeating) {
+		t.Errorf("water heater Thermostat FeatureMap = %v, want HEAT", fm)
+	}
+	readMounted(t, heater, modebase.ClusterIDWaterHeaterMode, modebase.AttrCurrentMode)
+
+	if fm := readMounted(t, thermostat, eprefdef.ClusterID, cluster.AttrGlobalFeatureMap); fm != uint32(eprefdef.FeatureEnergyBalance) {
+		t.Errorf("thermostat EnergyPreference FeatureMap = %v, want BALA", fm)
+	}
+	if v := readMounted(t, thermostat, eprefdef.ClusterID, eprefdef.AttrCurrentEnergyBalance); v != uint8(1) {
+		t.Errorf("CurrentEnergyBalance = %v", v)
 	}
 }

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4024,
+  "entry_points": 4044,
   "entry_packages": [
     ".",
     "bootid",
@@ -11,6 +11,7 @@
     "cluster/closure",
     "cluster/core",
     "cluster/cover",
+    "cluster/energy",
     "cluster/fan",
     "cluster/filter",
     "cluster/levelcontrol",
@@ -41,6 +42,7 @@
     "cluster/spec/electricalenergymeasurement",
     "cluster/spec/electricalpowermeasurement",
     "cluster/spec/energyevsemode",
+    "cluster/spec/energypreference",
     "cluster/spec/fancontrol",
     "cluster/spec/fixedlabel",
     "cluster/spec/flowmeasurement",
@@ -53,6 +55,7 @@
     "cluster/spec/illuminancemeasurement",
     "cluster/spec/laundrywashermode",
     "cluster/spec/levelcontrol",
+    "cluster/spec/meteridentification",
     "cluster/spec/microwaveovenmode",
     "cluster/spec/modeselect",
     "cluster/spec/networkcommissioning",
@@ -81,6 +84,7 @@
     "cluster/spec/thermostat",
     "cluster/spec/timesynchronization",
     "cluster/spec/valveconfigurationandcontrol",
+    "cluster/spec/waterheatermanagement",
     "cluster/spec/waterheatermode",
     "cluster/spec/windowcovering",
     "cluster/thermo",
@@ -124,9 +128,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 7820,
-    "reachable": 5340,
-    "whitelisted": 2475,
+    "total_exported": 7949,
+    "reachable": 5436,
+    "whitelisted": 2508,
     "unreachable": 5
   },
   "by_package": [
@@ -5240,6 +5244,62 @@
       "line": 59
     },
     {
+      "package": "cluster/energy",
+      "identifier": "Balance",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/preference.go",
+      "line": 29
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "BoostInfo",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/waterheater.go",
+      "line": 32
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "BoostState",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/waterheater.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "HeatSource",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/waterheater.go",
+      "line": 28
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "MeterType",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/meter.go",
+      "line": 18
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "PreferenceFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/preference.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "Priority",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/preference.go",
+      "line": 31
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "WaterHeaterFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/waterheater.go",
+      "line": 25
+    },
+    {
       "package": "cluster/fan",
       "identifier": "AirflowDirection",
       "reason": "auto-whitelist:pattern=type-alias",
@@ -7242,6 +7302,48 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/energypreference",
+      "identifier": "BalanceStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energypreference/definition_gen.go",
+      "line": 73
+    },
+    {
+      "package": "cluster/spec/energypreference",
+      "identifier": "EnergyPriorityEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energypreference/definition_gen.go",
+      "line": 81
+    },
+    {
+      "package": "cluster/spec/energypreference",
+      "identifier": "EnergyPriorityEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energypreference/definition_gen.go",
+      "line": 94
+    },
+    {
+      "package": "cluster/spec/energypreference",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/energypreference/definition_gen.go",
+      "line": 40
+    },
+    {
+      "package": "cluster/spec/energypreference",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/energypreference/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/energypreference",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/energypreference/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/fancontrol",
       "identifier": "AirflowDirectionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -7981,6 +8083,62 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/levelcontrol/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/meteridentification",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/meteridentification/definition_gen.go",
+      "line": 40
+    },
+    {
+      "package": "cluster/spec/meteridentification",
+      "identifier": "MeterTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/meteridentification/definition_gen.go",
+      "line": 50
+    },
+    {
+      "package": "cluster/spec/meteridentification",
+      "identifier": "MeterTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/meteridentification/definition_gen.go",
+      "line": 62
+    },
+    {
+      "package": "cluster/spec/meteridentification",
+      "identifier": "PowerThresholdSourceEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/meteridentification/definition_gen.go",
+      "line": 105
+    },
+    {
+      "package": "cluster/spec/meteridentification",
+      "identifier": "PowerThresholdSourceEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/meteridentification/definition_gen.go",
+      "line": 117
+    },
+    {
+      "package": "cluster/spec/meteridentification",
+      "identifier": "PowerThresholdStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/meteridentification/definition_gen.go",
+      "line": 96
+    },
+    {
+      "package": "cluster/spec/meteridentification",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/meteridentification/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/meteridentification",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/meteridentification/definition_gen_test.go",
       "line": 19
     },
     {
@@ -10063,6 +10221,62 @@
       "line": 125
     },
     {
+      "package": "cluster/spec/waterheatermanagement",
+      "identifier": "BoostStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermanagement/definition_gen.go",
+      "line": 64
+    },
+    {
+      "package": "cluster/spec/waterheatermanagement",
+      "identifier": "BoostStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermanagement/definition_gen.go",
+      "line": 75
+    },
+    {
+      "package": "cluster/spec/waterheatermanagement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermanagement/definition_gen.go",
+      "line": 53
+    },
+    {
+      "package": "cluster/spec/waterheatermanagement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/waterheatermanagement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/waterheatermanagement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/waterheatermanagement/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/waterheatermanagement",
+      "identifier": "WaterHeaterBoostInfoStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermanagement/definition_gen.go",
+      "line": 117
+    },
+    {
+      "package": "cluster/spec/waterheatermanagement",
+      "identifier": "WaterHeaterHeatSourceBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermanagement/definition_gen.go",
+      "line": 129
+    },
+    {
+      "package": "cluster/spec/waterheatermanagement",
+      "identifier": "WaterHeaterHeatSourceBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/waterheatermanagement/definition_gen.go",
+      "line": 143
+    },
+    {
       "package": "cluster/spec/waterheatermode",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -11453,7 +11667,7 @@
       "identifier": "TestBridgedEndpointsMeetTheirDeviceTypeConformance",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 47
+      "line": 52
     },
     {
       "package": "examples/reference-bridge",
@@ -11474,7 +11688,7 @@
       "identifier": "TestCeilingLightOnDoesNotDeadlockItsNotifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 271
+      "line": 276
     },
     {
       "package": "examples/reference-bridge",
@@ -11495,7 +11709,7 @@
       "identifier": "TestDelayedOffReportsItsCountdown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 225
+      "line": 230
     },
     {
       "package": "examples/reference-bridge",
@@ -11509,28 +11723,28 @@
       "identifier": "TestFridgeHasItsCoolingCabinetPart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 402
+      "line": 407
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestLightKeepsItsOnOffStateAcrossDispatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 310
+      "line": 315
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestOnWithTimedOffCountsDownAndTurnsTheLightOff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 163
+      "line": 168
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestOnWithTimedOffFieldsTakesTheGeneratedRequest",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 382
+      "line": 387
     },
     {
       "package": "examples/reference-bridge",
@@ -11600,7 +11814,7 @@
       "identifier": "TestValveTravelsThroughATarget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 326
+      "line": 331
     },
     {
       "package": "examples/reference-bridge",
@@ -11615,6 +11829,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
       "line": 176
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestWaterHeaterAndThermostatEnergyPreference",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/conformance_test.go",
+      "line": 460
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestWaterHeaterModeAndBoostSequence",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_energy_test.go",
+      "line": 92
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestWaterHeaterTankPercentSequence",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_energy_test.go",
+      "line": 63
     },
     {
       "package": "groups",

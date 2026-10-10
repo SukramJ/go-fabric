@@ -59,6 +59,33 @@ the same `ColorTemperatureWriter` as before.
   (Go runtime heap) and EthernetNetworkDiagnostics on the root; the
   chip-tool families FLABEL, ULABEL, LCFG, LTIME, LUNIT, DGSW and DGETH
   are declared and run in the core group.
+- `cluster/energy` (new package), on generated definitions:
+  - `NewWaterHeaterManagement`: a WaterHeaterManagement (0x0094) server
+    with the EnergyManagement and TankPercent features, the host port
+    `Booster` (`Boost`, `CancelBoost`), `SetHeatDemand` (held inside
+    HeaterTypes), `SetTankPercentage`, `SetTankVolume`,
+    `SetEstimatedHeatRequired`, and `EndBoost` for a boost that ends on
+    its own. Boost answers INVALID_COMMAND to the target fields
+    connectedhomeip's server refuses; a successful Boost sets BoostState
+    Active and emits BoostStarted, CancelBoost and `EndBoost` set it
+    Inactive and emit BoostEnded, and a CancelBoost without a running
+    boost succeeds without an event, as connectedhomeip's water-heater app
+    and TC-EWATERHTR-2.2 expect.
+  - `NewEnergyPreference`: an EnergyPreference (0x009B) server with the
+    EnergyBalance and LowPowerModeSensitivity features; a write of
+    CurrentEnergyBalance or CurrentLowPowerModeSensitivity at or beyond
+    its list's length is CONSTRAINT_ERROR, an accepted one reaches the
+    optional `PreferenceChanger`.
+  - `NewMeterIdentification`: the MeterIdentification (0x0B06) server
+    without PowerThreshold.
+- Generated definitions under `cluster/spec/` for WaterHeaterManagement,
+  EnergyPreference and MeterIdentification.
+- The reference daemon bridges a WaterHeater (WaterHeaterManagement EM +
+  TP, WaterHeaterMode, a HEAT Thermostat) whose tank answers the
+  WaterHeaterManagement test event triggers as connectedhomeip's
+  water-heater app does, an ElectricalUtilityMeter with
+  MeterIdentification, and serves EnergyPreference (EnergyBalance) on its
+  thermostat. The chip-tool family table runs EWATERHTR, WHM and EPREF.
 - `cluster/modebase` serves six more ModeBase derivations, each on its
   generated definition: `NewOvenMode`,
   `NewRefrigeratorAndTemperatureControlledCabinetMode`,
