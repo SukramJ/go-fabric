@@ -662,10 +662,15 @@ func (s *Server) SetEndpoint(endpoint uint16) {
 // value of the attribute that triggered it (element :48-71,
 // resource :127, :135, :146, :179, :189).
 //
+// It is the generated SmokeAlarm payload: the five events share one
+// shape (field 0 AlarmSeverityLevel, AlarmStateEnum) and the generated
+// SmokeAlarmEvent, CoAlarmEvent, LowBatteryEvent,
+// InterconnectSmokeAlarmEvent and InterconnectCoAlarmEvent codecs are
+// identical, so the bridge encodes it through the generated codec
+// (spec.Encodable).
+//
 //nolint:revive // named after the event field it carries, AlarmSeverityLevel.
-type AlarmSeverityEvent struct {
-	AlarmSeverityLevel AlarmState
-}
+type AlarmSeverityEvent = sdef.SmokeAlarmEvent
 
 // pendingEvent is one event a Refresh decided to emit.
 type pendingEvent struct {

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"math"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	ccdef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -170,6 +172,51 @@ type ClosureOverallCurrentState struct {
 type ClosureOverallTargetState struct {
 	// Position is field 0, conformance PS, quality X.
 	Position *ClosureTargetPosition
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec of
+// CurrentErrorList, list[ClosureErrorEnum].
+func (l ClosureErrorList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	out := make([]ccdef.ClosureErrorEnum, len(l))
+	for i, e := range l {
+		out[i] = ccdef.ClosureErrorEnum(e)
+	}
+	spec.PutList(spec.PutUint[ccdef.ClosureErrorEnum])(enc, tag, out)
+}
+
+// EncodeTLV implements spec.Encodable with the generated
+// OverallCurrentStateStruct codec. Position is always written (null for a
+// nil pointer): the server always serves Positioning. Latch and Speed
+// stay out. A nil *ClosureOverallCurrentState is the attribute's null.
+func (s *ClosureOverallCurrentState) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	if s == nil {
+		enc.PutNull(tag)
+		return
+	}
+	out := ccdef.OverallCurrentStateStruct{Position: &spec.Nullable[ccdef.CurrentPositionEnum]{Null: true}, SecureState: spec.Nullable[bool]{Null: true}}
+	if s.Position != nil {
+		out.Position.Null, out.Position.Value = false, ccdef.CurrentPositionEnum(*s.Position)
+	}
+	if s.SecureState != nil {
+		out.SecureState = spec.Nullable[bool]{Value: *s.SecureState}
+	}
+	out.EncodeTLV(enc, tag)
+}
+
+// EncodeTLV implements spec.Encodable with the generated
+// OverallTargetStateStruct codec. Position is always written (null for a
+// nil pointer); Latch and Speed stay out. A nil
+// *ClosureOverallTargetState is the attribute's null.
+func (s *ClosureOverallTargetState) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	if s == nil {
+		enc.PutNull(tag)
+		return
+	}
+	out := ccdef.OverallTargetStateStruct{Position: &spec.Nullable[ccdef.TargetPositionEnum]{Null: true}}
+	if s.Position != nil {
+		out.Position.Null, out.Position.Value = false, ccdef.TargetPositionEnum(*s.Position)
+	}
+	out.EncodeTLV(enc, tag)
 }
 
 // OverallCurrentState / OverallTargetState field tags.

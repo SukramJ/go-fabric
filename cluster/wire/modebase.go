@@ -3,6 +3,12 @@
 
 package wire
 
+import (
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	lwmdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashermode"
+	"github.com/SukramJ/go-fabric/tlv"
+)
+
 // The ModeBase derivations this module serves share the wire shapes below
 // (matter.js packages/model/src/standard/elements/mode-base.element.ts).
 // ModeSelect (0x0050) is not one of them: it predates ModeBase and has its
@@ -53,4 +59,44 @@ type ChangeToModeRequest struct {
 type ChangeToModeResponse struct {
 	Status     uint8
 	StatusText string
+}
+
+// The values below encode through generated codecs (spec.Encodable), so
+// the bridge writes them as matter.js's TlvOfModel does. The four ModeBase
+// derivations generate the same ModeOptionStruct, ModeTagStruct and
+// ChangeToModeResponse codecs (cluster/spec/laundrywashermode,
+// rvcrunmode, rvccleanmode, dishwashermode); these types are shared by
+// all four, so they convert to LaundryWasherMode's, and
+// TestModeBaseCodecsAgreeAcrossDerivations holds that the choice does not
+// change a byte.
+
+// generated returns m as the generated ModeOptionStruct.
+func (m ModeOptionStruct) generated() lwmdef.ModeOptionStruct {
+	tags := make([]lwmdef.ModeTagStruct, len(m.ModeTags))
+	for i, t := range m.ModeTags {
+		tags[i] = lwmdef.ModeTagStruct{MfgCode: t.MfgCode, Value: lwmdef.ModeTag(t.Value)}
+	}
+	return lwmdef.ModeOptionStruct{Label: m.Label, Mode: m.Mode, ModeTags: tags}
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec.
+func (m ModeOptionStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { m.generated().EncodeTLV(enc, tag) }
+
+// ModeOptionList is the SupportedModes attribute value: a list of
+// ModeOptionStruct, encoded by the generated codec, so the bridge encodes
+// a []ModeOptionStruct by converting it.
+type ModeOptionList []ModeOptionStruct
+
+// EncodeTLV implements spec.Encodable.
+func (l ModeOptionList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	out := make(spec.List[lwmdef.ModeOptionStruct], len(l))
+	for i, m := range l {
+		out[i] = m.generated()
+	}
+	out.EncodeTLV(enc, tag)
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec.
+func (r ChangeToModeResponse) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	lwmdef.ChangeToModeResponse{Status: lwmdef.ModeChangeStatus(r.Status), StatusText: r.StatusText}.EncodeTLV(enc, tag)
 }

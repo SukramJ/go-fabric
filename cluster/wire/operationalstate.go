@@ -3,6 +3,12 @@
 
 package wire
 
+import (
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
+	"github.com/SukramJ/go-fabric/tlv"
+)
+
 // OperationalState (0x0060) and its derived RvcOperationalState (0x0061)
 // share every wire shape below; RvcOperationalState adds GoHome and its
 // own enum values (matter.js
@@ -88,4 +94,88 @@ type OperationCompletionEvent struct {
 	CompletionErrorCode  uint8
 	TotalOperationalTime *ElapsedS
 	PausedTime           *ElapsedS
+}
+
+// The values below encode through the generated codecs of
+// cluster/spec/operationalstate (spec.Encodable), so the bridge writes
+// them as matter.js's TlvOfModel does. RvcOperationalState generates the
+// same five codecs (cluster/spec/rvcoperationalstate), so one conversion
+// serves both derivations; TestOperationalStateCodecsAgreeWithRvc holds
+// that.
+
+// generated returns e as the generated ErrorStateStruct: the label only
+// for a manufacturer-specific id (its conformance), the details only when
+// set.
+func (e ErrorStateStruct) generated() opdef.ErrorStateStruct {
+	out := opdef.ErrorStateStruct{ErrorStateId: opdef.ErrorStateEnum(e.ErrorStateID)}
+	if HasOperationalStateLabel(e.ErrorStateID) {
+		label := e.ErrorStateLabel
+		out.ErrorStateLabel = &label
+	}
+	if e.ErrorStateDetails != "" {
+		details := e.ErrorStateDetails
+		out.ErrorStateDetails = &details
+	}
+	return out
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec.
+func (e ErrorStateStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { e.generated().EncodeTLV(enc, tag) }
+
+// generated returns s as the generated OperationalStateStruct: the label
+// only for a manufacturer-specific id (its conformance).
+func (s OperationalStateStruct) generated() opdef.OperationalStateStruct {
+	out := opdef.OperationalStateStruct{OperationalStateId: opdef.OperationalStateEnum(s.OperationalStateID)}
+	if HasOperationalStateLabel(s.OperationalStateID) {
+		label := s.OperationalStateLabel
+		out.OperationalStateLabel = &label
+	}
+	return out
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec.
+func (s OperationalStateStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	s.generated().EncodeTLV(enc, tag)
+}
+
+// OperationalStateList is the OperationalStateList attribute value: a list
+// of OperationalStateStruct, encoded by the generated codec, so the bridge
+// encodes a []OperationalStateStruct by converting it.
+type OperationalStateList []OperationalStateStruct
+
+// EncodeTLV implements spec.Encodable.
+func (l OperationalStateList) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	out := make(spec.List[opdef.OperationalStateStruct], len(l))
+	for i, s := range l {
+		out[i] = s.generated()
+	}
+	out.EncodeTLV(enc, tag)
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec.
+func (r OperationalCommandResponse) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	opdef.OperationalCommandResponse{CommandResponseState: r.CommandResponseState.generated()}.EncodeTLV(enc, tag)
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec.
+func (e OperationalErrorEvent) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	opdef.OperationalErrorEvent{ErrorState: e.ErrorState.generated()}.EncodeTLV(enc, tag)
+}
+
+// nullable returns v as the generated optional, nullable elapsed-s: nil
+// stays nil (the field is left out).
+func (v *ElapsedS) nullable() *spec.Nullable[uint32] {
+	if v == nil {
+		return nil
+	}
+	return &spec.Nullable[uint32]{Value: v.Seconds, Null: v.Null}
+}
+
+// EncodeTLV implements spec.Encodable with the generated codec.
+func (e OperationCompletionEvent) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	opdef.OperationCompletionEvent{
+		CompletionErrorCode:  e.CompletionErrorCode,
+		TotalOperationalTime: e.TotalOperationalTime.nullable(),
+		PausedTime:           e.PausedTime.nullable(),
+	}.EncodeTLV(enc, tag)
 }
