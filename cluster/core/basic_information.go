@@ -833,6 +833,38 @@ func (b *BasicInformation) SetNodeLabel(s string) error {
 	return nil
 }
 
+// OtaNodeInformation is what the OTA Software Update Requestor reads from
+// the root's BasicInformation (matter.js OtaSoftwareUpdateRequestorServer.ts
+// #basicInformationState, :1214-1220). LocalConfigDisabled reads false: the
+// root does not serve it (see MatterRead).
+func (b *BasicInformation) OtaNodeInformation() OtaNodeInformation {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	return OtaNodeInformation{
+		VendorID:              b.vendorID,
+		ProductID:             b.productID,
+		SoftwareVersion:       b.softwareVersion,
+		SoftwareVersionString: b.softwareString,
+		HardwareVersion:       b.hardwareVersion,
+		Location:              b.location,
+	}
+}
+
+// SetSoftwareVersion sets SoftwareVersion and SoftwareVersionString to the
+// release the node now runs — after an applied OTA update. The string is
+// held to its "1 to 64" (basic-information.element.ts).
+func (b *BasicInformation) SetSoftwareVersion(version uint32, versionString string) error {
+	if versionString == "" || len(versionString) > 64 {
+		return fmt.Errorf("matter: SoftwareVersionString must be 1 to 64 bytes (got %d)", len(versionString))
+	}
+	b.mu.Lock()
+	b.softwareVersion = version
+	b.softwareString = versionString
+	b.mu.Unlock()
+	b.dataVersion.Bump()
+	return nil
+}
+
 // SetLocation updates Location out-of-band (boot-time restore of a
 // persisted commissioner write). Same validation as the Matter write
 // path; does NOT fire the persistence hook.

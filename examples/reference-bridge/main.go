@@ -29,6 +29,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -87,6 +88,8 @@ func run() error {
 		appPipe      = flag.String("app-pipe", "", "TESTING ONLY: named pipe of CHIP-style JSON test commands (button presses, sensor values, …); see control.go")
 		enableKey    = flag.String("enable-key", "", "TESTING ONLY: 16-byte hex test enable key that arms GeneralDiagnostics TestEventTrigger; see control.go")
 		osHostName   = flag.Bool("mdns-os-hostname", false, "TESTING ONLY: advertise the OS host name as SRV target instead of the MAC-derived one, for a test host whose LAN interface has no IPv6")
+		otaDir       = flag.String("ota-dir", "", "directory OTA images are downloaded to (default: an \"ota\" directory beside --db)")
+		otaHarness   = flag.Bool("ota-harness", false, "TESTING ONLY: apply a downloaded OTA image in place — report its version as running without a restart, as the CHIP SU cases read it; see ota.go")
 	)
 	flag.Parse()
 
@@ -241,7 +244,12 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("attestation chain: %w", err)
 	}
+	otaDownloads := *otaDir
+	if otaDownloads == "" {
+		otaDownloads = filepath.Join(filepath.Dir(*dbPath), "ota")
+	}
 	rootServers, refs, err := buildRootClusters(identity, credentials, groupState, chain,
+		otaConfig{dir: otaDownloads, harness: *otaHarness, connector: br, st: credentials, logger: logger},
 		func(hookCtx context.Context, fabricIndex uint8, _, _ uint64, _ []byte) {
 			if err := caseIDs.load(hookCtx, credentials, fabricIndex); err != nil {
 				logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
@@ -338,6 +346,9 @@ func run() error {
 		// BasicInformation Leave, as matter.js BasicInformationServer
 		// emits it when a fabric goes.
 		refs.basicInfo.EmitLeave(fabricIndex)
+		// Its DefaultOTAProviders entries go as every fabric-scoped entry
+		// does; the store's rows went with the fabric's own.
+		refs.otaRequestor.FabricRemoved(fabricIndex)
 		// Its CASE identity and operational record go too — a rolled-back
 		// commissioning included, which no RemoveFabric announces.
 		if compressedID, nodeID, ok := caseIDs.forget(fabricIndex); ok {
@@ -451,6 +462,12 @@ func run() error {
 	// at two seconds per controller; a controller that cannot be reached
 	// recovers on its own, as it would have without this.
 	br.ReestablishFormerSubscriptions(ctx)
+	// The OTA requestor goes online (#online): its providers can be reached
+	// now that the CASE identities are back.
+	if err := refs.otaRequestor.Start(ctx); err != nil {
+		logger.Warn("ota.requestor_start", slog.String("err", err.Error()))
+	}
+	defer refs.otaRequestor.Stop()
 	for _, fabric := range loaded {
 		br.AnnounceFabric(ctx, fabric.CompressedID, fabric.NodeID)
 	}

@@ -34,6 +34,8 @@ type packageFloor struct {
 // its own and not something to fold into a ratchet.
 var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric", min: 0, why: "module doc only, no statements to cover"},
+	{pkg: "github.com/SukramJ/go-fabric/bdx", min: 75},
+	{pkg: "github.com/SukramJ/go-fabric/bdx/otaimage", min: 76},
 	{pkg: "github.com/SukramJ/go-fabric/bootid", min: 89},
 	{
 		pkg: "github.com/SukramJ/go-fabric/bridge",
@@ -243,6 +245,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/binding", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/energyevsemode", min: 100},

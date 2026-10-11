@@ -53,6 +53,7 @@ func testRootClusters(t *testing.T) (servers []contract.ClusterServer, refs root
 		t.Fatalf("groups.NewManager: %v", err)
 	}
 	servers, refs, err = buildRootClusters(identity, st, groupState, chain,
+		otaConfig{dir: filepath.Join(t.TempDir(), "ota"), st: st, logger: slog.Default()},
 		func(context.Context, uint8, uint64, uint64, []byte) {})
 	if err != nil {
 		t.Fatalf("buildRootClusters: %v", err)

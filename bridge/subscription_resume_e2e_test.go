@@ -221,6 +221,10 @@ type fakeController struct {
 	// acknowledge on the unsecured session.
 	statusSent uint32
 	acked      chan uint32
+	// secureHook, when set, sees every message on the secure session
+	// first; returning true consumes it (the fake OTA provider of
+	// ota_provider_e2e_test.go answers Invoke and BDX through it).
+	secureHook func(hdr *message.Header, proto message.ProtocolHeader, payload []byte) bool
 }
 
 func newFakeController(t *testing.T, fab resumeFabric) *fakeController {
@@ -287,10 +291,19 @@ func (c *fakeController) handle(datagram []byte) {
 		return
 	}
 	proto, protoLen, err := message.UnmarshalProtocolHeader(plain)
-	if err != nil || proto.ProtocolID != im.InteractionModelProtocolID {
+	if err != nil {
 		return
 	}
 	payload := plain[protoLen:]
+	c.mu.Lock()
+	hook := c.secureHook
+	c.mu.Unlock()
+	if hook != nil && hook(&hdr, proto, payload) {
+		return
+	}
+	if proto.ProtocolID != im.InteractionModelProtocolID {
+		return
+	}
 	switch proto.Opcode {
 	case im.OpcodeReportData:
 		subID, attrs := decodeReportSummary(payload)

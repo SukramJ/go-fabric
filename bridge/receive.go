@@ -88,7 +88,7 @@ func (b *Bridge) AttachSessionLookup(lookup SessionLookup) {
 // [Bridge.handleDatagram] so tests can drive it without spinning up
 // a real UDP listener. Returns the first error encountered for
 // observability; the UDP handler discards it after logging.
-func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
+func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error { //nolint:funlen // one sequential receive pipeline; the initiated-exchange hook and the protocol switch read as one
 	// A group message is authenticated under an operational group key,
 	// not a session: it takes its own path before any unicast handling
 	// (matter.js ExchangeManager #receiveMessage branches on the session
@@ -249,6 +249,13 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 			slog.Int("vendor_id", int(proto.VendorID)),
 			slog.Int("protocol_id", int(proto.ProtocolID)))
 		return err
+	}
+
+	// A message the peer sends as the responder on an exchange this node
+	// opened on a secure session (the OTA requestor's Invoke and BDX
+	// transfer, ota_provider_link.go) belongs to that exchange.
+	if b.deliverInitiatedSecure(&hdr, proto, payload) {
+		return nil
 	}
 
 	switch proto.ProtocolID {

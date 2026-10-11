@@ -219,13 +219,18 @@ func TestSmallSystemServersMatchTheGeneratedDefinitions(t *testing.T) {
 }
 
 // TestOTARequestorMatchesTheGeneratedDefinition holds the OTA requestor
-// against ota-software-update-requestor.element.ts. It lists no events,
-// though matter.js makes StateTransition, VersionApplied and DownloadError
-// mandatory — the server never updates, so it never emits them; ADR 0013
-// records it as what remains.
+// against ota-software-update-requestor.element.ts: the four attributes,
+// AnnounceOTAProvider, and the three mandatory events (brief N).
 func TestOTARequestorMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
-	spectest.CheckServer(t, NewOTASoftwareUpdateRequestor(), otadef.Definition, 0)
+	r, err := NewOTASoftwareUpdateRequestor(OTARequestorConfig{
+		NodeInformation: func() OtaNodeInformation { return OtaNodeInformation{} },
+		DownloadDir:     t.TempDir(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spectest.CheckServer(t, r, otadef.Definition, 0)
 }
 
 // The three node clusters of brief J hold their generated definitions
