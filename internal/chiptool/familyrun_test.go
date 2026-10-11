@@ -145,7 +145,7 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 	}
 	out := filepath.Join(work, "pics")
 	gctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	log, err := h.execIn(gctx, work, "python3", "gen_pics.py", "--string-arg", "out_dir:"+out)
+	log, err := h.execIn(gctx, work, "python3", "gen_pics.py", "--paa-trust-store-path", chipPAATrustStore, "--string-arg", "out_dir:"+out)
 	cancel()
 	if _, pass := parsePython(log); err != nil || !pass {
 		t.Fatalf("generate the PICS slices: %v\n%s", err, saveCaseLog("PICS/generate", log))
@@ -492,6 +492,7 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 
 	args := []string{
 		"python3", c.Path, "--PICS", pics,
+		"--paa-trust-store-path", chipPAATrustStore,
 		"--app-pipe", filepath.Join(work, "app.fifo"),
 		"--restart-flag-file", filepath.Join(work, "restart.flag"),
 	}
