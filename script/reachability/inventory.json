@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4201,
+  "entry_points": 4209,
   "entry_packages": [
     ".",
     "bootid",
@@ -41,6 +41,9 @@
     "cluster/spec/closurecontrol",
     "cluster/spec/closuredimension",
     "cluster/spec/colorcontrol",
+    "cluster/spec/commoditymetering",
+    "cluster/spec/commodityprice",
+    "cluster/spec/commoditytariff",
     "cluster/spec/descriptor",
     "cluster/spec/deviceenergymanagement",
     "cluster/spec/deviceenergymanagementmode",
@@ -49,6 +52,7 @@
     "cluster/spec/dishwashermode",
     "cluster/spec/doorlock",
     "cluster/spec/electricalenergymeasurement",
+    "cluster/spec/electricalgridconditions",
     "cluster/spec/electricalpowermeasurement",
     "cluster/spec/energyevse",
     "cluster/spec/energyevsemode",
@@ -158,9 +162,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9322,
-    "reachable": 6518,
-    "whitelisted": 2799,
+    "total_exported": 9522,
+    "reachable": 6660,
+    "whitelisted": 2857,
     "unreachable": 5
   },
   "by_package": [
@@ -7129,6 +7133,370 @@
       "line": 351
     },
     {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditymetering/definition_gen.go",
+      "line": 39
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "MeteredQuantityStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditymetering/definition_gen.go",
+      "line": 66
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "TariffUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditymetering/definition_gen.go",
+      "line": 74
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "TariffUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditymetering/definition_gen.go",
+      "line": 85
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commoditymetering/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commoditymetering/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CommodityPriceComponentStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 90
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CommodityPriceDetailBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 125
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CommodityPriceDetailBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 136
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CommodityPriceStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 178
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CurrencyDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 231
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TariffPriceTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 100
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TariffPriceTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 114
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TariffUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 190
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TariffUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 201
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commodityprice/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commodityprice/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "AuxiliaryLoadSettingEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 77
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "AuxiliaryLoadSettingEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 89
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "AuxiliaryLoadSwitchSettingsStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 146
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "AuxiliaryLoadSwitchesSettingsStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 117
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "BlockModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 154
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "BlockModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 166
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "CalendarPeriodStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 197
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "CurrencyDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 677
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayEntryRandomizationTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 205
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayEntryRandomizationTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 219
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayEntryStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 261
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayPatternDayOfWeekBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 272
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayPatternDayOfWeekBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 288
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayPatternStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 326
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 360
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 369
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 382
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 62
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PeakPeriodSeverityEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 392
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PeakPeriodSeverityEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 405
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PeakPeriodStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 437
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PowerThresholdSourceEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 596
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PowerThresholdSourceEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 608
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PowerThresholdStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 587
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffComponentStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 488
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffInformationStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 645
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffPeriodStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 710
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffPriceStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 528
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffPriceTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 537
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffPriceTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 551
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 719
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 730
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commoditytariff/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commoditytariff/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/descriptor",
       "identifier": "DeviceTypeStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -8023,6 +8391,48 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen_test.go",
       "line": 19
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "ElectricalGridConditionsStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/electricalgridconditions/definition_gen.go",
+      "line": 87
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/electricalgridconditions/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/electricalgridconditions/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/electricalgridconditions/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "ThreeLevelEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/electricalgridconditions/definition_gen.go",
+      "line": 99
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "ThreeLevelEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/electricalgridconditions/definition_gen.go",
+      "line": 111
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",

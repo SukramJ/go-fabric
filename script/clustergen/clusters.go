@@ -94,6 +94,10 @@ var committed = []string{
 	"MeterIdentification",
 	"DeviceEnergyManagement",
 	"EnergyEvse",
+	"CommodityPrice",
+	"CommodityTariff",
+	"CommodityMetering",
+	"ElectricalGridConditions",
 	// cluster/wire
 	"Switch",
 	"AdministratorCommissioning",
