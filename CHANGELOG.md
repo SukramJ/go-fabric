@@ -395,6 +395,9 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- The pinned gofumpt is v0.12.0 (was v0.10.0; `GOFUMPT_VERSION` in the
+  Makefile and `ci.yml`). The two releases format a multi-line `append(`
+  differently; v0.12.0 reformats nothing on `main` at the bump.
 - ModeSelect SupportedModes is encoded by the generated codec
   (`cluster/spec/modeselect`): `modeselect.Server` reads it as a
   `spec.List[ModeOptionStruct]` and the bridge's hand-written case is gone.
@@ -735,6 +738,16 @@ the same `ColorTemperatureWriter` as before.
 
 ### Documentation
 
+- `notes/parity/by_design.md`: eleven entries for the decisions of waves
+  2–4 (BooleanStateConfiguration, UnitLocalization, WaterHeaterManagement,
+  EnergyPreference, AlarmBase, the appliance controls and the oven cavity,
+  DeviceEnergyManagement / EnergyEvse, ClosureDimension, SoilMeasurement,
+  PowerSourceConfiguration, EcosystemInformation, the commodity servers);
+  `BD-Matter-TimedAndQuotaDeferred` records the command half as closed and
+  the quota half as mirroring matter.js. The findings register gains the
+  host-side `Constraint.In` gap. `docs/open-items.md` drops the ModeSelect
+  encoder item and notes `schema/timed.go` as generated;
+  `docs/matterjs-comparison.md` counts 99 of 135 clusters served.
 - The target of the module is now stated: Matter 1.6.1 complete for the
   home-automation scope, measured against the snapshot and phased in
   [`docs/concept-matter-1.6.1-and-device-layer.md`](./docs/concept-matter-1.6.1-and-device-layer.md)

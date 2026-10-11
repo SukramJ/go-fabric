@@ -11,7 +11,7 @@ MATTERJS_DIR    ?= ../matter.js
 # openccu-loom's setup target installs @latest, which is how a local checkout
 # drifted behind its own CI; do not copy that here. Bump deliberately: raise
 # both, run the linter locally, fix what it finds, in one commit.
-GOFUMPT_VERSION       ?= v0.10.0
+GOFUMPT_VERSION       ?= v0.12.0
 GOLANGCI_LINT_VERSION ?= v2.14.0
 
 # govulncheck is deliberately NOT pinned (setup installs @latest, and so does

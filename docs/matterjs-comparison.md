@@ -82,9 +82,11 @@ matter.js HEAD as checked out at `../matter.js`.
 ## 5. Clusters
 
 matter.js ships **143** cluster behaviours generated from `@matter/model`;
-`go-fabric` serves **63** of the snapshot's 135 clusters (measured on
-2026-10-11 against `cluster/`, after #40 and #41), chosen so far by what a bridge actually
-mounts. The schema for all of them is present here (in `parity/` and
+`go-fabric` serves **99** of the snapshot's 135 clusters (measured on
+2026-10-11 after #47: the 96 generated definitions under `cluster/spec/`,
+each with a server, plus the hand-written AccessControl,
+OperationalCredentials and GroupKeyManagement), chosen by what a
+home-automation device type mandates or allows. The schema for all of them is present here (in `parity/` and
 `schema/`) — what is missing is server logic, not identifiers. The target
 since 2026-10-08 is every cluster a home-automation device type mandates or
 allows, 101 of the 135, through a generated default server
