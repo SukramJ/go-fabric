@@ -34,7 +34,8 @@ func TestCommodityTariffDays(t *testing.T) { //nolint:funlen // one sequence
 	// 21's start at 01:00; 21 runs to 22's start; 22 to the end of the day.
 	tariff.DayEntries = append(tariff.DayEntries, undatedEntry(20, 1380), undatedEntry(21, 60), undatedEntry(22, 600))
 	tariff.IndividualDays = []energy.TariffDay{{Date: today + 10, DayType: ct.DayTypeEvent, DayEntryIds: []uint32{20, 21, 22}}}
-	tariff.TariffPeriods = append(tariff.TariffPeriods,
+	tariff.TariffPeriods = append(
+		tariff.TariffPeriods,
 		energy.TariffPeriod{Label: spec.ValueOf(strings.Repeat("L", 100)), DayEntryIds: []uint32{20}, TariffComponentIds: []uint32{10}},
 		energy.TariffPeriod{Label: spec.ValueOf(strings.Repeat("M", 100)), DayEntryIds: []uint32{21, 22}, TariffComponentIds: []uint32{10}},
 	)
