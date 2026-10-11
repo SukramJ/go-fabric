@@ -1178,9 +1178,10 @@ func (s *CommodityTariffServer) OnMatterAttributesChanged(cb func(attrIDs []uint
 	return s.srv.OnMatterAttributesChanged(cb)
 }
 
-// MatterRead resolves an attribute.
+// MatterRead resolves an attribute; a list as its generated list
+// (commodityWireValue).
 func (s *CommodityTariffServer) MatterRead(attrID uint32) (any, bool) {
-	return s.srv.MatterRead(attrID)
+	return commodityRead(s.srv.MatterRead(attrID))
 }
 
 // MatterWrite answers every write: the cluster has no writable attribute.
