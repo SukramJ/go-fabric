@@ -49,7 +49,6 @@ type demoSmokeAlarm struct {
 }
 
 var (
-	_ contract.EndpointSource = (*demoSmokeAlarm)(nil)
 	_ alarm.StateSource       = (*demoSmokeAlarm)(nil)
 	_ alarm.SelfTester        = (*demoSmokeAlarm)(nil)
 	_ alarm.SensitivitySetter = (*demoSmokeAlarm)(nil)
@@ -65,21 +64,18 @@ func newDemoSmokeAlarm(name string) *demoSmokeAlarm {
 	}
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (a *demoSmokeAlarm) MatterDeviceType() uint16 { return alarm.DeviceTypeSmokeCoAlarm }
-
 // deviceTypePowerSource is the PowerSource device type
 // (power-source.element.ts, 0x0011), the component the alarm's battery is.
 const deviceTypePowerSource uint16 = 0x0011
 
-// MatterClusterServers implements [contract.EndpointSource]. The
+// servers are the cluster servers the device supplies. The
 // PowerSource component SmokeCoAlarm requires is a part of the alarm's
 // endpoint carrying the battery reading (fleet.go), not served from here.
 //
 // The server is built once: it carries the event emitter the bridge wires
 // at reassembly, and Refresh must emit through that same instance — a
 // server rebuilt per call left the alarm events unsent (TC-SMOKECO-2.2).
-func (a *demoSmokeAlarm) MatterClusterServers() []contract.ClusterServer {
+func (a *demoSmokeAlarm) servers() []contract.ClusterServer {
 	a.mu.Lock()
 	if a.srv != nil {
 		srv := a.srv
@@ -139,7 +135,7 @@ func (a *demoSmokeAlarm) SelfTest(context.Context) error {
 // or already tests (TC-SMOKECO-2.2 step 9) — and a refused press does
 // nothing, as on the device.
 func (a *demoSmokeAlarm) pressTestButton(ctx context.Context) error {
-	srv := a.MatterClusterServers()[0]
+	srv := a.servers()[0]
 	_, err := srv.MatterInvoke(ctx, alarm.CmdSelfTestRequest, nil)
 	var st interface{ MatterStatusCode() im.StatusCode }
 	if errors.As(err, &st) && st.MatterStatusCode() == im.StatusBusy {
@@ -193,21 +189,12 @@ type demoLock struct {
 	srv     *lock.DoorLockServer
 }
 
-var (
-	_ contract.EndpointSource = (*demoLock)(nil)
-	_ lock.StateSource        = (*demoLock)(nil)
-)
-
-// deviceTypeDoorLock is DoorLock (matter.js door-lock.element.ts).
-const deviceTypeDoorLock uint16 = 0x000A
+var _ lock.StateSource = (*demoLock)(nil)
 
 func newDemoLock(name string) *demoLock { return &demoLock{name: name, locked: true} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (l *demoLock) MatterDeviceType() uint16 { return deviceTypeDoorLock }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (l *demoLock) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (l *demoLock) servers() []contract.ClusterServer {
 	l.srvOnce.Do(func() {
 		l.srv = lock.NewDoorLockServer(lock.DoorLockConfig{Source: l, DataVersion: &l.version})
 	})
@@ -266,15 +253,10 @@ type demoBlind struct {
 	// persist is told every position it reaches — WindowCovering state is
 	// non-volatile in matter.js, and TC-WNCV-4.5 reads the lift position
 	// back after a reboot. Both are set before the first
-	// MatterClusterServers call; persist may be nil.
+	// servers call (restoreBlind, before fleet.endpoints); persist may be nil.
 	position uint16
 	persist  func(position uint16)
 }
-
-var _ contract.EndpointSource = (*demoBlind)(nil)
-
-// deviceTypeWindowCovering is WindowCovering (window-covering.element.ts).
-const deviceTypeWindowCovering uint16 = 0x0202
 
 // WindowCovering FeatureMap bits (window-covering-cluster.element.ts):
 // Lift and PositionAwareLift.
@@ -285,11 +267,8 @@ const (
 
 func newDemoBlind(name string) *demoBlind { return &demoBlind{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (b *demoBlind) MatterDeviceType() uint16 { return deviceTypeWindowCovering }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (b *demoBlind) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (b *demoBlind) servers() []contract.ClusterServer {
 	b.once.Do(func() {
 		b.srv = cover.NewWindowCoveringServer(cover.Config{
 			Type:                         0, // Rollershade

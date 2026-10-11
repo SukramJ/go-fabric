@@ -31,7 +31,7 @@ const (
 	otaVendorID  = 0xFFF1
 	otaProductID = 0x8001
 	// otaSoftwareVersion is the daemon's BasicInformation SoftwareVersion
-	// (examples/reference-bridge/wiring.go buildRootClusters) plus one.
+	// (examples/reference-bridge/main.go nodeConfig) plus one.
 	otaSoftwareVersion = 2
 )
 
@@ -214,14 +214,16 @@ func TestOtaPlumbing(t *testing.T) {
 		}
 		return string(data)
 	}
-	main, wiring := read("main.go"), read("wiring.go")
+	// The identity and the node's BasicInformation are both main.go's: the
+	// daemon builds its node.Config there (brief R).
+	main := read("main.go")
 	for _, c := range []struct {
 		src, pattern string
 		want         uint64
 	}{
 		{main, `testVendorID\s+uint16 = 0x([0-9A-Fa-f]+)`, otaVendorID},
 		{main, `testProductID\s+uint16 = 0x([0-9A-Fa-f]+)`, otaProductID},
-		{wiring, `SoftwareVersion:\s+(\d+),`, otaSoftwareVersion - 1},
+		{main, `SoftwareVersion:\s+(\d+),`, otaSoftwareVersion - 1},
 	} {
 		m := regexp.MustCompile(c.pattern).FindStringSubmatch(c.src)
 		if m == nil {

@@ -14,7 +14,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/servicearea"
 	"github.com/SukramJ/go-fabric/cluster/spec"
-	"github.com/SukramJ/go-fabric/contract"
 )
 
 // --- the robot vacuum's areas ----------------------------------------------
@@ -156,16 +155,4 @@ func (a *vacuumArea) SkipArea(_ context.Context, area uint32) (status serviceare
 // (RvcTestInstance.ts:82-93).
 func (a *vacuumArea) reset() error {
 	return a.server().SetSelectedAreas(nil)
-}
-
-// vacuumWithArea is the vacuum's endpoint source: the vacuum's own servers
-// and its ServiceArea.
-type vacuumWithArea struct {
-	*demoVacuum
-	area *vacuumArea
-}
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (v vacuumWithArea) MatterClusterServers() []contract.ClusterServer {
-	return append(v.demoVacuum.MatterClusterServers(), v.area.server())
 }

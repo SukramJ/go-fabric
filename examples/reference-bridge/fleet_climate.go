@@ -18,6 +18,7 @@ import (
 	hepaspec "github.com/SukramJ/go-fabric/cluster/spec/hepafiltermonitoring"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
 )
 
 // --- device: a ceiling fan -------------------------------------------------
@@ -40,7 +41,6 @@ type demoFan struct {
 }
 
 var (
-	_ contract.EndpointSource = (*demoFan)(nil)
 	_ contract.ChangeNotifier = (*demoFan)(nil)
 	_ fan.StateSource         = (*demoFan)(nil)
 )
@@ -55,11 +55,8 @@ func newDemoFan(name string) *demoFan {
 	}}
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (f *demoFan) MatterDeviceType() uint16 { return fan.DeviceTypeFan }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (f *demoFan) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (f *demoFan) servers() []contract.ClusterServer {
 	srv, err := fan.NewServer(fan.Config{
 		Source:      f,
 		Features:    fan.FeatureMultiSpeed | fan.FeatureAuto | fan.FeatureStep,
@@ -182,22 +179,13 @@ type demoThermostat struct {
 	ui   *thermo.ThermostatUIServer
 }
 
-var (
-	_ contract.EndpointSource  = (*demoThermostat)(nil)
-	_ energy.PreferenceChanger = (*demoThermostat)(nil)
-)
-
-// deviceTypeThermostat is Thermostat (matter.js thermostat.element.ts).
-const deviceTypeThermostat uint16 = 0x0301
+var _ energy.PreferenceChanger = (*demoThermostat)(nil)
 
 func newDemoThermostat(name string) *demoThermostat { return &demoThermostat{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (t *demoThermostat) MatterDeviceType() uint16 { return deviceTypeThermostat }
-
-// MatterClusterServers implements [contract.EndpointSource]. The server
+// servers are the cluster servers the device supplies. The server
 // holds the setpoints, so the same instance serves every reassembly.
-func (t *demoThermostat) MatterClusterServers() []contract.ClusterServer {
+func (t *demoThermostat) servers() []contract.ClusterServer {
 	t.build()
 	return []contract.ClusterServer{t.srv, t.pref, t.ui}
 }
@@ -266,21 +254,16 @@ type demoPump struct {
 }
 
 var (
-	_ contract.EndpointSource = (*demoPump)(nil)
 	_ contract.ChangeNotifier = (*demoPump)(nil)
 	_ pump.StateSource        = (*demoPump)(nil)
-	_ onOffDevice             = (*demoPump)(nil)
 )
 
 func newDemoPump(name string) *demoPump {
 	return &demoPump{name: name, flow: newDemoReading(name+" flow", contract.MeasurementFlow, 1.5)}
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (p *demoPump) MatterDeviceType() uint16 { return pump.DeviceTypePump }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (p *demoPump) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (p *demoPump) servers() []contract.ClusterServer {
 	maxPressure, maxSpeed, maxFlow := int16(3000), uint16(3200), uint16(60)
 	minSpeed, maxConstSpeed := uint16(500), uint16(3200)
 	srv, err := pump.NewServer(pump.Config{
@@ -301,10 +284,23 @@ func (p *demoPump) MatterClusterServers() []contract.ClusterServer {
 	p.srv = srv
 	p.srvMu.Unlock()
 	return []contract.ClusterServer{
-		&onOffServer{dev: p, logMessage: "pump.set"},
 		srv,
 		measurement.NewFlowServer(p.flow),
 	}
+}
+
+// device builds the pump: Pump with the device layer's default OnOff
+// server, which the pump follows through the device's OnChanged hook.
+func (p *demoPump) device(opts device.Options) (*device.Pump, error) {
+	dev, err := device.NewPump(opts, serve(p.servers(), device.WithChangeNotifier(p))...)
+	if err != nil {
+		return nil, err
+	}
+	followOnOff(dev.Device, dev.OnOff(), func(on bool) {
+		p.setOn(on)
+		slog.Info("pump.set", slog.String("device", p.name), slog.Bool("on", on))
+	})
+	return dev, nil
 }
 
 // PumpState implements [pump.StateSource].
@@ -334,14 +330,6 @@ func (p *demoPump) SetOperationMode(_ context.Context, mode pump.OperationMode) 
 	slog.Info("pump.mode", slog.String("device", p.name), slog.Int("mode", int(mode)))
 	p.notify()
 	return nil
-}
-
-func (p *demoPump) deviceName() string { return p.name }
-
-func (p *demoPump) isOn() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.on
 }
 
 func (p *demoPump) setOn(on bool) {
@@ -381,8 +369,6 @@ type demoAirPurifier struct {
 	carbon *filter.Server
 }
 
-var _ contract.EndpointSource = (*demoAirPurifier)(nil)
-
 func newDemoAirPurifier(name string) *demoAirPurifier {
 	p := &demoAirPurifier{demoFan: newDemoFan(name)}
 	products := []filter.ReplacementProduct{{ProductIdentifierType: hepaspec.ProductIdentifierTypeEan, ProductIdentifierValue: "1234567890123"}}
@@ -413,11 +399,8 @@ func newDemoAirPurifier(name string) *demoAirPurifier {
 	return p
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (p *demoAirPurifier) MatterDeviceType() uint16 { return fan.DeviceTypeAirPurifier }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (p *demoAirPurifier) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (p *demoAirPurifier) servers() []contract.ClusterServer {
 	srv, err := fan.NewServer(fan.Config{
 		Source:      p.demoFan,
 		Features:    fan.FeatureMultiSpeed | fan.FeatureAuto | fan.FeatureStep,

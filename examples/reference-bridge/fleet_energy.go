@@ -96,18 +96,14 @@ type demoWaterHeater struct {
 }
 
 var (
-	_ contract.EndpointSource = (*demoWaterHeater)(nil)
-	_ energy.Booster          = (*demoWaterHeater)(nil)
-	_ modebase.ModeChanger    = (*demoWaterHeater)(nil)
+	_ energy.Booster       = (*demoWaterHeater)(nil)
+	_ modebase.ModeChanger = (*demoWaterHeater)(nil)
 )
 
 func newDemoWaterHeater(name string) *demoWaterHeater { return &demoWaterHeater{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (w *demoWaterHeater) MatterDeviceType() uint16 { return deviceTypeWaterHeater }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (w *demoWaterHeater) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (w *demoWaterHeater) servers() []contract.ClusterServer {
 	w.build()
 	return []contract.ClusterServer{w.whm, w.modes, w.thermo}
 }
@@ -370,13 +366,6 @@ func (w *demoWaterHeater) testEventTrigger(trigger uint64) bool {
 
 // --- device: an electricity meter --------------------------------------------
 
-// deviceTypeElectricalUtilityMeter is ElectricalUtilityMeter
-// (parity/schema.json, 0x0511 rev 1): MeterIdentification mandatory,
-// Identify mandatory (mounted by the assembler), and the root's
-// TimeSyncCond, which the daemon's root TimeSynchronization meets
-// (wiring.go).
-const deviceTypeElectricalUtilityMeter uint16 = 0x0511
-
 // demoMeter is the utility's electricity meter, identified and nothing
 // more: the energy readings it may carry are ElectricalMeter parts
 // ("[ElectricalEnergy].a+", optional) it does not have.
@@ -400,15 +389,10 @@ type demoMeter struct {
 	presetsIdx int
 }
 
-var _ contract.EndpointSource = (*demoMeter)(nil)
-
 func newDemoMeter(name string) *demoMeter { return &demoMeter{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (m *demoMeter) MatterDeviceType() uint16 { return deviceTypeElectricalUtilityMeter }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (m *demoMeter) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (m *demoMeter) servers() []contract.ClusterServer {
 	m.build()
 	return []contract.ClusterServer{m.srv}
 }

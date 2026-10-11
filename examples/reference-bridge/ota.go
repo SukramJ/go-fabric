@@ -18,20 +18,6 @@ import (
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 )
 
-// otaConfig is how the daemon takes OTA updates.
-type otaConfig struct {
-	// dir receives the downloads; applied images are kept in its
-	// "applied" subdirectory.
-	dir string
-	// harness applies an image in place: TESTING ONLY, see otaApplier.
-	harness bool
-	// connector reaches the providers (the bridge).
-	connector mattercore.OtaProviderConnector
-	// st persists the requestor (nil: in memory).
-	st     mattercore.OtaRequestorStore
-	logger *slog.Logger
-}
-
 // otaApplier is the daemon's [mattercore.OtaApplier].
 //
 // A product applies an image by installing it and restarting into it; the
@@ -177,40 +163,4 @@ func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	r.Restarted(ctx)
-}
-
-// buildOtaRequestor builds the root's OTA Software Update Requestor.
-func buildOtaRequestor(cfg otaConfig, identity bridgeIdentity, basicInfo *mattercore.BasicInformation) (*mattercore.OTASoftwareUpdateRequestor, error) {
-	if err := os.MkdirAll(cfg.dir, 0o750); err != nil {
-		return nil, fmt.Errorf("ota download directory: %w", err)
-	}
-	var requestor *mattercore.OTASoftwareUpdateRequestor
-	applier := &otaApplier{
-		vendorID: identity.vendorID, productID: identity.productID, basicInfo: basicInfo,
-		dir: cfg.dir, harness: cfg.harness, logger: cfg.logger,
-		requestor: func() *mattercore.OTASoftwareUpdateRequestor { return requestor },
-	}
-	rcfg := mattercore.OTARequestorConfig{
-		NodeInformation: basicInfo.OtaNodeInformation,
-		Connector:       cfg.connector,
-		Applier:         applier,
-		Store:           cfg.st,
-		DownloadDir:     cfg.dir,
-		CanConsent:      cfg.harness,
-		Logger:          cfg.logger,
-	}
-	if cfg.harness {
-		// The matter.js cert requestor's wait after an announcement:
-		// "a cert run is one requestor with one provider, so the specified
-		// random window — up to ten minutes — only makes the run's own
-		// duration unpredictable" (OtaRequestorTestInstance.ts:65, :327-335).
-		quick := 250 * time.Millisecond
-		rcfg.AnnouncedUpdateQueryDelay = &quick
-	}
-	r, err := mattercore.NewOTASoftwareUpdateRequestor(rcfg)
-	if err != nil {
-		return nil, err
-	}
-	requestor = r
-	return r, nil
 }

@@ -15,12 +15,12 @@ import (
 	// DSN, is this host's job.
 	_ "modernc.org/sqlite"
 
-	"github.com/SukramJ/go-fabric/bridge"
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/store"
 )
+
+// dbHandle is the database the node keeps its state in.
+type dbHandle = *sql.DB
 
 // connectionPragmas are the modernc.org/sqlite `_pragma` query parameters
 // applied to every connection the pool opens, not just the first:
@@ -41,10 +41,9 @@ const connectionPragmas = "_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)"
 // are written against and hands it over — store.Apply for the matter_*
 // operational tables, sqlitestore.Apply for endpoint identity — so a schema
 // change arrives with the dependency bump instead of drifting against a
-// copy kept in this file. A host with a migration tool of its own feeds
-// store.Schema() and sqlitestore.Schema() through that instead; both
-// scripts are idempotent, so applying them on every boot is the intended
-// use rather than a first-run special case.
+// copy kept in this file. The node applies both again on the handle it is
+// given (node.Store.DB): both scripts are idempotent, so applying them on
+// every boot is the intended use rather than a first-run special case.
 func openDB(ctx context.Context, path string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", "file:"+path+"?"+connectionPragmas)
 	if err != nil {
@@ -61,144 +60,22 @@ func openDB(ctx context.Context, path string) (*sql.DB, error) {
 	return db, nil
 }
 
-// persistedLabels keeps controller-written NodeLabels in the store's
-// settings table: the root's under rootNodeLabelKey, each bridged
-// endpoint's under its stable key.
-type persistedLabels struct {
-	st     *store.Store
-	logger *slog.Logger
-}
-
-const (
-	rootNodeLabelKey         = "basic_information.node_label"
-	rootLocationKey          = "basic_information.location"
-	rootConfigVersionKey     = "basic_information.configuration_version"
-	endpointLabelKeyRoot     = "bridged_node_label."
-	endpointConfigVersionKey = "bridged_configuration_version."
-)
-
-// configVersion returns the ConfigurationVersion persisted for a bridged
-// endpoint, 0 for none.
-func (p persistedLabels) configVersion(ctx context.Context, key endpoint.StringKey) uint32 {
-	return p.loadUint32(ctx, endpointConfigVersionKey+string(key))
-}
-
-func (p persistedLabels) loadUint32(ctx context.Context, key string) uint32 {
-	v, ok, err := p.st.GetSetting(ctx, key)
-	if err != nil || !ok {
-		return 0
-	}
-	n, err := strconv.ParseUint(v, 10, 32)
-	if err != nil {
-		return 0
-	}
-	return uint32(n)
-}
-
-// storeConfigVersions persists what bridge.IncreaseConfigurationVersion
-// raised: the version may never decrease, so it has to outlive a restart.
-func (p persistedLabels) storeConfigVersions(topo *endpoint.Topology, v bridge.ConfigurationVersions) {
-	ctx := context.Background()
-	set := func(k string, n uint32) {
-		if err := p.st.SetSetting(ctx, k, strconv.FormatUint(uint64(n), 10)); err != nil {
-			p.logger.Warn("configuration_version.persist", slog.String("err", err.Error()))
-		}
-	}
-	if v.Node != 0 {
-		set(rootConfigVersionKey, v.Node)
-	}
-	for id, n := range v.Bridged {
-		if ep := topo.FindByID(id); ep != nil {
-			if k, ok := ep.SourceKey.(endpoint.StringKey); ok {
-				set(endpointConfigVersionKey+string(k), n)
-			}
-		}
-	}
-}
-
-// store implements endpoint.Config.OnNodeLabelWritten.
-func (p persistedLabels) store(key endpoint.SourceKey, label string) {
-	k, ok := key.(endpoint.StringKey)
-	if !ok {
-		return
-	}
-	if err := p.st.SetSetting(context.Background(), endpointLabelKeyRoot+string(k), label); err != nil {
-		p.logger.Warn("label.persist", slog.String("err", err.Error()))
-	}
-}
-
-// load returns the label persisted for a bridged endpoint, "" for none.
-func (p persistedLabels) load(ctx context.Context, key endpoint.StringKey) string {
-	label, ok, err := p.st.GetSetting(ctx, endpointLabelKeyRoot+string(key))
-	if err != nil || !ok {
-		return ""
-	}
-	return label
-}
-
-// restoreRoot applies the persisted root NodeLabel / Location and wires
-// their persistence — BasicInformation's writable attributes, which
-// matter.js keeps in node storage.
-func (p persistedLabels) restoreRoot(ctx context.Context, b *mattercore.BasicInformation) {
-	if v, ok, err := p.st.GetSetting(ctx, rootNodeLabelKey); err == nil && ok {
-		_ = b.SetNodeLabel(v)
-	}
-	if v, ok, err := p.st.GetSetting(ctx, rootLocationKey); err == nil && ok {
-		_ = b.SetLocation(v)
-	}
-	b.RestoreConfigurationVersion(p.loadUint32(ctx, rootConfigVersionKey))
-	b.SetOnPersistentWrite(func(nodeLabel, location string) {
-		for k, v := range map[string]string{rootNodeLabelKey: nodeLabel, rootLocationKey: location} {
-			if err := p.st.SetSetting(context.WithoutCancel(ctx), k, v); err != nil {
-				p.logger.Warn("label.persist", slog.String("err", err.Error()))
-			}
-		}
-	})
-}
-
-// scenesKeyRoot prefixes a bridged endpoint's persisted scene table.
-const scenesKeyRoot = "scenes."
-
-// LoadScenes implements endpoint.ScenesStore: the endpoint's scene table
-// from the settings table (matter.js keeps sceneTable nonvolatile).
-func (p persistedLabels) LoadScenes(key endpoint.SourceKey) []byte {
-	k, ok := key.(endpoint.StringKey)
-	if !ok {
-		return nil
-	}
-	v, found, err := p.st.GetSetting(context.Background(), scenesKeyRoot+string(k))
-	if err != nil || !found {
-		return nil
-	}
-	return []byte(v)
-}
-
-// SaveScenes implements endpoint.ScenesStore.
-func (p persistedLabels) SaveScenes(key endpoint.SourceKey, table []byte) {
-	k, ok := key.(endpoint.StringKey)
-	if !ok {
-		return
-	}
-	if err := p.st.SetSetting(context.Background(), scenesKeyRoot+string(k), string(table)); err != nil {
-		p.logger.Warn("scenes.persist", slog.String("err", err.Error()))
-	}
-}
-
 // blindPositionKey is the settings key the blind's lift position is kept
 // under.
 const blindPositionKey = "blind.position"
 
 // restoreBlind seeds the blind's position from the settings table and
-// persists every position it reaches.
-func (p persistedLabels) restoreBlind(ctx context.Context, b *demoBlind) {
-	if v, ok, err := p.st.GetSetting(ctx, blindPositionKey); err == nil && ok {
+// persists every position it reaches. Call it before the blind's server is
+// built (fleet.endpoints): the server starts at the seeded position.
+func restoreBlind(ctx context.Context, st *store.Store, b *demoBlind, logger *slog.Logger) {
+	if v, ok, err := st.GetSetting(ctx, blindPositionKey); err == nil && ok {
 		if pos, perr := strconv.ParseUint(v, 10, 16); perr == nil && pos <= 10000 {
 			b.position = uint16(pos)
 		}
 	}
 	b.persist = func(pos uint16) {
-		if err := p.st.SetSetting(context.WithoutCancel(ctx), blindPositionKey, strconv.FormatUint(uint64(pos), 10)); err != nil {
-			p.logger.Warn("blind.persist", slog.String("err", err.Error()))
+		if err := st.SetSetting(context.WithoutCancel(ctx), blindPositionKey, strconv.FormatUint(uint64(pos), 10)); err != nil {
+			logger.Warn("blind.persist", slog.String("err", err.Error()))
 		}
 	}
 }

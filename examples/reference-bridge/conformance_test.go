@@ -160,6 +160,22 @@ func mandatoryServerClusters(t *testing.T) map[uint32][]uint32 {
 	return out
 }
 
+// onOffTick is the period of cluster/onoff.Server's two countdowns:
+// OnTime and OffWaitTime count tenths of a second (matter.js
+// OnOffServer.ts `Time.getPeriodicTimer(…, Millis(100), …)`).
+const onOffTick = 100 * time.Millisecond
+
+// testLight builds the desk lamp's device and returns its OnOff server.
+func testLight(t *testing.T, name string) (*demoLight, *onoff.Server) {
+	t.Helper()
+	light := newDemoLight(name)
+	dev, err := light.device(bridged(name, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return light, dev.OnOff()
+}
+
 // TestOnWithTimedOffCountsDownAndTurnsTheLightOff drives the one LT command
 // with behaviour of its own through the server the light mounts:
 // OnWithTimedOff(OnTime=3) turns the light on and, three tenths of a second
@@ -168,16 +184,7 @@ func mandatoryServerClusters(t *testing.T) map[uint32][]uint32 {
 func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		light := newDemoLight("timed")
-		var srv *onOffServer
-		for _, s := range light.MatterClusterServers() {
-			if o, ok := s.(*onOffServer); ok {
-				srv = o
-			}
-		}
-		if srv == nil {
-			t.Fatal("the light mounts no onOffServer")
-		}
+		light, srv := testLight(t, "timed")
 		var reportedMu sync.Mutex
 		var reported [][]uint32
 		srv.OnMatterAttributesChanged(func(ids []uint32) {
@@ -186,7 +193,7 @@ func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 			reportedMu.Unlock()
 		})
 		if _, err := srv.MatterInvoke(context.Background(), onoff.CmdOnWithTimedOff,
-			map[uint8]any{0: uint8(0), 1: uint16(3), 2: uint16(0)}); err != nil {
+			onoffdef.OnWithTimedOffRequest{OnTime: 3}); err != nil {
 			t.Fatalf("OnWithTimedOff: %v", err)
 		}
 		if !light.isOn() {
@@ -195,10 +202,10 @@ func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 		if v, _ := srv.MatterRead(onoff.AttrOnTime); v != uint16(3) {
 			t.Fatalf("OnTime right after OnWithTimedOff = %v, want 3", v)
 		}
-		// OnTime counts down once per lightingTick (3 -> 2 -> 1) and the
-		// tick that finds OnTime <= 1 turns the light off, so the light is
+		// OnTime counts down once per tick (3 -> 2 -> 1) and the tick
+		// that finds OnTime <= 1 turns the light off, so the light is
 		// still on one nanosecond before the third tick and off at it.
-		time.Sleep(3*lightingTick - time.Nanosecond)
+		time.Sleep(3*onOffTick - time.Nanosecond)
 		synctest.Wait()
 		if !light.isOn() {
 			t.Fatal("the light turned off before the OnTime countdown elapsed")
@@ -218,9 +225,9 @@ func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 		// countdown is long answered, so nothing else would.
 		reportedMu.Lock()
 		defer reportedMu.Unlock()
-		want := [][]uint32{{onoff.AttrOnTime}, {onoff.AttrOnTime}, {onoff.AttrOnOff, onoff.AttrOnTime}}
+		want := [][]uint32{{onoff.AttrOnOff, onoff.AttrOnTime}, {onoff.AttrOnTime}, {onoff.AttrOnTime}, {onoff.AttrOnOff, onoff.AttrOnTime}}
 		if !reflect.DeepEqual(reported, want) {
-			t.Errorf("reported changes = %v, want %v (two countdown ticks, then the timed-off)", reported, want)
+			t.Errorf("reported changes = %v, want %v (the command, two countdown ticks, then the timed-off)", reported, want)
 		}
 	})
 }
@@ -230,12 +237,13 @@ func TestOnWithTimedOffCountsDownAndTurnsTheLightOff(t *testing.T) {
 func TestDelayedOffReportsItsCountdown(t *testing.T) {
 	t.Parallel()
 	synctest.Test(t, func(t *testing.T) {
-		light := newDemoLight("guard")
-		var srv *onOffServer
-		for _, s := range light.MatterClusterServers() {
-			if o, ok := s.(*onOffServer); ok {
-				srv = o
-			}
+		_, srv := testLight(t, "guard")
+		ctx := context.Background()
+		if _, err := srv.MatterInvoke(ctx, onoff.CmdOn, nil); err != nil {
+			t.Fatalf("On: %v", err)
+		}
+		if err := srv.MatterWrite(ctx, onoff.AttrOffWaitTime, uint16(2)); err != nil {
+			t.Fatalf("write OffWaitTime: %v", err)
 		}
 		var reportedMu sync.Mutex
 		var reported [][]uint32
@@ -244,26 +252,19 @@ func TestDelayedOffReportsItsCountdown(t *testing.T) {
 			reported = append(reported, ids)
 			reportedMu.Unlock()
 		})
-		ctx := context.Background()
-		if _, err := srv.MatterInvoke(ctx, onoff.CmdOn, nil); err != nil {
-			t.Fatalf("On: %v", err)
-		}
-		if err := srv.MatterWrite(ctx, onoff.AttrOffWaitTime, uint16(2)); err != nil {
-			t.Fatalf("write OffWaitTime: %v", err)
-		}
 		if _, err := srv.MatterInvoke(ctx, onoff.CmdOff, nil); err != nil {
 			t.Fatalf("Off: %v", err)
 		}
-		time.Sleep(2 * lightingTick)
+		time.Sleep(2 * onOffTick)
 		synctest.Wait()
 		if v, _ := srv.MatterRead(onoff.AttrOffWaitTime); v != uint16(0) {
 			t.Fatalf("OffWaitTime after the guard = %v, want 0", v)
 		}
 		reportedMu.Lock()
 		defer reportedMu.Unlock()
-		want := [][]uint32{{onoff.AttrOffWaitTime}, {onoff.AttrOffWaitTime}}
+		want := [][]uint32{{onoff.AttrOnOff}, {onoff.AttrOffWaitTime}, {onoff.AttrOffWaitTime}}
 		if !reflect.DeepEqual(reported, want) {
-			t.Errorf("reported changes = %v, want %v", reported, want)
+			t.Errorf("reported changes = %v, want %v (the command, then the two guard ticks)", reported, want)
 		}
 	})
 }
@@ -276,15 +277,11 @@ func TestDelayedOffReportsItsCountdown(t *testing.T) {
 func TestCeilingLightOnDoesNotDeadlockItsNotifier(t *testing.T) {
 	t.Parallel()
 	light := newDemoCeilingLight("ceiling")
-	var srv *onOffServer
-	for _, s := range light.MatterClusterServers() {
-		if o, ok := s.(*onOffServer); ok {
-			srv = o
-		}
+	dev, err := light.device(bridged("ceiling", "ceiling"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if srv == nil {
-		t.Fatal("the ceiling light mounts no onOffServer")
-	}
+	srv := dev.Server(onoff.ClusterID)
 	reads := 0
 	light.OnMatterValueChanged(func() {
 		if _, ok := srv.MatterRead(onoff.AttrOnTime); ok {
@@ -315,11 +312,15 @@ func TestCeilingLightOnDoesNotDeadlockItsNotifier(t *testing.T) {
 func TestLightKeepsItsOnOffStateAcrossDispatches(t *testing.T) {
 	t.Parallel()
 	light := newDemoLight("kept")
-	first := light.MatterClusterServers()[0]
+	dev, err := light.device(bridged("kept", "kept"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := dev.Spec().Source.MatterClusterServers()[0]
 	if err := first.MatterWrite(context.Background(), onoff.AttrOnTime, uint16(30)); err != nil {
 		t.Fatalf("write OnTime: %v", err)
 	}
-	again := light.MatterClusterServers()[0]
+	again := dev.Spec().Source.MatterClusterServers()[0]
 	if v, _ := again.MatterRead(onoff.AttrOnTime); v != uint16(30) {
 		t.Fatalf("OnTime on the next dispatch = %v, want 30", v)
 	}
@@ -378,24 +379,6 @@ func TestValveTravelsThroughATarget(t *testing.T) {
 			t.Fatalf("closing a closed valve notified %d times, want 1 (the command)", n)
 		}
 	})
-}
-
-// TestOnWithTimedOffFieldsTakesTheGeneratedRequest pins the shape the
-// bridge now hands over: the OnOff definition is registered once
-// cluster/onoff is linked, so OnWithTimedOff arrives as the generated
-// request struct, by value or pointer; the tag map stays accepted.
-func TestOnWithTimedOffFieldsTakesTheGeneratedRequest(t *testing.T) {
-	t.Parallel()
-	req := onoffdef.OnWithTimedOffRequest{OnOffControl: onoffdef.OnOffControlAcceptOnlyWhenOn, OnTime: 30, OffWaitTime: 7}
-	for _, fields := range []any{req, &req, map[uint8]any{0: uint8(1), 1: uint16(30), 2: uint16(7)}} {
-		control, onTime, offWait, err := onWithTimedOffFields(fields)
-		if err != nil || control != 1 || onTime != 30 || offWait != 7 {
-			t.Errorf("%T: (%d, %d, %d, %v), want (1, 30, 7, nil)", fields, control, onTime, offWait, err)
-		}
-	}
-	if _, _, _, err := onWithTimedOffFields((*onoffdef.OnWithTimedOffRequest)(nil)); err == nil {
-		t.Error("a nil request pointer was accepted")
-	}
 }
 
 // TestFridgeHasItsCoolingCabinetPart: the Refrigerator's mandatory

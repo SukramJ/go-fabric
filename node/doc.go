@@ -34,6 +34,10 @@
 //     the OTA requestor, AnnounceFabric for each fabric, and the node's
 //     own commissioning window when no fabric exists.
 //
+// The citations of examples/reference-bridge files and lines in this
+// package name the daemon as it stood before it moved onto the facade
+// (commit 30fe7f1; brief R): the code they cite is the facade's now.
+//
 // Left to the configuration on purpose: a nil Config.Advertiser publishes
 // nothing, a nil Config.OTA mounts no OTA requestor. Left to the host:
 // GeneralDiagnostics' TestEventTrigger enable key, the PowerSource

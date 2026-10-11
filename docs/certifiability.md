@@ -499,7 +499,7 @@ The reference set is matter.js's (`support/chip-testing/test/core`,
 
 Some families run but have nothing the daemon can be tested on. The root's
 IcdManagement and OTA Software Update Requestor are not mounted
-(`examples/reference-bridge/wiring.go` buildRootClusters says why), so the
+(`node/root.go` buildRoot says why), so the
 ICDM cases and the SU requestor cases are not applicable through the
 device's own PICS (`ICDM.S=0`, `MCORE.OTA.Requestor=0`). The image lists
 the DLOG case, the BIND cases and the SU YAML cases as manual, so the

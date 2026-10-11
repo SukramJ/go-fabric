@@ -4,11 +4,10 @@
 // The guard over this host's root-endpoint wiring.
 //
 // The cluster servers come from the module and are tested there; what the
-// module cannot test is the wiring a host has to do between them — the
-// hooks buildRootClusters closes, the providers attachPartsListProviders
-// installs. A hook nobody wires is indistinguishable from a wired one on
-// every read, so each test here drives the real constructor and asserts
-// the effect.
+// module cannot test is the wiring between them — the hooks the node closes
+// on the root, the providers it installs when it starts. A hook nobody
+// wires is indistinguishable from a wired one on every read, so each test
+// here drives the node as main() assembles it and asserts the effect.
 package main
 
 import (
@@ -16,7 +15,6 @@ import (
 	"log/slog"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -24,41 +22,18 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
-	"github.com/SukramJ/go-fabric/secure/attestation"
-	"github.com/SukramJ/go-fabric/secure/operational"
-	"github.com/SukramJ/go-fabric/secure/sigma"
+	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
 )
 
-// testRootClusters builds endpoint 0 exactly as main() does, over a
-// throw-away database and the CSA test attestation chain.
-func testRootClusters(t *testing.T) (servers []contract.ClusterServer, refs rootRefs) {
+// testRootClusters builds endpoint 0 exactly as main() does — the node
+// over a throw-away database and the CSA test attestation chain — and
+// returns its servers in mount order and their handles.
+func testRootClusters(t *testing.T) (servers []contract.ClusterServer, root *node.RootClusters) {
 	t.Helper()
-	ctx := context.Background()
-	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
-	if err != nil {
-		t.Fatalf("openDB: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	chain, err := attestation.BuildTestChain(testVendorID, testProductID)
-	if err != nil {
-		t.Fatalf("BuildTestChain: %v", err)
-	}
-	identity := bridgeIdentity{vendorID: testVendorID, productID: testProductID, nodeLabel: "wiring-test", serialNumber: "TEST-0001"}
-	st := store.New(db)
-	groupState, err := groups.NewManager(st, nil)
-	if err != nil {
-		t.Fatalf("groups.NewManager: %v", err)
-	}
-	servers, refs, err = buildRootClusters(identity, st, groupState, chain,
-		otaConfig{dir: filepath.Join(t.TempDir(), "ota"), st: st, logger: slog.Default()},
-		func(context.Context, uint8, uint64, uint64, []byte) {})
-	if err != nil {
-		t.Fatalf("buildRootClusters: %v", err)
-	}
-	return servers, refs
+	n := testNode(t, newFleet(), filepath.Join(t.TempDir(), "reference-bridge.db"))
+	return n.Root().Servers(), n.Root()
 }
 
 // TestCommissioningCompleteClearsThePendingCredentialState drives the
@@ -70,19 +45,19 @@ func testRootClusters(t *testing.T) (servers []contract.ClusterServer, refs root
 // commissioning left behind. Left pending, that index is what a lapsed
 // auto-armed window reverts — deleting the committed fabric.
 func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
-	_, refs := testRootClusters(t)
+	_, root := testRootClusters(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
 	const fabric = 1
-	if err := refs.generalCom.ArmFailSafeFor(ctx, 60, fabric); err != nil {
+	if err := root.GeneralCommissioning.ArmFailSafeFor(ctx, 60, fabric); err != nil {
 		t.Fatalf("ArmFailSafeFor: %v", err)
 	}
-	if _, err := refs.opCreds.MatterInvoke(ctx, 0x04, mattercore.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
+	if _, err := root.OperationalCredentials.MatterInvoke(ctx, 0x04, mattercore.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
 		t.Fatalf("CSRRequest: %v", err)
 	}
 
-	raw, err := refs.generalCom.MatterInvoke(im.WithFabricFilter(ctx, false, fabric), 0x04, nil)
+	raw, err := root.GeneralCommissioning.MatterInvoke(im.WithFabricFilter(ctx, false, fabric), 0x04, nil)
 	if err != nil {
 		t.Fatalf("CommissioningComplete: %v", err)
 	}
@@ -92,9 +67,9 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 
 	// The window a later Pake3 arms on its own — the path that fires no
 	// OnFailSafeArmed and so clears nothing by itself.
-	refs.generalCom.AutoArmOnPaseEstablished(ctx)
+	root.GeneralCommissioning.AutoArmOnPaseEstablished(ctx)
 
-	raw, err = refs.opCreds.MatterInvoke(ctx, 0x06, mattercore.AddNOCRequest{NOCValue: []byte{0x15}, IPKValue: make([]byte, 16)})
+	raw, err = root.OperationalCredentials.MatterInvoke(ctx, 0x06, mattercore.AddNOCRequest{NOCValue: []byte{0x15}, IPKValue: make([]byte, 16)})
 	if err != nil {
 		t.Fatalf("AddNOC: %v", err)
 	}
@@ -115,22 +90,9 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 // alone. The aggregator's list is held to the same rule over the bridged
 // endpoints.
 func TestRootPartsListNamesEveryDescendantEndpoint(t *testing.T) {
+	// The node mounts the root and the Aggregator and installs both
+	// PartsList providers when it starts.
 	_, br := startFleetBridge(t)
-	rootServers, _ := testRootClusters(t)
-	br.AttachRootClusters(rootServers)
-	db, err := openDB(context.Background(), filepath.Join(t.TempDir(), "aggregator.db"))
-	if err != nil {
-		t.Fatalf("openDB: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	aggregatorServers, err := buildAggregatorClusters(context.Background(), store.New(db))
-	if err != nil {
-		t.Fatalf("buildAggregatorClusters: %v", err)
-	}
-	br.AttachAggregatorClusters(aggregatorServers)
-	if err := attachPartsListProviders(br); err != nil {
-		t.Fatalf("attachPartsListProviders: %v", err)
-	}
 
 	topology := br.Topology()
 	if topology == nil {
@@ -184,28 +146,6 @@ func partsList(t *testing.T, ep *endpoint.Endpoint) []uint16 {
 	return nil
 }
 
-// TestCaseInitiatorProviderNeedsALoadedIdentity: the provider the bridge
-// dials former-subscription peers with refuses a fabric whose CASE
-// identity is not loaded, and leaves no session id reserved behind.
-func TestCaseInitiatorProviderNeedsALoadedIdentity(t *testing.T) {
-	ctx := context.Background()
-	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
-	if err != nil {
-		t.Fatalf("openDB: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	st := store.New(db)
-	sessions := operational.NewManager(st)
-	before := sessions.Occupancy()
-	provider := caseInitiatorProvider(st, sessions, newCaseIdentities(slog.Default()), slog.Default())
-	if init, err := provider(ctx, 1, 0xC0FFEE); err == nil || init != nil {
-		t.Fatalf("provider(unknown fabric) = %v, %v; want an error", init, err)
-	}
-	if after := sessions.Occupancy(); after != before {
-		t.Fatalf("session table occupancy %+v → %+v: a refused initiation must not reserve an id", before, after)
-	}
-}
-
 // TestRootMountsGroupcastWithTheAuxiliaryACL: the bridged lights and plugs
 // require the RootNode GroupcastListenerCond in Matter 1.6.1, so the root
 // mounts Groupcast — Listener and PerGroup — and AccessControl advertises
@@ -240,59 +180,6 @@ func TestRootMountsGroupcastWithTheAuxiliaryACL(t *testing.T) {
 	}
 }
 
-// TestCaseIdentitiesResolveAndForget pins the per-fabric identity table the
-// CASE responder resolves through: a resumed session answers as the fabric
-// its record names, and a forgotten fabric is no longer resolvable — by
-// index or as the latest identity.
-func TestCaseIdentitiesResolveAndForget(t *testing.T) {
-	t.Parallel()
-	c := newCaseIdentities(nil)
-	one := &caseFabric{identity: &sigma.Identity{FabricIndex: 1, NodeID: 11}}
-	two := &caseFabric{identity: &sigma.Identity{FabricIndex: 2, NodeID: 22}}
-	c.byIdx[1], c.byIdx[2], c.latest = one, two, two
-	if id, _, ok := c.ResolveFabricIndex(1); !ok || id.NodeID != 11 {
-		t.Fatalf("ResolveFabricIndex(1) = %+v, %v; want fabric 1's identity", id, ok)
-	}
-	if _, nodeID, ok := c.forget(2); !ok || nodeID != 22 {
-		t.Fatalf("forget(2) = %d, %v", nodeID, ok)
-	}
-	if _, _, ok := c.ResolveFabricIndex(2); ok {
-		t.Fatal("a forgotten fabric still resolves")
-	}
-	if cur := c.current(); cur != one {
-		t.Fatalf("latest after forgetting it: %+v, want fabric 1", cur)
-	}
-	if _, _, ok := c.forget(9); ok {
-		t.Fatal("forgetting an unknown fabric reported one")
-	}
-}
-
-// TestRebootCountCountsBoots: RebootCount is 0 on a database's first boot
-// and one more on each boot after (matter.js GeneralDiagnosticsServer.ts;
-// TC-DGGEN-2.1).
-func TestRebootCountCountsBoots(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
-	if err != nil {
-		t.Fatalf("openDB: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	st := store.New(db)
-	for want := range uint16(3) {
-		got, err := countBoot(ctx, st)
-		if err != nil || got != want {
-			t.Fatalf("boot %d: RebootCount = %d, %v", want, got, err)
-		}
-	}
-	if err := st.SetSetting(ctx, rebootCountSetting, "not a number"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := countBoot(ctx, st); err == nil {
-		t.Fatal("a corrupt reboot count was accepted")
-	}
-}
-
 // TestBlindPositionSurvivesARestart: the blind persists every position it
 // reaches and a new blind on the same database starts there (matter.js
 // keeps WindowCovering state non-volatile; TC-WNCV-4.5).
@@ -304,13 +191,13 @@ func TestBlindPositionSurvivesARestart(t *testing.T) {
 		t.Fatalf("openDB: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	labels := persistedLabels{st: store.New(db), logger: slog.Default()}
+	st := store.New(db)
 	saved := make(chan struct{}, 16)
 	first := newDemoBlind("blind")
-	labels.restoreBlind(ctx, first)
+	restoreBlind(ctx, st, first, slog.Default())
 	persist := first.persist
 	first.persist = func(pos uint16) { persist(pos); saved <- struct{}{} }
-	srv := first.MatterClusterServers()[0]
+	srv := first.servers()[0]
 	if _, err := srv.MatterInvoke(ctx, wire.WindowCoveringCmdGoToLiftPercentage, uint16(9000)); err != nil {
 		t.Fatalf("GoToLiftPercentage: %v", err)
 	}
@@ -326,77 +213,8 @@ func TestBlindPositionSurvivesARestart(t *testing.T) {
 		}
 	}
 	second := newDemoBlind("blind")
-	labels.restoreBlind(ctx, second)
-	if v, _ := second.MatterClusterServers()[0].MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v != uint16(9000) {
+	restoreBlind(ctx, st, second, slog.Default())
+	if v, _ := second.servers()[0].MatterRead(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths); v != uint16(9000) {
 		t.Fatalf("restarted blind at %v, want 9000", v)
-	}
-}
-
-// TestOperationalHoursSurviveARestart: the operational time is seeded from
-// the settings table and stored back in milliseconds, so a reboot does not
-// reset it (TC-DGGEN-2.1 step 10c) and a run shorter than an hour still
-// counts (matter.js totalOperationalHoursCounter). A database of an earlier
-// release, which kept whole hours, is migrated.
-func TestOperationalHoursSurviveARestart(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
-	if err != nil {
-		t.Fatalf("openDB: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	st := store.New(db)
-	if d, err := loadOperationalTime(ctx, st); err != nil || d != 0 {
-		t.Fatalf("operational time on a new database = %v, %v", d, err)
-	}
-
-	// An earlier release's whole hours migrate to milliseconds.
-	if err := st.SetSetting(ctx, legacyOperationalHoursSetting, "3"); err != nil {
-		t.Fatal(err)
-	}
-	d, err := loadOperationalTime(ctx, st)
-	if err != nil || d != 3*time.Hour {
-		t.Fatalf("legacy hours loaded as %v, %v; want 3h", d, err)
-	}
-	g := mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
-	g.SetPersistedOperationalTime(d + 59*time.Minute)
-	if err := storeOperationalTime(ctx, st, g); err != nil {
-		t.Fatal(err)
-	}
-	if raw, _, _ := st.GetSetting(ctx, operationalTimeSetting); !strings.HasPrefix(raw, "14340") {
-		t.Fatalf("stored %q ms; want 3h59m = 14340000 ms and change", raw)
-	}
-	// The part-hour survives: a restart starting at 3h59m reads 3 hours,
-	// and the next minute makes it 4.
-	d, err = loadOperationalTime(ctx, st)
-	if err != nil || d < 3*time.Hour+59*time.Minute || d > 4*time.Hour {
-		t.Fatalf("operational time after a store = %v, %v; want 3h59m", d, err)
-	}
-	g2 := mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
-	g2.SetPersistedOperationalTime(d + time.Minute)
-	if v, _ := g2.MatterRead(0x0003); v != uint32(4) {
-		t.Fatalf("TotalOperationalHours = %v after 3h59m + 1m; want 4", v)
-	}
-
-	runCtx, cancel := context.WithCancel(ctx)
-	done := make(chan struct{})
-	go func() { keepOperationalTime(runCtx, st, g, time.Millisecond, slog.Default()); close(done) }()
-	time.Sleep(10 * time.Millisecond)
-	cancel()
-	<-done
-	if err := st.SetSetting(ctx, operationalTimeSetting, "x"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := loadOperationalTime(ctx, st); err == nil {
-		t.Fatal("a corrupt millisecond count was accepted")
-	}
-	if err := st.SetSetting(ctx, operationalTimeSetting, "1"); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.SetSetting(ctx, legacyOperationalHoursSetting, "x"); err != nil {
-		t.Fatal(err)
-	}
-	if d, err := loadOperationalTime(ctx, st); err != nil || d != time.Millisecond {
-		t.Fatalf("the millisecond count must win over the legacy hours: %v, %v", d, err)
 	}
 }

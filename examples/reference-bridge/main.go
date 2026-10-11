@@ -13,6 +13,16 @@
 // host has to be able to do from the outside, and anything it cannot reach
 // without an internal is a defect in the seam rather than in the example.
 //
+// It is built the way the README points a host at (ADR 0018): one
+// node.Config, node.New, one device.New<Type> call per device added to the
+// node's Aggregator, and Run. The node performs the bring-up — stores,
+// root and Aggregator endpoints, sessions, PASE and CASE, the commissioning
+// window, the fabric hooks — in the order bridge/bridge.go documents. What
+// stays here is the host's own: its device models and the servers whose
+// rules need a host port (fleet*.go), the out-of-band test controls
+// (control.go), the OTA applier (ota.go), the mDNS responder and the
+// operator's banner.
+//
 // It is not a product. The identity it advertises is the CSA *test*
 // vendor/product pair and the attestation chain is the CSA *test* chain; see
 // the README next to this file for what that means.
@@ -21,7 +31,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -30,20 +39,19 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
-	"time"
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	"github.com/SukramJ/go-fabric/diagevent"
+	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
-	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/secure/attestation"
+	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/secure/setup"
-	"github.com/SukramJ/go-fabric/store"
 )
 
 // CSA test identity. 0xFFF1 is the Connectivity Standards Alliance's test
@@ -55,15 +63,16 @@ const (
 	testProductID uint16 = 0x8001
 )
 
-// bridgeIdentity is the static identity three separate constructors need
-// (the bridge config, the endpoint assembler and BasicInformation), kept in
-// one place so they cannot disagree.
-type bridgeIdentity struct {
-	vendorID     uint16
-	productID    uint16
-	nodeLabel    string
-	serialNumber string
-}
+// serialNumber only has to be stable across restarts; it seeds the rotating
+// device identifier and the derived UniqueID.
+const serialNumber = "GOFABRIC-REF-0001"
+
+// exampleVendorName is the node's BasicInformation VendorName. The
+// assembler serves it as the BridgedDeviceBasicInformation VendorName of
+// every bridged device (endpoint.Config.VendorName): the demo devices have
+// no manufacturer of their own, which a host with real devices would set
+// per device through device.Options.Vendor.
+const exampleVendorName = "go-fabric example"
 
 func main() {
 	if err := run(); err != nil {
@@ -72,117 +81,91 @@ func main() {
 	}
 }
 
-//nolint:funlen,gocognit,gocyclo // a composition root: one sequential wiring pass, deliberately readable top to bottom
-func run() error {
-	var (
-		dbPath       = flag.String("db", "reference-bridge.db", "SQLite file holding fabrics, credentials and endpoint numbers")
-		listen       = flag.String("listen", ":5540", "UDP listen address for Matter traffic")
-		tcpFlag      = flag.String("tcp", "true", "Matter TCP: true (accept and open connections), false, or incoming / outgoing comma-separated; incoming listens on the UDP port, both are advertised in the operational T key")
-		label        = flag.String("label", "go-fabric reference bridge", "operator-visible bridge name (BasicInformation.NodeLabel)")
-		passcodeFlag = flag.Uint("passcode", 20202021, "Matter setup passcode (8 digits, not trivially guessable)")
-		discFlag     = flag.Uint("discriminator", 3840, "12-bit commissioning discriminator")
-		iterations   = flag.Int("pbkdf-iterations", 1000, "SPAKE2+ PBKDF2 iteration count")
-		salt         = flag.String("pbkdf-salt", "go-fabric-ref-salt", "SPAKE2+ salt (16-32 bytes; change it for anything real)")
-		advertise    = flag.Bool("advertise", true, "publish the commissionable mDNS record (false = no discovery, direct address only)")
-		logLevel     = flag.String("log-level", "info", "debug, info, warn or error")
-		appPipe      = flag.String("app-pipe", "", "TESTING ONLY: named pipe of CHIP-style JSON test commands (button presses, sensor values, …); see control.go")
-		enableKey    = flag.String("enable-key", "", "TESTING ONLY: 16-byte hex test enable key that arms GeneralDiagnostics TestEventTrigger; see control.go")
-		osHostName   = flag.Bool("mdns-os-hostname", false, "TESTING ONLY: advertise the OS host name as SRV target instead of the MAC-derived one, for a test host whose LAN interface has no IPv6")
-		otaDir       = flag.String("ota-dir", "", "directory OTA images are downloaded to (default: an \"ota\" directory beside --db)")
-		otaHarness   = flag.Bool("ota-harness", false, "TESTING ONLY: apply a downloaded OTA image in place — report its version as running without a restart, as the CHIP SU cases read it; see ota.go")
-	)
-	flag.Parse()
+// flags are the daemon's command line.
+type flags struct {
+	dbPath, listen, tcp, label, salt, logLevel string
+	appPipe, enableKey, otaDir                 string
+	passcode, discriminator                    uint
+	iterations                                 int
+	advertise, osHostName, otaHarness          bool
+}
 
+func parseFlags() flags {
+	var f flags
+	flag.StringVar(&f.dbPath, "db", "reference-bridge.db", "SQLite file holding fabrics, credentials and endpoint numbers")
+	flag.StringVar(&f.listen, "listen", ":5540", "UDP listen address for Matter traffic")
+	flag.StringVar(&f.tcp, "tcp", "true", "Matter TCP: true (accept and open connections), false, or incoming / outgoing comma-separated; incoming listens on the UDP port, both are advertised in the operational T key")
+	flag.StringVar(&f.label, "label", "go-fabric reference bridge", "operator-visible bridge name (BasicInformation.NodeLabel)")
+	flag.UintVar(&f.passcode, "passcode", 20202021, "Matter setup passcode (8 digits, not trivially guessable)")
+	flag.UintVar(&f.discriminator, "discriminator", 3840, "12-bit commissioning discriminator")
+	flag.IntVar(&f.iterations, "pbkdf-iterations", 1000, "SPAKE2+ PBKDF2 iteration count")
+	flag.StringVar(&f.salt, "pbkdf-salt", "go-fabric-ref-salt", "SPAKE2+ salt (16-32 bytes; change it for anything real)")
+	flag.BoolVar(&f.advertise, "advertise", true, "publish the commissionable mDNS record (false = no discovery, direct address only)")
+	flag.StringVar(&f.logLevel, "log-level", "info", "debug, info, warn or error")
+	flag.StringVar(&f.appPipe, "app-pipe", "", "TESTING ONLY: named pipe of CHIP-style JSON test commands (button presses, sensor values, …); see control.go")
+	flag.StringVar(&f.enableKey, "enable-key", "", "TESTING ONLY: 16-byte hex test enable key that arms GeneralDiagnostics TestEventTrigger; see control.go")
+	flag.BoolVar(&f.osHostName, "mdns-os-hostname", false, "TESTING ONLY: advertise the OS host name as SRV target instead of the MAC-derived one, for a test host whose LAN interface has no IPv6")
+	flag.StringVar(&f.otaDir, "ota-dir", "", "directory OTA images are downloaded to (default: an \"ota\" directory beside --db)")
+	flag.BoolVar(&f.otaHarness, "ota-harness", false, "TESTING ONLY: apply a downloaded OTA image in place — report its version as running without a restart, as the CHIP SU cases read it; see ota.go")
+	flag.Parse()
+	return f
+}
+
+// checkFlags applies the checks whose message names the flag; the node's
+// Config.Validate holds the same ranges again.
+func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
+	if f.discriminator > setup.MaxDiscriminator {
+		return 0, 0, fmt.Errorf("--discriminator %d exceeds the 12-bit maximum %d", f.discriminator, setup.MaxDiscriminator)
+	}
+	// setupPasscodeMax is the Matter §5.1.1.6 upper bound; the narrowing
+	// below is safe exactly because of this check.
+	const setupPasscodeMax = 99999998
+	if f.passcode > setupPasscodeMax {
+		return 0, 0, fmt.Errorf("--passcode %d exceeds the Matter maximum %d", f.passcode, setupPasscodeMax)
+	}
+	passcode = uint32(f.passcode)
+	if !setup.IsValidSetupPIN(passcode) {
+		return 0, 0, fmt.Errorf("--passcode %d is invalid or on the trivially-guessable list", passcode)
+	}
+	if f.iterations < 0 {
+		return 0, 0, fmt.Errorf("--pbkdf-iterations %d must be positive", f.iterations)
+	}
+	return passcode, uint16(f.discriminator), nil
+}
+
+func run() error { //nolint:funlen // the composition root: one sequential pass, readable top to bottom
+	f := parseFlags()
 	level := slog.LevelInfo
-	if err := level.UnmarshalText([]byte(*logLevel)); err != nil {
+	if err := level.UnmarshalText([]byte(f.logLevel)); err != nil {
 		return fmt.Errorf("--log-level: %w", err)
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 	slog.SetDefault(logger)
 
-	tcpConfig, err := parseTCPFlag(*tcpFlag)
+	tcpConfig, err := parseTCPFlag(f.tcp)
 	if err != nil {
 		return err
 	}
-
-	if *discFlag > setup.MaxDiscriminator {
-		return fmt.Errorf("--discriminator %d exceeds the 12-bit maximum %d", *discFlag, setup.MaxDiscriminator)
-	}
-	discriminator := uint16(*discFlag)
-	// setupPasscodeMax is the Matter §5.1.1.6 upper bound; the narrowing
-	// below is safe exactly because of this check.
-	const setupPasscodeMax = 99999998
-	if *passcodeFlag > setupPasscodeMax {
-		return fmt.Errorf("--passcode %d exceeds the Matter maximum %d", *passcodeFlag, setupPasscodeMax)
-	}
-	passcode := uint32(*passcodeFlag)
-	if !setup.IsValidSetupPIN(passcode) {
-		return fmt.Errorf("--passcode %d is invalid or on the trivially-guessable list", passcode)
-	}
-	if *iterations < 0 {
-		return fmt.Errorf("--pbkdf-iterations %d must be positive", *iterations)
-	}
-
-	identity := bridgeIdentity{
-		vendorID:  testVendorID,
-		productID: testProductID,
-		nodeLabel: *label,
-		// The serial only has to be stable across restarts; it seeds the
-		// rotating device identifier and the derived UniqueID.
-		serialNumber: "GOFABRIC-REF-0001",
+	passcode, discriminator, err := checkFlags(f)
+	if err != nil {
+		return err
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// --- persistence ---------------------------------------------------
-	db, err := openDB(ctx, *dbPath)
+	// --- persistence: the node applies both schemas to the handle ---------
+	db, err := openDB(ctx, f.dbPath)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = db.Close() }()
-	credentials := store.New(db)
-	// This host's source identities are plain strings (see the fleet), so
-	// the default endpoint.StringKey decoding is the right one. A host with
-	// a composite key type must pass sqlitestore.WithKeyDecoder — its
-	// documentation says what silently breaks otherwise.
-	endpointStore := sqlitestore.New(db)
-	// The node's group state: key sets, GroupKeyMap and group table of
-	// every fabric. GroupKeyManagement writes it, every Groups server the
-	// assembler mounts reads and changes it, and the bridge receives group
-	// messages through it. One instance for all three.
-	groupState, err := groups.NewManager(credentials, logger)
-	if err != nil {
-		return fmt.Errorf("group state: %w", err)
-	}
 
-	// --- the fleet and its topology assembler --------------------------
-	// A NodeLabel a controller writes on a bridged endpoint is kept in
-	// the settings table and handed back to the assembler on the next
-	// boot (fleet.snapshotter), as matter.js persists a written nodeLabel.
-	labels := persistedLabels{st: credentials, logger: logger}
-	assemblerCfg := endpoint.Config{
-		VendorID:           identity.vendorID,
-		ProductID:          identity.productID,
-		NodeLabel:          identity.nodeLabel,
-		VendorName:         exampleVendorName,
-		Groups:             groupState,
-		OnNodeLabelWritten: labels.store,
-		Scenes:             labels,
-	}
-	devices, err := newFleet(endpointStore, assemblerCfg, logger)
-	if err != nil {
-		return err
-	}
-	devices.labels = labels.load
-	devices.configVersions = labels.configVersion
-	labels.restoreBlind(ctx, devices.blind)
-
-	// --- the bridge ----------------------------------------------------
+	// --- mDNS ---------------------------------------------------------------
 	var advertiser mdns.Advertiser = mdns.NewNoop()
-	if *advertise {
+	if f.advertise {
 		zc := mdns.NewZeroconf()
-		if *osHostName {
+		if f.osHostName {
 			if h, err := os.Hostname(); err == nil && h != "" {
 				zc.HostName = strings.TrimSuffix(h, ".local")
 			}
@@ -205,318 +188,172 @@ func run() error {
 		}
 		advertiser = zc
 	}
-	br, err := matterbridge.New(devices.snapshotter, advertiser, matterbridge.Config{
-		Listen:        *listen,
-		VendorID:      identity.vendorID,
-		ProductID:     identity.productID,
-		NodeLabel:     identity.nodeLabel,
-		Discriminator: discriminator,
-		TCP:           tcpConfig,
-	}, logger)
-	if err != nil {
-		return fmt.Errorf("bridge: %w", err)
-	}
 
-	// Access control fails CLOSED: leaving the lister nil denies every
-	// operational request rather than allowing them. The stored ACL is what
-	// a commissioner writes during AddNOC, so this is the production wiring.
-	br.AttachACLLister(credentials)
-	// Group messages: authenticated through the node's group state, routed
-	// to the member endpoints, and received on the multicast address of
-	// every group with a member endpoint. Restore the persisted groups first
-	// so their addresses are joined when the bridge starts.
-	if err := groupState.Load(ctx); err != nil {
-		return fmt.Errorf("group state: %w", err)
-	}
-	br.AttachGroupMessaging(groupState)
-	// The Groupcast server (root, below) synthesises auxiliary access
-	// control entries; the bridge enforces them from the same state.
-	br.AttachAuxiliaryACL(groupState)
-	// A bounded trace of the moments that explain a failed pairing. Attached
-	// before Start because the first of those moments is the first
-	// commissioner datagram.
-	diagRing := diagevent.NewRing(256)
-	br.AttachDiagnosticEvents(diagRing)
-
-	// --- root + aggregator endpoints -----------------------------------
-	caseIDs := newCaseIdentities(logger)
-	chain, err := attestation.BuildTestChain(identity.vendorID, identity.productID)
-	if err != nil {
-		return fmt.Errorf("attestation chain: %w", err)
-	}
-	otaDownloads := *otaDir
+	// --- the node -----------------------------------------------------------
+	devices := newFleet()
+	otaDownloads := f.otaDir
 	if otaDownloads == "" {
-		otaDownloads = filepath.Join(filepath.Dir(*dbPath), "ota")
+		otaDownloads = filepath.Join(filepath.Dir(f.dbPath), "ota")
 	}
-	rootServers, refs, err := buildRootClusters(identity, credentials, groupState, chain,
-		otaConfig{dir: otaDownloads, harness: *otaHarness, connector: br, st: credentials, logger: logger},
-		func(hookCtx context.Context, fabricIndex uint8, _, _ uint64, _ []byte) {
-			if err := caseIDs.load(hookCtx, credentials, fabricIndex); err != nil {
-				logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
-				return
-			}
-			// Publishing the operational record here is not an optimisation
-			// of the boot-time publish below -- it is the only publish a
-			// freshly commissioned fabric ever gets. The commissioner
-			// finishes AddNOC over PASE and immediately resolves
-			// `<compressed>-<node>._matter._tcp` to open its first CASE
-			// session; on a first pairing there was no such fabric at boot,
-			// so nothing has advertised it. Without this the pairing gets
-			// through PASE, installs the fabric, and then times out in
-			// operational discovery -- a failure that reads like a network
-			// fault and is not one.
-			compressedID, nodeID, ok := caseIDs.announceIdentity(fabricIndex)
-			if !ok {
-				logger.Warn("case.identity.announce_skipped",
-					slog.Int("fabric_index", int(fabricIndex)))
-				return
-			}
-			br.AnnounceFabric(hookCtx, compressedID, nodeID)
-		})
-	if err != nil {
-		return err
+	// The daemon's applier (ota.go); it reaches BasicInformation and the
+	// requestor once the node has built them.
+	applier := &otaApplier{
+		vendorID: testVendorID, productID: testProductID,
+		dir: otaDownloads, harness: f.otaHarness, logger: logger,
 	}
-	labels.restoreRoot(ctx, refs.basicInfo)
-	br.AttachRootClusters(rootServers)
-	devices.configChange = func() error {
-		topo := br.Topology()
-		if topo == nil {
-			return errors.New("no topology yet")
-		}
-		seen := map[string]bool{}
-		for _, ep := range topo.Bridged() {
-			if seen[ep.Scope+"|"+ep.DeviceAddress] {
-				continue
-			}
-			seen[ep.Scope+"|"+ep.DeviceAddress] = true
-			labels.storeConfigVersions(topo, br.IncreaseConfigurationVersion(ep.Scope, ep.DeviceAddress))
-		}
-		return nil
-	}
-
+	// Actions on the Aggregator (Aggregator: optional), over the demo
+	// scenes (fleet_node.go).
 	actions, err := mattercore.NewActions(mattercore.ActionsConfig{Host: devices.actions})
 	if err != nil {
 		return fmt.Errorf("aggregator actions: %w", err)
 	}
-	aggregatorServers, err := buildAggregatorClusters(ctx, credentials, actions)
+	n, err := assemble(ctx, devices, nodeConfig(f, passcode, discriminator, tcpConfig, db, advertiser, applier, actions, logger), applier)
 	if err != nil {
 		return err
 	}
-	br.AttachAggregatorClusters(aggregatorServers)
-
-	// --- sessions, PASE, CASE ------------------------------------------
-	sec := wireSecurity(ctx, br, credentials, refs, caseIDs, paseParams{
-		passcode:   passcode,
-		salt:       []byte(*salt),
-		iterations: *iterations,
-	}, logger)
-	// The commissionable advertisement: published with the configured
-	// passcode's discriminator (CM=1) while the node's own window is open —
-	// from the end of start-up of an uncommissioned node until it is
-	// commissioned — and replaced by the enhanced window's own (CM=2) while
-	// an admin has one open.
-	var instanceID [8]byte
-	if _, err := rand.Read(instanceID[:]); err != nil {
-		return fmt.Errorf("commissioning instance id: %w", err)
-	}
-	advert := matterbridge.CommissioningAdvertisement{
-		InstanceID:    instanceID,
-		Discriminator: discriminator,
-		VendorID:      identity.vendorID,
-		ProductID:     identity.productID,
-		NodeLabel:     identity.nodeLabel,
-		RotatingID: mdns.GenerateRotatingID(
-			mdns.DeriveUniqueIDFromIdentity(identity.vendorID, identity.productID, identity.serialNumber, identity.nodeLabel), 0,
-		),
-		CommissioningMode: 1, // §4.3.1.4 CM=1: standard commissioning window
-		DeviceTypeID:      deviceTypeRootNode,
-	}
-	// Multi-admin: AdministratorCommissioning's window, wired to this
-	// daemon's PASE provider and advertisement (commissioning.go).
-	commissioning := &commissioningHost{
-		br: br, sessions: sec.sessions, refs: refs, logger: logger,
-		baseline: sec.pase, advert: advert,
-	}
-	wireCommissioningWindow(ctx, commissioning, credentials)
-
-	// A removed fabric takes its persisted subscriptions with it.
-	// Its groups go with it too: EmitFabricRemoved hands the fabric to the
-	// attached group messaging.
-	refs.opCreds.SetOnFabricRemoved(func(ctx context.Context, fabricIndex uint8) {
-		// BasicInformation Leave, as matter.js BasicInformationServer
-		// emits it when a fabric goes.
-		refs.basicInfo.EmitLeave(fabricIndex)
-		// Its DefaultOTAProviders entries go as every fabric-scoped entry
-		// does; the store's rows went with the fabric's own.
-		refs.otaRequestor.FabricRemoved(fabricIndex)
-		// Its CASE identity and operational record go too — a rolled-back
-		// commissioning included, which no RemoveFabric announces.
-		if compressedID, nodeID, ok := caseIDs.forget(fabricIndex); ok {
-			br.WithdrawFabric(ctx, compressedID, nodeID)
+	started := false
+	defer func() {
+		if !started {
+			_ = n.Stop(context.WithoutCancel(ctx))
 		}
-		// The fabric's sessions end once the NOCResponse is out.
-		br.EmitFabricRemovedContext(ctx, fabricIndex)
-		// The last fabric gone, the node is commissionable again: matter.js
-		// CommissioningServer resets a decommissioned node, which then
-		// opens its own window as at a first start.
-		commissioning.reopenIfDecommissioned(ctx, credentials)
-	})
+	}()
 
-	// UpdateNOC rewrites the fabric's operational identity, possibly with a
-	// new node id: the CASE responder must answer as the new identity, the
-	// operational record must move to the new instance name at once (a
-	// controller reaches the node under it before CommissioningComplete),
-	// and the fabric's other sessions end. matter.js FabricManager's
-	// replaced event drives the same through DeviceAdvertiser and
-	// SessionManager.
-	refs.opCreds.SetOnFabricUpdated(func(hookCtx context.Context, fabricIndex uint8) {
-		oldCompressed, oldNode, hadOld := caseIDs.announceIdentity(fabricIndex)
-		if err := caseIDs.load(hookCtx, credentials, fabricIndex); err != nil {
-			logger.Warn("case.identity.reload_failed", slog.String("err", err.Error()))
-			return
-		}
-		if newCompressed, newNode, ok := caseIDs.announceIdentity(fabricIndex); ok && (!hadOld || newCompressed != oldCompressed || newNode != oldNode) {
-			if hadOld {
-				br.WithdrawFabric(hookCtx, oldCompressed, oldNode)
-			}
-			br.AnnounceFabric(hookCtx, newCompressed, newNode)
-		}
-		sec.sessions.CloseFabricExcept(fabricIndex, mattercore.InvokeSessionIDFromContext(hookCtx))
-	})
-
-	// Event numbers must not restart at zero across a reboot: a controller
-	// filters event reads on the last number it saw, so a reset makes it
-	// drop every event the bridge emits afterwards.
-	if ceiling, ok, cErr := credentials.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && ok {
-		br.EventLog().SeedNumber(ceiling)
-	}
-	br.EventLog().SetCounterPersistence(func(ceiling uint64) {
-		if err := credentials.SetMetadataCounter(context.Background(), store.MetadataKeyEventNumber, ceiling); err != nil {
-			logger.Warn("eventlog.persist_ceiling", slog.String("err", err.Error()))
-		}
-	}, 0)
-
-	if err := br.Start(ctx); err != nil {
-		return fmt.Errorf("bridge start: %w", err)
-	}
-	// The node's lifecycle events, in the order matter.js emits them when
-	// a node comes online: BasicInformation StartUp, then GeneralDiagnostics
-	// BootReason (BasicInformationServer.ts / GeneralDiagnosticsServer.ts).
-	// A controller's wildcard event subscription is primed with these; a
-	// node that never emits them answers it with nothing at all, which the
-	// CHIP device-composition checker (TC-IDM-10.1) fails.
-	if *enableKey != "" {
-		key, err := hex.DecodeString(*enableKey)
+	// TestEventTrigger, armed by the test enable key (control.go).
+	if f.enableKey != "" {
+		key, err := hex.DecodeString(f.enableKey)
 		if err != nil {
 			return fmt.Errorf("--enable-key: %w", err)
 		}
-		if err := refs.genDiag.EnableTestEventTriggers(key, devices.testEventTrigger); err != nil {
+		if err := n.Root().GeneralDiagnostics.EnableTestEventTriggers(key, devices.testEventTrigger); err != nil {
 			return fmt.Errorf("--enable-key: %w", err)
 		}
 	}
-	refs.diagLogs.AttachProvider(ringLogs{diagRing})
-	refs.basicInfo.EmitStartUp()
-	refs.genDiag.EmitBootReason()
-	go keepOperationalTime(ctx, credentials, refs.genDiag, time.Minute, logger)
-	defer func() {
-		stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := storeOperationalTime(stopCtx, credentials, refs.genDiag); err != nil {
-			logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
-		}
-		refs.basicInfo.EmitShutDown()
-		sec.pase.Stop()
-		commissioning.stop()
-		sec.casep.StopReaper()
-		sec.subs.Stop()
-		if err := br.Stop(stopCtx); err != nil {
-			logger.Warn("bridge stop", slog.String("err", err.Error()))
-		}
-		_ = advertiser.Close()
-	}()
 
-	// The two PartsList providers are what let a controller walk root →
-	// aggregator → bridged devices.
-	if err := attachPartsListProviders(br); err != nil {
+	if err := n.Start(ctx); err != nil {
 		return err
 	}
-	// PowerSourceConfiguration and the demo actions name endpoints by
-	// their StableKey, resolved through the live topology.
-	attachNodeProviders(br, refs.powerSources, devices)
-
-	// Fabrics installed in a previous run: rebuild each one's CASE identity
-	// and re-publish its operational record, so a controller that paired
-	// before this restart reconnects instead of being told to pair again.
-	fabrics := listFabrics(ctx, credentials, logger)
-	loaded := fabrics[:0]
-	for _, fabric := range fabrics {
-		if err := caseIDs.load(ctx, credentials, fabric.FabricIndex); err != nil {
-			logger.Warn("case.identity.boot_load_failed", slog.String("err", err.Error()))
-			continue
-		}
-		loaded = append(loaded, fabric)
-	}
-	// With the identities back, resume the subscriptions the controllers
-	// held before the restart, under their old ids — before announcing, as
-	// matter.js re-establishes ahead of entering operational mode. Bounded
-	// at two seconds per controller; a controller that cannot be reached
-	// recovers on its own, as it would have without this.
-	br.ReestablishFormerSubscriptions(ctx)
-	// The OTA requestor goes online (#online): its providers can be reached
-	// now that the CASE identities are back.
-	if err := refs.otaRequestor.Start(ctx); err != nil {
-		logger.Warn("ota.requestor_start", slog.String("err", err.Error()))
-	}
-	defer refs.otaRequestor.Stop()
-	for _, fabric := range loaded {
-		br.AnnounceFabric(ctx, fabric.CompressedID, fabric.NodeID)
-	}
-
-	// --- commissionable advertisement + pairing information -------------
-	// An uncommissioned node opens its own commissioning window (48 h,
-	// CM=1, the configured passcode); a commissioned one is not
-	// commissionable until an administrator opens a window. Mirrors
-	// matter.js CommissioningServer's start-up: enterOperationalMode when
-	// commissioned, enterCommissionableMode otherwise.
-	if len(loaded) == 0 {
-		if err := br.CommissioningWindow().OpenOwnWindow(ctx, 0); err != nil {
-			logger.Warn("commissioning.own_window", slog.String("err", err.Error()))
-		}
-	}
-
-	if err := printPairingInfo(br, identity, discriminator, passcode); err != nil {
+	started = true
+	if err := printPairingInfo(n, discriminator, passcode); err != nil {
+		_ = n.Stop(context.WithoutCancel(ctx))
 		return err
 	}
-	printTopology(br)
-	if *appPipe != "" {
-		if err := serveAppPipe(ctx, devices, *appPipe, logger); err != nil {
+	printTopology(n.Bridge())
+	if f.appPipe != "" {
+		if err := serveAppPipe(ctx, devices, f.appPipe, logger); err != nil {
+			_ = n.Stop(context.WithoutCancel(ctx))
 			return err
 		}
 	}
 
-	<-ctx.Done()
+	// Run on a started node waits for ctx and stops it (node.Run is Start,
+	// wait, Stop; Start is idempotent).
+	if err := n.Run(ctx); err != nil {
+		return err
+	}
 	logger.Info("shutting down")
 	return nil
 }
 
+// assemble builds the node for the fleet, unstarted: node.New, the OTA
+// applier's handles, the blind's persisted position, one device per fleet
+// member under the Aggregator (fleet.endpoints), the set marked complete,
+// the app pipe's configuration-version change, and the node-level
+// providers that name endpoints by StableKey.
+func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *otaApplier) (*node.Node, error) {
+	n, err := node.New(cfg) //nolint:contextcheck // the node's constructor takes no context; it loads the stores once
+	if err != nil {
+		return nil, err
+	}
+	ok := false
+	defer func() {
+		if !ok {
+			_ = n.Stop(context.WithoutCancel(ctx))
+		}
+	}()
+	if applier != nil {
+		applier.basicInfo = n.Root().BasicInformation
+		applier.requestor = func() *mattercore.OTASoftwareUpdateRequestor { return n.Root().OTARequestor }
+	}
+	restoreBlind(ctx, n.Store(), devices.blind, cfg.Logger)
+
+	eps, err := devices.endpoints()
+	if err != nil {
+		return nil, err
+	}
+	agg := n.Aggregator()
+	for _, ep := range eps {
+		if err := agg.Add(ctx, ep); err != nil {
+			return nil, fmt.Errorf("aggregator: %w", err)
+		}
+	}
+	// The fleet is hard-coded, so it is complete from the first assembly. A
+	// host whose model loads asynchronously marks it complete once loaded,
+	// or the assembler's vanished-source collection wipes every persisted
+	// endpoint number at boot.
+	agg.MarkComplete() //nolint:contextcheck // the node's own; the first assembly is Start's
+	// The app pipe's SimulateConfigurationVersionChange raises every
+	// bridged device's ConfigurationVersion, persisted by the node.
+	devices.configChange = func() error { //nolint:contextcheck // the app pipe's command carries no context; the node persists with its own
+		errs := make([]error, 0, len(eps))
+		for _, ep := range eps {
+			errs = append(errs, agg.IncreaseConfigurationVersion(ep.Spec().StableKey))
+		}
+		return errors.Join(errs...)
+	}
+	// PowerSourceConfiguration and the demo actions name endpoints by
+	// their StableKey, resolved through the live topology.
+	attachNodeProviders(n.Bridge(), n.Root().PowerSourceConfiguration, devices)
+	ok = true
+	return n, nil
+}
+
+// nodeConfig is the daemon's node.Config: the CSA test identity, the
+// flags, and the root's optional labels and locales.
+func nodeConfig(f flags, passcode uint32, discriminator uint16, tcp matterbridge.TCPConfig, db dbHandle,
+	advertiser mdns.Advertiser, applier *otaApplier, actions contract.ClusterServer, logger *slog.Logger,
+) node.Config {
+	return node.Config{
+		Network: node.Network{Listen: f.listen, TCP: tcp},
+		Commissioning: node.Commissioning{
+			Passcode: passcode, Discriminator: discriminator,
+			PBKDFIterations: f.iterations, Salt: []byte(f.salt),
+		},
+		ProductDescription: node.ProductDescription{VendorID: testVendorID, ProductID: testProductID},
+		BasicInformation: node.BasicInformation{
+			VendorName:            exampleVendorName,
+			ProductName:           "reference-bridge",
+			NodeLabel:             f.label,
+			SerialNumber:          serialNumber,
+			HardwareVersion:       1,
+			HardwareVersionString: "1",
+			SoftwareVersion:       1,
+			SoftwareVersionString: "1",
+		},
+		Store:      node.Store{DB: db},
+		Advertiser: advertiser,
+		// The OTA Software Update Requestor (ADR 0019) on the root, with
+		// the daemon's applier (ota.go).
+		OTA: &node.OtaConfig{Dir: applier.dir, Harness: applier.harness, Applier: applier},
+		FixedLabels: []fixedlabeldef.LabelStruct{
+			{Label: "role", Value: "bridge"},
+			{Label: "example", Value: "reference"},
+		},
+		// The detected values matter.js takes from Intl are this host's
+		// choice: en-US, with de-DE supported.
+		Locales:           []string{"en-US", "de-DE"},
+		AggregatorServers: []contract.ClusterServer{actions},
+		Logger:            logger,
+	}
+}
+
 // printPairingInfo writes the onboarding payload to stdout. It goes to stdout
 // rather than the log because it is the one thing an operator has to copy.
-func printPairingInfo(br *matterbridge.Bridge, identity bridgeIdentity, discriminator uint16, passcode uint32) error {
-	qr, err := setup.QRCode(setup.Payload{
-		VendorID:      identity.vendorID,
-		ProductID:     identity.productID,
-		Discriminator: discriminator,
-		Passcode:      passcode,
-		DiscoveryCaps: setup.DiscoveryOnIP,
-	})
+func printPairingInfo(n *node.Node, discriminator uint16, passcode uint32) error {
+	qr, manual, err := n.PairingCodes()
 	if err != nil {
-		return fmt.Errorf("qr payload: %w", err)
+		return err
 	}
-	manual, err := setup.ManualCode(discriminator, passcode)
-	if err != nil {
-		return fmt.Errorf("manual code: %w", err)
-	}
-
+	br := n.Bridge()
 	topology := br.Topology()
 	bridged := 0
 	if topology != nil {
@@ -539,20 +376,9 @@ func printPairingInfo(br *matterbridge.Bridge, identity bridgeIdentity, discrimi
     chip-tool pairing onnetwork-long 1 %d %d
   --------------------------------------------------------------
 
-`, br.LocalAddr(), bridged, identity.vendorID, identity.productID,
+`, br.LocalAddr(), bridged, testVendorID, testProductID,
 		discriminator, passcode, manual, qr, passcode, discriminator)
 	return nil
-}
-
-// listFabrics reads the persisted fabric set, logging rather than failing:
-// an unreadable fabric table costs re-pairing, not startup.
-func listFabrics(ctx context.Context, credentials *store.Store, logger *slog.Logger) []store.FabricRecord {
-	fabrics, err := credentials.ListFabrics(ctx)
-	if err != nil {
-		logger.Warn("fabrics.list_failed", slog.String("err", err.Error()))
-		return nil
-	}
-	return fabrics
 }
 
 // printTopology writes the assembled endpoints and their device types to
@@ -564,9 +390,16 @@ func printTopology(br *matterbridge.Bridge) {
 	if topology == nil {
 		return
 	}
+	ids := make([]uint16, 0, len(topology.Endpoints))
+	for _, ep := range topology.Endpoints {
+		if ep != nil {
+			ids = append(ids, ep.ID)
+		}
+	}
+	slices.Sort(ids)
 	var b bytes.Buffer
 	b.WriteString("  topology\n")
-	for _, id := range endpointIDs(br, func(*endpoint.Endpoint) bool { return true }) {
+	for _, id := range ids {
 		ep := topology.FindByID(id)
 		if ep == nil {
 			continue
@@ -575,4 +408,31 @@ func printTopology(br *matterbridge.Bridge) {
 	}
 	b.WriteString("  topology end\n\n")
 	fmt.Print(b.String())
+}
+
+// deviceTypeRevision reads a device type's revision from the generated
+// matter.js snapshot instead of restating it, so a schema regeneration
+// propagates here without an edit. A device type absent from the snapshot is
+// a programming error in this file, not a runtime condition.
+func deviceTypeRevision(id uint32) uint16 {
+	rev, ok := schema.DeviceTypeRevision(id)
+	if !ok {
+		panic(fmt.Sprintf("device type %#06x is not in the matter.js schema snapshot", id))
+	}
+	return rev
+}
+
+// endpointByKey returns the live endpoint id of the endpoint with key;
+// false before the first assembly or for a key the topology does not hold.
+func endpointByKey(br *matterbridge.Bridge, key endpoint.StringKey) (uint16, bool) {
+	topology := br.Topology()
+	if topology == nil {
+		return 0, false
+	}
+	for _, ep := range topology.Endpoints {
+		if ep != nil && ep.SourceKey == key {
+			return ep.ID, true
+		}
+	}
+	return 0, false
 }

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4421,
+  "entry_points": 4419,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10389,
+    "total_exported": 10387,
     "reachable": 7335,
-    "whitelisted": 3049,
+    "whitelisted": 3047,
     "unreachable": 5
   },
   "by_package": [
@@ -15032,7 +15032,7 @@
       "identifier": "TestAirQualitySensorMountsEveryConcentrationCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 337
+      "line": 338
     },
     {
       "package": "examples/reference-bridge",
@@ -15046,7 +15046,7 @@
       "identifier": "TestBlindPositionSurvivesARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 299
+      "line": 186
     },
     {
       "package": "examples/reference-bridge",
@@ -15060,7 +15060,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 295
+      "line": 296
     },
     {
       "package": "examples/reference-bridge",
@@ -15071,24 +15071,10 @@
     },
     {
       "package": "examples/reference-bridge",
-      "identifier": "TestCaseIdentitiesResolveAndForget",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-bridge/wiring_test.go",
-      "line": 247
-    },
-    {
-      "package": "examples/reference-bridge",
-      "identifier": "TestCaseInitiatorProviderNeedsALoadedIdentity",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-bridge/wiring_test.go",
-      "line": 190
-    },
-    {
-      "package": "examples/reference-bridge",
       "identifier": "TestCeilingLightOnDoesNotDeadlockItsNotifier",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 276
+      "line": 277
     },
     {
       "package": "examples/reference-bridge",
@@ -15102,14 +15088,14 @@
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 72
+      "line": 47
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestDelayedOffReportsItsCountdown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 230
+      "line": 237
     },
     {
       "package": "examples/reference-bridge",
@@ -15137,7 +15123,7 @@
       "identifier": "TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 51
+      "line": 49
     },
     {
       "package": "examples/reference-bridge",
@@ -15186,7 +15172,7 @@
       "identifier": "TestFridgeHasItsCoolingCabinetPart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 407
+      "line": 390
     },
     {
       "package": "examples/reference-bridge",
@@ -15200,7 +15186,7 @@
       "identifier": "TestLightKeepsItsOnOffStateAcrossDispatches",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 315
+      "line": 312
     },
     {
       "package": "examples/reference-bridge",
@@ -15235,21 +15221,7 @@
       "identifier": "TestOnWithTimedOffCountsDownAndTurnsTheLightOff",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 168
-    },
-    {
-      "package": "examples/reference-bridge",
-      "identifier": "TestOnWithTimedOffFieldsTakesTheGeneratedRequest",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-bridge/conformance_test.go",
-      "line": 387
-    },
-    {
-      "package": "examples/reference-bridge",
-      "identifier": "TestOperationalHoursSurviveARestart",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-bridge/wiring_test.go",
-      "line": 340
+      "line": 184
     },
     {
       "package": "examples/reference-bridge",
@@ -15302,24 +15274,10 @@
     },
     {
       "package": "examples/reference-bridge",
-      "identifier": "TestRebootCountCountsBoots",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-bridge/wiring_test.go",
-      "line": 273
-    },
-    {
-      "package": "examples/reference-bridge",
-      "identifier": "TestRingLogs",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-bridge/ringlogs_test.go",
-      "line": 17
-    },
-    {
-      "package": "examples/reference-bridge",
       "identifier": "TestRootMountsGroupcastWithTheAuxiliaryACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 215
+      "line": 155
     },
     {
       "package": "examples/reference-bridge",
@@ -15333,14 +15291,14 @@
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 117
+      "line": 92
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestSmokeAlarmHasItsPowerSourcePart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 312
+      "line": 313
     },
     {
       "package": "examples/reference-bridge",
@@ -15410,7 +15368,7 @@
       "identifier": "TestValveTravelsThroughATarget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 331
+      "line": 332
     },
     {
       "package": "examples/reference-bridge",
@@ -15431,7 +15389,7 @@
       "identifier": "TestWaterHeaterAndThermostatEnergyPreference",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
-      "line": 460
+      "line": 443
     },
     {
       "package": "examples/reference-bridge",
@@ -18053,10 +18011,31 @@
     },
     {
       "package": "node",
+      "identifier": "TestCaseIdentitiesResolveAndForget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/wiring_internal_test.go",
+      "line": 42
+    },
+    {
+      "package": "node",
+      "identifier": "TestCaseInitiatorProviderNeedsALoadedIdentity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/wiring_internal_test.go",
+      "line": 23
+    },
+    {
+      "package": "node",
       "identifier": "TestCountBootAndOperationalTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 40
+    },
+    {
+      "package": "node",
+      "identifier": "TestOperationalHoursSurviveARestart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/wiring_internal_test.go",
+      "line": 70
     },
     {
       "package": "node",
@@ -18071,6 +18050,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 136
+    },
+    {
+      "package": "node",
+      "identifier": "TestRuntimeHeapAndUnknownEthernet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/wiring_internal_test.go",
+      "line": 125
     },
     {
       "package": "schema",

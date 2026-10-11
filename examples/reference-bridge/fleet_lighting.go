@@ -10,22 +10,8 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/light"
-	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
-
-// deviceTypeColorTemperatureLight is ColorTemperatureLight (matter.js
-// packages/model/src/standard/elements/color-temperature-light.element.ts).
-// Besides Identify and Groups, which the assembler mounts, it requires
-// OnOff and LevelControl with the LIGHTING feature, ScenesManagement and
-// ColorControl with ColorTemperature.
-const deviceTypeColorTemperatureLight uint16 = 0x010C
-
-// deviceTypeExtendedColorLight is ExtendedColorLight (matter.js
-// packages/model/src/standard/elements/extended-color-light.element.ts):
-// the colour-temperature light's clusters, with ColorControl requiring XY
-// besides CT.
-const deviceTypeExtendedColorLight uint16 = 0x010D
 
 // extendedColorFeatures are the ColorControl features of the extended
 // colour light: every feature matter.js's ColorControlServer implements,
@@ -37,8 +23,8 @@ const extendedColorFeatures = light.ColorFeatureXY | light.ColorFeatureColorTemp
 	light.ColorFeatureHueSaturation | light.ColorFeatureEnhancedHue | light.ColorFeatureColorLoop
 
 // lightingSurface is what turns a [dimmer] into a colour-temperature light:
-// the OnOff Lighting state, the LevelControl Lighting attributes and the
-// colour temperature. Its servers hold state of their own (the ColorControl
+// the LevelControl Lighting attributes and the colour temperature (the
+// OnOff Lighting state is the device layer's default OnOff server). Its servers hold state of their own (the ColorControl
 // server keeps the current mireds in-process, the LevelControl server
 // StartUpCurrentLevel and the running transition), so the device builds
 // them once and hands the same instances to every reassembly — a fresh
@@ -108,8 +94,10 @@ func (s *dimmer) lightingServers() []contract.ClusterServer {
 		if s.lighting.extended {
 			color.SetColorWriter(lampColorWriter{name: s.name})
 		}
+		// ScenesManagement is the assembler's: the device type mandates it,
+		// and the assembler mounts the stack's server there
+		// (endpoint/materialize.go mountScenes).
 		s.lighting.servers = []contract.ClusterServer{
-			&onOffServer{dev: s, logMessage: s.kind + ".set", lt: newLightingState()},
 			levelcontrol.NewServer(levelcontrol.Config{
 				Source:      s,
 				DataVersion: &s.version,
@@ -117,7 +105,6 @@ func (s *dimmer) lightingServers() []contract.ClusterServer {
 				Transitions: &levelcontrol.Transitions{OnOff: s, ColorTemperature: color},
 			}),
 			color,
-			wire.ScenesManagement{},
 		}
 	})
 	return s.lighting.servers
@@ -156,9 +143,11 @@ func (s *dimmer) OnOff() bool { return s.isOn() }
 
 // SetOnOff implements [levelcontrol.OnOff]: a "with On/Off" level command
 // switches the light as its On/Off cluster does, OnLevel included
-// ([dimmer.setOn]).
+// ([dimmer.setOn]), and the OnOff server stores and reports the change
+// ([dimmer.publishOnOff]).
 func (s *dimmer) SetOnOff(_ context.Context, on bool) error {
 	s.setOn(on)
 	slog.Info(s.kind+".set", slog.String("device", s.name), slog.Bool("on", on))
+	s.publishOnOff(on)
 	return nil
 }

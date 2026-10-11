@@ -206,6 +206,13 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
 	r.NetworkCommissioning = mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{})
 
+	// IcdManagement is NOT mounted: RootNode requires it under "Sit | Lit"
+	// (root-node.element.ts), which an always-on, mains-powered bridge is
+	// not, and matter.js mounts it on no node that is not an ICD (it is in
+	// neither ServerNode.RootEndpoint nor any non-ICD test app). A
+	// controller reads its presence as "this node sleeps"
+	// (NodePhysicalProperties isIntermittentlyConnected).
+
 	optional, err := buildRootOptional(ctx, d.st, cfg.FixedLabels, cfg.Locales)
 	if err != nil {
 		return nil, fmt.Errorf("root labels and diagnostics: %w", err)
