@@ -1496,12 +1496,18 @@ type fleet struct {
 	evse       *demoEvse
 	vacuumArea *vacuumArea
 	panel      *demoPanel
+<<<<<<< HEAD
 	soil       *demoSoilSensor
 	// actions is the Aggregator's Actions host (fleet_node.go).
 	actions *demoActions
 	// endpointOf resolves a StableKey to its live endpoint id
 	// (attachNodeProviders); nil until the bridge runs.
 	endpointOf func(key endpoint.StringKey) (uint16, bool)
+=======
+	// The energy-market devices (fleet_energy_market.go).
+	energyTariff    *demoEnergyTariff
+	electricalMeter *demoElectricalMeter
+>>>>>>> origin/wave4/commodity
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1559,6 +1565,9 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		soil:        newDemoSoilSensor("Garden Soil"),
 		actions:     newDemoActions(light),
 		assembler:   asm,
+
+		energyTariff:    newDemoEnergyTariff("Energy Tariff"),
+		electricalMeter: newDemoElectricalMeter("Grid Meter"),
 	}, nil
 }
 
@@ -1684,7 +1693,7 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 	// ElectricalSensor device types: the charger's parts (fleet_evse.go).
 	charger := spec("evse", f.evse.name, f.evse.MatterDeviceType(), f.evse)
 	charger.Parts = f.evse.parts()
-	return []endpoint.Spec{
+	return append([]endpoint.Spec{
 		spec("ceiling", f.ceiling.name, f.ceiling.MatterDeviceType(), f.ceiling),
 		spec("fan", f.fan.name, f.fan.MatterDeviceType(), f.fan),
 		smoke,
@@ -1714,6 +1723,10 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("dryer", f.dryer.name, f.dryer.MatterDeviceType(), f.dryer),
 		charger,
 		spec("panel", f.panel.name, f.panel.MatterDeviceType(), f.panel),
+<<<<<<< HEAD
 		sensor("soil", f.soil.name, f.soil),
 	}
+=======
+	}, f.energyMarketSpecs(spec)...)
+>>>>>>> origin/wave4/commodity
 }

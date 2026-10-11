@@ -16,7 +16,11 @@
 // (packages/node/src/behaviors/<name>/*Server.ts) are empty subclasses of
 // the generated behavior; so is its MeterIdentificationServer, for the
 // third server here ([NewMeterIdentification], for the
-// ElectricalUtilityMeter device type). The few rules left here are
+// ElectricalUtilityMeter device type). The energy-market servers —
+// CommodityPrice, ElectricalGridConditions, CommodityMetering and
+// CommodityTariff, for the ElectricalEnergyTariff and ElectricalMeter
+// device types — are empty subclasses there too
+// (commodityprice.go has the citations). The few rules left here are
 // connectedhomeip's,
 // read at the harness pin (the Makefile's CHIP_TEST_IMAGE_COMMIT,
 // 6170af8461b10b1766044122ac83332c6d00ab20), each cited where it is
