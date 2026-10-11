@@ -345,6 +345,18 @@ FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
 rules below that matter.js does not carry and that were taken from memory
 of connectedhomeip are marked unverified:
 
+- **`spec.Instance` treats "Rev >= v7" as conditional, so a default LevelControl serves no MinLevel / MaxLevel.** `cluster/spec` leaves an attribute whose conformance names a revision condition unmounted unless the host opts it in, and the device layer's default server therefore does not apply the device type's MinLevel 1 / MaxLevel 254 defaults (`device/device_test.go:174-203` pins the gap and the values to expect once it closes). **matter.js:** `LevelControlServer.ts:114-116` sets both at initialisation. Fix package: resolve `Rev >= vN` against the definition's own revision in `cluster/spec` (true for every shipped definition, which is at or above the named revision), then let the device layer's mandated-element pass apply the defaults; the device test's two `t.Error` branches name the assertion to flip.
+
+- **OnOff scene invalidation, global-scene store / recall and the transition-delayed apply are not ported.** `cluster/onoff.Server` leaves scenes to ScenesManagement (`cluster/onoff/server.go` package doc). **matter.js:** `OnOffServer.ts:98-100`, `:114-117`, `:120-122` (invalidate the scene on a change), `:159-165`, `:175-184` (OffWithEffect stores the global scene, OnWithRecallGlobalScene recalls it) and `:268-310` (apply with transition time). Fix package: a scene hook on the server that ScenesManagement calls, with the parity table extended by the four paths.
+
+- **An optional Groups or ScenesManagement cannot be opted in through `device/`.** The assembler mounts the two only where a device type mandates them and replaces a supplied server (`BD-Matter-Device-AssemblerClustersStayTheAssemblers`); `WithOptional` refuses them (report P, question 7: Groups on AirPurifier, Pump, RoomAirConditioner, SmokeCoAlarm, Thermostat, WindowCovering; ScenesManagement on Pump, RoomAirConditioner). **matter.js:** `MutableEndpoint.with(GroupsServer)` mounts them on any endpoint. Fix package: an `endpoint.Spec` flag the assembler honours (mount Groups / Scenes where the spec asks, not only where the type mandates), and `WithOptional` setting it.
+
+- **No default server for a fabric-scoped cluster.** `device.New` answers `ErrNoDefaultServer` for Binding, OtaSoftwareUpdateRequestor and EcosystemInformation (`device/device.go` defaultServer, `spec.ErrFabricScoped`); the host supplies `core.NewBinding()` and the like through `WithServer`. **matter.js:** mounts `BindingServer` by default where Base mandates it (`EndpointFile.ts`). Fix package: a default-factory entry per fabric-scoped core server, as the OnOff entry, once the servers take a `spec.ServerConfig`.
+
+- **No device-layer binding for a host `MeasurementSource`.** A sensor built with `device.NewTemperatureSensor` serves static state through `Set`; the reference daemon keeps its sensors on `endpoint.Spec.Measurement` (`BD-Daemon-MeasurementEndpointsBypassDeviceLayer`). **matter.js:** a host sets behaviour state from its own reading and the Datasource reports it (`packages/node/src/behavior/state/managed/Datasource.ts`). Fix package: `device.WithMeasurement(contract.MeasurementSource)` that mounts the measurement cluster through `cluster/measurement FromMeasurementClass` as the assembler does, and routes the GenericSwitch press wiring the same way.
+
+- **The bridge wires only source-level change notifiers.** `bridge/bridge.go` wireMeasurementListenersLocked subscribes to the endpoint source's `contract.ChangeNotifier`; a server that notifies on its own is not heard unless the source relays it, which is why `device.WithChangeNotifier` exists. **matter.js:** every behaviour's Datasource reports its own changes (`Datasource.ts`). Fix package: let the bridge subscribe to each mounted server that implements `contract.ChangeNotifier`, then `WithChangeNotifier` becomes a convenience rather than a necessity.
+
 - **`Constraint.In` is checked on controller writes only.** Since #47 the
   `cluster/spec` runtime refuses a written value outside the peer list an
   `in` constraint names (CONSTRAINT_ERROR, matter.js `constraint.ts:153`);
@@ -558,24 +570,6 @@ the module builds itself (`endpoint/devicetype_module_test.go` pins each).
   override, so cases gated on E01 are skipped. Every other device-type
   element requirement of the reference daemon's endpoints agrees with its
   slices. For the chip-tool harness owner.
-
-- **The reference daemon's root lists the OtaRequestor device type with
-  no client cluster in ClientList.** `examples/reference-bridge/wiring.go:244`
-  passes no ClientList, and the validator judges the device type's client
-  requirement as missing (`endpoint/devicetype_conformance.go:644-645`,
-  `:692-702`, as matter.js's `DeviceTypeConformance.ts:299-300` does):
-  `matter.devicetype.violation endpoint=0 device_type=OtaRequestor
-  requirement=client:OtaSoftwareUpdateProvider kind=missing` at every
-  start. matter.js's OtaRequestor endpoint declares the client cluster as
-  mandatory (`packages/node/src/endpoints/ota-requestor.ts:50`),
-  `MutableEndpoint` registers mandatory client clusters into the endpoint
-  type at runtime (`MutableEndpoint.ts:16-18`, `:53-61`) and the
-  Descriptor derives ClientList from them (`DescriptorServer.ts:284-290`),
-  so its ClientList carries 0x0029. Decision (2026-10-11): mirror it — the
-  daemon lists 0x0029 in the root's ClientList. **Fix:** `[]uint32{0x0029}`
-  in `wiring.go`, a test that reads the root's ClientList, then an IDM and
-  DESC fixture run (the PICS checker and TC-DESC read ClientList). For the
-  daemon in wave 6, which rebuilds its topology.
 
 ## Verified sound (no action)
 

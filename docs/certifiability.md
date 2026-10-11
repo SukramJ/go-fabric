@@ -498,10 +498,10 @@ The reference set is matter.js's (`support/chip-testing/test/core`,
 | CNET Wi-Fi and Thread cases | NetworkCommissioning is Ethernet-only | (d) out of scope |
 
 Some families run but have nothing the daemon can be tested on. The root's
-IcdManagement and OTA Software Update Requestor are not mounted
-(`node/root.go` buildRoot says why), so the
-ICDM cases and the SU requestor cases are not applicable through the
-device's own PICS (`ICDM.S=0`, `MCORE.OTA.Requestor=0`). The image lists
+IcdManagement is not mounted (`node/root.go` buildRoot says why), so the
+ICDM cases are not applicable through the device's own PICS (`ICDM.S=0`).
+The OTA Software Update Requestor is mounted since #49 (ADR 0019) and its
+automated SU cases run. The image lists
 the DLOG case, the BIND cases and the SU YAML cases as manual, so the
 status block records them as class (c); on substance BIND tests the binding
 client (`BIND.C`, a controller-side role, (d)), the SU provider cases an OTA

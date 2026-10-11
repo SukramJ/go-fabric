@@ -20,7 +20,7 @@ German, briefly. Six waves were planned against the phases:
 | 3 | 2b (appliances, ovens, microwave), 2c part (DEM, EVSE), 2d part (ServiceArea, ClosureDimension, TSUIC) | G, H, I | #46 | merged 2026-10-11 |
 | 4 | 2c/2d rest (Commodity*, ElectricalGridConditions, Soil, Actions, EcosystemInformation, PowerSourceConfiguration) and the spec runtime (timed commands from the model, `Constraint.In`, TSUIC default, ModeSelect) | J, K, L | #47; docs #48 | merged 2026-10-11 |
 | 5 | 3 (TCP, BDX, OTA requestor; ADR 0019) and harness follow-ups | M, N, O | #49; docs PR `docs/wave-5-followups` | #49 merged 2026-10-11 (`5739ee8`); docs PR see §3 |
-| 6 | 4 (device layer `device/`, node facade `node/`, `cluster/onoff.Server`, daemon migration; ADR 0018 accepted 2026-10-11) | P, Q, R | wave-6 PR from `wave/2026-10-11-tranche-6` (auto-merge squash) | **integrated 2026-10-11 night** on the owner's Linux machine (`fabric-ubnt`); local chip-tool runs (Docker, avahi) instead of CI dispatches; see §6 |
+| 6 | 4 (device layer `device/`, node facade `node/`, `cluster/onoff.Server`, daemon migration; ADR 0018 accepted 2026-10-11) | P, Q, R | #51; docs PR `docs/wave-6-followups` | #51 merged 2026-10-12 (`b4ea1f9`); docs PR see §6 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -239,7 +239,9 @@ Owner decisions on R's questions (ADR 0018 stays as written):
    names the store CHIP's walk finds from a shallower checkout, CI is
    unchanged.
 
-**Docs PR after the merge** (same shape as §3): by_design — mandatory-
+#51 merged 2026-10-12 as `b4ea1f9` (CI incl. the families job green).
+
+**Docs PR `docs/wave-6-followups`** (same shape as §3), written from this list: by_design — mandatory-
 with-extension refuses `New` (`RequirementGenerator.ts:188-199`,
 `EndpointFile.ts:144-158`); `AddPart` stricter than `Parts.ts:170-201`;
 the assembler's five clusters never mounted by `device/`; feature masks
@@ -273,3 +275,15 @@ plus the older leftovers (`planning/briefs-wave-2..5`, `wave5/*`,
 Then phase 5: Apple Home / Alexa proof with the daemon on `node/` (the
 owner at the device), the shared AddNOC Go test commissioner (Q's
 deferral), `v1.0.0` freezing `device/` and `node/`.
+
+### After the docs PR (2026-10-12)
+
+Phase 5 is next. The wave programme's implementation phases 0–4 are
+closed; what remains needs the owner at a real controller (Apple Home,
+Alexa with the daemon on `node/`: parts, energy, appliances; findings into
+`docs/matter-ecosystem-observations.md`), then `v1.0.0` freezing `device/`
+and `node/` (README §API stability, CHANGELOG). Before the ecosystem runs,
+one more brief fits the Opus row: the shared AddNOC Go test commissioner
+(report Q, question 6) so the ACL and CASE ports become provable through
+the facade. The sweep record `notes/parity/sweeps/2026-10-f07365a8-85cf6647.md`
+keeps its `wiring.go` citations as a dated record.

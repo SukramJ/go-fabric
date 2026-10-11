@@ -1883,6 +1883,101 @@ stops at the first complete message, not the first byte
 (`TcpTransport.ts:98-103`) — are matter.js's. Nothing to retire; this
 records why the shapes differ.
 
+### BD-Matter-Device-MandatoryWithExtensionRefusesNew — a mandatory cluster whose mandated features are no legal selection refuses `New`
+
+matter.js's device generator leaves such a cluster out of the type's
+default behaviours and lets device-type validation report it at runtime
+(`packages/node/src/devices/.../RequirementGenerator.ts:188-199`,
+`EndpointFile.ts:144-158`: "mandatory with extension" is not mounted
+until the application chooses). `device.New<Type>` refuses construction
+instead (`device/device.go` defaultServer: `ErrConfiguration`, "needs a
+feature selection (WithFeatures)"), so a host learns at the constructor,
+not from a validation log. The affected types are listed in
+`device/conformance_test.go` `refusedDefaults` (Closure, ClosurePanel,
+DeviceEnergyManagement, ElectricalMeter, ElectricalSensor, GenericSwitch,
+MicrowaveOven, …). Retire if a host needs the matter.js shape — an
+endpoint that exists without the cluster.
+
+### BD-Matter-Device-AddPartComposition — `AddPart` refuses a part the owner's type does not name as a component
+
+matter.js validates a parts insertion for endpoint-number identity only
+(`packages/node/src/endpoint/properties/Parts.ts:170-201`) and leaves
+composition to device-type validation. `Device.AddPart`
+(`device/device.go`) refuses a part whose device type the owner's type does
+not name through its deviceType requirements (through the base types),
+except under BridgedNode, whose "Separate Endpoints" pattern hosts any
+application type on descendants (`endpoints/bridged-node.ts:39-73`). Same
+judgement, earlier; a topology the assembler would refuse never reaches
+it. Owner decision 2026-10-11 (report P, question 2).
+
+### BD-Matter-Device-AssemblerClustersStayTheAssemblers — Descriptor, BridgedDeviceBasicInformation, Identify, Groups and ScenesManagement are never mounted by `device/`
+
+matter.js's device files list them as behaviours of the type
+(`EndpointFile.ts`); here the endpoint assembler mounts them on every
+endpoint whose type asks for them (`endpoint/materialize.go`
+ClusterServers, partClusterServers, mountGroups, mountScenes) and replaces
+a source-supplied Groups or ScenesManagement with the stack's. `device/`
+skips them (`device/device.go` `assemblerMounted`) and refuses a
+`WithServer` / `WithOptional` / `WithFeatures` for them, so there is one
+owner per cluster. Consequence, recorded in the findings register: an
+optional Groups or ScenesManagement a device type merely allows cannot be
+opted in through `device/`.
+
+### BD-Matter-Device-FeatureMaskLiterals — mandated feature masks are literals in the generated device files
+
+matter.js's generated device files name features symbolically
+(`OnOffServer.with("Lighting")`); `device/*_gen.go` carries the mandated
+feature bitmask as a literal next to the cluster id. The literal is held
+to the cluster definition's Feature list by
+`device/device_test.go` `TestFeatureMasksMatchTheDefinitions`, and a
+regeneration rewrites both from the same snapshot. Go has no mixin to
+carry a name; the guard carries the provenance.
+
+### BD-Matter-OnOff-SinkAsOverride — `onoff.Sink` is the Go form of a host overriding `on()` / `off()`
+
+matter.js's OnOffServer lets a host override `on()` and `off()`, which is
+"enough" for the timed actions too (`OnOffServer.ts:142-145`,
+`:194-197`); a throwing override rolls the transaction back.
+`cluster/onoff.Sink.SetOnOff(ctx, on)` is told before the change is
+stored; an error answers FAILURE and stores nothing (`cluster/onoff/server.go`
+setOnOff). A countdown that ends in a refused `off` stops its timer and
+keeps the state as it was — matter.js stops the timer before `off()`
+(`:248`) and then rolls back, which lands in the same place. `Server.Set`
+and the StartUpOnOff apply do not call the sink.
+
+### BD-Matter-OnOff-ClockSeamCountdowns — the OnTime / OffWaitTime countdowns run on a `Clock` seam, goroutine-free
+
+matter.js runs the two countdowns on `Time.getPeriodicTimer` (100 ms,
+`OnOffServer.ts:227-254`, `:255-325`). `cluster/onoff` arms one
+`Clock.AfterFunc` per tick with a generation counter that drops a stale
+callback, so a test advances a hand clock deterministically and `race` has
+no timer goroutine to find. Mechanics only: the tick, the 0xFFFF hold and
+the end-of-countdown transitions are matter.js's, cited by line.
+
+### BD-Daemon-MeasurementEndpointsBypassDeviceLayer — the reference daemon's sensors stay on `endpoint.Spec.Measurement`
+
+Since wave 6 every fleet device is a `device.New<Type>` call, except the
+sensors assembled from a live `contract.MeasurementSource`
+(`examples/reference-bridge/fleet.go` `measured`: thermometer, flow,
+humidity, occupancy, button, soil) and the parts `withMeasuredParts`
+appends (`Spec.PowerSource`, ElectricalSensor). The generated device
+servers serve state, not a host's live reading, and the GenericSwitch
+press wiring reads `Spec.Measurement` (`bridge/bridge.go`
+wireMeasurementListenersLocked). Retire with the device-layer binding for
+a `MeasurementSource` (findings register, application cluster servers).
+
+### BD-Daemon-GlobalSceneControlTrue — the daemon's lights start with GlobalSceneControl true
+
+matter.js's schema gives GlobalSceneControl no default
+(`packages/model/src/standard/elements/on-off.element.ts:30`), so a fresh
+OnOffServer reads it as falsy until the first `on()` sets it
+(`OnOffServer.ts:103`); `cluster/onoff.New` starts it at false. The
+reference daemon has always served true on its lights and keeps it through
+`device.WithInitial` (`examples/reference-bridge/fleet.go`), as the
+daemon's own invariant (its wire shape is what the fixtures and the
+ecosystem observations were taken against). Daemon only; the library
+default is matter.js's.
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

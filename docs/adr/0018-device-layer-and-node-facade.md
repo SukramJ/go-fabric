@@ -119,7 +119,12 @@ decision names what it mirrors and what it leaves for later.
 
 1. **What is generated.** `script/devicegen` reads `parity/schema.json`
    as `script/clustergen` does and emits one file per device type for the
-   65 in-scope types of the concept's Appendix F.3 — the 60 application
+   in-scope types of the concept's Appendix F.3 — 63 as committed on
+   2026-10-11 (the ADR first said 65; VideoDoorbell and FloodlightCamera,
+   whose mandatory Camera component mandates CameraAvStreamManagement and
+   WebRtcTransportProvider, and CastingVideoClient, whose mandatory
+   clusters are media clients, are excluded by owner decision, report P
+   question 1): the application
    types plus the system endpoint types RootNode, Aggregator, BridgedNode,
    PowerSource, ElectricalSensor, DeviceEnergyManagement and OtaRequestor
    (matter.js `endpoints/`, `EndpointFile.ts:17,35-49`). Excluded types are
