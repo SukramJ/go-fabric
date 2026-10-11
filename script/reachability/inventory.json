@@ -13017,7 +13017,7 @@
       "identifier": "TestApplicationDeviceTypesMeetTheirDeviceTypeRequirements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 51
+      "line": 52
     },
     {
       "package": "endpoint",
@@ -13045,7 +13045,7 @@
       "identifier": "TestBooleanStateServerMeetsTheDetectorDeviceTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 160
+      "line": 170
     },
     {
       "package": "endpoint",
@@ -13409,14 +13409,14 @@
       "identifier": "TestLightServersMeetTheLightDeviceTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 117
+      "line": 127
     },
     {
       "package": "endpoint",
       "identifier": "TestMeasurementKindsMeetTheirDeviceTypeRequirements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 89
+      "line": 99
     },
     {
       "package": "endpoint",
