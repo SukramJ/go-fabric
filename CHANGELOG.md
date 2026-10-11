@@ -18,6 +18,34 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- The device layer `device/` (ADR 0018, wave 6), **public API from this
+  release on** (README.md §API stability): one generated Go type per device
+  type in scope — 63 of the snapshot's 91, the rest named with their concept
+  Appendix F.3 group — with its id, revision, classification, composition
+  and the server and client cluster requirements matter.js's generator
+  derives (`RequirementGenerator.ts`, `ClusterRequirements.ts`: mandatory
+  and optional clusters, mandated features, element alterations, Base's
+  Binding where it mandates it). `device.New<Type>(Options, ...Option)`
+  mounts every mandatory server cluster and every optional one the host
+  opts in with a default `spec.Server` (features, mandated elements, stated
+  defaults; the default selection adds the features the cluster itself
+  marks mandatory), takes a host server instead (`WithServer`), a feature
+  selection (`WithFeatures`, held to `spec.CheckFeatures` and to the
+  features the type mandates), an optional cluster (`WithOptional`),
+  optional elements (`WithElements`) and initial values (`WithInitial`). `Device.Spec()` turns a device and its
+  parts (`AddPart`, refused for a device type the owner does not compose)
+  into the `endpoint.Spec` the assembler consumes, with the type's
+  mandatory client clusters as `Spec.ClientClusters`; `Device.OnChanged`
+  delivers the server's attribute changes. Descriptor, Identify,
+  BridgedDeviceBasicInformation, Groups and ScenesManagement stay the
+  assembler's. `script/devicegen` generates the package from
+  `parity/schema.json` and runs in `make generate-matter-schema` after
+  `script/clustergen`.
+- `endpoint.Spec.ClientClusters`: the client clusters an endpoint declares,
+  served as its Descriptor ClientList (bridged endpoints and parts), as
+  matter.js `MutableEndpoint.ts:53-61` registers a type's mandatory client
+  clusters and `DescriptorServer.ts:284-290` lists them. Unset, the
+  ClientList stays empty as before.
 - Session establishment over TCP: a PASE or CASE message that arrives on a
   TCP connection is served on it, as matter.js creates the unsecured
   session from whichever channel carried the message
