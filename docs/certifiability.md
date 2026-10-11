@@ -136,6 +136,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DLOG | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
 | ICDM | 7 | 0 | 0 | 0 | 7 | 0 | 0 |
 | SU | 13 | 0 | 0 | 0 | 3 | 10 | 0 |
+| BDX | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | BIND | 3 | 0 | 0 | 0 | 0 | 3 | 0 |
 | FLABEL | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | ULABEL | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
@@ -171,6 +172,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MTRID | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | SETRF | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | COMMTR | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| EGC | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | DEM | 11 | 7 | 0 | 0 | 4 | 0 | 0 |
 | DEMM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | EEVSE | 10 | 9 | 0 | 1 | 0 | 0 | 0 |

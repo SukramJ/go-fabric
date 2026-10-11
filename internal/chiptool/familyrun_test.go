@@ -19,6 +19,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -151,15 +152,12 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 	}
 
 	set := &picsSet{byEP: map[uint16]string{}, values: map[uint16]map[string]string{}, honest: map[uint16]string{}, epOf: map[uint32]uint16{}}
-	for _, dt := range []uint32{
-		dtOnOffLight, dtColorTempLight, dtExtColorLight, dtSpeaker, dtTempSensor, dtWaterValve, dtModeSelect, dtFan,
-		dtSmokeCOAlarm, dtPump, dtFlowSensor, dtLaundryWasher, dtRVC, dtThermostat, dtWindowCovering,
-		dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch, dtAirPurifier, dtClosure,
-		dtTempControlledCabinet, dtAirQualitySensor, dtWaterHeater, dtElectricalUtilityMeter, dtRefrigerator, dtDishwasher, dtMicrowaveOven, dtOven, dtEnergyEvse, dtDeviceEnergyManagement, dtClosurePanel, dtSoilSensor, dtElectricalEnergyTariff, dtElectricalMeter,
-	} {
+	for _, dt := range endpointDeviceTypes {
 		set.epOf[dt] = br.endpointFor(t, dt)
 	}
-	set.epOf[dtOvenCavity] = br.endpointAfter(t, dtOven, dtTempControlledCabinet)
+	for key, at := range pseudoEndpoints {
+		set.epOf[key] = br.endpointAfter(t, at[0], at[1])
+	}
 
 	overrides, err := readPICS(filepath.Join("testdata", "reference-bridge.pics"))
 	if err != nil {
@@ -310,6 +308,9 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 			t.Errorf("exclusion %q matches no case of %s in this image: remove it", pattern, fam.name)
 		}
 	}
+	if slices.ContainsFunc(cases, func(c chipCase) bool { return c.Kind == "py" && needsOta(c.Args) }) {
+		prepareOta(ctx, t, h)
+	}
 	for i := range cases {
 		c := cases[i]
 		if caseFilter != nil && !slices.Contains(caseFilter, c.ID) {
@@ -371,6 +372,63 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 	}
 }
 
+// otaPlumbing is what the SU requestor cases are handed: the provider app
+// and the staged image, both paths inside the container. missing says why
+// a case that needs them cannot have them.
+type otaPlumbing struct {
+	provider, image string
+	missing         string
+}
+
+// prepareOta locates chip's OTA provider app and builds the staged image
+// (otaImageCommand) once per harness. A tool that is present and fails is
+// a broken harness, so the family fails; a tool or provider app the image
+// does not carry is the environment's, recorded for the cases that would
+// need it (they fail naming it once they apply).
+// It runs for a family with such a case whether or not the case applies,
+// so the plumbing is exercised before the requestor exists (brief N).
+func prepareOta(ctx context.Context, t *testing.T, h *harness) *otaPlumbing {
+	t.Helper()
+	otaMu.Lock()
+	defer otaMu.Unlock()
+	if ota, ok := otaPrepared[h]; ok {
+		return ota
+	}
+	ota := &otaPlumbing{}
+	otaPrepared[h] = ota
+	out, err := h.exec(ctx, "which", otaProviderApp)
+	if err != nil {
+		ota.missing = fmt.Sprintf("the harness image carries no %s (`which` says: %s)", otaProviderApp, strings.TrimSpace(out))
+		t.Logf("OTA plumbing: %s", ota.missing)
+	} else {
+		ota.provider = strings.TrimSpace(out)
+	}
+	payload := filepath.Join(h.shared, "ota-payload.bin")
+	// The payload is opaque to the provider and the transfer; the image
+	// header names the identity and version the requestor checks.
+	if err := os.WriteFile(payload, []byte("go-fabric reference-bridge OTA test payload\n"), 0o644); err != nil { //nolint:gosec // read by the container
+		t.Fatal(err)
+	}
+	ota.image = filepath.Join(h.shared, fmt.Sprintf("reference-bridge_v%d.ota", otaSoftwareVersion))
+	if _, err := h.exec(ctx, "test", "-f", otaImageTool); err != nil {
+		ota.missing = "the harness image carries no " + otaImageTool
+		t.Logf("OTA plumbing: %s", ota.missing)
+		return ota
+	}
+	if out, err := h.exec(ctx, otaImageCommand(payload, ota.image)...); err != nil {
+		t.Errorf("build the staged OTA image (%s): %v\n%s", strings.Join(otaImageCommand(payload, ota.image), " "), err, out)
+		ota.missing = "the staged OTA image could not be built"
+		return ota
+	}
+	t.Logf("OTA plumbing: provider %q, image %s (vendor 0x%04X, product 0x%04X, version %d)", ota.provider, ota.image, otaVendorID, otaProductID, otaSoftwareVersion)
+	return ota
+}
+
+var (
+	otaMu       sync.Mutex
+	otaPrepared = map[*harness]*otaPlumbing{}
+)
+
 // applyEdits patches a case file in the container (matter.js
 // chip.testFor(...).edit). An edit whose old text is gone but whose new text
 // is present was applied by an earlier run in this container.
@@ -430,6 +488,15 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 			a = fmt.Sprintf("PIXIT.ACE.APPENDPOINT:%d", app)
 		}
 		args = append(args, a)
+	}
+	// An SU requestor case starts chip's OTA provider app itself and has it
+	// serve the staged image (TC_SU_2_2.py:39-41 at the harness pin).
+	if needsOta(c.Args) {
+		ota := prepareOta(ctx, t, h)
+		if ota.missing != "" {
+			t.Fatalf("%s needs the OTA provider app and a staged image: %s", id, ota.missing)
+		}
+		args = otaArgs(args, ota.provider, ota.image)
 	}
 	// A factory-fresh case whose descriptor supplies the onboarding code
 	// (TC-SC-7.1) commissions in its own steps; one without (TC-ACL-2.6)
@@ -690,7 +757,7 @@ func (f family) caseTimeout(name string) time.Duration {
 
 // deviceTypeOf is the device type whose endpoint a case runs against.
 func (f family) deviceTypeOf(name string) uint32 {
-	if dt, ok := f.caseDeviceType[name]; ok {
+	if dt, ok := f.endpoints[name]; ok {
 		return dt
 	}
 	return f.deviceType
