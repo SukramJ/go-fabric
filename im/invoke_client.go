@@ -172,24 +172,8 @@ func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 			if !el.IsContainer || el.Type != tlv.TypeStructure {
 				return fmt.Errorf("%w: StatusIB not struct", ErrInvalidStatusIB)
 			}
-			for {
-				f, err := dec.Next()
-				if err != nil {
-					return err
-				}
-				if f.IsEndContainer {
-					break
-				}
-				if f.Tag.Kind != tlv.TagKindContext {
-					continue
-				}
-				switch uint8(f.Tag.Number & 0xFF) {
-				case tagStatusIBStatus:
-					ent.Status.Status = StatusCode(f.Uint & 0xFF)
-				case tagStatusIBClusterStatus:
-					ent.Status.ClusterStatus = uint8(f.Uint & 0xFF)
-					ent.Status.HasClusterStatus = true
-				}
+			if err := readStatusIBFields(dec, &ent.Status); err != nil {
+				return err
 			}
 		case tagCmdStatusRef:
 			ent.CommandRef = uint16(el.Uint & 0xFFFF)
@@ -200,6 +184,29 @@ func readCommandStatusIB(dec *tlv.Decoder, ent *InvokeResponseEntry) error {
 					return err
 				}
 			}
+		}
+	}
+}
+
+// readStatusIBFields reads a StatusIB's fields after its opener.
+func readStatusIBFields(dec *tlv.Decoder, st *StatusIB) error {
+	for {
+		f, err := dec.Next()
+		if err != nil {
+			return err
+		}
+		if f.IsEndContainer {
+			return nil
+		}
+		if f.Tag.Kind != tlv.TagKindContext {
+			continue
+		}
+		switch uint8(f.Tag.Number & 0xFF) {
+		case tagStatusIBStatus:
+			st.Status = StatusCode(f.Uint & 0xFF)
+		case tagStatusIBClusterStatus:
+			st.ClusterStatus = uint8(f.Uint & 0xFF)
+			st.HasClusterStatus = true
 		}
 	}
 }

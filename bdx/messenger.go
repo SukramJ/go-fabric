@@ -164,7 +164,7 @@ func (m *Messenger) SendSendInit(ctx context.Context, msg Init) (SendAccept, err
 	if err != nil {
 		return SendAccept{}, err
 	}
-	return v.(SendAccept), nil //nolint:forcetypeassert // Decode returns SendAccept for MessageSendAccept
+	return as[SendAccept](v)
 }
 
 // SendReceiveInit sends a ReceiveInit and returns the peer's ReceiveAccept
@@ -181,7 +181,7 @@ func (m *Messenger) SendReceiveInit(ctx context.Context, msg Init) (ReceiveAccep
 	if err != nil {
 		return ReceiveAccept{}, err
 	}
-	return v.(ReceiveAccept), nil //nolint:forcetypeassert // Decode returns ReceiveAccept for MessageReceiveAccept
+	return as[ReceiveAccept](v)
 }
 
 // SendSendAccept sends a SendAccept (BdxMessenger.ts:129-131).
@@ -239,7 +239,10 @@ func (m *Messenger) ReadBlock(ctx context.Context) (MessageType, Block, error) {
 	if err != nil {
 		return 0, Block{}, err
 	}
-	b := v.(Block) //nolint:forcetypeassert // Decode returns Block for Block and BlockEof
+	b, err := as[Block](v)
+	if err != nil {
+		return 0, Block{}, err
+	}
 	if t == MessageBlock && len(b.Data) == 0 {
 		return 0, Block{}, newError(StatusBadMessageContent, "Received empty data in Block message")
 	}
@@ -257,7 +260,11 @@ func (m *Messenger) ReadBlockQuery(ctx context.Context) (MessageType, any, error
 	}
 	var expectedCounter *uint32
 	if t == MessageBlockAck {
-		next := v.(CounterOnly).BlockCounter + 1 //nolint:forcetypeassert // Decode returns CounterOnly for BlockAck; wraps at 2^32
+		ack, err := as[CounterOnly](v)
+		if err != nil {
+			return 0, nil, err
+		}
+		next := ack.BlockCounter + 1 // wraps at 2^32
 		expectedCounter = &next
 		if t, v, err = m.Next(ctx, MessageBlockQuery, MessageBlockQueryWithSkip); err != nil {
 			return 0, nil, err
@@ -270,6 +277,16 @@ func (m *Messenger) ReadBlockQuery(ctx context.Context) (MessageType, any, error
 		}
 	}
 	return t, v, nil
+}
+
+// as returns the decoded message v as a T.
+func as[T any](v any) (T, error) {
+	t, ok := v.(T)
+	if !ok {
+		var zero T
+		return zero, fmt.Errorf("bdx: decoded %T, expected %T", v, zero)
+	}
+	return t, nil
 }
 
 func counterOf(v any) uint32 {
@@ -288,7 +305,7 @@ func (m *Messenger) ReadBlockAckEOF(ctx context.Context) (CounterOnly, error) {
 	if err != nil {
 		return CounterOnly{}, err
 	}
-	return v.(CounterOnly), nil //nolint:forcetypeassert // Decode returns CounterOnly for BlockAckEof
+	return as[CounterOnly](v)
 }
 
 // ReadBlockAck reads the next BlockAck (BdxMessenger.ts:246-250).
@@ -297,7 +314,7 @@ func (m *Messenger) ReadBlockAck(ctx context.Context) (CounterOnly, error) {
 	if err != nil {
 		return CounterOnly{}, err
 	}
-	return v.(CounterOnly), nil //nolint:forcetypeassert // Decode returns CounterOnly for BlockAck
+	return as[CounterOnly](v)
 }
 
 // SendError sends a failure StatusReport with code (BdxMessenger.ts:253-272:

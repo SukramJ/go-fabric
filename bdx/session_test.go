@@ -22,7 +22,7 @@ type pipeEnd struct {
 	maxSize int
 }
 
-func newPipe(maxPayload int) (*pipeEnd, *pipeEnd) {
+func newPipe(maxPayload int) (receiver, peer *pipeEnd) {
 	a2b := make(chan bdx.Message, 64)
 	b2a := make(chan bdx.Message, 64)
 	return &pipeEnd{in: b2a, out: a2b, maxSize: maxPayload}, &pipeEnd{in: a2b, out: b2a, maxSize: maxPayload}
@@ -77,6 +77,7 @@ type sender struct {
 }
 
 func newSender(t *testing.T, end *pipeEnd, accept bdx.ReceiveAccept, data []byte) *sender {
+	t.Helper()
 	return &sender{
 		t: t, end: end, accept: accept, data: data,
 		gotInit: make(chan bdx.Init, 1), gotStatus: make(chan bdx.StatusReport, 1), gotAckEOF: make(chan uint32, 1),

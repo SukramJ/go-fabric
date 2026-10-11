@@ -8,6 +8,7 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -53,6 +54,9 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 		return decodeGroupKeyMapList(el, dec)
 	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
 		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, false)
+	case path.Cluster == otadef.ClusterID && path.Attribute == otadef.AttrDefaultOtaProviders && el.IsContainer:
+		v, err := mattercore.DecodeDefaultOTAProvidersWrite(dec, el, false)
+		return im.AttributeValue{Value: v}, err
 	}
 	return primitiveAttributeValue(el, dec)
 }
@@ -493,6 +497,9 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 		return im.AttributeValue{Value: []mattercore.GroupKeyMapStruct{e}}, err
 	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
 		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, true)
+	case path.Cluster == otadef.ClusterID && path.Attribute == otadef.AttrDefaultOtaProviders && el.IsContainer:
+		v, err := mattercore.DecodeDefaultOTAProvidersWrite(dec, el, true)
+		return im.AttributeValue{Value: v}, err
 	}
 	v, err := primitiveAttributeValue(el, dec)
 	if err != nil {

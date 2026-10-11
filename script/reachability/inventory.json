@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4284,
+  "entry_points": 4297,
   "entry_packages": [
     ".",
     "bdx",
@@ -169,9 +169,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9887,
-    "reachable": 6934,
-    "whitelisted": 2948,
+    "total_exported": 9914,
+    "reachable": 6936,
+    "whitelisted": 2973,
     "unreachable": 5
   },
   "by_package": [
@@ -3508,6 +3508,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestOtaRequestor_EndToEnd_QueryBDXApply",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ota_provider_e2e_test.go",
+      "line": 187
+    },
+    {
+      "package": "bridge",
       "identifier": "TestOutboundReliableUntrack",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/outbound_untrack_test.go",
@@ -4764,63 +4771,63 @@
       "identifier": "TestSubscriptionResumption_DisabledRecordsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 907
+      "line": 920
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 925
+      "line": 938
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 796
+      "line": 809
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 942
+      "line": 955
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerThatSubscribesIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 864
+      "line": 877
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 706
+      "line": 719
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEndWithMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 714
+      "line": 727
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 968
+      "line": 981
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_UnreachablePeerIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 829
+      "line": 842
     },
     {
       "package": "bridge",
@@ -5233,7 +5240,7 @@
       "identifier": "TestActionsMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 266
+      "line": 271
     },
     {
       "package": "cluster/core",
@@ -5310,7 +5317,7 @@
       "identifier": "TestEcosystemInformationMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 245
+      "line": 250
     },
     {
       "package": "cluster/core",
@@ -5352,7 +5359,175 @@
       "identifier": "TestOTARequestorMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 226
+      "line": 224
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_Announce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 674
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_ApplyActions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 997
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_ApplyFailure",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1046
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_ChooseProvider",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 716
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_Consent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 890
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_DecodeDefaultProvidersWrite",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 641
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_DefaultProvidersWrite",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 589
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_DownloadFailure",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 945
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_DownloadProtocolNotSupported",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 818
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_EnableDisable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 562
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_FileAlreadyDownloaded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1067
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_FullUpdate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 742
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_Initialize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 456
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_InvalidAnswers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 840
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_InvalidImage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 974
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_NotAvailableAndBusy",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 778
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_OnlineAddsDefaultsAndSchedules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 482
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_Persistence",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1177
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_PreviousUpdateApplied",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 504
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_PreviousUpdateFailed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 538
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_QueryTimerFires",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1095
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_ReadsAndGlobals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1200
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_UpdateProgress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1161
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_UpdateStateRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1136
     },
     {
       "package": "cluster/core",
@@ -5457,7 +5632,7 @@
       "identifier": "TestPowerSourceConfigurationMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 236
+      "line": 241
     },
     {
       "package": "cluster/core",

@@ -118,72 +118,8 @@ func DecodeHeader(b []byte) (Header, error) {
 		}
 		n := el.Tag.Number
 		seen[n] = true
-		switch n {
-		case 0:
-			v, err := uintField(el, 16, "vendorId")
-			h.VendorID = uint16(v) //nolint:gosec // bounded by uintField
-			if err != nil {
-				return Header{}, err
-			}
-		case 1:
-			v, err := uintField(el, 16, "productId")
-			h.ProductID = uint16(v) //nolint:gosec // bounded by uintField
-			if err != nil {
-				return Header{}, err
-			}
-		case 2:
-			v, err := uintField(el, 32, "softwareVersion")
-			h.SoftwareVersion = uint32(v) //nolint:gosec // bounded by uintField
-			if err != nil {
-				return Header{}, err
-			}
-		case 3:
-			s, err := stringField(el, 1, 64, "softwareVersionString")
-			if err != nil {
-				return Header{}, err
-			}
-			h.SoftwareVersionString = s
-		case 4:
-			v, err := uintField(el, 64, "payloadSize")
-			if err != nil {
-				return Header{}, err
-			}
-			h.PayloadSize = v
-		case 5, 6:
-			v, err := uintField(el, 32, "applicableSoftwareVersion")
-			if err != nil {
-				return Header{}, err
-			}
-			u := uint32(v) //nolint:gosec // bounded by uintField
-			if n == 5 {
-				h.MinApplicableSoftwareVersion = &u
-			} else {
-				h.MaxApplicableSoftwareVersion = &u
-			}
-		case 7:
-			s, err := stringField(el, 1, 256, "releaseNotesUrl")
-			if err != nil {
-				return Header{}, err
-			}
-			h.ReleaseNotesURL = &s
-		case 8:
-			v, err := uintField(el, 8, "imageDigestType")
-			if err != nil {
-				return Header{}, err
-			}
-			h.ImageDigestType = uint8(v) //nolint:gosec // bounded by uintField
-		case 9:
-			if !isOctets(el.Type) {
-				return Header{}, invalid("imageDigest is not an octet string")
-			}
-			if len(el.Octets) > 64 {
-				return Header{}, invalid("imageDigest longer than 64 bytes")
-			}
-			h.ImageDigest = append([]byte(nil), el.Octets...)
-		default:
-			if el.IsContainer {
-				return Header{}, invalid("unexpected container field %d", n)
-			}
+		if err := decodeHeaderField(&h, n, el); err != nil {
+			return Header{}, err
 		}
 	}
 	for _, n := range []uint32{0, 1, 2, 3, 4, 8, 9} {
@@ -192,6 +128,78 @@ func DecodeHeader(b []byte) (Header, error) {
 		}
 	}
 	return h, nil
+}
+
+// decodeHeaderField decodes the header field with tag n into h.
+func decodeHeaderField(h *Header, n uint32, el tlv.Element) error {
+	switch n {
+	case 0:
+		v, err := uintField(el, 16, "vendorId")
+		h.VendorID = uint16(v) //nolint:gosec // bounded by uintField
+		if err != nil {
+			return err
+		}
+	case 1:
+		v, err := uintField(el, 16, "productId")
+		h.ProductID = uint16(v) //nolint:gosec // bounded by uintField
+		if err != nil {
+			return err
+		}
+	case 2:
+		v, err := uintField(el, 32, "softwareVersion")
+		h.SoftwareVersion = uint32(v) //nolint:gosec // bounded by uintField
+		if err != nil {
+			return err
+		}
+	case 3:
+		s, err := stringField(el, 1, 64, "softwareVersionString")
+		if err != nil {
+			return err
+		}
+		h.SoftwareVersionString = s
+	case 4:
+		v, err := uintField(el, 64, "payloadSize")
+		if err != nil {
+			return err
+		}
+		h.PayloadSize = v
+	case 5, 6:
+		v, err := uintField(el, 32, "applicableSoftwareVersion")
+		if err != nil {
+			return err
+		}
+		u := uint32(v) //nolint:gosec // bounded by uintField
+		if n == 5 {
+			h.MinApplicableSoftwareVersion = &u
+		} else {
+			h.MaxApplicableSoftwareVersion = &u
+		}
+	case 7:
+		s, err := stringField(el, 1, 256, "releaseNotesUrl")
+		if err != nil {
+			return err
+		}
+		h.ReleaseNotesURL = &s
+	case 8:
+		v, err := uintField(el, 8, "imageDigestType")
+		if err != nil {
+			return err
+		}
+		h.ImageDigestType = uint8(v) //nolint:gosec // bounded by uintField
+	case 9:
+		if !isOctets(el.Type) {
+			return invalid("imageDigest is not an octet string")
+		}
+		if len(el.Octets) > 64 {
+			return invalid("imageDigest longer than 64 bytes")
+		}
+		h.ImageDigest = append([]byte(nil), el.Octets...)
+	default:
+		if el.IsContainer {
+			return invalid("unexpected container field %d", n)
+		}
+	}
+	return nil
 }
 
 func uintField(el tlv.Element, bits int, name string) (uint64, error) {
