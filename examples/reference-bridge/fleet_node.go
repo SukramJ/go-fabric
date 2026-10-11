@@ -73,7 +73,7 @@ func attachNodeProviders(br *matterbridge.Bridge, pscfg *mattercore.PowerSourceC
 // The demo's ids: one endpoint list, two actions. connectedhomeip's
 // all-clusters app serves three actions that support no command at all
 // (examples/all-clusters-app/all-clusters-common/include/
-// bridged-actions-stub.h, ActionStructStorage(…, 0, kInactive)); these two
+// bridged-actions-stub.h:36-40, ActionStructStorage(…, 0, kInactive)); these two
 // support InstantAction, so a controller can run them.
 const (
 	demoLivingRoomList uint16 = 0xE001

@@ -25,7 +25,7 @@ var errWrongSoilEndpoint = errors.New("not the soil sensor's endpoint")
 
 // setSimulatedSoilMoisture applies CHIP's SetSimulatedSoilMoisture
 // ({"Name": "SetSimulatedSoilMoisture", "SoilMoistureValue": <uint8 or
-// null>, "EndpointId": <id>}, TC_SOIL_2_2.py:97, :108): the all-clusters
+// null>, "EndpointId": <id>}, TC_SOIL_2_2.py:97, :109): the all-clusters
 // app refuses any endpoint but its soil sensor's and takes a null value as
 // null (examples/all-clusters-app/linux/AllClustersCommandDelegate.cpp
 // :576-598), then sets the measured value through the cluster
