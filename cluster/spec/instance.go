@@ -114,7 +114,7 @@ func CheckFeatures(def *Cluster, features uint32) error {
 	for fi := range def.Features {
 		f := &def.Features[fi]
 		selected := features&f.Mask() != 0
-		switch f.Conformance.Applicability(ctx) {
+		switch featureApplicability(f.Conformance, ctx) {
 		case ApplicabilityNone:
 			if selected {
 				return fmt.Errorf("%w: %s feature %s is not allowed", ErrFeatureSelection, def.Name, f.Title)
@@ -151,6 +151,77 @@ func CheckFeatures(def *Cluster, features uint32) error {
 		}
 	}
 	return nil
+}
+
+// featureApplicability judges one feature's conformance for CheckFeatures
+// the way matter.js judges a feature selection: in an otherwise list "the
+// first applicable entry governs, so an entry's rules hold only where every
+// earlier entry is inapplicable" (IllegalFeatureCombinations.ts
+// addOtherwiseRules :388-390, behind FeatureSelectionErrors). Applicability
+// mirrors Conformance.ts computeApplicability instead, where a later
+// mandatory term outranks an earlier conditional one — right for
+// attributes, commands and events (ValidatedElements), wrong for features:
+// DeviceEnergyManagement's PFR "[!PA].a, STA | PAU | FA | CON, O" would
+// make PowerForecastReporting mandatory next to StateForecastReporting
+// whenever STA, PAU, FA or CON is set, a selection matter.js accepts and
+// chip's TC-DEM-2.6 runs (--featureSet 0x7C).
+func featureApplicability(c Conformance, ctx FeatureContext) Applicability {
+	if c.Op != ConfOtherwise {
+		return assessOuter(c, ctx)
+	}
+	provisional := false
+	for i, node := range c.Args {
+		switch node.Op {
+		case ConfProvisional:
+			provisional = true
+			continue
+		case ConfDeprecated:
+			// A trailing "D" announces a future deprecation; the terms
+			// before it decide.
+			if i == len(c.Args)-1 {
+				continue
+			}
+		}
+		applies, demands := featureEntry(node, ctx)
+		switch applies {
+		case ApplicabilityNone:
+			continue // inapplicable here; a later entry may govern
+		case ApplicabilityConditional:
+			return ApplicabilityConditional
+		}
+		if demands == ApplicabilityMandatory && provisional {
+			return ApplicabilityOptional
+		}
+		return demands
+	}
+	// Where no entry governs the feature is not applicable at all.
+	return ApplicabilityNone
+}
+
+// featureEntry splits one otherwise-list entry into whether it applies to
+// the selection (Mandatory: yes, None: no, Conditional: not decidable from
+// features) and what it demands of the feature when it does. A bracketed
+// condition applies where its expression holds and makes the feature
+// optional (its choice group is counted by CheckFeatures); a bare feature
+// expression applies where it holds and mandates the feature; M, O, X and
+// the like always apply.
+func featureEntry(node Conformance, ctx FeatureContext) (applies, demands Applicability) {
+	switch node.Op {
+	case ConfChoice:
+		return featureEntry(arg(node), ctx)
+	case ConfOptionalIf:
+		return assessInner(arg(node), ctx), ApplicabilityOptional
+	case ConfOptional, ConfEmpty, "", ConfProvisional:
+		return ApplicabilityMandatory, ApplicabilityOptional
+	case ConfMandatory:
+		return ApplicabilityMandatory, ApplicabilityMandatory
+	case ConfDisallowed, ConfDeprecated, ConfObsolete:
+		return ApplicabilityMandatory, ApplicabilityNone
+	case ConfDesc, ConfRevision:
+		return ApplicabilityConditional, ApplicabilityConditional
+	default:
+		return assessInner(node, ctx), ApplicabilityMandatory
+	}
 }
 
 // New binds def to a feature selection and the optional elements the

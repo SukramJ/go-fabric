@@ -88,8 +88,8 @@ const DescriptionMaxBytes = 64
 // Deprecated: SupportedModes is encoded by the generated codec,
 // [msdef.ModeOptionStruct.EncodeTLV] in cluster/spec/modeselect, which
 // carries the field ids itself; nothing in this module reads these tags.
-// Removal is permissible in the second minor release after the one that
-// ships this marker (README §API stability).
+// Marked in v0.3.0; removal is permissible from v0.5.0, the second minor
+// release after the marking one (README §API stability).
 const (
 	ModeOptionFieldLabel        uint8 = 0x00
 	ModeOptionFieldMode         uint8 = 0x01
@@ -128,8 +128,8 @@ const SupportedModesMaxEntries = 255
 // Deprecated: SupportedModes is encoded by the generated codec,
 // [msdef.SemanticTagStruct.EncodeTLV] in cluster/spec/modeselect, which
 // carries the field ids itself; nothing in this module reads these tags.
-// Removal is permissible in the second minor release after the one that
-// ships this marker (README §API stability).
+// Marked in v0.3.0; removal is permissible from v0.5.0, the second minor
+// release after the marking one (README §API stability).
 const (
 	SemanticTagFieldMfgCode uint8 = 0x00
 	SemanticTagFieldValue   uint8 = 0x01

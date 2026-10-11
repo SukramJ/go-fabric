@@ -57,6 +57,8 @@ type pipeCommand struct {
 	NumPresses *uint8  `json:"MultiPressNumPresses"`
 	Unmounted  *uint8  `json:"Unmounted"`
 	DoorOpen   *uint8  `json:"DoorOpen"`
+	// SoilMoistureValue is SetSimulatedSoilMoisture's new reading (percent).
+	SoilMoistureValue *uint8 `json:"SoilMoistureValue"`
 }
 
 // serveAppPipe creates the FIFO (when absent) and applies every command
@@ -163,6 +165,9 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 			return errors.New("SetRefrigeratorDoorStatus needs DoorOpen")
 		}
 		return f.fridge.reportDoor(*cmd.DoorOpen != 0)
+	case "SetSimulatedSoilMoisture":
+		// CHIP's all-clusters app, for the soil sensor (TC-SOIL-2.2).
+		return f.setSimulatedSoilMoisture(cmd.EndpointID, cmd.SoilMoistureValue)
 	case "OperationalStateChange":
 		// CHIP's all-clusters app routes by Device
 		// (AllClustersCommandDelegate.cpp:939-945 at the harness pin):
@@ -374,7 +379,7 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 	}
 	if f.garage.testEventTrigger(trigger) || f.heater.testEventTrigger(trigger) ||
 		f.contact.testEventTrigger(trigger) || f.meter.testEventTrigger(trigger) ||
-		f.evse.testEventTrigger(trigger) {
+		f.evse.testEventTrigger(trigger) || f.energyMarketTestEventTrigger(trigger) {
 		return nil
 	}
 	switch trigger & smokeTriggerMask {

@@ -18,6 +18,20 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `cluster/spec.CheckFeatures` judges a feature's otherwise-conformance by
+  its first applicable entry, as matter.js's FeatureSelectionErrors does
+  (`IllegalFeatureCombinations.ts` addOtherwiseRules): DeviceEnergyManagement
+  with StateForecastReporting and the adjustment features but without
+  PowerAdjustment (TC-DEM-2.6's `--featureSet 0x7C`) is accepted; before,
+  PowerForecastReporting was wrongly mandated. Attribute, command and event
+  conformance is unchanged (`Conformance.ts` computeApplicability).
+- Reference daemon, for the certification harness (wave-4 integration): the
+  app pipe knows `SetSimulatedSoilMoisture` (TC-SOIL-2.2) and the eleven
+  energy-market test event triggers of the tariff and meter devices reach
+  the TestEventTrigger dispatcher. The daemon binary that `go build` drops
+  into `examples/reference-bridge/` is no longer tracked (it had been
+  committed since the wave-1 refrigerator PR) and is ignored from now on.
+
 - `thermo.ThermostatUIConfig.UnitLocalization` (optional `*spec.Server`):
   with no configured TemperatureDisplayMode, the same endpoint's
   UnitLocalization decides it at construction — Fahrenheit when its

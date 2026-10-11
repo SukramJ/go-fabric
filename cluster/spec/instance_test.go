@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	demdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
 	pumpdef "github.com/SukramJ/go-fabric/cluster/spec/pumpconfigurationandcontrol"
 	"github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
 	"github.com/SukramJ/go-fabric/contract"
@@ -76,6 +77,37 @@ func TestCheckFeatures(t *testing.T) {
 	mandatory := &spec.Cluster{Name: "M", Features: []spec.Feature{{Name: "M", Title: "Must", Conformance: op(spec.ConfMandatory)}}}
 	if err := spec.CheckFeatures(mandatory, 0); !errors.Is(err, spec.ErrFeatureSelection) {
 		t.Errorf("mandatory feature left out: %v", err)
+	}
+}
+
+// TestCheckFeaturesFirstApplicableEntryGoverns: a feature's otherwise list
+// is judged by its first applicable entry (matter.js
+// IllegalFeatureCombinations.ts addOtherwiseRules :388-390), not by a later
+// mandatory term. DeviceEnergyManagement's PFR is "[!PA].a, STA | PAU | FA |
+// CON, O" and SFR "[!PA].a": without PA exactly one of PFR / SFR, and the
+// STA | PAU | FA | CON term governs only where PA is present.
+func TestCheckFeaturesFirstApplicableEntryGoverns(t *testing.T) {
+	t.Parallel()
+	const pa, pfr, sfr, sta, pau, fa, con = 1 << 0, 1 << 1, 1 << 2, 1 << 3, 1 << 4, 1 << 5, 1 << 6
+	cases := []struct {
+		name     string
+		features uint32
+		want     error
+	}{
+		{"SFR with the adjustments, no PA (TC-DEM-2.6 --featureSet 0x7C)", sfr | sta | pau | fa | con, nil},
+		{"PFR with the adjustments, no PA", pfr | sta | pau | fa | con, nil},
+		{"PA with PFR and the adjustments (the reference ESA)", pa | pfr | sta | pau | fa | con, nil},
+		{"PA alone", pa, nil},
+		{"PFR and SFR together", pfr | sfr | sta, spec.ErrFeatureSelection},
+		{"neither PFR nor SFR without PA", sta | pau, spec.ErrFeatureSelection},
+		{"SFR next to PA", pa | sfr, spec.ErrFeatureSelection},
+		{"PA with STA but no PFR", pa | sta, spec.ErrFeatureSelection},
+	}
+	for _, tc := range cases {
+		err := spec.CheckFeatures(demdef.Definition, tc.features)
+		if tc.want == nil && err != nil || tc.want != nil && !errors.Is(err, tc.want) {
+			t.Errorf("%s (0x%02X): %v, want %v", tc.name, tc.features, err, tc.want)
+		}
 	}
 }
 
