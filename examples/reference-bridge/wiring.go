@@ -603,7 +603,14 @@ func wireSecurity(
 			}
 			return entry.Session, true
 		},
-	).WithFabricResolver(func(id uint16) (uint8, bool) {
+	).WithTransportResolver(func(id uint16) (uint16, uint32, bool) {
+		e, err := sessions.Get(id)
+		if err != nil || e == nil {
+			return 0, 0, false
+		}
+		tr, mx := e.PeerTransportParameters()
+		return tr, mx, tr != 0 || mx != 0
+	}).WithFabricResolver(func(id uint16) (uint8, bool) {
 		entry, err := sessions.Get(id)
 		if err != nil || entry == nil {
 			return 0, false

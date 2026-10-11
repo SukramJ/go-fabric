@@ -359,7 +359,8 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 	// AND the per-datagram budget. chunkReportData splits on
 	// per-attribute boundaries; each chunk except the last carries
 	// MoreChunkedMessages=true (Matter §10.6.6).
-	chunks, err := chunkReportData(initialReport, reportChunkPayloadBudget)
+	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
+	chunks, err := chunkReportData(initialReport, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "chunk_initial_report", src, err)
 		return err

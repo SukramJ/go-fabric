@@ -418,7 +418,7 @@ func makeAttributeReport(endpoint uint16) im.AttributeReport {
 func TestChunkReportData_SmallSingleChunk(t *testing.T) {
 	t.Parallel()
 	rd := im.ReportData{Reports: []im.AttributeReport{makeAttributeReport(1)}}
-	chunks, err := chunkReportData(rd, reportChunkPayloadBudget)
+	chunks, err := chunkReportData(rd, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestChunkReportData_BudgetSplits(t *testing.T) {
 		reports[i] = makeAttributeReport(uint16(i + 1))
 	}
 	rd := im.ReportData{Reports: reports}
-	chunks, err := chunkReportData(rd, 200) // tight budget to force many chunks.
+	chunks, err := chunkReportData(rd, 200, reportChunkHardCap) // tight budget to force many chunks.
 	if err != nil {
 		t.Fatalf("chunkReportData: %v", err)
 	}
@@ -479,7 +479,7 @@ func TestChunkReportData_SuppressResponseRidesLastChunk(t *testing.T) {
 		reports[i] = makeAttributeReport(uint16(i + 1))
 	}
 	rd := im.ReportData{Reports: reports, SuppressResponse: true}
-	chunks, err := chunkReportData(rd, 200)
+	chunks, err := chunkReportData(rd, 200, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData: %v", err)
 	}
@@ -501,7 +501,7 @@ func TestChunkReportData_SuppressResponseRidesLastChunk(t *testing.T) {
 // receiver still expects one terminating ReportDataMessage.
 func TestChunkReportData_EmptyInputProducesOneChunk(t *testing.T) {
 	t.Parallel()
-	chunks, err := chunkReportData(im.ReportData{}, reportChunkPayloadBudget)
+	chunks, err := chunkReportData(im.ReportData{}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData: %v", err)
 	}
@@ -532,7 +532,7 @@ func TestChunkReportData_EventReports_FastPath(t *testing.T) {
 		SubscriptionID:  1,
 		EventReports:    []im.EventReport{makeEventReport(1)},
 	}
-	chunks, err := chunkReportData(rd, reportChunkPayloadBudget)
+	chunks, err := chunkReportData(rd, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData (event fast path): %v", err)
 	}
@@ -551,7 +551,7 @@ func TestChunkReportData_EventReports_Splits(t *testing.T) {
 		events[i] = makeEventReport(uint16(i + 1)) //nolint:gosec // test fixture
 	}
 	rd := im.ReportData{HasSubscription: true, SubscriptionID: 2, EventReports: events}
-	chunks, err := chunkReportData(rd, 200) // tight budget
+	chunks, err := chunkReportData(rd, 200, reportChunkHardCap) // tight budget
 	if err != nil {
 		t.Fatalf("chunkReportData (event splits): %v", err)
 	}
@@ -581,7 +581,7 @@ func TestChunkReportData_MixedReports_Splits(t *testing.T) {
 		events[i] = makeEventReport(uint16(i + 1)) //nolint:gosec // test fixture
 	}
 	rd := im.ReportData{Reports: reports, EventReports: events}
-	chunks, err := chunkReportData(rd, 200)
+	chunks, err := chunkReportData(rd, 200, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData (mixed): %v", err)
 	}
@@ -633,7 +633,7 @@ func TestChunkReportData_SplitsOversizedList(t *testing.T) {
 	t.Parallel()
 	rep := bigPartsList(1, 2000)
 	rep.DataVersion = 77
-	chunks, err := chunkReportData(im.ReportData{Reports: []im.AttributeReport{makeAttributeReport(9), rep}}, reportChunkPayloadBudget)
+	chunks, err := chunkReportData(im.ReportData{Reports: []im.AttributeReport{makeAttributeReport(9), rep}}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData: %v", err)
 	}
@@ -701,7 +701,7 @@ func TestChunkReportData_OversizedSingleAttributeDowngradesToStatus(t *testing.T
 	rep := bigOctets(1, 4000) // ~4 KB encoded, well past reportChunkHardCap.
 	rd := im.ReportData{Reports: []im.AttributeReport{rep}}
 
-	chunks, err := chunkReportData(rd, reportChunkPayloadBudget)
+	chunks, err := chunkReportData(rd, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData: %v", err)
 	}
@@ -745,7 +745,7 @@ func TestChunkReportData_OversizedSingleAttributeAmongOthers(t *testing.T) {
 	}
 	rd := im.ReportData{Reports: reports}
 
-	chunks, err := chunkReportData(rd, reportChunkPayloadBudget)
+	chunks, err := chunkReportData(rd, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData: %v", err)
 	}
@@ -798,7 +798,7 @@ func TestChunkReportData_OversizedSingleEventDowngradesToStatus(t *testing.T) {
 	}
 	rd := im.ReportData{HasSubscription: true, SubscriptionID: 1, EventReports: []im.EventReport{ev}}
 
-	chunks, err := chunkReportData(rd, reportChunkPayloadBudget)
+	chunks, err := chunkReportData(rd, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatalf("chunkReportData: %v", err)
 	}

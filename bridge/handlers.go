@@ -897,13 +897,14 @@ func (a *MRPAckAdapter) Discharge(sessionID, exchangeID uint16, initiator bool) 
 // non-nil `fabricFor` closure — Subscribe, ACL checks and any other
 // fabric-scoped logic can then resolve `(sessionID → fabricIndex)`.
 type OperationalSessionLookup struct {
-	get         func(sessionID uint16) (*channel.Session, bool)
-	fabricFor   func(sessionID uint16) (uint8, bool)
-	subjectFor  func(sessionID uint16) (uint64, []uint32, bool)
-	paseFor     func(sessionID uint16) (bool, bool)
-	intervalFor func(sessionID uint16, now time.Time) (time.Duration, bool)
-	markRx      func(sessionID uint16)
-	markTx      func(sessionID uint16)
+	get           func(sessionID uint16) (*channel.Session, bool)
+	fabricFor     func(sessionID uint16) (uint8, bool)
+	subjectFor    func(sessionID uint16) (uint64, []uint32, bool)
+	paseFor       func(sessionID uint16) (bool, bool)
+	intervalFor   func(sessionID uint16, now time.Time) (time.Duration, bool)
+	transportsFor func(sessionID uint16) (uint16, uint32, bool)
+	markRx        func(sessionID uint16)
+	markTx        func(sessionID uint16)
 }
 
 // SessionFabricResolver is an optional capability a [SessionLookup]
@@ -1055,6 +1056,27 @@ func (l *OperationalSessionLookup) WithRetransmitIntervalResolver(intervalFor fu
 	}
 	l.intervalFor = intervalFor
 	return l
+}
+
+// WithTransportResolver installs the closure [OperationalSessionLookup.TransportParametersFor]
+// answers from: the peer's SupportedTransports bitmap and MaxTcpMessageSize
+// a host keeps on its operational entry ([operational.Entry.PeerTransportParameters]).
+func (l *OperationalSessionLookup) WithTransportResolver(transportsFor func(sessionID uint16) (uint16, uint32, bool)) *OperationalSessionLookup {
+	if l == nil {
+		return nil
+	}
+	l.transportsFor = transportsFor
+	return l
+}
+
+// TransportParametersFor implements [SessionTransportResolver]. Returns
+// (0, 0, false) when no resolver closure was supplied or the session is
+// unknown.
+func (l *OperationalSessionLookup) TransportParametersFor(sessionID uint16) (transports uint16, maxTCPMessageSize uint32, ok bool) {
+	if l == nil || l.transportsFor == nil {
+		return 0, 0, false
+	}
+	return l.transportsFor(sessionID)
 }
 
 // RetransmitBaseInterval implements [SessionRetransmitIntervalResolver].

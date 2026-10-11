@@ -11,15 +11,12 @@ import (
 	"sort"
 	"testing"
 
-	mattercore "github.com/SukramJ/go-fabric/cluster/core"
-	matterlock "github.com/SukramJ/go-fabric/cluster/lock"
-	mattermeasure "github.com/SukramJ/go-fabric/cluster/measurement"
+	matterbridge "github.com/SukramJ/go-fabric/bridge"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
-	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/parity"
-	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // writerEncodes reports whether the bridge's attribute value writer
@@ -31,28 +28,7 @@ import (
 // unexported; this list transcribes its type switch, and
 // TestFleetWireShapes's report asks for an exported predicate instead
 // (notes/briefs/reports/O.md).
-func writerEncodes(v any) bool {
-	switch v.(type) {
-	case bool, uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64,
-		string, tlv.BoundedString, []byte,
-		mattercore.BasicCommissioningInfoStruct,
-		[]mattercore.AccessControlEntryStruct, []mattercore.AccessControlAuxiliaryEntryStruct,
-		[]mattercore.GroupcastMembershipStruct, []mattercore.NetworkInterfaceStruct,
-		[]mattercore.FabricDescriptorStruct, []mattercore.NOCStruct, [][]byte,
-		[]mattercore.AccessControlExtensionEntry, []any, []uint32, []uint16,
-		[]mattercore.NetworkInfoStruct, []mattercore.GroupKeyMapStruct, []mattercore.GroupInfoMapStruct,
-		[]mattercore.TargetStruct, []mattercore.DeviceTypeStruct, []mattermeasure.AccuracyStruct,
-		matterlock.LockOperationEvent, mattercore.AccessControlEntryChangedEvent,
-		mattercore.AuxiliaryAccessUpdatedEvent, mattercore.GroupcastTestingEvent,
-		mattercore.AccessControlExtensionChangedEvent,
-		// encodeApplicationValue
-		[]string, []clusterwire.OperationalStateStruct, []clusterwire.ModeOptionStruct, spec.Encodable,
-		// encodeScenesResponse
-		[]mattercore.SceneInfoStruct:
-		return true
-	}
-	return false
-}
+func writerEncodes(v any) bool { return matterbridge.EncodesAttributeValue(v) }
 
 // schemaNullable maps cluster id → attribute id → the attribute's
 // nullable quality ("X"), from the embedded matter.js snapshot

@@ -18,6 +18,20 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- Session establishment over TCP: a PASE or CASE message that arrives on a
+  TCP connection is served on it, as matter.js creates the unsecured
+  session from whichever channel carried the message
+  (`ExchangeManager.ts:241-264`); replies go back on the connection without
+  MRP. Reply chunking is route-aware: over a reliable connection the
+  ReportData and InvokeResponse chunkers fill the connection's frame,
+  bounded by the peer's stated MaxTcpMessageSize
+  (`bridge.SessionTransportResolver`, wired by the reference daemon from the
+  operational entry), and keep the UDP datagram budget otherwise.
+  `bridge.EncodesAttributeValue` tells a fleet guard whether the attribute
+  writer knows a value's type (the reference daemon's wire-shape guard uses
+  it instead of a copy of the writer's type switch). The harness runs the
+  daemon with TCP on (`MCORE.SC.S.TCP=1`, TC-SC-4.3's `T` key check) and
+  with `--ota-harness`.
 - Matter TCP transport (ADR 0019, phase 3). `transport.Conn`
   (`Send`, `Remote`, `Reliable`) is the connection a message arrived on;
   `transport/tcp` is the length-framed listener and dialer ported from

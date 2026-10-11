@@ -225,7 +225,8 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestH
 		b.logger.Debug("matter.tx.im.read_event_reports",
 			slog.Int("event_reports", len(report.EventReports)))
 	}
-	chunks, err := chunkReportData(report, reportChunkPayloadBudget)
+	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
+	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "chunk_report", src, err)
 		return err
@@ -540,7 +541,8 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, reques
 			slog.Int("statuses", len(resp.Responses)))
 		return nil
 	}
-	chunks, err := chunkInvokeResponse(resp, reportChunkPayloadBudget)
+	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
+	chunks, err := chunkInvokeResponse(resp, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "encode_invoke", src, err)
 		return err
@@ -790,13 +792,13 @@ func renderCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map
 // InvokeResponse split by maxPayloadSize). Found by the CHIP Python harness
 // (TC-IDM-1.4 step 11 batches two commands whose responses exceed one
 // message).
-func chunkInvokeResponse(resp im.InvokeResponse, budget int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one
+func chunkInvokeResponse(resp im.InvokeResponse, budget, hardCap int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one
 	whole, err := EncodeInvokeResponse(resp)
 	if err != nil {
 		return nil, err
 	}
 	if len(whole) <= budget || len(resp.Responses) <= 1 {
-		if len(whole) > reportChunkHardCap && len(resp.Responses) == 1 {
+		if len(whole) > hardCap && len(resp.Responses) == 1 {
 			resp.Responses[0] = oversizedInvokeEntry(resp.Responses[0])
 			whole, err = EncodeInvokeResponse(resp)
 			if err != nil {
@@ -834,7 +836,7 @@ func chunkInvokeResponse(resp im.InvokeResponse, budget int) ([][]byte, error) {
 				return nil, err
 			}
 		}
-		if len(body) > reportChunkHardCap {
+		if len(body) > hardCap {
 			ent = oversizedInvokeEntry(ent)
 		}
 		cur.Responses = append(cur.Responses, ent)

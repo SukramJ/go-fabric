@@ -717,7 +717,8 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // common case — still does not wait: its StatusResponse is consumed by the
 // subscription's own report bookkeeping.
 func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uint32, error) {
-	chunks, err := chunkReportData(report, reportChunkPayloadBudget)
+	limits := b.chunkLimitsFor(target.src, target.sessionID)
+	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "chunk_ongoing_report", target.src, err)
 		return nil, err

@@ -290,23 +290,29 @@ func (f *fakeConn) Send(msg []byte) error {
 func (f *fakeConn) Remote() net.Addr { return &net.TCPAddr{IP: net.IPv6loopback, Port: 40000} }
 func (f *fakeConn) Reliable() bool   { return true }
 
-// TestReceiveOverReliableDropsUnsecuredAndGroup: session establishment
-// over TCP is not served (owner work, ADR 0019) and group messages are
-// UDP multicast only.
-func TestReceiveOverReliableDropsUnsecuredAndGroup(t *testing.T) {
+// TestReceiveOverReliableServesUnsecuredDropsGroup: an unsecured
+// (handshake) message over TCP reaches the dispatcher like one over UDP
+// (matter.js ExchangeManager.ts:241-264 creates the unsecured session from
+// whichever channel carried the message; ADR 0019), while group messages
+// stay UDP multicast only.
+func TestReceiveOverReliableServesUnsecuredDropsGroup(t *testing.T) {
 	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
 	c := &fakeConn{}
 	unsecured := message.Header{SessionID: 0, MessageCounter: 1}
+	// A PBKDFParamRequest without a payload: the dispatcher answers it
+	// (with a status report or nothing), the point is that it is not
+	// refused for its transport.
 	buf := append(unsecured.Marshal(), message.ProtocolHeader{Initiator: true, Opcode: 0x20, ProtocolID: mrp.SecureChannelProtocolID}.Marshal()...)
-	if err := b.receive(context.Background(), buf, c); !errors.Is(err, ErrUnsecuredOverReliable) {
-		t.Fatalf("unsecured over TCP: %v", err)
+	if err := b.receive(context.Background(), buf, c); errors.Is(err, ErrGroupOverReliable) {
+		t.Fatalf("unsecured over TCP refused as a transport error: %v", err)
 	}
 	group := message.Header{SessionID: 0x0101, SessionType: message.SessionGroup, MessageCounter: 1}
+	sentBefore := len(c.sent)
 	if err := b.receive(context.Background(), group.Marshal(), c); !errors.Is(err, ErrGroupOverReliable) {
 		t.Fatalf("group over TCP: %v", err)
 	}
-	if len(c.sent) != 0 {
-		t.Fatalf("%d replies to dropped messages", len(c.sent))
+	if len(c.sent) != sentBefore {
+		t.Fatalf("%d replies to a dropped group message", len(c.sent)-sentBefore)
 	}
 	if isUnsecuredUnicast([]byte{0}) {
 		t.Fatal("short buffer read as unsecured")

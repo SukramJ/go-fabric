@@ -298,7 +298,8 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 // chunk after the first piggybacks the acknowledgement of the peer's
 // previous StatusResponse.
 func (b *Bridge) sendPrimingReport(target subTarget, report im.ReportData) error {
-	chunks, err := chunkReportData(report, reportChunkPayloadBudget)
+	limits := b.chunkLimitsFor(target.src, target.sessionID)
+	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
 	if err != nil {
 		return err
 	}

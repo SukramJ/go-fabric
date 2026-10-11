@@ -33,13 +33,6 @@ import (
 // identity is the connection's: a session bound to it can be found again
 // when the connection drops.
 
-// ErrUnsecuredOverReliable reports an unsecured (PASE / CASE handshake)
-// message that arrived over TCP. Session establishment over TCP is not
-// served yet (ADR 0019: owner work in secure/ and commissioning/); the
-// message is dropped, which the peer sees as a handshake that never
-// answers.
-var ErrUnsecuredOverReliable = errors.New("bridge: unsecured message over a reliable connection is not served")
-
 // ErrGroupOverReliable reports a group message that arrived over TCP.
 // Group messages are multicast UDP only.
 var ErrGroupOverReliable = errors.New("bridge: group message over a reliable connection")
@@ -197,12 +190,13 @@ func (b *Bridge) receive(ctx context.Context, buf []byte, c transport.Conn) erro
 			b.logger.Debug("matter.tcp.rx.group_dropped", slog.String("conn", route.String()))
 			return ErrGroupOverReliable
 		}
-		if isUnsecuredUnicast(buf) {
-			b.logger.Debug("matter.tcp.rx.unsecured_dropped",
-				slog.String("conn", route.String()),
-				slog.String("hint", "PASE / CASE over TCP is not served; the controller has to establish the session over UDP"))
-			return ErrUnsecuredOverReliable
-		}
+		// An unsecured (PASE / CASE handshake) message is served on the
+		// connection like any other: matter.js creates the unsecured
+		// session for an inbound message from whatever channel carried it
+		// (ExchangeManager.ts:241-264 `createUnsecuredSession({ channel,
+		// initiatorNodeId })`), and its secure-channel servers never ask
+		// which transport they run on. Replies go back on the connection
+		// (sendVia) without MRP (routeUsesMRP).
 	}
 	return b.dispatch(ctx, buf, route)
 }
