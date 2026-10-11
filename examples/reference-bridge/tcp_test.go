@@ -13,12 +13,12 @@ import (
 // resolveTcpConfig: true → both, false / unset → none, else the roles.
 func TestParseTCPFlag(t *testing.T) {
 	cases := map[string]matterbridge.TCPConfig{
-		"true":              {Incoming: true, Outgoing: true},
-		"false":             {},
-		"":                  {},
-		"incoming":          {Incoming: true},
-		"outgoing":          {Outgoing: true},
-		"incoming,outgoing": {Incoming: true, Outgoing: true},
+		"true":               {Incoming: true, Outgoing: true},
+		"false":              {},
+		"":                   {},
+		"incoming":           {Incoming: true},
+		"outgoing":           {Outgoing: true},
+		"incoming,outgoing":  {Incoming: true, Outgoing: true},
 		"outgoing, incoming": {Incoming: true, Outgoing: true},
 	}
 	for in, want := range cases {
