@@ -8,9 +8,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	tsuic "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/internal/paritytest"
@@ -97,6 +99,56 @@ func TestThermostatUIInitialValues(t *testing.T) {
 	srv = newTSUIC(t, thermo.ThermostatUIConfig{TemperatureDisplayMode: &f})
 	if v, _ := srv.MatterRead(tsuic.AttrTemperatureDisplayMode); v != uint8(thermo.TemperatureDisplayFahrenheit) {
 		t.Errorf("TemperatureDisplayMode = %v, want Fahrenheit", v)
+	}
+}
+
+// TestThermostatUIDisplayModeFromUnitLocalization: with no configured
+// TemperatureDisplayMode, the same endpoint's UnitLocalization decides it
+// once, at construction — Fahrenheit when its TemperatureUnit is
+// Fahrenheit, else Celsius; a configured mode wins. Mirrors matter.js
+// packages/node/src/behaviors/thermostat-user-interface-configuration/
+// ThermostatUserInterfaceConfigurationServer.ts:16-28.
+func TestThermostatUIDisplayModeFromUnitLocalization(t *testing.T) {
+	t.Parallel()
+	unit := func(u unitdef.TempUnitEnum) *spec.Server {
+		t.Helper()
+		srv, err := core.NewUnitLocalization(core.UnitLocalizationConfig{
+			TemperatureUnit:           &u,
+			SupportedTemperatureUnits: []unitdef.TempUnitEnum{unitdef.TempUnitFahrenheit, unitdef.TempUnitCelsius, unitdef.TempUnitKelvin},
+		})
+		if err != nil {
+			t.Fatalf("NewUnitLocalization: %v", err)
+		}
+		return srv
+	}
+	celsius := thermo.TemperatureDisplayCelsius
+	cases := []struct {
+		name string
+		cfg  thermo.ThermostatUIConfig
+		want thermo.TemperatureDisplayMode
+	}{
+		{"no UnitLocalization", thermo.ThermostatUIConfig{}, thermo.TemperatureDisplayCelsius},
+		{"UnitLocalization Fahrenheit", thermo.ThermostatUIConfig{UnitLocalization: unit(unitdef.TempUnitFahrenheit)}, thermo.TemperatureDisplayFahrenheit},
+		{"UnitLocalization Celsius", thermo.ThermostatUIConfig{UnitLocalization: unit(unitdef.TempUnitCelsius)}, thermo.TemperatureDisplayCelsius},
+		{"UnitLocalization Kelvin", thermo.ThermostatUIConfig{UnitLocalization: unit(unitdef.TempUnitKelvin)}, thermo.TemperatureDisplayCelsius},
+		{"configured mode wins", thermo.ThermostatUIConfig{TemperatureDisplayMode: &celsius, UnitLocalization: unit(unitdef.TempUnitFahrenheit)}, thermo.TemperatureDisplayCelsius},
+	}
+	for _, tc := range cases {
+		srv := newTSUIC(t, tc.cfg)
+		if v, _ := srv.MatterRead(tsuic.AttrTemperatureDisplayMode); v != uint8(tc.want) {
+			t.Errorf("%s: TemperatureDisplayMode = %v, want %d", tc.name, v, tc.want)
+		}
+	}
+
+	// Once, at construction: a later change of the unit leaves the
+	// display mode alone.
+	ul := unit(unitdef.TempUnitCelsius)
+	srv := newTSUIC(t, thermo.ThermostatUIConfig{UnitLocalization: ul})
+	if err := ul.Set(unitdef.AttrTemperatureUnit, unitdef.TempUnitFahrenheit); err != nil {
+		t.Fatalf("Set TemperatureUnit: %v", err)
+	}
+	if v, _ := srv.MatterRead(tsuic.AttrTemperatureDisplayMode); v != uint8(thermo.TemperatureDisplayCelsius) {
+		t.Errorf("TemperatureDisplayMode followed a later unit change: %v", v)
 	}
 }
 

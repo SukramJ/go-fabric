@@ -66,7 +66,46 @@ func (i *Instance) ValidateWrite(attrID uint32, value any, peers Peers) (any, er
 	if err != nil {
 		return nil, err
 	}
+	if a.Constraint.In != "" && v != nil && !i.inPeer(a.Constraint.In, v, peers) {
+		return nil, Errorf(im.StatusConstraintError, "%s: %s %v is not one of the values allowed by %q", i.def.Name, a.Name, v, a.Constraint.Text)
+	}
 	return v, nil
+}
+
+// inPeer evaluates an "in" constraint: v must be one of the entries of the
+// peer attribute named by in. An unresolved peer is an empty set, which
+// admits nothing — unlike an unresolved bound. Mirrors matter.js
+// packages/node/src/behavior/state/validation/constraint.ts:153-163 (the
+// "in" validator throws ConstraintError) and
+// packages/model/src/aspects/Constraint.ts:164-170 (test: a non-array
+// operand is a one-entry set, an undefined one an empty set, membership by
+// identity).
+func (i *Instance) inPeer(in string, v any, peers Peers) bool {
+	if peers == nil {
+		return false
+	}
+	a := i.def.AttributeByName(in)
+	if a == nil {
+		return false
+	}
+	set, ok := peers(a.ID)
+	if !ok || set == nil {
+		return false
+	}
+	want := underlying(v)
+	if !reflect.ValueOf(want).Comparable() {
+		return false
+	}
+	rv := reflect.ValueOf(set)
+	if rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array {
+		return underlying(set) == want
+	}
+	for n := range rv.Len() {
+		if underlying(entryValue(rv.Index(n).Interface())) == want {
+			return true
+		}
+	}
+	return false
 }
 
 // CheckValue holds a value of the attribute attrID to its type, its

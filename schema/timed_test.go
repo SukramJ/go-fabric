@@ -33,7 +33,10 @@ func TestIsTimedInvoke(t *testing.T) {
 		{"DoorLock/LockDoor", 0x0101, 0x00, true},
 		{"DoorLock/UnlockDoor", 0x0101, 0x01, true},
 		{"DoorLock/UnboltDoor", 0x0101, 0x27, true},
-		{"DoorLock/UnknownCommand", 0x0101, 0x02, false},
+		{"DoorLock/Toggle", 0x0101, 0x02, true},
+		{"DoorLock/GetWeekDaySchedule", 0x0101, 0x0C, false},
+		{"EnergyEvse/EnableCharging", 0x0099, 0x2, true},
+		{"ClosureDimension/SetTarget", 0x0105, 0x0, true},
 		{"ClosureControl/Stop", 0x0104, 0x0, false},
 		{"ClosureControl/MoveTo", 0x0104, 0x1, true},
 		{"ClosureControl/Calibrate", 0x0104, 0x2, true},
@@ -126,13 +129,8 @@ func TestTimedInvokeParity(t *testing.T) {
 		want      map[uint32]struct{}
 		idRange   uint32 // exclusive upper bound scanned for typo/false-positive detection
 		// fullCoverage is true when want equals the cluster's ENTIRE
-		// matter.js timed-command set (AdministratorCommissioning: every
-		// command is "A T"). It is false for clusters where the bridge only
-		// implements a subset of the cluster's commands — DoorLock ships
-		// LockDoor/UnlockDoor/UnboltDoor only; matter.js also marks
-		// SetUser/ClearUser/SetCredential/ClearCredential/Aliro commands as
-		// timed, but those are not yet exposed by the bridge so they are
-		// intentionally absent from timedInvokePaths.
+		// matter.js timed-command set. Since timedInvokePaths is generated
+		// from parity/schema.json every cluster's set is complete.
 		fullCoverage bool
 	}{
 		{
@@ -147,8 +145,12 @@ func TestTimedInvokeParity(t *testing.T) {
 			name:      "DoorLock",
 			clusterID: 0x0101,
 			file:      "door-lock-cluster.element.ts",
-			want:      map[uint32]struct{}{0x00: {}, 0x01: {}, 0x27: {}},
-			idRange:   0x30,
+			want: map[uint32]struct{}{
+				0x00: {}, 0x01: {}, 0x02: {}, 0x03: {}, 0x1A: {}, 0x1D: {},
+				0x22: {}, 0x26: {}, 0x27: {}, 0x28: {}, 0x29: {},
+			},
+			idRange:      0x30,
+			fullCoverage: true,
 		},
 		{
 			// MoveTo is "O T" (closure-control.element.ts:78) and Calibrate

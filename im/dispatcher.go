@@ -151,6 +151,19 @@ type CommandInvokePrivilegeProvider interface {
 	MinInvokePrivilege(endpoint uint16, clusterID, cmdID uint32) uint8
 }
 
+// TimedCommandProvider is the optional [Dispatcher] capability
+// [HandleInvokeRequest] consults for whether a concrete command needs a
+// timed interaction: the dispatcher asks the cluster server it resolves
+// (contract.TimedCommander, answered from a generated definition's model)
+// and falls back to schema.IsTimedInvoke for a hand-written server or a
+// path it does not resolve. A dispatcher without it is answered by
+// schema.IsTimedInvoke alone. Mirrors matter.js
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295,
+// which reads `limits.timed` from the command's model.
+type TimedCommandProvider interface {
+	IsTimedCommand(endpoint uint16, clusterID, cmdID uint32) bool
+}
+
 // CommandPathChecker is the optional [Dispatcher] capability
 // [HandleInvokeRequest] consults for a concrete command path's existence
 // before the payload check: UNSUPPORTED_ENDPOINT,

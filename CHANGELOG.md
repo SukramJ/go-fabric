@@ -18,6 +18,12 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `thermo.ThermostatUIConfig.UnitLocalization` (optional `*spec.Server`):
+  with no configured TemperatureDisplayMode, the same endpoint's
+  UnitLocalization decides it at construction — Fahrenheit when its
+  TemperatureUnit is Fahrenheit, else Celsius — as matter.js's
+  ThermostatUserInterfaceConfigurationServer initialize does.
+
 - Reference daemon, for the certification harness: FixedLabel and UserLabel
   on the Aggregator endpoint and FixedLabel on the first bridged light (the
   CSA cases written against the CHIP all-clusters app address endpoint 1);
@@ -331,6 +337,24 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- ModeSelect SupportedModes is encoded by the generated codec
+  (`cluster/spec/modeselect`): `modeselect.Server` reads it as a
+  `spec.List[ModeOptionStruct]` and the bridge's hand-written case is gone.
+  On the wire, SemanticTag MfgCode and Value now take the smallest integer
+  width, as matter.js's `TlvOfModel` writes them (they were always two
+  bytes). The list, its SemanticTags and Label are no longer trimmed at
+  encode time: matter.js trims nothing, and the bounds
+  (`SupportedModesMaxEntries`, `SemanticTagsMaxEntries`, `LabelMaxBytes`)
+  are now documented on `ModeSource.SupportedModes` as the host's part.
+
+- `cluster/spec` evaluates an "in" constraint on a controller write
+  (`Instance.ValidateWrite`): the value must be an entry of the named peer
+  attribute's current list, else CONSTRAINT_ERROR before the sink sees it;
+  an unresolved peer admits nothing, as matter.js's `Constraint.test`.
+  LocalizationConfiguration ActiveLocale and TimeFormatLocalization
+  ActiveCalendarType answer as before; their hand-written membership checks
+  are gone.
+
 - `contract.MeasurementClass` gains seven built-in classes after
   `MeasurementFlow`. The built-in values keep their numbers; the classes
   `RegisterMeasurementKind` hands out start seven higher, so a host that
@@ -586,8 +610,31 @@ the same `ColorTemperatureWriter` as before.
 - `endpoint.Topology.Bridged` leaves out parts (`Endpoint.Part`): they are
   components of a bridged device, not bridged devices.
 
+### Deprecated
+
+- `github.com/SukramJ/go-fabric/cluster/modeselect`: the field-tag
+  constants `ModeOptionFieldLabel`, `ModeOptionFieldMode`,
+  `ModeOptionFieldSemanticTags`, `SemanticTagFieldMfgCode` and
+  `SemanticTagFieldValue`. Replacement: the generated codec
+  (`cluster/spec/modeselect` `ModeOptionStruct.EncodeTLV`,
+  `SemanticTagStruct.EncodeTLV`), which carries the field ids itself.
+  Removal permissible in the second minor release after the one that ships
+  this entry.
+
 ### Fixed
 
+- **Timed commands come from the model.** An untimed invoke of a command
+  matter.js marks "T" answers NEEDS_TIMED_INTERACTION for every cluster,
+  not only for the hand-pinned AdministratorCommissioning, DoorLock and
+  ClosureControl commands: an untimed EnergyEvse EnableCharging or
+  ClosureDimension SetTarget used to be accepted. The IM asks the resolved
+  cluster server first through the new optional `contract.TimedCommander`
+  (implemented by `spec.Instance`, so by `spec.Server` and every server
+  embedding an Instance); `schema.IsTimedInvoke` is now generated from
+  `parity/schema.json` (`schema/timed_gen.go`, `make
+  generate-matter-schema`) and remains the fallback for hand-written
+  servers. New optional dispatcher capability `im.TimedCommandProvider`,
+  implemented by `endpoint.TopologyDispatcher`.
 - **A transition's rate and its RemainingTime came from two reads of the
   current value.** `cluster/light` (MoveToSaturation, MoveToColorTemperature)
   and `cluster/levelcontrol` read the current value, computed the rate, and

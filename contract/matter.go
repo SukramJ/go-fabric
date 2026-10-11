@@ -227,6 +227,21 @@ type ClusterCommandInvokePrivilege interface {
 	MinInvokePrivilege(cmdID uint32) uint8
 }
 
+// TimedCommander is the optional capability a [ClusterServer] implements
+// to answer, from its own model, whether a request command needs a timed
+// interaction (the "T" access quality). The IM invoke layer asks the
+// resolved server before it falls back to the module's generated table
+// (schema.IsTimedInvoke); a command it reports true for, invoked outside a
+// timed interaction, answers NEEDS_TIMED_INTERACTION. Mirrors matter.js
+// packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295
+// (`limits.timed && !this.session.timed`), which reads the flag from the
+// command's model for every cluster.
+type TimedCommander interface {
+	// IsTimedCommand reports whether the request command cmdID may only be
+	// invoked inside a timed interaction.
+	IsTimedCommand(cmdID uint32) bool
+}
+
 // MeasurementClass classifies Generic.Sensor / BinarySensor and
 // Calculated DP instances by Matter cluster without name-matching at
 // publish time. The model layer computes this once at materialisation

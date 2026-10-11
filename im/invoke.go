@@ -531,6 +531,13 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 	aclChecker, hasACL := d.(ACLChecker)
 	privProvider, hasPrivProvider := d.(CommandInvokePrivilegeProvider)
 	pathChecker, hasPathChecker := d.(CommandPathChecker)
+	timedProvider, hasTimedProvider := d.(TimedCommandProvider)
+	isTimed := func(inv CommandInvocation) bool {
+		if hasTimedProvider && inv.Path.HasEndpoint {
+			return timedProvider.IsTimedCommand(inv.Path.Endpoint, inv.Path.Cluster, inv.Path.Command)
+		}
+		return schema.IsTimedInvoke(inv.Path.Cluster, inv.Path.Command)
+	}
 
 	// invokePrivilege returns the minimum privilege needed to invoke the
 	// given command. Falls back to Operate (3) — the Matter §9.10.4.4
@@ -606,8 +613,10 @@ func HandleInvokeRequest(ctx context.Context, d Dispatcher, req InvokeRequest) I
 		}
 		// A timed-required command ("T") outside a timed interaction answers
 		// NeedsTimedInteraction for its own path, after the access and
-		// fabric checks — matter.js CommandInvokeResponse.ts:291-294.
-		if timed, known := TimedInteractionFromContext(ctx); known && !timed && schema.IsTimedInvoke(inv.Path.Cluster, inv.Path.Command) {
+		// fabric checks — matter.js CommandInvokeResponse.ts:292-295. The
+		// resolved server answers from its model first ([TimedCommandProvider]),
+		// the generated schema table otherwise.
+		if timed, known := TimedInteractionFromContext(ctx); known && !timed && isTimed(inv) {
 			ir.Responses = append(ir.Responses, InvokeResponseEntry{
 				Path:          ConcreteCommandPath{Endpoint: inv.Path.Endpoint, Cluster: inv.Path.Cluster, Command: inv.Path.Command, HasEndpoint: true, HasCluster: true, HasCommand: true},
 				CommandRef:    inv.CommandRef,
