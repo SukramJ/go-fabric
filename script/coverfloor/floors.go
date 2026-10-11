@@ -121,6 +121,11 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
+	{
+		pkg: "github.com/SukramJ/go-fabric/node",
+		min: 56,
+		why: "the end-to-end tests run PASE, reads and a subscription over UDP; the CASE responder and initiator, the fabric hooks, the enhanced commissioning window and the OTA applier need a commissioned fabric (AddNOC) the package's tests do not build yet",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
 	// This tool. Its parser and comparison are covered; main() — flag

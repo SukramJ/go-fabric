@@ -18,6 +18,24 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `node/`: the node facade (ADR 0018 decision 5), mirroring matter.js
+  `ServerNode` / `Node`. `node.Config` groups the configuration by
+  matter.js behaviour id — `Network` (listen address, IPv4, TCP),
+  `Commissioning` (passcode, discriminator, PBKDF parameters),
+  `ProductDescription`, `BasicInformation` — plus the store (`*sql.DB`, or
+  the two stores), the advertiser, the device-type validation mode, the
+  attestation material (the CSA test chain by default), an optional OTA
+  requestor and the logger; `Validate` applies the reference daemon's
+  checks. `node.New` performs the daemon's bring-up with every bridge port
+  wired in the order `bridge/bridge.go` documents; `Start`, `Stop` (both
+  idempotent) and `Run` the post-start sequence and the shutdown.
+  `node.Aggregator` (`Add`, `Remove`, `Endpoints`,
+  `IncreaseConfigurationVersion`) holds the bridged endpoints — anything
+  with `Spec() endpoint.Spec` — and reassembles a running node; NodeLabel
+  writes, ConfigurationVersion and scene tables persist under the daemon's
+  settings keys. `Bridge()`, `Root()` (the root servers), `Store()`,
+  `CommissioningWindow()`, `Fabrics()` and `PairingCodes()` reach the
+  ports the facade does not cover.
 - `cluster/onoff.Server`: the default OnOff server, a port of matter.js
   `OnOffBaseServer` (`packages/node/src/behaviors/on-off/OnOffServer.ts`)
   on the generated definition. `onoff.New(Config)` takes the feature
