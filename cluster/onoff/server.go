@@ -97,6 +97,11 @@ type Config struct {
 	BootReason func() uint8
 	// Clock is the timer seam; nil is the wall clock.
 	Clock Clock
+	// Bridged marks a server on an endpoint under the Aggregator: matter.js
+	// does not apply StartUpOnOff there
+	// (OnOffServer.ts:37, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
+	// The device layer sets it for a device added under the Aggregator.
+	Bridged bool
 }
 
 // ErrInvalidConfig reports a configuration the cluster's model refuses.
@@ -147,7 +152,8 @@ var (
 )
 
 // New builds an OnOff server. With LT, StartUpOnOff is applied to OnOff
-// unless the boot reason is SoftwareUpdateCompleted (OnOffServer.ts:34-50).
+// unless the boot reason is SoftwareUpdateCompleted or the server is
+// Bridged (OnOffServer.ts:34-50).
 func New(cfg Config) (*Server, error) {
 	srv, err := spec.NewServer(onoffdef.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{DataVersion: cfg.DataVersion})
 	if err != nil {
@@ -170,7 +176,9 @@ func New(cfg Config) (*Server, error) {
 	if err := srv.SetAttributes(initial); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
-	if s.lighting && (cfg.BootReason == nil || cfg.BootReason() != bootReasonSoftwareUpdateCompleted) {
+	// OnOffServer.ts:34-38: lighting, not after a software update, not
+	// under an Aggregator.
+	if s.lighting && !cfg.Bridged && (cfg.BootReason == nil || cfg.BootReason() != bootReasonSoftwareUpdateCompleted) {
 		s.applyStartUp()
 	}
 	srv.Handle(CmdOff, s.command(func(ctx context.Context, st *state, _ any) error { return s.off(ctx, st) }))

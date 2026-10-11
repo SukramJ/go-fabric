@@ -184,7 +184,8 @@ func statusOf(err error) im.StatusCode {
 
 // TestStartUpOnOff holds the boot rule (OnOffServer.ts:34-50): with LT a
 // non-null StartUpOnOff sets OnOff — Toggle inverts it — unless the boot
-// reason is SoftwareUpdateCompleted; without LT nothing is applied.
+// reason is SoftwareUpdateCompleted or the server is Bridged (:37); without
+// LT nothing is applied.
 func TestStartUpOnOff(t *testing.T) {
 	t.Parallel()
 	sw := uint8(5) // GeneralDiagnostics BootReason SoftwareUpdateCompleted
@@ -195,17 +196,21 @@ func TestStartUpOnOff(t *testing.T) {
 		initial bool
 		startUp any
 		boot    *uint8
+		bridged bool
 		want    bool
 	}{
-		{"null keeps off", onoff.FeatureLT, false, nil, nil, false},
-		{"null keeps on", onoff.FeatureLT, true, nil, nil, true},
-		{"On", onoff.FeatureLT, false, onoff.StartUpOn, nil, true},
-		{"Off", onoff.FeatureLT, true, onoff.StartUpOff, nil, false},
-		{"Toggle off→on", onoff.FeatureLT, false, onoff.StartUpToggle, nil, true},
-		{"Toggle on→off", onoff.FeatureLT, true, onoff.StartUpToggle, nil, false},
-		{"power-on reboot applies", onoff.FeatureLT, false, onoff.StartUpOn, &power, true},
-		{"software update skips", onoff.FeatureLT, false, onoff.StartUpOn, &sw, false},
-		{"no LT", 0, false, nil, nil, false},
+		{"null keeps off", onoff.FeatureLT, false, nil, nil, false, false},
+		{"null keeps on", onoff.FeatureLT, true, nil, nil, false, true},
+		{"On", onoff.FeatureLT, false, onoff.StartUpOn, nil, false, true},
+		{"Off", onoff.FeatureLT, true, onoff.StartUpOff, nil, false, false},
+		{"Toggle off→on", onoff.FeatureLT, false, onoff.StartUpToggle, nil, false, true},
+		{"Toggle on→off", onoff.FeatureLT, true, onoff.StartUpToggle, nil, false, false},
+		{"power-on reboot applies", onoff.FeatureLT, false, onoff.StartUpOn, &power, false, true},
+		{"software update skips", onoff.FeatureLT, false, onoff.StartUpOn, &sw, false, false},
+		{"no LT", 0, false, nil, nil, false, false},
+		// OnOffServer.ts:37: not under an Aggregator.
+		{"bridged skips On", onoff.FeatureLT, false, onoff.StartUpOn, nil, true, false},
+		{"bridged skips Toggle", onoff.FeatureLT, true, onoff.StartUpToggle, nil, true, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -214,7 +219,7 @@ func TestStartUpOnOff(t *testing.T) {
 			if c.feat&onoff.FeatureLT != 0 {
 				initial[onoff.AttrStartUpOnOff] = c.startUp
 			}
-			cfg := onoff.Config{Features: c.feat, Initial: initial, Clock: &fakeClock{}}
+			cfg := onoff.Config{Features: c.feat, Initial: initial, Clock: &fakeClock{}, Bridged: c.bridged}
 			if c.boot != nil {
 				b := *c.boot
 				cfg.BootReason = func() uint8 { return b }
