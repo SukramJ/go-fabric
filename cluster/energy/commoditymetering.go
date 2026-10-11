@@ -168,6 +168,12 @@ func (s *CommodityMeteringServer) MaximumMeteredQuantities() *uint16 {
 	return nil
 }
 
+// MatterRead resolves an attribute; MeteredQuantity as its generated
+// list (commodityWireValue).
+func (s *CommodityMeteringServer) MatterRead(attrID uint32) (any, bool) {
+	return commodityRead(s.Server.MatterRead(attrID))
+}
+
 // MeteredQuantity returns MeteredQuantity; nil while null.
 func (s *CommodityMeteringServer) MeteredQuantity() []MeteredQuantity {
 	v, _ := s.Value(commtr.AttrMeteredQuantity)

@@ -138,7 +138,7 @@ func TestCommodityPrice(t *testing.T) {
 	if err := srv.SetForecast(forecast); err != nil {
 		t.Fatal(err)
 	}
-	if got := read(t, srv, cp.AttrPriceForecast).([]energy.CommodityPrice); len(got) != 2 || got[1].Components != nil {
+	if got := read(t, srv, cp.AttrPriceForecast).(spec.List[energy.CommodityPrice]); len(got) != 2 || got[1].Components != nil {
 		t.Errorf("PriceForecast %+v", got)
 	}
 	resp, err = srv.MatterInvoke(context.Background(), cp.CmdGetDetailedForecastRequest,
@@ -222,7 +222,7 @@ func TestElectricalGridConditions(t *testing.T) {
 	if err := srv.SetForecastConditions([]energy.GridConditions{cond}); err != nil {
 		t.Fatal(err)
 	}
-	if got := read(t, srv, egc.AttrForecastConditions).([]energy.GridConditions); len(got) != 1 {
+	if got := read(t, srv, egc.AttrForecastConditions).(spec.List[energy.GridConditions]); len(got) != 1 {
 		t.Errorf("ForecastConditions %v", got)
 	}
 	plain, err := energy.NewElectricalGridConditions(energy.GridConditionsConfig{})
@@ -416,10 +416,10 @@ func TestCommodityTariffDerived(t *testing.T) { //nolint:funlen // one sequence
 	if read(t, srv, ct.AttrCurrentDayEntryDate) != dayStart || nextDate != dayStart+240*60 {
 		t.Errorf("entry dates %v %v", read(t, srv, ct.AttrCurrentDayEntryDate), nextDate)
 	}
-	if c := read(t, srv, ct.AttrCurrentTariffComponents).([]energy.TariffComponent); len(c) != 1 || c[0].TariffComponentId != 10 {
+	if c := read(t, srv, ct.AttrCurrentTariffComponents).(spec.List[energy.TariffComponent]); len(c) != 1 || c[0].TariffComponentId != 10 {
 		t.Errorf("CurrentTariffComponents %+v", c)
 	}
-	if c := read(t, srv, ct.AttrNextTariffComponents).([]energy.TariffComponent); len(c) != 1 || c[0].TariffComponentId != 20 {
+	if c := read(t, srv, ct.AttrNextTariffComponents).(spec.List[energy.TariffComponent]); len(c) != 1 || c[0].TariffComponentId != 20 {
 		t.Errorf("NextTariffComponents %+v", c)
 	}
 

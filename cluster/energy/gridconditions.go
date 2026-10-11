@@ -170,8 +170,11 @@ func (s *GridConditionsServer) OnMatterAttributesChanged(cb func(attrIDs []uint3
 	return s.srv.OnMatterAttributesChanged(cb)
 }
 
-// MatterRead resolves an attribute.
-func (s *GridConditionsServer) MatterRead(attrID uint32) (any, bool) { return s.srv.MatterRead(attrID) }
+// MatterRead resolves an attribute; a list as its generated list
+// (commodityWireValue).
+func (s *GridConditionsServer) MatterRead(attrID uint32) (any, bool) {
+	return commodityRead(s.srv.MatterRead(attrID))
+}
 
 // MatterWrite stores a LocalGenerationAvailable write the definition
 // accepts.

@@ -11,13 +11,77 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/energy"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	commtr "github.com/SukramJ/go-fabric/cluster/spec/commoditymetering"
 	cp "github.com/SukramJ/go-fabric/cluster/spec/commodityprice"
 	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
 	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
 )
+
+// TestEnergyMarketWireShapes fires the triggers TC-SETRF-2.2 (step 3) and
+// TC-COMMTR-3.1 send through the daemon's whole TestEventTrigger dispatch
+// and reads the mounted servers as the bridge does: every attribute is
+// null, a scalar or a spec.Encodable — a plain slice goes on the wire as
+// null (bridge/reply.go defaultAttributeValueWriter) — and the lists the
+// cases iterate carry the trigger's entries (TC_SETRF_2_2.py step 4,
+// TC_SETRF_3_1.py step 27, TC_COMMTR_3_1.py's MeteredQuantity report; CI
+// run 38114710064 saw Null for each).
+func TestEnergyMarketWireShapes(t *testing.T) {
+	f, br := startFleetBridge(t)
+	tariff := mountedEndpoint(t, br, "demo-tariff-1")
+	meter := mountedEndpoint(t, br, "demo-electricalmeter-1")
+	for _, trigger := range []uint64{
+		triggerTariffDataUpdated | uint64(tariff.ID)<<32, triggerPriceForecastUpdate, triggerGridForecastConditions,
+		triggerMeteringAttributesUpdate | uint64(meter.ID)<<32,
+	} {
+		if err := f.testEventTrigger(context.Background(), trigger); err != nil {
+			t.Fatalf("trigger 0x%016X: %v", trigger, err)
+		}
+	}
+	for _, ep := range []*endpoint.Endpoint{tariff, meter} {
+		for _, srv := range endpoint.ClusterServers(ep) {
+			switch srv.MatterClusterID() {
+			case cp.ClusterID, egc.ClusterID, ct.ClusterID, commtr.ClusterID:
+			default:
+				continue
+			}
+			lister, ok := srv.(contract.ClusterAttributeLister)
+			if !ok {
+				t.Fatalf("cluster 0x%04X lists no attributes", srv.MatterClusterID())
+			}
+			for _, id := range lister.MatterAttributes() {
+				if id >= 0xFFF8 {
+					continue // the globals, written by the bridge itself
+				}
+				v, _ := srv.MatterRead(id)
+				switch v.(type) {
+				case nil, bool, uint8, uint16, uint32, uint64, int8, int16, int32, int64, string, spec.Encodable:
+				default:
+					t.Errorf("endpoint %d cluster 0x%04X attribute 0x%04X reads as %T, which the bridge writes as null", ep.ID, srv.MatterClusterID(), id, v)
+				}
+			}
+		}
+	}
+	for _, c := range []struct {
+		ep            *endpoint.Endpoint
+		cluster, attr uint32
+	}{
+		{tariff, ct.ClusterID, ct.AttrTariffComponents},
+		{tariff, ct.ClusterID, ct.AttrIndividualDays},
+		{tariff, ct.ClusterID, ct.AttrDayEntries},
+		{tariff, cp.ClusterID, cp.AttrPriceForecast},
+		{tariff, egc.ClusterID, egc.AttrForecastConditions},
+		{meter, commtr.ClusterID, commtr.AttrMeteredQuantity},
+	} {
+		v := readMounted(t, c.ep, c.cluster, c.attr)
+		if l := reflect.ValueOf(v); v == nil || l.Kind() != reflect.Slice || l.Len() == 0 {
+			t.Errorf("cluster 0x%04X attribute 0x%04X = %#v after the trigger", c.cluster, c.attr, v)
+		}
+	}
+}
 
 // TestEnergyMarketDevices: the ElectricalEnergyTariff (0x0513) serves
 // CommodityPrice (FORE), ElectricalGridConditions (FORE) and
@@ -107,12 +171,12 @@ func TestTariffTriggers(t *testing.T) { //nolint:funlen // two runs of one seque
 		if want := []string{"Full Tariff One", "Full Tariff Two"}[run]; info.TariffLabel.Value != want {
 			t.Errorf("run %d: tariff %q, want %q", run, info.TariffLabel.Value, want)
 		}
-		components := read(ct.AttrTariffComponents).([]energy.TariffComponent)
+		components := read(ct.AttrTariffComponents).(spec.List[energy.TariffComponent])
 		resp, err := srv.MatterInvoke(context.Background(), ct.CmdGetTariffComponent, ct.GetTariffComponentRequest{TariffComponentId: components[0].TariffComponentId})
 		if err != nil || resp.(ct.GetTariffComponentResponse).Label.Null {
 			t.Errorf("run %d: GetTariffComponent %v %v", run, resp, err)
 		}
-		entries := read(ct.AttrDayEntries).([]energy.TariffDayEntry)
+		entries := read(ct.AttrDayEntries).(spec.List[energy.TariffDayEntry])
 		if _, err := srv.MatterInvoke(context.Background(), ct.CmdGetDayEntry, ct.GetDayEntryRequest{DayEntryId: entries[0].DayEntryId}); err != nil {
 			t.Errorf("run %d: GetDayEntry %v", run, err)
 		}
@@ -192,15 +256,15 @@ func TestPriceAndGridTriggers(t *testing.T) {
 		t.Errorf("CurrentPrice %+v", p)
 	}
 	fireMarket(t, f, triggerPriceForecastUpdate|0x0000_0001_0000_0000) // endpoint bits are cleared
-	if v, _ := d.price.MatterRead(cp.AttrPriceForecast); len(v.([]energy.CommodityPrice)) != 56 {
-		t.Errorf("PriceForecast %d entries", len(v.([]energy.CommodityPrice)))
+	if v, _ := d.price.MatterRead(cp.AttrPriceForecast); len(v.(spec.List[energy.CommodityPrice])) != 56 {
+		t.Errorf("PriceForecast %d entries", len(v.(spec.List[energy.CommodityPrice])))
 	}
 	fireMarket(t, f, triggerGridCurrentConditions)
 	if v, _ := d.grid.MatterRead(egc.AttrCurrentConditions); v.(energy.GridConditions).GridCarbonIntensity != 230 {
 		t.Errorf("CurrentConditions %v", v)
 	}
 	fireMarket(t, f, triggerGridForecastConditions)
-	if v, _ := d.grid.MatterRead(egc.AttrForecastConditions); len(v.([]energy.GridConditions)) != 48 {
+	if v, _ := d.grid.MatterRead(egc.AttrForecastConditions); len(v.(spec.List[energy.GridConditions])) != 48 {
 		t.Errorf("ForecastConditions %v", v)
 	}
 	for amount, want := range map[int64]string{5000: "Low", 15000: "Medium", 30000: "High"} {
