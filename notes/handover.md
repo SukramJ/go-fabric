@@ -45,13 +45,25 @@ commit, and the fix-up commits the fixture runs forced:
 | `737f423` | merge `wave5/fixup-su`: root `AttributeChangeNotifier` servers reported (SU/2.2 step 1), SU case timeouts, provider teardown and logs (report `N-fixup.md`) |
 | `993f802` | peer loss on an exchange this node opened force-closes the peer's sessions (`handleInitiatedPeerLoss`, `Manager.ClosePeerLost`, `Entry.CreatedAt`; SU/2.2 step 2); harness removes `/tmp/chip_kvs_provider*` only after the provider is gone (SU/2.4); fixtures of run 38142202247 |
 | `aac3870` | 1 MiB OTA payload so SU/2.2 step 3 can observe Downloading |
+| `9e22278` | harness case edit for TC-SU-2.2 step 3: the guard window ends at its tolerance boundary so Phase C sees the Downloading report (the guard swallowed a report that landed inside its last 5 s); fixtures of run 38149548973, SU/2.4 passes |
 
-**Pending when this was written:** fixture run
-[38149548973](https://github.com/SukramJ/go-fabric/actions/runs/38149548973)
-(families IDM, SU, `update_fixtures=true`), dispatched 17:08 local. The PR's
-`TestCertifiabilityDocument` stays red until that run's fixtures are
-committed: SU/2.2 and SU/2.4 are listed as neither passed nor classified in
-the committed golden.
+**Pending when this was written (18:10):** fixture run
+[38154468426](https://github.com/SukramJ/go-fabric/actions/runs/38154468426)
+(families IDM, SU, `update_fixtures=true`), dispatched 18:08 local, about
+45 minutes. The PR's `TestCertifiabilityDocument` stays red until that run's
+fixtures are committed: SU/2.2 is listed as neither passed nor classified in
+the committed golden (SU/2.4 and SU/4.1 pass since run 38149548973).
+
+Runs so far on this branch:
+
+| Run | Families | Result |
+| --- | --- | --- |
+| 38136443914 | IDM, SC, CADMIN, BDX, SETRF, COMMTR, EGC, DEM, SU | green except SU 2.2/2.4, DEM 2.2/2.4/2.6/2.10 |
+| 38141317526 | DEM with `--tcp false` | same → TCP ruled out |
+| 38142202247 | IDM, DEM, SU | IDM, DEM green (session cap); SU 2.2 step 2, SU 2.4 red |
+| 38146455037 | IDM, SU | SU 2.4 green; SU 2.2 step 3: 44-byte image downloaded in 200 ms, Downloading never reported |
+| 38149548973 | IDM, SU | SU 2.2 step 3: Downloading reported at 15:21:57.237, swallowed by the guard window that ended at the same instant |
+| 38154468426 | IDM, SU | pending |
 
 What to do with it, step by step (the same procedure every wave used):
 
@@ -73,12 +85,16 @@ What to do with it, step by step (the same procedure every wave used):
    push to the branch; the PR's auto-merge completes when the checks are
    green.
 
-Where SU/2.2 stood after run 38146455037: steps 1 and 2 pass, step 3 passes
-its Busy/180 s guard, and the DUT then downloaded and applied the 44-byte
-image within 200 ms so the subscription never showed Downloading; `aac3870`
-addresses exactly that. Steps 4–6 (invalid BDX URI, the full update, the
-same-version rejection) have not run yet on this branch; report N predicts
-TC_SU_2_7 steps 3 and 5 as findings, not 2.2.
+Where SU/2.2 stands after run 38149548973: steps 1 and 2 pass, step 3
+passes its Busy/180 s guard and the DUT re-queries at exactly 180 s and
+starts the 1 MiB download (103 s at the provider's 100 ms per block), but
+the Downloading report arrived at the instant the guard window ended and
+the guard consumed it; `9e22278` edits the case so the window ends 5 s
+earlier (its own elapsed assertion already allows that). Steps 4–6
+(invalid BDX URI, the full update, the same-version rejection) have not run
+yet on this branch; report N predicts TC_SU_2_7 steps 3 and 5 as findings,
+not 2.2. If a step still fails, the three logs name it; classify with the
+case line, never by guess.
 
 After #49 merges: delete the local wave branches and the agent worktrees
 under `.claude/worktrees/` (`git worktree remove --force <path>`; they are
