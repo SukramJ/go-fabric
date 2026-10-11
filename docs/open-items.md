@@ -47,7 +47,8 @@ last family run and held by `TestCertifiabilityDocument`.
 | **A TCP connection stays open after its last session** | findings register, Tier 3 | matter.js closes the connection when the last session bound to it goes (`ExchangeManager.ts:669`); the bridge closes sessions on a dropped connection, not the reverse. Report M also notes that TCP sends carry no write deadline (no matter.js source; a peer that stops reading blocks the sender until the connection closes). |
 | **`T=0` on the operational record when TCP is off** | findings register, Tier 3 | matter.js and chip omit the key; the module emits `T=0`. |
 | **BDX block size over TCP** | findings register, Tier 3 | The requestor asks for 1024-byte blocks on every channel; matter.js asks for 8192 over TCP. |
-| **The root's ClientList lacks the OtaRequestor's client cluster** | findings register, device type validation | matter.js's OtaRequestor endpoint lists OtaSoftwareUpdateProvider (0x0029) in ClientList; the reference daemon passes none and its validator logs the gap at every start. |
+| **A default LevelControl serves no MinLevel / MaxLevel** | findings register, application cluster servers | `spec.Instance` treats "Rev >= v7" as conditional; matter.js sets both at initialisation (`LevelControlServer.ts:114-116`). |
+| **No device-layer binding for a live `MeasurementSource`; optional Groups / ScenesManagement not opt-in-able; no default for fabric-scoped clusters** | findings register, application cluster servers | What the device layer (`device/`, wave 6) leaves to `WithServer` and `endpoint.Spec.Measurement`; the reference daemon's sensors bypass it (`BD-Daemon-MeasurementEndpointsBypassDeviceLayer`). |
 
 Concept phase 1 (per-attribute timed write, subscription quota, PASE
 session parameters) is closed: timed commands come from the model (#47),
@@ -88,6 +89,12 @@ records what those ecosystems demanded before.
 
 ## 5. Housekeeping
 
+- **A database the pre-wave-6 daemon wrote keeps its `"demo"`-scope
+  endpoint rows.** The daemon's snapshot scope is now `node.Scope`
+  (`"node"`); numbers are looked up by key, so an upgraded database keeps
+  its endpoint numbers, but the old rows stay under `"demo"` and the
+  model-complete GC never visits them. Harmless; a `Config.Scope` was
+  declined (report R, question 2).
 - **ADR 0012** (ScenesManagement server) and the real Groups server replaced
   the stubs that [ADR 0004](./adr/0004-groups-cluster-stays-stub.md) kept;
   0004 is superseded and stays for the record.

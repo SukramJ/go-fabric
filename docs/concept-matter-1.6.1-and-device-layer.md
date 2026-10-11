@@ -225,6 +225,9 @@ BDX-Familien laufen gegen `chip-ota-provider-app` aus dem Harness-Image;
 Referenz-Daemon migriert als erster Konsument; `examples/reference-bridge`
 schrumpft auf die Gerätebeschreibungen. Abschluss: jede Gerätetyp-Datei
 unter `device/` generiert, Referenz-Daemon ohne `contract.EndpointSource`.
+*Erledigt am 2026-10-11 (Welle 6, PR #51): `device/` (63 Typen), `node/`,
+`cluster/onoff.Server`, Referenz-Daemon auf `node.New` und
+`device.New<Type>`; Abweichungen in `by_design.md` (`BD-Matter-Device-*`).*
 
 **Phase 5: Nachweis und v1.0.** Apple-Home- und Alexa-Läufe mit dem
 Referenz-Daemon in der neuen Topologie (Teile, Energie, Appliances), Befunde
@@ -486,7 +489,8 @@ Die Quelle ist dieselbe; nur Packaging und Netzwerk unterscheiden sich.
    `docs/matterjs-comparison.md` §2, §5 und §6, `docs/open-items.md`,
    `docs/feature-scope.md`, `README.md` und `CHANGELOG.md` verweisen auf
    dieses Konzept. Beide ADRs wechseln auf „Accepted“, wenn ihre Phase
-   beginnt.
+   beginnt — ADR 0017 mit Phase 0 (#40), ADR 0018 am 2026-10-11 mit
+   Welle 6.
 3. Phase 0 beginnen mit dem Standard-Server aus ADR 0017; die
    ADR-0013-Migration, die hier ursprünglich als Einstieg stand, ist seit
    PR #34 erledigt.

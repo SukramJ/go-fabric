@@ -116,7 +116,7 @@ answered on the unsecured session type before any authentication exists.
   whenever a handler is attached; the switch at `bridge/securechannel.go:320`
   checks only the lockout, never whether a commissioning window is open. The
   reference host attaches the provider once at boot
-  (`examples/reference-bridge/wiring.go:412`). So an uncommissioned bridge
+  (`node/commissioning.go` attachPase, the baseline provider; before wave 6 `examples/reference-bridge/wiring.go:412`). So an uncommissioned bridge
   answers PASE from its configured passcode indefinitely. This is a deliberate
   divergence from matter.js (whose `PaseServer` dies with the window) and it is
   precisely why the lockout had to be invented.
@@ -300,7 +300,7 @@ So a host that wires `NewOperationalSessionLookup(...)` and forgets
 `.WithFabricResolver(...)` gets a bridge where **every authenticated CASE
 session bypasses the ACL entirely**, silently, with no error and no log. The
 reference wiring gets it right and even says so in a comment
-(`examples/reference-bridge/wiring.go:352-353`); nothing enforces it. This is
+(`node/security.go:251` `WithFabricResolver`; before wave 6 `examples/reference-bridge/wiring.go:352-353`); nothing enforces it. This is
 the single highest-value finding in this document.
 
 ### What the attacker must already have
