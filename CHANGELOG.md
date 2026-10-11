@@ -337,6 +337,16 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- ModeSelect SupportedModes is encoded by the generated codec
+  (`cluster/spec/modeselect`): `modeselect.Server` reads it as a
+  `spec.List[ModeOptionStruct]` and the bridge's hand-written case is gone.
+  On the wire, SemanticTag MfgCode and Value now take the smallest integer
+  width, as matter.js's `TlvOfModel` writes them (they were always two
+  bytes). The list, its SemanticTags and Label are no longer trimmed at
+  encode time: matter.js trims nothing, and the bounds
+  (`SupportedModesMaxEntries`, `SemanticTagsMaxEntries`, `LabelMaxBytes`)
+  are now documented on `ModeSource.SupportedModes` as the host's part.
+
 - `cluster/spec` evaluates an "in" constraint on a controller write
   (`Instance.ValidateWrite`): the value must be an entry of the named peer
   attribute's current list, else CONSTRAINT_ERROR before the sink sees it;
@@ -599,6 +609,17 @@ the same `ColorTemperatureWriter` as before.
   `OpenOwnWindow`.
 - `endpoint.Topology.Bridged` leaves out parts (`Endpoint.Part`): they are
   components of a bridged device, not bridged devices.
+
+### Deprecated
+
+- `github.com/SukramJ/go-fabric/cluster/modeselect`: the field-tag
+  constants `ModeOptionFieldLabel`, `ModeOptionFieldMode`,
+  `ModeOptionFieldSemanticTags`, `SemanticTagFieldMfgCode` and
+  `SemanticTagFieldValue`. Replacement: the generated codec
+  (`cluster/spec/modeselect` `ModeOptionStruct.EncodeTLV`,
+  `SemanticTagStruct.EncodeTLV`), which carries the field ids itself.
+  Removal permissible in the second minor release after the one that ships
+  this entry.
 
 ### Fixed
 

@@ -1,0 +1,71 @@
+[
+  {
+    "label": "supported_modes_small_ints",
+    "kind": "attributes",
+    "cluster": 80,
+    "element": "SupportedModes",
+    "fixture": [
+      {
+        "label": "Normal",
+        "mode": 0,
+        "semanticTags": [
+          {
+            "mfgCode": 0,
+            "value": 0
+          }
+        ]
+      },
+      {
+        "label": "Eco",
+        "mode": 7,
+        "semanticTags": []
+      }
+    ],
+    "bytesHex": "16152c00064e6f726d616c240100360215240000240100181818152c000345636f2401073602181818"
+  },
+  {
+    "label": "supported_modes_wide_ints",
+    "kind": "attributes",
+    "cluster": 80,
+    "element": "SupportedModes",
+    "fixture": [
+      {
+        "label": "Vendor",
+        "mode": 200,
+        "semanticTags": [
+          {
+            "mfgCode": 65521,
+            "value": 16384
+          },
+          {
+            "mfgCode": 300,
+            "value": 2
+          }
+        ]
+      }
+    ],
+    "bytesHex": "16152c000656656e646f722401c83602152500f1ff25010040181525002c0124010218181818"
+  },
+  {
+    "label": "supported_modes_utf8_label",
+    "kind": "attributes",
+    "cluster": 80,
+    "element": "SupportedModes",
+    "fixture": [
+      {
+        "label": "Spülen",
+        "mode": 1,
+        "semanticTags": []
+      }
+    ],
+    "bytesHex": "16152c00075370c3bc6c656e2401013602181818"
+  },
+  {
+    "label": "supported_modes_empty",
+    "kind": "attributes",
+    "cluster": 80,
+    "element": "SupportedModes",
+    "fixture": [],
+    "bytesHex": "1618"
+  }
+]

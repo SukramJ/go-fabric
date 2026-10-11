@@ -79,18 +79,32 @@ var instance, _ = spec.New(msdef.Definition, spec.Options{Features: featureMap})
 // sees before anyone reads the host's code.
 const DescriptionMaxBytes = 64
 
-// ModeOptionStruct field tags, and the ModeOptionStruct constraints.
+// ModeOptionStruct field tags.
 //
 // Mirrors matter.js mode-select-cluster.element.ts:61-69: Label 0x0
 // string "M" max 64, Mode 0x1 uint8 "M", SemanticTags 0x2 list "M"
 // max 64. All three carry quality F.
+//
+// Deprecated: SupportedModes is encoded by the generated codec,
+// [msdef.ModeOptionStruct.EncodeTLV] in cluster/spec/modeselect, which
+// carries the field ids itself; nothing in this module reads these tags.
+// Removal is permissible in the second minor release after the one that
+// ships this marker (README §API stability).
 const (
 	ModeOptionFieldLabel        uint8 = 0x00
 	ModeOptionFieldMode         uint8 = 0x01
 	ModeOptionFieldSemanticTags uint8 = 0x02
+)
 
+// The ModeSelect list and label bounds, from the model: the host's
+// [ModeSource.SupportedModes] must stay within them. They are not applied
+// by the server or the encoder — matter.js trims nothing either; its
+// validator refuses an out-of-bounds value with a ConstraintError
+// (packages/node/src/behavior/state/validation/constraint.ts). A list
+// returned past them goes on the wire as given.
+const (
 	// LabelMaxBytes is the ModeOptionStruct Label constraint "max 64"
-	// (mode-select-cluster.element.ts:63).
+	// (mode-select-cluster.element.ts:63), in UTF-8 bytes.
 	LabelMaxBytes = 64
 
 	// SemanticTagsMaxEntries is the ModeOptionStruct SemanticTags
@@ -100,10 +114,9 @@ const (
 )
 
 // SupportedModesMaxEntries is the SupportedModes constraint "max 255"
-// (matter.js mode-select-cluster.element.ts:37), in list entries. Like
-// Label's byte bound it is applied at encode time rather than trusted
-// from the host: a list longer than the constraint is a wire violation
-// a controller sees before anyone reads the host's code.
+// (matter.js mode-select-cluster.element.ts:37), in list entries: a bound
+// on the host's [ModeSource.SupportedModes], which the server returns as
+// given.
 const SupportedModesMaxEntries = 255
 
 // SemanticTagStruct field tags.
@@ -111,6 +124,12 @@ const SupportedModesMaxEntries = 255
 // Mirrors matter.js mode-select-cluster.element.ts:55-59: MfgCode 0x0
 // vendor-id "M", Value 0x1 uint16 "M". vendor-id is uint16
 // (matter.js vendor-id.element.ts:12).
+//
+// Deprecated: SupportedModes is encoded by the generated codec,
+// [msdef.SemanticTagStruct.EncodeTLV] in cluster/spec/modeselect, which
+// carries the field ids itself; nothing in this module reads these tags.
+// Removal is permissible in the second minor release after the one that
+// ships this marker (README §API stability).
 const (
 	SemanticTagFieldMfgCode uint8 = 0x00
 	SemanticTagFieldValue   uint8 = 0x01
@@ -166,7 +185,11 @@ type ModeSource interface {
 	// no standard semantic tags in this instance.
 	ModeNamespace() (namespace uint8, present bool)
 	// SupportedModes reports the selectable modes. Each entry needs a
-	// distinct Mode value.
+	// distinct Mode value. The model bounds the list to
+	// [SupportedModesMaxEntries] entries, each Label to [LabelMaxBytes]
+	// UTF-8 bytes and each SemanticTags to [SemanticTagsMaxEntries]
+	// entries; the server returns the list as given and the generated
+	// codec writes it, so staying within them is the host's part.
 	SupportedModes() []ModeOptionStruct
 	// CurrentMode reports the mode the device is in.
 	CurrentMode() uint8
@@ -291,7 +314,10 @@ func (s *Server) readFromSource(attrID uint32) (any, bool) {
 		}
 		return ns, true
 	case AttrSupportedModes:
-		return copyModes(s.src.SupportedModes()), true
+		// A spec.List encodes itself through the generated codec
+		// (msdef.ModeOptionStruct.EncodeTLV): smallest-width integers, as
+		// matter.js's TlvOfModel writes them.
+		return spec.List[ModeOptionStruct](copyModes(s.src.SupportedModes())), true
 	case AttrCurrentMode:
 		return s.src.CurrentMode(), true
 	default:

@@ -13,6 +13,7 @@ fails a test instead of failing a controller.
 | `generate-group-fixtures.ts wire` | GroupKeyManagement / Groups command payloads (`TlvOfModel(command)`) | [`bridge/testdata/group-wire-fixtures.json`](../../../bridge/testdata/group-wire-fixtures.json) → `bridge/groups_parity_matterjs_test.go` |
 | `generate-application-fixtures.ts` | FanControl Step request payloads and the SmokeCoAlarm / PumpConfigurationAndControl / Switch event payloads (`TlvOfModel(element)`) | [`bridge/testdata/application-wire-fixtures.json`](../../../bridge/testdata/application-wire-fixtures.json) → `bridge/application_parity_matterjs_test.go` |
 | `generate-colorcontrol-fixtures.ts` | Every ColorControl request payload and the colour attributes cluster/light reads (`TlvOfModel(element)`) | [`bridge/testdata/colorcontrol-wire-fixtures.json`](../../../bridge/testdata/colorcontrol-wire-fixtures.json) → `bridge/colorcontrol_parity_matterjs_test.go` |
+| `generate-modeselect-fixtures.ts` | ModeSelect SupportedModes values, in bounds, small and wide integers (`TlvOfModel(element)`) | [`cluster/modeselect/testdata/modeselect-wire-fixtures.json`](../../../cluster/modeselect/testdata/modeselect-wire-fixtures.json) → `cluster/modeselect/modeselect_wire_parity_matterjs_test.go` |
 | `generate-filter-fixtures.ts` | HepaFilterMonitoring / ActivatedCarbonFilterMonitoring ResetCondition requests and ReplacementProductList values (`TlvOfModel(element)`) | [`bridge/testdata/filter-wire-fixtures.json`](../../../bridge/testdata/filter-wire-fixtures.json) → `bridge/filter_parity_matterjs_test.go` |
 | `generate-group-fixtures.ts groupcast` | Groupcast command payloads, the Membership, AccessControl.AuxiliaryAcl / Acl / Extension and GroupKeyManagement GroupTable / GroupKeyMap values (unfiltered read), the GroupcastTesting / AuxiliaryAccessUpdated events (`TlvOfModel(element)`) | [`bridge/testdata/groupcast-wire-fixtures.json`](../../../bridge/testdata/groupcast-wire-fixtures.json) → `bridge/groupcast_parity_matterjs_test.go` |
 
@@ -54,9 +55,12 @@ node "$GO_FABRIC"/notes/parity/matter/generate-filter-fixtures.ts > /tmp/f.json 
 
 node "$GO_FABRIC"/notes/parity/matter/generate-colorcontrol-fixtures.ts > /tmp/cc.json \
     && mv /tmp/cc.json "$GO_FABRIC"/bridge/testdata/colorcontrol-wire-fixtures.json
+
+node "$GO_FABRIC"/notes/parity/matter/generate-modeselect-fixtures.ts > /tmp/ms.json \
+    && mv /tmp/ms.json "$GO_FABRIC"/cluster/modeselect/testdata/modeselect-wire-fixtures.json
 ```
 
-Then run `go test ./tlv/... ./im/... ./bridge/... ./groups/...` from this module's root.
+Then run `go test ./tlv/... ./im/... ./bridge/... ./groups/... ./cluster/modeselect/...` from this module's root.
 
 **A changed byte is a review decision, not a formatting update.** The whole
 point of the fixtures is that this module's output is pinned; a diff here says

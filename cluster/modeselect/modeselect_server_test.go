@@ -11,6 +11,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -90,7 +91,7 @@ func TestMatterReadProjectsThePort(t *testing.T) {
 		{
 			name:   "SupportedModes is the port's list",
 			attrID: modeselect.AttrSupportedModes,
-			want:   src.modes,
+			want:   spec.List[modeselect.ModeOptionStruct](src.modes),
 		},
 		{
 			name:   "CurrentMode is the port's mode",
@@ -147,9 +148,9 @@ func TestSupportedModesReadIsACopy(t *testing.T) {
 	src := coffeeSource()
 	srv := modeselect.NewServer(modeselect.Config{Source: src})
 	got, _ := srv.MatterRead(modeselect.AttrSupportedModes)
-	modes, ok := got.([]modeselect.ModeOptionStruct)
+	modes, ok := got.(spec.List[modeselect.ModeOptionStruct])
 	if !ok {
-		t.Fatalf("SupportedModes = %T, want []ModeOptionStruct", got)
+		t.Fatalf("SupportedModes = %T, want spec.List[ModeOptionStruct]", got)
 	}
 	modes[0].Label = "clobbered"
 	modes[1].SemanticTags[0].Value = 0xFFFF
