@@ -206,7 +206,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
 	r.NetworkCommissioning = mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{})
 
-	optional, err := buildRootOptional(ctx, d.st, cfg.FixedLabels)
+	optional, err := buildRootOptional(ctx, d.st, cfg.FixedLabels, cfg.Locales)
 	if err != nil {
 		return nil, fmt.Errorf("root labels and diagnostics: %w", err)
 	}
@@ -263,18 +263,22 @@ func attestationMaterial(cfg *Config) (*attestation.Chain, []byte, error) {
 
 // buildRootOptional constructs the root's optional label, localization
 // and diagnostics clusters as the daemon does (root_optional.go:28-91):
-// FixedLabel, UserLabel (persisted), LocalizationConfiguration (en-US),
+// FixedLabel, UserLabel (persisted), LocalizationConfiguration (locales,
+// nil is en-US alone),
 // TimeFormatLocalization (24-hour, Gregorian), UnitLocalization,
 // SoftwareDiagnostics (the Go heap) and EthernetNetworkDiagnostics (every
 // value null).
-func buildRootOptional(ctx context.Context, st *store.Store, fixed []fixedlabeldef.LabelStruct) ([]contract.ClusterServer, error) {
+func buildRootOptional(ctx context.Context, st *store.Store, fixed []fixedlabeldef.LabelStruct, locales []string) ([]contract.ClusterServer, error) {
 	fixedLabel, userLabel, err := buildLabels(ctx, st, rootUserLabelsKey, fixed)
 	if err != nil {
 		return nil, err
 	}
+	if len(locales) == 0 {
+		locales = []string{"en-US"}
+	}
 	localization, err := mattercore.NewLocalizationConfiguration(mattercore.LocalizationConfigurationConfig{
-		ActiveLocale:     "en-US",
-		SupportedLocales: []string{"en-US"},
+		ActiveLocale:     locales[0],
+		SupportedLocales: slices.Clone(locales),
 	})
 	if err != nil {
 		return nil, err

@@ -568,3 +568,38 @@ func TestBootReason(t *testing.T) {
 		t.Error("StartUpOnOff not applied after a power-on reboot")
 	}
 }
+
+// TestLocales: Config.Locales are the root LocalizationConfiguration's
+// SupportedLocales and the first is its ActiveLocale; nil serves en-US
+// alone.
+func TestLocales(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		locales   []string
+		active    string
+		supported []string
+	}{
+		"default": {nil, "en-US", []string{"en-US"}},
+		"host's":  {[]string{"en-US", "de-DE"}, "en-US", []string{"en-US", "de-DE"}},
+	} {
+		cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+		cfg.Locales = tc.locales
+		n := newNode(t, cfg)
+		var found bool
+		for _, srv := range n.Root().Servers() {
+			if srv.MatterClusterID() != 0x002B {
+				continue
+			}
+			found = true
+			if v, _ := srv.MatterRead(0x0000); v != tc.active {
+				t.Errorf("%s: ActiveLocale %v, want %s", name, v, tc.active)
+			}
+			if v, _ := srv.MatterRead(0x0001); !slices.Equal(v.([]string), tc.supported) {
+				t.Errorf("%s: SupportedLocales %v, want %v", name, v, tc.supported)
+			}
+		}
+		if !found {
+			t.Errorf("%s: no LocalizationConfiguration on the root", name)
+		}
+	}
+}

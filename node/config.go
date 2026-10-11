@@ -62,6 +62,12 @@ type Config struct {
 	OTA *OtaConfig
 	// FixedLabels is the root FixedLabel list; nil serves an empty list.
 	FixedLabels []fixedlabeldef.LabelStruct
+	// Locales are the root LocalizationConfiguration's SupportedLocales,
+	// the first of them its ActiveLocale; nil is en-US alone. matter.js
+	// detects the active locale and lists it alone when the host states
+	// neither (LocalizationConfigurationServer.ts:14-21 initialize); a host
+	// states its own, as the reference daemon does (en-US, de-DE).
+	Locales []string
 	// AggregatorServers are mounted on the Aggregator endpoint after
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
 	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345).
