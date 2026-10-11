@@ -41,31 +41,31 @@ const maxPortAssignmentRetries = 10
 // ServerNetworkRuntime.ts:203-226: the TCP transport listens on the UDP
 // interface's port; when that port is taken for TCP and the port was
 // auto-assigned, both sockets are closed and the pair is tried again.
-func (b *Bridge) openTransports() (*udp.Listener, *tcp.Listener, error) {
+func (b *Bridge) openTransports() (udpListener *udp.Listener, tcpListener *tcp.Listener, err error) {
 	udpCfg := udp.Config{LocalAddr: b.cfg.Listen, PreferIPv4: b.cfg.PreferIPv4}
 	if !b.cfg.TCP.Incoming {
-		l, err := udp.New(udpCfg)
-		return l, nil, err
+		udpListener, err = udp.New(udpCfg)
+		return udpListener, nil, err
 	}
 	attempts := 1
 	if autoAssignedPort(b.cfg.Listen) {
 		attempts = maxPortAssignmentRetries
 	}
 	for attempt := 1; ; attempt++ {
-		ul, err := udp.New(udpCfg)
+		udpListener, err = udp.New(udpCfg)
 		if err != nil {
 			return nil, nil, err
 		}
-		port := ul.LocalAddr().Port
-		tl, err := tcp.Listen(tcp.Config{
+		port := udpListener.LocalAddr().Port
+		tcpListener, err = tcp.Listen(tcp.Config{
 			LocalAddr:  tcpBindAddr(b.cfg.Listen, b.cfg.PreferIPv4, port),
 			PreferIPv4: b.cfg.PreferIPv4,
 			Logger:     b.logger,
 		})
 		if err == nil {
-			return ul, tl, nil
+			return udpListener, tcpListener, nil
 		}
-		_ = ul.Close()
+		_ = udpListener.Close()
 		if !errors.Is(err, syscall.EADDRINUSE) || attempt >= attempts {
 			return nil, nil, fmt.Errorf("tcp: %w", err)
 		}

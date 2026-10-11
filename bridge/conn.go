@@ -100,6 +100,14 @@ func isNilRoute(dst net.Addr) bool {
 	}
 }
 
+// udpAddrOf is dst as a UDP peer address, nil for a connection. Group
+// messages are multicast UDP only; receive drops one that arrived on a
+// connection before it reaches the group path.
+func udpAddrOf(dst net.Addr) *net.UDPAddr {
+	u, _ := dst.(*net.UDPAddr)
+	return u
+}
+
 // isConnRoute reports whether dst is a connection rather than a UDP
 // peer address — a reply on it needs no UDP listener.
 func isConnRoute(dst net.Addr) bool {

@@ -23,7 +23,7 @@ type received struct {
 // startListener binds a loopback listener on an ephemeral port and
 // serves it with handler; the returned channel carries every closed
 // connection.
-func startListener(t *testing.T, handler Handler, idle time.Duration) (*Listener, <-chan *Conn) {
+func startListener(t *testing.T, handler Handler, idle time.Duration) (l *Listener, closed <-chan *Conn) {
 	t.Helper()
 	l, err := Listen(Config{LocalAddr: "127.0.0.1:0", MaxPayloadSize: 64})
 	if err != nil {
@@ -32,17 +32,17 @@ func startListener(t *testing.T, handler Handler, idle time.Duration) (*Listener
 	if idle > 0 {
 		l.idleTimeout = idle
 	}
-	closed := make(chan *Conn, 16)
+	ch := make(chan *Conn, 16)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- l.Serve(ctx, handler, func(c *Conn) { closed <- c }) }()
+	go func() { done <- l.Serve(ctx, handler, func(c *Conn) { ch <- c }) }()
 	t.Cleanup(func() {
 		cancel()
 		if err := <-done; err != nil {
 			t.Errorf("serve: %v", err)
 		}
 	})
-	return l, closed
+	return l, ch
 }
 
 func dialRaw(t *testing.T, l *Listener) net.Conn {
@@ -127,7 +127,7 @@ func TestListenerDeliversInOrderAndReleaseLetsNextThrough(t *testing.T) {
 		}
 	}, 0)
 	c := dialRaw(t, l)
-	var stream []byte
+	stream := make([]byte, 0, 2*5)
 	for _, m := range []string{"a", "b"} {
 		stream = append(stream, frameOf([]byte(m))...)
 	}

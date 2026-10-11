@@ -113,10 +113,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 		// the way serialising unicast receive did (transport/udp Serve).
 		b.groupRx.Lock()
 		defer b.groupRx.Unlock()
-		// Group messages are multicast UDP only; receive drops one that
-		// arrived on a connection before it gets here.
-		udpSrc, _ := src.(*net.UDPAddr)
-		return b.dispatchGroupMessage(ctx, buf, udpSrc)
+		return b.dispatchGroupMessage(ctx, buf, udpAddrOf(src))
 	}
 	// Privacy unmask: when Security Flags carries the P bit, the
 	// header bytes from offset 4 onwards (MessageCounter + optional
@@ -160,8 +157,6 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// farewell route on it. matter.js adopts the newest inbound address
 	// on the session's channel — "the new message wins"
 	// (packages/protocol/src/protocol/ExchangeManager.ts:400-405).
-	//
-	// A session is not moved between transports (bindSessionRoute).
 	if hdr.SessionID != 0 && !isNilRoute(src) {
 		b.bindSessionRoute(hdr.SessionID, src)
 	}

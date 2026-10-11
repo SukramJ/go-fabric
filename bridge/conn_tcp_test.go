@@ -98,7 +98,7 @@ func newTCPHarness(t *testing.T) *tcpHarness {
 
 // dial opens a TCP connection to the bridge's listener; replies land
 // on the returned channel.
-func (h *tcpHarness) dial() (*tcp.Conn, <-chan []byte) {
+func (h *tcpHarness) dial() (conn *tcp.Conn, replies <-chan []byte) {
 	h.t.Helper()
 	h.bridge.mu.RLock()
 	tl := h.bridge.tcpListener
@@ -106,14 +106,14 @@ func (h *tcpHarness) dial() (*tcp.Conn, <-chan []byte) {
 	if tl == nil {
 		h.t.Fatal("bridge has no TCP listener")
 	}
-	replies := make(chan []byte, 16)
+	ch := make(chan []byte, 16)
 	var d tcp.Dialer
-	c, err := d.Dial(context.Background(), tl.Addr().String(), func(_ *tcp.Conn, msg []byte, _ func()) { replies <- msg })
+	c, err := d.Dial(context.Background(), tl.Addr().String(), func(_ *tcp.Conn, msg []byte, _ func()) { ch <- msg })
 	if err != nil {
 		h.t.Fatal(err)
 	}
 	h.t.Cleanup(func() { _ = c.Close() })
-	return c, replies
+	return c, ch
 }
 
 // sealedInvoke is an InvokeRequest on exchange xid, sealed under the
@@ -368,14 +368,14 @@ func TestUnsolicitedReportOverTCPHasNoMRP(t *testing.T) {
 	c := &fakeConn{}
 	route := h.bridge.routeFor(c)
 	h.bridge.bindSessionRoute(harnessLocalSessionID, route)
-	counter, err := h.bridge.sendUnsolicitedIM(subTarget{
+	counters, err := h.bridge.sendReportChunks(subTarget{
 		src: route, sessionID: harnessLocalSessionID, exchangeID: 0x400, hasAck: true, ackCounter: 9,
-	}, im.OpcodeReportData, []byte{0x15, 0x18})
+	}, im.ReportData{SubscriptionID: 7, HasSubscription: true, SuppressResponse: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if counter != 0 {
-		t.Fatalf("report over TCP tracked under counter %d", counter)
+	if len(counters) != 0 {
+		t.Fatalf("report over TCP tracked under counters %v", counters)
 	}
 	if len(c.sent) != 1 {
 		t.Fatalf("sent %d messages on the connection", len(c.sent))
