@@ -154,6 +154,15 @@ the same `ColorTemperatureWriter` as before.
   (0x0099…) and DeviceEnergyManagement (0x0098…) test event triggers as
   connectedhomeip's evse-app does. The chip-tool suite runs the DEM, DEMM,
   EEVSE and EEVSEM families against it (workflow group `app-energy`).
+- Reference daemon, for the certification harness (wave-3 fix-up): the
+  app-pipe `OperationalStateChange` routes Device "Oven" to the oven's
+  cavity as CHIP's all-clusters app does (`OnOvenOperationalStateChange`),
+  and the cavity's OperationalStateList holds Paused as that app's does
+  (TC-OVENOPSTATE-2.1, 2.2, 2.4). TC-EEVSE-2.2 runs with its
+  UserMaximumChargeCurrent write pointed at the case's own endpoint (the
+  case hard-codes endpoint 1); TC-EEVSE-2.3 is recorded as a class (a) gap
+  (step 19: CONSTRAINT_ERROR from the generated decoder where the case
+  expects RESOURCE_EXHAUSTED; matter.js answers the same).
 - `cluster/servicearea` (new): a ServiceArea (0x0150) server on the
   generated definition with the rules of matter.js's
   `ServiceAreaBaseServer` — the SupportedAreas / SupportedMaps /

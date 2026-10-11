@@ -44,6 +44,16 @@ func cycleStates() []opstate.StateEntry {
 	return []opstate.StateEntry{{ID: opstate.StateStopped}, {ID: opstate.StateRunning}, {ID: opstate.StateError}}
 }
 
+// ovenCavityStates are the oven cavity's OperationalStateList: the four
+// states of CHIP's all-clusters oven (oven-operational-state-delegate.h:37-40
+// at the harness pin), Paused included although the cavity offers no Pause
+// command — TC-OVENOPSTATE-2.2 step 3 requires every OperationalStateEnum
+// value in the list. matter.js's OvenCavityOperationalStateServer requires
+// only the Error entry (#assertOperationalStateList).
+func ovenCavityStates() []opstate.StateEntry {
+	return append(cycleStates(), opstate.StateEntry{ID: opstate.StatePaused})
+}
+
 // cycle is a Start / Stop handler for an OperationalState server: Start
 // runs, Stop stops, and stopping a running cycle reports its completion.
 type cycle struct {
@@ -245,7 +255,7 @@ func (c *demoOvenCavity) build() {
 		ops, err := opstate.NewOvenCavityServer(opstate.Config{
 			Handler:      cycle{name: c.name, ops: func() *opstate.Server { return c.ops }},
 			Commands:     opstate.CommandStart | opstate.CommandStop,
-			States:       cycleStates(),
+			States:       ovenCavityStates(),
 			State:        opstate.StateStopped,
 			Phases:       opstate.OvenCavityPhases,
 			CurrentPhase: &phase,

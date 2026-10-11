@@ -164,6 +164,13 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		}
 		return f.fridge.reportDoor(*cmd.DoorOpen != 0)
 	case "OperationalStateChange":
+		// CHIP's all-clusters app routes by Device
+		// (AllClustersCommandDelegate.cpp:939-945 at the harness pin):
+		// "Generic" is its OperationalState instance, "Oven" its
+		// OvenCavityOperationalState one.
+		if cmd.Device == "Oven" {
+			return f.ovenOperation(cmd)
+		}
 		return f.washerOperation(cmd)
 	case "ErrorEvent":
 		id, ok := rvcErrors[cmd.Error]
@@ -262,6 +269,36 @@ func (f *fleet) washerOperation(cmd pipeCommand) error {
 			return w.ops.SetOperationalState(opstate.StateRunning)
 		}
 		return nil
+	}
+	return fmt.Errorf("OperationalStateChange operation %q: %w", cmd.Operation, errUnknownPipeCommand)
+}
+
+// ovenOperation is CHIP's OperationalStateChange for the "Oven" device —
+// the oven's cavity here (TC-OVENOPSTATE-2.x drive it through the pipe,
+// TC_OpstateCommon.py:102). It mirrors
+// AllClustersAppCommandHandler::OnOvenOperationalStateChange
+// (AllClustersCommandDelegate.cpp:995-1028 at the harness pin): Start and
+// Resume set Running, Pause sets Paused, Stop sets Stopped, each directly
+// on the cluster instance; OnFault raises the error of Param, or
+// UnableToCompleteOperation without one, through OnOperationalErrorDetected
+// — which sets OperationalState to Error and emits OperationalError
+// (OperationalStateCluster.cpp:108-127).
+func (f *fleet) ovenOperation(cmd pipeCommand) error {
+	c := f.oven.cavity
+	c.build()
+	switch cmd.Operation {
+	case "Start", "Resume":
+		return c.ops.SetOperationalState(opstate.StateRunning)
+	case "Pause":
+		return c.ops.SetOperationalState(opstate.StatePaused)
+	case "Stop":
+		return c.ops.SetOperationalState(opstate.StateStopped)
+	case "OnFault":
+		id := opstate.ErrorUnableToCompleteOperation
+		if cmd.Param != nil {
+			id = opstate.ErrorID(*cmd.Param)
+		}
+		return c.ops.SetOperationalError(opstate.ErrorState{ID: id})
 	}
 	return fmt.Errorf("OperationalStateChange operation %q: %w", cmd.Operation, errUnknownPipeCommand)
 }

@@ -248,3 +248,45 @@ func TestSmokeTestButtonIsIgnoredWhileAlarming(t *testing.T) {
 		t.Fatal("a self-test started while the alarm sounds")
 	}
 }
+
+// TestOvenPipeDrivesTheCavity: OperationalStateChange for Device "Oven" is
+// CHIP's OnOvenOperationalStateChange (AllClustersCommandDelegate.cpp:995
+// at the harness pin) on the oven's cavity: Start, Pause and Stop set the
+// state directly, OnFault puts the cavity in Error with the error of Param,
+// and the list the cavity advertises holds Paused although it offers no
+// Pause command (TC-OVENOPSTATE-2.1 steps 6a-6h, 2.2 step 3, 2.4 step 3).
+func TestOvenPipeDrivesTheCavity(t *testing.T) {
+	f, _ := startFleetBridge(t)
+	cavity := f.oven.cavity
+	cavity.build()
+	state := func() opstate.State {
+		raw, _ := cavity.ops.MatterRead(opstate.AttrOperationalState)
+		st, _ := raw.(uint8)
+		return opstate.State(st)
+	}
+	for _, step := range []struct {
+		op   string
+		want opstate.State
+	}{{"Start", opstate.StateRunning}, {"Pause", opstate.StatePaused}, {"Resume", opstate.StateRunning}, {"Stop", opstate.StateStopped}} {
+		if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: step.op}); err != nil {
+			t.Fatalf("%s: %v", step.op, err)
+		}
+		if got := state(); got != step.want {
+			t.Fatalf("after %s: OperationalState = %d, want %d", step.op, got, step.want)
+		}
+	}
+	fault := uint8(opstate.ErrorUnableToStartOrResume)
+	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: "OnFault", Param: &fault}); err != nil {
+		t.Fatalf("OnFault: %v", err)
+	}
+	if got := state(); got != opstate.StateError {
+		t.Fatalf("after OnFault: OperationalState = %d, want Error", got)
+	}
+	raw, _ := cavity.ops.MatterRead(opstate.AttrOperationalError)
+	if e, ok := raw.(clusterwire.ErrorStateStruct); !ok || e.ErrorStateID != uint8(opstate.ErrorUnableToStartOrResume) {
+		t.Fatalf("OperationalError = %#v, want UnableToStartOrResume", raw)
+	}
+	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: "Bake"}); !errors.Is(err, errUnknownPipeCommand) {
+		t.Fatalf("unknown operation: %v, want errUnknownPipeCommand", err)
+	}
+}

@@ -352,6 +352,36 @@
       "steps": 64,
       "stepsSkipped": 72
     },
+    "CLDIM/2.1": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 4
+    },
+    "CLDIM/3.1": {
+      "tests": 1,
+      "steps": 28,
+      "stepsSkipped": 8
+    },
+    "CLDIM/3.2": {
+      "tests": 1,
+      "steps": 27,
+      "stepsSkipped": 8
+    },
+    "CLDIM/3.3": {
+      "tests": 1,
+      "steps": 41,
+      "stepsSkipped": 22
+    },
+    "CLDIM/4.1": {
+      "tests": 1,
+      "steps": 37,
+      "stepsSkipped": 4
+    },
+    "CLDIM/4.2": {
+      "tests": 1,
+      "steps": 15,
+      "stepsSkipped": 2
+    },
     "CMOCONC/2.1": {
       "steps": 6,
       "stepsSkipped": 6
@@ -395,6 +425,50 @@
       "tests": 1,
       "steps": 4,
       "stepsSkipped": 4
+    },
+    "DEM/2.1": {
+      "tests": 1,
+      "steps": 10,
+      "stepsSkipped": 0
+    },
+    "DEM/2.10": {
+      "tests": 1,
+      "steps": 28,
+      "stepsSkipped": 0
+    },
+    "DEM/2.2": {
+      "tests": 1,
+      "steps": 42,
+      "stepsSkipped": 0
+    },
+    "DEM/2.3": {
+      "tests": 1,
+      "steps": 37,
+      "stepsSkipped": 0
+    },
+    "DEM/2.4": {
+      "tests": 1,
+      "steps": 48,
+      "stepsSkipped": 0
+    },
+    "DEM/2.5": {
+      "tests": 1,
+      "steps": 39,
+      "stepsSkipped": 0
+    },
+    "DEM/2.7": {
+      "tests": 1,
+      "steps": 40,
+      "stepsSkipped": 0
+    },
+    "DEMM/1.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "DEMM/2.1": {
+      "steps": 11,
+      "stepsSkipped": 3
     },
     "DESC/2.2": {
       "tests": 1,
@@ -446,6 +520,11 @@
       "steps": 5,
       "stepsSkipped": 4
     },
+    "DISHALM/2.1": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
     "DRLK/2.1": {
       "steps": 29,
       "stepsSkipped": 161
@@ -482,6 +561,54 @@
       "tests": 1,
       "steps": 3,
       "stepsSkipped": 0
+    },
+    "EEVSE/2.1": {
+      "steps": 27,
+      "stepsSkipped": 0
+    },
+    "EEVSE/2.10": {
+      "tests": 1,
+      "steps": 48,
+      "stepsSkipped": 0
+    },
+    "EEVSE/2.4": {
+      "tests": 1,
+      "steps": 25,
+      "stepsSkipped": 0
+    },
+    "EEVSE/2.5": {
+      "tests": 1,
+      "steps": 21,
+      "stepsSkipped": 0
+    },
+    "EEVSE/2.6": {
+      "tests": 1,
+      "steps": 35,
+      "stepsSkipped": 0
+    },
+    "EEVSE/2.7": {
+      "tests": 1,
+      "steps": 52,
+      "stepsSkipped": 0
+    },
+    "EEVSE/2.8": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "EEVSE/2.9": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "EEVSEM/1.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "EEVSEM/2.1": {
+      "steps": 11,
+      "stepsSkipped": 3
     },
     "EPREF/2.1": {
       "tests": 1,
@@ -772,6 +899,56 @@
       "steps": 12,
       "stepsSkipped": 4
     },
+    "IDM/10.4@ep30": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep31": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep32": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep33": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep34": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep35": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep36": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep37": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep38": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep39": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
     "IDM/10.4@ep4": {
       "tests": 1,
       "steps": 12,
@@ -944,6 +1121,30 @@
       "steps": 16,
       "stepsSkipped": 16
     },
+    "MWOCTRL/2.1": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 2
+    },
+    "MWOCTRL/2.2": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 0
+    },
+    "MWOCTRL/2.4": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 8
+    },
+    "MWOCTRL/2.5": {
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "MWOM/1.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
     "NDOCONC/2.1": {
       "steps": 6,
       "stepsSkipped": 6
@@ -1049,6 +1250,20 @@
       "steps": 11,
       "stepsSkipped": 6
     },
+    "OTCCM/1.2": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "OTCCM/2.1": {
+      "steps": 4,
+      "stepsSkipped": 10
+    },
+    "OVENOPSTATE/2.5": {
+      "tests": 1,
+      "steps": 26,
+      "stepsSkipped": 42
+    },
     "OZCONC/2.1": {
       "steps": 6,
       "stepsSkipped": 6
@@ -1088,6 +1303,15 @@
     "PS/3.1": {
       "tests": 1,
       "steps": 5,
+      "stepsSkipped": 0
+    },
+    "REFALM/2.1": {
+      "steps": 4,
+      "stepsSkipped": 1
+    },
+    "REFALM/2.2": {
+      "tests": 1,
+      "steps": 13,
       "stepsSkipped": 0
     },
     "RH/2.1": {
@@ -1220,6 +1444,31 @@
       "steps": 3,
       "stepsSkipped": 0
     },
+    "SEAR/1.2": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "SEAR/1.3": {
+      "tests": 1,
+      "steps": 8,
+      "stepsSkipped": 0
+    },
+    "SEAR/1.4": {
+      "tests": 1,
+      "steps": 2,
+      "stepsSkipped": 0
+    },
+    "SEAR/1.5": {
+      "tests": 1,
+      "steps": 3,
+      "stepsSkipped": 0
+    },
+    "SEAR/1.6": {
+      "tests": 1,
+      "steps": 9,
+      "stepsSkipped": 0
+    },
     "SM/1.1": {
       "tests": 1,
       "steps": 9,
@@ -1319,6 +1568,14 @@
       "tests": 1,
       "steps": 18,
       "stepsSkipped": 34
+    },
+    "TSUIC/2.1": {
+      "steps": 3,
+      "stepsSkipped": 1
+    },
+    "TSUIC/2.2": {
+      "steps": 21,
+      "stepsSkipped": 16
     },
     "TVOCCONC/2.1": {
       "steps": 6,
@@ -1601,6 +1858,19 @@
       "7.3",
       "7.4"
     ],
+    "CLDIM": [
+      "2.1",
+      "3.1",
+      "3.2",
+      "3.3",
+      "4.1",
+      "4.2",
+      "5.1",
+      "5.2",
+      "5.3",
+      "6.1",
+      "6.2"
+    ],
     "CMOCONC": [
       "2.1"
     ],
@@ -1676,6 +1946,23 @@
       "3.21",
       "3.22"
     ],
+    "DEM": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.10",
+      "2.11"
+    ],
+    "DEMM": [
+      "1.2",
+      "2.1"
+    ],
     "DESC": [
       "2.1",
       "2.2",
@@ -1701,6 +1988,15 @@
       "2.3",
       "3.2.Simulated"
     ],
+    "DISHALM": [
+      "2.1",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "3.5",
+      "3.6"
+    ],
     "DLOG": [
       "2.1"
     ],
@@ -1722,6 +2018,22 @@
     ],
     "DT": [
       "1.1"
+    ],
+    "EEVSE": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.10"
+    ],
+    "EEVSEM": [
+      "1.2",
+      "2.1"
     ],
     "EPREF": [
       "2.1"
@@ -1870,6 +2182,15 @@
       "2.1",
       "3.1"
     ],
+    "MWOCTRL": [
+      "2.1",
+      "2.2",
+      "2.4",
+      "2.5"
+    ],
+    "MWOM": [
+      "1.2"
+    ],
     "NDOCONC": [
       "2.1"
     ],
@@ -1909,6 +2230,17 @@
       "2.5",
       "2.6"
     ],
+    "OTCCM": [
+      "1.2",
+      "2.1"
+    ],
+    "OVENOPSTATE": [
+      "2.1",
+      "2.2",
+      "2.4",
+      "2.5",
+      "2.6"
+    ],
     "OZCONC": [
       "2.1"
     ],
@@ -1932,6 +2264,11 @@
       "2.2",
       "2.3",
       "3.1"
+    ],
+    "REFALM": [
+      "2.1",
+      "2.2",
+      "2.3"
     ],
     "RH": [
       "2.1",
@@ -2003,6 +2340,13 @@
       "8.5",
       "8.6",
       "8.7"
+    ],
+    "SEAR": [
+      "1.2",
+      "1.3",
+      "1.4",
+      "1.5",
+      "1.6"
     ],
     "SM": [
       "1.1",
@@ -2078,6 +2422,10 @@
       "4.3",
       "4.4"
     ],
+    "TSUIC": [
+      "2.1",
+      "2.2"
+    ],
     "TVOCCONC": [
       "2.1"
     ],
@@ -2152,6 +2500,11 @@
     "CLCTRL/7.2": "CLCTRL.S \u0026 CLCTRL.S.F01 \u0026 CLCTRL.S.C03.Rsp",
     "CLCTRL/7.3": "CLCTRL.S \u0026 CLCTRL.S.C03.Rsp",
     "CLCTRL/7.4": "CLCTRL.S \u0026 CLCTRL.S.A0000 \u0026 CLCTRL.S.C03.Rsp",
+    "CLDIM/5.1": "CLDIM.S \u0026 CLDIM.S.F00 \u0026 CLDIM.S.C02.Rsp",
+    "CLDIM/5.2": "CLDIM.S \u0026 CLDIM.S.F01 \u0026 CLDIM.S.C02.Rsp",
+    "CLDIM/5.3": "CLDIM.S \u0026 CLDIM.S.C02.Rsp",
+    "CLDIM/6.1": "CLDIM.S \u0026 CLDIM.S.F00 \u0026 CLDIM.S.C03.Rsp",
+    "CLDIM/6.2": "CLDIM.S \u0026 CLDIM.S.F00 \u0026 CLDIM.S.C03.Rsp",
     "CNET/4.1": "CNET.S.F00",
     "CNET/4.10": "CNET.S \u0026 CNET.S.F01",
     "CNET/4.12": "CNET.S.F01",
@@ -2170,6 +2523,10 @@
     "DA/1.13": "MCORE.ROLE.COMMISSIONER",
     "DA/1.9": "MCORE.ROLE.COMMISSIONER",
     "DD/3.11": "MCORE.ROLE.COMMISSIONER \u0026 MCORE.DD.QR_COMMISSIONING \u0026 MCORE.DD.STANDARD_COMM_FLOW",
+    "DEM/2.11": "DEM.S.F07",
+    "DEM/2.6": "DEM.S.F05 \u0026 DEM.S.F02",
+    "DEM/2.8": "DEM.S.F06 \u0026 DEM.S.F02",
+    "DEM/2.9": "DEM.S.F01 \u0026 DEM.S.F02",
     "DGETH/3.2.Simulated": "DGETH.C",
     "DGSW/2.2": "DGSW.S.E00",
     "DGSW/3.2.Simulated": "DGSW.C",
@@ -2198,7 +2555,9 @@
     "OO/2.6": "OO.S \u0026 OO.S.F02",
     "OO/3.2.Simulated": "OO.C",
     "OPCREDS/3.9": "OPCREDS.S \u0026 OPCREDS.S.F00 \u0026 OPCREDS.S.C02.Rsp \u0026 OPCREDS.S.C03.Tx",
+    "OVENOPSTATE/2.6": "OVENOPSTATE.S \u0026 OVENOPSTATE.S.A0002",
     "PS/2.3": "PWRTL.S",
+    "REFALM/2.3": "REFALM.S \u0026 REFALM.S.M.LocalSuppress",
     "S/2.3": "S",
     "SC/3.5": "MCORE.ROLE.COMMISSIONER",
     "SC/4.6": "MCORE.ROLE.COMMISSIONER \u0026 MCORE.DD.COMM_DISCOVERY",
@@ -2283,6 +2642,12 @@
     "DESC/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DGGEN/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DGSW/2.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DISHALM/3.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DISHALM/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DISHALM/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DISHALM/3.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DISHALM/3.5": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DISHALM/3.6": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DLOG/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DRLK/2.10": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DRLK/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
