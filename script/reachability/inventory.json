@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4263,
+  "entry_points": 4264,
   "entry_packages": [
     ".",
     "bootid",
@@ -166,9 +166,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9765,
+    "total_exported": 9766,
     "reachable": 6819,
-    "whitelisted": 2941,
+    "whitelisted": 2942,
     "unreachable": 5
   },
   "by_package": [
@@ -14646,6 +14646,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_evse_test.go",
       "line": 95
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestFleetWireShapes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/wire_shape_test.go",
+      "line": 97
     },
     {
       "package": "examples/reference-bridge",
