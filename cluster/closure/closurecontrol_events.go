@@ -71,6 +71,10 @@ func (s *ControlServer) MinInvokePrivilege(cmdID uint32) uint8 {
 	return s.inst.MinInvokePrivilege(cmdID)
 }
 
+// IsTimedCommand implements [contract.TimedCommander] from the generated
+// definition: MoveTo and Calibrate carry "T", Stop does not.
+func (s *ControlServer) IsTimedCommand(cmdID uint32) bool { return s.inst.IsTimedCommand(cmdID) }
+
 // SetMatterEventEmitter implements [contract.EventReceiver].
 func (s *ControlServer) SetMatterEventEmitter(emitter contract.EventEmitter) {
 	s.mu.Lock()

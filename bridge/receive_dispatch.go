@@ -447,9 +447,10 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 // compares the request's own Timed flag with the exchange's timed window
 // (a mismatch either way is TIMED_REQUEST_MISMATCH, an expired window
 // TIMEOUT — InteractionServer.ts:940-950), and a command marked "T" in the
-// matter.js model (schema.IsTimedInvoke) invoked outside a timed interaction
-// answers NEEDS_TIMED_INTERACTION for its own path in the InvokeResponse
-// (CommandInvokeResponse.ts:291), via [im.WithTimedInteraction].
+// matter.js model (the resolved server's contract.TimedCommander, else
+// schema.IsTimedInvoke) invoked outside a timed interaction answers
+// NEEDS_TIMED_INTERACTION for its own path in the InvokeResponse
+// (CommandInvokeResponse.ts:292-295), via [im.WithTimedInteraction].
 func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.InvokeRequest) error { //nolint:funlen // the invoke path's gates in their wire order, read top to bottom
 	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "invoke", status)

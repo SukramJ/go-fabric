@@ -113,6 +113,7 @@ var (
 	_ contract.ClusterAttributeReadPrivilege  = (*Server)(nil)
 	_ contract.ClusterAttributeWritePrivilege = (*Server)(nil)
 	_ contract.ClusterCommandInvokePrivilege  = (*Server)(nil)
+	_ contract.TimedCommander                 = (*Server)(nil)
 	_ contract.AttributeChangeNotifier        = (*Server)(nil)
 	_ contract.EventReceiver                  = (*Server)(nil)
 )

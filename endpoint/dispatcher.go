@@ -921,6 +921,28 @@ func (d *TopologyDispatcher) MinInvokePrivilege(endpoint uint16, clusterID, cmdI
 	return want
 }
 
+// IsTimedCommand implements [im.TimedCommandProvider]: the cluster server
+// the path resolves to answers from its own model when it implements
+// [contract.TimedCommander] (every server built on a generated definition);
+// a hand-written server, or a path no server resolves, falls back to
+// [schema.IsTimedInvoke], the table generated from the same snapshot.
+// Mirrors matter.js packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295
+// (`limits.timed` read from the command's model).
+func (d *TopologyDispatcher) IsTimedCommand(endpoint uint16, clusterID, cmdID uint32) bool {
+	if ep := d.topology.FindByID(endpoint); ep != nil {
+		for _, srv := range ClusterServers(ep) {
+			if srv.MatterClusterID() != clusterID {
+				continue
+			}
+			if tc, ok := srv.(contract.TimedCommander); ok {
+				return tc.IsTimedCommand(cmdID)
+			}
+			break
+		}
+	}
+	return schema.IsTimedInvoke(clusterID, cmdID)
+}
+
 // FabricIndexUnresolvable marks a session whose fabric the bridge could not
 // determine. Matter constrains a fabric index to "1 to 254" (matter.js
 // packages/model/src/standard/elements/operational-credentials.element.ts:129,

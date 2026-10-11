@@ -363,6 +363,14 @@ func (i *Instance) IsTimed(cmdID uint32) bool {
 	return c != nil && c.Access.Timed
 }
 
+// IsTimedCommand implements [contract.TimedCommander] from the definition's
+// own model: [Instance.IsTimed]. Every server built on an Instance — a
+// [Server], or a hand-written server embedding *Instance — therefore answers
+// the IM's timed gate from the generated definition, as matter.js reads
+// `limits.timed` from the command's model
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295).
+func (i *Instance) IsTimedCommand(cmdID uint32) bool { return i.IsTimed(cmdID) }
+
 // EventPriority returns the priority matter.js declares for eventID; Info
 // for an event the cluster does not define.
 func (i *Instance) EventPriority(eventID uint32) contract.EventPriority {

@@ -588,6 +588,19 @@ the same `ColorTemperatureWriter` as before.
 
 ### Fixed
 
+- **Timed commands come from the model.** An untimed invoke of a command
+  matter.js marks "T" answers NEEDS_TIMED_INTERACTION for every cluster,
+  not only for the hand-pinned AdministratorCommissioning, DoorLock and
+  ClosureControl commands: an untimed EnergyEvse EnableCharging or
+  ClosureDimension SetTarget used to be accepted. The IM asks the resolved
+  cluster server first through the new optional `contract.TimedCommander`
+  (implemented by `spec.Instance`, so by `spec.Server` and every server
+  embedding an Instance); `schema.IsTimedInvoke` is now generated from
+  `parity/schema.json` (`schema/timed_gen.go`, `make
+  generate-matter-schema`) and remains the fallback for hand-written
+  servers. New optional dispatcher capability `im.TimedCommandProvider`,
+  implemented by `endpoint.TopologyDispatcher`.
+
 - **A transition's rate and its RemainingTime came from two reads of the
   current value.** `cluster/light` (MoveToSaturation, MoveToColorTemperature)
   and `cluster/levelcontrol` read the current value, computed the rate, and
