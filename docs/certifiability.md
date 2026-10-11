@@ -130,13 +130,13 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | IDM | 33 | 20 | 0 | 0 | 0 | 13 | 0 |
 | OPCREDS | 9 | 6 | 0 | 0 | 1 | 2 | 0 |
 | RR | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| SC | 34 | 9 | 0 | 0 | 10 | 15 | 0 |
+| SC | 34 | 16 | 0 | 0 | 3 | 15 | 0 |
 | SM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | TIMESYNC | 14 | 3 | 0 | 0 | 11 | 0 | 0 |
 | DLOG | 1 | 0 | 0 | 0 | 0 | 1 | 0 |
 | ICDM | 7 | 0 | 0 | 0 | 7 | 0 | 0 |
-| SU | 13 | 0 | 0 | 0 | 3 | 10 | 0 |
-| BDX | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| SU | 13 | 1 | 0 | 0 | 0 | 10 | 0 |
+| BDX | 11 | 0 | 0 | 0 | 0 | 11 | 0 |
 | BIND | 3 | 0 | 0 | 0 | 0 | 3 | 0 |
 | FLABEL | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | ULABEL | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
@@ -172,8 +172,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MTRID | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | SETRF | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | COMMTR | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| EGC | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| DEM | 11 | 7 | 0 | 0 | 4 | 0 | 0 |
+| EGC | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| DEM | 11 | 5 | 0 | 0 | 2 | 0 | 0 |
 | DEMM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | EEVSE | 10 | 9 | 0 | 1 | 0 | 0 | 0 |
 | EEVSEM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -211,7 +211,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WHM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **594** | **336** | **0** | **1** | **123** | **129** | **5** |
+| **all** | **608** | **345** | **0** | **1** | **111** | **140** | **5** |
 
 ### Cases not run
 
@@ -221,6 +221,17 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | ACT/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ACT/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ACT/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/1.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/1.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/1.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/1.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/2.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| BDX/2.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BIND/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BIND/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BIND/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -330,8 +341,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DD/3.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DEM/2.11 | (b) not supported | not applicable: the case's PICS `DEM.S.F07` is false for the reference DUT |
-| DEM/2.6 | (b) not supported | not applicable: the case's PICS `DEM.S.F05 & DEM.S.F02` is false for the reference DUT |
-| DEM/2.8 | (b) not supported | not applicable: the case's PICS `DEM.S.F06 & DEM.S.F02` is false for the reference DUT |
 | DEM/2.9 | (b) not supported | not applicable: the case's PICS `DEM.S.F01 & DEM.S.F02` is false for the reference DUT |
 | DESC/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DGETH/3.2.Simulated | (b) not supported | not applicable: the case's PICS `DGETH.C` is false for the reference DUT |
@@ -429,18 +438,9 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SC/4.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/5.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SC/6.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SC/8.1 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
-| SC/8.2 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
-| SC/8.3 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
-| SC/8.4 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
-| SC/8.5 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
-| SC/8.6 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
-| SC/8.7 | (b) not supported | not applicable: the case's PICS `MCORE.SC.S.TCP` is false for the reference DUT |
 | SU/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SU/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/2.2 | (b) not supported | not applicable: the case's PICS `MCORE.OTA.Requestor` is false for the reference DUT |
 | SU/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/2.4 | (b) not supported | not applicable: the case's PICS `MCORE.OTA.Requestor` is false for the reference DUT |
 | SU/2.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SU/2.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SU/2.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -448,7 +448,6 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | SU/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SU/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | SU/3.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
-| SU/4.1 | (b) not supported | not applicable: the case's PICS `MCORE.OTA.Requestor` is false for the reference DUT |
 | SWTCH/2.2 | (b) not supported | TC-SWTCH-2.2 runs only on a latching switch (PICS SWTCH.S.F00=0: the daemon's switch is momentary) (runs, and skips itself) |
 | SWTCH/2.5 | (b) not supported | TC-SWTCH-2.5 runs only with MomentarySwitchMultiPress (PICS SWTCH.S.F04=0) (runs, and skips itself) |
 | SWTCH/2.6 | (b) not supported | TC-SWTCH-2.6 runs only with MomentarySwitchMultiPress and ActionSwitch (PICS SWTCH.S.F04=0, SWTCH.S.F05=0) (runs, and skips itself) |

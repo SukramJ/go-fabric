@@ -249,7 +249,7 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	// is_dut_tcp_supported: "T key present and not 0"). --ota-harness
 	// applies a downloaded OTA image in place so TC-SU cases that read the
 	// new SoftwareVersion see it (brief N).
-	args := []string{"--db", opts.dbPath, "--listen", opts.listen, "--ota-harness"}
+	args := []string{"--db", opts.dbPath, "--listen", opts.listen, "--ota-harness", "--tcp", "false"} // EXPERIMENT: isolate the DEM subscription churn
 	if flags["log-level"] {
 		// The daemon-side view of a failed handshake is the only thing that
 		// says which stage stopped; chip-tool's output alone cannot.
