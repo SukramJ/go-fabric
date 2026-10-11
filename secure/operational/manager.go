@@ -302,6 +302,10 @@ type Entry struct {
 	peerIdleIntervalMs    uint32
 	peerActiveIntervalMs  uint32
 	peerActiveThresholdMs uint32
+	// peerTransports / peerMaxTCPMessageSize: the peer's effective
+	// SupportedTransports bitmap and TCP message bound (0 = not stated).
+	peerTransports        uint16
+	peerMaxTCPMessageSize uint32
 	// isPase marks a session established via the PASE handshake. The
 	// marker survives [Manager.AdoptFabricIndex] (the session stays a
 	// PASE session even after AddNOC rewrites its FabricIndex) so
@@ -333,6 +337,28 @@ func (e *Entry) SetPeerMRPIntervals(idleMs, activeMs, activeThresholdMs uint32) 
 	e.peerActiveIntervalMs = activeMs
 	e.peerActiveThresholdMs = activeThresholdMs
 	e.mu.Unlock()
+}
+
+// SetPeerTransportParameters stores what the peer stated about transports
+// in its SessionParameters: the SupportedTransports bitmap and
+// MaxTCPMessageSize, already passed through the Matter 1.5 gate
+// ([sessionparams.Parameters.EffectiveTransports]). A TCP sender bounds
+// its messages to the peer's size, as matter.js keeps
+// `maxTCPMessageSize` on the Session (Session.ts:86, :118).
+func (e *Entry) SetPeerTransportParameters(transports uint16, maxTCPMessageSize uint32) {
+	e.mu.Lock()
+	e.peerTransports = transports
+	e.peerMaxTCPMessageSize = maxTCPMessageSize
+	e.mu.Unlock()
+}
+
+// PeerTransportParameters returns the bitmap and the TCP message bound
+// stored by [Entry.SetPeerTransportParameters]; zero when the peer stated
+// none.
+func (e *Entry) PeerTransportParameters() (transports uint16, maxTCPMessageSize uint32) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.peerTransports, e.peerMaxTCPMessageSize
 }
 
 // RetransmitBaseInterval returns the MRP base interval for the next

@@ -1230,14 +1230,6 @@ implementation wave.
 
 ---
 
-### BD-Matter-PASE-SessionParametersLegacy — PBKDFParamResponse emits only the legacy MRP triplet
-
-**Go path:** `bridge/handlers.go` + `secure/spake2/wire.go` — PBKDFParamResponse tag-5 (`ResponderMRPParams`).
-
-**Rationale:** matter.js `PaseMessages.ts:23-50` serialises the full 1.3+ `TlvSessionParameters` (idle/active as UInt32, activeThreshold, dataModelRevision, interactionModelRevision, specificationVersion, maxPathsPerInvoke) into the PBKDFParamResponse's responderSessionParams, and types the initiator's idle/active intervals as UInt32. go-fabric's PASE wire layer emits only the legacy 3-field SED/MRP triplet and decodes the initiator's idle/active intervals as uint16 (truncating > 65535 ms). The matter.js-faithful target already exists in-tree as `sigma.SessionParameters` (the CASE Sigma2 path emits the full struct); unifying PASE onto it means reshaping the exported `spake2.MRPParameters` struct, which is consumed by `cmd/openccu-loom/daemon_matter.go`. Practically unreachable in the server-responder role — only a commissioner-initiator's InitiatorMRPParams passes through this decode, and commissioners (phone/hub, non-sleepy) advertise sub-65535 ms intervals. Deferred; recommend unifying PASE onto `sigma.SessionParameters` in a future pass.
-
----
-
 ### BD-Matter-P2-D22 — Wire-encoder parity tests for NOCStruct/FabricDescriptor new fields absent
 
 **Go path:** `bridge/reply.go` NOCStruct + FabricDescriptorStruct encoders.

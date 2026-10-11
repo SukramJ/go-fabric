@@ -57,7 +57,7 @@ func TestPeek_LongerSlice(t *testing.T) {
 func TestSessionParameters_IsEmpty_AllZero(t *testing.T) {
 	t.Parallel()
 	sp := SessionParameters{}
-	if !sp.isEmpty() {
+	if !sp.IsEmpty() {
 		t.Error("expected isEmpty=true for zero SessionParameters")
 	}
 }
@@ -67,7 +67,7 @@ func TestSessionParameters_IsEmpty_AllZero(t *testing.T) {
 func TestSessionParameters_IsEmpty_NonZeroIdle(t *testing.T) {
 	t.Parallel()
 	sp := SessionParameters{SessionIdleInterval: 500}
-	if sp.isEmpty() {
+	if sp.IsEmpty() {
 		t.Error("expected isEmpty=false when SessionIdleInterval != 0")
 	}
 }
@@ -77,7 +77,7 @@ func TestSessionParameters_IsEmpty_NonZeroIdle(t *testing.T) {
 func TestSessionParameters_IsEmpty_NonZeroActive(t *testing.T) {
 	t.Parallel()
 	sp := SessionParameters{SessionActiveInterval: 300}
-	if sp.isEmpty() {
+	if sp.IsEmpty() {
 		t.Error("expected isEmpty=false when SessionActiveInterval != 0")
 	}
 }
@@ -87,7 +87,7 @@ func TestSessionParameters_IsEmpty_NonZeroActive(t *testing.T) {
 func TestSessionParameters_IsEmpty_NonZeroThreshold(t *testing.T) {
 	t.Parallel()
 	sp := SessionParameters{SessionActiveThreshold: 4000}
-	if sp.isEmpty() {
+	if sp.IsEmpty() {
 		t.Error("expected isEmpty=false when SessionActiveThreshold != 0")
 	}
 }
@@ -106,7 +106,7 @@ func TestSessionParameters_Encode_AllNonZero(t *testing.T) {
 		SessionActiveThreshold: 4000,
 	}
 	enc := sigmaTLVEncoder()
-	sp.encode(enc, 5) // outerTag = 5 (Sigma2's context tag)
+	encodeSessionParameters(enc, 5, sp) // outerTag = 5 (Sigma2's context tag)
 	b := enc.bytes()
 	if len(b) == 0 {
 		t.Error("encode produced empty output")
@@ -119,7 +119,7 @@ func TestSessionParameters_Encode_AllZero(t *testing.T) {
 	t.Parallel()
 	sp := SessionParameters{}
 	enc := sigmaTLVEncoder()
-	sp.encode(enc, 5)
+	encodeSessionParameters(enc, 5, sp)
 	b := enc.bytes()
 	// Container open + close = 2 bytes minimum.
 	if len(b) < 2 {
@@ -134,7 +134,7 @@ func TestSessionParameters_Encode_PartialFields(t *testing.T) {
 	// Only SessionIdleInterval is set — only putUint32(1, …) fires.
 	sp := SessionParameters{SessionIdleInterval: 1000}
 	enc := sigmaTLVEncoder()
-	sp.encode(enc, 1)
+	encodeSessionParameters(enc, 1, sp)
 	b := enc.bytes()
 	if len(b) == 0 {
 		t.Error("encode partial: expected non-empty output")

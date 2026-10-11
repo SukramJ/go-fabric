@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4258,
+  "entry_points": 4268,
   "entry_packages": [
     ".",
     "bootid",
@@ -156,6 +156,7 @@
     "secure/channel",
     "secure/mattercert",
     "secure/operational",
+    "secure/sessionparams",
     "secure/setup",
     "secure/sigma",
     "secure/spake2",
@@ -166,9 +167,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9761,
-    "reachable": 6819,
-    "whitelisted": 2937,
+    "total_exported": 9771,
+    "reachable": 6825,
+    "whitelisted": 2941,
     "unreachable": 5
   },
   "by_package": [
@@ -236,7 +237,7 @@
       "package": "secure/sigma",
       "identifier": "ErrResumptionMICInvalid",
       "file": "secure/sigma/sigma.go",
-      "line": 89,
+      "line": 92,
       "kind": "var"
     }
   ],
@@ -3575,6 +3576,20 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestPaseAdapterAdvertisesDefaultSessionParameters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_session_params_test.go",
+      "line": 17
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestPaseAdapterLegacyTripletSettersStillWork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_session_params_test.go",
+      "line": 71
+    },
+    {
+      "package": "bridge",
       "identifier": "TestPaseAdapter_AbsentMRPParamsNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/pase_mrp_params_test.go",
@@ -4622,6 +4637,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/session_order_test.go",
       "line": 14
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestSessionParametersForStatesTCPOnlyWhenOffered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/pase_session_params_test.go",
+      "line": 52
     },
     {
       "package": "bridge",
@@ -18391,6 +18413,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
       "line": 21
+    },
+    {
+      "package": "secure/sigma",
+      "identifier": "SessionParameters",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "secure/sigma/sigma.go",
+      "line": 423
     },
     {
       "package": "secure/sigma",

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -54,16 +55,6 @@ const (
 const (
 	tagPBKDFParamsIterations uint8 = 1
 	tagPBKDFParamsSalt       uint8 = 2
-)
-
-// MRPParameters nested-struct field tags per Matter §4.13.5.2 (used
-// inside both InitiatorMRPParams and ResponderMRPParams). All three
-// fields are optional; absent fields signal "use commissioner-side
-// defaults".
-const (
-	tagMRPParamsIdleRetransTimeoutMs   uint8 = 1
-	tagMRPParamsActiveRetransTimeoutMs uint8 = 2
-	tagMRPParamsActiveThresholdTimeMs  uint8 = 3
 )
 
 // PBKDFRandomSize is the byte length of the InitiatorRandom /
@@ -245,12 +236,21 @@ type PBKDFParamRequest struct {
 	// responder omits the [PBKDFParamResponse.PBKDFParameters]
 	// field; when false, the responder MUST include it.
 	HasPBKDFParameters bool
-	// InitiatorMRPParams carries the commissioner's MRP retransmit
-	// tuning from tag 5, or nil when the field was absent. The PASE
-	// session opener stamps these onto the operational entry so
-	// retransmissions honour the peer's advertised intervals —
-	// matter.js PaseServer.ts:155-157 `session.timingParameters =
-	// initiatorSessionParams`.
+	// InitiatorSessionParams is the commissioner's SessionParameters
+	// (tag 5, nil when absent): the MRP intervals, the revisions,
+	// MaxPathsPerInvoke and, from Matter 1.5, SupportedTransports and
+	// MaxTCPMessageSize — the full TlvSessionParameters of matter.js
+	// PaseMessages.ts:28-58, :74. The PASE session opener stamps them
+	// onto the operational entry (PaseServer.ts:155-157
+	// `session.timingParameters = initiatorSessionParams`).
+	InitiatorSessionParams *sessionparams.Parameters
+	// InitiatorMRPParams is the MRP triplet of InitiatorSessionParams,
+	// filled on decode for consumers of the legacy field.
+	//
+	// Deprecated: read [PBKDFParamRequest.InitiatorSessionParams], which
+	// carries the whole structure. Marked in v0.3.0; removal is
+	// permissible from v0.5.0, the second minor release after the
+	// marking one (README §API stability).
 	InitiatorMRPParams *MRPParameters
 }
 
@@ -290,11 +290,12 @@ func DecodePBKDFParamRequest(payload []byte) (PBKDFParamRequest, error) {
 			req.HasPBKDFParameters = el.Bool
 		case tagPBKDFReqInitiatorMRPParams:
 			if el.IsContainer {
-				params, perr := decodeMRPParameters(dec)
+				params, perr := sessionparams.DecodeFields(dec)
 				if perr != nil {
-					return req, perr
+					return req, fmt.Errorf("%w: InitiatorSessionParams: %w", ErrWireMalformed, perr)
 				}
-				req.InitiatorMRPParams = &params
+				req.InitiatorSessionParams = &params
+				req.InitiatorMRPParams = legacyMRPParameters(params)
 			}
 		}
 	}
@@ -323,17 +324,31 @@ type PBKDFParamResponse struct {
 	// Parameters is included only when the request flagged
 	// HasPBKDFParameters=false; nil otherwise.
 	Parameters *PBKDFParameters
-	// ResponderMRPParams is the optional nested-struct that lets the
-	// bridge advertise its MRP retransmit-timer profile to the
-	// commissioner. Nil = omit the field; commissioners then fall
-	// back to spec defaults (Matter §4.12 — IdleRetransTimeout 500ms,
-	// ActiveRetransTimeout 300ms, ActiveThresholdTime 4000ms).
+	// ResponderSessionParams is the bridge's SessionParameters for the
+	// commissioner (tag 5): the full structure matter.js's PaseServer.ts:151
+	// sends (`responderSessionParams = this.sessions.sessionParameters`,
+	// the same parameters CASE advertises). Nil omits the field.
+	ResponderSessionParams *sessionparams.Parameters
+	// ResponderMRPParams is the legacy MRP triplet. When
+	// ResponderSessionParams is nil it is encoded as tags 1-3 of the
+	// structure; on decode it is filled from ResponderSessionParams.
+	//
+	// Deprecated: set [PBKDFParamResponse.ResponderSessionParams]. Marked
+	// in v0.3.0; removal is permissible from v0.5.0, the second minor
+	// release after the marking one (README §API stability).
 	ResponderMRPParams *MRPParameters
 }
 
-// MRPParameters carries the optional MRP retransmit-timer triplet a
-// PASE peer may advertise inside PBKDFParamRequest.InitiatorMRPParams
-// or PBKDFParamResponse.ResponderMRPParams. Each pointer field is
+// MRPParameters carries the MRP retransmit-timer triplet, tags 1-3 of
+// the SessionParameters structure a PASE peer advertises in
+// PBKDFParamRequest / PBKDFParamResponse tag 5.
+//
+// Deprecated: use [sessionparams.Parameters], which carries the whole
+// structure (tags 1-9) on both the PASE and the CASE path. Marked in
+// v0.3.0; removal is permissible from v0.5.0, the second minor release
+// after the marking one (README §API stability).
+//
+// It Each pointer field is
 // independently optional — a nil leaves the corresponding TLV tag
 // absent on the wire so the peer falls back to its own defaults
 // (Matter §4.12.8).
@@ -409,18 +424,8 @@ func (resp PBKDFParamResponse) Marshal() []byte {
 		enc.PutOctets(tlv.ContextTag(tagPBKDFParamsSalt), resp.Parameters.Salt)
 		_ = enc.EndContainer()
 	}
-	if resp.ResponderMRPParams != nil {
-		enc.StartStruct(tlv.ContextTag(tagPBKDFRespResponderMRPParams))
-		if v := resp.ResponderMRPParams.IdleRetransTimeoutMs; v != nil {
-			enc.PutUint(tlv.ContextTag(tagMRPParamsIdleRetransTimeoutMs), uint64(*v))
-		}
-		if v := resp.ResponderMRPParams.ActiveRetransTimeoutMs; v != nil {
-			enc.PutUint(tlv.ContextTag(tagMRPParamsActiveRetransTimeoutMs), uint64(*v))
-		}
-		if v := resp.ResponderMRPParams.ActiveThresholdTimeMs; v != nil {
-			enc.PutUint(tlv.ContextTag(tagMRPParamsActiveThresholdTimeMs), uint64(*v))
-		}
-		_ = enc.EndContainer()
+	if sp := resp.sessionParamsForWire(); sp != nil {
+		sp.Encode(enc, tlv.ContextTag(tagPBKDFRespResponderMRPParams))
 	}
 	_ = enc.EndContainer()
 	out, _ := enc.Bytes()
@@ -469,13 +474,14 @@ func DecodePBKDFParamResponse(payload []byte) (PBKDFParamResponse, error) {
 			resp.Parameters = &params
 		case tagPBKDFRespResponderMRPParams:
 			if !el.IsContainer {
-				return resp, fmt.Errorf("%w: ResponderMRPParams not a container", ErrWireMalformed)
+				return resp, fmt.Errorf("%w: ResponderSessionParams not a container", ErrWireMalformed)
 			}
-			params, err := decodeMRPParameters(dec)
+			params, err := sessionparams.DecodeFields(dec)
 			if err != nil {
-				return resp, err
+				return resp, fmt.Errorf("%w: ResponderSessionParams: %w", ErrWireMalformed, err)
 			}
-			resp.ResponderMRPParams = &params
+			resp.ResponderSessionParams = &params
+			resp.ResponderMRPParams = legacyMRPParameters(params)
 		}
 	}
 	if len(resp.InitiatorRandom) != PBKDFRandomSize {
@@ -519,34 +525,61 @@ func decodePBKDFParameters(dec *tlv.Decoder) (PBKDFParameters, error) {
 	return p, nil
 }
 
-// decodeMRPParameters consumes the nested MRPParameters structure
-// off dec. The opening Structure element has already been consumed
-// by the caller. All three sub-fields are optional; absent fields
-// are reflected as nil pointers on the returned struct.
-func decodeMRPParameters(dec *tlv.Decoder) (MRPParameters, error) {
-	var p MRPParameters
-	for {
-		el, err := dec.Next()
-		if err != nil {
-			return p, fmt.Errorf("%w: MRPParameters: %w", ErrWireMalformed, err)
+// sessionParamsForWire is the structure PBKDFParamResponse tag 5 carries:
+// ResponderSessionParams when set, else the legacy triplet lifted into
+// the structure (the same tags and widths, PaseMessages.ts:28-33), else
+// nothing.
+func (resp PBKDFParamResponse) sessionParamsForWire() *sessionparams.Parameters {
+	if resp.ResponderSessionParams != nil {
+		if resp.ResponderSessionParams.IsEmpty() {
+			return nil
 		}
-		if el.IsEndContainer {
-			break
-		}
-		if el.Tag.Kind != tlv.TagKindContext {
-			continue
-		}
-		switch uint8(el.Tag.Number & 0xFF) {
-		case tagMRPParamsIdleRetransTimeoutMs:
-			v := uint32(el.Uint & 0xFFFFFFFF)
-			p.IdleRetransTimeoutMs = &v
-		case tagMRPParamsActiveRetransTimeoutMs:
-			v := uint32(el.Uint & 0xFFFFFFFF)
-			p.ActiveRetransTimeoutMs = &v
-		case tagMRPParamsActiveThresholdTimeMs:
-			v := uint16(el.Uint & 0xFFFF)
-			p.ActiveThresholdTimeMs = &v
-		}
+		return resp.ResponderSessionParams
 	}
-	return p, nil
+	if m := resp.ResponderMRPParams; m != nil {
+		p := m.Parameters()
+		if p.IsEmpty() {
+			return nil
+		}
+		return &p
+	}
+	return nil
+}
+
+// Parameters lifts the triplet into a SessionParameters structure: a nil
+// field stays 0 ("not stated").
+func (m MRPParameters) Parameters() sessionparams.Parameters {
+	var p sessionparams.Parameters
+	if m.IdleRetransTimeoutMs != nil {
+		p.SessionIdleInterval = *m.IdleRetransTimeoutMs
+	}
+	if m.ActiveRetransTimeoutMs != nil {
+		p.SessionActiveInterval = *m.ActiveRetransTimeoutMs
+	}
+	if m.ActiveThresholdTimeMs != nil {
+		p.SessionActiveThreshold = *m.ActiveThresholdTimeMs
+	}
+	return p
+}
+
+// legacyMRPParameters is the triplet view of p for the deprecated
+// fields: nil when p states none of the three.
+func legacyMRPParameters(p sessionparams.Parameters) *MRPParameters {
+	if p.SessionIdleInterval == 0 && p.SessionActiveInterval == 0 && p.SessionActiveThreshold == 0 {
+		return nil
+	}
+	m := &MRPParameters{}
+	if p.SessionIdleInterval != 0 {
+		v := p.SessionIdleInterval
+		m.IdleRetransTimeoutMs = &v
+	}
+	if p.SessionActiveInterval != 0 {
+		v := p.SessionActiveInterval
+		m.ActiveRetransTimeoutMs = &v
+	}
+	if p.SessionActiveThreshold != 0 {
+		v := p.SessionActiveThreshold
+		m.ActiveThresholdTimeMs = &v
+	}
+	return m
 }

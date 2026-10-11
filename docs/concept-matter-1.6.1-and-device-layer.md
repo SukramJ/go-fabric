@@ -140,7 +140,7 @@ ihnen kein Server-Cluster fehlt; tatsächlich montierbar sind 61.
 | BDX | fehlt | `protocol/src/bdx` (BdxSession, BdxMessenger, BdxProtocol; 2 121 Zeilen mit TCP) |
 | Timed-Write pro Attribut | nur Request-Gate | `BD-Matter-TimedAndQuotaDeferred` |
 | Subscription-Quota pro Fabric | fehlt | dito |
-| PASE-Sitzungsparameter (1.3+) | Legacy-Tripel | `BD-Matter-PASE-SessionParametersLegacy` |
+| PASE-Sitzungsparameter (1.3+) | erledigt in Welle 5 (volle Struktur, Tags 1–9, `secure/sessionparams`) | matter.js `PaseMessages.ts:28-58`, `PaseServer.ts:151` |
 | ARL (Managed Aggregator) | nur Konstante | `BD-Matter-ARL-NotMounted` |
 | Server auf generierten Definitionen | alle Anwendungs-Server, `cluster/measurement`, GenericSwitch, AdministratorCommissioning und 14 Core-Server migriert (PR #32–#34, 2026-10-09); AccessControl, OperationalCredentials, GroupKeyManagement, Groupcast bewusst übersprungen | ADR 0013, Migrationsliste |
 | Gerätetyp-Definitionen als Code | nur Lookups | `docs/matterjs-comparison.md` §6, ◐ |
