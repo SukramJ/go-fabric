@@ -18,6 +18,21 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- Matter TCP transport (ADR 0019, phase 3). `transport.Conn`
+  (`Send`, `Remote`, `Reliable`) is the connection a message arrived on;
+  `transport/tcp` is the length-framed listener and dialer ported from
+  matter.js `TcpChannel.ts` / `TcpTransport.ts` (4-byte little-endian
+  length, 64 000-byte default frame, receive buffer bounded at twice that,
+  three connections per peer IP, 10 s for an inbound connection's first
+  message); `udp.Listener.Conn` is the unreliable adapter;
+  `mrp.UsesMRP` is matter.js's `usesMrp`. `bridge.Config.TCP`
+  (`Incoming`, `Outgoing`; zero value off) opens a TCP listener on the UDP
+  socket's port and sets the operational record's `T` key. A request over
+  TCP is answered on its connection without MRP, and a dropped connection
+  closes every session bound to it. Session establishment (PASE / CASE)
+  over TCP is not served yet: an unsecured message over TCP is dropped.
+  The reference daemon's `--tcp` flag (`true`, `false`, `incoming`,
+  `outgoing`) defaults to on.
 - `cluster/spec.CheckFeatures` judges a feature's otherwise-conformance by
   its first applicable entry, as matter.js's FeatureSelectionErrors does
   (`IllegalFeatureCombinations.ts` addOtherwiseRules): DeviceEnergyManagement
