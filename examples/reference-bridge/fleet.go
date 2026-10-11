@@ -1493,6 +1493,7 @@ type fleet struct {
 	oven       *demoOven
 	microwave  *demoMicrowave
 	dryer      *demoDryer
+	evse       *demoEvse
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1542,6 +1543,7 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		oven:        newDemoOven("Oven"),
 		microwave:   newDemoMicrowave("Microwave"),
 		dryer:       newDemoDryer("Tumble Dryer"),
+		evse:        newDemoEvse("EV Charger"),
 		assembler:   asm,
 	}, nil
 }
@@ -1664,6 +1666,10 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 	// condition: the cavity is a part of the oven's endpoint.
 	oven := spec("oven", f.oven.name, f.oven.MatterDeviceType(), f.oven)
 	oven.Parts = f.oven.parts()
+	// EnergyEvse requires PowerSource, DeviceEnergyManagement and
+	// ElectricalSensor device types: the charger's parts (fleet_evse.go).
+	charger := spec("evse", f.evse.name, f.evse.MatterDeviceType(), f.evse)
+	charger.Parts = f.evse.parts()
 	return []endpoint.Spec{
 		spec("ceiling", f.ceiling.name, f.ceiling.MatterDeviceType(), f.ceiling),
 		spec("fan", f.fan.name, f.fan.MatterDeviceType(), f.fan),
@@ -1690,5 +1696,6 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		oven,
 		spec("microwave", f.microwave.name, f.microwave.MatterDeviceType(), f.microwave),
 		spec("dryer", f.dryer.name, f.dryer.MatterDeviceType(), f.dryer),
+		charger,
 	}
 }

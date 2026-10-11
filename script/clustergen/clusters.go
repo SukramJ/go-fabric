@@ -88,6 +88,8 @@ var committed = []string{
 	"WaterHeaterManagement",
 	"EnergyPreference",
 	"MeterIdentification",
+	"DeviceEnergyManagement",
+	"EnergyEvse",
 	// cluster/wire
 	"Switch",
 	"AdministratorCommissioning",

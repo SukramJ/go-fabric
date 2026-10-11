@@ -332,7 +332,8 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 		return nil
 	}
 	if f.garage.testEventTrigger(trigger) || f.heater.testEventTrigger(trigger) ||
-		f.contact.testEventTrigger(trigger) || f.meter.testEventTrigger(trigger) {
+		f.contact.testEventTrigger(trigger) || f.meter.testEventTrigger(trigger) ||
+		f.evse.testEventTrigger(trigger) {
 		return nil
 	}
 	switch trigger & smokeTriggerMask {

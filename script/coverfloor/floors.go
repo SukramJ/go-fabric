@@ -244,6 +244,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/microwaveovenmode", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/ovenmode", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/energyevse", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/waterheatermanagement", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/energypreference", min: 100},

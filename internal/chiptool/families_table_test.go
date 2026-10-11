@@ -168,6 +168,13 @@ const (
 	// with none. It resolves to the first 0x0071 endpoint numbered above
 	// the Oven's (bridgeProcess.endpointAfter).
 	dtOvenCavity = dtOven<<16 | dtTempControlledCabinet
+	// dtEnergyEvse is the reference EV charger
+	// (examples/reference-bridge/fleet_evse.go): EnergyEvse and
+	// EnergyEvseMode; dtDeviceEnergyManagement is its
+	// DeviceEnergyManagement part (DeviceEnergyManagement with
+	// PA|PFR|STA|PAU|FA|CON and DeviceEnergyManagementMode).
+	dtEnergyEvse             = 0x050C
+	dtDeviceEnergyManagement = 0x050D
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -399,6 +406,16 @@ var chipFamilies = []family{
 	// MTRID: MeterIdentification on the electricity meter (connectedhomeip
 	// TC_MTRID_2_1.py, TC_MTRID_3_1.py).
 	{name: "MTRID", deviceType: dtElectricalUtilityMeter},
+	// DEM, DEMM, EEVSE and EEVSEM run on the EV charger and its
+	// DeviceEnergyManagement part; TC_EEVSE_2_x and TC_DEM_2_x drive them
+	// through the EnergyEvse (0x0099...) and DeviceEnergyManagement
+	// (0x0098...) test event triggers, which the charger answers as
+	// connectedhomeip's evse-app does (examples/reference-bridge/
+	// fleet_evse.go).
+	{name: "DEM", deviceType: dtDeviceEnergyManagement},
+	{name: "DEMM", deviceType: dtDeviceEnergyManagement},
+	{name: "EEVSE", deviceType: dtEnergyEvse},
+	{name: "EEVSEM", deviceType: dtEnergyEvse},
 	{name: "FAN", deviceType: dtFan},
 	{name: "HEPAFREMON", deviceType: dtAirPurifier},
 	{
