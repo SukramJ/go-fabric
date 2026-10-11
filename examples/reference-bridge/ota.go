@@ -1,0 +1,189 @@
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2026 SukramJ.
+
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+)
+
+// otaConfig is how the daemon takes OTA updates.
+type otaConfig struct {
+	// dir receives the downloads; applied images are kept in its
+	// "applied" subdirectory.
+	dir string
+	// harness applies an image in place: TESTING ONLY, see otaApplier.
+	harness bool
+	// connector reaches the providers (the bridge).
+	connector mattercore.OtaProviderConnector
+	// st persists the requestor (nil: in memory).
+	st     mattercore.OtaRequestorStore
+	logger *slog.Logger
+}
+
+// otaApplier is the daemon's [mattercore.OtaApplier].
+//
+// A product applies an image by installing it and restarting into it; the
+// requestor then reports the update at the next start (matter.js
+// OtaSoftwareUpdateRequestorServer.ts #handlePreviousUpdateOnStart). This
+// example cannot flash itself, so it validates the image, keeps it under
+// dir/applied/ for an operator, and keeps running the old version — which
+// the requestor reports as a failed update after the next restart, as it
+// must.
+//
+// In harness mode it instead reports the image's version as running at
+// once, without a restart, and runs the requestor's start-up path in place
+// (Restarted): VersionApplied, Applying → Idle, NotifyUpdateApplied. That
+// is what the CHIP SU cases read afterwards (TC_SU_2_7 step 7 at the
+// harness pin reads SoftwareVersion and the VersionApplied event). The
+// matter.js cert requestor does the same through a real restart only when
+// started with --rebootAfterApply (support/chip-testing/src/
+// OtaRequestorTestInstance.ts:43-48, 151-164); without it, it leaves
+// SoftwareVersion alone.
+type otaApplier struct {
+	vendorID, productID uint16
+	basicInfo           *mattercore.BasicInformation
+	dir                 string
+	harness             bool
+	requestor           func() *mattercore.OTASoftwareUpdateRequestor
+	logger              *slog.Logger
+}
+
+var _ mattercore.OtaApplier = (*otaApplier)(nil)
+
+// RequestUserConsent implements [mattercore.OtaApplier]. The daemon has no
+// user to ask; it declares CanConsent only in harness mode, where it
+// consents as the matter.js cert requestor does
+// (OtaRequestorTestInstance.ts:166-168).
+func (a *otaApplier) RequestUserConsent(context.Context, uint32, string) (bool, error) {
+	return a.harness, nil
+}
+
+// ApplyUpdate implements [mattercore.OtaApplier]: the image's payload digest
+// and total size hold, its version is the one the provider offered, it
+// carries a payload, and its vendor and product are this node's (a zero
+// field applies to every vendor or product, OtaImageHeader.ts:26-41) —
+// then it is moved out of the download location, as an applied or
+// abandoned file must be (OtaSoftwareUpdateRequestorServer.ts:153-159).
+func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32, file string) error {
+	header, err := a.verify(newSoftwareVersion, file)
+	if err != nil {
+		_ = os.Remove(file)
+		return err
+	}
+	appliedDir := filepath.Join(a.dir, "applied")
+	if err := os.MkdirAll(appliedDir, 0o750); err != nil {
+		return err
+	}
+	kept := filepath.Join(appliedDir, fmt.Sprintf("ota-%04x-%04x-v%d.ota", a.vendorID, a.productID, newSoftwareVersion))
+	if err := os.Rename(file, kept); err != nil {
+		_ = os.Remove(file)
+		return err
+	}
+	if !a.harness {
+		a.logger.Info("ota.image_stored",
+			slog.Uint64("version", uint64(newSoftwareVersion)), slog.String("path", kept),
+			slog.String("hint", "install it and restart; this example does not flash itself"))
+		return nil
+	}
+	if err := a.basicInfo.SetSoftwareVersion(newSoftwareVersion, header.SoftwareVersionString); err != nil {
+		return err
+	}
+	a.logger.Info("ota.applied_in_place", slog.Uint64("version", uint64(newSoftwareVersion)))
+	// The requestor returns to Idle once this returns; the start-up path
+	// runs after that, as a restart would.
+	go a.restartedWhenIdle(context.WithoutCancel(ctx))
+	return nil
+}
+
+func (a *otaApplier) verify(version uint32, file string) (otaimage.Header, error) {
+	f, err := os.Open(filepath.Clean(file)) //nolint:gosec // the requestor names its own download location
+	if err != nil {
+		return otaimage.Header{}, err
+	}
+	defer func() { _ = f.Close() }()
+	fi, err := f.Stat()
+	if err != nil {
+		return otaimage.Header{}, err
+	}
+	size := uint64(fi.Size()) //nolint:gosec // a file size is not negative
+	h, err := otaimage.ExtractPayload(f, io.Discard, &size)
+	if err != nil {
+		return otaimage.Header{}, err
+	}
+	switch {
+	case h.SoftwareVersion != version:
+		return h, fmt.Errorf("ota: image is version %d but the provider announced %d", h.SoftwareVersion, version)
+	case h.PayloadSize == 0:
+		return h, errors.New("ota: image carries no payload")
+	case h.VendorID != 0 && h.VendorID != a.vendorID:
+		return h, fmt.Errorf("ota: image is for vendor 0x%04x, this node is 0x%04x", h.VendorID, a.vendorID)
+	case h.ProductID != 0 && h.ProductID != a.productID:
+		return h, fmt.Errorf("ota: image is for product 0x%04x, this node is 0x%04x", h.ProductID, a.productID)
+	}
+	return h, nil
+}
+
+// restartedWhenIdle waits for the requestor to leave Applying, then runs
+// its start-up path.
+func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
+	r := a.requestor()
+	if r == nil {
+		return
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if v, _ := r.MatterRead(otadef.AttrUpdateState); v == uint8(otadef.UpdateStateIdle) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	r.Restarted(ctx)
+}
+
+// buildOtaRequestor builds the root's OTA Software Update Requestor.
+func buildOtaRequestor(cfg otaConfig, identity bridgeIdentity, basicInfo *mattercore.BasicInformation) (*mattercore.OTASoftwareUpdateRequestor, error) {
+	if err := os.MkdirAll(cfg.dir, 0o750); err != nil {
+		return nil, fmt.Errorf("ota download directory: %w", err)
+	}
+	var requestor *mattercore.OTASoftwareUpdateRequestor
+	applier := &otaApplier{
+		vendorID: identity.vendorID, productID: identity.productID, basicInfo: basicInfo,
+		dir: cfg.dir, harness: cfg.harness, logger: cfg.logger,
+		requestor: func() *mattercore.OTASoftwareUpdateRequestor { return requestor },
+	}
+	rcfg := mattercore.OTARequestorConfig{
+		NodeInformation: basicInfo.OtaNodeInformation,
+		Connector:       cfg.connector,
+		Applier:         applier,
+		Store:           cfg.st,
+		DownloadDir:     cfg.dir,
+		CanConsent:      cfg.harness,
+		Logger:          cfg.logger,
+	}
+	if cfg.harness {
+		// The matter.js cert requestor's wait after an announcement:
+		// "a cert run is one requestor with one provider, so the specified
+		// random window — up to ten minutes — only makes the run's own
+		// duration unpredictable" (OtaRequestorTestInstance.ts:65, :327-335).
+		quick := 250 * time.Millisecond
+		rcfg.AnnouncedUpdateQueryDelay = &quick
+	}
+	r, err := mattercore.NewOTASoftwareUpdateRequestor(rcfg)
+	if err != nil {
+		return nil, err
+	}
+	requestor = r
+	return r, nil
+}

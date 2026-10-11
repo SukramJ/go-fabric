@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4297,
+  "entry_points": 4300,
   "entry_packages": [
     ".",
     "bdx",
@@ -169,9 +169,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9914,
+    "total_exported": 9916,
     "reachable": 6936,
-    "whitelisted": 2973,
+    "whitelisted": 2975,
     "unreachable": 5
   },
   "by_package": [
@@ -14760,7 +14760,7 @@
       "identifier": "TestBlindPositionSurvivesARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 298
+      "line": 299
     },
     {
       "package": "examples/reference-bridge",
@@ -14788,14 +14788,14 @@
       "identifier": "TestCaseIdentitiesResolveAndForget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 246
+      "line": 247
     },
     {
       "package": "examples/reference-bridge",
       "identifier": "TestCaseInitiatorProviderNeedsALoadedIdentity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 189
+      "line": 190
     },
     {
       "package": "examples/reference-bridge",
@@ -14816,7 +14816,7 @@
       "identifier": "TestCommissioningCompleteClearsThePendingCredentialState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 71
+      "line": 72
     },
     {
       "package": "examples/reference-bridge",
@@ -14949,7 +14949,21 @@
       "identifier": "TestOperationalHoursSurviveARestart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 339
+      "line": 340
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestOtaApplier_Refusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/ota_test.go",
+      "line": 43
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestOtaHarness_UpdateReportedInPlace",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/ota_test.go",
+      "line": 198
     },
     {
       "package": "examples/reference-bridge",
@@ -14984,7 +14998,7 @@
       "identifier": "TestRebootCountCountsBoots",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 272
+      "line": 273
     },
     {
       "package": "examples/reference-bridge",
@@ -14998,7 +15012,7 @@
       "identifier": "TestRootMountsGroupcastWithTheAuxiliaryACL",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 214
+      "line": 215
     },
     {
       "package": "examples/reference-bridge",
@@ -15012,7 +15026,7 @@
       "identifier": "TestRootPartsListNamesEveryDescendantEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wiring_test.go",
-      "line": 116
+      "line": 117
     },
     {
       "package": "examples/reference-bridge",
