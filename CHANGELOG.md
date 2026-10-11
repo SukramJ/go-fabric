@@ -33,6 +33,17 @@ the same `ColorTemperatureWriter` as before.
   over TCP is not served yet: an unsecured message over TCP is dropped.
   The reference daemon's `--tcp` flag (`true`, `false`, `incoming`,
   `outgoing`) defaults to on.
+- `secure/sessionparams` (new): the SessionParameters structure both
+  handshakes exchange, tags 1–9 as matter.js `PaseMessages.ts:28-58`
+  declares them, including SupportedTransports (tag 8) and
+  MaxTCPMessageSize (tag 9, written only when the bitmap names TCP) with
+  the Matter 1.5 gate on a peer's TCP bits (`SessionParameters.ts:50-62`).
+  `sigma.SessionParameters` is this type; Sigma1/Sigma2/Sigma2_Resume carry
+  the two new fields. `bridge.SessionParametersFor` states the node's
+  transports for a host that listens on TCP; `operational.Entry` keeps the
+  peer's effective transports and TCP message bound
+  (`SetPeerTransportParameters`), which the reference daemon sets on every
+  CASE and PASE session.
 - `cluster/spec.CheckFeatures` judges a feature's otherwise-conformance by
   its first applicable entry, as matter.js's FeatureSelectionErrors does
   (`IllegalFeatureCombinations.ts` addOtherwiseRules): DeviceEnergyManagement
@@ -410,6 +421,14 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- PASE: PBKDFParamRequest and PBKDFParamResponse carry the whole
+  SessionParameters structure (`InitiatorSessionParams`,
+  `ResponderSessionParams`), and the response always states the node's
+  parameters — the same ones Sigma2 advertises — as matter.js
+  `PaseServer.ts:151` does; before, only a host-configured MRP triplet was
+  sent, and a 1.3+ commissioner's revisions, MaxPathsPerInvoke and
+  transports were dropped on decode (`BD-Matter-PASE-SessionParametersLegacy`,
+  retired).
 - The pinned gofumpt is v0.12.0 (was v0.10.0; `GOFUMPT_VERSION` in the
   Makefile and `ci.yml`). The two releases format a multi-line `append(`
   differently; v0.12.0 reformats nothing on `main` at the bump.
@@ -688,6 +707,15 @@ the same `ColorTemperatureWriter` as before.
 
 ### Deprecated
 
+- `github.com/SukramJ/go-fabric/secure/spake2`: `MRPParameters`,
+  `PBKDFParamRequest.InitiatorMRPParams`,
+  `PBKDFParamResponse.ResponderMRPParams`; and in `bridge`,
+  `PaseAdapter.SetResponderMRPParams` and `PaseAdapter.PeerMRPParams`.
+  Replacement: `sessionparams.Parameters` through
+  `InitiatorSessionParams` / `ResponderSessionParams`,
+  `SetResponderSessionParams` and `PeerSessionParams`. The old fields keep
+  their behaviour (decoded as the first three fields, encoded when the new
+  field is nil). Marked in v0.3.0; removal permissible from v0.5.0.
 - `github.com/SukramJ/go-fabric/cluster/modeselect`: the field-tag
   constants `ModeOptionFieldLabel`, `ModeOptionFieldMode`,
   `ModeOptionFieldSemanticTags`, `SemanticTagFieldMfgCode` and

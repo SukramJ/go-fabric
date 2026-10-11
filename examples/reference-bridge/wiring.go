@@ -721,6 +721,7 @@ func caseInitiatorProvider(st *store.Store, sessions *operational.Manager, ids *
 				}
 				if p := res.PeerSessionParams; p != nil {
 					entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
+					entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 				}
 				if err := sessions.PersistResumption(ctx, fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
 					logger.Debug("case.initiator.resumption_persist", slog.String("err", err.Error()))
@@ -773,6 +774,13 @@ func buildPaseAdapterFromContext(sessions *operational.Manager, refs rootRefs, v
 		if err != nil {
 			sessions.ReleaseID(sessionID)
 			return err
+		}
+		// The commissioner's SessionParameters size the session's
+		// retransmissions and name its transports — matter.js
+		// PaseServer.ts:155-157 `session.timingParameters = initiatorSessionParams`.
+		if p := adapter.PeerSessionParams(); p != nil {
+			entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
+			entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 		}
 		// AttestationRequest and CSRRequest signatures bind to the
 		// session's challenge; without this the commissioner rejects both.
@@ -855,6 +863,15 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, logger
 		if openErr != nil {
 			sessions.ReleaseID(effectiveID)
 			return openErr
+		}
+		// The initiator's Sigma1 SessionParameters size the session's
+		// retransmissions and name its transports (matter.js
+		// CaseServer.ts:339 `sessionParameters: secureSession.parameters`).
+		if resp := adapter.SnapshotResponder(); resp != nil {
+			if p, ok := resp.PeerSessionParameters(); ok {
+				entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
+				entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
+			}
 		}
 		logger.Info("case.session_established",
 			slog.Int("session_id", int(entry.SessionID)),
