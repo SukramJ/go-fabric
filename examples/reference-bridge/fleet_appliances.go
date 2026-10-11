@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	"github.com/SukramJ/go-fabric/cluster/alarmbase"
+	"github.com/SukramJ/go-fabric/cluster/appliance"
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
+	rfa "github.com/SukramJ/go-fabric/cluster/spec/refrigeratoralarm"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
@@ -47,14 +50,16 @@ const (
 )
 
 // demoWasher is a laundry washer: LaundryWasherMode picks the programme,
-// OperationalState runs it.
+// OperationalState runs it, LaundryWasherControls sets spin speed and
+// rinses.
 type demoWasher struct {
 	name string
 
-	once    sync.Once
-	ops     *opstate.Server
-	modes   *modebase.Server
-	version struct{ ops, modes cluster.DataVersionTracker }
+	once     sync.Once
+	ops      *opstate.Server
+	modes    *modebase.Server
+	controls *appliance.WasherServer
+	version  struct{ ops, modes, controls cluster.DataVersionTracker }
 
 	mu      sync.Mutex
 	running bool
@@ -77,9 +82,10 @@ type demoWasher struct {
 const washCycleSeconds = 30
 
 var (
-	_ contract.EndpointSource = (*demoWasher)(nil)
-	_ opstate.CommandHandler  = (*demoWasher)(nil)
-	_ modebase.ModeChanger    = (*demoWasher)(nil)
+	_ contract.EndpointSource  = (*demoWasher)(nil)
+	_ opstate.CommandHandler   = (*demoWasher)(nil)
+	_ modebase.ModeChanger     = (*demoWasher)(nil)
+	_ appliance.WasherListener = (*demoWasher)(nil)
 )
 
 func newDemoWasher(name string) *demoWasher { return &demoWasher{name: name} }
@@ -90,7 +96,7 @@ func (w *demoWasher) MatterDeviceType() uint16 { return opstate.DeviceTypeLaundr
 // MatterClusterServers implements [contract.EndpointSource].
 func (w *demoWasher) MatterClusterServers() []contract.ClusterServer {
 	w.build()
-	return []contract.ClusterServer{w.ops, w.modes}
+	return []contract.ClusterServer{w.ops, w.modes, w.controls}
 }
 
 // build constructs both servers once. A construction error is a programming
@@ -133,7 +139,20 @@ func (w *demoWasher) build() {
 		if err != nil {
 			panic(fmt.Sprintf("washer LaundryWasherMode: %v", err))
 		}
-		w.ops, w.modes = ops, modes
+		spin := uint8(2)
+		controls, err := appliance.NewLaundryWasherControls(appliance.WasherConfig{
+			Features:         appliance.WasherFeatureSpin | appliance.WasherFeatureRinse,
+			SpinSpeeds:       []string{"Off", "400", "800", "1200"},
+			SpinSpeedCurrent: &spin,
+			SupportedRinses:  []appliance.NumberOfRinses{0, 1, 2}, // None, Normal, Extra
+			NumberOfRinses:   1,
+			Listener:         w,
+			DataVersion:      &w.version.controls,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("washer LaundryWasherControls: %v", err))
+		}
+		w.ops, w.modes, w.controls = ops, modes, controls
 	})
 }
 
@@ -273,6 +292,20 @@ func (w *demoWasher) ChangeToMode(_ context.Context, newMode uint8) (modebase.St
 	}
 	slog.Info("washer.mode", slog.String("device", w.name), slog.Int("mode", int(newMode)))
 	return modebase.StatusSuccess, "", nil
+}
+
+// SpinSpeedCurrentChanged implements [appliance.WasherListener].
+func (w *demoWasher) SpinSpeedCurrentChanged(spin *uint8) {
+	v := -1
+	if spin != nil {
+		v = int(*spin)
+	}
+	slog.Info("washer.spin", slog.String("device", w.name), slog.Int("spin", v))
+}
+
+// NumberOfRinsesChanged implements [appliance.WasherListener].
+func (w *demoWasher) NumberOfRinsesChanged(rinses appliance.NumberOfRinses) {
+	slog.Info("washer.rinses", slog.String("device", w.name), slog.Int("rinses", int(rinses)))
 }
 
 // reportError is the device reporting a fault: OperationalState goes to
@@ -591,16 +624,21 @@ const (
 )
 
 // demoFridge is a refrigerator: its own endpoint serves the appliance's
-// RefrigeratorAndTemperatureControlledCabinetMode, and its one cabinet —
-// a part of its own — serves TemperatureControl and the cabinet's mode.
+// RefrigeratorAndTemperatureControlledCabinetMode and RefrigeratorAlarm
+// (the door), and its one cabinet — a part of its own — serves
+// TemperatureControl and the cabinet's mode.
 type demoFridge struct {
 	name    string
 	cabinet *demoCabinet
 
 	once    sync.Once
 	modes   *modebase.Server
-	version cluster.DataVersionTracker
+	alarm   *alarmbase.Server
+	version struct{ modes, alarm cluster.DataVersionTracker }
 }
+
+// fridgeDoorOpen is the RefrigeratorAlarm the fridge supports.
+const fridgeDoorOpen = uint32(rfa.AlarmDoorOpen)
 
 var (
 	_ contract.EndpointSource = (*demoFridge)(nil)
@@ -617,7 +655,7 @@ func (r *demoFridge) MatterDeviceType() uint16 { return deviceTypeRefrigerator }
 // MatterClusterServers implements [contract.EndpointSource].
 func (r *demoFridge) MatterClusterServers() []contract.ClusterServer {
 	r.build()
-	return []contract.ClusterServer{r.modes}
+	return []contract.ClusterServer{r.modes, r.alarm}
 }
 
 func (r *demoFridge) build() {
@@ -626,12 +664,20 @@ func (r *demoFridge) build() {
 			Changer:        r,
 			SupportedModes: fridgeModes(),
 			CurrentMode:    fridgeAuto,
-			DataVersion:    &r.version,
+			DataVersion:    &r.version.modes,
 		})
 		if err != nil {
 			panic(fmt.Sprintf("fridge RefrigeratorAndTemperatureControlledCabinetMode: %v", err))
 		}
-		r.modes = modes
+		alarm, err := alarmbase.NewRefrigeratorAlarm(alarmbase.Config{
+			Supported:   fridgeDoorOpen,
+			Mask:        fridgeDoorOpen,
+			DataVersion: &r.version.alarm,
+		})
+		if err != nil {
+			panic(fmt.Sprintf("fridge RefrigeratorAlarm: %v", err))
+		}
+		r.modes, r.alarm = modes, alarm
 	})
 }
 
@@ -640,6 +686,23 @@ func (r *demoFridge) build() {
 func (r *demoFridge) ChangeToMode(_ context.Context, newMode uint8) (modebase.Status, string, error) {
 	slog.Info("fridge.mode", slog.String("device", r.name), slog.Int("mode", int(newMode)))
 	return modebase.StatusSuccess, "", nil
+}
+
+// reportDoor is CHIP's SetRefrigeratorDoorStatus app-pipe command, as the
+// all-clusters app applies it (examples/all-clusters-app/linux/
+// AllClustersCommandDelegate.cpp SetRefrigeratorDoorStatusHandler at the
+// harness pin): a closed door sets Mask to 0 (which clears State); an open
+// one sets Mask and State to DoorOpen.
+func (r *demoFridge) reportDoor(open bool) error {
+	r.build()
+	slog.Info("fridge.door", slog.String("device", r.name), slog.Bool("open", open))
+	if !open {
+		return r.alarm.SetMask(0)
+	}
+	if err := r.alarm.SetMask(fridgeDoorOpen); err != nil {
+		return err
+	}
+	return r.alarm.SetState(fridgeDoorOpen)
 }
 
 // parts is the refrigerator's one compartment, a TemperatureControlledCabinet

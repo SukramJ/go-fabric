@@ -156,9 +156,11 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 		dtSmokeCOAlarm, dtPump, dtFlowSensor, dtLaundryWasher, dtRVC, dtThermostat, dtWindowCovering,
 		dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch, dtAirPurifier, dtClosure,
 		dtTempControlledCabinet, dtAirQualitySensor, dtWaterHeater, dtElectricalUtilityMeter,
+		dtTempControlledCabinet, dtRefrigerator, dtDishwasher, dtMicrowaveOven, dtOven,
 	} {
 		set.epOf[dt] = br.endpointFor(t, dt)
 	}
+	set.epOf[dtOvenCavity] = br.endpointAfter(t, dtOven, dtTempControlledCabinet)
 
 	overrides, err := readPICS(filepath.Join("testdata", "reference-bridge.pics"))
 	if err != nil {

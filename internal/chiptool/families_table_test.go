@@ -148,12 +148,26 @@ const (
 	dtElectricalUtilityMeter = 0x0511
 	// dtTempControlledCabinet is the reference fridge's cabinet part
 	// (examples/reference-bridge/fleet_appliances.go): TemperatureControl
-	// and RefrigeratorAndTemperatureControlledCabinetMode.
+	// and RefrigeratorAndTemperatureControlledCabinetMode. The oven's
+	// cavity advertises the same device type; the fridge's is the first
+	// endpoint that does (see dtOvenCavity).
 	dtTempControlledCabinet = 0x0071
 	// dtWaterHeater is the reference water heater
 	// (examples/reference-bridge/fleet_energy.go): WaterHeaterManagement
 	// (EM, TP), WaterHeaterMode and a HEAT Thermostat.
 	dtWaterHeater = 0x050F
+	dtRefrigerator          = 0x0070
+	dtDishwasher            = 0x0075
+	dtMicrowaveOven         = 0x0079
+	dtOven                  = 0x007B
+	// dtOvenCavity is no device type: it names the reference oven's
+	// cavity part (examples/reference-bridge/fleet_kitchen.go), the
+	// TemperatureControlledCabinet with OvenMode, OvenCavityOperationalState
+	// and TemperatureControl. A real device type is 16 bits; the key is the
+	// Oven's in the high half and the cabinet's in the low, so it collides
+	// with none. It resolves to the first 0x0071 endpoint numbered above
+	// the Oven's (bridgeProcess.endpointAfter).
+	dtOvenCavity = dtOven<<16 | dtTempControlledCabinet
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -454,6 +468,17 @@ var chipFamilies = []family{
 	// steps' verification text, not in its config.
 	{name: "TCCM", deviceType: dtTempControlledCabinet},
 	{name: "TCTL", deviceType: dtTempControlledCabinet},
+	// The kitchen appliances (examples/reference-bridge/fleet_kitchen.go,
+	// fleet_appliances.go): DishwasherAlarm on the dishwasher,
+	// RefrigeratorAlarm on the fridge, OvenCavityOperationalState and
+	// OvenMode on the oven's cavity, MicrowaveOvenControl and
+	// MicrowaveOvenMode on the microwave.
+	{name: "DISHALM", deviceType: dtDishwasher},
+	{name: "REFALM", deviceType: dtRefrigerator},
+	{name: "OVENOPSTATE", deviceType: dtOvenCavity},
+	{name: "OTCCM", deviceType: dtOvenCavity},
+	{name: "MWOCTRL", deviceType: dtMicrowaveOven},
+	{name: "MWOM", deviceType: dtMicrowaveOven},
 	{name: "RVCRUNM", deviceType: dtRVC},
 	{
 		name: "S", deviceType: dtOnOffLight, multicast: map[string]bool{"2.3": true},

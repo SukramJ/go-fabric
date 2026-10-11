@@ -94,6 +94,36 @@ the same `ColorTemperatureWriter` as before.
   water-heater app does, an ElectricalUtilityMeter with
   MeterIdentification, and serves EnergyPreference (EnergyBalance) on its
   thermostat. The chip-tool family table runs EWATERHTR, WHM and EPREF.
+- `cluster/alarmbase` (new): one server for the AlarmBase family on the
+  generated definitions — `NewDishwasherAlarm`, `NewRefrigeratorAlarm`,
+  `NewTemperatureAlarm`. Supported and Latch are fixed, Mask and State
+  move through `SetMask`, `SetState` and `ResetLatchedAlarms`, Reset and
+  ModifyEnabledAlarms ask an optional `Delegate`, and every State change
+  emits Notify — connectedhomeip's AlarmBase rules, as matter.js's servers
+  add none. TemperatureAlarm's adjustable-threshold features
+  (`SetTemperatureAlarmThresholds`) are refused
+  (`ErrAdjustableThresholds`): no source gives that command a rule.
+- `cluster/appliance` (new): `NewMicrowaveOvenControl` (SetCookingParameters,
+  AddMoreTime, the host port `Oven`), `NewLaundryWasherControls` and
+  `NewLaundryDryerControls` (controller writes checked against the
+  supported spin speeds, rinses and dryness levels, an optional listener),
+  each on its generated definition with connectedhomeip's rules.
+- `cluster/opstate.NewOvenCavityServer`: OvenCavityOperationalState
+  (0x0048), with matter.js's `#assertPhaseList` (`OvenCavityPhases`,
+  `ErrPhaseNotAllowed`). `DeviceTypeMicrowaveOven` and
+  `DeviceTypeTemperatureControlledCabinet` are accepted device types; a
+  MicrowaveOven OperationalState serves CountdownTime as the device type
+  mandates.
+- The generated definitions of DishwasherAlarm, RefrigeratorAlarm,
+  TemperatureAlarm, LaundryWasherControls, LaundryDryerControls,
+  MicrowaveOvenControl and OvenCavityOperationalState under `cluster/spec/`.
+- The reference daemon serves a dishwasher (DishwasherAlarm), an Oven with
+  a Heater cavity part (OvenMode, OvenCavityOperationalState,
+  TemperatureControl), a MicrowaveOven, and a laundry dryer
+  (LaundryDryerControls); the washer gains LaundryWasherControls and the
+  fridge RefrigeratorAlarm, driven by CHIP's `SetRefrigeratorDoorStatus`
+  app-pipe command. The chip-tool families DISHALM, REFALM, OVENOPSTATE,
+  OTCCM, MWOCTRL and MWOM are declared.
 - `cluster/modebase` serves six more ModeBase derivations, each on its
   generated definition: `NewOvenMode`,
   `NewRefrigeratorAndTemperatureControlledCabinetMode`,
@@ -244,6 +274,11 @@ the same `ColorTemperatureWriter` as before.
   persisted a registered class value must re-register rather than reuse it.
 - The reference daemon's contact sensor is assembled from a Source instead
   of a Measurement (same StableKey, device type and BooleanState surface).
+- `endpoint`: a bridged endpoint whose `Source` serves no cluster of its
+  own — a composed device such as an Oven, whose device type mandates none
+  and whose cavity is a part — now mounts the bridged node's Identify,
+  Descriptor and BridgedDeviceBasicInformation; before, it mounted
+  nothing. An endpoint with no source at all still mounts nothing.
 - The bridge encodes the OperationalState, RvcOperationalState, ModeBase,
   SmokeCoAlarm, PumpConfigurationAndControl and ClosureControl values
   through the generated codecs (ADR 0013): the hand-written cases in

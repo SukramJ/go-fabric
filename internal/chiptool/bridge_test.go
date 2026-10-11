@@ -500,6 +500,34 @@ func (b *bridgeProcess) endpointFor(t *testing.T, deviceType uint32) uint16 {
 	return 0
 }
 
+// endpointAfter returns the first endpoint advertising deviceType whose
+// number is above the endpoint advertising parent: the part a composed
+// device's parent carries, where another device carries the same part
+// type. The assembler numbers a spec's endpoint and then its parts, depth
+// first (endpoint/assembler.go buildEndpointTree), so on the harness's
+// fresh store a parent's part is numbered right after it; the topology
+// block lists the endpoints in ascending order
+// (examples/reference-bridge/wiring.go endpointIDs).
+func (b *bridgeProcess) endpointAfter(t *testing.T, parent, deviceType uint32) uint16 {
+	t.Helper()
+	above := b.endpointFor(t, parent)
+	out := b.snapshotStdout()
+	for _, m := range reTopologyLine.FindAllStringSubmatch(out, -1) {
+		ep, _ := strconv.Atoi(m[1])
+		if ep <= int(above) {
+			continue
+		}
+		for _, dt := range strings.Split(m[2], ",") {
+			v, err := strconv.ParseUint(strings.TrimPrefix(strings.TrimSpace(dt), "0x"), 16, 32)
+			if err == nil && v == uint64(deviceType) {
+				return uint16(ep)
+			}
+		}
+	}
+	t.Fatalf("no endpoint above %d advertises device type 0x%04X\n%s", above, deviceType, out)
+	return 0
+}
+
 // reTopologyLine matches one line of the daemon's topology block
 // (examples/reference-bridge/main.go printTopology).
 var reTopologyLine = regexp.MustCompile(`(?m)^\s*endpoint\s+(\d+)\s+device types\s+([0-9a-fA-FxX, ]+)`)

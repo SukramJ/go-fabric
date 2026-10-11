@@ -85,10 +85,13 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 			measurement.FromMeasurementClass(contract.MeasurementBattery, ep.PowerSource, mc)...)
 	}
 
-	if len(inner) == 0 {
+	if len(inner) == 0 && ep.Source == nil {
 		// Defensive: a bridged endpoint with neither source nor
 		// measurement contributes no cluster surface; the topology
-		// would be malformed but we must not panic mid-dispatch.
+		// would be malformed but we must not panic mid-dispatch. A
+		// source that serves no cluster of its own is a composed device
+		// whose device type mandates none (an Oven: its cavity is a part)
+		// and still gets the bridged node's surface below.
 		return nil
 	}
 	// Group membership is stack state: the stack's Groups server goes

@@ -56,6 +56,7 @@ type pipeCommand struct {
 	Jammed     bool    `json:"Jammed"`
 	NumPresses *uint8  `json:"MultiPressNumPresses"`
 	Unmounted  *uint8  `json:"Unmounted"`
+	DoorOpen   *uint8  `json:"DoorOpen"`
 }
 
 // serveAppPipe creates the FIFO (when absent) and applies every command
@@ -156,6 +157,12 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		}
 		f.occupancy.reportFromDevice(*cmd.Occupancy&1 != 0)
 		return nil
+	case "SetRefrigeratorDoorStatus":
+		// CHIP's all-clusters app (TC-REFALM-2.2), for the fridge.
+		if cmd.DoorOpen == nil {
+			return errors.New("SetRefrigeratorDoorStatus needs DoorOpen")
+		}
+		return f.fridge.reportDoor(*cmd.DoorOpen != 0)
 	case "OperationalStateChange":
 		return f.washerOperation(cmd)
 	case "ErrorEvent":
