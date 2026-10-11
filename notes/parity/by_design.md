@@ -1190,14 +1190,6 @@ implementation wave.
 
 ---
 
-### BD-Matter-CASE-StalePeerEviction — same-peer sessions evicted on CASE establishment
-
-**Go path:** `secure/operational/manager.go` — `collectStalePeerSessionsLocked`, called from `OpenFromSigma` / `OpenFromSigmaWithID`.
-
-**Rationale:** matter.js does NOT evict same-peer sessions when a new CASE session is established — `SessionManager.ts:396` `createSecureSession` retains concurrent `(fabric, peerNode)` sessions and reclaims a session id only on exhaustion (`getNextAvailableSessionId` → `findOldestInactiveSession`, `:455-476`). There is no `removeAllSessionsForNode` in matter.js HEAD. go-fabric deliberately diverges: on every CASE establishment it closes any pre-existing session for the same `(fabricIndex, peerNodeID)`. Apple iOS' Matter daemon caches old session keys across daemon restarts and replays them with counter values far above the bridge's in-memory reception window; without eviction the bridge keeps decrypting against the stale entry, fails authentication, and the commissioner aborts the pair attempt with INVALID_PARAMETER. The eviction is locked by dedicated tests (`TestManager_OpenFromSigma_EvictsStalePeerSession` and the DifferentPeer/DifferentFabric keep-existing counter-tests). Reversing it to match matter.js's retain-concurrent behaviour would reintroduce the Apple pairing abort and cannot be validated without live Apple hardware; kept as a deliberate interop divergence.
-
----
-
 ### BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly — id exhaustion reclaims reserved ids, never a live session
 
 **Go path:** `secure/operational/manager.go` — `allocateIDLocked` (exhaustion fallback) + `PlaceholderIDTTL`.

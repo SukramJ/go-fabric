@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4351,
+  "entry_points": 4352,
   "entry_packages": [
     ".",
     "bdx",
@@ -172,8 +172,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9988,
-    "reachable": 6966,
+    "total_exported": 9989,
+    "reachable": 6967,
     "whitelisted": 3017,
     "unreachable": 5
   },
@@ -18494,28 +18494,28 @@
       "identifier": "TestCloseAllGraceful_DeadlinePastSkipsNotifications",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 338
+      "line": 352
     },
     {
       "package": "secure/operational",
       "identifier": "TestCloseAllGraceful_NotifiesEveryPeerWithoutReannounce",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 284
+      "line": 298
     },
     {
       "package": "secure/operational",
       "identifier": "TestClosePeer_NotifiesAndResumesBroadcast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 219
+      "line": 233
     },
     {
       "package": "secure/operational",
       "identifier": "TestClose_PeerInitiated_DoesNotEchoGracefulClose",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
-      "line": 251
+      "line": 265
     },
     {
       "package": "secure/operational",
@@ -18568,6 +18568,13 @@
     },
     {
       "package": "secure/operational",
+      "identifier": "TestPeerCapEviction_ForceClosesWithoutCloseSessionOrReannounce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/manager_close_parity_test.go",
+      "line": 173
+    },
+    {
+      "package": "secure/operational",
       "identifier": "TestRandomInitialSessionID_InRangeAndVaries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_session_seed_test.go",
@@ -18600,13 +18607,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_occupancy_test.go",
       "line": 83
-    },
-    {
-      "package": "secure/operational",
-      "identifier": "TestStaleEviction_NotifiesOldSessionWithoutReannounce",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "secure/operational/manager_close_parity_test.go",
-      "line": 170
     },
     {
       "package": "secure/operational",

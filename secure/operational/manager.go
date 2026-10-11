@@ -313,6 +313,11 @@ type Entry struct {
 	// Mirrors matter.js SessionManager.ts:484 getPaseSession, which
 	// identifies the PASE session by type, not by fabric.
 	isPase bool
+	// isInitiator marks a session this node opened as the CASE
+	// initiator. Such sessions never claim a slot of the peer's
+	// per-peer budget (matter.js SessionManager.ts:650-652: "ones we
+	// initiated are ours to manage").
+	isInitiator bool
 	// mu guards the mutable fields above for concurrent Rx/Tx updates.
 	mu sync.Mutex
 }
@@ -495,18 +500,12 @@ func randomInitialSessionID() uint16 {
 // is the commissioner's node identifier extracted from the verified
 // peer NOC.
 //
-// Stale-session eviction: any pre-existing session for the same
-// (fabricIndex, peerNodeID) pair is closed before the new entry is
-// installed. Apple iOS' Matter daemon caches old session keys across
-// daemon restarts and replays them with counter values way above our
-// in-memory window's high-water mark; without eviction the bridge
-// keeps decrypting against the stale entry, fails authentication,
-// and the commissioner aborts the new pair attempt with INVALID_PARAMETER.
-// This is a deliberate divergence from matter.js, which does NOT evict
-// same-peer sessions on establishment: SessionManager.ts createSecureSession
-// (:396) retains concurrent (fabric, peer) sessions and reclaims an id only
-// on exhaustion (getNextAvailableSessionId -> findOldestInactiveSession,
-// :455-476). See notes/parity/by_design.md BD-Matter-CASE-StalePeerEviction.
+// A new CASE does not close the peer's previous sessions: the peer
+// keeps every session it established until it holds more than
+// [MaxSessionsPerPeer], at which point the least recently active ones
+// are force-closed (no CloseSession on the wire). Mirrors matter.js
+// packages/protocol/src/session/SessionManager.ts:185-189
+// (MAX_SESSIONS_PER_PEER) and :641-680 (#evictExcessSessionsFor).
 func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint64, keys sigma.SessionKeys) (*Entry, error) {
 	sess, err := channel.New(channel.Config{
 		EncryptKey:  keys.R2IKey[:], // bridge → peer
@@ -519,7 +518,6 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 	}
 
 	m.mu.Lock()
-	stale := m.collectStalePeerSessionsLocked(fabricIndex, peerNodeID)
 	id, err := m.allocateIDLocked()
 	if err != nil {
 		m.mu.Unlock()
@@ -535,14 +533,13 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
 	}
 	m.sessions[id] = entry
+	excess := m.evictExcessPeerSessionsLocked(entry)
 	m.mu.Unlock()
-	// Tell the evicted peer its old session is gone BEFORE zeroising
-	// the keys — matter.js emits gracefulClose (NodeSession.ts:343)
-	// while the session can still encrypt, and the exchange layer
-	// ships the CloseSession StatusReport (ExchangeManager.ts:658).
-	m.notifyGracefulClose(stale, time.Time{})
-	closeStaleEntries(stale)
-	m.fireOnSessionClose(stale)
+	// Force close, no CloseSession: matter.js SessionManager.ts:676-678
+	// skips the graceful path for the cap because the eviction target
+	// is typically the peer it can no longer reach.
+	closeStaleEntries(excess)
+	m.fireOnSessionClose(excess)
 	return entry, nil
 }
 
@@ -641,27 +638,29 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 		fabricIndex:          fabricIndex,
 		Session:              sess,
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
+		isInitiator:          initiator,
 	}
 	m.mu.Lock()
-	stale := m.collectStalePeerSessionsLocked(fabricIndex, peerNodeID)
 	// The pre-allocated id is in m.sessions as a placeholder Entry
-	// (Session==nil) — collectStalePeerSessionsLocked filters those
-	// out, so the placeholder survives until it is overwritten here. A
-	// LIVE session of a DIFFERENT peer can hold the slot too (the
-	// stale collection only removes this same (fabric, peer)); it goes
-	// through the eviction cascade rather than being dropped silently.
+	// (Session==nil) that is overwritten here. A LIVE session can hold
+	// the slot too; it goes through the graceful close cascade rather
+	// than being dropped silently. Tell its peer BEFORE zeroising the
+	// keys — matter.js emits gracefulClose (NodeSession.ts:343) while
+	// the session can still encrypt, and the exchange layer ships the
+	// CloseSession StatusReport (ExchangeManager.ts:658).
+	var occupied []*Entry
 	if occupant := m.installEntryLocked(id, entry); occupant != nil {
-		stale = append(stale, occupant)
+		occupied = append(occupied, occupant)
 	}
+	excess := m.evictExcessPeerSessionsLocked(entry)
 	m.mu.Unlock()
-	// Graceful CloseSession to the evicted stale session's peer before
-	// key zeroise — see OpenFromSigma for the matter.js provenance. No
-	// reannounce here: the replacement session for the same peer was
-	// just installed, which is exactly the `hasSessionForPeer` skip in
-	// matter.js DeviceAdvertiser.ts:138.
-	m.notifyGracefulClose(stale, time.Time{})
-	closeStaleEntries(stale)
-	m.fireOnSessionClose(stale)
+	m.notifyGracefulClose(occupied, time.Time{})
+	closeStaleEntries(occupied)
+	m.fireOnSessionClose(occupied)
+	// The per-peer cap force-closes without CloseSession — see
+	// OpenFromSigma for the matter.js provenance.
+	closeStaleEntries(excess)
+	m.fireOnSessionClose(excess)
 	return entry, nil
 }
 
@@ -1018,30 +1017,60 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	return len(victims)
 }
 
-// collectStalePeerSessionsLocked finds sessions matching
-// (fabricIndex, peerNodeID) and removes them from the live map.
-// Caller MUST hold m.mu in write mode and MUST close the returned
-// entries OUTSIDE the lock — Session.Close acquires its own
-// privacy mutex and we keep the operational lock scope minimal.
+// MaxSessionsPerPeer is the number of sessions one peer may hold at a
+// time. A new CASE does not close the peer's previous sessions, so a
+// peer that reconnects repeatedly accumulates them; the cap is per
+// peer rather than global so one noisy peer cannot evict another's.
+// Mirrors matter.js packages/protocol/src/session/SessionManager.ts:185-189
+// MAX_SESSIONS_PER_PEER.
+const MaxSessionsPerPeer = 5
+
+// evictExcessPeerSessionsLocked removes the least recently active
+// sessions of added's peer from the live map once the peer holds more
+// than [MaxSessionsPerPeer], and returns them for the caller to close
+// OUTSIDE the lock (Session.Close acquires its own privacy mutex).
+// Caller MUST hold m.mu in write mode and MUST have installed added.
 //
-// Pre-allocated placeholders (Entry.Session==nil) are left
-// untouched: the handshake that allocated them is mid-flight and
-// will overwrite the placeholder on completion. Closing them here
-// would also free their session-id slot, allocating which to a
-// subsequent session is racy because the in-flight handshake still
-// holds the id externally.
-func (m *Manager) collectStalePeerSessionsLocked(fabricIndex uint8, peerNodeID uint64) []*Entry {
-	var stale []*Entry
-	for id, entry := range m.sessions {
-		if entry.Session == nil {
+// Only sessions the peer established claim a slot: initiator sessions
+// are this node's to manage, PASE sessions never trigger the check,
+// placeholders (Session==nil) are mid-handshake and left alone, and
+// added itself is excluded so a burst of new sessions cannot evict the
+// one that prompted the check. Mirrors matter.js
+// packages/protocol/src/session/SessionManager.ts:647-680
+// #evictExcessSessionsFor and #leastRecentlyUsedSession.
+func (m *Manager) evictExcessPeerSessionsLocked(added *Entry) []*Entry {
+	if added.isPase {
+		return nil
+	}
+	fabricIndex, peerNodeID := added.FabricIndex(), added.Session.PeerNodeID()
+	var claimants []*Entry
+	for _, entry := range m.sessions {
+		if entry == added || entry.Session == nil || entry.isInitiator {
 			continue
 		}
 		if entry.FabricIndex() == fabricIndex && entry.Session.PeerNodeID() == peerNodeID {
-			stale = append(stale, entry)
-			delete(m.sessions, id)
+			claimants = append(claimants, entry)
 		}
 	}
-	return stale
+	excess := len(claimants) + 1 - MaxSessionsPerPeer
+	if excess <= 0 {
+		return nil
+	}
+	// Least recently active first; the lower session id breaks a tie
+	// (two sessions that never carried traffic both report the zero
+	// time) so the eviction order is deterministic.
+	sort.Slice(claimants, func(i, j int) bool {
+		ti, tj := claimants[i].LastActivity(), claimants[j].LastActivity()
+		if ti.Equal(tj) {
+			return claimants[i].SessionID < claimants[j].SessionID
+		}
+		return ti.Before(tj)
+	})
+	evicted := claimants[:excess]
+	for _, entry := range evicted {
+		delete(m.sessions, entry.SessionID)
+	}
+	return evicted
 }
 
 // closeStaleEntries shuts down each session outside any lock. Safe

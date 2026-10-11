@@ -783,6 +783,23 @@ the same `ColorTemperatureWriter` as before.
 
 ### Fixed
 
+- **A new CASE no longer closes the peer's previous sessions.** The session
+  manager used to evict every session of the same (fabric, peer node) when
+  that peer established another CASE session. A controller that runs two
+  clients under one node identity (the CSA Python harness and chip-tool do)
+  saw each client's new session close the other's, with a CloseSession on
+  the wire every time, and every subscription on the closed session died
+  with it: the DEM certification cases 2.2, 2.4, 2.6 and 2.10 lost their
+  event and attribute reports that way. The manager now keeps a peer's
+  sessions and caps them at `operational.MaxSessionsPerPeer` (5); beyond
+  the cap the least recently active responder session is force-closed
+  without a CloseSession, sessions this node initiated never claim a slot,
+  and a PASE session never triggers the check. Mirrors matter.js
+  `SessionManager.ts:185-189` (`MAX_SESSIONS_PER_PEER`) and `:647-680`
+  (`#evictExcessSessionsFor`). The retired divergence
+  `BD-Matter-CASE-StalePeerEviction` is removed from
+  `notes/parity/by_design.md`; the Apple-Home stale-key replay it was
+  introduced for is now handled the way matter.js handles it, by the cap.
 - **Timed commands come from the model.** An untimed invoke of a command
   matter.js marks "T" answers NEEDS_TIMED_INTERACTION for every cluster,
   not only for the hand-pinned AdministratorCommissioning, DoorLock and

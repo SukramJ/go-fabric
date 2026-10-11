@@ -262,46 +262,92 @@ func TestManager_Get_AfterClose_Miss(t *testing.T) {
 	}
 }
 
-// TestManager_OpenFromSigma_EvictsStalePeerSession asserts that
-// re-opening a CASE session for the same (fabricIndex, peerNodeID)
-// pair tears down the previous session. Apple iOS Matter daemon
-// caches old session keys across daemon restarts and replays them
-// at counter values way above the bridge's window high-water mark;
-// without eviction the old entry keeps eating inbound packets and
-// fails authentication, so the new pair attempt aborts. Mirrors
-// matter.js packages/protocol/src/session/SessionManager.ts:
-// removeAllSessionsForNode.
-func TestManager_OpenFromSigma_EvictsStalePeerSession(t *testing.T) {
+// TestManager_OpenFromSigma_RetainsPeerSessionsUpToCap asserts that
+// a new CASE does not close the peer's previous sessions: the same
+// (fabricIndex, peerNodeID) pair holds up to MaxSessionsPerPeer
+// sessions concurrently, and the one beyond the cap evicts the least
+// recently active. Mirrors matter.js
+// packages/protocol/src/session/SessionManager.ts:185-189 and
+// :647-680 (#evictExcessSessionsFor).
+func TestManager_OpenFromSigma_RetainsPeerSessionsUpToCap(t *testing.T) {
 	t.Parallel()
 	m, _ := newTestManager()
 	keys := testKeys()
 
-	// Open the first session for fabric 1, peer 0xABCD.
-	first, err := m.OpenFromSigma(1, 0x100, 0xABCD, keys)
-	if err != nil {
-		t.Fatalf("OpenFromSigma first: %v", err)
+	opened := make([]*operational.Entry, 0, operational.MaxSessionsPerPeer+1)
+	for i := range operational.MaxSessionsPerPeer {
+		e, err := m.OpenFromSigma(1, 0x100, 0xABCD, keys)
+		if err != nil {
+			t.Fatalf("OpenFromSigma #%d: %v", i+1, err)
+		}
+		opened = append(opened, e)
 	}
-	if m.Active() != 1 {
-		t.Fatalf("Active() = %d, want 1 after first open", m.Active())
+	if m.Active() != operational.MaxSessionsPerPeer {
+		t.Fatalf("Active() = %d, want %d (every session retained)", m.Active(), operational.MaxSessionsPerPeer)
 	}
-
-	// Open a second session for the same (fabric, peer) — the first
-	// MUST be evicted.
-	second, err := m.OpenFromSigma(1, 0x100, 0xABCD, keys)
-	if err != nil {
-		t.Fatalf("OpenFromSigma second: %v", err)
-	}
-	if m.Active() != 1 {
-		t.Fatalf("Active() = %d, want 1 (stale evicted, new installed)", m.Active())
+	for _, e := range opened {
+		if _, err := m.Get(e.SessionID); err != nil {
+			t.Fatalf("Get(%d) = %v, want hit — a new CASE must not close the peer's previous sessions", e.SessionID, err)
+		}
 	}
 
-	// The first session-id must no longer resolve.
-	if _, err := m.Get(first.SessionID); !errors.Is(err, operational.ErrSessionNotFound) {
-		t.Errorf("Get(first) = %v, want ErrSessionNotFound after eviction", err)
+	// Touch every session but the second one, so the second is the
+	// least recently active and the eviction target.
+	for i, e := range opened {
+		if i != 1 {
+			e.MarkActiveRx()
+		}
 	}
-	// The second one must.
-	if _, err := m.Get(second.SessionID); err != nil {
-		t.Errorf("Get(second) = %v, want hit", err)
+	sixth, err := m.OpenFromSigma(1, 0x100, 0xABCD, keys)
+	if err != nil {
+		t.Fatalf("OpenFromSigma beyond cap: %v", err)
+	}
+	if m.Active() != operational.MaxSessionsPerPeer {
+		t.Fatalf("Active() = %d, want %d (least recently active evicted)", m.Active(), operational.MaxSessionsPerPeer)
+	}
+	if _, err := m.Get(opened[1].SessionID); !errors.Is(err, operational.ErrSessionNotFound) {
+		t.Errorf("Get(least recently active) = %v, want ErrSessionNotFound", err)
+	}
+	for i, e := range opened {
+		if i == 1 {
+			continue
+		}
+		if _, err := m.Get(e.SessionID); err != nil {
+			t.Errorf("Get(%d) = %v, want hit (more recently active than the evicted one)", e.SessionID, err)
+		}
+	}
+	if _, err := m.Get(sixth.SessionID); err != nil {
+		t.Errorf("Get(new) = %v, want hit — the session that prompted the check is never evicted", err)
+	}
+}
+
+// TestManager_PeerCap_InitiatorSessionsNeverClaimASlot asserts that
+// sessions this node opened as the CASE initiator neither count
+// towards nor fall to the peer's cap (SessionManager.ts:650-652:
+// "ones we initiated are ours to manage").
+func TestManager_PeerCap_InitiatorSessionsNeverClaimASlot(t *testing.T) {
+	t.Parallel()
+	m, _ := newTestManager()
+	keys := testKeys()
+
+	id, err := m.AllocateID()
+	if err != nil {
+		t.Fatalf("AllocateID: %v", err)
+	}
+	initiated, err := m.OpenFromSigmaAsInitiatorWithID(id, 1, 0x100, 0xABCD, 0x300, nil, keys)
+	if err != nil {
+		t.Fatalf("OpenFromSigmaAsInitiatorWithID: %v", err)
+	}
+	for i := range operational.MaxSessionsPerPeer + 1 {
+		if _, err := m.OpenFromSigma(1, 0x100, 0xABCD, keys); err != nil {
+			t.Fatalf("OpenFromSigma #%d: %v", i+1, err)
+		}
+	}
+	if m.Active() != operational.MaxSessionsPerPeer+1 {
+		t.Fatalf("Active() = %d, want %d (cap of responder sessions plus the initiator one)", m.Active(), operational.MaxSessionsPerPeer+1)
+	}
+	if _, err := m.Get(initiated.SessionID); err != nil {
+		t.Errorf("Get(initiator session) = %v, want hit — never evicted by the peer's cap", err)
 	}
 }
 
@@ -817,45 +863,60 @@ func TestManager_ClosePeer_SkipsPlaceholderEntry(t *testing.T) {
 	}
 }
 
-// TestManager_OpenFromSigmaWithID_EvictsStale verifies that
-// OpenFromSigmaWithID evicts stale sessions for the same
-// (fabricIndex, peerNodeID) pair, matching OpenFromSigma behaviour.
-func TestManager_OpenFromSigmaWithID_EvictsStale(t *testing.T) {
+// TestManager_OpenFromSigmaWithID_HonoursPeerCap verifies that
+// OpenFromSigmaWithID applies the same per-peer cap as OpenFromSigma:
+// previous sessions of the peer survive, and the one beyond
+// MaxSessionsPerPeer evicts the least recently active.
+func TestManager_OpenFromSigmaWithID_HonoursPeerCap(t *testing.T) {
 	t.Parallel()
 	m, _ := newTestManager()
 	keys := testKeys()
 
-	// Open an initial session for fabric 1, peer 0xCAFE.
 	first, err := m.OpenFromSigma(1, 0x100, 0xCAFE, keys)
 	if err != nil {
 		t.Fatalf("OpenFromSigma: %v", err)
 	}
+	for i := 1; i < operational.MaxSessionsPerPeer; i++ {
+		id, err := m.AllocateID()
+		if err != nil {
+			t.Fatalf("AllocateID: %v", err)
+		}
+		e, err := m.OpenFromSigmaWithID(id, 1, 0x100, 0xCAFE, 0x300, nil, keys)
+		if err != nil {
+			t.Fatalf("OpenFromSigmaWithID #%d: %v", i, err)
+		}
+		e.MarkActiveRx()
+	}
+	if m.Active() != operational.MaxSessionsPerPeer {
+		t.Fatalf("Active() = %d, want %d (all retained)", m.Active(), operational.MaxSessionsPerPeer)
+	}
+	if _, err := m.Get(first.SessionID); err != nil {
+		t.Fatalf("first session must survive the peer's later sessions: %v", err)
+	}
 
-	// Allocate and open a second session for the same peer via
-	// OpenFromSigmaWithID — must evict the first.
 	id, err := m.AllocateID()
 	if err != nil {
 		t.Fatalf("AllocateID: %v", err)
 	}
-	second, err := m.OpenFromSigmaWithID(id, 1, 0x100, 0xCAFE, 0x300, nil, keys)
+	last, err := m.OpenFromSigmaWithID(id, 1, 0x100, 0xCAFE, 0x300, nil, keys)
 	if err != nil {
-		t.Fatalf("OpenFromSigmaWithID: %v", err)
+		t.Fatalf("OpenFromSigmaWithID beyond cap: %v", err)
 	}
-	if m.Active() != 1 {
-		t.Fatalf("Active() = %d, want 1 (stale evicted)", m.Active())
+	if m.Active() != operational.MaxSessionsPerPeer {
+		t.Fatalf("Active() = %d, want %d (least recently active evicted)", m.Active(), operational.MaxSessionsPerPeer)
 	}
 	if _, err := m.Get(first.SessionID); err == nil {
-		t.Error("first session must be evicted but Get returned nil error")
+		t.Error("least recently active session must be evicted but Get returned nil error")
 	}
-	if _, err := m.Get(second.SessionID); err != nil {
-		t.Errorf("second session must be live: %v", err)
+	if _, err := m.Get(last.SessionID); err != nil {
+		t.Errorf("new session must be live: %v", err)
 	}
 }
 
 // TestManager_OnSessionCloseHook_FiresOnEveryEvictionPath verifies that the
 // hook registered via SetOnSessionClose fires exactly once per evicted session
 // for all five eviction paths: Close, ClosePeer, CloseFabric,
-// OpenFromSigma (stale eviction), and OpenFromSigmaWithID (stale eviction).
+// OpenFromSigma (per-peer cap), and OpenFromSigmaWithID (per-peer cap).
 // The hook is dispatched outside the manager lock, so the collector uses a
 // mutex to stay race-clean under go test -race.
 func TestManager_OnSessionCloseHook_FiresOnEveryEvictionPath(t *testing.T) {
@@ -971,7 +1032,7 @@ func TestManager_OnSessionCloseHook_FiresOnEveryEvictionPath(t *testing.T) {
 	})
 
 	// --- Path 4: OpenFromSigma stale-eviction ---
-	t.Run("OpenFromSigma_StaleEviction", func(t *testing.T) {
+	t.Run("OpenFromSigma_PeerCap", func(t *testing.T) {
 		t.Parallel()
 		m, _ := newTestManager()
 		c := &hookCollector{}
@@ -981,28 +1042,35 @@ func TestManager_OnSessionCloseHook_FiresOnEveryEvictionPath(t *testing.T) {
 		if err != nil {
 			t.Fatalf("OpenFromSigma first: %v", err)
 		}
-		// No hook yet — no stale session existed at that point.
+		for i := 1; i < operational.MaxSessionsPerPeer; i++ {
+			e, err := m.OpenFromSigma(1, 0x10, 0xCAFE, keys)
+			if err != nil {
+				t.Fatalf("OpenFromSigma #%d: %v", i+1, err)
+			}
+			e.MarkActiveRx()
+		}
+		// No hook yet — the peer is within its cap.
 		if len(seen(c)) != 0 {
 			t.Fatalf("hook fired prematurely: %v", seen(c))
 		}
 
-		// Open again for the same (fabric, peer) — must evict first.
+		// One beyond the cap — must evict the least recently active.
 		_, err = m.OpenFromSigma(1, 0x10, 0xCAFE, keys)
 		if err != nil {
-			t.Fatalf("OpenFromSigma second: %v", err)
+			t.Fatalf("OpenFromSigma beyond cap: %v", err)
 		}
 
 		ids := seen(c)
 		if len(ids) != 1 || ids[0] != first.SessionID {
 			t.Fatalf("hook ids = %v, want [%d]", ids, first.SessionID)
 		}
-		if m.Active() != 1 {
-			t.Fatalf("Active() = %d, want 1", m.Active())
+		if m.Active() != operational.MaxSessionsPerPeer {
+			t.Fatalf("Active() = %d, want %d", m.Active(), operational.MaxSessionsPerPeer)
 		}
 	})
 
-	// --- Path 5: OpenFromSigmaWithID stale-eviction ---
-	t.Run("OpenFromSigmaWithID_StaleEviction", func(t *testing.T) {
+	// --- Path 5: OpenFromSigmaWithID per-peer cap ---
+	t.Run("OpenFromSigmaWithID_PeerCap", func(t *testing.T) {
 		t.Parallel()
 		m, _ := newTestManager()
 		c := &hookCollector{}
@@ -1011,6 +1079,13 @@ func TestManager_OnSessionCloseHook_FiresOnEveryEvictionPath(t *testing.T) {
 		first, err := m.OpenFromSigma(1, 0x10, 0xFACE, keys)
 		if err != nil {
 			t.Fatalf("OpenFromSigma: %v", err)
+		}
+		for i := 1; i < operational.MaxSessionsPerPeer; i++ {
+			e, err := m.OpenFromSigma(1, 0x10, 0xFACE, keys)
+			if err != nil {
+				t.Fatalf("OpenFromSigma #%d: %v", i+1, err)
+			}
+			e.MarkActiveRx()
 		}
 
 		id, err := m.AllocateID()
@@ -1026,8 +1101,8 @@ func TestManager_OnSessionCloseHook_FiresOnEveryEvictionPath(t *testing.T) {
 		if len(ids) != 1 || ids[0] != first.SessionID {
 			t.Fatalf("hook ids = %v, want [%d]", ids, first.SessionID)
 		}
-		if m.Active() != 1 {
-			t.Fatalf("Active() = %d, want 1", m.Active())
+		if m.Active() != operational.MaxSessionsPerPeer {
+			t.Fatalf("Active() = %d, want %d", m.Active(), operational.MaxSessionsPerPeer)
 		}
 	})
 
