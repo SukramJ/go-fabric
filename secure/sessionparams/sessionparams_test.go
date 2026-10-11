@@ -148,3 +148,35 @@ func TestDecodeSkipsUnknownAndNested(t *testing.T) {
 		t.Fatal("truncated structure decoded without error")
 	}
 }
+
+// TestDecodeIgnoresNonContextTagsAndDeepNesting: an anonymous element
+// inside the structure is ignored, a doubly nested container is skipped
+// whole, and a container truncated mid-way is an error.
+func TestDecodeIgnoresNonContextTagsAndDeepNesting(t *testing.T) {
+	t.Parallel()
+	b := []byte{
+		0x35, 0x05,
+		0x04, 0x07, // anonymous uint8 7 — no context tag, ignored
+		0x35, 0x0B, 0x35, 0x01, 0x24, 0x01, 0x01, 0x18, 0x18, // [11]{ [1]{ [1]:1 } }
+		0x25, 0x07, 0x03, 0x00, // [7] 3
+		0x18,
+	}
+	dec := tlv.NewDecoder(b)
+	if _, err := dec.Next(); err != nil {
+		t.Fatal(err)
+	}
+	p, err := sessionparams.DecodeFields(dec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.MaxPathsPerInvoke != 3 {
+		t.Fatalf("decoded %+v", p)
+	}
+	dec = tlv.NewDecoder(b[:9]) // cut inside the nested container
+	if _, err := dec.Next(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sessionparams.DecodeFields(dec); err == nil {
+		t.Fatal("truncated nested container decoded without error")
+	}
+}
