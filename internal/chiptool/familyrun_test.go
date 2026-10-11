@@ -382,8 +382,9 @@ type otaPlumbing struct {
 
 // prepareOta locates chip's OTA provider app and builds the staged image
 // (otaImageCommand) once per harness. A tool that is present and fails is
-// a broken harness, so the family fails; a provider app the image does not
-// carry is the environment's, recorded for the cases that would need it.
+// a broken harness, so the family fails; a tool or provider app the image
+// does not carry is the environment's, recorded for the cases that would
+// need it (they fail naming it once they apply).
 // It runs for a family with such a case whether or not the case applies,
 // so the plumbing is exercised before the requestor exists (brief N).
 func prepareOta(ctx context.Context, t *testing.T, h *harness) *otaPlumbing {
@@ -409,6 +410,11 @@ func prepareOta(ctx context.Context, t *testing.T, h *harness) *otaPlumbing {
 		t.Fatal(err)
 	}
 	ota.image = filepath.Join(h.shared, fmt.Sprintf("reference-bridge_v%d.ota", otaSoftwareVersion))
+	if _, err := h.exec(ctx, "test", "-f", otaImageTool); err != nil {
+		ota.missing = "the harness image carries no " + otaImageTool
+		t.Logf("OTA plumbing: %s", ota.missing)
+		return ota
+	}
 	if out, err := h.exec(ctx, otaImageCommand(payload, ota.image)...); err != nil {
 		t.Errorf("build the staged OTA image (%s): %v\n%s", strings.Join(otaImageCommand(payload, ota.image), " "), err, out)
 		ota.missing = "the staged OTA image could not be built"
