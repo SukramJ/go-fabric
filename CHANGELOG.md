@@ -18,6 +18,26 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `cluster/energy`: CommodityPrice (0x0095), ElectricalGridConditions
+  (0x00A0), CommodityMetering (0x0B07) and CommodityTariff (0x0700) servers
+  on the generated definitions (`NewCommodityPrice`,
+  `NewElectricalGridConditions`, `NewCommodityMetering`,
+  `NewCommodityTariff`), with connectedhomeip's rules at the harness pin:
+  the price validation, the detail filter of the CurrentPrice and
+  PriceForecast attributes and of GetDetailedPriceRequest /
+  GetDetailedForecastRequest, the PriceChange and CurrentConditionsChanged
+  events, the metering setter rules, and for CommodityTariff the whole
+  update validation and cross validation (`UpdateTariff` takes a `Tariff`;
+  a refused update returns which rule refused it), the delayed activation
+  at StartDate, `ClearTariff`, the derived CurrentDay / NextDay /
+  Current- and NextDayEntry(Date) / Current- and NextTariffComponents
+  (`SyncTime`), GetTariffComponent and GetDayEntry.
+- Reference daemon: an ElectricalEnergyTariff (0x0513) with CommodityPrice,
+  ElectricalGridConditions and CommodityTariff, and an ElectricalMeter
+  (0x0514) with ElectricalPowerMeasurement, ElectricalEnergyMeasurement,
+  CommodityMetering and an ElectricalSensor part, carrying the
+  energy-gateway app's demo data, tariff presets and test event triggers.
+  chip-tool families SETRF and COMMTR (workflow group `app-energy`).
 - Reference daemon, for the certification harness: FixedLabel and UserLabel
   on the Aggregator endpoint and FixedLabel on the first bridged light (the
   CSA cases written against the CHIP all-clusters app address endpoint 1);
