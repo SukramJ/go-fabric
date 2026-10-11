@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4259,
+  "entry_points": 4261,
   "entry_packages": [
     ".",
     "bootid",
@@ -166,9 +166,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9761,
+    "total_exported": 9763,
     "reachable": 6819,
-    "whitelisted": 2937,
+    "whitelisted": 2939,
     "unreachable": 5
   },
   "by_package": [
@@ -14586,6 +14586,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestDemTriggerReachesBothEsas",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_esa_test.go",
+      "line": 55
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestDemTriggers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_evse_test.go",
@@ -14807,6 +14814,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_node_test.go",
       "line": 26
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestStateForecastEsa",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_esa_test.go",
+      "line": 22
     },
     {
       "package": "examples/reference-bridge",
