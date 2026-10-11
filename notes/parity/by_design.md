@@ -1425,44 +1425,36 @@ The ownership guard is a defence-in-depth refinement, not a correctness fix; it
 is tracked here rather than implemented to keep the disarm path simple. (Re-audit
 2026-05-31, finding F5.)
 
-### BD-Matter-TimedAndQuotaDeferred — per-attribute timed-interaction enforcement and subscribe-quota eviction are unbuilt
+### BD-Matter-TimedAndQuotaDeferred — per-attribute timed-write enforcement is unbuilt; subscribe-quota eviction mirrors matter.js
 
-Two IM robustness behaviours from chip are intentionally not yet implemented
-because the bridged-cluster surface cannot reach them today:
+Status 2026-10-11 (#47): the command half of this entry is closed. A request
+command marked "T" in the model answers NEEDS_TIMED_INTERACTION outside a
+timed interaction for every cluster: the IM asks the cluster server
+(`contract.TimedCommander`, implemented by `spec.Instance.IsTimedCommand`
+from the generated definition) and falls back to `schema/timed_gen.go`,
+generated from `parity/schema.json` by `make generate-matter-schema` — the
+hand pin of AdministratorCommissioning and three DoorLock commands is gone.
+Mirrors matter.js `CommandInvokeResponse.ts` (`limits.timed`).
 
-- **Per-attribute/-command `kTimed` enforcement** (chip
-  `WriteHandler.cpp:810-812`): an untimed write/invoke targeting a
-  timed-required attribute or command must be rejected with
-  NEEDS_TIMED_INTERACTION. **Enforced** for commands via the per-path
-  predicate `schema.IsTimedInvoke` (`schema/timed.go`),
-  consulted by `anyTimedRequiredInvoke` in
-  `bridge/receive_dispatch.go` alongside the
-  request-level timed flag before `checkTimedGate`
-  (`bridge/receive.go`). `timedInvokePaths` currently
-  pins AdministratorCommissioning (every command) and DoorLock's
-  LockDoor/UnlockDoor/UnboltDoor (Matter §8.7; matter.js
-  `door-lock-cluster.element.ts:230,234,560` mark them `"O T"`) — a DoorLock
-  unlock routed through the bridge outside a timed window now yields
-  NEEDS_TIMED_INTERACTION instead of succeeding. No currently exposed
-  *attribute* (as opposed to command) carries the `T` access quality, so
-  per-attribute write enforcement remains unbuilt until one does; extend
-  `timedInvokePaths` (and `TestTimedInvokeParity`) the next time a newly
-  exposed cluster ships a timed command or attribute.
-- **Subscribe per-fabric quota eviction** (chip
-  `InteractionModelEngine.cpp:1263`): chip evicts an existing subscription to
-  guarantee the per-fabric minimum, returning ResourceExhausted only when truly
-  out of resources. go-fabric
-  (`bridge/subscribe.go`) caps at the default 16
-  per-fabric and falls through; with a 1–10 controller bridge fleet the cap is
-  effectively unreachable.
+What stays:
 
-Both remain documented unbuilt extension points, not dormant wiring — there is
-no implemented-but-unwired capability behind either. Per-command enforcement
-became real work once the bridge mounted a cluster with timed-required
-commands (DoorLock); per-attribute enforcement and quota eviction become real
-work when the bridge exposes a timed-quality attribute or targets large
-controller fleets, respectively.
-(Re-audit 2026-05-31, findings F3 / F4.)
+- **Per-attribute timed-write enforcement.** matter.js refuses an untimed
+  write to an attribute with the `timed` access quality
+  (`AttributeWriteResponse.ts:241-244`, `AccessControl.ts:290-300`). No
+  attribute of any cluster this module serves carries that quality in the
+  snapshot (`grep 'Timed: true' cluster/spec/*/definition_gen.go` lists
+  commands only), so the write path has nothing to enforce yet. Retire when
+  a served cluster ships a timed attribute: enforce it in `cluster/spec`'s
+  write path the way the invoke path does, with a parity test.
+- **Subscribe per-fabric quota eviction.** chip evicts an existing
+  subscription to guarantee the per-fabric minimum
+  (`InteractionModelEngine.cpp:1263`). matter.js has no per-fabric
+  subscription quota and no eviction (no such limit in
+  `packages/protocol/src/interaction` or `packages/node/src/node/server`,
+  measured 2026-10-11); go-fabric caps at 16 per fabric (`bridge/subscribe.go`)
+  and falls through. This half therefore mirrors the gold standard and is
+  not a gap; it is kept here only because the cap is a chip behaviour a
+  controller fleet larger than a home's could notice.
 
 ### BD-Matter-CaseInitiatorPeerCATs — the CASE initiator takes the responder's CATs from its NOC
 
@@ -1606,6 +1598,183 @@ differs, because a Go topology is installed whole. Pinned by
 [ADR 0016](../../docs/adr/0016-device-type-validation.md).
 
 ---
+
+### BD-chip-BooleanStateConfiguration-RulesInServer — the command and sensitivity rules are connectedhomeip's; matter.js has none
+
+matter.js `BooleanStateConfigurationServer` adds no logic to the generated
+behaviour (`cluster/boolcfg/boolcfg.go:4-19` quotes it). `cluster/boolcfg`
+therefore follows connectedhomeip's `BooleanStateConfigurationCluster`
+(harness pin 6170af84; each rule cites its line in the Go source): the
+SupportedSensitivityLevels clamp, the DefaultSensitivityLevel and
+CurrentSensitivityLevel caps, SuppressAlarm refused without the
+VisualAlarm or AudibleAlarm feature, a `Delegate` refusal answered as
+FAILURE, and EnableDisableAlarm / SuppressAlarm as chip handles them. The
+chip-tool family BOOLCFG passes (#45). Retire when matter.js's server gains
+these rules; then re-derive from it.
+
+### BD-chip-UnitLocalization-TemperatureUnitInSupported — a written TemperatureUnit outside SupportedTemperatureUnits is CONSTRAINT_ERROR
+
+matter.js's `UnitLocalizationServer` only seeds the defaults (Celsius,
+`[Celsius, Fahrenheit]`; `cluster/core/unit_localization.go:38-48` cites
+the lines) and does not check a written TemperatureUnit against
+SupportedTemperatureUnits: the attribute's model carries no `in`
+constraint. connectedhomeip refuses such a write with CONSTRAINT_ERROR
+(`UnitLocalizationCluster.cpp SetTemperatureUnit :105-115` at the pin),
+and the CSA case TC-LUNIT-3.1 writes an unsupported unit. go-fabric follows
+chip here (`cluster/core/unit_localization.go`, `localization_test.go:137-140`)
+and also refuses a start-up unit the supported list lacks
+(`ErrLocalizationConfig`). Retire when the matter.js model gains the
+constraint; the runtime's `Constraint.In` check (#47) then takes over.
+
+### BD-chip-WaterHeaterManagement-RulesInServer — Boost, EndBoost and CancelBoost follow connectedhomeip's water-heater app
+
+matter.js's `WaterHeaterManagementServer` adds no rules; `cluster/energy/
+waterheater.go` takes them from connectedhomeip at the pin: the Boost field
+rules (`WaterHeaterManagementCluster.cpp:152-189`), EndBoost and the
+`Booster` host port as the delegate leaves ending a boost to the device
+(`:191, :201`; `WaterHeaterDelegateImpl.cpp:181, :234-259, :439-455`), and
+CancelBoost without a running boost answering SUCCESS with no host call
+and no BoostEnded event (`WaterHeaterDelegateImpl.cpp:270-296`;
+TC_EWATERHTR_2_2.py:196-197, :470-473 expect it). Family EWATERHTR passes
+(#45). Retire when matter.js's server gains the rules.
+
+### BD-chip-EnergyPreference-IndexRule — CurrentEnergyBalance / CurrentLowPowerModeSensitivity at or beyond the list length are CONSTRAINT_ERROR
+
+matter.js's `EnergyPreferenceServer` adds no rule; the generated
+constraint bounds the index type only. connectedhomeip refuses an index
+`>= correspondingArraySize` with CONSTRAINT_ERROR before telling the
+delegate (`EnergyPreferenceCluster.cpp:108-116`, `:118-125`; `.h:57-58,
+:69-70`). `cluster/energy/preference.go:82-86, :144` does the same.
+Family EPREF passes (#45).
+
+### BD-chip-AlarmBase-RulesInServer — Reset, ModifyEnabledAlarms and Notify follow connectedhomeip; TemperatureAlarm's thresholds have no source
+
+matter.js's DishwasherAlarm, RefrigeratorAlarm and TemperatureAlarm
+servers are empty subclasses. `cluster/alarmbase/alarmbase.go:4-38` lists
+the AlarmBase rules it takes from connectedhomeip at the pin (Supported and
+Latch fixed; Mask and State through the setters; Reset and
+ModifyEnabledAlarms ask the `Delegate`; every State change emits Notify).
+`SetTemperatureAlarmThresholds` is refused (`ErrAdjustableThresholds`):
+neither matter.js (empty server) nor chip at the pin (no
+`temperature-alarm-server` directory) gives that command a rule, so the
+module does not invent one. Families DISHALM and REFALM pass (#46). Retire
+the threshold refusal when either source carries the rule.
+
+### BD-chip-Appliance-RulesInServer — MicrowaveOvenControl and the laundry controls follow connectedhomeip; the oven cavity follows its all-clusters demo
+
+matter.js's MicrowaveOvenControl, LaundryWasherControls and
+LaundryDryerControls servers are empty (`cluster/appliance/microwave.go:4-23`,
+`laundry.go`); the command and write rules come from connectedhomeip at the
+pin, cited per rule. One model-versus-chip difference is recorded in
+`microwave.go:158-160`: SupportedWatts and SelectedWattIndex are
+provisional in the model ("P, WATTS"), so the definition keeps them
+optional even with the WATTS feature; the server serves both with the
+feature as chip does (`MicrowaveOvenControlCluster.cpp:153-154`).
+`cluster/opstate`'s oven variant (`opstate_server.go:4-23, :346-358`)
+takes Pause and Resume as "X" from the model and the PhaseList rule from
+matter.js `OvenCavityOperationalStateServer.ts:35-46`. The reference
+daemon's cavity additionally follows chip's all-clusters oven, which the
+CSA cases were written against: Paused in the OperationalStateList
+(`oven-operational-state-delegate.h:37-40`; TC-OVENOPSTATE-2.2 step 3) and
+Start under a standing OperationalError answering UnableToStartOrResume
+(`oven-operational-state-delegate.cpp HandleStartStateCallback :139-146`;
+step 17) — `examples/reference-bridge/fleet_kitchen.go:48-64`. Families
+MWOCTRL, MWOM, OTCCM, OVENOPSTATE pass (#46).
+
+### BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer — both servers transcribe connectedhomeip, with the quirks named
+
+matter.js's `DeviceEnergyManagementServer` and `EvseServer` are empty
+subclasses; `cluster/energy/devicemanagement.go` and `evse.go` transcribe
+connectedhomeip at the pin (`DeviceEnergyManagementCluster.cpp`,
+`DeviceEnergyManagementDelegateImpl.cpp`, `EnergyEvseCluster.cpp`,
+`EnergyEvseDelegateImpl.cpp`, `EnergyEvseTargetsStore.cpp`), each rule
+with its line. The places where the Go code knowingly differs from, or
+tightens, the transcription are commented where they occur:
+`devicemanagement.go:452-454` (chip dereferences a capability unchecked; a
+null one is left null here), `:473-475` (chip's INVALID_VALUE is answered
+as CONSTRAINT_ERROR, the IM status the spec names), `:815-817` (the
+power-adjustment timer is cancelled in the pause failure path, transcribed
+as written), `:942-946` (only the first constraint's fields are checked,
+as chip does); `evse.go:370-372, :776-777, :846-848, :1254-1260`.
+PowerRangeAdjustment (DEM feature bit 7) is not served: it exists at the
+chip pin but not in the matter.js snapshot nor the 1.6.1 data model
+(DEM/2.11 stays class (b)). Families DEM, DEMM, EEVSE, EEVSEM pass or are
+classified (#46, #47; TC-EEVSE-2.3 is a findings entry).
+
+### BD-chip-ClosureDimension-RulesInServer — the command rules are connectedhomeip's; the feature check is matter.js's stricter one
+
+matter.js's `ClosureDimensionServer` is empty; `cluster/closure/
+closuredimension_server.go:20-65` lists the rules it takes from
+connectedhomeip's `ClosureDimensionCluster.cpp` at the pin. The feature
+conformance is the model's, i.e. matter.js's, and is stricter than chip in
+one place: with Positioning it requires exactly one of Translation,
+Rotation and Modulation (`[PS].b`), where chip's server accepts at most
+one. Family CLDIM passes (#46). The daemon's ClosurePanel shares
+`BD-Matter-ClosureWithoutTagList`.
+
+### BD-chip-SoilMeasurement-PullRefusal — a reading outside the limits is dropped at read time rather than refused at set time
+
+connectedhomeip refuses `SetSoilMoistureMeasuredValue` outside
+SoilMoistureMeasurementLimits with CONSTRAINT_ERROR and keeps the stored
+value (`SoilMeasurementCluster.cpp:58-71` at the pin). `cluster/measurement`
+reads the host's value on every read (the module's pull model, as for every
+measurement kind), so the refusal is not an error anyone sees: the read
+answers the last reading inside the limits, null until there was one; a
+float reading is rounded to whole percent. matter.js's server is empty.
+Family SOIL passes (#47).
+
+### BD-chip-PowerSourceConfiguration-HostOrder — Sources is the host's ordered list, not a read-time sort by PowerSource.Order
+
+connectedhomeip builds Sources at read time from the first six enabled
+PowerSource endpoints, bubble-sorted by each endpoint's PowerSource `Order`
+(`power-source-configuration-server.cpp:65-90` at the pin). The module has
+no view of other endpoints' attributes from inside a cluster server, so
+`core.NewPowerSourceConfiguration` takes the host's list (or a provider),
+in the host's order, and keeps the first six; the host, which owns both
+clusters, states the priority. matter.js's server is empty. Family PSCFG
+passes (#47).
+
+### BD-chip-EcosystemInformation-ReadTimeValidation — invalid directory entries are left out at read time instead of refused at add time
+
+connectedhomeip validates an entry when the application adds it (device
+builder `ecosystem-information-server.cpp:135-157`, location builder
+`:215-229`, `AddLocationInfo :271-288`, which also refuses a duplicate
+location key). The module's `EcosystemDirectory` host port is read on
+every read, so an entry those rules would refuse is left out of the read,
+and the second of two locations with the same key is ignored; the rules
+themselves are chip's. matter.js's server is empty. The ECOINFO cases need
+a fabric-sync admin+bridge app and are class (c) in the harness (#47).
+
+### BD-chip-Commodity-ServerChoices — where connectedhomeip's commodity servers are undefined or incidental, the module's choice is recorded
+
+The four commodity servers in `cluster/energy` (CommodityPrice,
+CommodityTariff, CommodityMetering, ElectricalGridConditions; matter.js's
+servers are empty) transcribe connectedhomeip at the pin. Recorded
+differences, each a deliberate choice:
+
+- CommodityMetering: a refused MeteredQuantity list keeps the old value.
+  chip frees the stored list before validating the new one
+  (`commodity-metering-server.cpp:183-203`), so a refused write there
+  leaves the attribute null.
+- CommodityTariff: the derived Current*/Next* attributes report their
+  reset. chip nulls them without a report (`commodity-tariff-server.cpp
+  ResetCurrentAttributes :575-586`); `spec.Server` reports every change.
+- CommodityPrice and ElectricalGridConditions setters emit the event on
+  every set, as chip does (`CommodityPriceCluster.cpp:434`,
+  `electrical-grid-conditions-server.cpp:143`), but report the attribute
+  only on a change.
+- PeriodStart equal to PeriodEnd is accepted, as chip's checks are
+  `periodStart <= periodEnd` (`CommodityPriceCluster.cpp:93`) and
+  `periodStart > periodEnd` refused (`electrical-grid-conditions-server.cpp:132`);
+  the definition's `min periodStart + 1` is an expression bound the
+  runtime does not evaluate (`cluster/spec/model.go:80`: such a bound
+  admits every value).
+- Where chip is undefined: an update without DayPatterns is treated as an
+  empty set (chip would dereference null); ClearTariff drops a pending
+  delayed update; the tariff test clock is scoped to the server (chip's
+  mock clock replaces the whole app's clock).
+
+Families SETRF and COMMTR pass (#47). Retire an item when chip defines it.
 
 ## Removed (built, tested, never wired)
 

@@ -345,6 +345,16 @@ FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
 rules below that matter.js does not carry and that were taken from memory
 of connectedhomeip are marked unverified:
 
+- **`Constraint.In` is checked on controller writes only.** Since #47 the
+  `cluster/spec` runtime refuses a written value outside the peer list an
+  `in` constraint names (CONSTRAINT_ERROR, matter.js `constraint.ts:153`);
+  a host-side `Set` or the `Initial` value is not checked. **matter.js:**
+  validates every state commit, including the initial one. Checking
+  `Initial` today would make `NewServer` refuse LocalizationConfiguration,
+  because ActiveLocale is checked before SupportedLocales is applied.
+  **Fix:** validate initial and host-set values after all initials are
+  applied, then add the two localization clusters' start-up cases to the
+  parity test.
 - **FanControl percent / speed formulas and the On / Smart mapping.**
   `ceil(SpeedMax × p / 100)`, `floor(s × 100 / SpeedMax)`, On → High,
   Smart → Auto-or-High (`cluster/fan/fancontrol_server.go`
