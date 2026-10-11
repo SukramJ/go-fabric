@@ -93,6 +93,15 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   of the MAC-derived one, for a test host whose LAN interface has no IPv6:
   the OS responder then publishes the address records — the IPv6 link-local
   ones of every interface an IPv6-only controller needs included.
+- `--ota-harness` applies a downloaded OTA image in place: the root's
+  BasicInformation reports the image's version at once and the OTA
+  requestor reports the update as after a restart (VersionApplied,
+  NotifyUpdateApplied), which is what the CHIP SU cases read. It also lets
+  the requestor consent to an update and query 250 ms after an
+  announcement, as matter.js's cert requestor does. Without it the daemon
+  validates a downloaded image and keeps it under `<ota-dir>/applied/`,
+  still running the old version; `--ota-dir` (default `ota` beside `--db`)
+  is where downloads land.
 
 Each applied command is logged as `apppipe.applied`. None of these flags
 belongs in a real deployment.

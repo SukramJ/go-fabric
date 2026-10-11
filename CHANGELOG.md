@@ -18,6 +18,31 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- **OTA Software Update Requestor and BDX** (ADR 0019, brief N).
+  `cluster/core.OTASoftwareUpdateRequestor` replaces the static stub: it
+  queries the providers a controller names (DefaultOTAProviders, persisted
+  per fabric in the new `matter_ota_default_providers` table, or
+  AnnounceOTAProvider), downloads the image over BDX, asks the provider
+  whether to apply it, hands it to the host's `OtaApplier` and reports
+  the outcome (StateTransition, VersionApplied, DownloadError,
+  NotifyUpdateApplied) — matter.js's OtaSoftwareUpdateRequestorServer rule
+  for rule. **Breaking:** `NewOTASoftwareUpdateRequestor` takes an
+  `OTARequestorConfig` and returns an error; the `OTAUpdateState*`
+  constants are gone (use `otasoftwareupdaterequestor.UpdateState*`).
+  New package `bdx` (message codecs, messenger, the initiating receiver in
+  both driver modes, `FileSink`) and `bdx/otaimage` (OTA image header,
+  validation, writer), both byte-checked against matter.js fixtures.
+  `*bridge.Bridge` implements `core.OtaProviderConnector`: the ADR 0008
+  CASE initiator, generalised to one Invoke and one BDX exchange on a
+  session with the provider. `im` gains the client-side InvokeRequest
+  encoder and InvokeResponse decoder; `store` gains
+  `ListDefaultOTAProviders`, `ReplaceDefaultOTAProviders` and the
+  requestor's state; `BasicInformation` gains `OtaNodeInformation` and
+  `SetSoftwareVersion`. HTTPS downloads are not ported.
+- Reference daemon: the requestor on the root (device type OtaRequestor),
+  with an applier that validates the image against the node's vendor,
+  product and the offered version and keeps it; `--ota-dir` and the
+  test-only `--ota-harness`, which applies in place.
 - `cluster/spec.CheckFeatures` judges a feature's otherwise-conformance by
   its first applicable entry, as matter.js's FeatureSelectionErrors does
   (`IllegalFeatureCombinations.ts` addOtherwiseRules): DeviceEnergyManagement
