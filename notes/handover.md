@@ -20,7 +20,7 @@ German, briefly. Six waves were planned against the phases:
 | 3 | 2b (appliances, ovens, microwave), 2c part (DEM, EVSE), 2d part (ServiceArea, ClosureDimension, TSUIC) | G, H, I | #46 | merged 2026-10-11 |
 | 4 | 2c/2d rest (Commodity*, ElectricalGridConditions, Soil, Actions, EcosystemInformation, PowerSourceConfiguration) and the spec runtime (timed commands from the model, `Constraint.In`, TSUIC default, ModeSelect) | J, K, L | #47; docs #48 | merged 2026-10-11 |
 | 5 | 3 (TCP, BDX, OTA requestor; ADR 0019) and harness follow-ups | M, N, O | #49; docs PR `docs/wave-5-followups` | #49 merged 2026-10-11 (`5739ee8`); docs PR see §3 |
-| 6 | 4 (device layer `device/` and node facade; ADR 0018, still "Proposed") | not written yet | — | **starts on another machine** (owner's decision, 2026-10-11 17:20); see §6 |
+| 6 | 4 (device layer `device/`, node facade `node/`, `cluster/onoff.Server`, daemon migration; ADR 0018 accepted 2026-10-11) | P, Q, R | — | **running since 2026-10-11 evening on the owner's Linux machine** (`fabric-ubnt`): P on `wave6/device`, Q on `wave6/node` in parallel (two Opus agents), R after integration; local chip-tool runs (Docker, avahi) instead of CI dispatches; see §6 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -192,29 +192,17 @@ Still open after it:
 - Harness timeouts come from the case's `--timeout` declaration, not from a
   family default.
 
-## 6. Starting wave 6 on the other machine
+## 6. Wave 6 (started 2026-10-11 on the Linux machine)
 
-The owner decided on 2026-10-11 that wave 6 starts on another machine while
-this one finishes wave 5 (PR #49 and its docs PR). Nothing of wave 6 exists
-yet: no briefs, no branch. Scope and sources:
-
-- The concept's Part B (`docs/concept-matter-1.6.1-and-device-layer.md`
-  §B.1–B.6) and Phase 4 in §A.3: a `device/` package generated from the
-  device-type model, as matter.js `packages/node/src/devices/` and
-  `endpoints/`, and a node facade as `ServerNode`; the reference daemon
-  migrates as the first consumer and shrinks to device descriptions, ending
-  without `contract.EndpointSource`.
-- [ADR 0018](../docs/adr/0018-device-layer-and-node-facade.md) is
-  "Proposed"; it switches to "Accepted" in the wave's first commit, with the
-  wizard decisions the owner takes at the start recorded in its text (that
-  is how ADR 0019 was handled for wave 5: `docs/adr/0019-*.md` plus the
-  concept's §0 and Phase 3 paragraph rewritten in the same commit).
-- Procedure as in §4: briefs on `planning/briefs-wave-6` (each with its
-  matter.js file:line facts, owned files, guards, exclusions), agents on
-  `wave6/<topic>`, integration on `wave/<date>-tranche-6`, one PR.
-- Do not wait for this machine: wave 5's remaining work (fixtures of run
-  38149548973, PR #49's merge, the docs PR with the §3 items) touches
-  `internal/chiptool`, `notes/parity` and `docs/`, not `device/` or the
-  daemon's topology code. Rebase the wave-6 branch onto `main` after #49
-  merges; `examples/reference-bridge` is the one place both may touch.
-
+Briefs on `planning/briefs-wave-6` (`notes/briefs/2026-10-11-P-*.md`,
+`Q-*.md`, `R-*.md`); ADR 0018 "Accepted" with six decisions in the same
+commit (default-server policy, what is generated, accessors, composition,
+the facade's config, complete daemon migration). Worktrees
+`.claude/worktrees/wave6-device` (P) and `wave6-node` (Q), branched from
+the planning branch so they carry the briefs. Integration branch
+`wave/2026-10-11-tranche-6`; R (`wave6/daemon`) branches from it after P
+and Q are merged. Local guards: `make chiptool-test`,
+`make chiptool-families GOFABRIC_CHIP_FAMILIES=…` (the harness image is
+pulled, avahi runs, IPv6 is on the LAN interface); fixtures from the local
+run, not from a CI dispatch. Phase 5 (Apple Home and Alexa runs, `v1.0.0`)
+follows; the real-controller runs need the owner at the device.
