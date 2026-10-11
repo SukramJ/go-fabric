@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4213,
+  "entry_points": 4224,
   "entry_packages": [
     ".",
     "bootid",
@@ -162,9 +162,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9469,
-    "reachable": 6629,
-    "whitelisted": 2835,
+    "total_exported": 9491,
+    "reachable": 6640,
+    "whitelisted": 2846,
     "unreachable": 5
   },
   "by_package": [
@@ -5202,6 +5202,41 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestActionsCommandStatuses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/actions_test.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestActionsEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/actions_test.go",
+      "line": 158
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestActionsListsAreTheHosts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/actions_test.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestActionsMatchesTheGeneratedDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/spec_parity_matterjs_test.go",
+      "line": 266
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestActionsRequestShapes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/actions_test.go",
+      "line": 129
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestBasicInfoSerialFromUniqueID_Long",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_diagnostics_internal_test.go",
@@ -5219,14 +5254,14 @@
       "identifier": "TestBasicInformationMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 84
+      "line": 88
     },
     {
       "package": "cluster/core",
       "identifier": "TestBridgedDeviceBasicInformationMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 118
+      "line": 122
     },
     {
       "package": "cluster/core",
@@ -5240,7 +5275,35 @@
       "identifier": "TestDescriptorMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 44
+      "line": 48
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestEcosystemInformationAppliesChipBuilderRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ecosystem_information_test.go",
+      "line": 133
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestEcosystemInformationDirectoryChanged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ecosystem_information_test.go",
+      "line": 190
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestEcosystemInformationFiltersByFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ecosystem_information_test.go",
+      "line": 77
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestEcosystemInformationMatchesTheGeneratedDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/spec_parity_matterjs_test.go",
+      "line": 245
     },
     {
       "package": "cluster/core",
@@ -5254,14 +5317,14 @@
       "identifier": "TestGeneralCommissioningMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 180
+      "line": 184
     },
     {
       "package": "cluster/core",
       "identifier": "TestGeneralDiagnosticsMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 142
+      "line": 146
     },
     {
       "package": "cluster/core",
@@ -5275,14 +5338,14 @@
       "identifier": "TestIdentifyMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 58
+      "line": 62
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 222
+      "line": 226
     },
     {
       "package": "cluster/core",
@@ -5384,10 +5447,24 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestPowerSourceConfigurationMatchesTheGeneratedDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/spec_parity_matterjs_test.go",
+      "line": 236
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestPowerSourceConfigurationSources",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/power_source_configuration_test.go",
+      "line": 17
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestSmallSystemServersMatchTheGeneratedDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 193
+      "line": 197
     },
     {
       "package": "cluster/core",

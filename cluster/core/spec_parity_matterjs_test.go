@@ -8,18 +8,22 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
 	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
 	bdbidef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
 	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
 	diaglogsdef "github.com/SukramJ/go-fabric/cluster/spec/diagnosticlogs"
+	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
 	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
 	icddef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	netcommdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
+	pscfgdef "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	timesyncdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	"github.com/SukramJ/go-fabric/contract"
@@ -222,4 +226,73 @@ func TestSmallSystemServersMatchTheGeneratedDefinitions(t *testing.T) {
 func TestOTARequestorMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
 	spectest.CheckServer(t, NewOTASoftwareUpdateRequestor(), otadef.Definition, 0)
+}
+
+// The three node clusters of brief J hold their generated definitions
+// (matter.js power-source-configuration.element.ts,
+// ecosystem-information.element.ts, actions.element.ts); each matter.js
+// server is an empty subclass of its behavior.
+
+func TestPowerSourceConfigurationMatchesTheGeneratedDefinition(t *testing.T) {
+	t.Parallel()
+	p, err := NewPowerSourceConfiguration([]uint16{3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spectest.CheckServer(t, p, pscfgdef.Definition, 0)
+}
+
+func TestEcosystemInformationMatchesTheGeneratedDefinition(t *testing.T) {
+	t.Parallel()
+	e := NewEcosystemInformation(&ecoDir{})
+	spectest.CheckServer(t, e, ecodef.Definition, 0)
+	// Both lists need Manage to read ("R F M").
+	for _, id := range []uint32{ecodef.AttrDeviceDirectory, ecodef.AttrLocationDirectory} {
+		if got := e.MinReadPrivilege(id); got != 4 {
+			t.Errorf("MinReadPrivilege(0x%04X) = %d, want Manage (4)", id, got)
+		}
+	}
+	if _, err := e.MatterInvoke(context.Background(), 0, nil); err == nil {
+		t.Error("invoke accepted")
+	}
+	if _, ok := e.MatterRead(0x0005); ok {
+		t.Error("unknown attribute read succeeded")
+	}
+	if v, ok := e.MatterRead(cluster.AttrGlobalClusterRevision); !ok || v != ecodef.Revision {
+		t.Errorf("ClusterRevision = %v", v)
+	}
+}
+
+func TestActionsMatchesTheGeneratedDefinition(t *testing.T) {
+	t.Parallel()
+	url := "https://example.com/setup"
+	a, err := NewActions(ActionsConfig{Host: newActionsStub(), SetupURL: &url})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spectest.CheckServer(t, a, actionsdef.Definition, 0)
+	// All twelve commands are accepted, as connectedhomeip lists them
+	// (ActionsCluster.cpp AcceptedCommands :231-252).
+	if got := a.MatterAcceptedCommands(); len(got) != 12 {
+		t.Errorf("AcceptedCommandList = %v, want all twelve", got)
+	}
+	if v, ok := a.MatterRead(actionsdef.AttrSetupUrl); !ok || v != url {
+		t.Errorf("SetupURL = %v (%v)", v, ok)
+	}
+	bare, err := NewActions(ActionsConfig{Host: newActionsStub()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range bare.MatterAttributes() {
+		if id == actionsdef.AttrSetupUrl {
+			t.Error("SetupURL served without a URL")
+		}
+	}
+	if _, err := NewActions(ActionsConfig{}); err == nil {
+		t.Error("NewActions accepted no host")
+	}
+	long := string(make([]byte, 513))
+	if _, err := NewActions(ActionsConfig{Host: newActionsStub(), SetupURL: &long}); err == nil {
+		t.Error("NewActions accepted a SetupURL over 512")
+	}
 }
