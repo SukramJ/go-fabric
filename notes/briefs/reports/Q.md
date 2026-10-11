@@ -245,3 +245,57 @@ Mutation checks:
   :120-122, :159-165, :175-184, :268-310).
 - findings — **`node.Aggregator` Remove + re-add yields a fresh number**
   (open question 2), if the owner reads the brief as requiring the old one.
+
+## Follow-up (owner decisions, 2026-10-11)
+
+| Commit | Decision |
+| --- | --- |
+| bcacbec | 1: `onoff.Config.Bridged` |
+| 5841838 | 3: `Aggregator.MarkComplete`; 7: `Node.BootReason` |
+
+- **1 — StartUpOnOff under the Aggregator.** `onoff.Config.Bridged bool`.
+  When it is true, `New` skips the StartUpOnOff apply, mirroring
+  `OnOffServer.ts:37` (`!this.endpoint.ownerOfType(AggregatorEndpoint)`,
+  cited in code). Both branches are tested: `TestStartUpOnOff` gained the
+  rows "bridged skips On" and "bridged skips Toggle"; the unbridged rows
+  are unchanged.
+- **2 — Remove + re-add.** No change. A fresh number is matter.js's
+  behaviour too (`Endpoint.delete()` erases the endpoint's storage,
+  `Endpoint.ts:985`). The test doc now cites it.
+- **3 — Model completeness.** Snapshots carry `ModelComplete: false` until
+  the host calls `Aggregator.MarkComplete()`, and `true` after it. `Start`
+  does not mark the set complete. `MarkComplete` is idempotent, and on a
+  running node it reassembles at once (a failure is logged; the next Add,
+  Remove or Reassemble retries). The doc says: call MarkComplete once the
+  host has added every device it knows about; before that, numbers of
+  stored endpoints are retained. Tests:
+  - `TestMarkComplete/retained until MarkComplete`: the endpoint was stored
+    by a previous run, the node starts with an empty Aggregator, and the
+    endpoint added after Start gets its stored number back.
+  - `TestMarkComplete/collected after MarkComplete`: the stored endpoint is
+    absent when MarkComplete runs, is garbage-collected, and a later add
+    gets a fresh number.
+  - `TestAggregatorAcrossRestart` now calls MarkComplete before its Remove.
+- **4, 5.** Confirmed; no change. Salt and PBKDF iterations stay required.
+- **6 — AddNOC test commissioner.** Not in this wave. It remains an open
+  question as phase-5 work: a shared Go commissioner that completes AddNOC,
+  so the ACL and CASE ports become provable through the facade and the
+  `node/` floor can rise.
+- **7 — `Node.BootReason() uint8`.** Returns the boot reason the node passes
+  to `NewGeneralDiagnostics`, which is the value `EmitBootReason` reports
+  (PowerOnReboot for now). `GeneralDiagnostics` does not serve the
+  attribute, so the node keeps the value itself and hands the same field
+  to `buildRoot`. `TestBootReason` checks the value and that an OnOff
+  server given `n.BootReason` applies StartUpOnOff.
+
+Guards after the follow-up (Linux, local):
+
+| Guard | Result |
+| --- | --- |
+| `go test ./node/... ./cluster/onoff/... ./bridge/... ./examples/...` | green |
+| race on `node/`, `cluster/onoff/` (`-count=3`) | green |
+| `make lint` | 0 issues |
+| gofumpt v0.12.0 `-l .` | prints nothing |
+| `make cover-check` | green; `node/` 57.7 % against floor 56, `cluster/onoff` 100 % |
+| `make reachability` | unreached 5 |
+| `go test ./internal/chiptool/ -run 'TestWorkflow\|TestFamil'` | green |
