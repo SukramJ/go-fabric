@@ -175,6 +175,13 @@ const (
 	// PA|PFR|STA|PAU|FA|CON and DeviceEnergyManagementMode).
 	dtEnergyEvse             = 0x050C
 	dtDeviceEnergyManagement = 0x050D
+	// dtElectricalEnergyTariff is the reference daemon's energy tariff
+	// (examples/reference-bridge/fleet_energy_market.go): CommodityPrice,
+	// ElectricalGridConditions and CommodityTariff; dtElectricalMeter its
+	// grid meter: ElectricalPowerMeasurement, ElectricalEnergyMeasurement
+	// and CommodityMetering.
+	dtElectricalEnergyTariff = 0x0513
+	dtElectricalMeter        = 0x0514
 	// dtClosurePanel is the reference daemon's closure panel
 	// (examples/reference-bridge/fleet_closure.go): ClosureDimension.
 	dtClosurePanel = 0x0231
@@ -419,6 +426,14 @@ var chipFamilies = []family{
 	// (0x0098...) test event triggers, which the charger answers as
 	// connectedhomeip's evse-app does (examples/reference-bridge/
 	// fleet_evse.go).
+	// SETRF and COMMTR run on the energy tariff and the grid meter;
+	// TC_SETRF_2_2/2_3 and TC_COMMTR_3_1 drive them through the
+	// CommodityTariff (0x0700...) and CommodityMetering (0x0b07...) test
+	// event triggers, which the daemon answers as connectedhomeip's
+	// energy-gateway app does (examples/reference-bridge/
+	// fleet_energy_market.go).
+	{name: "SETRF", deviceType: dtElectricalEnergyTariff},
+	{name: "COMMTR", deviceType: dtElectricalMeter},
 	{name: "DEM", deviceType: dtDeviceEnergyManagement},
 	{name: "DEMM", deviceType: dtDeviceEnergyManagement},
 	{
