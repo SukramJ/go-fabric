@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -49,8 +51,40 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 		return decodeExtensionList(el, dec)
 	case path.Cluster == 0x003F && path.Attribute == 0x0000: // GroupKeyManagement.GroupKeyMap
 		return decodeGroupKeyMapList(el, dec)
+	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
+		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, false)
 	}
 	return primitiveAttributeValue(el, dec)
+}
+
+// undecodedValue stands in for a structured write value its generated
+// decoder refused — a label longer than its "max 16", a field of the
+// wrong type. It is neither a list nor a struct with the attribute's
+// fields, so the server's write check answers it CONSTRAINT_ERROR
+// (spec.Instance.ValidateWrite), the status matter.js answers a value its
+// TlvSchema rejects with (AttributeWriteResponse.ts #decodeWithSchema),
+// without failing the rest of the write request.
+type undecodedValue struct{ err error }
+
+// generatedAttributeValue decodes a structured write value with the
+// attribute's generated decoder (cluster/spec/<cluster>), as matter.js
+// decodes every write with the attribute's own schema. el is the value's
+// container opener, already consumed. For a list-append write (item) el
+// opens one entry, which is decoded as a one-element list for the
+// dispatcher to append.
+func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, dec *tlv.Decoder, item bool) (im.AttributeValue, error) {
+	n, err := spec.ReadContainer(dec, el)
+	if err != nil {
+		return im.AttributeValue{}, fmt.Errorf("%s: %w", def.Name, err)
+	}
+	if item {
+		n = spec.Node{El: tlv.Element{Type: tlv.TypeArray, IsContainer: true}, Children: []spec.Node{n}}
+	}
+	v, derr := def.Attribute(attrID).Decode(n)
+	if derr != nil {
+		v = undecodedValue{derr}
+	}
+	return im.AttributeValue{Value: v}, nil
 }
 
 // decodeACLList reads an array of AccessControlEntryStruct (Matter
@@ -457,6 +491,8 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 	case path.Cluster == 0x003F && path.Attribute == 0x0000 && isStruct:
 		e, err := decodeGroupKeyMapEntry(dec)
 		return im.AttributeValue{Value: []mattercore.GroupKeyMapStruct{e}}, err
+	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
+		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, true)
 	}
 	v, err := primitiveAttributeValue(el, dec)
 	if err != nil {

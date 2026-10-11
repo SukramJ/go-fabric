@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/cluster/wire"
@@ -148,6 +150,16 @@ func (d *demoLight) MatterClusterServers() []contract.ClusterServer {
 		d.servers = []contract.ClusterServer{
 			&onOffServer{dev: d, logMessage: "light.set", lt: newLightingState()},
 			wire.ScenesManagement{},
+		}
+		// FixedLabel on the first light as well: the harness points the
+		// certification cases written against the CHIP all-clusters app's
+		// endpoint 1 (TC_FLABEL_2_1.py `--endpoint 1`) at the daemon's first
+		// bridged light, and that app serves FixedLabel there. Base allows
+		// the cluster on any endpoint.
+		if fixedLabel, err := mattercore.NewFixedLabel([]fixedlabeldef.LabelStruct{
+			{Label: "room", Value: "demo"},
+		}); err == nil {
+			d.servers = append(d.servers, fixedLabel)
 		}
 	})
 	return d.servers
@@ -1468,12 +1480,15 @@ type fleet struct {
 	lock       *demoLock
 	humidity   *demoReading
 	occupancy  *demoBinary
-	contact    *demoBinary
+	contact    *demoContactSensor
 	button     *demoButton
 	purifier   *demoAirPurifier
 	garage     *demoGarage
 	colorLight *dimmer
 	fridge     *demoFridge
+	airQuality *demoAirQualitySensor
+	heater     *demoWaterHeater
+	meter      *demoMeter
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1510,12 +1525,15 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		lock:        newDemoLock("Front Door"),
 		humidity:    newDemoReading("Bathroom Humidity", contract.MeasurementHumidity, 48),
 		occupancy:   newDemoBinary("Hall Motion", contract.MeasurementOccupancy, false),
-		contact:     newDemoBinary("Window Contact", contract.MeasurementContact, true),
+		contact:     newDemoContactSensor("Window Contact"),
 		button:      newDemoButton("Wall Button"),
 		purifier:    newDemoAirPurifier("Air Purifier"),
 		garage:      newDemoGarage("Garage Door"),
 		colorLight:  newDemoColorLight("Color Bulb"),
 		fridge:      newDemoFridge("Kitchen Fridge"),
+		airQuality:  newDemoAirQualitySensor("Air Quality Sensor"),
+		heater:      newDemoWaterHeater("Water Heater"),
+		meter:       newDemoMeter("Electricity Meter"),
 		assembler:   asm,
 	}, nil
 }
@@ -1647,11 +1665,14 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("lock", f.lock.name, f.lock.MatterDeviceType(), f.lock),
 		sensor("humidity", f.humidity.name, f.humidity),
 		sensor("occupancy", f.occupancy.name, f.occupancy),
-		sensor("contact", f.contact.name, f.contact),
+		spec("contact", f.contact.name, f.contact.MatterDeviceType(), f.contact),
 		sensor("button", f.button.name, f.button),
 		spec("purifier", f.purifier.name, f.purifier.MatterDeviceType(), f.purifier),
 		spec("garage", f.garage.name, f.garage.MatterDeviceType(), f.garage),
 		spec("colorlight", f.colorLight.name, f.colorLight.MatterDeviceType(), f.colorLight),
 		fridge,
+		spec("airquality", f.airQuality.name, f.airQuality.MatterDeviceType(), f.airQuality),
+		spec("waterheater", f.heater.name, f.heater.MatterDeviceType(), f.heater),
+		spec("meter", f.meter.name, f.meter.MatterDeviceType(), f.meter),
 	}
 }

@@ -197,13 +197,18 @@ WNCV.S.M.Maintenance=0
 
 # --- Client roles -------------------------------------------------------------
 # The daemon is a server for every cluster it mounts and a client of none: it
-# never sends OnOff, ColorControl or WindowCovering commands. CHIP's
-# ci-pics-values declares those clients for its sample apps, which would run
-# the DUT-as-client cases (Test_TC_*_Simulated) against a DUT that issues no
-# command.
+# never sends OnOff, ColorControl, WindowCovering, SoftwareDiagnostics or
+# EthernetNetworkDiagnostics commands. CHIP's ci-pics-values declares those
+# clients for its sample apps (DGSW.C=1 at :49, DGETH.C=1 at :1144 at the
+# harness pin), which would run the DUT-as-client cases
+# (Test_TC_*_Simulated; TC-DGSW-3.2 and TC-DGETH-3.2 wait for the DUT to send
+# ResetWatermarks / ResetCounts, PICS DGSW.C / DGETH.C) against a DUT that
+# issues no command.
 OO.C=0
 CC.C=0
 WNCV.C=0
+DGSW.C=0
+DGETH.C=0
 
 # --- Door lock writable attributes (cluster/lock) ---------------------------
 # The lock serves LockState, LockType, ActuatorEnabled, OperatingMode

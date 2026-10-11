@@ -26,7 +26,9 @@ import (
 	"time"
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/cluster/boolcfg"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
+	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -92,6 +94,29 @@ func TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint(t *testing.
 			before:        uint8(120),
 			after:         uint8(200),
 			change:        func(*testing.T) { f.speaker.reportFromDevice(200) },
+		},
+		{
+			name:          "contact sensor reports the window it saw open",
+			deviceAddress: "demo-contact-1",
+			clusterID:     measurement.ClusterBooleanState,
+			attributeID:   0x0000, // StateValue
+			before:        true,
+			after:         false,
+			change:        func(*testing.T) { f.contact.reportFromDevice(false) },
+		},
+		{
+			name:          "contact sensor raises its visual alarm",
+			deviceAddress: "demo-contact-1",
+			clusterID:     boolcfg.ClusterID,
+			attributeID:   0x0003, // AlarmsActive
+			before:        uint8(0),
+			after:         uint8(boolcfg.AlarmVisual),
+			change: func(t *testing.T) {
+				t.Helper()
+				if err := f.contact.config.SetAlarmsActive(boolcfg.AlarmVisual); err != nil {
+					t.Fatalf("SetAlarmsActive: %v", err)
+				}
+			},
 		},
 	}
 
@@ -303,5 +328,33 @@ func TestSmokeAlarmHasItsPowerSourcePart(t *testing.T) {
 		if v.Endpoint == alarm.ID || v.Endpoint == alarm.PartIDs[0] {
 			t.Errorf("device type violation: %s", v)
 		}
+	}
+}
+
+// TestAirQualitySensorMountsEveryConcentrationCluster: the AirQualitySensor
+// endpoint carries AirQuality, which the device type mandates, and the ten
+// concentration clusters it lists as optional, each exactly once.
+func TestAirQualitySensorMountsEveryConcentrationCluster(t *testing.T) {
+	_, br := startFleetBridge(t)
+	ep := mountedEndpoint(t, br, "demo-airquality-1")
+	want := []uint32{
+		measurement.ClusterAirQuality,
+		measurement.ClusterCO2Concentration, measurement.ClusterCOConcentration,
+		measurement.ClusterNO2Concentration, measurement.ClusterOzoneConcentration,
+		measurement.ClusterPM25Concentration, measurement.ClusterFormaldehydeConcentration,
+		measurement.ClusterPM1Concentration, measurement.ClusterPM10Concentration,
+		measurement.ClusterTVOCConcentration, measurement.ClusterRadonConcentration,
+	}
+	seen := map[uint32]int{}
+	for _, srv := range endpoint.ClusterServers(ep) {
+		seen[srv.MatterClusterID()]++
+	}
+	for _, id := range want {
+		if seen[id] != 1 {
+			t.Errorf("cluster 0x%04X mounted %d times, want once", id, seen[id])
+		}
+	}
+	if ep.DeviceType != 0x002C {
+		t.Errorf("device type 0x%04X, want AirQualitySensor", ep.DeviceType)
 	}
 }

@@ -68,6 +68,7 @@ func init() {
 		contract.MeasurementPM10,
 		func(f contract.FloatMeasurementSource) contract.ClusterServer { return NewPM10ConcentrationServer(f) },
 	))
+	concentrationMaterializers() // the seven further concentration kinds (concentration.go)
 
 	booleanState := boolServer(
 		func(b contract.BoolMeasurementSource) contract.ClusterServer { return NewBooleanStateServer(b) },

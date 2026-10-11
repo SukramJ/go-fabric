@@ -289,6 +289,13 @@ func TestParityMatterJS_ConcentrationClustersShareRevision(t *testing.T) {
 		{0x040D, "CarbonDioxideConcentrationMeasurement"},
 		{0x042A, "Pm25ConcentrationMeasurement"},
 		{0x042D, "Pm10ConcentrationMeasurement"},
+		{0x040C, "CarbonMonoxideConcentrationMeasurement"},
+		{0x0413, "NitrogenDioxideConcentrationMeasurement"},
+		{0x0415, "OzoneConcentrationMeasurement"},
+		{0x042B, "FormaldehydeConcentrationMeasurement"},
+		{0x042C, "Pm1ConcentrationMeasurement"},
+		{0x042E, "TotalVolatileOrganicCompoundsConcentrationMeasurement"},
+		{0x042F, "RadonConcentrationMeasurement"},
 	}
 	for _, c := range concentrationIDs {
 		js, ok := clusterByID(schema, c.id)

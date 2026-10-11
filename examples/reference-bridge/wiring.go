@@ -21,6 +21,7 @@ import (
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/diagevent"
@@ -247,7 +248,13 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	// Update Requestor is not mounted either: the module has no BDX and no
 	// update agent, so the node cannot take an update.
 
-	servers := []contract.ClusterServer{
+	// FixedLabel, UserLabel, the three localization clusters, Software- and
+	// EthernetNetworkDiagnostics (RootNode: all optional).
+	optional, err := buildRootLabelsAndDiagnostics(context.Background(), st)
+	if err != nil {
+		return nil, refs, fmt.Errorf("root labels and diagnostics: %w", err)
+	}
+	servers := slices.Concat([]contract.ClusterServer{
 		basicInfo,
 		accessControl,
 		generalCom,
@@ -260,7 +267,7 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 		groupKeys,
 		groupcast,
 		descriptor,
-	}
+	}, optional)
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
 	return servers, refs, nil
 }
@@ -315,7 +322,13 @@ func endpointIDs(br *matterbridge.Bridge, keep func(*endpoint.Endpoint) bool) []
 // controller walks RootNode.PartsList to the Aggregator and the Aggregator's
 // PartsList to the bridged devices. Collapsing the two onto endpoint 0
 // leaves a bridge that pairs and then shows no accessories.
-func buildAggregatorClusters() ([]contract.ClusterServer, error) {
+//
+// FixedLabel and UserLabel are mounted here as on the root: the CHIP
+// FLABEL and ULABEL cases address endpoint 1 (TC_FLABEL_2_1.py's
+// "--endpoint 1", Test_TC_ULABEL_2_*.yaml's "endpoint: 1"), where CHIP's
+// all-clusters app serves both; the Aggregator's UserLabel list is
+// persisted under its own key.
+func buildAggregatorClusters(ctx context.Context, st *store.Store) ([]contract.ClusterServer, error) {
 	descriptor, err := mattercore.NewDescriptor(
 		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(deviceTypeAggregator)}},
 		nil, nil, nil,
@@ -323,7 +336,13 @@ func buildAggregatorClusters() ([]contract.ClusterServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("aggregator descriptor: %w", err)
 	}
-	servers := []contract.ClusterServer{mattercore.NewIdentify(), descriptor}
+	fixedLabel, userLabel, err := buildLabels(ctx, st, aggregatorUserLabelsKey, []fixedlabeldef.LabelStruct{
+		{Label: "role", Value: "aggregator"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("aggregator labels: %w", err)
+	}
+	servers := []contract.ClusterServer{mattercore.NewIdentify(), descriptor, fixedLabel, userLabel}
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
 	return servers, nil
 }

@@ -18,6 +18,82 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- Reference daemon, for the certification harness: FixedLabel and UserLabel
+  on the Aggregator endpoint and FixedLabel on the first bridged light (the
+  CSA cases written against the CHIP all-clusters app address endpoint 1);
+  the BooleanStateConfiguration and MeterIdentification test event triggers
+  as chip's handlers define them; the demo meter starts with MeterType null,
+  as chip's `meter-identification-server.cpp` does. DGSW/3.2 and DGETH/3.2
+  "Simulated" are declared not applicable (`DGSW.C=0`, `DGETH.C=0`: the
+  daemon is no client).
+- `cluster/measurement` serves seven more concentration clusters on the
+  existing kind pattern, each with its `contract.MeasurementClass`
+  (`MeasurementCO`, `MeasurementNO2`, `MeasurementOzone`,
+  `MeasurementFormaldehyde`, `MeasurementPM1`, `MeasurementTVOC`,
+  `MeasurementRadon`; AirQualitySensor 0x002C) and constructor
+  (`NewCOConcentrationServer`, …, `NewRadonConcentrationServer`). Model
+  units: ppm for CO, NO2, ozone, formaldehyde and TVOC, µg/m³ for PM1,
+  Bq/m³ for radon. The materialiser mounts AirQuality next to each, which
+  reads Unknown for these seven (no grading guideline).
+- `cluster/boolcfg`: a BooleanStateConfiguration (0x0080) server on the
+  generated definition — sensitivity level, visual / audible alarms with
+  EnableDisableAlarm and SuppressAlarm, sensor faults, the
+  AlarmsStateChanged and SensorFault events — with the command rules of
+  connectedhomeip's BooleanStateConfigurationCluster and a `Delegate` host
+  port.
+- The reference daemon has an AirQualitySensor carrying AirQuality and all
+  ten concentration clusters, and its contact sensor carries
+  BooleanStateConfiguration (SENSLVL, VIS, SPRS); the certification table
+  declares BOOLCFG and the concentration families for them.
+- `cluster/core` serves six more root (or any-endpoint) clusters, each on
+  its generated definition: `NewUserLabel` (LabelList longer than
+  `MaxLabels`, default 255, is RESOURCE_EXHAUSTED; `OnWrite` persists),
+  `NewLocalizationConfiguration`, `NewTimeFormatLocalization` (with
+  CalendarFormat) and `NewUnitLocalization` (with TemperatureUnit) —
+  each takes the host's detected values, defaults its supported list as
+  matter.js does and answers a written active value outside that list
+  CONSTRAINT_ERROR — plus `NewSoftwareDiagnostics` (host port
+  `HeapReporter`; WTRMRK and ResetWatermarks with a `WatermarkReporter`)
+  and `NewEthernetNetworkDiagnostics` (host port `EthernetReporter`;
+  PHYRate, FullDuplex, CarrierDetect null and TimeSinceReset 0 where the
+  host cannot tell; no PKTCNT / ERRCNT). `ErrLocalizationConfig`,
+  `ErrUserLabelConfig` and `ErrNilReporter` reject a configuration.
+- The bridge decodes a UserLabel LabelList write — whole list or
+  list-append entry — with the generated decoder; a label over "max 16"
+  is answered CONSTRAINT_ERROR without failing the rest of the request.
+- The reference daemon mounts FixedLabel (two labels), UserLabel
+  (persisted in the settings table), the three localization clusters
+  (en-US with de-DE, 24-hour, Gregorian, Celsius), SoftwareDiagnostics
+  (Go runtime heap) and EthernetNetworkDiagnostics on the root; the
+  chip-tool families FLABEL, ULABEL, LCFG, LTIME, LUNIT, DGSW and DGETH
+  are declared and run in the core group.
+- `cluster/energy` (new package), on generated definitions:
+  - `NewWaterHeaterManagement`: a WaterHeaterManagement (0x0094) server
+    with the EnergyManagement and TankPercent features, the host port
+    `Booster` (`Boost`, `CancelBoost`), `SetHeatDemand` (held inside
+    HeaterTypes), `SetTankPercentage`, `SetTankVolume`,
+    `SetEstimatedHeatRequired`, and `EndBoost` for a boost that ends on
+    its own. Boost answers INVALID_COMMAND to the target fields
+    connectedhomeip's server refuses; a successful Boost sets BoostState
+    Active and emits BoostStarted, CancelBoost and `EndBoost` set it
+    Inactive and emit BoostEnded, and a CancelBoost without a running
+    boost succeeds without an event, as connectedhomeip's water-heater app
+    and TC-EWATERHTR-2.2 expect.
+  - `NewEnergyPreference`: an EnergyPreference (0x009B) server with the
+    EnergyBalance and LowPowerModeSensitivity features; a write of
+    CurrentEnergyBalance or CurrentLowPowerModeSensitivity at or beyond
+    its list's length is CONSTRAINT_ERROR, an accepted one reaches the
+    optional `PreferenceChanger`.
+  - `NewMeterIdentification`: the MeterIdentification (0x0B06) server
+    without PowerThreshold.
+- Generated definitions under `cluster/spec/` for WaterHeaterManagement,
+  EnergyPreference and MeterIdentification.
+- The reference daemon bridges a WaterHeater (WaterHeaterManagement EM +
+  TP, WaterHeaterMode, a HEAT Thermostat) whose tank answers the
+  WaterHeaterManagement test event triggers as connectedhomeip's
+  water-heater app does, an ElectricalUtilityMeter with
+  MeterIdentification, and serves EnergyPreference (EnergyBalance) on its
+  thermostat. The chip-tool family table runs EWATERHTR, WHM and EPREF.
 - `cluster/modebase` serves six more ModeBase derivations, each on its
   generated definition: `NewOvenMode`,
   `NewRefrigeratorAndTemperatureControlledCabinetMode`,
@@ -162,6 +238,12 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- `contract.MeasurementClass` gains seven built-in classes after
+  `MeasurementFlow`. The built-in values keep their numbers; the classes
+  `RegisterMeasurementKind` hands out start seven higher, so a host that
+  persisted a registered class value must re-register rather than reuse it.
+- The reference daemon's contact sensor is assembled from a Source instead
+  of a Measurement (same StableKey, device type and BooleanState surface).
 - The bridge encodes the OperationalState, RvcOperationalState, ModeBase,
   SmokeCoAlarm, PumpConfigurationAndControl and ClosureControl values
   through the generated codecs (ADR 0013): the hand-written cases in

@@ -279,7 +279,7 @@ func run() error {
 		return nil
 	}
 
-	aggregatorServers, err := buildAggregatorClusters()
+	aggregatorServers, err := buildAggregatorClusters(ctx, credentials)
 	if err != nil {
 		return err
 	}

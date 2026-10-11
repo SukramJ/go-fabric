@@ -140,10 +140,20 @@ const (
 	dtGenericSwitch   = 0x000F
 	dtAirPurifier     = 0x002D
 	dtClosure         = 0x0230
+	// dtAirQualitySensor carries AirQuality and the ten concentration
+	// clusters (examples/reference-bridge/fleet_sensors.go).
+	dtAirQualitySensor = 0x002C
+	// dtElectricalUtilityMeter is the reference daemon's electricity meter
+	// (MeterIdentification, brief F).
+	dtElectricalUtilityMeter = 0x0511
 	// dtTempControlledCabinet is the reference fridge's cabinet part
 	// (examples/reference-bridge/fleet_appliances.go): TemperatureControl
 	// and RefrigeratorAndTemperatureControlledCabinetMode.
 	dtTempControlledCabinet = 0x0071
+	// dtWaterHeater is the reference water heater
+	// (examples/reference-bridge/fleet_energy.go): WaterHeaterManagement
+	// (EM, TP), WaterHeaterMode and a HEAT Thermostat.
+	dtWaterHeater = 0x050F
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -295,9 +305,40 @@ var chipFamilies = []family{
 	{name: "ICDM"},
 	{name: "SU"},
 	{name: "BIND"},
+	// The root's label, localization and diagnostics clusters (all
+	// optional on RootNode), mounted by buildRootLabelsAndDiagnostics in
+	// examples/reference-bridge/root_optional.go.
+	{name: "FLABEL"},
+	{name: "ULABEL"},
+	{name: "LCFG"},
+	{name: "LTIME"},
+	{name: "LUNIT"},
+	{name: "DGSW"},
+	{name: "DGETH"},
 	// --- application clusters ----------------------------------------------
 	{name: "ACFREMON", deviceType: dtAirPurifier},
 	{name: "BOOL", deviceType: dtContactSensor},
+	{name: "BOOLCFG", deviceType: dtContactSensor},
+	// The concentration families, one case each (TC-<FAM>-2.1), all on
+	// the reference AirQualitySensor. CDOCONC is CarbonDioxide and
+	// CMOCONC CarbonMonoxide (connectedhomeip
+	// src/app/tests/suites/certification/Test_TC_CDOCONC_2_1.yaml:29,
+	// Test_TC_CMOCONC_2_1.yaml:22).
+	{name: "CDOCONC", deviceType: dtAirQualitySensor},
+	{name: "CMOCONC", deviceType: dtAirQualitySensor},
+	// AIRQUAL, PMICONC (PM2.5) and PMKCONC (PM10): the AirQuality, Pm25 and
+	// Pm10 clusters the air quality sensor also serves (connectedhomeip
+	// Test_TC_AIRQUAL_2_1.yaml, Test_TC_PMICONC_2_1.yaml,
+	// Test_TC_PMKCONC_2_1.yaml).
+	{name: "AIRQUAL", deviceType: dtAirQualitySensor},
+	{name: "PMICONC", deviceType: dtAirQualitySensor},
+	{name: "PMKCONC", deviceType: dtAirQualitySensor},
+	{name: "FLDCONC", deviceType: dtAirQualitySensor},
+	{name: "NDOCONC", deviceType: dtAirQualitySensor},
+	{name: "OZCONC", deviceType: dtAirQualitySensor},
+	{name: "PMHCONC", deviceType: dtAirQualitySensor},
+	{name: "RNCONC", deviceType: dtAirQualitySensor},
+	{name: "TVOCCONC", deviceType: dtAirQualitySensor},
 	{
 		name: "CLCTRL", deviceType: dtClosure,
 		// TC_CLCTRL_5_1 gates on "CLCTRL.S.C00", a code no PICS defines:
@@ -334,6 +375,16 @@ var chipFamilies = []family{
 			"2.6": {classHarness, "TC-DRLK-2.6 gates every step on the Year Day Schedule feature (PICS DRLK.S.F0a=0 here) except its final \"Cleanup the created user\" ClearUser, which has no PICS gate and fails on a lock without the User feature (DRLK.S.F08=0)", false},
 		},
 	},
+	// EPREF runs on the thermostat, which serves EnergyPreference (BALA).
+	{name: "EPREF", deviceType: dtThermostat},
+	// EWATERHTR 2.2 and 2.3 drive the tank through the
+	// WaterHeaterManagement test event triggers (0x0094...), which the
+	// daemon's tank model answers as connectedhomeip's water-heater app
+	// does (examples/reference-bridge/fleet_energy.go).
+	{name: "EWATERHTR", deviceType: dtWaterHeater},
+	// MTRID: MeterIdentification on the electricity meter (connectedhomeip
+	// TC_MTRID_2_1.py, TC_MTRID_3_1.py).
+	{name: "MTRID", deviceType: dtElectricalUtilityMeter},
 	{name: "FAN", deviceType: dtFan},
 	{name: "HEPAFREMON", deviceType: dtAirPurifier},
 	{
@@ -455,5 +506,6 @@ var chipFamilies = []family{
 			"3.3": {classNotSupported, "TC-VALCC-3.3 runs only with DefaultOpenLevel (PICS VALCC.S.A0006=0)", true},
 		},
 	},
+	{name: "WHM", deviceType: dtWaterHeater},
 	{name: "WNCV", deviceType: dtWindowCovering},
 }
