@@ -1269,6 +1269,11 @@
       "steps": 23,
       "stepsSkipped": 6
     },
+    "OVENOPSTATE/2.2": {
+      "tests": 1,
+      "steps": 17,
+      "stepsSkipped": 6
+    },
     "OVENOPSTATE/2.4": {
       "tests": 1,
       "steps": 4,
