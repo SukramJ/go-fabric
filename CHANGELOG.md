@@ -18,6 +18,12 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `thermo.ThermostatUIConfig.UnitLocalization` (optional `*spec.Server`):
+  with no configured TemperatureDisplayMode, the same endpoint's
+  UnitLocalization decides it at construction — Fahrenheit when its
+  TemperatureUnit is Fahrenheit, else Celsius — as matter.js's
+  ThermostatUserInterfaceConfigurationServer initialize does.
+
 - Reference daemon, for the certification harness: FixedLabel and UserLabel
   on the Aggregator endpoint and FixedLabel on the first bridged light (the
   CSA cases written against the CHIP all-clusters app address endpoint 1);

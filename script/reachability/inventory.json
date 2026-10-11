@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4206,
+  "entry_points": 4207,
   "entry_packages": [
     ".",
     "bootid",
@@ -12397,14 +12397,14 @@
       "identifier": "KeypadLockout",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/thermo",
       "identifier": "ScheduleProgrammingVisibility",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 45
+      "line": 47
     },
     {
       "package": "cluster/thermo",
@@ -12418,7 +12418,7 @@
       "identifier": "TemperatureDisplayMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 40
+      "line": 42
     },
     {
       "package": "cluster/valve",
