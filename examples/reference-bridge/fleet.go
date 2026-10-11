@@ -1496,6 +1496,12 @@ type fleet struct {
 	evse       *demoEvse
 	vacuumArea *vacuumArea
 	panel      *demoPanel
+	soil       *demoSoilSensor
+	// actions is the Aggregator's Actions host (fleet_node.go).
+	actions *demoActions
+	// endpointOf resolves a StableKey to its live endpoint id
+	// (attachNodeProviders); nil until the bridge runs.
+	endpointOf func(key endpoint.StringKey) (uint16, bool)
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1515,8 +1521,9 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		return nil, fmt.Errorf("endpoint assembler: %w", err)
 	}
 	vacuum := newDemoVacuum("Robot Vacuum")
+	light := newDemoLight("Desk Lamp")
 	return &fleet{
-		light:       newDemoLight("Desk Lamp"),
+		light:       light,
 		thermometer: newDemoThermometer(21.5),
 		valve:       newDemoValve("Garden Tap", 600),
 		selector:    newDemoSelector("Coffee Machine"),
@@ -1549,6 +1556,8 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 		evse:        newDemoEvse("EV Charger"),
 		vacuumArea:  newVacuumArea(vacuum),
 		panel:       newDemoPanel("Patio Door Panel"),
+		soil:        newDemoSoilSensor("Garden Soil"),
+		actions:     newDemoActions(light),
 		assembler:   asm,
 	}, nil
 }
@@ -1705,5 +1714,6 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		spec("dryer", f.dryer.name, f.dryer.MatterDeviceType(), f.dryer),
 		charger,
 		spec("panel", f.panel.name, f.panel.MatterDeviceType(), f.panel),
+		sensor("soil", f.soil.name, f.soil),
 	}
 }

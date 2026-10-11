@@ -279,7 +279,11 @@ func run() error {
 		return nil
 	}
 
-	aggregatorServers, err := buildAggregatorClusters(ctx, credentials)
+	actions, err := mattercore.NewActions(mattercore.ActionsConfig{Host: devices.actions})
+	if err != nil {
+		return fmt.Errorf("aggregator actions: %w", err)
+	}
+	aggregatorServers, err := buildAggregatorClusters(ctx, credentials, actions)
 	if err != nil {
 		return err
 	}
@@ -418,6 +422,9 @@ func run() error {
 	if err := attachPartsListProviders(br); err != nil {
 		return err
 	}
+	// PowerSourceConfiguration and the demo actions name endpoints by
+	// their StableKey, resolved through the live topology.
+	attachNodeProviders(br, refs.powerSources, devices)
 
 	// Fabrics installed in a previous run: rebuild each one's CASE identity
 	// and re-publish its operational record, so a controller that paired

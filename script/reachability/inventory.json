@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4224,
+  "entry_points": 4227,
   "entry_packages": [
     ".",
     "bootid",
@@ -162,9 +162,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9491,
+    "total_exported": 9494,
     "reachable": 6640,
-    "whitelisted": 2846,
+    "whitelisted": 2849,
     "unreachable": 5
   },
   "by_package": [
@@ -14029,6 +14029,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestDemoActionsWithoutTopology",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_node_test.go",
+      "line": 122
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
@@ -14089,6 +14096,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/kitchen_test.go",
       "line": 67
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestNodeClustersOnRootAndAggregator",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_node_test.go",
+      "line": 63
     },
     {
       "package": "examples/reference-bridge",
@@ -14194,6 +14208,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/control_test.go",
       "line": 84
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestSoilSensorEndpoint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_node_test.go",
+      "line": 26
     },
     {
       "package": "examples/reference-bridge",
