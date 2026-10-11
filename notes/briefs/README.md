@@ -33,3 +33,18 @@ Learned in the first wave (2026-10-10):
   worktrees; the owner rebases them in sequence, regenerates the
   reachability inventory instead of merging it, runs `make ci` once and
   opens the PR with auto-merge.
+
+Learned in the third wave (2026-10-11):
+
+- The local `../connectedhomeip` checkout may sit at another commit than the
+  harness pin (6170af84). Read chip sources with
+  `git -C ../connectedhomeip show 6170af8461b10b1766044122ac83332c6d00ab20:<path>`
+  and cite the pin's line numbers.
+- `make reachability` after every commit on the branch, not only at the
+  integration: two fix-up commits without it cost a CI round.
+- A CSA case that hard-codes an endpoint (TC-EEVSE-2.2 step 9) is patched
+  with a harness case edit (`edits` in the family row), which works for
+  Python cases as well as YAML; the reason cites the case line.
+- The app-pipe handlers must match the all-clusters app per *device*
+  (`OperationalStateChange` routes "Generic" and "Oven" differently).
+
