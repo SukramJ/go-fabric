@@ -46,7 +46,7 @@ func TestMRPRTTMeasuresFirstTryOnly(t *testing.T) {
 		tr.Track(2, 7, 9, []byte{0x02}, dest, now)
 		// Drive the retransmit the way the scheduler does, so `retries` is
 		// incremented by production code rather than by the test reaching in.
-		if sent := tr.Tick(now.Add(time.Hour), func(_ *net.UDPAddr, _ []byte) error { return nil }); len(sent) == 0 {
+		if sent := tr.Tick(now.Add(time.Hour), func(_ net.Addr, _ []byte) error { return nil }); len(sent) == 0 {
 			t.Fatal("Tick issued no retransmit, so this case never reaches the state it means to test")
 		}
 

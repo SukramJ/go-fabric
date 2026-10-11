@@ -146,7 +146,7 @@ func (b *Bridge) releaseSubscriptionRouting(subID uint32) {
 // travel; SessionID==0 means PASE (unencrypted), >0 means CASE
 // (AES-CCM-sealed via [channel.Session]).
 type subTarget struct {
-	src                 *net.UDPAddr
+	src                 net.Addr
 	hasPeerSourceNodeID bool
 	peerSourceNodeID    uint64
 	exchangeID          uint16
@@ -255,7 +255,7 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 		return
 	}
 	target, ok := raw.(subTarget)
-	if !ok || target.src == nil {
+	if !ok || isNilRoute(target.src) {
 		return
 	}
 
@@ -412,7 +412,7 @@ func (b *Bridge) reportSubscription(ctx context.Context, sub *subscription.Subsc
 		return
 	}
 	target, ok := raw.(subTarget)
-	if !ok || target.src == nil {
+	if !ok || isNilRoute(target.src) {
 		return
 	}
 
@@ -641,8 +641,8 @@ func reportCounterKey(sessionID uint16, counter uint32) uint64 {
 // so reportSubscription can find it later. Overwrites any prior entry
 // with the same subID — recycled IDs are rare in practice but the
 // engine guarantees ordering of Subscribe-then-tick on the same ID.
-func (b *Bridge) captureSubTarget(subID uint32, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, fabricFiltered bool) {
-	if subID == 0 || src == nil || requestHdr == nil {
+func (b *Bridge) captureSubTarget(subID uint32, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, fabricFiltered bool) {
+	if subID == 0 || isNilRoute(src) || requestHdr == nil {
 		return
 	}
 	// Resolve the requesting fabric + subject the same way the initial
@@ -825,9 +825,19 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	sessions := b.sessions
 	tracker := b.outboundReliable
 	b.mu.RUnlock()
-	if listener == nil {
+	// Route to the address the peer most recently used on this session,
+	// not the one frozen into the target at Subscribe time: a controller
+	// whose source address rotates mid-session keeps authenticating from
+	// the new one, and matter.js adopts it ("the new message wins",
+	// ExchangeManager.ts:400-405) before routing reports through the
+	// session's current channel (ServerSubscription.ts:823).
+	dest := b.currentPeerAddr(target.sessionID, target.src)
+	if listener == nil && !isConnRoute(dest) {
 		return 0, ErrUnsolicitedListenerMissing
 	}
+	// Over a reliable connection MRP is off: no R flag, no piggybacked
+	// acknowledgement (matter.js MessageExchange.ts:660, :680-686).
+	usesMRP := routeUsesMRP(dest)
 
 	// sendUnsolicitedIM is the low-level primitive that ships an IM
 	// datagram on whichever exchange the caller has prepared in `target`.
@@ -845,9 +855,9 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 		// NeedsAck only when the bridge can track the obligation;
 		// without a tracker the peer would block on a reply that
 		// nothing rebroadcasts on loss.
-		NeedsAck: tracker != nil,
+		NeedsAck: tracker != nil && usesMRP,
 	}
-	if target.hasAck {
+	if target.hasAck && usesMRP {
 		respProto.HasAck = true
 		respProto.AckCounter = target.ackCounter
 	}
@@ -891,20 +901,13 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 		datagram = append(respHdr.Marshal(), enc.Ciphertext...)
 	}
 
-	// Route to the address the peer most recently used on this session,
-	// not the one frozen into the target at Subscribe time: a controller
-	// whose source address rotates mid-session keeps authenticating from
-	// the new one, and matter.js adopts it ("the new message wins",
-	// ExchangeManager.ts:400-405) before routing reports through the
-	// session's current channel (ServerSubscription.ts:823).
-	dest := b.currentPeerAddr(target.sessionID, target.src)
 	// Tracked before it is sent, so an ack handled before Send returns is
 	// not lost (bridge/reply.go sendReplyReliable).
 	track := tracker != nil && respProto.NeedsAck
 	if track {
 		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, time.Now())
 	}
-	if err := listener.Send(dest, datagram); err != nil {
+	if err := sendVia(listener, dest, datagram); err != nil {
 		if track {
 			tracker.Untrack(target.sessionID, counter)
 		}
@@ -921,12 +924,12 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 // has no authenticated peer, and a test may plant a target without any
 // inbound traffic). The record is written by the receive pipeline for
 // every datagram that decrypts under the session.
-func (b *Bridge) currentPeerAddr(sessionID uint16, fallback *net.UDPAddr) *net.UDPAddr {
+func (b *Bridge) currentPeerAddr(sessionID uint16, fallback net.Addr) net.Addr {
 	if sessionID == 0 {
 		return fallback
 	}
 	if raw, ok := b.sessionPeerAddrs.Load(sessionID); ok {
-		if addr, ok := raw.(*net.UDPAddr); ok && addr != nil {
+		if addr, ok := raw.(net.Addr); ok && !isNilRoute(addr) {
 			return addr
 		}
 	}
@@ -957,7 +960,7 @@ func (b *Bridge) abandonPrimingSubscription(subID uint32) {
 
 func (b *Bridge) handleSubscribeRequest(
 	ctx context.Context,
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	proto message.ProtocolHeader,
 	req im.SubscribeRequest,
@@ -1055,14 +1058,14 @@ func (b *Bridge) handleSubscribeRequest(
 // StatusResponse(InvalidAction) for a Subscribe that cannot be
 // established (illegal paths, no paths, or zero matching paths) and
 // discharges the owed MRP ack. stage tags the debug log line.
-func (b *Bridge) rejectSubscribeInvalidAction(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string) error {
+func (b *Bridge) rejectSubscribeInvalidAction(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, stage string) error {
 	return b.rejectSubscribeStatus(src, requestHdr, proto, stage, im.StatusInvalidAction)
 }
 
 // rejectSubscribeStatus ships a top-level StatusResponse carrying status
 // for a Subscribe that cannot be established and discharges the owed MRP
 // ack. stage tags the debug log line.
-func (b *Bridge) rejectSubscribeStatus(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
+func (b *Bridge) rejectSubscribeStatus(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
 	body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
 	if err != nil {
 		debugReplyError(b.logger, "encode_subscribe_reject_"+stage, src, err)

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4281,
+  "entry_points": 4288,
   "entry_packages": [
     ".",
     "bootid",
@@ -168,9 +168,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9803,
-    "reachable": 6839,
-    "whitelisted": 2959,
+    "total_exported": 9813,
+    "reachable": 6842,
+    "whitelisted": 2966,
     "unreachable": 5
   },
   "by_package": [
@@ -648,6 +648,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_acl_test.go",
       "line": 85
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBindSessionRouteNeverSwitchesTransport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 319
     },
     {
       "package": "bridge",
@@ -4144,6 +4151,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestReceiveOverReliableDropsUnsecuredAndGroup",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 296
+    },
+    {
+      "package": "bridge",
       "identifier": "TestRegisterSubscription_KeepSubscriptionsTrue_BothSurvive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscribe_dispatch_test.go",
@@ -4449,6 +4463,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fields_reader_test.go",
       "line": 393
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestRouteHelpers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 391
     },
     {
       "package": "bridge",
@@ -4851,6 +4872,27 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestTCPConnectionDropEvictsBoundSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 218
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestTCPListenerSharesUDPPortAndAdvertisesT",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 254
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestTCPRequestRepliedOnSameConnWithoutMRP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 187
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTickOutboundReliable_NilListener",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
@@ -4918,6 +4960,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/decode_error_reply_test.go",
       "line": 21
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestUnsolicitedReportOverTCPHasNoMRP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 366
     },
     {
       "package": "bridge",

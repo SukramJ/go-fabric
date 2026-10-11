@@ -282,7 +282,7 @@ func (b *Bridge) AttachAckHandler(h AckHandler) {
 // The router is logged at debug for happy paths and warn for handler
 // errors so operators can tail the bridge during commissioner
 // pairing without grepping noise.
-func (b *Bridge) dispatchSecureChannel(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
+func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
 	// Per-exchange owe-tracker discharge: when an inbound datagram
 	// piggybacks an ACK we use the exchange ID to clear any pending
 	// owe — the legacy AckHandler is keyed on exchange, distinct
@@ -305,8 +305,8 @@ func (b *Bridge) dispatchSecureChannel(src *net.UDPAddr, requestHdr *message.Hea
 	// matter.js keeps the association on the session itself via its
 	// MessageChannel (packages/protocol/src/session/Session.ts,
 	// `get channel()`).
-	if requestHdr.SessionID != 0 && src != nil {
-		b.sessionPeerAddrs.Store(requestHdr.SessionID, src)
+	if requestHdr.SessionID != 0 && !isNilRoute(src) {
+		b.bindSessionRoute(requestHdr.SessionID, src)
 	}
 
 	// The peer answering, as responder, a CASE handshake this node opened
@@ -434,7 +434,7 @@ func (b *Bridge) dispatchSecureChannel(src *net.UDPAddr, requestHdr *message.Hea
 // single-active-PASE claim, the handler resolution and the post-Pake3
 // release stay together while the switch keeps one entry per family.
 func (b *Bridge) dispatchPase(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	proto message.ProtocolHeader,
 	payload []byte,
@@ -685,7 +685,7 @@ func (b *Bridge) resetPaseFailures() {
 // table and the reply-path bookkeeping (errors, log scoping) lives
 // in one place per family.
 func (b *Bridge) handlePase(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	proto message.ProtocolHeader,
 	payload []byte,
@@ -783,7 +783,7 @@ func (b *Bridge) handlePase(
 }
 
 func (b *Bridge) handleCase(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	proto message.ProtocolHeader,
 	payload []byte,
@@ -983,7 +983,7 @@ func (b *Bridge) AttachSessionRegistry(reg SessionRegistry) {
 // pasePairingTimeout, every retry in that minute was dropped as busy, and
 // the twenty wrong-passcode attempts of TC-CADMIN-1.9 timed out instead
 // of failing. Returns whether the report belonged to the PASE handshake.
-func (b *Bridge) abortPaseOnStatusReport(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) bool {
+func (b *Bridge) abortPaseOnStatusReport(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) bool {
 	if requestHdr.SessionID != 0 {
 		return false
 	}
@@ -1035,7 +1035,7 @@ func decodeStatusReport(payload []byte) (generalCode uint16, protocolID uint32, 
 // reports log + close the exchange, CloseSession resolves the session
 // and calls session.handlePeerClose (SecureChannelProtocol.ts:81-82
 // "Closed by peer").
-func (b *Bridge) handleSecureChannelStatusReport(src *net.UDPAddr, requestHdr *message.Header, payload []byte) error {
+func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *message.Header, payload []byte) error {
 	generalCode, protocolID, protocolCode, ok := decodeStatusReport(payload)
 	isClose := ok &&
 		generalCode == mrp.SCStatusGeneralSuccess &&
@@ -1099,21 +1099,21 @@ func (b *Bridge) handleSecureChannelStatusReport(src *net.UDPAddr, requestHdr *m
 // Returns nil when the peer address was never observed; the caller
 // skips the notification (best-effort, matching the try/catch around
 // matter.js ExchangeManager.ts:658-666 #sendCloseSession).
-func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) *net.UDPAddr {
+func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) net.Addr {
 	if raw, ok := b.sessionPeerAddrs.Load(sessionID); ok {
-		if addr, ok := raw.(*net.UDPAddr); ok && addr != nil {
+		if addr, ok := raw.(net.Addr); ok && !isNilRoute(addr) {
 			return addr
 		}
 	}
-	var addr *net.UDPAddr
+	var addr net.Addr
 	b.routing.subTargets.Range(func(_, v any) bool {
-		if t, ok := v.(subTarget); ok && t.sessionID == sessionID && t.src != nil {
+		if t, ok := v.(subTarget); ok && t.sessionID == sessionID && !isNilRoute(t.src) {
 			addr = t.src
 			return false
 		}
 		return true
 	})
-	if addr != nil {
+	if !isNilRoute(addr) {
 		return addr
 	}
 	b.routing.exchangeSrcs.Range(func(k, v any) bool {
@@ -1121,7 +1121,7 @@ func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) *net.UDPAddr {
 		if !ok || key.SessionID != sessionID {
 			return true
 		}
-		if t, ok := v.(exchangeReplyTarget); ok && t.src != nil {
+		if t, ok := v.(exchangeReplyTarget); ok && !isNilRoute(t.src) {
 			addr = t.src
 			return false
 		}
@@ -1157,11 +1157,14 @@ func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session)
 	b.mu.RLock()
 	listener := b.listener
 	b.mu.RUnlock()
-	if listener == nil || sess == nil {
+	if sess == nil {
 		return
 	}
 	dst := b.resolveSessionPeerAddr(sessionID)
-	if dst == nil {
+	if listener == nil && !isConnRoute(dst) {
+		return
+	}
+	if isNilRoute(dst) {
 		b.logger.Debug("matter.tx.sc.close_session.no_peer_addr",
 			slog.Int("session_id", int(sessionID)))
 		return
@@ -1197,7 +1200,7 @@ func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session)
 		return
 	}
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
-	if err := listener.Send(dst, datagram); err != nil {
+	if err := sendVia(listener, dst, datagram); err != nil {
 		b.logger.Debug("matter.tx.sc.close_session.send",
 			slog.Int("session_id", int(sessionID)),
 			slog.String("err", err.Error()))

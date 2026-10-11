@@ -88,7 +88,7 @@ func (b *Bridge) AttachSessionLookup(lookup SessionLookup) {
 // [Bridge.handleDatagram] so tests can drive it without spinning up
 // a real UDP listener. Returns the first error encountered for
 // observability; the UDP handler discards it after logging.
-func (b *Bridge) dispatch(ctx context.Context, buf []byte, src *net.UDPAddr) error {
+func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// A group message is authenticated under an operational group key,
 	// not a session: it takes its own path before any unicast handling
 	// (matter.js ExchangeManager #receiveMessage branches on the session
@@ -113,7 +113,10 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src *net.UDPAddr) err
 		// the way serialising unicast receive did (transport/udp Serve).
 		b.groupRx.Lock()
 		defer b.groupRx.Unlock()
-		return b.dispatchGroupMessage(ctx, buf, src)
+		// Group messages are multicast UDP only; receive drops one that
+		// arrived on a connection before it gets here.
+		udpSrc, _ := src.(*net.UDPAddr)
+		return b.dispatchGroupMessage(ctx, buf, udpSrc)
 	}
 	// Privacy unmask: when Security Flags carries the P bit, the
 	// header bytes from offset 4 onwards (MessageCounter + optional
@@ -157,8 +160,10 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src *net.UDPAddr) err
 	// farewell route on it. matter.js adopts the newest inbound address
 	// on the session's channel — "the new message wins"
 	// (packages/protocol/src/protocol/ExchangeManager.ts:400-405).
-	if hdr.SessionID != 0 && src != nil {
-		b.sessionPeerAddrs.Store(hdr.SessionID, src)
+	//
+	// A session is not moved between transports (bindSessionRoute).
+	if hdr.SessionID != 0 && !isNilRoute(src) {
+		b.bindSessionRoute(hdr.SessionID, src)
 	}
 	if len(plain) == 0 {
 		// No body after decrypt — every well-formed datagram carries
@@ -410,7 +415,7 @@ func (b *Bridge) notifySessionActivity(sessionID uint16, rx bool) {
 //     deadline is stamped into `exchangeRouting.timedDeadlines` and the
 //     matching follow-up Write/Invoke is gated against it via
 //     `Bridge.checkTimedGate` per Matter §8.7.
-func (b *Bridge) handleIMOpcode(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
+func (b *Bridge) handleIMOpcode(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
 	b.load.imReceived.Add(1)
 	switch classifyIMOpcode(proto.Opcode, requestHdr.SessionType) {
 	case imGateProceed:
@@ -615,7 +620,7 @@ func (b *Bridge) NotifyDeviceReachable(scope, deviceAddress string, reachable bo
 // suppressed Write or Invoke — timed mismatch or timeout, a chunked or
 // batch InvalidAction, a decode failure — is suppressed, as the CHIP SDK
 // 1.6.1 does. Read, Subscribe and Timed requests have no such field.
-func (b *Bridge) replyStatusUnlessSuppressed(suppress bool, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
+func (b *Bridge) replyStatusUnlessSuppressed(suppress bool, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
 	if suppress {
 		b.suppressStatus(src, requestHdr, proto, stage, status)
 		return nil
@@ -625,7 +630,7 @@ func (b *Bridge) replyStatusUnlessSuppressed(suppress bool, src *net.UDPAddr, re
 
 // suppressStatus ends a suppressed request's transaction without a
 // StatusResponse, discharging the owed acknowledgement.
-func (b *Bridge) suppressStatus(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) {
+func (b *Bridge) suppressStatus(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) {
 	b.dischargeOwedAck(requestHdr.SessionID, proto.ExchangeID, !proto.Initiator)
 	b.logger.Debug("matter.rx.im.status_suppressed",
 		slog.String("src", srcString(src)),
@@ -633,7 +638,7 @@ func (b *Bridge) suppressStatus(src *net.UDPAddr, requestHdr *message.Header, pr
 		slog.String("status", status.String()))
 }
 
-func (b *Bridge) replyTimedStatus(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
+func (b *Bridge) replyTimedStatus(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, stage string, status im.StatusCode) error {
 	body, err := EncodeStatusResponse(im.StatusResponse{Status: status})
 	if err != nil {
 		debugReplyError(b.logger, "encode_timed_"+stage, src, err)
@@ -680,8 +685,8 @@ func securityFlagsByte(hdr *message.Header) uint8 {
 
 // srcString defends against nil src — the udp.Handler signature
 // allows it on certain error paths.
-func srcString(src *net.UDPAddr) string {
-	if src == nil {
+func srcString(src net.Addr) string {
+	if isNilRoute(src) {
 		return "<nil>"
 	}
 	return src.String()
@@ -818,7 +823,7 @@ func wireCommissioned(servers []contract.ClusterServer, w *CommissioningWindow) 
 // StatusResponseError.of(error)?.code ?? Status.Failure for any error the
 // handling of a request throws. Found by the CHIP harness (TC-ACL-2.3 waited
 // ten seconds for a WriteResponse to a write it could not decode).
-func (b *Bridge) replyDecodeError(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, op string, decodeErr error) error {
+func (b *Bridge) replyDecodeError(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, op string, decodeErr error) error {
 	status := im.StatusFailure
 	var sce im.StatusCodeError
 	if errors.As(decodeErr, &sce) {
