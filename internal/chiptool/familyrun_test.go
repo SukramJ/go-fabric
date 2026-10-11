@@ -404,9 +404,8 @@ func prepareOta(ctx context.Context, t *testing.T, h *harness) *otaPlumbing {
 		ota.provider = strings.TrimSpace(out)
 	}
 	payload := filepath.Join(h.shared, "ota-payload.bin")
-	// The payload is opaque to the provider and the transfer; the image
-	// header names the identity and version the requestor checks.
-	if err := os.WriteFile(payload, []byte("go-fabric reference-bridge OTA test payload\n"), 0o644); err != nil { //nolint:gosec // read by the container
+	// Sized so a download is observable — see otaPayloadSize.
+	if err := os.WriteFile(payload, otaPayload(), 0o644); err != nil { //nolint:gosec // read by the container
 		t.Fatal(err)
 	}
 	ota.image = filepath.Join(h.shared, fmt.Sprintf("reference-bridge_v%d.ota", otaSoftwareVersion))

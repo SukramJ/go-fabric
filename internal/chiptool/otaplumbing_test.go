@@ -4,6 +4,7 @@
 package chiptool
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -119,6 +120,26 @@ func otaCaseTimeout(args []string, base time.Duration) time.Duration {
 		}
 	}
 	return base
+}
+
+// otaPayloadSize sizes the staged image so that a download is observable.
+// TC-SU-2.2 step 3 waits for UpdateState=Downloading on its subscription
+// and terminates the provider at that moment (TC_SU_2_2.py:146-156 and
+// :858-870 at the harness pin); with a 44-byte payload the BDX transfer
+// was one block, the requestor went Querying → Downloading → Applying →
+// Idle within 200 ms and the subscription reported only Idle (run
+// 38146455037, SU_2.2-daemon.log 14:34:08.017-.222). One MiB is 1024 BDX
+// blocks of 1024 bytes, each its own round trip, which keeps Downloading
+// visible for seconds and stays far inside TC-SU-2.4's 360 s download
+// budget (TC_SU_2_4.py:69).
+const otaPayloadSize = 1 << 20
+
+// otaPayload is the staged image's payload: opaque to the provider and the
+// transfer (the image header names the identity and version the requestor
+// checks), deterministic so a rebuilt image is byte-identical.
+func otaPayload() []byte {
+	marker := []byte("go-fabric reference-bridge OTA test payload\n")
+	return bytes.Repeat(marker, otaPayloadSize/len(marker)+1)[:otaPayloadSize]
 }
 
 // otaProviderKVS is the provider's persistent store every SU case names
@@ -261,6 +282,9 @@ func TestOtaPlumbing(t *testing.T) {
 	if s := otaProviderLogsScript("TC_SU_2_2"); !strings.Contains(s, "/tmp/provider_*.log") ||
 		!strings.Contains(s, "/TC_SU_2_2/*/provider_logs/*.log") {
 		t.Errorf("otaProviderLogsScript = %q", s)
+	}
+	if got := len(otaPayload()); got != otaPayloadSize || got < 1<<20 {
+		t.Errorf("otaPayload() is %d bytes, want %d (at least a MiB so a download is observable)", got, otaPayloadSize)
 	}
 	cleanup := otaCleanupCommand()
 	if len(cleanup) != 3 || cleanup[0] != "sh" || cleanup[1] != "-c" ||
