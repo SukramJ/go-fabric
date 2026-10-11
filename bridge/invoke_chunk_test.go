@@ -27,12 +27,12 @@ func TestChunkInvokeResponseSplitsWhatDoesNotFit(t *testing.T) {
 			CommandRef: uint16(cmd), HasCommandRef: true,
 		}
 	}
-	small, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 10), entry(5, 10)}}, reportChunkPayloadBudget)
+	small, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 10), entry(5, 10)}}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil || len(small) != 1 {
 		t.Fatalf("small response: %d chunks, %v", len(small), err)
 	}
 
-	big, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 800), entry(5, 600)}}, reportChunkPayloadBudget)
+	big, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 800), entry(5, 600)}}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestChunkInvokeResponseSplitsWhatDoesNotFit(t *testing.T) {
 		}
 	}
 
-	huge, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 2000)}}, reportChunkPayloadBudget)
+	huge, err := chunkInvokeResponse(im.InvokeResponse{Responses: []im.InvokeResponseEntry{entry(4, 2000)}}, reportChunkPayloadBudget, reportChunkHardCap)
 	if err != nil || len(huge) != 1 {
 		t.Fatalf("oversized response: %d chunks, %v", len(huge), err)
 	}

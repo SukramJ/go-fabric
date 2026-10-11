@@ -47,7 +47,7 @@ var errChunkUnanswered = errors.New("receive: peer did not answer ReportData chu
 // retransmits its previous request indefinitely after pairing,
 // which Apple eventually surfaces as "device added" → immediate
 // disconnect.
-func (b *Bridge) absorbStatusResponse(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
+func (b *Bridge) absorbStatusResponse(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, payload []byte) error {
 	// Decode the carried status: the peer's answer is only a go-ahead
 	// when it is Success. matter.js reads it on every inbound
 	// StatusResponse (InteractionMessenger.ts:183-196
@@ -106,7 +106,7 @@ func (b *Bridge) absorbStatusResponse(src *net.UDPAddr, requestHdr *message.Head
 
 // rejectUnsupportedOpcode handles any opcode that is not a request opcode
 // and not StatusResponse. Returns ErrUnsupportedOpcode.
-func (b *Bridge) rejectUnsupportedOpcode(src *net.UDPAddr, proto message.ProtocolHeader) error {
+func (b *Bridge) rejectUnsupportedOpcode(src net.Addr, proto message.ProtocolHeader) error {
 	err := fmt.Errorf("%w: opcode=0x%02X", ErrUnsupportedOpcode, proto.Opcode)
 	b.logger.Debug("matter.rx.im.unsupported",
 		slog.String("src", srcString(src)),
@@ -119,7 +119,7 @@ func (b *Bridge) rejectUnsupportedOpcode(src *net.UDPAddr, proto message.Protoco
 // arrived over a Secure Group session, which is forbidden by Matter §8.5.7.
 // Sends StatusResponse(InvalidAction) and discharges the owed ACK.
 // The matter.js citation for the group-session rule is on classifyIMOpcode.
-func (b *Bridge) rejectGroupSession(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader) error {
+func (b *Bridge) rejectGroupSession(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader) error {
 	b.logger.Warn("matter.rx.im.group_reject",
 		slog.String("src", srcString(src)),
 		slog.Int("opcode", int(proto.Opcode)))
@@ -140,7 +140,7 @@ func (b *Bridge) rejectGroupSession(src *net.UDPAddr, requestHdr *message.Header
 // dispatcher nil-check are done by the caller (handleIMOpcode); this method
 // receives the already-decoded req and runs fabric-context stamping, event
 // merging, chunked report encoding, and the per-chunk IM:StatusResponse wait.
-func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.ReadRequest) error {
+func (b *Bridge) dispatchReadRequest(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.ReadRequest) error {
 	// Diagnostic: dump every requested attribute path so we can
 	// identify which spec-conformance probe Apple Home runs
 	// post-CommissioningComplete. The 27/28-byte read requests
@@ -225,7 +225,8 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 		b.logger.Debug("matter.tx.im.read_event_reports",
 			slog.Int("event_reports", len(report.EventReports)))
 	}
-	chunks, err := chunkReportData(report, reportChunkPayloadBudget)
+	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
+	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "chunk_report", src, err)
 		return err
@@ -302,7 +303,7 @@ func (b *Bridge) dispatchReadRequest(ctx context.Context, src *net.UDPAddr, requ
 // interaction — the caller returns the error and sends nothing more on
 // the exchange. op names the loop for the log line ("read" /
 // "subscribe").
-func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string, src *net.UDPAddr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
+func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string, src net.Addr, sessionID, exchangeID uint16, initiator bool, chunkIdx int, chunk im.ReportData) error {
 	timeout := b.chunkStatusResponseTimeout(sessionID)
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
@@ -332,7 +333,7 @@ func (b *Bridge) awaitChunkStatusResponse(waitCh <-chan im.StatusCode, op string
 
 // dispatchWriteRequest handles a decoded WriteRequest. The TLV decode and
 // dispatcher nil-check are done by the caller (handleIMOpcode).
-func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.WriteRequest) error {
+func (b *Bridge) dispatchWriteRequest(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.WriteRequest) error {
 	for _, w := range req.Writes {
 		b.logger.Debug("matter.rx.im.write_path",
 			slog.String("src", srcString(src)),
@@ -451,7 +452,7 @@ func (b *Bridge) dispatchWriteRequest(ctx context.Context, src *net.UDPAddr, req
 // schema.IsTimedInvoke) invoked outside a timed interaction answers
 // NEEDS_TIMED_INTERACTION for its own path in the InvokeResponse
 // (CommandInvokeResponse.ts:292-295), via [im.WithTimedInteraction].
-func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.InvokeRequest) error { //nolint:funlen // the invoke path's gates in their wire order, read top to bottom
+func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, dispatcher im.Dispatcher, req im.InvokeRequest) error { //nolint:funlen // the invoke path's gates in their wire order, read top to bottom
 	if status, gated := b.checkTimedGate(req.TimedRequest, requestHdr.SessionID, proto.ExchangeID); gated {
 		return b.replyStatusUnlessSuppressed(req.SuppressResponse, src, requestHdr, proto, "invoke", status)
 	}
@@ -540,7 +541,8 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 			slog.Int("statuses", len(resp.Responses)))
 		return nil
 	}
-	chunks, err := chunkInvokeResponse(resp, reportChunkPayloadBudget)
+	limits := b.chunkLimitsFor(src, requestHdr.SessionID)
+	chunks, err := chunkInvokeResponse(resp, limits.budget, limits.hardCap)
 	if err != nil {
 		debugReplyError(b.logger, "encode_invoke", src, err)
 		return err
@@ -613,7 +615,7 @@ func (b *Bridge) dispatchInvokeRequest(ctx context.Context, src *net.UDPAddr, re
 // on the same exchange can be checked against it; expired
 // or missing-prior-TimedRequest cases are rejected via
 // StatusResponse with the spec-mandated codes.
-func (b *Bridge) dispatchTimedRequest(src *net.UDPAddr, requestHdr *message.Header, proto message.ProtocolHeader, req im.TimedRequest) error {
+func (b *Bridge) dispatchTimedRequest(src net.Addr, requestHdr *message.Header, proto message.ProtocolHeader, req im.TimedRequest) error {
 	now := time.Now()
 	deadline := now.Add(time.Duration(req.TimeoutMs) * time.Millisecond)
 	// Key on (sessionID, exchangeID) so a different session cannot
@@ -790,13 +792,13 @@ func renderCluster(ctx context.Context, d im.Dispatcher, key invokedCluster) map
 // InvokeResponse split by maxPayloadSize). Found by the CHIP Python harness
 // (TC-IDM-1.4 step 11 batches two commands whose responses exceed one
 // message).
-func chunkInvokeResponse(resp im.InvokeResponse, budget int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one
+func chunkInvokeResponse(resp im.InvokeResponse, budget, hardCap int) ([][]byte, error) { //nolint:unparam // the budget is the caller's; the tests pin the split at the production one
 	whole, err := EncodeInvokeResponse(resp)
 	if err != nil {
 		return nil, err
 	}
 	if len(whole) <= budget || len(resp.Responses) <= 1 {
-		if len(whole) > reportChunkHardCap && len(resp.Responses) == 1 {
+		if len(whole) > hardCap && len(resp.Responses) == 1 {
 			resp.Responses[0] = oversizedInvokeEntry(resp.Responses[0])
 			whole, err = EncodeInvokeResponse(resp)
 			if err != nil {
@@ -834,7 +836,7 @@ func chunkInvokeResponse(resp im.InvokeResponse, budget int) ([][]byte, error) {
 				return nil, err
 			}
 		}
-		if len(body) > reportChunkHardCap {
+		if len(body) > hardCap {
 			ent = oversizedInvokeEntry(ent)
 		}
 		cur.Responses = append(cur.Responses, ent)

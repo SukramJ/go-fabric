@@ -160,14 +160,17 @@ func TestReapIdle_ReannounceSkippedWhilePeerKeepsAnotherSession(t *testing.T) {
 	}
 }
 
-// TestStaleEviction_NotifiesOldSessionWithoutReannounce verifies the
-// same-peer stale-CASE eviction in OpenFromSigmaWithID: the evicted
-// session's peer receives a graceful close (matter.js sends
-// CloseSession on every non-peer-lost close, ExchangeManager.ts:635)
-// but the reannounce trigger stays silent because the replacement
-// session for the same peer was just installed — exactly the
-// `hasSessionForPeer` skip in DeviceAdvertiser.ts:138.
-func TestStaleEviction_NotifiesOldSessionWithoutReannounce(t *testing.T) {
+// TestPeerCapEviction_ForceClosesWithoutCloseSessionOrReannounce
+// verifies the per-peer cap in OpenFromSigmaWithID: the evicted
+// session is force-closed — no CloseSession to its peer, because
+// matter.js skips the graceful path for the cap
+// (SessionManager.ts:676-678: the target is typically the peer it can
+// no longer reach, and a graceful close would hold the mutex for a
+// full retransmission window) — the onSessionClose hook still fires,
+// and the reannounce trigger stays silent because the peer still has
+// sessions, exactly the `hasSessionForPeer` skip in
+// DeviceAdvertiser.ts:138.
+func TestPeerCapEviction_ForceClosesWithoutCloseSessionOrReannounce(t *testing.T) {
 	t.Parallel()
 	m := NewManager(newMinimalFakeStore())
 	rec := &closeRecorder{}
@@ -185,30 +188,41 @@ func TestStaleEviction_NotifiesOldSessionWithoutReannounce(t *testing.T) {
 	if _, err := m.OpenFromSigmaWithID(firstID, fabricIndex, localNodeID, peerNodeID, 0x1000, nil, closeParityKeys(0)); err != nil {
 		t.Fatalf("OpenFromSigmaWithID (first): %v", err)
 	}
+	for i := 1; i < MaxSessionsPerPeer; i++ {
+		id, err := m.AllocateID()
+		if err != nil {
+			t.Fatalf("AllocateID (#%d): %v", i+1, err)
+		}
+		e, err := m.OpenFromSigmaWithID(id, fabricIndex, localNodeID, peerNodeID, 0x1000+uint16(i), nil, closeParityKeys(byte(i)))
+		if err != nil {
+			t.Fatalf("OpenFromSigmaWithID (#%d): %v", i+1, err)
+		}
+		e.MarkActiveRx()
+	}
+	if graceful, closed, _, _ := rec.snapshot(); len(graceful) != 0 || len(closed) != 0 {
+		t.Fatalf("within the cap nothing closes: graceful=%v closed=%v", graceful, closed)
+	}
 
-	secondID, err := m.AllocateID()
+	lastID, err := m.AllocateID()
 	if err != nil {
-		t.Fatalf("AllocateID (second): %v", err)
+		t.Fatalf("AllocateID (beyond cap): %v", err)
 	}
-	if _, err := m.OpenFromSigmaWithID(secondID, fabricIndex, localNodeID, peerNodeID, 0x1001, nil, closeParityKeys(32)); err != nil {
-		t.Fatalf("OpenFromSigmaWithID (second): %v", err)
+	if _, err := m.OpenFromSigmaWithID(lastID, fabricIndex, localNodeID, peerNodeID, 0x1FFF, nil, closeParityKeys(32)); err != nil {
+		t.Fatalf("OpenFromSigmaWithID (beyond cap): %v", err)
 	}
 
-	graceful, closed, encryptOK, reannounce := rec.snapshot()
-	if len(graceful) != 1 || graceful[0] != firstID {
-		t.Fatalf("graceful notifier calls = %v, want [%d] (evicted stale session)", graceful, firstID)
-	}
-	if len(encryptOK) != 1 || !encryptOK[0] {
-		t.Error("evicted session could not encrypt inside the notifier — keys zeroised too early")
+	graceful, closed, _, reannounce := rec.snapshot()
+	if len(graceful) != 0 {
+		t.Errorf("graceful notifier calls = %v, want none — the cap force-closes without CloseSession", graceful)
 	}
 	if len(closed) != 1 || closed[0] != firstID {
-		t.Errorf("onSessionClose calls = %v, want [%d]", closed, firstID)
+		t.Errorf("onSessionClose calls = %v, want [%d] (least recently active)", closed, firstID)
 	}
 	if reannounce != 0 {
-		t.Errorf("reannounce fired %d times, want 0 — replacement session exists for the peer", reannounce)
+		t.Errorf("reannounce fired %d times, want 0 — the peer still holds sessions", reannounce)
 	}
-	if _, err := m.Get(secondID); err != nil {
-		t.Errorf("replacement session %d missing after eviction: %v", secondID, err)
+	if _, err := m.Get(lastID); err != nil {
+		t.Errorf("session %d that prompted the check missing after eviction: %v", lastID, err)
 	}
 }
 
@@ -360,5 +374,76 @@ func TestCloseAllGraceful_DeadlinePastSkipsNotifications(t *testing.T) {
 	}
 	if _, err := entry.Session.Encrypt(&message.Header{}, 0, []byte{0x01}); err == nil {
 		t.Error("Encrypt after CloseAllGraceful succeeded — keys were not zeroised")
+	}
+}
+
+// TestClosePeerLost_ForceClosesWithoutCloseSession verifies the peer-loss
+// sweep: every session of the lost peer created before asOf is closed
+// without a CloseSession on the wire (matter.js NodeSession.ts:300-303
+// handlePeerLoss → initiateForceClose), the onSessionClose hook still
+// fires per session, a session established after the loss was observed
+// survives (SessionManager.ts:688-690), and the reannounce trigger stays
+// silent while that survivor keeps the peer connected
+// (DeviceAdvertiser.ts:138 hasSessionForPeer).
+func TestClosePeerLost_ForceClosesWithoutCloseSession(t *testing.T) {
+	t.Parallel()
+	m := NewManager(newMinimalFakeStore())
+	rec := &closeRecorder{}
+	rec.wire(m)
+
+	const (
+		fabricIndex uint8  = 2
+		localNodeID uint64 = 0xB0B
+		peerNodeID  uint64 = 0xA11
+	)
+	first, err := m.OpenFromSigma(fabricIndex, localNodeID, peerNodeID, closeParityKeys(1))
+	if err != nil {
+		t.Fatalf("OpenFromSigma (first): %v", err)
+	}
+	second, err := m.OpenFromSigma(fabricIndex, localNodeID, peerNodeID, closeParityKeys(2))
+	if err != nil {
+		t.Fatalf("OpenFromSigma (second): %v", err)
+	}
+	other, err := m.OpenFromSigma(fabricIndex, localNodeID, 0xBEEF, closeParityKeys(3))
+	if err != nil {
+		t.Fatalf("OpenFromSigma (other peer): %v", err)
+	}
+	asOf := time.Now()
+	time.Sleep(time.Millisecond)
+	later, err := m.OpenFromSigma(fabricIndex, localNodeID, peerNodeID, closeParityKeys(4))
+	if err != nil {
+		t.Fatalf("OpenFromSigma (later): %v", err)
+	}
+
+	if n := m.ClosePeerLost(fabricIndex, peerNodeID, asOf); n != 2 {
+		t.Fatalf("ClosePeerLost = %d, want 2 (the sessions held when the loss was observed)", n)
+	}
+	graceful, closed, _, reannounce := rec.snapshot()
+	if len(graceful) != 0 {
+		t.Errorf("graceful notifier calls = %v, want none — a lost peer gets no CloseSession", graceful)
+	}
+	if len(closed) != 2 {
+		t.Errorf("onSessionClose calls = %v, want the two lost sessions", closed)
+	}
+	if reannounce != 0 {
+		t.Errorf("reannounce fired %d times, want 0 — the later session keeps the peer connected", reannounce)
+	}
+	for _, id := range []uint16{first.SessionID, second.SessionID} {
+		if _, err := m.Get(id); err == nil {
+			t.Errorf("session %d still live after the peer was lost", id)
+		}
+	}
+	for _, id := range []uint16{later.SessionID, other.SessionID} {
+		if _, err := m.Get(id); err != nil {
+			t.Errorf("session %d must survive: %v", id, err)
+		}
+	}
+
+	// A zero asOf sweeps the rest; with no session left the broadcast resumes.
+	if n := m.ClosePeerLost(fabricIndex, peerNodeID, time.Time{}); n != 1 {
+		t.Fatalf("ClosePeerLost(zero asOf) = %d, want 1", n)
+	}
+	if _, _, _, reannounce := rec.snapshot(); reannounce != 1 {
+		t.Errorf("reannounce fired %d times after the last session, want 1", reannounce)
 	}
 }

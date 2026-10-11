@@ -18,6 +18,88 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- Session establishment over TCP: a PASE or CASE message that arrives on a
+  TCP connection is served on it, as matter.js creates the unsecured
+  session from whichever channel carried the message
+  (`ExchangeManager.ts:241-264`); replies go back on the connection without
+  MRP. Reply chunking is route-aware: over a reliable connection the
+  ReportData and InvokeResponse chunkers fill the connection's frame,
+  bounded by the peer's stated MaxTcpMessageSize
+  (`bridge.SessionTransportResolver`, wired by the reference daemon from the
+  operational entry), and keep the UDP datagram budget otherwise.
+  `bridge.EncodesAttributeValue` tells a fleet guard whether the attribute
+  writer knows a value's type (the reference daemon's wire-shape guard uses
+  it instead of a copy of the writer's type switch). The harness runs the
+  daemon with TCP on (`MCORE.SC.S.TCP=1`, TC-SC-4.3's `T` key check) and
+  with `--ota-harness`.
+- Matter TCP transport (ADR 0019, phase 3). `transport.Conn`
+  (`Send`, `Remote`, `Reliable`) is the connection a message arrived on;
+  `transport/tcp` is the length-framed listener and dialer ported from
+  matter.js `TcpChannel.ts` / `TcpTransport.ts` (4-byte little-endian
+  length, 64 000-byte default frame, receive buffer bounded at twice that,
+  three connections per peer IP, 10 s for an inbound connection's first
+  message); `udp.Listener.Conn` is the unreliable adapter;
+  `mrp.UsesMRP` is matter.js's `usesMrp`. `bridge.Config.TCP`
+  (`Incoming`, `Outgoing`; zero value off) opens a TCP listener on the UDP
+  socket's port and sets the operational record's `T` key. A request over
+  TCP is answered on its connection without MRP, and a dropped connection
+  closes every session bound to it. Session establishment (PASE / CASE)
+  over TCP is not served yet: an unsecured message over TCP is dropped.
+  The reference daemon's `--tcp` flag (`true`, `false`, `incoming`,
+  `outgoing`) defaults to on.
+- `secure/sessionparams` (new): the SessionParameters structure both
+  handshakes exchange, tags 1–9 as matter.js `PaseMessages.ts:28-58`
+  declares them, including SupportedTransports (tag 8) and
+  MaxTCPMessageSize (tag 9, written only when the bitmap names TCP) with
+  the Matter 1.5 gate on a peer's TCP bits (`SessionParameters.ts:50-62`).
+  `sigma.SessionParameters` is this type; Sigma1/Sigma2/Sigma2_Resume carry
+  the two new fields. `bridge.SessionParametersFor` states the node's
+  transports for a host that listens on TCP; `operational.Entry` keeps the
+  peer's effective transports and TCP message bound
+  (`SetPeerTransportParameters`), which the reference daemon sets on every
+  CASE and PASE session.
+- **OTA Software Update Requestor and BDX** (ADR 0019, brief N).
+  `cluster/core.OTASoftwareUpdateRequestor` replaces the static stub: it
+  queries the providers a controller names (DefaultOTAProviders, persisted
+  per fabric in the new `matter_ota_default_providers` table, or
+  AnnounceOTAProvider), downloads the image over BDX, asks the provider
+  whether to apply it, hands it to the host's `OtaApplier` and reports
+  the outcome (StateTransition, VersionApplied, DownloadError,
+  NotifyUpdateApplied) — matter.js's OtaSoftwareUpdateRequestorServer rule
+  for rule. **Breaking:** `NewOTASoftwareUpdateRequestor` takes an
+  `OTARequestorConfig` and returns an error; the `OTAUpdateState*`
+  constants are gone (use `otasoftwareupdaterequestor.UpdateState*`).
+  New package `bdx` (message codecs, messenger, the initiating receiver in
+  both driver modes, `FileSink`) and `bdx/otaimage` (OTA image header,
+  validation, writer), both byte-checked against matter.js fixtures.
+  `*bridge.Bridge` implements `core.OtaProviderConnector`: the ADR 0008
+  CASE initiator, generalised to one Invoke and one BDX exchange on a
+  session with the provider. `im` gains the client-side InvokeRequest
+  encoder and InvokeResponse decoder; `store` gains
+  `ListDefaultOTAProviders`, `ReplaceDefaultOTAProviders` and the
+  requestor's state; `BasicInformation` gains `OtaNodeInformation` and
+  `SetSoftwareVersion`. HTTPS downloads are not ported.
+- Reference daemon: the requestor on the root (device type OtaRequestor),
+  with an applier that validates the image against the node's vendor,
+  product and the offered version and keeps it; `--ota-dir` and the
+  test-only `--ota-harness`, which applies in place.
+- Reference daemon: a second DeviceEnergyManagement device ("Charger ESA",
+  `fleet_esa.go`) with StateForecastReporting, StartTimeAdjustment,
+  Pausable, ForecastAdjustment and ConstraintBasedAdjustment (FeatureMap
+  0x7C, as TC-DEM-2.6/2.8 start chip's app), appended after the grid
+  meter. The DEM test event triggers reach both ESAs. A test,
+  `TestFleetWireShapes`, reads every attribute of the fleet through the
+  bridge's dispatcher and fails on a value the bridge writer would encode
+  as null.
+- Certification harness: a per-case endpoint override in the family table
+  (`endpoints`, formerly `caseDeviceType`, taking a pseudo key too) runs
+  DEM/2.6 and 2.8 on the new ESA with its PICS slice; the EGC family runs
+  on the energy tariff, BDX next to SU; the SU requestor cases get chip's
+  OTA provider app and a staged image built with `ota_image_tool.py` for
+  the daemon's vendor, product and next software version.
+- `deprecation_policy_test.go` checks a `Deprecated:` paragraph on a
+  `const (` / `var (` group, and one inside it, against CHANGELOG.md.
+
 - `cluster/spec.CheckFeatures` judges a feature's otherwise-conformance by
   its first applicable entry, as matter.js's FeatureSelectionErrors does
   (`IllegalFeatureCombinations.ts` addOtherwiseRules): DeviceEnergyManagement
@@ -395,6 +477,14 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- PASE: PBKDFParamRequest and PBKDFParamResponse carry the whole
+  SessionParameters structure (`InitiatorSessionParams`,
+  `ResponderSessionParams`), and the response always states the node's
+  parameters — the same ones Sigma2 advertises — as matter.js
+  `PaseServer.ts:151` does; before, only a host-configured MRP triplet was
+  sent, and a 1.3+ commissioner's revisions, MaxPathsPerInvoke and
+  transports were dropped on decode (`BD-Matter-PASE-SessionParametersLegacy`,
+  retired).
 - The pinned gofumpt is v0.12.0 (was v0.10.0; `GOFUMPT_VERSION` in the
   Makefile and `ci.yml`). The two releases format a multi-line `append(`
   differently; v0.12.0 reformats nothing on `main` at the bump.
@@ -673,6 +763,15 @@ the same `ColorTemperatureWriter` as before.
 
 ### Deprecated
 
+- `github.com/SukramJ/go-fabric/secure/spake2`: `MRPParameters`,
+  `PBKDFParamRequest.InitiatorMRPParams`,
+  `PBKDFParamResponse.ResponderMRPParams`; and in `bridge`,
+  `PaseAdapter.SetResponderMRPParams` and `PaseAdapter.PeerMRPParams`.
+  Replacement: `sessionparams.Parameters` through
+  `InitiatorSessionParams` / `ResponderSessionParams`,
+  `SetResponderSessionParams` and `PeerSessionParams`. The old fields keep
+  their behaviour (decoded as the first three fields, encoded when the new
+  field is nil). Marked in v0.3.0; removal permissible from v0.5.0.
 - `github.com/SukramJ/go-fabric/cluster/modeselect`: the field-tag
   constants `ModeOptionFieldLabel`, `ModeOptionFieldMode`,
   `ModeOptionFieldSemanticTags`, `SemanticTagFieldMfgCode` and
@@ -684,6 +783,52 @@ the same `ColorTemperatureWriter` as before.
 
 ### Fixed
 
+- **A peer that stops answering an exchange this node opened is lost, and
+  its sessions go.** When the outbound-reliable tracker gave up on a
+  message of an exchange the bridge itself opened (the OTA requestor's
+  QueryImage or a BDX block), nothing happened to the session: the next
+  query reused it, and a provider restarted under the same node id, which
+  knows nothing of the old keys, was never reached again (TC-SU-2.2 step 2
+  announced 24 times in vain). Max retransmissions on such an exchange now
+  force-close every session with that peer established before the
+  exchange, without a CloseSession to a peer that is gone, so the next
+  connect runs a fresh CASE. `operational.Manager.ClosePeerLost` is the
+  new primitive; `Entry.CreatedAt` bounds the sweep. Mirrors matter.js
+  `MessageExchange.ts:620` → `ExchangeManager.ts:556-580` →
+  `SessionManager.ts:677-695`. A subscription report that runs out of
+  retransmissions still closes only the subscription, as before.
+- **Harness: the OTA provider's store is removed after the provider is
+  gone, before and after each SU case.** TC-SU-2.2's own teardown removes
+  `/tmp/chip_kvs_provider` and then terminates the provider, whose
+  shutdown writes the store back (chip's Linux store rewrites the whole
+  file on commit), so TC-SU-2.4's provider came up already commissioned
+  and never advertised for commissioning. The harness now stops the
+  provider, waits until it is gone and removes the store, at the start of
+  an SU case as well as after it.
+- **A new CASE no longer closes the peer's previous sessions.** The session
+  manager used to evict every session of the same (fabric, peer node) when
+  that peer established another CASE session. A controller that runs two
+  clients under one node identity (the CSA Python harness and chip-tool do)
+  saw each client's new session close the other's, with a CloseSession on
+  the wire every time, and every subscription on the closed session died
+  with it: the DEM certification cases 2.2, 2.4, 2.6 and 2.10 lost their
+  event and attribute reports that way. The manager now keeps a peer's
+  sessions and caps them at `operational.MaxSessionsPerPeer` (5); beyond
+  the cap the least recently active responder session is force-closed
+  without a CloseSession, sessions this node initiated never claim a slot,
+  and a PASE session never triggers the check. Mirrors matter.js
+  `SessionManager.ts:185-189` (`MAX_SESSIONS_PER_PEER`) and `:647-680`
+  (`#evictExcessSessionsFor`). The retired divergence
+  `BD-Matter-CASE-StalePeerEviction` is removed from
+  `notes/parity/by_design.md`; the Apple-Home stale-key replay it was
+  introduced for is now handled the way matter.js handles it, by the cap.
+- **Root cluster servers that name their changed attributes are
+  reported.** The bridge wired `contract.AttributeChangeNotifier` only on
+  bridged endpoints, so a root server keeping its own state — the OTA
+  Software Update Requestor's UpdateState, UpdatePossible and
+  UpdateStateProgress — changed without a subscription report (TC-SU-2.2
+  waited for DelayedOnQuery in vain). Root and aggregator servers are now
+  wired as well; their own DataVersion stays authoritative.
 - **Timed commands come from the model.** An untimed invoke of a command
   matter.js marks "T" answers NEEDS_TIMED_INTERACTION for every cluster,
   not only for the hand-pinned AdministratorCommissioning, DoorLock and

@@ -102,7 +102,7 @@ func TestPaseAdapter_EmitsResponderMRPParams(t *testing.T) {
 	a.SetPBKDFParams(1000, []byte("SPAKE2P Key Salt"), 1)
 	a.randomSource = func() [spake2.PBKDFRandomSize]byte { return [spake2.PBKDFRandomSize]byte{0x11} }
 	idle, active, thresh := uint32(500), uint32(300), uint16(4000)
-	a.SetResponderMRPParams(&spake2.MRPParameters{
+	a.SetResponderMRPParams(&spake2.MRPParameters{ //nolint:staticcheck // the deprecated triplet API stays under test until its removal
 		IdleRetransTimeoutMs:   &idle,
 		ActiveRetransTimeoutMs: &active,
 		ActiveThresholdTimeMs:  &thresh,
@@ -120,11 +120,11 @@ func TestPaseAdapter_EmitsResponderMRPParams(t *testing.T) {
 	if derr != nil {
 		t.Fatalf("DecodePBKDFParamResponse: %v", derr)
 	}
-	if resp.ResponderMRPParams == nil {
+	if resp.ResponderMRPParams == nil { //nolint:staticcheck // the deprecated triplet API stays under test until its removal
 		t.Fatal("ResponderMRPParams absent from PBKDFParamResponse (tag 5 not emitted)")
 	}
-	if resp.ResponderMRPParams.IdleRetransTimeoutMs == nil || *resp.ResponderMRPParams.IdleRetransTimeoutMs != 500 {
-		t.Errorf("responder idle = %v, want 500", resp.ResponderMRPParams.IdleRetransTimeoutMs)
+	if resp.ResponderMRPParams.IdleRetransTimeoutMs == nil || *resp.ResponderMRPParams.IdleRetransTimeoutMs != 500 { //nolint:staticcheck // the deprecated triplet API stays under test until its removal
+		t.Errorf("responder idle = %v, want 500", resp.ResponderMRPParams.IdleRetransTimeoutMs) //nolint:staticcheck // deprecated triplet API under test
 	}
 }
 

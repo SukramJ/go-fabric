@@ -78,7 +78,7 @@ type outboundEntry struct {
 	sessionID  uint16
 	exchangeID uint16
 	datagram   []byte
-	dest       *net.UDPAddr
+	dest       net.Addr
 	retries    int
 	nextSendAt time.Time
 	// sentWall is the wall-clock reading when the datagram first left, used
@@ -118,7 +118,7 @@ func (t *outboundReliableTracker) baseInterval(sessionID uint16, now time.Time) 
 // caller pools / reuses are safe). Subsequent inbound HasAck with
 // AckCounter=counter clears the entry; otherwise the next ACK pump
 // tick resends it after the Matter §4.12.6 backoff.
-func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest *net.UDPAddr, now time.Time) {
+func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID uint16, datagram []byte, dest net.Addr, now time.Time) {
 	cp := make([]byte, len(datagram))
 	copy(cp, datagram)
 	// The initial wait before the first retransmit uses the full spec
@@ -296,9 +296,10 @@ func (t *outboundReliableTracker) Pending() int {
 
 // outboundTickResult enumerates the outcome of a single Tick sweep.
 type outboundTickResult struct {
-	SessionID uint16
-	Counter   uint32
-	Err       error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
+	SessionID  uint16
+	ExchangeID uint16
+	Counter    uint32
+	Err        error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
 }
 
 // Tick walks every entry whose nextSendAt has elapsed: re-sends via
@@ -312,7 +313,7 @@ type outboundTickResult struct {
 // implementations enqueue (don't block) on the UDP socket. Send
 // errors are surfaced via the result slice; the entry stays in the
 // pending map for the next tick to retry.
-func (t *outboundReliableTracker) Tick(now time.Time, send func(*net.UDPAddr, []byte) error) []outboundTickResult {
+func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte) error) []outboundTickResult {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	var out []outboundTickResult
@@ -327,12 +328,12 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(*net.UDPAddr, []
 				ch <- mrp.ErrMaxRetransmissionsReached
 				close(ch)
 			}
-			out = append(out, outboundTickResult{SessionID: key.sessionID, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached})
 			continue
 		}
 		p.retries++
 		if err := send(p.dest, p.datagram); err != nil {
-			out = append(out, outboundTickResult{SessionID: key.sessionID, Counter: key.counter, Err: err})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Counter: key.counter, Err: err})
 			continue
 		}
 		// Full spec backoff per Matter §4.12.2.1: peer-appropriate

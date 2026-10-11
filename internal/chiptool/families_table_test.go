@@ -61,10 +61,13 @@ type family struct {
 	// core families), runs with the endpoint-0 PICS slice and passes no
 	// --endpoint.
 	deviceType uint32
-	// caseDeviceType overrides deviceType for single cases: a core case
-	// that exercises an application cluster on --endpoint (TC-ACE-1.4 reads
-	// OnOff there) is pointed at a bridged endpoint that serves it.
-	caseDeviceType map[string]uint32
+	// endpoints overrides deviceType for single cases (case → device type
+	// or pseudo key, see pseudoEndpoints): such a case takes its endpoint
+	// and that endpoint's PICS slice from the key (familyrun_test.go
+	// deviceTypeOf). A case that needs elements the family's endpoint does
+	// not serve is pointed at one that does: TC-S-2.2 at a light with
+	// LevelControl and ColorControl, TC-DEM-2.6 at the ESA with SFR.
+	endpoints map[string]uint32
 	// ownEndpoints cases name every endpoint they touch through PIXIT
 	// arguments and keep their own default endpoint (0) for the rest; they
 	// run with the PICS slice of deviceType's endpoint but get no
@@ -175,6 +178,16 @@ const (
 	// PA|PFR|STA|PAU|FA|CON and DeviceEnergyManagementMode).
 	dtEnergyEvse             = 0x050C
 	dtDeviceEnergyManagement = 0x050D
+	// dtStateForecastEsa is no device type: it names the reference
+	// daemon's standalone DeviceEnergyManagement endpoint
+	// (examples/reference-bridge/fleet_esa.go, FeatureMap 0x7C: SFR, STA,
+	// PAU, FA, CON), which TC-DEM-2.6 and 2.8 need (TC_DEM_2_6.py:30,
+	// TC_DEM_2_8.py:30 at the harness pin run chip's app with
+	// --featureSet 0x7c). The charger's part is the first 0x050D endpoint;
+	// the ESA is the first one numbered above the grid meter's
+	// (bridgeProcess.endpointAfter), so the key is the meter's in the high
+	// half and DeviceEnergyManagement's in the low, as dtOvenCavity is.
+	dtStateForecastEsa = dtElectricalMeter<<16 | dtDeviceEnergyManagement
 	// dtElectricalEnergyTariff is the reference daemon's energy tariff
 	// (examples/reference-bridge/fleet_energy_market.go): CommodityPrice,
 	// ElectricalGridConditions and CommodityTariff; dtElectricalMeter its
@@ -189,6 +202,27 @@ const (
 	// (examples/reference-bridge/fleet_sensors.go): SoilMeasurement.
 	dtSoilSensor = 0x0045
 )
+
+// endpointDeviceTypes are the device types the harness resolves to an
+// endpoint of the reference daemon (familyrun_test.go devicePICS, the first
+// endpoint advertising each). A family row or an endpoints entry naming a
+// device type outside this list and pseudoEndpoints fails every case of the
+// family with "no endpoint advertises device type" (briefs README, first
+// wave); TestFamilyDeviceTypesResolve holds the table to it.
+var endpointDeviceTypes = []uint32{
+	dtOnOffLight, dtColorTempLight, dtExtColorLight, dtSpeaker, dtTempSensor, dtWaterValve, dtModeSelect, dtFan,
+	dtSmokeCOAlarm, dtPump, dtFlowSensor, dtLaundryWasher, dtRVC, dtThermostat, dtWindowCovering,
+	dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch, dtAirPurifier, dtClosure,
+	dtTempControlledCabinet, dtAirQualitySensor, dtWaterHeater, dtElectricalUtilityMeter, dtRefrigerator, dtDishwasher, dtMicrowaveOven, dtOven, dtEnergyEvse, dtDeviceEnergyManagement, dtClosurePanel, dtSoilSensor, dtElectricalEnergyTariff, dtElectricalMeter,
+}
+
+// pseudoEndpoints are the keys that name an endpoint by its position: the
+// first endpoint advertising the second device type that is numbered above
+// the first endpoint advertising the first (bridgeProcess.endpointAfter).
+var pseudoEndpoints = map[uint32][2]uint32{
+	dtOvenCavity:       {dtOven, dtTempControlledCabinet},
+	dtStateForecastEsa: {dtElectricalMeter, dtDeviceEnergyManagement},
+}
 
 // chipFamilies is this module's selection of CSA certification families,
 // declared the way matter.js declares its own (support/chip-testing/test/
@@ -337,7 +371,43 @@ var chipFamilies = []family{
 	{name: "TIMESYNC"},
 	{name: "DLOG"},
 	{name: "ICDM"},
-	{name: "SU"},
+	// SU and BDX: the software-update requestor cases take chip's OTA
+	// provider app and a staged image (TC_SU_2_2.py:39-41 at the harness
+	// pin: provider_app_path, ota_image, ota_provider_port), which the
+	// runner prepares in the container for every case whose descriptor
+	// arguments name them (otaPlumbing), with the case's own --timeout as
+	// budget, and stops the provider and collects its logs after each
+	// (otaCaseTimeout, otaCleanupCommand, otaProviderLogsScript). The
+	// requestor is mounted on the root (brief N); the BDX cases at the pin
+	// are YAML with every step disabled (Test_TC_BDX_*.yaml), manual in
+	// the descriptor.
+	{
+		name: "SU",
+		edits: map[string][]edit{
+			// Step 3 guards the 180 s DelayedActionTime on the UpdateState
+			// subscription and then waits for Downloading on the same
+			// queue. The guard consumes every report until its full
+			// duration has elapsed, the last 5 s unchecked (tolerance zone,
+			// event_attribute_reporting.py:704-739 at the harness pin), and
+			// the test anchors the window on *its* receipt of
+			// DelayedOnQuery, after the DUT started its timer. A DUT that
+			// re-queries at exactly DelayedActionTime, as matter.js
+			// schedules it (OtaSoftwareUpdateRequestorServer.ts:676-680,
+			// max(delayedActionTime, minimumQueryInterval)), reports
+			// Downloading inside that zone, where the guard swallows it,
+			// and Phase C waits for a report that already went by (run
+			// 38149548973: report at 15:21:57.237, Phase C from
+			// 15:21:57.237). The guard ends at the tolerance boundary
+			// instead, so Phase C sees the report; the step's own elapsed
+			// assertion already allows it (TC_SU_2_2.py:864-867,
+			// `elapsed_s3 >= min_interval_s3 - tolerance_s3`).
+			"2.2": {
+				{"            duration_sec=min_interval_s3,", "            duration_sec=min_interval_s3 - tolerance_s3,", "end the step-3 guard at the tolerance boundary so the Downloading report reaches Phase C (TC_SU_2_2.py:846-850)"},
+				{"            tolerance_sec=tolerance_s3,", "            tolerance_sec=0.0,", "the guard's tolerance zone is now outside its duration (TC_SU_2_2.py:846-850)"},
+			},
+		},
+	},
+	{name: "BDX"},
 	{name: "BIND"},
 	// The root's label, localization and diagnostics clusters (all
 	// optional on RootNode), mounted by buildRootLabelsAndDiagnostics in
@@ -460,7 +530,35 @@ var chipFamilies = []family{
 	// fleet_energy_market.go).
 	{name: "SETRF", deviceType: dtElectricalEnergyTariff},
 	{name: "COMMTR", deviceType: dtElectricalMeter},
-	{name: "DEM", deviceType: dtDeviceEnergyManagement},
+	// EGC: ElectricalGridConditions on the energy tariff
+	// (fleet_energy_market.go, FORE); TC_EGC_2_2/2_3 drive it through the
+	// 0x00A0... triggers (TC_EGCTestBase.py:36-37 at the harness pin),
+	// which the daemon answers as the energy-gateway app does.
+	{
+		name: "EGC", deviceType: dtElectricalEnergyTariff,
+		// TC_EGC_2_3.py:61-64 gates on "EGC.F00", a code no PICS defines:
+		// a cluster feature's PICS code is <PICS>.S.F<bit>, as the case
+		// family's sibling gates (TC_EGC_2_1.py:64 "EGC.S") and every
+		// device-generated slice name it (testdata/pics), so the honest
+		// PICS would leave the Forecasting case unrun on a device that
+		// serves FORE.
+		picsEdits: map[string]edit{
+			"2.3": {"EGC.F00", "EGC.S.F00", "TC_EGC_2_3 gates on the undefined code EGC.F00 (TC_EGC_2_3.py:63); ElectricalGridConditions Forecasting is EGC.S.F00"},
+		},
+		edits: map[string][]edit{
+			"2.3": {{`"EGC.F00"`, `"EGC.S.F00"`, "TC_EGC_2_3 gates on the undefined code EGC.F00 (TC_EGC_2_3.py:63); ElectricalGridConditions Forecasting is EGC.S.F00"}},
+		},
+	},
+	// DEM/2.6 and 2.8 need StateForecastReporting (DEM.S.F02), which the
+	// charger's part does not have; they run on the standalone ESA
+	// (fleet_esa.go, FeatureMap 0x7C as TC_DEM_2_6.py:30 and
+	// TC_DEM_2_8.py:30 start chip's app) with its own PICS slice. 2.9
+	// (PFR & SFR) and 2.11 (F07) stay not applicable on both
+	// (BD-chip-DeviceEnergyManagement-EnergyEvse-RulesInServer).
+	{
+		name: "DEM", deviceType: dtDeviceEnergyManagement,
+		endpoints: map[string]uint32{"2.6": dtStateForecastEsa, "2.8": dtStateForecastEsa},
+	},
 	{name: "DEMM", deviceType: dtDeviceEnergyManagement},
 	{
 		name: "EEVSE", deviceType: dtEnergyEvse,
@@ -576,7 +674,7 @@ var chipFamilies = []family{
 		// cluster of the endpoint (OnOff, LevelControl, ColorControl): the
 		// colour-temperature light has all three, the on/off light only
 		// OnOff.
-		caseDeviceType: map[string]uint32{"2.2": dtColorTempLight, "2.4": dtColorTempLight},
+		endpoints: map[string]uint32{"2.2": dtColorTempLight, "2.4": dtColorTempLight},
 		edits: map[string][]edit{
 			// matter.js test/app-fast/S.test.ts: chip expects the unset
 			// values of a ScenesManagement server that no longer tracks

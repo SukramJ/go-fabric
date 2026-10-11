@@ -79,6 +79,9 @@ type rootRefs struct {
 	// powerSources lists the node's PowerSource endpoints, which are
 	// numbered only once the topology is assembled (attachNodeProviders).
 	powerSources *mattercore.PowerSourceConfiguration
+	// otaRequestor goes online once the CASE identities are loaded, and
+	// learns of commissionings and removed fabrics.
+	otaRequestor *mattercore.OTASoftwareUpdateRequestor
 }
 
 // buildRootClusters constructs endpoint 0's cluster surface.
@@ -92,6 +95,7 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	st *store.Store,
 	groupState *groups.Manager,
 	chain *attestation.Chain,
+	ota otaConfig,
 	onFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte),
 ) ([]contract.ClusterServer, rootRefs, error) {
 	var refs rootRefs
@@ -190,7 +194,22 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	// ACL, group keys and the fabric row gone. Mirrors chip
 	// FailSafeContext::Reset() on the success path of
 	// CommissioningWindowManager::OnCommissioningComplete.
-	generalCom.SetOnCommissioningComplete(func(context.Context, uint8) { opCreds.ClearPendingState() })
+	// The OTA Software Update Requestor (ADR 0019) on the root, as matter.js
+	// adds OtaRequestor to the endpoint it serves on
+	// (OtaSoftwareUpdateRequestorServer.ts:181). It asks the providers a
+	// commissioner names; the daemon's applier validates and keeps the image
+	// (ota.go).
+	refs.otaRequestor, err = buildOtaRequestor(ota, identity, basicInfo)
+	if err != nil {
+		return nil, refs, fmt.Errorf("ota requestor: %w", err)
+	}
+	otaRequestor := refs.otaRequestor
+	generalCom.SetOnCommissioningComplete(func(context.Context, uint8) {
+		opCreds.ClearPendingState()
+		// A query 30 s after a commissioning (#scheduleInitialQuery,
+		// OtaSoftwareUpdateRequestorServer.ts:194-195, :251-253).
+		otaRequestor.Commissioned()
+	})
 
 	accessControl, err := mattercore.NewAccessControl(st)
 	if err != nil {
@@ -219,6 +238,7 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	descriptor, err := mattercore.NewDescriptor(
 		[]mattercore.DeviceTypeStruct{
 			{DeviceType: deviceTypeRootNode, Revision: deviceTypeRevision(deviceTypeRootNode)},
+			mattercore.OtaRequestorDeviceType(),
 		},
 		nil, // ServerList — provider wired below
 		nil, // ClientList — this is not a controller
@@ -247,9 +267,7 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	// not, and matter.js mounts it on no node that is not an ICD (it is in
 	// neither ServerNode.RootEndpoint nor any non-ICD test app). A
 	// controller reads its presence as "this node sleeps"
-	// (NodePhysicalProperties isIntermittentlyConnected). The OTA Software
-	// Update Requestor is not mounted either: the module has no BDX and no
-	// update agent, so the node cannot take an update.
+	// (NodePhysicalProperties isIntermittentlyConnected).
 
 	// FixedLabel, UserLabel, the three localization clusters, Software- and
 	// EthernetNetworkDiagnostics (RootNode: all optional).
@@ -277,6 +295,7 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 		groupKeys,
 		groupcast,
 		descriptor,
+		refs.otaRequestor,
 	}, optional)
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
 	return servers, refs, nil
@@ -584,7 +603,14 @@ func wireSecurity(
 			}
 			return entry.Session, true
 		},
-	).WithFabricResolver(func(id uint16) (uint8, bool) {
+	).WithTransportResolver(func(id uint16) (uint16, uint32, bool) {
+		e, err := sessions.Get(id)
+		if err != nil || e == nil {
+			return 0, 0, false
+		}
+		tr, mx := e.PeerTransportParameters()
+		return tr, mx, tr != 0 || mx != 0
+	}).WithFabricResolver(func(id uint16) (uint8, bool) {
 		entry, err := sessions.Get(id)
 		if err != nil || entry == nil {
 			return 0, false
@@ -721,6 +747,7 @@ func caseInitiatorProvider(st *store.Store, sessions *operational.Manager, ids *
 				}
 				if p := res.PeerSessionParams; p != nil {
 					entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
+					entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 				}
 				if err := sessions.PersistResumption(ctx, fabricIndex, res.PeerNodeID, res.ResumptionID, res.SharedSecret, res.PeerCATs); err != nil {
 					logger.Debug("case.initiator.resumption_persist", slog.String("err", err.Error()))
@@ -773,6 +800,13 @@ func buildPaseAdapterFromContext(sessions *operational.Manager, refs rootRefs, v
 		if err != nil {
 			sessions.ReleaseID(sessionID)
 			return err
+		}
+		// The commissioner's SessionParameters size the session's
+		// retransmissions and name its transports — matter.js
+		// PaseServer.ts:155-157 `session.timingParameters = initiatorSessionParams`.
+		if p := adapter.PeerSessionParams(); p != nil {
+			entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
+			entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
 		}
 		// AttestationRequest and CSRRequest signatures bind to the
 		// session's challenge; without this the commissioner rejects both.
@@ -855,6 +889,15 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, logger
 		if openErr != nil {
 			sessions.ReleaseID(effectiveID)
 			return openErr
+		}
+		// The initiator's Sigma1 SessionParameters size the session's
+		// retransmissions and name its transports (matter.js
+		// CaseServer.ts:339 `sessionParameters: secureSession.parameters`).
+		if resp := adapter.SnapshotResponder(); resp != nil {
+			if p, ok := resp.PeerSessionParameters(); ok {
+				entry.SetPeerMRPIntervals(p.SessionIdleInterval, p.SessionActiveInterval, uint32(p.SessionActiveThreshold))
+				entry.SetPeerTransportParameters(p.EffectiveTransports(), p.EffectiveMaxTCPMessageSize())
+			}
 		}
 		logger.Info("case.session_established",
 			slog.Int("session_id", int(entry.SessionID)),

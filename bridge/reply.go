@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -71,7 +72,7 @@ func (b *Bridge) encryptSecureOutbound(sess *channel.Session, localSessionID uin
 // must survive a single packet drop — see that method's docstring
 // for the obligation contract.
 func (b *Bridge) sendReply(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	requestProto message.ProtocolHeader,
 	responseOpcode uint8,
@@ -95,7 +96,7 @@ func (b *Bridge) sendReply(
 // When the bridge has no AckTracker wired (test paths) the call
 // degrades silently to the best-effort path.
 func (b *Bridge) sendReplyReliable(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	requestProto message.ProtocolHeader,
 	responseOpcode uint8,
@@ -123,7 +124,7 @@ func (b *Bridge) sendReplyReliable(
 // attempting to write — the receive pipeline never invents a src on
 // the response path, so a nil src here is a programming error.
 func (b *Bridge) sendReplyOpts(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	requestProto message.ProtocolHeader,
 	responseOpcode uint8,
@@ -138,26 +139,32 @@ func (b *Bridge) sendReplyOpts(
 	sessions := b.sessions
 	tracker := b.outboundReliable
 	b.mu.RUnlock()
-	if listener == nil {
+	if listener == nil && !isConnRoute(src) {
 		return fmt.Errorf("%w: listener nil", ErrReplySend)
 	}
-	if src == nil {
+	if isNilRoute(src) {
 		return fmt.Errorf("%w: src nil", ErrReplySend)
 	}
 
 	// Engage MRP only when both the caller asked for it AND the bridge
 	// has a tracker wired — degrading to best-effort on a missing
 	// tracker keeps test fixtures (which never wire one) functional.
-	needsAck := reliable && tracker != nil
+	// Over a reliable connection MRP is off altogether: no R flag, no
+	// piggybacked acknowledgement (matter.js MessageExchange.ts:660,
+	// :680-686; transport/mrp UsesMRP).
+	usesMRP := routeUsesMRP(src)
+	needsAck := reliable && tracker != nil && usesMRP
 
 	respProto := message.ProtocolHeader{
 		Initiator:  !requestProto.Initiator,
-		HasAck:     true,
-		AckCounter: requestHdr.MessageCounter,
+		HasAck:     usesMRP,
 		Opcode:     responseOpcode,
 		ExchangeID: requestProto.ExchangeID,
 		ProtocolID: requestProto.ProtocolID,
 		NeedsAck:   needsAck,
+	}
+	if usesMRP {
+		respProto.AckCounter = requestHdr.MessageCounter
 	}
 	protoBytes := respProto.Marshal()
 
@@ -213,7 +220,7 @@ func (b *Bridge) sendReplyOpts(
 		if needsAck {
 			tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, time.Now())
 		}
-		if err := listener.Send(src, datagram); err != nil {
+		if err := sendVia(listener, src, datagram); err != nil {
 			if needsAck {
 				tracker.Untrack(requestHdr.SessionID, counter)
 			}
@@ -266,7 +273,7 @@ func (b *Bridge) sendReplyOpts(
 	if needsAck {
 		tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, time.Now())
 	}
-	if err := listener.Send(src, datagram); err != nil {
+	if err := sendVia(listener, src, datagram); err != nil {
 		if needsAck {
 			tracker.Untrack(requestHdr.SessionID, counter)
 		}
@@ -316,6 +323,51 @@ const reportChunkPayloadBudget = 1100
 // instead of shipping (and Send rejecting) an oversized datagram.
 const reportChunkHardCap = udp.MaxDatagramSize - 200
 
+// chunkLimits are the per-message budget and the hard ceiling for the
+// chunkers, for one route: the UDP constants, or over a reliable
+// connection the connection's frame size bounded by the peer's stated
+// MaxTcpMessageSize — matter.js keeps `maxTcpMessageSize` on the Session
+// (Session.ts:86, :118) and the TCP channel refuses a larger message
+// (TcpChannel.ts:125-126). The 200-byte margin is the headers' and the
+// AES-CCM tag's, as for [reportChunkHardCap].
+type chunkLimits struct {
+	budget, hardCap int
+}
+
+var udpChunkLimits = chunkLimits{budget: reportChunkPayloadBudget, hardCap: reportChunkHardCap}
+
+// SessionTransportResolver resolves a session id to the transport
+// parameters its peer stated in the handshake (SupportedTransports and
+// MaxTcpMessageSize after the Matter 1.5 gate, sessionparams); ok is false
+// when the session is unknown or stated none.
+type SessionTransportResolver interface {
+	TransportParametersFor(sessionID uint16) (transports uint16, maxTCPMessageSize uint32, ok bool)
+}
+
+// chunkLimitsFor picks the chunk limits for a reply to sessionID over dst.
+func (b *Bridge) chunkLimitsFor(dst net.Addr, sessionID uint16) chunkLimits {
+	r, ok := dst.(*connRoute)
+	if !ok || r == nil || r.conn == nil || !r.conn.Reliable() {
+		return udpChunkLimits
+	}
+	size := 0
+	if m, ok := r.conn.(interface{ MaxMessageSize() int }); ok {
+		size = m.MaxMessageSize()
+	}
+	b.mu.Lock()
+	lookup := b.sessions
+	b.mu.Unlock()
+	if res, ok := lookup.(SessionTransportResolver); ok {
+		if _, peerMax, known := res.TransportParametersFor(sessionID); known && peerMax > 0 && (size == 0 || int(peerMax) < size) {
+			size = int(peerMax)
+		}
+	}
+	if size <= reportChunkHardCap+200 {
+		return udpChunkLimits
+	}
+	return chunkLimits{budget: size - 200, hardCap: size - 200}
+}
+
 // chunkReportData splits rd into per-datagram chunks whose encoded
 // size stays within budget. All chunks except the last carry
 // MoreChunkedMessages=true (Matter §10.6.6); a SuppressResponse=true
@@ -337,7 +389,7 @@ const reportChunkHardCap = udp.MaxDatagramSize - 200
 // EventStatusIB carrying StatusResourceExhausted for that one path
 // instead — the rest of the report, and the SubscribeResponse that
 // depends on it, still go out.
-func chunkReportData(rd im.ReportData, budget int) ([]im.ReportData, error) {
+func chunkReportData(rd im.ReportData, budget, hardCap int) ([]im.ReportData, error) {
 	// Fast path: single small report → no work.
 	probe, err := EncodeReportData(rd)
 	if err != nil {
@@ -363,7 +415,7 @@ func chunkReportData(rd im.ReportData, budget int) ([]im.ReportData, error) {
 			}
 			return nil
 		}
-		rep, err := capOversizedAttributeReport(rd, rep)
+		rep, err := capOversizedAttributeReport(rd, rep, hardCap)
 		if err != nil {
 			return err
 		}
@@ -386,7 +438,7 @@ func chunkReportData(rd im.ReportData, budget int) ([]im.ReportData, error) {
 		return nil
 	}
 	addEventReport := func(ev im.EventReport) error {
-		ev, err := capOversizedEventReport(rd, ev)
+		ev, err := capOversizedEventReport(rd, ev, hardCap)
 		if err != nil {
 			return err
 		}
@@ -519,7 +571,7 @@ func splitListAttributeReport(rd im.ReportData, rep im.AttributeReport, budget i
 // shipping the raw value is never an option. Split out of
 // [chunkReportData] to keep that function's per-entry bookkeeping
 // readable.
-func capOversizedAttributeReport(rd im.ReportData, rep im.AttributeReport) (im.AttributeReport, error) {
+func capOversizedAttributeReport(rd im.ReportData, rep im.AttributeReport, hardCap int) (im.AttributeReport, error) {
 	if rep.IsStatus {
 		return rep, nil
 	}
@@ -532,7 +584,7 @@ func capOversizedAttributeReport(rd im.ReportData, rep im.AttributeReport) (im.A
 	if err != nil {
 		return im.AttributeReport{}, err
 	}
-	if len(aloneBody) <= reportChunkHardCap {
+	if len(aloneBody) <= hardCap {
 		return rep, nil
 	}
 	return im.AttributeReport{
@@ -544,7 +596,7 @@ func capOversizedAttributeReport(rd im.ReportData, rep im.AttributeReport) (im.A
 
 // capOversizedEventReport is [capOversizedAttributeReport]'s twin for
 // EventReport.
-func capOversizedEventReport(rd im.ReportData, ev im.EventReport) (im.EventReport, error) {
+func capOversizedEventReport(rd im.ReportData, ev im.EventReport, hardCap int) (im.EventReport, error) {
 	if ev.IsStatus {
 		return ev, nil
 	}
@@ -557,7 +609,7 @@ func capOversizedEventReport(rd im.ReportData, ev im.EventReport) (im.EventRepor
 	if err != nil {
 		return im.EventReport{}, err
 	}
-	if len(aloneBody) <= reportChunkHardCap {
+	if len(aloneBody) <= hardCap {
 		return ev, nil
 	}
 	return im.EventReport{
@@ -619,6 +671,28 @@ func EncodeSubscribeResponse(sr im.SubscribeResponse) ([]byte, error) {
 		return nil, fmt.Errorf("%w: subscribe response: %w", ErrReplyEncode, err)
 	}
 	return buf, nil
+}
+
+// EncodesAttributeValue reports whether the bridge's attribute writer has an
+// encoding for a Go value a cluster server returns from MatterRead. A
+// value of a type the writer does not know goes on the wire as TLV null
+// (the writer's default arm), which a guard over a fleet's servers must
+// catch before a controller does; a nil value encodes as null by design
+// and reports false too.
+func EncodesAttributeValue(v any) bool {
+	if v == nil {
+		return false
+	}
+	enc := tlv.NewEncoder()
+	defaultAttributeValueWriter(enc, tlv.ContextTag(0), im.AttributeValue{Value: v})
+	out, err := enc.Bytes()
+	if err != nil {
+		return false
+	}
+	null := tlv.NewEncoder()
+	null.PutNull(tlv.ContextTag(0))
+	nb, _ := null.Bytes()
+	return !bytes.Equal(out, nb)
 }
 
 // defaultAttributeValueWriter is the wire writer the bridge plugs
@@ -1255,7 +1329,7 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) { //nolint
 // debugReplyError is a small helper that turns reply-path errors
 // into structured slog records. Each error gets its own attribute
 // list so operators can grep for the specific failure stage.
-func debugReplyError(logger *slog.Logger, stage string, src *net.UDPAddr, err error) {
+func debugReplyError(logger *slog.Logger, stage string, src net.Addr, err error) {
 	if err == nil {
 		return
 	}

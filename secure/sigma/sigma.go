@@ -16,6 +16,9 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // Sizes per Matter Core Spec §4.13.
@@ -270,7 +273,7 @@ func (s Sigma1) Marshal() []byte {
 	// responder copies onto the operational entry. Emitted when set, in
 	// tag order ahead of the resumption pair.
 	if s.InitiatorSessionParams != nil {
-		s.InitiatorSessionParams.encode(enc, 5)
+		encodeSessionParameters(enc, 5, *s.InitiatorSessionParams)
 	}
 	// Optional resumption fields (tags 6 + 7) — emitted asymmetrically
 	// only when set. The decoder enforces the all-or-nothing pairing
@@ -414,15 +417,10 @@ func peek(b []byte, n int) []byte {
 //
 // All fields are optional on the wire — a zero value omits the
 // corresponding tag so the peer falls back to its own defaults.
-type SessionParameters struct {
-	SessionIdleInterval      uint32 // [1] milliseconds; 0 = omit
-	SessionActiveInterval    uint32 // [2] milliseconds; 0 = omit
-	SessionActiveThreshold   uint16 // [3] milliseconds; 0 = omit
-	DataModelRevision        uint16 // [4] Matter Data Model revision; 0 = omit
-	InteractionModelRevision uint16 // [5] Matter Interaction Model revision; 0 = omit
-	SpecificationVersion     uint32 // [6] Matter specification version (e.g. 0x01040000); 0 = omit
-	MaxPathsPerInvoke        uint16 // [7] maximum paths per InvokeRequests list; 0 = omit
-}
+// SessionParameters is the handshake's SessionParameters structure,
+// shared with the PASE path: [sessionparams.Parameters] (tags 1-9,
+// PaseMessages.ts:28-58; CaseMessages.ts:34, :46, :55 reuse the schema).
+type SessionParameters = sessionparams.Parameters
 
 // parseSessionParameters reads a SessionParameters container the
 // decoder has just entered (Sigma1 initiatorSessionParams, tag 5).
@@ -459,51 +457,19 @@ func parseSessionParameters(dec *sigmaDecoder) (SessionParameters, error) {
 			sp.SpecificationVersion = uint32(val.u & 0xFFFFFFFF)
 		case 7:
 			sp.MaxPathsPerInvoke = uint16(val.u & 0xFFFF)
+		case 8:
+			sp.SupportedTransports = uint16(val.u & 0xFFFF)
+		case 9:
+			sp.MaxTCPMessageSize = uint32(val.u & 0xFFFFFFFF)
 		}
 	}
 }
 
-// isEmpty reports whether the SessionParameters carries no hint at
-// all. An all-zero SessionParameters is omitted on the wire so the
-// responder behaves as if no struct was supplied.
-func (sp SessionParameters) isEmpty() bool {
-	return sp.SessionIdleInterval == 0 &&
-		sp.SessionActiveInterval == 0 &&
-		sp.SessionActiveThreshold == 0 &&
-		sp.DataModelRevision == 0 &&
-		sp.InteractionModelRevision == 0 &&
-		sp.SpecificationVersion == 0 &&
-		sp.MaxPathsPerInvoke == 0
-}
-
-// encode writes the SessionParameters fields into `enc` as a
-// context-tag-`outerTag` sub-struct. The outer tag is the parent's
-// chosen number (Sigma2 uses 5; Sigma2_Resume uses 4 — see Matter
-// §4.14.2.3 / §4.14.2.4).
-func (sp SessionParameters) encode(enc *sigmaEncoder, outerTag uint8) {
-	enc.startStructTag(outerTag)
-	if sp.SessionIdleInterval != 0 {
-		enc.putUint32(1, sp.SessionIdleInterval)
-	}
-	if sp.SessionActiveInterval != 0 {
-		enc.putUint32(2, sp.SessionActiveInterval)
-	}
-	if sp.SessionActiveThreshold != 0 {
-		enc.putUint16(3, sp.SessionActiveThreshold)
-	}
-	if sp.DataModelRevision != 0 {
-		enc.putUint16(4, sp.DataModelRevision)
-	}
-	if sp.InteractionModelRevision != 0 {
-		enc.putUint16(5, sp.InteractionModelRevision)
-	}
-	if sp.SpecificationVersion != 0 {
-		enc.putUint32(6, sp.SpecificationVersion)
-	}
-	if sp.MaxPathsPerInvoke != 0 {
-		enc.putUint16(7, sp.MaxPathsPerInvoke)
-	}
-	enc.endContainer()
+// encodeSessionParameters writes sp into `enc` as a context-tag-`outerTag`
+// sub-struct (Sigma2 uses 5; Sigma2_Resume uses 4 — Matter §4.14.2.3 /
+// §4.14.2.4). Widths and the tag-9 rule are [sessionparams.Parameters.Encode].
+func encodeSessionParameters(enc *sigmaEncoder, outerTag uint8, sp SessionParameters) {
+	sp.Encode(enc.enc, tlv.ContextTag(outerTag))
 }
 
 // Sigma2 is the second message. ResponderRandom + ResponderSessionId
@@ -540,7 +506,7 @@ type Sigma2 struct {
 // CaseServer.ts:258-264 (`sendSigma2({ ..., responderSessionParams:
 // this.#sessions.sessionParameters })`) and chip
 // CASESession.cpp:1282,1326 (kResponderSessionParams = 5). The empty
-// case (SessionParams==nil OR SessionParams.isEmpty()) still omits
+// case (SessionParams==nil OR SessionParams.IsEmpty()) still omits
 // the tag entirely so the wire is byte-identical to the pre-fix
 // shape — only callers that supply non-empty hints emit the new field.
 func (s Sigma2) Marshal() []byte {
@@ -550,8 +516,8 @@ func (s Sigma2) Marshal() []byte {
 	enc.putUint16(2, s.ResponderSessionID)
 	enc.putOctets(3, s.ResponderEphPubKey)
 	enc.putOctets(4, s.Encrypted2)
-	if s.SessionParams != nil && !s.SessionParams.isEmpty() {
-		s.SessionParams.encode(enc, 5)
+	if s.SessionParams != nil && !s.SessionParams.IsEmpty() {
+		encodeSessionParameters(enc, 5, *s.SessionParams)
 	}
 	enc.endContainer()
 	return enc.bytes()
@@ -769,7 +735,7 @@ type Sigma2Resume struct {
 // Mirrors matter.js packages/protocol/src/session/case/CaseServer.ts:186-191
 // (`sendSigma2Resume({ ..., responderSessionParams: this.#sessions.sessionParameters })`)
 // and chip CASESession.cpp:1113,1144. The empty case (SessionParams==nil
-// OR SessionParams.isEmpty()) still omits the tag entirely so the wire
+// OR SessionParams.IsEmpty()) still omits the tag entirely so the wire
 // is byte-identical to the pre-fix shape.
 func MarshalSigma2Resume(s Sigma2Resume) []byte {
 	enc := sigmaTLVEncoder()
@@ -777,8 +743,8 @@ func MarshalSigma2Resume(s Sigma2Resume) []byte {
 	enc.putOctets(1, s.ResumptionID)
 	enc.putOctets(2, s.Sigma2ResumeMIC)
 	enc.putUint16(3, s.ResponderSessionID)
-	if s.SessionParams != nil && !s.SessionParams.isEmpty() {
-		s.SessionParams.encode(enc, 4)
+	if s.SessionParams != nil && !s.SessionParams.IsEmpty() {
+		encodeSessionParameters(enc, 4, *s.SessionParams)
 	}
 	enc.endContainer()
 	return enc.bytes()

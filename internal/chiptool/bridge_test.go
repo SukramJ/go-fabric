@@ -242,7 +242,14 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	if opts.listen == "" {
 		opts.listen = defaultListen
 	}
-	args := []string{"--db", opts.dbPath, "--listen", opts.listen}
+	// TCP stays at the daemon's default (on): the PICS declare
+	// MCORE.SC.S.TCP=1 (testdata/reference-bridge.pics) and TC-SC-4.3
+	// checks the operational T key against it (chip 6170af84
+	// src/python_testing/mdns_discovery/utils/network.py:78-92
+	// is_dut_tcp_supported: "T key present and not 0"). --ota-harness
+	// applies a downloaded OTA image in place so TC-SU cases that read the
+	// new SoftwareVersion see it (brief N).
+	args := []string{"--db", opts.dbPath, "--listen", opts.listen, "--ota-harness"}
 	if flags["log-level"] {
 		// The daemon-side view of a failed handshake is the only thing that
 		// says which stage stopped; chip-tool's output alone cannot.

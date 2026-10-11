@@ -1190,14 +1190,6 @@ implementation wave.
 
 ---
 
-### BD-Matter-CASE-StalePeerEviction — same-peer sessions evicted on CASE establishment
-
-**Go path:** `secure/operational/manager.go` — `collectStalePeerSessionsLocked`, called from `OpenFromSigma` / `OpenFromSigmaWithID`.
-
-**Rationale:** matter.js does NOT evict same-peer sessions when a new CASE session is established — `SessionManager.ts:396` `createSecureSession` retains concurrent `(fabric, peerNode)` sessions and reclaims a session id only on exhaustion (`getNextAvailableSessionId` → `findOldestInactiveSession`, `:455-476`). There is no `removeAllSessionsForNode` in matter.js HEAD. go-fabric deliberately diverges: on every CASE establishment it closes any pre-existing session for the same `(fabricIndex, peerNodeID)`. Apple iOS' Matter daemon caches old session keys across daemon restarts and replays them with counter values far above the bridge's in-memory reception window; without eviction the bridge keeps decrypting against the stale entry, fails authentication, and the commissioner aborts the pair attempt with INVALID_PARAMETER. The eviction is locked by dedicated tests (`TestManager_OpenFromSigma_EvictsStalePeerSession` and the DifferentPeer/DifferentFabric keep-existing counter-tests). Reversing it to match matter.js's retain-concurrent behaviour would reintroduce the Apple pairing abort and cannot be validated without live Apple hardware; kept as a deliberate interop divergence.
-
----
-
 ### BD-Matter-CASE-IDExhaustionEvictsPlaceholdersOnly — id exhaustion reclaims reserved ids, never a live session
 
 **Go path:** `secure/operational/manager.go` — `allocateIDLocked` (exhaustion fallback) + `PlaceholderIDTTL`.
@@ -1227,14 +1219,6 @@ implementation wave.
 **Go path:** `bridge/securechannel.go` — `claimPaseInFlight` / `releasePaseInFlight` (the single-active-PASE claim, released on Pake3).
 
 **Rationale:** matter.js `PaseServer.ts:80-81` refuses a new PASE exchange while an established, non-closing PASE session exists (`getPaseSession() !== undefined && !isClosing`), not just while a handshake is mid-flight. The bridge's only gate is the in-flight claim, which `releasePaseInFlight` clears on Pake3 — so a second `PBKDFParamRequest` arriving after the first PASE completes (but before CommissioningComplete) is accepted. A faithful, non-regressive fix needs an `operational.Manager` "active non-closing PASE session" predicate plus a bridge-side gate; a bridge-only heuristic (holding the in-flight claim through Pake3) over-blocks a legitimate retry after a failed post-PASE commissioning inside the window and under-blocks a commission running past the 60 s self-expiry — semantically muddy versus matter.js and a commissioning-flow regression risk that cannot be validated without live commissioner hardware. Defense-in-depth only (`AdministratorCommissioning` already returns `Busy` to a second window-open); deferred to a lane that can validate the manager-predicate approach end-to-end.
-
----
-
-### BD-Matter-PASE-SessionParametersLegacy — PBKDFParamResponse emits only the legacy MRP triplet
-
-**Go path:** `bridge/handlers.go` + `secure/spake2/wire.go` — PBKDFParamResponse tag-5 (`ResponderMRPParams`).
-
-**Rationale:** matter.js `PaseMessages.ts:23-50` serialises the full 1.3+ `TlvSessionParameters` (idle/active as UInt32, activeThreshold, dataModelRevision, interactionModelRevision, specificationVersion, maxPathsPerInvoke) into the PBKDFParamResponse's responderSessionParams, and types the initiator's idle/active intervals as UInt32. go-fabric's PASE wire layer emits only the legacy 3-field SED/MRP triplet and decodes the initiator's idle/active intervals as uint16 (truncating > 65535 ms). The matter.js-faithful target already exists in-tree as `sigma.SessionParameters` (the CASE Sigma2 path emits the full struct); unifying PASE onto it means reshaping the exported `spake2.MRPParameters` struct, which is consumed by `cmd/openccu-loom/daemon_matter.go`. Practically unreachable in the server-responder role — only a commissioner-initiator's InitiatorMRPParams passes through this decode, and commissioners (phone/hub, non-sleepy) advertise sub-65535 ms intervals. Deferred; recommend unifying PASE onto `sigma.SessionParameters` in a future pass.
 
 ---
 

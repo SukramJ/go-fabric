@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
+
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/im"
 
@@ -110,18 +112,19 @@ type PaseAdapter struct {
 	// Header.SessionID for any encrypted reply.
 	peerSessionID uint16
 
-	// peerMRPParams retains the commissioner's InitiatorMRPParams
+	// peerSessionParams retains the commissioner's SessionParameters
 	// (PBKDFParamRequest tag 5, nil when absent) so the PASE session
 	// opener can size retransmissions to the peer's advertised
-	// intervals. Mirrors matter.js PaseServer.ts:155-157.
-	peerMRPParams *spake2.MRPParameters
+	// intervals and learn its transports. Mirrors matter.js
+	// PaseServer.ts:155-157.
+	peerSessionParams *sessionparams.Parameters
 
-	// responderMRPParams, when non-nil, is emitted as
-	// PBKDFParamResponse tag 5 (ResponderMRPParams) so the
-	// commissioner aligns its retransmit budget with the bridge's
-	// advertised intervals. Mirrors matter.js PaseServer.ts:151
-	// `responderSessionParams = this.sessions.sessionParameters`.
-	responderMRPParams *spake2.MRPParameters
+	// responderSessionParams is emitted as PBKDFParamResponse tag 5.
+	// Nil means [DefaultSessionParameters]: matter.js answers every
+	// PBKDFParamRequest with the node's session parameters, the same
+	// ones CASE advertises (PaseServer.ts:151 `responderSessionParams =
+	// this.sessions.sessionParameters`; CaseServer.ts:272).
+	responderSessionParams *sessionparams.Parameters
 }
 
 // PaseSessionEstablished fires after a successful Pake3 verification.
@@ -201,29 +204,84 @@ func (a *PaseAdapter) SetPBKDFParams(iterations uint32, salt []byte, responderSe
 	a.responderSessionID = responderSessionID
 }
 
-// SetResponderMRPParams configures the MRP retransmit profile the
-// adapter advertises as PBKDFParamResponse tag 5. Nil omits the field
-// (commissioners fall back to spec defaults). Mirrors matter.js
-// PaseServer.ts:151 responderSessionParams.
-func (a *PaseAdapter) SetResponderMRPParams(p *spake2.MRPParameters) {
+// SetResponderSessionParams configures the SessionParameters the adapter
+// advertises as PBKDFParamResponse tag 5. Nil restores
+// [DefaultSessionParameters]; an empty structure omits the field.
+// Mirrors matter.js PaseServer.ts:151 responderSessionParams.
+func (a *PaseAdapter) SetResponderSessionParams(p *sessionparams.Parameters) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.responderMRPParams = p
+	a.responderSessionParams = p
 }
 
-// PeerMRPParams returns the commissioner's InitiatorMRPParams from
-// the most recent PBKDFParamRequest, or nil when the commissioner
-// omitted the field. The daemon's PASE onEstablished callback stamps
-// these onto the operational entry (matter.js PaseServer.ts:155-157
-// `session.timingParameters = initiatorSessionParams`).
-func (a *PaseAdapter) PeerMRPParams() *spake2.MRPParameters {
+// SetResponderMRPParams configures the MRP triplet of the advertised
+// SessionParameters, keeping the other fields of
+// [DefaultSessionParameters]. Nil restores the defaults.
+//
+// Deprecated: use [PaseAdapter.SetResponderSessionParams]. Marked in
+// v0.3.0; removal is permissible from v0.5.0, the second minor release
+// after the marking one (README §API stability).
+func (a *PaseAdapter) SetResponderMRPParams(p *spake2.MRPParameters) {
+	if p == nil {
+		a.SetResponderSessionParams(nil)
+		return
+	}
+	sp := DefaultSessionParameters()
+	m := p.Parameters()
+	if m.SessionIdleInterval != 0 {
+		sp.SessionIdleInterval = m.SessionIdleInterval
+	}
+	if m.SessionActiveInterval != 0 {
+		sp.SessionActiveInterval = m.SessionActiveInterval
+	}
+	if m.SessionActiveThreshold != 0 {
+		sp.SessionActiveThreshold = m.SessionActiveThreshold
+	}
+	a.SetResponderSessionParams(&sp)
+}
+
+// PeerSessionParams returns the commissioner's SessionParameters from
+// the most recent PBKDFParamRequest, or nil when it sent none. The PASE
+// session opener stamps them onto the operational entry (matter.js
+// PaseServer.ts:155-157).
+func (a *PaseAdapter) PeerSessionParams() *sessionparams.Parameters {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.peerMRPParams == nil {
+	if a.peerSessionParams == nil {
 		return nil
 	}
-	cp := *a.peerMRPParams
+	cp := *a.peerSessionParams
 	return &cp
+}
+
+// PeerMRPParams returns the MRP triplet of the commissioner's
+// SessionParameters, or nil when it stated none of the three.
+//
+// Deprecated: use [PaseAdapter.PeerSessionParams]. Marked in v0.3.0;
+// removal is permissible from v0.5.0, the second minor release after the
+// marking one (README §API stability).
+func (a *PaseAdapter) PeerMRPParams() *spake2.MRPParameters {
+	p := a.PeerSessionParams()
+	if p == nil {
+		return nil
+	}
+	m := spake2.MRPParameters{}
+	if p.SessionIdleInterval != 0 {
+		v := p.SessionIdleInterval
+		m.IdleRetransTimeoutMs = &v
+	}
+	if p.SessionActiveInterval != 0 {
+		v := p.SessionActiveInterval
+		m.ActiveRetransTimeoutMs = &v
+	}
+	if p.SessionActiveThreshold != 0 {
+		v := p.SessionActiveThreshold
+		m.ActiveThresholdTimeMs = &v
+	}
+	if m.IdleRetransTimeoutMs == nil && m.ActiveRetransTimeoutMs == nil && m.ActiveThresholdTimeMs == nil {
+		return nil
+	}
+	return &m
 }
 
 // ProcessPBKDFParamRequest decodes the commissioner's request, picks
@@ -271,9 +329,9 @@ func (a *PaseAdapter) ProcessPBKDFParamRequest(payload []byte) (opcode uint8, re
 		InitiatorRandom:    req.InitiatorRandom,
 		ResponderRandom:    respRand[:],
 		ResponderSessionID: a.responderSessionID,
-		// Advertise the bridge's MRP profile (tag 5) when configured
-		// — matter.js PaseServer.ts:151/:160 responderSessionParams.
-		ResponderMRPParams: a.responderMRPParams,
+		// Advertise the node's SessionParameters (tag 5) — matter.js
+		// PaseServer.ts:151/:160 responderSessionParams.
+		ResponderSessionParams: a.responderSessionParamsLocked(),
 	}
 	if !req.HasPBKDFParameters {
 		resp.Parameters = &spake2.PBKDFParameters{
@@ -290,9 +348,9 @@ func (a *PaseAdapter) ProcessPBKDFParamRequest(payload []byte) (opcode uint8, re
 	// Capture the commissioner's local session id so the post-Pake3
 	// session pickup can hand it to the operational manager.
 	a.peerSessionID = req.InitiatorSessionID
-	// Retain the commissioner's MRP tuning (tag 5) for the session
-	// opener — matter.js PaseServer.ts:155-157.
-	a.peerMRPParams = req.InitiatorMRPParams
+	// Retain the commissioner's SessionParameters (tag 5) for the
+	// session opener — matter.js PaseServer.ts:155-157.
+	a.peerSessionParams = req.InitiatorSessionParams
 	return mrp.SCOpcodePBKDFParamResponse, respBytes, nil
 }
 
@@ -535,6 +593,36 @@ func NewCaseAdapter(r *sigma.Responder) *CaseAdapter {
 		r.SetSessionParameters(&p)
 	}
 	return &CaseAdapter{responder: r}
+}
+
+// responderSessionParamsLocked is the structure PBKDFParamResponse tag 5
+// carries, with the adapter's mutex held: the host's choice, else
+// [DefaultSessionParameters] — matter.js sends the node's session
+// parameters on every PBKDFParamResponse (PaseServer.ts:151).
+func (a *PaseAdapter) responderSessionParamsLocked() *sessionparams.Parameters {
+	if a.responderSessionParams != nil {
+		return a.responderSessionParams
+	}
+	p := DefaultSessionParameters()
+	return &p
+}
+
+// SessionParametersFor is [DefaultSessionParameters] with the node's
+// transports stated: the SupportedTransports bitmap
+// ([sessionparams.TransportTCPClient], [sessionparams.TransportTCPServer])
+// and, when it names TCP, MaxTCPMessageSize — matter.js's fallback of
+// 64000 bytes unless the host passes its own bound (SessionParameters.ts:55-62,
+// :133). A node without TCP states neither field.
+func SessionParametersFor(transports uint16, maxTCPMessageSize uint32) sigma.SessionParameters {
+	p := DefaultSessionParameters()
+	p.SupportedTransports = transports
+	if p.SupportsTCP() {
+		p.MaxTCPMessageSize = maxTCPMessageSize
+		if p.MaxTCPMessageSize == 0 {
+			p.MaxTCPMessageSize = sessionparams.DefaultMaxTCPMessageSize
+		}
+	}
+	return p
 }
 
 // DefaultSessionParameters is what a node advertises in Sigma2 when the
@@ -809,13 +897,14 @@ func (a *MRPAckAdapter) Discharge(sessionID, exchangeID uint16, initiator bool) 
 // non-nil `fabricFor` closure — Subscribe, ACL checks and any other
 // fabric-scoped logic can then resolve `(sessionID → fabricIndex)`.
 type OperationalSessionLookup struct {
-	get         func(sessionID uint16) (*channel.Session, bool)
-	fabricFor   func(sessionID uint16) (uint8, bool)
-	subjectFor  func(sessionID uint16) (uint64, []uint32, bool)
-	paseFor     func(sessionID uint16) (bool, bool)
-	intervalFor func(sessionID uint16, now time.Time) (time.Duration, bool)
-	markRx      func(sessionID uint16)
-	markTx      func(sessionID uint16)
+	get           func(sessionID uint16) (*channel.Session, bool)
+	fabricFor     func(sessionID uint16) (uint8, bool)
+	subjectFor    func(sessionID uint16) (uint64, []uint32, bool)
+	paseFor       func(sessionID uint16) (bool, bool)
+	intervalFor   func(sessionID uint16, now time.Time) (time.Duration, bool)
+	transportsFor func(sessionID uint16) (uint16, uint32, bool)
+	markRx        func(sessionID uint16)
+	markTx        func(sessionID uint16)
 }
 
 // SessionFabricResolver is an optional capability a [SessionLookup]
@@ -967,6 +1056,27 @@ func (l *OperationalSessionLookup) WithRetransmitIntervalResolver(intervalFor fu
 	}
 	l.intervalFor = intervalFor
 	return l
+}
+
+// WithTransportResolver installs the closure [OperationalSessionLookup.TransportParametersFor]
+// answers from: the peer's SupportedTransports bitmap and MaxTcpMessageSize
+// a host keeps on its operational entry ([operational.Entry.PeerTransportParameters]).
+func (l *OperationalSessionLookup) WithTransportResolver(transportsFor func(sessionID uint16) (uint16, uint32, bool)) *OperationalSessionLookup {
+	if l == nil {
+		return nil
+	}
+	l.transportsFor = transportsFor
+	return l
+}
+
+// TransportParametersFor implements [SessionTransportResolver]. Returns
+// (0, 0, false) when no resolver closure was supplied or the session is
+// unknown.
+func (l *OperationalSessionLookup) TransportParametersFor(sessionID uint16) (transports uint16, maxTCPMessageSize uint32, ok bool) {
+	if l == nil || l.transportsFor == nil {
+		return 0, 0, false
+	}
+	return l.transportsFor(sessionID)
 }
 
 // RetransmitBaseInterval implements [SessionRetransmitIntervalResolver].

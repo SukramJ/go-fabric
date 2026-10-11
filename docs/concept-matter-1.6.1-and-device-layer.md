@@ -56,8 +56,9 @@ go-fabric ist vollständig für Matter 1.6.1, wenn alle vier Sätze gelten:
 1. **Protokoll.** Jede Responder-Fähigkeit, die matter.js's `ServerNode`
    hat und die nicht durch eine Scope-Grenze ausgeschlossen ist, ist
    portiert: IM-Rest (Timed-Write pro Attribut, Subscription-Quota),
-   Commissioning-Rest (node-eigenes Fenster), Transport (TCP, BDX),
-   Sitzungsparameter auf dem PASE-Pfad.
+   Commissioning-Rest (node-eigenes Fenster), Transport (TCP als
+   Large-Payload-Pfad, BDX), Sitzungsparameter auf dem PASE-Pfad, und
+   der OTA-Requestor als BDX-Konsument (ADR 0019, 2026-10-11).
 2. **Cluster.** Jeder Cluster, den ein Gerätetyp im Scope als Server verlangt
    oder erlaubt, hat einen Server in `cluster/`.
 3. **Gerätetypen.** Jeder Gerätetyp im Scope ist über `device/` montierbar,
@@ -140,7 +141,7 @@ ihnen kein Server-Cluster fehlt; tatsächlich montierbar sind 61.
 | BDX | fehlt | `protocol/src/bdx` (BdxSession, BdxMessenger, BdxProtocol; 2 121 Zeilen mit TCP) |
 | Timed-Write pro Attribut | nur Request-Gate | `BD-Matter-TimedAndQuotaDeferred` |
 | Subscription-Quota pro Fabric | fehlt | dito |
-| PASE-Sitzungsparameter (1.3+) | Legacy-Tripel | `BD-Matter-PASE-SessionParametersLegacy` |
+| PASE-Sitzungsparameter (1.3+) | erledigt in Welle 5 (volle Struktur, Tags 1–9, `secure/sessionparams`) | matter.js `PaseMessages.ts:28-58`, `PaseServer.ts:151` |
 | ARL (Managed Aggregator) | nur Konstante | `BD-Matter-ARL-NotMounted` |
 | Server auf generierten Definitionen | alle Anwendungs-Server, `cluster/measurement`, GenericSwitch, AdministratorCommissioning und 14 Core-Server migriert (PR #32–#34, 2026-10-09); AccessControl, OperationalCredentials, GroupKeyManagement, Groupcast bewusst übersprungen | ADR 0013, Migrationsliste |
 | Gerätetyp-Definitionen als Code | nur Lookups | `docs/matterjs-comparison.md` §6, ◐ |
@@ -202,10 +203,23 @@ im Referenz-Daemon und PICS-Regeneration:
 
 Abschluss: 101 Server; jeder Gerätetyp im Scope montierbar.
 
-**Phase 3: TCP und BDX.** `transport/tcp` nach `TcpTransport.ts`,
-Sitzungsparameter-Aushandlung für große Nutzlasten, `bdx/` als Responder
-für `DiagnosticLogs.RetrieveLogsRequest` mit `TransferFileDesignator`. Kein
-OTA. Abschluss: DLOG-Familie läuft; `BD-chip-DiagLogs-NoBDX` entfällt.
+**Phase 3: TCP, BDX und OTA-Requestor** (ADR 0019, Wizard 2026-10-11).
+`transport/tcp` nach `TcpTransport.ts`/`TcpChannel.ts` (4-Byte-Längenpräfix,
+höchstens drei Verbindungen je Peer-IP, 10 s bis zum ersten Byte),
+transportneutrale Verbindung in `bridge/` statt `*net.UDPAddr`, kein MRP
+über TCP, Sitzungs-Evakuierung bei Verbindungsabriss
+(`ExchangeManager.ts:628-655`), mDNS-`T`-Flag und TCP-Listener im
+Referenz-Daemon; Sitzungsparameter `supportedTransports` (Tag 8) und
+`maxTcpMessageSize` (Tag 9) auf CASE und PASE, PASE auf
+`sigma.SessionParameters` vereinheitlicht, CASE/PASE auch über TCP
+(Owner, `secure/`). `bdx/` nach `protocol/src/bdx` als Empfänger und
+Initiator; `cluster/core` OTA-Requestor als Port von
+`OtaSoftwareUpdateRequestorServer.ts` (1 436 Zeilen) mit Host-Port zum
+Anwenden; der ADR-0008-Initiator wird auf einen Invoke und einen
+BDX-Transfer zum Provider verallgemeinert. DiagnosticLogs bleibt ohne BDX
+(matter.js hat keines; DLOG/2.1 ist manuell). Abschluss: SU- und
+BDX-Familien laufen gegen `chip-ota-provider-app` aus dem Harness-Image;
+`BD-Matter-PASE-SessionParametersLegacy` entfällt.
 
 **Phase 4: Geräteschicht `device/` und Node-Fassade** (Teil B). Der
 Referenz-Daemon migriert als erster Konsument; `examples/reference-bridge`
@@ -496,7 +510,7 @@ Entscheidung steht, und was es kosten würde, ihn später hereinzuholen.
 | Thread, Thread-Border-Router-Client, Thread-Netzwerk-Diagnose | Der Host hängt an Ethernet oder Wi-Fi; NetworkCommissioning meldet Ethernet. | Non-goal, `docs/matterjs-comparison.md` §2 | Setzt Thread-Hardware oder einen Border-Router voraus. |
 | Wi-Fi-Commissioning (NetworkCommissioning Feature WI) | Ohne BLE gibt es keinen Weg, Credentials vor dem Netzbeitritt zu übergeben. | Wizard, Runde 1 | Folgt BLE. |
 | Groupcast-Sender-Feature, Gruppen-Senden | Senden ist Initiator-Verhalten. | `BD-Matter-GroupcastNoSender` | Folgt dem Minimal-Controller. |
-| TCP für Kamera-Streams | TCP kommt (Phase 3), aber nur als Large-Payload-Pfad für DiagnosticLogs. Streaming-Nutzlasten brauchen die Kamera-Cluster aus F.2. | Wizard, Runde 1 | Mit F.2 Kamera. |
+| TCP für Kamera-Streams | TCP kommt (Phase 3) als Large-Payload-Pfad und als BDX-Träger für den OTA-Requestor (ADR 0019). Streaming-Nutzlasten brauchen die Kamera-Cluster aus F.2. | Wizard, Runde 1 | Mit F.2 Kamera. |
 
 ### F.2 Cluster-Familien (32 Cluster)
 
@@ -531,7 +545,7 @@ BridgedNode, PowerSource und ElectricalSensor.
 
 | Punkt | Heute | Warum draußen | Weg herein |
 | --- | --- | --- | --- |
-| OTA-Requestor vollständig (Query, Download, Apply, DefaultOTAProviders persistent) | Stub, nicht montiert | Ein Bridge-Produkt bringt seinen eigenen Update-Pfad mit; Apple und Google nutzen den Requestor gebridgter Geräte nicht. Nach TCP+BDX (Phase 3) ist er technisch möglich. | matter.js `ota-software-update-requestor` (1 436 Zeilen) portieren, Host-Port für das Anwenden. SU-Familie (13 Fälle) wird lauffähig. |
+| OTA-Requestor vollständig (Query, Download, Apply, DefaultOTAProviders persistent) | **Aufgenommen am 2026-10-11 (ADR 0019, Welle 5):** BDX hat in matter.js nur OTA als Konsument, DiagnosticLogs macht dort kein BDX. Der OTA-**Provider** bleibt draußen (`BD-Matter-OTAProvider-NotExposed`). | — | SU-Familie (13 Fälle) und BDX-Familie (11 Fälle) gegen `chip-ota-provider-app`. |
 | Binding-Tabelle und Client-Cluster-Deklaration | Server mit Tabelle vorhanden, kein Endpoint deklariert Clients | Ohne Sender hat die Tabelle keinen Effekt; sie nur zu persistieren täuscht einem Controller Fähigkeit vor. | Mit dem Minimal-Controller. BIND-Familie (3 Fälle). |
 | ICDManagement | Attribute 0..2, nicht montiert | Eine netzbetriebene Bridge ist kein Intermittently Connected Device; ein Controller hielte den Node für schläfrig. | Nur für ein Batteriegerät auf go-fabric, das ohne Thread und BLE nicht entsteht. ICDM-Familie (7 Fälle). |
 | Access Restriction List (Managed Aggregator) | Konstante und Integrationspunkt | Kein Konsument hat den Managed-Aggregator-Fall. | `BD-Matter-ARL-NotMounted` nennt die Reaktivierungs-Checkliste. |

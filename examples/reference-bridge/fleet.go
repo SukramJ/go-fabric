@@ -1505,6 +1505,8 @@ type fleet struct {
 	// The energy-market devices (fleet_energy_market.go).
 	energyTariff    *demoEnergyTariff
 	electricalMeter *demoElectricalMeter
+	// esa is the state-forecast ESA (fleet_esa.go).
+	esa *demoEsa
 
 	assembler *endpoint.Assembler
 	// labels returns the NodeLabel a controller wrote for a bridged
@@ -1565,6 +1567,7 @@ func newFleet(store endpoint.Store, cfg endpoint.Config, logger *slog.Logger) (*
 
 		energyTariff:    newDemoEnergyTariff("Energy Tariff"),
 		electricalMeter: newDemoElectricalMeter("Grid Meter"),
+		esa:             newDemoEsa("Charger ESA"),
 	}, nil
 }
 
@@ -1721,5 +1724,5 @@ func (f *fleet) surfaceSpecs() []endpoint.Spec {
 		charger,
 		spec("panel", f.panel.name, f.panel.MatterDeviceType(), f.panel),
 		sensor("soil", f.soil.name, f.soil),
-	}, f.energyMarketSpecs(spec)...)
+	}, append(f.energyMarketSpecs(spec), f.esaSpec(spec))...)
 }

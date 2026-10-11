@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -30,7 +31,10 @@ import (
 //   - The announcement. Every deprecated identifier must be named in
 //     CHANGELOG.md, because the window only means something to a consumer who
 //     is told the clock is running.
-var deprecatedMarker = regexp.MustCompile(`(?m)^// Deprecated: `)
+//
+// A marker inside a `const (` or `var (` group is indented; it is a marker
+// all the same (SA1019 reads it), so the pattern allows leading space.
+var deprecatedMarker = regexp.MustCompile(`(?m)^[ \t]*// Deprecated: `)
 
 // looseDeprecation catches the near-misses that produce no tooling warning —
 // a comment that OPENS with the word and so was plainly meant as a marker,
@@ -38,6 +42,8 @@ var deprecatedMarker = regexp.MustCompile(`(?m)^// Deprecated: `)
 // does not match a mention of deprecation inside a sentence: prose about the
 // policy is not a marker, and flagging it would make the guard fire on its
 // own documentation.
+// It stays at the top level: indented, the word opens prose about wire
+// values the spec retired (FanMode, the WindowCovering percent fields).
 var looseDeprecation = regexp.MustCompile(`(?mi)^//\s*deprecated\b[^\n]*$`)
 
 func TestDeprecationMarkersMatchThePolicy(t *testing.T) {
@@ -60,7 +66,7 @@ func TestDeprecationMarkersMatchThePolicy(t *testing.T) {
 		// Every loose mention that is not one of the proper ones is a
 		// candidate for a marker that will never warn anyone.
 		for _, m := range looseDeprecation.FindAllString(text, -1) {
-			if strings.HasPrefix(m, "// Deprecated: ") {
+			if strings.HasPrefix(strings.TrimLeft(m, " \t"), "// Deprecated: ") {
 				continue // the exact form the policy asks for
 			}
 			loose = append(loose, rel+": "+strings.TrimSpace(m))
@@ -91,16 +97,10 @@ func TestDeprecatedIdentifiersAreAnnounced(t *testing.T) {
 		t.Fatalf("read CHANGELOG.md: %v", err)
 	}
 
-	// The identifier a `Deprecated: ` marker belongs to is the one declared
-	// on the next non-comment line. Parsing Go for that is overkill here:
-	// the declaration line is enough to name it.
-	declAfterMarker := regexp.MustCompile(`(?m)^// Deprecated: [^\n]*\n(?://[^\n]*\n)*(?:func|type|var|const|)\s*(?:\([^)]*\)\s*)?([A-Z]\w*)`)
-
 	var missing []string
 	walkGoFiles(t, root, func(path string, src []byte) {
 		rel, _ := filepath.Rel(root, path)
-		for _, m := range declAfterMarker.FindAllStringSubmatch(string(src), -1) {
-			ident := m[1]
+		for _, ident := range deprecatedIdentifiers(string(src)) {
 			if !strings.Contains(string(changelog), ident) {
 				missing = append(missing, rel+": "+ident)
 			}
@@ -112,6 +112,87 @@ func TestDeprecatedIdentifiersAreAnnounced(t *testing.T) {
 			"means something to a consumer who is told the clock is running — README.md's API "+
 			"stability section says the deprecation is announced when it is marked, not when it "+
 			"is removed", m)
+	}
+}
+
+// declAfterMarker finds the declaration a `Deprecated: ` marker belongs to:
+// the one on the next non-comment line. Parsing Go for that is overkill
+// here: the declaration line is enough to name it. Group 1 is set when the
+// marker documents a whole `const (` / `var (` group, whose members
+// groupMembers then reads; group 2 is the identifier of a single
+// declaration.
+var declAfterMarker = regexp.MustCompile(`(?m)^[ \t]*// Deprecated: [^\n]*\n(?:[ \t]*//[^\n]*\n)*[ \t]*(?:(?:const|var)[ \t]*(\()|(?:func|type|var|const|)[ \t]*(?:\([^)]*\)[ \t]*)?([A-Z]\w*))`)
+
+// groupMember is the exported names one line of a declaration group
+// declares (`Name`, `Name Type = v`, `A, B = 1, 2`).
+var groupMember = regexp.MustCompile(`^\s*([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)\b`)
+
+// deprecatedIdentifiers returns every identifier a `Deprecated: ` marker in
+// src covers: the declaration after it, every member of a `const (` /
+// `var (` group whose doc comment carries it (the policy deprecates the
+// group's names, not the keyword), and a group member with its own marker.
+func deprecatedIdentifiers(src string) []string {
+	var out []string
+	for _, m := range declAfterMarker.FindAllStringSubmatchIndex(src, -1) {
+		switch {
+		case m[2] >= 0:
+			out = append(out, groupMembers(src[m[3]:])...)
+		case m[4] >= 0:
+			out = append(out, src[m[4]:m[5]])
+		}
+	}
+	return out
+}
+
+// groupMembers reads the exported names of a declaration group, from the
+// text after its opening paren to the line that closes it. Comment and
+// blank lines name nothing.
+func groupMembers(body string) []string {
+	var out []string
+	for _, line := range strings.Split(body, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, ")") {
+			break
+		}
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+		if g := groupMember.FindStringSubmatch(line); g != nil {
+			for _, name := range strings.Split(g[1], ",") {
+				out = append(out, strings.TrimSpace(name))
+			}
+		}
+	}
+	return out
+}
+
+// TestDeprecatedConstGroupIsChecked holds the announcement check to a
+// deprecation written on a `const (` group: the marker documents the group,
+// so each of its names must reach CHANGELOG.md. The first such groups in
+// the module are ModeSelect's field tags (report L, question 5); before
+// this test the check read no identifier out of them.
+func TestDeprecatedConstGroupIsChecked(t *testing.T) {
+	t.Parallel()
+
+	src, err := os.ReadFile(filepath.Join(moduleRoot(t), "cluster", "modeselect", "modeselect_server.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := deprecatedIdentifiers(string(src))
+	for _, want := range []string{
+		"ModeOptionFieldLabel", "ModeOptionFieldMode", "ModeOptionFieldSemanticTags",
+		"SemanticTagFieldMfgCode", "SemanticTagFieldValue",
+	} {
+		if !slices.Contains(got, want) {
+			t.Errorf("deprecatedIdentifiers misses %s in cluster/modeselect/modeselect_server.go (found %v)", want, got)
+		}
+	}
+
+	synthetic := "// Deprecated: gone.\nconst (\n\t// A is one.\n\tA uint8 = 0\n\n\tB, C = 1, 2\n\td = 3\n)\n\nconst E = 4\n" +
+		"const (\n\tF = 5\n\t// Deprecated: also gone.\n\tG = 6\n)\n// Deprecated: one.\nfunc H() {}\n" +
+		"// Deprecated: a method.\nfunc (r *R) M() {}\n"
+	if got, want := deprecatedIdentifiers(synthetic), []string{"A", "B", "C", "G", "H", "M"}; !slices.Equal(got, want) {
+		t.Errorf("deprecatedIdentifiers(synthetic) = %v, want %v", got, want)
 	}
 }
 

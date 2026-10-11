@@ -267,3 +267,41 @@ func TestWorkflowRunsEveryFamily(t *testing.T) {
 		}
 	}
 }
+
+// TestFamilyDeviceTypesResolve holds every endpoint the family table names
+// — a row's deviceType and each per-case endpoints entry — to the device
+// types the harness resolves (endpointDeviceTypes, pseudoEndpoints): an
+// unresolved one fails every case it names with "no endpoint advertises
+// device type", and only in the Linux CI run. A per-case entry must also
+// name a case the family has in the last run's descriptor (the golden
+// file), when the family has run.
+func TestFamilyDeviceTypesResolve(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", chipCasesGoldenFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var g docGolden
+	if err := json.Unmarshal(data, &g); err != nil {
+		t.Fatal(err)
+	}
+	resolves := func(dt uint32) bool {
+		if dt == 0 || slices.Contains(endpointDeviceTypes, dt) {
+			return true
+		}
+		at, ok := pseudoEndpoints[dt]
+		return ok && slices.Contains(endpointDeviceTypes, at[0]) && slices.Contains(endpointDeviceTypes, at[1])
+	}
+	for _, fam := range chipFamilies {
+		if !resolves(fam.deviceType) {
+			t.Errorf("family %s runs on device type 0x%X, which the harness does not resolve (endpointDeviceTypes)", fam.name, fam.deviceType)
+		}
+		for c, dt := range fam.endpoints {
+			if !resolves(dt) {
+				t.Errorf("%s/%s runs on device type 0x%X, which the harness does not resolve (endpointDeviceTypes)", fam.name, c, dt)
+			}
+			if cases, ran := g.Families[fam.name]; ran && !slices.Contains(cases, c) {
+				t.Errorf("%s/%s has an endpoints entry but the family has no such case in the image's descriptor (%v)", fam.name, c, cases)
+			}
+		}
+	}
+}

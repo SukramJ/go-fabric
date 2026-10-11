@@ -57,7 +57,7 @@ type sessionTurnKey struct{}
 // context carries the release of the session's turn.
 func (b *Bridge) handleOrderedDatagram(buf []byte, src *net.UDPAddr, release func()) {
 	ctx := context.WithValue(b.handlerContext(), sessionTurnKey{}, release)
-	_ = b.dispatch(ctx, buf, src)
+	_ = b.receive(ctx, buf, b.udpConn(src))
 }
 
 // leaveSessionOrder hands the session's turn to its next message: called

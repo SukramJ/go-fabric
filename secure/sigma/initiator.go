@@ -156,7 +156,7 @@ func NewPeerInitiator(cfg InitiatorConfig) (*Initiator, error) {
 		rec.PeerCATs = append([]uint32(nil), rec.PeerCATs...)
 		i.resumption = &rec
 	}
-	if cfg.SessionParams != nil && !cfg.SessionParams.isEmpty() {
+	if cfg.SessionParams != nil && !cfg.SessionParams.IsEmpty() {
 		sp := *cfg.SessionParams
 		i.sessionParams = &sp
 	}

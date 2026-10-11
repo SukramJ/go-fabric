@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 // statefulServer is a bridged cluster server that keeps its own state and
@@ -89,5 +90,49 @@ func TestAttributeChangeNotifierMarksOnlyTheNamedAttributes(t *testing.T) {
 	}
 	if !slices.Equal(dirty, []uint32{1}) {
 		t.Errorf("dirty attributes %v, want [1]", dirty)
+	}
+}
+
+// TestAttributeChangeNotifierOnRootIsReported: a root cluster server that
+// names its changed attributes — the OTA requestor's UpdateState is one —
+// gets them marked dirty on endpoint 0. Before, only bridged endpoints were
+// wired, so TC-SU-2.2's UpdateState subscription saw empty keep-alive
+// reports while the requestor moved to DelayedOnQuery (CI families run
+// 38136443914, SU_2.2-daemon.log: `paths=0` reports after the Busy answer).
+func TestAttributeChangeNotifierOnRootIsReported(t *testing.T) {
+	t.Parallel()
+	srv := &statefulServer{}
+	h := newSecureHarnessWith(t, func(*store.Store, uint8) (Snapshotter, []contract.ClusterServer) {
+		return nil, []contract.ClusterServer{srv}
+	})
+	spy := &reachAttrReporterSpy{}
+	mgr := subscription.NewManager(subscription.Config{}, spy.report, nil)
+	if _, err := mgr.Subscribe(subscription.SubscribeArgs{
+		FabricIndex: h.fabric, PeerNodeID: harnessControllerNodeID, SessionID: 1, MaxIntervalCeiling: 60,
+		AttributePaths: []im.ConcreteAttributePath{{HasEndpoint: true, HasCluster: true, HasAttribute: true, Endpoint: 0, Cluster: srv.MatterClusterID(), Attribute: 2}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	h.bridge.AttachSubscriptionManager(mgr)
+	root := h.bridge.Topology().FindByID(0)
+	before := root.ClusterDataVersion(srv.MatterClusterID())
+
+	srv.fire(2)
+	if root.ClusterDataVersion(srv.MatterClusterID()) != before {
+		t.Error("a root fire advanced the endpoint-hosted DataVersion; the root server's own tracker is authoritative")
+	}
+	mgr.Tick(context.Background(), time.Now().Add(2*time.Second))
+	spy.mu.Lock()
+	defer spy.mu.Unlock()
+	var dirty []im.ConcreteAttributePath
+	for _, call := range spy.calls {
+		for _, p := range call {
+			if p.Cluster == srv.MatterClusterID() {
+				dirty = append(dirty, p)
+			}
+		}
+	}
+	if len(dirty) != 1 || dirty[0].Endpoint != 0 || dirty[0].Attribute != 2 {
+		t.Errorf("dirty paths %+v, want endpoint 0 attribute 2", dirty)
 	}
 }

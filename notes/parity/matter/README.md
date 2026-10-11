@@ -14,6 +14,7 @@ fails a test instead of failing a controller.
 | `generate-application-fixtures.ts` | FanControl Step request payloads and the SmokeCoAlarm / PumpConfigurationAndControl / Switch event payloads (`TlvOfModel(element)`) | [`bridge/testdata/application-wire-fixtures.json`](../../../bridge/testdata/application-wire-fixtures.json) → `bridge/application_parity_matterjs_test.go` |
 | `generate-colorcontrol-fixtures.ts` | Every ColorControl request payload and the colour attributes cluster/light reads (`TlvOfModel(element)`) | [`bridge/testdata/colorcontrol-wire-fixtures.json`](../../../bridge/testdata/colorcontrol-wire-fixtures.json) → `bridge/colorcontrol_parity_matterjs_test.go` |
 | `generate-modeselect-fixtures.ts` | ModeSelect SupportedModes values, in bounds, small and wide integers (`TlvOfModel(element)`) | [`cluster/modeselect/testdata/modeselect-wire-fixtures.json`](../../../cluster/modeselect/testdata/modeselect-wire-fixtures.json) → `cluster/modeselect/modeselect_wire_parity_matterjs_test.go` |
+| `generate-bdx-wire-fixtures.ts` | Every BDX message (`BdxMessage.encode`/`decode`), the BDX StatusReport, *Init/*Accept payloads matter.js refuses with their BdxStatusCode, OTA images from `OtaImageWriter.create` | [`bdx/testdata/bdx-wire-fixtures.json`](../../../bdx/testdata/bdx-wire-fixtures.json) → `bdx/bdx_parity_matterjs_test.go` |
 | `generate-filter-fixtures.ts` | HepaFilterMonitoring / ActivatedCarbonFilterMonitoring ResetCondition requests and ReplacementProductList values (`TlvOfModel(element)`) | [`bridge/testdata/filter-wire-fixtures.json`](../../../bridge/testdata/filter-wire-fixtures.json) → `bridge/filter_parity_matterjs_test.go` |
 | `generate-group-fixtures.ts groupcast` | Groupcast command payloads, the Membership, AccessControl.AuxiliaryAcl / Acl / Extension and GroupKeyManagement GroupTable / GroupKeyMap values (unfiltered read), the GroupcastTesting / AuxiliaryAccessUpdated events (`TlvOfModel(element)`) | [`bridge/testdata/groupcast-wire-fixtures.json`](../../../bridge/testdata/groupcast-wire-fixtures.json) → `bridge/groupcast_parity_matterjs_test.go` |
 
@@ -58,6 +59,10 @@ node "$GO_FABRIC"/notes/parity/matter/generate-colorcontrol-fixtures.ts > /tmp/c
 
 node "$GO_FABRIC"/notes/parity/matter/generate-modeselect-fixtures.ts > /tmp/ms.json \
     && mv /tmp/ms.json "$GO_FABRIC"/cluster/modeselect/testdata/modeselect-wire-fixtures.json
+
+# needs packages/protocol transpiled (npm run build there; the transpile step suffices)
+node "$GO_FABRIC"/notes/parity/matter/generate-bdx-wire-fixtures.ts > /tmp/bdx.json \
+    && mv /tmp/bdx.json "$GO_FABRIC"/bdx/testdata/bdx-wire-fixtures.json
 ```
 
 Then run `go test ./tlv/... ./im/... ./bridge/... ./groups/... ./cluster/modeselect/...` from this module's root.
