@@ -204,8 +204,6 @@ type demoAirQualitySensor struct {
 	readings []*demoReading
 }
 
-var _ contract.EndpointSource = (*demoAirQualitySensor)(nil)
-
 func newDemoAirQualitySensor(name string) *demoAirQualitySensor {
 	return &demoAirQualitySensor{name: name, readings: []*demoReading{
 		newDemoReading(name+" CO2", contract.MeasurementCO2, 650),
@@ -221,18 +219,13 @@ func newDemoAirQualitySensor(name string) *demoAirQualitySensor {
 	}}
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (a *demoAirQualitySensor) MatterDeviceType() uint16 {
-	return contract.MeasurementClassDeviceType(contract.MeasurementCO2)
-}
-
-// MatterClusterServers implements [contract.EndpointSource]: AirQuality
+// servers are the cluster servers the device supplies: AirQuality
 // first, then each concentration cluster as its class materialises it
 // (the class's materialiser returns AirQuality and the concentration
 // cluster; the AirQuality copies are dropped), then EcosystemInformation
 // (BridgedNode: optional) with the demo directory that names this sensor
 // (fleet_node.go).
-func (a *demoAirQualitySensor) MatterClusterServers() []contract.ClusterServer {
+func (a *demoAirQualitySensor) servers() []contract.ClusterServer {
 	servers := []contract.ClusterServer{measurement.NewAirQualityServer(contract.MeasurementCO2, a.readings[0])}
 	for _, r := range a.readings {
 		for _, srv := range measurement.FromMeasurementClass(r.class, r, contract.MeasurementContext{}) {
@@ -333,8 +326,6 @@ type demoContactSensor struct {
 	config *boolcfg.Server
 }
 
-var _ contract.EndpointSource = (*demoContactSensor)(nil)
-
 func newDemoContactSensor(name string) *demoContactSensor {
 	cfg, err := boolcfg.New(boolcfg.Config{
 		Features:                   boolcfg.FeatureSensitivityLevel | boolcfg.FeatureVisual | boolcfg.FeatureAlarmSuppress,
@@ -351,13 +342,8 @@ func newDemoContactSensor(name string) *demoContactSensor {
 	return &demoContactSensor{demoBinary: newDemoBinary(name, contract.MeasurementContact, true), config: cfg}
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (c *demoContactSensor) MatterDeviceType() uint16 {
-	return contract.MeasurementClassDeviceType(contract.MeasurementContact)
-}
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (c *demoContactSensor) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (c *demoContactSensor) servers() []contract.ClusterServer {
 	return []contract.ClusterServer{measurement.NewBooleanStateServer(c.demoBinary), c.config}
 }
 

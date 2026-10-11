@@ -19,7 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/device"
 )
 
 // The two appliances below run a programme: an OperationalState (or
@@ -82,7 +82,6 @@ type demoWasher struct {
 const washCycleSeconds = 30
 
 var (
-	_ contract.EndpointSource  = (*demoWasher)(nil)
 	_ opstate.CommandHandler   = (*demoWasher)(nil)
 	_ modebase.ModeChanger     = (*demoWasher)(nil)
 	_ appliance.WasherListener = (*demoWasher)(nil)
@@ -90,11 +89,8 @@ var (
 
 func newDemoWasher(name string) *demoWasher { return &demoWasher{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (w *demoWasher) MatterDeviceType() uint16 { return opstate.DeviceTypeLaundryWasher }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (w *demoWasher) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (w *demoWasher) servers() []contract.ClusterServer {
 	w.build()
 	return []contract.ClusterServer{w.ops, w.modes, w.controls}
 }
@@ -375,18 +371,12 @@ type demoVacuum struct {
 	paused  bool
 }
 
-var (
-	_ contract.EndpointSource = (*demoVacuum)(nil)
-	_ opstate.CommandHandler  = (*demoVacuum)(nil)
-)
+var _ opstate.CommandHandler = (*demoVacuum)(nil)
 
 func newDemoVacuum(name string) *demoVacuum { return &demoVacuum{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (v *demoVacuum) MatterDeviceType() uint16 { return opstate.DeviceTypeRoboticVacuumCleaner }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (v *demoVacuum) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (v *demoVacuum) servers() []contract.ClusterServer {
 	v.build()
 	return []contract.ClusterServer{v.ops, v.run, v.clean}
 }
@@ -640,20 +630,14 @@ type demoFridge struct {
 // fridgeDoorOpen is the RefrigeratorAlarm the fridge supports.
 const fridgeDoorOpen = uint32(rfa.AlarmDoorOpen)
 
-var (
-	_ contract.EndpointSource = (*demoFridge)(nil)
-	_ modebase.ModeChanger    = (*demoFridge)(nil)
-)
+var _ modebase.ModeChanger = (*demoFridge)(nil)
 
 func newDemoFridge(name string) *demoFridge {
 	return &demoFridge{name: name, cabinet: &demoCabinet{name: name + " cabinet"}}
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (r *demoFridge) MatterDeviceType() uint16 { return deviceTypeRefrigerator }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (r *demoFridge) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (r *demoFridge) servers() []contract.ClusterServer {
 	r.build()
 	return []contract.ClusterServer{r.modes, r.alarm}
 }
@@ -705,15 +689,22 @@ func (r *demoFridge) reportDoor(open bool) error {
 	return r.alarm.SetState(fridgeDoorOpen)
 }
 
-// parts is the refrigerator's one compartment, a TemperatureControlledCabinet
-// stating the Cooler condition.
-func (r *demoFridge) parts() []endpoint.Spec {
-	return []endpoint.Spec{{
-		StableKey:        endpoint.StringKey("demo:fridge:cabinet"),
-		DeviceType:       deviceTypeTemperatureControlledCabinet,
-		Source:           r.cabinet,
-		DeviceConditions: []string{conditionCooler},
-	}}
+// device builds the fridge with its cooling compartment as a part: a
+// TemperatureControlledCabinet stating the Cooler condition the
+// Refrigerator requires of a descendant.
+func (r *demoFridge) device(opts device.Options) (*device.Refrigerator, error) {
+	fridge, err := device.NewRefrigerator(opts, serve(r.servers())...)
+	if err != nil {
+		return nil, err
+	}
+	cabinet, err := device.NewTemperatureControlledCabinet(part("demo:fridge:cabinet", conditionCooler), serve(r.cabinet.servers())...)
+	if err != nil {
+		return nil, err
+	}
+	if err := fridge.AddPart(cabinet.Device); err != nil {
+		return nil, err
+	}
+	return fridge, nil
 }
 
 func fridgeModes() []modebase.ModeOption {
@@ -736,16 +727,12 @@ type demoCabinet struct {
 }
 
 var (
-	_ contract.EndpointSource  = (*demoCabinet)(nil)
 	_ thermo.TemperatureSetter = (*demoCabinet)(nil)
 	_ modebase.ModeChanger     = (*demoCabinet)(nil)
 )
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (c *demoCabinet) MatterDeviceType() uint16 { return deviceTypeTemperatureControlledCabinet }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (c *demoCabinet) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (c *demoCabinet) servers() []contract.ClusterServer {
 	c.build()
 	return []contract.ClusterServer{c.temp, c.modes}
 }

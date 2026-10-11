@@ -16,7 +16,7 @@ import (
 // 6170af84) are manual end to end — every step is `disabled: true` — so
 // they drive no pipe command; the soil cases do.
 
-// soilKey is the soil sensor's StableKey (fleet.go surfaceSpecs).
+// soilKey is the soil sensor's StableKey (fleet.go endpoints).
 const soilKey = endpoint.StringKey("demo:soil:1")
 
 // errWrongSoilEndpoint: SetSimulatedSoilMoisture named an endpoint that

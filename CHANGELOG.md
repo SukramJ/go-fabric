@@ -18,6 +18,71 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- The device layer `device/` (ADR 0018, wave 6), **public API from this
+  release on** (README.md §API stability): one generated Go type per device
+  type in scope — 63 of the snapshot's 91, the rest named with their concept
+  Appendix F.3 group — with its id, revision, classification, composition
+  and the server and client cluster requirements matter.js's generator
+  derives (`RequirementGenerator.ts`, `ClusterRequirements.ts`: mandatory
+  and optional clusters, mandated features, element alterations, Base's
+  Binding where it mandates it). `device.New<Type>(Options, ...Option)`
+  mounts every mandatory server cluster and every optional one the host
+  opts in with a default `spec.Server` (features, mandated elements, stated
+  defaults; the default selection adds the features the cluster itself
+  marks mandatory), takes a host server instead (`WithServer` — also for a
+  cluster the type does not list, mounted after the type's own, as
+  matter.js's `MutableEndpoint.with` adds any behavior), the host model's
+  change notifier as the endpoint source's (`WithChangeNotifier`, for
+  servers that read their state through a host port), a feature
+  selection (`WithFeatures`, held to `spec.CheckFeatures` and to the
+  features the type mandates), an optional cluster (`WithOptional`),
+  optional elements (`WithElements`) and initial values (`WithInitial`). `Device.Spec()` turns a device and its
+  parts (`AddPart`, refused for a device type the owner does not compose)
+  into the `endpoint.Spec` the assembler consumes, with the type's
+  mandatory client clusters as `Spec.ClientClusters`; `Device.OnChanged`
+  delivers the server's attribute changes. Descriptor, Identify,
+  BridgedDeviceBasicInformation, Groups and ScenesManagement stay the
+  assembler's. `script/devicegen` generates the package from
+  `parity/schema.json` and runs in `make generate-matter-schema` after
+  `script/clustergen`.
+- `endpoint.Spec.ClientClusters`: the client clusters an endpoint declares,
+  served as its Descriptor ClientList (bridged endpoints and parts), as
+  matter.js `MutableEndpoint.ts:53-61` registers a type's mandatory client
+  clusters and `DescriptorServer.ts:284-290` lists them. Unset, the
+  ClientList stays empty as before.
+- `node/`: the node facade (ADR 0018 decision 5), mirroring matter.js
+  `ServerNode` / `Node`. `node.Config` groups the configuration by
+  matter.js behaviour id — `Network` (listen address, IPv4, TCP),
+  `Commissioning` (passcode, discriminator, PBKDF parameters),
+  `ProductDescription`, `BasicInformation` — plus the store (`*sql.DB`, or
+  the two stores), the advertiser, the device-type validation mode, the
+  attestation material (the CSA test chain by default), an optional OTA
+  requestor, the root's FixedLabel list and supported locales (`Locales`,
+  en-US alone by default) and the logger; `Validate` applies the reference daemon's
+  checks. `node.New` performs the daemon's bring-up with every bridge port
+  wired in the order `bridge/bridge.go` documents; `Start`, `Stop` (both
+  idempotent) and `Run` the post-start sequence and the shutdown.
+  `node.Aggregator` (`Add`, `Remove`, `Endpoints`, `MarkComplete`,
+  `IncreaseConfigurationVersion`) holds the bridged endpoints — anything
+  with `Spec() endpoint.Spec` — and reassembles a running node; stored
+  endpoint numbers are retained until the host calls `MarkComplete`; NodeLabel
+  writes, ConfigurationVersion and scene tables persist under the daemon's
+  settings keys. `Bridge()`, `Root()` (the root servers), `Store()`,
+  `CommissioningWindow()`, `Fabrics()`, `PairingCodes()` and
+  `BootReason()` reach the ports the facade does not cover.
+- `cluster/onoff.Server`: the default OnOff server, a port of matter.js
+  `OnOffBaseServer` (`packages/node/src/behaviors/on-off/OnOffServer.ts`)
+  on the generated definition. `onoff.New(Config)` takes the feature
+  selection, an optional host `Sink` (`SetOnOff(ctx, bool) error`, which
+  may refuse a change: the command answers FAILURE and nothing is stored),
+  the initial values, an optional `BootReason` and a `Clock` seam. It
+  carries the command logic (On, Off, Toggle, OffWithEffect,
+  OnWithRecallGlobalScene, OnWithTimedOff), StartUpOnOff at construction
+  (not after a software update), the 100 ms timed-on and delayed-off
+  countdowns with the 0xFFFF hold, `Set` / `OnOff` for the host and
+  `MatterQuiesce`; `Config.Bridged` skips StartUpOnOff on an endpoint under
+  the Aggregator, as matter.js does. The existing constants and functions of `cluster/onoff`
+  are unchanged.
 - Session establishment over TCP: a PASE or CASE message that arrives on a
   TCP connection is served on it, as matter.js creates the unsecured
   session from whichever channel carried the message
@@ -475,6 +540,25 @@ the same `ColorTemperatureWriter` as before.
   `cluster/spec/fixedlabel`. Not mounted by the reference bridge.
 
 ### Changed
+
+- `examples/reference-bridge` runs on the device layer and the node facade
+  (ADR 0018 decision 6), the shape the README points a host at:
+  `node.New(cfg)`, one `device.New<Type>` call per device added to
+  `Aggregator()`, `MarkComplete`, `Run`. Every flag keeps its name and
+  meaning. Servers whose rules need a host port go in through
+  `device.WithServer`, the host models' change notifiers through
+  `device.WithChangeNotifier`, parts through `AddPart`; measurement-backed
+  sensors keep `endpoint.Spec.Measurement`. The hand-written OnOff server is
+  gone: the lights, the speaker and the pump use `cluster/onoff.Server`.
+  The bring-up the facade performs left the daemon (`wiring.go`,
+  `commissioning.go`, `root_optional.go`). Endpoint numbers, device types,
+  cluster sets and attribute values are unchanged; the Descriptor
+  ServerList of the vacuum, the air quality sensor and the oven cavity
+  lists its clusters in the device type's order, as matter.js does. The
+  snapshot scope is the node's (`"node"`): a database written by an
+  earlier release keeps every endpoint number (the store looks numbers up
+  by key), but its rows stay under the old scope `"demo"`, which the
+  model-complete garbage collection no longer visits.
 
 - PASE: PBKDFParamRequest and PBKDFParamResponse carry the whole
   SessionParameters structure (`InitiatorSessionParams`,

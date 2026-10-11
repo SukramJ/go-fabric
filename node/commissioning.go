@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 SukramJ.
 
-package main
+package node
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	matterbridge "github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/spake2"
@@ -29,34 +29,35 @@ import (
 // advertise itself as in an enhanced window (CM=2) under the discriminator
 // the window carries, and fall back to its configured state when the window
 // closes or is revoked. The cluster server owns the command surface; the
-// [matterbridge.CommissioningWindow] owns the window; this file plugs the
-// two into this host's PASE provider and advertisement. Mirrors matter.js
+// [bridge.CommissioningWindow] owns the window; this file plugs the
+// two into the node's PASE provider and advertisement (ported from
+// examples/reference-bridge/commissioning.go). Mirrors matter.js
 // AdministratorCommissioningServer.ts openCommissioningWindow →
 // PaseServer.fromVerificationValue, and the advertisement of
 // DeviceCommissioner.ts.
 
-// commissioningHost is what the window needs from the daemon. Each field is
+// commissioningHost is what the window needs from the node. Each field is
 // set once during wiring.
 type commissioningHost struct {
-	br        *matterbridge.Bridge
+	br        *bridge.Bridge
 	sessions  *operational.Manager
-	refs      rootRefs
+	root      *RootClusters
 	logger    *slog.Logger
-	baseline  *matterbridge.PerExchangePaseProvider // the configured-passcode provider
-	advert    matterbridge.CommissioningAdvertisement
+	baseline  *bridge.PerExchangePaseProvider // the configured-passcode provider
+	advert    bridge.CommissioningAdvertisement
 	installMu sync.Mutex
-	active    *matterbridge.PerExchangePaseProvider // the window's provider, nil between windows
+	active    *bridge.PerExchangePaseProvider // the window's provider, nil between windows
 }
 
 // wireCommissioningWindow builds the window, gives it to the bridge and the
 // cluster, and installs the hooks. Called once the session manager and the
 // configured PASE provider exist.
 func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st *store.Store) {
-	window := matterbridge.NewCommissioningWindow()
+	window := bridge.NewCommissioningWindow()
 	h.br.AttachCommissioningWindow(window)
-	admin := h.refs.adminCom
+	admin := h.root.AdministratorCommissioning
 	admin.SetController(window)
-	admin.SetIsFailSafeArmed(h.refs.generalCom.FailSafeArmed)
+	admin.SetIsFailSafeArmed(h.root.GeneralCommissioning.FailSafeArmed)
 	admin.SetVendorIDResolver(func(ctx context.Context, fabricIndex uint8) uint16 {
 		rec, err := st.GetFabric(ctx, fabricIndex)
 		if err != nil {
@@ -71,13 +72,13 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st *stor
 	admin.SetFabricCounter(fabrics)
 	window.SetFabricCounter(fabrics)
 
-	window.SetFailSafeChecker(h.refs.generalCom)
-	window.SetFailSafeArmer(h.refs.generalCom)
+	window.SetFailSafeChecker(h.root.GeneralCommissioning)
+	window.SetFailSafeArmer(h.root.GeneralCommissioning)
 	window.SetPaseSessionCloser(paseCloser{h.sessions})
 	window.SetPaseVerifierInstaller(h)
 	window.SetTransitionHook(func() {
 		snap := window.CurrentWindow()
-		//nolint:contextcheck // the hook fires on a window transition, outside any request; the announce is bounded by the daemon's lifetime
+		//nolint:contextcheck // the hook fires on a window transition, outside any request; the announce is bounded by the node's lifetime
 		if window.IsOwnWindow() {
 			// The node's own window: PASE with the configured passcode,
 			// advertised CM=1 (matter.js allowBasicCommissioning).
@@ -111,7 +112,7 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st *stor
 
 // attachPase makes p the bridge's PASE acceptor (nil: none) unless an
 // administrator's verifier window has its own installed.
-func (h *commissioningHost) attachPase(p *matterbridge.PerExchangePaseProvider) {
+func (h *commissioningHost) attachPase(p *bridge.PerExchangePaseProvider) {
 	h.installMu.Lock()
 	defer h.installMu.Unlock()
 	if h.active != nil {
@@ -140,7 +141,7 @@ func (h *commissioningHost) reopenIfDecommissioned(ctx context.Context, st *stor
 	}
 }
 
-// InstallVerifier implements [matterbridge.PaseVerifierInstaller]: for the
+// InstallVerifier implements [bridge.PaseVerifierInstaller]: for the
 // window's lifetime, PASE runs against the commissioner's verifier.
 func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, salt []byte) (func(), error) {
 	const want = spake2.VerifierW0Size + spake2.VerifierLSize // 97 bytes, Matter §3.10.5
@@ -151,8 +152,8 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 	if err != nil {
 		return nil, fmt.Errorf("PAKE passcode verifier: %w", err)
 	}
-	provider := matterbridge.NewPerExchangePaseProvider(func() *matterbridge.PaseAdapter {
-		adapter, err := buildPaseAdapterFromContext(h.sessions, h.refs, vc, salt, int(iterations))
+	provider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
+		adapter, err := buildPaseAdapterFromContext(h.sessions, h.root, vc, salt, int(iterations))
 		if err != nil {
 			h.logger.Warn("pase.window.build_failed", slog.String("err", err.Error()))
 			return nil
@@ -198,7 +199,7 @@ func (h *commissioningHost) stop() {
 // §11.19.7.3 step 1). PASE sessions live under fabric index 0.
 type paseCloser struct{ sessions *operational.Manager }
 
-// ClosePaseSessions implements [matterbridge.PaseSessionCloser].
+// ClosePaseSessions implements [bridge.PaseSessionCloser].
 func (c paseCloser) ClosePaseSessions(context.Context) error {
 	if c.sessions == nil {
 		return errors.New("no session manager")

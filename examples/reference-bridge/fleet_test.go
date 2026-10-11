@@ -12,9 +12,9 @@
 // them dirty on the subscription manager. A device wired to a server nobody
 // mounts satisfies every cluster test and reports nothing.
 //
-// So this file boots a real [matterbridge.Bridge] over the daemon's own
-// fleet — the same snapshotter main() passes — and drives changes in at the
-// device end, where a southbound event would arrive.
+// So this file boots a real node over the daemon's own fleet — the same
+// assembly main() performs — and drives changes in at the device end, where
+// a southbound event would arrive.
 package main
 
 import (
@@ -27,17 +27,15 @@ import (
 
 	matterbridge "github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/boolcfg"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/levelcontrol"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/cluster/valve"
 	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
-	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
-	"github.com/SukramJ/go-fabric/mdns"
-	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint drives one
@@ -179,58 +177,61 @@ func TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint(t *testing.
 	}
 }
 
-// startFleetBridge boots the daemon's fleet behind a real bridge on an
-// ephemeral port, with an in-memory endpoint store and no mDNS.
+// startFleetBridge boots the daemon's fleet on a node on an ephemeral
+// port, with a throw-away database and no mDNS, and returns its bridge.
 //
-// It goes through [newFleet] and [matterbridge.New] rather than assembling a
-// topology by hand: the point of the test is the wiring main() performs, and
-// a topology built here would prove only that one can be built.
+// It goes through [newFleet] and [assemble], the wiring main() performs,
+// rather than assembling a topology by hand: the point of the test is that
+// wiring, and a topology built here would prove only that one can be built.
 func startFleetBridge(t *testing.T) (*fleet, *matterbridge.Bridge) {
 	t.Helper()
-	logger := slog.New(slog.DiscardHandler)
+	f, n := startFleetNode(t)
+	return f, n.Bridge()
+}
 
-	// The group state main() hands the assembler: Groups is stack state,
-	// mounted by the assembler wherever a device type mandates it.
-	db, err := openDB(context.Background(), filepath.Join(t.TempDir(), "fleet.db"))
+// startFleetNode is [startFleetBridge] returning the node.
+func startFleetNode(t *testing.T) (*fleet, *node.Node) {
+	t.Helper()
+	f := newFleet()
+	n := testNode(t, f, filepath.Join(t.TempDir(), "fleet.db"))
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	if err := n.Start(ctx); err != nil {
+		t.Fatalf("node.Start: %v", err)
+	}
+	return f, n
+}
+
+// testNode assembles f on a node over the database at path, as main()
+// does, unstarted; the node is stopped when the test ends.
+func testNode(t *testing.T, f *fleet, path string) *node.Node {
+	t.Helper()
+	logger := slog.New(slog.DiscardHandler)
+	db, err := openDB(context.Background(), path)
 	if err != nil {
 		t.Fatalf("openDB: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	groupState, err := groups.NewManager(store.New(db), logger)
-	if err != nil {
-		t.Fatalf("groups.NewManager: %v", err)
+	applier := &otaApplier{
+		vendorID: testVendorID, productID: testProductID,
+		dir: filepath.Join(filepath.Dir(path), "ota"), logger: logger,
 	}
-	f, err := newFleet(endpointtest.NewFakeStore(), endpoint.Config{
-		VendorID:   testVendorID,
-		ProductID:  testProductID,
-		NodeLabel:  "fleet-test",
-		VendorName: exampleVendorName,
-		Groups:     groupState,
-	}, logger)
+	actions, err := mattercore.NewActions(mattercore.ActionsConfig{Host: f.actions})
 	if err != nil {
-		t.Fatalf("newFleet: %v", err)
+		t.Fatalf("NewActions: %v", err)
 	}
-
-	br, err := matterbridge.New(f.snapshotter, mdns.NewNoop(), matterbridge.Config{
-		Listen:    "127.0.0.1:0",
-		VendorID:  testVendorID,
-		ProductID: testProductID,
-		NodeLabel: "fleet-test",
-	}, logger)
+	cfg := nodeConfig(flags{listen: "127.0.0.1:0", label: "fleet-test", salt: "go-fabric-ref-salt", iterations: 1000},
+		20202021, 3840, matterbridge.TCPConfig{}, db, nil, applier, actions, logger)
+	n, err := assemble(context.Background(), f, cfg, applier)
 	if err != nil {
-		t.Fatalf("bridge.New: %v", err)
+		t.Fatalf("assemble: %v", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(func() {
-		cancel()
 		stopCtx, stopCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer stopCancel()
-		_ = br.Stop(stopCtx)
+		_ = n.Stop(stopCtx)
 	})
-	if err := br.Start(ctx); err != nil {
-		t.Fatalf("bridge.Start: %v", err)
-	}
-	return f, br
+	return n
 }
 
 // mountedEndpoint finds the bridged endpoint the assembler gave the named

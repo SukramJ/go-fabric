@@ -12,7 +12,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	dem "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/device"
 )
 
 // --- device: a state-forecast ESA ----------------------------------------------
@@ -36,8 +36,6 @@ type demoEsa struct {
 	// does for its part (demoEvse.triggers).
 	triggers sync.Mutex
 }
-
-var _ contract.EndpointSource = (*demoEsa)(nil)
 
 func newDemoEsa(name string) *demoEsa {
 	return &demoEsa{name: name, dem: newStateForecastDem(name, time.Now)}
@@ -83,23 +81,19 @@ func newStateForecastDem(name string, now func() time.Time) *demoDem {
 	return d
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (e *demoEsa) MatterDeviceType() uint16 { return deviceTypeDeviceEnergyManagement }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (e *demoEsa) MatterClusterServers() []contract.ClusterServer {
-	return e.dem.MatterClusterServers()
+// servers are the cluster servers the device supplies.
+func (e *demoEsa) servers() []contract.ClusterServer {
+	return e.dem.servers()
 }
 
-// esaSpec is the ESA's bridged endpoint, stating ControllableEsa so
+// device builds the ESA's bridged endpoint, stating ControllableEsa so
 // DeviceEnergyManagementMode is mounted, as the charger's part does. It is
 // appended after the energy-market devices: the harness resolves it as the
 // first DeviceEnergyManagement endpoint above the grid meter
 // (internal/chiptool dtStateForecastEsa).
-func (f *fleet) esaSpec(specOf func(key, name string, deviceType uint16, src contract.EndpointSource) endpoint.Spec) endpoint.Spec {
-	s := specOf("esa", f.esa.name, f.esa.MatterDeviceType(), f.esa)
-	s.DeviceConditions = []string{conditionControllableEsa}
-	return s
+func (e *demoEsa) device(opts device.Options) (*device.DeviceEnergyManagement, error) {
+	opts.Conditions = []string{conditionControllableEsa}
+	return device.NewDeviceEnergyManagement(opts, serve(e.servers())...)
 }
 
 // testEventTrigger hands a DEM trigger to the ESA's handler

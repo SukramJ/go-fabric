@@ -18,7 +18,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/device"
 )
 
 // The kitchen appliances: a dishwasher with its alarm, an oven with a
@@ -115,18 +115,12 @@ type demoDishwasher struct {
 	version struct{ ops, alarms cluster.DataVersionTracker }
 }
 
-var (
-	_ contract.EndpointSource = (*demoDishwasher)(nil)
-	_ alarmbase.Delegate      = (*demoDishwasher)(nil)
-)
+var _ alarmbase.Delegate = (*demoDishwasher)(nil)
 
 func newDemoDishwasher(name string) *demoDishwasher { return &demoDishwasher{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (d *demoDishwasher) MatterDeviceType() uint16 { return opstate.DeviceTypeDishwasher }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (d *demoDishwasher) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (d *demoDishwasher) servers() []contract.ClusterServer {
 	d.build()
 	return []contract.ClusterServer{d.ops, d.alarms}
 }
@@ -198,27 +192,29 @@ type demoOven struct {
 	cavity *demoOvenCavity
 }
 
-var _ contract.EndpointSource = (*demoOven)(nil)
-
 func newDemoOven(name string) *demoOven {
 	return &demoOven{name: name, cavity: &demoOvenCavity{name: name + " cavity"}}
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (o *demoOven) MatterDeviceType() uint16 { return deviceTypeOven }
-
-// MatterClusterServers implements [contract.EndpointSource]: the Oven
+// servers are the cluster servers the device supplies: the Oven
 // device type mandates no application cluster of its own.
-func (o *demoOven) MatterClusterServers() []contract.ClusterServer { return nil }
+func (o *demoOven) servers() []contract.ClusterServer { return nil }
 
-// parts is the oven's cavity.
-func (o *demoOven) parts() []endpoint.Spec {
-	return []endpoint.Spec{{
-		StableKey:        endpoint.StringKey("demo:oven:cavity"),
-		DeviceType:       deviceTypeTemperatureControlledCabinet,
-		Source:           o.cavity,
-		DeviceConditions: []string{conditionHeater},
-	}}
+// device builds the oven with its cavity as a part: a
+// TemperatureControlledCabinet stating the Heater condition.
+func (o *demoOven) device(opts device.Options) (*device.Oven, error) {
+	oven, err := device.NewOven(opts, serve(o.servers())...)
+	if err != nil {
+		return nil, err
+	}
+	cavity, err := device.NewTemperatureControlledCabinet(part("demo:oven:cavity", conditionHeater), serve(o.cavity.servers())...)
+	if err != nil {
+		return nil, err
+	}
+	if err := oven.AddPart(cavity.Device); err != nil {
+		return nil, err
+	}
+	return oven, nil
 }
 
 // demoOvenCavity is the oven's heating compartment.
@@ -233,16 +229,12 @@ type demoOvenCavity struct {
 }
 
 var (
-	_ contract.EndpointSource  = (*demoOvenCavity)(nil)
 	_ modebase.ModeChanger     = (*demoOvenCavity)(nil)
 	_ thermo.TemperatureSetter = (*demoOvenCavity)(nil)
 )
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (c *demoOvenCavity) MatterDeviceType() uint16 { return deviceTypeTemperatureControlledCabinet }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (c *demoOvenCavity) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (c *demoOvenCavity) servers() []contract.ClusterServer {
 	c.build()
 	return []contract.ClusterServer{c.modes, c.ops, c.temp}
 }
@@ -330,18 +322,14 @@ type demoMicrowave struct {
 }
 
 var (
-	_ contract.EndpointSource = (*demoMicrowave)(nil)
-	_ appliance.Oven          = (*demoMicrowave)(nil)
-	_ opstate.CommandHandler  = (*demoMicrowave)(nil)
+	_ appliance.Oven         = (*demoMicrowave)(nil)
+	_ opstate.CommandHandler = (*demoMicrowave)(nil)
 )
 
 func newDemoMicrowave(name string) *demoMicrowave { return &demoMicrowave{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (m *demoMicrowave) MatterDeviceType() uint16 { return deviceTypeMicrowaveOven }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (m *demoMicrowave) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (m *demoMicrowave) servers() []contract.ClusterServer {
 	m.build()
 	return []contract.ClusterServer{m.ops, m.modes, m.control}
 }
@@ -481,18 +469,12 @@ type demoDryer struct {
 	version  struct{ ops, controls cluster.DataVersionTracker }
 }
 
-var (
-	_ contract.EndpointSource = (*demoDryer)(nil)
-	_ appliance.DryerListener = (*demoDryer)(nil)
-)
+var _ appliance.DryerListener = (*demoDryer)(nil)
 
 func newDemoDryer(name string) *demoDryer { return &demoDryer{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (d *demoDryer) MatterDeviceType() uint16 { return opstate.DeviceTypeLaundryDryer }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (d *demoDryer) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (d *demoDryer) servers() []contract.ClusterServer {
 	d.build()
 	return []contract.ClusterServer{d.ops, d.controls}
 }

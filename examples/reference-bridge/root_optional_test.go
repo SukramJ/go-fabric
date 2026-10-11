@@ -18,7 +18,7 @@ import (
 	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/contract"
-	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // TestRootMountsLabelsLocalizationAndDiagnostics: the root serves the seven
@@ -40,20 +40,13 @@ func TestRootMountsLabelsLocalizationAndDiagnostics(t *testing.T) {
 		}
 	}
 
+	// A UserLabel list written on one boot is served on the next: two
+	// nodes, one after the other, over one database.
 	ctx := context.Background()
-	db, err := openDB(ctx, filepath.Join(t.TempDir(), "reference-bridge.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	st := store.New(db)
-	userLabel := func() contract.ClusterServer {
+	path := filepath.Join(t.TempDir(), "reference-bridge.db")
+	userLabel := func(n *node.Node) contract.ClusterServer {
 		t.Helper()
-		srvs, err := buildRootLabelsAndDiagnostics(ctx, st)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, s := range srvs {
+		for _, s := range n.Root().Servers() {
 			if s.MatterClusterID() == userlabeldef.ClusterID {
 				return s
 			}
@@ -61,22 +54,16 @@ func TestRootMountsLabelsLocalizationAndDiagnostics(t *testing.T) {
 		t.Fatal("no UserLabel")
 		return nil
 	}
+	first := testNode(t, newFleet(), path)
 	want := spec.List[userlabeldef.LabelStruct]{{Label: "room", Value: "office"}}
-	if err := userLabel().MatterWrite(ctx, userlabeldef.AttrLabelList, want); err != nil {
+	if err := userLabel(first).MatterWrite(ctx, userlabeldef.AttrLabelList, want); err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := userLabel().MatterRead(userlabeldef.AttrLabelList); !slices.Equal(v.(spec.List[userlabeldef.LabelStruct]), want) {
+	if err := first.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	second := testNode(t, newFleet(), path)
+	if v, _ := userLabel(second).MatterRead(userlabeldef.AttrLabelList); !slices.Equal(v.(spec.List[userlabeldef.LabelStruct]), want) {
 		t.Errorf("after restart LabelList %v, want %v", v, want)
-	}
-
-	if used, ok := (runtimeHeap{}).CurrentHeapUsed(); !ok || used == 0 {
-		t.Errorf("heap used %d", used)
-	}
-	if _, ok := (runtimeHeap{}).CurrentHeapFree(); !ok {
-		t.Error("heap free unknown")
-	}
-	e := unknownEthernet{}
-	if _, ok := e.TimeSinceReset(); ok {
-		t.Error("TimeSinceReset known")
 	}
 }

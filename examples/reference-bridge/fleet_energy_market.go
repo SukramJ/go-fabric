@@ -19,7 +19,9 @@ import (
 	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
 	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // The energy-market devices: an ElectricalEnergyTariff with CommodityPrice,
@@ -135,15 +137,10 @@ type demoEnergyTariff struct {
 	poll        *time.Timer
 }
 
-var _ contract.EndpointSource = (*demoEnergyTariff)(nil)
-
 func newDemoEnergyTariff(name string) *demoEnergyTariff { return &demoEnergyTariff{name: name} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (d *demoEnergyTariff) MatterDeviceType() uint16 { return deviceTypeElectricalEnergyTariff }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (d *demoEnergyTariff) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (d *demoEnergyTariff) servers() []contract.ClusterServer {
 	d.build()
 	return []contract.ClusterServer{d.price, d.grid, d.tariff}
 }
@@ -529,17 +526,12 @@ type demoElectricalMeter struct {
 	unit  *energy.MeteringTariffUnit
 }
 
-var _ contract.EndpointSource = (*demoElectricalMeter)(nil)
-
 func newDemoElectricalMeter(name string) *demoElectricalMeter {
 	return &demoElectricalMeter{name: name}
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (m *demoElectricalMeter) MatterDeviceType() uint16 { return deviceTypeElectricalMeter }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (m *demoElectricalMeter) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (m *demoElectricalMeter) servers() []contract.ClusterServer {
 	m.build()
 	return []contract.ClusterServer{m.power, m.energy, m.metering}
 }
@@ -638,17 +630,17 @@ func (m *demoElectricalMeter) testEventTrigger(trigger uint64) bool {
 	return true
 }
 
-// energyMarketSpecs are the two devices' endpoint specs. ElectricalMeter
-// requires an ElectricalSensor device type, min 1 (matter.js
+// device builds the grid meter. ElectricalMeter requires an
+// ElectricalSensor device type, min 1 (matter.js
 // packages/model/src/standard/elements/electrical-meter.element.ts:21):
-// the meter's sensor is a part, as the charger's is (fleet_evse.go).
-func (f *fleet) energyMarketSpecs(specOf func(key, name string, deviceType uint16, src contract.EndpointSource) endpoint.Spec) []endpoint.Spec {
-	meter := specOf("electricalmeter", f.electricalMeter.name, f.electricalMeter.MatterDeviceType(), f.electricalMeter)
-	meter.Parts = []endpoint.Spec{{
-		StableKey: endpoint.StringKey("demo:electricalmeter:sensor"), DeviceType: deviceTypeElectricalSensor, Measurement: evseMeter{},
-	}}
-	return []endpoint.Spec{
-		specOf("tariff", f.energyTariff.name, f.energyTariff.MatterDeviceType(), f.energyTariff),
-		meter,
+// the meter's sensor is a part, as the charger's is (fleet_evse.go), a
+// measurement-backed endpoint.
+func (m *demoElectricalMeter) device(opts device.Options) (node.Endpoint, error) {
+	meter, err := device.NewElectricalMeter(opts, serve(m.servers())...)
+	if err != nil {
+		return nil, err
 	}
+	return withMeasuredParts{meter, []endpoint.Spec{{
+		StableKey: endpoint.StringKey("demo:electricalmeter:sensor"), DeviceType: deviceTypeElectricalSensor, Measurement: evseMeter{},
+	}}}, nil
 }

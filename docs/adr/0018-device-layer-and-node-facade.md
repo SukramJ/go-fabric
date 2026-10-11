@@ -1,8 +1,8 @@
 # ADR 0018 — A device layer (`device/`) generated from the device-type model, and a node facade, as matter.js's `devices/`, `endpoints/` and `ServerNode`
 
-- **Status**: Proposed (planning record; phase 4 of
-  [`../concept-matter-1.6.1-and-device-layer.md`](../concept-matter-1.6.1-and-device-layer.md))
-- **Date**: 2026-10-08
+- **Status**: Accepted (2026-10-11; wave 6 of
+  [`../concept-matter-1.6.1-and-device-layer.md`](../concept-matter-1.6.1-and-device-layer.md), phase 4)
+- **Date**: 2026-10-08, accepted 2026-10-11
 - **Related**:
   [ADR 0016 — device type validation](./0016-device-type-validation.md),
   [ADR 0017 — generated default cluster server](./0017-generated-default-cluster-server.md),
@@ -111,6 +111,64 @@ and the protocol remainder, before the real-controller evidence runs and
 `v1.0.0`. The reference daemon (`examples/reference-bridge`) migrates
 first and completely, so the layer has a consumer before it is frozen;
 openccu-loom migrates at least its lights and covers before `v1.0.0`.
+
+### Decisions taken at the start of wave 6 (2026-10-11)
+
+Measured against matter.js `4633bfd7` before the first commit; each
+decision names what it mirrors and what it leaves for later.
+
+1. **What is generated.** `script/devicegen` reads `parity/schema.json`
+   as `script/clustergen` does and emits one file per device type for the
+   65 in-scope types of the concept's Appendix F.3 — the 60 application
+   types plus the system endpoint types RootNode, Aggregator, BridgedNode,
+   PowerSource, ElectricalSensor, DeviceEnergyManagement and OtaRequestor
+   (matter.js `endpoints/`, `EndpointFile.ts:17,35-49`). Excluded types are
+   listed by name in the generator with the Appendix F.3 group, and a test
+   holds the committed files to the snapshot and every snapshot device type
+   to one of the two lists. The generator transcribes what matter.js's
+   `RequirementGenerator.ts:141-199` and `ClusterRequirements.ts:102-207`
+   emit: mandatory and optional server clusters, mandated features, the
+   attribute `min` / `max` / `default` alterations and elements made
+   non-optional; device-type and condition requirements stay in the schema
+   (`requirement-coverage.ts:41-44`), where ADR 0016 reads them.
+2. **Default servers.** matter.js mounts a state-holding default behaviour
+   for every mandatory cluster. Here the default for a cluster is the
+   module's self-held server where one exists (`cluster/onoff.Server`, new
+   in this wave, mirrors `OnOffServer.ts`), else `spec.Server` from the
+   generated definition with the mandated features and the alterations as
+   initial values. A host that must act itself supplies its own server for
+   a cluster (`device.WithServer`), as a matter.js host overrides a
+   behaviour; the rule servers that take a host port today (LevelControl,
+   ColorControl, WindowCovering, DoorLock, Thermostat, …) are supplied that
+   way until they gain a self-held form, which is follow-up work per
+   server, not this wave's. The system clusters the assembler already
+   adds (Descriptor, Identify, BridgedDeviceBasicInformation, Groups,
+   ScenesManagement) are not mounted twice.
+3. **Accessors.** A generated type exposes `Server(clusterID)` and one
+   typed accessor per mandatory or opted-in cluster whose default server
+   type the generator's table knows (`onoff.Server`, `*spec.Server`);
+   `OnChanged` and `Handle` reach the host through the server's own hooks
+   (`contract.AttributeChangeNotifier`, `spec.Server.Handle`).
+4. **Composition.** `device.Options` maps onto `endpoint.Spec` (StableKey,
+   Name, Vendor, Reachable, Conditions); `AddPart` fills `Spec.Parts`;
+   `node.Aggregator.Add` / `Remove` keep the set and produce the
+   `endpoint.Snapshot` the existing assembler consumes, so endpoint-id
+   persistence and `ModelComplete` are unchanged. A device added under the
+   aggregator is a BridgedNode, as `BridgedDeviceBasicInformationServer.ts:111-125`
+   injects that device type at run time.
+5. **The facade.** `node.Config` mirrors the subset of
+   `ServerNode.Configuration` the daemon uses — `network` (listen, TCP,
+   IPv4 preference), `commissioning` (passcode, discriminator, PBKDF),
+   `productDescription`, `basicInformation`, the store — and `node.New` /
+   `Start` / `Stop` perform `examples/reference-bridge/main.go`'s bring-up
+   in the order `bridge/bridge.go` documents, with every port wired. The
+   facade exposes the bridge and the root cluster set for a host that
+   needs a port the facade does not cover.
+6. **Migration.** The reference daemon migrates completely in this wave:
+   every device becomes a `device.New…` call with `WithServer` where it
+   keeps a rule server with a host port; `contract.EndpointSource` leaves
+   the daemon. The chip-tool suite and the certification families decide
+   the migration, run locally (Linux, Docker) in this wave.
 
 ## Consequences
 

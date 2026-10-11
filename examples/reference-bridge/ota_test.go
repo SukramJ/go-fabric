@@ -202,8 +202,20 @@ func TestOtaHarness_UpdateReportedInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider := &harnessProvider{t: t, image: testOtaImage(t, testVendorID, testProductID, 2)}
-	r, err := buildOtaRequestor(otaConfig{dir: t.TempDir(), harness: true, connector: provider, logger: slog.Default()},
-		bridgeIdentity{vendorID: testVendorID, productID: testProductID}, bi)
+	// The requestor as the node builds it around the daemon's applier in
+	// harness mode (node/ota.go buildOtaRequestor), with the test's
+	// provider as its connector.
+	dir := t.TempDir()
+	var r *mattercore.OTASoftwareUpdateRequestor
+	applier := &otaApplier{
+		vendorID: testVendorID, productID: testProductID, basicInfo: bi, dir: dir, harness: true, logger: slog.Default(),
+		requestor: func() *mattercore.OTASoftwareUpdateRequestor { return r },
+	}
+	quick := 250 * time.Millisecond
+	r, err = mattercore.NewOTASoftwareUpdateRequestor(mattercore.OTARequestorConfig{
+		NodeInformation: bi.OtaNodeInformation, Connector: provider, Applier: applier,
+		DownloadDir: dir, CanConsent: true, Logger: slog.Default(), AnnouncedUpdateQueryDelay: &quick,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

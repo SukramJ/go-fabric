@@ -455,6 +455,19 @@ func onlyKnownProblems(t *testing.T, out string, known knownProblems) bool {
 // copy — a commissioned device fresh from the factory, without paying for
 // a commissioning per case.
 
+// chipPAATrustStore is the image's development PAA trust store, which the
+// Python harness verifies device attestation against. CHIP finds it by
+// walking up at most ten directories from the working directory
+// (matter/testing/runner.py get_default_paa_trust_store, max_levels = 10)
+// and otherwise falls back to the working directory itself, which holds no
+// PAA, and fails every commissioning with "Failed Device Attestation". The
+// harness's working directories are host paths under the module root
+// (launchHarness), so a checkout two levels deeper than the usual one — an
+// agent worktree under .claude/worktrees/ — puts / out of reach. Naming
+// the store the walk finds from a shallower checkout keeps the run
+// independent of where the module lives.
+const chipPAATrustStore = "/credentials/development/paa-root-certs"
+
 type dutSnapshot struct {
 	dir   string
 	files []string
@@ -485,6 +498,7 @@ func commissionedSnapshot(ctx context.Context, t *testing.T, h *harness, bin str
 	case "py":
 		cctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 		out, err := h.execIn(cctx, dir, "python3", "/src/python_testing/hello_test.py", "--commission-only",
+			"--paa-trust-store-path", chipPAATrustStore,
 			"--commissioning-method", "on-network",
 			"--discriminator", strconv.Itoa(dutDiscriminator), "--passcode", strconv.Itoa(dutPasscode))
 		cancel()

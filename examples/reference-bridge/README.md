@@ -7,6 +7,40 @@ over mDNS, accepts a commissioner over PASE and serves the operational CASE
 session that follows. It is also the device the chip-tool suite
 (`internal/chiptool`) and the borrowed CSA certification cases run against.
 
+It is built the way a host is meant to build one (ADR 0018):
+
+```go
+n, err := node.New(cfg)                         // the node: root, Aggregator, sessions, PASE/CASE, window
+lamp, err := device.NewOnOffLight(opts, ...)    // one device.New<Type> per device
+err = n.Aggregator().Add(ctx, lamp)             // … for each device of the fleet
+n.Aggregator().MarkComplete()                   // the fleet is complete from the first assembly
+err = n.Run(ctx)                                // Start, wait for ctx, Stop
+```
+
+`main.go` holds the `node.Config` (the CSA test identity, the flags, the
+root's labels and locales, the Aggregator's Actions server) and the steps
+the facade leaves to the host on its accessors: the test event triggers
+(`Root().GeneralDiagnostics`), the OTA applier (`ota.go`, handed over as
+`node.OtaConfig.Applier`), the mDNS subtype responder, the providers that
+name endpoints by StableKey (`fleet_node.go`), the banner and the topology
+listing. `fleet.go` `endpoints` builds the devices:
+
+- a device type's **default servers** where the module holds the state —
+  the lights, the speaker and the pump take `cluster/onoff.Server` as
+  their OnOff cluster and follow it through `Device.OnChanged`, and switch
+  it with `onoff.Server.Set` when the device switches itself;
+- **the host's own server** through `device.WithServer` where the cluster's
+  rules need a host port (`cluster/valve`, `cluster/levelcontrol`,
+  `cluster/fan`, `cluster/lock`, `cluster/thermo`, `cluster/opstate`, …),
+  with `device.WithChangeNotifier` when the host model notifies its own
+  changes;
+- **parts** through `AddPart` (the fridge's and the oven's cabinets, the
+  charger's PowerSource and DeviceEnergyManagement);
+- **measurement-backed sensors** as plain `endpoint.Spec`s with
+  `Measurement` (or `PowerSource`, the smoke alarm's battery): the
+  assembler picks the cluster from the declared measurement class, a path
+  the device layer's generated servers do not take.
+
 It exists as the module's *second* consumer. The first is the daemon
 go-fabric was extracted from, which remembers how the code used to be
 arranged. This one does not, so what it costs to write is a measurement of
@@ -40,37 +74,38 @@ Startup prints the pairing information on stdout:
 
 | Endpoint | Device type | Backed by |
 | --- | --- | --- |
-| 2 | OnOffLight `0x0100` | `demoLight`, a `contract.EndpointSource` with a hand-written OnOff (`0x0006`) cluster server |
+| 2 | OnOffLight `0x0100` | `demoLight`: `device.NewOnOffLight` with the default OnOff (`cluster/onoff.Server`, Lighting) and a FixedLabel |
 | 3 | TemperatureSensor `0x0302` | `demoThermometer`, a `contract.FloatMeasurementSource` — no cluster code at all; the assembler picks the cluster from the declared measurement class |
 | 4 | WaterValve `0x0042` | `demoValve`, the host port behind the library's `cluster/valve` server (ValveConfigurationAndControl `0x0081`) |
 | 5 | ModeSelect `0x0027` | `demoSelector`, the host port behind `cluster/modeselect` (ModeSelect `0x0050`) |
-| 6 | Speaker `0x0022` | `dimmer`, the host port behind `cluster/levelcontrol` (LevelControl `0x0008`), with the OnOff cluster its "with On/Off" commands drive |
-| 7 | ColorTemperatureLight `0x010C` | the same `dimmer` with the Lighting surface (`fleet_lighting.go`): LT OnOff, the module's LevelControl extended by the LT attributes, `cluster/light` ColorControl |
+| 6 | Speaker `0x0022` | `dimmer`, the host port behind `cluster/levelcontrol` (LevelControl `0x0008`), with the default OnOff its "with On/Off" commands drive |
+| 7 | ColorTemperatureLight `0x010C` | the same `dimmer` with the Lighting surface (`fleet_lighting.go`): the default LT OnOff, the module's LevelControl extended by the LT attributes, `cluster/light` ColorControl |
 | 8 | Fan `0x002B` | `demoFan`, host port of `cluster/fan` (MultiSpeed, Auto, Step) |
-| 9 | SmokeCoAlarm `0x0076` | `demoSmokeAlarm`, host port of `cluster/alarm` with every optional attribute, plus the battery as PowerSource |
-| 10 | Pump `0x0303` | `demoPump`: OnOff, `cluster/pump`, and a FlowMeasurement |
-| 11 | FlowSensor `0x0306` | a `demoReading` (`fleet_sensors.go`) |
-| 12 | LaundryWasher `0x0073` | `demoWasher`: `cluster/opstate` OperationalState and `cluster/modebase` LaundryWasherMode (`fleet_appliances.go`) |
-| 13 | RoboticVacuumCleaner `0x0074` | `demoVacuum`: RvcOperationalState, RvcRunMode, RvcCleanMode, and `cluster/servicearea` ServiceArea with one map and two areas (`fleet_servicearea.go`) |
-| 14 | Thermostat `0x0301` | `cluster/thermo` Thermostat and ThermostatUserInterfaceConfiguration |
-| 15 | WindowCovering `0x0202` | `cluster/cover` |
-| 16 | DoorLock `0x000A` | `demoLock`, host port of `cluster/lock` |
-| 17-19 | Humidity, Occupancy, Contact sensors | `demoReading` / `demoBinary` measurement sources |
-| 20 | GenericSwitch `0x000F` | `demoButton`, a momentary press source with long-press |
-| 21 | AirPurifier `0x002D` | `demoAirPurifier`: the fan's FanControl plus `cluster/filter` HEPA and activated-carbon filter monitoring |
-| 22 | Closure `0x0230` | `demoGarage`: `cluster/closure` ClosureControl (Positioning, Ventilation) with a simulated drive (`fleet_closure.go`) |
-| 27 | ClosurePanel `0x0231` | `demoPanel`: `cluster/closure` ClosureDimension as connectedhomeip's closure-app panel serves it, with its simulated motion (`fleet_closure.go`) |
+| 9, 10 | SmokeCoAlarm `0x0076` | `demoSmokeAlarm`, host port of `cluster/alarm` with every optional attribute; its battery is the PowerSource part (10) |
+| 11 | Pump `0x0303` | `demoPump`: the default OnOff, `cluster/pump`, and a FlowMeasurement |
+| 12 | FlowSensor `0x0306` | a `demoReading` (`fleet_sensors.go`) |
+| 13 | LaundryWasher `0x0073` | `demoWasher`: `cluster/opstate` OperationalState and `cluster/modebase` LaundryWasherMode (`fleet_appliances.go`) |
+| 14 | RoboticVacuumCleaner `0x0074` | `demoVacuum`: RvcOperationalState, RvcRunMode, RvcCleanMode, and `cluster/servicearea` ServiceArea with one map and two areas (`fleet_servicearea.go`) |
+| 15 | Thermostat `0x0301` | `cluster/thermo` Thermostat and ThermostatUserInterfaceConfiguration |
+| 16 | WindowCovering `0x0202` | `cluster/cover` |
+| 17 | DoorLock `0x000A` | `demoLock`, host port of `cluster/lock` |
+| 18-20 | Humidity, Occupancy, Contact sensors | `demoReading` / `demoBinary` measurement sources; the contact sensor adds BooleanStateConfiguration |
+| 21 | GenericSwitch `0x000F` | `demoButton`, a momentary press source with long-press |
+| 22 | AirPurifier `0x002D` | `demoAirPurifier`: the fan's FanControl plus `cluster/filter` HEPA and activated-carbon filter monitoring |
+| 23 | Closure `0x0230` | `demoGarage`: `cluster/closure` ClosureControl (Positioning, Ventilation) with a simulated drive (`fleet_closure.go`) |
+| 39 | ClosurePanel `0x0231` | `demoPanel`: `cluster/closure` ClosureDimension as connectedhomeip's closure-app panel serves it, with its simulated motion (`fleet_closure.go`) |
 
-The root endpoint carries the node's own clusters, TimeSynchronization and
-DiagnosticLogs among them (`wiring.go` buildRootClusters, which also says why
-IcdManagement and the OTA requestor are left out).
+The root endpoint carries the node's own clusters, TimeSynchronization,
+DiagnosticLogs and the OTA requestor among them — the node builds them
+(`node/root.go` buildRoot, which also says why IcdManagement is left out).
 
-The shapes are deliberately different. A device with commands has to serve
-`contract.ClusterServer` itself; a read-only measurement does not, and the
-difference in what the host has to write is large. The last three write no
-cluster code either: the library carries the server, and the device
-implements only that server's narrow host port — the shape a consumer with a
-cluster the library already models is meant to reach for.
+The shapes are deliberately different. A read-only measurement writes no
+cluster code at all. A device type's default servers hold their state
+themselves and need nothing but the host's hooks. A cluster whose rules
+reach the device writes no cluster code either: the library carries the
+server, and the device implements only that server's narrow host port —
+the shape a consumer with a cluster the library already models is meant
+to reach for.
 
 Endpoint numbers are the assembler's to assign and are shown here as they
 come out of an empty store; nothing reads them back as constants.
@@ -147,8 +182,9 @@ hand, both halves it had to hand-write moved into the module:
   requirement of `go-fabric`, so persisting adds no new dependency.
 - **The module owns the DDL.** `store.Schema()` and `sqlitestore.Schema()`
   return the embedded text each package's own queries are written against;
-  `Apply` runs it. `persist.go` calls both and writes no SQL, so a schema
-  change arrives with the dependency bump. A host with a migration tool
+  `Apply` runs it. `persist.go` calls both and writes no SQL, and the node
+  applies them again on the handle it is given, so a schema change arrives
+  with the dependency bump. A host with a migration tool
   feeds the two scripts through that instead.
 - **Numbers only ever advance.** The high-water mark lives in
   `matter_endpoint_allocation`, and `RemoveEndpoint` never returns a number
@@ -162,8 +198,8 @@ hand, both halves it had to hand-write moved into the module:
 
 Subscriptions persist too (`docs/adr/0008`, as matter.js does): each CASE
 subscription is recorded in `matter_server_subscriptions` while it is active.
-After a restart `main` loads the CASE identities, then calls
-`Bridge.ReestablishFormerSubscriptions`: the bridge resolves each controller
+After a restart the node (`node.Start`) loads the CASE identities, then
+calls `Bridge.ReestablishFormerSubscriptions`: the bridge resolves each controller
 over mDNS, opens CASE to it as the initiator and re-sends the priming report
 under the old subscription id, so the controller carries on without
 re-subscribing. A controller it cannot reach within two seconds recovers on
@@ -184,13 +220,6 @@ one omits, listed so the omission is not mistaken for "not needed":
   not wired, so every controller reconnect runs a full Sigma1–3 handshake
   instead of the one-round-trip resume. (The initiator that re-establishes
   subscriptions does offer a stored record and stores the new one.)
-- **Fabric teardown.** `RemoveFabric` persists and drops the fabric's
-  persisted subscriptions, but no session, live subscription or resumption
-  record is evicted, and the operational mDNS record is not withdrawn.
-- **A closing commissioning window.** The configured passcode's window is
-  open for the process lifetime. AdministratorCommissioning and the enhanced
-  (multi-admin) window are wired (`commissioning.go`); the basic window is
-  not.
-- **Reassembly.** `Bridge.Reassemble` is never called; the fleet is fixed.
-- **Persisted `GeneralDiagnostics` counters** (RebootCount,
-  TotalOperationalHours).
+- **Reassembly.** The fleet is fixed: every device is added before the
+  node starts, and none is added or removed while it runs (a running
+  node's `Aggregator().Add` / `Remove` reassemble).

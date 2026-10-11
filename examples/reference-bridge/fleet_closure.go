@@ -18,9 +18,6 @@ import (
 	"github.com/SukramJ/go-fabric/contract"
 )
 
-// deviceTypeClosure is the Closure device type (closure.element.ts, 0x0230).
-const deviceTypeClosure uint16 = 0x0230
-
 // garageTravel is how long the simulated drive takes between two stops.
 const garageTravel = 2 * time.Second
 
@@ -39,10 +36,7 @@ type demoGarage struct {
 	ctl    *closure.ControlServer
 }
 
-var (
-	_ contract.EndpointSource = (*demoGarage)(nil)
-	_ contract.ChangeNotifier = (*demoGarage)(nil)
-)
+var _ contract.ChangeNotifier = (*demoGarage)(nil)
 
 func newDemoGarage(name string) *demoGarage {
 	g := &demoGarage{name: name}
@@ -53,13 +47,10 @@ func newDemoGarage(name string) *demoGarage {
 	return g
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (g *demoGarage) MatterDeviceType() uint16 { return deviceTypeClosure }
-
-// MatterClusterServers implements [contract.EndpointSource]. The server is
+// servers are the cluster servers the device supplies. The server is
 // the same instance on every call: it holds the drive's state and the
 // event emitter the bridge wires into it.
-func (g *demoGarage) MatterClusterServers() []contract.ClusterServer {
+func (g *demoGarage) servers() []contract.ClusterServer {
 	return []contract.ClusterServer{g.ctl}
 }
 
@@ -184,8 +175,6 @@ type demoPanel struct {
 	version cluster.DataVersionTracker
 }
 
-var _ contract.EndpointSource = (*demoPanel)(nil)
-
 func newDemoPanel(name string) *demoPanel {
 	p := &demoPanel{name: name}
 	auto := cdim.ThreeLevelAutoAuto
@@ -219,11 +208,8 @@ func newDemoPanel(name string) *demoPanel {
 	return p
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (p *demoPanel) MatterDeviceType() uint16 { return closure.DeviceTypeClosurePanel }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (p *demoPanel) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (p *demoPanel) servers() []contract.ClusterServer {
 	return []contract.ClusterServer{p.srv}
 }
 

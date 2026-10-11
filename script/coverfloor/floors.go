@@ -85,6 +85,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/contract", min: 76, why: "lowest in the module; see the note above this entry"},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/device", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint", min: 86},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
@@ -121,6 +122,11 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
+	{
+		pkg: "github.com/SukramJ/go-fabric/node",
+		min: 59,
+		why: "the end-to-end tests run PASE, reads and a subscription over UDP; the CASE responder and initiator, the fabric hooks, the enhanced commissioning window and the OTA applier need a commissioned fabric (AddNOC) the package's tests do not build yet",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/schema", min: 100},
 	// This tool. Its parser and comparison are covered; main() — flag
@@ -277,6 +283,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/servicearea", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/spectest", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/clustergen", min: 95},
+	{pkg: "github.com/SukramJ/go-fabric/script/devicegen", min: 95},
 	// The CHIP data model cross-check (internal/chipdm): measured 97.4 without
 	// a connectedhomeip checkout (as cover-check runs in CI: the cross-check
 	// skips, the synthetic-fixture unit tests carry it), 98.6 with one.

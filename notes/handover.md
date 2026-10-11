@@ -20,7 +20,7 @@ German, briefly. Six waves were planned against the phases:
 | 3 | 2b (appliances, ovens, microwave), 2c part (DEM, EVSE), 2d part (ServiceArea, ClosureDimension, TSUIC) | G, H, I | #46 | merged 2026-10-11 |
 | 4 | 2c/2d rest (Commodity*, ElectricalGridConditions, Soil, Actions, EcosystemInformation, PowerSourceConfiguration) and the spec runtime (timed commands from the model, `Constraint.In`, TSUIC default, ModeSelect) | J, K, L | #47; docs #48 | merged 2026-10-11 |
 | 5 | 3 (TCP, BDX, OTA requestor; ADR 0019) and harness follow-ups | M, N, O | #49; docs PR `docs/wave-5-followups` | #49 merged 2026-10-11 (`5739ee8`); docs PR see §3 |
-| 6 | 4 (device layer `device/` and node facade; ADR 0018, still "Proposed") | not written yet | — | **starts on another machine** (owner's decision, 2026-10-11 17:20); see §6 |
+| 6 | 4 (device layer `device/`, node facade `node/`, `cluster/onoff.Server`, daemon migration; ADR 0018 accepted 2026-10-11) | P, Q, R | wave-6 PR from `wave/2026-10-11-tranche-6` (auto-merge squash) | **integrated 2026-10-11 night** on the owner's Linux machine (`fabric-ubnt`); local chip-tool runs (Docker, avahi) instead of CI dispatches; see §6 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -192,29 +192,84 @@ Still open after it:
 - Harness timeouts come from the case's `--timeout` declaration, not from a
   family default.
 
-## 6. Starting wave 6 on the other machine
+## 6. Wave 6 (started 2026-10-11 on the Linux machine)
 
-The owner decided on 2026-10-11 that wave 6 starts on another machine while
-this one finishes wave 5 (PR #49 and its docs PR). Nothing of wave 6 exists
-yet: no briefs, no branch. Scope and sources:
+Briefs on `planning/briefs-wave-6` (`notes/briefs/2026-10-11-P-*.md`,
+`Q-*.md`, `R-*.md`); ADR 0018 "Accepted" with six decisions in the same
+commit (default-server policy, what is generated, accessors, composition,
+the facade's config, complete daemon migration). Worktrees
+`.claude/worktrees/wave6-device` (P) and `wave6-node` (Q), branched from
+the planning branch so they carry the briefs. Integration branch
+`wave/2026-10-11-tranche-6`; R (`wave6/daemon`) branches from it after P
+and Q are merged. Local guards: `make chiptool-test`,
+`make chiptool-families GOFABRIC_CHIP_FAMILIES=…` (the harness image is
+pulled, avahi runs, IPv6 is on the LAN interface); fixtures from the local
+run, not from a CI dispatch. Phase 5 (Apple Home and Alexa runs, `v1.0.0`)
+follows; the real-controller runs need the owner at the device.
 
-- The concept's Part B (`docs/concept-matter-1.6.1-and-device-layer.md`
-  §B.1–B.6) and Phase 4 in §A.3: a `device/` package generated from the
-  device-type model, as matter.js `packages/node/src/devices/` and
-  `endpoints/`, and a node facade as `ServerNode`; the reference daemon
-  migrates as the first consumer and shrinks to device descriptions, ending
-  without `contract.EndpointSource`.
-- [ADR 0018](../docs/adr/0018-device-layer-and-node-facade.md) is
-  "Proposed"; it switches to "Accepted" in the wave's first commit, with the
-  wizard decisions the owner takes at the start recorded in its text (that
-  is how ADR 0019 was handled for wave 5: `docs/adr/0019-*.md` plus the
-  concept's §0 and Phase 3 paragraph rewritten in the same commit).
-- Procedure as in §4: briefs on `planning/briefs-wave-6` (each with its
-  matter.js file:line facts, owned files, guards, exclusions), agents on
-  `wave6/<topic>`, integration on `wave/<date>-tranche-6`, one PR.
-- Do not wait for this machine: wave 5's remaining work (fixtures of run
-  38149548973, PR #49's merge, the docs PR with the §3 items) touches
-  `internal/chiptool`, `notes/parity` and `docs/`, not `device/` or the
-  daemon's topology code. Rebase the wave-6 branch onto `main` after #49
-  merges; `examples/reference-bridge` is the one place both may touch.
+### State at the end of the wave (2026-10-11 night)
 
+Integration branch `wave/2026-10-11-tranche-6`, head = R's `50a2a64`
+(fast-forward: P `b547b99` and Q `de5a7bb` merged, the OnOff seam
+`30fe7f1`, then R's five commits). Reports P, Q, R in
+`notes/briefs/reports/`. Local guards on that tree: `go test ./...`,
+`make lint`, `make race`, `make cover-check` (173 packages; node floor
+56 → 59), `make reachability-check` (unreached 5), `make chiptool-test`
+(commissioning, 287 suite subtests, matter.js controller), families
+IDM 65/13 skip, DESC 2/1, BRBINFO 1/4, ACE 10/0 — all green, PICS slices
+byte-identical.
+
+Owner decisions on R's questions (ADR 0018 stays as written):
+1. `device.WithServer` mounting a cluster the type does not list
+   (`MutableEndpoint.ts:95-110`) and `device.WithChangeNotifier` stay.
+   The bridge still wires only source-level notifiers; "subscribe to
+   server-level notifiers regardless of source" is a findings candidate,
+   not this wave.
+2. Snapshot scope stays `node.Scope` ("node"); no `Config.Scope`. A
+   database written by the pre-wave daemon keeps its "demo" rows, which
+   the model-complete GC never visits again: harmless, documented in the
+   docs PR (open-items), not an API.
+3. The lights keep GlobalSceneControl true (the daemon's invariant);
+   matter.js's schema has no default for it (`on-off.element.ts:30`) and
+   the server reads unset as false (`OnOffServer.ts:105`). Daemon-only
+   by_design entry, not a library divergence.
+4. ServerList order on endpoints 14, 27, 32 now follows the type's
+   requirement order (`DescriptorServer.ts:270-279`): accepted.
+5. Harness fix `77a6677` (explicit `--paa-trust-store-path`) stays; it
+   names the store CHIP's walk finds from a shallower checkout, CI is
+   unchanged.
+
+**Docs PR after the merge** (same shape as §3): by_design — mandatory-
+with-extension refuses `New` (`RequirementGenerator.ts:188-199`,
+`EndpointFile.ts:144-158`); `AddPart` stricter than `Parts.ts:170-201`;
+the assembler's five clusters never mounted by `device/`; feature masks
+as literals; `onoff.Sink` as on()/off() override; Clock-seam countdowns;
+a refused countdown off keeps state; measurement-backed daemon endpoints
+bypass the device layer (`Spec.Measurement`, `Spec.PowerSource`);
+`WithServer` for unlisted clusters; GlobalSceneControl true in the
+daemon. findings — `spec.Instance` treats "Rev >= v7" as conditional so a
+default LevelControl lacks MinLevel/MaxLevel (`LevelControlServer.ts:114-116`);
+OnOff scene invalidation, global scene and delayed scene apply not ported
+(`OnOffServer.ts:98-100,120-122,159-165,175-184,268-310`); optional
+Groups/ScenesManagement not opt-in-able; no default for fabric-scoped
+clusters; no device-layer binding for a host `MeasurementSource`; the
+bridge wires only source-level notifiers. Also: ADR 0018 says 65 types,
+committed are 63 (VideoDoorbell, FloodlightCamera, CastingVideoClient
+excluded); `docs/matterjs-comparison.md` §6 row for the device layer;
+`docs/open-items.md` (the "demo" scope rows); concept phase 4 → done;
+`docs/certifiability.md:500-501` still says the OTA requestor is not on
+the root (it is, ADR 0019); stale `wiring.go` citations in
+`notes/parity/matter_behaviour_findings.md:563`,
+`notes/audits/matter-threat-model.md:119,303`,
+`notes/parity/sweeps/2026-10-f07365a8-85cf6647.md:44,67` → `node/root.go`,
+`node/security.go`, `node/commissioning.go`; `node/` comments cite the
+daemon at `30fe7f1`.
+
+Branches to delete after the merge: `wave6/device`, `wave6/node`,
+`wave6/daemon`, `wave/2026-10-11-tranche-6`, `planning/briefs-wave-6`,
+plus the older leftovers (`planning/briefs-wave-2..5`, `wave5/*`,
+`wave/2026-10-11-tranche-5`, `docs/wave-5-followups`).
+
+Then phase 5: Apple Home / Alexa proof with the daemon on `node/` (the
+owner at the device), the shared AddNOC Go test commissioner (Q's
+deferral), `v1.0.0` freezing `device/` and `node/`.

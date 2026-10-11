@@ -26,7 +26,7 @@ func TestCeilingLightRampsThroughTheEngine(t *testing.T) {
 		lamp := newDemoCeilingLight("ceiling")
 		var lvl *levelcontrol.Server
 		var cc *light.ColorControlServer
-		for _, s := range lamp.MatterClusterServers() {
+		for _, s := range lamp.servers() {
 			switch v := s.(type) {
 			case *levelcontrol.Server:
 				lvl = v

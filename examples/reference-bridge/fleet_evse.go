@@ -18,7 +18,9 @@ import (
 	evse "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	"github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/device"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/node"
 )
 
 // --- device: an EV charger ---------------------------------------------------
@@ -144,18 +146,14 @@ type demoEvse struct {
 }
 
 var (
-	_ contract.EndpointSource = (*demoEvse)(nil)
-	_ energy.EvseHost         = (*demoEvse)(nil)
-	_ modebase.ModeChanger    = (*demoEvse)(nil)
+	_ energy.EvseHost      = (*demoEvse)(nil)
+	_ modebase.ModeChanger = (*demoEvse)(nil)
 )
 
 func newDemoEvse(name string) *demoEvse { return &demoEvse{name: name, now: time.Now} }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (e *demoEvse) MatterDeviceType() uint16 { return deviceTypeEnergyEvse }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (e *demoEvse) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (e *demoEvse) servers() []contract.ClusterServer {
 	e.build()
 	return []contract.ClusterServer{e.evse, e.modes}
 }
@@ -202,19 +200,32 @@ func (e *demoEvse) build() {
 	})
 }
 
-// parts are the charger's PowerSource, DeviceEnergyManagement (stating
-// ControllableEsa, so DeviceEnergyManagementMode is mounted) and
-// ElectricalSensor endpoints.
-func (e *demoEvse) parts() []endpoint.Spec {
+// device builds the charger with its parts: PowerSource,
+// DeviceEnergyManagement (stating ControllableEsa, so
+// DeviceEnergyManagementMode is mounted) and the ElectricalSensor, a
+// measurement-backed endpoint appended after them.
+func (e *demoEvse) device(opts device.Options) (node.Endpoint, error) {
 	e.build()
-	return []endpoint.Spec{
-		{StableKey: endpoint.StringKey("demo:evse:power"), DeviceType: deviceTypePowerSource, Source: e.power},
-		{
-			StableKey: endpoint.StringKey("demo:evse:dem"), DeviceType: deviceTypeDeviceEnergyManagement, Source: e.dem,
-			DeviceConditions: []string{conditionControllableEsa},
-		},
-		{StableKey: endpoint.StringKey("demo:evse:meter"), DeviceType: deviceTypeElectricalSensor, Measurement: e.meter},
+	charger, err := device.NewEnergyEvse(opts, serve(e.servers())...)
+	if err != nil {
+		return nil, err
 	}
+	power, err := device.NewPowerSource(part("demo:evse:power"), serve(e.power.servers())...)
+	if err != nil {
+		return nil, err
+	}
+	esa, err := device.NewDeviceEnergyManagement(part("demo:evse:dem", conditionControllableEsa), serve(e.dem.servers())...)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range []*device.Device{power.Device, esa.Device} {
+		if err := charger.AddPart(p); err != nil {
+			return nil, err
+		}
+	}
+	return withMeasuredParts{charger, []endpoint.Spec{{
+		StableKey: endpoint.StringKey("demo:evse:meter"), DeviceType: deviceTypeElectricalSensor, Measurement: e.meter,
+	}}}, nil
 }
 
 // ChangeToMode implements [modebase.ModeChanger]: every supported mode is
@@ -447,9 +458,8 @@ type demoDem struct {
 }
 
 var (
-	_ contract.EndpointSource = (*demoDem)(nil)
-	_ energy.DemManager       = (*demoDem)(nil)
-	_ modebase.ModeChanger    = (*demoDem)(nil)
+	_ energy.DemManager    = (*demoDem)(nil)
+	_ modebase.ModeChanger = (*demoDem)(nil)
 )
 
 func newDemoDem(name string, now func() time.Time) *demoDem {
@@ -492,11 +502,8 @@ func newDemoDem(name string, now func() time.Time) *demoDem {
 	return d
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (d *demoDem) MatterDeviceType() uint16 { return deviceTypeDeviceEnergyManagement }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (d *demoDem) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (d *demoDem) servers() []contract.ClusterServer {
 	return []contract.ClusterServer{d.srv, d.modes}
 }
 
@@ -674,8 +681,6 @@ type wiredPowerSource struct {
 	version cluster.DataVersionTracker
 }
 
-var _ contract.EndpointSource = (*wiredPowerSource)(nil)
-
 func newWiredPowerSource() *wiredPowerSource {
 	p := &wiredPowerSource{}
 	srv, err := spec.NewServer(powersource.Definition, spec.Options{
@@ -697,11 +702,8 @@ func newWiredPowerSource() *wiredPowerSource {
 	return p
 }
 
-// MatterDeviceType implements [contract.EndpointSource].
-func (p *wiredPowerSource) MatterDeviceType() uint16 { return deviceTypePowerSource }
-
-// MatterClusterServers implements [contract.EndpointSource].
-func (p *wiredPowerSource) MatterClusterServers() []contract.ClusterServer {
+// servers are the cluster servers the device supplies.
+func (p *wiredPowerSource) servers() []contract.ClusterServer {
 	return []contract.ClusterServer{p}
 }
 

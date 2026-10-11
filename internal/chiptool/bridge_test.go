@@ -514,7 +514,7 @@ func (b *bridgeProcess) endpointFor(t *testing.T, deviceType uint32) uint16 {
 // first (endpoint/assembler.go buildEndpointTree), so on the harness's
 // fresh store a parent's part is numbered right after it; the topology
 // block lists the endpoints in ascending order
-// (examples/reference-bridge/wiring.go endpointIDs).
+// (examples/reference-bridge/main.go printTopology).
 func (b *bridgeProcess) endpointAfter(t *testing.T, parent, deviceType uint32) uint16 {
 	t.Helper()
 	above := b.endpointFor(t, parent)
