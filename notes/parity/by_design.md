@@ -308,10 +308,12 @@ diff that motivated it should be attached when next reproduced.
 ### BD-Matter-OTAProvider-NotExposed — the OTA Software Update Provider cluster is not exposed
 
 The bridge does not expose the OTA Software Update **Provider** cluster
-(0x0029). Only the **Requestor** cluster server (0x002A) exists, and it too
-is intentionally left unmounted (`cmd/openccu-loom/daemon_matter.go`
-buildRootClusters — "OTASoftwareUpdateRequestor is intentionally NOT
-mounted").
+(0x0029). The **Requestor** cluster server (0x002A) is a full port since #49
+([ADR 0019](../../docs/adr/0019-tcp-bdx-and-the-ota-requestor.md),
+`BD-Matter-OTARequestor-OnSpecInstance`), and the reference daemon mounts
+it on the root; the reference host's note that it was "intentionally NOT
+mounted" (`cmd/openccu-loom/daemon_matter.go` buildRootClusters) predates
+that and records the host's choice, not the module's.
 
 **Rationale (verified against the gold standard, 2026-07):**
 - matter.js **defines** the Provider cluster and an `OtaProvider` device
@@ -325,12 +327,15 @@ mounted").
 - The Provider cluster is mandatory on the OtaProvider device type (0x14),
   **not** on the RootNode (0x0016) or Aggregator (0x000E) device types loom
   composes. Mounting 0x0029 on the RootNode makes Apple Home's HAP mapper
-  reject the node as schematically inconsistent (same reason 0x002A stays
-  unmounted — see the buildRootClusters comment).
-- A bridge has **no Matter-OTA consumer**: HomeMatic devices update through
-  the CCU, and the daemon updates via its Docker / GoReleaser channel
-  (`ota_software_update_requestor.go` header). A Provider that only ever
-  answers `QueryImage` with `NotAvailable` would serve no controller.
+  reject the node as schematically inconsistent (the reference host's
+  reason for leaving 0x002A unmounted as well; the reference daemon lists
+  the OtaRequestor device type on the root since #49, and whether Apple
+  Home accepts that is on `docs/open-items.md` §4, not yet proven against
+  a real controller).
+- A bridge has **no Matter-OTA consumer** for the Provider role: HomeMatic
+  devices update through the CCU, and the daemon updates via its Docker /
+  GoReleaser channel. A Provider that only ever answers `QueryImage` with
+  `NotAvailable` would serve no controller.
 
 Implementing an unreachable, never-invoked responder (plus its dead
 QueryImageResponse / ApplyUpdateResponse TLV encoders) would add code no
@@ -1759,6 +1764,124 @@ differences, each a deliberate choice:
   mock clock replaces the whole app's clock).
 
 Families SETRF and COMMTR pass (#47). Retire an item when chip defines it.
+
+### BD-Matter-OTARequestor-OnSpecInstance — the OTA requestor is built on `spec.Instance`, and the host's applier checks the image further than matter.js's `validateUpdateFile`
+
+matter.js's `OtaSoftwareUpdateRequestorServer`
+(`packages/node/src/behaviors/ota-software-update-requestor/OtaSoftwareUpdateRequestorServer.ts`)
+is a behaviour whose fabric-scoped DefaultOtaProviders the behaviour
+framework scopes for it. `spec.NewServer` refuses a fabric-scoped attribute
+(`spec.ErrFabricScoped`), so `cluster/core/ota_software_update_requestor.go`
+embeds `spec.Instance` and implements `contract.FabricScopedReader` itself
+(`MatterReadFiltered`), as EcosystemInformation does; the rules are
+transcribed from the behaviour line for line (the table in
+`ota_software_update_requestor_test.go` names each). Two further surface
+differences:
+
+- **Validation split.** matter.js's default `validateUpdateFile` (:1111)
+  reads the header and checks payload size and version; `OtaImageReader.file`
+  records the whole-file checksum on its default branch instead of
+  verifying the payload digest
+  (`packages/protocol/src/ota/OtaImageReader.ts:248-262`), and neither
+  checks vendor or product. The requestor here does the same, and the
+  reference daemon's applier (`examples/reference-bridge/ota.go`) verifies
+  the payload digest, the total size and vendor/product (0 meaning "applies
+  to all") before it keeps the image. A host that wants matter.js's
+  leniency validates less in its `OtaApplier`.
+- **Error strings** of matter.js's ImplementationErrors are lower-cased
+  (lint).
+
+Recorded so they are not re-derived, not divergences: the host-facing
+surface — `OtaApplier` for matter.js's `requestUserConsent` / `applyUpdate`
+extension points, `OtaProviderConnector` for its node's peer connection, a
+host directory for its blob store — and the absence of HTTPS downloads,
+which matter.js's default `transferProtocolsSupported` (:139, :839) does
+not announce either. Retire the `spec.Instance` half when `spec.Server`
+learns fabric-scoped attributes.
+
+### BD-Daemon-OTA-HarnessAppliesInPlace — the reference daemon's `--ota-harness` applies an image in place, after a 2 s Applying hold, with the requestor on the root
+
+matter.js's certification requestor
+(`support/chip-testing/src/OtaRequestorTestInstance.ts`) is its own
+endpoint 1 of type OtaRequestor (`:29-31`, `:326-328`) on a node whose
+product description names that device type (`:284-285`); it leaves
+SoftwareVersion alone after an apply unless started with
+`--rebootAfterApply`, which restarts the process into the applied header
+(`:40-48`, `:151-164`); it can consent and answers an announcement after
+250 ms (`:65`, `:337-340`).
+
+The reference daemon (`examples/reference-bridge/ota.go`) lists the
+OtaRequestor device type on the root (endpoint 0) — the CSA cases
+subscribe to UpdateState there (`TC_SU_2_7.py:216`, `:244` at the harness
+pin) — and, outside harness mode, validates the image, keeps it under
+`<ota-dir>/applied/` and keeps running the old version, which the
+requestor reports as a failed update at the next start (matter.js
+`#handlePreviousUpdateOnStart`). With `--ota-harness` it instead stays in
+Applying for 2 s (`otaHarnessApplyHold`, eight subscription ticks, so
+TC-SU-2.2 step 5 sees the state on its subscription; run 38154468426 timed
+out on a 1 ms Applying), then sets SoftwareVersion to the image's and runs
+the requestor's start-up path in process (`Restarted`: VersionApplied,
+NotifyUpdateApplied); it consents and uses the 250 ms announced-query
+delay as the cert requestor does. A product installs and restarts; nothing
+of this mode is in the module. Pinned by
+`examples/reference-bridge/ota_test.go`; SU/2.2, 2.4 and 4.1 pass on it
+(run 38159192091, #49).
+
+### BD-Matter-ElectricalEnergyTariffWithoutTagList — the tariff endpoint omits the TAGLIST feature its device type marks mandatory
+
+matter.js marks the Descriptor's TAGLIST feature `M` for the
+ElectricalEnergyTariff device type
+(`packages/model/src/standard/elements/electrical-energy-tariff.element.ts:21`)
+and composes the device with `DescriptorServer.with("TagList")`
+(`packages/node/src/devices/electrical-energy-tariff.ts:32`); the
+ElectricalMeter files carry no such requirement. The Descriptor here
+advertises `FeatureMap=0` and reports TagList unsupported
+(`cluster/core/descriptor.go:177-186`) for the Apple `semtag` rejection
+`BD-Matter-ClosureWithoutTagList` records — the same switch and the same
+rationale; this entry exists so the reference daemon's tariff endpoint
+(`examples/reference-bridge/fleet_energy_market.go`) is not read as a
+second defect. The validator (ADR 0016, warn mode) reports
+`matter.devicetype.violation … requirement=Descriptor.TAGLIST` on it at
+every start, and `fleet_energy_market_test.go` tolerates exactly that one.
+The EGC family passes on it (#49). Retire together with the Closure entry.
+
+### BD-Daemon-DEM-OneTriggerTwoEsas — one DeviceEnergyManagement test event trigger reaches both ESAs of the reference daemon
+
+chip's DEM trigger codes carry no endpoint
+(`src/app/clusters/device-energy-management-server/DeviceEnergyManagementTestEventTriggerHandler.h:43-83`
+at the harness pin, `0x0098'0000'0000'00xx`), and in chip's
+energy-management app the one delegate they reach is the device's only
+DEM (`examples/energy-management/energy-management-triggers/DEMTestEventTriggers.cpp`).
+The daemon has two — the EV charger's and the "Charger ESA" with
+StateForecastReporting (`examples/reference-bridge/fleet_esa.go`,
+FeatureMap 0x7C as TC-DEM-2.6/2.8 start chip's app) — and hands every
+0x0098… trigger to both: the ESA's handler returns false
+(`fleet_esa.go:105-118`) so the dispatch in `control.go:380-382` goes on to
+the charger. DEM/2.6 and 2.8 run on the ESA through the family table's
+per-case endpoint; the charger's forecast moving with it is invisible to
+them. `TestDemTriggerReachesBothEsas` pins it. A daemon choice, not a
+module behaviour.
+
+### BD-Matter-TCP-GoMechanics — the TCP port's Go-side mechanics: a `net.Addr` route inside the bridge, a 64-message in-flight bound, 16 KiB socket reads
+
+matter.js threads a `MessageChannel` through the exchange and iterates the
+socket as an async stream
+(`packages/protocol/src/transport/tcp/TcpChannel.ts:87`,
+`for await (const chunk of this.#socket)`), with Node's stream buffering as
+backpressure. Here the bridge-internal route stays a `net.Addr` —
+`*net.UDPAddr` for UDP, `*connRoute` for a TCP connection
+(`bridge/conn.go:44`) — so every UDP send site and test keeps its shape and
+only the receive entry takes a `transport.Conn`; a session is bound to the
+first authenticated route and never switches transport
+(`bindSessionRoute`; matter.js replaces a channel UDP-for-UDP only,
+`MessageChannel.ts:140-148`). `transport/tcp` reads 16 KiB at a time and
+lets at most 64 messages of one connection be in flight before the reader
+stops (`transport/tcp/conn.go:26-36`); no matter.js constant exists for
+either. The framing constants, the three-connections-per-peer cap and the
+10 s timer for an inbound connection's first message — which matter.js
+stops at the first complete message, not the first byte
+(`TcpTransport.ts:98-103`) — are matter.js's. Nothing to retire; this
+records why the shapes differ.
 
 ## Removed (built, tested, never wired)
 

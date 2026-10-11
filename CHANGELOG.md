@@ -44,8 +44,7 @@ the same `ColorTemperatureWriter` as before.
   socket's port and sets the operational record's `T` key. A request over
   TCP is answered on its connection without MRP, and a dropped connection
   closes every session bound to it. Session establishment (PASE / CASE)
-  over TCP is not served yet: an unsecured message over TCP is dropped.
-  The reference daemon's `--tcp` flag (`true`, `false`, `incoming`,
+  over TCP is served too (above). The reference daemon's `--tcp` flag (`true`, `false`, `incoming`,
   `outgoing`) defaults to on.
 - `secure/sessionparams` (new): the SessionParameters structure both
   handshakes exchange, tags 1–9 as matter.js `PaseMessages.ts:28-58`
