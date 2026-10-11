@@ -1663,6 +1663,11 @@
       "steps": 7,
       "stepsSkipped": 0
     },
+    "SU/2.2": {
+      "tests": 1,
+      "steps": 7,
+      "stepsSkipped": 0
+    },
     "SU/2.4": {
       "tests": 1,
       "steps": 2,
