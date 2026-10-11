@@ -171,22 +171,20 @@ func featureApplicability(c Conformance, ctx FeatureContext) Applicability {
 	}
 	provisional := false
 	for i, node := range c.Args {
-		switch node.Op {
-		case ConfProvisional:
+		if node.Op == ConfProvisional {
 			provisional = true
 			continue
-		case ConfDeprecated:
-			// A trailing "D" announces a future deprecation; the terms
-			// before it decide.
-			if i == len(c.Args)-1 {
-				continue
-			}
+		}
+		// A trailing "D" announces a future deprecation; the terms before
+		// it decide.
+		if node.Op == ConfDeprecated && i == len(c.Args)-1 {
+			continue
 		}
 		applies, demands := featureEntry(node, ctx)
-		switch applies {
-		case ApplicabilityNone:
+		if applies == ApplicabilityNone {
 			continue // inapplicable here; a later entry may govern
-		case ApplicabilityConditional:
+		}
+		if applies == ApplicabilityConditional {
 			return ApplicabilityConditional
 		}
 		if demands == ApplicabilityMandatory && provisional {
