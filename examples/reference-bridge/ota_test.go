@@ -218,7 +218,25 @@ func TestOtaHarness_UpdateReportedInPlace(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	// Applying stays readable for the hold, as on a device that flashes
+	// and reboots; a subscriber would otherwise only see the Idle after it.
 	deadline := time.Now().Add(5 * time.Second)
+	var applyingSince time.Time
+	for applyingSince.IsZero() {
+		if v, _ := r.MatterRead(otadef.AttrUpdateState); v == uint8(otadef.UpdateStateApplying) {
+			applyingSince = time.Now()
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("never in Applying")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(otaHarnessApplyHold / 2)
+	if v, _ := r.MatterRead(otadef.AttrUpdateState); v != uint8(otadef.UpdateStateApplying) {
+		t.Fatalf("state %v %v after entering Applying, want still Applying", v, time.Since(applyingSince))
+	}
+	deadline = time.Now().Add(5 * time.Second)
 	for !events.saw(otadef.EventVersionApplied) {
 		if time.Now().After(deadline) {
 			t.Fatal("no VersionApplied")

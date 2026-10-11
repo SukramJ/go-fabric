@@ -46,6 +46,7 @@ commit, and the fix-up commits the fixture runs forced:
 | `993f802` | peer loss on an exchange this node opened force-closes the peer's sessions (`handleInitiatedPeerLoss`, `Manager.ClosePeerLost`, `Entry.CreatedAt`; SU/2.2 step 2); harness removes `/tmp/chip_kvs_provider*` only after the provider is gone (SU/2.4); fixtures of run 38142202247 |
 | `aac3870` | 1 MiB OTA payload so SU/2.2 step 3 can observe Downloading |
 | `9e22278` | harness case edit for TC-SU-2.2 step 3: the guard window ends at its tolerance boundary so Phase C sees the Downloading report (the guard swallowed a report that landed inside its last 5 s); fixtures of run 38149548973, SU/2.4 passes |
+| next | `--ota-harness` apply holds Applying for 2 s before setting the version, so TC-SU-2.2 step 5 sees Applying (run 38154468426: steps 1–4 passed, step 5 timed out waiting for Applying, the state lasted 1 ms) |
 
 **Pending when this was written (18:10):** fixture run
 [38154468426](https://github.com/SukramJ/go-fabric/actions/runs/38154468426)
@@ -63,7 +64,7 @@ Runs so far on this branch:
 | 38142202247 | IDM, DEM, SU | IDM, DEM green (session cap); SU 2.2 step 2, SU 2.4 red |
 | 38146455037 | IDM, SU | SU 2.4 green; SU 2.2 step 3: 44-byte image downloaded in 200 ms, Downloading never reported |
 | 38149548973 | IDM, SU | SU 2.2 step 3: Downloading reported at 15:21:57.237, swallowed by the guard window that ended at the same instant |
-| 38154468426 | IDM, SU | pending |
+| 38154468426 | IDM, SU | SU/2.2 steps 1–4 pass (case edit works); step 5 waited for Applying, which the in-place apply left after 1 ms |
 
 What to do with it, step by step (the same procedure every wave used):
 

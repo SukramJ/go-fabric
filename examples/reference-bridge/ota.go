@@ -97,6 +97,15 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 			slog.String("hint", "install it and restart; this example does not flash itself"))
 		return nil
 	}
+	// A device that flashes its image stays in Applying until it reboots;
+	// applied in place, the requestor would leave Applying a millisecond
+	// after entering it, inside one subscription tick, and a subscriber
+	// would only ever see the Idle that follows. TC-SU-2.2 step 5 waits
+	// for Applying on its UpdateState subscription (TC_SU_2_2.py:1232-1262
+	// at the harness pin) and timed out on exactly that (run 38154468426).
+	if err := sleepCtx(ctx, otaHarnessApplyHold); err != nil {
+		return err
+	}
 	if err := a.basicInfo.SetSoftwareVersion(newSoftwareVersion, header.SoftwareVersionString); err != nil {
 		return err
 	}
@@ -105,6 +114,24 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	// runs after that, as a restart would.
 	go a.restartedWhenIdle(context.WithoutCancel(ctx))
 	return nil
+}
+
+// otaHarnessApplyHold is how long the in-place apply of --ota-harness stays
+// in Applying: eight ticks of the subscription engine (250 ms,
+// im/subscription/manager.go:185), so the state is reported before the
+// requestor returns to Idle.
+const otaHarnessApplyHold = 2 * time.Second
+
+// sleepCtx waits d or until ctx ends.
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (a *otaApplier) verify(version uint32, file string) (otaimage.Header, error) {
