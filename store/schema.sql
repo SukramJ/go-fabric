@@ -261,3 +261,18 @@ CREATE TABLE IF NOT EXISTS matter_server_subscriptions (
 
 CREATE INDEX IF NOT EXISTS matter_server_subscriptions_fabric
     ON matter_server_subscriptions(fabric_index);
+
+-- matter_ota_default_providers persists the OTA Software Update Requestor's
+-- DefaultOTAProviders: a fabric-scoped list, nonvolatile as matter.js keeps
+-- it (ota-software-update-requestor.element.ts, quality "N"). position keeps
+-- the order a controller wrote; a removed fabric takes its entries along.
+-- New in brief N (ADR 0019); `IF NOT EXISTS` is its migration, as for every
+-- table this file adds.
+CREATE TABLE IF NOT EXISTS matter_ota_default_providers (
+    fabric_index        INTEGER  NOT NULL,
+    position            INTEGER  NOT NULL,
+    provider_node_id    BLOB     NOT NULL,
+    endpoint            INTEGER  NOT NULL CHECK(endpoint BETWEEN 0 AND 65535),
+    PRIMARY KEY(fabric_index, position),
+    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
+);
