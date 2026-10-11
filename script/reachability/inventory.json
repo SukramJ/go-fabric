@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4280,
+  "entry_points": 4281,
   "entry_packages": [
     ".",
     "bootid",
@@ -168,9 +168,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9801,
-    "reachable": 6838,
-    "whitelisted": 2958,
+    "total_exported": 9803,
+    "reachable": 6839,
+    "whitelisted": 2959,
     "unreachable": 5
   },
   "by_package": [
@@ -20661,6 +20661,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/mrp/mrp_test.go",
       "line": 148
+    },
+    {
+      "package": "transport/mrp",
+      "identifier": "TestUsesMRP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/mrp/reliable_test.go",
+      "line": 9
     },
     {
       "package": "transport/mrp",
