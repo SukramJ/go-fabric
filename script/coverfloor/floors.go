@@ -257,6 +257,10 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/laundrydryercontrols", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/ovencavityoperationalstate", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/servicearea", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/closuredimension", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/servicearea", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/spectest", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/script/clustergen", min: 95},
 	// The CHIP data model cross-check (internal/chipdm): measured 97.4 without

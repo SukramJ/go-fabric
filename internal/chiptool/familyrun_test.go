@@ -155,7 +155,7 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 		dtOnOffLight, dtColorTempLight, dtExtColorLight, dtSpeaker, dtTempSensor, dtWaterValve, dtModeSelect, dtFan,
 		dtSmokeCOAlarm, dtPump, dtFlowSensor, dtLaundryWasher, dtRVC, dtThermostat, dtWindowCovering,
 		dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch, dtAirPurifier, dtClosure,
-		dtTempControlledCabinet, dtAirQualitySensor, dtWaterHeater, dtElectricalUtilityMeter, dtRefrigerator, dtDishwasher, dtMicrowaveOven, dtOven, dtEnergyEvse, dtDeviceEnergyManagement,
+		dtTempControlledCabinet, dtAirQualitySensor, dtWaterHeater, dtElectricalUtilityMeter, dtRefrigerator, dtDishwasher, dtMicrowaveOven, dtOven, dtEnergyEvse, dtDeviceEnergyManagement, dtClosurePanel,
 	} {
 		set.epOf[dt] = br.endpointFor(t, dt)
 	}

@@ -175,6 +175,9 @@ const (
 	// PA|PFR|STA|PAU|FA|CON and DeviceEnergyManagementMode).
 	dtEnergyEvse             = 0x050C
 	dtDeviceEnergyManagement = 0x050D
+	// dtClosurePanel is the reference daemon's closure panel
+	// (examples/reference-bridge/fleet_closure.go): ClosureDimension.
+	dtClosurePanel = 0x0231
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -374,6 +377,10 @@ var chipFamilies = []family{
 			"5.1": {{`"CLCTRL.S", "CLCTRL.S.C00"`, `"CLCTRL.S", "CLCTRL.S.C00.Rsp"`, "TC_CLCTRL_5_1 gates on the undefined code CLCTRL.S.C00; Stop is CLCTRL.S.C00.Rsp"}},
 		},
 	},
+	// CLDIM sets no PIXIT and sends no test event trigger: the CHIP cases
+	// at the harness pin (TC_CLDIM_*.py) name none; they run against the
+	// closure panel, whose features are the closure-app panel's.
+	{name: "CLDIM", deviceType: dtClosurePanel},
 	{
 		// The extended colour light serves every ColorControl feature (XY,
 		// CT, HS, EHUE, CL), as matter.js's own CHIP test endpoint does
@@ -525,6 +532,9 @@ var chipFamilies = []family{
 			},
 		},
 	},
+	// SEAR sets no PIXIT: TC_SEAR_*.py at the harness pin name none; the
+	// vacuum's ServiceArea serves MAPS and PROG (fleet_servicearea.go).
+	{name: "SEAR", deviceType: dtRVC},
 	{name: "SMOKECO", deviceType: dtSmokeCOAlarm},
 	{
 		name: "SWTCH", deviceType: dtGenericSwitch,
@@ -541,6 +551,7 @@ var chipFamilies = []family{
 		},
 	},
 	{name: "TSTAT", deviceType: dtThermostat},
+	{name: "TSUIC", deviceType: dtThermostat},
 	{
 		name: "VALCC", deviceType: dtWaterValve,
 		exclude: map[string]gap{

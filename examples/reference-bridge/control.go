@@ -174,7 +174,11 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 	case "Docked":
 		return f.vacuum.reportDocked()
 	case "Reset":
-		return f.vacuum.reset()
+		// matter.js RvcTestInstance "reset" also clears the selected areas.
+		if err := f.vacuum.reset(); err != nil {
+			return err
+		}
+		return f.vacuumArea.reset()
 	case "ChargerFound", "Charging":
 		return f.vacuum.reportState(opstate.StateCharging)
 	case "Charged":

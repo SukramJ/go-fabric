@@ -53,6 +53,9 @@ var committed = []string{
 	"LevelControl",
 	// cluster/closure
 	"ClosureControl",
+	"ClosureDimension",
+	// cluster/servicearea
+	"ServiceArea",
 	// cluster/cover
 	"WindowCovering",
 	// cluster/lock
@@ -60,6 +63,7 @@ var committed = []string{
 	// cluster/thermo
 	"Thermostat",
 	"TemperatureControl",
+	"ThermostatUserInterfaceConfiguration",
 	// cluster/measurement
 	"TemperatureMeasurement",
 	"RelativeHumidityMeasurement",

@@ -154,6 +154,30 @@ the same `ColorTemperatureWriter` as before.
   (0x0099…) and DeviceEnergyManagement (0x0098…) test event triggers as
   connectedhomeip's evse-app does. The chip-tool suite runs the DEM, DEMM,
   EEVSE and EEVSEM families against it (workflow group `app-energy`).
+- `cluster/servicearea` (new): a ServiceArea (0x0150) server on the
+  generated definition with the rules of matter.js's
+  `ServiceAreaBaseServer` — the SupportedAreas / SupportedMaps /
+  SelectedAreas / CurrentArea / Progress checks on construction and on
+  every setter (`ErrInvalidState`), SelectAreas (UnsupportedArea, duplicate
+  removal, Progress reset to Pending) with the device's decision through
+  the `Selector` host port, SkipArea's default checks with the `Skipper`
+  host port, `RemoveSupportedAreasEntry` / `RemoveSupportedMapsEntry`, and
+  EstimatedEndTime reported per matter.js's quiet rule.
+- `cluster/closure.NewDimension`: a ClosureDimension (0x0105) server on
+  the generated definition with connectedhomeip's rules (SetTarget and
+  Step checks, LimitRange clamp, Resolution rounding, the latch rules,
+  CurrentState's reporting rule), the `DimensionHandler` host port and
+  `DeviceTypeClosurePanel`.
+- `cluster/thermo.NewThermostatUserInterfaceConfiguration`: the
+  ThermostatUserInterfaceConfiguration (0x0204) server on the generated
+  default server, starting at matter.js's values (Celsius unless the host
+  says otherwise, KeypadLockout NoLockout).
+- Reference daemon: the vacuum serves ServiceArea (one map, two areas,
+  matter.js's RVC test-node decisions; the app pipe's `Reset` clears the
+  selection), the thermostat serves ThermostatUserInterfaceConfiguration,
+  and a ClosurePanel (0x0231) serves ClosureDimension as connectedhomeip's
+  closure-app panel does, with its simulated motion. The chip-tool table
+  declares the SEAR, CLDIM and TSUIC families.
 - `cluster/modebase` serves six more ModeBase derivations, each on its
   generated definition: `NewOvenMode`,
   `NewRefrigeratorAndTemperatureControlledCabinetMode`,
