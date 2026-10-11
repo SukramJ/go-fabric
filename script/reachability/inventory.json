@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4200,
+  "entry_points": 4201,
   "entry_packages": [
     ".",
     "bootid",
@@ -158,9 +158,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9321,
+    "total_exported": 9322,
     "reachable": 6518,
-    "whitelisted": 2798,
+    "whitelisted": 2799,
     "unreachable": 5
   },
   "by_package": [
@@ -13784,6 +13784,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/kitchen_test.go",
       "line": 27
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestOvenPipeDrivesTheCavity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/control_test.go",
+      "line": 258
     },
     {
       "package": "examples/reference-bridge",
