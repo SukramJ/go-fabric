@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4261,
+  "entry_points": 4263,
   "entry_packages": [
     ".",
     "bootid",
@@ -166,9 +166,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9763,
+    "total_exported": 9765,
     "reachable": 6819,
-    "whitelisted": 2939,
+    "whitelisted": 2941,
     "unreachable": 5
   },
   "by_package": [
@@ -16599,6 +16599,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
       "line": 49
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestFamilyDeviceTypesResolve",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/certifiability_doc_test.go",
+      "line": 278
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestOtaPlumbing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/otaplumbing_test.go",
+      "line": 100
     },
     {
       "package": "internal/chiptool",
