@@ -6,6 +6,7 @@
 package device
 
 import (
+	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
@@ -65,4 +66,4 @@ func NewFan(opts Options, with ...Option) (*Fan, error) {
 func (d *Fan) FanControl() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0202) }
 
 // OnOff returns the OnOff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Fan) OnOff() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0006) }
+func (d *Fan) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }

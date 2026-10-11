@@ -6,6 +6,7 @@
 package device
 
 import (
+	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	laundrywashercontrolsdef "github.com/SukramJ/go-fabric/cluster/spec/laundrywashercontrols"
@@ -79,7 +80,7 @@ func (d *LaundryWasher) OperationalState() *spec.Server {
 }
 
 // OnOff returns the OnOff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *LaundryWasher) OnOff() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0006) }
+func (d *LaundryWasher) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // LaundryWasherMode returns the LaundryWasherMode server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
 func (d *LaundryWasher) LaundryWasherMode() *spec.Server {

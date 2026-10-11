@@ -24,5 +24,5 @@ var specServer = serverType{Type: "*spec.Server", Import: specImport}
 // generated one: cluster name → Go type and import. Keep it in step with
 // device/device.go defaultFactories, which builds them.
 var servers = map[string]serverType{
-	"OnOff": specServer, // TODO(brief Q): *onoff.Server from cluster/onoff once it lands.
+	"OnOff": {Type: "*onoff.Server", Import: "github.com/SukramJ/go-fabric/cluster/onoff"},
 }

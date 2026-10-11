@@ -6,6 +6,7 @@
 package device
 
 import (
+	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	activatedcarbonfiltermonitoringdef "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring"
 	fancontroldef "github.com/SukramJ/go-fabric/cluster/spec/fancontrol"
@@ -101,7 +102,7 @@ func NewRoomAirConditioner(opts Options, with ...Option) (*RoomAirConditioner, e
 }
 
 // OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *RoomAirConditioner) OnOff() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0006) }
+func (d *RoomAirConditioner) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // Thermostat returns the Thermostat server (mandatory), or nil when the host supplied one of another type.
 func (d *RoomAirConditioner) Thermostat() *spec.Server {

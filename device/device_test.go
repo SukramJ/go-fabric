@@ -225,14 +225,12 @@ func TestOnChangedFiresOnSet(t *testing.T) {
 	}
 	var got [][]uint32
 	stop := d.OnChanged(onoffdef.ClusterID, func(ids []uint32) { got = append(got, ids) })
-	if err := d.OnOff().Set(onoffdef.AttrOnOff, true); err != nil {
-		t.Fatal(err)
-	}
+	d.OnOff().Set(true)
 	if len(got) != 1 || !slices.Equal(got[0], []uint32{onoffdef.AttrOnOff}) {
 		t.Errorf("notified %v", got)
 	}
 	stop()
-	_ = d.OnOff().Set(onoffdef.AttrOnOff, false)
+	d.OnOff().Set(false)
 	if len(got) != 1 {
 		t.Error("notified after unsubscribe")
 	}

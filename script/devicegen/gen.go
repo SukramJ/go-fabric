@@ -443,6 +443,10 @@ func (g *generator) body(m *typeModel, imports map[string]string) ([]byte, error
 		}
 		if acc.Import == specImport {
 			imports[specImport] = ""
+		} else {
+			// A self-held server's package, aliased by its last path
+			// element; the definition import carries the "def" suffix.
+			imports[acc.Import] = acc.Import[strings.LastIndex(acc.Import, "/")+1:]
 		}
 		method := exportName(cr.def.Name)
 		if deviceMethods[method] {

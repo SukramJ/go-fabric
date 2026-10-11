@@ -6,6 +6,7 @@
 package device
 
 import (
+	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	colorcontroldef "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
@@ -98,7 +99,7 @@ func NewExtendedColorLight(opts Options, with ...Option) (*ExtendedColorLight, e
 }
 
 // OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *ExtendedColorLight) OnOff() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0006) }
+func (d *ExtendedColorLight) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // LevelControl returns the LevelControl server (mandatory), or nil when the host supplied one of another type.
 func (d *ExtendedColorLight) LevelControl() *spec.Server {

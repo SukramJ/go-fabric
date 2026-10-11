@@ -6,6 +6,7 @@
 package device
 
 import (
+	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	flowmeasurementdef "github.com/SukramJ/go-fabric/cluster/spec/flowmeasurement"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
@@ -101,7 +102,7 @@ func NewPump(opts Options, with ...Option) (*Pump, error) {
 }
 
 // OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *Pump) OnOff() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0006) }
+func (d *Pump) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // PumpConfigurationAndControl returns the PumpConfigurationAndControl server (mandatory), or nil when the host supplied one of another type.
 func (d *Pump) PumpConfigurationAndControl() *spec.Server {

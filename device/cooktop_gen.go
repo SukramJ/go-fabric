@@ -6,7 +6,7 @@
 package device
 
 import (
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/schema"
@@ -51,4 +51,4 @@ func NewCooktop(opts Options, with ...Option) (*Cooktop, error) {
 }
 
 // OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *Cooktop) OnOff() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0006) }
+func (d *Cooktop) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }

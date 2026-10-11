@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/onoff"
+
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -251,7 +253,19 @@ type serverFactory func(def *spec.Cluster, opts spec.Options, cfg spec.ServerCon
 // wave 6, 2). Keep it in step with script/devicegen/servers.go, which
 // types the generated accessors.
 var defaultFactories = map[uint32]serverFactory{
-	0x0006: newSpecServer, // OnOff. TODO(brief Q): cluster/onoff.Server once it lands.
+	0x0006: newOnOffServer, // OnOff: cluster/onoff.Server, matter.js OnOffServer.ts.
+}
+
+// newOnOffServer is the module's OnOff server ([onoff.New]). A device of
+// this layer sits under the Aggregator, so StartUpOnOff is not applied
+// (OnOffServer.ts:37, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
+func newOnOffServer(_ *spec.Cluster, opts spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error) {
+	return onoff.New(onoff.Config{
+		Features:    onoff.Feature(opts.Features),
+		DataVersion: cfg.DataVersion,
+		Initial:     cfg.Initial,
+		Bridged:     true,
+	})
 }
 
 // newSpecServer is the generated server, [spec.NewServer].

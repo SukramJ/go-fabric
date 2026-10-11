@@ -6,6 +6,7 @@
 package device
 
 import (
+	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	dishwasheralarmdef "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
 	dishwashermodedef "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
@@ -77,7 +78,7 @@ func NewDishwasher(opts Options, with ...Option) (*Dishwasher, error) {
 func (d *Dishwasher) OperationalState() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0060) }
 
 // OnOff returns the OnOff server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *Dishwasher) OnOff() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0006) }
+func (d *Dishwasher) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // TemperatureControl returns the TemperatureControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
 func (d *Dishwasher) TemperatureControl() *spec.Server {

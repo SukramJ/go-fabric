@@ -6,6 +6,7 @@
 package device
 
 import (
+	onoff "github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
@@ -87,7 +88,7 @@ func NewMountedOnOffControl(opts Options, with ...Option) (*MountedOnOffControl,
 }
 
 // OnOff returns the OnOff server (mandatory), or nil when the host supplied one of another type.
-func (d *MountedOnOffControl) OnOff() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0006) }
+func (d *MountedOnOffControl) OnOff() *onoff.Server { return serverAs[*onoff.Server](d.Device, 0x0006) }
 
 // LevelControl returns the LevelControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
 func (d *MountedOnOffControl) LevelControl() *spec.Server {
