@@ -19,7 +19,7 @@ German, briefly. Six waves were planned against the phases:
 | 2 | 2a (concentration clusters, labels, localization, diagnostics, WaterHeater, EnergyPreference, MeterIdentification) | D, E, F | #45 | merged 2026-10-11 |
 | 3 | 2b (appliances, ovens, microwave), 2c part (DEM, EVSE), 2d part (ServiceArea, ClosureDimension, TSUIC) | G, H, I | #46 | merged 2026-10-11 |
 | 4 | 2c/2d rest (Commodity*, ElectricalGridConditions, Soil, Actions, EcosystemInformation, PowerSourceConfiguration) and the spec runtime (timed commands from the model, `Constraint.In`, TSUIC default, ModeSelect) | J, K, L | #47; docs #48 | merged 2026-10-11 |
-| 5 | 3 (TCP, BDX, OTA requestor; ADR 0019) and harness follow-ups | M, N, O | #49 | **open with auto-merge** — see §2 |
+| 5 | 3 (TCP, BDX, OTA requestor; ADR 0019) and harness follow-ups | M, N, O | #49; docs PR `docs/wave-5-followups` | #49 merged 2026-10-11 (`5739ee8`); docs PR see §3 |
 | 6 | 4 (device layer `device/` and node facade; ADR 0018, still "Proposed") | not written yet | — | **starts on another machine** (owner's decision, 2026-10-11 17:20); see §6 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
@@ -32,8 +32,9 @@ sources; an agent transcribes, the owner decides.
 
 ## 2. Current state: wave 5, PR #49
 
-Branch `wave/2026-10-11-tranche-5`, PR #49 open with auto-merge, base `main`
-at `07d9622` (PR #48). The branch holds, in order: the three agent branches
+PR #49 merged 2026-10-11 20:46 as `5739ee8` (squash); the wave branches
+are to be deleted (below). It was branch `wave/2026-10-11-tranche-5`, base
+`main` at `07d9622` (PR #48). The branch holds, in order: the three agent branches
 merged (`wave5/tcp` M, `wave5/ota` N, `wave5/harness` O, plus
 `wave5/fixup-su`), the owner's session-parameter work, the integration
 commit, and the fix-up commits the fixture runs forced:
@@ -108,29 +109,40 @@ under `.claude/worktrees/` (`git worktree remove --force <path>`; they are
 remote branches `wave5/*`, `wave/2026-10-11-tranche-5`,
 `planning/briefs-wave-5`.
 
-## 3. Open after wave 5 (the docs PR that follows every wave)
+## 3. After wave 5: the docs PR, and what it left open
 
 The owner writes these; agents never edit `by_design.md` or the findings
-register.
+register. The docs PR (branch `docs/wave-5-followups`, 2026-10-11) did:
 
-- **by_design entries** proposed in the reports' "Deviations the owner should
-  judge" sections: `notes/briefs/reports/M.md`, `N.md`, `O.md`. Among them:
-  the requestor on `spec.Instance` rather than a hand-written behaviour, the
-  harness's in-place apply (`--ota-harness`), one DEM test trigger reaching
-  two ESAs, ElectricalEnergyTariff without TagList, `T=0` as matter.js's
-  runtime does.
-- **Findings** (`notes/parity/matter_behaviour_findings.md`): TC_SU_2_7
-  steps 3/5 (N.md §Findings); subscription-report retransmission exhaustion
-  closes only the subscription where matter.js treats it as peer loss
-  (Tier 3 entry already added on 2026-10-11).
-- **Open question N.1**: ClientList on the root. The OtaRequestor device type
-  requires client cluster OtaSoftwareUpdateProvider; matter.js lists none
-  (`DescriptorServer.ts:288-297`), the daemon logs
-  `client:OtaSoftwareUpdateProvider kind=missing`. Owner decision.
-- **Follow-ups** (code): BDX block size 8192 over TCP; closing a TCP
-  connection when its last session goes; a write deadline on TCP sends.
-- `docs/open-items.md` and the counts in `README.md` move with each wave;
-  check them after the merge.
+- `notes/parity/by_design.md`: `BD-Matter-OTARequestor-OnSpecInstance`,
+  `BD-Daemon-OTA-HarnessAppliesInPlace` (endpoint 0, the 2 s Applying
+  hold), `BD-Matter-ElectricalEnergyTariffWithoutTagList`,
+  `BD-Daemon-DEM-OneTriggerTwoEsas`, `BD-Matter-TCP-GoMechanics`;
+  `BD-Matter-OTAProvider-NotExposed` no longer says the requestor is
+  unmounted. Every matter.js line was re-read at the local checkout
+  `4633bfd7` (the reports cite `9840bb92`; the cited lines agree), chip at
+  the harness pin.
+- `notes/parity/matter_behaviour_findings.md`: Tier 3 — a TCP connection
+  is not closed when its last session goes, `T=0` emitted where matter.js
+  and chip omit the key, 1024-byte BDX blocks over TCP; certification
+  harness — TC-SU-2.7 steps 3 and 5 (manual case, not run); device type
+  validation — the root's ClientList lacks 0x0029, with the decision to
+  mirror matter.js and list it (wave 6, with the daemon's topology).
+- `docs/open-items.md` (counts 608 / 351, phase 1 closed, the four new
+  rows), `docs/matterjs-comparison.md` (TCP / BDX, timed, quota, OTA rows),
+  ADR 0013's migration list, one CHANGELOG sentence.
+
+Still open after it:
+
+- **Code follow-ups** (findings register): close a TCP connection with its
+  last session; omit `T` without TCP; 8192-byte BDX blocks over TCP; the
+  daemon's root ClientList. A write deadline on TCP sends has no matter.js
+  source (report M) and is a Go choice.
+- **TC-SU-2.7**: follow matter.js or the case — decide when the case is
+  automated; upstream issue candidate.
+- Report M's open questions 1–5 were settled in #49 (TCP default on,
+  `MCORE.SC.S.TCP=1`; binding never switches transport; the idle timer as
+  matter.js; the in-package seam; `T=0` now a finding).
 
 ## 4. How the work is done (rules that are not in CLAUDE.md)
 

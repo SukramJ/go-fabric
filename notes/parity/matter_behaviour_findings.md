@@ -419,6 +419,12 @@ of connectedhomeip are marked unverified:
 
 - **Subscription-report retransmission exhaustion closes the subscription, not the peer's sessions.** `bridge/ackpump.go` `tickOutboundReliable`: `mrp.ErrMaxRetransmissionsReached` on a report counter reaps the owning subscription (`closeSubscriptionByCounter`) and leaves the session in the table; only an exchange this node opened (OTA, BDX) reports peer loss (`handleInitiatedPeerLoss`, added 2026-10-11). matter.js treats exhaustion on any exchange of a NodeSession as peer loss and force-closes every session with that peer created before the exchange (`MessageExchange.ts:620` → `ExchangeManager.ts:556-580` → `SessionManager.ts:677-695`). Fix package: route the report-counter case through the same peer-loss path once the subscription's exchange key is known to the tracker result; the sessions' other subscriptions then fall with them (`SetOnSessionClose` cascade).
 
+- **A TCP connection stays open after its last session goes.** `bridge/conn.go` closes the sessions bound to a connection when the connection drops (`evictConn`, :235); nothing closes a connection whose sessions were all closed the other way round — by CloseSession, fabric removal, the reaper or NOC rotation. matter.js closes the TCP channel when the last session on it is removed (`ExchangeManager.ts:669` `#closeTcpChannelIfLastSession`, scheduled from `:704`). Fix package: count the sessions bound to each `*connRoute` in `bindSessionRoute`; on every `SessionRegistry` close (the hook the subscription manager already uses) decrement and, at zero, close the `tcp.Conn`; test `TestTCPConnClosedWhenLastSessionGoes` with the secure harness of `bridge/tcp_test.go`. Until then an idle controller connection lives until the peer closes it; the 10 s timer covers only a connection's first message. (Report M also notes that TCP sends carry no write deadline — no matter.js source, so not a finding: a peer that stops reading blocks the sender until the connection closes.)
+
+- **`T=0` is emitted on the operational record when TCP is off.** `mdns/service.go:206-248` always writes the `T` key, 0 with no TCP bits, and `mdns/service_test.go:30`, `:173`, `:300`, `:316` lock it. matter.js sets `supportedTransports` only when TCP is configured (`ServerNetworkRuntime.ts:335-337`) and emits `T` only then (`MdnsAdvertisement.ts:205`); chip at the harness pin writes the key only when a mode is advertised (`src/lib/dnssd/Advertiser_ImplMinimalMdns.cpp:279-285`). TC-SC-4.3 accepts both — `mdns_discovery/utils/asserts.py:1130-1131` returns when the key is absent, and requires the PICS to match the DUT when it is present — so the daemon's `T=6` with `MCORE.SC.S.TCP=1` passes either way. Fix package: omit the key when neither bit is set and move the parity lock to "absent without TCP, `6` with both"; the commissionable record never carries it (unchanged, `MdnsAdvertisement.ts:204`).
+
+- **The OTA requestor asks for 1024-byte BDX blocks on every channel.** `cluster/core/ota_requestor_query.go:551` (`otaBdxMaxBlockSizeNonTCP`); matter.js asks for 8192 over a TCP channel (`OtaSoftwareUpdateRequestorServer.ts:54-55`, `:963`). `bdx` already caps the block size at the exchange's `MaxPayloadSize`. Fix package: let the bridge's initiated exchange (`bridge/ota_provider_link.go`) report whether its route is reliable (`transport.Conn.Reliable`) and let the requestor pick the TCP constant when it is; check the negotiated block size in `bridge/ota_provider_e2e_test.go` over a TCP-bound session.
+
 Fixed-width integer encodes exceed the sanctioned SubscriptionID/DataVersion workaround family-wide, and the provenance comments misstate matter.js (`tlv/encode.go:119`); invalid UTF-8 preserved on decode (`tlv/decode.go:201`); maxPathsPerInvoke unenforced and Invoke SuppressResponse ignored (`im/invoke.go:307`); CSRRequest lacks the post-NOC ConstraintError guard; CaseAdminSubject CAT version 0 accepted (`cluster/core/operational_credentials.go:1831`); unfiltered NOCs read returns other fabrics' cert bytes; advertised port ignores the effective bind port (`bridge/bridge.go:1168`); ephemeral PASE provider leaks a reaper goroutine per close (`cmd/openccu-loom/matter_ephemeral_provider.go:164`); encrypted receive window permits rollover (`transport/mrp/window.go:88`); negative-write parity guards pin unmounted implementations (`cluster/matter_negative_write_parity_test.go:231`).
 
 ---
@@ -484,6 +490,23 @@ family, and deleting the entry.
   text for SetTargets names RESOURCE_EXHAUSTED. Until then the case is
   excluded as class (a) in the EEVSE family.
 
+- **TC-SU-2.7 would fail two asserts where the case and matter.js
+  disagree — not run: the case is manual at the harness pin.** Recorded
+  from the port (#49) so the first manual run is not read as a defect.
+  Step 3 kills the provider and expects Querying → Idle with ChangeReason
+  *Failure* (`TC_SU_2_7.py:257`); matter.js treats a failed provider
+  connection as "no update" and resets with the default reason, Success
+  (`OtaSoftwareUpdateRequestorServer.ts:620-627`), as the requestor here
+  does. Step 5 expects a DownloadError with `bytesDownloaded > 0`,
+  `progressPercent > 0`, `platformCode` null and at least 300 s until Idle
+  (`:364`, `:371-374`); matter.js builds the BDX failure's OtaDownloadError
+  without a byte count and with the BDX code or 0 as the platform code
+  (`:982`, `:915`, `:1209-1215`) and returns to Idle at once with reason
+  Failure (`:916`). Mirrored (`cluster/core/ota_requestor_query.go:449-451`,
+  `:536`). Open: follow matter.js (then exclude the case as class (a)
+  with this entry once it is automated) or follow the case; an upstream
+  matter.js issue is the candidate either way.
+
 The group-messaging cases are not findings: they are skipped on a host
 whose LAN interface has no IPv6, with the command that enables it, and run
 wherever it has. TC-SC-4.1 and TC-SC-4.3 were wrongly listed here as such an
@@ -535,6 +558,24 @@ the module builds itself (`endpoint/devicetype_module_test.go` pins each).
   override, so cases gated on E01 are skipped. Every other device-type
   element requirement of the reference daemon's endpoints agrees with its
   slices. For the chip-tool harness owner.
+
+- **The reference daemon's root lists the OtaRequestor device type with
+  no client cluster in ClientList.** `examples/reference-bridge/wiring.go:244`
+  passes no ClientList, and the validator judges the device type's client
+  requirement as missing (`endpoint/devicetype_conformance.go:644-645`,
+  `:692-702`, as matter.js's `DeviceTypeConformance.ts:299-300` does):
+  `matter.devicetype.violation endpoint=0 device_type=OtaRequestor
+  requirement=client:OtaSoftwareUpdateProvider kind=missing` at every
+  start. matter.js's OtaRequestor endpoint declares the client cluster as
+  mandatory (`packages/node/src/endpoints/ota-requestor.ts:50`),
+  `MutableEndpoint` registers mandatory client clusters into the endpoint
+  type at runtime (`MutableEndpoint.ts:16-18`, `:53-61`) and the
+  Descriptor derives ClientList from them (`DescriptorServer.ts:284-290`),
+  so its ClientList carries 0x0029. Decision (2026-10-11): mirror it — the
+  daemon lists 0x0029 in the root's ClientList. **Fix:** `[]uint32{0x0029}`
+  in `wiring.go`, a test that reads the root's ClientList, then an IDM and
+  DESC fixture run (the PICS checker and TC-DESC read ClientList). For the
+  daemon in wave 6, which rebuilds its topology.
 
 ## Verified sound (no action)
 
