@@ -517,6 +517,9 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 			t.Fatalf("%s needs the OTA provider app and a staged image: %s", id, ota.missing)
 		}
 		args = otaArgs(args, ota.provider, ota.image)
+		// No provider and no provider store from an earlier case may be
+		// left when this one starts (see otaCleanupCommand).
+		_, _ = h.exec(ctx, otaCleanupCommand()...)
 	}
 	// A factory-fresh case whose descriptor supplies the onboarding code
 	// (TC-SC-7.1) commissions in its own steps; one without (TC-ACL-2.6)

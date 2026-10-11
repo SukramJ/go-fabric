@@ -296,9 +296,10 @@ func (t *outboundReliableTracker) Pending() int {
 
 // outboundTickResult enumerates the outcome of a single Tick sweep.
 type outboundTickResult struct {
-	SessionID uint16
-	Counter   uint32
-	Err       error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
+	SessionID  uint16
+	ExchangeID uint16
+	Counter    uint32
+	Err        error // nil = re-sent; mrp.ErrMaxRetransmissionsReached = abandoned
 }
 
 // Tick walks every entry whose nextSendAt has elapsed: re-sends via
@@ -327,12 +328,12 @@ func (t *outboundReliableTracker) Tick(now time.Time, send func(net.Addr, []byte
 				ch <- mrp.ErrMaxRetransmissionsReached
 				close(ch)
 			}
-			out = append(out, outboundTickResult{SessionID: key.sessionID, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Counter: key.counter, Err: mrp.ErrMaxRetransmissionsReached})
 			continue
 		}
 		p.retries++
 		if err := send(p.dest, p.datagram); err != nil {
-			out = append(out, outboundTickResult{SessionID: key.sessionID, Counter: key.counter, Err: err})
+			out = append(out, outboundTickResult{SessionID: key.sessionID, ExchangeID: p.exchangeID, Counter: key.counter, Err: err})
 			continue
 		}
 		// Full spec backoff per Matter §4.12.2.1: peer-appropriate

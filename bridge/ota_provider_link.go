@@ -197,9 +197,14 @@ type initiatedSecureExchange struct {
 	sessionID  uint16
 	addr       *net.UDPAddr
 	exchangeID uint16
-	in         chan bdx.Message
-	done       chan struct{}
-	closeOnce  sync.Once
+	// createdAt bounds the peer-loss sweep this exchange may trigger:
+	// a session the peer established after the exchange was opened is
+	// not what went unanswered (matter.js ExchangeManager.ts:549 takes
+	// the context's creation time, SessionManager.ts:688 compares).
+	createdAt time.Time
+	in        chan bdx.Message
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 var _ bdx.Exchange = (*initiatedSecureExchange)(nil)
@@ -216,10 +221,72 @@ func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange,
 	}
 	ex := &initiatedSecureExchange{
 		b: b, sessionID: link.sessionID, addr: link.addr, exchangeID: b.nextOutboundExchangeID(),
-		in: make(chan bdx.Message, 16), done: make(chan struct{}),
+		createdAt: time.Now(), in: make(chan bdx.Message, 16), done: make(chan struct{}),
 	}
 	b.resumption.initiated.Store(secureExchangeKey{sessionID: ex.sessionID, exchangeID: ex.exchangeID}, ex)
 	return ex, nil
+}
+
+// peerLossCloser is the optional [SessionRegistry] capability that
+// force-closes every session of a peer created before asOf
+// (secure/operational.Manager.ClosePeerLost).
+type peerLossCloser interface {
+	ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.Time) int
+}
+
+// handleInitiatedPeerLoss is the outbound-reliable tracker giving up on a
+// message of an exchange this node opened: the peer is lost. Every
+// session with that peer is force-closed — the next
+// [Bridge.ConnectOtaProvider] then runs a fresh CASE instead of reusing
+// a session the peer no longer knows (a provider restarted under the same
+// node id answers nothing on the old keys). Mirrors matter.js
+// MessageExchange.ts:620 (retransmissions exhausted → context.peerLost) →
+// ExchangeManager.ts:556-580 (a commissioned peer: SessionManager.
+// handlePeerLoss for the peer address, asOf the exchange context's
+// creation; otherwise the session alone) → SessionManager.ts:677-695.
+// An exhausted counter that belongs to no initiated exchange (a
+// subscription report) is left to [Bridge.closeSubscriptionByCounter].
+func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
+	raw, ok := b.resumption.initiated.Load(secureExchangeKey{sessionID: sessionID, exchangeID: exchangeID})
+	if !ok {
+		return
+	}
+	ex, ok := raw.(*initiatedSecureExchange)
+	if !ok {
+		return
+	}
+	b.mu.RLock()
+	sessions := b.sessions
+	registry := b.sessionRegistry
+	b.mu.RUnlock()
+	if sessions == nil || registry == nil {
+		return
+	}
+	sess, live := sessions.Lookup(sessionID)
+	if !live {
+		return
+	}
+	peerNodeID := sess.PeerNodeID()
+	var fabricIndex uint8
+	if resolver, ok := sessions.(SessionFabricResolver); ok {
+		fabricIndex, _ = resolver.FabricFor(sessionID)
+	}
+	closed := 0
+	closer, perPeer := registry.(peerLossCloser)
+	if perPeer && fabricIndex != 0 && peerNodeID != 0 {
+		closed = closer.ClosePeerLost(fabricIndex, peerNodeID, ex.createdAt)
+	} else if err := registry.Close(sessionID); err == nil {
+		closed = 1
+	}
+	if b.logger != nil {
+		b.logger.Info("matter.session.peer_lost",
+			slog.Int("session_id", int(sessionID)),
+			slog.Int("exchange_id", int(exchangeID)),
+			slog.Int("fabric", int(fabricIndex)),
+			slog.Uint64("peer_node", peerNodeID),
+			slog.Int("closed", closed),
+			slog.String("hint", "max retransmissions reached on an exchange this node opened; the peer's sessions are force-closed"))
+	}
 }
 
 // deliverInitiatedSecure hands a message the peer sent as the responder on

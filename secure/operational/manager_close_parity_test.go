@@ -376,3 +376,74 @@ func TestCloseAllGraceful_DeadlinePastSkipsNotifications(t *testing.T) {
 		t.Error("Encrypt after CloseAllGraceful succeeded — keys were not zeroised")
 	}
 }
+
+// TestClosePeerLost_ForceClosesWithoutCloseSession verifies the peer-loss
+// sweep: every session of the lost peer created before asOf is closed
+// without a CloseSession on the wire (matter.js NodeSession.ts:300-303
+// handlePeerLoss → initiateForceClose), the onSessionClose hook still
+// fires per session, a session established after the loss was observed
+// survives (SessionManager.ts:688-690), and the reannounce trigger stays
+// silent while that survivor keeps the peer connected
+// (DeviceAdvertiser.ts:138 hasSessionForPeer).
+func TestClosePeerLost_ForceClosesWithoutCloseSession(t *testing.T) {
+	t.Parallel()
+	m := NewManager(newMinimalFakeStore())
+	rec := &closeRecorder{}
+	rec.wire(m)
+
+	const (
+		fabricIndex uint8  = 2
+		localNodeID uint64 = 0xB0B
+		peerNodeID  uint64 = 0xA11
+	)
+	first, err := m.OpenFromSigma(fabricIndex, localNodeID, peerNodeID, closeParityKeys(1))
+	if err != nil {
+		t.Fatalf("OpenFromSigma (first): %v", err)
+	}
+	second, err := m.OpenFromSigma(fabricIndex, localNodeID, peerNodeID, closeParityKeys(2))
+	if err != nil {
+		t.Fatalf("OpenFromSigma (second): %v", err)
+	}
+	other, err := m.OpenFromSigma(fabricIndex, localNodeID, 0xBEEF, closeParityKeys(3))
+	if err != nil {
+		t.Fatalf("OpenFromSigma (other peer): %v", err)
+	}
+	asOf := time.Now()
+	time.Sleep(time.Millisecond)
+	later, err := m.OpenFromSigma(fabricIndex, localNodeID, peerNodeID, closeParityKeys(4))
+	if err != nil {
+		t.Fatalf("OpenFromSigma (later): %v", err)
+	}
+
+	if n := m.ClosePeerLost(fabricIndex, peerNodeID, asOf); n != 2 {
+		t.Fatalf("ClosePeerLost = %d, want 2 (the sessions held when the loss was observed)", n)
+	}
+	graceful, closed, _, reannounce := rec.snapshot()
+	if len(graceful) != 0 {
+		t.Errorf("graceful notifier calls = %v, want none — a lost peer gets no CloseSession", graceful)
+	}
+	if len(closed) != 2 {
+		t.Errorf("onSessionClose calls = %v, want the two lost sessions", closed)
+	}
+	if reannounce != 0 {
+		t.Errorf("reannounce fired %d times, want 0 — the later session keeps the peer connected", reannounce)
+	}
+	for _, id := range []uint16{first.SessionID, second.SessionID} {
+		if _, err := m.Get(id); err == nil {
+			t.Errorf("session %d still live after the peer was lost", id)
+		}
+	}
+	for _, id := range []uint16{later.SessionID, other.SessionID} {
+		if _, err := m.Get(id); err != nil {
+			t.Errorf("session %d must survive: %v", id, err)
+		}
+	}
+
+	// A zero asOf sweeps the rest; with no session left the broadcast resumes.
+	if n := m.ClosePeerLost(fabricIndex, peerNodeID, time.Time{}); n != 1 {
+		t.Fatalf("ClosePeerLost(zero asOf) = %d, want 1", n)
+	}
+	if _, _, _, reannounce := rec.snapshot(); reannounce != 1 {
+		t.Errorf("reannounce fired %d times after the last session, want 1", reannounce)
+	}
+}

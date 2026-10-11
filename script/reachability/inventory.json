@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4354,
+  "entry_points": 4357,
   "entry_packages": [
     ".",
     "bdx",
@@ -172,9 +172,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9991,
+    "total_exported": 9994,
     "reachable": 6967,
-    "whitelisted": 3019,
+    "whitelisted": 3022,
     "unreachable": 5
   },
   "by_package": [
@@ -3263,6 +3263,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/configuration_version_test.go",
       "line": 19
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestInitiatedExchangePeerLoss_ForceClosesPeerSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
+      "line": 44
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestInitiatedPeerLoss_UnknownExchangeIsNoOp",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
+      "line": 127
     },
     {
       "package": "bridge",
@@ -16996,7 +17010,7 @@
       "identifier": "TestOtaPlumbing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/otaplumbing_test.go",
-      "line": 166
+      "line": 187
     },
     {
       "package": "internal/chiptool",
@@ -18516,6 +18530,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_close_parity_test.go",
       "line": 298
+    },
+    {
+      "package": "secure/operational",
+      "identifier": "TestClosePeerLost_ForceClosesWithoutCloseSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/operational/manager_close_parity_test.go",
+      "line": 388
     },
     {
       "package": "secure/operational",

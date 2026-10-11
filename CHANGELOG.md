@@ -783,6 +783,28 @@ the same `ColorTemperatureWriter` as before.
 
 ### Fixed
 
+- **A peer that stops answering an exchange this node opened is lost, and
+  its sessions go.** When the outbound-reliable tracker gave up on a
+  message of an exchange the bridge itself opened (the OTA requestor's
+  QueryImage or a BDX block), nothing happened to the session: the next
+  query reused it, and a provider restarted under the same node id, which
+  knows nothing of the old keys, was never reached again (TC-SU-2.2 step 2
+  announced 24 times in vain). Max retransmissions on such an exchange now
+  force-close every session with that peer established before the
+  exchange, without a CloseSession to a peer that is gone, so the next
+  connect runs a fresh CASE. `operational.Manager.ClosePeerLost` is the
+  new primitive; `Entry.CreatedAt` bounds the sweep. Mirrors matter.js
+  `MessageExchange.ts:620` → `ExchangeManager.ts:556-580` →
+  `SessionManager.ts:677-695`. A subscription report that runs out of
+  retransmissions still closes only the subscription, as before.
+- **Harness: the OTA provider's store is removed after the provider is
+  gone, before and after each SU case.** TC-SU-2.2's own teardown removes
+  `/tmp/chip_kvs_provider` and then terminates the provider, whose
+  shutdown writes the store back (chip's Linux store rewrites the whole
+  file on commit), so TC-SU-2.4's provider came up already commissioned
+  and never advertised for commissioning. The harness now stops the
+  provider, waits until it is gone and removes the store, at the start of
+  an SU case as well as after it.
 - **A new CASE no longer closes the peer's previous sessions.** The session
   manager used to evict every session of the same (fabric, peer node) when
   that peer established another CASE session. A controller that runs two

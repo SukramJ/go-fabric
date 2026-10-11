@@ -121,20 +121,41 @@ func otaCaseTimeout(args []string, base time.Duration) time.Duration {
 	return base
 }
 
-// otaCleanupCommand stops the provider app an SU case started. The case
-// starts it as its own child (TC_SUTestBase.py start_provider →
-// OTAProviderSubprocess) and stops it in its teardown; a case the runner
-// kills never gets there, and killing `docker exec` does not reach the
-// processes inside the container (the same reason runYamlCase pkills the
-// chip-tool server). The provider left behind by TC-SU-2.2 then held UDP
-// 5541 and /tmp/chip_kvs_provider, which every SU case's provider uses
-// (TC_SU_2_2.py:41 and :435, TC_SU_2_4.py:106-107: port 5541,
-// /tmp/chip_kvs_provider) — the
-// inferred cause of TC-SU-2.4's provider never printing "Server
-// initialization complete" (its own log was not collected; see
-// otaProviderLogsScript).
+// otaProviderKVS is the provider's persistent store every SU case names
+// (TC_SU_2_2.py:41 KVS_PATH, TC_SU_2_4.py:107 provider_kvs_path default:
+// /tmp/chip_kvs_provider); the cases remove it by prefix in their
+// teardown (TC_SUTestBase.py:405-423 clear_kvs).
+const otaProviderKVS = "/tmp/chip_kvs_provider"
+
+// otaCleanupCommand stops the provider app an SU case started and removes
+// its store, in that order. The case starts the provider as its own child
+// (TC_SUTestBase.py start_provider → OTAProviderSubprocess) and stops it
+// in its teardown; a case the runner kills never gets there, and killing
+// `docker exec` does not reach the processes inside the container (the
+// same reason runYamlCase pkills the chip-tool server). The provider left
+// behind by TC-SU-2.2 would hold UDP 5541 and the store, which every SU
+// case's provider uses (TC_SU_2_2.py:41 and :435, TC_SU_2_4.py:106-107).
+//
+// The store goes after the process is gone, not before: TC-SU-2.2's own
+// teardown removes the store first and terminates the provider second
+// (TC_SU_2_2.py:186-190), and chip's Linux store writes its whole content
+// back on every commit — a temp file renamed over the path
+// (src/platform/Linux/CHIPLinuxStorageIni.cpp:92-105 CommitConfig at the
+// harness pin) — so the provider's shutdown recreated the store with the
+// fabric TC-SU-2.2 had commissioned it into. TC-SU-2.4's provider then
+// came up operational on that fabric and advertised no commissionable
+// service (its log in run 38142202247: "Advertise operational node
+// 5F228F8CF154C939-0000000012344322"), and the case's CommissionOnNetwork
+// on discriminator 321 timed out. The bracket in the pattern keeps pkill
+// and pgrep from matching this shell's own command line.
 func otaCleanupCommand() []string {
-	return []string{"pkill", "-f", otaProviderApp}
+	const pattern = "chip-ota-provider-ap[p]"
+	return []string{
+		"sh", "-c",
+		"pkill -f '" + pattern + "'; " +
+			"for i in 1 2 3 4 5 6 7 8 9 10; do pgrep -f '" + pattern + "' >/dev/null || break; sleep 0.5; done; " +
+			"rm -rf " + otaProviderKVS + "*",
+	}
 }
 
 // otaProviderLogsScript lists, one path per line, the provider logs an SU
@@ -241,7 +262,12 @@ func TestOtaPlumbing(t *testing.T) {
 		!strings.Contains(s, "/TC_SU_2_2/*/provider_logs/*.log") {
 		t.Errorf("otaProviderLogsScript = %q", s)
 	}
-	if got := strings.Join(otaCleanupCommand(), " "); got != "pkill -f chip-ota-provider-app" {
-		t.Errorf("otaCleanupCommand = %q", got)
+	cleanup := otaCleanupCommand()
+	if len(cleanup) != 3 || cleanup[0] != "sh" || cleanup[1] != "-c" ||
+		!strings.Contains(cleanup[2], "pkill -f 'chip-ota-provider-ap[p]'") ||
+		!strings.Contains(cleanup[2], "pgrep -f 'chip-ota-provider-ap[p]'") ||
+		!strings.HasSuffix(cleanup[2], "rm -rf /tmp/chip_kvs_provider*") ||
+		strings.Index(cleanup[2], "pkill") > strings.Index(cleanup[2], "rm -rf") {
+		t.Errorf("otaCleanupCommand = %q: want the provider stopped and waited for before its store is removed", cleanup)
 	}
 }

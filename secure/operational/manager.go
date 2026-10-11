@@ -318,6 +318,10 @@ type Entry struct {
 	// per-peer budget (matter.js SessionManager.ts:650-652: "ones we
 	// initiated are ours to manage").
 	isInitiator bool
+	// createdAt is when the session was installed with its keys. The
+	// peer-loss sweep spares sessions created at or after the exchange
+	// that reported the loss (matter.js SessionManager.ts:688-690).
+	createdAt time.Time
 	// mu guards the mutable fields above for concurrent Rx/Tx updates.
 	mu sync.Mutex
 }
@@ -411,6 +415,15 @@ func (e *Entry) MarkActiveTx() {
 func (e *Entry) LastActivity() time.Time {
 	e.mu.Lock()
 	t := e.lastActivity
+	e.mu.Unlock()
+	return t
+}
+
+// CreatedAt returns when the session was installed with its keys; the
+// zero time for a pre-allocated placeholder.
+func (e *Entry) CreatedAt() time.Time {
+	e.mu.Lock()
+	t := e.createdAt
 	e.mu.Unlock()
 	return t
 }
@@ -531,6 +544,7 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		// As openFromSigma: the Sigma key schedule's third block
 		// (matter.js NodeSession.ts:80).
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
+		createdAt:            time.Now(),
 	}
 	m.sessions[id] = entry
 	excess := m.evictExcessPeerSessionsLocked(entry)
@@ -639,6 +653,7 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 		Session:              sess,
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
 		isInitiator:          initiator,
+		createdAt:            time.Now(),
 	}
 	m.mu.Lock()
 	// The pre-allocated id is in m.sessions as a placeholder Entry
@@ -705,6 +720,7 @@ func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uin
 		Session:              sess,
 		AttestationChallenge: append([]byte(nil), derived[32:48]...),
 		isPase:               true,
+		createdAt:            time.Now(),
 	}
 	m.sessions[id] = entry
 	m.mu.Unlock()
@@ -747,6 +763,7 @@ func (m *Manager) OpenFromPaseWithID(id uint16, localNodeID, peerNodeID uint64, 
 		Session:              sess,
 		AttestationChallenge: append([]byte(nil), derived[32:48]...),
 		isPase:               true,
+		createdAt:            time.Now(),
 	}
 	m.mu.Lock()
 	displaced := m.installEntryLocked(id, entry)
@@ -983,12 +1000,11 @@ func (m *Manager) ClosePASESessions() int {
 }
 
 // ClosePeer tears down every live session matching the
-// (fabricIndex, peerNodeID) pair. Returns the number of sessions
-// closed. Exposed so an operator (or a counter-jump heuristic) can
-// invalidate a stale session table on demand. matter.js has no direct
-// per-peer equivalent (it drops sessions per fabric on fabric teardown,
-// not per peer); this backs the bridge's stale-session invalidation path.
-// See notes/parity/by_design.md BD-Matter-CASE-StalePeerEviction.
+// (fabricIndex, peerNodeID) pair, telling each peer with a CloseSession
+// first. Returns the number of sessions closed. The bridge uses it for
+// the KeepSubscriptions=false teardown (matter.js InteractionServer.ts:
+// 549-566 closes the peer's subscriptions by (fabric, node)); a peer that
+// stopped answering is closed with [Manager.ClosePeerLost] instead.
 func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0)
@@ -1011,6 +1027,39 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	// conditional broadcast resume — matter.js ExchangeManager.ts:658
 	// / DeviceAdvertiser.ts:132-149 (see the hook field docs).
 	m.notifyGracefulClose(victims, time.Time{})
+	closeStaleEntries(victims)
+	m.fireOnSessionClose(victims)
+	m.fireReannounceIfPeerGone(victims)
+	return len(victims)
+}
+
+// ClosePeerLost force-closes every live session with the
+// (fabricIndex, peerNodeID) pair that was created before asOf — the
+// sessions a peer held when an exchange on one of them ran out of MRP
+// retransmissions. No CloseSession goes on the wire: the peer is
+// lost, so matter.js marks the session peer-lost and force-closes it
+// (NodeSession.ts:300-303 handlePeerLoss → initiateForceClose), and
+// the session manager applies that to every session of the peer
+// created before the reporting exchange (SessionManager.ts:677-695
+// #handlePeerLoss, the `asOf` check at :688). A zero asOf closes them
+// all. Returns the number of sessions closed.
+func (m *Manager) ClosePeerLost(fabricIndex uint8, peerNodeID uint64, asOf time.Time) int {
+	m.mu.Lock()
+	victims := make([]*Entry, 0)
+	for id, entry := range m.sessions {
+		if entry.Session == nil {
+			continue // a placeholder has no keys and no peer yet
+		}
+		if entry.FabricIndex() != fabricIndex || entry.Session.PeerNodeID() != peerNodeID {
+			continue
+		}
+		if !asOf.IsZero() && !entry.CreatedAt().Before(asOf) {
+			continue // established after the loss was observed
+		}
+		victims = append(victims, entry)
+		delete(m.sessions, id)
+	}
+	m.mu.Unlock()
 	closeStaleEntries(victims)
 	m.fireOnSessionClose(victims)
 	m.fireReannounceIfPeerGone(victims)
