@@ -381,7 +381,32 @@ var chipFamilies = []family{
 	// requestor is mounted on the root (brief N); the BDX cases at the pin
 	// are YAML with every step disabled (Test_TC_BDX_*.yaml), manual in
 	// the descriptor.
-	{name: "SU"},
+	{
+		name: "SU",
+		edits: map[string][]edit{
+			// Step 3 guards the 180 s DelayedActionTime on the UpdateState
+			// subscription and then waits for Downloading on the same
+			// queue. The guard consumes every report until its full
+			// duration has elapsed, the last 5 s unchecked (tolerance zone,
+			// event_attribute_reporting.py:704-739 at the harness pin), and
+			// the test anchors the window on *its* receipt of
+			// DelayedOnQuery, after the DUT started its timer. A DUT that
+			// re-queries at exactly DelayedActionTime, as matter.js
+			// schedules it (OtaSoftwareUpdateRequestorServer.ts:676-680,
+			// max(delayedActionTime, minimumQueryInterval)), reports
+			// Downloading inside that zone, where the guard swallows it,
+			// and Phase C waits for a report that already went by (run
+			// 38149548973: report at 15:21:57.237, Phase C from
+			// 15:21:57.237). The guard ends at the tolerance boundary
+			// instead, so Phase C sees the report; the step's own elapsed
+			// assertion already allows it (TC_SU_2_2.py:864-867,
+			// `elapsed_s3 >= min_interval_s3 - tolerance_s3`).
+			"2.2": {
+				{"            duration_sec=min_interval_s3,", "            duration_sec=min_interval_s3 - tolerance_s3,", "end the step-3 guard at the tolerance boundary so the Downloading report reaches Phase C (TC_SU_2_2.py:846-850)"},
+				{"            tolerance_sec=tolerance_s3,", "            tolerance_sec=0.0,", "the guard's tolerance zone is now outside its duration (TC_SU_2_2.py:846-850)"},
+			},
+		},
+	},
 	{name: "BDX"},
 	{name: "BIND"},
 	// The root's label, localization and diagnostics clusters (all
