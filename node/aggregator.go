@@ -45,6 +45,11 @@ var (
 // documents it. Before [Node.Start] an Add or Remove only changes the set
 // (Start's assembly is the first); after it, each one reassembles the
 // running bridge.
+//
+// Because every assembly is model-complete, add the endpoints the host
+// already knows before Start: an endpoint whose number was persisted by an
+// earlier run and that is added only after Start has lost that number to
+// the first assembly's garbage collection, and gets a fresh one.
 type Aggregator struct {
 	n *Node
 
