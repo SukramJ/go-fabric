@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4282,
+  "entry_points": 4284,
   "entry_packages": [
     ".",
     "bdx",
@@ -169,9 +169,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9883,
-    "reachable": 6932,
-    "whitelisted": 2946,
+    "total_exported": 9887,
+    "reachable": 6934,
+    "whitelisted": 2948,
     "unreachable": 5
   },
   "by_package": [
@@ -15657,6 +15657,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/wire_fixtures_parity_test.go",
       "line": 298
+    },
+    {
+      "package": "im",
+      "identifier": "TestInvokeClientRequestParityMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_client_parity_matterjs_test.go",
+      "line": 18
+    },
+    {
+      "package": "im",
+      "identifier": "TestInvokeClientResponseRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_client_parity_matterjs_test.go",
+      "line": 67
     },
     {
       "package": "im",
