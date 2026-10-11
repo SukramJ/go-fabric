@@ -331,6 +331,14 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- `cluster/spec` evaluates an "in" constraint on a controller write
+  (`Instance.ValidateWrite`): the value must be an entry of the named peer
+  attribute's current list, else CONSTRAINT_ERROR before the sink sees it;
+  an unresolved peer admits nothing, as matter.js's `Constraint.test`.
+  LocalizationConfiguration ActiveLocale and TimeFormatLocalization
+  ActiveCalendarType answer as before; their hand-written membership checks
+  are gone.
+
 - `contract.MeasurementClass` gains seven built-in classes after
   `MeasurementFlow`. The built-in values keep their numbers; the classes
   `RegisterMeasurementKind` hands out start seven higher, so a host that
@@ -600,7 +608,6 @@ the same `ColorTemperatureWriter` as before.
   generate-matter-schema`) and remains the fallback for hand-written
   servers. New optional dispatcher capability `im.TimedCommandProvider`,
   implemented by `endpoint.TopologyDispatcher`.
-
 - **A transition's rate and its RemainingTime came from two reads of the
   current value.** `cluster/light` (MoveToSaturation, MoveToColorTemperature)
   and `cluster/levelcontrol` read the current value, computed the rate, and

@@ -12,7 +12,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	lcfgdef "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
-	"github.com/SukramJ/go-fabric/im"
 )
 
 // ErrLocalizationConfig rejects a localization configuration (of
@@ -54,7 +53,8 @@ type LocalizationConfigurationConfig struct {
 // "in supportedLocales", which matter.js's validator enforces
 // (packages/node/src/behavior/state/validation/constraint.ts:153-163,
 // packages/model/src/aspects/Constraint.ts test :164-170) and the
-// generated runtime does not evaluate; connectedhomeip answers the same
+// generated runtime evaluates before the sink sees the value
+// (spec.Instance.ValidateWrite); connectedhomeip answers the same
 // (src/app/clusters/localization-configuration-server/
 // LocalizationConfigurationCluster.cpp SetActiveLocale :123-128,
 // IsSupportedLocale :172-187, at the harness pin
@@ -72,7 +72,7 @@ func NewLocalizationConfiguration(cfg LocalizationConfigurationConfig) (*spec.Se
 	}
 	srv, err := spec.NewServer(lcfgdef.Definition, spec.Options{}, spec.ServerConfig{
 		DataVersion: cfg.DataVersion,
-		Sink:        localeSink{supported: supported, onWrite: cfg.OnWrite},
+		Sink:        localeSink{onWrite: cfg.OnWrite},
 		Initial: map[uint32]any{
 			lcfgdef.AttrActiveLocale:     cfg.ActiveLocale,
 			lcfgdef.AttrSupportedLocales: supported,
@@ -84,20 +84,17 @@ func NewLocalizationConfiguration(cfg LocalizationConfigurationConfig) (*spec.Se
 	return srv, nil
 }
 
-// localeSink holds a written ActiveLocale to SupportedLocales, which is
-// fixed, and hands it to the host.
+// localeSink hands a written ActiveLocale to the host. Membership in
+// SupportedLocales is the runtime's "in" constraint, refused before the
+// sink is called.
 type localeSink struct {
-	supported []string
-	onWrite   func(ctx context.Context, activeLocale string) error
+	onWrite func(ctx context.Context, activeLocale string) error
 }
 
 // MatterWriteAttribute implements [spec.Sink]; ActiveLocale is the only
 // writable attribute.
 func (s localeSink) MatterWriteAttribute(ctx context.Context, _ uint32, value any) error {
 	locale, _ := value.(string)
-	if !slices.Contains(s.supported, locale) {
-		return spec.Errorf(im.StatusConstraintError, "LocalizationConfiguration: ActiveLocale %q is not in SupportedLocales", locale)
-	}
 	if s.onWrite != nil {
 		if err := s.onWrite(ctx, locale); err != nil {
 			return fmt.Errorf("core: LocalizationConfiguration: %w", err)
