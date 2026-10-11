@@ -283,6 +283,9 @@ generate-matter-schema: ## regenerate parity/schema.json, schema/ and the genera
 	@# The cluster definitions under cluster/spec/ (ADR 0013) are generated
 	@# from the same snapshot; script/clustergen/clusters.go lists which.
 	$(GO) run ./script/clustergen
+	@# The device types under device/ (ADR 0018) reference those definitions;
+	@# script/devicegen/devicetypes.go lists which.
+	$(GO) run ./script/devicegen
 
 .PHONY: ci
 ci: build vet test lint cover-check ## everything the pipeline runs
