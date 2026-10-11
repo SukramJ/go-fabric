@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	dwa "github.com/SukramJ/go-fabric/cluster/spec/dishwasheralarm"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
+	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 )
@@ -56,6 +57,10 @@ func ovenCavityStates() []opstate.StateEntry {
 
 // cycle is a Start / Stop handler for an OperationalState server: Start
 // runs, Stop stops, and stopping a running cycle reports its completion.
+// Start while OperationalError is not NoError answers UnableToStartOrResume
+// without changing state, as CHIP's all-clusters oven does
+// (oven-operational-state-delegate.cpp HandleStartStateCallback :139-146 at
+// the harness pin; TC-OVENOPSTATE-2.2 step 17).
 type cycle struct {
 	name string
 	ops  func() *opstate.Server
@@ -65,6 +70,11 @@ func (c cycle) HandleOperationalCommand(_ context.Context, cmd opstate.Command) 
 	srv := c.ops()
 	switch cmd {
 	case opstate.CommandStart:
+		if raw, _ := srv.MatterRead(opstate.AttrOperationalError); raw != nil {
+			if e, ok := raw.(clusterwire.ErrorStateStruct); ok && e.ErrorStateID != uint8(opstate.ErrorNoError) {
+				return opstate.ErrorState{ID: opstate.ErrorUnableToStartOrResume}, nil
+			}
+		}
 		if err := srv.SetOperationalState(opstate.StateRunning); err != nil {
 			return opstate.ErrorState{}, err
 		}

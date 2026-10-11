@@ -286,6 +286,21 @@ func TestOvenPipeDrivesTheCavity(t *testing.T) {
 	if e, ok := raw.(clusterwire.ErrorStateStruct); !ok || e.ErrorStateID != uint8(opstate.ErrorUnableToStartOrResume) {
 		t.Fatalf("OperationalError = %#v, want UnableToStartOrResume", raw)
 	}
+	// Start while the fault stands is UnableToStartOrResume, as CHIP's oven
+	// delegate answers (HandleStartStateCallback :139-146; TC-OVENOPSTATE-2.2
+	// step 17); clearing it with OnFault 0 lets Start through.
+	got, err := cycle{name: cavity.name, ops: func() *opstate.Server { return cavity.ops }}.HandleOperationalCommand(context.Background(), opstate.CommandStart)
+	if err != nil || got.ID != opstate.ErrorUnableToStartOrResume {
+		t.Fatalf("Start under a fault = %+v, %v; want UnableToStartOrResume", got, err)
+	}
+	zero := uint8(opstate.ErrorNoError)
+	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: "OnFault", Param: &zero}); err != nil {
+		t.Fatalf("OnFault 0: %v", err)
+	}
+	got, err = cycle{name: cavity.name, ops: func() *opstate.Server { return cavity.ops }}.HandleOperationalCommand(context.Background(), opstate.CommandStart)
+	if err != nil || got.ID != opstate.ErrorNoError {
+		t.Fatalf("Start after the fault cleared = %+v, %v; want NoError", got, err)
+	}
 	if err := f.applyPipeCommand(pipeCommand{Name: "OperationalStateChange", Device: "Oven", Operation: "Bake"}); !errors.Is(err, errUnknownPipeCommand) {
 		t.Fatalf("unknown operation: %v, want errUnknownPipeCommand", err)
 	}

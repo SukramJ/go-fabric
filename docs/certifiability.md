@@ -167,7 +167,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MTRID | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | DEM | 11 | 7 | 0 | 0 | 4 | 0 | 0 |
 | DEMM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| EEVSE | 10 | 8 | 0 | 1 | 0 | 0 | 0 |
+| EEVSE | 10 | 9 | 0 | 1 | 0 | 0 | 0 |
 | EEVSEM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | FAN | 12 | 7 | 0 | 0 | 5 | 0 | 0 |
 | HEPAFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -188,7 +188,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TCTL | 5 | 3 | 0 | 0 | 2 | 0 | 0 |
 | DISHALM | 7 | 1 | 0 | 0 | 0 | 6 | 0 |
 | REFALM | 3 | 2 | 0 | 0 | 1 | 0 | 0 |
-| OVENOPSTATE | 5 | 1 | 0 | 0 | 1 | 0 | 0 |
+| OVENOPSTATE | 5 | 3 | 0 | 0 | 1 | 0 | 0 |
 | OTCCM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | MWOCTRL | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | MWOM | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
@@ -203,7 +203,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WHM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **579** | **323** | **0** | **1** | **123** | **123** | **5** |
+| **all** | **579** | **326** | **0** | **1** | **123** | **123** | **5** |
 
 ### Cases not run
 

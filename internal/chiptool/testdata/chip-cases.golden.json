@@ -571,6 +571,11 @@
       "steps": 48,
       "stepsSkipped": 0
     },
+    "EEVSE/2.2": {
+      "tests": 1,
+      "steps": 46,
+      "stepsSkipped": 0
+    },
     "EEVSE/2.4": {
       "tests": 1,
       "steps": 25,
@@ -1258,6 +1263,16 @@
     "OTCCM/2.1": {
       "steps": 4,
       "stepsSkipped": 10
+    },
+    "OVENOPSTATE/2.1": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 6
+    },
+    "OVENOPSTATE/2.4": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
     },
     "OVENOPSTATE/2.5": {
       "tests": 1,
