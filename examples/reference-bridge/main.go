@@ -76,6 +76,7 @@ func run() error {
 	var (
 		dbPath       = flag.String("db", "reference-bridge.db", "SQLite file holding fabrics, credentials and endpoint numbers")
 		listen       = flag.String("listen", ":5540", "UDP listen address for Matter traffic")
+		tcpFlag      = flag.String("tcp", "true", "Matter TCP: true (accept and open connections), false, or incoming / outgoing comma-separated; incoming listens on the UDP port, both are advertised in the operational T key")
 		label        = flag.String("label", "go-fabric reference bridge", "operator-visible bridge name (BasicInformation.NodeLabel)")
 		passcodeFlag = flag.Uint("passcode", 20202021, "Matter setup passcode (8 digits, not trivially guessable)")
 		discFlag     = flag.Uint("discriminator", 3840, "12-bit commissioning discriminator")
@@ -95,6 +96,11 @@ func run() error {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 	slog.SetDefault(logger)
+
+	tcpConfig, err := parseTCPFlag(*tcpFlag)
+	if err != nil {
+		return err
+	}
 
 	if *discFlag > setup.MaxDiscriminator {
 		return fmt.Errorf("--discriminator %d exceeds the 12-bit maximum %d", *discFlag, setup.MaxDiscriminator)
@@ -202,6 +208,7 @@ func run() error {
 		ProductID:     identity.productID,
 		NodeLabel:     identity.nodeLabel,
 		Discriminator: discriminator,
+		TCP:           tcpConfig,
 	}, logger)
 	if err != nil {
 		return fmt.Errorf("bridge: %w", err)

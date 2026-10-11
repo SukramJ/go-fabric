@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4288,
+  "entry_points": 4289,
   "entry_packages": [
     ".",
     "bootid",
@@ -168,9 +168,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9813,
+    "total_exported": 9814,
     "reachable": 6842,
-    "whitelisted": 2966,
+    "whitelisted": 2967,
     "unreachable": 5
   },
   "by_package": [
@@ -14781,6 +14781,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/area_closure_test.go",
       "line": 98
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestParseTCPFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/tcp_test.go",
+      "line": 14
     },
     {
       "package": "examples/reference-bridge",
