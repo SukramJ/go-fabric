@@ -10,7 +10,9 @@ import (
 	"sync"
 
 	"github.com/SukramJ/go-fabric/cluster/boolcfg"
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	soildef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -227,7 +229,9 @@ func (a *demoAirQualitySensor) MatterDeviceType() uint16 {
 // MatterClusterServers implements [contract.EndpointSource]: AirQuality
 // first, then each concentration cluster as its class materialises it
 // (the class's materialiser returns AirQuality and the concentration
-// cluster; the AirQuality copies are dropped).
+// cluster; the AirQuality copies are dropped), then EcosystemInformation
+// (BridgedNode: optional) with the demo directory that names this sensor
+// (fleet_node.go).
 func (a *demoAirQualitySensor) MatterClusterServers() []contract.ClusterServer {
 	servers := []contract.ClusterServer{measurement.NewAirQualityServer(contract.MeasurementCO2, a.readings[0])}
 	for _, r := range a.readings {
@@ -237,7 +241,83 @@ func (a *demoAirQualitySensor) MatterClusterServers() []contract.ClusterServer {
 			}
 		}
 	}
-	return servers
+	return append(servers, mattercore.NewEcosystemInformation(demoEcosystem{name: a.name}))
+}
+
+// --- device: a soil moisture sensor -------------------------------------------
+
+// demoSoilLimits are the limits connectedhomeip's all-clusters app gives
+// its soil sensor: 0 to 100 %, one accuracy range over the whole span
+// with PercentMax 10 (examples/all-clusters-app/all-clusters-common/src/
+// soil-measurement-stub.cpp:30-41 at the harness pin 6170af84), the shape
+// TC_SOIL_2_1.py checks (steps 3-10).
+func demoSoilLimits() soildef.MeasurementAccuracyStruct {
+	percentMax := uint16(10)
+	return soildef.MeasurementAccuracyStruct{
+		MeasurementType:  soildef.MeasurementTypeSoilMoisture,
+		Measured:         true,
+		MinMeasuredValue: 0,
+		MaxMeasuredValue: 100,
+		AccuracyRanges:   []soildef.MeasurementAccuracyRangeStruct{{RangeMin: 0, RangeMax: 100, PercentMax: &percentMax}},
+	}
+}
+
+// demoSoilSensor is a SoilSensor (0x0045): a soil moisture reading in
+// percent, nullable, with fixed limits ([measurement.SoilMoistureSource]).
+// It starts at the minimum, as the all-clusters app sets it
+// (soil-measurement-stub.cpp:67-68); the app pipe's
+// SetSimulatedSoilMoisture moves it (control_actions.go).
+type demoSoilSensor struct {
+	name string
+	notifier
+
+	mu    sync.RWMutex
+	value *uint8
+}
+
+var (
+	_ measurement.SoilMoistureSource = (*demoSoilSensor)(nil)
+	_ contract.ChangeNotifier        = (*demoSoilSensor)(nil)
+)
+
+func newDemoSoilSensor(name string) *demoSoilSensor {
+	initial := uint8(0) // demoSoilLimits' MinMeasuredValue
+	return &demoSoilSensor{name: name, value: &initial}
+}
+
+// MatterMeasurementClass implements [contract.MeasurementSource].
+func (*demoSoilSensor) MatterMeasurementClass() contract.MeasurementClass {
+	return contract.MeasurementSoilMoisture
+}
+
+// MatterFloatValue implements [contract.FloatMeasurementSource]; a null
+// reading is unobserved.
+func (s *demoSoilSensor) MatterFloatValue() (float64, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.value == nil {
+		return 0, false
+	}
+	return float64(*s.value), true
+}
+
+// MatterSoilMoistureLimits implements [measurement.SoilMoistureSource].
+func (*demoSoilSensor) MatterSoilMoistureLimits() soildef.MeasurementAccuracyStruct {
+	return demoSoilLimits()
+}
+
+// reportFromDevice applies a new reading (nil for null) and pushes it to
+// subscribers.
+func (s *demoSoilSensor) reportFromDevice(value *uint8) {
+	s.mu.Lock()
+	s.value = value
+	s.mu.Unlock()
+	if value == nil {
+		slog.Info("sensor.reported", slog.String("device", s.name), slog.String("value", "null"))
+	} else {
+		slog.Info("sensor.reported", slog.String("device", s.name), slog.Int("value", int(*value)))
+	}
+	s.notify()
 }
 
 // --- device: a contact sensor with alarm configuration -----------------------

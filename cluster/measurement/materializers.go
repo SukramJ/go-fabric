@@ -82,6 +82,7 @@ func init() {
 	contract.SetMeasurementMaterializer(contract.MeasurementBattery, powerSourceServers)
 	contract.SetMeasurementMaterializer(contract.MeasurementElectrical, electricalSensorServers)
 	contract.SetMeasurementMaterializer(contract.MeasurementMomentarySwitch, genericSwitchServers)
+	contract.SetMeasurementMaterializer(contract.MeasurementSoilMoisture, soilServer) // soil.go
 }
 
 // floatServer adapts a single-server constructor over

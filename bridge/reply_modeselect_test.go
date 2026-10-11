@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 SukramJ.
 
-// White-box test for the ModeSelect.SupportedModes encoding added to
-// defaultAttributeValueWriter. Lives in package bridge because the
-// writer is unexported.
+// White-box test for the ModeSelect.SupportedModes encoding through
+// defaultAttributeValueWriter: the value the server reads (a spec.List of
+// the generated ModeOptionStruct) encodes through the generated codec.
+// Lives in package bridge because the writer is unexported.
 //
 // The writer's default branch encodes anything it does not recognise as
 // TLV null, so a list-of-struct attribute without a case of its own
@@ -12,12 +13,36 @@
 package bridge
 
 import (
+	"context"
 	"testing"
 
 	mattermodeselect "github.com/SukramJ/go-fabric/cluster/modeselect"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
+
+// modeListSource is a ModeSource serving a fixed mode list.
+type modeListSource struct {
+	modes []mattermodeselect.ModeOptionStruct
+}
+
+func (modeListSource) ModeDescription() string                               { return "test" }
+func (modeListSource) ModeNamespace() (uint8, bool)                          { return 0, false }
+func (s modeListSource) SupportedModes() []mattermodeselect.ModeOptionStruct { return s.modes }
+func (modeListSource) CurrentMode() uint8                                    { return 0 }
+func (modeListSource) ChangeToMode(context.Context, uint8) error             { return nil }
+
+// supportedModesValue is the SupportedModes value the ModeSelect server
+// reads for modes — what the bridge hands the writer.
+func supportedModesValue(t *testing.T, modes []mattermodeselect.ModeOptionStruct) im.AttributeValue {
+	t.Helper()
+	srv := mattermodeselect.NewServer(mattermodeselect.Config{Source: modeListSource{modes: modes}})
+	v, ok := srv.MatterRead(mattermodeselect.AttrSupportedModes)
+	if !ok {
+		t.Fatal("SupportedModes not read")
+	}
+	return im.AttributeValue{Value: v}
+}
 
 // decodedSemanticTag mirrors one decoded SemanticTagStruct.
 type decodedSemanticTag struct {
@@ -95,11 +120,11 @@ func decodeOneModeOption(t *testing.T, d *tlv.Decoder) decodedModeOption {
 			t.Fatalf("ModeOptionStruct field carries tag kind %v, want a context tag", el.Tag.Kind)
 		}
 		switch uint8(el.Tag.Number) {
-		case mattermodeselect.ModeOptionFieldLabel:
+		case 0: // Label
 			opt.label = el.String
-		case mattermodeselect.ModeOptionFieldMode:
+		case 1: // Mode
 			opt.mode = uint8(el.Uint)
-		case mattermodeselect.ModeOptionFieldSemanticTags:
+		case 2: // SemanticTags
 			if el.Type != tlv.TypeArray {
 				t.Fatalf("SemanticTags has type 0x%02X, want an array", el.Type)
 			}
@@ -137,9 +162,9 @@ func decodeSemanticTags(t *testing.T, d *tlv.Decoder) []decodedSemanticTag {
 				break
 			}
 			switch uint8(f.Tag.Number) {
-			case mattermodeselect.SemanticTagFieldMfgCode:
+			case 0: // MfgCode
 				tag.mfgCode = uint16(f.Uint)
-			case mattermodeselect.SemanticTagFieldValue:
+			case 1: // Value
 				tag.value = uint16(f.Uint)
 			default:
 				t.Fatalf("unexpected SemanticTagStruct field tag %d", f.Tag.Number)
@@ -167,7 +192,7 @@ func TestDefaultAttrWriter_ModeSelectSupportedModes(t *testing.T) {
 			},
 		},
 	}
-	got := decodeSupportedModes(t, im.AttributeValue{Value: modes})
+	got := decodeSupportedModes(t, supportedModesValue(t, modes))
 
 	if len(got) != len(modes) {
 		t.Fatalf("decoded %d modes, want %d", len(got), len(modes))
@@ -198,13 +223,12 @@ func TestDefaultAttrWriter_ModeSelectSupportedModes(t *testing.T) {
 	}
 }
 
-// TestDefaultAttrWriter_ModeSelectListBounds pins the two list
-// constraints matter.js states, the way Label's byte bound is already
-// pinned: SupportedModes is "max 255"
-// (mode-select-cluster.element.ts:36) and SemanticTags is "max 64"
-// (:66). A host over either bound is trimmed at encode time rather than
-// putting a list on the wire that a controller must reject.
-func TestDefaultAttrWriter_ModeSelectListBounds(t *testing.T) {
+// TestDefaultAttrWriter_ModeSelectListAsGiven pins that the list goes on
+// the wire as the server read it: matter.js trims nothing (its validator
+// refuses a list past "max 255" / "max 64" instead), so staying within
+// the bounds is the host's part of the ModeSource contract
+// (mattermodeselect.SupportedModesMaxEntries, SemanticTagsMaxEntries).
+func TestDefaultAttrWriter_ModeSelectListAsGiven(t *testing.T) {
 	t.Parallel()
 
 	modes := make([]mattermodeselect.ModeOptionStruct, mattermodeselect.SupportedModesMaxEntries+1)
@@ -213,15 +237,13 @@ func TestDefaultAttrWriter_ModeSelectListBounds(t *testing.T) {
 	}
 	modes[0].SemanticTags = make([]mattermodeselect.SemanticTagStruct, mattermodeselect.SemanticTagsMaxEntries+1)
 
-	got := decodeSupportedModes(t, im.AttributeValue{Value: modes})
+	got := decodeSupportedModes(t, supportedModesValue(t, modes))
 
-	if len(got) != mattermodeselect.SupportedModesMaxEntries {
-		t.Errorf("encoded %d modes, want %d — SupportedModes carries constraint \"max 255\"",
-			len(got), mattermodeselect.SupportedModesMaxEntries)
+	if len(got) != len(modes) {
+		t.Errorf("encoded %d modes, want %d as given", len(got), len(modes))
 	}
-	if len(got[0].tags) != mattermodeselect.SemanticTagsMaxEntries {
-		t.Errorf("encoded %d semantic tags, want %d — SemanticTags carries constraint \"max 64\"",
-			len(got[0].tags), mattermodeselect.SemanticTagsMaxEntries)
+	if len(got[0].tags) != len(modes[0].SemanticTags) {
+		t.Errorf("encoded %d semantic tags, want %d as given", len(got[0].tags), len(modes[0].SemanticTags))
 	}
 }
 
@@ -231,7 +253,7 @@ func TestDefaultAttrWriter_ModeSelectListBounds(t *testing.T) {
 func TestDefaultAttrWriter_ModeSelectEmptyList(t *testing.T) {
 	t.Parallel()
 
-	got := decodeSupportedModes(t, im.AttributeValue{Value: []mattermodeselect.ModeOptionStruct{}})
+	got := decodeSupportedModes(t, supportedModesValue(t, []mattermodeselect.ModeOptionStruct{}))
 	if len(got) != 0 {
 		t.Errorf("decoded %d modes, want 0", len(got))
 	}

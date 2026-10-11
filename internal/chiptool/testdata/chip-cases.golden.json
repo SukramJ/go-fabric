@@ -396,6 +396,16 @@
       "steps": 7,
       "stepsSkipped": 0
     },
+    "COMMTR/2.1": {
+      "tests": 1,
+      "steps": 5,
+      "stepsSkipped": 0
+    },
+    "COMMTR/3.1": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
     "DA/1.1": {
       "tests": 1,
       "steps": 11,
@@ -959,6 +969,26 @@
       "steps": 12,
       "stepsSkipped": 4
     },
+    "IDM/10.4@ep40": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep41": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep42": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
+    "IDM/10.4@ep43": {
+      "tests": 1,
+      "steps": 12,
+      "stepsSkipped": 4
+    },
     "IDM/10.4@ep5": {
       "tests": 1,
       "steps": 12,
@@ -1325,6 +1355,10 @@
       "steps": 5,
       "stepsSkipped": 0
     },
+    "PSCFG/2.1": {
+      "steps": 2,
+      "stepsSkipped": 0
+    },
     "REFALM/2.1": {
       "steps": 4,
       "stepsSkipped": 1
@@ -1489,6 +1523,26 @@
       "steps": 9,
       "stepsSkipped": 0
     },
+    "SETRF/2.1": {
+      "tests": 1,
+      "steps": 20,
+      "stepsSkipped": 0
+    },
+    "SETRF/2.2": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "SETRF/2.3": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 2
+    },
+    "SETRF/3.1": {
+      "tests": 1,
+      "steps": 44,
+      "stepsSkipped": 0
+    },
     "SM/1.1": {
       "tests": 1,
       "steps": 9,
@@ -1532,6 +1586,16 @@
     "SMOKECO/2.7": {
       "tests": 1,
       "steps": 11,
+      "stepsSkipped": 0
+    },
+    "SOIL/2.1": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "SOIL/2.2": {
+      "tests": 1,
+      "steps": 7,
       "stepsSkipped": 0
     },
     "SWTCH/2.1": {
@@ -1757,6 +1821,11 @@
       "2.10",
       "2.11"
     ],
+    "ACT": [
+      "2.1",
+      "2.2",
+      "3.2"
+    ],
     "AIRQUAL": [
       "2.1"
     ],
@@ -1919,6 +1988,10 @@
       "4.27",
       "4.29"
     ],
+    "COMMTR": [
+      "2.1",
+      "3.1"
+    ],
     "DA": [
       "1.1",
       "1.2",
@@ -2038,6 +2111,10 @@
     ],
     "DT": [
       "1.1"
+    ],
+    "ECOINFO": [
+      "2.1",
+      "2.2"
     ],
     "EEVSE": [
       "2.1",
@@ -2285,6 +2362,10 @@
       "2.3",
       "3.1"
     ],
+    "PSCFG": [
+      "2.1",
+      "2.2"
+    ],
     "REFALM": [
       "2.1",
       "2.2",
@@ -2368,6 +2449,12 @@
       "1.5",
       "1.6"
     ],
+    "SETRF": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "3.1"
+    ],
     "SM": [
       "1.1",
       "1.2"
@@ -2380,6 +2467,10 @@
       "2.5",
       "2.6",
       "2.7"
+    ],
+    "SOIL": [
+      "2.1",
+      "2.2"
     ],
     "SU": [
       "1.1",
@@ -2611,6 +2702,9 @@
     "WNCV/7.1.Simulated": "WNCV.C"
   },
   "hostSkipped": {
+    "ACT/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "ACT/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "ACT/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "BIND/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "BIND/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "BIND/2.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
@@ -2693,6 +2787,7 @@
     "OPCREDS/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "OPCREDS/3.6": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "PS/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "PSCFG/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "S/3.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SC/1.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "SC/1.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",

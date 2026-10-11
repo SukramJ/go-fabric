@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4201,
+  "entry_points": 4258,
   "entry_packages": [
     ".",
     "bootid",
@@ -28,6 +28,7 @@
     "cluster/pump",
     "cluster/servicearea",
     "cluster/spec",
+    "cluster/spec/actions",
     "cluster/spec/activatedcarbonfiltermonitoring",
     "cluster/spec/administratorcommissioning",
     "cluster/spec/airquality",
@@ -41,6 +42,9 @@
     "cluster/spec/closurecontrol",
     "cluster/spec/closuredimension",
     "cluster/spec/colorcontrol",
+    "cluster/spec/commoditymetering",
+    "cluster/spec/commodityprice",
+    "cluster/spec/commoditytariff",
     "cluster/spec/descriptor",
     "cluster/spec/deviceenergymanagement",
     "cluster/spec/deviceenergymanagementmode",
@@ -48,7 +52,9 @@
     "cluster/spec/dishwasheralarm",
     "cluster/spec/dishwashermode",
     "cluster/spec/doorlock",
+    "cluster/spec/ecosysteminformation",
     "cluster/spec/electricalenergymeasurement",
+    "cluster/spec/electricalgridconditions",
     "cluster/spec/electricalpowermeasurement",
     "cluster/spec/energyevse",
     "cluster/spec/energyevsemode",
@@ -87,6 +93,7 @@
     "cluster/spec/pm1concentrationmeasurement",
     "cluster/spec/pm25concentrationmeasurement",
     "cluster/spec/powersource",
+    "cluster/spec/powersourceconfiguration",
     "cluster/spec/powertopology",
     "cluster/spec/pressuremeasurement",
     "cluster/spec/pumpconfigurationandcontrol",
@@ -101,6 +108,7 @@
     "cluster/spec/servicearea",
     "cluster/spec/smokecoalarm",
     "cluster/spec/softwarediagnostics",
+    "cluster/spec/soilmeasurement",
     "cluster/spec/spectest",
     "cluster/spec/switchcluster",
     "cluster/spec/temperaturealarm",
@@ -158,9 +166,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9322,
-    "reachable": 6518,
-    "whitelisted": 2799,
+    "total_exported": 9761,
+    "reachable": 6819,
+    "whitelisted": 2937,
     "unreachable": 5
   },
   "by_package": [
@@ -1960,21 +1968,21 @@
       "identifier": "TestDefaultAttrWriter_ModeSelectEmptyList",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_modeselect_test.go",
-      "line": 231
+      "line": 253
     },
     {
       "package": "bridge",
-      "identifier": "TestDefaultAttrWriter_ModeSelectListBounds",
+      "identifier": "TestDefaultAttrWriter_ModeSelectListAsGiven",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_modeselect_test.go",
-      "line": 207
+      "line": 231
     },
     {
       "package": "bridge",
       "identifier": "TestDefaultAttrWriter_ModeSelectSupportedModes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_modeselect_test.go",
-      "line": 156
+      "line": 181
     },
     {
       "package": "bridge",
@@ -5198,6 +5206,41 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestActionsCommandStatuses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/actions_test.go",
+      "line": 83
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestActionsEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/actions_test.go",
+      "line": 158
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestActionsListsAreTheHosts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/actions_test.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestActionsMatchesTheGeneratedDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/spec_parity_matterjs_test.go",
+      "line": 266
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestActionsRequestShapes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/actions_test.go",
+      "line": 129
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestBasicInfoSerialFromUniqueID_Long",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/general_diagnostics_internal_test.go",
@@ -5215,14 +5258,14 @@
       "identifier": "TestBasicInformationMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 84
+      "line": 88
     },
     {
       "package": "cluster/core",
       "identifier": "TestBridgedDeviceBasicInformationMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 118
+      "line": 122
     },
     {
       "package": "cluster/core",
@@ -5236,7 +5279,35 @@
       "identifier": "TestDescriptorMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 44
+      "line": 48
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestEcosystemInformationAppliesChipBuilderRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ecosystem_information_test.go",
+      "line": 133
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestEcosystemInformationDirectoryChanged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ecosystem_information_test.go",
+      "line": 190
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestEcosystemInformationFiltersByFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ecosystem_information_test.go",
+      "line": 77
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestEcosystemInformationMatchesTheGeneratedDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/spec_parity_matterjs_test.go",
+      "line": 245
     },
     {
       "package": "cluster/core",
@@ -5250,14 +5321,14 @@
       "identifier": "TestGeneralCommissioningMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 180
+      "line": 184
     },
     {
       "package": "cluster/core",
       "identifier": "TestGeneralDiagnosticsMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 142
+      "line": 146
     },
     {
       "package": "cluster/core",
@@ -5271,14 +5342,14 @@
       "identifier": "TestIdentifyMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 58
+      "line": 62
     },
     {
       "package": "cluster/core",
       "identifier": "TestOTARequestorMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 222
+      "line": 226
     },
     {
       "package": "cluster/core",
@@ -5380,10 +5451,24 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestPowerSourceConfigurationMatchesTheGeneratedDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/spec_parity_matterjs_test.go",
+      "line": 236
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestPowerSourceConfigurationSources",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/power_source_configuration_test.go",
+      "line": 17
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestSmallSystemServersMatchTheGeneratedDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 193
+      "line": 197
     },
     {
       "package": "cluster/core",
@@ -5447,6 +5532,41 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
       "line": 53
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "CommodityPrice",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commodityprice.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "CommodityPriceComponent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commodityprice.go",
+      "line": 47
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "CommodityPriceDetail",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commodityprice.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "CommodityPriceFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commodityprice.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "DayEntryRandomizationType",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 64
     },
     {
       "package": "cluster/energy",
@@ -5527,6 +5647,20 @@
     },
     {
       "package": "cluster/energy",
+      "identifier": "GridConditions",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/gridconditions.go",
+      "line": 32
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "GridConditionsFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/gridconditions.go",
+      "line": 30
+    },
+    {
+      "package": "cluster/energy",
       "identifier": "HeatSource",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/waterheater.go",
@@ -5538,6 +5672,20 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/meter.go",
       "line": 18
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "MeteredQuantity",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditymetering.go",
+      "line": 28
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "MeteringTariffUnit",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditymetering.go",
+      "line": 31
     },
     {
       "package": "cluster/energy",
@@ -5576,6 +5724,20 @@
     },
     {
       "package": "cluster/energy",
+      "identifier": "PriceCurrency",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commodityprice.go",
+      "line": 50
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "PriceTariffUnit",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commodityprice.go",
+      "line": 53
+    },
+    {
+      "package": "cluster/energy",
       "identifier": "Priority",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/preference.go",
@@ -5601,6 +5763,83 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/energy/evse.go",
       "line": 57
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TariffCalendarPeriod",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 59
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TariffComponent",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 53
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TariffDay",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 57
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TariffDayEntry",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 49
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TariffDayPattern",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 51
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TariffFeature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TariffInformation",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 47
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TariffPeriod",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TariffUnit",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/commoditytariff.go",
+      "line": 62
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "TestCommodityWireValue",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/energy/commodity_wire_internal_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/energy",
+      "identifier": "ThreeLevel",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/energy/gridconditions.go",
+      "line": 34
     },
     {
       "package": "cluster/energy",
@@ -5754,7 +5993,7 @@
       "identifier": "TestElectricalValuesDecodeThroughTheGeneratedCodecs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 98
+      "line": 100
     },
     {
       "package": "cluster/measurement",
@@ -5845,28 +6084,56 @@
       "identifier": "TestServersMatchTheGeneratedDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 51
+      "line": 52
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestSoilMeasurementIsReadOnlyAndHasNoCommands",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/soil_test.go",
+      "line": 115
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestSoilMeasurementMeasuredValueFollowsChipBounds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/soil_test.go",
+      "line": 76
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestSoilMeasurementReadsLimitsAsGiven",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/soil_test.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestSoilMoistureMaterializes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/soil_test.go",
+      "line": 137
     },
     {
       "package": "cluster/modeselect",
       "identifier": "ChangeToModeRequest",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 140
+      "line": 159
     },
     {
       "package": "cluster/modeselect",
       "identifier": "ModeOptionStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 136
+      "line": 155
     },
     {
       "package": "cluster/modeselect",
       "identifier": "SemanticTagStruct",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
-      "line": 128
+      "line": 147
     },
     {
       "package": "cluster/opstate",
@@ -6175,6 +6442,111 @@
       "reason": "generic: every generated EncodeTLV / DecodeTLV calls an instantiation of it, and RTA records the instantiation, not the generic declaration",
       "file": "cluster/spec/codec.go",
       "line": 301
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "ActionErrorEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 65
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "ActionErrorEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 76
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "ActionStateEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 84
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "ActionStateEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 97
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "ActionStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 141
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "ActionTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 153
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "ActionTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 169
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "CommandBits",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 182
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "CommandBitsDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 203
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "EndpointListStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 249
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "EndpointListTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 259
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "EndpointListTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 271
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/actions/definition_gen.go",
+      "line": 60
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/actions/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/actions",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/actions/definition_gen_test.go",
+      "line": 19
     },
     {
       "package": "cluster/spec/activatedcarbonfiltermonitoring",
@@ -7129,6 +7501,370 @@
       "line": 351
     },
     {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditymetering/definition_gen.go",
+      "line": 39
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "MeteredQuantityStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditymetering/definition_gen.go",
+      "line": 66
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "TariffUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditymetering/definition_gen.go",
+      "line": 74
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "TariffUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditymetering/definition_gen.go",
+      "line": 85
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commoditymetering/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/commoditymetering",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commoditymetering/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CommodityPriceComponentStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 90
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CommodityPriceDetailBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 125
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CommodityPriceDetailBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 136
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CommodityPriceStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 178
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "CurrencyDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 231
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TariffPriceTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 100
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TariffPriceTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 114
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TariffUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 190
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TariffUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commodityprice/definition_gen.go",
+      "line": 201
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commodityprice/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/commodityprice",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commodityprice/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "AuxiliaryLoadSettingEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 77
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "AuxiliaryLoadSettingEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 89
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "AuxiliaryLoadSwitchSettingsStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 146
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "AuxiliaryLoadSwitchesSettingsStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 117
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "BlockModeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 154
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "BlockModeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 166
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "CalendarPeriodStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 197
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "CurrencyDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 677
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayEntryRandomizationTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 205
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayEntryRandomizationTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 219
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayEntryStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 261
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayPatternDayOfWeekBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 272
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayPatternDayOfWeekBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 288
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayPatternStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 326
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 360
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 369
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "DayTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 382
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 62
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PeakPeriodSeverityEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 392
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PeakPeriodSeverityEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 405
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PeakPeriodStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 437
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PowerThresholdSourceEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 596
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PowerThresholdSourceEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 608
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "PowerThresholdStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 587
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffComponentStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 488
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffInformationStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 645
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffPeriodStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 710
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffPriceStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 528
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffPriceTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 537
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffPriceTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 551
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffUnitEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 719
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TariffUnitEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commoditytariff/definition_gen.go",
+      "line": 730
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commoditytariff/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/commoditytariff",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commoditytariff/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/descriptor",
       "identifier": "DeviceTypeStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -7962,6 +8698,55 @@
       "line": 802
     },
     {
+      "package": "cluster/spec/ecosysteminformation",
+      "identifier": "DeviceTypeStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ecosysteminformation/definition_gen.go",
+      "line": 64
+    },
+    {
+      "package": "cluster/spec/ecosysteminformation",
+      "identifier": "EcosystemDeviceStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ecosysteminformation/definition_gen.go",
+      "line": 112
+    },
+    {
+      "package": "cluster/spec/ecosysteminformation",
+      "identifier": "EcosystemLocationStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ecosysteminformation/definition_gen.go",
+      "line": 154
+    },
+    {
+      "package": "cluster/spec/ecosysteminformation",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ecosysteminformation/definition_gen.go",
+      "line": 37
+    },
+    {
+      "package": "cluster/spec/ecosysteminformation",
+      "identifier": "LocationdescDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ecosysteminformation/definition_gen.go",
+      "line": 189
+    },
+    {
+      "package": "cluster/spec/ecosysteminformation",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ecosysteminformation/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/ecosysteminformation",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ecosysteminformation/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/electricalenergymeasurement",
       "identifier": "CumulativeEnergyResetStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -8023,6 +8808,48 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/electricalenergymeasurement/definition_gen_test.go",
       "line": 19
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "ElectricalGridConditionsStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/electricalgridconditions/definition_gen.go",
+      "line": 87
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/electricalgridconditions/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/electricalgridconditions/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/electricalgridconditions/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "ThreeLevelEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/electricalgridconditions/definition_gen.go",
+      "line": 99
+    },
+    {
+      "package": "cluster/spec/electricalgridconditions",
+      "identifier": "ThreeLevelEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/electricalgridconditions/definition_gen.go",
+      "line": 111
     },
     {
       "package": "cluster/spec/electricalpowermeasurement",
@@ -10426,6 +11253,27 @@
       "line": 524
     },
     {
+      "package": "cluster/spec/powersourceconfiguration",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/powersourceconfiguration/definition_gen.go",
+      "line": 33
+    },
+    {
+      "package": "cluster/spec/powersourceconfiguration",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/powersourceconfiguration/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/powersourceconfiguration",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/powersourceconfiguration/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/powertopology",
       "identifier": "Feature",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -11215,6 +12063,55 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/softwarediagnostics/definition_gen.go",
       "line": 90
+    },
+    {
+      "package": "cluster/spec/soilmeasurement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/soilmeasurement/definition_gen.go",
+      "line": 37
+    },
+    {
+      "package": "cluster/spec/soilmeasurement",
+      "identifier": "MeasurementAccuracyRangeStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/soilmeasurement/definition_gen.go",
+      "line": 175
+    },
+    {
+      "package": "cluster/spec/soilmeasurement",
+      "identifier": "MeasurementAccuracyStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/soilmeasurement/definition_gen.go",
+      "line": 73
+    },
+    {
+      "package": "cluster/spec/soilmeasurement",
+      "identifier": "MeasurementTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/soilmeasurement/definition_gen.go",
+      "line": 84
+    },
+    {
+      "package": "cluster/spec/soilmeasurement",
+      "identifier": "MeasurementTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/soilmeasurement/definition_gen.go",
+      "line": 111
+    },
+    {
+      "package": "cluster/spec/soilmeasurement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/soilmeasurement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/soilmeasurement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/soilmeasurement/definition_gen_test.go",
+      "line": 19
     },
     {
       "package": "cluster/spec/spectest",
@@ -12397,14 +13294,14 @@
       "identifier": "KeypadLockout",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 42
+      "line": 44
     },
     {
       "package": "cluster/thermo",
       "identifier": "ScheduleProgrammingVisibility",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 45
+      "line": 47
     },
     {
       "package": "cluster/thermo",
@@ -12418,7 +13315,7 @@
       "identifier": "TemperatureDisplayMode",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
-      "line": 40
+      "line": 42
     },
     {
       "package": "cluster/valve",
@@ -12684,7 +13581,7 @@
       "identifier": "TestApplicationDeviceTypesMeetTheirDeviceTypeRequirements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 51
+      "line": 52
     },
     {
       "package": "endpoint",
@@ -12712,7 +13609,7 @@
       "identifier": "TestBooleanStateServerMeetsTheDetectorDeviceTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 160
+      "line": 170
     },
     {
       "package": "endpoint",
@@ -13076,14 +13973,14 @@
       "identifier": "TestLightServersMeetTheLightDeviceTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 117
+      "line": 127
     },
     {
       "package": "endpoint",
       "identifier": "TestMeasurementKindsMeetTheirDeviceTypeRequirements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
-      "line": 89
+      "line": 99
     },
     {
       "package": "endpoint",
@@ -13696,10 +14593,31 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestDemoActionsWithoutTopology",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_node_test.go",
+      "line": 122
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
       "line": 51
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestEnergyMarketDevices",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_energy_market_test.go",
+      "line": 96
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestEnergyMarketWireShapes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_energy_market_test.go",
+      "line": 32
     },
     {
       "package": "examples/reference-bridge",
@@ -13752,10 +14670,24 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestMeteringTriggers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_energy_market_test.go",
+      "line": 221
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestMicrowaveCooks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/kitchen_test.go",
       "line": 67
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestNodeClustersOnRootAndAggregator",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_node_test.go",
+      "line": 63
     },
     {
       "package": "examples/reference-bridge",
@@ -13798,6 +14730,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/area_closure_test.go",
       "line": 98
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestPriceAndGridTriggers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_energy_market_test.go",
+      "line": 249
     },
     {
       "package": "examples/reference-bridge",
@@ -13864,10 +14803,31 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestSoilSensorEndpoint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_node_test.go",
+      "line": 26
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestTariffTriggers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_energy_market_test.go",
+      "line": 156
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestThermostatHasItsUIConfiguration",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/area_closure_test.go",
       "line": 137
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestTimedCommandsFromTheModel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/timed_commands_test.go",
+      "line": 27
     },
     {
       "package": "examples/reference-bridge",
@@ -14491,6 +15451,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_batch_test.go",
       "line": 162
+    },
+    {
+      "package": "im",
+      "identifier": "TestHandleInvokeRequest_TimedFromProvider",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_timed_provider_test.go",
+      "line": 32
+    },
+    {
+      "package": "im",
+      "identifier": "TestHandleInvokeRequest_TimedSchemaFallback",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_timed_provider_test.go",
+      "line": 67
     },
     {
       "package": "im",

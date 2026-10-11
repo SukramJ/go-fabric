@@ -11,7 +11,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
-	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -51,7 +50,9 @@ type TimeFormatLocalizationConfig struct {
 // A written ActiveCalendarType that SupportedCalendarTypes does not hold
 // is CONSTRAINT_ERROR: the model constraint is "in
 // supportedCalendarTypes", enforced by matter.js's validator
-// (packages/node/src/behavior/state/validation/constraint.ts:153-163) and
+// (packages/node/src/behavior/state/validation/constraint.ts:153-163) — and
+// by the generated runtime before the sink sees the value
+// (spec.Instance.ValidateWrite) — and
 // by connectedhomeip (src/app/clusters/time-format-localization-server/
 // TimeFormatLocalizationCluster.cpp WriteImpl :133-141,
 // IsSupportedCalendarType :30-52, at the harness pin
@@ -67,7 +68,7 @@ func NewTimeFormatLocalization(cfg TimeFormatLocalizationConfig) (*spec.Server, 
 	}
 	srv, err := spec.NewServer(tfldef.Definition, spec.Options{Features: uint32(tfldef.FeatureCalendarFormat)}, spec.ServerConfig{
 		DataVersion: cfg.DataVersion,
-		Sink:        calendarSink{supported: supported, onWrite: cfg.OnWrite},
+		Sink:        calendarSink{onWrite: cfg.OnWrite},
 		Initial: map[uint32]any{
 			tfldef.AttrHourFormat:             cfg.HourFormat,
 			tfldef.AttrActiveCalendarType:     cfg.ActiveCalendarType,
@@ -80,20 +81,17 @@ func NewTimeFormatLocalization(cfg TimeFormatLocalizationConfig) (*spec.Server, 
 	return srv, nil
 }
 
-// calendarSink holds a written ActiveCalendarType to the fixed
-// SupportedCalendarTypes and hands every accepted write to the host.
+// calendarSink hands every accepted write to the host. Membership of
+// ActiveCalendarType in SupportedCalendarTypes is the runtime's "in"
+// constraint, refused before the sink is called.
 type calendarSink struct {
-	supported []tfldef.CalendarTypeEnum
-	onWrite   func(ctx context.Context, attrID uint32, value uint8) error
+	onWrite func(ctx context.Context, attrID uint32, value uint8) error
 }
 
 // MatterWriteAttribute implements [spec.Sink]: value is the stored form,
 // a uint8 for both writable enums.
 func (s calendarSink) MatterWriteAttribute(ctx context.Context, attrID uint32, value any) error {
 	v, _ := value.(uint8)
-	if attrID == tfldef.AttrActiveCalendarType && !slices.Contains(s.supported, tfldef.CalendarTypeEnum(v)) {
-		return spec.Errorf(im.StatusConstraintError, "TimeFormatLocalization: ActiveCalendarType %d is not in SupportedCalendarTypes", v)
-	}
 	if s.onWrite != nil {
 		if err := s.onWrite(ctx, attrID, v); err != nil {
 			return fmt.Errorf("core: TimeFormatLocalization: %w", err)

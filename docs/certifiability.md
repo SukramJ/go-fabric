@@ -144,6 +144,9 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | LUNIT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | DGSW | 4 | 1 | 0 | 0 | 2 | 1 | 0 |
 | DGETH | 3 | 2 | 0 | 0 | 1 | 0 | 0 |
+| ACT | 3 | 0 | 0 | 0 | 0 | 3 | 0 |
+| PSCFG | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
+| ECOINFO | 2 | 0 | 0 | 0 | 0 | 2 | 0 |
 | ACFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | BOOL | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | BOOLCFG | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
@@ -158,6 +161,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | PMHCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | RNCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | TVOCCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| SOIL | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | CLCTRL | 12 | 5 | 0 | 0 | 7 | 0 | 0 |
 | CLDIM | 11 | 6 | 0 | 0 | 5 | 0 | 0 |
 | CC | 31 | 21 | 0 | 0 | 6 | 4 | 0 |
@@ -165,6 +169,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | EPREF | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | EWATERHTR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | MTRID | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| SETRF | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
+| COMMTR | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | DEM | 11 | 7 | 0 | 0 | 4 | 0 | 0 |
 | DEMM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | EEVSE | 10 | 9 | 0 | 1 | 0 | 0 | 0 |
@@ -203,13 +209,16 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WHM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **579** | **327** | **0** | **1** | **123** | **123** | **5** |
+| **all** | **594** | **336** | **0** | **1** | **123** | **129** | **5** |
 
 ### Cases not run
 
 | Case | Class | Reason |
 | --- | --- | --- |
 | ACL/2.11 | (b) not supported | not applicable: the case's PICS `ACL.S.F01` is false for the reference DUT |
+| ACT/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| ACT/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| ACT/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BIND/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BIND/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BIND/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -342,6 +351,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DRLK/2.6 | (c) harness | TC-DRLK-2.6 gates every step on the Year Day Schedule feature (PICS DRLK.S.F0a=0 here) except its final "Cleanup the created user" ClearUser, which has no PICS gate and fails on a lock without the User feature (DRLK.S.F08=0) |
 | DRLK/2.7 | (b) not supported | not applicable: the case's PICS `DRLK.S & DRLK.S.F08` is false for the reference DUT |
 | DRLK/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| ECOINFO/2.1 | (c) harness | TC_ECOINFO_2_1.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |
+| ECOINFO/2.2 | (c) harness | TC_ECOINFO_2_2.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT |
 | EEVSE/2.3 | (a) defect | TC-EEVSE-2.3 step 19 (eleven ChargingTargets in one day) expects RESOURCE_EXHAUSTED; the generated SetTargets decoder refuses the list at its `max 10` constraint with CONSTRAINT_ERROR before the server's own check (cluster/energy/evse.go, evseMaxTargetsPerDay) can answer, as matter.js does (CommandInvokeResponse.ts requestTlv.validate). notes/parity/matter_behaviour_findings.md, Certification harness, TC-EEVSE-2.3 |
 | FAN/2.3 | (b) not supported | not applicable: the case's PICS `FAN.S.F02` is false for the reference DUT |
 | FAN/2.4 | (b) not supported | not applicable: the case's PICS `FAN.S.F03` is false for the reference DUT |
@@ -393,6 +404,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | OVENOPSTATE/2.6 | (b) not supported | not applicable: the case's PICS `OVENOPSTATE.S & OVENOPSTATE.S.A0002` is false for the reference DUT |
 | PS/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | PS/2.3 | (b) not supported | not applicable: the case's PICS `PWRTL.S` is false for the reference DUT |
+| PSCFG/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | REFALM/2.3 | (b) not supported | not applicable: the case's PICS `REFALM.S & REFALM.S.M.LocalSuppress` is false for the reference DUT |
 | RH/2.2 | (c) harness | TC-RH-2.2 has an operator change the measured value between two reads (a UserPrompt under RH.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
 | S/2.3 | (b) not supported | not applicable: the case's PICS `S` is false for the reference DUT |

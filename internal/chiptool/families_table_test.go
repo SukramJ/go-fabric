@@ -175,9 +175,19 @@ const (
 	// PA|PFR|STA|PAU|FA|CON and DeviceEnergyManagementMode).
 	dtEnergyEvse             = 0x050C
 	dtDeviceEnergyManagement = 0x050D
+	// dtElectricalEnergyTariff is the reference daemon's energy tariff
+	// (examples/reference-bridge/fleet_energy_market.go): CommodityPrice,
+	// ElectricalGridConditions and CommodityTariff; dtElectricalMeter its
+	// grid meter: ElectricalPowerMeasurement, ElectricalEnergyMeasurement
+	// and CommodityMetering.
+	dtElectricalEnergyTariff = 0x0513
+	dtElectricalMeter        = 0x0514
 	// dtClosurePanel is the reference daemon's closure panel
 	// (examples/reference-bridge/fleet_closure.go): ClosureDimension.
 	dtClosurePanel = 0x0231
+	// dtSoilSensor is the reference daemon's soil moisture sensor
+	// (examples/reference-bridge/fleet_sensors.go): SoilMeasurement.
+	dtSoilSensor = 0x0045
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -339,6 +349,25 @@ var chipFamilies = []family{
 	{name: "LUNIT"},
 	{name: "DGSW"},
 	{name: "DGETH"},
+	// The node clusters of brief J. Actions is on the Aggregator
+	// (examples/reference-bridge/fleet_node.go); every step of
+	// Test_TC_ACT_2_1/2_2/3_2.yaml is manual (`disabled: true`) at the
+	// harness pin. PowerSourceConfiguration is on the root, where
+	// Test_TC_PSCFG_2_1.yaml reads Sources (config endpoint: 0).
+	{name: "ACT"},
+	{name: "PSCFG"},
+	{
+		// EcosystemInformation is on the air quality sensor, but both
+		// CHIP cases bring their own DUT: a fabric-sync admin and bridge
+		// pair the runner starts itself (TC_ECOINFO_2_1.py and
+		// TC_ECOINFO_2_2.py CI arguments, header lines 24-27 at the
+		// harness pin: "app: examples/fabric-admin/scripts/fabric-sync-app.py").
+		name: "ECOINFO",
+		exclude: map[string]gap{
+			"2.1": {classHarness, "TC_ECOINFO_2_1.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT", false},
+			"2.2": {classHarness, "TC_ECOINFO_2_2.py runs against the fabric-sync app it starts itself (CI arguments, header lines 24-27: app: examples/fabric-admin/scripts/fabric-sync-app.py), not against a commissioned DUT", false},
+		},
+	},
 	// --- application clusters ----------------------------------------------
 	{name: "ACFREMON", deviceType: dtAirPurifier},
 	{name: "BOOL", deviceType: dtContactSensor},
@@ -363,6 +392,10 @@ var chipFamilies = []family{
 	{name: "PMHCONC", deviceType: dtAirQualitySensor},
 	{name: "RNCONC", deviceType: dtAirQualitySensor},
 	{name: "TVOCCONC", deviceType: dtAirQualitySensor},
+	// SOIL: SoilMeasurement on the soil sensor (connectedhomeip
+	// TC_SOIL_2_1.py, TC_SOIL_2_2.py; 2.2 moves the reading through the
+	// app pipe's SetSimulatedSoilMoisture).
+	{name: "SOIL", deviceType: dtSoilSensor},
 	{
 		name: "CLCTRL", deviceType: dtClosure,
 		// TC_CLCTRL_5_1 gates on "CLCTRL.S.C00", a code no PICS defines:
@@ -419,6 +452,14 @@ var chipFamilies = []family{
 	// (0x0098...) test event triggers, which the charger answers as
 	// connectedhomeip's evse-app does (examples/reference-bridge/
 	// fleet_evse.go).
+	// SETRF and COMMTR run on the energy tariff and the grid meter;
+	// TC_SETRF_2_2/2_3 and TC_COMMTR_3_1 drive them through the
+	// CommodityTariff (0x0700...) and CommodityMetering (0x0b07...) test
+	// event triggers, which the daemon answers as connectedhomeip's
+	// energy-gateway app does (examples/reference-bridge/
+	// fleet_energy_market.go).
+	{name: "SETRF", deviceType: dtElectricalEnergyTariff},
+	{name: "COMMTR", deviceType: dtElectricalMeter},
 	{name: "DEM", deviceType: dtDeviceEnergyManagement},
 	{name: "DEMM", deviceType: dtDeviceEnergyManagement},
 	{

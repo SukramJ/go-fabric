@@ -9,6 +9,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	tsuic "github.com/SukramJ/go-fabric/cluster/spec/thermostatuserinterfaceconfiguration"
+	unitdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
 )
 
 // ThermostatUserInterfaceConfiguration (0x0204) is built on its generated
@@ -21,11 +22,12 @@ import (
 // (packages/node/src/behaviors/thermostat-user-interface-configuration/
 // ThermostatUserInterfaceConfigurationServer.ts):
 //
-//   - TemperatureDisplayMode, when the host gives none, is Celsius (:18,
-//     :26-27). matter.js first asks a UnitLocalization server on the same
-//     node for Fahrenheit (:20-24); this module serves no
-//     UnitLocalization, so the host states Fahrenheit itself through
-//     [ThermostatUIConfig.TemperatureDisplayMode].
+//   - TemperatureDisplayMode, when the host gives none, is Fahrenheit if
+//     the same endpoint's UnitLocalization server reads TemperatureUnit
+//     Fahrenheit, else Celsius (:16-28: `this.agent.has(
+//     UnitLocalizationServer)` asks the TSUIC's own endpoint). The host
+//     hands that server in as [ThermostatUIConfig.UnitLocalization]; it is
+//     read once, at construction, as matter.js reads it once at initialize.
 //   - KeypadLockout is NoLockout on every start, whatever was stored
 //     before (:30).
 
@@ -53,9 +55,16 @@ const (
 
 // ThermostatUIConfig carries the construction parameters.
 type ThermostatUIConfig struct {
-	// TemperatureDisplayMode is the initial display unit; nil is Celsius,
-	// matter.js's fallback.
+	// TemperatureDisplayMode is the initial display unit; nil takes it
+	// from UnitLocalization, else Celsius, matter.js's fallback.
 	TemperatureDisplayMode *TemperatureDisplayMode
+	// UnitLocalization, optional, is the UnitLocalization (0x002D) server
+	// of the same endpoint (core.NewUnitLocalization). When
+	// TemperatureDisplayMode is nil and its TemperatureUnit reads
+	// Fahrenheit at construction, the display mode starts at Fahrenheit.
+	// Mirrors matter.js
+	// ThermostatUserInterfaceConfigurationServer.ts:18-27.
+	UnitLocalization *spec.Server
 	// ScheduleProgrammingVisibility, when set, serves the optional
 	// attribute with this initial value; nil leaves it out.
 	ScheduleProgrammingVisibility *ScheduleProgrammingVisibility
@@ -74,12 +83,18 @@ type ThermostatUIServer struct {
 }
 
 // NewThermostatUserInterfaceConfiguration builds the server. Its initial
-// state is matter.js's initialize: TemperatureDisplayMode as configured
-// (Celsius by default), KeypadLockout NoLockout.
+// state is matter.js's initialize: TemperatureDisplayMode as configured,
+// else from UnitLocalization, else Celsius; KeypadLockout NoLockout.
 func NewThermostatUserInterfaceConfiguration(cfg ThermostatUIConfig) (*ThermostatUIServer, error) {
 	display := TemperatureDisplayCelsius
-	if cfg.TemperatureDisplayMode != nil {
+	switch {
+	case cfg.TemperatureDisplayMode != nil:
 		display = *cfg.TemperatureDisplayMode
+	case cfg.UnitLocalization != nil:
+		// matter.js ThermostatUserInterfaceConfigurationServer.ts:20-24.
+		if v, ok := cfg.UnitLocalization.MatterRead(unitdef.AttrTemperatureUnit); ok && v == any(uint8(unitdef.TempUnitFahrenheit)) {
+			display = TemperatureDisplayFahrenheit
+		}
 	}
 	initial := map[uint32]any{
 		tsuic.AttrTemperatureDisplayMode: display,

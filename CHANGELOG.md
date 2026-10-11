@@ -18,6 +18,70 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `cluster/spec.CheckFeatures` judges a feature's otherwise-conformance by
+  its first applicable entry, as matter.js's FeatureSelectionErrors does
+  (`IllegalFeatureCombinations.ts` addOtherwiseRules): DeviceEnergyManagement
+  with StateForecastReporting and the adjustment features but without
+  PowerAdjustment (TC-DEM-2.6's `--featureSet 0x7C`) is accepted; before,
+  PowerForecastReporting was wrongly mandated. Attribute, command and event
+  conformance is unchanged (`Conformance.ts` computeApplicability).
+- Reference daemon, for the certification harness (wave-4 integration): the
+  app pipe knows `SetSimulatedSoilMoisture` (TC-SOIL-2.2) and the eleven
+  energy-market test event triggers of the tariff and meter devices reach
+  the TestEventTrigger dispatcher. The daemon binary that `go build` drops
+  into `examples/reference-bridge/` is no longer tracked (it had been
+  committed since the wave-1 refrigerator PR) and is ignored from now on.
+
+- `thermo.ThermostatUIConfig.UnitLocalization` (optional `*spec.Server`):
+  with no configured TemperatureDisplayMode, the same endpoint's
+  UnitLocalization decides it at construction — Fahrenheit when its
+  TemperatureUnit is Fahrenheit, else Celsius — as matter.js's
+  ThermostatUserInterfaceConfigurationServer initialize does.
+
+- `cluster/measurement`: SoilMeasurement (0x0430) as the SoilSensor kind,
+  `contract.MeasurementSoilMoisture` (SoilSensor 0x0045). A source
+  implements `measurement.SoilMoistureSource`: the reading in percent plus
+  the fixed `SoilMoistureMeasurementLimits` struct; a source without
+  limits mounts nothing. The measured value starts null and a reading
+  outside the limits is refused, keeping the previous value, as
+  connectedhomeip's `SoilMeasurementCluster.cpp` does.
+- `cluster/core`: `NewPowerSourceConfiguration` (0x002E; Sources in
+  priority order, at most six, optionally read through
+  `SetSourcesProvider`), `NewEcosystemInformation` (0x0750; host port
+  `EcosystemDirectory`, fabric-scoped lists filtered by the reading fabric,
+  another fabric's entries redacted on an unfiltered read) and
+  `NewActions` (0x0025; host port `ActionsHost`, all twelve commands
+  accepted, NOT_FOUND for an unknown action, INVALID_COMMAND for a command
+  the action does not support, StateChanged / ActionFailed through the
+  event emitter).
+- Generated definitions for SoilMeasurement, PowerSourceConfiguration,
+  EcosystemInformation and Actions under `cluster/spec/`.
+- Reference daemon: a SoilSensor ("Garden Soil"), PowerSourceConfiguration
+  on the root listing the EV charger's PowerSource endpoint, Actions on the
+  Aggregator with two demo scenes over the desk lamp, EcosystemInformation
+  on the air quality sensor. The SOIL, ACT, PSCFG and ECOINFO families are
+  declared (ECOINFO's two cases excluded: they start their own fabric-sync
+  DUT).
+- `cluster/energy`: CommodityPrice (0x0095), ElectricalGridConditions
+  (0x00A0), CommodityMetering (0x0B07) and CommodityTariff (0x0700) servers
+  on the generated definitions (`NewCommodityPrice`,
+  `NewElectricalGridConditions`, `NewCommodityMetering`,
+  `NewCommodityTariff`), with connectedhomeip's rules at the harness pin:
+  the price validation, the detail filter of the CurrentPrice and
+  PriceForecast attributes and of GetDetailedPriceRequest /
+  GetDetailedForecastRequest, the PriceChange and CurrentConditionsChanged
+  events, the metering setter rules, and for CommodityTariff the whole
+  update validation and cross validation (`UpdateTariff` takes a `Tariff`;
+  a refused update returns which rule refused it), the delayed activation
+  at StartDate, `ClearTariff`, the derived CurrentDay / NextDay /
+  Current- and NextDayEntry(Date) / Current- and NextTariffComponents
+  (`SyncTime`), GetTariffComponent and GetDayEntry.
+- Reference daemon: an ElectricalEnergyTariff (0x0513) with CommodityPrice,
+  ElectricalGridConditions and CommodityTariff, and an ElectricalMeter
+  (0x0514) with ElectricalPowerMeasurement, ElectricalEnergyMeasurement,
+  CommodityMetering and an ElectricalSensor part, carrying the
+  energy-gateway app's demo data, tariff presets and test event triggers.
+  chip-tool families SETRF and COMMTR (workflow group `app-energy`).
 - Reference daemon, for the certification harness: FixedLabel and UserLabel
   on the Aggregator endpoint and FixedLabel on the first bridged light (the
   CSA cases written against the CHIP all-clusters app address endpoint 1);
@@ -331,6 +395,24 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- ModeSelect SupportedModes is encoded by the generated codec
+  (`cluster/spec/modeselect`): `modeselect.Server` reads it as a
+  `spec.List[ModeOptionStruct]` and the bridge's hand-written case is gone.
+  On the wire, SemanticTag MfgCode and Value now take the smallest integer
+  width, as matter.js's `TlvOfModel` writes them (they were always two
+  bytes). The list, its SemanticTags and Label are no longer trimmed at
+  encode time: matter.js trims nothing, and the bounds
+  (`SupportedModesMaxEntries`, `SemanticTagsMaxEntries`, `LabelMaxBytes`)
+  are now documented on `ModeSource.SupportedModes` as the host's part.
+
+- `cluster/spec` evaluates an "in" constraint on a controller write
+  (`Instance.ValidateWrite`): the value must be an entry of the named peer
+  attribute's current list, else CONSTRAINT_ERROR before the sink sees it;
+  an unresolved peer admits nothing, as matter.js's `Constraint.test`.
+  LocalizationConfiguration ActiveLocale and TimeFormatLocalization
+  ActiveCalendarType answer as before; their hand-written membership checks
+  are gone.
+
 - `contract.MeasurementClass` gains seven built-in classes after
   `MeasurementFlow`. The built-in values keep their numbers; the classes
   `RegisterMeasurementKind` hands out start seven higher, so a host that
@@ -586,8 +668,31 @@ the same `ColorTemperatureWriter` as before.
 - `endpoint.Topology.Bridged` leaves out parts (`Endpoint.Part`): they are
   components of a bridged device, not bridged devices.
 
+### Deprecated
+
+- `github.com/SukramJ/go-fabric/cluster/modeselect`: the field-tag
+  constants `ModeOptionFieldLabel`, `ModeOptionFieldMode`,
+  `ModeOptionFieldSemanticTags`, `SemanticTagFieldMfgCode` and
+  `SemanticTagFieldValue`. Replacement: the generated codec
+  (`cluster/spec/modeselect` `ModeOptionStruct.EncodeTLV`,
+  `SemanticTagStruct.EncodeTLV`), which carries the field ids itself.
+  Removal permissible in the second minor release after the one that ships
+  this entry.
+
 ### Fixed
 
+- **Timed commands come from the model.** An untimed invoke of a command
+  matter.js marks "T" answers NEEDS_TIMED_INTERACTION for every cluster,
+  not only for the hand-pinned AdministratorCommissioning, DoorLock and
+  ClosureControl commands: an untimed EnergyEvse EnableCharging or
+  ClosureDimension SetTarget used to be accepted. The IM asks the resolved
+  cluster server first through the new optional `contract.TimedCommander`
+  (implemented by `spec.Instance`, so by `spec.Server` and every server
+  embedding an Instance); `schema.IsTimedInvoke` is now generated from
+  `parity/schema.json` (`schema/timed_gen.go`, `make
+  generate-matter-schema`) and remains the fallback for hand-written
+  servers. New optional dispatcher capability `im.TimedCommandProvider`,
+  implemented by `endpoint.TopologyDispatcher`.
 - **A transition's rate and its RemainingTime came from two reads of the
   current value.** `cluster/light` (MoveToSaturation, MoveToColorTemperature)
   and `cluster/levelcontrol` read the current value, computed the rate, and

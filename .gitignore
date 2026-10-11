@@ -22,3 +22,6 @@ __pycache__/
 
 # Claude Code agent worktrees.
 /.claude/worktrees/
+
+# a plain `go build` inside the example directory drops its binary there
+examples/reference-bridge/reference-bridge

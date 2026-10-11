@@ -14,6 +14,8 @@
 //     type's requirement tree, conditions and composition: the device-type
 //     layer of the snapshot), baseDeviceTypeDefinitions, clusterFeatures,
 //     clusterClassifications, unbindableClusters
+//   - timed_gen.go — timedInvokePaths (every request command whose
+//     effective access carries "T", the timed-interaction quality)
 //   - schema_provenance_gen.go — SchemaSnapshotSHA256
 //
 // It reads the same bytes package parity embeds rather than a second copy of
@@ -59,6 +61,7 @@ const (
 	provenanceFile  = "schema/schema_provenance_gen.go"
 	accessFile      = "schema/attribute_access_gen.go"
 	requirementFile = "schema/devicetype_requirements_gen.go"
+	timedFile       = "schema/timed_gen.go"
 )
 
 // moduleRoot returns the directory holding this module's go.mod, found by
@@ -91,6 +94,7 @@ type snapshotCluster struct {
 	Revision       uint16              `json:"revision"`
 	FeatureMap     uint32              `json:"featureMap"`
 	Attributes     []snapshotAttribute `json:"attributes"`
+	Commands       []snapshotCommand   `json:"commands"`
 	Features       []snapshotFeature   `json:"features"`
 	Classification string              `json:"classification"`
 	Bindable       *bool               `json:"bindable"`
@@ -108,6 +112,20 @@ type snapshotAttribute struct {
 	Name    string `json:"name"`
 	Access  string `json:"access"`
 	Quality string `json:"quality"`
+}
+
+// snapshotCommand mirrors one command of a cluster in parity/schema.json:
+// its direction and the access of its effective layer, where the extractor
+// records the timed quality ("T") as access.timed.
+type snapshotCommand struct {
+	ID        uint32 `json:"id"`
+	Name      string `json:"name"`
+	Direction string `json:"direction"`
+	Effective *struct {
+		Access struct {
+			Timed bool `json:"timed"`
+		} `json:"access"`
+	} `json:"effective"`
 }
 
 // snapshotRequirement mirrors one cluster requirement of a device type in
@@ -242,6 +260,12 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("wrote %s\n", accessFile)
+
+	if err := writeTimedFile(snap.Clusters); err != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", timedFile, err)
+		os.Exit(1)
+	}
+	fmt.Printf("wrote %s\n", timedFile)
 
 	if err := writeRequirementsFile(snap); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", requirementFile, err)
@@ -521,6 +545,45 @@ func writeAccessFile(clusters []snapshotCluster) error {
 		return err
 	}
 	return writeIfChanged(accessFile, out)
+}
+
+// writeTimedFile emits timedInvokePaths: every request command whose
+// effective access carries the timed quality ("T", matter.js
+// Access.Timed.Required), which matter.js answers NeedsTimedInteraction for
+// outside a timed interaction
+// (packages/protocol/src/action/server/CommandInvokeResponse.ts:292-295).
+func writeTimedFile(clusters []snapshotCluster) error {
+	var buf bytes.Buffer
+	buf.WriteString(fileHeaderTpl)
+	buf.WriteString("// timedInvokePaths lists every request command whose effective access in\n")
+	buf.WriteString("// parity/schema.json carries the timed quality (\"T\"): it may only be\n")
+	buf.WriteString("// invoked inside a timed interaction.\n")
+	buf.WriteString("var timedInvokePaths = map[uint32]map[uint32]struct{}{\n")
+	for _, c := range clusters {
+		cmds := slices.Clone(c.Commands)
+		sort.Slice(cmds, func(i, j int) bool { return cmds[i].ID < cmds[j].ID })
+		var rows []string
+		for _, m := range cmds {
+			if m.Direction != "request" || m.Effective == nil || !m.Effective.Access.Timed {
+				continue
+			}
+			rows = append(rows, fmt.Sprintf("\t\t0x%02X: {}, // %s\n", m.ID, m.Name))
+		}
+		if len(rows) == 0 {
+			continue
+		}
+		fmt.Fprintf(&buf, "\t0x%04X: { // %s\n", c.ID, c.Name)
+		for _, r := range rows {
+			buf.WriteString(r)
+		}
+		buf.WriteString("\t},\n")
+	}
+	buf.WriteString("}\n")
+	out, err := format.Source(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	return writeIfChanged(timedFile, out)
 }
 
 // hasQuality reports whether a matter.js quality string carries flag as a
