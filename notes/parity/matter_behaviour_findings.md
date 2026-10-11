@@ -455,6 +455,23 @@ family, and deleting the entry.
   ConfigStatus.Operational. **Fix:** port the Mode / ConfigStatus sync and
   the maintenance refusal, then declare the PICS code 1.
 
+- **TC-EEVSE-2.3 step 19 — eleven ChargingTargets in one day answer
+  CONSTRAINT_ERROR, the case expects RESOURCE_EXHAUSTED.** The generated
+  SetTargets decoder (`cluster/spec/energyevse`, `DecodeListIn(…, 0, 10)`
+  from the `max 10` constraint on ChargingTargetScheduleStruct.ChargingTargets)
+  refuses the request before `cluster/energy/evse.go`'s own per-day check
+  (`evseMaxTargetsPerDay`, which would answer RESOURCE_EXHAUSTED as
+  connectedhomeip's `EvseCluster.cpp` does) runs. **matter.js:** validates
+  the request TLV against the same model constraint before the behavior
+  sees it (`CommandInvokeResponse.ts` `requestTlv.validate(request)`;
+  `TlvArray.validate` throws `ValidationOutOfBoundsError`, a
+  `ValidationError` whose status is ConstraintError) — so matter.js answers
+  CONSTRAINT_ERROR here too, and the CSA case disagrees with both. **Fix:**
+  decide whether a command's list bound belongs to the decoder (status of
+  the schema) or to the server (status of the cluster's rule); the spec
+  text for SetTargets names RESOURCE_EXHAUSTED. Until then the case is
+  excluded as class (a) in the EEVSE family.
+
 The group-messaging cases are not findings: they are skipped on a host
 whose LAN interface has no IPv6, with the command that enables it, and run
 wherever it has. TC-SC-4.1 and TC-SC-4.3 were wrongly listed here as such an

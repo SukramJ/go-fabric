@@ -35,15 +35,27 @@ var committed = []string{
 	"ModeSelect",
 	// cluster/alarm
 	"SmokeCoAlarm",
+	// cluster/alarmbase
+	"DishwasherAlarm",
+	"RefrigeratorAlarm",
+	"TemperatureAlarm",
+	// cluster/appliance
+	"LaundryWasherControls",
+	"LaundryDryerControls",
+	"MicrowaveOvenControl",
 	// cluster/fan
 	"FanControl",
 	// cluster/opstate
 	"OperationalState",
 	"RvcOperationalState",
+	"OvenCavityOperationalState",
 	// cluster/levelcontrol
 	"LevelControl",
 	// cluster/closure
 	"ClosureControl",
+	"ClosureDimension",
+	// cluster/servicearea
+	"ServiceArea",
 	// cluster/cover
 	"WindowCovering",
 	// cluster/lock
@@ -51,6 +63,7 @@ var committed = []string{
 	// cluster/thermo
 	"Thermostat",
 	"TemperatureControl",
+	"ThermostatUserInterfaceConfiguration",
 	// cluster/measurement
 	"TemperatureMeasurement",
 	"RelativeHumidityMeasurement",
@@ -79,6 +92,8 @@ var committed = []string{
 	"WaterHeaterManagement",
 	"EnergyPreference",
 	"MeterIdentification",
+	"DeviceEnergyManagement",
+	"EnergyEvse",
 	// cluster/wire
 	"Switch",
 	"AdministratorCommissioning",

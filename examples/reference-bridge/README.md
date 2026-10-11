@@ -51,14 +51,15 @@ Startup prints the pairing information on stdout:
 | 10 | Pump `0x0303` | `demoPump`: OnOff, `cluster/pump`, and a FlowMeasurement |
 | 11 | FlowSensor `0x0306` | a `demoReading` (`fleet_sensors.go`) |
 | 12 | LaundryWasher `0x0073` | `demoWasher`: `cluster/opstate` OperationalState and `cluster/modebase` LaundryWasherMode (`fleet_appliances.go`) |
-| 13 | RoboticVacuumCleaner `0x0074` | `demoVacuum`: RvcOperationalState, RvcRunMode, RvcCleanMode |
-| 14 | Thermostat `0x0301` | `cluster/thermo` |
+| 13 | RoboticVacuumCleaner `0x0074` | `demoVacuum`: RvcOperationalState, RvcRunMode, RvcCleanMode, and `cluster/servicearea` ServiceArea with one map and two areas (`fleet_servicearea.go`) |
+| 14 | Thermostat `0x0301` | `cluster/thermo` Thermostat and ThermostatUserInterfaceConfiguration |
 | 15 | WindowCovering `0x0202` | `cluster/cover` |
 | 16 | DoorLock `0x000A` | `demoLock`, host port of `cluster/lock` |
 | 17-19 | Humidity, Occupancy, Contact sensors | `demoReading` / `demoBinary` measurement sources |
 | 20 | GenericSwitch `0x000F` | `demoButton`, a momentary press source with long-press |
 | 21 | AirPurifier `0x002D` | `demoAirPurifier`: the fan's FanControl plus `cluster/filter` HEPA and activated-carbon filter monitoring |
 | 22 | Closure `0x0230` | `demoGarage`: `cluster/closure` ClosureControl (Positioning, Ventilation) with a simulated drive (`fleet_closure.go`) |
+| 27 | ClosurePanel `0x0231` | `demoPanel`: `cluster/closure` ClosureDimension as connectedhomeip's closure-app panel serves it, with its simulated motion (`fleet_closure.go`) |
 
 The root endpoint carries the node's own clusters, TimeSynchronization and
 DiagnosticLogs among them (`wiring.go` buildRootClusters, which also says why

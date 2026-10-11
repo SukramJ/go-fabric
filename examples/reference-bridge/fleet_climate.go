@@ -170,11 +170,16 @@ func copyUint8(v *uint8) *uint8 {
 // Thermostat device type offers as optional (parity/schema.json): three
 // balances from efficient to comfortable, and the two priorities they
 // trade between.
+//
+// Its display settings are a
+// ThermostatUserInterfaceConfiguration, the optional cluster the Thermostat
+// device type offers (thermostat.element.ts), with matter.js's defaults.
 type demoThermostat struct {
 	name string
 	once sync.Once
 	srv  *thermo.ThermostatServer
 	pref *energy.PreferenceServer
+	ui   *thermo.ThermostatUIServer
 }
 
 var (
@@ -194,7 +199,7 @@ func (t *demoThermostat) MatterDeviceType() uint16 { return deviceTypeThermostat
 // holds the setpoints, so the same instance serves every reassembly.
 func (t *demoThermostat) MatterClusterServers() []contract.ClusterServer {
 	t.build()
-	return []contract.ClusterServer{t.srv, t.pref}
+	return []contract.ClusterServer{t.srv, t.pref, t.ui}
 }
 
 func (t *demoThermostat) build() {
@@ -218,6 +223,11 @@ func (t *demoThermostat) build() {
 			panic(fmt.Sprintf("thermostat EnergyPreference: %v", err))
 		}
 		t.pref = pref
+		ui, err := thermo.NewThermostatUserInterfaceConfiguration(thermo.ThermostatUIConfig{})
+		if err != nil {
+			panic(fmt.Sprintf("thermostat ThermostatUserInterfaceConfiguration: %v", err))
+		}
+		t.ui = ui
 	})
 }
 

@@ -159,11 +159,16 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | RNCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | TVOCCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | CLCTRL | 12 | 5 | 0 | 0 | 7 | 0 | 0 |
+| CLDIM | 11 | 6 | 0 | 0 | 5 | 0 | 0 |
 | CC | 31 | 21 | 0 | 0 | 6 | 4 | 0 |
 | DRLK | 14 | 7 | 0 | 0 | 4 | 3 | 0 |
 | EPREF | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | EWATERHTR | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | MTRID | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| DEM | 11 | 7 | 0 | 0 | 4 | 0 | 0 |
+| DEMM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| EEVSE | 10 | 9 | 0 | 1 | 0 | 0 | 0 |
+| EEVSEM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | FAN | 12 | 7 | 0 | 0 | 5 | 0 | 0 |
 | HEPAFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | FLW | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
@@ -181,16 +186,24 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | RVCOPSTATE | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
 | TCCM | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | TCTL | 5 | 3 | 0 | 0 | 2 | 0 | 0 |
+| DISHALM | 7 | 1 | 0 | 0 | 0 | 6 | 0 |
+| REFALM | 3 | 2 | 0 | 0 | 1 | 0 | 0 |
+| OVENOPSTATE | 5 | 4 | 0 | 0 | 1 | 0 | 0 |
+| OTCCM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| MWOCTRL | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
+| MWOM | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | RVCRUNM | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | S | 7 | 5 | 0 | 0 | 1 | 1 | 0 |
+| SEAR | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
 | SMOKECO | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
 | SWTCH | 5 | 1 | 0 | 0 | 3 | 1 | 0 |
 | TMP | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | TSTAT | 6 | 3 | 0 | 0 | 2 | 1 | 0 |
+| TSUIC | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WHM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **514** | **280** | **0** | **0** | **112** | **117** | **5** |
+| **all** | **579** | **327** | **0** | **1** | **123** | **123** | **5** |
 
 ### Cases not run
 
@@ -242,6 +255,11 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CLCTRL/7.2 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F01 & CLCTRL.S.C03.Rsp` is false for the reference DUT |
 | CLCTRL/7.3 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.C03.Rsp` is false for the reference DUT |
 | CLCTRL/7.4 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.A0000 & CLCTRL.S.C03.Rsp` is false for the reference DUT |
+| CLDIM/5.1 | (b) not supported | not applicable: the case's PICS `CLDIM.S & CLDIM.S.F00 & CLDIM.S.C02.Rsp` is false for the reference DUT |
+| CLDIM/5.2 | (b) not supported | not applicable: the case's PICS `CLDIM.S & CLDIM.S.F01 & CLDIM.S.C02.Rsp` is false for the reference DUT |
+| CLDIM/5.3 | (b) not supported | not applicable: the case's PICS `CLDIM.S & CLDIM.S.C02.Rsp` is false for the reference DUT |
+| CLDIM/6.1 | (b) not supported | not applicable: the case's PICS `CLDIM.S & CLDIM.S.F00 & CLDIM.S.C03.Rsp` is false for the reference DUT |
+| CLDIM/6.2 | (b) not supported | not applicable: the case's PICS `CLDIM.S & CLDIM.S.F00 & CLDIM.S.C03.Rsp` is false for the reference DUT |
 | CNET/4.1 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.10 | (b) not supported | not applicable: the case's PICS `CNET.S & CNET.S.F01` is false for the reference DUT |
 | CNET/4.11 | (d) out of scope | TC-CNET-4.11 verifies Wi-Fi ConnectNetwork; Wi-Fi commissioning is out of scope (ADR 0011 (d), docs/matterjs-comparison.md), and the case has no PICS gate (CNET.S.F00=0) |
@@ -300,12 +318,22 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DD/3.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.8 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DD/3.9 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DEM/2.11 | (b) not supported | not applicable: the case's PICS `DEM.S.F07` is false for the reference DUT |
+| DEM/2.6 | (b) not supported | not applicable: the case's PICS `DEM.S.F05 & DEM.S.F02` is false for the reference DUT |
+| DEM/2.8 | (b) not supported | not applicable: the case's PICS `DEM.S.F06 & DEM.S.F02` is false for the reference DUT |
+| DEM/2.9 | (b) not supported | not applicable: the case's PICS `DEM.S.F01 & DEM.S.F02` is false for the reference DUT |
 | DESC/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DGETH/3.2.Simulated | (b) not supported | not applicable: the case's PICS `DGETH.C` is false for the reference DUT |
 | DGGEN/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DGSW/2.2 | (b) not supported | not applicable: the case's PICS `DGSW.S.E00` is false for the reference DUT |
 | DGSW/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DGSW/3.2.Simulated | (b) not supported | not applicable: the case's PICS `DGSW.C` is false for the reference DUT |
+| DISHALM/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DISHALM/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DISHALM/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DISHALM/3.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DISHALM/3.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DISHALM/3.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DLOG/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DRLK/2.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DRLK/2.11 | (b) not supported | not applicable: the case's PICS `DRLK.S & DRLK.S.F00 & DRLK.S.F01 & DRLK.S.F02` is false for the reference DUT |
@@ -314,6 +342,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DRLK/2.6 | (c) harness | TC-DRLK-2.6 gates every step on the Year Day Schedule feature (PICS DRLK.S.F0a=0 here) except its final "Cleanup the created user" ClearUser, which has no PICS gate and fails on a lock without the User feature (DRLK.S.F08=0) |
 | DRLK/2.7 | (b) not supported | not applicable: the case's PICS `DRLK.S & DRLK.S.F08` is false for the reference DUT |
 | DRLK/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| EEVSE/2.3 | (a) defect | TC-EEVSE-2.3 step 19 (eleven ChargingTargets in one day) expects RESOURCE_EXHAUSTED; the generated SetTargets decoder refuses the list at its `max 10` constraint with CONSTRAINT_ERROR before the server's own check (cluster/energy/evse.go, evseMaxTargetsPerDay) can answer, as matter.js does (CommandInvokeResponse.ts requestTlv.validate). notes/parity/matter_behaviour_findings.md, Certification harness, TC-EEVSE-2.3 |
 | FAN/2.3 | (b) not supported | not applicable: the case's PICS `FAN.S.F02` is false for the reference DUT |
 | FAN/2.4 | (b) not supported | not applicable: the case's PICS `FAN.S.F03` is false for the reference DUT |
 | FAN/2.5 | (b) not supported | not applicable: the case's PICS `FAN.S & FAN.S.F05` is false for the reference DUT |
@@ -361,8 +390,10 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | OPCREDS/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | OPCREDS/3.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | OPCREDS/3.9 | (b) not supported | not applicable: the case's PICS `OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
+| OVENOPSTATE/2.6 | (b) not supported | not applicable: the case's PICS `OVENOPSTATE.S & OVENOPSTATE.S.A0002` is false for the reference DUT |
 | PS/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | PS/2.3 | (b) not supported | not applicable: the case's PICS `PWRTL.S` is false for the reference DUT |
+| REFALM/2.3 | (b) not supported | not applicable: the case's PICS `REFALM.S & REFALM.S.M.LocalSuppress` is false for the reference DUT |
 | RH/2.2 | (c) harness | TC-RH-2.2 has an operator change the measured value between two reads (a UserPrompt under RH.M.ManuallyControlled); an unattended run has no operator, and the YAML case has no app-pipe step that would stand in |
 | S/2.3 | (b) not supported | not applicable: the case's PICS `S` is false for the reference DUT |
 | S/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |

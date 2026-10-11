@@ -5,11 +5,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/closure"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	cdim "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 )
@@ -143,4 +147,166 @@ func (g *demoGarage) testEventTrigger(trigger uint64) (handled bool) {
 	}
 	g.notify()
 	return true
+}
+
+// --- device: a closure panel ---------------------------------------------------
+
+// Panel motion, as connectedhomeip's closure-app simulates it at the
+// harness pin (examples/closure-app/linux/ClosureManager.cpp:38-39): one
+// motion tick a second, 20 % per tick for SetTarget; a Step tick moves by
+// StepValue (HandlePanelStepAction :787-799).
+const (
+	panelTick         = time.Second
+	panelPositionStep = uint16(2000)
+	// panelStepValue is the panel's StepValue, 10 %
+	// (ClosureDimensionEndpoint.cpp:63).
+	panelStepValue = uint16(1000)
+)
+
+// demoPanel is a closure panel (ClosurePanel, 0x0231): one movable part
+// with a position and a latch, the ClosureDimension of connectedhomeip's
+// closure-app panels — PS, LT, UT, LM, SP, RO; Resolution 1 %, StepValue
+// 10 %, millimetres, rotating about a centred vertical axis with a
+// top-inside overflow, latching and unlatching remotely; it starts fully
+// closed (100.00 %), latched, speed Auto, with a null target
+// (ClosureDimensionEndpoint.cpp Init :50-71, ClosureManager.cpp
+// SetClosurePanelInitialState :169-207). A command unlatches first when
+// it must, moves a tick at a time, latches last when asked, and then
+// takes the target's fields as current (HandlePanelUnlatchAction,
+// HandlePanelSetTargetAction, UpdateCurrentStateFromTargetState).
+type demoPanel struct {
+	name string
+	srv  *closure.DimensionServer
+
+	mu      sync.Mutex
+	motion  *time.Timer
+	stepBy  uint16
+	version cluster.DataVersionTracker
+}
+
+var _ contract.EndpointSource = (*demoPanel)(nil)
+
+func newDemoPanel(name string) *demoPanel {
+	p := &demoPanel{name: name}
+	auto := cdim.ThreeLevelAutoAuto
+	srv, err := closure.NewDimension(closure.DimensionConfig{
+		Features: closure.DimensionFeaturePositioning | closure.DimensionFeatureMotionLatching | closure.DimensionFeatureUnit |
+			closure.DimensionFeatureLimitation | closure.DimensionFeatureSpeed | closure.DimensionFeatureRotation,
+		Handler:    panelHandler{p},
+		Resolution: 100, StepValue: panelStepValue,
+		Unit:              cdim.ClosureUnitMillimeter,
+		UnitRange:         &closure.UnitRange{Min: 0, Max: 10000},
+		LimitRange:        closure.LimitRange{Min: 0, Max: closure.Percent100thsMax},
+		RotationAxis:      cdim.RotationAxisCenteredVertical,
+		Overflow:          cdim.OverflowTopInside,
+		LatchControlModes: cdim.LatchControlModesRemoteLatching | cdim.LatchControlModesRemoteUnlatching,
+		CurrentState: &closure.DimensionState{
+			Position: &spec.Nullable[uint16]{Value: closure.Percent100thsMax},
+			Latch:    &spec.Nullable[bool]{Value: true},
+			Speed:    &auto,
+		},
+		TargetState: &closure.DimensionState{
+			Position: &spec.Nullable[uint16]{Null: true},
+			Latch:    &spec.Nullable[bool]{Null: true},
+			Speed:    &auto,
+		},
+		DataVersion: &p.version,
+	})
+	if err != nil {
+		panic(fmt.Sprintf("panel ClosureDimension: %v", err))
+	}
+	p.srv = srv
+	return p
+}
+
+// MatterDeviceType implements [contract.EndpointSource].
+func (p *demoPanel) MatterDeviceType() uint16 { return closure.DeviceTypeClosurePanel }
+
+// MatterClusterServers implements [contract.EndpointSource].
+func (p *demoPanel) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{p.srv}
+}
+
+// panelHandler is the panel's [closure.DimensionHandler]: both commands
+// start the motion one tick later, as the closure-app's OnSetTargetCommand
+// and OnStepCommand start their timers. The server sets the target once
+// they return.
+type panelHandler struct{ p *demoPanel }
+
+func (h panelHandler) SetTarget(_ context.Context, position *uint16, latch *bool, _ *closure.ThreeLevelAuto) error {
+	slog.Info("panel.set_target", slog.String("device", h.p.name), slog.Any("position", position), slog.Any("latch", latch))
+	h.p.start(panelPositionStep)
+	return nil
+}
+
+func (h panelHandler) Step(_ context.Context, direction closure.StepDirection, steps uint16, _ *closure.ThreeLevelAuto) error {
+	slog.Info("panel.step", slog.String("device", h.p.name), slog.Int("direction", int(direction)), slog.Int("steps", int(steps)))
+	h.p.start(panelStepValue)
+	return nil
+}
+
+// start (re)arms the motion timer.
+func (p *demoPanel) start(stepBy uint16) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.motion != nil {
+		p.motion.Stop()
+	}
+	p.stepBy = stepBy
+	p.motion = time.AfterFunc(panelTick, p.tick)
+}
+
+// tick is one motion step: unlatch when the target unlatches, move toward
+// the target position, and at the target latch when asked and take the
+// target's fields as current.
+func (p *demoPanel) tick() {
+	p.mu.Lock()
+	p.motion = nil
+	stepBy := p.stepBy
+	p.mu.Unlock()
+	cur, tgt := p.srv.CurrentState(), p.srv.TargetState()
+	if cur == nil || tgt == nil {
+		return
+	}
+	if isTrue(cur.Latch) && isFalse(tgt.Latch) {
+		cur.Latch = &spec.Nullable[bool]{Value: false}
+		_ = p.srv.SetCurrentState(cur)
+	}
+	if next, moving := nextPosition(cur.Position, tgt.Position, stepBy); moving {
+		cur.Position = &spec.Nullable[uint16]{Value: next}
+		_ = p.srv.SetCurrentState(cur)
+		if next != tgt.Position.Value {
+			p.mu.Lock()
+			p.motion = time.AfterFunc(panelTick, p.tick)
+			p.mu.Unlock()
+			return
+		}
+	}
+	// UpdateCurrentStateFromTargetState: the target's non-null fields.
+	if tgt.Position != nil && !tgt.Position.Null {
+		cur.Position = tgt.Position
+	}
+	if tgt.Latch != nil && !tgt.Latch.Null {
+		cur.Latch = tgt.Latch
+	}
+	if tgt.Speed != nil {
+		cur.Speed = tgt.Speed
+	}
+	_ = p.srv.SetCurrentState(cur)
+	slog.Info("panel.arrived", slog.String("device", p.name))
+}
+
+func isTrue(b *spec.Nullable[bool]) bool  { return b != nil && !b.Null && b.Value }
+func isFalse(b *spec.Nullable[bool]) bool { return b != nil && !b.Null && !b.Value }
+
+// nextPosition is the closure-app's GetPanelNextPosition (:978-1013) with
+// the step size a parameter: one step toward the target, never past it.
+func nextPosition(cur, tgt *spec.Nullable[uint16], by uint16) (uint16, bool) {
+	if cur == nil || cur.Null || tgt == nil || tgt.Null || cur.Value == tgt.Value {
+		return 0, false
+	}
+	if cur.Value < tgt.Value {
+		return min(cur.Value+by, tgt.Value), true
+	}
+	return max(cur.Value-min(cur.Value, by), tgt.Value), true
 }

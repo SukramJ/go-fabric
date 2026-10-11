@@ -94,6 +94,99 @@ the same `ColorTemperatureWriter` as before.
   water-heater app does, an ElectricalUtilityMeter with
   MeterIdentification, and serves EnergyPreference (EnergyBalance) on its
   thermostat. The chip-tool family table runs EWATERHTR, WHM and EPREF.
+- `cluster/alarmbase` (new): one server for the AlarmBase family on the
+  generated definitions — `NewDishwasherAlarm`, `NewRefrigeratorAlarm`,
+  `NewTemperatureAlarm`. Supported and Latch are fixed, Mask and State
+  move through `SetMask`, `SetState` and `ResetLatchedAlarms`, Reset and
+  ModifyEnabledAlarms ask an optional `Delegate`, and every State change
+  emits Notify — connectedhomeip's AlarmBase rules, as matter.js's servers
+  add none. TemperatureAlarm's adjustable-threshold features
+  (`SetTemperatureAlarmThresholds`) are refused
+  (`ErrAdjustableThresholds`): no source gives that command a rule.
+- `cluster/appliance` (new): `NewMicrowaveOvenControl` (SetCookingParameters,
+  AddMoreTime, the host port `Oven`), `NewLaundryWasherControls` and
+  `NewLaundryDryerControls` (controller writes checked against the
+  supported spin speeds, rinses and dryness levels, an optional listener),
+  each on its generated definition with connectedhomeip's rules.
+- `cluster/opstate.NewOvenCavityServer`: OvenCavityOperationalState
+  (0x0048), with matter.js's `#assertPhaseList` (`OvenCavityPhases`,
+  `ErrPhaseNotAllowed`). `DeviceTypeMicrowaveOven` and
+  `DeviceTypeTemperatureControlledCabinet` are accepted device types; a
+  MicrowaveOven OperationalState serves CountdownTime as the device type
+  mandates.
+- The generated definitions of DishwasherAlarm, RefrigeratorAlarm,
+  TemperatureAlarm, LaundryWasherControls, LaundryDryerControls,
+  MicrowaveOvenControl and OvenCavityOperationalState under `cluster/spec/`.
+- The reference daemon serves a dishwasher (DishwasherAlarm), an Oven with
+  a Heater cavity part (OvenMode, OvenCavityOperationalState,
+  TemperatureControl), a MicrowaveOven, and a laundry dryer
+  (LaundryDryerControls); the washer gains LaundryWasherControls and the
+  fridge RefrigeratorAlarm, driven by CHIP's `SetRefrigeratorDoorStatus`
+  app-pipe command. The chip-tool families DISHALM, REFALM, OVENOPSTATE,
+  OTCCM, MWOCTRL and MWOM are declared.
+- `cluster/energy.NewDeviceEnergyManagement`: a DeviceEnergyManagement
+  (0x0098) server on the generated definition, any feature selection the
+  definition allows (PA, PFR, SFR, STA, PAU, FA, CON). The eight requests
+  carry connectedhomeip's checks (opt-out, ESAState, the capability and
+  forecast bounds, its post-conditions); ESAState, the PowerAdjustStart /
+  PowerAdjustEnd / Paused / Resumed events, the adjustment and pause
+  timers and the opt-out cancellation follow chip's shared DEM delegate.
+  The host port `DemManager` is chip's DEMManufacturerDelegate
+  (`NopDemManager` for its defaults); the device side sets ESAState, the
+  power bounds, PowerAdjustmentCapability, Forecast and OptOutState.
+- `cluster/energy.NewEnergyEvse`: an EnergyEvse (0x0099) server on the
+  generated definition (PREF, SOC, PNC, RFID, V2X; the optional
+  UserMaximumChargeCurrent, RandomizationDelayWindow,
+  ApproximateEvEfficiency and StartDiagnostics). Disable, EnableCharging,
+  EnableDischarging, StartDiagnostics, SetTargets, GetTargets and
+  ClearTargets carry chip's checks; chip's EVSE state machine drives
+  State, SupplyState, FaultState, the current limits, the session
+  attributes, the ChargingEnabledUntil timer and the EVConnected,
+  EVNotDetected, EnergyTransferStarted / Stopped, Fault and RFID events
+  from the device-side inputs (`SetHardwareState`, `SetFault`,
+  `ReportRFID`, `SetVehicleID`, `DiagnosticsComplete`, the hardware,
+  circuit and cable limits). The host port `EvseHost` reads the energy
+  meter and is told of state, limit and charging-preference changes.
+- The reference daemon serves an EV charger: EnergyEvse (0x050C) with
+  EnergyEvse and EnergyEvseMode, and PowerSource (wired),
+  DeviceEnergyManagement (with DeviceEnergyManagementMode, condition
+  ControllableEsa) and ElectricalSensor parts; it answers the EnergyEvse
+  (0x0099…) and DeviceEnergyManagement (0x0098…) test event triggers as
+  connectedhomeip's evse-app does. The chip-tool suite runs the DEM, DEMM,
+  EEVSE and EEVSEM families against it (workflow group `app-energy`).
+- Reference daemon, for the certification harness (wave-3 fix-up): the
+  app-pipe `OperationalStateChange` routes Device "Oven" to the oven's
+  cavity as CHIP's all-clusters app does (`OnOvenOperationalStateChange`),
+  and the cavity's OperationalStateList holds Paused as that app's does
+  (TC-OVENOPSTATE-2.1, 2.2, 2.4). TC-EEVSE-2.2 runs with its
+  UserMaximumChargeCurrent write pointed at the case's own endpoint (the
+  case hard-codes endpoint 1); TC-EEVSE-2.3 is recorded as a class (a) gap
+  (step 19: CONSTRAINT_ERROR from the generated decoder where the case
+  expects RESOURCE_EXHAUSTED; matter.js answers the same).
+- `cluster/servicearea` (new): a ServiceArea (0x0150) server on the
+  generated definition with the rules of matter.js's
+  `ServiceAreaBaseServer` — the SupportedAreas / SupportedMaps /
+  SelectedAreas / CurrentArea / Progress checks on construction and on
+  every setter (`ErrInvalidState`), SelectAreas (UnsupportedArea, duplicate
+  removal, Progress reset to Pending) with the device's decision through
+  the `Selector` host port, SkipArea's default checks with the `Skipper`
+  host port, `RemoveSupportedAreasEntry` / `RemoveSupportedMapsEntry`, and
+  EstimatedEndTime reported per matter.js's quiet rule.
+- `cluster/closure.NewDimension`: a ClosureDimension (0x0105) server on
+  the generated definition with connectedhomeip's rules (SetTarget and
+  Step checks, LimitRange clamp, Resolution rounding, the latch rules,
+  CurrentState's reporting rule), the `DimensionHandler` host port and
+  `DeviceTypeClosurePanel`.
+- `cluster/thermo.NewThermostatUserInterfaceConfiguration`: the
+  ThermostatUserInterfaceConfiguration (0x0204) server on the generated
+  default server, starting at matter.js's values (Celsius unless the host
+  says otherwise, KeypadLockout NoLockout).
+- Reference daemon: the vacuum serves ServiceArea (one map, two areas,
+  matter.js's RVC test-node decisions; the app pipe's `Reset` clears the
+  selection), the thermostat serves ThermostatUserInterfaceConfiguration,
+  and a ClosurePanel (0x0231) serves ClosureDimension as connectedhomeip's
+  closure-app panel does, with its simulated motion. The chip-tool table
+  declares the SEAR, CLDIM and TSUIC families.
 - `cluster/modebase` serves six more ModeBase derivations, each on its
   generated definition: `NewOvenMode`,
   `NewRefrigeratorAndTemperatureControlledCabinetMode`,
@@ -244,6 +337,11 @@ the same `ColorTemperatureWriter` as before.
   persisted a registered class value must re-register rather than reuse it.
 - The reference daemon's contact sensor is assembled from a Source instead
   of a Measurement (same StableKey, device type and BooleanState surface).
+- `endpoint`: a bridged endpoint whose `Source` serves no cluster of its
+  own — a composed device such as an Oven, whose device type mandates none
+  and whose cavity is a part — now mounts the bridged node's Identify,
+  Descriptor and BridgedDeviceBasicInformation; before, it mounted
+  nothing. An endpoint with no source at all still mounts nothing.
 - The bridge encodes the OperationalState, RvcOperationalState, ModeBase,
   SmokeCoAlarm, PumpConfigurationAndControl and ClosureControl values
   through the generated codecs (ADR 0013): the hand-written cases in

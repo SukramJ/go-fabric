@@ -148,12 +148,36 @@ const (
 	dtElectricalUtilityMeter = 0x0511
 	// dtTempControlledCabinet is the reference fridge's cabinet part
 	// (examples/reference-bridge/fleet_appliances.go): TemperatureControl
-	// and RefrigeratorAndTemperatureControlledCabinetMode.
+	// and RefrigeratorAndTemperatureControlledCabinetMode. The oven's
+	// cavity advertises the same device type; the fridge's is the first
+	// endpoint that does (see dtOvenCavity).
 	dtTempControlledCabinet = 0x0071
 	// dtWaterHeater is the reference water heater
 	// (examples/reference-bridge/fleet_energy.go): WaterHeaterManagement
 	// (EM, TP), WaterHeaterMode and a HEAT Thermostat.
-	dtWaterHeater = 0x050F
+	dtWaterHeater   = 0x050F
+	dtRefrigerator  = 0x0070
+	dtDishwasher    = 0x0075
+	dtMicrowaveOven = 0x0079
+	dtOven          = 0x007B
+	// dtOvenCavity is no device type: it names the reference oven's
+	// cavity part (examples/reference-bridge/fleet_kitchen.go), the
+	// TemperatureControlledCabinet with OvenMode, OvenCavityOperationalState
+	// and TemperatureControl. A real device type is 16 bits; the key is the
+	// Oven's in the high half and the cabinet's in the low, so it collides
+	// with none. It resolves to the first 0x0071 endpoint numbered above
+	// the Oven's (bridgeProcess.endpointAfter).
+	dtOvenCavity = dtOven<<16 | dtTempControlledCabinet
+	// dtEnergyEvse is the reference EV charger
+	// (examples/reference-bridge/fleet_evse.go): EnergyEvse and
+	// EnergyEvseMode; dtDeviceEnergyManagement is its
+	// DeviceEnergyManagement part (DeviceEnergyManagement with
+	// PA|PFR|STA|PAU|FA|CON and DeviceEnergyManagementMode).
+	dtEnergyEvse             = 0x050C
+	dtDeviceEnergyManagement = 0x050D
+	// dtClosurePanel is the reference daemon's closure panel
+	// (examples/reference-bridge/fleet_closure.go): ClosureDimension.
+	dtClosurePanel = 0x0231
 )
 
 // chipFamilies is this module's selection of CSA certification families,
@@ -353,6 +377,10 @@ var chipFamilies = []family{
 			"5.1": {{`"CLCTRL.S", "CLCTRL.S.C00"`, `"CLCTRL.S", "CLCTRL.S.C00.Rsp"`, "TC_CLCTRL_5_1 gates on the undefined code CLCTRL.S.C00; Stop is CLCTRL.S.C00.Rsp"}},
 		},
 	},
+	// CLDIM sets no PIXIT and sends no test event trigger: the CHIP cases
+	// at the harness pin (TC_CLDIM_*.py) name none; they run against the
+	// closure panel, whose features are the closure-app panel's.
+	{name: "CLDIM", deviceType: dtClosurePanel},
 	{
 		// The extended colour light serves every ColorControl feature (XY,
 		// CT, HS, EHUE, CL), as matter.js's own CHIP test endpoint does
@@ -385,6 +413,32 @@ var chipFamilies = []family{
 	// MTRID: MeterIdentification on the electricity meter (connectedhomeip
 	// TC_MTRID_2_1.py, TC_MTRID_3_1.py).
 	{name: "MTRID", deviceType: dtElectricalUtilityMeter},
+	// DEM, DEMM, EEVSE and EEVSEM run on the EV charger and its
+	// DeviceEnergyManagement part; TC_EEVSE_2_x and TC_DEM_2_x drive them
+	// through the EnergyEvse (0x0099...) and DeviceEnergyManagement
+	// (0x0098...) test event triggers, which the charger answers as
+	// connectedhomeip's evse-app does (examples/reference-bridge/
+	// fleet_evse.go).
+	{name: "DEM", deviceType: dtDeviceEnergyManagement},
+	{name: "DEMM", deviceType: dtDeviceEnergyManagement},
+	{
+		name: "EEVSE", deviceType: dtEnergyEvse,
+		edits: map[string][]edit{
+			// Step 9 writes UserMaximumChargeCurrent to endpoint 1
+			// (TC_EEVSE_2_2.py:298 at the harness pin) — the EVSE endpoint
+			// of the energy-management app the case was written against
+			// (its header runs with --endpoint 1, :35) — while every
+			// other step uses --endpoint. On this daemon endpoint 1 is the
+			// first bridged light, so the write lands on an endpoint
+			// without the cluster (UNSUPPORTED_CLUSTER). matter.js's
+			// chip-testing does not run the EEVSE family.
+			"2.2": {{"self.write_user_max_charge(1, user_max_charge_current)", "self.write_user_max_charge(self.get_endpoint(), user_max_charge_current)", "TC-EEVSE-2.2 step 9 hard-codes endpoint 1 for the UserMaximumChargeCurrent write (TC_EEVSE_2_2.py:298); the case's own endpoint is the EVSE"}},
+		},
+		exclude: map[string]gap{
+			"2.3": {classDefect, "TC-EEVSE-2.3 step 19 (eleven ChargingTargets in one day) expects RESOURCE_EXHAUSTED; the generated SetTargets decoder refuses the list at its `max 10` constraint with CONSTRAINT_ERROR before the server's own check (cluster/energy/evse.go, evseMaxTargetsPerDay) can answer, as matter.js does (CommandInvokeResponse.ts requestTlv.validate). notes/parity/matter_behaviour_findings.md, Certification harness, TC-EEVSE-2.3", false},
+		},
+	},
+	{name: "EEVSEM", deviceType: dtEnergyEvse},
 	{name: "FAN", deviceType: dtFan},
 	{name: "HEPAFREMON", deviceType: dtAirPurifier},
 	{
@@ -454,6 +508,17 @@ var chipFamilies = []family{
 	// steps' verification text, not in its config.
 	{name: "TCCM", deviceType: dtTempControlledCabinet},
 	{name: "TCTL", deviceType: dtTempControlledCabinet},
+	// The kitchen appliances (examples/reference-bridge/fleet_kitchen.go,
+	// fleet_appliances.go): DishwasherAlarm on the dishwasher,
+	// RefrigeratorAlarm on the fridge, OvenCavityOperationalState and
+	// OvenMode on the oven's cavity, MicrowaveOvenControl and
+	// MicrowaveOvenMode on the microwave.
+	{name: "DISHALM", deviceType: dtDishwasher},
+	{name: "REFALM", deviceType: dtRefrigerator},
+	{name: "OVENOPSTATE", deviceType: dtOvenCavity},
+	{name: "OTCCM", deviceType: dtOvenCavity},
+	{name: "MWOCTRL", deviceType: dtMicrowaveOven},
+	{name: "MWOM", deviceType: dtMicrowaveOven},
 	{name: "RVCRUNM", deviceType: dtRVC},
 	{
 		name: "S", deviceType: dtOnOffLight, multicast: map[string]bool{"2.3": true},
@@ -483,6 +548,9 @@ var chipFamilies = []family{
 			},
 		},
 	},
+	// SEAR sets no PIXIT: TC_SEAR_*.py at the harness pin name none; the
+	// vacuum's ServiceArea serves MAPS and PROG (fleet_servicearea.go).
+	{name: "SEAR", deviceType: dtRVC},
 	{name: "SMOKECO", deviceType: dtSmokeCOAlarm},
 	{
 		name: "SWTCH", deviceType: dtGenericSwitch,
@@ -499,6 +567,7 @@ var chipFamilies = []family{
 		},
 	},
 	{name: "TSTAT", deviceType: dtThermostat},
+	{name: "TSUIC", deviceType: dtThermostat},
 	{
 		name: "VALCC", deviceType: dtWaterValve,
 		exclude: map[string]gap{

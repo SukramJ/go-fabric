@@ -56,6 +56,7 @@ type pipeCommand struct {
 	Jammed     bool    `json:"Jammed"`
 	NumPresses *uint8  `json:"MultiPressNumPresses"`
 	Unmounted  *uint8  `json:"Unmounted"`
+	DoorOpen   *uint8  `json:"DoorOpen"`
 }
 
 // serveAppPipe creates the FIFO (when absent) and applies every command
@@ -156,7 +157,20 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		}
 		f.occupancy.reportFromDevice(*cmd.Occupancy&1 != 0)
 		return nil
+	case "SetRefrigeratorDoorStatus":
+		// CHIP's all-clusters app (TC-REFALM-2.2), for the fridge.
+		if cmd.DoorOpen == nil {
+			return errors.New("SetRefrigeratorDoorStatus needs DoorOpen")
+		}
+		return f.fridge.reportDoor(*cmd.DoorOpen != 0)
 	case "OperationalStateChange":
+		// CHIP's all-clusters app routes by Device
+		// (AllClustersCommandDelegate.cpp:939-945 at the harness pin):
+		// "Generic" is its OperationalState instance, "Oven" its
+		// OvenCavityOperationalState one.
+		if cmd.Device == "Oven" {
+			return f.ovenOperation(cmd)
+		}
 		return f.washerOperation(cmd)
 	case "ErrorEvent":
 		id, ok := rvcErrors[cmd.Error]
@@ -167,7 +181,11 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 	case "Docked":
 		return f.vacuum.reportDocked()
 	case "Reset":
-		return f.vacuum.reset()
+		// matter.js RvcTestInstance "reset" also clears the selected areas.
+		if err := f.vacuum.reset(); err != nil {
+			return err
+		}
+		return f.vacuumArea.reset()
 	case "ChargerFound", "Charging":
 		return f.vacuum.reportState(opstate.StateCharging)
 	case "Charged":
@@ -255,6 +273,36 @@ func (f *fleet) washerOperation(cmd pipeCommand) error {
 	return fmt.Errorf("OperationalStateChange operation %q: %w", cmd.Operation, errUnknownPipeCommand)
 }
 
+// ovenOperation is CHIP's OperationalStateChange for the "Oven" device —
+// the oven's cavity here (TC-OVENOPSTATE-2.x drive it through the pipe,
+// TC_OpstateCommon.py:102). It mirrors
+// AllClustersAppCommandHandler::OnOvenOperationalStateChange
+// (AllClustersCommandDelegate.cpp:995-1028 at the harness pin): Start and
+// Resume set Running, Pause sets Paused, Stop sets Stopped, each directly
+// on the cluster instance; OnFault raises the error of Param, or
+// UnableToCompleteOperation without one, through OnOperationalErrorDetected
+// — which sets OperationalState to Error and emits OperationalError
+// (OperationalStateCluster.cpp:108-127).
+func (f *fleet) ovenOperation(cmd pipeCommand) error {
+	c := f.oven.cavity
+	c.build()
+	switch cmd.Operation {
+	case "Start", "Resume":
+		return c.ops.SetOperationalState(opstate.StateRunning)
+	case "Pause":
+		return c.ops.SetOperationalState(opstate.StatePaused)
+	case "Stop":
+		return c.ops.SetOperationalState(opstate.StateStopped)
+	case "OnFault":
+		id := opstate.ErrorUnableToCompleteOperation
+		if cmd.Param != nil {
+			id = opstate.ErrorID(*cmd.Param)
+		}
+		return c.ops.SetOperationalError(opstate.ErrorState{ID: id})
+	}
+	return fmt.Errorf("OperationalStateChange operation %q: %w", cmd.Operation, errUnknownPipeCommand)
+}
+
 // rvcErrors maps the rvc-app's ErrorEvent names to ErrorStateEnum values
 // (CHIP examples/rvc-app, RvcAppCommandDelegate).
 var rvcErrors = map[string]opstate.ErrorID{
@@ -325,7 +373,8 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 		return nil
 	}
 	if f.garage.testEventTrigger(trigger) || f.heater.testEventTrigger(trigger) ||
-		f.contact.testEventTrigger(trigger) || f.meter.testEventTrigger(trigger) {
+		f.contact.testEventTrigger(trigger) || f.meter.testEventTrigger(trigger) ||
+		f.evse.testEventTrigger(trigger) {
 		return nil
 	}
 	switch trigger & smokeTriggerMask {
