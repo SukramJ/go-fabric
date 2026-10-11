@@ -424,6 +424,26 @@ func prepareOta(ctx context.Context, t *testing.T, h *harness) *otaPlumbing {
 	return ota
 }
 
+// saveOtaProviderLogs copies the provider logs an SU case left in the
+// container next to the case's own log (bin/chip-harness/logs), so a
+// provider that did not start leaves its reason in the CI artifact.
+func saveOtaProviderLogs(t *testing.T, h *harness, class, id string) {
+	t.Helper()
+	list, err := h.exec(context.Background(), "sh", "-c", otaProviderLogsScript(class))
+	if err != nil {
+		t.Logf("OTA provider logs: listing failed: %v\n%s", err, list)
+		return
+	}
+	for _, path := range strings.Fields(list) {
+		body, err := h.exec(context.Background(), "cat", path)
+		if err != nil {
+			t.Logf("OTA provider log %s: %v", path, err)
+			continue
+		}
+		t.Logf("OTA provider log %s: %s", path, saveCaseLog(otaProviderLogName(id, path), body))
+	}
+}
+
 var (
 	otaMu       sync.Mutex
 	otaPrepared = map[*harness]*otaPlumbing{}
@@ -512,11 +532,26 @@ func runPythonCase(ctx context.Context, t *testing.T, h *harness, fam family, c 
 	if passEP {
 		args = append(args, "--endpoint", strconv.Itoa(int(ep)))
 	}
-	rctx, rcancel := context.WithTimeout(ctx, fam.caseTimeout(c.Name))
+	timeout := fam.caseTimeout(c.Name)
+	if needsOta(c.Args) {
+		timeout = otaCaseTimeout(c.Args, timeout)
+	}
+	rctx, rcancel := context.WithTimeout(ctx, timeout)
 	defer rcancel()
 	current, stopMonitor := monitorRestartFlag(t, br, filepath.Join(work, "restart.flag"))
 	out, err := h.execIn(rctx, work, args...)
 	stopMonitor()
+	// A case the runner cut short keeps running in the container: killing
+	// `docker exec` does not reach it (runYamlCase's chip-tool server, the
+	// same). It, and the provider app an SU case started, would hold the
+	// next case's ports and storage.
+	if rctx.Err() != nil {
+		_, _ = h.exec(context.Background(), "pkill", "-f", c.Path)
+	}
+	if needsOta(c.Args) {
+		_, _ = h.exec(context.Background(), otaCleanupCommand()...)
+		saveOtaProviderLogs(t, h, otaCaseClass(fam.name, c.Name), id)
+	}
 	counts, pass := parsePython(out)
 	logFile := saveCaseLog(id, out)
 	if g, ok := fam.gapFor(c.Name); ok && g.selfSkip {
