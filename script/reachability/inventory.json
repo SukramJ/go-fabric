@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4385,
+  "entry_points": 4418,
   "entry_packages": [
     ".",
     "bdx",
@@ -149,6 +149,7 @@
     "internal/chiptool",
     "internal/paritytest",
     "mdns",
+    "node",
     "parity",
     "schema",
     "script/clustergen",
@@ -174,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10349,
-    "reachable": 7303,
-    "whitelisted": 3041,
+    "total_exported": 10386,
+    "reachable": 7334,
+    "whitelisted": 3047,
     "unreachable": 5
   },
   "by_package": [
@@ -6429,6 +6430,27 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
       "line": 147
+    },
+    {
+      "package": "cluster/onoff",
+      "identifier": "Feature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/onoff/server.go",
+      "line": 21
+    },
+    {
+      "package": "cluster/onoff",
+      "identifier": "TestStaleTickDoesNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/onoff/server_internal_test.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/onoff",
+      "identifier": "TestTickHoldsAt0xFFFF",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/onoff/server_internal_test.go",
+      "line": 27
     },
     {
       "package": "cluster/opstate",
@@ -18014,6 +18036,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
       "line": 331
+    },
+    {
+      "package": "node",
+      "identifier": "TestCountBootAndOperationalTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/persist_internal_test.go",
+      "line": 40
+    },
+    {
+      "package": "node",
+      "identifier": "TestPersistedKeys",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/persist_internal_test.go",
+      "line": 100
+    },
+    {
+      "package": "node",
+      "identifier": "TestRingLogs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/persist_internal_test.go",
+      "line": 136
     },
     {
       "package": "schema",
