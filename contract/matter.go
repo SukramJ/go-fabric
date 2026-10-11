@@ -272,13 +272,14 @@ const (
 	MeasurementPM1                              // 0x042C Pm1ConcentrationMeasurement
 	MeasurementTVOC                             // 0x042E TotalVolatileOrganicCompoundsConcentrationMeasurement
 	MeasurementRadon                            // 0x042F RadonConcentrationMeasurement
+	MeasurementSoilMoisture                     // 0x0430 SoilMeasurement (SoilSensor endpoint)
 )
 
 // measurementClassBuiltinEnd is one past the last built-in class, and
 // the first class [RegisterMeasurementKind] hands out. Keeping the two
 // ranges apart is what lets the constants above keep their numeric
 // values while the set stays open.
-const measurementClassBuiltinEnd = MeasurementRadon + 1
+const measurementClassBuiltinEnd = MeasurementSoilMoisture + 1
 
 // MeasurementMaterializer builds the cluster server(s) that carry one
 // source's readings for a measurement kind — the same job the library's
@@ -528,6 +529,12 @@ func builtinMeasurementKinds() map[MeasurementClass]MeasurementKind {
 		MeasurementPM1:          {Name: "PM1", DeviceType: 0x002C, ClusterID: 0x042C},
 		MeasurementTVOC:         {Name: "Total Volatile Organic Compounds", DeviceType: 0x002C, ClusterID: 0x042E},
 		MeasurementRadon:        {Name: "Radon", DeviceType: 0x002C, ClusterID: 0x042F},
+		// SoilSensor (0x0045) mandates Identify plus SoilMeasurement
+		// (0x0430); the ids are schema/devicetypes.go's and the generated
+		// definition's (cluster/spec/soilmeasurement). The source must
+		// also carry the fixed measurement limits, which
+		// measurement.SoilMoistureSource names.
+		MeasurementSoilMoisture: {Name: "Soil Moisture", DeviceType: 0x0045, ClusterID: 0x0430},
 	}
 }
 
@@ -576,14 +583,14 @@ type MeasurementSource interface {
 
 // FloatMeasurementSource is the typed read surface for scalar
 // measurement classes (Temperature, Humidity, Illuminance, Pressure,
-// Flow and the ten concentration classes). Implemented by Generic.Sensor[float64] and the
+// Flow, SoilMoisture and the ten concentration classes). Implemented by Generic.Sensor[float64] and the
 // equivalent calculated-DP types.
 //
 // MatterFloatValue returns the current observed value in the model's
 // native unit (°C for temperature, % RH for humidity, lux for
 // illuminance, hPa for pressure, ppm for CO2, CO, NO2, ozone,
 // formaldehyde and TVOC, µg/m³ for particulates (PM1, PM2.5, PM10),
-// Bq/m³ for radon, m³/h for flow).
+// Bq/m³ for radon, m³/h for flow, % for soil moisture).
 // `observed` is false when no measurement has been received yet — the
 // bridge maps that to a Matter-spec NULL response (e.g. -32768 sentinel
 // for nullable int16 attributes).

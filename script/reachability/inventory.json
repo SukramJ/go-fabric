@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4209,
+  "entry_points": 4213,
   "entry_packages": [
     ".",
     "bootid",
@@ -162,9 +162,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9460,
-    "reachable": 6624,
-    "whitelisted": 2831,
+    "total_exported": 9469,
+    "reachable": 6629,
+    "whitelisted": 2835,
     "unreachable": 5
   },
   "by_package": [
@@ -5758,7 +5758,7 @@
       "identifier": "TestElectricalValuesDecodeThroughTheGeneratedCodecs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 98
+      "line": 100
     },
     {
       "package": "cluster/measurement",
@@ -5849,7 +5849,35 @@
       "identifier": "TestServersMatchTheGeneratedDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/measurement/spec_parity_matterjs_test.go",
-      "line": 51
+      "line": 52
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestSoilMeasurementIsReadOnlyAndHasNoCommands",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/soil_test.go",
+      "line": 115
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestSoilMeasurementMeasuredValueFollowsChipBounds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/soil_test.go",
+      "line": 76
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestSoilMeasurementReadsLimitsAsGiven",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/soil_test.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/measurement",
+      "identifier": "TestSoilMoistureMaterializes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/measurement/soil_test.go",
+      "line": 137
     },
     {
       "package": "cluster/modeselect",
