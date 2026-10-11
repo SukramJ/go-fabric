@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4258,
+  "entry_points": 4260,
   "entry_packages": [
     ".",
     "bootid",
@@ -85,6 +85,7 @@
     "cluster/spec/occupancysensing",
     "cluster/spec/onoff",
     "cluster/spec/operationalstate",
+    "cluster/spec/otasoftwareupdateprovider",
     "cluster/spec/otasoftwareupdaterequestor",
     "cluster/spec/ovencavityoperationalstate",
     "cluster/spec/ovenmode",
@@ -166,9 +167,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9761,
-    "reachable": 6819,
-    "whitelisted": 2937,
+    "total_exported": 9795,
+    "reachable": 6844,
+    "whitelisted": 2946,
     "unreachable": 5
   },
   "by_package": [
@@ -10641,6 +10642,69 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/operationalstate/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/otasoftwareupdateprovider",
+      "identifier": "ApplyUpdateActionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/otasoftwareupdateprovider/definition_gen.go",
+      "line": 45
+    },
+    {
+      "package": "cluster/spec/otasoftwareupdateprovider",
+      "identifier": "ApplyUpdateActionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/otasoftwareupdateprovider/definition_gen.go",
+      "line": 57
+    },
+    {
+      "package": "cluster/spec/otasoftwareupdateprovider",
+      "identifier": "DownloadProtocolEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/otasoftwareupdateprovider/definition_gen.go",
+      "line": 66
+    },
+    {
+      "package": "cluster/spec/otasoftwareupdateprovider",
+      "identifier": "DownloadProtocolEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/otasoftwareupdateprovider/definition_gen.go",
+      "line": 79
+    },
+    {
+      "package": "cluster/spec/otasoftwareupdateprovider",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/otasoftwareupdateprovider/definition_gen.go",
+      "line": 40
+    },
+    {
+      "package": "cluster/spec/otasoftwareupdateprovider",
+      "identifier": "StatusEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/otasoftwareupdateprovider/definition_gen.go",
+      "line": 89
+    },
+    {
+      "package": "cluster/spec/otasoftwareupdateprovider",
+      "identifier": "StatusEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/otasoftwareupdateprovider/definition_gen.go",
+      "line": 102
+    },
+    {
+      "package": "cluster/spec/otasoftwareupdateprovider",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/otasoftwareupdateprovider/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/otasoftwareupdateprovider",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/otasoftwareupdateprovider/definition_gen_test.go",
       "line": 19
     },
     {

@@ -115,6 +115,11 @@ var committed = []string{
 	"Binding",
 	"IcdManagement",
 	"OtaSoftwareUpdateRequestor",
+	// cluster/core OtaSoftwareUpdateRequestor, client side: the requestor
+	// invokes QueryImage, ApplyUpdateRequest and NotifyUpdateApplied on a
+	// provider and decodes the responses with these codecs (ADR 0019). No
+	// server in this module serves the cluster (BD-Matter-OTAProvider-NotExposed).
+	"OtaSoftwareUpdateProvider",
 	"NetworkCommissioning",
 	"DiagnosticLogs",
 	"FixedLabel",
