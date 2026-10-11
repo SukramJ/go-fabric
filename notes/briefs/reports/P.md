@@ -255,3 +255,47 @@ Guards run (Linux, local):
   (Binding, OtaSoftwareUpdateRequestor, EcosystemInformation).
 - findings candidate — **optional Groups / ScenesManagement cannot be opted
   in** (open question 7).
+
+## Follow-up (owner decisions, 2026-10-11)
+
+Commit 1c32e0c implements decisions 1, 3, 6, 8 and 9 (one commit, inventory
+regenerated in it, unreached stays 5).
+
+- **1 — scope 63.** VideoDoorbell and FloodlightCamera (mandatory Camera
+  component, `deviceType Camera, M, 1`; Camera mandates
+  CameraAvStreamManagement and WebRtcTransportProvider) and
+  CastingVideoClient (mandatory media clients KeypadInput,
+  ContentLauncher, ApplicationBasic) are in `excluded`, group "camera /
+  media (Appendix F.3: …)"; their generated files are gone and their
+  fixtures removed. `TestEveryDeviceTypeIsListed` accepts a group that
+  starts with "F.3 " or cites Appendix F.3. The ADR's count stays the
+  owner's.
+- **2 — parts rule** unchanged; `AddPart`'s comment already cites
+  `Parts.ts:170-201` as what matter.js checks instead.
+- **3 — ClientList.** `endpoint.Spec.ClientClusters` (doc as given) →
+  `Endpoint.ClientClusters` (assembler.go) → `NewDescriptor`'s clientList
+  for bridged endpoints and parts (materialize.go, both call sites). The
+  zero value gives the same empty ClientList as before. `device.Spec()`
+  fills it from the type's mandatory client clusters. Guards:
+  `endpoint` `TestSpecClientClustersReadBackInTheDescriptor` (bridged,
+  part, unset); `device` `TestClientListCarriesTheMandatoryClientClusters`
+  (OtaRequestor → 0x0029, Doorbell → Chime 0x0556, OnOffLight → none). The
+  Doorbell fixture no longer tolerates `missing client:Chime`.
+- **6 — default features.** The default selection is the type's mandated
+  features ∪ the cluster's own "M" features (`clusterMandatedFeatures`),
+  for every cluster. EnergyEvse leaves `refusedDefaults` and its fixture
+  needs no selection; `TestDefaultSelectionKeepsTheClusterMandatedFeatures`.
+  A host selection must still pass `spec.CheckFeatures`.
+- **8 — `WithElements(clusterID, spec.Options)`**: Attributes, Commands
+  and Events feed the default server's `spec.Options` (calls accumulate);
+  non-zero Features is refused (WithFeatures' job), as is a host server
+  for the same cluster; it mounts an optional cluster. `TestWithElements`;
+  the composed-ESA fixtures now use it instead of host-built servers.
+- **9** — `WithFeatures`' doc says it mounts an optional cluster.
+- 4, 5, 7, 10, 11: no change. The LevelControl "Rev >= v7" observation
+  stays a `cluster/spec` finding for the owner.
+
+Guards: `go test -count=1 ./...` green; `-race` on `./device/...`,
+`./script/devicegen/...`, `./endpoint/...` green; `make lint` 0 issues;
+gofumpt v0.12.0 clean; `make cover-check` passes (device 97.4 %, devicegen
+95.7 %, endpoint 92.4 %); `make reachability` unreached 5.
