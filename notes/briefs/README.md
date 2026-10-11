@@ -48,3 +48,14 @@ Learned in the third wave (2026-10-11):
 - The app-pipe handlers must match the all-clusters app per *device*
   (`OperationalStateChange` routes "Generic" and "Oven" differently).
 
+Learned in the fifth wave (2026-10-11):
+
+- Session rules decide certification outcomes: the CSA Python runner and
+  chip-tool share one controller identity, so a same-peer eviction on a new
+  CASE kills the other client's subscriptions. Mirror matter.js's per-peer
+  cap, never a stricter rule.
+- An SU case needs the provider gone *before* its store is removed, a staged
+  image of real size (1 MiB), and the case's own `--timeout` plus a reserve.
+- `notes/handover.md` carries the state of the programme between machines;
+  update it when a wave moves.
+
