@@ -223,12 +223,3 @@ DRLK.S.M.LocalProgrammingFeaturesAttributeWritable=0
 DRLK.S.M.WrongCodeEntryLimitAttributeWritable=0
 DRLK.S.M.UserCodedTemporaryDisableTimeAttributeWritable=0
 DRLK.S.M.RequirePINForRemoteOperationAttributeWritable=0
-
-# --- Soil measurement (cluster/measurement/soil.go) ---------------------------
-# The committed device-generated slices (pics/ep*.txt) carry no SOIL code
-# and CHIP's ci-pics-values declares none, so TC_SOIL_2_1/2_2 (pics: "SOIL.S") would not run. The soil sensor
-# (examples/reference-bridge/fleet_sensors.go) serves SoilMeasurement with
-# both of its attributes.
-SOIL.S=1
-SOIL.S.A0000=1
-SOIL.S.A0001=1

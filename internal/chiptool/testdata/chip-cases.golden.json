@@ -401,6 +401,11 @@
       "steps": 5,
       "stepsSkipped": 0
     },
+    "COMMTR/3.1": {
+      "tests": 1,
+      "steps": 14,
+      "stepsSkipped": 0
+    },
     "DA/1.1": {
       "tests": 1,
       "steps": 11,
@@ -1521,6 +1526,21 @@
     "SETRF/2.1": {
       "tests": 1,
       "steps": 20,
+      "stepsSkipped": 0
+    },
+    "SETRF/2.2": {
+      "tests": 1,
+      "steps": 11,
+      "stepsSkipped": 0
+    },
+    "SETRF/2.3": {
+      "tests": 1,
+      "steps": 23,
+      "stepsSkipped": 2
+    },
+    "SETRF/3.1": {
+      "tests": 1,
+      "steps": 44,
       "stepsSkipped": 0
     },
     "SM/1.1": {
