@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4357,
+  "entry_points": 4375,
   "entry_packages": [
     ".",
     "bdx",
@@ -172,9 +172,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9994,
-    "reachable": 6967,
-    "whitelisted": 3022,
+    "total_exported": 10009,
+    "reachable": 6979,
+    "whitelisted": 3025,
     "unreachable": 5
   },
   "by_package": [
@@ -6427,6 +6427,27 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/modeselect/modeselect_server.go",
       "line": 147
+    },
+    {
+      "package": "cluster/onoff",
+      "identifier": "Feature",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/onoff/server.go",
+      "line": 21
+    },
+    {
+      "package": "cluster/onoff",
+      "identifier": "TestStaleTickDoesNothing",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/onoff/server_internal_test.go",
+      "line": 52
+    },
+    {
+      "package": "cluster/onoff",
+      "identifier": "TestTickHoldsAt0xFFFF",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/onoff/server_internal_test.go",
+      "line": 27
     },
     {
       "package": "cluster/opstate",

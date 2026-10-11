@@ -18,6 +18,18 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `cluster/onoff.Server`: the default OnOff server, a port of matter.js
+  `OnOffBaseServer` (`packages/node/src/behaviors/on-off/OnOffServer.ts`)
+  on the generated definition. `onoff.New(Config)` takes the feature
+  selection, an optional host `Sink` (`SetOnOff(ctx, bool) error`, which
+  may refuse a change: the command answers FAILURE and nothing is stored),
+  the initial values, an optional `BootReason` and a `Clock` seam. It
+  carries the command logic (On, Off, Toggle, OffWithEffect,
+  OnWithRecallGlobalScene, OnWithTimedOff), StartUpOnOff at construction
+  (not after a software update), the 100 ms timed-on and delayed-off
+  countdowns with the 0xFFFF hold, `Set` / `OnOff` for the host and
+  `MatterQuiesce`. The existing constants and functions of `cluster/onoff`
+  are unchanged.
 - Session establishment over TCP: a PASE or CASE message that arrives on a
   TCP connection is served on it, as matter.js creates the unsecured
   session from whichever channel carried the message
