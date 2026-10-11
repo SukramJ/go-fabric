@@ -71,7 +71,7 @@ func (b *Bridge) encryptSecureOutbound(sess *channel.Session, localSessionID uin
 // must survive a single packet drop — see that method's docstring
 // for the obligation contract.
 func (b *Bridge) sendReply(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	requestProto message.ProtocolHeader,
 	responseOpcode uint8,
@@ -95,7 +95,7 @@ func (b *Bridge) sendReply(
 // When the bridge has no AckTracker wired (test paths) the call
 // degrades silently to the best-effort path.
 func (b *Bridge) sendReplyReliable(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	requestProto message.ProtocolHeader,
 	responseOpcode uint8,
@@ -123,7 +123,7 @@ func (b *Bridge) sendReplyReliable(
 // attempting to write — the receive pipeline never invents a src on
 // the response path, so a nil src here is a programming error.
 func (b *Bridge) sendReplyOpts(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	requestProto message.ProtocolHeader,
 	responseOpcode uint8,
@@ -138,26 +138,32 @@ func (b *Bridge) sendReplyOpts(
 	sessions := b.sessions
 	tracker := b.outboundReliable
 	b.mu.RUnlock()
-	if listener == nil {
+	if listener == nil && !isConnRoute(src) {
 		return fmt.Errorf("%w: listener nil", ErrReplySend)
 	}
-	if src == nil {
+	if isNilRoute(src) {
 		return fmt.Errorf("%w: src nil", ErrReplySend)
 	}
 
 	// Engage MRP only when both the caller asked for it AND the bridge
 	// has a tracker wired — degrading to best-effort on a missing
 	// tracker keeps test fixtures (which never wire one) functional.
-	needsAck := reliable && tracker != nil
+	// Over a reliable connection MRP is off altogether: no R flag, no
+	// piggybacked acknowledgement (matter.js MessageExchange.ts:660,
+	// :680-686; transport/mrp UsesMRP).
+	usesMRP := routeUsesMRP(src)
+	needsAck := reliable && tracker != nil && usesMRP
 
 	respProto := message.ProtocolHeader{
 		Initiator:  !requestProto.Initiator,
-		HasAck:     true,
-		AckCounter: requestHdr.MessageCounter,
+		HasAck:     usesMRP,
 		Opcode:     responseOpcode,
 		ExchangeID: requestProto.ExchangeID,
 		ProtocolID: requestProto.ProtocolID,
 		NeedsAck:   needsAck,
+	}
+	if usesMRP {
+		respProto.AckCounter = requestHdr.MessageCounter
 	}
 	protoBytes := respProto.Marshal()
 
@@ -213,7 +219,7 @@ func (b *Bridge) sendReplyOpts(
 		if needsAck {
 			tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, time.Now())
 		}
-		if err := listener.Send(src, datagram); err != nil {
+		if err := sendVia(listener, src, datagram); err != nil {
 			if needsAck {
 				tracker.Untrack(requestHdr.SessionID, counter)
 			}
@@ -266,7 +272,7 @@ func (b *Bridge) sendReplyOpts(
 	if needsAck {
 		tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, time.Now())
 	}
-	if err := listener.Send(src, datagram); err != nil {
+	if err := sendVia(listener, src, datagram); err != nil {
 		if needsAck {
 			tracker.Untrack(requestHdr.SessionID, counter)
 		}
@@ -1255,7 +1261,7 @@ func defaultCommandFieldsWriter(enc *tlv.Encoder, tag tlv.Tag, v any) { //nolint
 // debugReplyError is a small helper that turns reply-path errors
 // into structured slog records. Each error gets its own attribute
 // list so operators can grep for the specific failure stage.
-func debugReplyError(logger *slog.Logger, stage string, src *net.UDPAddr, err error) {
+func debugReplyError(logger *slog.Logger, stage string, src net.Addr, err error) {
 	if err == nil {
 		return
 	}

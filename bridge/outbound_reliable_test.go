@@ -55,7 +55,7 @@ func TestOutboundReliable_TickRetransmits(t *testing.T) {
 	tr.Track(7, 0, 0, []byte{0xAA}, dest, now)
 
 	calls := 0
-	send := func(addr *net.UDPAddr, payload []byte) error {
+	send := func(addr net.Addr, payload []byte) error {
 		calls++
 		if addr != dest {
 			t.Errorf("send: dest = %v, want %v", addr, dest)
@@ -99,7 +99,7 @@ func TestOutboundReliable_TickGivesUp(t *testing.T) {
 
 	// Drive past every retry: keep advancing time and ticking.
 	now := time.Unix(0, 0)
-	send := func(*net.UDPAddr, []byte) error { return nil }
+	send := func(net.Addr, []byte) error { return nil }
 	for i := range mrp.MaxRetransmissions {
 		now = now.Add(10 * time.Second) // way past any backoff window
 		results := tr.Tick(now, send)
@@ -218,7 +218,7 @@ func TestOutboundReliable_PerSessionBaseInterval(t *testing.T) {
 	tr.Track(702, sessionSlow, 0, []byte{0x02}, dest, t0)
 
 	var fired []uint32
-	send := func(_ *net.UDPAddr, payload []byte) error {
+	send := func(_ net.Addr, payload []byte) error {
 		fired = append(fired, uint32(payload[0]))
 		return nil
 	}
@@ -430,7 +430,7 @@ func TestOutboundReliable_TickSendError(t *testing.T) {
 	tr.Track(42, 0, 0, []byte{0xAA}, dest, now)
 
 	sendErr := errors.New("simulated send failure")
-	failSend := func(*net.UDPAddr, []byte) error { return sendErr }
+	failSend := func(net.Addr, []byte) error { return sendErr }
 
 	// 700ms clears the 687.5ms jitter ceiling of the 500ms idle-default
 	// base a session-0 (unknown) entry falls back to.

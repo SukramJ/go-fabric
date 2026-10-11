@@ -242,7 +242,13 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	if opts.listen == "" {
 		opts.listen = defaultListen
 	}
-	args := []string{"--db", opts.dbPath, "--listen", opts.listen}
+	// TCP off: the PICS declare MCORE.SC.S.TCP=0 (testdata/reference-bridge.pics:43),
+	// and TC-SC-4.3 fails a T key that advertises TCP against a PICS
+	// that does not (chip 6170af84 src/python_testing/mdns_discovery/utils/asserts.py:1134-1135
+	// assert_valid_t_key, "TCP support in the PICS … must match"). The
+	// daemon's own default is on; turning it on here waits for CASE / PASE
+	// over TCP and the PICS change that enables the SC/8.x TCP cases.
+	args := []string{"--db", opts.dbPath, "--listen", opts.listen, "--tcp", "false"}
 	if flags["log-level"] {
 		// The daemon-side view of a failed handshake is the only thing that
 		// says which stage stopped; chip-tool's output alone cannot.

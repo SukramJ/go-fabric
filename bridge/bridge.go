@@ -16,6 +16,16 @@
 // Start is idempotent (returns ErrAlreadyStarted on a second call).
 // Stop is idempotent and safe to call after a failed Start.
 //
+// Transports: Start binds the UDP socket and, when [Config].TCP.Incoming
+// is set, a TCP listener on the same port (matter.js
+// ServerNetworkRuntime.ts:203-214). Every message enters through one
+// transport-neutral receive path and every reply leaves on the
+// connection the request arrived on (conn.go). Over TCP, MRP is off,
+// session establishment is not served yet (an unsecured message is
+// dropped), and a dropped connection closes every session bound to it.
+// Config.TCP is configuration, not a port: the zero value is TCP off
+// and the bridge behaves exactly as without it.
+//
 // # Bring-up sequence
 //
 // [New] takes only a [Snapshotter], an [mdns.Advertiser] and a
@@ -174,6 +184,7 @@ import (
 	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/transport/mrp"
+	"github.com/SukramJ/go-fabric/transport/tcp"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -222,6 +233,11 @@ type Config struct {
 	// PreferIPv4 forces an IPv4-only socket. Defaults to dual-stack
 	// IPv6 (which also accepts IPv4 traffic).
 	PreferIPv4 bool
+
+	// TCP selects the Matter TCP transport: a listener on the UDP
+	// socket's port for Incoming, and the T key of the operational
+	// record for both roles. The zero value is TCP off. See [TCPConfig].
+	TCP TCPConfig
 
 	// VendorID is the bridge's IANA-assigned vendor identifier
 	// (BasicInformation.VendorID, Matter §11.1.5.2). Mandatory.
@@ -591,6 +607,24 @@ type Bridge struct {
 	// stays bounded and cannot outlive a reuse.
 	sessionPeerAddrs sync.Map
 
+	// connRoutes maps each connection a message arrived on (a
+	// transport.Conn other than the UDP adapter) to its one reply route,
+	// so the sessions bound to it can be found when it drops
+	// (conn.go evictConn).
+	connRoutes sync.Map
+
+	// sessionRouteOwners remembers, per session id, the session object
+	// its sessionPeerAddrs entry was bound under, so a reused id is
+	// told apart from the session that still holds it
+	// (conn.go bindSessionRoute).
+	sessionRouteOwners sync.Map
+
+	// tcpListener accepts the inbound TCP connections when
+	// Config.TCP.Incoming is set; nil otherwise. tcpServeDone closes
+	// when its accept loop returned.
+	tcpListener  *tcp.Listener
+	tcpServeDone chan struct{}
+
 	// reportExchangeOwner maps the bridge-initiated exchange an ongoing
 	// subscription report currently rides ([mrp.ExchangeKey] with
 	// Initiator=true, the bridge's role) to the owning subscription ID,
@@ -705,11 +739,8 @@ func (b *Bridge) Start(ctx context.Context) error {
 		return fmt.Errorf("bridge: initial topology: %w", err)
 	}
 
-	// --- UDP listener ---
-	listener, err := udp.New(udp.Config{
-		LocalAddr:  b.cfg.Listen,
-		PreferIPv4: b.cfg.PreferIPv4,
-	})
+	// --- UDP listener, and the TCP listener on its port ---
+	listener, tcpListener, err := b.openTransports()
 	if err != nil {
 		return fmt.Errorf("bridge: udp: %w", err)
 	}
@@ -734,8 +765,24 @@ func (b *Bridge) Start(ctx context.Context) error {
 		}
 	}()
 
+	// The TCP accept loop runs under the same context: Stop's cancel
+	// ends both. Every message goes through the transport-neutral
+	// receive entry; a dropped connection evicts its sessions.
+	var tcpDone chan struct{}
+	if tcpListener != nil {
+		tcpDone = make(chan struct{})
+		go func() {
+			defer close(tcpDone)
+			if err := tcpListener.Serve(serveCtx, b.handleTCPMessage, b.handleTCPClose); err != nil {
+				b.logger.Debug("matter.tcp.serve.exit", slog.String("err", err.Error()))
+			}
+		}()
+	}
+
 	b.mu.Lock()
 	b.listener = listener
+	b.tcpListener = tcpListener
+	b.tcpServeDone = tcpDone
 	b.serveCancel = cancel
 	b.serveDone = done
 	b.handlerCtx = serveCtx
@@ -770,6 +817,12 @@ func (b *Bridge) Start(ctx context.Context) error {
 		slog.String("addr", listener.LocalAddr().String()),
 		slog.Int("endpoints", b.endpointCount()),
 	)
+	if tcpListener != nil {
+		b.logger.Info("matter.tcp.listening",
+			slog.String("addr", tcpListener.Addr().String()),
+			slog.Bool("incoming", b.cfg.TCP.Incoming),
+			slog.Bool("outgoing", b.cfg.TCP.Outgoing))
+	}
 
 	// --- mDNS advertise ---
 	if err := b.publishOperationalRecord(ctx); err != nil {
@@ -1382,11 +1435,15 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// store when the node goes offline).
 	b.eventLog.DropBuffered()
 	listener := b.listener
+	tcpListener := b.tcpListener
+	tcpDone := b.tcpServeDone
 	cancel := b.serveCancel
 	done := b.serveDone
 	pumpCancel := b.pumpCancel
 	pumpDone := b.pumpDone
 	b.listener = nil
+	b.tcpListener = nil
+	b.tcpServeDone = nil
 	b.serveCancel = nil
 	b.serveDone = nil
 	b.handlerCtx = nil
@@ -1414,11 +1471,21 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	if listener != nil {
 		_ = listener.Close()
 	}
+	if tcpListener != nil {
+		_ = tcpListener.Close()
+	}
 	if done != nil {
 		select {
 		case <-done:
 		case <-ctx.Done():
 			b.logger.Warn("matter.bridge.stop.serve_timeout", slog.String("err", ctx.Err().Error()))
+		}
+	}
+	if tcpDone != nil {
+		select {
+		case <-tcpDone:
+		case <-ctx.Done():
+			b.logger.Warn("matter.bridge.stop.tcp_serve_timeout", slog.String("err", ctx.Err().Error()))
 		}
 	}
 	if pumpDone != nil {
@@ -1586,7 +1653,18 @@ func (b *Bridge) endpointCount() int {
 // cancels handlerCtx so any blocked IM handler unwinds promptly.
 func (b *Bridge) handleDatagram(buf []byte, src *net.UDPAddr) {
 	ctx := b.handlerContext()
-	_ = b.dispatch(ctx, buf, src)
+	_ = b.receive(ctx, buf, b.udpConn(src))
+}
+
+// udpConn is the UDP adapter of [transport.Conn] for a datagram from
+// src: the bridge's listener plus the peer address. Built without a
+// listener too (test paths that never Start); the reply path sends a
+// UDP route through the listener snapshot it takes itself.
+func (b *Bridge) udpConn(src *net.UDPAddr) *udp.Conn {
+	b.mu.RLock()
+	listener := b.listener
+	b.mu.RUnlock()
+	return listener.Conn(src)
 }
 
 // handlerContext returns the context every IM/SC handler call runs
@@ -1644,6 +1722,11 @@ func (b *Bridge) AnnounceFabric(ctx context.Context, compressedFabricID [8]byte,
 		// HostName empty → the advertiser's MAC-derived default (mdns defaultHostName) so the
 		// SRV target resolves via macOS Bonjour / Linux avahi A/AAAA.
 		HostName: "",
+		// T key: matter.js ServerNetworkRuntime.ts:334-338 sets
+		// supportedTransports {tcpClient: outgoing, tcpServer: incoming}
+		// for the operational advertisement only (MdnsAdvertisement.ts:205-206).
+		TCPClient: b.cfg.TCP.Outgoing,
+		TCPServer: b.cfg.TCP.Incoming,
 	})
 	if err := b.advertiser.Publish(pubCtx, svc); err != nil {
 		b.logger.Debug("matter.mdns.fabric_publish",
@@ -1681,6 +1764,8 @@ func (b *Bridge) WithdrawFabric(ctx context.Context, compressedFabricID [8]byte,
 		NodeID:             nodeID,
 		Port:               uint16(b.effectiveUDPPort()), //nolint:gosec // the bound / parsed port is ≤ 65535; see #20
 		HostName:           "",
+		TCPClient:          b.cfg.TCP.Outgoing,
+		TCPServer:          b.cfg.TCP.Incoming,
 	})
 	if err := b.advertiser.Withdraw(wCtx, svc.InstanceName, svc.ServiceType); err != nil {
 		b.logger.Debug("matter.mdns.fabric_withdraw",

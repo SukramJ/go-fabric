@@ -83,7 +83,7 @@ func (b *Bridge) outboundBaseInterval(sessionID uint16, now time.Time) time.Dura
 // replies that don't echo the value (Matter §4.4.1.2). Same constraint
 // as [Bridge.sendReply].
 type exchangeReplyTarget struct {
-	src                 *net.UDPAddr
+	src                 net.Addr
 	hasPeerSourceNodeID bool
 	peerSourceNodeID    uint64
 	// sessionID is the SessionID of the inbound message that owed the
@@ -102,14 +102,20 @@ type exchangeReplyTarget struct {
 // then degrades to "no MRP". Peers retransmit until their max-retry
 // cap, which is fine for unit tests but burns bandwidth in
 // production; daemons should always wire a tracker.
-func (b *Bridge) owedInboundAck(src *net.UDPAddr, hdr *message.Header, proto message.ProtocolHeader) {
+func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message.ProtocolHeader) {
+	// Over a reliable connection the R flag is ignored and no
+	// acknowledgement is owed (matter.js MessageExchange.ts:448-452;
+	// transport/mrp UsesMRP).
+	if !routeUsesMRP(src) {
+		return
+	}
 	b.mu.RLock()
 	tracker := b.ackTracker
 	b.mu.RUnlock()
 	if tracker == nil {
 		return
 	}
-	if src != nil {
+	if !isNilRoute(src) {
 		// Keyed on (session, exchange, our role): exchange IDs are only
 		// unique per session AND per side, so two controllers sharing an
 		// exchange ID — or a peer-opened exchange colliding with a
@@ -350,8 +356,8 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 	if listener == nil {
 		return
 	}
-	results := outbound.Tick(now, func(dest *net.UDPAddr, datagram []byte) error {
-		return listener.Send(dest, datagram)
+	results := outbound.Tick(now, func(dest net.Addr, datagram []byte) error {
+		return sendVia(listener, dest, datagram)
 	})
 	for _, r := range results {
 		if r.Err == nil {
@@ -400,7 +406,7 @@ func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation) {
 		return
 	}
 	target, ok := raw.(exchangeReplyTarget)
-	if !ok || target.src == nil {
+	if !ok || isNilRoute(target.src) {
 		return
 	}
 
@@ -476,7 +482,7 @@ func (b *Bridge) emitStandaloneAck(obl mrp.AckObligation) {
 		datagram = append(hdr.Marshal(), enc.Ciphertext...)
 	}
 
-	if err := listener.Send(target.src, datagram); err != nil {
+	if err := sendVia(listener, target.src, datagram); err != nil {
 		b.logger.Warn("matter.tx.ack_pump.send",
 			slog.Int("exchange_id", int(obl.ExchangeID)),
 			slog.String("src", target.src.String()),

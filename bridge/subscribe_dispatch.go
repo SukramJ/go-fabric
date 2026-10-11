@@ -193,7 +193,7 @@ func (b *Bridge) buildInitialReport(
 // packages/protocol/src/action/server/EventReadResponse.ts for the
 // EventPaths wiring.
 func (b *Bridge) registerSubscription(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	proto message.ProtocolHeader,
 	req im.SubscribeRequest,
@@ -347,7 +347,7 @@ func subscribeRejectStatus(err error) im.StatusCode {
 // inbound ReportData and stays in the per-chunk read state until
 // that response is on the wire.
 func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack synchronisation loop mirrors matter.js sendDataReportMessage; splitting would obscure the atomic arm→send→wait sequence
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	proto message.ProtocolHeader,
 	subID uint32,
@@ -489,7 +489,7 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 // leaves chip-tool's ReliableMessaging still waiting on the StatusResponse
 // counter.
 func (b *Bridge) sendSubscribeResponse(
-	src *net.UDPAddr,
+	src net.Addr,
 	requestHdr *message.Header,
 	proto message.ProtocolHeader,
 	req im.SubscribeRequest,
