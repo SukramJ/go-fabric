@@ -178,6 +178,10 @@ type Endpoint struct {
 	// Endpoint.Options.deviceConditions.
 	DeviceConditions []string
 
+	// ClientClusters are the client clusters the endpoint declares, served
+	// as its Descriptor ClientList. Carried from [Spec.ClientClusters].
+	ClientClusters []uint32
+
 	// attachedClusters holds the cluster servers that come from OUTSIDE
 	// the assembler: the daemon builds them and hands them to the bridge,
 	// which places them on the root endpoint (BasicInformation,

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4381,
+  "entry_points": 4385,
   "entry_packages": [
     ".",
     "bdx",
@@ -174,9 +174,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10359,
-    "reachable": 7317,
-    "whitelisted": 3037,
+    "total_exported": 10349,
+    "reachable": 7303,
+    "whitelisted": 3041,
     "unreachable": 5
   },
   "by_package": [
@@ -223,7 +223,7 @@
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 119,
+      "line": 124,
       "kind": "func"
     },
     {
@@ -13824,6 +13824,20 @@
     },
     {
       "package": "device",
+      "identifier": "TestClientListCarriesTheMandatoryClientClusters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/device_test.go",
+      "line": 442
+    },
+    {
+      "package": "device",
+      "identifier": "TestDefaultSelectionKeepsTheClusterMandatedFeatures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/device_test.go",
+      "line": 470
+    },
+    {
+      "package": "device",
       "identifier": "TestDeviceRequirementsParityMatterJS",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/parity_matterjs_test.go",
@@ -13834,28 +13848,28 @@
       "identifier": "TestElementAlterationsApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 182
+      "line": 186
     },
     {
       "package": "device",
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 304
+      "line": 255
     },
     {
       "package": "device",
       "identifier": "TestFeatureMasksMatchTheDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 387
+      "line": 391
     },
     {
       "package": "device",
       "identifier": "TestFeatureSelection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 43
+      "line": 47
     },
     {
       "package": "device",
@@ -13869,63 +13883,70 @@
       "identifier": "TestOnChangedFiresOnSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 216
+      "line": 220
     },
     {
       "package": "device",
       "identifier": "TestOptionalClusterWithItsAlterations",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 147
+      "line": 151
     },
     {
       "package": "device",
       "identifier": "TestOptionsRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 113
+      "line": 117
     },
     {
       "package": "device",
       "identifier": "TestParts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 253
+      "line": 257
     },
     {
       "package": "device",
       "identifier": "TestRefusalsWrapTheirSentinel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 360
+      "line": 311
     },
     {
       "package": "device",
       "identifier": "TestSpec",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 304
+      "line": 308
     },
     {
       "package": "device",
       "identifier": "TestTypeLookups",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 330
+      "line": 334
     },
     {
       "package": "device",
       "identifier": "TestTypedDefault",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 361
+      "line": 365
+    },
+    {
+      "package": "device",
+      "identifier": "TestWithElements",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/device_test.go",
+      "line": 484
     },
     {
       "package": "device",
       "identifier": "TestWithServerReplacesTheDefault",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 80
+      "line": 84
     },
     {
       "package": "diagevent",
@@ -14717,6 +14738,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
       "line": 202
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestSpecClientClustersReadBackInTheDescriptor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/client_clusters_test.go",
+      "line": 19
     },
     {
       "package": "endpoint",

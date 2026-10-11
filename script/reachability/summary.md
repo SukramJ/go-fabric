@@ -1,15 +1,15 @@
 # Exported-API reachability summary
 
 Root set: test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)
-Entry points: 4381 across 170 test packages.
+Entry points: 4385 across 170 test packages.
 
 ## Overview
 
 | Metric | Count |
 |---|---|
-| Total exported | 10359 |
-| Reached by a test | 7317 |
-| Whitelisted | 3037 |
+| Total exported | 10349 |
+| Reached by a test | 7303 |
+| Whitelisted | 3041 |
 | **Unreached** | **5** |
 
 ## Top-20 packages by unreached exported identifiers
@@ -27,7 +27,7 @@ Entry points: 4381 across 170 test packages.
 | Package | Identifier | File | Line |
 |---|---|---|---|
 | cluster/measurement | CelsiusToInt16 | cluster/measurement/measurement.go | 1662 |
-| endpoint | ComposeNodeLabel | endpoint/spec.go | 119 |
+| endpoint | ComposeNodeLabel | endpoint/spec.go | 124 |
 
 ## Full by-package breakdown
 

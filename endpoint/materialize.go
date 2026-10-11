@@ -304,7 +304,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// pattern in daemon.go). A static buildServerList call here would
 	// silently drift whenever clusters are added before or after the
 	// Descriptor construction.
-	descriptor, derr := mattercore.NewDescriptor(deviceTypes, nil, nil, ep.PartIDs)
+	descriptor, derr := mattercore.NewDescriptor(deviceTypes, nil, ep.ClientClusters, ep.PartIDs)
 	if derr != nil {
 		return append(clusters, bridged)
 	}
@@ -329,7 +329,7 @@ func partClusterServers(ep *Endpoint, inner []contract.ClusterServer) []contract
 	out = append(out, inner...)
 	descriptor, err := mattercore.NewDescriptor([]mattercore.DeviceTypeStruct{{
 		DeviceType: uint32(ep.DeviceType), Revision: deviceTypeRevision(ep.DeviceType),
-	}}, nil, nil, ep.PartIDs)
+	}}, nil, ep.ClientClusters, ep.PartIDs)
 	if err != nil {
 		return out
 	}

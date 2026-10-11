@@ -6,16 +6,17 @@ package main
 // committed lists the device types whose generated files are committed
 // under device/: the device types in scope of
 // docs/concept-matter-1.6.1-and-device-layer.md Appendix F.3 — every
-// snapshot device type the appendix does not name — with OtaRequestor,
-// which ADR 0018 ("Decisions taken at the start of wave 6", 1) takes in
-// since the requestor joined in wave 5 (ADR 0019). Sorted by name.
+// snapshot device type the appendix does not name, less the three whose
+// mandatory clusters are the excluded camera and media families (owner's
+// decision, 2026-10-11) — with OtaRequestor, which ADR 0018 ("Decisions
+// taken at the start of wave 6", 1) takes in since the requestor joined in
+// wave 5 (ADR 0019). Sorted by name.
 var committed = []string{
 	"Aggregator",
 	"AirPurifier",
 	"AirQualitySensor",
 	"BatteryStorage",
 	"BridgedNode",
-	"CastingVideoClient",
 	"Closure",
 	"ClosurePanel",
 	"ColorTemperatureLight",
@@ -36,7 +37,6 @@ var committed = []string{
 	"ExtendedColorLight",
 	"ExtractorHood",
 	"Fan",
-	"FloodlightCamera",
 	"FlowSensor",
 	"GenericSwitch",
 	"HeatPump",
@@ -70,13 +70,16 @@ var committed = []string{
 	"TemperatureControlledCabinet",
 	"TemperatureSensor",
 	"Thermostat",
-	"VideoDoorbell",
 	"WaterFreezeDetector",
 	"WaterHeater",
 	"WaterLeakDetector",
 	"WaterValve",
 	"WindowCovering",
 }
+
+// cameraMedia is the group of the device types not named in Appendix F.3
+// whose mandatory requirements are its excluded families.
+const cameraMedia = "camera / media (Appendix F.3: their mandatory clusters are the excluded camera and media families)"
 
 // excluded names every other snapshot device type with its group in
 // docs/concept-matter-1.6.1-and-device-layer.md Appendix F.3.
@@ -110,6 +113,16 @@ var excluded = map[string]string{
 	"PumpController":           "F.3 controller device types",
 	"ClosureController":        "F.3 controller device types",
 	"VideoRemoteControl":       "F.3 controller device types",
+	// Camera / media by their mandatory requirements (owner's decision,
+	// 2026-10-11), read from parity/schema.json effective.requirements:
+	// VideoDoorbell and FloodlightCamera mandate a Camera component
+	// ("deviceType Camera, M, 1"), whose mandatory server clusters
+	// CameraAvStreamManagement and WebRtcTransportProvider are the F.2
+	// camera family; CastingVideoClient mandates the media client clusters
+	// KeypadInput, ContentLauncher and ApplicationBasic ("M").
+	"VideoDoorbell":      cameraMedia,
+	"FloodlightCamera":   cameraMedia,
+	"CastingVideoClient": cameraMedia,
 	// The last row of F.3 (OtaRequestor moved in by ADR 0018).
 	"SecondaryNetworkInterface": "F.3 secondary network interface (Thread or Wi-Fi diagnostics)",
 }

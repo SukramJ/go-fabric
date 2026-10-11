@@ -10,9 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
+	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	levelcontroldef "github.com/SukramJ/go-fabric/cluster/spec/levelcontrol"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
+	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
@@ -407,5 +411,94 @@ func TestFeatureMasksMatchTheDefinitions(t *testing.T) {
 				t.Errorf("%s %s: definition of 0x%04X", ty.Name, r.Name, r.Definition.ID)
 			}
 		}
+	}
+}
+
+// descriptorClientList reads the assembled Descriptor ClientList of the
+// endpoint whose source is d.
+func descriptorClientList(t *testing.T, topo *endpoint.Topology, d *Device) []uint32 {
+	t.Helper()
+	for _, ep := range topo.Endpoints {
+		if ep.Source != contract.EndpointSource(d) {
+			continue
+		}
+		for _, srv := range endpoint.ClusterServers(ep) {
+			if srv.MatterClusterID() == 0x001D {
+				v, _ := srv.MatterRead(0x0002)
+				l, _ := v.([]uint32)
+				return l
+			}
+		}
+	}
+	t.Fatal("no Descriptor for the device")
+	return nil
+}
+
+// TestClientListCarriesTheMandatoryClientClusters: the device type's
+// mandatory client clusters reach the Descriptor's ClientList
+// (MutableEndpoint.ts:53-61, DescriptorServer.ts:284-290) — OtaRequestor's
+// OtaSoftwareUpdateProvider, Doorbell's Chime; a type with only optional
+// clients declares none.
+func TestClientListCarriesTheMandatoryClientClusters(t *testing.T) {
+	t.Parallel()
+	ota, err := NewOtaRequestor(testOptions("ota"), WithServer(&hostServer{id: 0x002A}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bell, err := NewDoorbell(testOptions("bell"), WithServer(core.NewBinding()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	light, _ := NewOnOffLight(testOptions("light"))
+	if got := ota.Spec().ClientClusters; !slices.Equal(got, []uint32{0x0029}) {
+		t.Errorf("OtaRequestor ClientClusters %v", got)
+	}
+	if light.Spec().ClientClusters != nil {
+		t.Error("OnOffLight declares a client cluster")
+	}
+	topo := assemble(t, ota.Device, bell.Device, light.Device)
+	for d, want := range map[*Device][]uint32{ota.Device: {0x0029}, bell.Device: {0x0556}, light.Device: nil} {
+		if got := descriptorClientList(t, topo, d); !slices.Equal(got, want) {
+			t.Errorf("%s ClientList %v, want %v", d.Type().Name, got, want)
+		}
+	}
+}
+
+// TestDefaultSelectionKeepsTheClusterMandatedFeatures: EnergyEvse's PREF
+// ("M" in the cluster) is in its default selection, so the type constructs
+// with defaults.
+func TestDefaultSelectionKeepsTheClusterMandatedFeatures(t *testing.T) {
+	t.Parallel()
+	d, err := NewEnergyEvse(testOptions("evse"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := d.EnergyEvse().MatterRead(spec.AttrFeatureMap); v != uint32(evsedef.FeatureChargingPreferences) {
+		t.Errorf("EnergyEvse FeatureMap %v", v)
+	}
+}
+
+// TestWithElements: optional attributes of a default server are served,
+// the cluster is mounted; features in it, or a host server for the
+// cluster, are refused.
+func TestWithElements(t *testing.T) {
+	t.Parallel()
+	el := WithElements(epmdef.ClusterID, spec.Options{Attributes: []uint32{epmdef.AttrVoltage}})
+	d, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology), acPower, el,
+		WithElements(epmdef.ClusterID, spec.Options{Attributes: []uint32{epmdef.AttrActiveCurrent}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	epm := d.ElectricalPowerMeasurement()
+	if !epm.Serves(epmdef.AttrVoltage) || !epm.Serves(epmdef.AttrActiveCurrent) {
+		t.Error("the elements opted in are not served")
+	}
+	if _, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology),
+		WithElements(epmdef.ClusterID, spec.Options{Features: 2})); !errors.Is(err, ErrConfiguration) {
+		t.Errorf("features through WithElements: %v", err)
+	}
+	if _, err := NewElectricalSensor(testOptions("s"), feat(0x009C, ptdef.FeatureNodeTopology),
+		WithServer(&hostServer{id: epmdef.ClusterID}), el); !errors.Is(err, ErrConfiguration) {
+		t.Errorf("WithElements with a host server: %v", err)
 	}
 }

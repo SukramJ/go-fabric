@@ -133,7 +133,7 @@ func TestEveryDeviceTypeIsListed(t *testing.T) {
 		if !inSnapshot[name] {
 			t.Errorf("excluded %s is not a snapshot device type", name)
 		}
-		if !strings.HasPrefix(group, "F.3 ") {
+		if !strings.HasPrefix(group, "F.3 ") && !strings.Contains(group, "Appendix F.3") {
 			t.Errorf("excluded %s names no Appendix F.3 group: %q", name, group)
 		}
 	}

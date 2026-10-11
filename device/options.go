@@ -6,6 +6,7 @@ package device
 import (
 	"maps"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 )
@@ -52,6 +53,7 @@ type settings struct {
 	optional map[uint32]bool
 	servers  map[uint32]contract.ClusterServer
 	initial  map[uint32]map[uint32]any
+	elements map[uint32]spec.Options
 	nilSrv   bool
 }
 
@@ -59,6 +61,7 @@ func newSettings(with []Option) *settings {
 	s := &settings{
 		features: map[uint32]uint32{}, optional: map[uint32]bool{},
 		servers: map[uint32]contract.ClusterServer{}, initial: map[uint32]map[uint32]any{},
+		elements: map[uint32]spec.Options{},
 	}
 	for _, o := range with {
 		if o != nil {
@@ -71,8 +74,9 @@ func newSettings(with []Option) *settings {
 // WithFeatures selects the FeatureMap of a cluster's default server, as
 // `OnOffServer.with("Lighting")` does in matter.js. The selection must
 // pass the cluster's feature conformance ([spec.CheckFeatures]) and
-// include every feature the device type mandates; it mounts an optional
-// cluster too.
+// include every feature the device type mandates. It also mounts an
+// optional cluster of the type, as matter.js's `Device.with(Server.with(…))`
+// does (accepted by the owner, 2026-10-11).
 func WithFeatures(clusterID, features uint32) Option {
 	return func(s *settings) {
 		s.features[clusterID] = features
@@ -97,6 +101,24 @@ func WithServer(srv contract.ClusterServer) Option {
 			return
 		}
 		s.servers[srv.MatterClusterID()] = srv
+	}
+}
+
+// WithElements serves optional attributes, accepts optional commands and
+// emits optional events of a cluster's default server beyond the ones the
+// device type mandates: opts.Attributes, opts.Commands and opts.Events
+// feed the default server's [spec.Options]; opts.Features must be zero —
+// the feature selection is [WithFeatures]'s. It mounts an optional cluster
+// too. Calls for one cluster accumulate.
+func WithElements(clusterID uint32, opts spec.Options) Option {
+	return func(s *settings) {
+		e := s.elements[clusterID]
+		e.Features |= opts.Features
+		e.Attributes = append(e.Attributes, opts.Attributes...)
+		e.Commands = append(e.Commands, opts.Commands...)
+		e.Events = append(e.Events, opts.Events...)
+		s.elements[clusterID] = e
+		s.optional[clusterID] = true
 	}
 }
 

@@ -120,6 +120,12 @@ func checkOptedClusters(t *Type, s *settings) error {
 	for id := range s.initial {
 		ids = append(ids, id)
 	}
+	for id, o := range s.elements {
+		ids = append(ids, id)
+		if o.Features != 0 {
+			return fmt.Errorf("%w: %s: WithElements for cluster 0x%04X states features; select them with WithFeatures", ErrConfiguration, t.Name, id)
+		}
+	}
 	slices.Sort(ids)
 	for _, id := range slices.Compact(ids) {
 		if name, ok := assemblerMounted[id]; ok {
@@ -132,6 +138,9 @@ func checkOptedClusters(t *Type, s *settings) error {
 	for id := range s.servers {
 		if _, ok := s.features[id]; ok {
 			return fmt.Errorf("%w: %s: WithFeatures for cluster 0x%04X, whose server the host supplies", ErrConfiguration, t.Name, id)
+		}
+		if _, ok := s.elements[id]; ok {
+			return fmt.Errorf("%w: %s: WithElements for cluster 0x%04X, whose server the host supplies", ErrConfiguration, t.Name, id)
 		}
 		if _, ok := s.initial[id]; ok {
 			return fmt.Errorf("%w: %s: WithInitial for cluster 0x%04X, whose server the host supplies", ErrConfiguration, t.Name, id)
@@ -152,7 +161,11 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings) (contract.Cluste
 		return nil, fmt.Errorf("%w: %s requires %s (0x%04X, conformance %q) and no generated definition is committed for it: supply its server with WithServer",
 			ErrNoDefaultServer, t.Name, r.Name, r.ID, r.Conformance)
 	}
-	features := r.Features
+	// The default selection is the device type's mandated features and the
+	// features the cluster itself marks mandatory ("M"), which
+	// spec.CheckFeatures demands of every selection — EnergyEvse's PREF
+	// (owner's decision, 2026-10-11).
+	features := r.Features | clusterMandatedFeatures(def)
 	if sel, ok := s.features[r.ID]; ok {
 		if missing := r.Features &^ sel; missing != 0 {
 			return nil, fmt.Errorf("%w: %s requires %s feature %s (conformance M); the selection 0x%X leaves it out",
@@ -167,6 +180,11 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings) (contract.Cluste
 		return nil, fmt.Errorf("%w: %s %s needs a feature selection (WithFeatures): %w", ErrConfiguration, t.Name, r.Name, err)
 	}
 	opts := spec.Options{Features: features}
+	if extra, ok := s.elements[r.ID]; ok {
+		opts.Attributes = append(opts.Attributes, extra.Attributes...)
+		opts.Commands = append(opts.Commands, extra.Commands...)
+		opts.Events = append(opts.Events, extra.Events...)
+	}
 	for _, e := range r.Elements {
 		if e.Presence != PresenceMandatory {
 			continue
@@ -209,6 +227,18 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings) (contract.Cluste
 		return nil, fmt.Errorf("%w: %s %s: %w", ErrConfiguration, t.Name, r.Name, err)
 	}
 	return srv, nil
+}
+
+// clusterMandatedFeatures is the FeatureMap of the features whose own
+// conformance is "M".
+func clusterMandatedFeatures(def *spec.Cluster) uint32 {
+	var mask uint32
+	for i := range def.Features {
+		if def.Features[i].Conformance.Op == spec.ConfMandatory {
+			mask |= def.Features[i].Mask()
+		}
+	}
+	return mask
 }
 
 // serverFactory builds a cluster's default server from its definition,
@@ -397,11 +427,26 @@ func (d *Device) Spec() endpoint.Spec {
 		Source:           d,
 		NodeLabel:        d.opts.NodeLabel,
 		DeviceConditions: slices.Clone(d.opts.Conditions),
+		ClientClusters:   d.clientClusters(),
 	}
 	for _, p := range d.Parts() {
 		s.Parts = append(s.Parts, p.Spec())
 	}
 	return s
+}
+
+// clientClusters are the client clusters the device type mandates — what
+// matter.js's MutableEndpoint registers into the type
+// (packages/node/src/endpoint/type/MutableEndpoint.ts:53-61) and its
+// DescriptorServer lists as ClientList (DescriptorServer.ts:284-290).
+func (d *Device) clientClusters() []uint32 {
+	var out []uint32
+	for _, r := range d.typ.Clients {
+		if r.Mandatory {
+			out = append(out, r.ID)
+		}
+	}
+	return out
 }
 
 // OnChanged calls fn with the ids of the attributes of the device's

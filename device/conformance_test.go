@@ -17,7 +17,6 @@ import (
 	demdef "github.com/SukramJ/go-fabric/cluster/spec/deviceenergymanagement"
 	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
-	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
 	mwocdef "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
 	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
 	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
@@ -50,13 +49,9 @@ var refusedDefaults = map[string]string{
 	"SmokeCoAlarm":           "SmokeCoAlarm needs a feature selection",
 	"Thermostat":             "Thermostat needs a feature selection",
 	"WindowCovering":         "WindowCovering needs a feature selection",
-	// EnergyEvse's PREF feature is mandatory ("M"), which spec.CheckFeatures
-	// demands of a selection; matter.js mounts the cluster by default.
-	"EnergyEvse": "EnergyEvse feature ChargingPreferences is mandatory",
 	// A mandatory cluster whose generated server refuses its definition.
-	"CastingVideoClient": "Binding attribute Binding: supply its server with WithServer",
-	"Doorbell":           "Binding attribute Binding: supply its server with WithServer",
-	"OtaRequestor":       "attribute DefaultOtaProviders: supply its server with WithServer",
+	"Doorbell":     "Binding attribute Binding: supply its server with WithServer",
+	"OtaRequestor": "attribute DefaultOtaProviders: supply its server with WithServer",
 	// The node's root clusters have no committed definitions; the root is
 	// the node facade's, not a bridged device.
 	"RootNode": "requires AccessControl (0x001F, conformance \"M\") and no generated definition is committed",
@@ -133,18 +128,6 @@ var (
 	adjustable = feat(0x0098, demdef.FeaturePowerAdjustment|demdef.FeaturePowerForecastReporting)
 )
 
-// specSrv is a host-built generated server with optional attributes the
-// default server does not serve: what a composing device type's element
-// requirements on a component ask for.
-func specSrv(t *testing.T, def *spec.Cluster, features uint32, attrs ...uint32) Option {
-	t.Helper()
-	srv, err := spec.NewServer(def, spec.Options{Features: features, Attributes: attrs}, spec.ServerConfig{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return WithServer(srv)
-}
-
 // meteredSensor is an ElectricalSensor part as an ESA's composition asks
 // for it: power with Voltage and ActiveCurrent, and imported and exported
 // cumulative energy.
@@ -152,24 +135,15 @@ func meteredSensor(t *testing.T, features uint32) []Option {
 	t.Helper()
 	return []Option{
 		nodeTopo,
-		specSrv(t, epmdef.Definition, features, epmdef.AttrVoltage, epmdef.AttrActiveCurrent),
-		specSrv(t, eemdef.Definition, uint32(eemdef.FeatureImportedEnergy|eemdef.FeatureExportedEnergy|eemdef.FeatureCumulativeEnergy)),
+		WithFeatures(0x0090, features),
+		WithElements(0x0090, spec.Options{Attributes: []uint32{epmdef.AttrVoltage, epmdef.AttrActiveCurrent}}),
+		feat(0x0091, eemdef.FeatureImportedEnergy|eemdef.FeatureExportedEnergy|eemdef.FeatureCumulativeEnergy),
 	}
 }
-
-// clientListReason: the assembler builds every Descriptor with a nil
-// ClientList (endpoint/materialize.go ClusterServers, NewDescriptor), and
-// endpoint.Spec has no field to carry the client clusters a device type
-// mandates (MutableEndpoint.ts:53-61 registers them) — an open question of
-// brief P.
-const clientListReason = "the assembler's Descriptor has no ClientList and endpoint.Spec cannot carry one"
 
 // tagListReason: the Descriptor the assembler mounts has no TagList
 // feature; the device type mandates it.
 const tagListReason = "the assembler's Descriptor has no TagList feature and endpoint.Spec cannot select one"
-
-// cameraReason: Camera is outside the device layer (concept Appendix F.3).
-const cameraReason = "Camera is excluded from the device layer (concept Appendix F.3), so no part can fill it"
 
 var fixtures = map[string]fixture{
 	"BatteryStorage": {
@@ -178,22 +152,17 @@ var fixtures = map[string]fixture{
 			part(t, d, "ElectricalSensor", nil, meteredSensor(t, uint32(epmdef.FeatureAlternatingCurrent))...)
 			part(t, d, "ElectricalSensor", nil, meteredSensor(t, uint32(epmdef.FeatureDirectCurrent))...)
 			part(t, d, "PowerSource", nil, wired)
-			part(t, d, "PowerSource", nil, specSrv(t, psdef.Definition, uint32(psdef.FeatureBattery|psdef.FeatureRechargeable),
-				psdef.AttrBatVoltage, psdef.AttrBatPercentRemaining, psdef.AttrBatTimeRemaining, psdef.AttrActiveBatFaults,
-				psdef.AttrBatCapacity, psdef.AttrBatTimeToFullCharge, psdef.AttrBatChargingCurrent, psdef.AttrActiveBatChargeFaults))
+			part(t, d, "PowerSource", nil, feat(0x002F, psdef.FeatureBattery|psdef.FeatureRechargeable),
+				WithElements(0x002F, spec.Options{Attributes: []uint32{
+					psdef.AttrBatVoltage, psdef.AttrBatPercentRemaining, psdef.AttrBatTimeRemaining, psdef.AttrActiveBatFaults,
+					psdef.AttrBatCapacity, psdef.AttrBatTimeToFullCharge, psdef.AttrBatChargingCurrent, psdef.AttrActiveBatChargeFaults,
+				}}))
 			part(t, d, "DeviceEnergyManagement", nil, adjustable)
 		},
 		tolerate: map[string]string{
 			"instanceCount device:ElectricalSensor#1": tagListReason, "instanceCount device:ElectricalSensor#2": tagListReason,
 			"instanceCount device:PowerSource#1": tagListReason, "instanceCount device:PowerSource#2": tagListReason,
 			"missing device:BatteryStorage/ElectricalSensor": tagListReason, "missing device:BatteryStorage/PowerSource": tagListReason,
-		},
-	},
-	"CastingVideoClient": {
-		with: func(*testing.T) []Option { return []Option{WithServer(core.NewBinding())} },
-		tolerate: map[string]string{
-			"missing client:OnOff": clientListReason, "missing client:KeypadInput": clientListReason,
-			"missing client:ContentLauncher": clientListReason, "missing client:ApplicationBasic": clientListReason,
 		},
 	},
 	"Closure": {
@@ -205,10 +174,7 @@ var fixtures = map[string]fixture{
 		tolerate: map[string]string{"missing Descriptor.TAGLIST": tagListReason},
 	},
 	"DeviceEnergyManagement": {with: opts(forecast)},
-	"Doorbell": {
-		with:     func(*testing.T) []Option { return []Option{WithServer(core.NewBinding())} },
-		tolerate: map[string]string{"missing client:Chime": clientListReason},
-	},
+	"Doorbell":               {with: func(*testing.T) []Option { return []Option{WithServer(core.NewBinding())} }},
 	"ElectricalEnergyTariff": {tolerate: map[string]string{"missing Descriptor.TAGLIST": tagListReason}},
 	"ElectricalMeter": {
 		with: opts(acPower, feat(0x0091, eemdef.FeatureImportedEnergy|eemdef.FeatureCumulativeEnergy)),
@@ -219,20 +185,12 @@ var fixtures = map[string]fixture{
 	},
 	"ElectricalSensor": {with: opts(nodeTopo, acPower)},
 	"EnergyEvse": {
-		with: opts(feat(0x0099, evsedef.FeatureChargingPreferences)),
 		parts: func(t *testing.T, d *Device) {
 			t.Helper()
 			part(t, d, "PowerSource", nil, wired)
 			part(t, d, "DeviceEnergyManagement", nil, forecast)
 			part(t, d, "ElectricalSensor", nil, meteredSensor(t, uint32(epmdef.FeatureAlternatingCurrent))...)
 		},
-	},
-	"FloodlightCamera": {
-		parts: func(t *testing.T, d *Device) {
-			t.Helper()
-			part(t, d, "OnOffLight", nil)
-		},
-		tolerate: map[string]string{"instanceCount device:Camera": cameraReason},
 	},
 	"GenericSwitch": {with: opts(feat(0x003B, switchdef.FeatureLatchingSwitch))},
 	"HeatPump": {
@@ -276,14 +234,7 @@ var fixtures = map[string]fixture{
 		},
 		tolerate: map[string]string{"instanceCount device:PowerSource#1": tagListReason, "missing device:SolarPower/PowerSource": tagListReason},
 	},
-	"Thermostat": {with: opts(heating)},
-	"VideoDoorbell": {
-		parts: func(t *testing.T, d *Device) {
-			t.Helper()
-			part(t, d, "Doorbell", nil, WithServer(core.NewBinding()))
-		},
-		tolerate: map[string]string{"instanceCount device:Camera": cameraReason, "missing client:Chime": clientListReason},
-	},
+	"Thermostat":     {with: opts(heating)},
 	"WindowCovering": {with: opts(feat(0x0102, wcdef.FeatureLift))},
 }
 

@@ -95,6 +95,11 @@ type Spec struct {
 	// DeviceConditions are the device-type conditions the host states for
 	// the endpoint ([Endpoint.DeviceConditions]); nil states none.
 	DeviceConditions []string
+	// ClientClusters are the client clusters the endpoint declares: the
+	// Descriptor's ClientList, as matter.js MutableEndpoint.ts:53-61
+	// registers a type's mandatory client clusters and
+	// DescriptorServer.ts:284-290 lists them. nil declares none.
+	ClientClusters []uint32
 	// Parts are the endpoint's child endpoints — matter.js Endpoint
 	// `parts` — such as the PowerSource (0x0011) component a SmokeCoAlarm
 	// requires (matter.js examples/device-smoke-co-alarm). Each part is an

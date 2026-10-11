@@ -129,19 +129,6 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("BridgedNode") {
 		t.Errorf("BridgedNode: %v", err)
 	}
-	if _, err := NewCastingVideoClient(Options{}); err == nil {
-		t.Error("CastingVideoClient: constructed without a StableKey")
-	}
-	if d, err := NewCastingVideoClient(testOptions("CastingVideoClient"), testWith(t, "CastingVideoClient")...); err == nil {
-		if d.Type() != &CastingVideoClientType {
-			t.Errorf("CastingVideoClient: type %v", d.Type().Name)
-		}
-		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
-			t.Error("CastingVideoClient: mandatory Binding not mounted")
-		}
-	} else if !refusesFixture("CastingVideoClient") {
-		t.Errorf("CastingVideoClient: %v", err)
-	}
 	if _, err := NewClosure(Options{}); err == nil {
 		t.Error("Closure: constructed without a StableKey")
 	}
@@ -479,16 +466,6 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("Fan") {
 		t.Errorf("Fan: %v", err)
-	}
-	if _, err := NewFloodlightCamera(Options{}); err == nil {
-		t.Error("FloodlightCamera: constructed without a StableKey")
-	}
-	if d, err := NewFloodlightCamera(testOptions("FloodlightCamera"), testWith(t, "FloodlightCamera")...); err == nil {
-		if d.Type() != &FloodlightCameraType {
-			t.Errorf("FloodlightCamera: type %v", d.Type().Name)
-		}
-	} else if !refusesFixture("FloodlightCamera") {
-		t.Errorf("FloodlightCamera: %v", err)
 	}
 	if _, err := NewFlowSensor(Options{}); err == nil {
 		t.Error("FlowSensor: constructed without a StableKey")
@@ -1089,16 +1066,6 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("Thermostat") {
 		t.Errorf("Thermostat: %v", err)
-	}
-	if _, err := NewVideoDoorbell(Options{}); err == nil {
-		t.Error("VideoDoorbell: constructed without a StableKey")
-	}
-	if d, err := NewVideoDoorbell(testOptions("VideoDoorbell"), testWith(t, "VideoDoorbell")...); err == nil {
-		if d.Type() != &VideoDoorbellType {
-			t.Errorf("VideoDoorbell: type %v", d.Type().Name)
-		}
-	} else if !refusesFixture("VideoDoorbell") {
-		t.Errorf("VideoDoorbell: %v", err)
 	}
 	if _, err := NewWaterFreezeDetector(Options{}); err == nil {
 		t.Error("WaterFreezeDetector: constructed without a StableKey")
