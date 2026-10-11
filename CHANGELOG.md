@@ -29,7 +29,11 @@ the same `ColorTemperatureWriter` as before.
   mounts every mandatory server cluster and every optional one the host
   opts in with a default `spec.Server` (features, mandated elements, stated
   defaults; the default selection adds the features the cluster itself
-  marks mandatory), takes a host server instead (`WithServer`), a feature
+  marks mandatory), takes a host server instead (`WithServer` — also for a
+  cluster the type does not list, mounted after the type's own, as
+  matter.js's `MutableEndpoint.with` adds any behavior), the host model's
+  change notifier as the endpoint source's (`WithChangeNotifier`, for
+  servers that read their state through a host port), a feature
   selection (`WithFeatures`, held to `spec.CheckFeatures` and to the
   features the type mandates), an optional cluster (`WithOptional`),
   optional elements (`WithElements`) and initial values (`WithInitial`). `Device.Spec()` turns a device and its
@@ -53,7 +57,8 @@ the same `ColorTemperatureWriter` as before.
   `ProductDescription`, `BasicInformation` — plus the store (`*sql.DB`, or
   the two stores), the advertiser, the device-type validation mode, the
   attestation material (the CSA test chain by default), an optional OTA
-  requestor and the logger; `Validate` applies the reference daemon's
+  requestor, the root's FixedLabel list and supported locales (`Locales`,
+  en-US alone by default) and the logger; `Validate` applies the reference daemon's
   checks. `node.New` performs the daemon's bring-up with every bridge port
   wired in the order `bridge/bridge.go` documents; `Start`, `Stop` (both
   idempotent) and `Run` the post-start sequence and the shutdown.
@@ -535,6 +540,25 @@ the same `ColorTemperatureWriter` as before.
   `cluster/spec/fixedlabel`. Not mounted by the reference bridge.
 
 ### Changed
+
+- `examples/reference-bridge` runs on the device layer and the node facade
+  (ADR 0018 decision 6), the shape the README points a host at:
+  `node.New(cfg)`, one `device.New<Type>` call per device added to
+  `Aggregator()`, `MarkComplete`, `Run`. Every flag keeps its name and
+  meaning. Servers whose rules need a host port go in through
+  `device.WithServer`, the host models' change notifiers through
+  `device.WithChangeNotifier`, parts through `AddPart`; measurement-backed
+  sensors keep `endpoint.Spec.Measurement`. The hand-written OnOff server is
+  gone: the lights, the speaker and the pump use `cluster/onoff.Server`.
+  The bring-up the facade performs left the daemon (`wiring.go`,
+  `commissioning.go`, `root_optional.go`). Endpoint numbers, device types,
+  cluster sets and attribute values are unchanged; the Descriptor
+  ServerList of the vacuum, the air quality sensor and the oven cavity
+  lists its clusters in the device type's order, as matter.js does. The
+  snapshot scope is the node's (`"node"`): a database written by an
+  earlier release keeps every endpoint number (the store looks numbers up
+  by key), but its rows stay under the old scope `"demo"`, which the
+  model-complete garbage collection no longer visits.
 
 - PASE: PBKDFParamRequest and PBKDFParamResponse carry the whole
   SessionParameters structure (`InitiatorSessionParams`,
