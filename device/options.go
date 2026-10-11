@@ -52,9 +52,13 @@ type settings struct {
 	features map[uint32]uint32
 	optional map[uint32]bool
 	servers  map[uint32]contract.ClusterServer
-	initial  map[uint32]map[uint32]any
-	elements map[uint32]spec.Options
-	nilSrv   bool
+	// serverOrder is the order WithServer named the clusters in; a host
+	// server for a cluster the type does not list is mounted in it.
+	serverOrder []uint32
+	notifier    contract.ChangeNotifier
+	initial     map[uint32]map[uint32]any
+	elements    map[uint32]spec.Options
+	nilSrv      bool
 }
 
 func newSettings(with []Option) *settings {
@@ -91,17 +95,42 @@ func WithOptional(clusterID uint32) Option {
 	return func(s *settings) { s.optional[clusterID] = true }
 }
 
-// WithServer supplies the host's own server for a cluster the device type
-// allows, in place of the default — as a matter.js host replaces a
-// behavior with its own implementation. It mounts an optional cluster too.
+// WithServer supplies the host's own server for a cluster, in place of the
+// default — as a matter.js host replaces a behavior with its own
+// implementation. It mounts an optional cluster too. A cluster the device
+// type does not list is mounted as well, after the type's clusters and in
+// the order of the WithServer calls: matter.js's MutableEndpoint.with adds
+// any behavior to the type's (packages/node/src/endpoint/type/
+// MutableEndpoint.ts:95-110, SupportedBehaviors.extend), and leaves the
+// judgement to device-type validation — a FixedLabel on a light, say, or
+// the EcosystemInformation BridgedNode allows on the bridged endpoint.
+// The clusters the endpoint assembler mounts stay refused.
 func WithServer(srv contract.ClusterServer) Option {
 	return func(s *settings) {
 		if srv == nil {
 			s.nilSrv = true
 			return
 		}
-		s.servers[srv.MatterClusterID()] = srv
+		id := srv.MatterClusterID()
+		if _, dup := s.servers[id]; !dup {
+			s.serverOrder = append(s.serverOrder, id)
+		}
+		s.servers[id] = srv
 	}
+}
+
+// WithChangeNotifier makes the device's endpoint source a
+// [contract.ChangeNotifier] that fires whenever n fires: the host's own
+// model telling the bridge that state its servers read through a host
+// port (valve.StateSource, modeselect.ModeSource, …) has moved, so the
+// endpoint's reportable attributes are reported. It is the Go form of a
+// matter.js host setting behavior state from its own device events,
+// whose Datasource then reports the change (packages/node/src/behavior/
+// state/managed/Datasource.ts). Without it a device whose servers hold no
+// state of their own changes silently for a subscriber. A later call
+// replaces an earlier one; nil leaves the source without one.
+func WithChangeNotifier(n contract.ChangeNotifier) Option {
+	return func(s *settings) { s.notifier = n }
 }
 
 // WithElements serves optional attributes, accepts optional commands and

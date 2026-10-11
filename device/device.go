@@ -39,6 +39,9 @@ type Device struct {
 	typ     *Type
 	opts    Options
 	servers []contract.ClusterServer
+	// source is what Spec hands the assembler: the device itself, or the
+	// device with the host's change notifier ([WithChangeNotifier]).
+	source contract.EndpointSource
 
 	mu    sync.Mutex
 	parts []*Device
@@ -89,6 +92,10 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 		return nil, err
 	}
 	d := &Device{typ: t, opts: opts}
+	d.source = d
+	if s.notifier != nil {
+		d.source = &notifyingSource{Device: d, notifier: s.notifier}
+	}
 	for i := range t.Servers {
 		r := &t.Servers[i]
 		if _, ok := assemblerMounted[r.ID]; ok {
@@ -106,11 +113,31 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 		}
 		d.servers = append(d.servers, srv)
 	}
+	// Host servers for clusters the type does not list, after the type's
+	// own (MutableEndpoint.ts:95-110 extends the type's behaviors).
+	for _, id := range s.serverOrder {
+		if _, listed := t.Server(id); !listed {
+			d.servers = append(d.servers, s.servers[id])
+		}
+	}
 	return d, nil
 }
 
+// notifyingSource is a device whose host model notifies its changes
+// ([WithChangeNotifier]): the endpoint source the bridge subscribes to.
+type notifyingSource struct {
+	*Device
+	notifier contract.ChangeNotifier
+}
+
+// OnMatterValueChanged implements [contract.ChangeNotifier].
+func (n *notifyingSource) OnMatterValueChanged(cb func()) (unsubscribe func()) {
+	return n.notifier.OnMatterValueChanged(cb)
+}
+
 // checkOptedClusters refuses an option for a cluster the device type does
-// not allow as a server, or one the assembler mounts itself.
+// not allow as a server — a host server ([WithServer]) excepted — or one
+// the assembler mounts itself.
 func checkOptedClusters(t *Type, s *settings) error {
 	ids := make([]uint32, 0, len(s.optional)+len(s.servers)+len(s.initial))
 	for id := range s.optional {
@@ -133,7 +160,7 @@ func checkOptedClusters(t *Type, s *settings) error {
 		if name, ok := assemblerMounted[id]; ok {
 			return fmt.Errorf("%w: %s: the endpoint assembler mounts %s (0x%04X) itself", ErrConfiguration, t.Name, name, id)
 		}
-		if _, ok := t.Server(id); !ok {
+		if _, ok := t.Server(id); !ok && !onlyHostServer(s, id) {
 			return fmt.Errorf("%w: %s has no server cluster requirement for cluster 0x%04X", ErrConfiguration, t.Name, id)
 		}
 	}
@@ -149,6 +176,17 @@ func checkOptedClusters(t *Type, s *settings) error {
 		}
 	}
 	return nil
+}
+
+// onlyHostServer reports whether the host supplies its own server for id
+// and states nothing else about it: no feature selection, initial values,
+// elements or opt-in, which need a requirement to apply to.
+func onlyHostServer(s *settings, id uint32) bool {
+	_, host := s.servers[id]
+	_, initial := s.initial[id]
+	_, elements := s.elements[id]
+	_, features := s.features[id]
+	return host && !initial && !elements && !features && !s.optional[id]
 }
 
 // defaultServer builds the default server of one cluster: the generated
@@ -438,7 +476,7 @@ func (d *Device) Spec() endpoint.Spec {
 		FriendlyName:     d.opts.Name,
 		ChannelAddress:   d.opts.ChannelAddress,
 		Availability:     d.opts.Reachable,
-		Source:           d,
+		Source:           d.source,
 		NodeLabel:        d.opts.NodeLabel,
 		DeviceConditions: slices.Clone(d.opts.Conditions),
 		ClientClusters:   d.clientClusters(),

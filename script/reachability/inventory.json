@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4418,
+  "entry_points": 4420,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10386,
-    "reachable": 7334,
-    "whitelisted": 3047,
+    "total_exported": 10389,
+    "reachable": 7335,
+    "whitelisted": 3049,
     "unreachable": 5
   },
   "by_package": [
@@ -13958,10 +13958,24 @@
     },
     {
       "package": "device",
+      "identifier": "TestWithChangeNotifier",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/host_options_test.go",
+      "line": 76
+    },
+    {
+      "package": "device",
       "identifier": "TestWithElements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
       "line": 482
+    },
+    {
+      "package": "device",
+      "identifier": "TestWithServerMountsAClusterTheTypeDoesNotList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/host_options_test.go",
+      "line": 20
     },
     {
       "package": "device",
