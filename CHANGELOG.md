@@ -18,6 +18,23 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- Reference daemon: a second DeviceEnergyManagement device ("Charger ESA",
+  `fleet_esa.go`) with StateForecastReporting, StartTimeAdjustment,
+  Pausable, ForecastAdjustment and ConstraintBasedAdjustment (FeatureMap
+  0x7C, as TC-DEM-2.6/2.8 start chip's app), appended after the grid
+  meter. The DEM test event triggers reach both ESAs. A test,
+  `TestFleetWireShapes`, reads every attribute of the fleet through the
+  bridge's dispatcher and fails on a value the bridge writer would encode
+  as null.
+- Certification harness: a per-case endpoint override in the family table
+  (`endpoints`, formerly `caseDeviceType`, taking a pseudo key too) runs
+  DEM/2.6 and 2.8 on the new ESA with its PICS slice; the EGC family runs
+  on the energy tariff, BDX next to SU; the SU requestor cases get chip's
+  OTA provider app and a staged image built with `ota_image_tool.py` for
+  the daemon's vendor, product and next software version.
+- `deprecation_policy_test.go` checks a `Deprecated:` paragraph on a
+  `const (` / `var (` group, and one inside it, against CHANGELOG.md.
+
 - `cluster/spec.CheckFeatures` judges a feature's otherwise-conformance by
   its first applicable entry, as matter.js's FeatureSelectionErrors does
   (`IllegalFeatureCombinations.ts` addOtherwiseRules): DeviceEnergyManagement
