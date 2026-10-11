@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2026 SukramJ.
+
+package device
+
+import (
+	"context"
+	"testing"
+
+	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/endpoint/endpointtest"
+	"github.com/SukramJ/go-fabric/groups"
+	"github.com/SukramJ/go-fabric/store"
+)
+
+// testOptions are the Options a test device of a given name gets.
+func testOptions(name string) Options {
+	return Options{StableKey: endpoint.StringKey("test:" + name), Name: name}
+}
+
+// nopGroupStore is a group store with one fabric and nothing else, so the
+// assembler mounts Groups and ScenesManagement where the type mandates
+// them.
+type nopGroupStore struct{}
+
+func (nopGroupStore) GetFabric(context.Context, uint8) (store.FabricRecord, error) {
+	return store.FabricRecord{FabricIndex: 1}, nil
+}
+
+func (nopGroupStore) ListFabrics(context.Context) ([]store.FabricRecord, error) { return nil, nil }
+
+func (nopGroupStore) ListGroupKeySets(context.Context, uint8) ([]store.GroupKeySet, error) {
+	return nil, nil
+}
+
+func (nopGroupStore) ListGroupKeyMappings(context.Context, uint8) ([]store.GroupKeyMapping, error) {
+	return nil, nil
+}
+
+func (nopGroupStore) ListGroupTable(context.Context, uint8) ([]store.GroupTableEntry, error) {
+	return nil, nil
+}
+
+func (nopGroupStore) UpsertGroupTableEntry(context.Context, store.GroupTableEntry) error { return nil }
+
+func (nopGroupStore) RemoveGroupTableEntry(context.Context, uint8, uint16) error { return nil }
+
+func (nopGroupStore) ListGroupcastGroups(context.Context, uint8) ([]store.GroupcastGroup, error) {
+	return nil, nil
+}
+
+func (nopGroupStore) UpsertGroupcastGroup(context.Context, store.GroupcastGroup) error { return nil }
+
+func (nopGroupStore) RemoveGroupcastGroup(context.Context, uint8, uint16) error { return nil }
+
+// assemble runs devices through the endpoint assembler, as a host's
+// snapshot does, with the node's group state configured.
+func assemble(t *testing.T, devices ...*Device) *endpoint.Topology {
+	t.Helper()
+	mgr, err := groups.NewManager(nopGroupStore{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := endpointtest.AssemblerConfig()
+	cfg.Groups = mgr
+	a, err := endpoint.New(endpointtest.NewFakeStore(), cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	specs := make([]endpoint.Spec, 0, len(devices))
+	for _, d := range devices {
+		specs = append(specs, d.Spec())
+	}
+	topo, err := a.Assemble(context.Background(), []endpoint.Snapshot{{Scope: "test", Endpoints: specs, ModelComplete: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return topo
+}
+
+// violationsOf returns the device-type violations of the bridged endpoints
+// (the device and its parts), leaving the unpublished root and aggregator
+// out.
+func violationsOf(topo *endpoint.Topology) []endpoint.DeviceTypeViolation {
+	var out []endpoint.DeviceTypeViolation
+	all := endpoint.ValidateDeviceTypes(topo)
+	for i := range all {
+		if ep := topo.FindByID(all[i].Endpoint); ep != nil && (ep.IsRoot() || ep.IsAggregator()) {
+			continue
+		}
+		out = append(out, all[i])
+	}
+	return out
+}
