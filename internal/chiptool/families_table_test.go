@@ -375,9 +375,10 @@ var chipFamilies = []family{
 	// provider app and a staged image (TC_SU_2_2.py:39-41 at the harness
 	// pin: provider_app_path, ota_image, ota_provider_port), which the
 	// runner prepares in the container for every case whose descriptor
-	// arguments name them (otaPlumbing). The requestor is not mounted yet
-	// (brief N), so MCORE.OTA.Requestor stays 0 in the device-generated
-	// slice and those cases are not applicable; the BDX cases at the pin
+	// arguments name them (otaPlumbing), with the case's own --timeout as
+	// budget, and stops the provider and collects its logs after each
+	// (otaCaseTimeout, otaCleanupCommand, otaProviderLogsScript). The
+	// requestor is mounted on the root (brief N); the BDX cases at the pin
 	// are YAML with every step disabled (Test_TC_BDX_*.yaml), manual in
 	// the descriptor.
 	{name: "SU"},

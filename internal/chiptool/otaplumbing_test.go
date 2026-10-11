@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // This file carries no build tag: what the SU cases are handed is fixed
@@ -95,6 +96,71 @@ func otaArgs(args []string, provider, image string) []string {
 	return out
 }
 
+// otaCaseMargin is what the runner adds to an SU case's own --timeout so
+// the case's own budget, not the runner's kill, ends a slow run.
+const otaCaseMargin = 5 * time.Minute
+
+// otaCaseTimeout is the runner budget of an SU case: at least the
+// --timeout its descriptor arguments give (TC_SU_2_2.py:42 and
+// TC_SU_2_4.py:44 at the harness pin: `--timeout 2100`) plus
+// otaCaseMargin. The family default (10 min) cut TC-SU-2.2 off in CI
+// families run 38136443914 at 600 s of a case that budgets 2100 s for its
+// six steps (two 120 s guards, a 180 s delay and a full download among
+// them).
+func otaCaseTimeout(args []string, base time.Duration) time.Duration {
+	for i, a := range args {
+		if a != "--timeout" || i+1 >= len(args) {
+			continue
+		}
+		if s, err := strconv.Atoi(args[i+1]); err == nil {
+			if d := time.Duration(s)*time.Second + otaCaseMargin; d > base {
+				return d
+			}
+		}
+	}
+	return base
+}
+
+// otaCleanupCommand stops the provider app an SU case started. The case
+// starts it as its own child (TC_SUTestBase.py start_provider →
+// OTAProviderSubprocess) and stops it in its teardown; a case the runner
+// kills never gets there, and killing `docker exec` does not reach the
+// processes inside the container (the same reason runYamlCase pkills the
+// chip-tool server). The provider left behind by TC-SU-2.2 then held UDP
+// 5541 and /tmp/chip_kvs_provider, which every SU case's provider uses
+// (TC_SU_2_2.py:41 and :435, TC_SU_2_4.py:106-107: port 5541,
+// /tmp/chip_kvs_provider) — the
+// inferred cause of TC-SU-2.4's provider never printing "Server
+// initialization complete" (its own log was not collected; see
+// otaProviderLogsScript).
+func otaCleanupCommand() []string {
+	return []string{"pkill", "-f", otaProviderApp}
+}
+
+// otaProviderLogsScript lists, one path per line, the provider logs an SU
+// case left in the container: the fixed /tmp/provider_*.log a case names
+// (TC_SU_2_4.py:108: provider_log_path default
+// /tmp/provider_2_4.log) and the per-start logs TC-SU-2.2 writes under its
+// Mobly output directory (TC_SU_2_2.py:431: <output_path>/provider_logs).
+// class is the case's test class, TC_SU_2_2.
+func otaProviderLogsScript(class string) string {
+	return "for f in /tmp/provider_*.log /tmp/matter_testing/logs/*/*/" + class + "/*/provider_logs/*.log; " +
+		`do [ -f "$f" ] && echo "$f"; done; true`
+}
+
+// otaCaseClass is the Python test class of an SU case: family SU, case
+// 2.2 → TC_SU_2_2.
+func otaCaseClass(family, name string) string {
+	return "TC_" + family + "_" + strings.ReplaceAll(name, ".", "_")
+}
+
+// otaProviderLogName is the name a collected provider log is saved under
+// next to the case's own log: SU/2.4 and /tmp/provider_2_4.log →
+// SU/2.4-provider-provider_2_4 (saveCaseLog turns "/" into "_").
+func otaProviderLogName(id, path string) string {
+	return id + "-provider-" + strings.TrimSuffix(filepath.Base(path), ".log")
+}
+
 // TestOtaPlumbing holds the SU plumbing to its sources: the image identity
 // to the daemon's, and the argument rewrite to TC_SU_2_2's header.
 func TestOtaPlumbing(t *testing.T) {
@@ -154,5 +220,28 @@ func TestOtaPlumbing(t *testing.T) {
 	if got, want := strings.Join(otaImageCommand("p.bin", "i.ota"), " "),
 		"python3 /src/app/ota_image_tool.py create -v 0xfff1 -p 0x8001 -vn 2 -vs 2.0 -da sha256 p.bin i.ota"; got != want {
 		t.Errorf("otaImageCommand = %q, want %q", got, want)
+	}
+
+	if got := otaCaseTimeout(header, 10*time.Minute); got != 2100*time.Second+otaCaseMargin {
+		t.Errorf("otaCaseTimeout(TC_SU_2_2) = %v", got)
+	}
+	if got := otaCaseTimeout([]string{"--endpoint", "0"}, 10*time.Minute); got != 10*time.Minute {
+		t.Errorf("otaCaseTimeout without --timeout = %v", got)
+	}
+	if got := otaCaseTimeout([]string{"--timeout", "60"}, 10*time.Minute); got != 10*time.Minute {
+		t.Errorf("otaCaseTimeout lowered the base: %v", got)
+	}
+	if got := otaCaseClass("SU", "2.2"); got != "TC_SU_2_2" {
+		t.Errorf("otaCaseClass = %q", got)
+	}
+	if got := otaProviderLogName("SU/2.4", "/tmp/provider_2_4.log"); got != "SU/2.4-provider-provider_2_4" {
+		t.Errorf("otaProviderLogName = %q", got)
+	}
+	if s := otaProviderLogsScript("TC_SU_2_2"); !strings.Contains(s, "/tmp/provider_*.log") ||
+		!strings.Contains(s, "/TC_SU_2_2/*/provider_logs/*.log") {
+		t.Errorf("otaProviderLogsScript = %q", s)
+	}
+	if got := strings.Join(otaCleanupCommand(), " "); got != "pkill -f chip-ota-provider-app" {
+		t.Errorf("otaCleanupCommand = %q", got)
 	}
 }

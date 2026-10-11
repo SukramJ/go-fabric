@@ -800,6 +800,13 @@ the same `ColorTemperatureWriter` as before.
   `BD-Matter-CASE-StalePeerEviction` is removed from
   `notes/parity/by_design.md`; the Apple-Home stale-key replay it was
   introduced for is now handled the way matter.js handles it, by the cap.
+- **Root cluster servers that name their changed attributes are
+  reported.** The bridge wired `contract.AttributeChangeNotifier` only on
+  bridged endpoints, so a root server keeping its own state — the OTA
+  Software Update Requestor's UpdateState, UpdatePossible and
+  UpdateStateProgress — changed without a subscription report (TC-SU-2.2
+  waited for DelayedOnQuery in vain). Root and aggregator servers are now
+  wired as well; their own DataVersion stays authoritative.
 - **Timed commands come from the model.** An untimed invoke of a command
   matter.js marks "T" answers NEEDS_TIMED_INTERACTION for every cluster,
   not only for the hand-pinned AdministratorCommissioning, DoorLock and

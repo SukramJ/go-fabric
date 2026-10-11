@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4352,
+  "entry_points": 4354,
   "entry_packages": [
     ".",
     "bdx",
@@ -172,9 +172,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 9989,
+    "total_exported": 9991,
     "reachable": 6967,
-    "whitelisted": 3017,
+    "whitelisted": 3019,
     "unreachable": 5
   },
   "by_package": [
@@ -595,7 +595,14 @@
       "identifier": "TestAttributeChangeNotifierMarksOnlyTheNamedAttributes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/attribute_notifier_test.go",
-      "line": 54
+      "line": 55
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAttributeChangeNotifierOnRootIsReported",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/attribute_notifier_test.go",
+      "line": 102
     },
     {
       "package": "bridge",
@@ -5468,6 +5475,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
       "line": 1046
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_BusyReportsDelayedOnQuery",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1229
     },
     {
       "package": "cluster/core",
@@ -16982,7 +16996,7 @@
       "identifier": "TestOtaPlumbing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/otaplumbing_test.go",
-      "line": 100
+      "line": 166
     },
     {
       "package": "internal/chiptool",

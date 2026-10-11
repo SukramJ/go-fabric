@@ -1216,3 +1216,58 @@ func TestOTARequestor_ReadsAndGlobals(t *testing.T) {
 		t.Fatal("UpdatePossible change did not bump the data version")
 	}
 }
+
+// TestOTARequestor_BusyReportsDelayedOnQuery pins TC-SU-2.2 step 1 on the
+// cluster side: a Busy answer with DelayedActionTime 60 s moves UpdateState
+// Querying → DelayedOnQuery (DelayByProvider) and names UpdateState to the
+// change listeners at each move, with the data version bumped first; the
+// retry is floored at minimumQueryInterval, 120 s
+// (OtaSoftwareUpdateRequestorServer.ts :674-684), which is the case's "no
+// QueryImage before 120 s". The bridge half — a root listener reaching the
+// subscription — is bridge/attribute_notifier_test.go
+// TestAttributeChangeNotifierOnRootIsReported.
+func TestOTARequestor_BusyReportsDelayedOnQuery(t *testing.T) {
+	t.Parallel()
+	h := newOtaHarness(t, nil)
+	h.addActive(t)
+	h.provider.answer = func(int) (provdef.QueryImageResponse, error) {
+		d := uint32(60)
+		return provdef.QueryImageResponse{Status: provdef.StatusBusy, DelayedActionTime: &d}, nil
+	}
+	var (
+		mu       sync.Mutex
+		reported []uint8
+		versions []uint32
+	)
+	unsub := h.r.OnMatterAttributesChanged(func(attrs []uint32) {
+		if !slices.Contains(attrs, otadef.AttrUpdateState) {
+			return
+		}
+		v, _ := h.r.MatterRead(otadef.AttrUpdateState)
+		mu.Lock()
+		reported = append(reported, v.(uint8))
+		versions = append(versions, h.r.MatterDataVersion())
+		mu.Unlock()
+	})
+	defer unsub()
+	before := h.r.MatterDataVersion()
+
+	h.r.performUpdateQuery(context.Background())
+
+	mu.Lock()
+	defer mu.Unlock()
+	want := []uint8{uint8(otadef.UpdateStateQuerying), uint8(otadef.UpdateStateDelayedOnQuery)}
+	if !slices.Equal(reported, want) {
+		t.Fatalf("reported UpdateState %v, want %v", reported, want)
+	}
+	if versions[0] == before || versions[1] == versions[0] {
+		t.Fatalf("data versions %v (before %d) not bumped per change", versions, before)
+	}
+	if got := h.clock.pending(); len(got) != 1 || got[0] != 120*time.Second {
+		t.Fatalf("pending %v, want the 120 s floor over the provider's 60 s", got)
+	}
+	tr := h.events.transitions()
+	if l := tr[len(tr)-1]; l.NewState != otadef.UpdateStateDelayedOnQuery || l.Reason != otadef.ChangeReasonDelayByProvider {
+		t.Fatalf("last transition %+v", l)
+	}
+}

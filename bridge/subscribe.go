@@ -1261,23 +1261,36 @@ func (b *Bridge) wireRootNotifiersLocked(mgr *subscription.Manager) {
 	}
 }
 
-// wireAttributeNotifiersLocked subscribes every bridged cluster server
-// that implements [contract.AttributeChangeNotifier] — the servers that
-// keep their own attribute state, such as cluster/opstate and
-// cluster/modebase — independently of whether the endpoint's source has a
-// notifier of its own. On a fire the cluster's endpoint-hosted DataVersion
-// advances once, before the named attributes are marked dirty, so the
+// wireAttributeNotifiersLocked subscribes every cluster server that
+// implements [contract.AttributeChangeNotifier] — the servers that keep
+// their own attribute state, such as cluster/opstate and cluster/modebase
+// on a bridged endpoint or the OTA Software Update Requestor on the root —
+// independently of whether the endpoint's source has a notifier of its
+// own. On a bridged endpoint a fire advances the cluster's endpoint-hosted
+// DataVersion once, before the named attributes are marked dirty, so the
 // report carries the post-change version (matter.js Datasource.ts
 // advanceVersion, then broadcastChanges for the changed properties only).
-// Caller holds b.mu.
+// A root or aggregator server is a persistent instance whose own tracker
+// is the DataVersion the dispatcher reports (endpoint/dispatcher.go
+// clusterDataVersionFor), so it bumps that itself before it fires and
+// nothing is bumped here. matter.js reports a state change of every
+// behavior on every endpoint the same way, the root's included — the OTA
+// requestor's UpdateState is plain behavior state
+// (OtaSoftwareUpdateRequestorServer.ts #updateState :1164-1204). A root
+// server that is also a [contract.ChangeNotifier] is wired by
+// wireRootNotifiersLocked already and is skipped here. Caller holds b.mu.
 func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 	for _, ep := range b.topology.Endpoints {
-		if ep == nil || ep.IsRoot() || ep.IsAggregator() {
+		if ep == nil {
 			continue
 		}
+		persistent := ep.IsRoot() || ep.IsAggregator()
 		for _, srv := range endpointpkg.ClusterServers(ep) {
 			notifier, ok := srv.(contract.AttributeChangeNotifier)
 			if !ok {
+				continue
+			}
+			if _, wired := srv.(contract.ChangeNotifier); wired && ep.IsRoot() {
 				continue
 			}
 			clusterID := srv.MatterClusterID()
@@ -1285,7 +1298,9 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 				if len(attrIDs) == 0 {
 					return
 				}
-				ep.BumpClusterDataVersion(clusterID)
+				if !persistent {
+					ep.BumpClusterDataVersion(clusterID)
+				}
 				for _, attr := range attrIDs {
 					mgr.OnAttributeChanged(im.ConcreteAttributePath{
 						Endpoint: ep.ID, Cluster: clusterID, Attribute: attr,
