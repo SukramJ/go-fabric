@@ -15,22 +15,9 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	mwo "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
 	tcdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturecontrol"
-	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
 )
-
-// mountedServer returns the mounted server of clusterID on ep.
-func mountedServer(t *testing.T, ep *endpoint.Endpoint, clusterID uint32) contract.ClusterServer {
-	t.Helper()
-	for _, srv := range endpoint.ClusterServers(ep) {
-		if srv.MatterClusterID() == clusterID {
-			return srv
-		}
-	}
-	t.Fatalf("endpoint %d mounts no cluster 0x%04X", ep.ID, clusterID)
-	return nil
-}
 
 // TestOvenHasItsHeatingCavityPart: the Oven's mandatory
 // TemperatureControlledCabinet is a part of the oven's endpoint, states the

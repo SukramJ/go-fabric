@@ -155,11 +155,11 @@ const (
 	// dtWaterHeater is the reference water heater
 	// (examples/reference-bridge/fleet_energy.go): WaterHeaterManagement
 	// (EM, TP), WaterHeaterMode and a HEAT Thermostat.
-	dtWaterHeater = 0x050F
-	dtRefrigerator          = 0x0070
-	dtDishwasher            = 0x0075
-	dtMicrowaveOven         = 0x0079
-	dtOven                  = 0x007B
+	dtWaterHeater   = 0x050F
+	dtRefrigerator  = 0x0070
+	dtDishwasher    = 0x0075
+	dtMicrowaveOven = 0x0079
+	dtOven          = 0x007B
 	// dtOvenCavity is no device type: it names the reference oven's
 	// cavity part (examples/reference-bridge/fleet_kitchen.go), the
 	// TemperatureControlledCabinet with OvenMode, OvenCavityOperationalState
