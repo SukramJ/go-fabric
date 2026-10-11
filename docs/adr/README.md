@@ -24,6 +24,7 @@ an oversight to the next reader — including choices to *not* do something.
 | [0016](./0016-device-type-validation.md) | Assembled topologies are validated against their device types — a port of matter.js's `DeviceTypeConformance` and its service's modes (warn by default, strict, off) — on every bridge assembly, with a structured verdict for the host | accepted |
 | [0017](./0017-generated-default-cluster-server.md) | A generated default cluster server in `cluster/spec`, so a cluster without matter.js logic costs its definition and a host port; the hand-written schema tables are generated too | accepted, implemented in #40 |
 | [0018](./0018-device-layer-and-node-facade.md) | A device layer `device/` generated from the device-type model and a `node/` facade — the port of matter.js `devices/`, `endpoints/` and `ServerNode`; the existing `contract/` level stays beneath it, foreign-source projection stays outside | proposed (concept phase 4) |
+| [0019](./0019-tcp-bdx-and-the-ota-requestor.md) | TCP (full large-payload path), BDX and the complete OTA Software Update Requestor enter the scope in wave 5; DiagnosticLogs stays without BDX (matter.js has none); the OTA Provider stays out. | Accepted |
 
 ## Provenance
 
