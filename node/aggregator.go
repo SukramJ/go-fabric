@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"sync"
 
@@ -40,22 +41,23 @@ var (
 // matter.js `server.add(aggregator)` and `aggregator.add(endpoint)`
 // (examples/device-bridge-onoff/src/BridgedDevicesNode.ts:77-78). It keeps
 // the set in insertion order and produces the [endpoint.Snapshot] the
-// assembler consumes (ADR 0018 decision 4): one scope, [Scope], with
-// ModelComplete true, so endpoint-id persistence works as the assembler
-// documents it. Before [Node.Start] an Add or Remove only changes the set
-// (Start's assembly is the first); after it, each one reassembles the
-// running bridge.
+// assembler consumes (ADR 0018 decision 4): one scope, [Scope]. Before
+// [Node.Start] an Add or Remove only changes the set (Start's assembly is
+// the first); after it, each one reassembles the running bridge.
 //
-// Because every assembly is model-complete, add the endpoints the host
-// already knows before Start: an endpoint whose number was persisted by an
-// earlier run and that is added only after Start has lost that number to
-// the first assembly's garbage collection, and gets a fresh one.
+// Call [Aggregator.MarkComplete] once the host has added every device it
+// knows about; before that, numbers of stored endpoints are retained. The
+// snapshots carry ModelComplete false until then and true afterwards, when
+// a stored endpoint absent from the set is garbage-collected
+// (endpoint.Snapshot.ModelComplete, BD-Matter-EndpointGC-ModelCompleteGate).
+// Start does not mark the set complete.
 type Aggregator struct {
 	n *Node
 
-	mu      sync.Mutex
-	eps     []Endpoint
-	started bool
+	mu       sync.Mutex
+	eps      []Endpoint
+	started  bool
+	complete bool
 }
 
 func keyOf(spec endpoint.Spec) (string, error) {
@@ -85,10 +87,11 @@ func (a *Aggregator) Add(ctx context.Context, ep Endpoint) error {
 	return a.reassemble(ctx)
 }
 
-// Remove drops the endpoint with key; a running node reassembles. The
-// assembler releases the endpoint's number then, as matter.js erases a
-// deleted endpoint's number (ServerEndpointInitializer.ts eraseDescendant,
-// cited at endpoint.Snapshot.ModelComplete).
+// Remove drops the endpoint with key; a running node reassembles. Once the
+// set is complete ([Aggregator.MarkComplete]) the assembler releases the
+// endpoint's number then, as matter.js erases a deleted endpoint's storage
+// (ServerEndpointInitializer.ts eraseDescendant, cited at
+// endpoint.Snapshot.ModelComplete); a re-add gets a fresh number.
 func (a *Aggregator) Remove(ctx context.Context, key endpoint.SourceKey) error {
 	if key == nil {
 		return ErrNoStableKey
@@ -106,6 +109,26 @@ func (a *Aggregator) Remove(ctx context.Context, key endpoint.SourceKey) error {
 		return nil
 	}
 	return a.reassemble(ctx)
+}
+
+// MarkComplete declares the set authoritative: every later snapshot is
+// model-complete, so stored endpoints absent from it are garbage-collected.
+// Call it once the host has added every device it knows about; before
+// that, numbers of stored endpoints are retained. On a running node it
+// reassembles at once; a failure is logged and the next Add, Remove or
+// Reassemble retries.
+func (a *Aggregator) MarkComplete() {
+	a.mu.Lock()
+	already := a.complete
+	a.complete = true
+	started := a.started
+	a.mu.Unlock()
+	if already || !started {
+		return
+	}
+	if err := a.reassemble(context.Background()); err != nil {
+		a.n.logger.Warn("node.aggregator.mark_complete", slog.String("err", err.Error()))
+	}
 }
 
 // Endpoints returns the set, in insertion order.
@@ -153,12 +176,15 @@ func (a *Aggregator) reassemble(ctx context.Context) error {
 	return nil
 }
 
-// snapshot is the bridge's Snapshotter: the set as one model-complete
-// snapshot, each endpoint's persisted NodeLabel and ConfigurationVersion
+// snapshot is the bridge's Snapshotter: the set as one snapshot,
+// model-complete once MarkComplete was called, each endpoint's persisted NodeLabel and ConfigurationVersion
 // restored as the daemon's fleet does (fleet.go:1625-1647). A persisted
 // label replaces the Spec's; the version is the larger of the two.
 func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
-	eps := a.Endpoints()
+	a.mu.Lock()
+	eps := slices.Clone(a.eps)
+	complete := a.complete
+	a.mu.Unlock()
 	specs := make([]endpoint.Spec, 0, len(eps))
 	for _, ep := range eps {
 		spec := ep.Spec()
@@ -171,6 +197,6 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	return a.n.assembler.Assemble(ctx, []endpoint.Snapshot{{
 		Scope:         Scope,
 		Endpoints:     specs,
-		ModelComplete: true,
+		ModelComplete: complete,
 	}})
 }

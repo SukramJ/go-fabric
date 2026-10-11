@@ -15,6 +15,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -250,11 +251,13 @@ func TestRunStopsWithTheContext(t *testing.T) {
 	}
 }
 
-// TestAggregatorAcrossRestart: Add before and after Start, Remove, and a
-// restart on the same database. An endpoint kept across the restart keeps
-// its number (BD-Matter-EndpointID-Persistent); one removed and added
-// again gets a fresh one, as the allocator never reissues a released
-// number (BD-Matter-EndpointNumber-Monotonic).
+// TestAggregatorAcrossRestart: Add before and after Start, Remove on a
+// complete set, and a restart on the same database. An endpoint kept
+// across the restart keeps its number (BD-Matter-EndpointID-Persistent);
+// one removed and added again gets a fresh one, as the allocator never
+// reissues a released number (BD-Matter-EndpointNumber-Monotonic) and
+// matter.js's Endpoint.delete() erases the endpoint's storage
+// (Endpoint.ts:985).
 func TestAggregatorAcrossRestart(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "node.db")
@@ -271,6 +274,7 @@ func TestAggregatorAcrossRestart(t *testing.T) {
 	if err := n.Aggregator().Add(ctx, b); err != nil {
 		t.Fatal(err)
 	}
+	n.Aggregator().MarkComplete()
 	idA, okA := endpointOf(t, n, "plug:a")
 	idB, okB := endpointOf(t, n, "plug:b")
 	if !okA || !okB || idA == idB {
@@ -477,5 +481,90 @@ func TestOTARequestorMounted(t *testing.T) {
 	dt := readAttr(t, n.Bridge().Topology(), 0, 0x001D, 0x0000)
 	if dt == nil {
 		t.Error("root DeviceTypeList empty")
+	}
+}
+
+// TestMarkComplete: a node started with an empty Aggregator keeps the
+// number of an endpoint stored by a previous run until MarkComplete, so
+// one added after Start gets its old number back; once MarkComplete was
+// called, a stored endpoint absent from the set is garbage-collected and
+// a later add gets a fresh number.
+func TestMarkComplete(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	seed := func(t *testing.T, path string) (idA uint16) {
+		t.Helper()
+		n := newNode(t, minimalConfig(openDB(t, path)))
+		for _, k := range []string{"plug:a", "plug:b"} {
+			if err := n.Aggregator().Add(ctx, newPlug(t, k)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := n.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		n.Aggregator().MarkComplete()
+		n.Aggregator().MarkComplete() // idempotent
+		idA, _ = endpointOf(t, n, "plug:a")
+		if err := n.Stop(ctx); err != nil {
+			t.Fatal(err)
+		}
+		return idA
+	}
+
+	t.Run("retained until MarkComplete", func(t *testing.T) {
+		t.Parallel()
+		path := filepath.Join(t.TempDir(), "node.db")
+		idA := seed(t, path)
+		m := newNode(t, minimalConfig(openDB(t, path)))
+		if err := m.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := m.Aggregator().Add(ctx, newPlug(t, "plug:a")); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := endpointOf(t, m, "plug:a"); got != idA {
+			t.Errorf("plug:a endpoint %d after Start, want its stored %d", got, idA)
+		}
+	})
+
+	t.Run("collected after MarkComplete", func(t *testing.T) {
+		t.Parallel()
+		path := filepath.Join(t.TempDir(), "node.db")
+		idA := seed(t, path)
+		m := newNode(t, minimalConfig(openDB(t, path)))
+		if err := m.Aggregator().Add(ctx, newPlug(t, "plug:b")); err != nil {
+			t.Fatal(err)
+		}
+		if err := m.Start(ctx); err != nil {
+			t.Fatal(err)
+		}
+		m.Aggregator().MarkComplete()
+		if err := m.Aggregator().Add(ctx, newPlug(t, "plug:a")); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := endpointOf(t, m, "plug:a"); got == idA || got == 0 {
+			t.Errorf("plug:a endpoint %d, want a fresh number (stored %d was collected)", got, idA)
+		}
+	})
+}
+
+// TestBootReason: the node reports the BootReason its GeneralDiagnostics
+// emits — PowerOnReboot (1) for a node the facade builds.
+func TestBootReason(t *testing.T) {
+	t.Parallel()
+	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
+	if got := n.BootReason(); got != mattercore.BootReasonPowerOnReboot {
+		t.Errorf("BootReason %d, want %d", got, mattercore.BootReasonPowerOnReboot)
+	}
+	srv, err := onoff.New(onoff.Config{
+		Features: onoff.FeatureLT, BootReason: n.BootReason,
+		Initial: map[uint32]any{onoff.AttrStartUpOnOff: onoff.StartUpOn},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !srv.OnOff() {
+		t.Error("StartUpOnOff not applied after a power-on reboot")
 	}
 }

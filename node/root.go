@@ -81,6 +81,7 @@ func (r *RootClusters) Servers() []contract.ClusterServer { return slices.Clone(
 // rootDeps is what buildRoot needs from the node under construction.
 type rootDeps struct {
 	cfg               *Config
+	bootReason        uint8
 	st                *store.Store
 	groups            *groups.Manager
 	connector         mattercore.OtaProviderConnector
@@ -116,7 +117,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 
 	// RebootCount and the operational time carry over from the previous
 	// boots (wiring.go:118-128).
-	r.GeneralDiagnostics = mattercore.NewGeneralDiagnostics(mattercore.BootReasonPowerOnReboot)
+	r.GeneralDiagnostics = mattercore.NewGeneralDiagnostics(d.bootReason)
 	reboots, err := countBoot(ctx, d.st)
 	if err != nil {
 		return nil, fmt.Errorf("general diagnostics: %w", err)

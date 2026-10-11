@@ -54,6 +54,7 @@ type Node struct {
 	window     *commissioningHost
 	diagRing   *diagevent.Ring
 	advertiser mdns.Advertiser
+	bootReason uint8
 	persisted  persisted
 
 	// life bounds the goroutines New and Start begin (subscription
@@ -92,7 +93,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		cfg.Advertiser = mdns.NewNoop()
 	}
 	ctx := context.Background()
-	n := &Node{cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser}
+	n := &Node{cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, bootReason: mattercore.BootReasonPowerOnReboot}
 	n.life, n.cancel = context.WithCancel(ctx)
 	ok := false
 	defer func() {
@@ -161,7 +162,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	// --- root + Aggregator endpoints (main.go:253-321) ------------------
 	n.caseIDs = newCaseIdentities(n.logger)
 	n.root, err = buildRoot(ctx, rootDeps{
-		cfg: &n.cfg, st: n.st, groups: n.groups, connector: n.br,
+		cfg: &n.cfg, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
 		onFabricInstalled: n.fabricInstalled,
 	})
 	if err != nil {
@@ -450,6 +451,12 @@ func (n *Node) CommissioningWindow() *bridge.CommissioningWindow { return n.br.C
 func (n *Node) Fabrics(ctx context.Context) ([]store.FabricRecord, error) {
 	return n.st.ListFabrics(ctx)
 }
+
+// BootReason returns the GeneralDiagnostics BootReason the node was built
+// with — the value [Node.Start]'s EmitBootReason reports. The device layer
+// passes it to the default OnOff servers (onoff.Config.BootReason), which
+// skip StartUpOnOff after a software update (OnOffServer.ts:36, :326-331).
+func (n *Node) BootReason() uint8 { return n.bootReason }
 
 // Store returns the credential store the node runs on.
 func (n *Node) Store() *store.Store { return n.st }
