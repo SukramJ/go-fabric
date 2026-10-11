@@ -11,6 +11,7 @@ import (
 	lightcluster "github.com/SukramJ/go-fabric/cluster/light"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
+	soildef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
 )
@@ -85,6 +86,15 @@ func (measurementSource) Energy() (float64, bool)                             { 
 func (measurementSource) HasEnergy() bool                                     { return true }
 func (measurementSource) MatterSwitchPositions() uint8                        { return 2 }
 func (measurementSource) MatterSwitchSupportsLongPress() bool                 { return true }
+
+// MatterSoilMoistureLimits makes the source a measurement.SoilMoistureSource:
+// the SoilMoisture kind mounts nothing for a source without limits.
+func (measurementSource) MatterSoilMoistureLimits() soildef.MeasurementAccuracyStruct {
+	return soildef.MeasurementAccuracyStruct{
+		MeasurementType: soildef.MeasurementTypeSoilMoisture, Measured: true, MaxMeasuredValue: 100,
+		AccuracyRanges: []soildef.MeasurementAccuracyRangeStruct{{RangeMax: 100}},
+	}
+}
 
 func TestMeasurementKindsMeetTheirDeviceTypeRequirements(t *testing.T) {
 	t.Parallel()

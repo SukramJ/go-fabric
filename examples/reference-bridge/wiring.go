@@ -76,6 +76,9 @@ type rootRefs struct {
 	// diagLogs answers RetrieveLogsRequest from the bridge's diagnostic
 	// event ring, attached in main once the ring exists.
 	diagLogs *mattercore.DiagnosticLogs
+	// powerSources lists the node's PowerSource endpoints, which are
+	// numbered only once the topology is assembled (attachNodeProviders).
+	powerSources *mattercore.PowerSourceConfiguration
 }
 
 // buildRootClusters constructs endpoint 0's cluster surface.
@@ -254,6 +257,13 @@ func buildRootClusters( //nolint:funlen // the root endpoint's servers, built an
 	if err != nil {
 		return nil, refs, fmt.Errorf("root labels and diagnostics: %w", err)
 	}
+	// PowerSourceConfiguration (RootNode: optional, deprecated) lists the
+	// EV charger's PowerSource endpoint (fleet_node.go).
+	refs.powerSources, err = mattercore.NewPowerSourceConfiguration(nil)
+	if err != nil {
+		return nil, refs, fmt.Errorf("root power source configuration: %w", err)
+	}
+	optional = append(optional, refs.powerSources)
 	servers := slices.Concat([]contract.ClusterServer{
 		basicInfo,
 		accessControl,
@@ -327,8 +337,9 @@ func endpointIDs(br *matterbridge.Bridge, keep func(*endpoint.Endpoint) bool) []
 // FLABEL and ULABEL cases address endpoint 1 (TC_FLABEL_2_1.py's
 // "--endpoint 1", Test_TC_ULABEL_2_*.yaml's "endpoint: 1"), where CHIP's
 // all-clusters app serves both; the Aggregator's UserLabel list is
-// persisted under its own key.
-func buildAggregatorClusters(ctx context.Context, st *store.Store) ([]contract.ClusterServer, error) {
+// persisted under its own key. extra are mounted after them: the Actions
+// server (Aggregator: optional, fleet_node.go) in the daemon.
+func buildAggregatorClusters(ctx context.Context, st *store.Store, extra ...contract.ClusterServer) ([]contract.ClusterServer, error) {
 	descriptor, err := mattercore.NewDescriptor(
 		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(deviceTypeAggregator)}},
 		nil, nil, nil,
@@ -342,7 +353,7 @@ func buildAggregatorClusters(ctx context.Context, st *store.Store) ([]contract.C
 	if err != nil {
 		return nil, fmt.Errorf("aggregator labels: %w", err)
 	}
-	servers := []contract.ClusterServer{mattercore.NewIdentify(), descriptor, fixedLabel, userLabel}
+	servers := append([]contract.ClusterServer{mattercore.NewIdentify(), descriptor, fixedLabel, userLabel}, extra...)
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
 	return servers, nil
 }

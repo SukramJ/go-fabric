@@ -24,6 +24,30 @@ the same `ColorTemperatureWriter` as before.
   TemperatureUnit is Fahrenheit, else Celsius — as matter.js's
   ThermostatUserInterfaceConfigurationServer initialize does.
 
+- `cluster/measurement`: SoilMeasurement (0x0430) as the SoilSensor kind,
+  `contract.MeasurementSoilMoisture` (SoilSensor 0x0045). A source
+  implements `measurement.SoilMoistureSource`: the reading in percent plus
+  the fixed `SoilMoistureMeasurementLimits` struct; a source without
+  limits mounts nothing. The measured value starts null and a reading
+  outside the limits is refused, keeping the previous value, as
+  connectedhomeip's `SoilMeasurementCluster.cpp` does.
+- `cluster/core`: `NewPowerSourceConfiguration` (0x002E; Sources in
+  priority order, at most six, optionally read through
+  `SetSourcesProvider`), `NewEcosystemInformation` (0x0750; host port
+  `EcosystemDirectory`, fabric-scoped lists filtered by the reading fabric,
+  another fabric's entries redacted on an unfiltered read) and
+  `NewActions` (0x0025; host port `ActionsHost`, all twelve commands
+  accepted, NOT_FOUND for an unknown action, INVALID_COMMAND for a command
+  the action does not support, StateChanged / ActionFailed through the
+  event emitter).
+- Generated definitions for SoilMeasurement, PowerSourceConfiguration,
+  EcosystemInformation and Actions under `cluster/spec/`.
+- Reference daemon: a SoilSensor ("Garden Soil"), PowerSourceConfiguration
+  on the root listing the EV charger's PowerSource endpoint, Actions on the
+  Aggregator with two demo scenes over the desk lamp, EcosystemInformation
+  on the air quality sensor. The SOIL, ACT, PSCFG and ECOINFO families are
+  declared (ECOINFO's two cases excluded: they start their own fabric-sync
+  DUT).
 - Reference daemon, for the certification harness: FixedLabel and UserLabel
   on the Aggregator endpoint and FixedLabel on the first bridged light (the
   CSA cases written against the CHIP all-clusters app address endpoint 1);

@@ -84,6 +84,7 @@ var committed = []string{
 	"TotalVolatileOrganicCompoundsConcentrationMeasurement",
 	"RadonConcentrationMeasurement",
 	"BooleanStateConfiguration",
+	"SoilMeasurement",
 	"PowerSource",
 	"PowerTopology",
 	"ElectricalPowerMeasurement",
@@ -119,4 +120,7 @@ var committed = []string{
 	"UnitLocalization",
 	"SoftwareDiagnostics",
 	"EthernetNetworkDiagnostics",
+	"PowerSourceConfiguration",
+	"EcosystemInformation",
+	"Actions",
 }

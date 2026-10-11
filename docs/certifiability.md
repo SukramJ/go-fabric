@@ -144,6 +144,9 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | LUNIT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | DGSW | 4 | 1 | 0 | 0 | 2 | 1 | 0 |
 | DGETH | 3 | 2 | 0 | 0 | 1 | 0 | 0 |
+| ACT | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| PSCFG | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ECOINFO | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | ACFREMON | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | BOOL | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | BOOLCFG | 9 | 9 | 0 | 0 | 0 | 0 | 0 |
@@ -158,6 +161,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | PMHCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | RNCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | TVOCCONC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| SOIL | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | CLCTRL | 12 | 5 | 0 | 0 | 7 | 0 | 0 |
 | CLDIM | 11 | 6 | 0 | 0 | 5 | 0 | 0 |
 | CC | 31 | 21 | 0 | 0 | 6 | 4 | 0 |

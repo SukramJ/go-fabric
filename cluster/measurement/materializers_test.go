@@ -53,6 +53,7 @@ func TestBuiltinMaterializersAreInstalled(t *testing.T) {
 		{"PM1", contract.MeasurementPM1, true},
 		{"TVOC", contract.MeasurementTVOC, true},
 		{"Radon", contract.MeasurementRadon, true},
+		{"SoilMoisture", contract.MeasurementSoilMoisture, true},
 	}
 
 	for _, tc := range cases {

@@ -27,6 +27,7 @@ import (
 	prsdef "github.com/SukramJ/go-fabric/cluster/spec/pressuremeasurement"
 	radondef "github.com/SukramJ/go-fabric/cluster/spec/radonconcentrationmeasurement"
 	rhdef "github.com/SukramJ/go-fabric/cluster/spec/relativehumiditymeasurement"
+	soildef "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement"
 	"github.com/SukramJ/go-fabric/cluster/spec/spectest"
 	tmpdef "github.com/SukramJ/go-fabric/cluster/spec/temperaturemeasurement"
 	tvocdef "github.com/SukramJ/go-fabric/cluster/spec/totalvolatileorganiccompoundsconcentrationmeasurement"
@@ -82,6 +83,7 @@ func TestServersMatchTheGeneratedDefinitions(t *testing.T) {
 		{"ElectricalPower", NewElectricalPowerServer(f), epmdef.Definition, uint32(epmdef.FeatureAlternatingCurrent)},
 		{"ElectricalPower readings", NewElectricalPowerServerFromReadings(specReadings{f}), epmdef.Definition, uint32(epmdef.FeatureAlternatingCurrent)},
 		{"ElectricalEnergy", NewElectricalEnergyServer(f), eemdef.Definition, uint32(eemdef.FeatureImportedEnergy | eemdef.FeatureCumulativeEnergy)},
+		{"SoilMeasurement", NewSoilMeasurementServer(&soilStub{value: 40, observed: true, limits: demoSoilLimits()}), soildef.Definition, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
