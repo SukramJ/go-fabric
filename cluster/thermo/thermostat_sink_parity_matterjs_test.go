@@ -26,13 +26,11 @@ type sinkCall struct {
 	companions []thermo.SetpointChange
 }
 
-// recordingThermoSink records every call and refuses with err (all calls)
-// or, with refuseAttr set, only the SetSetpoint calls for that attribute.
+// recordingThermoSink records every call and refuses each with err.
 type recordingThermoSink struct {
-	mu         sync.Mutex
-	calls      []sinkCall
-	err        error
-	refuseAttr uint32
+	mu    sync.Mutex
+	calls []sinkCall
+	err   error
 }
 
 func (r *recordingThermoSink) SetSystemMode(_ context.Context, mode uint8) error {
@@ -46,9 +44,6 @@ func (r *recordingThermoSink) SetSetpoint(_ context.Context, attrID uint32, valu
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.calls = append(r.calls, sinkCall{attrID: attrID, value: value, companions: companions})
-	if r.refuseAttr != 0 && r.refuseAttr != attrID {
-		return nil
-	}
 	return r.err
 }
 
@@ -170,23 +165,34 @@ func TestSinkNotCalledForLimitsOrRefusedWrites(t *testing.T) {
 }
 
 // TestSetpointRaiseLowerGoesThroughTheSink: Both on a HEAT+COOL thermostat
-// hands the cooling setpoint and then the heating setpoint to the Sink
-// (matter.js ThermostatServer.ts:218-219 at 4633bfd7); a refusal of the
-// second stores neither.
+// is one Sink call — the cooling setpoint as the primary, the heating
+// setpoint its companion (matter.js ThermostatServer.ts:218-219 at
+// 4633bfd7 assigns cooling first); a single-mode command is one call with
+// no companions; a refusal stores neither.
 func TestSetpointRaiseLowerGoesThroughTheSink(t *testing.T) {
 	t.Parallel()
 	sink := &recordingThermoSink{}
 	srv := newSinkHeatCool(sink)
 	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 3)
+	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeHeat, -2)
 	want := []sinkCall{
-		{attrID: tdef.AttrOccupiedCoolingSetpoint, value: 2630},
-		{attrID: tdef.AttrOccupiedHeatingSetpoint, value: 2030},
+		{
+			attrID: tdef.AttrOccupiedCoolingSetpoint, value: 2630,
+			companions: []thermo.SetpointChange{{AttrID: tdef.AttrOccupiedHeatingSetpoint, Value: 2030}},
+		},
+		{attrID: tdef.AttrOccupiedHeatingSetpoint, value: 2010},
 	}
 	if got := sink.recorded(); !reflect.DeepEqual(got, want) {
 		t.Errorf("Sink calls = %+v, want %+v", got, want)
 	}
+	if got := readSetpoint(t, srv, tdef.AttrOccupiedCoolingSetpoint, "cool"); got != 2630 {
+		t.Errorf("OccupiedCoolingSetpoint = %d, want 2630", got)
+	}
+	if got := readSetpoint(t, srv, tdef.AttrOccupiedHeatingSetpoint, "heat"); got != 2010 {
+		t.Errorf("OccupiedHeatingSetpoint = %d, want 2010", got)
+	}
 
-	refusing := &recordingThermoSink{err: errors.New("no"), refuseAttr: tdef.AttrOccupiedHeatingSetpoint}
+	refusing := &recordingThermoSink{err: errors.New("no")}
 	srv = newSinkHeatCool(refusing)
 	_, err := srv.MatterInvoke(context.Background(), tdef.CmdSetpointRaiseLower,
 		clusterwire.SetpointRaiseLowerRequest{Mode: clusterwire.ThermostatSetpointModeBoth, Amount: 3})
@@ -199,8 +205,45 @@ func TestSetpointRaiseLowerGoesThroughTheSink(t *testing.T) {
 	if got := readSetpoint(t, srv, tdef.AttrOccupiedHeatingSetpoint, "heat"); got != 2000 {
 		t.Errorf("OccupiedHeatingSetpoint = %d after a refusal, want 2000", got)
 	}
-	if n := len(refusing.recorded()); n != 2 {
-		t.Errorf("Sink called %d times, want 2", n)
+	if n := len(refusing.recorded()); n != 1 {
+		t.Errorf("Sink called %d times, want 1", n)
+	}
+}
+
+// TestUnchangedValueDoesNotCallTheSink: a write of the stored SystemMode
+// or setpoint, and a SetpointRaiseLower that moves nothing, answer SUCCESS
+// without the Sink — matter.js Datasource.ts:674-676 skips an equal value
+// on commit and :956-957 fires $Changing only for changed fields (4633bfd7).
+// A cooling-only Both moves one setpoint, which travels alone.
+func TestUnchangedValueDoesNotCallTheSink(t *testing.T) {
+	t.Parallel()
+	sink := &recordingThermoSink{err: errors.New("must not be called")}
+	srv := newSinkHeatCool(sink)
+	ctx := context.Background()
+	if err := srv.MatterWrite(ctx, tdef.AttrOccupiedHeatingSetpoint, int16(2000)); err != nil {
+		t.Errorf("unchanged OccupiedHeatingSetpoint: %v", err)
+	}
+	if err := srv.MatterWrite(ctx, tdef.AttrSystemMode, uint8(tdef.SystemModeAuto)); err != nil {
+		t.Errorf("unchanged SystemMode: %v", err)
+	}
+	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeBoth, 0)
+	if n := len(sink.recorded()); n != 0 {
+		t.Errorf("Sink called %d times for unchanged values, want 0", n)
+	}
+
+	coolSink := &recordingThermoSink{}
+	cfg := thermo.ThermostatConfig{
+		Features:                thermo.ThermostatFeatureCOOL,
+		AbsMinCoolSetpointLimit: 1600,
+		AbsMaxCoolSetpointLimit: 3200,
+		InitialCoolingSetpoint:  2600,
+		Sink:                    coolSink,
+	}
+	cool := thermo.NewThermostatServer(cfg)
+	invokeSetpointRaiseLower(t, cool, clusterwire.ThermostatSetpointModeBoth, 1)
+	want := []sinkCall{{attrID: tdef.AttrOccupiedCoolingSetpoint, value: 2610}}
+	if got := coolSink.recorded(); !reflect.DeepEqual(got, want) {
+		t.Errorf("Sink calls = %+v, want %+v", got, want)
 	}
 }
 

@@ -69,7 +69,9 @@ var ErrMoverWithMoveStep = errors.New("windowcovering: Config.Mover and Config.M
 // :542-554, :576-592), stores the target attribute and calls the Mover —
 // one call per command — instead of moving the lift itself.
 //
-// An error answers the command FAILURE and restores the previous target.
+// An error refuses the command and restores the previous target: an
+// error that carries an IM status ([im.StatusCodeError]) answers with it,
+// any other answers FAILURE — the rule thermo.Sink follows too.
 // The Mover runs inside the command: the command's answer waits for it,
 // so it returns once the device accepted the target, not once it arrived
 // (matter.js runs handleMovement as a worker and answers first,
@@ -362,7 +364,8 @@ func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, f
 // stored, and the Mover called: GoTo with the lift target, Stop for
 // StopMotion. The server neither moves the lift nor changes
 // OperationalStatus: both are the device's, reported through the inbound
-// setters. A Mover error answers FAILURE and restores the previous target.
+// setters. A Mover error answers with its IM status, FAILURE without one,
+// and restores the previous target.
 func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, fields any) error {
 	var target uint16
 	stop := false
@@ -404,6 +407,10 @@ func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, fi
 	s.mu.Lock()
 	s.targetPositionPercent100ths = prev
 	s.mu.Unlock()
+	var sc im.StatusCodeError
+	if errors.As(err, &sc) {
+		return err
+	}
 	return spec.Errorf(im.StatusFailure, "windowcovering: command 0x%02X refused: %v", cmdID, err)
 }
 

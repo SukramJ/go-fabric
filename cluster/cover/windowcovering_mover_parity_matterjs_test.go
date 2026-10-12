@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/cover"
+	"github.com/SukramJ/go-fabric/cluster/spec"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
 	clusterwire "github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -262,5 +263,24 @@ func TestMoverPathRefusesWhatTheServerRefuses(t *testing.T) {
 	}
 	if n := len(m.recorded()); n != 0 {
 		t.Errorf("Mover called %d times, want 0", n)
+	}
+}
+
+// TestMoverStatusErrorPassesThrough: a Mover refusal that carries an IM
+// status answers with it (the rule thermo.Sink follows too), and the
+// target goes back.
+func TestMoverStatusErrorPassesThrough(t *testing.T) {
+	t.Parallel()
+	m := &recordingMover{err: spec.Errorf(im.StatusBusy, "motor busy")}
+	srv := newMoverServer(t, m, 3000)
+	for _, cmd := range []uint32{clusterwire.WindowCoveringCmdDownOrClose, clusterwire.WindowCoveringCmdStopMotion} {
+		_, err := srv.MatterInvoke(context.Background(), cmd, nil)
+		var sc im.StatusCodeError
+		if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusBusy {
+			t.Errorf("command 0x%02X: error %v, want BUSY", cmd, err)
+		}
+		if got := readU16(t, srv, clusterwire.WindowCoveringAttrTargetPositionLiftPercent100ths); got != 3000 {
+			t.Errorf("command 0x%02X: target %d after a refusal, want 3000", cmd, got)
+		}
 	}
 }

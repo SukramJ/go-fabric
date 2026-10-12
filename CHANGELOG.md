@@ -15,10 +15,12 @@ pseudo-version of `main`.
 - `thermo.ThermostatConfig.Sink` (`thermo.Sink`, `thermo.SetpointChange`):
   an optional host port for a bridged thermostat. A controller's SystemMode
   write, OccupiedHeating/CoolingSetpoint write (with the companions the
-  reconcile would move) and each setpoint a SetpointRaiseLower moves reach
-  the host after validation and before anything is stored; an error refuses
-  the change (its IM status if it carries one, FAILURE otherwise) and
-  nothing is stored. The limit writes do not call it. New inbound setters
+  reconcile would move) and the setpoints a SetpointRaiseLower moves (one
+  call; in Both mode the cooling setpoint with the heating setpoint as its
+  companion) reach the host after validation and before anything is stored;
+  an error refuses the change (its IM status if it carries one, FAILURE
+  otherwise) and nothing is stored. A value equal to the stored one is no
+  change and does not call the Sink. The limit writes do not call it. New inbound setters
   `SetSystemMode`, `SetOccupiedHeatingSetpoint` and
   `SetOccupiedCoolingSetpoint` record the device's own state without the
   Sink and report through the change notifier (issue #60).
@@ -26,8 +28,9 @@ pseudo-version of `main`.
   window covering. UpOrOpen, DownOrClose and GoToLiftPercentage store the
   target the server infers and call `GoTo` once; StopMotion sets the target
   to the current position and calls `Stop`. The server then neither moves
-  the lift nor changes OperationalStatus; a Mover error answers FAILURE and
-  restores the previous target. The Mover runs inside the command, so it
+  the lift nor changes OperationalStatus; a Mover error answers with its IM
+  status if it carries one, FAILURE otherwise, and restores the previous
+  target. The Mover runs inside the command, so it
   returns once the device accepted the target. `New` refuses a Mover
   together with a `MoveStep` (`cover.ErrMoverWithMoveStep`). New inbound
   setters `SetCurrentPosition(lift, tilt)` (tilt unused: the server is

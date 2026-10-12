@@ -10,7 +10,8 @@ at 5) and a CHANGELOG entry under `[Unreleased]`.
 | --- | --- |
 | dfb2f26 `cluster/thermo: a host Sink for SystemMode and setpoint changes, inbound setters` | 1 (#60) |
 | 067a33a `cluster/cover: a host Mover for the window covering, inbound position setters` | 2 (#61) |
-| (this file) `notes: report Y` | — |
+| 2157c3b `notes: report Y` | — |
+| (fix-up) `cluster/thermo, cluster/cover: owner decisions on report Y — one status rule, one RaiseLower call, unchanged values skip the Sink` | decisions Q1, Q3, Q6 |
 
 ## What was built
 
@@ -32,19 +33,29 @@ at 5) and a CHANGELOG entry under `[Unreleased]`.
   - Limits, LocalTemperatureCalibration and the two silently-ignored
     attributes do not call the Sink (doc comment says limits are
     configuration).
-- `SetpointRaiseLower`: the arithmetic is unchanged; it now computes both
-  setpoints first, then calls `Sink.SetSetpoint` once per setpoint that
-  moves, cooling before heating (matter.js `:218-219` for Both on
-  HEAT+COOL; the single-setpoint branches `:221`, `:223`, `:246`, `:268`
-  move one), with `companions` nil, and stores both only after every call
-  succeeded.
+- `SetpointRaiseLower`: the arithmetic is unchanged; it computes both
+  setpoints first, then makes **one** `Sink.SetSetpoint` call (fix-up, Q3):
+  in Both mode on HEAT+COOL the cooling setpoint is the primary and the
+  heating setpoint its companion (matter.js assigns cooling first,
+  `:218-219`); when only one moves it travels alone; a single-mode command
+  (`:221`, `:223`, `:246`, `:268`) is one call with no companions. Both
+  are stored only after the call succeeded.
+- Unchanged values (fix-up, Q6): a SystemMode or occupied-setpoint write
+  equal to the stored value, and a SetpointRaiseLower that moves nothing,
+  answer SUCCESS without calling the Sink and store nothing new — matter.js
+  `packages/node/src/behavior/state/managed/Datasource.ts:674-676`
+  (`isDeepEqual` skips an equal value on commit) and `:956-957`
+  (`$Changing` only for changed fields), cited in the code. An equal
+  setpoint write skips the limit assert too (no `$Changing`). Limit writes
+  are unchanged.
 - Refusal mapping (`sinkError`): an error that carries an IM status
   (`errors.As(err, &im.StatusCodeError)`) passes through as is; any other
   answers FAILURE (`spec.Errorf(im.StatusFailure, …)`). Nothing is stored.
   **What onoff does:** `onoff.Server.setOnOff` (`cluster/onoff/server.go:319-328`)
   wraps *every* Sink error, a status error included, in FAILURE — it does
-  not pass a status through. The thermostat follows the brief (pass
-  through); the Sink doc names the difference. See open question 1.
+  not pass a status through. Decision Q1: the thermostat Sink and the
+  cover Mover share the pass-through rule; onoff stays as it is (open
+  items).
 - Locking: a new `op` mutex serialises writes, the command and the inbound
   setters; the value lock `mu` is not held while the Sink runs, so the Sink
   may `MatterRead`, but must not call the inbound setters synchronously
@@ -82,8 +93,10 @@ at 5) and a CHANGELOG entry under `[Unreleased]`.
   `:576-584`, StopMotion := current `:491-493`), store
   TargetPositionLiftPercent100ths, then one `GoTo(ctx, &lift, nil)` or
   `Stop(ctx)`. No travel simulation, no immediate move of the current
-  position. A Mover error → FAILURE (`spec.Errorf(im.StatusFailure, …)`)
-  and the previous target restored.
+  position. A Mover error restores the previous target and answers with
+  its IM status when it carries one, FAILURE otherwise (fix-up, Q1 — the
+  thermostat's rule). The Mover is called on every command, an unchanged
+  target included (matter.js runs `handleMovement` on every command).
 - Locking: `op` serialises Mover commands; `mu` is released while the Mover
   runs, so the Mover may call the inbound setters synchronously (tested).
 - Inbound setters, no Mover, reported through the change notifier:
@@ -126,6 +139,13 @@ All local, Linux, on this branch:
   - The reference daemon mounts neither port, so these prove only that the
     port-less path did not regress.
 
+Fix-up commit (decisions Q1, Q3, Q6), guards as the owner set them, no
+chip-tool rerun: `go test -count=1 ./cluster/thermo/... ./cluster/cover/...
+./cluster/` green; `CGO_ENABLED=1 go test -race -count=1 ./cluster/thermo/...
+./cluster/cover/...` green; `make lint` green; `make cover-check` green
+(173 packages at or above their floor); `make reachability` (inventory in
+the commit, unreached 5) and `make reachability-check` green.
+
 No chip-tool test, PICS slice or golden was edited.
 
 ## Tests
@@ -138,8 +158,12 @@ New files (parity-named, MIT header):
   (BUSY passes, SystemMode kept), `TestSinkSeesSystemModeAndTheCompanions`
   (heat 2500 under the 2.0 °C deadband → companion cool 2700, both stored),
   `TestSinkNotCalledForLimitsOrRefusedWrites`,
-  `TestSetpointRaiseLowerGoesThroughTheSink` (Both: cool 2630 then heat
-  2030; a refusal of the second stores neither),
+  `TestSetpointRaiseLowerGoesThroughTheSink` (Both: one call, cool 2630
+  with companion heat 2030; Heat −2: one call, heat 2010, no companions;
+  a refusal stores neither, one call),
+  `TestUnchangedValueDoesNotCallTheSink` (equal setpoint and SystemMode
+  writes and a zero-amount RaiseLower: no call; cooling-only Both: one
+  call, cool alone),
   `TestInboundSettersDoNotCallTheSink` (reconcile moves and reports the
   companion; 9000 clamped to 3200; Sink never called),
   `TestInboundSystemModeTheSelectionCannotServe`.
@@ -148,7 +172,9 @@ New files (parity-named, MIT header):
   `TestMoverErrorAnswersFailureAndRestoresTheTarget` (also: a CONSTRAINT
   refusal never reaches the Mover), `TestInboundSettersReportWithoutTheMover`,
   `TestMoverMayReportFromInsideGoTo`, `TestNewRefusesMoverWithMoveStep`,
-  `TestMoverPathRefusesWhatTheServerRefuses`.
+  `TestMoverPathRefusesWhatTheServerRefuses`,
+  `TestMoverStatusErrorPassesThrough` (BUSY passes for DownOrClose and
+  StopMotion, target restored).
 - `cluster/matter_negative_write_parity_test.go` (the consolidated
   negative-write table; the brief named `cluster/thermo/*parity_matterjs_test.go`,
   which has no table — the table lives here): rows "Thermostat/OccupiedHeatingSetpoint
@@ -159,44 +185,43 @@ New files (parity-named, MIT header):
 
 ## Test edits
 
-None of the existing tests changed.
+None of the tests that predate this branch changed. The fix-up rewrote
+this branch's own `TestSetpointRaiseLowerGoesThroughTheSink` for the
+single-call rule (Q3) and dropped the test sink's per-attribute refusal,
+which only the two-call case used.
 
 ## Left out, and why
 
 - **LocalTemperatureCalibration** does not reach the Sink — the brief names
   SystemMode and the setpoints only. A host that maps calibration to its
-  device has no port for it (question 4).
+  device has no port for it. Decision Q4: stays outside the Sink.
 - **OperationalStatus with a Mover**: the server leaves it to the host
   (`SetOperationalStatus`). matter.js would derive it from the target
   (`#handleLiftTargetPositionChanging :217-224`, `#prepareMovement
   :412-420`) and stop it when the position reaches the target
-  (`#syncLiftCurrentPositions :237-248`). The brief did not carry it
-  (question 2).
+  (`#syncLiftCurrentPositions :237-248`). Decision Q2: stays the host's.
 - Debouncing (the host's), tilt, `cluster/spec`, the registers — out of
   scope.
 
-## Open questions
+## Owner decisions (2026-10-12)
 
-1. **Status pass-through differs between the three ports.** onoff wraps
-   every Sink error in FAILURE; the thermostat Sink passes an IM status
-   error through (brief item 1); the cover Mover answers every error
-   FAILURE (brief item 2's words). Should the three agree, and on which?
-2. **OperationalStatus under a Mover** — server-derived as matter.js does
-   (target vs. current, Stopped on arrival), or host-only as built?
-3. **SetpointRaiseLower partial refusal.** Both on HEAT+COOL makes two
-   Sink calls; when the second is refused nothing is stored and the
-   command fails, but the host already applied the first. matter.js rolls
-   back its transaction; the host has no rollback signal. Acceptable, or
-   should a single call carry both (cool with heat as companion)?
-4. **LocalTemperatureCalibration** through the Sink?
-5. **Inbound values out of range**: the thermostat clamps setpoints (brief)
-   but ignores an unservable SystemMode (cannot clamp an enum); the cover
-   clamps a position above 10000 and masks OperationalStatus above 63 —
-   the brief carried no rule for the cover; I followed the thermostat's.
-6. **Sink on an unchanged value**: a write of the current setpoint or mode
-   still calls the Sink (the controller asked for it); SetpointRaiseLower
-   calls it only for setpoints that move. matter.js's `$Changing` fires on
-   a change only, as far as I know — not verified at the pin.
+1. **Status rule** — one rule for both new ports: an error carrying an IM
+   status passes through, any other answers FAILURE. Applied to the Mover
+   (GoTo and Stop) in the fix-up; onoff left as it is.
+2. **OperationalStatus under a Mover** — no change; the host's.
+3. **SetpointRaiseLower** — one Sink call; Both: cooling primary, heating
+   companion. Fixed.
+4. **LocalTemperatureCalibration** — stays outside the Sink.
+5. **Inbound out-of-range values** — clamp-and-log kept (thermostat
+   setpoints, cover position; OperationalStatus bits above 63 masked).
+6. **Unchanged values** — no Sink call, SUCCESS, nothing stored
+   (Datasource.ts:674-676, :956-957). Fixed; the Mover is not affected.
+
+## Open items
+
+- For the docs PR: `onoff.Server.setOnOff` (`cluster/onoff/server.go:319-328`)
+  still maps every Sink error, a status error included, to FAILURE — it
+  differs from the rule the thermostat Sink and the cover Mover now share.
 
 ## by_design / findings candidates (for the owner)
 
@@ -204,11 +229,12 @@ None of the existing tests changed.
   the command** where matter.js runs `handleMovement` as a worker and
   answers first (`WindowCoveringServer.ts:378-392`, `:455-463`); the host
   returns once the device accepted the target.
-- by_design: **a SetpointRaiseLower refused at its second setpoint leaves
-  the first applied on the host** (question 3); matter.js has the
-  transaction rollback.
-- by_design or finding: **OperationalStatus is the host's under a Mover**
-  (question 2).
+- by_design: **OperationalStatus is the host's under a Mover** (decision
+  Q2). matter.js derives it from the target
+  (`WindowCoveringServer.ts:217-224` `#handleLiftTargetPositionChanging`,
+  `:412-420` `#prepareMovement`) and sets Stopped when the position reaches
+  the target (`:237-248` `#syncLiftCurrentPositions`); with a Mover the
+  server leaves it to `SetOperationalStatus`.
 - finding (Tier 3, pre-existing, found while reading): **SetpointRaiseLower
   Heat / Cool on an AUTO thermostat does not keep the deadband.** matter.js
   moves the other setpoint by the deadband or answers INVALID_COMMAND when

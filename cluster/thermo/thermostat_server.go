@@ -144,11 +144,20 @@ type Sink interface {
 	// SetSystemMode is a SystemMode write the definition admitted.
 	SetSystemMode(ctx context.Context, mode uint8) error
 	// SetSetpoint is a change of OccupiedHeatingSetpoint or
-	// OccupiedCoolingSetpoint (attrID) to value. For a write, companions
-	// are the other attributes the reconcile would move with it
-	// (matter.js #reconcileSetpoints), computed but not yet stored; a
-	// SetpointRaiseLower calls SetSetpoint once per setpoint it moves, in
-	// matter.js's order, with no companions.
+	// OccupiedCoolingSetpoint (attrID) to value, with companions: the
+	// other attributes that move with it, computed but not yet stored.
+	// For a write they are what the reconcile would move (matter.js
+	// #reconcileSetpoints). A SetpointRaiseLower makes one call: in Both
+	// mode on a HEAT+COOL thermostat the cooling setpoint is the primary
+	// and the heating setpoint its companion (matter.js assigns cooling
+	// first, ThermostatServer.ts:218-219); when only one of them moves it
+	// travels alone, and a single-mode command moves one with no
+	// companions.
+	//
+	// A value equal to the stored one is no change: the write or command
+	// answers SUCCESS without calling the Sink (matter.js Datasource.ts
+	// skips an equal value on commit, :674-676, and fires $Changing only
+	// for fields that changed, :956-957).
 	SetSetpoint(ctx context.Context, attrID uint32, value int16, companions []SetpointChange) error
 }
 
@@ -527,6 +536,16 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 // systemMode$Changing, ThermostatServer.ts:619 at 4633bfd7, runs before
 // the state changes); a refusal stores nothing. The caller holds s.op.
 func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
+	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:674-676
+	// (isDeepEqual skips an unchanged value on commit) and :956-957
+	// ($Changing only for changed fields) at 4633bfd7: an unchanged mode
+	// is no change, and the Sink is not called.
+	s.mu.RLock()
+	same := s.systemMode == v
+	s.mu.RUnlock()
+	if same {
+		return nil
+	}
 	if s.sink != nil {
 		if err := s.sink.SetSystemMode(ctx, v); err != nil {
 			return sinkError(fmt.Sprintf("SystemMode %d", v), err)
@@ -568,6 +587,13 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	// Served only with its feature, per ValidateWrite.
 	cur := s.setpointState()
 	s.mu.RUnlock()
+	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:674-676
+	// and :956-957 at 4633bfd7: an occupied setpoint equal to the stored
+	// one is no change — no $Changing, so neither the assert nor the Sink.
+	if (attrID == thermoAttrOccupiedHeatingSetpoint && v == cur.occupHeat) ||
+		(attrID == thermoAttrOccupiedCoolingSetpoint && v == cur.occupCool) {
+		return nil, nil
+	}
 	st := cur
 	if t.limit {
 		if err := st.assertLimitWithinAbs(t.heat, v); err != nil {
@@ -649,12 +675,12 @@ func abs16(x int16) int16 {
 // (thermostat-cluster.element.ts:510-514): Heat 0x0, Cool 0x1, Both 0x2 —
 // the [wire.ThermostatSetpointModeHeat] family, never bare literals.
 //
-// The new setpoints are computed first; with a [Sink] each setpoint that
-// moves goes to it before anything is stored, in matter.js's assignment
-// order (ThermostatServer.ts:218-219 at 4633bfd7: cooling, then heating,
-// for Both on a HEAT+COOL thermostat) — in matter.js those assignments
-// pass occupied*Setpoint$Changing (:599-606), where a host refuses. A
-// refusal answers the command and stores neither setpoint.
+// The new setpoints are computed first; with a [Sink] what moves goes to
+// it in one call before anything is stored (cooling primary, heating its
+// companion, for Both on a HEAT+COOL thermostat — matter.js's assignment
+// order, ThermostatServer.ts:218-219 at 4633bfd7); in matter.js those
+// assignments pass occupied*Setpoint$Changing (:599-606), where a host
+// refuses. A refusal answers the command and stores neither setpoint.
 func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields any) error { //nolint:funlen // single-purpose setpoint command handler with many mode/feature branches
 	req, err := setpointRaiseLowerRequest(fields)
 	if err != nil {
@@ -745,10 +771,13 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	return s.applyRaiseLower(ctx, occupHeat, occupCool)
 }
 
-// applyRaiseLower hands each setpoint SetpointRaiseLower moves to the Sink
-// — cooling before heating, matter.js's order (ThermostatServer.ts:218-219,
-// :221, :223, :246, :268 at 4633bfd7) — and stores both once every call
-// succeeded. The caller holds s.op.
+// applyRaiseLower hands what SetpointRaiseLower moves to the Sink in one
+// call — the cooling setpoint as the primary and the heating setpoint as
+// its companion when both move, matter.js's order (ThermostatServer.ts:218-219,
+// :221, :223, :246, :268 at 4633bfd7), the one that moves alone otherwise —
+// and stores once the call succeeded. A setpoint that does not move is no
+// change (Datasource.ts:674-676, :956-957): when neither moves, the Sink is
+// not called. The caller holds s.op.
 func (s *ThermostatServer) applyRaiseLower(ctx context.Context, heat, cool int16) error {
 	s.mu.RLock()
 	moves := make([]SetpointChange, 0, 2)
@@ -759,11 +788,16 @@ func (s *ThermostatServer) applyRaiseLower(ctx context.Context, heat, cool int16
 		moves = append(moves, SetpointChange{AttrID: thermoAttrOccupiedHeatingSetpoint, Value: heat})
 	}
 	s.mu.RUnlock()
+	if len(moves) == 0 {
+		return nil
+	}
 	if s.sink != nil {
-		for _, m := range moves {
-			if err := s.sink.SetSetpoint(ctx, m.AttrID, m.Value, nil); err != nil {
-				return sinkError(fmt.Sprintf("SetpointRaiseLower setpoint 0x%04X = %d", m.AttrID, m.Value), err)
-			}
+		primary, companions := moves[0], moves[1:]
+		if len(companions) == 0 {
+			companions = nil
+		}
+		if err := s.sink.SetSetpoint(ctx, primary.AttrID, primary.Value, companions); err != nil {
+			return sinkError(fmt.Sprintf("SetpointRaiseLower setpoint 0x%04X = %d", primary.AttrID, primary.Value), err)
 		}
 	}
 	s.mu.Lock()
