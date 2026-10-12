@@ -2091,6 +2091,93 @@ the connection drops. The PASE hold is bounded by `PASE_PAIRING_TIMEOUT`
 (60 s, `PaseServer.ts:33`) regardless. Recorded so a host wiring the
 provider itself knows what the eviction callback also does.
 
+### BD-Matter-Node-BasicWindowCredentials — `Node.OpenBasicWindow` opens the node's own window with per-window credentials
+
+matter.js has one set of setup credentials per node: an administrator's
+OpenBasicCommissioningWindow runs `allowBasicCommissioning` with the
+configured passcode (`AdministratorCommissioningServer.ts:105-121`), and
+every window the node opens itself is advertised under the configured
+discriminator unless an enhanced window supplied one
+(`DeviceCommissioner.ts:236-256` `#openWindow`, `discriminator ??
+commissioningConfig.discriminator`). `Node.OpenBasicWindow(ctx,
+WindowCredentials)` is a host extension: the node's own window (not an
+administrator's — it reads WindowNotOpen, an administrator's
+OpenCommissioningWindow replaces it) with a verifier computed from the
+window's passcode and salt, advertised CM=1 under the window's
+discriminator; the configured credentials come back when it closes, and a
+direct `CommissioningWindow().OpenOwnWindow` ends it first. Issue #58 asked
+for it so a host can hand a user a one-time code; the wire is unchanged —
+a commissioner sees a basic window with a different discriminator. Recorded
+because no matter.js path opens a window with credentials of its own.
+
+### BD-Matter-Node-SupportedFabricsDefault5 — the node facade defaults SupportedFabrics to 5, matter.js to 254
+
+`OperationalCredentialsServer.initialize` sets `supportedFabrics` to 254
+when unset, the FabricBuilder's maximum
+(`OperationalCredentialsServer.ts:84-88`). `cluster/core` keeps that
+default; the facade (`node/root.go:146-148`) passes 5 when
+`Config.SupportedFabrics` is 0, the value the reference daemon has
+advertised since wave 6 and the fixture runs were made with. A host that
+wants matter.js's number sets `SupportedFabrics: 254`; values above 254
+are refused. A different SupportedFabrics is a different device, not a
+different behaviour: AddNOC answers TableFull at the limit either way.
+
+### BD-Matter-Node-CommissioningCompletePerCommand — `Observers.OnCommissioningComplete` fires on every CommissioningComplete
+
+matter.js's `commissioned` event is a transition: `#syncCommissioned`
+compares the fabric count with the stored `commissioned` flag and emits
+only when the count crosses zero (`CommissioningServer.ts:157-171`). The
+facade's `OnCommissioningComplete(fabricIndex)` runs after every successful
+CommissioningComplete, the second and later fabrics included, after the
+facade's own body (`ClearPendingState`, OTA `Commissioned`) and before
+`EndCommissioning` closes the window. Decided in wave 9 (report Z,
+question 4): a host that adds a fabric wants to know which one, and the
+first-fabric transition is the host's one comparison
+(`OnFabricAdded` with the fabric count). No first-fabric observer.
+
+### BD-Matter-Node-ObserversSynchronous — `node.Config.Observers` run inline, before the command's response
+
+matter.js emits its fabric events inline too: `FabricManager`'s
+`added`, `replaced`, `leaving`, `deleting`, `deleted` are Observables the
+manager emits from the operation itself (`FabricManager.ts:41-48`,
+`:377`), and an observer's error is logged, never surfaced
+(`FabricManager.ts:381-386` `unhandled`). The facade mirrors that: each
+observer runs on the handler's goroutine after the facade's own handler,
+inside AddNOC / UpdateNOC / RemoveFabric / CommissioningComplete and before
+their responses; an error or panic is logged (`node.observer.failed`,
+`node.observer.panic`). Recorded as the host's contract: a blocking
+observer delays the NOCResponse and, past the fail-safe, the
+commissioning. Observers take no context on purpose — the command's
+context ends with the response, and an observer that needs one starts its
+own work.
+
+### BD-Matter-WindowCovering-MoverSynchronous — `cover.Mover` runs inside the command, matter.js's movement is a worker
+
+matter.js answers a movement command first and moves afterwards:
+`#prepareMovement` hands the movement to a `Worker` the runtime owns and
+"returns before actual movement completes"
+(`WindowCoveringServer.ts:378-392`, `:455-463`). `cover.Mover.GoTo` and
+`Stop` are called once, synchronously, inside the command after the target
+is stored; a status-carrying error becomes the command's status, any other
+error FAILURE, and the previous target is restored. The host's drive is
+expected to accept the target and return — the travel itself is the
+host's, reported back through `SetCurrentPosition`. Chosen so a refused
+movement answers the controller with the refusal instead of a SUCCESS the
+host then has to undo; a host whose drive blocks wraps the call.
+
+### BD-Matter-WindowCovering-MoverOperationalStatus — with a Mover, OperationalStatus is the host's
+
+matter.js derives OperationalStatus itself: a target change sets it from
+target against current (`WindowCoveringServer.ts:217-224`
+`#handleLiftTargetPositionChanging`, `:412-420` Opening/Closing by
+direction) and a current-position update that reaches the target sets it
+Stopped (`:237-248` `#syncLiftCurrentPositions`). Without a Mover the Go
+server keeps that (the simulated travel moves the status). With a Mover
+the server does not touch OperationalStatus: the host knows when its
+drive starts and stops and reports it through `SetOperationalStatus`;
+a derived status from a position the host reports late would say Stopped
+while the blind still moves. Report Y, question 2.
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

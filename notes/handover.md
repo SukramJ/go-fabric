@@ -445,11 +445,18 @@ per-window basic credentials (`AdministratorCommissioningServer.ts:105-121`,
 per command, observers synchronous before the response, Mover synchronous
 inside the command (`WindowCoveringServer.ts:378-392,455-463`),
 OperationalStatus host-owned with a Mover (`WindowCoveringServer.ts:217-224,
-412-420,237-248`), unchanged values skip the Sink. Findings — Tier 3:
+412-420,237-248`); unchanged values skipping the Sink is parity, not
+by_design (`Datasource.ts:674-676`). Findings — Tier 3:
 SetpointRaiseLower in Heat/Cool mode on an AUTO thermostat does not keep the
 deadband (`ThermostatServer.ts:228-266`). Open items — `SetOnFabricAdded`
 never fires under the facade; `onoff.setOnOff` maps every Sink error to
 FAILURE (`cluster/onoff/server.go:319-328`). Close #57, #58, #60, #61, #62.
-Then delete `wave9/*`, `planning/briefs-wave-9`, `wave/2026-10-12-tranche-9`
+Written on `docs/wave-9-followups` on top of the tranche, cherry-picked
+onto `main` after #64 merged: six by_design entries
+(`BD-Matter-Node-BasicWindowCredentials`, `-SupportedFabricsDefault5`,
+`-CommissioningCompletePerCommand`, `-ObserversSynchronous`,
+`BD-Matter-WindowCovering-MoverSynchronous`, `-MoverOperationalStatus`),
+the deadband finding (Tier 3, with the Go line and a fix package), two
+open-items rows. Then delete `wave9/*`, `planning/briefs-wave-9`, `wave/2026-10-12-tranche-9`
 and the `.claude/worktrees/wave9-*` worktrees. Next: wave 10 = the pin lift
 to `0ceb202d` and ADR 0020 (concept v2 Teil E).
