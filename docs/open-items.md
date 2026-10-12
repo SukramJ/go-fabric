@@ -43,12 +43,9 @@ last family run and held by `TestCertifiabilityDocument`.
 
 | Item | Where | What |
 | --- | --- | --- |
+| **RemoveFabric closes sessions without CloseSession; handshake sessions do not hold a TCP connection; a chunked report's first chunk is not peer loss** | findings register, Tier 3 | Three wave-7 findings from reports S and U, each with a fix package. |
+| **A host wiring its own session registry must call `Bridge.SessionClosed`** | `BD-Matter-SessionClosed-HostCall` | `operational.Manager.SetOnSessionClose` holds one callback; `node/` makes the call. Retire when the manager takes several observers. |
 | **Hand-off transitions report RemainingTime 0** | [ADR 0014](./adr/0014-transitions-optional-per-endpoint.md), `BD-Matter-LevelControl-NativeRamp` | A host whose device ramps natively has no way to state the end time; matter.js's application-stated `transitionEndTime` is not ported. |
-| **A TCP connection stays open after its last session** | findings register, Tier 3 | matter.js closes the connection when the last session bound to it goes (`ExchangeManager.ts:669`); the bridge closes sessions on a dropped connection, not the reverse. Report M also notes that TCP sends carry no write deadline (no matter.js source; a peer that stops reading blocks the sender until the connection closes). |
-| **`T=0` on the operational record when TCP is off** | findings register, Tier 3 | matter.js and chip omit the key; the module emits `T=0`. |
-| **BDX block size over TCP** | findings register, Tier 3 | The requestor asks for 1024-byte blocks on every channel; matter.js asks for 8192 over TCP. |
-| **A default LevelControl serves no MinLevel / MaxLevel** | findings register, application cluster servers | `spec.Instance` treats "Rev >= v7" as conditional; matter.js sets both at initialisation (`LevelControlServer.ts:114-116`). |
-| **No device-layer binding for a live `MeasurementSource`; optional Groups / ScenesManagement not opt-in-able; no default for fabric-scoped clusters** | findings register, application cluster servers | What the device layer (`device/`, wave 6) leaves to `WithServer` and `endpoint.Spec.Measurement`; the reference daemon's sensors bypass it (`BD-Daemon-MeasurementEndpointsBypassDeviceLayer`). |
 
 Concept phase 1 (per-attribute timed write, subscription quota, PASE
 session parameters) is closed: timed commands come from the model (#47),

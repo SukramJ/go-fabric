@@ -21,7 +21,7 @@ German, briefly. Six waves were planned against the phases:
 | 4 | 2c/2d rest (Commodity*, ElectricalGridConditions, Soil, Actions, EcosystemInformation, PowerSourceConfiguration) and the spec runtime (timed commands from the model, `Constraint.In`, TSUIC default, ModeSelect) | J, K, L | #47; docs #48 | merged 2026-10-11 |
 | 5 | 3 (TCP, BDX, OTA requestor; ADR 0019) and harness follow-ups | M, N, O | #49; docs PR `docs/wave-5-followups` | #49 merged 2026-10-11 (`5739ee8`); docs PR see §3 |
 | 6 | 4 (device layer `device/`, node facade `node/`, `cluster/onoff.Server`, daemon migration; ADR 0018 accepted 2026-10-11) | P, Q, R | #51; docs PR `docs/wave-6-followups` | #51 merged 2026-10-12 (`b4ea1f9`); docs PR see §6 |
-| 7 | phase-5 preparation and release: AddNOC test commissioner, device-layer gaps, Tier-3 transport findings + OnOff scenes, v0.2.0 deprecations removed, `v0.3.0` | S, T, U, V | wave-7 PR from `wave/2026-10-12-tranche-7` | integrated 2026-10-12; tag `v0.3.0` after the merge (normal release, no pre-release flag — owner 2026-10-12) |
+| 7 | phase-5 preparation and release: AddNOC test commissioner, device-layer gaps, Tier-3 transport findings + OnOff scenes, v0.2.0 deprecations removed, `v0.3.0` | S, T, U, V | #53; docs PR `docs/wave-7-followups` | #53 merged 2026-10-12 (`b0b97ff`); tag `v0.3.0` after the docs PR (normal release, no pre-release flag — owner 2026-10-12) |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -322,7 +322,9 @@ Owner decisions on the reports:
   openccu-loom breaks on `wire.Groups{}` in five places (report V lists
   them) — its own move.
 
-**Docs PR after the merge:** by_design — test CA fixed validity;
+#53 merged 2026-10-12 as `b0b97ff`.
+
+**Docs PR `docs/wave-7-followups`** (written from this list): by_design — test CA fixed validity;
 commissioner without retransmission, random ephemeral id; two readings of
 revision conditions; a measured cluster is the assembler's per device
 (accessor nil); `OptIn` only where the type allows; Binding default a
