@@ -2178,6 +2178,83 @@ drive starts and stops and reports it through `SetOperationalStatus`;
 a derived status from a position the host reports late would say Stopped
 while the blind still moves. Report Y, question 2.
 
+### BD-Matter-HostPort-OutsideTheSetterLock — a host port never runs under the lock the inbound setter takes; the command wins an overlap
+
+matter.js runs a command in a transaction that holds the behavior's state
+locks until it commits: `addResources` awaits `acquireLocks`
+(`packages/general/src/transaction/Tx.ts:194-203`) and a second
+transaction on the same state waits (`waitFor`, `Tx.ts:479-501`). A host
+override of `on()` that awaits its device while the device's event
+handler awaits `endpoint.set(...)` meets that wait asynchronously; the
+host's write lands after the command commits and wins. In Go the same
+wait is a blocked goroutine: a Sink that confirms through `Server.Set`
+before it returns deadlocked the command for the write's timeout and
+blocked the host's event goroutine for good (issue #63, measured in
+openccu-loom PR #955). So every server with a host port and an inbound
+setter keeps two locks: the command queue (`op`, which the host never
+takes — commands, writes, ticks and scene applies stay serialised) and
+the state lock (`mu`), which is never held across the port call and is
+all the setter takes (`cluster/onoff/server.go`, `cluster/thermo/thermostat_server.go`;
+`cluster/cover` was already in that shape, `levelcontrol` and `light`
+have no inbound state setter — the call-site table is in
+`notes/briefs/reports/AA.md`). The one difference to matter.js is the
+overlap: a `Set` that lands while the Sink is in flight is adopted and
+then overwritten by the command's own attribute — the command wins,
+where matter.js's waiting write would win. Chosen because the host's
+echo of the very change carries the command's value, and a different
+host value in that window is a race the host created. DEM and EVSE keep
+chip's delegate model (ports called under the state lock, the host must
+not call the server from them — `cluster/energy/devicemanagement.go:123-124`,
+`evse.go:131-132`); they are the documented exception.
+
+### BD-Matter-Thermostat-CompanionsAfterSink — the thermostat re-runs the reconcile after the Sink and logs companions that moved
+
+matter.js validates and reconciles a setpoint write inside the write's
+transaction (`occupied*Setpoint$Changing` → `#assert…Changing`,
+`ThermostatServer.ts:599-606`): no other write can land between the
+reconcile and the commit. The Go write releases the state lock for the
+Sink (`BD-Matter-HostPort-OutsideTheSetterLock`), so the host's inbound
+setters may move a setpoint meanwhile. The server tells the Sink the
+value it will store (the written setpoint as the reconcile leaves it,
+plus the companions), re-reads the state after the Sink consented,
+stores the consented value and re-runs the reconcile; a companion whose
+final value differs from what the Sink heard is stored as recomputed and
+logged (`matter.thermostat.sink_companions_moved`). SetpointRaiseLower has
+no reconcile until the deadband finding (Tier 3) is fixed, so it stores
+what it moved as the Sink saw it.
+
+### BD-Matter-ColorControl-DeviceSetDoesNotStopMovement — `ColorControlServer.Set` stores the device's colour and lets a running transition continue
+
+matter.js has no device-originated set path: a host writes the state
+attributes, and a running transition's next step overwrites an external
+value (`packages/node/src/behavior/Transitions.ts:455-534` `step`,
+`:537-574` `determineUpdates`); the only reaction to an external write is
+`#instrumentProperty` (`:659-693`), which finishes the transition when the
+written value equals its target. `Set(c Color)` — the twin of
+`onoff.Server.Set`, issue #66 — stores and reports the device's colour
+under the state lock only, calls no writer, leaves RemainingTime and a
+running transition or colour loop alone (the next step overwrites the
+value, a late echo of an earlier step too), and does not mirror the
+finish-on-target: `Engine.Finish` needs the engine lock the writers run
+under, and `Set` may be called from inside a writer
+(`BD-Matter-HostPort-OutsideTheSetterLock`). A writer that calls `Set`
+with a colour other than the one it was given keeps the device's colour
+stored and the command answers SUCCESS — the device accepted the command
+and reported what it did. Recorded because issue #66 assumed matter.js
+stops the transition; it does not.
+
+### BD-Matter-ColorControl-DeviceSetConverts — `Set` converts the other modes as `switchColorMode` does, without its stop
+
+On a mode change `Set` runs the port of `switchColorMode`
+(`ColorControlServer.ts:1454-1540`), then writes the new mode's own
+fields from the device's colour over the converted ones. matter.js's
+`switchColorMode` stops all colour movement first (`:1458`); `Set` skips
+that stop for the reason in the entry above. Hue and enhanced hue are
+not coupled — neither matter.js nor the server derives one from the
+other — and a colour whose mode the server has no feature for is logged
+(`matter.colorcontrol.inbound_color_mode_ignored`) and ignored, as the
+thermostat treats an inbound SystemMode it cannot serve.
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was
