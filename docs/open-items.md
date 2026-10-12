@@ -98,6 +98,7 @@ records what those ecosystems demanded before.
 - **ADR 0012** (ScenesManagement server) and the real Groups server replaced
   the stubs that [ADR 0004](./adr/0004-groups-cluster-stays-stub.md) kept;
   0004 is superseded and stays for the record.
-- Deprecated in `v0.2.0`, removable in `v0.3.0`: `wire.Groups`,
+- Deprecated in `v0.2.0`, removed in `v0.3.0`: `wire.Groups`,
   `im.StatusUnreportableAttr`, `im.StatusNoUpstreamSubscription`, the
-  `PersistentSubscription*` store API.
+  `PersistentSubscription*` store API (the `matter_persistent_subscriptions`
+  table stays in the schema; nothing reads it).

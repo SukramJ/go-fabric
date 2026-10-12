@@ -17,10 +17,11 @@ import (
 // announced in CHANGELOG.md before it disappears.
 //
 // Prose enforces nothing. A policy no test can fail is a statement of intent,
-// and this file is the difference — it is empty of findings today, because the
-// module has no deprecations yet, and that is exactly when a policy is cheap
-// to make enforceable. The first deprecation someone writes will be held to
-// what the README promises rather than to what they remembered of it.
+// and this file is the difference. It was written while the module had no
+// deprecations, when a policy is cheap to make enforceable; the v0.2.0 marks
+// were the first held to it, and v0.3.0 removed them after their window. Every
+// deprecation since is held to what the README promises rather than to what
+// its author remembered of it.
 //
 // Two things are checked, both of them mechanical:
 //
