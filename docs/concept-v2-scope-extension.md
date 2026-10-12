@@ -24,24 +24,41 @@ sind Größenordnungen; Zeilenzitate im Code bleiben auf dem Pin, bis Frage
 
 ---
 
-## 0. Wizard-Fragen
+## 0. Entscheidungen aus dem Wizard (2026-10-12)
 
-Antwortformat wie in Konzept v1: pro Frage eine Entscheidung, die Tabelle
-wird nach dem Wizard mit der Spalte „Entscheidung“ ergänzt.
-
-| # | Frage | Optionen | Empfehlung |
+| # | Frage | Empfehlung war | **Entscheidung** |
 | --- | --- | --- | --- |
-| 0.1 | **Initiator-Rolle: wie weit?** | (a) keine (Stand heute, nur ADR 0008); (b) **Minimal-Controller**: CASE zum gebundenen Peer, Invoke/Read/Subscribe, Binding wirkt, Groupcast-Senden, die 11 Controller-Gerätetypen; (c) voller Commissioner: Discovery, Attestation-Prüfung, NOC-Ausstellung, Joint Fabric, DCL. | **(b).** Größter Hebel für Parität und Zertifizierbarkeit (BIND, Controller-Typen) auf vorhandenem Unterbau (`secure/sigma.NewPeerInitiator`, `bridge/case_initiator.go`). (c) ist nach Konzept v1 F.1 „ein anderes Produkt“ und bleibt es. |
-| 0.2 | **Media/Content (15 Cluster, 3 Gerätetypen): aufnehmen?** | (a) nein; (b) ja, als generierte Tranche ohne Konsumenten; (c) ja, sobald ein Host ein Media-Gerät bridgen will. | **(c), vorbereitet als (b)-fähig.** In matter.js sind alle 15 Server reine Stubs; der Aufwand liegt in `device/`-Typen und Host-Ports. Ohne Konsument gibt es keinen Ecosystem-Nachweis. |
-| 0.3 | **OTA-Provider und DiagnosticLogs über BDX?** | (a) nein; (b) OTA-Provider ja, DLOG nein (matter.js-Parität); (c) beides. | **(b).** Der Provider ist in matter.js ein 668-Zeilen-Server auf dem vorhandenen `bdx/`; DLOG über BDX hat matter.js nicht (`BD-chip-DiagLogs-NoBDX` bleibt), und DLOG/2.1 ist manuell. |
-| 0.4 | **Netzwerk: Wi-Fi-Diagnose, Wi-Fi-Commissioning, SecondaryNetworkInterface?** | (a) nichts; (b) WiFiNetworkDiagnostics und SecondaryNetworkInterface als Host-Port (die Bridge läuft auch auf Wi-Fi-Hosts); (c) zusätzlich NetworkCommissioning Feature WI mit BLE. | **(b).** Diagnose ist ein generierter Server mit Host-Port. (c) setzt BLE voraus (0.6). |
-| 0.5 | **ICDManagement vollständig (inkl. Check-in-Sender)?** | (a) nein; (b) ja. | **(a).** Eine netzbetriebene Bridge ist kein ICD; ein Controller hielte den Node für schläfrig. Nur mit einem Batteriegerät auf go-fabric, das ohne Thread/BLE nicht entsteht. ICDM (7) und ICDB bleiben (b)/(d). |
-| 0.6 | **BLE/BTP und Thread?** | (a) bleiben Nicht-Ziele; (b) BLE als eigenes Modul (BlueZ) für Wi-Fi-Commissioning; (c) auch Thread-BR-Client. | **(a).** matter.js trägt dafür `nodejs-ble` (2 092 Zeilen, Noble/Bleno) und `thread-br-client` (10 754); beides zieht Plattform-Stacks in ein Modul mit einem UDP-Socket als einziger OS-Abhängigkeit. |
-| 0.7 | **Kamera (7 Cluster) + TLS (2) + 6 Gerätetypen?** | (a) nein; (b) ja, mit konkretem Kamera-Host. | **(a) bis ein Host existiert.** matter.js hat keinen WebRTC-Stack; außer `WebRtcTransportRequestorServer` (209 Zeilen) sind die Server Stubs. Der Medienpfad ist vollständig Host-Sache. |
-| 0.8 | **ARL (Managed Aggregator)?** | (a) nein; (b) ja. | **(a), endgültig.** matter.js implementiert ARL nicht (`AccessControlServer.ts` kennt keine Access Restriction); Parität verlangt es nicht. `BD-Matter-ARL-NotMounted` wird in „nicht in matter.js“ umklassifiziert. |
-| 0.9 | **matter.js-Pin heben?** | (a) bleibt `4633bfd7`; (b) auf `0ceb202d` (65 Commits), Snapshot regenerieren, Zeilenzitate prüfen. | **(b) als erste Phase**, bevor neue Zitate entstehen. Eine Review-Entscheidung nach CLAUDE.md; der Diff des Snapshots zeigt, ob 1.6.1-Elemente wanderten. |
-| 0.10 | **Reihenfolge** | (a) Parität zuerst (0.1, 0.3, 0.2); (b) Zertifizierbarkeit zuerst (0.1, 0.5, 0.4); (c) Konsumenten zuerst (0.2 nur mit Host). | **(a)** mit 0.9 davor: Minimal-Controller, dann OTA-Provider, dann Wi-Fi-Diagnose, Media bei Bedarf. |
-| 0.11 | **Version** | Erweiterungen vor oder nach `v1.0.0`? | **Nach.** `v1.0.0` friert `device/` und `node/` nach Phase 5 (Apple Home, Alexa). Jede Erweiterung ist additiv (`v1.x`), die Initiator-Rolle bekommt ein eigenes Paket statt neuer Felder in `node.Config`. |
+| 0.1 | Initiator-Rolle | Minimal-Controller | **Voller Commissioner**: Discovery, PASE/CASE-Client, Attestation-Prüfung, NOC-Ausstellung, Client-Interaktion, Binding-Client, Groupcast-Sender, Joint Fabric; DCL-Client als letzte Stufe. Konsument: **beides**, ein Controller-Daemon als Produkt und das Harness-Werkzeug (ersetzt chip-tool und den matter.js-Controller für die BIND- und Controller-Fälle). |
+| 0.2 | Media/Content | nur mit Konsument | **Ja, jetzt generiert** (15 Cluster, 3 Gerätetypen). |
+| 0.3 | OTA-Provider, DLOG über BDX | Provider ja, DLOG nein | **Beides.** DLOG über BDX geht über matter.js hinaus; Referenz ist dann chip (`src/app/clusters/diagnostic-logs-server`), wie CLAUDE.md es für Verhalten vorsieht, das matter.js nicht modelliert. `BD-chip-DiagLogs-NoBDX` entfällt. |
+| 0.4 | Netzwerk | Diagnose + Interface | **Diagnose + Interface.** WiFiNetworkDiagnostics mit Host-Port, Gerätetyp SecondaryNetworkInterface; NetworkCommissioning bleibt Ethernet-only. |
+| 0.5 | ICD vollständig | nein | **Nein.** |
+| 0.6 | BLE, Thread | Nicht-Ziele | **Bleiben Nicht-Ziele.** |
+| 0.7 | Kamera + TLS | nein, bis Kamera-Host | **Nein, bis ein Kamera-Host existiert.** |
+| 0.8 | ARL | endgültig nein | **Endgültig nein.** `BD-Matter-ARL-NotMounted` wird als „nicht in matter.js“ umklassifiziert. |
+| 0.9 | matter.js-Pin | heben, als erste Phase | **Ja, als erste Phase** auf `0ceb202d`. |
+| 0.10 | Reihenfolge | Pin, Controller, OTA/DLOG, Media, Wi-Fi | **Pin, Commissioner, OTA/DLOG, Media, Wi-Fi.** |
+| 0.11 | Version | nach `v1.0.0` | **Vor `v1.0.0`.** `v1.0.0` erst mit Commissioner, OTA-Provider und Media; Phase 5 (Apple Home, Alexa) läuft parallel, sobald der Owner am Gerät ist. |
+
+Zwei Spannungen aus diesen Entscheidungen müssen benannt werden.
+
+**Erstens: der Commissioner ist die größte Scope-Bewegung seit dem Start.**
+CLAUDE.md, `docs/matterjs-comparison.md` §Non-goals, ADR 0008 und Konzept
+v1 F.1 nennen „keine Controller-/Commissioner-Rolle“ als Entscheidung,
+nicht als Backlog. Die Entscheidung 0.1 hebt sie auf. Das braucht eine ADR
+(0020), die die alte Grenze als überholt markiert und die neue zieht: der
+Commissioner ist ein eigenes Paket mit eigener Zustandsmaschine, die
+Responder-Seite (`bridge/`, `node/`, `device/`) bleibt davon unberührt,
+und `contract/` bleibt stdlib-only. Was der Commissioner mit dem Responder
+teilt (`secure/`, `tlv/`, `im/`-Codecs, `mdns/`, `transport/`), wird
+dabei zum ersten Mal von zwei Rollen benutzt; jede Änderung dort läuft
+weiter über die Responder-Guards.
+
+**Zweitens: `v1.0.0` rückt um die Dauer der Phasen 6 bis 9.** Das
+Einfrieren von `device/` und `node/` verschiebt sich; Konsumenten (openccu-
+loom) leben solange auf `v0.x`-Garantien. Der Vorteil: `v1.0.0` enthält
+dann beide Rollen und die Media-Breite, und ein späteres `v2.0.0` für den
+Commissioner entfällt.
 
 ---
 
@@ -123,43 +140,60 @@ wird mit der ersten Phase dieses Konzepts korrigiert.
 
 ## Teil B: Die Kandidaten
 
-### B.1 Minimal-Controller (Initiator-Rolle im Kleinen)
+### B.1 Commissioner und Controller (Paket `controller/`, Arbeitstitel)
 
-**Was fehlt.** Ein Endpoint kann keinen Client-Cluster deklarieren, die
-Binding-Tabelle löst keinen Peer auf (`BD-Matter-Binding-StoreOnly`,
-Finding „The default Binding server resolves no peer“), Groupcast sendet
-nicht (`BD-Matter-GroupcastNoSender`), die 11 Controller-Gerätetypen
-(OnOffLightSwitch, DimmerSwitch, ColorDimmerSwitch, ControlBridge,
-OnOffSensor, DoorLockController, WindowCoveringController,
-ThermostatController, PumpController, ClosureController,
-VideoRemoteControl) sind aus `script/devicegen` ausgeschlossen.
+**Was fehlt.** Alles, was in `docs/matterjs-comparison.md` §1–§3 mit
+„Controller“ markiert ist: Discovery kommissionierbarer und operativer
+Nodes, PASE- und CASE-Client, Attestation-Prüfung gegen einen PAA-Store,
+Zertifikatsausstellung (RCAC, NOC), der Commissioning-Flow (ArmFailSafe →
+CSR → AddTrustedRoot → AddNOC → NetworkCommissioning → CommissioningComplete),
+Client-Interaktion (Read, Write, Invoke, Subscribe mit Wiederaufnahme),
+Peer-Verwaltung mit Adress-Überwachung, Binding-Client, Groupcast-Sender,
+Joint Fabric (3 Cluster) und der DCL-Client.
 
-**Was da ist.** `secure/sigma.NewPeerInitiator` und
-`bridge/case_initiator.go` (ADR 0008: CASE zu einem früheren Subscriber,
-`connectPeer`, `existingPeerSession`, `runCASEInitiator`), ein
-`OperationalResolver`-Port, der matter.js-Resolver im Test-Commissioner.
-`bridgetest.Commissioner` ist ein Testwerkzeug und bleibt es.
+**Was da ist.** `secure/sigma.NewPeerInitiator`, `bridge/case_initiator.go`
+(ADR 0008), `bridge/bridgetest.Commissioner` (#53: PASE → ArmFailSafe →
+Attestation/CSR → AddTrustedRoot → AddNOC → CASE → CommissioningComplete,
+mit Test-CA; `Dial/Commission/PASE/CASE/CASEAs/RemoveFabric`,
+`Session.Read/Write/Invoke/Subscribe`), `secure/mattercert` (Codec),
+`secure/attestation` (Geräteseite), `mdns/` (Advertiser, kein Browser),
+`commissioning/` (Responder-Seite von PASE), der matter.js-Controller im
+Harness (`internal/chiptool/controller_test.go`).
 
-**Form.** Ein Paket `client/` (Arbeitstitel) mit: Peer-Adressauflösung
-über DNS-SD (`_matter._tcp`, Port von `OperationalResolver`), CASE über den
-verallgemeinerten ADR-0008-Initiator, ein `Invoke`/`Read`/`Subscribe`-Client
-nach `ClientInteraction.ts` (nur der Teil, den Binding braucht: Invoke und
-Read, keine Client-Struktur, kein `ClientNode`), ein `BindingManager` nach
-`BindingManager.ts` (737 Zeilen), der bei einem Host-Ereignis die gebundenen
-Ziele anspricht, und der Groupcast-Sender aus `GroupcastServer.ts`.
-`device/` bekommt die 11 Controller-Typen aus dem Generator; ein Endpoint
-deklariert Client-Cluster in der Descriptor-ClientList.
+**Form.** Ein Paket `controller/` außerhalb von `bridge/`, nach matter.js
+in Stufen:
 
-**Maß.** matter.js: rund 2 500 Zeilen (CaseClient 402, Binding 998,
-Groupcast-Sender, der Invoke/Read-Teil von `ClientInteraction.ts`). Go:
-Einschätzung 4 000–6 000 Zeilen mit Tests; zwei bis drei Wellen.
+| Stufe | Port von | matter.js-Zeilen | Ergebnis |
+| --- | --- | --- | --- |
+| 1 Transportclient | `CommissionableMdnsScanner.ts` (593), `common/Scanner.ts` (330), `PaseClient.ts` (229), `CaseClient.ts` (402), `peer/PeerConnection.ts` (866), `PeerSet.ts` (350), `Peer.ts` (759), `PeerAddressMonitor.ts` (293) | 3 822 | DNS-SD-Browsing, Sessions zu beliebigen Nodes, Adress-Verfolgung |
+| 2 Commissioning | `ControllerCommissioningFlow.ts` (2 141), `ControllerCommissioner.ts` (746), `CommissioningConnection.ts` (313), `DeviceCommissioner.ts` (376), Zertifikatsausstellung (RCAC/NOC, heute als Test-CA in `bridgetest`), Attestation-Prüfung mit PAA-Store | 3 576 + CA | ein Node wird kommissioniert; der Harness nutzt es statt chip-tool |
+| 3 Client-Interaktion | `action/client/` (3 201: `ClientInteraction.ts` 1 294, Subscriptions 1 222, `InputChunk.ts` 432) | 3 201 | Read/Write/Invoke/Subscribe mit Chunking und Wiederaufnahme |
+| 4 Client-Node-Modell | `ClientNode.ts` (409), `node/client/` (4 273: `ClientStructure.ts` 1 692, `Peers.ts` 966, `PeerBehavior.ts` 507) | 4 682 | typisiertes Abbild entfernter Nodes aus dem Schema; `device/`-Typen als Client-Sicht |
+| 5 Binding, Groupcast, Controller-Typen | `behaviors/binding/` (998), Sender-Anteil von `GroupcastServer.ts` (940), 11 Controller-Gerätetypen im Generator | ~1 500 | Binding wirkt, BIND-Familie, Groupcast-Sender-Feature |
+| 6 Joint Fabric, DCL | `joint-fabric-*`, `commissioner-control` (3 Cluster), `protocol/src/dcl/` (4 691) | ~5 500 | fabric-übergreifende Administration; DCL-Prüfung von Attestation und OTA-URLs |
 
-**Öffnet.** BIND (3), 11 Gerätetypen, Groupcast-Sender-Feature; schließt
-zwei Findings und zwei by_design-Einträge.
+Gesamt rund 22 000 matter.js-Zeilen. Go-Einschätzung 25 000–35 000 Zeilen
+mit Tests, sechs bis acht Wellen. Stufe 6 ist abtrennbar; der DCL-Client
+ist ein HTTP-Client gegen die CSA-Ledger-API und zieht keine Abhängigkeit
+(`net/http`).
 
-**Abhängigkeiten.** Keine. Nicht enthalten: Commissioning anderer Nodes,
-Attestation-Prüfung, NOC-Ausstellung, DCL, Joint Fabric. Das bleibt die
-Grenze „kein Commissioner“; die ADR nennt sie neu.
+**Konsumenten.** (1) Ein Controller-Daemon als Produkt (außerhalb von
+go-fabric, wie der Adapter-Daemon aus Konzept v1 Teil C; Arbeitstitel
+`go-matter-controller`): kommissioniert, hält Peers, abonniert, bietet die
+Geräte einem Host an. (2) Das Harness: `internal/chiptool` kommissioniert
+den Referenz-Daemon heute mit chip-tool und dem matter.js-Controller; der
+eigene Commissioner wird dritte Gegenstelle und trägt die BIND- und
+Controller-Fälle. `bridgetest.Commissioner` geht in Stufe 2 auf; seine
+Test-CA wird die Default-CA des Pakets (feste Validität bleibt
+by_design).
+
+**Öffnet.** BIND (3), 11 Gerätetypen, Groupcast-Sender, Joint Fabric;
+Parität in `docs/matterjs-comparison.md` §1–§3 auf ✅.
+
+**Grenze (ADR 0020).** Kein BLE, kein Thread, kein Wi-Fi-Commissioning
+über BLE: Nodes werden über IP kommissioniert (on-network, wie chip-tool
+`pairing onnetwork`). Kein eigenes Gerätemodell im Controller-Daemon; die
+Client-Sicht kommt aus `device/` und dem Schema.
 
 ### B.2 OTA-Provider
 
@@ -182,6 +216,13 @@ Referenz-Daemon bekommt einen Provider-Endpoint mit einem Test-Image.
 (Device-zu-Device), OtaProvider-Gerätetyp. Nachweis: unser Requestor lädt
 vom eigenen Provider.
 
+**DiagnosticLogs über BDX** (0.3): matter.js hat keinen Transfer, chip
+schon (`src/app/clusters/diagnostic-logs-server/`, BDX-Sender bei
+`RetrieveLogsRequest` mit `TransferFileDesignator`). Port nach chip, Zitat
+auf chip, `BD-chip-DiagLogs-NoBDX` entfällt; DLOG/2.1 bleibt manuell,
+läuft aber im Harness mit dem eigenen Commissioner (B.1 Stufe 3) als
+Empfänger.
+
 ### B.3 Media/Content
 
 **Was fehlt.** 15 Cluster, drei Gerätetypen (BasicVideoPlayer,
@@ -197,8 +238,10 @@ KeypadInput, ApplicationLauncher; Referenz-Daemon mit einem Player-Endpoint.
 Welle.
 
 **Öffnet.** Media-Familien des Images; Parität um 15 Cluster.
-**Risiko.** Ohne Konsument kein Ecosystem-Nachweis; Apple Home zeigt
-Media-Geräte hinter Bridges nicht an (zu prüfen in Phase 5).
+**Risiko.** Ohne Konsument kein Ecosystem-Nachweis; ob Apple Home
+Media-Geräte hinter Bridges zeigt, ist in Phase 5 zu prüfen. Entscheidung
+0.2: jetzt generiert, Nachweis über chip-Familien und den eigenen
+Controller.
 
 ### B.4 Wi-Fi-Diagnose und SecondaryNetworkInterface
 
@@ -216,24 +259,25 @@ Gerätetyp; `NetworkCommissioning` bleibt Ethernet-only. Eine halbe Welle.
 | BLE/BTP | 2 092 + 674 | Plattform-Radio; einziger Nutzen ist Wi-Fi-Commissioning |
 | Thread | 10 754 + 4 Stubs | Hardware oder Border-Router |
 | Voller Commissioner, Joint Fabric, DCL | 7 105 + 4 790 + 4 691 | anderes Produkt |
-| ARL | nicht in matter.js | Parität verlangt es nicht |
+| ARL | nicht in matter.js | Parität verlangt es nicht; endgültig (0.8) |
 
 ---
 
-## Teil C: Phasen (Vorschlag, nach Wizard anzupassen)
+## Teil C: Phasen
 
-| Phase | Inhalt | Abschluss |
-| --- | --- | --- |
-| 5 (v1) | Apple Home, Alexa; `v1.0.0` | `device/`, `node/` eingefroren |
-| 6 | matter.js-Pin auf `0ceb202d` (0.9), `certifiability.md` §„Families“ korrigiert, Register-Befunde Tier 1/2 abgearbeitet | Snapshot-Diff klassifiziert; Register ohne Tier 1/2 |
-| 7 | Minimal-Controller (B.1), ADR 0020 | BIND grün; 74 Gerätetypen; Binding-Findings geschlossen |
-| 8 | OTA-Provider (B.2), ADR 0021 (ergänzt 0019) | SU Provider-Fälle gegen den eigenen Requestor |
-| 9 | Wi-Fi-Diagnose (B.4) | DGWIFI grün |
-| 10 | Media/Content (B.3), nur mit Konsument | Player-Endpoint im Referenz-Daemon, Media-Familien |
+| Phase | Inhalt | ADR | Abschluss |
+| --- | --- | --- | --- |
+| 5 | Apple Home, Alexa mit dem Referenz-Daemon; parallel zu 6–10, sobald der Owner am Gerät ist | — | Befunde in `docs/matter-ecosystem-observations.md` |
+| 6 | matter.js-Pin auf `0ceb202d` (Snapshot-Diff klassifiziert, Generatoren, Zitate geprüft); `certifiability.md` §„Families“ korrigiert; Register Tier 1/2 abgearbeitet | — | `chipdm-check` grün; Register ohne Tier 1/2 |
+| 7 | Commissioner Stufen 1–5 (B.1), sechs bis acht Wellen; Stufe 6 (Joint Fabric, DCL) als eigene Welle am Ende | 0020 | Harness kommissioniert mit dem eigenen Commissioner; BIND grün; 74 Gerätetypen |
+| 8 | OTA-Provider und DLOG über BDX (B.2) | 0021 (ergänzt 0019) | SU-Provider-Fälle und DLOG-Transfer gegen den eigenen Requestor/Commissioner |
+| 9 | Media/Content (B.3) | 0022 | 116 Cluster, 77 Gerätetypen; Media-Familien |
+| 10 | Wi-Fi-Diagnose, SecondaryNetworkInterface (B.4) | — | DGWIFI grün |
+| `v1.0.0` | nach 7–9; friert `device/`, `node/` und `controller/` | — | README §API stability |
 
 Querschnitt wie in v1: `make chipdm-check`, Parity-Guards, Ratchets,
-CHANGELOG; jede Phase, die eine Scope-Grenze bewegt, bekommt eine ADR und
-eine Zeile in `docs/matterjs-comparison.md` §Non-goals.
+CHANGELOG. Jede Phase mit ADR ergänzt `docs/matterjs-comparison.md`
+§Non-goals und CLAUDE.md §„Scope boundaries“.
 
 ---
 
@@ -241,7 +285,21 @@ eine Zeile in `docs/matterjs-comparison.md` §Non-goals.
 
 | Risiko | Folge | Gegenmaßnahme |
 | --- | --- | --- |
-| Der Minimal-Controller wächst zum Commissioner | zweites Produkt im Modul | ADR 0020 zieht die Grenze: kein PASE-Client, keine NOC-Ausstellung, keine Discovery kommissionierbarer Nodes |
-| Media ohne Konsument | tote API, PICS-Lücken | Phase 10 nur mit Host; sonst nicht |
+| Zwei Rollen in einem Modul | `secure/`, `im/`, `mdns/` werden von Responder und Controller benutzt; eine Controller-Änderung bricht die Responder-Parität | `controller/` importiert, `bridge/` importiert nicht zurück; jede gemeinsame Änderung läuft über die Responder-Guards und die chip-tool-Suite |
+| Aufwand des Commissioners (25 000–35 000 Go-Zeilen) | `v1.0.0` rückt um Monate | Stufen 1–3 zuerst, jede mit Harness-Nachweis; Stufe 6 abtrennbar |
+| Media ohne Konsument | tote API, PICS-Lücken | Nachweis über chip-Familien und den eigenen Controller; Host-Ports klein halten |
 | Pin-Hebung verschiebt 1.6.1-Elemente | Zitate und Snapshot drift | Snapshot-Diff vor der Generierung lesen; `chipdm-check` |
 | Apple Home zeigt Controller-Typen oder Media nicht | Nachweis fehlt | `docs/matter-ecosystem-observations.md` vor der Entscheidung 0.2 |
+
+---
+
+## Teil E: Nächste Schritte
+
+1. ADR 0020 „Commissioner and controller role“ (Proposed) mit der Grenze
+   aus B.1 und den Konsumenten; CLAUDE.md, `docs/matterjs-comparison.md`
+   §Non-goals, ADR 0008 und Konzept v1 F.1 erhalten je eine Notiz
+   „überholt durch 0020“.
+2. Phase 6 als Welle 9: Pin heben, `certifiability.md` korrigieren,
+   Register Tier 1/2. Briefs nach dem Wellen-Schema in `notes/briefs/`.
+3. Phase 7 Stufe 1 als Welle 10, mit einem Brief je Stufe; die
+   Stufen-Tabelle in B.1 ist die Brief-Liste.
