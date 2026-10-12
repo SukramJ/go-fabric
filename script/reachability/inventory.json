@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4435,
+  "entry_points": 4444,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10419,
+    "total_exported": 10427,
     "reachable": 7348,
-    "whitelisted": 3066,
+    "whitelisted": 3074,
     "unreachable": 5
   },
   "by_package": [
@@ -424,6 +424,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
       "line": 268
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAdaptersNameTheirEstablishedSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_handshake_test.go",
+      "line": 225
     },
     {
       "package": "bridge",
@@ -1267,10 +1274,38 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
+      "line": 425
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkedReportLaterChunkUnacknowledged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
+      "line": 483
+    },
+    {
+      "package": "bridge",
       "identifier": "TestClassifyIMOpcode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/im_gate_test.go",
       "line": 16
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCloseFabricSessionsExcept_TellsEachOtherSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_session_close_test.go",
+      "line": 44
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCloseFabricSessionsExcept_WithoutCapability",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_session_close_test.go",
+      "line": 152
     },
     {
       "package": "bridge",
@@ -2877,6 +2912,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestEmitFabricRemovedContext_InvokingSessionLast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_session_close_test.go",
+      "line": 96
+    },
+    {
+      "package": "bridge",
       "identifier": "TestEncodeInvokeResponse_Empty",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
@@ -3248,6 +3290,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestHandshakeHoldLifecycle",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_handshake_test.go",
+      "line": 142
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInboundCloseSessionStatusReport_ClosesSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
@@ -3272,14 +3321,14 @@
       "identifier": "TestInitiatedExchangePeerLoss_ForceClosesPeerSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 45
+      "line": 46
     },
     {
       "package": "bridge",
       "identifier": "TestInitiatedPeerLoss_UnknownExchangeIsNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 128
+      "line": 129
     },
     {
       "package": "bridge",
@@ -4273,14 +4322,14 @@
       "identifier": "TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 149
+      "line": 150
     },
     {
       "package": "bridge",
       "identifier": "TestReportPeerLoss_OnlyFirstMessageOfExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 251
+      "line": 252
     },
     {
       "package": "bridge",
@@ -4988,6 +5037,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
       "line": 218
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestTCPHandshakeHoldsConnection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_handshake_test.go",
+      "line": 63
     },
     {
       "package": "bridge",

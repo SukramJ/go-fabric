@@ -11,9 +11,12 @@ import (
 	"log/slog"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/secure/channel"
+	"github.com/SukramJ/go-fabric/secure/sigma"
+	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/transport"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
@@ -48,6 +51,19 @@ type connRoute struct {
 	// unbindSessionRoute takes it away again; at zero the connection is
 	// closed. Guarded by Bridge.routeBindMu.
 	sessions int
+	// handshakes holds the PASE / CASE handshakes in flight on the
+	// connection, by exchange id: from PBKDFParamRequest / Sigma1 until
+	// the secure session it established binds to the connection, it
+	// fails, or its exchange ends. A connection with a handshake in
+	// flight is not closed when its last secure session goes. Guarded by
+	// Bridge.routeBindMu.
+	handshakes map[uint16]handshakeHold
+}
+
+// handshakeHold is one handshake in flight on a connection.
+type handshakeHold struct {
+	pase  bool
+	since time.Time
 }
 
 // Network names the transport of the connection's peer address.
@@ -225,15 +241,140 @@ func (b *Bridge) unbindSessionRoute(sid uint16) {
 }
 
 // releaseConnRouteLocked takes one session off r's count and returns r
-// when that was the last one, nil otherwise. The caller holds
-// b.routeBindMu.
+// when that was the last one and no handshake is in flight on it, nil
+// otherwise. The caller holds b.routeBindMu.
+//
+// matter.js counts the unsecured sessions on the channel with the secure
+// ones (ExchangeManager.ts:629-643 #sessionsOnChannel, both loops at
+// :639-640), so #closeTcpChannelIfLastSession (:669-676) keeps a
+// connection that carries a handshake. A handshake's own end closes
+// nothing: only a secure session's removal schedules the check
+// (#deleteSession :691-708; #addSession :678-689 observes NodeSessions
+// only).
 func (b *Bridge) releaseConnRouteLocked(r *connRoute) *connRoute {
 	r.sessions--
 	if r.sessions > 0 {
 		return nil
 	}
 	r.sessions = 0
+	if r.liveHandshakesLocked(time.Now()) > 0 {
+		return nil
+	}
 	return r
+}
+
+// liveHandshakesLocked counts the handshakes in flight on r, dropping a
+// PASE hold older than [pasePairingTimeout], the bound after which the
+// single-active-PASE claim expires too (matter.js PaseServer.ts:33
+// PASE_PAIRING_TIMEOUT). A CASE hold ends with its handshake or with the
+// per-exchange CASE state's eviction ([Bridge.ForgetSigma1Replied]). The
+// caller holds b.routeBindMu.
+func (r *connRoute) liveHandshakesLocked(now time.Time) int {
+	for xid, h := range r.handshakes {
+		if h.pase && now.Sub(h.since) > pasePairingTimeout {
+			delete(r.handshakes, xid)
+		}
+	}
+	return len(r.handshakes)
+}
+
+// holdHandshake records a PASE (pase) or CASE handshake starting on
+// exchangeID over src. Only a connection is held; over UDP there is
+// nothing to keep open.
+func (b *Bridge) holdHandshake(src net.Addr, exchangeID uint16, pase bool) {
+	r, ok := src.(*connRoute)
+	if !ok || r == nil || r.conn == nil {
+		return
+	}
+	b.routeBindMu.Lock()
+	defer b.routeBindMu.Unlock()
+	if _, held := r.handshakes[exchangeID]; held {
+		return // a retransmitted first message: the handshake already counts
+	}
+	if r.handshakes == nil {
+		r.handshakes = make(map[uint16]handshakeHold)
+	}
+	r.handshakes[exchangeID] = handshakeHold{pase: pase, since: time.Now()}
+}
+
+// releaseHandshake ends the hold of the handshake on exchangeID over src.
+// It never closes the connection — see [Bridge.releaseConnRouteLocked].
+func (b *Bridge) releaseHandshake(src net.Addr, exchangeID uint16) {
+	r, ok := src.(*connRoute)
+	if !ok || r == nil {
+		return
+	}
+	b.routeBindMu.Lock()
+	delete(r.handshakes, exchangeID)
+	b.routeBindMu.Unlock()
+}
+
+// releaseCASEHandshakeEverywhere ends the hold of a CASE handshake on
+// exchangeID on every connection — its per-exchange state was evicted.
+func (b *Bridge) releaseCASEHandshakeEverywhere(exchangeID uint16) {
+	b.connRoutes.Range(func(_, v any) bool {
+		r, ok := v.(*connRoute)
+		if !ok || r == nil {
+			return true
+		}
+		b.routeBindMu.Lock()
+		if h, held := r.handshakes[exchangeID]; held && !h.pase {
+			delete(r.handshakes, exchangeID)
+		}
+		b.routeBindMu.Unlock()
+		return true
+	})
+}
+
+// establishedSessionReporter is the optional capability of a PASE or CASE
+// handler to name the secure session its handshake established
+// ([PaseAdapter], [CaseAdapter]).
+type establishedSessionReporter interface {
+	establishedSession() (sessionID uint16, ok bool)
+}
+
+// settleHandshake follows one handshake step on exchangeID over src — the
+// handler h's answer (respOpcode, respPayload) or its error — and ends the
+// handshake's hold on a connection when the step ended the handshake. A
+// session it established is bound to the connection first, as matter.js
+// creates the secure session on the channel the handshake ran on
+// (`createSecureSession({ channel, … })`, CaseServer.ts:175-176 resume,
+// :316-317 Sigma3; PaseServer.ts:184-185) before the unsecured session
+// is closed in the handler's finally (CaseServer.ts:94-98,
+// PaseServer.ts:111-118): the connection is then held by the session
+// itself, before its first authenticated message. A replayed step (the handler's state rejects it)
+// leaves the original handshake running.
+func (b *Bridge) settleHandshake(src net.Addr, exchangeID uint16, h any, respOpcode uint8, respPayload []byte, err error) {
+	if !isConnRoute(src) {
+		return
+	}
+	switch {
+	case err != nil:
+		if errors.Is(err, spake2.ErrSessionState) || errors.Is(err, sigma.ErrSessionState) {
+			return
+		}
+	case respOpcode == mrp.SCOpcodeSigma2Resume:
+		b.bindEstablishedSession(src, h)
+	case respOpcode == mrp.SCOpcodeStatusReport:
+		if general, _, _, ok := decodeStatusReport(respPayload); ok && general == mrp.SCStatusGeneralSuccess {
+			b.bindEstablishedSession(src, h)
+		}
+	default:
+		return // PBKDFParamResponse, Pake2, Sigma2: the handshake goes on
+	}
+	b.releaseHandshake(src, exchangeID)
+}
+
+// bindEstablishedSession binds the secure session handler h established
+// to src, when h names it.
+func (b *Bridge) bindEstablishedSession(src net.Addr, h any) {
+	rep, ok := h.(establishedSessionReporter)
+	if !ok {
+		return
+	}
+	if sid, ok := rep.establishedSession(); ok && sid != 0 {
+		b.bindSessionRoute(sid, src)
+	}
 }
 
 // closeConnRoute closes r's connection, whose last session went; nil is
@@ -281,7 +422,10 @@ func (b *Bridge) receive(ctx context.Context, buf []byte, c transport.Conn) erro
 		// (ExchangeManager.ts:241-264 `createUnsecuredSession({ channel,
 		// initiatorNodeId })`), and its secure-channel servers never ask
 		// which transport they run on. Replies go back on the connection
-		// (sendVia) without MRP (routeUsesMRP).
+		// (sendVia) without MRP (routeUsesMRP). The handshake holds the
+		// connection open while it runs (holdHandshake, settleHandshake),
+		// as matter.js counts the unsecured session on the channel
+		// (ExchangeManager.ts:629-643).
 	}
 	return b.dispatch(ctx, buf, route)
 }

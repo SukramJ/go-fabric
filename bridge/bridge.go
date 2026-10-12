@@ -178,10 +178,12 @@ import (
 	"log/slog"
 	"net"
 	"reflect"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -1176,17 +1178,39 @@ type fabricSessionCloser interface {
 	CloseFabric(fabricIndex uint8)
 }
 
+// fabricSessionExceptCloser is the optional capability of a
+// [SessionRegistry] to close every session of one fabric but one
+// (operational.Manager.CloseFabricExcept).
+type fabricSessionExceptCloser interface {
+	CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16)
+}
+
 // EmitFabricRemovedContext is [Bridge.EmitFabricRemoved] for a removal
 // the host learns about inside the RemoveFabric command (ctx is the
 // command's context): it also ends every secure session of the removed
-// fabric once the command's response is out — the session that removed
-// its own fabric included, which must still carry the NOCResponse. matter.js
-// OperationalCredentialsServer.removeFabric → Fabric.remove closes the
-// fabric's sessions, the invoking one after its exchange
-// (NodeSession deferredClose); without it a controller whose fabric is
-// gone kept being answered on it (TC-CADMIN-1.15 step 12). Outside a
-// command the sessions close at once. Needs a [SessionRegistry] that can
-// close by fabric (the operational manager does).
+// fabric. Every session but the one carrying the command is told with a
+// CloseSession and closed at once; the invoking session, which must still
+// carry the NOCResponse, is closed once the command's response is out,
+// without a CloseSession. Outside a command every session of the fabric
+// is told and closed at once. Without the close a controller whose fabric
+// is gone kept being answered on it (TC-CADMIN-1.15 step 12). Needs a
+// [SessionRegistry] that can close by fabric (the operational manager
+// does).
+//
+// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:418-427
+// `leave(currentExchange)` (OperationalCredentialsServer.ts:412
+// `fabric.leave(this.context.exchange)`): each session of the fabric runs
+// `initiateClose` — a session without active exchanges closes at once and
+// its close emits gracefulClose (NodeSession.ts:359-368), which the
+// ExchangeManager answers with a CloseSession on a fresh exchange
+// (ExchangeManager.ts:688, :711-721 #sendCloseSession); the session of the
+// current exchange defers its close until that exchange ends
+// (NodeSession.ts:312-322, Session.ts:292-308). `delete` → `#closeSessions`
+// (Fabric.ts:435-460) then force-closes what is left with the current
+// exchange: `NodeSession.initiateForceClose` marks the session peer-lost
+// (NodeSession.ts:324-327), so the deferred close of the invoking session
+// emits no gracefulClose — it closes after its exchange without a
+// CloseSession.
 func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8) {
 	b.emitFabricRemoved(ctx, fabricIndex)
 	b.mu.RLock()
@@ -1196,9 +1220,89 @@ func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8
 	if !ok {
 		return
 	}
+	invoking := mattercore.InvokeSessionIDFromContext(ctx)
+	b.closeFabricSessionsGracefully(reg, fabricIndex, invoking)
 	closeNow := func() { closer.CloseFabric(fabricIndex) }
 	if !im.DeferAfterResponse(ctx, closeNow) {
 		closeNow()
+	}
+}
+
+// CloseFabricSessionsExcept ends every secure session of fabricIndex but
+// exceptSessionID (0: none is kept), telling each peer with a
+// CloseSession before its keys go. The host calls it after UpdateNOC
+// rotated the fabric's operational identity, with the session that
+// carried the command as exceptSessionID so the NOCResponse still
+// reaches the wire. Needs a [SessionRegistry] that can close a fabric but
+// one session (operational.Manager.CloseFabricExcept); without one it
+// does nothing.
+//
+// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:403-410
+// `replaced(currentExchange)` (OperationalCredentialsServer.ts:360): each
+// session of the fabric runs `initiateClose`, whose close emits
+// gracefulClose and so a CloseSession (NodeSession.ts:359-368,
+// ExchangeManager.ts:688, :711-721), before `initiateForceClose`. The
+// invoking session is kept open here, where matter.js closes it after its
+// exchange without a CloseSession (the force close marks it peer-lost,
+// NodeSession.ts:324-327); keeping it is the existing rule of
+// operational.Manager.CloseFabricExcept, which this does not change.
+func (b *Bridge) CloseFabricSessionsExcept(fabricIndex uint8, exceptSessionID uint16) {
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
+	closer, ok := reg.(fabricSessionExceptCloser)
+	if !ok {
+		return
+	}
+	b.notifyFabricSessionsClosing(fabricIndex, exceptSessionID)
+	closer.CloseFabricExcept(fabricIndex, exceptSessionID)
+}
+
+// closeFabricSessionsGracefully tells every live session of fabricIndex
+// but invoking with a CloseSession and, when the registry can, closes
+// them at once; without that capability they close with the rest of the
+// fabric in the caller's CloseFabric.
+func (b *Bridge) closeFabricSessionsGracefully(reg SessionRegistry, fabricIndex uint8, invoking uint16) {
+	b.notifyFabricSessionsClosing(fabricIndex, invoking)
+	if invoking == 0 {
+		return // the caller's CloseFabric closes them all at once
+	}
+	if closer, ok := reg.(fabricSessionExceptCloser); ok {
+		closer.CloseFabricExcept(fabricIndex, invoking)
+	}
+}
+
+// notifyFabricSessionsClosing sends a CloseSession on every live secure
+// session of fabricIndex the bridge has a route for, except
+// exceptSessionID, while its keys are still live. A session the bridge
+// never routed a message of has no address to tell; it closes silently.
+// The fabric of a session is read from the [SessionLookup]'s
+// [SessionFabricResolver]; without one nothing is sent.
+func (b *Bridge) notifyFabricSessionsClosing(fabricIndex uint8, exceptSessionID uint16) {
+	b.mu.RLock()
+	lookup := b.sessions
+	b.mu.RUnlock()
+	resolver, ok := lookup.(SessionFabricResolver)
+	if !ok || fabricIndex == 0 {
+		return
+	}
+	var sids []uint16
+	b.sessionPeerAddrs.Range(func(k, _ any) bool {
+		if sid, ok := k.(uint16); ok && sid != 0 && sid != exceptSessionID {
+			sids = append(sids, sid)
+		}
+		return true
+	})
+	slices.Sort(sids)
+	for _, sid := range sids {
+		if fi, known := resolver.FabricFor(sid); !known || fi != fabricIndex {
+			continue
+		}
+		sess, live := lookup.Lookup(sid)
+		if !live || sess == nil {
+			continue
+		}
+		b.sendCloseSessionReport(sid, sess)
 	}
 }
 

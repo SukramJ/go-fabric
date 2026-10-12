@@ -497,6 +497,11 @@ const sendErrorRetryLimit = 2
 //
 // op names the reporter for the log line ("report" / "event_report").
 func (b *Bridge) noteSubscriptionSendError(subID uint32, op string, err error) {
+	if _, live := b.routing.subTargets.Load(subID); !live {
+		// Reaped while the report was being sent — its first chunk's
+		// loss closed the peer: nothing is left to count against.
+		return
+	}
 	var failures int
 	if raw, ok := b.subSendErrorCount.Load(subID); ok {
 		if n, ok := raw.(int); ok {
@@ -726,6 +731,15 @@ func (b *Bridge) nextOutboundExchangeID() uint16 {
 // common case — still does not wait: its StatusResponse is consumed by the
 // subscription's own report bookkeeping.
 func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uint32, error) {
+	return b.sendReportChunksNotify(target, report, nil)
+}
+
+// sendReportChunksNotify is [Bridge.sendReportChunks] that hands the MRP
+// counter of the first chunk to firstSent (nil: no one) once it is sent
+// and tracked — before the wait for the peer's StatusResponse to it, so
+// the owner can register the counter while the exchange has heard nothing
+// from the peer yet.
+func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, firstSent func(counter uint32)) ([]uint32, error) {
 	limits := b.chunkLimitsFor(target.src, target.sessionID)
 	chunks, err := chunkReportData(report, limits.budget, limits.hardCap)
 	if err != nil {
@@ -764,6 +778,9 @@ func (b *Bridge) sendReportChunks(target subTarget, report im.ReportData) ([]uin
 		}
 		if counter != 0 {
 			counters = append(counters, counter)
+			if i == 0 && firstSent != nil {
+				firstSent(counter)
+			}
 		}
 		if waitCh != nil {
 			if err := b.awaitChunkStatusResponse(waitCh, "subscribe.ongoing", target.src, target.sessionID, target.exchangeID, ourRole, i, chunk); err != nil {
@@ -806,13 +823,30 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 	// The exchange context's creation time bounds a peer-loss sweep this
 	// report may trigger (matter.js ExchangeManager.ts:544, :571 asOf).
 	createdAt := time.Now()
-	counters, err = b.sendReportChunks(freshTarget, report)
+	key := mrp.ExchangeKey{SessionID: target.sessionID, ExchangeID: freshExchangeID, Initiator: true}
+	// The first message's counter belongs to the report's exchange from
+	// the moment it is sent, not from when the whole report is out: a
+	// chunked report waits for the peer's StatusResponse to its first
+	// chunk, and the first chunk going unacknowledged there is peer loss
+	// like any first message of an exchange this node opened — matter.js
+	// MessageExchange.ts:605-624 `send` reports `peerLost` on a failed
+	// send when `#reportsPeerLoss` (:626-633: nothing received on the
+	// exchange yet, `#messageReceivedCounter === 0`). Later chunks are
+	// registered by the caller once the report is out, as before.
+	var firstCounter uint32
+	counters, err = b.sendReportChunksNotify(freshTarget, report, func(counter uint32) {
+		firstCounter = counter
+		b.reportExchangeOrigins.Store(key, reportExchangeOrigin{createdAt: createdAt, firstCounter: counter})
+		if report.SubscriptionID != 0 {
+			b.reportCounterOwner.Store(reportCounterKey(target.sessionID, counter), report.SubscriptionID)
+		}
+	})
 	if err != nil {
+		if firstCounter != 0 {
+			b.reportExchangeOrigins.Delete(key)
+			b.reportCounterOwner.Delete(reportCounterKey(target.sessionID, firstCounter))
+		}
 		return nil, 0, err
-	}
-	if len(counters) > 0 {
-		b.reportExchangeOrigins.Store(mrp.ExchangeKey{SessionID: target.sessionID, ExchangeID: freshExchangeID, Initiator: true},
-			reportExchangeOrigin{createdAt: createdAt, firstCounter: counters[0]})
 	}
 	return counters, freshExchangeID, nil
 }

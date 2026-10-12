@@ -365,13 +365,17 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 				slog.Int("exchange_id", int(proto.ExchangeID)))
 			return nil
 		}
+		// The handshake holds a TCP connection it runs on open until it
+		// ends (matter.js ExchangeManager.ts:629-643 counts the unsecured
+		// session on the channel).
+		b.holdHandshake(src, proto.ExchangeID, false)
 		ch := b.resolveCaseHandler(proto.ExchangeID)
 		return b.handleCase(src, requestHdr, proto, payload, "sigma1",
-			ch.ProcessSigma1)
+			ch.ProcessSigma1, ch)
 	case mrp.SCOpcodeSigma3:
 		ch := b.resolveCaseHandler(proto.ExchangeID)
 		if err := b.handleCase(src, requestHdr, proto, payload, "sigma3",
-			ch.ProcessSigma3); err != nil {
+			ch.ProcessSigma3, ch); err != nil {
 			return err
 		}
 		// Sigma3 closes the CASE handshake on the wire — forget the
@@ -412,9 +416,16 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 	case mrp.SCOpcodeSigma2Resume:
 		ch := b.resolveCaseHandler(proto.ExchangeID)
 		return b.handleCase(src, requestHdr, proto, payload, "sigma2_resume",
-			ch.ProcessSigma2Resume)
+			ch.ProcessSigma2Resume, ch)
 
 	case mrp.SCOpcodeStatusReport:
+		if requestHdr.SessionID == 0 {
+			// The peer ended a handshake on this exchange with a failure:
+			// it no longer holds a connection open.
+			if general, _, _, ok := decodeStatusReport(payload); ok && general != mrp.SCStatusGeneralSuccess {
+				b.releaseHandshake(src, proto.ExchangeID)
+			}
+		}
 		if b.abortPaseOnStatusReport(src, requestHdr, proto, payload) {
 			return nil
 		}
@@ -461,17 +472,18 @@ func (b *Bridge) dispatchPase(
 			})
 			return nil
 		}
+		b.holdHandshake(src, proto.ExchangeID, true)
 		h := b.resolvePaseHandler(proto.ExchangeID)
 		return b.handlePase(src, requestHdr, proto, payload, "pbkdf_param_req",
-			h.ProcessPBKDFParamRequest)
+			h.ProcessPBKDFParamRequest, h)
 	case mrp.SCOpcodePake1:
 		h := b.resolvePaseHandler(proto.ExchangeID)
 		return b.handlePase(src, requestHdr, proto, payload, "pake1",
-			h.ProcessPake1)
+			h.ProcessPake1, h)
 	case mrp.SCOpcodePake3:
 		h := b.resolvePaseHandler(proto.ExchangeID)
 		err := b.handlePase(src, requestHdr, proto, payload, "pake3",
-			h.ProcessPake3)
+			h.ProcessPake3, h)
 		// Pake3 terminates the handshake either way (success installs
 		// the session, failure aborts the attempt) — release the
 		// single-active-PASE claim so the next commissioner can start.
@@ -691,6 +703,7 @@ func (b *Bridge) handlePase(
 	payload []byte,
 	stage string,
 	process func([]byte) (uint8, []byte, error),
+	handler any,
 ) error {
 	// Entry marker BEFORE the handler runs: a stage log with no
 	// follow-up (no reply, no pase_err) pins a stall inside the
@@ -700,6 +713,7 @@ func (b *Bridge) handlePase(
 		slog.String("src", srcString(src)),
 		slog.Int("exchange_id", int(proto.ExchangeID)))
 	respOpcode, respPayload, err := process(payload)
+	b.settleHandshake(src, proto.ExchangeID, handler, respOpcode, respPayload, err)
 	if err != nil {
 		// Missing-handler is a routine pre-PASE-wiring condition
 		// (commissioner pings before the daemon's PASE port is up);
@@ -789,8 +803,10 @@ func (b *Bridge) handleCase(
 	payload []byte,
 	stage string,
 	process func([]byte) (uint8, []byte, error),
+	handler any,
 ) error {
 	respOpcode, respPayload, err := process(payload)
+	b.settleHandshake(src, proto.ExchangeID, handler, respOpcode, respPayload, err)
 	if err != nil {
 		// Most "case_err"s on a healthy pair are MRP retransmissions of
 		// an already-processed sigma message: the per-exchange responder
@@ -894,8 +910,12 @@ func (b *Bridge) forgetSigma1Replied(exchangeID uint16) {
 // through here lets a per-exchange provider clean up aborted handshakes
 // so the sigma1Replied map cannot grow without bound on a daemon that
 // sees many half-completed CASE attempts.
+//
+// The eviction also ends the handshake's hold on a TCP connection it ran
+// on ([Bridge.holdHandshake]): the handshake can no longer complete.
 func (b *Bridge) ForgetSigma1Replied(exchangeID uint16) {
 	b.forgetSigma1Replied(exchangeID)
+	b.releaseCASEHandshakeEverywhere(exchangeID)
 }
 
 // ---------------------------------------------------------------------------

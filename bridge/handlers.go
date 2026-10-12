@@ -88,6 +88,9 @@ type PaseAdapter struct {
 	pbkdfIterations    uint32
 	pbkdfSalt          []byte
 	responderSessionID uint16
+	// established is set once Pake3 verified and the pickup callback
+	// registered the session under responderSessionID.
+	established bool
 	// randomSource feeds ResponderRandom in ProcessPBKDFParamRequest.
 	// Nil means crypto/rand. In-package tests assign a deterministic
 	// source directly, before the handshake starts (no concurrent
@@ -439,6 +442,15 @@ func (a *PaseAdapter) computePaseContextLocked() ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
+// establishedSession names the PASE session the adapter's handshake
+// established, for the bridge to bind it to the connection the handshake
+// ran on.
+func (a *PaseAdapter) establishedSession() (uint16, bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.responderSessionID, a.established
+}
+
 // ProcessPake3 decodes the wire payload and runs the verifier
 // allocated during the matching ProcessPake1. On success the
 // optional [PaseAdapter.SetOnSessionEstablished] callback fires
@@ -481,6 +493,9 @@ func (a *PaseAdapter) ProcessPake3(payload []byte) (opcode uint8, respPayload []
 		if err := cb(sharedSecret, peerSessionID); err != nil {
 			return 0, nil, fmt.Errorf("bridge: PASE session pickup: %w", err)
 		}
+		a.mu.Lock()
+		a.established = true
+		a.mu.Unlock()
 	}
 	// Per Matter §4.13.4 step 11 the verifier MUST close the PASE
 	// handshake with a StatusReport(SUCCESS, SESSION_ESTABLISHMENT_SUCCESS).
@@ -674,6 +689,15 @@ func (a *CaseAdapter) snapshotResponder() *sigma.Responder {
 // callback to lift state (peer node id, peer session id, …) the
 // callback signature does not expose directly.
 func (a *CaseAdapter) SnapshotResponder() *sigma.Responder { return a.snapshotResponder() }
+
+// establishedSession names the secure session the adapter's handshake
+// established (Sigma3 or a resume), for the bridge to bind it to the
+// connection the handshake ran on.
+func (a *CaseAdapter) establishedSession() (uint16, bool) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.establishedSessionID, a.established
+}
 
 // SetOnSessionEstablished installs a callback that fires after a
 // successful Sigma3 verification. Pass nil to clear.

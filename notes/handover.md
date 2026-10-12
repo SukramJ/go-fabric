@@ -22,6 +22,7 @@ German, briefly. Six waves were planned against the phases:
 | 5 | 3 (TCP, BDX, OTA requestor; ADR 0019) and harness follow-ups | M, N, O | #49; docs PR `docs/wave-5-followups` | #49 merged 2026-10-11 (`5739ee8`); docs PR see §3 |
 | 6 | 4 (device layer `device/`, node facade `node/`, `cluster/onoff.Server`, daemon migration; ADR 0018 accepted 2026-10-11) | P, Q, R | #51; docs PR `docs/wave-6-followups` | #51 merged 2026-10-12 (`b4ea1f9`); docs PR see §6 |
 | 7 | phase-5 preparation and release: AddNOC test commissioner, device-layer gaps, Tier-3 transport findings + OnOff scenes, v0.2.0 deprecations removed, `v0.3.0` | S, T, U, V | #53; docs PR `docs/wave-7-followups` | #53 merged 2026-10-12 (`b0b97ff`); tag `v0.3.0` after the docs PR (normal release, no pre-release flag — owner 2026-10-12) |
+| 8 | the three Tier-3 session findings of #54: RemoveFabric/UpdateNOC CloseSession, handshakes hold a TCP connection, first chunk of a chunked report is peer loss | W | `wave/2026-10-12-tranche-8`; docs PR `docs/wave-8-followups` | see §8 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -341,3 +342,43 @@ the deprecated state (historical, a note each). Then: tag `v0.3.0` on
 `main` (owner or this session), delete the `wave7/*`, `planning/briefs-wave-7`,
 `wave/2026-10-12-tranche-7` branches and the `.claude/worktrees/wave7-*`
 worktrees.
+
+## 8. Wave 8 (2026-10-12, the owner away; everything local)
+
+Brief W on `planning/briefs-wave-8`; one agent branch `wave8/sessions`
+(items 1–3 `46f79d7`, `8de3313`, `3622e71`; report `f6e47f2`). Integration
+`wave/2026-10-12-tranche-8` is that branch plus this section. Local guards
+on the agent's head: `make ci`, race on `bridge`/`node`, reachability
+(unreached 5), `make chiptool-test`; families OPCREDS/SC/IDM: 88 passed,
+34 skipped (the table's verdicts), SC/5.2 timed out in the family run at
+step 15b (an 84-chunk wildcard read, no item-1/2/3 path) and passed alone —
+read as a timing flake, to be confirmed by the owner's fixture run. No
+chip-tool test, PICS or golden changed.
+
+Owner decisions on report W (verified against `Fabric.ts:403-427,456-460`,
+`NodeSession.ts:312-327,359-368` at 4633bfd7):
+- Q1: matter.js wins over the brief — the invoking session of RemoveFabric
+  closes after its response **without** a CloseSession (`initiateForceClose`
+  marks it peer-lost, `close()` skips `gracefulClose`); the brief's wording
+  was wrong. The other sessions get the CloseSession.
+- Q2: a failed handshake never closes a connection; only a secure session's
+  deletion schedules the check (`ExchangeManager.ts:678-708`) — parity,
+  no change.
+- Q3: UDP sessions without a route close silently — finding (Tier 3), not
+  moved in this wave: binding a UDP session at establishment changes the
+  UDP route rule, which the fixture runs have proven.
+- Q4: no bound on an abandoned CASE hold beyond the host's eviction —
+  by_design (matter.js has no constant either; `node` wires the 1-minute
+  TTL).
+
+**Docs PR `docs/wave-8-followups`** (after merge): findings — close the three
+Tier-3 bullets (RemoveFabric without CloseSession, handshake sessions on
+TCP, first chunk of a chunked report); add UpdateNOC keeps the invoking
+session open (`Fabric.ts:403-410` closes it after the exchange) and
+unrouted sessions closed silently (Q3). by_design — CloseSession to every
+other routed session regardless of active exchanges (`NodeSession.ts:312-327`
+defers and then sends none); no subscription flush on fabric removal or
+rotation (`Fabric.ts:405-407,421-423`); CASE hold bounded only by eviction
+(Q4). `docs/open-items.md`: the three rows closed, two new rows. Then
+delete `wave8/sessions`, `planning/briefs-wave-8`,
+`wave/2026-10-12-tranche-8` and `.claude/worktrees/wave8-sessions`.

@@ -10,6 +10,36 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `bridge.Bridge.CloseFabricSessionsExcept(fabricIndex, exceptSessionID)`:
+  ends every session of a fabric but one, telling each peer with a
+  CloseSession first — the UpdateNOC path (matter.js `Fabric.replaced`).
+  `node` calls it after UpdateNOC instead of closing the sessions silently.
+
+### Changed
+
+- RemoveFabric tells every other session of the removed fabric with a
+  Secure-Channel CloseSession before they close (matter.js `Fabric.leave`);
+  the session that carried the command still closes after its response,
+  without one, as in matter.js. A host on `EmitFabricRemovedContext` gets
+  this without a change; the peer address comes from the bridge's session
+  routes and the fabric from the `SessionLookup`'s `SessionFabricResolver`.
+
+### Fixed
+
+- A PASE or CASE handshake in flight on a TCP connection now holds the
+  connection open: the connection's last secure session closing mid-handshake
+  no longer closes it under the handshake (matter.js counts the unsecured
+  session on the channel). The session the handshake establishes is bound to
+  the connection when the handshake completes, not at its first message.
+- The first chunk of a chunked ongoing report that the peer never
+  acknowledges is peer loss, as an unchunked report's message already was:
+  its counter is registered with the report's exchange as soon as it is sent,
+  not once the whole report is out, so the peer's earlier sessions close and
+  their subscriptions with them (matter.js `MessageExchange.send` →
+  `peerLost`). A later chunk's loss is unchanged.
+
 ## [0.3.0] — 2026-10-12
 
 **What a host must do.** Upgrading from `v0.2.x` needs a source change only
