@@ -19,7 +19,6 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -202,8 +201,8 @@ func (e *demoEvse) build() {
 
 // device builds the charger with its parts: PowerSource,
 // DeviceEnergyManagement (stating ControllableEsa, so
-// DeviceEnergyManagementMode is mounted) and the ElectricalSensor, a
-// measurement-backed endpoint appended after them.
+// DeviceEnergyManagementMode is mounted) and the ElectricalSensor, whose
+// clusters the assembler materialises from the meter reading.
 func (e *demoEvse) device(opts device.Options) (node.Endpoint, error) {
 	e.build()
 	charger, err := device.NewEnergyEvse(opts, serve(e.servers())...)
@@ -218,14 +217,16 @@ func (e *demoEvse) device(opts device.Options) (node.Endpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range []*device.Device{power.Device, esa.Device} {
+	meter, err := device.NewElectricalSensor(part("demo:evse:meter"), measured(e.meter))
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range []*device.Device{power.Device, esa.Device, meter.Device} {
 		if err := charger.AddPart(p); err != nil {
 			return nil, err
 		}
 	}
-	return withMeasuredParts{charger, []endpoint.Spec{{
-		StableKey: endpoint.StringKey("demo:evse:meter"), DeviceType: deviceTypeElectricalSensor, Measurement: e.meter,
-	}}}, nil
+	return charger, nil
 }
 
 // ChangeToMode implements [modebase.ModeChanger]: every supported mode is

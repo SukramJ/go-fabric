@@ -18,6 +18,19 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `device.WithMeasurement(contract.MeasurementSource)`: a device's
+  measurement clusters are served from the host's live reading — the
+  assembler materialises them from the reading's measurement class
+  (`endpoint.Spec.Measurement`, `cluster/measurement FromMeasurementClass`)
+  on every dispatch, the bridge subscribes to the reading's notifier and
+  wires a GenericSwitch's presses to it. The clusters the reading
+  materialises are the assembler's for that device: no default server, no
+  other option for them. A device without the option is unchanged.
+  `endpoint.ClusterServers` now serves a Source's clusters followed by the
+  Measurement's when an endpoint carries both. The reference daemon's
+  sensors, the smoke alarm's battery and the electrical sensors are
+  `device.New<Type>(…, WithMeasurement(src))` calls, parts through
+  `AddPart`; endpoint ids, cluster sets and attribute values are unchanged.
 - The device layer `device/` (ADR 0018, wave 6), **public API from this
   release on** (README.md §API stability): one generated Go type per device
   type in scope — 63 of the snapshot's 91, the rest named with their concept

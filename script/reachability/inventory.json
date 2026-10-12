@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4421,
+  "entry_points": 4425,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10389,
-    "reachable": 7336,
-    "whitelisted": 3048,
+    "total_exported": 10394,
+    "reachable": 7337,
+    "whitelisted": 3052,
     "unreachable": 5
   },
   "by_package": [
@@ -224,7 +224,7 @@
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 124,
+      "line": 126,
       "kind": "func"
     },
     {
@@ -13979,6 +13979,27 @@
     },
     {
       "package": "device",
+      "identifier": "TestWithMeasurement",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/measurement_test.go",
+      "line": 38
+    },
+    {
+      "package": "device",
+      "identifier": "TestWithMeasurementComposesWithTheDevicesOwnServers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/measurement_test.go",
+      "line": 88
+    },
+    {
+      "package": "device",
+      "identifier": "TestWithMeasurementRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/measurement_test.go",
+      "line": 106
+    },
+    {
+      "package": "device",
       "identifier": "TestWithServerMountsAClusterTheTypeDoesNotList",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/host_options_test.go",
@@ -15039,7 +15060,7 @@
       "identifier": "TestAirQualitySensorMountsEveryConcentrationCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 338
+      "line": 350
     },
     {
       "package": "examples/reference-bridge",
@@ -15067,7 +15088,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 296
+      "line": 308
     },
     {
       "package": "examples/reference-bridge",
@@ -15075,6 +15096,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
       "line": 52
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestButtonPressWiringThroughTheDeviceLayer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_test.go",
+      "line": 379
     },
     {
       "package": "examples/reference-bridge",
@@ -15305,7 +15333,7 @@
       "identifier": "TestSmokeAlarmHasItsPowerSourcePart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 313
+      "line": 325
     },
     {
       "package": "examples/reference-bridge",

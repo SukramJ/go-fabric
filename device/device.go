@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -42,6 +43,10 @@ type Device struct {
 	// source is what Spec hands the assembler: the device itself, or the
 	// device with the host's change notifier ([WithChangeNotifier]).
 	source contract.EndpointSource
+	// measurement is the host's live reading ([WithMeasurement]) and
+	// measured the clusters the assembler materialises from it.
+	measurement contract.MeasurementSource
+	measured    map[uint32]bool
 
 	mu    sync.Mutex
 	parts []*Device
@@ -88,17 +93,21 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 	if s.nilSrv {
 		return nil, fmt.Errorf("%w: %s: WithServer(nil)", ErrConfiguration, t.Name)
 	}
-	if err := checkOptedClusters(t, s); err != nil {
+	measured, err := measuredClusters(t, s)
+	if err != nil {
 		return nil, err
 	}
-	d := &Device{typ: t, opts: opts}
+	if err := checkOptedClusters(t, s, measured); err != nil {
+		return nil, err
+	}
+	d := &Device{typ: t, opts: opts, measurement: s.measurement, measured: measured}
 	d.source = d
 	if s.notifier != nil {
 		d.source = &notifyingSource{Device: d, notifier: s.notifier}
 	}
 	for i := range t.Servers {
 		r := &t.Servers[i]
-		if _, ok := assemblerMounted[r.ID]; ok {
+		if _, ok := assemblerMounted[r.ID]; ok || measured[r.ID] {
 			continue
 		}
 		srv, ok := s.servers[r.ID]
@@ -135,10 +144,34 @@ func (n *notifyingSource) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	return n.notifier.OnMatterValueChanged(cb)
 }
 
+// measuredClusters are the clusters the host's measurement source
+// ([WithMeasurement]) materialises — the assembler's for this device. The
+// materialiser runs once here, with no endpoint id, to learn the set; the
+// assembler runs it again on every dispatch with the endpoint's
+// (endpoint/materialize.go ClusterServers).
+func measuredClusters(t *Type, s *settings) (map[uint32]bool, error) {
+	if !s.measurementSet {
+		return nil, nil
+	}
+	if s.measurement == nil {
+		return nil, fmt.Errorf("%w: %s: WithMeasurement(nil)", ErrConfiguration, t.Name)
+	}
+	class := s.measurement.MatterMeasurementClass()
+	servers := measurement.FromMeasurementClass(class, s.measurement, contract.MeasurementContext{})
+	if len(servers) == 0 {
+		return nil, fmt.Errorf("%w: %s: the measurement source (class %d) materialises no cluster", ErrConfiguration, t.Name, class)
+	}
+	out := make(map[uint32]bool, len(servers))
+	for _, srv := range servers {
+		out[srv.MatterClusterID()] = true
+	}
+	return out, nil
+}
+
 // checkOptedClusters refuses an option for a cluster the device type does
 // not allow as a server — a host server ([WithServer]) excepted — or one
-// the assembler mounts itself.
-func checkOptedClusters(t *Type, s *settings) error {
+// the assembler mounts itself, measured clusters included.
+func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	ids := make([]uint32, 0, len(s.optional)+len(s.servers)+len(s.initial))
 	for id := range s.optional {
 		ids = append(ids, id)
@@ -159,6 +192,9 @@ func checkOptedClusters(t *Type, s *settings) error {
 	for _, id := range slices.Compact(ids) {
 		if name, ok := assemblerMounted[id]; ok {
 			return fmt.Errorf("%w: %s: the endpoint assembler mounts %s (0x%04X) itself", ErrConfiguration, t.Name, name, id)
+		}
+		if measured[id] {
+			return fmt.Errorf("%w: %s: cluster 0x%04X is served from the measurement source (WithMeasurement)", ErrConfiguration, t.Name, id)
 		}
 		if _, ok := t.Server(id); !ok && !onlyHostServer(s, id) {
 			return fmt.Errorf("%w: %s has no server cluster requirement for cluster 0x%04X", ErrConfiguration, t.Name, id)
@@ -356,7 +392,8 @@ func featureNames(r *ClusterRequirement, mask uint32) []string {
 func (d *Device) Type() *Type { return d.typ }
 
 // Server returns the device's server for clusterID, or nil when it mounts
-// none.
+// none — a cluster served from the measurement source ([WithMeasurement])
+// included, whose servers the assembler builds per dispatch.
 func (d *Device) Server(clusterID uint32) contract.ClusterServer {
 	for _, srv := range d.servers {
 		if srv.MatterClusterID() == clusterID {
@@ -477,6 +514,7 @@ func (d *Device) Spec() endpoint.Spec {
 		ChannelAddress:   d.opts.ChannelAddress,
 		Availability:     d.opts.Reachable,
 		Source:           d.source,
+		Measurement:      d.measurement,
 		NodeLabel:        d.opts.NodeLabel,
 		DeviceConditions: slices.Clone(d.opts.Conditions),
 		ClientClusters:   d.clientClusters(),

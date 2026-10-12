@@ -56,9 +56,13 @@ type settings struct {
 	// server for a cluster the type does not list is mounted in it.
 	serverOrder []uint32
 	notifier    contract.ChangeNotifier
-	initial     map[uint32]map[uint32]any
-	elements    map[uint32]spec.Options
-	nilSrv      bool
+	// measurement is the host's live reading ([WithMeasurement]);
+	// measurementSet tells a WithMeasurement(nil) from no call.
+	measurement    contract.MeasurementSource
+	measurementSet bool
+	initial        map[uint32]map[uint32]any
+	elements       map[uint32]spec.Options
+	nilSrv         bool
 }
 
 func newSettings(with []Option) *settings {
@@ -131,6 +135,30 @@ func WithServer(srv contract.ClusterServer) Option {
 // replaces an earlier one; nil leaves the source without one.
 func WithChangeNotifier(n contract.ChangeNotifier) Option {
 	return func(s *settings) { s.notifier = n }
+}
+
+// WithMeasurement serves the device's measurement clusters from the host's
+// live reading m: the endpoint assembler materialises them from m's
+// measurement class ([endpoint.Spec.Measurement], cluster/measurement
+// FromMeasurementClass) on every dispatch, exactly as for a measurement
+// endpoint the host hands over as an [endpoint.Spec], and the bridge
+// subscribes to m when it is a [contract.ChangeNotifier] and wires a
+// GenericSwitch's presses to it. The clusters m's class materialises are
+// then the assembler's for this device, as Descriptor is: New mounts no
+// default server for them, refuses every other option for them, and
+// [Device.Server] and the typed accessors answer nil for them. A device
+// without the option is unchanged.
+//
+// It is the Go form of a matter.js host setting a measurement behavior's
+// state from its own reading, which the behavior's Datasource then reports
+// (packages/node/src/behavior/state/managed/Datasource.ts:200-203
+// `onChange`, :690-710). New refuses a nil m and a class that materialises
+// no cluster from m. A later call replaces an earlier one.
+func WithMeasurement(m contract.MeasurementSource) Option {
+	return func(s *settings) {
+		s.measurement = m
+		s.measurementSet = true
+	}
 }
 
 // WithElements serves optional attributes, accepts optional commands and

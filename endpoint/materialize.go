@@ -31,7 +31,8 @@ const matterDeviceTypeBridgedNode uint32 = 0x0013
 //
 //  1. Custom-DP-backed endpoints (ep.Source != nil) ask the source
 //     directly via [contract.EndpointSource.MatterClusterServers].
-//  2. Standalone-sensor endpoints (ep.Measurement != nil) consult the
+//  2. Sensor endpoints (ep.Measurement != nil, after the source's
+//     clusters when both are set) consult the
 //     [measurement.FromMeasurementClass] materializer, which looks the
 //     measurement class up in the kind registry and runs the
 //     materialiser registered for it against the source DP. A kind a
@@ -69,13 +70,16 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// across calls.
 	mc := contract.MeasurementContext{EndpointID: ep.ID}
 	var inner []contract.ClusterServer
-	switch {
-	case ep.Source != nil:
+	if ep.Source != nil {
 		inner = append([]contract.ClusterServer(nil), ep.Source.MatterClusterServers()...)
-	case ep.Measurement != nil:
-		inner = measurement.FromMeasurementClass(
+	}
+	// A measurement source's clusters follow the source's own: a sensor
+	// endpoint has no source servers, a device-layer device built with
+	// device.WithMeasurement has its other clusters there.
+	if ep.Measurement != nil {
+		inner = append(inner, measurement.FromMeasurementClass(
 			ep.Measurement.MatterMeasurementClass(), ep.Measurement, mc,
-		)
+		)...)
 	}
 	// The device's battery rides on this endpoint when attachPowerSource
 	// picked it. Appended after the endpoint's own clusters so the primary

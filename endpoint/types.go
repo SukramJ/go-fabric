@@ -99,8 +99,9 @@ type Endpoint struct {
 	// surface. nil for the root endpoint and for measurement-only
 	// sub-endpoints (which use Measurement instead).
 	Source contract.EndpointSource
-	// Measurement is set on standalone sensor endpoints assembled
-	// from MatterMeasurementSource implementers. nil otherwise.
+	// Measurement is set on sensor endpoints assembled from
+	// MatterMeasurementSource implementers. nil otherwise. With Source
+	// also set, its clusters follow the source's ([ClusterServers]).
 	Measurement contract.MeasurementSource
 	// PowerSource carries the device's battery reading on exactly one of
 	// the device's endpoints, so the PowerSource cluster (0x002F) is served
