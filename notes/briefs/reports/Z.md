@@ -11,7 +11,9 @@ entry under `[Unreleased]`. `secure/` and `commissioning/` are untouched.
 | d73aa27 `node: Config.Observers — fabric, commissioning-complete and window observers chained after the facade's handlers` | 1 |
 | 1e1cfdf `node: OpenBasicWindow — the node's own window with per-window credentials, CM=1 under its discriminator, configured credentials back on close` | 2 |
 | f909430 `node: Config.SupportedFabrics and DisableTimeSynchronization` | 3 |
-| (this file) `notes: report Z` | — |
+| 0eb4d91 `notes: report Z` | — |
+| 71e80f8 `node: a direct OpenOwnWindow ends an open basic window — configured credentials and discriminator` | Q7 fix-up |
+| (this update) `notes: report Z — owner decisions` | — |
 
 ## Already there (for the host, no code)
 
@@ -103,7 +105,13 @@ Name: `OpenBasicWindow` — CM=1, passcode-based, as matter.js's
   Opened while an administrator's window is open:
   `bridge.ErrAdministratorWindowOpen`, checked before the install so the
   administrator's acceptor is not replaced. A second `OpenBasicWindow`
-  replaces the first.
+  replaces the first. A direct `CommissioningWindow().OpenOwnWindow` while a
+  basic window is open ends the basic window (Q7 fix-up, 71e80f8):
+  `openBasic` marks its `basicWindow` as opening before its own
+  `OpenOwnWindow`; `transition`, seeing the own window with a basic window
+  not marked opening, calls `endBasic` (restore, then `attachPase(baseline)`
+  attaches the configured acceptor) and announces the configured
+  discriminator; the mark is cleared the first time `transition` consumes it.
 - On close (timeout, CommissioningComplete, revoke, replacement by an
   administrator) the window's acceptor is removed; then, if no window is open
   and the node has no fabric, the node's own window is reopened with the
@@ -127,6 +135,9 @@ open (CM=1, D = window's) then closed), `TestOpenBasicWindowRefusals` (five
 invalid credentials refused, record unchanged; administrator window open →
 `ErrAdministratorWindowOpen`). Checked: without the discriminator override
 three tests fail; without the reopen the timeout test fails.
+`TestOwnWindowOpenEndsBasicWindow` (Q7: OpenBasicWindow, then
+`OpenOwnWindow(ctx, 0)`; the record is D=3840 CM=1 and the configured
+passcode commissions); it fails with the end-on-direct-open removed (checked).
 
 ### 3. Configuration knobs
 
@@ -176,6 +187,12 @@ All local, Linux, on this branch:
   13 (10.4 on every endpoint); **0 failed**. Every skip is the table's
   verdict (manual case, commissioner, PICS) as on main.
 
+Q7 fix-up guards (71e80f8): `go test ./node/...` PASS;
+`CGO_ENABLED=1 go test -race -count=1 ./node/...` PASS (10.9 s); `make lint`
+0 issues, `go mod verify` all modules verified; `make reachability` (unreached
+5, inventory in the commit); `make reachability-check` PASS. No chip-tool
+rerun (owner).
+
 No test, PICS slice or golden of `internal/chiptool` was edited. The
 reference daemon is unchanged: it sets none of the new fields, so it runs
 with the defaults (5 fabrics, TimeSynchronization mounted, no observers).
@@ -197,33 +214,26 @@ None. Existing tests unchanged; the new tests are in three new files.
   180 s..900 s (`#assertCommissioningWindowRequirements`), which is not the
   path this mirrors. The tests use 300 ms.
 
-## Open questions
+## Open questions — owner decisions (2026-10-12)
 
-1. **ConcurrentPairings**: a documented constant (no field) — confirm, or add
-   a field that, when false, would make the provider single-exchange.
-2. **Observer signatures** carry no `context.Context` and return `error`
-   (logged). The brief gives `OnFabricAdded(FabricInfo)` etc. without either;
-   the error return follows "errors are logged not returned". A host doing
-   I/O in an observer has no request context — intended?
-3. **`Bridge.SetOnFabricAdded` stays unfired under the facade** (and the
-   issue lists it). Should the facade call `EmitFabricAdded` in its AddNOC
-   handler, as `EmitFabricRemovedContext` already fires the bridge's removed
-   hook?
-4. **`OnCommissioningComplete` fires on every CommissioningComplete**, also
-   for a second admin's; matter.js's `commissioned` event fires only when the
-   fabric count crosses zero (`CommissioningServer.ts:157-171`). Keep per
-   command, or add a separate "first fabric" observer?
-5. **`WindowSnapshot` fields** are not specified by the brief; chosen: open,
-   own, the AdministratorCommissioning snapshot, and the published CM and
-   discriminator (what the facade advertised after the transition; a failed
-   publish leaves the previous values). Adequate for the host's WS event?
-6. **Restore after a basic window on an uncommissioned node** reopens the
-   node's own window with a fresh default timeout (48 h), not the remainder
-   of the window it replaced. Acceptable?
-7. **`CommissioningWindow().OpenOwnWindow` while a basic window is open**
-   restarts the window but keeps the basic window's credentials and
-   discriminator (the basic window ends only on close). Should a host's
-   direct own-window open end the basic window first?
+1. **ConcurrentPairings**: confirmed — a documented constant, no field.
+2. **Observer signatures** (no `context.Context`, `error` logged): confirmed, kept.
+3. **`Bridge.SetOnFabricAdded` never fires under the facade**: not changed.
+   Recorded under open items below; the docs PR takes it.
+4. **`OnCommissioningComplete` per command**: kept; no first-fabric observer.
+   Listed as a by_design candidate below.
+5. **`WindowSnapshot` fields**: adequate.
+6. **Restore after a basic window on an uncommissioned node** reopens the own
+   window with a fresh default timeout (48 h), not the remainder of the window
+   it replaced: acceptable (noted here as the decided behaviour).
+7. **Direct `OpenOwnWindow` while a basic window is open**: now ends the basic
+   window (fix-up 71e80f8, described under item 2).
+
+## Open items
+
+- `Bridge.SetOnFabricAdded` is never fired under the facade
+  (`Bridge.EmitFabricAdded` is not called from `fabricInstalled`); a host on
+  the facade uses `Observers.OnFabricAdded`. For the docs PR.
 
 ## by_design / findings candidates (for the owner)
 
@@ -234,8 +244,10 @@ None. Existing tests unchanged; the new tests are in three new files.
 - by_design: **SupportedFabrics default 5 in the facade** vs matter.js 254
   (`OperationalCredentialsServer.ts:84-88`); `cluster/core` defaults to 254,
   the facade passes 5 when unset.
-- by_design (or finding): **`OnCommissioningComplete` per command** vs
-  matter.js `commissioned` on the fabric count crossing zero (question 4).
+- by_design: **`OnCommissioningComplete` fires on every
+  CommissioningComplete**, whereas matter.js emits `commissioned` only when
+  the fabric count crosses zero (`CommissioningServer.ts:157-171`
+  `#syncCommissioned`). Owner decision: keep per command (question 4).
 - by_design: **Observers run synchronously before the command's response**
   (fabric events) — as matter.js emits its Observables inline; a blocking
   observer delays the NOCResponse.
