@@ -279,6 +279,7 @@ func (a *Assembler) buildEndpoint(ctx context.Context, scope string, spec *Spec)
 		HasParentEndpointID: true,
 		DeviceConditions:    append([]string(nil), spec.DeviceConditions...),
 		ClientClusters:      append([]uint32(nil), spec.ClientClusters...),
+		OptIn:               append([]uint32(nil), spec.OptIn...),
 		groups:              a.cfg.Groups,
 		onNodeLabelWritten:  a.cfg.OnNodeLabelWritten,
 		scenesStore:         a.cfg.Scenes,

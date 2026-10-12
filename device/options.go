@@ -95,6 +95,11 @@ func WithFeatures(clusterID, features uint32) Option {
 // WithOptional mounts an optional cluster of the device type with its
 // default server — matter.js's `Device.with(LevelControlServer)` for a
 // cluster in `server.optional` (devices/on-off-light.ts:111, 126-131).
+// For Groups (0x0004) and ScenesManagement (0x0062), whose server is the
+// stack's, it opts the endpoint in ([endpoint.Spec.OptIn]) and the
+// assembler mounts them, as `MutableEndpoint.with(GroupsServer)` extends
+// any endpoint type (packages/node/src/endpoint/type/MutableEndpoint.ts:95-112);
+// every other option for them stays refused.
 func WithOptional(clusterID uint32) Option {
 	return func(s *settings) { s.optional[clusterID] = true }
 }

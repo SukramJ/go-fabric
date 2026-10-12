@@ -18,7 +18,9 @@
 // endpoint-id persistence and device-type validation are the assembler's
 // (ADR 0016). The clusters the assembler mounts on every endpoint —
 // Descriptor, Identify, BridgedDeviceBasicInformation, Groups and
-// ScenesManagement — are never mounted here.
+// ScenesManagement — are never mounted here; an optional Groups or
+// ScenesManagement is opted into with [WithOptional] and mounted by the
+// assembler.
 //
 // The package is public API from its first commit (README.md §API
 // stability). A device type matter.js renames becomes an alias with a

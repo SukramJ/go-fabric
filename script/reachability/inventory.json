@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4425,
+  "entry_points": 4428,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10394,
+    "total_exported": 10397,
     "reachable": 7337,
-    "whitelisted": 3052,
+    "whitelisted": 3055,
     "unreachable": 5
   },
   "by_package": [
@@ -224,7 +224,7 @@
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 126,
+      "line": 135,
       "kind": "func"
     },
     {
@@ -13916,10 +13916,24 @@
     },
     {
       "package": "device",
+      "identifier": "TestOptInRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/optin_test.go",
+      "line": 84
+    },
+    {
+      "package": "device",
       "identifier": "TestOptionalClusterWithItsAlterations",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
       "line": 151
+    },
+    {
+      "package": "device",
+      "identifier": "TestOptionalGroupsAndScenes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/optin_test.go",
+      "line": 24
     },
     {
       "package": "device",
@@ -14816,6 +14830,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/parts_test.go",
       "line": 23
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestStackClustersMountWhereTheEndpointOptsIn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/groups_mount_test.go",
+      "line": 240
     },
     {
       "package": "endpoint",

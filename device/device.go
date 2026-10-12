@@ -47,6 +47,9 @@ type Device struct {
 	// measured the clusters the assembler materialises from it.
 	measurement contract.MeasurementSource
 	measured    map[uint32]bool
+	// optIn are the assembler's optional clusters the host opted into
+	// ([WithOptional] for Groups or ScenesManagement).
+	optIn []uint32
 
 	mu    sync.Mutex
 	parts []*Device
@@ -60,9 +63,11 @@ var _ contract.EndpointSource = (*Device)(nil)
 // mounts them a second time: Descriptor and BridgedDeviceBasicInformation
 // on every bridged endpoint, Identify on every bridged endpoint and on a
 // part whose device type mandates it, Groups and ScenesManagement where the
-// device type mandates them — a Groups or ScenesManagement server the
-// source supplies is replaced by the stack's (endpoint/materialize.go
-// ClusterServers, partClusterServers, mountGroups, mountScenes).
+// device type mandates them or allows them and the host opts in
+// ([WithOptional] → [endpoint.Spec.OptIn]) — a Groups or ScenesManagement
+// server the source supplies is replaced by the stack's
+// (endpoint/materialize.go ClusterServers, partClusterServers,
+// mountGroups, mountScenes).
 var assemblerMounted = map[uint32]string{
 	0x001D: "Descriptor",
 	0x0039: "BridgedDeviceBasicInformation",
@@ -101,6 +106,12 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 		return nil, err
 	}
 	d := &Device{typ: t, opts: opts, measurement: s.measurement, measured: measured}
+	for id := range optInMounted {
+		if s.optional[id] {
+			d.optIn = append(d.optIn, id)
+		}
+	}
+	slices.Sort(d.optIn)
 	d.source = d
 	if s.notifier != nil {
 		d.source = &notifyingSource{Device: d, notifier: s.notifier}
@@ -190,7 +201,7 @@ func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	}
 	slices.Sort(ids)
 	for _, id := range slices.Compact(ids) {
-		if name, ok := assemblerMounted[id]; ok {
+		if name, ok := assemblerMounted[id]; ok && (!optInMounted[id] || !onlyOptIn(s, id)) {
 			return fmt.Errorf("%w: %s: the endpoint assembler mounts %s (0x%04X) itself", ErrConfiguration, t.Name, name, id)
 		}
 		if measured[id] {
@@ -212,6 +223,24 @@ func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 		}
 	}
 	return nil
+}
+
+// optInMounted are the assembler's clusters a device opts into with
+// [WithOptional] where its type lists them as optional: the assembler then
+// mounts the stack's server ([endpoint.Spec.OptIn]).
+var optInMounted = map[uint32]bool{
+	0x0004: true, // Groups
+	0x0062: true, // ScenesManagement
+}
+
+// onlyOptIn reports whether the host opts into id and states nothing else
+// about it.
+func onlyOptIn(s *settings, id uint32) bool {
+	_, host := s.servers[id]
+	_, initial := s.initial[id]
+	_, elements := s.elements[id]
+	_, features := s.features[id]
+	return s.optional[id] && !host && !initial && !elements && !features
 }
 
 // onlyHostServer reports whether the host supplies its own server for id
@@ -518,6 +547,7 @@ func (d *Device) Spec() endpoint.Spec {
 		NodeLabel:        d.opts.NodeLabel,
 		DeviceConditions: slices.Clone(d.opts.Conditions),
 		ClientClusters:   d.clientClusters(),
+		OptIn:            slices.Clone(d.optIn),
 	}
 	for _, p := range d.Parts() {
 		s.Parts = append(s.Parts, p.Spec())

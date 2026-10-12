@@ -232,3 +232,44 @@ func TestScenesServerReplacesTheStub(t *testing.T) {
 		t.Fatalf("FeatureMap = %v, want 1 (SceneNames)", v)
 	}
 }
+
+// TestStackClustersMountWhereTheEndpointOptsIn: an endpoint opts into an
+// optional Groups or ScenesManagement (Spec.OptIn) and the assembler mounts
+// the stack's server — where the device type allows the cluster only
+// (matter.js MutableEndpoint.with, MutableEndpoint.ts:95-112).
+func TestStackClustersMountWhereTheEndpointOptsIn(t *testing.T) {
+	t.Parallel()
+	mgr, err := groups.NewManager(nopGroupStore{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const scenes = mattercore.ScenesManagementClusterID
+	cases := []struct {
+		name       string
+		dt         uint16
+		optIn      []uint32
+		wantGroups int
+		wantScenes int
+	}{
+		{"WindowCovering without opting in", 0x0202, nil, 0, 0},
+		{"WindowCovering opting into Groups", 0x0202, []uint32{mattercore.GroupsClusterID}, 1, 0},
+		{"Pump opting into both", 0x0303, []uint32{mattercore.GroupsClusterID, scenes}, 1, 1},
+		{"TemperatureSensor, which allows neither", 0x0302, []uint32{mattercore.GroupsClusterID, scenes}, 0, 0},
+		{"an id the assembler does not mount", 0x0202, []uint32{0x0008}, 0, 0},
+	}
+	for _, tc := range cases {
+		spec := Spec{OptIn: tc.optIn}
+		ep := &Endpoint{
+			ID: 7, DeviceType: tc.dt, FriendlyName: "Thing", SourceKey: StringKey("thing"),
+			Source: deviceTypeSource{dt: tc.dt, servers: []contract.ClusterServer{fakeServer{id: 0xFFF1_FC00}}},
+			OptIn:  spec.OptIn, groups: mgr,
+		}
+		servers := ClusterServers(ep)
+		if n, _ := countCluster(servers, mattercore.GroupsClusterID); n != tc.wantGroups {
+			t.Errorf("%s: Groups servers %d, want %d (%v)", tc.name, n, tc.wantGroups, clusterIDs(servers))
+		}
+		if n, _ := countCluster(servers, scenes); n != tc.wantScenes {
+			t.Errorf("%s: ScenesManagement servers %d, want %d (%v)", tc.name, n, tc.wantScenes, clusterIDs(servers))
+		}
+	}
+}

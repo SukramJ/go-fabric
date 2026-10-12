@@ -183,6 +183,10 @@ type Endpoint struct {
 	// as its Descriptor ClientList. Carried from [Spec.ClientClusters].
 	ClientClusters []uint32
 
+	// OptIn are the stack-mounted optional server clusters the endpoint
+	// opts into (Groups, ScenesManagement). Carried from [Spec.OptIn].
+	OptIn []uint32
+
 	// attachedClusters holds the cluster servers that come from OUTSIDE
 	// the assembler: the daemon builds them and hands them to the bridge,
 	// which places them on the root endpoint (BasicInformation,

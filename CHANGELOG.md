@@ -18,6 +18,14 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `endpoint.Spec.OptIn []uint32`: an endpoint opts into an optional Groups
+  (0x0004) or ScenesManagement (0x0062) and the assembler mounts the stack's
+  server where the device type allows the cluster, as matter.js's
+  `MutableEndpoint.with(GroupsServer)` extends any endpoint type.
+  `device.WithOptional` sets it for those two clusters instead of refusing
+  them (AirPurifier, Pump, RoomAirConditioner, SmokeCoAlarm, Thermostat,
+  WindowCovering list Groups as optional; Pump and RoomAirConditioner
+  ScenesManagement); every other option for them stays refused.
 - `device.WithMeasurement(contract.MeasurementSource)`: a device's
   measurement clusters are served from the host's live reading — the
   assembler materialises them from the reading's measurement class
