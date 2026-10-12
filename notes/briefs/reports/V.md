@@ -85,7 +85,7 @@ after every commit that changed Go code, inventory in the same commit
   created.
 - `TestParityMatterJS_WireClusterRevisions`, `schema` parity tests.
 - `make reachability-check` — unreached 5, unchanged in every commit
-  (total exported 10417 → 10404 over the branch).
+  (total exported 10417 → 10409 over the branch).
 
 ## Guards run (Linux, local)
 
