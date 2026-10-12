@@ -348,8 +348,10 @@ func (b *Bridge) ackPumpTick(tracker *mrp.AckTracker, outbound *outboundReliable
 // When a counter hits [mrp.MaxRetransmissions] the tracker reports
 // `mrp.ErrMaxRetransmissionsReached`; the bridge then closes the
 // owning subscription so the peer-vanished route stops burning
-// engine ticks, and treats the peer of an exchange this node opened
-// (OTA, BDX) as lost — [Bridge.handleInitiatedPeerLoss].
+// engine ticks, and treats the peer as lost when the message was the
+// first of an exchange this node opened — an ongoing report
+// ([Bridge.reportPeerLoss]) or an OTA / BDX exchange
+// ([Bridge.handleInitiatedPeerLoss]).
 func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now time.Time) {
 	b.mu.RLock()
 	listener := b.listener
@@ -365,7 +367,12 @@ func (b *Bridge) tickOutboundReliable(outbound *outboundReliableTracker, now tim
 			continue
 		}
 		if errors.Is(r.Err, mrp.ErrMaxRetransmissionsReached) {
+			// Read before the reap below forgets the report's exchange.
+			asOf, lost := b.reportPeerLoss(r.SessionID, r.ExchangeID, r.Counter)
 			b.closeSubscriptionByCounter(r.SessionID, r.Counter)
+			if lost {
+				b.closeLostPeer(r.SessionID, r.ExchangeID, asOf, "an ongoing subscription report")
+			}
 			b.handleInitiatedPeerLoss(r.SessionID, r.ExchangeID)
 			continue
 		}

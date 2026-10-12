@@ -70,3 +70,23 @@ func TestStaleTickDoesNothing(t *testing.T) {
 func timedOffReq(onTime uint16) any {
 	return onoffdef.OnWithTimedOffRequest{OnTime: onTime}
 }
+
+// TestDelayedSceneApplyStaleRun: a delayed scene apply whose timer was
+// already due as a change of OnOff dropped it (OnOffServer.ts:62,
+// :291-297) changes nothing when it runs.
+func TestDelayedSceneApplyStaleRun(t *testing.T) {
+	t.Parallel()
+	clock := &manualClock{}
+	s, err := New(Config{Features: FeatureLT, Clock: clock})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.MatterApplySceneValues(t.Context(), map[uint32]uint64{AttrOnOff: 1}, 500)
+	due := clock.f
+	s.Set(true) // drops the pending value
+	s.Set(false)
+	due()
+	if s.OnOff() {
+		t.Fatal("a dropped scene apply turned the server on")
+	}
+}

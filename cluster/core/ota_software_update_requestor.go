@@ -153,7 +153,17 @@ type OtaProviderSession interface {
 	// command, nil for a status-only Success; another status is an error.
 	Invoke(ctx context.Context, endpoint uint16, clusterID, commandID uint32, fields spec.Encodable) (*spec.Node, error)
 	// OpenExchange opens a new exchange on the session for a BDX transfer.
+	// An exchange that also has a `Reliable() bool` method reporting true
+	// runs over TCP, and the requestor asks for 8192-byte blocks on it
+	// instead of 1024 (matter.js `messenger.channel.type === "tcp"`,
+	// :962-963); the bridge's exchanges have it.
 	OpenExchange(ctx context.Context) (bdx.Exchange, error)
+}
+
+// reliableExchange is the optional capability of an [OtaProviderSession]
+// exchange that runs over a reliable (TCP) channel.
+type reliableExchange interface {
+	Reliable() bool
 }
 
 // OtaApplier is the host's part of an update: matter.js's extension
@@ -219,8 +229,10 @@ type pendingApply struct {
 
 // The matter.js constants of the requestor.
 const (
-	// otaBdxMaxBlockSizeNonTCP: OTA_BDX_MAX_BLOCK_SIZE_NON_TCP (:55). TCP's
-	// 8192 (:54) arrives with brief M's transport.
+	// otaBdxMaxBlockSizeTCP: OTA_BDX_MAX_BLOCK_SIZE_TCP (:54), asked for
+	// over a TCP channel (:962-963).
+	otaBdxMaxBlockSizeTCP = 8192
+	// otaBdxMaxBlockSizeNonTCP: OTA_BDX_MAX_BLOCK_SIZE_NON_TCP (:55).
 	otaBdxMaxBlockSizeNonTCP = 1024
 	// otaMaxBusyRetries: MAX_BUSY_RETRIES (:61).
 	otaMaxBusyRetries = 3

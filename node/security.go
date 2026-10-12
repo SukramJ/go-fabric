@@ -285,7 +285,13 @@ func wireSecurity(
 	subs.Start(ctx)
 	subs.SetEventReporter(br.SubscriptionEventReporter())
 	br.AttachSubscriptionManager(subs)
-	sessions.SetOnSessionClose(subs.CloseSession)
+	// One close hook, two observers: the session's subscriptions fall
+	// with it, and the bridge forgets its route — closing a TCP
+	// connection whose last session it was (bridge.SessionClosed).
+	sessions.SetOnSessionClose(func(id uint16) {
+		subs.CloseSession(id)
+		br.SessionClosed(id)
+	})
 	br.AttachSessionRegistry(sessions)
 	sessions.StartReaper(ctx, operational.SessionIdleTimeout, time.Minute)
 

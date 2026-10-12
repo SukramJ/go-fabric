@@ -78,6 +78,33 @@ the same `ColorTemperatureWriter` as before.
   sensors, the smoke alarm's battery and the electrical sensors are
   `device.New<Type>(…, WithMeasurement(src))` calls, parts through
   `AddPart`; endpoint ids, cluster sets and attribute values are unchanged.
+- `onoff.Server` carries matter.js's scene paths (`OnOffServer.ts`) through
+  an optional ScenesManagement port, `onoff.Scenes` (`Config.Scenes`,
+  `Server.SetScenes`), whose three operations are named after
+  `ScenesManagementServer`'s: `MakeAllFabricSceneInfoEntriesInvalid`,
+  `StoreGlobalScene`, `RecallGlobalScene`. `core.ScenesManagement`
+  implements them, and the endpoint layer hands an endpoint's
+  ScenesManagement to its `onoff.Server` when it mounts one. With the port,
+  a command that changes OnOff invalidates the current scene (one that
+  leaves it unchanged does not; the endpoint's blanket invalidation after
+  every OnOff command is skipped for such a server,
+  `core.SceneInvalidator`); OffWithEffect stores the accessing fabric's
+  global scene while GlobalSceneControl is true; OnWithRecallGlobalScene
+  recalls it; and a recalled scene's OnOff value is applied by the server
+  (`MatterApplySceneValues`) at once, or after the scene's transition time
+  on the server's clock, dropped when OnOff changes in between.
+
+- `Bridge.SessionClosed(sessionID)`: the host calls it from the session
+  registry's close hook, next to the subscription manager's
+  `CloseSession` (`node/` does). The bridge forgets the session's route
+  and closes a TCP connection when its last session goes — by
+  CloseSession, fabric removal, NOC rotation or the idle reaper — as
+  matter.js's `#closeTcpChannelIfLastSession` does
+  (`ExchangeManager.ts:669-676`). Before, such a connection stayed open
+  until the peer closed it. An inbound or outbound CloseSession closes the
+  connection without the hook. A host that wires the registry itself
+  should add the call.
+
 - The device layer `device/` (ADR 0018, wave 6), **public API from this
   release on** (README.md §API stability): one generated Go type per device
   type in scope — 63 of the snapshot's 91, the rest named with their concept
@@ -619,6 +646,24 @@ the same `ColorTemperatureWriter` as before.
   (`IllegalFeatureCombinations.ts`). A default LevelControl from `device/`
   now serves MinLevel and MaxLevel with the device type's defaults
   (DimmableLight: 1 and 254).
+- The OTA Software Update Requestor asks for 8192-byte BDX blocks when the
+  provider's session runs over TCP and 1024 otherwise, as matter.js does
+  (`OtaSoftwareUpdateRequestorServer.ts:54-55`, `:962-963`). An exchange
+  `OtaProviderSession.OpenExchange` returns states its channel with an
+  optional `Reliable() bool`; the bridge's exchanges do. The bridge's
+  initiated exchanges follow the session's route: over a TCP connection
+  they run without MRP and carry the connection's message size, and
+  `ConnectOtaProvider` (and subscription re-establishment) reuse a live
+  session bound to a TCP connection as they reuse one on UDP (matter.js
+  `Peer.ts:418-438`).
+
+- The operational DNS-SD record carries the `T` key only when a TCP mode
+  is advertised (`T=2`, `4` or `6`); with TCP off the key is absent instead
+  of `T=0`, as in matter.js (`MdnsAdvertisement.ts:204-206`,
+  `ServerNetworkRuntime.ts:334-338`) and chip
+  (`Advertiser_ImplMinimalMdns.cpp:279-285`). The commissionable record
+  never carries it, as before.
+
 - `examples/reference-bridge` runs on the device layer and the node facade
   (ADR 0018 decision 6), the shape the README points a host at:
   `node.New(cfg)`, one `device.New<Type>` call per device added to
@@ -971,6 +1016,16 @@ left to keep.
   same schema.
 
 ### Fixed
+
+- An ongoing subscription report the controller never acknowledges is peer
+  loss, as matter.js treats an exhausted first message on any exchange
+  (`MessageExchange.ts:616-621`, `SessionManager.ts:677-695`): every
+  session with that peer established before the report's exchange is
+  force-closed without a CloseSession, and their other subscriptions close
+  with them. Before, only the one subscription was closed and the peer's
+  sessions stayed in the table. A later chunk of a chunked report, sent
+  after the peer answered the previous one, still closes only its
+  subscription.
 
 - **A peer that stops answering an exchange this node opened is lost, and
   its sessions go.** When the outbound-reliable tracker gave up on a

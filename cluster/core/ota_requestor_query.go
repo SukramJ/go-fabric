@@ -515,8 +515,9 @@ func (r *OTASoftwareUpdateRequestor) handleDownload(ctx context.Context, sess Ot
 }
 
 // handleBdxDownload mirrors #handleBdxDownload (:959-1006): up to three
-// attempts of a receiver-driven transfer in 1024-byte blocks into the
-// download location; the last failure becomes an otaDownloadError with the
+// attempts of a receiver-driven transfer into the download location, in
+// 8192-byte blocks over TCP and 1024-byte blocks otherwise (:962-963,
+// [bdxMaxBlockSize]); the last failure becomes an otaDownloadError with the
 // BDX status code, or UpdateState Unknown's value (0) for any other error.
 func (r *OTASoftwareUpdateRequestor) handleBdxDownload(ctx context.Context, sess OtaProviderSession, fd bdx.FileDesignator) error {
 	for attempt := 1; ; attempt++ {
@@ -548,10 +549,21 @@ func (r *OTASoftwareUpdateRequestor) bdxAttempt(ctx context.Context, sess OtaPro
 		TransferFileDesignator: fd,
 		Sink:                   bdx.NewFileSink(r.downloadPath()),
 		PreferredDriverModes:   []bdx.DriverMode{bdx.ReceiverDrive},
-		MaxBlockSize:           otaBdxMaxBlockSizeNonTCP,
+		MaxBlockSize:           bdxMaxBlockSize(ex),
 		Progress:               r.updateProgress,
 	})
 	return err
+}
+
+// bdxMaxBlockSize is the block size the requestor asks for on ex:
+// OTA_BDX_MAX_BLOCK_SIZE_TCP when the exchange's channel is TCP,
+// OTA_BDX_MAX_BLOCK_SIZE_NON_TCP otherwise (:962-963). The transfer still
+// caps it at what one message of the exchange carries (bdx).
+func bdxMaxBlockSize(ex bdx.Exchange) uint16 {
+	if re, ok := ex.(reliableExchange); ok && re.Reliable() {
+		return otaBdxMaxBlockSizeTCP
+	}
+	return otaBdxMaxBlockSizeNonTCP
 }
 
 // updateProgress mirrors #updateProgress (:1064-1070): 0-99 % while

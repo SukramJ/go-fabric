@@ -87,6 +87,11 @@
 //     farewell (leaving controllers on stale sessions after a restart),
 //     and the two reverse hooks this call self-wires — the graceful-close
 //     notifier and the mDNS reannounce trigger — are never installed.
+//     The registry's close hook is wired by the host and calls
+//     [Bridge.SessionClosed] besides the subscription manager's
+//     CloseSession; without it a TCP connection whose sessions were
+//     reaped or removed with their fabric stays open until the peer
+//     closes it.
 //   - AttachSubscriptionStore — silent. Start loads the previous run's
 //     subscriptions from it and clears it; each subscription of a CASE
 //     session is written when it becomes active and deleted when it is
@@ -619,6 +624,11 @@ type Bridge struct {
 	// (conn.go bindSessionRoute).
 	sessionRouteOwners sync.Map
 
+	// routeBindMu serialises the session-route bindings with the
+	// per-connection session counts they keep (conn.go
+	// bindSessionRoute, unbindSessionRoute).
+	routeBindMu sync.Mutex
+
 	// tcpListener accepts the inbound TCP connections when
 	// Config.TCP.Incoming is set; nil otherwise. tcpServeDone closes
 	// when its accept loop returned.
@@ -638,6 +648,13 @@ type Bridge struct {
 	// map[mrp.ExchangeKey]uint32 / map[uint32]mrp.ExchangeKey
 	reportExchangeOwner sync.Map
 	subReportExchange   sync.Map
+	// reportExchangeOrigins holds, per report exchange in
+	// reportExchangeOwner, when it was opened and the counter of its first
+	// message (map[mrp.ExchangeKey]reportExchangeOrigin) — what the
+	// peer-loss path needs when that message is never acknowledged
+	// (ackpump.go tickOutboundReliable). Kept and dropped with the two
+	// maps above.
+	reportExchangeOrigins sync.Map
 
 	// resumption holds subscription persistence and the re-establishment
 	// of former subscriptions after a restart (docs/adr/0008). See

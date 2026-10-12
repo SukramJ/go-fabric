@@ -247,6 +247,109 @@ func TestTCPConnectionDropEvictsBoundSessions(t *testing.T) {
 	}
 }
 
+// TestTCPConnClosedWhenLastSessionGoes: a connection whose sessions all
+// closed the other way round — here through the registry's close hook,
+// as the reaper or a fabric removal closes them — is closed when its
+// last session goes, and not before (matter.js ExchangeManager.ts:669-676
+// #closeTcpChannelIfLastSession, scheduled from :691-708).
+func TestTCPConnClosedWhenLastSessionGoes(t *testing.T) {
+	h := newTCPHarness(t)
+	conn, replies := h.dial()
+	if err := conn.Send(h.sealedInvoke(0x302)); err != nil {
+		t.Fatal(err)
+	}
+	waitReply(t, replies)
+	raw, ok := h.bridge.sessionPeerAddrs.Load(harnessLocalSessionID)
+	if !ok {
+		t.Fatal("session not bound to the connection")
+	}
+	route, _ := raw.(*connRoute)
+	if route == nil {
+		t.Fatalf("session bound to %T, want the connection", raw)
+	}
+	// A second session on the same connection, and a repeat binding of
+	// the first, which must not count twice.
+	const second = harnessLocalSessionID + 1
+	h.bridge.bindSessionRoute(second, route)
+	h.bridge.bindSessionRoute(harnessLocalSessionID, route)
+	h.bridge.routeBindMu.Lock()
+	n := route.sessions
+	h.bridge.routeBindMu.Unlock()
+	if n != 2 {
+		t.Fatalf("connection counts %d sessions, want 2", n)
+	}
+
+	h.bridge.SessionClosed(harnessLocalSessionID)
+	select {
+	case <-conn.Closed():
+		t.Fatal("connection closed while a session was still bound to it")
+	case <-time.After(100 * time.Millisecond):
+	}
+	h.bridge.SessionClosed(harnessLocalSessionID) // a repeat changes nothing
+	select {
+	case <-conn.Closed():
+		t.Fatal("a repeated close released the remaining session")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	h.bridge.SessionClosed(second)
+	select {
+	case <-conn.Closed():
+	case <-time.After(5 * time.Second):
+		t.Fatal("connection still open after its last session went")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		n := 0
+		h.bridge.connRoutes.Range(func(_, _ any) bool { n++; return true })
+		if n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d connection routes left after the close", n)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// TestTCPInboundCloseSessionClosesConn: a CloseSession that arrives on
+// the connection closes the session and, with it the last one, the
+// connection — matter.js removes the session (SecureChannelProtocol.ts
+// handlePeerClose) and #deleteSession closes the channel.
+func TestTCPInboundCloseSessionClosesConn(t *testing.T) {
+	h := newTCPHarness(t)
+	conn, replies := h.dial()
+	if err := conn.Send(h.sealedInvoke(0x303)); err != nil {
+		t.Fatal(err)
+	}
+	waitReply(t, replies)
+	proto := message.ProtocolHeader{
+		Initiator: true, Opcode: mrp.SCOpcodeStatusReport,
+		ExchangeID: 0x304, ProtocolID: mrp.SecureChannelProtocolID,
+	}
+	plain := append(proto.Marshal(), mrp.EncodeStatusReport(
+		mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), scStatusProtocolCloseSession, nil)...)
+	hdr := message.Header{SessionID: harnessLocalSessionID}
+	sealed, err := h.peer.Encrypt(&hdr, securityFlagsByte(&hdr), plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Send(append(hdr.Marshal(), sealed.Ciphertext...)); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-conn.Closed():
+	case <-time.After(5 * time.Second):
+		t.Fatal("connection still open after the peer closed its only session")
+	}
+	h.registry.mu.Lock()
+	closed := append([]uint16(nil), h.registry.closed...)
+	h.registry.mu.Unlock()
+	if len(closed) != 1 || closed[0] != harnessLocalSessionID {
+		t.Fatalf("registry closed %v, want [%d]", closed, harnessLocalSessionID)
+	}
+}
+
 // TestTCPListenerSharesUDPPortAndAdvertisesT: the TCP listener binds
 // the UDP socket's port (ServerNetworkRuntime.ts:203-214) and the
 // operational record carries T=6 for client+server (Advertiser.h:63-64
