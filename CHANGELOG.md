@@ -32,7 +32,7 @@ the same `ColorTemperatureWriter` as before.
   from a test CA in the package, determined by `Options.Seed`; with
   `Options.Advertiser` the commissioner finds the device through its
   DNS-SD records. It implements `bridge.OperationalResolver`, so a device
-=======
+  re-establishing a former subscription after a restart reaches it.
 - `device/` mounts default servers for two fabric-scoped clusters whose
   generated server refuses them: Binding (`core.NewBinding`, as matter.js
   mounts BindingServer where the device type or Base mandates it) and
@@ -61,8 +61,8 @@ the same `ColorTemperatureWriter` as before.
   `endpoint.ClusterServers` now serves a Source's clusters followed by the
   Measurement's when an endpoint carries both. The reference daemon's
   sensors, the smoke alarm's battery and the electrical sensors are
+  `device.New<Type>(…, WithMeasurement(src))` calls, parts through
   `AddPart`; endpoint ids, cluster sets and attribute values are unchanged.
->>>>>>> origin/wave7/device
 - The device layer `device/` (ADR 0018, wave 6), **public API from this
   release on** (README.md §API stability): one generated Go type per device
   type in scope — 63 of the snapshot's 91, the rest named with their concept
