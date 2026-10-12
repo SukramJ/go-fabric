@@ -10,7 +10,9 @@ Changed.
 | --- | --- |
 | 541171f `cluster/onoff: the Sink runs outside the lock Set takes (issue #63)` | 1 |
 | 2f3b041 `cluster/thermo: the inbound setters never wait for a Sink in flight (issue #63)` | 2 |
-| (this commit) `notes: report AA` | 3 |
+| 5c733a9 `notes: report AA` | 3 |
+| 0d2a5fe `cluster/thermo: the Sink hears the value the server stores (report AA, decision Q3)` | decision Q3 |
+| (this commit) `notes: report AA — owner decisions` | — |
 
 ## What was built
 
@@ -252,7 +254,70 @@ Notify listeners also fire under the state lock in several servers: onoff
 listener that calls the same server's setter synchronously self-deadlocks.
 That is a different hazard class from the ports and is unchanged here.
 
-## Open questions
+## Owner decisions (2026-10-12)
+
+1. **Overlap outcome:** confirmed. The command wins its own attribute.
+   The owner's by_design entry names the difference from matter.js.
+2. **SetpointRaiseLower:** keeps no reconcile, before or after the Sink,
+   until the Tier-3 deadband finding (report Y) is fixed. Until then a
+   setpoint the command did not move keeps the host's value even if that
+   breaks the deadband.
+3. **The Sink hears the value that will be stored.** Fixed in 0d2a5fe.
+   - **Change:** `writeSetpoint` tells the Sink the written setpoint as the
+     reconcile leaves it (`setpointState.value`), not the value the
+     controller wrote.
+   - **Re-run:** the re-run after the Sink starts from that value.
+     `companionsMoved` now names the written setpoint too, so if the re-run
+     moves it, it is stored and logged with the same
+     `matter.thermostat.sink_companions_moved` event. The Sink doc comment
+     says this.
+   - **Finding: the pin does not occur.** No occupied-setpoint write is
+     pinned to another value of itself, so the test row the decision asked
+     for (a write the reconcile pins) cannot be built through the public
+     API. The argument, for a heating write v (cooling is symmetric):
+     - The assert admits v ≤ MaxHeat (effective).
+     - `fixSetpointRange` pins only when v + deadband > MaxCool.
+     - Every state the reconcile accepts has MaxCool − MaxHeat ≥ deadband
+       (`valid`), which contradicts the line above.
+     - A state that cannot meet it is refused with ConstraintError, never
+       pinned.
+     - Brute-force check: a throwaway test (not committed) ran every valid
+       AUTO state on a 14-value grid of the six setpoints and limits,
+       writing each setpoint in 50-unit steps. 1,760,820 accepted writes,
+       none pinned. A second run that also allowed invalid starting states
+       found no pin before the 10-minute test timeout cut it off.
+     - My open question 3 was therefore based on reading `fixSetpointRange`
+       without checking whether the branch can be reached. The code change
+       stands as the stated rule, but it changes nothing observable today.
+   - **Tests instead of the pin row:**
+     - `TestSinkHearsTheValueTheServerStores` is the Sink row on the
+       existing reconcile case "cooling setpoint inside the deadband pushes
+       the heating setpoint": the Sink is told cool 2100 with companion
+       heat 1900, and the stored values equal those.
+     - `cluster/thermo/setpoints_internal_test.go`
+       `TestCompanionsMovedNamesTheWrittenSetpoint` holds the branch where
+       the written setpoint moves, on the function itself.
+   - The limit writes that do move the written attribute ("max heat past
+     the cool range …") never reach the Sink.
+4. **onoff read accessors:** accepted. `OnOff()` and `MatterRead` read
+   through `spec.Server`'s own lock, which makes each read atomic. They do
+   not take `mu`: a change listener that reads `OnOff()` from inside the
+   synchronous notification, fired while `mu` is held, would deadlock.
+5. **DEM and EVSE:** no change in this wave. The Tier-3 candidate goes to
+   the docs PR.
+
+Fix-up guards:
+- `go test -count=1 ./cluster/thermo/... ./cluster/`: green.
+- `CGO_ENABLED=1 go test -race -count=1 ./cluster/thermo/...`: green.
+- `make lint`: green.
+- `make cover-check`: 173 packages at or above their floor; thermo at
+  96.4 % against 95.
+- `make reachability`: the inventory is in the commit; unreached is
+  unchanged.
+- `make reachability-check`: green.
+- No chip-tool rerun, as decided.
+
+## Open questions (as first reported; answered above)
 
 1. **Who wins an overlap.** matter.js lets the host's set wait and land
    after the command (the host wins). Here the command stores over a set
