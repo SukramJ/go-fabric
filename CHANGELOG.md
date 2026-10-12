@@ -552,6 +552,13 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- The operational DNS-SD record carries the `T` key only when a TCP mode
+  is advertised (`T=2`, `4` or `6`); with TCP off the key is absent instead
+  of `T=0`, as in matter.js (`MdnsAdvertisement.ts:204-206`,
+  `ServerNetworkRuntime.ts:334-338`) and chip
+  (`Advertiser_ImplMinimalMdns.cpp:279-285`). The commissionable record
+  never carries it, as before.
+
 - `examples/reference-bridge` runs on the device layer and the node facade
   (ADR 0018 decision 6), the shape the README points a host at:
   `node.New(cfg)`, one `device.New<Type>` call per device added to
