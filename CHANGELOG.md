@@ -26,6 +26,14 @@ pseudo-version of `main`.
   this without a change; the peer address comes from the bridge's session
   routes and the fabric from the `SessionLookup`'s `SessionFabricResolver`.
 
+### Fixed
+
+- A PASE or CASE handshake in flight on a TCP connection now holds the
+  connection open: the connection's last secure session closing mid-handshake
+  no longer closes it under the handshake (matter.js counts the unsecured
+  session on the channel). The session the handshake establishes is bound to
+  the connection when the handshake completes, not at its first message.
+
 ## [0.3.0] — 2026-10-12
 
 **What a host must do.** Upgrading from `v0.2.x` needs a source change only

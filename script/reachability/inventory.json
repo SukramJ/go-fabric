@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4439,
+  "entry_points": 4442,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10422,
+    "total_exported": 10425,
     "reachable": 7348,
-    "whitelisted": 3069,
+    "whitelisted": 3072,
     "unreachable": 5
   },
   "by_package": [
@@ -424,6 +424,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ackpump_test.go",
       "line": 268
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestAdaptersNameTheirEstablishedSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_handshake_test.go",
+      "line": 225
     },
     {
       "package": "bridge",
@@ -3269,6 +3276,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestHandshakeHoldLifecycle",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_handshake_test.go",
+      "line": 142
+    },
+    {
+      "package": "bridge",
       "identifier": "TestInboundCloseSessionStatusReport_ClosesSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_close_parity_test.go",
@@ -5009,6 +5023,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
       "line": 218
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestTCPHandshakeHoldsConnection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_handshake_test.go",
+      "line": 63
     },
     {
       "package": "bridge",
