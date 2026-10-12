@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4435,
+  "entry_points": 4424,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,8 +175,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10410,
-    "reachable": 7347,
+    "total_exported": 10409,
+    "reachable": 7346,
     "whitelisted": 3058,
     "unreachable": 5
   },
@@ -13758,7 +13758,7 @@
       "identifier": "TestParityMatterJS_SchedulesClusterIsNotShipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/wire/parity_matterjs_test.go",
-      "line": 97
+      "line": 96
     },
     {
       "package": "cluster/wire",
