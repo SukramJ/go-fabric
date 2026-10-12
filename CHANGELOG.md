@@ -18,6 +18,21 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `bridge/bridgetest.Commissioner`, **public test support** (README.md §API
+  stability): a commissioner and controller for tests. `Dial(t, addr,
+  Options{Passcode, Discriminator, FabricID, NodeID, CAT, Seed, …})`;
+  `Commission(ctx)` runs PASE, ArmFailSafe, SetRegulatoryConfig, the
+  certificate-chain and attestation requests (signatures checked against
+  the DAC), CSRRequest, AddTrustedRootCertificate, AddNOC, CASE and
+  CommissioningComplete over CASE, in chip-tool's AutoCommissioner order,
+  and returns the CASE `Session`; `PASE`, `CASE`, `CASEAs` (another
+  controller of the fabric) and `Accept` (a CASE session the device opens)
+  give further sessions. A `Session` reads, writes, invokes, subscribes,
+  receives reports (`NextReport`) and closes. Keys and certificates come
+  from a test CA in the package, determined by `Options.Seed`; with
+  `Options.Advertiser` the commissioner finds the device through its
+  DNS-SD records. It implements `bridge.OperationalResolver`, so a device
+  re-establishing a former subscription after a restart reaches it.
 - The device layer `device/` (ADR 0018, wave 6), **public API from this
   release on** (README.md §API stability): one generated Go type per device
   type in scope — 63 of the snapshot's 91, the rest named with their concept
