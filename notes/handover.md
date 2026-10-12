@@ -508,9 +508,10 @@ this section; CHANGELOG and the inventory were the only conflicts
 Local guards on the agents' heads: `make ci`, race on the touched
 packages, reachability; AA ran `make chiptool-test` and the families
 OO/TSTAT (7 passed, 6 skipped, 0 failed); AB ran no harness (single-user,
-AA had it). The tranche runs `make ci`, `make race`,
-`make reachability-check`, `make chiptool-test` and the families
-OO/TSTAT/CC before the PR.
+AA had it). On the tranche head: `make ci`, `make race`,
+`make reachability-check`, `make chiptool-test` green; families OO/TSTAT
+(7 passed, 6 skipped) and CC (21 passed, 6 not applicable — PICS `CC.C`
+false, 9.1–9.3 excluded as in matter.js), 0 failed.
 
 **Docs PR `docs/wave-10-followups`** (after the tranche merges):
 by_design — host port outside the setter's lock, command wins the overlap
@@ -525,7 +526,14 @@ Tier 3: `handleArmFailSafe` runs `onFailSafeArmed` with `g.mu` held
 (`:566-568`); no cycle with today's wiring. Open items — DEM and EVSE
 call their host ports under the state lock by documented contract
 (`devicemanagement.go:123-124`, `evse.go:131-132`, chip's delegate model),
-the one place the AA rule does not hold. Close #63, #66. Then delete
+the one place the AA rule does not hold. Close #63, #66. Written on
+`docs/wave-10-followups` on top of the tranche, cherry-picked onto `main`
+after the tranche merged: four by_design entries
+(`BD-Matter-HostPort-OutsideTheSetterLock`,
+`BD-Matter-Thermostat-CompanionsAfterSink`,
+`BD-Matter-ColorControl-DeviceSetDoesNotStopMovement`,
+`BD-Matter-ColorControl-DeviceSetConverts`), the ArmFailSafe finding, two
+open-items rows. Then delete
 `wave10/*`, `planning/briefs-wave-10`, `wave/2026-10-12-tranche-10` and
 the `.claude/worktrees/wave10-*` worktrees. Next: wave 11 = the pin lift
 to `0ceb202d`, then ADR 0020.
