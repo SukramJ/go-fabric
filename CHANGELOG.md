@@ -18,6 +18,17 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `Bridge.SessionClosed(sessionID)`: the host calls it from the session
+  registry's close hook, next to the subscription manager's
+  `CloseSession` (`node/` does). The bridge forgets the session's route
+  and closes a TCP connection when its last session goes — by
+  CloseSession, fabric removal, NOC rotation or the idle reaper — as
+  matter.js's `#closeTcpChannelIfLastSession` does
+  (`ExchangeManager.ts:669-676`). Before, such a connection stayed open
+  until the peer closed it. An inbound or outbound CloseSession closes the
+  connection without the hook. A host that wires the registry itself
+  should add the call.
+
 - The device layer `device/` (ADR 0018, wave 6), **public API from this
   release on** (README.md §API stability): one generated Go type per device
   type in scope — 63 of the snapshot's 91, the rest named with their concept

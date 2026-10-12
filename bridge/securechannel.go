@@ -957,6 +957,11 @@ type reannounceTriggerSetter interface {
 // hooks when the registry supports them: the graceful-close notifier
 // (outbound CloseSession StatusReport before key zeroise) and the
 // mDNS reannounce trigger. Pass nil to detach.
+//
+// The registry's own close hook is the host's to wire (it also feeds the
+// subscription manager): the host calls [Bridge.SessionClosed] from it,
+// or a TCP connection whose sessions all closed by another path than an
+// inbound or outbound CloseSession stays open until the peer drops it.
 func (b *Bridge) AttachSessionRegistry(reg SessionRegistry) {
 	b.mu.Lock()
 	b.sessionRegistry = reg
@@ -1052,7 +1057,11 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 			slog.String("hex", hex.EncodeToString(payload)))
 		return nil
 	}
-	b.sessionPeerAddrs.Delete(requestHdr.SessionID)
+	// Deferred: the route goes after the session, and with the session's
+	// last route a TCP connection — matter.js closes the channel from
+	// #deleteSession, after the session left the table
+	// (ExchangeManager.ts:691-708).
+	defer b.unbindSessionRoute(requestHdr.SessionID)
 	// Every exchange the session carried dies with it, so any timed
 	// deadline it registered can never be consumed.
 	b.routing.dropSessionTimedDeadlines(requestHdr.SessionID)
@@ -1153,7 +1162,9 @@ func (b *Bridge) sendCloseSessionReport(sessionID uint16, sess *channel.Session)
 	b.routing.dropSessionTimedDeadlines(sessionID)
 	// Deferred, not dropped here: this farewell still has to be routed
 	// on that address, and every exit path must release it.
-	defer b.sessionPeerAddrs.Delete(sessionID)
+	// unbindSessionRoute also closes a TCP connection this was the last
+	// session of — after the farewell went out on it.
+	defer b.unbindSessionRoute(sessionID)
 	b.mu.RLock()
 	listener := b.listener
 	b.mu.RUnlock()

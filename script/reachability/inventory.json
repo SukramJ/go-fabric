@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4419,
+  "entry_points": 4421,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10387,
+    "total_exported": 10389,
     "reachable": 7335,
-    "whitelisted": 3047,
+    "whitelisted": 3049,
     "unreachable": 5
   },
   "by_package": [
@@ -668,7 +668,7 @@
       "identifier": "TestBindSessionRouteNeverSwitchesTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 325
+      "line": 428
     },
     {
       "package": "bridge",
@@ -4217,7 +4217,7 @@
       "identifier": "TestReceiveOverReliableServesUnsecuredDropsGroup",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 298
+      "line": 401
     },
     {
       "package": "bridge",
@@ -4532,7 +4532,7 @@
       "identifier": "TestRouteHelpers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 397
+      "line": 500
     },
     {
       "package": "bridge",
@@ -4942,6 +4942,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestTCPConnClosedWhenLastSessionGoes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 255
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTCPConnectionDropEvictsBoundSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
@@ -4949,10 +4956,17 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestTCPInboundCloseSessionClosesConn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 319
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTCPListenerSharesUDPPortAndAdvertisesT",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 254
+      "line": 357
     },
     {
       "package": "bridge",
@@ -5036,7 +5050,7 @@
       "identifier": "TestUnsolicitedReportOverTCPHasNoMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 372
+      "line": 475
     },
     {
       "package": "bridge",
