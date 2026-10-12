@@ -12,6 +12,16 @@ pseudo-version of `main`.
 
 ### Added
 
+- `thermo.ThermostatConfig.Sink` (`thermo.Sink`, `thermo.SetpointChange`):
+  an optional host port for a bridged thermostat. A controller's SystemMode
+  write, OccupiedHeating/CoolingSetpoint write (with the companions the
+  reconcile would move) and each setpoint a SetpointRaiseLower moves reach
+  the host after validation and before anything is stored; an error refuses
+  the change (its IM status if it carries one, FAILURE otherwise) and
+  nothing is stored. The limit writes do not call it. New inbound setters
+  `SetSystemMode`, `SetOccupiedHeatingSetpoint` and
+  `SetOccupiedCoolingSetpoint` record the device's own state without the
+  Sink and report through the change notifier (issue #60).
 - `bridge.Bridge.CloseFabricSessionsExcept(fabricIndex, exceptSessionID)`:
   ends every session of a fabric but one, telling each peer with a
   CloseSession first — the UpdateNOC path (matter.js `Fabric.replaced`).

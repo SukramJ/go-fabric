@@ -74,6 +74,24 @@ func (s *ThermostatServer) commitSetpoints(st setpointState) []uint32 {
 	return changed
 }
 
+// setpointDiff lists what next changes against cur, in commitSetpoints'
+// order.
+func setpointDiff(cur, next setpointState) []SetpointChange {
+	var out []SetpointChange
+	add := func(was, is int, id uint32) {
+		if was != is {
+			out = append(out, SetpointChange{AttrID: id, Value: int16(is)}) //nolint:gosec // reconciled values stay within the int16 absolute limits
+		}
+	}
+	add(cur.minHeat, next.minHeat, thermoAttrMinHeatSetpointLimit)
+	add(cur.maxHeat, next.maxHeat, thermoAttrMaxHeatSetpointLimit)
+	add(cur.minCool, next.minCool, thermoAttrMinCoolSetpointLimit)
+	add(cur.maxCool, next.maxCool, thermoAttrMaxCoolSetpointLimit)
+	add(cur.occupHeat, next.occupHeat, thermoAttrOccupiedHeatingSetpoint)
+	add(cur.occupCool, next.occupCool, thermoAttrOccupiedCoolingSetpoint)
+	return out
+}
+
 func (st *setpointState) userLimits(heat bool) (minV, maxV int) {
 	if heat {
 		return st.minHeat, st.maxHeat
