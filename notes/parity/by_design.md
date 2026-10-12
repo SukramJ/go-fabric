@@ -1919,9 +1919,11 @@ ClusterServers, partClusterServers, mountGroups, mountScenes) and replaces
 a source-supplied Groups or ScenesManagement with the stack's. `device/`
 skips them (`device/device.go` `assemblerMounted`) and refuses a
 `WithServer` / `WithOptional` / `WithFeatures` for them, so there is one
-owner per cluster. Consequence, recorded in the findings register: an
-optional Groups or ScenesManagement a device type merely allows cannot be
-opted in through `device/`.
+owner per cluster. An optional Groups or ScenesManagement a device type
+allows is opted in through `endpoint.Spec.OptIn` (set by
+`device.WithOptional`, wave 7), and the assembler mounts it only where the
+type allows it — matter.js's `MutableEndpoint.with(GroupsServer)` mounts
+on any endpoint (`MutableEndpoint.ts:95-110`).
 
 ### BD-Matter-Device-FeatureMaskLiterals — mandated feature masks are literals in the generated device files
 
@@ -1954,18 +1956,6 @@ callback, so a test advances a hand clock deterministically and `race` has
 no timer goroutine to find. Mechanics only: the tick, the 0xFFFF hold and
 the end-of-countdown transitions are matter.js's, cited by line.
 
-### BD-Daemon-MeasurementEndpointsBypassDeviceLayer — the reference daemon's sensors stay on `endpoint.Spec.Measurement`
-
-Since wave 6 every fleet device is a `device.New<Type>` call, except the
-sensors assembled from a live `contract.MeasurementSource`
-(`examples/reference-bridge/fleet.go` `measured`: thermometer, flow,
-humidity, occupancy, button, soil) and the parts `withMeasuredParts`
-appends (`Spec.PowerSource`, ElectricalSensor). The generated device
-servers serve state, not a host's live reading, and the GenericSwitch
-press wiring reads `Spec.Measurement` (`bridge/bridge.go`
-wireMeasurementListenersLocked). Retire with the device-layer binding for
-a `MeasurementSource` (findings register, application cluster servers).
-
 ### BD-Daemon-GlobalSceneControlTrue — the daemon's lights start with GlobalSceneControl true
 
 matter.js's schema gives GlobalSceneControl no default
@@ -1977,6 +1967,90 @@ reference daemon has always served true on its lights and keeps it through
 daemon's own invariant (its wire shape is what the fixtures and the
 ecosystem observations were taken against). Daemon only; the library
 default is matter.js's.
+
+### BD-Matter-Commissioner-TestCA — `bridgetest.Commissioner`'s CA issues certificates with a fixed validity window, no retransmission, a random ephemeral id
+
+matter.js's `CertificateAuthority.ts` dates a certificate now − 1 year to
+now + 10 years; the test CA in `bridge/bridgetest` uses a fixed NotBefore
+and NotAfter 0 so that keys, certificates and nonces follow the test seed
+alone and a fixture is reproducible. The commissioner sends every message
+once (no MRP retransmission: a lost datagram fails the test rather than
+hiding a flake), and keeps the unsecured ephemeral node id and message
+counter random — seeded values made two commissioners in one test
+collide and the device dropped the second Sigma1 as a duplicate. Test
+support only; nothing of it is on the device path.
+
+### BD-Matter-RevisionConditions-TwoReadings — a `Rev >= vN` condition decides element presence, never feature legality
+
+matter.js's runtime conformance compiler resolves a revision condition
+against the cluster's revision for element presence
+(`support/codegen`-fed `conformance-compiler.ts:250-254`), while its
+feature-combination judgement ignores revisions
+(`IllegalFeatureCombinations.ts:441-443`, `:464-468`). `cluster/spec`
+does the same since wave 7: `Instance` resolves `Rev >= vN` against
+`Definition.Revision` so a default LevelControl serves MinLevel / MaxLevel
+(`LevelControlServer.ts:113-121`), and `CheckFeatures` still reports such
+a node as conditional. Owner decision 2026-10-12 (report T, question 1).
+
+### BD-Matter-Device-MeasuredClusterIsTheAssemblers — with `WithMeasurement` the measured cluster belongs to the assembler, and the typed accessor answers nil
+
+`device.WithMeasurement(src)` fills `endpoint.Spec.Measurement`; the
+assembler then materialises the measurement cluster from the reading
+(`cluster/measurement FromMeasurementClass`, `endpoint/materialize.go`
+ClusterServers: the Source's clusters, then the Measurement's) exactly as
+it does for a host on `endpoint.Spec`, and the device's generated
+accessor for that cluster returns nil. matter.js has one behaviour whose
+state the host sets (`Datasource.ts`); here the live reading has one
+owner, the assembler, so that a device without the option is unchanged.
+`New` runs the materialiser once (endpoint id 0) to learn the cluster set
+(report T, question 5). The reference daemon's sensors use it.
+
+### BD-Matter-Binding-StoreOnly — the default Binding server keeps the list and resolves no peer
+
+`device/` mounts `core.Binding` by default where Base mandates it
+(`RequirementGenerator.ts:143-155`, `:187-188`, `endpoints/base.ts:15-19`,
+`:39`). matter.js's `BindingServer` resolves its entries into peers for
+a client cluster to talk to; this module has no client role (no
+controller, `docs/matterjs-comparison.md` §Non-goals), so the server is
+the fabric-scoped list with its write rules and nothing acts on it. The
+findings register carries the gap.
+
+### BD-Matter-TCP-ExchangePayloadSize — an initiated exchange over TCP offers the message size, 4 bytes below matter.js's frame size
+
+matter.js hands an exchange over a TCP channel the channel's maximum
+payload including the length prefix (`MessageExchange.ts:435-439`); the
+bridge's initiated exchange reports the connection's message size, 4
+bytes smaller. The BDX block negotiation (`OtaSoftwareUpdateRequestorServer.ts:54-55`)
+asks for 8192 either way and both sides cap at what the transport
+carries, so the difference is in the bound, not in a block that crosses
+the wire. Mechanics of `transport/tcp`'s framing, not semantics.
+
+### BD-Matter-OnOff-SceneHooksNoRollback — a refused sink in a scene path does not roll back the scene store
+
+The OnOff scene paths (`onoff.Scenes`: invalidate, store global scene,
+recall it; `OnOffServer.ts:98-100`, `:159-165`, `:175-184`) run inside
+matter.js's transaction, so a throwing `off()` undoes the stored global
+scene with it. Here the ScenesManagement side commits first and a
+refusal by `onoff.Sink` leaves the stored or recalled scene as it is;
+Go's mutex-and-context model has no cross-cluster transaction
+(`BD-Matter-OnOff-SinkAsOverride`). A pending transition-delayed apply
+(`:267-310`, on the `Clock` seam) is dropped by `MatterQuiesce`, as a
+stopped matter.js timer would be.
+
+### BD-Matter-SessionClosed-HostCall — a host wiring its own session registry calls `Bridge.SessionClosed`
+
+matter.js's ExchangeManager observes every session removal itself and
+closes a TCP channel whose last session went (`ExchangeManager.ts:669-676`,
+`:700-706`). The bridge learns of a close through
+`operational.Manager.SetOnSessionClose`, a single callback the host owns;
+the inbound and outbound CloseSession paths close the connection by
+themselves, every other close (fabric removal, NOC rotation, the idle
+reaper, peer loss) reaches the connection count only through
+`Bridge.SessionClosed`, which `node/security.go` calls next to the
+subscription manager's close. A host that wires the registry itself and
+omits the call keeps an idle TCP connection open until the peer closes it
+(`bridge/bridge.go` package doc names the port). Retire when the manager
+takes more than one observer (report U, question 1).
 
 ## Removed (built, tested, never wired)
 
