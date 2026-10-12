@@ -56,9 +56,13 @@ type settings struct {
 	// server for a cluster the type does not list is mounted in it.
 	serverOrder []uint32
 	notifier    contract.ChangeNotifier
-	initial     map[uint32]map[uint32]any
-	elements    map[uint32]spec.Options
-	nilSrv      bool
+	// measurement is the host's live reading ([WithMeasurement]);
+	// measurementSet tells a WithMeasurement(nil) from no call.
+	measurement    contract.MeasurementSource
+	measurementSet bool
+	initial        map[uint32]map[uint32]any
+	elements       map[uint32]spec.Options
+	nilSrv         bool
 }
 
 func newSettings(with []Option) *settings {
@@ -91,6 +95,11 @@ func WithFeatures(clusterID, features uint32) Option {
 // WithOptional mounts an optional cluster of the device type with its
 // default server — matter.js's `Device.with(LevelControlServer)` for a
 // cluster in `server.optional` (devices/on-off-light.ts:111, 126-131).
+// For Groups (0x0004) and ScenesManagement (0x0062), whose server is the
+// stack's, it opts the endpoint in ([endpoint.Spec.OptIn]) and the
+// assembler mounts them, as `MutableEndpoint.with(GroupsServer)` extends
+// any endpoint type (packages/node/src/endpoint/type/MutableEndpoint.ts:95-112);
+// every other option for them stays refused.
 func WithOptional(clusterID uint32) Option {
 	return func(s *settings) { s.optional[clusterID] = true }
 }
@@ -120,17 +129,44 @@ func WithServer(srv contract.ClusterServer) Option {
 }
 
 // WithChangeNotifier makes the device's endpoint source a
-// [contract.ChangeNotifier] that fires whenever n fires: the host's own
-// model telling the bridge that state its servers read through a host
-// port (valve.StateSource, modeselect.ModeSource, …) has moved, so the
-// endpoint's reportable attributes are reported. It is the Go form of a
-// matter.js host setting behavior state from its own device events,
-// whose Datasource then reports the change (packages/node/src/behavior/
-// state/managed/Datasource.ts). Without it a device whose servers hold no
-// state of their own changes silently for a subscriber. A later call
-// replaces an earlier one; nil leaves the source without one.
+// [contract.ChangeNotifier] that fires whenever n fires: the host-model
+// relay, the host's own model telling the bridge that state its servers
+// read through a host port (valve.StateSource, modeselect.ModeSource, …)
+// has moved, so the endpoint's reportable attributes are reported. It is
+// the Go form of a matter.js host setting behavior state from its own
+// device events, whose Datasource then reports the change
+// (packages/node/src/behavior/state/managed/Datasource.ts). A server that
+// notifies its own changes ([contract.ChangeNotifier] or
+// [contract.AttributeChangeNotifier]) is heard by the bridge without it;
+// the relay is for a host model whose servers do not forward its
+// notifications. A later call replaces an earlier one; nil leaves the
+// source without one.
 func WithChangeNotifier(n contract.ChangeNotifier) Option {
 	return func(s *settings) { s.notifier = n }
+}
+
+// WithMeasurement serves the device's measurement clusters from the host's
+// live reading m: the endpoint assembler materialises them from m's
+// measurement class ([endpoint.Spec.Measurement], cluster/measurement
+// FromMeasurementClass) on every dispatch, exactly as for a measurement
+// endpoint the host hands over as an [endpoint.Spec], and the bridge
+// subscribes to m when it is a [contract.ChangeNotifier] and wires a
+// GenericSwitch's presses to it. The clusters m's class materialises are
+// then the assembler's for this device, as Descriptor is: New mounts no
+// default server for them, refuses every other option for them, and
+// [Device.Server] and the typed accessors answer nil for them. A device
+// without the option is unchanged.
+//
+// It is the Go form of a matter.js host setting a measurement behavior's
+// state from its own reading, which the behavior's Datasource then reports
+// (packages/node/src/behavior/state/managed/Datasource.ts:200-203
+// `onChange`, :690-710). New refuses a nil m and a class that materialises
+// no cluster from m. A later call replaces an earlier one.
+func WithMeasurement(m contract.MeasurementSource) Option {
+	return func(s *settings) {
+		s.measurement = m
+		s.measurementSet = true
+	}
 }
 
 // WithElements serves optional attributes, accepts optional commands and

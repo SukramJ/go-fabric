@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
@@ -171,12 +170,42 @@ func TestOptionalClusterWithItsAlterations(t *testing.T) {
 			t.Errorf("attribute 0x%04X = %v (%T), want %v", attr, v, v, want)
 		}
 	}
-	// MinLevel and MaxLevel ("Rev >= v7, O") are not served by the
-	// generated server, which leaves a revision gate conditional
-	// (cluster/spec/conformance.go); their stated defaults apply only to
-	// a served attribute.
-	if lc.Serves(levelcontroldef.AttrMinLevel) {
-		t.Error("MinLevel served; the device type's default 1 should now be checked here")
+	// MinLevel and MaxLevel ("Rev >= v7, O") are mandatory at the
+	// definition's revision 7 (cluster/spec resolves the revision
+	// condition), so the defaults OnOffLight states for them apply
+	// (on-off-light.ts: minLevel 1, maxLevel 254).
+	for attr, want := range map[uint32]any{
+		levelcontroldef.AttrMinLevel: uint8(1),
+		levelcontroldef.AttrMaxLevel: uint8(254),
+	} {
+		if !lc.Serves(attr) {
+			t.Errorf("attribute 0x%04X not served", attr)
+		}
+		if v, _ := lc.MatterRead(attr); v != want {
+			t.Errorf("attribute 0x%04X = %v (%T), want %v", attr, v, v, want)
+		}
+	}
+}
+
+// TestDimmableLightServesMinAndMaxLevel: a default DimmableLight serves
+// MinLevel 1 and MaxLevel 254, as matter.js's DimmableLightDevice does
+// (dimmable-light.ts alterations; LevelControlServer.ts:113-120 sets both
+// at initialisation, "Spec 1.5.1 made minLevel/maxLevel mandatory at rev
+// 7").
+func TestDimmableLightServesMinAndMaxLevel(t *testing.T) {
+	t.Parallel()
+	d, err := NewDimmableLight(testOptions("d"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lc := d.LevelControl()
+	for attr, want := range map[uint32]any{
+		levelcontroldef.AttrMinLevel: uint8(1),
+		levelcontroldef.AttrMaxLevel: uint8(254),
+	} {
+		if v, _ := lc.MatterRead(attr); v != want {
+			t.Errorf("attribute 0x%04X = %v (%T), want %v", attr, v, v, want)
+		}
 	}
 }
 
@@ -443,7 +472,7 @@ func TestClientListCarriesTheMandatoryClientClusters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bell, err := NewDoorbell(testOptions("bell"), WithServer(core.NewBinding()))
+	bell, err := NewDoorbell(testOptions("bell"))
 	if err != nil {
 		t.Fatal(err)
 	}

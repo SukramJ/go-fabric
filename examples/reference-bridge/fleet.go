@@ -1097,43 +1097,28 @@ func serve(servers []contract.ClusterServer, with ...device.Option) []device.Opt
 	return append(out, with...)
 }
 
-// measured is a sensor endpoint assembled from a measurement source: the
-// assembler materialises its cluster from the declared class
-// (endpoint.Spec.Measurement, cluster/measurement FromMeasurementClass), a
-// path the device layer's generated servers do not take — they serve
-// state, not a host's live reading.
-type measured struct{ spec endpoint.Spec }
+// measured is the device option of a sensor whose cluster the assembler
+// materialises from the host's live reading (device.WithMeasurement →
+// endpoint.Spec.Measurement, cluster/measurement FromMeasurementClass).
+func measured(m contract.MeasurementSource) device.Option { return device.WithMeasurement(m) }
 
-// Spec implements [node.Endpoint].
-func (m measured) Spec() endpoint.Spec { return m.spec }
-
-// newMeasured is the sensor endpoint of m under key.
-func newMeasured(key, name string, m contract.MeasurementSource) measured {
-	o := bridged(key, name)
-	return measured{endpoint.Spec{
-		StableKey:      o.StableKey,
-		DeviceAddress:  o.DeviceAddress,
-		ChannelAddress: o.ChannelAddress,
-		DeviceType:     contract.MeasurementClassDeviceType(m.MatterMeasurementClass()),
-		FriendlyName:   name,
-		Measurement:    m,
-	}}
-}
-
-// withMeasuredParts is a device whose last parts are measurement-backed
-// endpoints (a battery, an electrical sensor), which [device.Device.AddPart]
-// cannot hold: they are appended to the device's own parts, so their
-// endpoint numbers follow the device's other parts.
-type withMeasuredParts struct {
-	node.Endpoint
-	parts []endpoint.Spec
-}
-
-// Spec implements [node.Endpoint].
-func (w withMeasuredParts) Spec() endpoint.Spec {
-	s := w.Endpoint.Spec()
-	s.Parts = append(s.Parts, w.parts...)
-	return s
+// smokeDevice is the smoke alarm with its battery: SmokeCoAlarm requires a
+// PowerSource device-type component, a part of its own whose PowerSource
+// cluster the assembler materialises from the battery reading, as matter.js
+// composes it (examples/device-smoke-co-alarm, parts: [PowerSourceEndpoint]).
+func (f *fleet) smokeDevice() (node.Endpoint, error) {
+	smoke, err := device.NewSmokeCoAlarm(bridged("smoke", f.smoke.name), serve(f.smoke.servers(), device.WithChangeNotifier(f.smoke))...)
+	if err != nil {
+		return nil, err
+	}
+	battery, err := device.NewPowerSource(part("demo:smoke:battery"), measured(f.smoke.battery))
+	if err != nil {
+		return nil, err
+	}
+	if err := smoke.AddPart(battery.Device); err != nil {
+		return nil, err
+	}
+	return smoke, nil
 }
 
 // endpoints builds the fleet's bridged endpoints, in the order their
@@ -1159,24 +1144,16 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 	}
 
 	add(f.light.device(bridged("light", f.light.name)))
-	out = append(out, newMeasured("thermometer", "Study Thermometer", f.thermometer))
+	add(device.NewTemperatureSensor(bridged("thermometer", "Study Thermometer"), measured(f.thermometer)))
 	add(device.NewWaterValve(bridged("valve", f.valve.name), notifying(f.valve, f.valve.servers())...))
 	add(device.NewModeSelect(bridged("selector", f.selector.name), notifying(f.selector, f.selector.servers())...))
 	add(f.speaker.device(bridged("speaker", f.speaker.name)))
 
 	add(f.ceiling.device(bridged("ceiling", f.ceiling.name)))
 	add(device.NewFan(bridged("fan", f.fan.name), notifying(f.fan, f.fan.servers())...))
-	// SmokeCoAlarm requires a PowerSource device-type component: the
-	// alarm's battery is a part of its own, as matter.js composes it
-	// (examples/device-smoke-co-alarm, parts: [PowerSourceEndpoint]).
-	smoke, err := device.NewSmokeCoAlarm(bridged("smoke", f.smoke.name), notifying(f.smoke, f.smoke.servers())...)
-	add(withMeasuredParts{smoke, []endpoint.Spec{{
-		StableKey:   endpoint.StringKey("demo:smoke:battery"),
-		DeviceType:  deviceTypePowerSource,
-		PowerSource: f.smoke.battery,
-	}}}, err)
+	add(f.smokeDevice())
 	add(f.pump.device(bridged("pump", f.pump.name)))
-	out = append(out, newMeasured("flow", f.flow.name, f.flow))
+	add(device.NewFlowSensor(bridged("flow", f.flow.name), measured(f.flow)))
 	add(device.NewLaundryWasher(bridged("washer", f.washer.name), serve(f.washer.servers())...))
 	// The vacuum's endpoint carries its ServiceArea too
 	// (fleet_servicearea.go).
@@ -1185,11 +1162,10 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 	add(device.NewThermostat(bridged("thermostat", f.thermostat.name), serve(f.thermostat.servers())...))
 	add(device.NewWindowCovering(bridged("blind", f.blind.name), serve(f.blind.servers())...))
 	add(device.NewDoorLock(bridged("lock", f.lock.name), notifying(f.lock, f.lock.servers())...))
-	out = append(out,
-		newMeasured("humidity", f.humidity.name, f.humidity),
-		newMeasured("occupancy", f.occupancy.name, f.occupancy))
+	add(device.NewHumiditySensor(bridged("humidity", f.humidity.name), measured(f.humidity)))
+	add(device.NewOccupancySensor(bridged("occupancy", f.occupancy.name), measured(f.occupancy)))
 	add(device.NewContactSensor(bridged("contact", f.contact.name), notifying(f.contact, f.contact.servers())...))
-	out = append(out, newMeasured("button", f.button.name, f.button))
+	add(device.NewGenericSwitch(bridged("button", f.button.name), measured(f.button)))
 	add(device.NewAirPurifier(bridged("purifier", f.purifier.name), notifying(f.purifier, f.purifier.servers())...))
 	add(device.NewClosure(bridged("garage", f.garage.name), notifying(f.garage, f.garage.servers())...))
 	add(f.colorLight.device(bridged("colorlight", f.colorLight.name)))
@@ -1209,7 +1185,7 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 	// ElectricalSensor device types: the charger's parts (fleet_evse.go).
 	add(f.evse.device(bridged("evse", f.evse.name)))
 	add(device.NewClosurePanel(bridged("panel", f.panel.name), serve(f.panel.servers())...))
-	out = append(out, newMeasured("soil", f.soil.name, f.soil))
+	add(device.NewSoilSensor(bridged("soil", f.soil.name), measured(f.soil)))
 	add(device.NewElectricalEnergyTariff(bridged("tariff", f.energyTariff.name), serve(f.energyTariff.servers())...))
 	add(f.electricalMeter.device(bridged("electricalmeter", f.electricalMeter.name)))
 	add(f.esa.device(bridged("esa", f.esa.name)))

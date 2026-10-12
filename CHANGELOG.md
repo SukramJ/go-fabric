@@ -32,7 +32,37 @@ the same `ColorTemperatureWriter` as before.
   from a test CA in the package, determined by `Options.Seed`; with
   `Options.Advertiser` the commissioner finds the device through its
   DNS-SD records. It implements `bridge.OperationalResolver`, so a device
-  re-establishing a former subscription after a restart reaches it.
+=======
+- `device/` mounts default servers for two fabric-scoped clusters whose
+  generated server refuses them: Binding (`core.NewBinding`, as matter.js
+  mounts BindingServer where the device type or Base mandates it) and
+  EcosystemInformation (`core.NewEcosystemInformation` over empty
+  directories). `Doorbell.Binding()` returns `*core.Binding` and
+  `BridgedNode.EcosystemInformation()` `*core.EcosystemInformation`. A
+  Doorbell no longer needs `WithServer(core.NewBinding())`.
+  OtaSoftwareUpdateRequestor stays the host's (`ErrNoDefaultServer`): its
+  server needs the node's connector.
+- `endpoint.Spec.OptIn []uint32`: an endpoint opts into an optional Groups
+  (0x0004) or ScenesManagement (0x0062) and the assembler mounts the stack's
+  server where the device type allows the cluster, as matter.js's
+  `MutableEndpoint.with(GroupsServer)` extends any endpoint type.
+  `device.WithOptional` sets it for those two clusters instead of refusing
+  them (AirPurifier, Pump, RoomAirConditioner, SmokeCoAlarm, Thermostat,
+  WindowCovering list Groups as optional; Pump and RoomAirConditioner
+  ScenesManagement); every other option for them stays refused.
+- `device.WithMeasurement(contract.MeasurementSource)`: a device's
+  measurement clusters are served from the host's live reading — the
+  assembler materialises them from the reading's measurement class
+  (`endpoint.Spec.Measurement`, `cluster/measurement FromMeasurementClass`)
+  on every dispatch, the bridge subscribes to the reading's notifier and
+  wires a GenericSwitch's presses to it. The clusters the reading
+  materialises are the assembler's for that device: no default server, no
+  other option for them. A device without the option is unchanged.
+  `endpoint.ClusterServers` now serves a Source's clusters followed by the
+  Measurement's when an endpoint carries both. The reference daemon's
+  sensors, the smoke alarm's battery and the electrical sensors are
+  `AddPart`; endpoint ids, cluster sets and attribute values are unchanged.
+>>>>>>> origin/wave7/device
 - The device layer `device/` (ADR 0018, wave 6), **public API from this
   release on** (README.md §API stability): one generated Go type per device
   type in scope — 63 of the snapshot's 91, the rest named with their concept
@@ -556,6 +586,24 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- The bridge subscribes every mounted cluster server of a bridged endpoint
+  that implements `contract.ChangeNotifier`, whether or not the endpoint's
+  source or measurement notifies (before, the servers were wired only
+  behind a notifying source); a server that is the source itself is
+  subscribed once. A server that notifies its own changes reaches a
+  subscriber without `device.WithChangeNotifier`, which stays as the relay
+  for a host model whose servers do not forward its notifications —
+  matter.js reports each behavior's change through its own Datasource.
+- `cluster/spec` decides a revision condition ("Rev >= vN") against the
+  definition's own revision instead of leaving it conditional, as matter.js's
+  runtime conformance compiler does (`conformance-compiler.ts:250-254`): an
+  element "Rev >= vN" or "Rev >= vN, O" is served by default at or above
+  revision N, and refused when declared below it. `spec.Context` returns a
+  `spec.RevisionContext`; a `FeatureContext` without a revision keeps the
+  condition conditional, and `CheckFeatures` still ignores the revision
+  (`IllegalFeatureCombinations.ts`). A default LevelControl from `device/`
+  now serves MinLevel and MaxLevel with the device type's defaults
+  (DimmableLight: 1 and 254).
 - `examples/reference-bridge` runs on the device layer and the node facade
   (ADR 0018 decision 6), the shape the README points a host at:
   `node.New(cfg)`, one `device.New<Type>` call per device added to

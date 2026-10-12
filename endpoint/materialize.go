@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/SukramJ/go-fabric/bootid"
@@ -31,7 +32,8 @@ const matterDeviceTypeBridgedNode uint32 = 0x0013
 //
 //  1. Custom-DP-backed endpoints (ep.Source != nil) ask the source
 //     directly via [contract.EndpointSource.MatterClusterServers].
-//  2. Standalone-sensor endpoints (ep.Measurement != nil) consult the
+//  2. Sensor endpoints (ep.Measurement != nil, after the source's
+//     clusters when both are set) consult the
 //     [measurement.FromMeasurementClass] materializer, which looks the
 //     measurement class up in the kind registry and runs the
 //     materialiser registered for it against the source DP. A kind a
@@ -69,13 +71,16 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// across calls.
 	mc := contract.MeasurementContext{EndpointID: ep.ID}
 	var inner []contract.ClusterServer
-	switch {
-	case ep.Source != nil:
+	if ep.Source != nil {
 		inner = append([]contract.ClusterServer(nil), ep.Source.MatterClusterServers()...)
-	case ep.Measurement != nil:
-		inner = measurement.FromMeasurementClass(
+	}
+	// A measurement source's clusters follow the source's own: a sensor
+	// endpoint has no source servers, a device-layer device built with
+	// device.WithMeasurement has its other clusters there.
+	if ep.Measurement != nil {
+		inner = append(inner, measurement.FromMeasurementClass(
 			ep.Measurement.MatterMeasurementClass(), ep.Measurement, mc,
-		)
+		)...)
 	}
 	// The device's battery rides on this endpoint when attachPowerSource
 	// picked it. Appended after the endpoint's own clusters so the primary
@@ -433,7 +438,8 @@ func renderSourceKey(key any) string {
 
 // mountGroups places the stack's Groups server on a bridged endpoint that
 // has the node's group state: on every endpoint whose device type
-// mandates Groups, and in place of any Groups server the source supplied
+// mandates Groups, on one whose device type allows it and that opts into
+// it ([Spec.OptIn]), and in place of any Groups server the source supplied
 // itself. Group membership is stack state — matter.js mounts GroupsServer
 // for every device type whose requirements make Groups mandatory
 // (packages/node/src/devices/<name>.ts) and keeps the membership in the
@@ -454,7 +460,7 @@ func mountGroups(ep *Endpoint, identify *mattercore.Identify, inner []contract.C
 		}
 		kept = append(kept, srv)
 	}
-	if !supplied && !schema.DeviceTypeRequiresServerCluster(uint32(ep.DeviceType), mattercore.GroupsClusterID) {
+	if !supplied && !stackClusterWanted(ep, mattercore.GroupsClusterID) {
 		return inner
 	}
 	srv, err := mattercore.NewGroups(ep.ID, ep.groups, func() uint16 {
@@ -468,10 +474,28 @@ func mountGroups(ep *Endpoint, identify *mattercore.Identify, inner []contract.C
 	return append([]contract.ClusterServer{srv}, kept...)
 }
 
+// stackClusterWanted reports whether the endpoint's device type mandates
+// the stack-mounted cluster id, or allows it and the endpoint opts into it
+// ([Spec.OptIn]) — matter.js mounts an optional GroupsServer or
+// ScenesManagementServer where the endpoint type is extended with it
+// (packages/node/src/endpoint/type/MutableEndpoint.ts:95-112).
+func stackClusterWanted(ep *Endpoint, id uint32) bool {
+	dt := uint32(ep.DeviceType)
+	if schema.DeviceTypeRequiresServerCluster(dt, id) {
+		return true
+	}
+	if !slices.Contains(ep.OptIn, id) {
+		return false
+	}
+	allowed, _ := schema.DeviceTypeAllowsServerCluster(dt, id)
+	return allowed
+}
+
 // mountScenes places the stack's ScenesManagement server on a bridged
 // endpoint that has the node's group state, wherever the device type
-// mandates ScenesManagement or the source supplied a server for it (which
-// it replaces): scenes are stack state like groups — matter.js mounts
+// mandates ScenesManagement, allows it and the endpoint opts into it
+// ([Spec.OptIn]), or the source supplied a server for it (which it
+// replaces): scenes are stack state like groups — matter.js mounts
 // ScenesManagementServer for the light device types
 // (packages/node/src/devices/on-off-light.ts …) and keeps the table in the
 // endpoint's nonvolatile state. The endpoint's Groups server is tied to the
@@ -489,7 +513,7 @@ func mountScenes(ep *Endpoint, inner []contract.ClusterServer) []contract.Cluste
 		}
 		kept = append(kept, srv)
 	}
-	if !supplied && !schema.DeviceTypeRequiresServerCluster(uint32(ep.DeviceType), mattercore.ScenesManagementClusterID) {
+	if !supplied && !stackClusterWanted(ep, mattercore.ScenesManagementClusterID) {
 		return inner
 	}
 	state := ep.scenesState()

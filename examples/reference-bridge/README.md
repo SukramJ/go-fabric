@@ -35,11 +35,12 @@ listing. `fleet.go` `endpoints` builds the devices:
   with `device.WithChangeNotifier` when the host model notifies its own
   changes;
 - **parts** through `AddPart` (the fridge's and the oven's cabinets, the
-  charger's PowerSource and DeviceEnergyManagement);
-- **measurement-backed sensors** as plain `endpoint.Spec`s with
-  `Measurement` (or `PowerSource`, the smoke alarm's battery): the
-  assembler picks the cluster from the declared measurement class, a path
-  the device layer's generated servers do not take.
+  charger's PowerSource, DeviceEnergyManagement and ElectricalSensor, the
+  grid meter's ElectricalSensor, the smoke alarm's battery);
+- **measurement-backed sensors** through `device.WithMeasurement` (the
+  thermometer, flow, humidity, occupancy, soil sensors, the button, the
+  battery and the electrical sensors): the assembler materialises their
+  clusters from the host's live reading by its measurement class.
 
 It exists as the module's *second* consumer. The first is the daemon
 go-fabric was extracted from, which remembers how the code used to be

@@ -45,7 +45,7 @@ func TestApplicability(t *testing.T) {
 		{"D", op(spec.ConfDeprecated), none},
 		{"Z", op(spec.ConfObsolete), none},
 		{"desc", op(spec.ConfDesc), cond},
-		{"Rev >= v2", spec.Conformance{Op: spec.ConfRevision, Rev: 2}, cond},
+		{"Rev >= v2 without a revision", spec.Conformance{Op: spec.ConfRevision, Rev: 2}, cond},
 		{"supported feature", name("A"), mand},
 		{"unsupported feature", name("B"), none},
 		{"element name", name("Other"), cond},

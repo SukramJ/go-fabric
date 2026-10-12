@@ -11,12 +11,16 @@
 // a default server: the module's own where it has one, else the generated
 // [spec.Server] with the features the type mandates and the defaults it
 // states. A host that must act itself supplies its own server for a cluster
-// ([WithServer]), as a matter.js host overrides a behavior. [Device.Spec]
+// ([WithServer]), as a matter.js host overrides a behavior; a sensor's
+// measurement clusters come from the host's live reading
+// ([WithMeasurement]). [Device.Spec]
 // hands the device to the endpoint assembler as an [endpoint.Spec], so
 // endpoint-id persistence and device-type validation are the assembler's
 // (ADR 0016). The clusters the assembler mounts on every endpoint —
 // Descriptor, Identify, BridgedDeviceBasicInformation, Groups and
-// ScenesManagement — are never mounted here.
+// ScenesManagement — are never mounted here; an optional Groups or
+// ScenesManagement is opted into with [WithOptional] and mounted by the
+// assembler.
 //
 // The package is public API from its first commit (README.md §API
 // stability). A device type matter.js renames becomes an alias with a

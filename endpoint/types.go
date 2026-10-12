@@ -99,8 +99,9 @@ type Endpoint struct {
 	// surface. nil for the root endpoint and for measurement-only
 	// sub-endpoints (which use Measurement instead).
 	Source contract.EndpointSource
-	// Measurement is set on standalone sensor endpoints assembled
-	// from MatterMeasurementSource implementers. nil otherwise.
+	// Measurement is set on sensor endpoints assembled from
+	// MatterMeasurementSource implementers. nil otherwise. With Source
+	// also set, its clusters follow the source's ([ClusterServers]).
 	Measurement contract.MeasurementSource
 	// PowerSource carries the device's battery reading on exactly one of
 	// the device's endpoints, so the PowerSource cluster (0x002F) is served
@@ -181,6 +182,10 @@ type Endpoint struct {
 	// ClientClusters are the client clusters the endpoint declares, served
 	// as its Descriptor ClientList. Carried from [Spec.ClientClusters].
 	ClientClusters []uint32
+
+	// OptIn are the stack-mounted optional server clusters the endpoint
+	// opts into (Groups, ScenesManagement). Carried from [Spec.OptIn].
+	OptIn []uint32
 
 	// attachedClusters holds the cluster servers that come from OUTSIDE
 	// the assembler: the daemon builds them and hands them to the bridge,
