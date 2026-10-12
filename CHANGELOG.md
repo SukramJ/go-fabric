@@ -89,6 +89,16 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `onoff.Server`: the host `Sink` no longer runs under a lock `Set` takes.
+  Commands, writes, the countdown ticks and scene applies stay serialised
+  in one queue the host never takes; the stored state has a lock of its
+  own that `Set` takes alone. A Sink may now confirm the change through
+  `Set` before it returns — on its own goroutine or from another — where
+  it used to block the command for the host's write timeout and the
+  confirming goroutine for good (issue #63). A `Set` that lands while a
+  command's Sink runs is stored and reported at once; once the Sink
+  consents, the command compares with it (the scene invalidation) and
+  stores its own OnOff over it.
 - RemoveFabric tells every other session of the removed fabric with a
   Secure-Channel CloseSession before they close (matter.js `Fabric.leave`);
   the session that carried the command still closes after its response,
