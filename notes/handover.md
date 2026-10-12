@@ -23,6 +23,7 @@ German, briefly. Six waves were planned against the phases:
 | 6 | 4 (device layer `device/`, node facade `node/`, `cluster/onoff.Server`, daemon migration; ADR 0018 accepted 2026-10-11) | P, Q, R | #51; docs PR `docs/wave-6-followups` | #51 merged 2026-10-12 (`b4ea1f9`); docs PR see §6 |
 | 7 | phase-5 preparation and release: AddNOC test commissioner, device-layer gaps, Tier-3 transport findings + OnOff scenes, v0.2.0 deprecations removed, `v0.3.0` | S, T, U, V | #53; docs PR `docs/wave-7-followups` | #53 merged 2026-10-12 (`b0b97ff`); tag `v0.3.0` after the docs PR (normal release, no pre-release flag — owner 2026-10-12) |
 | 8 | the three Tier-3 session findings of #54: RemoveFabric/UpdateNOC CloseSession, handshakes hold a TCP connection, first chunk of a chunked report is peer loss | W | `wave/2026-10-12-tranche-8`; docs PR `docs/wave-8-followups` | see §8 |
+| 9 | the five owner issues #57, #58, #60, #61, #62 (openccu-loom ADR 0084 migration): generated device-type names, store migrations + fingerprint, node observers + basic window + knobs, Thermostat Sink, WindowCovering Mover | X, Y, Z | `wave/2026-10-12-tranche-9`; docs PR `docs/wave-9-followups` | see §9 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -382,3 +383,73 @@ rotation (`Fabric.ts:405-407,421-423`); CASE hold bounded only by eviction
 (Q4). `docs/open-items.md`: the three rows closed, two new rows. Then
 delete `wave8/sessions`, `planning/briefs-wave-8`,
 `wave/2026-10-12-tranche-8` and `.claude/worktrees/wave8-sessions`.
+
+## 9. Wave 9 (2026-10-12, the owner away; everything local)
+
+Wave 9 takes the five owner issues that the openccu-loom ADR 0084 migration
+raised, ahead of the matter.js pin lift and ADR 0020 (concept v2). Briefs X,
+Y, Z on `planning/briefs-wave-9` (`f6f221e`); agent branches `wave9/store`
+(X, head `6b20fb3`), `wave9/ports` (Y, `39757f5`), `wave9/node` (Z,
+`0ef2f6f`). Integration `wave/2026-10-12-tranche-9` = the three branches
+cherry-picked in the order X, Z, Y plus this section; the CHANGELOG and the
+reachability inventory were the only conflicts (inventory regenerated once at
+the end, unreached 5, entry points 4444 → 4482).
+
+- **X (#57, #62):** `contract/devicetype_names_gen.go` (91 names, generated
+  by `script/devicegen` with `labels.go` overrides; contract stays
+  stdlib-only); `store.Migrations()` v1..v4 (v1 = v0.1.0 DDL, v2 = the three
+  v0.2.0 tables, v3 = the `group_key_map` rebuild with a documented lossy
+  Down, v4 = `matter_ota_default_providers`), `store.SchemaFingerprint`
+  hashing only the tables and indexes the embedded schema declares (value
+  pinned in the CHANGELOG and a test). Decisions: four steps despite the
+  CHANGELOG's three-release cut, names `v1`..`v4`, CamelCase labels.
+- **Y (#60, #61):** `thermo.Sink` (`SetSystemMode`, `SetSetpoint` with
+  companions; called after validate + reconcile, before the store; status
+  errors pass through, anything else FAILURE; inbound `SetSystemMode`,
+  `SetOccupied{Heating,Cooling}Setpoint` clamp and log), `cover.Mover`
+  (`GoTo`, `Stop`; `New` refuses Mover + MoveStep; inbound
+  `SetCurrentPosition`, `SetOperationalStatus`). Decisions: one status rule
+  for both new ports (onoff untouched — open item); SetpointRaiseLower in
+  Both mode is one Sink call, cooling primary, heating companion
+  (`ThermostatServer.ts:218-219`); an unchanged value skips the Sink
+  (matter.js `Datasource.ts:674-676` skips equal values on commit,
+  `$Changing` only for changed fields `:956-957` — verified at the pin);
+  OperationalStatus stays the host's with a Mover; calibration outside the
+  Sink.
+- **Z (#58):** `node.Config.Observers` (`OnFabricAdded/Removed/Updated`
+  with `FabricInfo`, `OnCommissioningComplete`, `OnWindowTransition` with
+  `WindowSnapshot`), each chained after the facade's handler, errors and
+  panics logged; `Node.OpenBasicWindow(ctx, WindowCredentials)` — the own
+  window with per-window credentials, CM=1 under the window's
+  discriminator, configured credentials back on close, a direct
+  `OpenOwnWindow` ends it first (Q7 fix-up); `Config.SupportedFabrics`
+  (0 → 5, > 254 refused), `Config.DisableTimeSynchronization`. Already
+  there, no code: CM=2 for an administrator's window with a verifier,
+  concurrent pairings always on. Decisions: `ConcurrentPairings` stays a
+  constant; observers take no ctx and return a logged error;
+  `OnCommissioningComplete` fires per command (matter.js `commissioned`
+  only when the fabric count crosses zero, `CommissioningServer.ts:157-171`
+  — by_design); a basic window closing on an uncommissioned node reopens
+  the own window with a fresh timeout.
+
+Local guards on the agents' heads: `make ci`, race on the touched packages,
+reachability, `make chiptool-test`; families CADMIN/OPCREDS/CGEN/IDM (Z, 38
+passed, 35 skipped) and TSTAT/WNCV/IDM (Y, 37 passed, 18 skipped), every
+skip the table's verdict. No chip-tool test, PICS or golden changed. The
+tranche runs the full set again before the PR.
+
+**Docs PR `docs/wave-9-followups`** (after the tranche merges): by_design —
+per-window basic credentials (`AdministratorCommissioningServer.ts:105-121`,
+`DeviceCommissioner.ts:236-256`), SupportedFabrics default 5 vs matter.js
+254 (`OperationalCredentialsServer.ts:84-88`), `OnCommissioningComplete`
+per command, observers synchronous before the response, Mover synchronous
+inside the command (`WindowCoveringServer.ts:378-392,455-463`),
+OperationalStatus host-owned with a Mover (`WindowCoveringServer.ts:217-224,
+412-420,237-248`), unchanged values skip the Sink. Findings — Tier 3:
+SetpointRaiseLower in Heat/Cool mode on an AUTO thermostat does not keep the
+deadband (`ThermostatServer.ts:228-266`). Open items — `SetOnFabricAdded`
+never fires under the facade; `onoff.setOnOff` maps every Sink error to
+FAILURE (`cluster/onoff/server.go:319-328`). Close #57, #58, #60, #61, #62.
+Then delete `wave9/*`, `planning/briefs-wave-9`, `wave/2026-10-12-tranche-9`
+and the `.claude/worktrees/wave9-*` worktrees. Next: wave 10 = the pin lift
+to `0ceb202d` and ADR 0020 (concept v2 Teil E).
