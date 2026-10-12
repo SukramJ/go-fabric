@@ -96,7 +96,7 @@ The Go mapping of brief AA's matter.js model:
 
 - matter.js: a transition step holds the behavior's lock across its await.
   `Transitions.ts:582-589` `executeStep` calls `addResourcesSync(behavior)`
-  then `begin()`, and `ColorControlServer.ts:1743-1744` says so. A host's
+  then `begin()`, and `ColorControlServer.ts:1739-1740` says so. A host's
   `endpoint.set` in the same state waits for it (`Tx.ts:194-203`
   `addResources` → `acquireLocks`, `:479` `waitFor`).
 - Go: the host's write cannot wait on the goroutine that holds the lock.
