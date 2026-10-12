@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-12
+
 **ColorControl serves every feature matter.js implements; ExtendedColorLight
 is servable.** A CT-only host keeps working unchanged: a
 `light.ColorControlServerConfig` without `Features` is CT only, serves the
@@ -926,6 +928,34 @@ the same `ColorTemperatureWriter` as before.
   `SemanticTagStruct.EncodeTLV`), which carries the field ids itself.
   Removal permissible in the second minor release after the one that ships
   this entry.
+
+### Removed
+
+Marked in v0.2.0, removal announced there. A host that still uses one of
+them moves to the replacement named here; none has a behaviour of its own
+left to keep.
+
+- `github.com/SukramJ/go-fabric/cluster/wire`: `Groups`, the read-only
+  Groups stub. Replacement: none to wire — group membership is stack state;
+  configure `endpoint.Config.Groups` and the assembler mounts the real
+  `cluster/core.Groups` server wherever a device type mandates Groups
+  (ADR 0009).
+- `github.com/SukramJ/go-fabric/im`: `StatusUnreportableAttr` (0x8c) and
+  `StatusNoUpstreamSubscription` (0xc5). Matter 1.6.1 removed both codes and
+  matter.js dropped them from its status table; no replacement.
+- `github.com/SukramJ/go-fabric/store`: the never-wired subscription API —
+  `PersistentSubscriptionRecord`, `ErrPersistentSubscriptionNotFound`,
+  `Store.SavePersistentSubscription`, `Store.LoadPersistentSubscriptions`,
+  `Store.DeletePersistentSubscription`,
+  `Store.DeletePersistentSubscriptionsByFabric`,
+  `Store.GetPersistentSubscription`, `PersistentSubscriptionIntervals`,
+  `MarshalIntervals` and `UnmarshalIntervals`. Replacement:
+  `Store.SaveServerSubscription` and its siblings on the
+  `matter_server_subscriptions` table (ADR 0008). The
+  `matter_persistent_subscriptions` table itself stays in `store.Schema()`:
+  every database a v0.2.x store applied already carries it, nothing reads
+  or writes it, and keeping the CREATE leaves old and new databases with the
+  same schema.
 
 ### Fixed
 
@@ -2772,3 +2802,8 @@ consumer of an older pseudo-version should read.
   code does, and it tells a reader the snapshot was measured one commit
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
+
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/SukramJ/go-fabric/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/SukramJ/go-fabric/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/SukramJ/go-fabric/releases/tag/v0.1.0
