@@ -2052,6 +2052,45 @@ omits the call keeps an idle TCP connection open until the peer closes it
 (`bridge/bridge.go` package doc names the port). Retire when the manager
 takes more than one observer (report U, question 1).
 
+### BD-Matter-FabricClose-CloseSessionRegardlessOfExchanges — every other routed session of a removed or rotated fabric gets a CloseSession
+
+matter.js `Fabric.leave` / `replaced` run `initiateClose` on every session
+of the fabric; a session with an exchange in flight defers its close
+(`NodeSession.ts:312-322`), and the force close that follows marks it
+peer-lost (`:324-327`), so that session closes after its exchange without
+a CloseSession. The bridge has no per-session view of active exchanges:
+`EmitFabricRemovedContext` and `Bridge.CloseFabricSessionsExcept` send the
+CloseSession to every routed session of the fabric except the invoking
+one, then close them at once. A peer whose exchange was in flight sees a
+CloseSession where matter.js would have let the exchange finish. The
+invoking session itself matches matter.js: closed after its response,
+without a CloseSession (`Fabric.ts:456-460`). Retire when the bridge
+tracks exchanges per session.
+
+### BD-Matter-FabricClose-NoSubscriptionFlush — no final report before the sessions of a removed or rotated fabric close
+
+matter.js `leave` and `replaced` run `closeSubscriptions(true)` on every
+session before closing it (`Fabric.ts:405-407`, `:421-423`), flushing a
+last report so a `leave` event reaches the peer. The bridge forgets the
+fabric's subscriptions without a final report, as it did before wave 8;
+the sessions close right after, and a report that raced the close would
+reach a peer that is removing the fabric. Retire if an ecosystem is seen
+to wait for that last report.
+
+### BD-Matter-CaseHold-BoundedByEvictionOnly — an abandoned Sigma1 holds its TCP connection until the CASE state is evicted
+
+A CASE handshake in flight holds its TCP connection open
+(`ExchangeManager.ts:669-676`); the hold ends with the handshake, a peer
+failure StatusReport, the connection dropping, or the eviction of the
+per-exchange CASE state (`Bridge.ForgetSigma1Replied`, which
+`node/security.go:327` wires to the CASE provider's one-minute TTL through
+`SetOnEvict`). matter.js has no constant bounding the CASE exchange either;
+its unsecured session ends with the exchange. A host that wires its own
+CASE provider without `SetOnEvict` keeps an abandoned Sigma1's hold until
+the connection drops. The PASE hold is bounded by `PASE_PAIRING_TIMEOUT`
+(60 s, `PaseServer.ts:33`) regardless. Recorded so a host wiring the
+provider itself knows what the eviction callback also does.
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

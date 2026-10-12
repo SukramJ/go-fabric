@@ -43,7 +43,7 @@ last family run and held by `TestCertifiabilityDocument`.
 
 | Item | Where | What |
 | --- | --- | --- |
-| **RemoveFabric closes sessions without CloseSession; handshake sessions do not hold a TCP connection; a chunked report's first chunk is not peer loss** | findings register, Tier 3 | Three wave-7 findings from reports S and U, each with a fix package. |
+| **UpdateNOC keeps the invoking session open; unrouted UDP sessions close without a CloseSession** | findings register, Tier 3 | Two wave-8 findings from report W, each with a fix package; the second waits for a fixture run because it moves the UDP route rule. |
 | **A host wiring its own session registry must call `Bridge.SessionClosed`** | `BD-Matter-SessionClosed-HostCall` | `operational.Manager.SetOnSessionClose` holds one callback; `node/` makes the call. Retire when the manager takes several observers. |
 | **Hand-off transitions report RemainingTime 0** | [ADR 0014](./adr/0014-transitions-optional-per-endpoint.md), `BD-Matter-LevelControl-NativeRamp` | A host whose device ramps natively has no way to state the end time; matter.js's application-stated `transitionEndTime` is not ported. |
 
