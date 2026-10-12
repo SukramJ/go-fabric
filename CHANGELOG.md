@@ -38,6 +38,14 @@ pseudo-version of `main`.
   the release's at column and constraint level. This release, after
   `store.Apply`:
   `924e777a63a110753483a2dd08fb61c19bc5b9f96f09271b1bd265b9212bd924`.
+- `node.Config.Observers` (issue #58): `OnFabricAdded`, `OnFabricRemoved`,
+  `OnFabricUpdated` (a `node.FabricInfo`: index, fabric id, node id, root
+  public key, compressed fabric id), `OnCommissioningComplete(fabricIndex)`
+  and `OnWindowTransition(node.WindowSnapshot)`. Each runs after the
+  facade's own handler for the event, which stays wired; an observer's
+  error or panic is logged, not returned. A host no longer replaces the
+  facade's OperationalCredentials, GeneralCommissioning or window hooks to
+  follow these events.
 
 ### Changed
 

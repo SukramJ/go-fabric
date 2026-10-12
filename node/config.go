@@ -72,6 +72,10 @@ type Config struct {
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
 	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345).
 	AggregatorServers []contract.ClusterServer
+	// Observers are the host's callbacks on fabric and commissioning
+	// events, each chained after the facade's own handler (observers.go);
+	// the zero value observes nothing.
+	Observers Observers
 	// Logger is the node's logger; nil is slog.Default().
 	Logger *slog.Logger
 }

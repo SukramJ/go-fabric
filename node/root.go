@@ -86,6 +86,9 @@ type rootDeps struct {
 	groups            *groups.Manager
 	connector         mattercore.OtaProviderConnector
 	onFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
+	// onCommissioningComplete runs after the root's own
+	// CommissioningComplete handling (the host's observer).
+	onCommissioningComplete func(ctx context.Context, fabricIndex uint8)
 }
 
 // buildRoot constructs endpoint 0's cluster surface and cross-wires the
@@ -174,11 +177,15 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		deviceTypes = append(deviceTypes, mattercore.OtaRequestorDeviceType())
 	}
 	otaRequestor := r.OTARequestor
-	generalCom.SetOnCommissioningComplete(func(context.Context, uint8) {
+	observer := d.onCommissioningComplete
+	generalCom.SetOnCommissioningComplete(func(ctx context.Context, fabricIndex uint8) {
 		opCreds.ClearPendingState()
 		if otaRequestor != nil {
 			// A query 30 s after a commissioning (wiring.go:210-215).
 			otaRequestor.Commissioned()
+		}
+		if observer != nil {
+			observer(ctx, fabricIndex)
 		}
 	})
 

@@ -47,6 +47,12 @@ type commissioningHost struct {
 	advert    bridge.CommissioningAdvertisement
 	installMu sync.Mutex
 	active    *bridge.PerExchangePaseProvider // the window's provider, nil between windows
+	// observer is the host's OnWindowTransition (nil: none).
+	observer func(WindowSnapshot) error
+
+	announcedMu            sync.Mutex
+	announcedMode          uint8  // CM of the published commissionable record; 0 none
+	announcedDiscriminator uint16 // its discriminator
 }
 
 // wireCommissioningWindow builds the window, gives it to the bridge and the
@@ -77,37 +83,79 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st *stor
 	window.SetPaseSessionCloser(paseCloser{h.sessions})
 	window.SetPaseVerifierInstaller(h)
 	window.SetTransitionHook(func() {
-		snap := window.CurrentWindow()
 		//nolint:contextcheck // the hook fires on a window transition, outside any request; the announce is bounded by the node's lifetime
-		if window.IsOwnWindow() {
-			// The node's own window: PASE with the configured passcode,
-			// advertised CM=1 (matter.js allowBasicCommissioning).
-			h.attachPase(h.baseline)
-			if err := h.br.AnnounceCommissioning(ctx, h.advert); err != nil {
-				h.logger.Warn("commissioning.own_window.announce", slog.String("err", err.Error()))
-			}
-			h.logger.Info("commissioning.own_window.open")
-			return
-		}
-		if snap.Status == wire.WindowStatusEnhanced && window.HasSuppliedVerifier() {
-			adv := h.advert
-			adv.Discriminator = window.Discriminator()
-			adv.CommissioningMode = 2 // §4.3.1.3 CM=2: enhanced window opened by an admin
-			if err := h.br.AnnounceCommissioning(ctx, adv); err != nil {
-				h.logger.Warn("commissioning.window.announce", slog.String("err", err.Error()))
-			}
-			h.logger.Info("commissioning.window.open", slog.Int("discriminator", int(adv.Discriminator)))
-			return
-		}
-		if snap.Status == wire.WindowStatusClosed {
-			// No window: no PASE acceptor and no commissionable record
-			// (matter.js #closeWindow: removePaseCommissioner,
-			// exitCommissioningMode).
-			h.attachPase(nil)
-			h.br.WithdrawCommissioning(ctx)
-			h.logger.Info("commissioning.window.closed")
-		}
+		h.transition(ctx, window)
+		// The host's observer runs after the facade's handling.
+		h.notifyTransition(window)
 	})
+}
+
+// transition is the facade's handling of a window transition: the PASE
+// acceptor and the commissionable record follow the window.
+func (h *commissioningHost) transition(ctx context.Context, window *bridge.CommissioningWindow) {
+	snap := window.CurrentWindow()
+	if window.IsOwnWindow() {
+		// The node's own window: PASE with the configured passcode,
+		// advertised CM=1 (matter.js allowBasicCommissioning).
+		h.attachPase(h.baseline)
+		h.announce(ctx, h.advert, "commissioning.own_window.announce")
+		h.logger.Info("commissioning.own_window.open")
+		return
+	}
+	if snap.Status == wire.WindowStatusEnhanced && window.HasSuppliedVerifier() {
+		adv := h.advert
+		adv.Discriminator = window.Discriminator()
+		adv.CommissioningMode = 2 // §4.3.1.3 CM=2: enhanced window opened by an admin
+		h.announce(ctx, adv, "commissioning.window.announce")
+		h.logger.Info("commissioning.window.open", slog.Int("discriminator", int(adv.Discriminator)))
+		return
+	}
+	if snap.Status == wire.WindowStatusClosed {
+		// No window: no PASE acceptor and no commissionable record
+		// (matter.js #closeWindow: removePaseCommissioner,
+		// exitCommissioningMode).
+		h.attachPase(nil)
+		h.br.WithdrawCommissioning(ctx)
+		h.setAnnounced(0, 0)
+		h.logger.Info("commissioning.window.closed")
+	}
+}
+
+// announce publishes adv and, once published, records what the node
+// advertises.
+func (h *commissioningHost) announce(ctx context.Context, adv bridge.CommissioningAdvertisement, event string) {
+	if err := h.br.AnnounceCommissioning(ctx, adv); err != nil {
+		h.logger.Warn(event, slog.String("err", err.Error()))
+		return
+	}
+	h.setAnnounced(adv.CommissioningMode, adv.Discriminator)
+}
+
+// setAnnounced records the commissioning mode and discriminator of the
+// published commissionable record (0, 0: none).
+func (h *commissioningHost) setAnnounced(mode uint8, discriminator uint16) {
+	h.announcedMu.Lock()
+	h.announcedMode, h.announcedDiscriminator = mode, discriminator
+	h.announcedMu.Unlock()
+}
+
+// notifyTransition hands the window after a transition to the host's
+// OnWindowTransition.
+func (h *commissioningHost) notifyTransition(window *bridge.CommissioningWindow) {
+	fn := h.observer
+	if fn == nil {
+		return
+	}
+	h.announcedMu.Lock()
+	snap := WindowSnapshot{
+		Open:              window.IsOpen(),
+		Own:               window.IsOwnWindow(),
+		Administrator:     window.CurrentWindow(),
+		CommissioningMode: h.announcedMode,
+		Discriminator:     h.announcedDiscriminator,
+	}
+	h.announcedMu.Unlock()
+	observe(h.logger, "window_transition", func() error { return fn(snap) })
 }
 
 // attachPase makes p the bridge's PASE acceptor (nil: none) unless an
