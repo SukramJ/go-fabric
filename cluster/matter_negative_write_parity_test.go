@@ -26,6 +26,7 @@ package cluster_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/alarm"
@@ -64,6 +65,35 @@ func newCoolOnlyServer() *thermo.ThermostatServer {
 		InitialCoolingSetpoint:  2600,
 	})
 }
+
+// refusingThermostatSink is a Thermostat host that refuses every change,
+// as a matter.js host throwing in occupied*Setpoint$Changing /
+// systemMode$Changing does.
+type refusingThermostatSink struct{}
+
+func (refusingThermostatSink) SetSystemMode(context.Context, uint8) error {
+	return errors.New("device refused")
+}
+
+func (refusingThermostatSink) SetSetpoint(context.Context, uint32, int16, []thermo.SetpointChange) error {
+	return errors.New("device refused")
+}
+
+func newRefusingThermostatServer() *thermo.ThermostatServer {
+	cfg := thermo.DefaultThermostatConfig()
+	cfg.Sink = refusingThermostatSink{}
+	return thermo.NewThermostatServer(cfg)
+}
+
+// refusingMover is a WindowCovering host whose device refuses every
+// movement.
+type refusingMover struct{}
+
+func (refusingMover) GoTo(context.Context, *uint16, *uint16) error {
+	return errors.New("device refused")
+}
+
+func (refusingMover) Stop(context.Context) error { return errors.New("device refused") }
 
 func newWindowCoveringServer() *cover.WindowCoveringServer {
 	return cover.NewWindowCoveringServer(cover.Config{
@@ -273,6 +303,33 @@ func TestNegativeWriteParity(t *testing.T) {
 			attrID:     0x001C, // SystemMode
 			value:      uint8(4),
 			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:599-606
+			// (4633bfd7): a host refusing in occupiedHeatingSetpoint$Changing
+			// fails the write; thermo.Sink is its Go form, a plain error → Failure.
+			name: "Thermostat/OccupiedHeatingSetpoint refused by the host Sink → Failure",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newRefusingThermostatServer()
+			},
+			attrID:     0x0012, // OccupiedHeatingSetpoint
+			value:      int16(2100),
+			wantStatus: im.StatusFailure,
+		},
+		{
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:619
+			// (4633bfd7): a host refusing in systemMode$Changing fails the write.
+			name: "Thermostat/SystemMode refused by the host Sink → Failure",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newRefusingThermostatServer()
+			},
+			attrID:     0x001C, // SystemMode
+			value:      uint8(4),
+			wantStatus: im.StatusFailure,
 		},
 		{
 			// Mirrors matter.js packages/node/src/standard/elements/window-covering-cluster.element.ts:72
@@ -579,6 +636,20 @@ func TestNegativeInvokeParity(t *testing.T) {
 			wantStatus: im.StatusInvalidCommand,
 		},
 		{
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:187-219
+			// (4633bfd7): setpointRaiseLower assigns the setpoints, which pass
+			// occupied*Setpoint$Changing (:599-606) where a host refuses.
+			name: "Thermostat/SetpointRaiseLower refused by the host Sink → Failure",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return newRefusingThermostatServer()
+			},
+			cmdID:      0x00, // SetpointRaiseLower
+			fields:     map[uint8]any{0: uint64(wire.ThermostatSetpointModeBoth), 1: int64(5)},
+			wantStatus: im.StatusFailure,
+		},
+		{
 			// Mirrors matter.js packages/node/src/standard/elements/window-covering-cluster.element.ts:72
 			// GoToLiftPercentage liftPercent100thsValue constraint "max 10000".
 			name: "WindowCovering/GoToLiftPercentage liftPercent100ths > 10000 → ConstraintError",
@@ -592,6 +663,19 @@ func TestNegativeInvokeParity(t *testing.T) {
 				"percent": uint16(10001),
 			},
 			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// Mirrors matter.js packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338
+			// (4633bfd7): a host's handleMovement that throws fails the command;
+			// cover.Mover is its Go form, an error → Failure.
+			name: "WindowCovering/UpOrOpen refused by the host Mover → Failure",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0x05, Mover: refusingMover{}})
+			},
+			cmdID:      wire.WindowCoveringCmdUpOrOpen,
+			wantStatus: im.StatusFailure,
 		},
 		{
 			// rvc-operational-state.element.ts:23 — Start is "X" in the

@@ -7,8 +7,9 @@
 // revision, its [device.Type] with the cluster requirements matter.js's
 // generator derives, a constructor and the typed accessors of its default
 // servers — plus device/types_gen.go, the registry of every generated
-// type, and device/types_gen_test.go, which calls every constructor and
-// accessor.
+// type, device/types_gen_test.go, which calls every constructor and
+// accessor, and contract/devicetype_names_gen.go, the label table of
+// contract.DeviceTypeName over every snapshot device type (labels.go).
 //
 // It is matter.js's support/codegen/src/endpoints translated: matter.js
 // generates packages/node/src/devices and packages/node/src/endpoints from
@@ -20,7 +21,9 @@
 // clustergen, whose committed definitions it references):
 //
 //	go run ./script/devicegen            # regenerate device/*_gen.go
-//	go run ./script/devicegen -out DIR   # into DIR instead
+//	go run ./script/devicegen -out DIR   # into DIR instead (the contract
+//	                                     # label table too, unless
+//	                                     # -contract-out names another)
 //
 // The committed set is the device types in scope (committed in
 // devicetypes.go); every other snapshot device type is listed in
@@ -56,6 +59,7 @@ func run(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("devicegen", flag.ContinueOnError)
 	fs.SetOutput(stdout)
 	out := fs.String("out", "", "output directory (default: device of this module)")
+	contractOut := fs.String("contract-out", "", "output directory of the contract label table (default: -out if given, else contract of this module)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -71,10 +75,31 @@ func run(args []string, stdout io.Writer) error {
 	if dir == "" {
 		dir = filepath.Join(root, outDir)
 	}
+	cdir := *contractOut
+	switch {
+	case cdir != "":
+	case *out != "":
+		cdir = *out
+	default:
+		cdir = filepath.Join(root, contractDir)
+	}
 	files, err := g.all()
 	if err != nil {
 		return err
 	}
+	names, err := g.generateContractNames()
+	if err != nil {
+		return err
+	}
+	if err := writeAll(stdout, dir, files...); err != nil {
+		return err
+	}
+	return writeAll(stdout, cdir, names)
+}
+
+// writeAll creates dir and writes every file into it, naming each one it
+// changed on stdout.
+func writeAll(stdout io.Writer, dir string, files ...*output) error {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}

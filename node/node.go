@@ -163,7 +163,8 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.caseIDs = newCaseIdentities(n.logger)
 	n.root, err = buildRoot(ctx, rootDeps{
 		cfg: &n.cfg, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
-		onFabricInstalled: n.fabricInstalled,
+		onFabricInstalled:       n.observedFabricInstalled,
+		onCommissioningComplete: n.commissioningCompleted,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("node: %w", err)
@@ -189,13 +190,14 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 	n.window = &commissioningHost{
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
-		baseline: n.sec.pase, advert: advert,
+		baseline: n.sec.pase, advert: advert, observer: cfg.Observers.OnWindowTransition,
 	}
 	wireCommissioningWindow(n.life, n.window, n.st)
 
 	// --- fabric hooks (main.go:362-414) ---------------------------------
-	n.root.OperationalCredentials.SetOnFabricRemoved(n.fabricRemoved)
-	n.root.OperationalCredentials.SetOnFabricUpdated(n.fabricUpdated)
+	// The host's observers run after each (observers.go).
+	n.root.OperationalCredentials.SetOnFabricRemoved(n.observedFabricRemoved)
+	n.root.OperationalCredentials.SetOnFabricUpdated(n.observedFabricUpdated)
 
 	// Event numbers continue across a reboot (main.go:416-426).
 	if ceiling, found, cErr := n.st.GetMetadataCounter(ctx, store.MetadataKeyEventNumber); cErr == nil && found {
@@ -313,6 +315,58 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 		n.br.AnnounceFabric(ctx, newCompressed, newNode)
 	}
 	n.br.CloseFabricSessionsExcept(fabricIndex, mattercore.InvokeSessionIDFromContext(ctx))
+}
+
+// observedFabricInstalled is the facade's fabricInstalled, then the
+// host's OnFabricAdded with what the AddNOC hook carries.
+func (n *Node) observedFabricInstalled(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte) {
+	n.fabricInstalled(ctx, fabricIndex, fabricID, nodeID, rootPublicKey)
+	fn := n.cfg.Observers.OnFabricAdded
+	if fn == nil {
+		return
+	}
+	info := FabricInfo{FabricIndex: fabricIndex, FabricID: fabricID, NodeID: nodeID, RootPublicKey: append([]byte(nil), rootPublicKey...)}
+	if stored, ok := n.fabricInfo(ctx, fabricIndex); ok {
+		info.CompressedFabricID = stored.CompressedFabricID
+	}
+	observe(n.logger, "fabric_added", func() error { return fn(info) })
+}
+
+// observedFabricRemoved is the facade's fabricRemoved, then the host's
+// OnFabricRemoved. The store no longer holds the fabric when the hook
+// fires, so its identity is read from the CASE identity the facade holds
+// until its own handler forgets it.
+func (n *Node) observedFabricRemoved(ctx context.Context, fabricIndex uint8) {
+	info := FabricInfo{FabricIndex: fabricIndex}
+	if f, ok := n.caseIDs.forFabric(fabricIndex); ok {
+		info.FabricID = f.identity.FabricID
+		info.NodeID = f.identity.NodeID
+		info.CompressedFabricID = f.identity.CompressedFabricID
+		info.RootPublicKey = append([]byte(nil), f.rootPublicKey...)
+	}
+	n.fabricRemoved(ctx, fabricIndex)
+	if fn := n.cfg.Observers.OnFabricRemoved; fn != nil {
+		observe(n.logger, "fabric_removed", func() error { return fn(info) })
+	}
+}
+
+// observedFabricUpdated is the facade's fabricUpdated, then the host's
+// OnFabricUpdated with the fabric as the store now holds it.
+func (n *Node) observedFabricUpdated(ctx context.Context, fabricIndex uint8) {
+	n.fabricUpdated(ctx, fabricIndex)
+	if fn := n.cfg.Observers.OnFabricUpdated; fn != nil {
+		info, _ := n.fabricInfo(ctx, fabricIndex)
+		observe(n.logger, "fabric_updated", func() error { return fn(info) })
+	}
+}
+
+// commissioningCompleted runs the host's OnCommissioningComplete; the
+// root's CommissioningComplete hook calls it after its own body
+// (root.go).
+func (n *Node) commissioningCompleted(_ context.Context, fabricIndex uint8) {
+	if fn := n.cfg.Observers.OnCommissioningComplete; fn != nil {
+		observe(n.logger, "commissioning_complete", func() error { return fn(fabricIndex) })
+	}
 }
 
 // Start brings the node online: the bridge starts, and the daemon's

@@ -29,6 +29,10 @@ var schemaDDL string
 // [Apply]. Either way the text is the module's, so a column added here
 // arrives with the dependency bump instead of being missed.
 //
+// A host whose migration tool needs the schema as versioned steps rather
+// than one idempotent script takes [Migrations] instead; the two produce
+// the same schema ([SchemaFingerprint]).
+//
 // It creates no endpoint table: endpoint identity is keyed on the host's
 // own source identity and lives behind endpoint.Store, whose SQLite
 // implementation ships its own schema.
@@ -80,8 +84,9 @@ func Upgrade(ctx context.Context, db *sql.DB) error {
 // foreign key to matter_group_keys when the table still carries one. SQLite
 // cannot drop a constraint in place: the rows move to a new table of the
 // current definition, which then takes the old name — all in one
-// transaction. Nothing references matter_group_key_map, so the rebuild
-// needs no foreign_keys pragma change.
+// transaction; the statements are migration v3's ([Migrations]). Nothing
+// references matter_group_key_map, so the rebuild needs no foreign_keys
+// pragma change.
 func dropGroupKeyMapKeySetForeignKey(ctx context.Context, db *sql.DB) error {
 	var n int
 	if err := db.QueryRowContext(
@@ -98,22 +103,8 @@ func dropGroupKeyMapKeySetForeignKey(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("rebuild matter_group_key_map: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	for _, stmt := range []string{
-		`CREATE TABLE matter_group_key_map_rebuild (
-    fabric_index        INTEGER NOT NULL,
-    group_id            INTEGER NOT NULL CHECK(group_id BETWEEN 0 AND 65535),
-    group_key_set_id    INTEGER NOT NULL,
-    PRIMARY KEY(fabric_index, group_id),
-    FOREIGN KEY(fabric_index) REFERENCES matter_fabrics(fabric_index) ON DELETE CASCADE
-)`,
-		`INSERT INTO matter_group_key_map_rebuild (fabric_index, group_id, group_key_set_id)
-    SELECT fabric_index, group_id, group_key_set_id FROM matter_group_key_map`,
-		`DROP TABLE matter_group_key_map`,
-		`ALTER TABLE matter_group_key_map_rebuild RENAME TO matter_group_key_map`,
-	} {
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("rebuild matter_group_key_map: %w", err)
-		}
+	if _, err := tx.ExecContext(ctx, mustMigrationFile("v3.up.sql")); err != nil {
+		return fmt.Errorf("rebuild matter_group_key_map: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("rebuild matter_group_key_map: %w", err)

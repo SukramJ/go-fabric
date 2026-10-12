@@ -4,14 +4,15 @@
 // Package cover contains the Matter WindowCovering cluster server (0x0102)
 // for the position-aware lift feature profile.
 //
-// This package is a conformance reference: the server holds its own state
-// and answers every command with Success without forwarding it anywhere,
-// so it does not drive a device. With [Config.MoveStep] it simulates the
-// lift's travel the way matter.js's CHIP test node does. It exists to pin the cluster's wire shape
-// and attribute surface against matter.js HEAD; only the reference daemon
-// (examples/reference-bridge) mounts it, to put that surface in front of
-// chip-tool. A host that needs live control mounts its own
-// [contract.ClusterServer] on the endpoint instead.
+// The server holds its own state. Without a host port it answers every
+// command without forwarding it anywhere; with [Config.MoveStep] it
+// simulates the lift's travel the way matter.js's CHIP test node does —
+// the reference daemon (examples/reference-bridge) mounts it that way, to
+// put the surface in front of chip-tool. A host that drives a device sets
+// [Config.Mover]: each command's target reaches the host, and the device's
+// position and movement come back through
+// [WindowCoveringServer.SetCurrentPosition] and
+// [WindowCoveringServer.SetOperationalStatus].
 //
 // The cluster's identity is the generated definition (cluster/spec/
 // windowcovering, ADR 0013): ids, revision, the attribute and command
@@ -26,6 +27,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"sync"
 	"time"
@@ -53,6 +55,39 @@ const ServedFeatureMap = uint32(wcdef.FeatureLift | wcdef.FeaturePositionAwareLi
 
 // ErrFeatureMap reports a Config.FeatureMap other than [ServedFeatureMap].
 var ErrFeatureMap = errors.New("windowcovering: FeatureMap names features this server does not serve")
+
+// ErrMoverWithMoveStep reports a [Config] that sets both a Mover and a
+// MoveStep: the device moves, the server does not simulate it.
+var ErrMoverWithMoveStep = errors.New("windowcovering: Config.Mover and Config.MoveStep exclude each other")
+
+// Mover is the optional host port: the device that moves. It is the Go
+// form of a matter.js host overriding handleMovement / handleStopMovement
+// (packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338,
+// :487 at matter.js 4633bfd7; "do not invoke super.handleMovement()",
+// :328): the server validates the command, infers the target (UpOrOpen
+// open, DownOrClose closed, GoToLiftPercentage the percentage, :518-530,
+// :542-554, :576-592), stores the target attribute and calls the Mover —
+// one call per command — instead of moving the lift itself.
+//
+// An error refuses the command and restores the previous target: an
+// error that carries an IM status ([im.StatusCodeError]) answers with it,
+// any other answers FAILURE — the rule thermo.Sink follows too.
+// The Mover runs inside the command: the command's answer waits for it,
+// so it returns once the device accepted the target, not once it arrived
+// (matter.js runs handleMovement as a worker and answers first,
+// :378-392). The device's position and movement come back through
+// [WindowCoveringServer.SetCurrentPosition] and
+// [WindowCoveringServer.SetOperationalStatus], which may be called from
+// inside the Mover. Debouncing is the host's.
+type Mover interface {
+	// GoTo moves to the target, in percent100ths (0 open, 10000 closed).
+	// lift is the lift target; tilt is the tilt target and always nil:
+	// the server serves the lift axis only ([ServedFeatureMap]).
+	GoTo(ctx context.Context, lift, tilt *uint16) error
+	// Stop stops a movement (StopMotion, matter.js handleStopMovement
+	// :487-504). The server has set the target to the current position.
+	Stop(ctx context.Context) error
+}
 
 // servedOptional are the optional attributes the server serves.
 var servedOptional = []uint32{wcdef.AttrCurrentPositionLiftPercentage, wcdef.AttrSafetyStatus}
@@ -84,8 +119,11 @@ type Config struct {
 	// node does (support/chip-testing/src/cluster/
 	// TestWindowCoveringServer.ts, six 950 ms steps). Zero moves at once,
 	// as matter.js's WindowCoveringServer does without a handleMovement of
-	// its own.
+	// its own. [New] refuses a MoveStep together with a Mover.
 	MoveStep time.Duration
+	// Mover is the optional host port; nil keeps the server
+	// self-contained.
+	Mover Mover
 }
 
 // moveSteps is the number of steps a travelling movement takes
@@ -95,12 +133,18 @@ const moveSteps = 6
 // WindowCoveringServer implements
 // [github.com/SukramJ/go-fabric/contract.ClusterServer]
 // for the Matter WindowCovering cluster (0x0102), position-aware lift
-// feature profile. State is self-contained; commands update internal
-// fields and return Success so that commissioning tools and controller
-// apps receive a well-formed cluster without requiring a live CCU
-// backend.
+// feature profile. Without a [Mover] the state is self-contained: commands
+// update internal fields and return Success, so that commissioning tools
+// and controller apps receive a well-formed cluster without a device
+// behind it. With a Mover the commands reach the device.
 type WindowCoveringServer struct {
+	// op serialises the commands while a Mover runs, so a command
+	// restoring its target never races another; mu guards the values and
+	// is not held while the Mover runs.
+	op sync.Mutex
 	mu sync.RWMutex
+
+	mover Mover
 
 	inst           *spec.Instance
 	wcType         uint8
@@ -148,10 +192,14 @@ func (s *WindowCoveringServer) OnMatterAttributesChanged(cb func(attrIDs []uint3
 // New constructs a [WindowCoveringServer] from cfg. A cfg.FeatureMap other
 // than zero and [ServedFeatureMap] is refused with [ErrFeatureMap]:
 // advertising it would list attributes or commands the server does not
-// serve.
+// serve. A Mover together with a non-zero MoveStep is refused with
+// [ErrMoverWithMoveStep].
 func New(cfg Config) (*WindowCoveringServer, error) {
 	if cfg.FeatureMap != 0 && cfg.FeatureMap != ServedFeatureMap {
 		return nil, fmt.Errorf("%w: 0x%X, the server serves 0x%X", ErrFeatureMap, cfg.FeatureMap, ServedFeatureMap)
+	}
+	if cfg.Mover != nil && cfg.MoveStep != 0 {
+		return nil, fmt.Errorf("%w: MoveStep %s", ErrMoverWithMoveStep, cfg.MoveStep)
 	}
 	// LF | PA_LF satisfies "O.a+" and "[LF]", and both optional attributes
 	// are allowed under it, so spec.New cannot refuse it.
@@ -164,6 +212,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 		targetPositionPercent100ths:  cfg.InitialPositionPercent100ths,
 		operationalStatus:            0,
 		moveStep:                     cfg.MoveStep,
+		mover:                        cfg.Mover,
 	}, nil
 }
 
@@ -271,11 +320,14 @@ func (s *WindowCoveringServer) MinWritePrivilege(attrID uint32) uint8 {
 	return s.inst.MinWritePrivilege(attrID)
 }
 
-// MatterInvoke handles the mandatory WindowCovering commands. All four
-// commands accept the request and update internal state; they return
-// Success without forwarding anywhere — see the package doc on why this
-// server does not drive a device.
-func (s *WindowCoveringServer) MatterInvoke(_ context.Context, cmdID uint32, fields any) (any, error) {
+// MatterInvoke handles the mandatory WindowCovering commands. Without a
+// [Mover] all four commands accept the request and update internal state;
+// they return Success without forwarding anywhere. With one, see
+// [WindowCoveringServer.invokeMover].
+func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
+	if s.mover != nil {
+		return nil, s.invokeMover(ctx, cmdID, fields)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -302,6 +354,110 @@ func (s *WindowCoveringServer) MatterInvoke(_ context.Context, cmdID uint32, fie
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("windowcovering: unknown command 0x%02X", cmdID)
+	}
+}
+
+// invokeMover is MatterInvoke with a [Mover]: the command is validated,
+// its target inferred (UpOrOpen 0, DownOrClose 10000, GoToLiftPercentage
+// the value — WindowCoveringServer.ts:518-530, :542-554, :576-584 at
+// matter.js 4633bfd7 — and StopMotion the current position, :491-493) and
+// stored, and the Mover called: GoTo with the lift target, Stop for
+// StopMotion. The server neither moves the lift nor changes
+// OperationalStatus: both are the device's, reported through the inbound
+// setters. A Mover error answers with its IM status, FAILURE without one,
+// and restores the previous target.
+func (s *WindowCoveringServer) invokeMover(ctx context.Context, cmdID uint32, fields any) error {
+	var target uint16
+	stop := false
+	switch cmdID {
+	case wcdef.CmdUpOrOpen:
+		target = 0
+	case wire.WindowCoveringCmdDownOrClose:
+		target = 10000
+	case wire.WindowCoveringCmdStopMotion:
+		stop = true
+	case wire.WindowCoveringCmdGoToLiftPercentage:
+		pct, err := extractPercent100ths(fields)
+		if err != nil {
+			return err
+		}
+		target = pct
+	default:
+		return fmt.Errorf("windowcovering: unknown command 0x%02X", cmdID)
+	}
+	s.op.Lock()
+	defer s.op.Unlock()
+	s.mu.Lock()
+	prev := s.targetPositionPercent100ths
+	if stop {
+		target = s.currentPositionPercent100ths
+	}
+	s.targetPositionPercent100ths = target
+	s.mu.Unlock()
+
+	var err error
+	if stop {
+		err = s.mover.Stop(ctx)
+	} else {
+		err = s.mover.GoTo(ctx, &target, nil)
+	}
+	if err == nil {
+		return nil
+	}
+	s.mu.Lock()
+	s.targetPositionPercent100ths = prev
+	s.mu.Unlock()
+	var sc im.StatusCodeError
+	if errors.As(err, &sc) {
+		return err
+	}
+	return spec.Errorf(im.StatusFailure, "windowcovering: command 0x%02X refused: %v", cmdID, err)
+}
+
+// SetCurrentPosition records the position the device reports: lift is
+// CurrentPositionLiftPercent100ths (and, scaled, CurrentPositionLiftPercentage),
+// nil leaving it unchanged; a value above 10000 (the attribute's "max
+// 10000") is clamped to it and logged. tilt is accepted and unused: the
+// server serves the lift axis only ([ServedFeatureMap]). It is stored
+// without the [Mover] and reported through the change notifier; it does
+// not move the target or OperationalStatus. Without a Mover it does not
+// stop a simulated travel either.
+func (s *WindowCoveringServer) SetCurrentPosition(lift, _ *uint16) {
+	if lift == nil {
+		return
+	}
+	v := *lift
+	if v > 10000 {
+		slog.Default().Warn("matter.windowcovering.inbound_position_clamped",
+			slog.Int("value", int(v)), slog.Int("stored", 10000))
+		v = 10000
+	}
+	s.mu.Lock()
+	changed := s.currentPositionPercent100ths != v
+	s.currentPositionPercent100ths = v
+	s.mu.Unlock()
+	if changed {
+		s.changes.Notify(wire.WindowCoveringAttrCurrentPositionLiftPercent100ths, wire.WindowCoveringAttrCurrentPositionLiftPercentage)
+	}
+}
+
+// SetOperationalStatus records the OperationalStatus bitmap the device
+// reports (global in bits 0-1, lift in bits 2-3, tilt in bits 4-5 —
+// window-covering-cluster.element.ts:128-131 at matter.js 4633bfd7),
+// stored without the [Mover] and reported through the change notifier.
+// Bits above the attribute's "max 63" (:55-56) are dropped and logged.
+func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {
+	if status > 63 {
+		slog.Default().Warn("matter.windowcovering.inbound_operational_status_masked",
+			slog.Int("value", int(status)), slog.Int("stored", int(status&63)))
+		status &= 63
+	}
+	s.mu.Lock()
+	changed := s.operationalStatus != status
+	s.operationalStatus = status
+	s.mu.Unlock()
+	if changed {
+		s.changes.Notify(wire.WindowCoveringAttrOperationalStatus)
 	}
 }
 

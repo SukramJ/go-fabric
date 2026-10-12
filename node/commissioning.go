@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -47,6 +48,15 @@ type commissioningHost struct {
 	advert    bridge.CommissioningAdvertisement
 	installMu sync.Mutex
 	active    *bridge.PerExchangePaseProvider // the window's provider, nil between windows
+	// observer is the host's OnWindowTransition (nil: none).
+	observer func(WindowSnapshot) error
+
+	basicMu sync.Mutex
+	basic   *basicWindow // the open OpenBasicWindow window, nil without one
+
+	announcedMu            sync.Mutex
+	announcedMode          uint8  // CM of the published commissionable record; 0 none
+	announcedDiscriminator uint16 // its discriminator
 }
 
 // wireCommissioningWindow builds the window, gives it to the bridge and the
@@ -77,37 +87,181 @@ func wireCommissioningWindow(ctx context.Context, h *commissioningHost, st *stor
 	window.SetPaseSessionCloser(paseCloser{h.sessions})
 	window.SetPaseVerifierInstaller(h)
 	window.SetTransitionHook(func() {
-		snap := window.CurrentWindow()
 		//nolint:contextcheck // the hook fires on a window transition, outside any request; the announce is bounded by the node's lifetime
-		if window.IsOwnWindow() {
-			// The node's own window: PASE with the configured passcode,
-			// advertised CM=1 (matter.js allowBasicCommissioning).
-			h.attachPase(h.baseline)
-			if err := h.br.AnnounceCommissioning(ctx, h.advert); err != nil {
-				h.logger.Warn("commissioning.own_window.announce", slog.String("err", err.Error()))
-			}
-			h.logger.Info("commissioning.own_window.open")
-			return
-		}
-		if snap.Status == wire.WindowStatusEnhanced && window.HasSuppliedVerifier() {
-			adv := h.advert
-			adv.Discriminator = window.Discriminator()
-			adv.CommissioningMode = 2 // §4.3.1.3 CM=2: enhanced window opened by an admin
-			if err := h.br.AnnounceCommissioning(ctx, adv); err != nil {
-				h.logger.Warn("commissioning.window.announce", slog.String("err", err.Error()))
-			}
-			h.logger.Info("commissioning.window.open", slog.Int("discriminator", int(adv.Discriminator)))
-			return
-		}
-		if snap.Status == wire.WindowStatusClosed {
-			// No window: no PASE acceptor and no commissionable record
-			// (matter.js #closeWindow: removePaseCommissioner,
-			// exitCommissioningMode).
-			h.attachPase(nil)
-			h.br.WithdrawCommissioning(ctx)
-			h.logger.Info("commissioning.window.closed")
+		reopen := h.transition(ctx, window)
+		// The host's observer runs after the facade's handling.
+		h.notifyTransition(window)
+		if reopen {
+			// A basic window closed on a node without a fabric: the node's
+			// own window with the configured credentials comes back, as at
+			// start. After the observer saw the close, so the host sees
+			// close, then open.
+			h.reopenIfDecommissioned(ctx, st) //nolint:contextcheck // as above
 		}
 	})
+}
+
+// transition is the facade's handling of a window transition: the PASE
+// acceptor and the commissionable record follow the window. It reports
+// whether a [Node.OpenBasicWindow] window just closed with no other window
+// open, after which the caller restores the node's own window if the node
+// has no fabric.
+func (h *commissioningHost) transition(ctx context.Context, window *bridge.CommissioningWindow) (reopen bool) {
+	snap := window.CurrentWindow()
+	basic := h.currentBasic()
+	endedBasic := false
+	if basic != nil && !window.IsOwnWindow() {
+		// The basic window closed, or an administrator's replaced it: its
+		// acceptor goes (the configured one is not attached here — the
+		// branches below decide what the window now accepts).
+		h.endBasic(basic)
+		basic, endedBasic = nil, true
+	}
+	if window.IsOwnWindow() {
+		if basic != nil && !h.consumeOpening(basic) {
+			// The own window was (re)opened directly
+			// (CommissioningWindow().OpenOwnWindow) while a basic window
+			// was open: the basic window ends, and the restarted window
+			// runs with the configured credentials and discriminator.
+			h.endBasic(basic)
+			basic = nil
+		}
+		// The node's own window: PASE with the configured passcode,
+		// advertised CM=1 (matter.js allowBasicCommissioning) — or, for
+		// the transition OpenBasicWindow's own open fires, the basic
+		// window's acceptor (installed, so attachPase leaves it) and its
+		// discriminator.
+		h.attachPase(h.baseline)
+		adv := h.advert
+		if basic != nil {
+			adv.Discriminator = basic.discriminator
+		}
+		h.announce(ctx, adv, "commissioning.own_window.announce")
+		h.logger.Info("commissioning.own_window.open", slog.Int("discriminator", int(adv.Discriminator)))
+		return false
+	}
+	if snap.Status == wire.WindowStatusEnhanced && window.HasSuppliedVerifier() {
+		adv := h.advert
+		adv.Discriminator = window.Discriminator()
+		adv.CommissioningMode = 2 // §4.3.1.3 CM=2: enhanced window opened by an admin
+		h.announce(ctx, adv, "commissioning.window.announce")
+		h.logger.Info("commissioning.window.open", slog.Int("discriminator", int(adv.Discriminator)))
+		return false
+	}
+	if snap.Status == wire.WindowStatusClosed {
+		// No window: no PASE acceptor and no commissionable record
+		// (matter.js #closeWindow: removePaseCommissioner,
+		// exitCommissioningMode).
+		h.attachPase(nil)
+		h.br.WithdrawCommissioning(ctx)
+		h.setAnnounced(0, 0)
+		h.logger.Info("commissioning.window.closed")
+		return endedBasic && !window.IsOpen()
+	}
+	return false
+}
+
+// basicWindow is an open [Node.OpenBasicWindow] window: the discriminator
+// it is advertised under and the restore of its PASE acceptor.
+type basicWindow struct {
+	discriminator uint16
+	restore       func()
+	// opening marks the window until the transition its own
+	// OpenOwnWindow fires has consumed it (guarded by basicMu).
+	opening bool
+}
+
+// consumeOpening reports whether b was marked opening, clearing the mark.
+func (h *commissioningHost) consumeOpening(b *basicWindow) bool {
+	h.basicMu.Lock()
+	defer h.basicMu.Unlock()
+	was := b.opening
+	b.opening = false
+	return was
+}
+
+// currentBasic returns the open basic window, nil without one.
+func (h *commissioningHost) currentBasic() *basicWindow {
+	h.basicMu.Lock()
+	defer h.basicMu.Unlock()
+	return h.basic
+}
+
+// endBasic removes b's acceptor once, if b is still the open basic window.
+func (h *commissioningHost) endBasic(b *basicWindow) {
+	h.basicMu.Lock()
+	if h.basic != b {
+		h.basicMu.Unlock()
+		return
+	}
+	h.basic = nil
+	h.basicMu.Unlock()
+	b.restore()
+}
+
+// openBasic opens the node's own window with vc as its PASE acceptor,
+// advertised CM=1 under discriminator (see [Node.OpenBasicWindow]).
+func (h *commissioningHost) openBasic(ctx context.Context, vc *spake2.VerifierContext, iterations uint32, salt []byte, discriminator uint16, timeout time.Duration) error {
+	window := h.br.CommissioningWindow()
+	if window.IsOpen() && !window.IsOwnWindow() {
+		// Checked before the install, which would replace the
+		// administrator's acceptor.
+		return bridge.ErrAdministratorWindowOpen
+	}
+	//nolint:contextcheck // the provider outlives this call; the adapters it builds carry no ctx of their own (as InstallVerifier's)
+	b := &basicWindow{discriminator: discriminator, restore: h.installVerifierContext(vc, iterations, salt), opening: true}
+	h.basicMu.Lock()
+	prev := h.basic
+	h.basic = b
+	h.basicMu.Unlock()
+	if prev != nil {
+		// A basic window replaced by the next: its provider stops (the
+		// new one is installed already, so its restore leaves the
+		// bridge's acceptor alone).
+		prev.restore()
+	}
+	if err := window.OpenOwnWindow(ctx, timeout); err != nil {
+		h.endBasic(b)
+		return err
+	}
+	return nil
+}
+
+// announce publishes adv and, once published, records what the node
+// advertises.
+func (h *commissioningHost) announce(ctx context.Context, adv bridge.CommissioningAdvertisement, event string) {
+	if err := h.br.AnnounceCommissioning(ctx, adv); err != nil {
+		h.logger.Warn(event, slog.String("err", err.Error()))
+		return
+	}
+	h.setAnnounced(adv.CommissioningMode, adv.Discriminator)
+}
+
+// setAnnounced records the commissioning mode and discriminator of the
+// published commissionable record (0, 0: none).
+func (h *commissioningHost) setAnnounced(mode uint8, discriminator uint16) {
+	h.announcedMu.Lock()
+	h.announcedMode, h.announcedDiscriminator = mode, discriminator
+	h.announcedMu.Unlock()
+}
+
+// notifyTransition hands the window after a transition to the host's
+// OnWindowTransition.
+func (h *commissioningHost) notifyTransition(window *bridge.CommissioningWindow) {
+	fn := h.observer
+	if fn == nil {
+		return
+	}
+	h.announcedMu.Lock()
+	snap := WindowSnapshot{
+		Open:              window.IsOpen(),
+		Own:               window.IsOwnWindow(),
+		Administrator:     window.CurrentWindow(),
+		CommissioningMode: h.announcedMode,
+		Discriminator:     h.announcedDiscriminator,
+	}
+	h.announcedMu.Unlock()
+	observe(h.logger, "window_transition", func() error { return fn(snap) })
 }
 
 // attachPase makes p the bridge's PASE acceptor (nil: none) unless an
@@ -152,6 +306,13 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 	if err != nil {
 		return nil, fmt.Errorf("PAKE passcode verifier: %w", err)
 	}
+	return h.installVerifierContext(vc, iterations, salt), nil
+}
+
+// installVerifierContext makes a PASE acceptor over vc the bridge's until
+// the returned restore runs: the path both an administrator's verifier
+// (InstallVerifier) and [Node.OpenBasicWindow]'s credentials take.
+func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, iterations uint32, salt []byte) (restore func()) {
 	provider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
 		adapter, err := buildPaseAdapterFromContext(h.sessions, h.root, vc, salt, int(iterations))
 		if err != nil {
@@ -182,7 +343,7 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 		}
 		provider.Stop()
 		h.logger.Info("pase.window.verifier_restored")
-	}, nil
+	}
 }
 
 // stop ends a window provider still running at shutdown.
@@ -206,4 +367,93 @@ func (c paseCloser) ClosePaseSessions(context.Context) error {
 	}
 	c.sessions.CloseFabric(0)
 	return nil
+}
+
+// WindowCredentials are the setup credentials of one [Node.OpenBasicWindow]
+// window.
+type WindowCredentials struct {
+	// Discriminator is the 12-bit discriminator the window is advertised
+	// under.
+	Discriminator uint16
+	// Passcode is the window's setup passcode; it must pass
+	// setup.IsValidSetupPIN.
+	Passcode uint32
+	// Iterations is the SPAKE2+ PBKDF2 iteration count, within
+	// [spake2.IterationsMin, spake2.IterationsMax].
+	Iterations uint32
+	// Salt is the SPAKE2+ salt, spake2.PBKDFMinSaltSize to
+	// spake2.PBKDFMaxSaltSize bytes.
+	Salt []byte
+	// Timeout is how long the window stays open; 0 is the node's own
+	// window default (bridge.OwnWindowTimeoutUncommissioned while the node
+	// has no fabric, bridge.OwnWindowTimeoutCommissioned once it has one).
+	Timeout time.Duration
+}
+
+// ErrInvalidWindowCredentials wraps every [Node.OpenBasicWindow]
+// credential failure.
+var ErrInvalidWindowCredentials = errors.New("node: invalid window credentials")
+
+// validate holds the credential checks [Config.Validate] applies to the
+// configured commissioning secret.
+func (c *WindowCredentials) validate() error {
+	var errs []error
+	if c.Discriminator > setup.MaxDiscriminator {
+		errs = append(errs, fmt.Errorf("discriminator %d exceeds the 12-bit maximum %d", c.Discriminator, setup.MaxDiscriminator))
+	}
+	if c.Passcode > setupPasscodeMax || !setup.IsValidSetupPIN(c.Passcode) {
+		errs = append(errs, fmt.Errorf("passcode %d is invalid or on the trivially-guessable list", c.Passcode))
+	}
+	if c.Iterations < spake2.IterationsMin || c.Iterations > spake2.IterationsMax {
+		errs = append(errs, fmt.Errorf("PBKDF iterations %d not in [%d, %d]", c.Iterations, spake2.IterationsMin, spake2.IterationsMax))
+	}
+	if len(c.Salt) < spake2.PBKDFMinSaltSize || len(c.Salt) > spake2.PBKDFMaxSaltSize {
+		errs = append(errs, fmt.Errorf("PBKDF salt is %d bytes, want %d to %d", len(c.Salt), spake2.PBKDFMinSaltSize, spake2.PBKDFMaxSaltSize))
+	}
+	if c.Timeout < 0 {
+		errs = append(errs, fmt.Errorf("timeout %s is negative", c.Timeout))
+	}
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidWindowCredentials, err)
+	}
+	return nil
+}
+
+// OpenBasicWindow opens the node's own commissioning window with its own
+// credentials: PASE runs against a verifier computed from creds
+// (spake2.NewVerifierContext, the function commissioning/ uses) and
+// installed through the path an administrator's verifier takes, and the
+// node is advertised with CM=1 under creds.Discriminator. The window is
+// the node's own (CommissioningWindow().IsOwnWindow): it reads WindowNotOpen
+// on the AdministratorCommissioning cluster, an administrator's
+// OpenCommissioningWindow replaces it, and it closes on its timeout, on
+// CommissioningComplete and on RevokeCommissioning. Opened while a basic
+// window or the node's own window is open, it replaces that window; while
+// an administrator's window is open it returns
+// bridge.ErrAdministratorWindowOpen. A direct
+// CommissioningWindow().OpenOwnWindow while it is open ends it: the
+// restarted window runs with the configured credentials and is advertised
+// under the configured discriminator. Once it closes, the configured
+// credentials are back: a node without a fabric reopens its own window
+// under the configured discriminator, a commissioned node publishes no
+// commissionable record until the next window — the facade's window
+// semantics, unchanged.
+//
+// matter.js has no per-window basic credentials: openBasicCommissioningWindow
+// opens the window with the node's own passcode
+// (packages/node/src/behaviors/administrator-commissioning/
+// AdministratorCommissioningServer.ts:105-121), and DeviceCommissioner
+// #openWindow advertises `discriminator ?? commissioningConfig.discriminator`
+// (packages/protocol/src/protocol/DeviceCommissioner.ts:236-256). This is a
+// host extension, exposed as the facade's own API rather than as a cluster
+// command.
+func (n *Node) OpenBasicWindow(ctx context.Context, creds WindowCredentials) error {
+	if err := creds.validate(); err != nil {
+		return err
+	}
+	vc, err := spake2.NewVerifierContext(creds.Passcode, creds.Salt, int(creds.Iterations))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidWindowCredentials, err)
+	}
+	return n.window.openBasic(ctx, vc, creds.Iterations, append([]byte(nil), creds.Salt...), creds.Discriminator, creds.Timeout)
 }

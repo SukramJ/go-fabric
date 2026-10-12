@@ -9,7 +9,9 @@
 // already-migrated *sql.DB from whatever opened it and never opens one.
 // The DDL its queries are written against is embedded here and reachable
 // as [Schema]; a host either feeds that text through its own migration
-// tool or calls [Apply], but does not transcribe it.
+// tool or calls [Apply], but does not transcribe it. A tool that needs
+// versioned steps takes [Migrations], and [SchemaFingerprint] tells a host
+// whether its database carries this release's schema.
 //
 // Persistence model (Matter Core Spec §11.18 / §11.2 / §11.2.10):
 //

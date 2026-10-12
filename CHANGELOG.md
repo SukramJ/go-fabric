@@ -12,10 +12,80 @@ pseudo-version of `main`.
 
 ### Added
 
+- `thermo.ThermostatConfig.Sink` (`thermo.Sink`, `thermo.SetpointChange`):
+  an optional host port for a bridged thermostat. A controller's SystemMode
+  write, OccupiedHeating/CoolingSetpoint write (with the companions the
+  reconcile would move) and the setpoints a SetpointRaiseLower moves (one
+  call; in Both mode the cooling setpoint with the heating setpoint as its
+  companion) reach the host after validation and before anything is stored;
+  an error refuses the change (its IM status if it carries one, FAILURE
+  otherwise) and nothing is stored. A value equal to the stored one is no
+  change and does not call the Sink. The limit writes do not call it. New inbound setters
+  `SetSystemMode`, `SetOccupiedHeatingSetpoint` and
+  `SetOccupiedCoolingSetpoint` record the device's own state without the
+  Sink and report through the change notifier (issue #60).
+- `cover.Config.Mover` (`cover.Mover`): an optional host port for a bridged
+  window covering. UpOrOpen, DownOrClose and GoToLiftPercentage store the
+  target the server infers and call `GoTo` once; StopMotion sets the target
+  to the current position and calls `Stop`. The server then neither moves
+  the lift nor changes OperationalStatus; a Mover error answers with its IM
+  status if it carries one, FAILURE otherwise, and restores the previous
+  target. The Mover runs inside the command, so it
+  returns once the device accepted the target. `New` refuses a Mover
+  together with a `MoveStep` (`cover.ErrMoverWithMoveStep`). New inbound
+  setters `SetCurrentPosition(lift, tilt)` (tilt unused: the server is
+  lift-only) and `SetOperationalStatus` record the device's state without
+  the Mover and report through the change notifier (issue #61).
 - `bridge.Bridge.CloseFabricSessionsExcept(fabricIndex, exceptSessionID)`:
   ends every session of a fabric but one, telling each peer with a
   CloseSession first — the UpdateNOC path (matter.js `Fabric.replaced`).
   `node` calls it after UpdateNOC instead of closing the sessions silently.
+- `store.Migrations()` and `store.Migration{Version, Up, Down}` (#62): the
+  matter_* schema as ordered, versioned steps for a host that runs its own
+  migration tool and cannot call `store.Apply` — `v1` the DDL of v0.1.0
+  (`matter_group_key_map` with its foreign key into `matter_group_keys`),
+  `v2` the three tables of v0.2.0 (`matter_group_table`,
+  `matter_groupcast_groups`, `matter_server_subscriptions`), `v3` the
+  v0.2.0 `matter_group_key_map` rebuild without that foreign key (the
+  `store.Upgrade` step, which now runs the same text), `v4` the v0.3.0
+  `matter_ota_default_providers`. Each step's `Down` drops what it added,
+  `v3`'s rebuilds the foreign key and drops the GroupKeyMap entries that
+  name a key set that does not exist. A host embeds the steps in order and
+  pins `len(Migrations())` (4) and the last version (`v4`); a test applies
+  the list to one database and `store.Apply` to another and compares
+  their `sqlite_schema`, so the list and `store.Schema()` cannot drift.
+  `store.Schema`, `store.Apply` and `store.Upgrade` are unchanged.
+- `store.SchemaFingerprint(ctx, db)`: SHA-256 of the database's matter_*
+  schema (the tables `store.Schema()` creates, the indexes its DDL declares
+  and those tables' automatic indexes, statements normalised; a host's own
+  index on one of these tables does not count), so a host that carries the schema itself can compare it with
+  the release's at column and constraint level. This release, after
+  `store.Apply`:
+  `924e777a63a110753483a2dd08fb61c19bc5b9f96f09271b1bd265b9212bd924`.
+- `node.Config.Observers` (issue #58): `OnFabricAdded`, `OnFabricRemoved`,
+  `OnFabricUpdated` (a `node.FabricInfo`: index, fabric id, node id, root
+  public key, compressed fabric id), `OnCommissioningComplete(fabricIndex)`
+  and `OnWindowTransition(node.WindowSnapshot)`. Each runs after the
+  facade's own handler for the event, which stays wired; an observer's
+  error or panic is logged, not returned. A host no longer replaces the
+  facade's OperationalCredentials, GeneralCommissioning or window hooks to
+  follow these events.
+- `node.Node.OpenBasicWindow(ctx, node.WindowCredentials)` (issue #58): the
+  node's own commissioning window with per-window credentials
+  (discriminator, passcode, PBKDF iterations and salt, timeout) — the
+  ephemeral-window pattern. PASE runs against a verifier computed from them,
+  the node is advertised CM=1 under the window's discriminator, and once the
+  window closes the configured credentials are back (a node without a fabric
+  reopens its own window under the configured discriminator). matter.js has
+  no per-window basic credentials; this is a facade extension, not a cluster
+  path.
+- `node.Config.SupportedFabrics` (OperationalCredentials SupportedFabrics;
+  0 keeps the facade's 5, above 254 is refused) and
+  `node.Config.DisableTimeSynchronization` (the zero value keeps
+  TimeSynchronization on the root; set, the root's ServerList lacks 0x0038,
+  `RootClusters.TimeSynchronization` is nil and GeneralDiagnostics
+  TimeSnapshot answers with a null PosixTimeMs, as matter.js does without
+  the behaviour) (issue #58).
 
 ### Changed
 
@@ -39,6 +109,14 @@ pseudo-version of `main`.
   not once the whole report is out, so the peer's earlier sessions close and
   their subscriptions with them (matter.js `MessageExchange.send` →
   `peerLost`). A later chunk's loss is unchanged.
+- `contract.DeviceTypeName` labels every device type of the matter.js
+  snapshot, not only the 31 it had a hand-kept entry for (#57):
+  `DeviceTypeName(0x0045)` — SoilSensor, which `MeasurementSoilMoisture`
+  advertises — returned the hex fallback `"0x0045"`. The table
+  (`contract/devicetype_names_gen.go`) is now generated by
+  `script/devicegen` from `parity/schema.json`; the 31 existing labels are
+  unchanged, the 60 new ones are the matter.js names as
+  `schema.DeviceTypeName` gives them (`"SoilSensor"`, `"RootNode"`, …).
 
 ## [0.3.0] — 2026-10-12
 

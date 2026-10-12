@@ -43,5 +43,11 @@
 // GeneralDiagnostics' TestEventTrigger enable key, the PowerSource
 // endpoints of PowerSourceConfiguration, and the bridge's observer hooks
 // (SetOnReassembled, SetOnFabricAdded) — reachable through [Node.Root] and
-// [Node.Bridge].
+// [Node.Bridge]. The fabric, commissioning-complete and window events reach
+// the host through [Config].Observers, chained after the facade's own
+// handlers; a host that set the cluster hooks the facade wires
+// (OperationalCredentials SetOnFabricRemoved / SetOnFabricUpdated,
+// GeneralCommissioning SetOnCommissioningComplete, the window's
+// SetTransitionHook) would replace the facade's wiring. A window with
+// credentials other than the configured ones is [Node.OpenBasicWindow].
 package node

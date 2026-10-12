@@ -61,11 +61,13 @@ type RootClusters struct {
 	NetworkCommissioning       *mattercore.NetworkCommissioning
 	GeneralDiagnostics         *mattercore.GeneralDiagnostics
 	DiagnosticLogs             *mattercore.DiagnosticLogs
-	TimeSynchronization        *mattercore.TimeSynchronization
-	OperationalCredentials     *mattercore.OperationalCredentials
-	GroupKeyManagement         *mattercore.GroupKeyManagement
-	Groupcast                  *mattercore.Groupcast
-	Descriptor                 *mattercore.Descriptor
+	// TimeSynchronization is nil when [Config].DisableTimeSynchronization
+	// is set.
+	TimeSynchronization    *mattercore.TimeSynchronization
+	OperationalCredentials *mattercore.OperationalCredentials
+	GroupKeyManagement     *mattercore.GroupKeyManagement
+	Groupcast              *mattercore.Groupcast
+	Descriptor             *mattercore.Descriptor
 	// OTARequestor is nil unless [Config].OTA is set.
 	OTARequestor *mattercore.OTASoftwareUpdateRequestor
 	// PowerSourceConfiguration lists the node's PowerSource endpoints;
@@ -86,6 +88,9 @@ type rootDeps struct {
 	groups            *groups.Manager
 	connector         mattercore.OtaProviderConnector
 	onFabricInstalled func(ctx context.Context, fabricIndex uint8, fabricID, nodeID uint64, rootPublicKey []byte)
+	// onCommissioningComplete runs after the root's own
+	// CommissioningComplete handling (the host's observer).
+	onCommissioningComplete func(ctx context.Context, fabricIndex uint8)
 }
 
 // buildRoot constructs endpoint 0's cluster surface and cross-wires the
@@ -138,12 +143,16 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	generalCom := r.GeneralCommissioning
 
+	supportedFabrics := cfg.SupportedFabrics
+	if supportedFabrics == 0 {
+		supportedFabrics = defaultSupportedFabrics
+	}
 	chain, cd, err := attestationMaterial(cfg)
 	if err != nil {
 		return nil, err
 	}
 	r.OperationalCredentials, err = mattercore.NewOperationalCredentials(d.st, mattercore.OpcredsConfig{
-		SupportedFabrics:         5,
+		SupportedFabrics:         supportedFabrics,
 		DACPrivateKey:            chain.DACKey,
 		DAC:                      chain.DAC,
 		PAI:                      chain.PAI,
@@ -174,11 +183,15 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		deviceTypes = append(deviceTypes, mattercore.OtaRequestorDeviceType())
 	}
 	otaRequestor := r.OTARequestor
-	generalCom.SetOnCommissioningComplete(func(context.Context, uint8) {
+	observer := d.onCommissioningComplete
+	generalCom.SetOnCommissioningComplete(func(ctx context.Context, fabricIndex uint8) {
 		opCreds.ClearPendingState()
 		if otaRequestor != nil {
 			// A query 30 s after a commissioning (wiring.go:210-215).
 			otaRequestor.Commissioned()
+		}
+		if observer != nil {
+			observer(ctx, fabricIndex)
 		}
 	})
 
@@ -201,8 +214,10 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		return nil, fmt.Errorf("root descriptor: %w", err)
 	}
 	r.AdministratorCommissioning = wire.NewAdministratorCommissioning()
-	r.TimeSynchronization = mattercore.NewTimeSynchronization()
-	r.GeneralDiagnostics.SetUTCClock(r.TimeSynchronization.UTC)
+	if !cfg.DisableTimeSynchronization {
+		r.TimeSynchronization = mattercore.NewTimeSynchronization()
+		r.GeneralDiagnostics.SetUTCClock(r.TimeSynchronization.UTC)
+	}
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
 	r.NetworkCommissioning = mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{})
 
@@ -232,12 +247,16 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		r.NetworkCommissioning,
 		r.GeneralDiagnostics,
 		r.DiagnosticLogs,
-		r.TimeSynchronization,
+	}
+	if r.TimeSynchronization != nil {
+		servers = append(servers, r.TimeSynchronization)
+	}
+	servers = append(servers,
 		opCreds,
 		r.GroupKeyManagement,
 		r.Groupcast,
 		r.Descriptor,
-	}
+	)
 	if r.OTARequestor != nil {
 		servers = append(servers, r.OTARequestor)
 	}
