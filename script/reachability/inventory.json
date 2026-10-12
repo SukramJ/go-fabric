@@ -1277,14 +1277,14 @@
       "identifier": "TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 416
+      "line": 425
     },
     {
       "package": "bridge",
       "identifier": "TestChunkedReportLaterChunkUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 474
+      "line": 483
     },
     {
       "package": "bridge",

@@ -387,21 +387,30 @@ func (p *chunkedReportPeer) exhaust() {
 }
 
 // reportOrigin is the registered first message of the report's exchange.
+// The registration follows the send's return in the sending goroutine
+// (MRP tracks the message inside the send), so a caller that saw the
+// message tracked may be a few instructions ahead of it: poll.
 func (p *chunkedReportPeer) reportOrigin(t *testing.T) (mrp.ExchangeKey, reportExchangeOrigin) {
 	t.Helper()
-	var key mrp.ExchangeKey
-	var origin reportExchangeOrigin
-	found := false
-	p.dev.br.reportExchangeOrigins.Range(func(k, v any) bool {
-		key, _ = k.(mrp.ExchangeKey)
-		origin, _ = v.(reportExchangeOrigin)
-		found = key.SessionID == p.reportSID
-		return !found
-	})
-	if !found {
-		t.Fatal("the report's first message is not registered with its exchange")
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		var key mrp.ExchangeKey
+		var origin reportExchangeOrigin
+		found := false
+		p.dev.br.reportExchangeOrigins.Range(func(k, v any) bool {
+			key, _ = k.(mrp.ExchangeKey)
+			origin, _ = v.(reportExchangeOrigin)
+			found = key.SessionID == p.reportSID
+			return !found
+		})
+		if found {
+			return key, origin
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the report's first message is not registered with its exchange")
+		}
+		time.Sleep(time.Millisecond)
 	}
-	return key, origin
 }
 
 // TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss: the first chunk of
