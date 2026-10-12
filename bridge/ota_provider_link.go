@@ -41,7 +41,11 @@ const otaProviderConnectTimeout = 90 * time.Second
 // UdpSocket.ts:12, 1280 - 48) minus MATTER_MESSAGE_OVERHEAD
 // (packages/protocol/src/protocol/MessageExchange.ts:156, 26 + 12 + the
 // 16-byte MIC), as MessageExchange.maxPayloadSize computes it (:435-439).
-const exchangeMaxPayloadSize = (1280 - 48) - (26 + 12 + 16)
+const exchangeMaxPayloadSize = (1280 - 48) - matterMessageOverhead
+
+// matterMessageOverhead is matter.js MATTER_MESSAGE_OVERHEAD
+// (MessageExchange.ts:156, 26 + 12 + the 16-byte MIC).
+const matterMessageOverhead = 26 + 12 + 16
 
 // ErrExchangeClosed is a send or receive on an exchange already closed.
 var ErrExchangeClosed = errors.New("bridge: exchange closed")
@@ -195,7 +199,7 @@ type secureExchangeKey struct {
 type initiatedSecureExchange struct {
 	b          *Bridge
 	sessionID  uint16
-	addr       *net.UDPAddr
+	addr       net.Addr
 	exchangeID uint16
 	// createdAt bounds the peer-loss sweep this exchange may trigger:
 	// a session the peer established after the exchange was opened is
@@ -319,9 +323,28 @@ func (b *Bridge) deliverInitiatedSecure(hdr *message.Header, proto message.Proto
 	return true
 }
 
+// route is where the exchange's messages go: the session's current route
+// (a TCP connection it is bound to, or its newest UDP address), the
+// link's address otherwise.
+func (e *initiatedSecureExchange) route() net.Addr {
+	return e.b.currentPeerAddr(e.sessionID, e.addr)
+}
+
+// Reliable reports whether the exchange runs over a reliable connection
+// (TCP) — the Go form of matter.js's `messenger.channel.type === "tcp"`,
+// on which the OTA requestor picks its BDX block size
+// (OtaSoftwareUpdateRequestorServer.ts:962-963). A session never moves
+// between transports (bindSessionRoute), so the answer holds for the
+// exchange's life.
+func (e *initiatedSecureExchange) Reliable() bool {
+	r, ok := e.route().(*connRoute)
+	return ok && r != nil && r.conn != nil && r.conn.Reliable()
+}
+
 // Send implements [bdx.Exchange]: one message on the exchange, reliable
-// when the MRP tracker is wired, piggybacking the acknowledgement owed on
-// the exchange.
+// when the MRP tracker is wired and the route is not a reliable
+// connection (MRP is off over TCP, [routeUsesMRP]), piggybacking the
+// acknowledgement owed on the exchange.
 func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opcode uint8, payload []byte) error {
 	select {
 	case <-e.done:
@@ -335,7 +358,11 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 	tracker := b.outboundReliable
 	ackTracker := b.ackTracker
 	b.mu.RUnlock()
-	if listener == nil {
+	dest := e.route()
+	if !routeUsesMRP(dest) {
+		tracker = nil
+	}
+	if listener == nil && !isConnRoute(dest) {
 		return ErrUnsolicitedListenerMissing
 	}
 	if sessions == nil {
@@ -367,7 +394,6 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 		return fmt.Errorf("%w: %w", ErrUnsolicitedEncrypt, err)
 	}
 	datagram := append(hdr.Marshal(), enc.Ciphertext...) //nolint:gocritic // single-allocation join
-	dest := b.currentPeerAddr(e.sessionID, e.addr)
 	if tracker != nil {
 		tracker.Track(hdr.MessageCounter, e.sessionID, e.exchangeID, datagram, dest, time.Now())
 	}
@@ -392,8 +418,23 @@ func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, err
 	}
 }
 
-// MaxPayloadSize implements [bdx.Exchange].
-func (e *initiatedSecureExchange) MaxPayloadSize() int { return exchangeMaxPayloadSize }
+// MaxPayloadSize implements [bdx.Exchange]: the channel's maximum less the
+// message overhead, as matter.js MessageExchange.maxPayloadSize computes
+// it (MessageExchange.ts:435-439) — over UDP [exchangeMaxPayloadSize],
+// over a TCP connection the connection's largest message
+// (tcp.Conn.MaxMessageSize, the frame less its length prefix; matter.js
+// subtracts from the frame size, TcpChannel.ts:47, :115-117) less the same
+// overhead.
+func (e *initiatedSecureExchange) MaxPayloadSize() int {
+	if r, ok := e.route().(*connRoute); ok && r != nil && r.conn != nil && r.conn.Reliable() {
+		if m, ok := r.conn.(interface{ MaxMessageSize() int }); ok {
+			if n := m.MaxMessageSize() - matterMessageOverhead; n > exchangeMaxPayloadSize {
+				return n
+			}
+		}
+	}
+	return exchangeMaxPayloadSize
+}
 
 // Close implements [bdx.Exchange]: the exchange stops receiving, and an
 // acknowledgement still owed on it goes out now — matter.js

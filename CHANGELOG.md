@@ -552,6 +552,17 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- The OTA Software Update Requestor asks for 8192-byte BDX blocks when the
+  provider's session runs over TCP and 1024 otherwise, as matter.js does
+  (`OtaSoftwareUpdateRequestorServer.ts:54-55`, `:962-963`). An exchange
+  `OtaProviderSession.OpenExchange` returns states its channel with an
+  optional `Reliable() bool`; the bridge's exchanges do. The bridge's
+  initiated exchanges follow the session's route: over a TCP connection
+  they run without MRP and carry the connection's message size, and
+  `ConnectOtaProvider` (and subscription re-establishment) reuse a live
+  session bound to a TCP connection as they reuse one on UDP (matter.js
+  `Peer.ts:418-438`).
+
 - The operational DNS-SD record carries the `T` key only when a TCP mode
   is advertised (`T=2`, `4` or `6`); with TCP off the key is absent instead
   of `T=0`, as in matter.js (`MdnsAdvertisement.ts:204-206`,

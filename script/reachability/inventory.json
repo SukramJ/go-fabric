@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4422,
+  "entry_points": 4424,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10389,
+    "total_exported": 10391,
     "reachable": 7335,
-    "whitelisted": 3049,
+    "whitelisted": 3051,
     "unreachable": 5
   },
   "by_package": [
@@ -3559,7 +3559,14 @@
       "identifier": "TestOtaRequestor_EndToEnd_QueryBDXApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ota_provider_e2e_test.go",
-      "line": 187
+      "line": 190
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOtaRequestor_EndToEnd_TCPBlockSize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ota_provider_e2e_test.go",
+      "line": 276
     },
     {
       "package": "bridge",
@@ -4854,63 +4861,63 @@
       "identifier": "TestSubscriptionResumption_DisabledRecordsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 920
+      "line": 927
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 938
+      "line": 945
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 809
+      "line": 816
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 955
+      "line": 962
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerThatSubscribesIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 877
+      "line": 884
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 719
+      "line": 726
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEndWithMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 727
+      "line": 734
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 981
+      "line": 988
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_UnreachablePeerIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 842
+      "line": 849
     },
     {
       "package": "bridge",
@@ -5660,6 +5667,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
       "line": 1136
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOtaRequestorBdxBlockSizeByChannel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1286
     },
     {
       "package": "cluster/core",

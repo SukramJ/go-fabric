@@ -91,7 +91,9 @@ func (b *Bridge) AttachOperationalResolver(r OperationalResolver) {
 // peerLink is a secure session to a peer, ready to carry reports.
 type peerLink struct {
 	sessionID uint16
-	addr      *net.UDPAddr
+	// addr is the session's route: the peer's UDP address, or the
+	// *connRoute of the TCP connection the session is bound to.
+	addr net.Addr
 }
 
 // peerSessionLister is the optional [SessionRegistry] capability that
@@ -180,9 +182,14 @@ func (b *Bridge) existingPeerSession(fabricIndex uint8, peerNodeID uint64) (peer
 		if _, live := lookup.Lookup(id); !live {
 			continue
 		}
+		// A session bound to a TCP connection is reused like one on UDP:
+		// matter.js Peer.connect takes the newest live session of the
+		// peer, of any channel type when no transport is required
+		// (packages/protocol/src/peer/Peer.ts:418-438, newestSession
+		// :560-580).
 		raw, known := b.sessionPeerAddrs.Load(id)
-		addr, isAddr := raw.(*net.UDPAddr)
-		if known && isAddr && addr != nil {
+		addr, isAddr := raw.(net.Addr)
+		if known && isAddr && !isNilRoute(addr) {
 			return peerLink{sessionID: id, addr: addr}, true
 		}
 	}

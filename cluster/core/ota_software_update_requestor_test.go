@@ -1271,3 +1271,30 @@ func TestOTARequestor_BusyReportsDelayedOnQuery(t *testing.T) {
 		t.Fatalf("last transition %+v", l)
 	}
 }
+
+// reliablePipe is a pipe that states its channel.
+type reliablePipe struct {
+	pipe
+	reliable bool
+}
+
+func (p *reliablePipe) Reliable() bool { return p.reliable }
+
+// TestOtaRequestorBdxBlockSizeByChannel: 8192-byte blocks over a TCP
+// channel, 1024 otherwise — an exchange that does not state its channel
+// counts as not TCP (OtaSoftwareUpdateRequestorServer.ts:54-55, :962-963).
+func TestOtaRequestorBdxBlockSizeByChannel(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ex   bdx.Exchange
+		want uint16
+	}{
+		{"unstated", &pipe{}, 1024},
+		{"udp", &reliablePipe{}, 1024},
+		{"tcp", &reliablePipe{reliable: true}, 8192},
+	} {
+		if got := bdxMaxBlockSize(tc.ex); got != tc.want {
+			t.Errorf("%s: block size %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
