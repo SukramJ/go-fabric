@@ -21,6 +21,7 @@ German, briefly. Six waves were planned against the phases:
 | 4 | 2c/2d rest (Commodity*, ElectricalGridConditions, Soil, Actions, EcosystemInformation, PowerSourceConfiguration) and the spec runtime (timed commands from the model, `Constraint.In`, TSUIC default, ModeSelect) | J, K, L | #47; docs #48 | merged 2026-10-11 |
 | 5 | 3 (TCP, BDX, OTA requestor; ADR 0019) and harness follow-ups | M, N, O | #49; docs PR `docs/wave-5-followups` | #49 merged 2026-10-11 (`5739ee8`); docs PR see §3 |
 | 6 | 4 (device layer `device/`, node facade `node/`, `cluster/onoff.Server`, daemon migration; ADR 0018 accepted 2026-10-11) | P, Q, R | #51; docs PR `docs/wave-6-followups` | #51 merged 2026-10-12 (`b4ea1f9`); docs PR see §6 |
+| 7 | phase-5 preparation and release: AddNOC test commissioner, device-layer gaps, Tier-3 transport findings + OnOff scenes, v0.2.0 deprecations removed, `v0.3.0` | S, T, U, V | wave-7 PR from `wave/2026-10-12-tranche-7` | integrated 2026-10-12; tag `v0.3.0` after the merge (normal release, no pre-release flag — owner 2026-10-12) |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -287,3 +288,54 @@ one more brief fits the Opus row: the shared AddNOC Go test commissioner
 (report Q, question 6) so the ACL and CASE ports become provable through
 the facade. The sweep record `notes/parity/sweeps/2026-10-f07365a8-85cf6647.md`
 keeps its `wiring.go` citations as a dated record.
+
+## 7. Wave 7 (2026-10-12, the owner away; everything local)
+
+Briefs S, T, U, V on `planning/briefs-wave-7`; reports in
+`notes/briefs/reports/`. Integration `wave/2026-10-12-tranche-7` (S
+`18f632a`, T `577faaf`, V `d999df2`, U `77d4bdd`; merge fixes for the
+CHANGELOG and `endpoint/groups_mount_test.go`). Local guards on the
+integrated tree: `make ci`, `make race`, `make chiptool-test`; families
+per agent branch: T IDM/DESC/LVL/G/S, U OO/S/SC/SU — all green, no
+fixture, PICS or golden change.
+
+Owner decisions on the reports:
+- S: CASE before CommissioningComplete (chip `CHIPDeviceController.cpp:4574`,
+  the device refuses it over PASE); `NodeID` is the device's,
+  `ControllerNodeID` the commissioner's; ephemeral id and counter random,
+  certificate validity fixed (by_design); `node.Config` resolver port and
+  the regulatory fallbacks are phase-5 items; S's questions 7 (subscription
+  lost on an immediate Stop) and 8 (RemoveFabric closes sessions without
+  CloseSession) are findings to verify against matter.js in the docs PR.
+- T: revision conditions decide element presence only, features stay
+  conditional (`IllegalFeatureCombinations.ts:441-443,464-468`,
+  `conformance-compiler.ts:250-254`) — confirmed; Source and Measurement
+  both served — accepted; the `WithMeasurement` probe at `New` — accepted;
+  Binding default is a store without peer resolution — finding.
+- U: TCP-bound session reuse in `existingPeerSession` (`Peer.ts:418-438`)
+  confirmed; `SetOnSessionClose` single callback (host must call
+  `Bridge.SessionClosed`) — open item; unsecured handshake sessions not
+  counted on a TCP connection, and the first chunk of a multi-chunk report
+  not treated as peer loss — findings.
+- V: `v0.3.0` is a normal release (no pre-release flag); the four
+  identifier groups removed; `matter_persistent_subscriptions` CREATE stays.
+  openccu-loom breaks on `wire.Groups{}` in five places (report V lists
+  them) — its own move.
+
+**Docs PR after the merge:** by_design — test CA fixed validity;
+commissioner without retransmission, random ephemeral id; two readings of
+revision conditions; a measured cluster is the assembler's per device
+(accessor nil); `OptIn` only where the type allows; Binding default a
+store; TCP exchange payload 4 bytes below matter.js's; no cross-cluster
+rollback in the scene paths; `MatterQuiesce` drops a pending scene apply;
+`SessionClosed` is the host's call. findings — close five of the six
+"Application cluster servers" items and the first four Tier-3 bullets;
+add S's 7 and 8 (after the matter.js read), U's 2 and 4, T's Binding.
+Retire `BD-Daemon-MeasurementEndpointsBypassDeviceLayer`; extend
+`BD-Matter-Device-AssemblerClustersStayTheAssemblers` (opt-in);
+`docs/open-items.md` §1 rows (TCP, `T=0`, BDX, LevelControl, device gaps)
+closed; `release.yml` unchanged. ADRs 0004, 0008, 0009 still describe
+the deprecated state (historical, a note each). Then: tag `v0.3.0` on
+`main` (owner or this session), delete the `wave7/*`, `planning/briefs-wave-7`,
+`wave/2026-10-12-tranche-7` branches and the `.claude/worktrees/wave7-*`
+worktrees.
