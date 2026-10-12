@@ -33,6 +33,12 @@ pseudo-version of `main`.
   no longer closes it under the handshake (matter.js counts the unsecured
   session on the channel). The session the handshake establishes is bound to
   the connection when the handshake completes, not at its first message.
+- The first chunk of a chunked ongoing report that the peer never
+  acknowledges is peer loss, as an unchunked report's message already was:
+  its counter is registered with the report's exchange as soon as it is sent,
+  not once the whole report is out, so the peer's earlier sessions close and
+  their subscriptions with them (matter.js `MessageExchange.send` →
+  `peerLost`). A later chunk's loss is unchanged.
 
 ## [0.3.0] — 2026-10-12
 

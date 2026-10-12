@@ -4,6 +4,7 @@
 package bridge
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -270,5 +271,228 @@ func TestReportPeerLoss_OnlyFirstMessageOfExchange(t *testing.T) {
 	b.rememberReportExchange(1, 7, 10)
 	if _, ok := b.reportExchangeOrigins.Load(key); ok {
 		t.Fatal("origin of a replaced report exchange kept")
+	}
+}
+
+// threeChunkReport is an ongoing report for subID that splits into three
+// UDP chunks.
+func threeChunkReport(t *testing.T, subID uint32) im.ReportData {
+	t.Helper()
+	report := im.ReportData{HasSubscription: true, SubscriptionID: subID}
+	for i := range 3 {
+		report.Reports = append(report.Reports, im.AttributeReport{
+			Path:  im.ConcreteAttributePath{Endpoint: 0, Cluster: 0x0028, Attribute: uint32(0x10 + i), HasEndpoint: true, HasCluster: true, HasAttribute: true},
+			Value: im.AttributeValue{Value: bytes.Repeat([]byte{byte('a' + i)}, 700)},
+		})
+	}
+	chunks, err := chunkReportData(report, udpChunkLimits.budget, udpChunkLimits.hardCap)
+	if err != nil || len(chunks) != 3 {
+		t.Fatalf("report splits into %d chunks (%v), want 3", len(chunks), err)
+	}
+	return report
+}
+
+// chunkedReportPeer is a device with an unanswering peer of two sessions
+// (one carrying a subscription), a session of another peer, and the
+// ongoing report of that subscription about to be sent.
+type chunkedReportPeer struct {
+	dev        *resumeDevice
+	outbound   *outboundReliableTracker
+	target     subTarget
+	reportSub  uint32
+	reportSID  uint16
+	siblingSID uint16
+	otherSID   uint16
+	graceful   *atomic.Int32
+}
+
+func newChunkedReportPeer(t *testing.T, base uint16) *chunkedReportPeer {
+	t.Helper()
+	dev := startResumeDevice(t, newMemSubscriptionStore(), func(br *Bridge, _ *operational.Manager) {
+		br.AttachAckTracker(mrp.NewAckTracker(0))
+		// Long enough for the test to drive the first chunk to exhaustion
+		// while the send still waits for its StatusResponse.
+		br.chunkStatusResponseTimeoutOverride = 2 * time.Second
+	})
+	p := &chunkedReportPeer{dev: dev, graceful: &atomic.Int32{}, reportSID: base, siblingSID: base + 1, otherSID: base + 2}
+	dev.sessions.SetGracefulCloseNotifier(func(uint16, *channel.Session) { p.graceful.Add(1) })
+	silent, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = silent.Close() })
+	peerAddr, ok := silent.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		t.Fatalf("peer address %T", silent.LocalAddr())
+	}
+	for _, s := range []struct {
+		sid  uint16
+		peer uint64
+	}{{p.reportSID, resumeCtrlNode}, {p.siblingSID, resumeCtrlNode}, {p.otherSID, 0xD1D1D1D1}} {
+		if _, err := dev.sessions.OpenFromSigmaWithID(s.sid, resumeFabricIndex, resumeDeviceNode, s.peer, s.sid+0x100, nil, peerLossKeys(t)); err != nil {
+			t.Fatal(err)
+		}
+		dev.br.sessionPeerAddrs.Store(s.sid, peerAddr)
+	}
+	sub, err := dev.subs.Subscribe(subscription.SubscribeArgs{
+		FabricIndex: resumeFabricIndex, PeerNodeID: resumeCtrlNode, SessionID: p.reportSID,
+		MinIntervalFloor: 0, MaxIntervalCeiling: 3600, KeepSubscriptions: true,
+		AttributePaths: []im.ConcreteAttributePath{{Endpoint: 0, Cluster: 0x001F, Attribute: 0x0000}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.reportSub = sub.ID
+	p.target = subTarget{src: peerAddr, sessionID: p.reportSID, fabricIndex: resumeFabricIndex, subjectNodeID: resumeCtrlNode}
+	dev.br.routing.subTargets.Store(sub.ID, p.target)
+	dev.br.mu.RLock()
+	p.outbound = dev.br.outboundReliable
+	dev.br.mu.RUnlock()
+	if p.outbound == nil {
+		t.Fatal("no outbound-reliable tracker")
+	}
+	return p
+}
+
+// send starts the report and returns where its result lands.
+func (p *chunkedReportPeer) send(t *testing.T) <-chan error {
+	t.Helper()
+	done := make(chan error, 1)
+	report := threeChunkReport(t, p.reportSub)
+	go func() {
+		_, _, err := p.dev.br.sendInitiatedReport(p.target, report)
+		done <- err
+	}()
+	return done
+}
+
+// awaitPending waits until n messages are tracked for retransmission.
+func (p *chunkedReportPeer) awaitPending(t *testing.T, n int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for p.outbound.Pending() != n {
+		if time.Now().After(deadline) {
+			t.Fatalf("%d messages tracked, want %d", p.outbound.Pending(), n)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// exhaust drives every tracked message to its last retransmission.
+func (p *chunkedReportPeer) exhaust() {
+	now := time.Now()
+	for i := 0; i <= mrp.MaxRetransmissions+1; i++ {
+		p.dev.br.tickOutboundReliable(p.outbound, now.Add(time.Duration(i+1)*time.Hour))
+	}
+}
+
+// reportOrigin is the registered first message of the report's exchange.
+func (p *chunkedReportPeer) reportOrigin(t *testing.T) (mrp.ExchangeKey, reportExchangeOrigin) {
+	t.Helper()
+	var key mrp.ExchangeKey
+	var origin reportExchangeOrigin
+	found := false
+	p.dev.br.reportExchangeOrigins.Range(func(k, v any) bool {
+		key, _ = k.(mrp.ExchangeKey)
+		origin, _ = v.(reportExchangeOrigin)
+		found = key.SessionID == p.reportSID
+		return !found
+	})
+	if !found {
+		t.Fatal("the report's first message is not registered with its exchange")
+	}
+	return key, origin
+}
+
+// TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss: the first chunk of
+// a three-chunk ongoing report is never acknowledged while the send waits
+// for its StatusResponse. Its counter is the report exchange's from the
+// moment it is sent, so its exhaustion is peer loss (matter.js
+// MessageExchange.ts:605-624 send → peerLost when #reportsPeerLoss,
+// :626-633): the peer's sessions established before the report are closed
+// without a CloseSession, its subscription with them, and a later session
+// of the peer and another peer's session survive. The other two chunks are
+// never sent.
+func TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss(t *testing.T) {
+	t.Parallel()
+	p := newChunkedReportPeer(t, 0x1201)
+	done := p.send(t)
+	p.awaitPending(t, 1)
+	p.reportOrigin(t)
+	time.Sleep(time.Millisecond)
+	const laterSID = uint16(0x1281)
+	if _, err := p.dev.sessions.OpenFromSigmaWithID(laterSID, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode, laterSID+0x100, nil, peerLossKeys(t)); err != nil {
+		t.Fatal(err)
+	}
+
+	p.exhaust()
+
+	for _, sid := range []uint16{p.reportSID, p.siblingSID} {
+		if _, err := p.dev.sessions.Get(sid); !errors.Is(err, operational.ErrSessionNotFound) {
+			t.Errorf("session %#x after the loss: %v, want ErrSessionNotFound", sid, err)
+		}
+	}
+	for _, sid := range []uint16{laterSID, p.otherSID} {
+		if _, err := p.dev.sessions.Get(sid); err != nil {
+			t.Errorf("session %#x must survive: %v", sid, err)
+		}
+	}
+	if _, err := p.dev.subs.Get(p.reportSub); err == nil {
+		t.Error("the subscription of the lost peer is still open")
+	}
+	if n := p.graceful.Load(); n != 0 {
+		t.Errorf("CloseSession sent %d times to a lost peer, want 0", n)
+	}
+	err := <-done
+	if err == nil {
+		t.Fatal("the report's send succeeded without a StatusResponse")
+	}
+	// The reporter's failure count does not resurrect the reaped subscription.
+	p.dev.br.noteSubscriptionSendError(p.reportSub, "report", err)
+	if _, counted := p.dev.br.subSendErrorCount.Load(p.reportSub); counted {
+		t.Error("a send failure counted against a reaped subscription")
+	}
+	if n := p.outbound.Pending(); n != 0 {
+		t.Errorf("%d later chunks sent after the first went unanswered", n)
+	}
+	found := false
+	p.dev.br.reportExchangeOrigins.Range(func(_, _ any) bool { found = true; return false })
+	if found {
+		t.Error("the failed report's exchange origin was kept")
+	}
+}
+
+// TestChunkedReportLaterChunkUnacknowledged: the first chunk is
+// acknowledged and answered, the second never acknowledged. As before
+// this change, a later chunk's counter is not owned while the report is
+// being sent (the reporter registers the counters once the whole report
+// is out, subscribe.go reportSubscription), so its exhaustion closes
+// neither the subscription nor any session — the peer answered on the
+// exchange (matter.js #reportsPeerLoss, MessageExchange.ts:626-633) — and
+// the send ends with the StatusResponse wait's timeout, which the
+// reporter counts as one send failure (noteSubscriptionSendError).
+func TestChunkedReportLaterChunkUnacknowledged(t *testing.T) {
+	t.Parallel()
+	p := newChunkedReportPeer(t, 0x1301)
+	done := p.send(t)
+	p.awaitPending(t, 1)
+	key, origin := p.reportOrigin(t)
+	p.outbound.Ack(p.reportSID, origin.firstCounter)
+	p.dev.br.releaseReportCounter(p.reportSID, origin.firstCounter)
+	p.dev.br.signalStatusResponseRX(key.SessionID, key.ExchangeID, true, im.StatusSuccess)
+	p.awaitPending(t, 1) // the second chunk
+
+	p.exhaust()
+
+	for _, sid := range []uint16{p.reportSID, p.siblingSID, p.otherSID} {
+		if _, err := p.dev.sessions.Get(sid); err != nil {
+			t.Errorf("session %#x closed by a later chunk's loss: %v", sid, err)
+		}
+	}
+	if _, err := p.dev.subs.Get(p.reportSub); err != nil {
+		t.Errorf("subscription closed by a later chunk's loss: %v", err)
+	}
+	if err := <-done; !errors.Is(err, errChunkUnanswered) {
+		t.Fatalf("send = %v, want the StatusResponse wait's timeout", err)
 	}
 }

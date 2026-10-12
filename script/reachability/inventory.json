@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4442,
+  "entry_points": 4444,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10425,
+    "total_exported": 10427,
     "reachable": 7348,
-    "whitelisted": 3072,
+    "whitelisted": 3074,
     "unreachable": 5
   },
   "by_package": [
@@ -1270,6 +1270,20 @@
       "identifier": "TestChunkReportData_SuppressResponseRidesLastChunk",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_test.go",
+      "line": 474
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
+      "line": 416
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestChunkedReportLaterChunkUnacknowledged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
       "line": 474
     },
     {
@@ -3307,14 +3321,14 @@
       "identifier": "TestInitiatedExchangePeerLoss_ForceClosesPeerSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 45
+      "line": 46
     },
     {
       "package": "bridge",
       "identifier": "TestInitiatedPeerLoss_UnknownExchangeIsNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 128
+      "line": 129
     },
     {
       "package": "bridge",
@@ -4308,14 +4322,14 @@
       "identifier": "TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 149
+      "line": 150
     },
     {
       "package": "bridge",
       "identifier": "TestReportPeerLoss_OnlyFirstMessageOfExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 251
+      "line": 252
     },
     {
       "package": "bridge",
