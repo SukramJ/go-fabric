@@ -25,14 +25,16 @@ pseudo-version of `main`.
   v0.2.0 `matter_group_key_map` rebuild without that foreign key (the
   `store.Upgrade` step, which now runs the same text), `v4` the v0.3.0
   `matter_ota_default_providers`. Each step's `Down` drops what it added,
-  `v3`'s rebuilds the foreign key. A host embeds the steps in order and
+  `v3`'s rebuilds the foreign key and drops the GroupKeyMap entries that
+  name a key set that does not exist. A host embeds the steps in order and
   pins `len(Migrations())` (4) and the last version (`v4`); a test applies
   the list to one database and `store.Apply` to another and compares
   their `sqlite_schema`, so the list and `store.Schema()` cannot drift.
   `store.Schema`, `store.Apply` and `store.Upgrade` are unchanged.
 - `store.SchemaFingerprint(ctx, db)`: SHA-256 of the database's matter_*
-  schema (the tables `store.Schema()` creates and their indexes, statements
-  normalised), so a host that carries the schema itself can compare it with
+  schema (the tables `store.Schema()` creates, the indexes its DDL declares
+  and those tables' automatic indexes, statements normalised; a host's own
+  index on one of these tables does not count), so a host that carries the schema itself can compare it with
   the release's at column and constraint level. This release, after
   `store.Apply`:
   `924e777a63a110753483a2dd08fb61c19bc5b9f96f09271b1bd265b9212bd924`.

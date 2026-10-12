@@ -140,8 +140,9 @@ func TestSchemaFingerprintRelease(t *testing.T) {
 	}
 }
 
-// TestSchemaFingerprintIgnoresOtherTablesAndRows: a host's own table and
-// the rows do not move the fingerprint; a changed column does.
+// TestSchemaFingerprintIgnoresOtherTablesAndRows: a host's own table, its
+// own index on a module table and the rows do not move the fingerprint; a
+// changed column or a dropped declared index does.
 func TestSchemaFingerprintIgnoresOtherTablesAndRows(t *testing.T) {
 	t.Parallel()
 	db := openTestDB(t)
@@ -157,6 +158,21 @@ func TestSchemaFingerprintIgnoresOtherTablesAndRows(t *testing.T) {
 	}
 	if got := fingerprint(t, db); got != base {
 		t.Errorf("fingerprint moved with host tables and rows: %s → %s", base, got)
+	}
+	// A host's own index on one of the module's tables is the host's.
+	if _, err := db.ExecContext(t.Context(), `CREATE INDEX host_fabrics_label ON matter_fabrics(label)`); err != nil {
+		t.Fatal(err)
+	}
+	if got := fingerprint(t, db); got != base {
+		t.Errorf("fingerprint moved with a host index on matter_fabrics: %s → %s", base, got)
+	}
+	// Dropping an index the module declares does move it.
+	other := openTestDB(t)
+	if _, err := other.ExecContext(t.Context(), `DROP INDEX matter_acl_position`); err != nil {
+		t.Fatal(err)
+	}
+	if got := fingerprint(t, other); got == base {
+		t.Error("fingerprint did not move with a declared index dropped")
 	}
 	if _, err := db.ExecContext(t.Context(), `ALTER TABLE matter_settings ADD COLUMN extra TEXT`); err != nil {
 		t.Fatal(err)

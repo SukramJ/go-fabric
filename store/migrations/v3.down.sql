@@ -2,8 +2,9 @@
 -- Copyright (C) 2026 SukramJ.
 --
 -- Reverts v3: rebuilds matter_group_key_map with the foreign key into
--- matter_group_keys again (v1's definition). An entry naming a key set
--- that does not exist cannot satisfy that key and is dropped.
+-- matter_group_keys again (v1's definition). This step is lossy: an
+-- entry naming a key set that does not exist cannot satisfy that key and
+-- is dropped, rather than failing the step.
 
 CREATE TABLE matter_group_key_map_rebuild (
     fabric_index        INTEGER NOT NULL,

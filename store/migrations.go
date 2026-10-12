@@ -10,8 +10,10 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
+	"sync"
 )
 
 //go:embed migrations/*.sql
@@ -31,7 +33,10 @@ type Migration struct {
 	// Up moves a database from the previous step to this one.
 	Up string
 	// Down reverts Up. It is DROP TABLE for an additive step and the
-	// reverse rebuild for a rebuild.
+	// reverse rebuild for a rebuild. v3's Down is lossy: it restores the
+	// foreign key from matter_group_key_map into matter_group_keys, so a
+	// GroupKeyMap entry naming a key set that does not exist is dropped
+	// rather than failing the step.
 	Down string
 }
 
@@ -73,30 +78,28 @@ func mustMigrationFile(name string) string {
 	return string(b)
 }
 
-// schemaTables are the tables [Schema] creates. [SchemaFingerprint] hashes
-// these and their indexes only, so a host's own tables in the same
-// database (endpoint/sqlitestore's matter_endpoints among them) do not move
-// it. TestSchemaTablesAreTheSchemas holds the list against [Apply].
-var schemaTables = []string{
-	"matter_acl_entries",
-	"matter_diagnostics",
-	"matter_fabrics",
-	"matter_group_key_map",
-	"matter_group_keys",
-	"matter_group_table",
-	"matter_groupcast_groups",
-	"matter_metadata",
-	"matter_node_identities",
-	"matter_ota_default_providers",
-	"matter_persistent_subscriptions",
-	"matter_resumption",
-	"matter_server_subscriptions",
-	"matter_settings",
-}
+// schemaObjects are the tables and indexes [Schema] declares, by name,
+// read from the embedded DDL itself so the fingerprint follows the file
+// with no second list to keep. [SchemaFingerprint] hashes these only: a
+// host's own tables and its own indexes on these tables do not move it.
+var schemaObjects = sync.OnceValues(func() (tables, indexes map[string]bool) {
+	tables, indexes = map[string]bool{}, map[string]bool{}
+	for _, m := range schemaObjectRE.FindAllStringSubmatch(schemaDDL, -1) {
+		if m[1] == "TABLE" {
+			tables[m[2]] = true
+		} else {
+			indexes[m[2]] = true
+		}
+	}
+	return tables, indexes
+})
+
+var schemaObjectRE = regexp.MustCompile(`(?m)^CREATE (TABLE|(?:UNIQUE )?INDEX) IF NOT EXISTS (\w+)`)
 
 // SchemaFingerprint returns the SHA-256, hex-encoded, of db's matter_*
-// schema: every table [Schema] creates and every index on one, as
-// sqlite_schema records them (type, name, table, and the CREATE statement
+// schema: every table [Schema] creates, every index its DDL declares by
+// name and the automatic indexes SQLite derives from those tables' own
+// PRIMARY KEY / UNIQUE constraints, as sqlite_schema records them (type, name, table, and the CREATE statement
 // normalised — identifier quotes dropped, whitespace collapsed — so a table
 // rebuilt and renamed hashes like one created under its name). Rows and
 // other tables do not count.
@@ -104,7 +107,9 @@ var schemaTables = []string{
 // After [Apply] it is the release's value, recorded in the CHANGELOG; a
 // host that carries the schema through its own migrations compares its
 // database's fingerprint with that value to know its tables match this
-// release's at column and constraint level, not only by name.
+// release's at column and constraint level, not only by name. An index a
+// host adds on one of these tables, another table and the rows do not
+// count.
 func SchemaFingerprint(ctx context.Context, db *sql.DB) (string, error) {
 	rows, err := schemaRows(ctx, db)
 	if err != nil {
@@ -128,7 +133,7 @@ func schemaRows(ctx context.Context, db *sql.DB) ([]string, error) {
 		if err := rs.Scan(&typ, &name, &tbl, &ddl); err != nil {
 			return nil, fmt.Errorf("matter store: read schema: %w", err)
 		}
-		if !slices.Contains(schemaTables, tbl) {
+		if !inSchema(typ, name, tbl) {
 			continue
 		}
 		out = append(out, typ+"|"+name+"|"+tbl+"|"+normaliseDDL(ddl))
@@ -138,6 +143,20 @@ func schemaRows(ctx context.Context, db *sql.DB) ([]string, error) {
 	}
 	slices.Sort(out)
 	return out, nil
+}
+
+// inSchema reports whether a sqlite_schema row belongs to the module's
+// DDL: one of its tables, one of its named indexes, or an automatic index
+// of one of its tables.
+func inSchema(typ, name, tbl string) bool {
+	tables, indexes := schemaObjects()
+	switch typ {
+	case "table":
+		return tables[name]
+	case "index":
+		return indexes[name] || tables[tbl] && strings.HasPrefix(name, "sqlite_autoindex_"+tbl+"_")
+	}
+	return false
 }
 
 // normaliseDDL drops identifier quotes and collapses whitespace, with none
