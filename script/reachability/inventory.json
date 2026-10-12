@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4435,
+  "entry_points": 4439,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10419,
+    "total_exported": 10422,
     "reachable": 7348,
-    "whitelisted": 3066,
+    "whitelisted": 3069,
     "unreachable": 5
   },
   "by_package": [
@@ -1271,6 +1271,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/im_gate_test.go",
       "line": 16
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCloseFabricSessionsExcept_TellsEachOtherSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_session_close_test.go",
+      "line": 44
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCloseFabricSessionsExcept_WithoutCapability",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_session_close_test.go",
+      "line": 152
     },
     {
       "package": "bridge",
@@ -2874,6 +2888,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/fabric_removed_sessions_test.go",
       "line": 38
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestEmitFabricRemovedContext_InvokingSessionLast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_session_close_test.go",
+      "line": 96
     },
     {
       "package": "bridge",

@@ -10,6 +10,22 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `bridge.Bridge.CloseFabricSessionsExcept(fabricIndex, exceptSessionID)`:
+  ends every session of a fabric but one, telling each peer with a
+  CloseSession first — the UpdateNOC path (matter.js `Fabric.replaced`).
+  `node` calls it after UpdateNOC instead of closing the sessions silently.
+
+### Changed
+
+- RemoveFabric tells every other session of the removed fabric with a
+  Secure-Channel CloseSession before they close (matter.js `Fabric.leave`);
+  the session that carried the command still closes after its response,
+  without one, as in matter.js. A host on `EmitFabricRemovedContext` gets
+  this without a change; the peer address comes from the bridge's session
+  routes and the fabric from the `SessionLookup`'s `SessionFabricResolver`.
+
 ## [0.3.0] — 2026-10-12
 
 **What a host must do.** Upgrading from `v0.2.x` needs a source change only

@@ -298,7 +298,8 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 
 // fabricUpdated is OperationalCredentials' OnFabricUpdated
 // (main.go:387-406): UpdateNOC moves the CASE identity and the
-// operational record, and ends the fabric's other sessions.
+// operational record, and ends the fabric's other sessions, each told
+// with a CloseSession (Bridge.CloseFabricSessionsExcept).
 func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 	oldCompressed, oldNode, hadOld := n.caseIDs.announceIdentity(fabricIndex)
 	if err := n.caseIDs.load(ctx, n.st, fabricIndex); err != nil {
@@ -311,7 +312,7 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 		}
 		n.br.AnnounceFabric(ctx, newCompressed, newNode)
 	}
-	n.sec.sessions.CloseFabricExcept(fabricIndex, mattercore.InvokeSessionIDFromContext(ctx))
+	n.br.CloseFabricSessionsExcept(fabricIndex, mattercore.InvokeSessionIDFromContext(ctx))
 }
 
 // Start brings the node online: the bridge starts, and the daemon's
