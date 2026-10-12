@@ -107,9 +107,12 @@ pseudo-version of `main`.
   the Sink. Once it consented, a write stores its value on the state as it
   is then and reruns the reconcile there; when the companions it computes
   differ from the ones the Sink was told about, the recomputed ones are
-  stored and `matter.thermostat.sink_companions_moved` is logged. A
-  SetpointRaiseLower stores what it moved as the Sink saw it and leaves a
-  setpoint it did not move as the host stored it.
+  stored and `matter.thermostat.sink_companions_moved` is logged. The
+  Sink is told the written setpoint as the reconcile leaves it — the value
+  the server stores — rather than the value the controller wrote (the two
+  are equal for every write the limits admit). A SetpointRaiseLower stores
+  what it moved as the Sink saw it and leaves a setpoint it did not move
+  as the host stored it.
 - RemoveFabric tells every other session of the removed fabric with a
   Secure-Channel CloseSession before they close (matter.js `Fabric.leave`);
   the session that carried the command still closes after its response,

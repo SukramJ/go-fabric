@@ -74,6 +74,15 @@ func (st *setpointState) assign(attrID uint32, v int) {
 	}
 }
 
+// value is the occupied setpoint attrID (OccupiedHeatingSetpoint or
+// OccupiedCoolingSetpoint).
+func (st *setpointState) value(attrID uint32) int {
+	if attrID == thermoAttrOccupiedHeatingSetpoint {
+		return st.occupHeat
+	}
+	return st.occupCool
+}
+
 // commit stores st and returns the attributes whose value it changed.
 func (s *ThermostatServer) commitSetpoints(st setpointState) []uint32 {
 	var changed []uint32

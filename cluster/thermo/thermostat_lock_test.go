@@ -202,3 +202,41 @@ func TestSinkCompanionsRecomputedOnTheReReadState(t *testing.T) {
 		})
 	}
 }
+
+// TestSinkHearsTheValueTheServerStores: the Sink is told the written
+// setpoint as the reconcile leaves it — the value the server stores — and
+// the companions the reconcile moves. The row is the reconcile case
+// "cooling setpoint inside the deadband pushes the heating setpoint"
+// (TestParityMatterJS_Thermostat_ReconcileSequences): cool 21.00 °C pushes
+// heat to 19.00 °C under the 2.0 °C deadband.
+//
+// No occupied-setpoint write is pinned to another value of itself: within
+// the limits the assert admits, moving it needs v + deadband above
+// MaxCoolSetpointLimit (or v − deadband below MinHeatSetpointLimit), which
+// the deadband between the user limits rules out, and a reconcile that
+// cannot fit refuses the write instead. So value equals the written value
+// here, and the stored value equals what the Sink was told.
+func TestSinkHearsTheValueTheServerStores(t *testing.T) {
+	t.Parallel()
+	sink := &recordingThermoSink{}
+	srv := newSinkHeatCool(sink)
+	if err := srv.MatterWrite(context.Background(), tdef.AttrOccupiedCoolingSetpoint, int16(2100)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	calls := sink.recorded()
+	if len(calls) != 1 {
+		t.Fatalf("Sink calls %+v, want one", calls)
+	}
+	c := calls[0]
+	stored := readSetpoint(t, srv, tdef.AttrOccupiedCoolingSetpoint, "cool")
+	if c.attrID != tdef.AttrOccupiedCoolingSetpoint || c.value != stored || stored != 2100 {
+		t.Errorf("Sink told 0x%04X=%d, stored %d, want both 2100", c.attrID, c.value, stored)
+	}
+	want := []thermo.SetpointChange{{AttrID: tdef.AttrOccupiedHeatingSetpoint, Value: 1900}}
+	if len(c.companions) != 1 || c.companions[0] != want[0] {
+		t.Errorf("companions %v, want %v", c.companions, want)
+	}
+	if got := readSetpoint(t, srv, tdef.AttrOccupiedHeatingSetpoint, "heat"); got != 1900 {
+		t.Errorf("OccupiedHeatingSetpoint = %d, want 1900", got)
+	}
+}

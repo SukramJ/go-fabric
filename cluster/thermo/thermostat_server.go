@@ -146,10 +146,10 @@ type ThermostatConfig struct {
 // the Sink consented, the server stores on the state as it is then: the
 // value the Sink consented to, over whatever an inbound setter stored for
 // that attribute meanwhile, and — for a write — the companions the
-// reconcile computes on that state. When those differ from the
-// companions the Sink was told about (an inbound setter moved a setpoint
-// while the Sink ran), the recomputed ones are stored and the server logs
-// matter.thermostat.sink_companions_moved. The cover server's Mover
+// reconcile computes on that state. When those, or the written setpoint
+// itself, differ from what the Sink was told (an inbound setter moved a
+// setpoint while the Sink ran), the recomputed values are stored and the
+// server logs matter.thermostat.sink_companions_moved. The cover server's Mover
 // follows the same rule (cluster/cover windowcovering_server.go
 // invokeMover).
 type Sink interface {
@@ -158,8 +158,10 @@ type Sink interface {
 	// SetSetpoint is a change of OccupiedHeatingSetpoint or
 	// OccupiedCoolingSetpoint (attrID) to value, with companions: the
 	// other attributes that move with it, computed but not yet stored.
-	// For a write they are what the reconcile would move (matter.js
-	// #reconcileSetpoints). A SetpointRaiseLower makes one call: in Both
+	// For a write, value is the written setpoint after the reconcile
+	// (matter.js #reconcileSetpoints) — the value the server will store,
+	// should the reconcile ever pin it elsewhere than the controller
+	// wrote — and the companions are what the reconcile moves besides it. A SetpointRaiseLower makes one call: in Both
 	// mode on a HEAT+COOL thermostat the cooling setpoint is the primary
 	// and the heating setpoint its companion (matter.js assigns cooling
 	// first, ThermostatServer.ts:218-219); when only one of them moves it
@@ -630,11 +632,18 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		s.mu.Unlock()
 		return coupled, nil
 	}
+	// The Sink hears the value the server will store: the written
+	// setpoint after the reconcile, not the value the controller wrote.
+	// Within the limits the assert admitted the reconcile never moves it
+	// (moving it needs v + deadband above MaxCool or v - deadband below
+	// MinHeat, which the deadband between the user limits rules out), so
+	// in practice the two are equal; the rule is the one the Sink states.
+	primary := st.value(attrID)
 	saw := withoutChange(setpointDiff(cur, st), attrID)
 	s.mu.Unlock()
 
-	if err := s.sink.SetSetpoint(ctx, attrID, int16(v), saw); err != nil { //nolint:gosec // an int16 per ValidateWrite
-		return nil, sinkError(fmt.Sprintf("setpoint 0x%04X = %d", attrID, v), err)
+	if err := s.sink.SetSetpoint(ctx, attrID, int16(primary), saw); err != nil { //nolint:gosec // reconciled values stay within the int16 absolute limits
+		return nil, sinkError(fmt.Sprintf("setpoint 0x%04X = %d", attrID, primary), err)
 	}
 
 	s.mu.Lock()
@@ -643,20 +652,23 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	// while the Sink ran. The consented value goes onto it and the
 	// reconcile computes the companions afresh; the limits cannot have
 	// moved (only writes change them, and writes wait in s.op).
+	// The re-run starts from the value the Sink consented to; should it
+	// move that value too, the recomputed one is stored and logged with
+	// the companions — the host's own state is the truth.
 	now := s.setpointState()
 	next := now
-	next.assign(attrID, v)
+	next.assign(attrID, primary)
 	if err := next.reconcile(t.key); err != nil {
 		// The written value passed the same limits before the Sink ran, so
 		// the reconcile fits it on any setpoint the setters can store;
 		// should it not, the state the Sink consented to is stored.
 		slog.Default().Warn("matter.thermostat.sink_reconcile_failed",
-			slog.Uint64("attribute", uint64(attrID)), slog.Int("value", v), slog.String("reason", err.Error()))
+			slog.Uint64("attribute", uint64(attrID)), slog.Int("value", primary), slog.String("reason", err.Error()))
 		next = st
 	}
-	if moved := companionsMoved(st, next, saw, withoutChange(setpointDiff(now, next), attrID)); len(moved) > 0 {
+	if moved := companionsMoved(attrID, st, next, saw, withoutChange(setpointDiff(now, next), attrID)); len(moved) > 0 {
 		attrs := make([]any, 0, len(moved)+2)
-		attrs = append(attrs, slog.Uint64("attribute", uint64(attrID)), slog.Int("value", v))
+		attrs = append(attrs, slog.Uint64("attribute", uint64(attrID)), slog.Int("value", primary))
 		for _, c := range moved {
 			attrs = append(attrs, slog.Int(fmt.Sprintf("0x%04X", c.AttrID), int(c.Value)))
 		}
@@ -687,13 +699,14 @@ func withoutChange(changes []SetpointChange, attrID uint32) []SetpointChange {
 	return out
 }
 
-// companionsMoved lists, with the value that will be stored, every
-// companion — one the Sink was told about (saw) or one the reconcile
-// moves on the re-read state (recomputed) — whose stored value differs
-// from the one the Sink's call assumed (st). A host that echoed a
-// companion makes no difference; one that stored another value does.
-func companionsMoved(st, next setpointState, saw, recomputed []SetpointChange) []SetpointChange {
-	named := map[uint32]bool{}
+// companionsMoved lists, with the value that will be stored, the written
+// setpoint (attrID) and every companion — one the Sink was told about
+// (saw) or one the reconcile moves on the re-read state (recomputed) —
+// whose stored value differs from the one the Sink's call assumed (st). A
+// host that echoed a companion makes no difference; one that stored
+// another value does.
+func companionsMoved(attrID uint32, st, next setpointState, saw, recomputed []SetpointChange) []SetpointChange {
+	named := map[uint32]bool{attrID: true}
 	for _, c := range saw {
 		named[c.AttrID] = true
 	}
