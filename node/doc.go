@@ -48,5 +48,6 @@
 // handlers; a host that set the cluster hooks the facade wires
 // (OperationalCredentials SetOnFabricRemoved / SetOnFabricUpdated,
 // GeneralCommissioning SetOnCommissioningComplete, the window's
-// SetTransitionHook) would replace the facade's wiring.
+// SetTransitionHook) would replace the facade's wiring. A window with
+// credentials other than the configured ones is [Node.OpenBasicWindow].
 package node

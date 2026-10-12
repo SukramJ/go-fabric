@@ -46,6 +46,15 @@ pseudo-version of `main`.
   error or panic is logged, not returned. A host no longer replaces the
   facade's OperationalCredentials, GeneralCommissioning or window hooks to
   follow these events.
+- `node.Node.OpenBasicWindow(ctx, node.WindowCredentials)` (issue #58): the
+  node's own commissioning window with per-window credentials
+  (discriminator, passcode, PBKDF iterations and salt, timeout) — the
+  ephemeral-window pattern. PASE runs against a verifier computed from them,
+  the node is advertised CM=1 under the window's discriminator, and once the
+  window closes the configured credentials are back (a node without a fabric
+  reopens its own window under the configured discriminator). matter.js has
+  no per-window basic credentials; this is a facade extension, not a cluster
+  path.
 
 ### Changed
 
