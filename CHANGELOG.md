@@ -12,6 +12,19 @@ pseudo-version of `main`.
 
 ## [0.3.0] — 2026-10-12
 
+**What a host must do.** Upgrading from `v0.2.x` needs a source change only
+where a host still names what `v0.2.0` announced for removal: `wire.Groups`
+(configure `endpoint.Config.Groups`; the assembler mounts the real server),
+`im.StatusUnreportableAttr` / `im.StatusNoUpstreamSubscription` (no
+replacement; the codes left the spec), and the `PersistentSubscription*`
+store API (server-side subscription resumption, ADR 0008, needs none). The
+`matter_persistent_subscriptions` table stays in the schema, so an existing
+database opens unchanged. Everything else in this release is additive: the
+device layer `device/`, the node facade `node/`, `cluster/onoff.Server`,
+TCP, BDX and the OTA requestor, `bridgetest.Commissioner`. A host on
+`contract.EndpointSource` keeps working; the reference daemon shows the
+move to `node.New` and `device.New<Type>`.
+
 **ColorControl serves every feature matter.js implements; ExtendedColorLight
 is servable.** A CT-only host keeps working unchanged: a
 `light.ColorControlServerConfig` without `Features` is CT only, serves the

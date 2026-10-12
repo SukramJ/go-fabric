@@ -65,9 +65,9 @@ through which the test-support packages reach package internals
 unimportable from outside. Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
-Depend freely on `bootid/`, `bridge/`, `cluster/…`, `commissioning/`,
+Depend freely on `bdx/`, `bootid/`, `bridge/`, `cluster/…`, `commissioning/`,
 `contract/`, `device/`, `diagevent/`, `eligibility/`, `endpoint/` (including
-`endpoint/sqlitestore`), `im/`, `im/subscription`, `mdns/`, `node/`,
+`endpoint/sqlitestore`), `groups/`, `im/`, `im/subscription`, `mdns/`, `node/`,
 `parity/`, `schema/`, `secure/…`, `store/`, `tlv/` and `transport/…`. The
 device layer `device/` and the node facade `node/` are public API since
 `v0.3.0`; that release freezes nothing, and the `v1.0.0` freeze is still
