@@ -129,15 +129,18 @@ func WithServer(srv contract.ClusterServer) Option {
 }
 
 // WithChangeNotifier makes the device's endpoint source a
-// [contract.ChangeNotifier] that fires whenever n fires: the host's own
-// model telling the bridge that state its servers read through a host
-// port (valve.StateSource, modeselect.ModeSource, …) has moved, so the
-// endpoint's reportable attributes are reported. It is the Go form of a
-// matter.js host setting behavior state from its own device events,
-// whose Datasource then reports the change (packages/node/src/behavior/
-// state/managed/Datasource.ts). Without it a device whose servers hold no
-// state of their own changes silently for a subscriber. A later call
-// replaces an earlier one; nil leaves the source without one.
+// [contract.ChangeNotifier] that fires whenever n fires: the host-model
+// relay, the host's own model telling the bridge that state its servers
+// read through a host port (valve.StateSource, modeselect.ModeSource, …)
+// has moved, so the endpoint's reportable attributes are reported. It is
+// the Go form of a matter.js host setting behavior state from its own
+// device events, whose Datasource then reports the change
+// (packages/node/src/behavior/state/managed/Datasource.ts). A server that
+// notifies its own changes ([contract.ChangeNotifier] or
+// [contract.AttributeChangeNotifier]) is heard by the bridge without it;
+// the relay is for a host model whose servers do not forward its
+// notifications. A later call replaces an earlier one; nil leaves the
+// source without one.
 func WithChangeNotifier(n contract.ChangeNotifier) Option {
 	return func(s *settings) { s.notifier = n }
 }

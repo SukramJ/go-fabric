@@ -1093,8 +1093,10 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 }
 
 // wireMeasurementListenersLocked binds every bridged endpoint whose
-// Measurement source implements [contract.ChangeNotifier] to
-// the subscription manager's OnAttributeChanged hook. On a value push
+// Source or Measurement implements [contract.ChangeNotifier] — and then
+// every mounted cluster server of the endpoint that does, whether or not
+// the source notifies — to the subscription manager's OnAttributeChanged
+// hook. On a value push
 // from the CCU the notifier fires, the bridge marks every
 // (endpoint, cluster, attribute) path advertised by the cluster
 // server's MatterReportable() set dirty, and the manager's next tick
@@ -1159,52 +1161,52 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 		if !ok && ep.Measurement != nil {
 			notifier, ok = ep.Measurement.(contract.ChangeNotifier)
 		}
-		if !ok {
-			continue
-		}
-		notifierOK++
 		paths := endpointpkg.ReportablePaths(ep)
 		if len(paths) == 0 {
 			continue
 		}
-		// Narrow the dirty-mark set to the paths that BELONG to the
-		// firing source's own cluster. The notifier reports "my value
-		// changed" — it does not say "every cluster on this endpoint
-		// changed". Marking the full reportable-path set dirty makes
-		// every STATE flip emit a 5-attribute report (OnOff +
-		// Identify.IdentifyTime + Descriptor.PartsList +
-		// BridgedDeviceBasicInformation.{Reachable,NodeLabel}) where
-		// only OnOff actually moved. Apple Home's HMOutlet treats
-		// such bursty same-DataVersion reports as noisy and
-		// suppresses the UI refresh. matter.js ships one attribute
-		// report per real cluster-attribute change; mirror that.
-		pathSet := filterPathsByNotifierCluster(notifier, paths)
-		if len(pathSet) == 0 {
-			// Defensive — if no path survives the filter the notifier
-			// would fire to no effect. Leaving it un-wired keeps the
-			// per-endpoint listener count diagnostic honest.
-			continue
-		}
-		withPaths++
-		b.wireMeasurementNotifier(mgr, ep, notifier, pathSet)
-
-		// A metering switch hosts sub-cluster servers (ElectricalPower /
-		// ElectricalEnergy) backed by sibling meter-channel sensors, in
-		// ADDITION to its primary OnOff. The primary notifier above only
-		// marks its own cluster's paths (filterPathsByNotifierCluster), so
-		// wire each remaining notifier-capable cluster server to its own
-		// cluster's reportable paths — otherwise a POWER / ENERGY_COUNTER
-		// push never reaches a controller as a proactive report.
 		primaryCluster := uint32(0)
-		if srv, isSrv := notifier.(contract.ClusterServer); isSrv {
-			primaryCluster = srv.MatterClusterID()
+		if ok {
+			notifierOK++
+			// Narrow the dirty-mark set to the paths that BELONG to the
+			// firing source's own cluster. The notifier reports "my value
+			// changed" — it does not say "every cluster on this endpoint
+			// changed". Marking the full reportable-path set dirty makes
+			// every STATE flip emit a 5-attribute report (OnOff +
+			// Identify.IdentifyTime + Descriptor.PartsList +
+			// BridgedDeviceBasicInformation.{Reachable,NodeLabel}) where
+			// only OnOff actually moved. Apple Home's HMOutlet treats
+			// such bursty same-DataVersion reports as noisy and
+			// suppresses the UI refresh. matter.js ships one attribute
+			// report per real cluster-attribute change; mirror that.
+			if pathSet := filterPathsByNotifierCluster(notifier, paths); len(pathSet) > 0 {
+				withPaths++
+				b.wireMeasurementNotifier(mgr, ep, notifier, pathSet)
+			}
+			if srv, isSrv := notifier.(contract.ClusterServer); isSrv {
+				primaryCluster = srv.MatterClusterID()
+			}
 		}
+
+		// Then every mounted cluster server that notifies its own changes
+		// — whether or not the source notifies: matter.js reports a
+		// change of any behavior's state through that behavior's own
+		// Datasource (packages/node/src/behavior/state/managed/
+		// Datasource.ts:690-710, onChange then the $Changed events), so a
+		// server need not be relayed by its source to be heard. A metering
+		// switch hosts sub-cluster servers (ElectricalPower /
+		// ElectricalEnergy) backed by sibling meter-channel sensors in
+		// addition to its primary OnOff; a device-layer device mounts
+		// host servers that forward their port's notifier. Each is wired
+		// to its own cluster's reportable paths. A server that is the
+		// source's notifier itself, or serves the source's own cluster, is
+		// subscribed once, above.
 		for _, srv := range endpointpkg.ClusterServers(ep) {
 			if srv == nil || srv.MatterClusterID() == primaryCluster {
 				continue
 			}
 			subNotifier, isNotifier := srv.(contract.ChangeNotifier)
-			if !isNotifier {
+			if !isNotifier || (ok && sameNotifier(subNotifier, notifier)) {
 				continue
 			}
 			subPaths := filterPathsByNotifierCluster(subNotifier, paths)
@@ -1357,6 +1359,20 @@ func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpoint
 		unsub = func() {}
 	}
 	b.measurementUnsubscribers = append(b.measurementUnsubscribers, unsub)
+}
+
+// sameNotifier reports whether a and b are the same notifier — the
+// source that is also one of its endpoint's cluster servers. Notifiers of
+// a type that cannot be compared are never the same.
+func sameNotifier(a, b contract.ChangeNotifier) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	ta := reflect.TypeOf(a)
+	if ta != reflect.TypeOf(b) || !ta.Comparable() {
+		return false
+	}
+	return a == b
 }
 
 // filterPathsByNotifierCluster narrows reportable paths to only those

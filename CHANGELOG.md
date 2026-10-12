@@ -571,6 +571,14 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- The bridge subscribes every mounted cluster server of a bridged endpoint
+  that implements `contract.ChangeNotifier`, whether or not the endpoint's
+  source or measurement notifies (before, the servers were wired only
+  behind a notifying source); a server that is the source itself is
+  subscribed once. A server that notifies its own changes reaches a
+  subscriber without `device.WithChangeNotifier`, which stays as the relay
+  for a host model whose servers do not forward its notifications —
+  matter.js reports each behavior's change through its own Datasource.
 - `cluster/spec` decides a revision condition ("Rev >= vN") against the
   definition's own revision instead of leaving it conditional, as matter.js's
   runtime conformance compiler does (`conformance-compiler.ts:250-254`): an
