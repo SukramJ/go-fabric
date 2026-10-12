@@ -72,6 +72,21 @@ type Config struct {
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
 	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345).
 	AggregatorServers []contract.ClusterServer
+	// SupportedFabrics is OperationalCredentials' SupportedFabrics, the
+	// number of fabrics the node admits (Matter §11.18.4.4: 1 to 254); 0
+	// is 5, the facade's value before it was configurable. matter.js
+	// defaults it to 254 when unset (OperationalCredentialsServer.ts:
+	// 84-88 initialize), which cluster/core does too; the facade keeps 5.
+	SupportedFabrics uint8
+	// DisableTimeSynchronization leaves the TimeSynchronization cluster
+	// (0x0038) off the root; the zero value mounts it, as the facade
+	// always did. RootNode carries it under an optional conformance
+	// (device/root_node_gen.go, generated from the snapshot).
+	// Without it GeneralDiagnostics has no UTC clock: TimeSnapshot
+	// answers SystemTimeMs alone and PosixTimeMs null, as matter.js
+	// GeneralDiagnosticsServer.timeSnapshot does without a
+	// TimeSynchronizationBehavior (GeneralDiagnosticsServer.ts:168-182).
+	DisableTimeSynchronization bool
 	// Observers are the host's callbacks on fabric and commissioning
 	// events, each chained after the facade's own handler (observers.go);
 	// the zero value observes nothing.
@@ -174,6 +189,14 @@ var ErrInvalidConfig = errors.New("node: invalid configuration")
 // (main.go:121-125).
 const setupPasscodeMax = 99999998
 
+// Fabric-table bounds: Matter §11.18.4.4 limits SupportedFabrics to 1..254
+// (matter.js: "FabricBuilder uses 254 as max",
+// OperationalCredentialsServer.ts:85); the facade's default is 5.
+const (
+	maxSupportedFabrics     = 254
+	defaultSupportedFabrics = 5
+)
+
 // Validate holds the checks the daemon applies to its flags
 // (main.go:113-131): the discriminator's 12 bits, the passcode's range
 // and the trivially-guessable list, the PBKDF iteration range and salt
@@ -202,6 +225,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil) {
 		errs = append(errs, errors.New("Store needs DB, or both Credentials and Endpoints"))
+	}
+	if c.SupportedFabrics > maxSupportedFabrics {
+		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
 	}
 	if c.OTA != nil && c.OTA.Dir == "" {
 		errs = append(errs, errors.New("OTA.Dir must be set"))

@@ -55,6 +55,13 @@ pseudo-version of `main`.
   reopens its own window under the configured discriminator). matter.js has
   no per-window basic credentials; this is a facade extension, not a cluster
   path.
+- `node.Config.SupportedFabrics` (OperationalCredentials SupportedFabrics;
+  0 keeps the facade's 5, above 254 is refused) and
+  `node.Config.DisableTimeSynchronization` (the zero value keeps
+  TimeSynchronization on the root; set, the root's ServerList lacks 0x0038,
+  `RootClusters.TimeSynchronization` is nil and GeneralDiagnostics
+  TimeSnapshot answers with a null PosixTimeMs, as matter.js does without
+  the behaviour) (issue #58).
 
 ### Changed
 
