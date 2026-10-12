@@ -15,26 +15,29 @@ import "log/slog"
 // is); on a mode change the other modes' fields are first converted as a
 // command's mode switch converts them (switchColorMode). Every attribute
 // that changed is reported through the change notifier, the "Q" ones by
-// their quieter rules. The writers are not called.
+// their quieter rules, and a Read returns the new colour at once. The
+// writers are not called. A colour equal to the current one, or to the
+// one a writer is being given, is no change. A colour of a mode the
+// server has no feature for is logged and ignored.
 //
-// A device-side change ends what the controller asked for, so the colour
-// movement stops and RemainingTime reports 0 as StopMoveStep does — except
-// a running colour loop, which only ColorLoopSet ends. The stop runs on
-// the command queue after Set returns, and no transition step changes the
-// colour while it is pending.
+// Set does not stop a running transition or colour loop and leaves
+// RemainingTime alone: the movement's next step overwrites the device's
+// value, as matter.js's next step overwrites an external state write
+// (packages/node/src/behavior/Transitions.ts:455-534 step computes from
+// the transition's own currentValue, :537-574 determineUpdates /
+// applyUpdates write it). A late echo of a value written earlier is
+// therefore stored and then overwritten by the next step. matter.js also
+// finishes a transition when an external write equals its target
+// (Transitions.ts:659-693 #instrumentProperty); that is not mirrored,
+// because finishing needs the engine lock the writers run under, and Set
+// may be called from inside a writer.
 //
 // Set takes only the server's state lock, never the command queue or the
 // writers' serialisation: it may be called from inside a writer, on the
 // writer's goroutine, and from any goroutine while a writer runs, without
-// blocking. A colour equal to the current one, or to the one a writer is
-// being given, is no change and stops nothing. A colour of a mode the
-// server has no feature for is logged and ignored.
-//
-// matter.js has no device-originated path: a host writes the state
-// attributes, and no observer of ColorControlServer stops a transition on
-// such a write (packages/node/src/behavior/Transitions.ts:659-693
-// #instrumentProperty finishes a transition only when the written value is
-// its target).
+// blocking. When a writer calls Set with a colour other than the one it
+// is given, the device's colour stays stored and the command answers
+// SUCCESS: the device accepted the command and reported what it did.
 func (s *ColorControlServer) Set(c Color) {
 	if !s.supportsColorMode(c.Mode) {
 		slog.Default().Warn("matter.colorcontrol.inbound_color_mode_ignored",
@@ -54,13 +57,8 @@ func (s *ColorControlServer) Set(c Color) {
 	}
 	s.st = next
 	s.setGen++
-	spawn := !s.haltPending
-	s.haltPending = true
 	s.mu.Unlock()
 	s.report(prev, next)
-	if spawn {
-		go s.haltAfterSet()
-	}
 }
 
 // deviceColor is st with the device's colour c: the mode switch's
@@ -83,34 +81,4 @@ func (s *ColorControlServer) deviceColor(st colorState, c Color) colorState {
 		s.setMireds(&st, float64(c.ColorTemperatureMireds))
 	}
 	return st
-}
-
-// lockCommands takes the command queue and first runs the stop a Set
-// left pending, so a command never starts behind a movement the device
-// has ended.
-func (s *ColorControlServer) lockCommands() {
-	s.cmd.Lock()
-	s.haltIfPending()
-}
-
-// haltAfterSet runs the stop a Set asked for on the command queue.
-func (s *ColorControlServer) haltAfterSet() {
-	s.cmd.Lock()
-	defer s.cmd.Unlock()
-	s.haltIfPending()
-}
-
-// haltIfPending stops the colour movement a Set ended. The caller holds
-// cmd. The flag clears only after the stop, so no step lands in between.
-func (s *ColorControlServer) haltIfPending() {
-	s.mu.Lock()
-	pending := s.haltPending
-	s.mu.Unlock()
-	if !pending {
-		return
-	}
-	s.stopMoveStepLogic()
-	s.mu.Lock()
-	s.haltPending = false
-	s.mu.Unlock()
 }

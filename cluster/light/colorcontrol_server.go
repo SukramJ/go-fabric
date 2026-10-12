@@ -276,10 +276,6 @@ type ColorControlServer struct {
 	// inflight is the colour an update is pushing to the writers, nil
 	// outside one: a Set of that colour is the device confirming it.
 	inflight *colorState
-	// haltPending is a movement stop a Set asked for and the command
-	// queue has not run yet; the transition steps change nothing while it
-	// is pending.
-	haltPending bool
 }
 
 // Compile-time assertions.

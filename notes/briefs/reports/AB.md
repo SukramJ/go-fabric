@@ -6,10 +6,17 @@ PR. matter.js read at the pin 4633bfd7 (`git -C ../matter.js show
 carrying the regenerated reachability inventory (unreached unchanged at 5)
 and a CHANGELOG entry under `[Unreleased]` → Added.
 
+**After the owner's decisions (see "Decisions" at the end), `Set` no
+longer stops any movement.** The sections below describe the first commit
+as it was built. The fix-up removed the movement stop, the pending stop,
+its goroutine and the command-entry and step checks. The extraction of
+`stopMoveStepLogic` is reverted, because nothing else used it.
+
 | Commit | Item |
 | --- | --- |
 | `cluster/light: ColorControlServer.Set — the device's own colour reaches the server (brief AB, #66)` | 1 |
 | `notes: report AB` | 2 |
+| (fix-up) `cluster/light: Set mirrors matter.js — no movement stop (owner decisions on report AB)` | decisions |
 
 ## What was built
 
@@ -256,7 +263,7 @@ see changes it did not make.
    is not stored, because the device's colour wins. Should it answer
    FAILURE instead? matter.js has no equivalent.
 
-## by_design candidates (not written)
+## by_design candidates (not written) — first commit, superseded below
 
 - **BD-Matter-ColorControl-DeviceSetStopsMovement:** a device-side colour
   (`Set`) stops the colour movement and reports RemainingTime 0 as
@@ -281,3 +288,92 @@ see changes it did not make.
 
 None new. Open question 1 could become a Tier-3 finding if the owner wants
 the loop ended on a mode-leaving Set.
+
+## Decisions (owner, 2026-10-12) and the fix-up
+
+The finding above (matter.js does not stop a transition on an external
+write) changed the design: `Set` mirrors matter.js.
+
+### What the fix-up changed
+
+- `Set` stores and reports under `mu` only. These parts are unchanged:
+  - the mode-switch conversion, then the own-mode fields;
+  - the equal-value no-op, including the in-flight confirmation;
+  - the unserved-mode log.
+- `Set` stops no movement and does not touch the command queue. These are
+  removed: the pending-stop flag `haltPending`, its goroutine, the
+  `lockCommands` entry that ran a pending stop, the step-dropping check in
+  `applyChanges`, and the clearing in `MatterQuiesce`.
+- `stopMoveStepLogic` is folded back into `stopMoveStep`.
+  `colorcontrol_commands.go` and `colorcontrol_scenes.go` are back to
+  their state before AB.
+- A running transition or colour loop continues. Its next step overwrites
+  the device's value, as matter.js's next step overwrites an external
+  write: `Transitions.ts:455-534` `step` computes from the transition's
+  own `currentValue`, and `:537-574` `determineUpdates` / `applyUpdates`
+  write it. RemainingTime is untouched by `Set`.
+- **Not mirrored: finish-on-target.** matter.js's `#instrumentProperty`
+  (`Transitions.ts:659-693`) finishes a transition when an external write
+  equals its target. `Engine.Finish` needs the engine lock the writers run
+  under, and `Set` may be called from inside a writer. The `Set` doc
+  comment says so and cites the lines.
+- **Q5 kept:** a command whose writer calls `Set` with a different colour
+  answers SUCCESS, and the device's colour stays stored: the device
+  accepted the command and reported what it did. The `setGen` check in
+  `update` implements this, and the `Set` doc comment states it.
+- **Q3:** a late echo is stored and then overwritten by the next step. The
+  doc comment has one sentence on this.
+- **Q1 and Q4 are moot.** The loop keeps running and overwrites the hue
+  the device reported, as a transition does.
+- **Q2:** no hue coupling.
+
+### Tests after the fix-up
+
+- `TestSetStopsARunningTransition` became `TestSetDuringATransition`:
+  - the device's 160 is stored and a Read returns it at once;
+  - RemainingTime reads the same before and after the Set;
+  - the writer is not called;
+  - the next step overwrites the value with the transition's own value;
+  - the transition ends at its target 370, and RemainingTime reports
+    `[100 0]`, unchanged by the Set.
+- The report of the device's value follows the "Q" quieter rules, which
+  throttle to once a second while a transition runs. The test therefore
+  asserts the Read, and `TestSetStoresAndReportsWithoutTheWriter` asserts
+  the report.
+- `TestSetLeavesTheColorLoop` (a deferred-stop test) is dropped.
+- The in-writer tests stay, each with a 1 s deadline on not blocking. The
+  step case now checks that the transition goes on to its target after
+  the Set from inside the step's writer.
+
+### Guards after the fix-up
+
+- `go test -count=1 ./cluster/light/...` — green.
+- `CGO_ENABLED=1 go test -race -count=3 ./cluster/light/...` — green.
+- `make lint` — green.
+- `make cover-check` — green: 173 packages at or above their floor;
+  `cluster/light` is at 95.8 % against a floor of 94.0 %.
+- `make reachability` — the inventory is in the fix-up commit and
+  unreached stays at 5. `make reachability-check` is green after the
+  commit.
+
+### by_design candidates (current; not written)
+
+- **BD-Matter-ColorControl-DeviceSetDoesNotStopMovement:** a device-side
+  colour (`Set`) is stored and reported at once, but a running transition
+  or colour loop goes on. Its next step overwrites the value, and
+  RemainingTime is unchanged. This is parity with matter.js
+  `Transitions.ts:455-574` (`step`, `determineUpdates`, `applyUpdates`).
+  One part is not mirrored: matter.js finishes a transition when an
+  external write equals its target (`Transitions.ts:659-693`
+  `#instrumentProperty`, installed at `:171`). Here `Engine.Finish` needs
+  the engine lock the writers run under, and `Set` may be called from
+  inside a writer (brief AA's rule).
+- **BD-Matter-ColorControl-DeviceSetConverts:** a `Set` in another mode
+  converts as `switchColorMode` does (`ColorControlServer.ts:1454-1540`),
+  without that function's `stopAllColorMovement` (`:1458`). The new mode's
+  own fields from the device then overwrite the conversion.
+- **DeviceSetDeferredStop** is gone with the fix-up.
+
+### Open questions after the fix-up
+
+None.

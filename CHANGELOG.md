@@ -18,12 +18,13 @@ pseudo-version of `main`.
   current colour (the colour temperature cropped to the physical range,
   the other fields to their attributes' ranges), a mode change converts as
   a command's mode switch does, and every changed attribute is reported
-  through the change notifier. The writers are not called. A running
-  colour movement stops and RemainingTime reports 0, as StopMoveStep does
-  — a running colour loop is left running. Set takes only the state lock,
-  so a `ColorWriter` or `ColorTemperatureWriter` may call it from inside
-  its own call; a Set of the colour being written is a confirmation and
-  stops nothing, a colour of a mode the server has no feature for is
+  through the change notifier. The writers are not called. As in matter.js,
+  a running transition or colour loop is not stopped: its next step
+  overwrites the device's value, and RemainingTime is unchanged. Set takes
+  only the state lock, so a `ColorWriter` or `ColorTemperatureWriter` may
+  call it from inside its own call; the device's colour then stays stored
+  and the command answers SUCCESS, and a Set of the colour being written
+  is a confirmation. A colour of a mode the server has no feature for is
   logged and ignored (issue #66).
 - `thermo.ThermostatConfig.Sink` (`thermo.Sink`, `thermo.SetpointChange`):
   an optional host port for a bridged thermostat. A controller's SystemMode

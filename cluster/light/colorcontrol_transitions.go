@@ -133,14 +133,9 @@ func (s *ColorControlServer) cropMireds(v float64) float64 {
 }
 
 // applyChanges is the engine's Apply: the values of one step, or of a
-// transition that applies at once. While a stop a Set asked for is
-// pending it changes nothing: the device's colour stands until the
-// movement has stopped.
+// transition that applies at once.
 func (s *ColorControlServer) applyChanges(changes []transition.Change) error {
 	return s.update(context.Background(), func(st *colorState) {
-		if s.haltPending { // update holds mu
-			return
-		}
 		for _, c := range changes {
 			st.setProperty(c.Name, c.Value)
 		}
@@ -277,12 +272,7 @@ func (s *ColorControlServer) MatterSelfReportedAttributes() []uint32 {
 // MatterQuiesce implements [contract.ClusterQuiescer]: a transition stops
 // where it is, without a report (matter.js ColorControlServer
 // [Symbol.asyncDispose]).
-func (s *ColorControlServer) MatterQuiesce() {
-	s.engine.StopAll()
-	s.mu.Lock()
-	s.haltPending = false // nothing moves any more
-	s.mu.Unlock()
-}
+func (s *ColorControlServer) MatterQuiesce() { s.engine.StopAll() }
 
 // executes is matter.js #optionsAllowExecution.
 func (s *ColorControlServer) executes(mask, override uint8) bool {
@@ -340,7 +330,7 @@ func (s *ColorControlServer) endTransitions() { s.engine.CancelAll() }
 // a level in between linearly; the value applies at once. It implements
 // levelcontrol.ColorTemperatureCoupling.
 func (s *ColorControlServer) SyncColorTemperatureWithLevel(_ context.Context, level uint8) error {
-	s.lockCommands()
+	s.cmd.Lock()
 	defer s.cmd.Unlock()
 	if st := s.state(); st.mode != ColorModeColorTemperature && st.enhancedMode != ColorModeColorTemperature {
 		return nil

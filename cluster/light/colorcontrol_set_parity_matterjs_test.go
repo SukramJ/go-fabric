@@ -176,75 +176,46 @@ func TestSetSwitchesTheModeAsACommandDoes(t *testing.T) {
 	}
 }
 
-// TestSetStopsARunningTransition: a device-side colour ends the
-// controller's transition — RemainingTime reports 0, the colour stays the
-// device's — as StopMoveStep ends it.
-func TestSetStopsARunningTransition(t *testing.T) {
+// TestSetDuringATransition: a device-side colour during a transition is
+// stored at once — a Read returns it — but the transition goes on, its
+// next step overwrites the value and RemainingTime does not move, as
+// matter.js's next step overwrites an external write (Transitions.ts:455-534,
+// :537-574). The value is reported by the "Q" quieter rules, which a
+// running transition throttles to once a second.
+func TestSetDuringATransition(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv := colorLight(t, allColorFeatures, true)
 		w := &hookWriter{}
 		srv.SetWriter(w)
-		r := watch(srv, ccdef.AttrRemainingTime, ccdef.AttrColorTemperatureMireds)
+		r := watch(srv, ccdef.AttrRemainingTime)
 		invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 100})
-		time.Sleep(2 * time.Second)
+		time.Sleep(2*time.Second + 50*time.Millisecond)
+		remaining := read(t, srv, ccdef.AttrRemainingTime)
+		before := read(t, srv, ccdef.AttrColorTemperatureMireds)
 		calls := w.calls()
-		srv.Set(light.Color{Mode: light.ColorModeColorTemperature, ColorTemperatureMireds: 200})
-		synctest.Wait()
-		if got := r.values(ccdef.AttrRemainingTime); !slices.Equal(got, []uint64{100, 0}) {
-			t.Errorf("RemainingTime reports %v, want [100 0]", got)
+		srv.Set(light.Color{Mode: light.ColorModeColorTemperature, ColorTemperatureMireds: 160})
+		if m := read(t, srv, ccdef.AttrColorTemperatureMireds); m != 160 {
+			t.Fatalf("ColorTemperatureMireds reads %d right after the Set, want the device's 160", m)
 		}
-		if read(t, srv, ccdef.AttrRemainingTime) != 0 {
-			t.Error("RemainingTime does not read 0")
+		if got := read(t, srv, ccdef.AttrRemainingTime); got != remaining {
+			t.Errorf("RemainingTime reads %d after the Set, %d before", got, remaining)
+		}
+		if w.calls() != calls {
+			t.Error("the Set called the writer")
+		}
+		time.Sleep(100 * time.Millisecond)
+		synctest.Wait()
+		if m := read(t, srv, ccdef.AttrColorTemperatureMireds); m <= before || m >= 370 {
+			t.Errorf("the next step left %d, want the transition's own value past %d", m, before)
 		}
 		time.Sleep(10 * time.Second)
 		synctest.Wait()
-		if m := read(t, srv, ccdef.AttrColorTemperatureMireds); m != 200 {
-			t.Errorf("ColorTemperatureMireds = %d after the transition's end, want the device's 200", m)
+		if m := read(t, srv, ccdef.AttrColorTemperatureMireds); m != 370 {
+			t.Errorf("the transition ended at %d, want its target 370", m)
 		}
-		if got := r.values(ccdef.AttrColorTemperatureMireds); len(got) == 0 || got[len(got)-1] != 200 {
-			t.Errorf("the last ColorTemperatureMireds report is not the device's: %v", got)
+		if got := r.values(ccdef.AttrRemainingTime); !slices.Equal(got, []uint64{100, 0}) {
+			t.Errorf("RemainingTime reports %v, want [100 0]", got)
 		}
-		if w.calls() != calls {
-			t.Error("the writer was called after the Set")
-		}
-		// The next command runs from the device's colour.
-		invoke(t, srv, ccdef.CmdStepColorTemperature, ccdef.StepColorTemperatureRequest{StepMode: ccdef.StepModeUp, StepSize: 5})
-		if m := read(t, srv, ccdef.AttrColorTemperatureMireds); m != 205 {
-			t.Errorf("a step after the Set gives %d, want 205", m)
-		}
-	})
-}
-
-// TestSetLeavesTheColorLoop: a running colour loop is a command the device
-// did not end; only ColorLoopSet ends it (ColorControlServer.ts:1218-1249,
-// stopMoveStep), so it keeps looping after a Set while the other movement
-// stops.
-func TestSetLeavesTheColorLoop(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		srv := colorLight(t, allColorFeatures, true)
-		invoke(t, srv, ccdef.CmdColorLoopSet, ccdef.ColorLoopSetRequest{
-			UpdateFlags: ccdef.UpdateFlagsUpdateAction, Action: ccdef.ColorLoopActionActivateFromEnhancedCurrentHue,
-			Direction: ccdef.ColorLoopDirectionIncrement, Time: 25,
-		})
-		invoke(t, srv, ccdef.CmdMoveToSaturation, ccdef.MoveToSaturationRequest{Saturation: 254, TransitionTime: 100})
-		time.Sleep(time.Second)
-		srv.Set(light.Color{Mode: light.ColorModeEnhancedHueSaturation, EnhancedHue: srv.Color().EnhancedHue, Saturation: 10})
-		synctest.Wait()
-		time.Sleep(2 * time.Second)
-		synctest.Wait()
-		if read(t, srv, ccdef.AttrColorLoopActive) != 1 {
-			t.Fatal("the Set ended the colour loop")
-		}
-		if read(t, srv, ccdef.AttrCurrentSaturation) != 10 {
-			t.Error("the saturation transition went on after the Set")
-		}
-		before := read(t, srv, ccdef.AttrEnhancedCurrentHue)
-		time.Sleep(time.Second)
-		synctest.Wait()
-		if read(t, srv, ccdef.AttrEnhancedCurrentHue) == before {
-			t.Error("the enhanced hue stopped looping")
-		}
-		srv.MatterQuiesce()
 	})
 }
 
@@ -290,8 +261,8 @@ func within(t *testing.T, what string, fn func()) {
 // TestSetFromInsideTheWriter: brief AA's rule — the writer may call Set on
 // its own goroutine before it returns, from a command and from a
 // transition step, without blocking; the device's colour wins over the
-// one being written, and a Set of the colour being written is the device
-// confirming it.
+// one being written (the command answers SUCCESS), and a Set of the
+// colour being written is the device confirming it.
 func TestSetFromInsideTheWriter(t *testing.T) {
 	t.Run("from a command", func(t *testing.T) {
 		srv := colorLight(t, allColorFeatures, false)
@@ -352,22 +323,20 @@ func TestSetFromInsideTheWriter(t *testing.T) {
 			})
 		}
 		srv.SetWriter(w)
-		invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 50})
+		invoke(t, srv, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 370, TransitionTime: 10})
 		select {
 		case <-returned:
 		case <-time.After(time.Second):
 			t.Fatal("Set from inside a step's writer blocked")
 		}
-		deadline := time.Now().Add(time.Second)
-		for read(t, srv, ccdef.AttrRemainingTime) != 0 && time.Now().Before(deadline) {
+		// The step whose writer the device answered stored the device's
+		// colour; the transition goes on to its target.
+		deadline := time.Now().Add(2 * time.Second)
+		for read(t, srv, ccdef.AttrColorTemperatureMireds) != 370 && time.Now().Before(deadline) {
 			time.Sleep(5 * time.Millisecond)
 		}
-		if read(t, srv, ccdef.AttrRemainingTime) != 0 {
-			t.Fatal("the transition did not stop")
-		}
-		time.Sleep(50 * time.Millisecond)
-		if m := read(t, srv, ccdef.AttrColorTemperatureMireds); m != 160 {
-			t.Errorf("ColorTemperatureMireds = %d, want the device's 160", m)
+		if m := read(t, srv, ccdef.AttrColorTemperatureMireds); m != 370 {
+			t.Errorf("ColorTemperatureMireds = %d, want the transition's target 370", m)
 		}
 	})
 }
