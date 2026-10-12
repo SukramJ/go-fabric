@@ -225,6 +225,9 @@ type fakeController struct {
 	// first; returning true consumes it (the fake OTA provider of
 	// ota_provider_e2e_test.go answers Invoke and BDX through it).
 	secureHook func(hdr *message.Header, proto message.ProtocolHeader, payload []byte) bool
+	// secureOut, when set, carries every secure message this controller
+	// sends instead of its UDP socket (a TCP connection to the bridge).
+	secureOut func(msg []byte) error
 }
 
 func newFakeController(t *testing.T, fab resumeFabric) *fakeController {
@@ -329,7 +332,7 @@ func (c *fakeController) sendSecure(inReplyTo message.ProtocolHeader, opcode uin
 // ackCounter when it is non-zero.
 func (c *fakeController) sendSecureAck(inReplyTo message.ProtocolHeader, ackCounter uint32, opcode uint8, payload []byte) {
 	c.mu.Lock()
-	sess, peerSID := c.sess, c.peerSID
+	sess, peerSID, out := c.sess, c.peerSID, c.secureOut
 	c.mu.Unlock()
 	proto := message.ProtocolHeader{
 		Initiator:  !inReplyTo.Initiator,
@@ -343,6 +346,10 @@ func (c *fakeController) sendSecureAck(inReplyTo message.ProtocolHeader, ackCoun
 	enc, err := sess.Encrypt(&hdr, hdr.NonceSecurityFlags(), append(proto.Marshal(), payload...))
 	if err != nil {
 		c.t.Errorf("controller encrypt: %v", err)
+		return
+	}
+	if out != nil {
+		_ = out(append(hdr.Marshal(), enc.Ciphertext...))
 		return
 	}
 	_, _ = c.conn.WriteToUDP(append(hdr.Marshal(), enc.Ciphertext...), c.bridgeAddr())

@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
+	onoffsrv "github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/store"
 )
 
@@ -231,4 +233,105 @@ func TestScenesServerReplacesTheStub(t *testing.T) {
 	if v, _ := scenes.MatterRead(0xFFFC); v != uint32(1) {
 		t.Fatalf("FeatureMap = %v, want 1 (SceneNames)", v)
 	}
+}
+
+// TestStackClustersMountWhereTheEndpointOptsIn: an endpoint opts into an
+// optional Groups or ScenesManagement (Spec.OptIn) and the assembler mounts
+// the stack's server — where the device type allows the cluster only
+// (matter.js MutableEndpoint.with, MutableEndpoint.ts:95-112).
+func TestStackClustersMountWhereTheEndpointOptsIn(t *testing.T) {
+	t.Parallel()
+	mgr, err := groups.NewManager(nopGroupStore{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const scenes = mattercore.ScenesManagementClusterID
+	cases := []struct {
+		name       string
+		dt         uint16
+		optIn      []uint32
+		wantGroups int
+		wantScenes int
+	}{
+		{"WindowCovering without opting in", 0x0202, nil, 0, 0},
+		{"WindowCovering opting into Groups", 0x0202, []uint32{mattercore.GroupsClusterID}, 1, 0},
+		{"Pump opting into both", 0x0303, []uint32{mattercore.GroupsClusterID, scenes}, 1, 1},
+		{"TemperatureSensor, which allows neither", 0x0302, []uint32{mattercore.GroupsClusterID, scenes}, 0, 0},
+		{"an id the assembler does not mount", 0x0202, []uint32{0x0008}, 0, 0},
+	}
+	for _, tc := range cases {
+		spec := Spec{OptIn: tc.optIn}
+		ep := &Endpoint{
+			ID: 7, DeviceType: tc.dt, FriendlyName: "Thing", SourceKey: StringKey("thing"),
+			Source: deviceTypeSource{dt: tc.dt, servers: []contract.ClusterServer{fakeServer{id: 0xFFF1_FC00}}},
+			OptIn:  spec.OptIn, groups: mgr,
+		}
+		servers := ClusterServers(ep)
+		if n, _ := countCluster(servers, mattercore.GroupsClusterID); n != tc.wantGroups {
+			t.Errorf("%s: Groups servers %d, want %d (%v)", tc.name, n, tc.wantGroups, clusterIDs(servers))
+		}
+		if n, _ := countCluster(servers, scenes); n != tc.wantScenes {
+			t.Errorf("%s: ScenesManagement servers %d, want %d (%v)", tc.name, n, tc.wantScenes, clusterIDs(servers))
+		}
+	}
+}
+
+// TestScenesMountWiresOnOffScenesPort pins the OnOff server's scenes port:
+// mounting ScenesManagement hands it the endpoint's server (matter.js
+// OnOffServer reaches ScenesManagementServer through its agent,
+// OnOffServer.ts:116, :161-164, :180-183), and the endpoint then leaves the
+// invalidation after OnOff commands to that server, which invalidates only
+// on a change of OnOff (:97-100, :119-122); another OnOff server keeps the
+// endpoint's invalidation after every command.
+func TestScenesMountWiresOnOffScenesPort(t *testing.T) {
+	t.Parallel()
+	mgr, _ := groups.NewManager(oneFabricGroupStore{}, nil)
+	light, err := onoffsrv.New(onoffsrv.Config{Features: onoffsrv.FeatureLT})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ep := &Endpoint{
+		ID: 7, DeviceType: 0x0100, FriendlyName: "Lamp", SourceKey: StringKey("lamp"),
+		Source: deviceTypeSource{dt: 0x0100, servers: []contract.ClusterServer{light}},
+		groups: mgr,
+	}
+	var scenes *mattercore.ScenesManagement
+	for _, s := range ClusterServers(ep) {
+		if sm, ok := s.(*mattercore.ScenesManagement); ok {
+			scenes = sm
+		}
+	}
+	if scenes == nil {
+		t.Fatal("no stack ScenesManagement server")
+	}
+	if !light.MatterInvalidatesScenes() {
+		t.Fatal("the OnOff server has no scenes port after the mount")
+	}
+	ctx := im.WithFabricFilter(context.Background(), true, 1)
+	if _, err := scenes.MatterInvoke(ctx, 0x04, mattercore.SceneRef{GroupID: 0, SceneID: 1}); err != nil {
+		t.Fatal(err)
+	}
+	valid := func() bool {
+		v, _ := scenes.MatterReadFiltered(ctx, 0x0002)
+		si, _ := v.([]mattercore.SceneInfoStruct)
+		return len(si) == 1 && si[0].SceneValid
+	}
+	if !valid() {
+		t.Fatal("the stored scene is not current")
+	}
+	ep.invalidateSceneOnCommand(light, 0x0006)
+	if !valid() {
+		t.Fatal("the endpoint invalidated after a command of an OnOff server that does so itself")
+	}
+	ep.invalidateSceneOnCommand(fakeServer{id: 0x0006}, 0x0006)
+	if valid() {
+		t.Fatal("the endpoint left the scene valid after another OnOff server's command")
+	}
+}
+
+// oneFabricGroupStore is nopGroupStore with fabric 1 stored.
+type oneFabricGroupStore struct{ nopGroupStore }
+
+func (oneFabricGroupStore) ListFabrics(context.Context) ([]store.FabricRecord, error) {
+	return []store.FabricRecord{{FabricIndex: 1}}, nil
 }

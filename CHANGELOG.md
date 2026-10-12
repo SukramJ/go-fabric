@@ -10,6 +10,21 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-12
+
+**What a host must do.** Upgrading from `v0.2.x` needs a source change only
+where a host still names what `v0.2.0` announced for removal: `wire.Groups`
+(configure `endpoint.Config.Groups`; the assembler mounts the real server),
+`im.StatusUnreportableAttr` / `im.StatusNoUpstreamSubscription` (no
+replacement; the codes left the spec), and the `PersistentSubscription*`
+store API (server-side subscription resumption, ADR 0008, needs none). The
+`matter_persistent_subscriptions` table stays in the schema, so an existing
+database opens unchanged. Everything else in this release is additive: the
+device layer `device/`, the node facade `node/`, `cluster/onoff.Server`,
+TCP, BDX and the OTA requestor, `bridgetest.Commissioner`. A host on
+`contract.EndpointSource` keeps working; the reference daemon shows the
+move to `node.New` and `device.New<Type>`.
+
 **ColorControl serves every feature matter.js implements; ExtendedColorLight
 is servable.** A CT-only host keeps working unchanged: a
 `light.ColorControlServerConfig` without `Features` is CT only, serves the
@@ -17,6 +32,78 @@ same attribute and command lists, reports the same attributes and drives
 the same `ColorTemperatureWriter` as before.
 
 ### Added
+
+- `bridge/bridgetest.Commissioner`, **public test support** (README.md §API
+  stability): a commissioner and controller for tests. `Dial(t, addr,
+  Options{Passcode, Discriminator, FabricID, NodeID, CAT, Seed, …})`;
+  `Commission(ctx)` runs PASE, ArmFailSafe, SetRegulatoryConfig, the
+  certificate-chain and attestation requests (signatures checked against
+  the DAC), CSRRequest, AddTrustedRootCertificate, AddNOC, CASE and
+  CommissioningComplete over CASE, in chip-tool's AutoCommissioner order,
+  and returns the CASE `Session`; `PASE`, `CASE`, `CASEAs` (another
+  controller of the fabric) and `Accept` (a CASE session the device opens)
+  give further sessions. A `Session` reads, writes, invokes, subscribes,
+  receives reports (`NextReport`) and closes. Keys and certificates come
+  from a test CA in the package, determined by `Options.Seed`; with
+  `Options.Advertiser` the commissioner finds the device through its
+  DNS-SD records. It implements `bridge.OperationalResolver`, so a device
+  re-establishing a former subscription after a restart reaches it.
+- `device/` mounts default servers for two fabric-scoped clusters whose
+  generated server refuses them: Binding (`core.NewBinding`, as matter.js
+  mounts BindingServer where the device type or Base mandates it) and
+  EcosystemInformation (`core.NewEcosystemInformation` over empty
+  directories). `Doorbell.Binding()` returns `*core.Binding` and
+  `BridgedNode.EcosystemInformation()` `*core.EcosystemInformation`. A
+  Doorbell no longer needs `WithServer(core.NewBinding())`.
+  OtaSoftwareUpdateRequestor stays the host's (`ErrNoDefaultServer`): its
+  server needs the node's connector.
+- `endpoint.Spec.OptIn []uint32`: an endpoint opts into an optional Groups
+  (0x0004) or ScenesManagement (0x0062) and the assembler mounts the stack's
+  server where the device type allows the cluster, as matter.js's
+  `MutableEndpoint.with(GroupsServer)` extends any endpoint type.
+  `device.WithOptional` sets it for those two clusters instead of refusing
+  them (AirPurifier, Pump, RoomAirConditioner, SmokeCoAlarm, Thermostat,
+  WindowCovering list Groups as optional; Pump and RoomAirConditioner
+  ScenesManagement); every other option for them stays refused.
+- `device.WithMeasurement(contract.MeasurementSource)`: a device's
+  measurement clusters are served from the host's live reading — the
+  assembler materialises them from the reading's measurement class
+  (`endpoint.Spec.Measurement`, `cluster/measurement FromMeasurementClass`)
+  on every dispatch, the bridge subscribes to the reading's notifier and
+  wires a GenericSwitch's presses to it. The clusters the reading
+  materialises are the assembler's for that device: no default server, no
+  other option for them. A device without the option is unchanged.
+  `endpoint.ClusterServers` now serves a Source's clusters followed by the
+  Measurement's when an endpoint carries both. The reference daemon's
+  sensors, the smoke alarm's battery and the electrical sensors are
+  `device.New<Type>(…, WithMeasurement(src))` calls, parts through
+  `AddPart`; endpoint ids, cluster sets and attribute values are unchanged.
+- `onoff.Server` carries matter.js's scene paths (`OnOffServer.ts`) through
+  an optional ScenesManagement port, `onoff.Scenes` (`Config.Scenes`,
+  `Server.SetScenes`), whose three operations are named after
+  `ScenesManagementServer`'s: `MakeAllFabricSceneInfoEntriesInvalid`,
+  `StoreGlobalScene`, `RecallGlobalScene`. `core.ScenesManagement`
+  implements them, and the endpoint layer hands an endpoint's
+  ScenesManagement to its `onoff.Server` when it mounts one. With the port,
+  a command that changes OnOff invalidates the current scene (one that
+  leaves it unchanged does not; the endpoint's blanket invalidation after
+  every OnOff command is skipped for such a server,
+  `core.SceneInvalidator`); OffWithEffect stores the accessing fabric's
+  global scene while GlobalSceneControl is true; OnWithRecallGlobalScene
+  recalls it; and a recalled scene's OnOff value is applied by the server
+  (`MatterApplySceneValues`) at once, or after the scene's transition time
+  on the server's clock, dropped when OnOff changes in between.
+
+- `Bridge.SessionClosed(sessionID)`: the host calls it from the session
+  registry's close hook, next to the subscription manager's
+  `CloseSession` (`node/` does). The bridge forgets the session's route
+  and closes a TCP connection when its last session goes — by
+  CloseSession, fabric removal, NOC rotation or the idle reaper — as
+  matter.js's `#closeTcpChannelIfLastSession` does
+  (`ExchangeManager.ts:669-676`). Before, such a connection stayed open
+  until the peer closed it. An inbound or outbound CloseSession closes the
+  connection without the hook. A host that wires the registry itself
+  should add the call.
 
 - The device layer `device/` (ADR 0018, wave 6), **public API from this
   release on** (README.md §API stability): one generated Go type per device
@@ -541,6 +628,42 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- The bridge subscribes every mounted cluster server of a bridged endpoint
+  that implements `contract.ChangeNotifier`, whether or not the endpoint's
+  source or measurement notifies (before, the servers were wired only
+  behind a notifying source); a server that is the source itself is
+  subscribed once. A server that notifies its own changes reaches a
+  subscriber without `device.WithChangeNotifier`, which stays as the relay
+  for a host model whose servers do not forward its notifications —
+  matter.js reports each behavior's change through its own Datasource.
+- `cluster/spec` decides a revision condition ("Rev >= vN") against the
+  definition's own revision instead of leaving it conditional, as matter.js's
+  runtime conformance compiler does (`conformance-compiler.ts:250-254`): an
+  element "Rev >= vN" or "Rev >= vN, O" is served by default at or above
+  revision N, and refused when declared below it. `spec.Context` returns a
+  `spec.RevisionContext`; a `FeatureContext` without a revision keeps the
+  condition conditional, and `CheckFeatures` still ignores the revision
+  (`IllegalFeatureCombinations.ts`). A default LevelControl from `device/`
+  now serves MinLevel and MaxLevel with the device type's defaults
+  (DimmableLight: 1 and 254).
+- The OTA Software Update Requestor asks for 8192-byte BDX blocks when the
+  provider's session runs over TCP and 1024 otherwise, as matter.js does
+  (`OtaSoftwareUpdateRequestorServer.ts:54-55`, `:962-963`). An exchange
+  `OtaProviderSession.OpenExchange` returns states its channel with an
+  optional `Reliable() bool`; the bridge's exchanges do. The bridge's
+  initiated exchanges follow the session's route: over a TCP connection
+  they run without MRP and carry the connection's message size, and
+  `ConnectOtaProvider` (and subscription re-establishment) reuse a live
+  session bound to a TCP connection as they reuse one on UDP (matter.js
+  `Peer.ts:418-438`).
+
+- The operational DNS-SD record carries the `T` key only when a TCP mode
+  is advertised (`T=2`, `4` or `6`); with TCP off the key is absent instead
+  of `T=0`, as in matter.js (`MdnsAdvertisement.ts:204-206`,
+  `ServerNetworkRuntime.ts:334-338`) and chip
+  (`Advertiser_ImplMinimalMdns.cpp:279-285`). The commissionable record
+  never carries it, as before.
+
 - `examples/reference-bridge` runs on the device layer and the node facade
   (ADR 0018 decision 6), the shape the README points a host at:
   `node.New(cfg)`, one `device.New<Type>` call per device added to
@@ -864,7 +987,45 @@ the same `ColorTemperatureWriter` as before.
   Removal permissible in the second minor release after the one that ships
   this entry.
 
+### Removed
+
+Marked in v0.2.0, removal announced there. A host that still uses one of
+them moves to the replacement named here; none has a behaviour of its own
+left to keep.
+
+- `github.com/SukramJ/go-fabric/cluster/wire`: `Groups`, the read-only
+  Groups stub. Replacement: none to wire — group membership is stack state;
+  configure `endpoint.Config.Groups` and the assembler mounts the real
+  `cluster/core.Groups` server wherever a device type mandates Groups
+  (ADR 0009).
+- `github.com/SukramJ/go-fabric/im`: `StatusUnreportableAttr` (0x8c) and
+  `StatusNoUpstreamSubscription` (0xc5). Matter 1.6.1 removed both codes and
+  matter.js dropped them from its status table; no replacement.
+- `github.com/SukramJ/go-fabric/store`: the never-wired subscription API —
+  `PersistentSubscriptionRecord`, `ErrPersistentSubscriptionNotFound`,
+  `Store.SavePersistentSubscription`, `Store.LoadPersistentSubscriptions`,
+  `Store.DeletePersistentSubscription`,
+  `Store.DeletePersistentSubscriptionsByFabric`,
+  `Store.GetPersistentSubscription`, `PersistentSubscriptionIntervals`,
+  `MarshalIntervals` and `UnmarshalIntervals`. Replacement:
+  `Store.SaveServerSubscription` and its siblings on the
+  `matter_server_subscriptions` table (ADR 0008). The
+  `matter_persistent_subscriptions` table itself stays in `store.Schema()`:
+  every database a v0.2.x store applied already carries it, nothing reads
+  or writes it, and keeping the CREATE leaves old and new databases with the
+  same schema.
+
 ### Fixed
+
+- An ongoing subscription report the controller never acknowledges is peer
+  loss, as matter.js treats an exhausted first message on any exchange
+  (`MessageExchange.ts:616-621`, `SessionManager.ts:677-695`): every
+  session with that peer established before the report's exchange is
+  force-closed without a CloseSession, and their other subscriptions close
+  with them. Before, only the one subscription was closed and the peer's
+  sessions stayed in the table. A later chunk of a chunked report, sent
+  after the peer answered the previous one, still closes only its
+  subscription.
 
 - **A peer that stops answering an exchange this node opened is lost, and
   its sessions go.** When the outbound-reliable tracker gave up on a
@@ -2709,3 +2870,8 @@ consumer of an older pseudo-version should read.
   code does, and it tells a reader the snapshot was measured one commit
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
+
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/SukramJ/go-fabric/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/SukramJ/go-fabric/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/SukramJ/go-fabric/releases/tag/v0.1.0

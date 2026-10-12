@@ -3,7 +3,10 @@
 
 // Package bridgetest provides the affordances a test outside package bridge
 // needs to put a [bridge.Bridge] into a chosen state without sending
-// anything over the wire.
+// anything over the wire — and, in [Commissioner], the controller a test
+// needs to reach that state over the wire instead: a commissioner that
+// commissions a device onto a fabric of its own and then reads, writes,
+// invokes and subscribes over CASE.
 //
 // It exists for the same reason net/http/httptest does: the production API
 // is shaped for the daemon that runs the bridge, and a test driving it from

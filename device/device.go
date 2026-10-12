@@ -4,15 +4,19 @@
 package device
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/core"
+	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
@@ -42,6 +46,13 @@ type Device struct {
 	// source is what Spec hands the assembler: the device itself, or the
 	// device with the host's change notifier ([WithChangeNotifier]).
 	source contract.EndpointSource
+	// measurement is the host's live reading ([WithMeasurement]) and
+	// measured the clusters the assembler materialises from it.
+	measurement contract.MeasurementSource
+	measured    map[uint32]bool
+	// optIn are the assembler's optional clusters the host opted into
+	// ([WithOptional] for Groups or ScenesManagement).
+	optIn []uint32
 
 	mu    sync.Mutex
 	parts []*Device
@@ -55,9 +66,11 @@ var _ contract.EndpointSource = (*Device)(nil)
 // mounts them a second time: Descriptor and BridgedDeviceBasicInformation
 // on every bridged endpoint, Identify on every bridged endpoint and on a
 // part whose device type mandates it, Groups and ScenesManagement where the
-// device type mandates them — a Groups or ScenesManagement server the
-// source supplies is replaced by the stack's (endpoint/materialize.go
-// ClusterServers, partClusterServers, mountGroups, mountScenes).
+// device type mandates them or allows them and the host opts in
+// ([WithOptional] → [endpoint.Spec.OptIn]) — a Groups or ScenesManagement
+// server the source supplies is replaced by the stack's
+// (endpoint/materialize.go ClusterServers, partClusterServers,
+// mountGroups, mountScenes).
 var assemblerMounted = map[uint32]string{
 	0x001D: "Descriptor",
 	0x0039: "BridgedDeviceBasicInformation",
@@ -88,17 +101,27 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 	if s.nilSrv {
 		return nil, fmt.Errorf("%w: %s: WithServer(nil)", ErrConfiguration, t.Name)
 	}
-	if err := checkOptedClusters(t, s); err != nil {
+	measured, err := measuredClusters(t, s)
+	if err != nil {
 		return nil, err
 	}
-	d := &Device{typ: t, opts: opts}
+	if err := checkOptedClusters(t, s, measured); err != nil {
+		return nil, err
+	}
+	d := &Device{typ: t, opts: opts, measurement: s.measurement, measured: measured}
+	for id := range optInMounted {
+		if s.optional[id] {
+			d.optIn = append(d.optIn, id)
+		}
+	}
+	slices.Sort(d.optIn)
 	d.source = d
 	if s.notifier != nil {
 		d.source = &notifyingSource{Device: d, notifier: s.notifier}
 	}
 	for i := range t.Servers {
 		r := &t.Servers[i]
-		if _, ok := assemblerMounted[r.ID]; ok {
+		if _, ok := assemblerMounted[r.ID]; ok || measured[r.ID] {
 			continue
 		}
 		srv, ok := s.servers[r.ID]
@@ -135,10 +158,34 @@ func (n *notifyingSource) OnMatterValueChanged(cb func()) (unsubscribe func()) {
 	return n.notifier.OnMatterValueChanged(cb)
 }
 
+// measuredClusters are the clusters the host's measurement source
+// ([WithMeasurement]) materialises — the assembler's for this device. The
+// materialiser runs once here, with no endpoint id, to learn the set; the
+// assembler runs it again on every dispatch with the endpoint's
+// (endpoint/materialize.go ClusterServers).
+func measuredClusters(t *Type, s *settings) (map[uint32]bool, error) {
+	if !s.measurementSet {
+		return nil, nil
+	}
+	if s.measurement == nil {
+		return nil, fmt.Errorf("%w: %s: WithMeasurement(nil)", ErrConfiguration, t.Name)
+	}
+	class := s.measurement.MatterMeasurementClass()
+	servers := measurement.FromMeasurementClass(class, s.measurement, contract.MeasurementContext{})
+	if len(servers) == 0 {
+		return nil, fmt.Errorf("%w: %s: the measurement source (class %d) materialises no cluster", ErrConfiguration, t.Name, class)
+	}
+	out := make(map[uint32]bool, len(servers))
+	for _, srv := range servers {
+		out[srv.MatterClusterID()] = true
+	}
+	return out, nil
+}
+
 // checkOptedClusters refuses an option for a cluster the device type does
 // not allow as a server — a host server ([WithServer]) excepted — or one
-// the assembler mounts itself.
-func checkOptedClusters(t *Type, s *settings) error {
+// the assembler mounts itself, measured clusters included.
+func checkOptedClusters(t *Type, s *settings, measured map[uint32]bool) error {
 	ids := make([]uint32, 0, len(s.optional)+len(s.servers)+len(s.initial))
 	for id := range s.optional {
 		ids = append(ids, id)
@@ -157,8 +204,11 @@ func checkOptedClusters(t *Type, s *settings) error {
 	}
 	slices.Sort(ids)
 	for _, id := range slices.Compact(ids) {
-		if name, ok := assemblerMounted[id]; ok {
+		if name, ok := assemblerMounted[id]; ok && (!optInMounted[id] || !onlyOptIn(s, id)) {
 			return fmt.Errorf("%w: %s: the endpoint assembler mounts %s (0x%04X) itself", ErrConfiguration, t.Name, name, id)
+		}
+		if measured[id] {
+			return fmt.Errorf("%w: %s: cluster 0x%04X is served from the measurement source (WithMeasurement)", ErrConfiguration, t.Name, id)
 		}
 		if _, ok := t.Server(id); !ok && !onlyHostServer(s, id) {
 			return fmt.Errorf("%w: %s has no server cluster requirement for cluster 0x%04X", ErrConfiguration, t.Name, id)
@@ -176,6 +226,24 @@ func checkOptedClusters(t *Type, s *settings) error {
 		}
 	}
 	return nil
+}
+
+// optInMounted are the assembler's clusters a device opts into with
+// [WithOptional] where its type lists them as optional: the assembler then
+// mounts the stack's server ([endpoint.Spec.OptIn]).
+var optInMounted = map[uint32]bool{
+	0x0004: true, // Groups
+	0x0062: true, // ScenesManagement
+}
+
+// onlyOptIn reports whether the host opts into id and states nothing else
+// about it.
+func onlyOptIn(s *settings, id uint32) bool {
+	_, host := s.servers[id]
+	_, initial := s.initial[id]
+	_, elements := s.elements[id]
+	_, features := s.features[id]
+	return s.optional[id] && !host && !initial && !elements && !features
 }
 
 // onlyHostServer reports whether the host supplies its own server for id
@@ -290,8 +358,66 @@ type serverFactory func(def *spec.Cluster, opts spec.Options, cfg spec.ServerCon
 // generated [spec.Server] every other cluster gets (ADR 0018, decisions of
 // wave 6, 2). Keep it in step with script/devicegen/servers.go, which
 // types the generated accessors.
+//
+// The fabric-scoped clusters, whose generated server [spec.NewServer]
+// refuses ([spec.ErrFabricScoped]), take the core server here where it holds
+// its own state: Binding and EcosystemInformation. OtaSoftwareUpdateRequestor
+// has none: its server needs the node's connector to reach a provider
+// (node/ota.go), so a device that mounts it — OtaRequestor — answers
+// [ErrNoDefaultServer] and the host supplies it with [WithServer].
 var defaultFactories = map[uint32]serverFactory{
-	0x0006: newOnOffServer, // OnOff: cluster/onoff.Server, matter.js OnOffServer.ts.
+	0x0006: newOnOffServer,                // OnOff: cluster/onoff.Server, matter.js OnOffServer.ts.
+	0x001E: newBindingServer,              // Binding: cluster/core.Binding, matter.js BindingServer.ts.
+	0x0750: newEcosystemInformationServer, // EcosystemInformation: cluster/core.EcosystemInformation.
+}
+
+// newBindingServer is the module's Binding server ([core.NewBinding]), the
+// default matter.js mounts where the device type — or Base, for a type
+// that would miss it — mandates Binding
+// (support/codegen/src/endpoints/RequirementGenerator.ts:143-155, 187-188;
+// packages/node/src/devices/on-off-sensor.ts:91 `mandatory: { Identify:
+// IdentifyServer, Binding: BindingServer }`; packages/node/src/endpoints/
+// base.ts:15-19, 39 BindingServer as the default implementation). It keeps
+// its own list and data version, so the configuration states nothing it
+// can take.
+func newBindingServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error) {
+	if err := selfHeldConfig("Binding", cfg); err != nil {
+		return nil, err
+	}
+	return core.NewBinding(), nil
+}
+
+// newEcosystemInformationServer is the module's EcosystemInformation
+// server ([core.NewEcosystemInformation]) over empty directories, the state
+// matter.js's default server starts with
+// (packages/node/src/behaviors/ecosystem-information/
+// EcosystemInformationServer.ts:14, no server logic; both attributes are
+// lists). A host whose bridged device belongs to an ecosystem supplies its
+// own server over its directory with [WithServer].
+func newEcosystemInformationServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error) {
+	if err := selfHeldConfig("EcosystemInformation", cfg); err != nil {
+		return nil, err
+	}
+	return core.NewEcosystemInformation(emptyEcosystem{}), nil
+}
+
+// selfHeldConfig refuses initial values for a core server that keeps its
+// state behind its own API: there is nothing to apply them to.
+func selfHeldConfig(name string, cfg spec.ServerConfig) error {
+	if len(cfg.Initial) != 0 {
+		return fmt.Errorf("%s keeps its own state: no initial values (WithInitial)", name)
+	}
+	return nil
+}
+
+// emptyEcosystem is an ecosystem directory with no devices and no
+// locations.
+type emptyEcosystem struct{}
+
+func (emptyEcosystem) EcosystemDevices(context.Context) []ecodef.EcosystemDeviceStruct { return nil }
+
+func (emptyEcosystem) EcosystemLocations(context.Context) []ecodef.EcosystemLocationStruct {
+	return nil
 }
 
 // newOnOffServer is the module's OnOff server ([onoff.New]). A device of
@@ -356,7 +482,8 @@ func featureNames(r *ClusterRequirement, mask uint32) []string {
 func (d *Device) Type() *Type { return d.typ }
 
 // Server returns the device's server for clusterID, or nil when it mounts
-// none.
+// none — a cluster served from the measurement source ([WithMeasurement])
+// included, whose servers the assembler builds per dispatch.
 func (d *Device) Server(clusterID uint32) contract.ClusterServer {
 	for _, srv := range d.servers {
 		if srv.MatterClusterID() == clusterID {
@@ -477,9 +604,11 @@ func (d *Device) Spec() endpoint.Spec {
 		ChannelAddress:   d.opts.ChannelAddress,
 		Availability:     d.opts.Reachable,
 		Source:           d.source,
+		Measurement:      d.measurement,
 		NodeLabel:        d.opts.NodeLabel,
 		DeviceConditions: slices.Clone(d.opts.Conditions),
 		ClientClusters:   d.clientClusters(),
+		OptIn:            slices.Clone(d.optIn),
 	}
 	for _, p := range d.Parts() {
 		s.Parts = append(s.Parts, p.Spec())

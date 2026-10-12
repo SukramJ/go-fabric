@@ -103,6 +103,18 @@ func TestDeviceSideChangeReachesASubscriberThroughTheMountedEndpoint(t *testing.
 			change:        func(*testing.T) { f.contact.reportFromDevice(false) },
 		},
 		{
+			// A sensor on the device layer (device.WithMeasurement): the
+			// assembler materialises its cluster from the reading, and the
+			// bridge hears the reading's own notifier.
+			name:          "humidity sensor reports its new reading",
+			deviceAddress: "demo-humidity-1",
+			clusterID:     0x0405, // RelativeHumidityMeasurement
+			attributeID:   0x0000, // MeasuredValue
+			before:        uint16(4800),
+			after:         uint16(5500),
+			change:        func(*testing.T) { f.humidity.reportFromDevice(55) },
+		},
+		{
 			name:          "contact sensor raises its visual alarm",
 			deviceAddress: "demo-contact-1",
 			clusterID:     boolcfg.ClusterID,
@@ -357,5 +369,20 @@ func TestAirQualitySensorMountsEveryConcentrationCluster(t *testing.T) {
 	}
 	if ep.DeviceType != 0x002C {
 		t.Errorf("device type 0x%04X, want AirQualitySensor", ep.DeviceType)
+	}
+}
+
+// TestButtonPressWiringThroughTheDeviceLayer: the button is a
+// device.NewGenericSwitch with device.WithMeasurement, and the bridge still
+// hands its reading the Switch cluster's emitter (bridge/bridge.go reads
+// endpoint.Spec.Measurement), so a press fires.
+func TestButtonPressWiringThroughTheDeviceLayer(t *testing.T) {
+	f, br := startFleetBridge(t)
+	ep := mountedEndpoint(t, br, "demo-button-1")
+	if ep.Measurement != f.button {
+		t.Fatalf("button endpoint %d carries Measurement %T, want the button", ep.ID, ep.Measurement)
+	}
+	if !f.button.press(false) {
+		t.Fatal("the button has no Switch emitter wired: a press reaches no controller")
 	}
 }

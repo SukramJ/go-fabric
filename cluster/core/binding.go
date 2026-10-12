@@ -20,16 +20,11 @@ import (
 // endpoints that support local actions referencing other Matter nodes
 // (e.g. a Light switch endpoint binding to a target Light endpoint).
 //
-// Stub, not mounted: no bridged endpoint in v1.1 constructs a Binding
-// server — [NewBinding] has no production caller (see
-// cluster/core/doc.go's cluster inventory), so
-// this cluster is absent from every endpoint's ServerList and no
-// controller can reach the write handler below. The bridge does not
-// originate traffic to bound nodes even where it is present, so
-// mounting it would still be a round-trippable-but-opaque store, not
-// live binding behaviour. Wiring this in requires deciding which
-// bridged endpoints declare the binding feature; deferred until a
-// concrete use-case arrives.
+// A store, not live binding behaviour: the device layer mounts it as the
+// default Binding server where a device type mandates the cluster
+// (device/device.go defaultFactories — a Doorbell, say), and a controller
+// can write and read the list, but the bridge does not originate traffic
+// to bound nodes, which matter.js's BindingServer resolves into peers.
 type Binding struct {
 	mu       sync.RWMutex
 	bindings []TargetStruct

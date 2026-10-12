@@ -43,6 +43,11 @@ var errNoRoute = errors.New("bridge: no route to the peer")
 // connRoute is the reply route over a connection-oriented transport.
 type connRoute struct {
 	conn transport.Conn
+	// sessions counts the secure sessions bound to the connection:
+	// bindSessionRoute adds one when a session first binds to it,
+	// unbindSessionRoute takes it away again; at zero the connection is
+	// closed. Guarded by Bridge.routeBindMu.
+	sessions int
 }
 
 // Network names the transport of the connection's peer address.
@@ -165,11 +170,14 @@ func (b *Bridge) bindSessionRoute(sid uint16, dst net.Addr) {
 	if lookup != nil {
 		sess, _ = lookup.Lookup(sid)
 	}
-	if prev, loaded := b.sessionPeerAddrs.Load(sid); loaded {
-		prevAddr, _ := prev.(net.Addr)
+	b.routeBindMu.Lock()
+	prev, loaded := b.sessionPeerAddrs.Load(sid)
+	prevAddr, _ := prev.(net.Addr)
+	if loaded {
 		moves := isConnRoute(prevAddr) || isConnRoute(dst)
 		if moves && prevAddr != dst && sess != nil {
 			if owner, ok := b.sessionRouteOwners.Load(sid); ok && owner == sess {
+				b.routeBindMu.Unlock()
 				return
 			}
 		}
@@ -178,6 +186,83 @@ func (b *Bridge) bindSessionRoute(sid uint16, dst net.Addr) {
 	if sess != nil {
 		b.sessionRouteOwners.Store(sid, sess)
 	}
+	var closeConn *connRoute
+	if !loaded || prevAddr != dst {
+		if r, ok := dst.(*connRoute); ok && r != nil {
+			r.sessions++
+		}
+		// The entry overwritten here was left behind by a teardown that
+		// never reached unbindSessionRoute: its session is gone, so it
+		// leaves the count of its connection.
+		if r, ok := prevAddr.(*connRoute); ok && r != nil {
+			closeConn = b.releaseConnRouteLocked(r)
+		}
+	}
+	b.routeBindMu.Unlock()
+	b.closeConnRoute(closeConn)
+}
+
+// unbindSessionRoute forgets the route of secure session sid, which is
+// closing or closed. When the route is a connection and sid was the last
+// session bound to it, the connection is closed — the Go translation of
+// matter.js ExchangeManager.ts:669-676 #closeTcpChannelIfLastSession
+// ("Mimics CHIP SDK behavior: close TCP connection when last session is
+// removed"), scheduled from :691-708 #deleteSession for every session
+// whose transport channel is TCP. matter.js recounts the live sessions on
+// the channel (#sessionsOnChannel, :629-643); the bridge keeps the count
+// on the route instead. The 10 s first-message timer of the listener is
+// not involved: it covers only a connection that never carried a message.
+func (b *Bridge) unbindSessionRoute(sid uint16) {
+	b.routeBindMu.Lock()
+	raw, loaded := b.sessionPeerAddrs.LoadAndDelete(sid)
+	b.sessionRouteOwners.Delete(sid)
+	var closeConn *connRoute
+	if r, ok := raw.(*connRoute); loaded && ok && r != nil {
+		closeConn = b.releaseConnRouteLocked(r)
+	}
+	b.routeBindMu.Unlock()
+	b.closeConnRoute(closeConn)
+}
+
+// releaseConnRouteLocked takes one session off r's count and returns r
+// when that was the last one, nil otherwise. The caller holds
+// b.routeBindMu.
+func (b *Bridge) releaseConnRouteLocked(r *connRoute) *connRoute {
+	r.sessions--
+	if r.sessions > 0 {
+		return nil
+	}
+	r.sessions = 0
+	return r
+}
+
+// closeConnRoute closes r's connection, whose last session went; nil is
+// a no-op. The connection's own close then runs the drop path
+// (handleTCPClose → evictConn), which finds nothing bound any more and
+// forgets the route.
+func (b *Bridge) closeConnRoute(r *connRoute) {
+	if r == nil || r.conn == nil {
+		return
+	}
+	c, ok := r.conn.(interface{ Close() error })
+	if !ok {
+		return
+	}
+	b.logger.Info("matter.tcp.close_last_session", slog.String("conn", r.String()))
+	_ = c.Close()
+}
+
+// SessionClosed tells the bridge that secure session sessionID is gone.
+// The host calls it from the session registry's close hook — the hook
+// that also cascades into the subscription manager
+// (operational.Manager.SetOnSessionClose) — so every close path reaches
+// it: CloseSession, fabric removal, NOC rotation, the idle reaper, a
+// peer-loss eviction. The bridge forgets the session's route and closes
+// a TCP connection whose last session this was (unbindSessionRoute;
+// matter.js ExchangeManager.ts:669-676). Calling it for a session the
+// bridge never routed, or twice, is a no-op.
+func (b *Bridge) SessionClosed(sessionID uint16) {
+	b.unbindSessionRoute(sessionID)
 }
 
 // receive is the transport-neutral receive entry: buf is one complete

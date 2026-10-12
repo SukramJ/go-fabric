@@ -18,8 +18,8 @@ import (
 // TCPConfig selects the Matter TCP transport (ADR 0019). Incoming opens
 // a TCP listener on the UDP socket's port; Outgoing declares that this
 // node may open TCP connections itself. Both are advertised in the
-// operational record's T key (bit 1 client, bit 2 server). The zero
-// value is TCP off — matter.js NetworkServer.resolveTcpConfig with
+// operational record's T key (bit 1 client, bit 2 server), which is
+// absent when neither is set. The zero value is TCP off — matter.js NetworkServer.resolveTcpConfig with
 // nothing configured (NetworkServer.ts:261-272) — and leaves the bridge
 // exactly as it was before TCP existed.
 type TCPConfig struct {

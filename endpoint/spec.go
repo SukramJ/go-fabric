@@ -74,7 +74,9 @@ type Spec struct {
 	// Measurement instead.
 	Source contract.EndpointSource
 	// Measurement is set on sensor endpoints assembled from a
-	// measurement source. nil otherwise.
+	// measurement source. nil otherwise. With Source also set (a
+	// device-layer device built with device.WithMeasurement), the
+	// clusters it materialises follow the source's own.
 	Measurement contract.MeasurementSource
 	// NodeLabel is a BridgedDeviceBasicInformation NodeLabel a controller
 	// wrote in an earlier run and the host persisted through
@@ -100,6 +102,15 @@ type Spec struct {
 	// registers a type's mandatory client clusters and
 	// DescriptorServer.ts:284-290 lists them. nil declares none.
 	ClientClusters []uint32
+	// OptIn names the stack-mounted optional server clusters the endpoint
+	// opts into: Groups (0x0004) and ScenesManagement (0x0062), which the
+	// assembler mounts where the device type mandates them and, with this,
+	// where the device type allows them as optional — matter.js's
+	// `MutableEndpoint.with(GroupsServer)` adds a behavior to any endpoint
+	// type (packages/node/src/endpoint/type/MutableEndpoint.ts:95-112). An
+	// id the device type does not allow as a server cluster, and any other
+	// id, is ignored. nil opts into nothing.
+	OptIn []uint32
 	// Parts are the endpoint's child endpoints — matter.js Endpoint
 	// `parts` — such as the PowerSource (0x0011) component a SmokeCoAlarm
 	// requires (matter.js examples/device-smoke-co-alarm). Each part is an

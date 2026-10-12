@@ -27,7 +27,7 @@ func validService(t *testing.T) mdns.Service {
 		TXT: []mdns.TXTRecord{
 			{Key: "SII", Value: "5000"},
 			{Key: "SAI", Value: "300"},
-			{Key: "T", Value: "0"},
+			{Key: "T", Value: "6"},
 		},
 	}
 }
@@ -170,13 +170,13 @@ func TestService_MarshalTXT_SortedAlphabetically(t *testing.T) {
 	t.Parallel()
 	svc := mdns.Service{
 		TXT: []mdns.TXTRecord{
-			{Key: "T", Value: "0"},
+			{Key: "T", Value: "6"},
 			{Key: "SAI", Value: "300"},
 			{Key: "SII", Value: "5000"},
 		},
 	}
 	got := svc.MarshalTXT()
-	want := []string{"SAI=300", "SII=5000", "T=0"}
+	want := []string{"SAI=300", "SII=5000", "T=6"}
 	if len(got) != len(want) {
 		t.Fatalf("MarshalTXT len=%d, want %d", len(got), len(want))
 	}
@@ -290,14 +290,14 @@ func TestBuildOperationalService_ServiceType(t *testing.T) {
 	}
 }
 
-func TestBuildOperationalService_TXTContainsSIISAIT(t *testing.T) {
+func TestBuildOperationalService_TXTContainsSIISAISAT(t *testing.T) {
 	t.Parallel()
 	svc := mdns.BuildOperationalService(operationalCfg())
 	keys := make(map[string]string, len(svc.TXT))
 	for _, r := range svc.TXT {
 		keys[r.Key] = r.Value
 	}
-	for _, k := range []string{"SII", "SAI", "SAT", "T"} {
+	for _, k := range []string{"SII", "SAI", "SAT"} {
 		if _, ok := keys[k]; !ok {
 			t.Errorf("TXT missing key %q", k)
 		}
@@ -313,7 +313,22 @@ func TestBuildOperationalService_TCPFlags_BothFalse(t *testing.T) {
 	cfg.TCPClient = false
 	cfg.TCPServer = false
 	svc := mdns.BuildOperationalService(cfg)
-	assertTXTValue(t, svc, "T", "0")
+	// No mode, no key: matter.js MdnsAdvertisement.ts:204-206 (T only when
+	// description.tcp is set, ServerNetworkRuntime.ts:334-338 sets it only
+	// with TCP configured); chip Advertiser_ImplMinimalMdns.cpp:279-285.
+	if hasTXTKey(svc, "T") {
+		t.Fatalf("operational record without TCP carries T: %v", svc.TXT)
+	}
+}
+
+// TestBuildCommissionableService_NeverCarriesT: the T key is operational
+// only (MdnsAdvertisement.ts:204-206 `this.isOperational()`).
+func TestBuildCommissionableService_NeverCarriesT(t *testing.T) {
+	t.Parallel()
+	svc := mdns.BuildCommissionableService(commissionableCfg())
+	if hasTXTKey(svc, "T") {
+		t.Fatalf("commissionable record carries T: %v", svc.TXT)
+	}
 }
 
 // The `T` (TCP Support) bitmap per Matter §4.3.1.7 / chip Advertiser.h:

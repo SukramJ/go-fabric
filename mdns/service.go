@@ -206,6 +206,14 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 	// Matter §4.3.1.7 `T` (TCP Support) bitmap: bit0 is reserved/deprecated,
 	// bit1 = TCP client supported, bit2 = TCP server supported. Mirrors chip
 	// src/lib/dnssd/Advertiser.h:63-64 (kTCPClient=1<<1, kTCPServer=1<<2).
+	// The key is written only when a mode is advertised: matter.js sets the
+	// advertiser's supportedTransports only when TCP is configured
+	// (packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:334-338)
+	// and emits `T` only then, and only on the operational record
+	// (packages/protocol/src/advertisement/mdns/MdnsAdvertisement.ts:204-206);
+	// chip at the harness pin writes it only for a mode other than kNone
+	// (src/lib/dnssd/Advertiser_ImplMinimalMdns.cpp:279-285). The
+	// commissionable record never carries it.
 	tcpFlag := uint8(0)
 	if cfg.TCPClient {
 		tcpFlag |= 1 << 1
@@ -245,7 +253,9 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 		{Key: "SII", Value: strconv.FormatUint(uint64(sii), 10)},
 		{Key: "SAI", Value: strconv.FormatUint(uint64(sai), 10)},
 		{Key: "SAT", Value: strconv.FormatUint(uint64(sat), 10)},
-		{Key: "T", Value: strconv.FormatUint(uint64(tcpFlag), 10)},
+	}
+	if tcpFlag != 0 {
+		txt = append(txt, TXTRecord{Key: "T", Value: strconv.FormatUint(uint64(tcpFlag), 10)})
 	}
 	// ICD operating-mode hint per Matter §4.3.1.6, matter.js
 	// MdnsAdvertisement.ts:191-193. Non-ICD bridges omit this key

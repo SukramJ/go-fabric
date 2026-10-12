@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4419,
+  "entry_points": 4435,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10387,
-    "reachable": 7335,
-    "whitelisted": 3047,
+    "total_exported": 10419,
+    "reachable": 7348,
+    "whitelisted": 3066,
     "unreachable": 5
   },
   "by_package": [
@@ -224,7 +224,7 @@
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 124,
+      "line": 135,
       "kind": "func"
     },
     {
@@ -668,7 +668,7 @@
       "identifier": "TestBindSessionRouteNeverSwitchesTransport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 325
+      "line": 428
     },
     {
       "package": "bridge",
@@ -3272,14 +3272,14 @@
       "identifier": "TestInitiatedExchangePeerLoss_ForceClosesPeerSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 44
+      "line": 45
     },
     {
       "package": "bridge",
       "identifier": "TestInitiatedPeerLoss_UnknownExchangeIsNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 127
+      "line": 128
     },
     {
       "package": "bridge",
@@ -3559,7 +3559,14 @@
       "identifier": "TestOtaRequestor_EndToEnd_QueryBDXApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/ota_provider_e2e_test.go",
-      "line": 187
+      "line": 190
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestOtaRequestor_EndToEnd_TCPBlockSize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/ota_provider_e2e_test.go",
+      "line": 276
     },
     {
       "package": "bridge",
@@ -4217,7 +4224,7 @@
       "identifier": "TestReceiveOverReliableServesUnsecuredDropsGroup",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 298
+      "line": 401
     },
     {
       "package": "bridge",
@@ -4260,6 +4267,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
       "line": 509
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
+      "line": 149
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReportPeerLoss_OnlyFirstMessageOfExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
+      "line": 251
     },
     {
       "package": "bridge",
@@ -4532,7 +4553,7 @@
       "identifier": "TestRouteHelpers",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 397
+      "line": 500
     },
     {
       "package": "bridge",
@@ -4662,6 +4683,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestServerChangeNotifierIsHeardWithoutASourceNotifier",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/server_notifier_test.go",
+      "line": 156
+    },
+    {
+      "package": "bridge",
       "identifier": "TestSessionMissBurst_CooldownSuppressesRepeats",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/session_miss_burst_test.go",
@@ -4767,6 +4795,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestSourceThatIsAServerIsSubscribedOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/server_notifier_test.go",
+      "line": 177
+    },
+    {
+      "package": "bridge",
       "identifier": "TestStartHealthProbe_BoundReportsHealthy",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/health_probe_test.go",
@@ -4854,63 +4889,63 @@
       "identifier": "TestSubscriptionResumption_DisabledRecordsNothing",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 920
+      "line": 927
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_FabricRemovalForgetsRows",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 938
+      "line": 945
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_InvalidSubscriptionDropsTheRecord",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 809
+      "line": 816
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerReplacingSubscriptionForgetsIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 955
+      "line": 962
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_PeerThatSubscribesIsSkipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 877
+      "line": 884
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEnd",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 719
+      "line": 726
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_RestartEndToEndWithMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 727
+      "line": 734
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_SilentPeerStopsThatPeersLoop",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 981
+      "line": 988
     },
     {
       "package": "bridge",
       "identifier": "TestSubscriptionResumption_UnreachablePeerIsDropped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/subscription_resume_e2e_test.go",
-      "line": 842
+      "line": 849
     },
     {
       "package": "bridge",
@@ -4942,6 +4977,13 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestTCPConnClosedWhenLastSessionGoes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 255
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTCPConnectionDropEvictsBoundSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
@@ -4949,10 +4991,17 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestTCPInboundCloseSessionClosesConn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/conn_tcp_test.go",
+      "line": 319
+    },
+    {
+      "package": "bridge",
       "identifier": "TestTCPListenerSharesUDPPortAndAdvertisesT",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 254
+      "line": 357
     },
     {
       "package": "bridge",
@@ -5036,7 +5085,7 @@
       "identifier": "TestUnsolicitedReportOverTCPHasNoMRP",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/conn_tcp_test.go",
-      "line": 372
+      "line": 475
     },
     {
       "package": "bridge",
@@ -5646,6 +5695,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
       "line": 1136
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOtaRequestorBdxBlockSizeByChannel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_software_update_requestor_test.go",
+      "line": 1286
     },
     {
       "package": "cluster/core",
@@ -6437,6 +6493,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/onoff/server.go",
       "line": 21
+    },
+    {
+      "package": "cluster/onoff",
+      "identifier": "TestDelayedSceneApplyStaleRun",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/onoff/server_internal_test.go",
+      "line": 77
     },
     {
       "package": "cluster/onoff",
@@ -13744,7 +13807,7 @@
       "identifier": "TestParityMatterJS_SchedulesClusterIsNotShipped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/wire/parity_matterjs_test.go",
-      "line": 97
+      "line": 96
     },
     {
       "package": "cluster/wire",
@@ -13849,14 +13912,14 @@
       "identifier": "TestClientListCarriesTheMandatoryClientClusters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 440
+      "line": 469
     },
     {
       "package": "device",
       "identifier": "TestDefaultSelectionKeepsTheClusterMandatedFeatures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 468
+      "line": 497
     },
     {
       "package": "device",
@@ -13867,31 +13930,45 @@
     },
     {
       "package": "device",
+      "identifier": "TestDimmableLightServesMinAndMaxLevel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/device_test.go",
+      "line": 195
+    },
+    {
+      "package": "device",
       "identifier": "TestElementAlterationsApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 186
+      "line": 215
     },
     {
       "package": "device",
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 255
+      "line": 254
+    },
+    {
+      "package": "device",
+      "identifier": "TestFabricScopedDefaults",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/fabric_scoped_test.go",
+      "line": 18
     },
     {
       "package": "device",
       "identifier": "TestFeatureMasksMatchTheDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 389
+      "line": 418
     },
     {
       "package": "device",
       "identifier": "TestFeatureSelection",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 47
+      "line": 46
     },
     {
       "package": "device",
@@ -13905,56 +13982,70 @@
       "identifier": "TestOnChangedFiresOnSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 220
+      "line": 249
+    },
+    {
+      "package": "device",
+      "identifier": "TestOptInRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/optin_test.go",
+      "line": 84
     },
     {
       "package": "device",
       "identifier": "TestOptionalClusterWithItsAlterations",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 151
+      "line": 150
+    },
+    {
+      "package": "device",
+      "identifier": "TestOptionalGroupsAndScenes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/optin_test.go",
+      "line": 24
     },
     {
       "package": "device",
       "identifier": "TestOptionsRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 117
+      "line": 116
     },
     {
       "package": "device",
       "identifier": "TestParts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 255
+      "line": 284
     },
     {
       "package": "device",
       "identifier": "TestRefusalsWrapTheirSentinel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 311
+      "line": 310
     },
     {
       "package": "device",
       "identifier": "TestSpec",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 306
+      "line": 335
     },
     {
       "package": "device",
       "identifier": "TestTypeLookups",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 332
+      "line": 361
     },
     {
       "package": "device",
       "identifier": "TestTypedDefault",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 363
+      "line": 392
     },
     {
       "package": "device",
@@ -13968,7 +14059,28 @@
       "identifier": "TestWithElements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 482
+      "line": 511
+    },
+    {
+      "package": "device",
+      "identifier": "TestWithMeasurement",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/measurement_test.go",
+      "line": 38
+    },
+    {
+      "package": "device",
+      "identifier": "TestWithMeasurementComposesWithTheDevicesOwnServers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/measurement_test.go",
+      "line": 88
+    },
+    {
+      "package": "device",
+      "identifier": "TestWithMeasurementRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/measurement_test.go",
+      "line": 106
     },
     {
       "package": "device",
@@ -13982,7 +14094,7 @@
       "identifier": "TestWithServerReplacesTheDefault",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 84
+      "line": 83
     },
     {
       "package": "diagevent",
@@ -14115,7 +14227,7 @@
       "identifier": "TestAssemblerStampsGroupState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 147
+      "line": 149
     },
     {
       "package": "endpoint",
@@ -14388,7 +14500,7 @@
       "identifier": "TestGroupsServerIsMountedWhereTheDeviceTypeMandatesIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 85
+      "line": 87
     },
     {
       "package": "endpoint",
@@ -14770,10 +14882,17 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestScenesMountWiresOnOffScenesPort",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/groups_mount_test.go",
+      "line": 286
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestScenesServerReplacesTheStub",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 202
+      "line": 204
     },
     {
       "package": "endpoint",
@@ -14788,6 +14907,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/parts_test.go",
       "line": 23
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestStackClustersMountWhereTheEndpointOptsIn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/groups_mount_test.go",
+      "line": 242
     },
     {
       "package": "endpoint",
@@ -15032,7 +15158,7 @@
       "identifier": "TestAirQualitySensorMountsEveryConcentrationCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 338
+      "line": 350
     },
     {
       "package": "examples/reference-bridge",
@@ -15060,7 +15186,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 296
+      "line": 308
     },
     {
       "package": "examples/reference-bridge",
@@ -15068,6 +15194,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
       "line": 52
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestButtonPressWiringThroughTheDeviceLayer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_test.go",
+      "line": 379
     },
     {
       "package": "examples/reference-bridge",
@@ -15298,7 +15431,7 @@
       "identifier": "TestSmokeAlarmHasItsPowerSourcePart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 313
+      "line": 325
     },
     {
       "package": "examples/reference-bridge",

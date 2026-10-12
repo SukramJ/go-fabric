@@ -65,10 +65,13 @@ through which the test-support packages reach package internals
 unimportable from outside. Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
-Depend freely on `bootid/`, `bridge/`, `cluster/…`, `commissioning/`,
-`contract/`, `diagevent/`, `eligibility/`, `endpoint/` (including
-`endpoint/sqlitestore`), `im/`, `im/subscription`, `mdns/`, `parity/`,
-`schema/`, `secure/…`, `store/`, `tlv/` and `transport/…`.
+Depend freely on `bdx/`, `bootid/`, `bridge/`, `cluster/…`, `commissioning/`,
+`contract/`, `device/`, `diagevent/`, `eligibility/`, `endpoint/` (including
+`endpoint/sqlitestore`), `groups/`, `im/`, `im/subscription`, `mdns/`, `node/`,
+`parity/`, `schema/`, `secure/…`, `store/`, `tlv/` and `transport/…`. The
+device layer `device/` and the node facade `node/` are public API since
+`v0.3.0`; that release freezes nothing, and the `v1.0.0` freeze is still
+ahead.
 
 `bridge/bridgetest` and `endpoint/endpointtest` are public API on the same
 terms as the rest, not a lower tier. They exist for the reason
@@ -124,6 +127,10 @@ SemVer permits a `v0` module to break on any minor bump. This module does not us
 above applies at `v0` exactly as it would at `v1`: a breaking change is a
 minor bump, never a patch, and wherever the old identifier can be kept
 working it is kept working for the full window.
+
+`v0.3.0` is the first release to act on the window: it removes the
+identifiers `v0.2.0` marked for removal in it, each listed with its
+replacement under `### Removed` in [`CHANGELOG.md`](./CHANGELOG.md#030--2026-10-12).
 
 Two changes bypass the window, and both are named as such in their entry:
 

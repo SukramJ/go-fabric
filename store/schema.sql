@@ -225,10 +225,13 @@ CREATE TABLE IF NOT EXISTS matter_settings (
     value TEXT NOT NULL
 );
 
--- matter_persistent_subscriptions is the deprecated first attempt at
--- subscription persistence. Nothing in this module writes or reads it; it
--- is still created so a host that pinned the old store API keeps working
--- through the deprecation window. matter_server_subscriptions replaces it.
+-- matter_persistent_subscriptions is the first attempt at subscription
+-- persistence. Its Go API (PersistentSubscription*) was deprecated in
+-- v0.2.0 and removed in v0.3.0; nothing in this module writes or reads the
+-- table. The CREATE stays: every database a v0.2.x store applied carries
+-- the table already, so dropping the statement would not remove it, and
+-- keeping it leaves old and new databases with the same schema.
+-- matter_server_subscriptions replaces it.
 CREATE TABLE IF NOT EXISTS matter_persistent_subscriptions (
     id                  INTEGER  PRIMARY KEY AUTOINCREMENT,
     fabric_index        INTEGER  NOT NULL,

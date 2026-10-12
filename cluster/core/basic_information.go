@@ -357,9 +357,9 @@ func (b *BasicInformation) instanceOptions() spec.Options {
 	opts := spec.Options{
 		// UniqueID ("Rev >= v4, O"), SpecificationVersion and
 		// MaxPathsPerInvoke ("Rev >= v3") and ConfigurationVersion
-		// ("Rev >= v6") are mandatory at the revision served; the
-		// runtime leaves revision conditions to the server, so they are
-		// declared.
+		// ("Rev >= v6") are mandatory at the revision served, which
+		// cluster/spec resolves; they are declared as well, to keep the
+		// list explicit.
 		Attributes: []uint32{
 			basicInfoAttrReachable, basicInfoAttrSerialNumber, basicInfoAttrUniqueID,
 			basicInfoAttrSpecificationVersion, basicInfoAttrMaxPathsPerInvoke, basicInfoAttrConfigurationVersion,

@@ -91,6 +91,40 @@ type FeatureContext interface {
 	Supported(name string) bool
 }
 
+// RevisionContext is a [FeatureContext] that also knows the revision of
+// the cluster it judges ([Context] returns one). A revision condition
+// ("Rev >= vN") is decided against it: present at or above revision N,
+// absent below — matter.js's runtime conformance compiler resolves the
+// node "at compile time since the cluster revision is static"
+// (packages/node/src/behavior/state/validation/conformance-compiler.ts:250-254,
+// `revision >= ast.param ? ConformantNode : NonconformantNode`, the
+// schema's revision defaulting to 1). A context without a revision leaves
+// the condition conditional, as matter.js's model-level
+// computeApplicability does (packages/model/src/aspects/Conformance.ts:995-997,
+// 1004-1006).
+type RevisionContext interface {
+	FeatureContext
+	Revision() uint16
+}
+
+// revisionApplicability decides a ConfRevision node: Mandatory where the
+// context's revision reaches c.Rev, None below it, Conditional without a
+// revision.
+func revisionApplicability(c Conformance, ctx FeatureContext) Applicability {
+	rc, ok := ctx.(RevisionContext)
+	if !ok {
+		return ApplicabilityConditional
+	}
+	rev := int(rc.Revision())
+	if rev == 0 {
+		rev = 1 // conformance-compiler.ts:252, `?? 1`
+	}
+	if rev >= c.Rev {
+		return ApplicabilityMandatory
+	}
+	return ApplicabilityNone
+}
+
 // IsMandatory mirrors Conformance.isMandatory: "M", or an otherwise list
 // that reaches "M" before any "P". It decides whether a payload field is
 // mandatory (ValueModel.mandatory, which TlvOfModel encodes as TlvField).
@@ -171,8 +205,10 @@ func assessOuter(c Conformance, ctx FeatureContext) Applicability {
 		return ApplicabilityOptional
 	case ConfMandatory:
 		return ApplicabilityMandatory
-	case ConfDesc, ConfRevision:
+	case ConfDesc:
 		return ApplicabilityConditional
+	case ConfRevision:
+		return revisionApplicability(c, ctx)
 	default:
 		return assessInner(c, ctx)
 	}
@@ -207,6 +243,8 @@ func assessInner(c Conformance, ctx FeatureContext) Applicability {
 			return ApplicabilityConditional
 		}
 		return ApplicabilityMandatory
+	case ConfRevision:
+		return revisionApplicability(c, ctx)
 	case ConfOr:
 		lhs, rhs := assessInner(lhsOf(c), ctx), assessInner(rhsOf(c), ctx)
 		switch {
@@ -217,8 +255,8 @@ func assessInner(c Conformance, ctx FeatureContext) Applicability {
 		}
 		return ApplicabilityConditional
 	default:
-		// Revision, member access, comparisons, XOR and values: decidable
-		// only once the record or the revision is known.
+		// Member access, comparisons, XOR and values: decidable only once
+		// the record is known.
 		return ApplicabilityConditional
 	}
 }

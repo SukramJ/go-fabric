@@ -93,7 +93,7 @@ Application clusters, grouped by the device surface they serve:
 | [`cluster/energy`](../cluster/energy) | WaterHeaterManagement (0x0094) — EM / TP, Boost / CancelBoost through a host port with chip's field rules, BoostStarted / BoostEnded · EnergyPreference (0x009B) — BALA / LPMS, index writes held to their lists · MeterIdentification (0x0B06) |
 | [`cluster/spec`](../cluster/spec) | The generated cluster definitions (`cluster/spec/<name>/`, written by `script/clustergen` from the snapshot) and the runtime that derives a server's lists, globals, privileges, write checks and payload codecs from one ([ADR 0013](./adr/0013-generated-cluster-definitions.md)); `cluster/spec/spectest` holds the parity assertions |
 | [`cluster/measurement`](../cluster/measurement) | Temperature (0x0402) · RelativeHumidity (0x0405) · Illuminance (0x0400) · Pressure (0x0403) · Flow (0x0404) · BooleanState (0x0045) · OccupancySensing (0x0406) · AirQuality (0x005B) · CO₂ (0x040D) · PM2.5 (0x042A) · PM10 (0x042D) · PowerSource (0x002F) · ElectricalPowerMeasurement (0x0090) · ElectricalEnergyMeasurement (0x0091) |
-| [`cluster/wire`](../cluster/wire) | Wire-format types and encoders for AdministratorCommissioning, Switch (Generic Switch), ScenesManagement, Schedules, the deprecated Groups stub, and the command payloads of the servers above |
+| [`cluster/wire`](../cluster/wire) | Wire-format types and encoders for AdministratorCommissioning, Switch (Generic Switch), ScenesManagement, Schedules, and the command payloads of the servers above |
 
 Groups (0x0004) is a **real server** ([`cluster/core`](../cluster/core)):
 group membership is stack state held by [`groups`](../groups), the assembler

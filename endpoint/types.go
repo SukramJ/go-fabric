@@ -99,8 +99,9 @@ type Endpoint struct {
 	// surface. nil for the root endpoint and for measurement-only
 	// sub-endpoints (which use Measurement instead).
 	Source contract.EndpointSource
-	// Measurement is set on standalone sensor endpoints assembled
-	// from MatterMeasurementSource implementers. nil otherwise.
+	// Measurement is set on sensor endpoints assembled from
+	// MatterMeasurementSource implementers. nil otherwise. With Source
+	// also set, its clusters follow the source's ([ClusterServers]).
 	Measurement contract.MeasurementSource
 	// PowerSource carries the device's battery reading on exactly one of
 	// the device's endpoints, so the PowerSource cluster (0x002F) is served
@@ -181,6 +182,10 @@ type Endpoint struct {
 	// ClientClusters are the client clusters the endpoint declares, served
 	// as its Descriptor ClientList. Carried from [Spec.ClientClusters].
 	ClientClusters []uint32
+
+	// OptIn are the stack-mounted optional server clusters the endpoint
+	// opts into (Groups, ScenesManagement). Carried from [Spec.OptIn].
+	OptIn []uint32
 
 	// attachedClusters holds the cluster servers that come from OUTSIDE
 	// the assembler: the daemon builds them and hands them to the bridge,
@@ -641,9 +646,15 @@ func (e *Endpoint) ForgetFabricScenes(fabricIndex uint8) {
 // LevelControlServer and ColorControlServer call
 // ScenesManagementServer.makeAllFabricSceneInfoEntriesInvalid from their
 // state-changing commands. A recall applies its values through the
-// servers directly and keeps the scene valid.
-func (e *Endpoint) invalidateSceneOnCommand(clusterID uint32) {
+// servers directly and keeps the scene valid. A server that invalidates
+// the scene from its own logic ([mattercore.SceneInvalidator], the OnOff
+// server with its scenes port) is left to do so: matter.js's OnOffServer
+// invalidates only when OnOff changes (OnOffServer.ts:97-100, :119-122).
+func (e *Endpoint) invalidateSceneOnCommand(srv contract.ClusterServer, clusterID uint32) {
 	if clusterID != 0x0006 && clusterID != 0x0008 && clusterID != 0x0300 {
+		return
+	}
+	if inv, ok := srv.(mattercore.SceneInvalidator); ok && inv.MatterInvalidatesScenes() {
 		return
 	}
 	st := e.endpointState()

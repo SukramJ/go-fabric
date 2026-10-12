@@ -20,7 +20,6 @@ import (
 	egc "github.com/SukramJ/go-fabric/cluster/spec/electricalgridconditions"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/device"
-	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/node"
 )
 
@@ -633,14 +632,19 @@ func (m *demoElectricalMeter) testEventTrigger(trigger uint64) bool {
 // device builds the grid meter. ElectricalMeter requires an
 // ElectricalSensor device type, min 1 (matter.js
 // packages/model/src/standard/elements/electrical-meter.element.ts:21):
-// the meter's sensor is a part, as the charger's is (fleet_evse.go), a
-// measurement-backed endpoint.
+// the meter's sensor is a part, as the charger's is (fleet_evse.go), served
+// from its reading.
 func (m *demoElectricalMeter) device(opts device.Options) (node.Endpoint, error) {
 	meter, err := device.NewElectricalMeter(opts, serve(m.servers())...)
 	if err != nil {
 		return nil, err
 	}
-	return withMeasuredParts{meter, []endpoint.Spec{{
-		StableKey: endpoint.StringKey("demo:electricalmeter:sensor"), DeviceType: deviceTypeElectricalSensor, Measurement: evseMeter{},
-	}}}, nil
+	sensor, err := device.NewElectricalSensor(part("demo:electricalmeter:sensor"), measured(evseMeter{}))
+	if err != nil {
+		return nil, err
+	}
+	if err := meter.AddPart(sensor.Device); err != nil {
+		return nil, err
+	}
+	return meter, nil
 }

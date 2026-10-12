@@ -35,6 +35,8 @@ func TestSchemaCreatesEveryTableThePackageQueries(t *testing.T) {
 		"matter_diagnostics",
 		"matter_metadata",
 		"matter_settings",
+		// No query reads this one since v0.3.0 removed its API; the CREATE
+		// stays so every database keeps the same schema (schema.sql).
 		"matter_persistent_subscriptions",
 		"matter_server_subscriptions",
 	} {

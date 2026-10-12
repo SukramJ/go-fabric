@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	cccdef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
 	cddef "github.com/SukramJ/go-fabric/cluster/spec/closuredimension"
@@ -49,8 +48,9 @@ var refusedDefaults = map[string]string{
 	"SmokeCoAlarm":           "SmokeCoAlarm needs a feature selection",
 	"Thermostat":             "Thermostat needs a feature selection",
 	"WindowCovering":         "WindowCovering needs a feature selection",
-	// A mandatory cluster whose generated server refuses its definition.
-	"Doorbell":     "Binding attribute Binding: supply its server with WithServer",
+	// A mandatory cluster whose generated server refuses its definition
+	// and that has no core default: the requestor needs the node's
+	// connector.
 	"OtaRequestor": "attribute DefaultOtaProviders: supply its server with WithServer",
 	// The node's root clusters have no committed definitions; the root is
 	// the node facade's, not a bridged device.
@@ -174,7 +174,6 @@ var fixtures = map[string]fixture{
 		tolerate: map[string]string{"missing Descriptor.TAGLIST": tagListReason},
 	},
 	"DeviceEnergyManagement": {with: opts(forecast)},
-	"Doorbell":               {with: func(*testing.T) []Option { return []Option{WithServer(core.NewBinding())} }},
 	"ElectricalEnergyTariff": {tolerate: map[string]string{"missing Descriptor.TAGLIST": tagListReason}},
 	"ElectricalMeter": {
 		with: opts(acPower, feat(0x0091, eemdef.FeatureImportedEnergy|eemdef.FeatureCumulativeEnergy)),
