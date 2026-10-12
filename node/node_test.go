@@ -15,6 +15,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/contract"
@@ -110,10 +111,10 @@ func endpointOf(t *testing.T, n *node.Node, key string) (uint16, bool) {
 	return 0, false
 }
 
-func uintList(v tlvTree) []uint64 {
+func uintList(v bridgetest.TLV) []uint64 {
 	out := make([]uint64, 0, len(v.Children))
 	for _, c := range v.Children {
-		out = append(out, c.El.Uint)
+		out = append(out, c.Uint)
 	}
 	return out
 }
@@ -143,34 +144,46 @@ func TestNodeServesPASEReadAndSubscription(t *testing.T) {
 		t.Fatal("plug:1 not in the topology")
 	}
 
-	c := dialCommissioner(t, n.Bridge().LocalAddr())
-	c.pase(testPasscode)
+	c := bridgetest.Dial(t, n.Bridge().LocalAddr(), commissionerOptions())
+	s, err := c.PASE(ctx)
+	if err != nil {
+		t.Fatalf("PASE: %v", err)
+	}
 
-	root := attributeData(t, c.read(
-		attrPath{0, 0x0028, 0x0001}, // BasicInformation VendorName
-		attrPath{0, 0x0028, 0x0005}, // NodeLabel
-		attrPath{0, 0x001D, 0x0003}, // root Descriptor PartsList
-	))
-	if got := root[0x0001].El.String; got != "go-fabric test" {
-		t.Errorf("VendorName %q", got)
+	root, err := s.Read(ctx,
+		attr(0, 0x0028, 0x0001), // BasicInformation VendorName
+		attr(0, 0x0028, 0x0005), // NodeLabel
+		attr(0, 0x001D, 0x0003), // root Descriptor PartsList
+	)
+	if err != nil {
+		t.Fatalf("read root: %v", err)
 	}
-	if got := root[0x0005].El.String; got != "test node" {
-		t.Errorf("NodeLabel %q", got)
+	if got, _ := root.Value(0, 0x0028, 0x0001); got.String != "go-fabric test" {
+		t.Errorf("VendorName %q", got.String)
 	}
-	if got := uintList(root[0x0003]); !slices.Equal(got, []uint64{1, uint64(plugEP)}) {
-		t.Errorf("root PartsList %v, want [1 %d]", got, plugEP)
+	if got, _ := root.Value(0, 0x0028, 0x0005); got.String != "test node" {
+		t.Errorf("NodeLabel %q", got.String)
 	}
-	bridged := attributeData(t, c.read(attrPath{plugEP, onoff.ClusterID, onoff.AttrOnOff}))
-	if v, ok := bridged[onoff.AttrOnOff]; !ok || v.El.Bool {
+	if got, _ := root.Value(0, 0x001D, 0x0003); !slices.Equal(uintList(got), []uint64{1, uint64(plugEP)}) {
+		t.Errorf("root PartsList %v, want [1 %d]", uintList(got), plugEP)
+	}
+	bridged, err := s.Read(ctx, attr(plugEP, onoff.ClusterID, onoff.AttrOnOff))
+	if err != nil {
+		t.Fatalf("read bridged: %v", err)
+	}
+	if v, ok := bridged.Value(plugEP, onoff.ClusterID, onoff.AttrOnOff); !ok || v.Bool {
 		t.Errorf("bridged OnOff %+v (%v), want false", v, ok)
 	}
 
-	priming, resp := c.subscribe(60, attrPath{1, 0x001D, 0x0003})
-	if got := uintList(attributeData(t, priming)[0x0003]); !slices.Equal(got, []uint64{uint64(plugEP)}) {
-		t.Errorf("priming Aggregator PartsList %v", got)
+	sub, err := s.Subscribe(ctx, 0, 60, attr(1, 0x001D, 0x0003))
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
 	}
-	if sub, ok := decodeTree(t, resp).child(0); !ok || sub.El.Uint == 0 {
-		t.Fatalf("SubscribeResponse without a SubscriptionID: %x", resp)
+	if got, _ := sub.Priming.Value(1, 0x001D, 0x0003); !slices.Equal(uintList(got), []uint64{uint64(plugEP)}) {
+		t.Errorf("priming Aggregator PartsList %v", uintList(got))
+	}
+	if sub.ID == 0 {
+		t.Fatal("SubscribeResponse without a SubscriptionID")
 	}
 
 	if err := n.Aggregator().Add(ctx, newPlug(t, "plug:2")); err != nil {
@@ -180,12 +193,14 @@ func TestNodeServesPASEReadAndSubscription(t *testing.T) {
 	if !ok {
 		t.Fatal("plug:2 not reassembled into the topology")
 	}
+	deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	for {
-		report, err := c.nextReport(10 * time.Second)
+		report, err := s.NextReport(deadline)
 		if err != nil {
 			t.Fatalf("no report after the Aggregator changed: %v", err)
 		}
-		if v, ok := attributeData(t, report)[0x0003]; ok {
+		if v, ok := report.Value(1, 0x001D, 0x0003); ok {
 			if got := uintList(v); !slices.Equal(got, []uint64{uint64(plugEP), uint64(plug2)}) {
 				t.Errorf("reported PartsList %v", got)
 			}
