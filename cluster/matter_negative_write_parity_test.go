@@ -85,6 +85,16 @@ func newRefusingThermostatServer() *thermo.ThermostatServer {
 	return thermo.NewThermostatServer(cfg)
 }
 
+// refusingMover is a WindowCovering host whose device refuses every
+// movement.
+type refusingMover struct{}
+
+func (refusingMover) GoTo(context.Context, *uint16, *uint16) error {
+	return errors.New("device refused")
+}
+
+func (refusingMover) Stop(context.Context) error { return errors.New("device refused") }
+
 func newWindowCoveringServer() *cover.WindowCoveringServer {
 	return cover.NewWindowCoveringServer(cover.Config{
 		Type:           0,
@@ -653,6 +663,19 @@ func TestNegativeInvokeParity(t *testing.T) {
 				"percent": uint16(10001),
 			},
 			wantStatus: im.StatusConstraintError,
+		},
+		{
+			// Mirrors matter.js packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338
+			// (4633bfd7): a host's handleMovement that throws fails the command;
+			// cover.Mover is its Go form, an error → Failure.
+			name: "WindowCovering/UpOrOpen refused by the host Mover → Failure",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				return cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0x05, Mover: refusingMover{}})
+			},
+			cmdID:      wire.WindowCoveringCmdUpOrOpen,
+			wantStatus: im.StatusFailure,
 		},
 		{
 			// rvc-operational-state.element.ts:23 — Start is "X" in the

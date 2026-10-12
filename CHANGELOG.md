@@ -22,6 +22,17 @@ pseudo-version of `main`.
   `SetSystemMode`, `SetOccupiedHeatingSetpoint` and
   `SetOccupiedCoolingSetpoint` record the device's own state without the
   Sink and report through the change notifier (issue #60).
+- `cover.Config.Mover` (`cover.Mover`): an optional host port for a bridged
+  window covering. UpOrOpen, DownOrClose and GoToLiftPercentage store the
+  target the server infers and call `GoTo` once; StopMotion sets the target
+  to the current position and calls `Stop`. The server then neither moves
+  the lift nor changes OperationalStatus; a Mover error answers FAILURE and
+  restores the previous target. The Mover runs inside the command, so it
+  returns once the device accepted the target. `New` refuses a Mover
+  together with a `MoveStep` (`cover.ErrMoverWithMoveStep`). New inbound
+  setters `SetCurrentPosition(lift, tilt)` (tilt unused: the server is
+  lift-only) and `SetOperationalStatus` record the device's state without
+  the Mover and report through the change notifier (issue #61).
 - `bridge.Bridge.CloseFabricSessionsExcept(fabricIndex, exceptSessionID)`:
   ends every session of a fabric but one, telling each peer with a
   CloseSession first — the UpdateNOC path (matter.js `Fabric.replaced`).
