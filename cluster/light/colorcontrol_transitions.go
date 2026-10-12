@@ -133,9 +133,14 @@ func (s *ColorControlServer) cropMireds(v float64) float64 {
 }
 
 // applyChanges is the engine's Apply: the values of one step, or of a
-// transition that applies at once.
+// transition that applies at once. While a stop a Set asked for is
+// pending it changes nothing: the device's colour stands until the
+// movement has stopped.
 func (s *ColorControlServer) applyChanges(changes []transition.Change) error {
 	return s.update(context.Background(), func(st *colorState) {
+		if s.haltPending { // update holds mu
+			return
+		}
 		for _, c := range changes {
 			st.setProperty(c.Name, c.Value)
 		}
@@ -147,6 +152,11 @@ func (s *ColorControlServer) applyChanges(changes []transition.Change) error {
 // then makes the state the attributes' values and reports what changed —
 // the "Q" attributes by their quieter rules, the rest at once. A refused
 // value leaves every attribute where it was.
+//
+// The writers run with commit held but not mu, so a writer may call
+// [ColorControlServer.Set] (brief AA's rule). A Set that stored the
+// device's colour while the writers ran wins: the update then stores
+// nothing and reports nothing.
 func (s *ColorControlServer) update(ctx context.Context, change func(st *colorState)) error {
 	s.commit.Lock()
 	defer s.commit.Unlock()
@@ -155,10 +165,35 @@ func (s *ColorControlServer) update(ctx context.Context, change func(st *colorSt
 	next := prev
 	change(&next)
 	ct, cw := s.writer, s.colorWriter
+	gen := s.setGen
+	if next != prev {
+		inflight := next
+		s.inflight = &inflight
+	}
 	s.mu.Unlock()
 	if next == prev {
 		return nil
 	}
+	if err := s.write(ctx, ct, cw, prev, next); err != nil {
+		s.mu.Lock()
+		s.inflight = nil
+		s.mu.Unlock()
+		return err
+	}
+	s.mu.Lock()
+	s.inflight = nil
+	if s.setGen != gen {
+		s.mu.Unlock()
+		return nil
+	}
+	s.st = next
+	s.mu.Unlock()
+	s.report(prev, next)
+	return nil
+}
+
+// write pushes what changed between prev and next to the writers.
+func (s *ColorControlServer) write(ctx context.Context, ct ColorTemperatureWriter, cw ColorWriter, prev, next colorState) error {
 	if ct != nil && next.mireds != prev.mireds {
 		if err := ct.SetColorTemperatureMireds(ctx, next.mireds); err != nil {
 			return fmt.Errorf("colorcontrol: ColorTemperatureMireds write-through: %w", err)
@@ -169,10 +204,6 @@ func (s *ColorControlServer) update(ctx context.Context, change func(st *colorSt
 			return fmt.Errorf("colorcontrol: colour write-through: %w", err)
 		}
 	}
-	s.mu.Lock()
-	s.st = next
-	s.mu.Unlock()
-	s.report(prev, next)
 	return nil
 }
 
@@ -246,7 +277,12 @@ func (s *ColorControlServer) MatterSelfReportedAttributes() []uint32 {
 // MatterQuiesce implements [contract.ClusterQuiescer]: a transition stops
 // where it is, without a report (matter.js ColorControlServer
 // [Symbol.asyncDispose]).
-func (s *ColorControlServer) MatterQuiesce() { s.engine.StopAll() }
+func (s *ColorControlServer) MatterQuiesce() {
+	s.engine.StopAll()
+	s.mu.Lock()
+	s.haltPending = false // nothing moves any more
+	s.mu.Unlock()
+}
 
 // executes is matter.js #optionsAllowExecution.
 func (s *ColorControlServer) executes(mask, override uint8) bool {
@@ -304,7 +340,7 @@ func (s *ColorControlServer) endTransitions() { s.engine.CancelAll() }
 // a level in between linearly; the value applies at once. It implements
 // levelcontrol.ColorTemperatureCoupling.
 func (s *ColorControlServer) SyncColorTemperatureWithLevel(_ context.Context, level uint8) error {
-	s.cmd.Lock()
+	s.lockCommands()
 	defer s.cmd.Unlock()
 	if st := s.state(); st.mode != ColorModeColorTemperature && st.enhancedMode != ColorModeColorTemperature {
 		return nil

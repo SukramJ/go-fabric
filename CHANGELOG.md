@@ -12,6 +12,19 @@ pseudo-version of `main`.
 
 ### Added
 
+- `light.ColorControlServer.Set(light.Color)`: records a colour the device
+  took on itself, the twin of `onoff.Server.Set`. `Color.Mode` is the
+  EnhancedColorMode the device reports; that mode's fields become the
+  current colour (the colour temperature cropped to the physical range,
+  the other fields to their attributes' ranges), a mode change converts as
+  a command's mode switch does, and every changed attribute is reported
+  through the change notifier. The writers are not called. A running
+  colour movement stops and RemainingTime reports 0, as StopMoveStep does
+  — a running colour loop is left running. Set takes only the state lock,
+  so a `ColorWriter` or `ColorTemperatureWriter` may call it from inside
+  its own call; a Set of the colour being written is a confirmation and
+  stops nothing, a colour of a mode the server has no feature for is
+  logged and ignored (issue #66).
 - `thermo.ThermostatConfig.Sink` (`thermo.Sink`, `thermo.SetpointChange`):
   an optional host port for a bridged thermostat. A controller's SystemMode
   write, OccupiedHeating/CoolingSetpoint write (with the companions the

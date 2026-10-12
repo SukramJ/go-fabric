@@ -23,7 +23,7 @@ func (s *ColorControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	if !s.inst.Accepts(cmdID) {
 		return nil, im.UnsupportedCommandf("colorcontrol: command 0x%02X is not supported", cmdID)
 	}
-	s.cmd.Lock()
+	s.lockCommands()
 	defer s.cmd.Unlock()
 	return nil, s.invoke(ctx, cmdID, fields)
 }
@@ -664,6 +664,13 @@ func (s *ColorControlServer) stopMoveStep(_ context.Context, fields any) error {
 	if !s.executes(uint8(r.OptionsMask), uint8(r.OptionsOverride)) {
 		return nil
 	}
+	s.stopMoveStepLogic()
+	return nil
+}
+
+// stopMoveStepLogic is the part of stopMoveStep after the ExecuteIfOff
+// gate; [ColorControlServer.Set] runs it as well.
+func (s *ColorControlServer) stopMoveStepLogic() {
 	// Without the ColorLoop feature the attribute reads undefined in
 	// matter.js, so only an explicitly active loop is carved out.
 	looping := s.has(ColorFeatureColorLoop) && s.state().loopActive == colorLoopActiveActive
@@ -676,8 +683,7 @@ func (s *ColorControlServer) stopMoveStep(_ context.Context, fields any) error {
 	s.engine.Stop(propY)
 	s.engine.Stop(propColorTemperature)
 	if looping {
-		return nil
+		return
 	}
 	s.endTransitions()
-	return nil
 }

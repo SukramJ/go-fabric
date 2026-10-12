@@ -32,7 +32,7 @@ import (
 // the one hue attribute with the "S" quality, as this module recalled it
 // before.
 func (s *ColorControlServer) MatterApplySceneValues(ctx context.Context, values map[uint32]uint64, transitionMs uint32) {
-	s.cmd.Lock()
+	s.lockCommands()
 	defer s.cmd.Unlock()
 	tenths := float64(min(transitionMs/100, maxTransitionTime))
 
