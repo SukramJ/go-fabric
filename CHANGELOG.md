@@ -18,6 +18,15 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `device/` mounts default servers for two fabric-scoped clusters whose
+  generated server refuses them: Binding (`core.NewBinding`, as matter.js
+  mounts BindingServer where the device type or Base mandates it) and
+  EcosystemInformation (`core.NewEcosystemInformation` over empty
+  directories). `Doorbell.Binding()` returns `*core.Binding` and
+  `BridgedNode.EcosystemInformation()` `*core.EcosystemInformation`. A
+  Doorbell no longer needs `WithServer(core.NewBinding())`.
+  OtaSoftwareUpdateRequestor stays the host's (`ErrNoDefaultServer`): its
+  server needs the node's connector.
 - `endpoint.Spec.OptIn []uint32`: an endpoint opts into an optional Groups
   (0x0004) or ScenesManagement (0x0062) and the assembler mounts the stack's
   server where the device type allows the cluster, as matter.js's

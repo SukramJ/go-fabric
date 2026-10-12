@@ -4,16 +4,19 @@
 package device
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	ecodef "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/schema"
@@ -355,8 +358,66 @@ type serverFactory func(def *spec.Cluster, opts spec.Options, cfg spec.ServerCon
 // generated [spec.Server] every other cluster gets (ADR 0018, decisions of
 // wave 6, 2). Keep it in step with script/devicegen/servers.go, which
 // types the generated accessors.
+//
+// The fabric-scoped clusters, whose generated server [spec.NewServer]
+// refuses ([spec.ErrFabricScoped]), take the core server here where it holds
+// its own state: Binding and EcosystemInformation. OtaSoftwareUpdateRequestor
+// has none: its server needs the node's connector to reach a provider
+// (node/ota.go), so a device that mounts it — OtaRequestor — answers
+// [ErrNoDefaultServer] and the host supplies it with [WithServer].
 var defaultFactories = map[uint32]serverFactory{
-	0x0006: newOnOffServer, // OnOff: cluster/onoff.Server, matter.js OnOffServer.ts.
+	0x0006: newOnOffServer,                // OnOff: cluster/onoff.Server, matter.js OnOffServer.ts.
+	0x001E: newBindingServer,              // Binding: cluster/core.Binding, matter.js BindingServer.ts.
+	0x0750: newEcosystemInformationServer, // EcosystemInformation: cluster/core.EcosystemInformation.
+}
+
+// newBindingServer is the module's Binding server ([core.NewBinding]), the
+// default matter.js mounts where the device type — or Base, for a type
+// that would miss it — mandates Binding
+// (support/codegen/src/endpoints/RequirementGenerator.ts:143-155, 187-188;
+// packages/node/src/devices/on-off-sensor.ts:91 `mandatory: { Identify:
+// IdentifyServer, Binding: BindingServer }`; packages/node/src/endpoints/
+// base.ts:15-19, 39 BindingServer as the default implementation). It keeps
+// its own list and data version, so the configuration states nothing it
+// can take.
+func newBindingServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error) {
+	if err := selfHeldConfig("Binding", cfg); err != nil {
+		return nil, err
+	}
+	return core.NewBinding(), nil
+}
+
+// newEcosystemInformationServer is the module's EcosystemInformation
+// server ([core.NewEcosystemInformation]) over empty directories, the state
+// matter.js's default server starts with
+// (packages/node/src/behaviors/ecosystem-information/
+// EcosystemInformationServer.ts:14, no server logic; both attributes are
+// lists). A host whose bridged device belongs to an ecosystem supplies its
+// own server over its directory with [WithServer].
+func newEcosystemInformationServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error) {
+	if err := selfHeldConfig("EcosystemInformation", cfg); err != nil {
+		return nil, err
+	}
+	return core.NewEcosystemInformation(emptyEcosystem{}), nil
+}
+
+// selfHeldConfig refuses initial values for a core server that keeps its
+// state behind its own API: there is nothing to apply them to.
+func selfHeldConfig(name string, cfg spec.ServerConfig) error {
+	if len(cfg.Initial) != 0 {
+		return fmt.Errorf("%s keeps its own state: no initial values (WithInitial)", name)
+	}
+	return nil
+}
+
+// emptyEcosystem is an ecosystem directory with no devices and no
+// locations.
+type emptyEcosystem struct{}
+
+func (emptyEcosystem) EcosystemDevices(context.Context) []ecodef.EcosystemDeviceStruct { return nil }
+
+func (emptyEcosystem) EcosystemLocations(context.Context) []ecodef.EcosystemLocationStruct {
+	return nil
 }
 
 // newOnOffServer is the module's OnOff server ([onoff.New]). A device of

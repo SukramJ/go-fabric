@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	evsedef "github.com/SukramJ/go-fabric/cluster/spec/energyevse"
@@ -473,7 +472,7 @@ func TestClientListCarriesTheMandatoryClientClusters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bell, err := NewDoorbell(testOptions("bell"), WithServer(core.NewBinding()))
+	bell, err := NewDoorbell(testOptions("bell"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,6 +6,7 @@
 package device
 
 import (
+	core "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	administratorcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/administratorcommissioning"
 	bridgeddevicebasicinformationdef "github.com/SukramJ/go-fabric/cluster/spec/bridgeddevicebasicinformation"
@@ -79,6 +80,6 @@ func (d *BridgedNode) AdministratorCommissioning() *spec.Server {
 }
 
 // EcosystemInformation returns the EcosystemInformation server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
-func (d *BridgedNode) EcosystemInformation() *spec.Server {
-	return serverAs[*spec.Server](d.Device, 0x0750)
+func (d *BridgedNode) EcosystemInformation() *core.EcosystemInformation {
+	return serverAs[*core.EcosystemInformation](d.Device, 0x0750)
 }
