@@ -147,6 +147,11 @@ func (s *ColorControlServer) applyChanges(changes []transition.Change) error {
 // then makes the state the attributes' values and reports what changed —
 // the "Q" attributes by their quieter rules, the rest at once. A refused
 // value leaves every attribute where it was.
+//
+// The writers run with commit held but not mu, so a writer may call
+// [ColorControlServer.Set] (brief AA's rule). A Set that stored the
+// device's colour while the writers ran wins: the update then stores
+// nothing and reports nothing.
 func (s *ColorControlServer) update(ctx context.Context, change func(st *colorState)) error {
 	s.commit.Lock()
 	defer s.commit.Unlock()
@@ -155,10 +160,35 @@ func (s *ColorControlServer) update(ctx context.Context, change func(st *colorSt
 	next := prev
 	change(&next)
 	ct, cw := s.writer, s.colorWriter
+	gen := s.setGen
+	if next != prev {
+		inflight := next
+		s.inflight = &inflight
+	}
 	s.mu.Unlock()
 	if next == prev {
 		return nil
 	}
+	if err := s.write(ctx, ct, cw, prev, next); err != nil {
+		s.mu.Lock()
+		s.inflight = nil
+		s.mu.Unlock()
+		return err
+	}
+	s.mu.Lock()
+	s.inflight = nil
+	if s.setGen != gen {
+		s.mu.Unlock()
+		return nil
+	}
+	s.st = next
+	s.mu.Unlock()
+	s.report(prev, next)
+	return nil
+}
+
+// write pushes what changed between prev and next to the writers.
+func (s *ColorControlServer) write(ctx context.Context, ct ColorTemperatureWriter, cw ColorWriter, prev, next colorState) error {
 	if ct != nil && next.mireds != prev.mireds {
 		if err := ct.SetColorTemperatureMireds(ctx, next.mireds); err != nil {
 			return fmt.Errorf("colorcontrol: ColorTemperatureMireds write-through: %w", err)
@@ -169,10 +199,6 @@ func (s *ColorControlServer) update(ctx context.Context, change func(st *colorSt
 			return fmt.Errorf("colorcontrol: colour write-through: %w", err)
 		}
 	}
-	s.mu.Lock()
-	s.st = next
-	s.mu.Unlock()
-	s.report(prev, next)
 	return nil
 }
 

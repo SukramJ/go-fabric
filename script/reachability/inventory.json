@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4482,
+  "entry_points": 4497,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10439,
+    "total_exported": 10440,
     "reachable": 7360,
-    "whitelisted": 3074,
+    "whitelisted": 3075,
     "unreachable": 5
   },
   "by_package": [
@@ -13815,6 +13815,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/thermo/thermostatuserinterfaceconfiguration.go",
       "line": 42
+    },
+    {
+      "package": "cluster/thermo",
+      "identifier": "TestCompanionsMovedNamesTheWrittenSetpoint",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/thermo/setpoints_internal_test.go",
+      "line": 14
     },
     {
       "package": "cluster/valve",

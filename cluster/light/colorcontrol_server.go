@@ -269,6 +269,13 @@ type ColorControlServer struct {
 	// options is the Options bitmap (0x000F, "RW VO"): bit 0
 	// ExecuteIfOff is the only defined bit.
 	options uint8
+	// setGen counts the device's colours [ColorControlServer.Set] stored;
+	// an update whose writers ran while it moved does not store its own
+	// colour over the device's.
+	setGen uint64
+	// inflight is the colour an update is pushing to the writers, nil
+	// outside one: a Set of that colour is the device confirming it.
+	inflight *colorState
 }
 
 // Compile-time assertions.
@@ -351,10 +358,7 @@ func NewColorControl(cfg ColorControlServerConfig) (*ColorControlServer, error) 
 		return nil, err
 	}
 	s.st.enhancedMode = mode
-	s.st.mode = mode
-	if mode == ColorModeEnhancedHueSaturation {
-		s.st.mode = ColorModeHueSaturation
-	}
+	s.st.mode = colorModeOf(mode)
 
 	s.quiet = map[uint32]*cluster.Quieter{}
 	for _, id := range quietAttributes {
@@ -403,6 +407,16 @@ func (s *ColorControlServer) initialMode() (ColorMode, error) {
 	default:
 		return ColorModeHueSaturation, nil
 	}
+}
+
+// colorModeOf is the ColorMode an EnhancedColorMode reads as: the enhanced
+// hue mode is hue and saturation, every other mode itself (matter.js
+// setEnhancedColorMode).
+func colorModeOf(m ColorMode) ColorMode {
+	if m == ColorModeEnhancedHueSaturation {
+		return ColorModeHueSaturation
+	}
+	return m
 }
 
 // has reports whether the server has feature f.

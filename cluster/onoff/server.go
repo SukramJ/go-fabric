@@ -59,6 +59,14 @@ const hold = 0xFFFF
 // for the timed actions as well (OnOffServer.ts:142-145, :194-197).
 // The host's own changes ([Server.Set]) and the StartUpOnOff applied by
 // [New] do not call it.
+//
+// The Sink runs with no lock held that [Server.Set] or a read of the
+// server takes: it may confirm the change through [Server.Set] before it
+// returns, on its own goroutine or from any other, and it may read the
+// server. Commands, writes and the countdown ticks stay serialised behind
+// it — the next one waits until it returned. A Set that lands while the
+// Sink runs is stored and reported at once; when the Sink consents, the
+// command stores its own OnOff over it (see [Server.Set]).
 type Sink interface {
 	SetOnOff(ctx context.Context, on bool) error
 }
@@ -146,10 +154,16 @@ var ErrInvalidConfig = errors.New("onoff: configuration outside the cluster's mo
 // — at once without a transition time, after it otherwise
 // ([Server.MatterApplySceneValues], :268-310).
 //
-// Every operation — a command, a write, a timer tick, a host change — runs
-// under one lock, as matter.js runs the timer callbacks with `lock: true`
-// (:233, :261), and stores its changes at once when it succeeds, as a
-// matter.js command's transaction commits.
+// Two locks. Every operation the server starts itself — a command, a
+// write, a timer tick, a scene apply — runs in one queue (op), as
+// matter.js runs the timer callbacks with `lock: true` (:233, :261), and
+// stores its changes at once when it succeeds, as a matter.js command's
+// transaction commits. The stored state has its own lock (mu), held only
+// while a state is read or stored and never across a host port: the
+// host's [Server.Set] takes only mu, so a [Sink] that confirms through it
+// — synchronously or from another goroutine — never waits on the command
+// that called it (issue #63). The cover server's Mover follows the same
+// rule (cluster/cover windowcovering_server.go invokeMover).
 type Server struct {
 	*spec.Instance
 
@@ -161,10 +175,17 @@ type Server struct {
 	delayedOff ticker
 
 	// sceneApply is the pending transition-delayed scene apply (matter.js
-	// applySceneDelayTimer / applyScenePendingOnOff, :283-288), under op.
+	// applySceneDelayTimer / applyScenePendingOnOff, :283-288), under mu:
+	// [Server.Set] drops it when it changes OnOff.
 	sceneApply pendingSceneApply
 
+	// op is the queue: commands, writes, timer ticks, scene applies and
+	// the timers' running state. The host never takes it.
 	op sync.Mutex
+	// mu guards the stored state's read-modify-write ([Server.load],
+	// [Server.commit], [Server.Set]) and sceneApply. It is never held
+	// while a host port runs.
+	mu sync.Mutex
 
 	// scenes is the ScenesManagement port, nil without one. It has its
 	// own lock so [Server.SetScenes] never waits for a command (a host
@@ -258,11 +279,19 @@ type state struct {
 	onTime, offWaitTime       uint16
 	timedOnRunning            bool
 	delayedOffRunning         bool
+	// stored is OnOff as stored when st was loaded or last brought up to
+	// date ([Server.setOnOff]): the baseline that tells a host's
+	// [Server.Set] apart from the operation's own, not yet stored, change.
+	stored bool
 }
 
-// load reads the stored state; the caller holds s.op.
+// load reads the stored state; the caller holds s.op (the timers' running
+// state is op's), load takes s.mu.
 func (s *Server) load() state {
-	st := state{onOff: s.OnOff(), timedOnRunning: s.timedOn.running, delayedOffRunning: s.delayedOff.running}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	on := s.OnOff()
+	st := state{onOff: on, stored: on, timedOnRunning: s.timedOn.running, delayedOffRunning: s.delayedOff.running}
 	if s.lighting {
 		if v, ok := s.srv.Value(AttrGlobalSceneControl); ok {
 			st.globalSceneControl, _ = v.(bool)
@@ -280,8 +309,17 @@ func (s *Server) uint16Value(attrID uint32) uint16 {
 }
 
 // commit stores st and starts or stops the timers to match it; the
-// caller holds s.op.
+// caller holds s.op, commit takes s.mu for the store.
 func (s *Server) commit(st state) {
+	s.store(st)
+	s.setTimer(&s.timedOn, st.timedOnRunning, s.timedOnTick)
+	s.setTimer(&s.delayedOff, st.delayedOffRunning, s.delayedOffTick)
+}
+
+// store is commit's attribute half, under s.mu.
+func (s *Server) store(st state) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// matter.js clears a pending scene apply whenever OnOff changes
 	// (:62 reactTo(onOff$Changed, #clearDelayedSceneApplyData)); the
 	// event fires after the transaction commits
@@ -297,12 +335,11 @@ func (s *Server) commit(st state) {
 		values[AttrOffWaitTime] = st.offWaitTime
 	}
 	_ = s.srv.SetAttributes(values) // every value is one the model admits
-	s.setTimer(&s.timedOn, st.timedOnRunning, s.timedOnTick)
-	s.setTimer(&s.delayedOff, st.delayedOffRunning, s.delayedOffTick)
 }
 
-// command wraps one command's logic in the operation lock and the
-// commit-on-success the handlers share.
+// command wraps one command's logic in the queue and the
+// commit-on-success the handlers share. Only op is held while fn runs, so
+// the Sink fn calls runs outside s.mu.
 func (s *Server) command(fn func(ctx context.Context, st *state, fields any) error) spec.CommandHandler {
 	return func(ctx context.Context, fields any) (any, error) {
 		s.op.Lock()
@@ -316,13 +353,25 @@ func (s *Server) command(fn func(ctx context.Context, st *state, fields any) err
 	}
 }
 
-// setOnOff tells the sink, which may refuse.
-func (s *Server) setOnOff(ctx context.Context, on bool) error {
+// setOnOff tells the sink, which may refuse, and then re-loads OnOff: when
+// the stored value moved since st was loaded — a [Server.Set] the host
+// made while the sink ran, the confirmation of this very change or
+// another — st takes it, so the handler compares against what the host
+// stored, not what it read before. When it did not move, st keeps its
+// own value: an operation's change that is not stored yet (the scene
+// recall inside OnWithRecallGlobalScene) is not undone. Only OnOff can
+// have moved: the host's setter changes nothing else, and every other
+// change waits in the queue (s.op) the caller holds. The caller holds
+// neither s.mu nor anything [Server.Set] takes.
+func (s *Server) setOnOff(ctx context.Context, st *state, on bool) error {
 	if s.sink == nil {
 		return nil
 	}
 	if err := s.sink.SetOnOff(ctx, on); err != nil {
 		return spec.Errorf(im.StatusFailure, "OnOff: change to %t refused: %v", on, err)
+	}
+	if now := s.OnOff(); now != st.stored {
+		st.onOff, st.stored = now, now
 	}
 	return nil
 }
@@ -332,9 +381,10 @@ func (s *Server) setOnOff(ctx context.Context, on bool) error {
 // OnTime 0 the delayed-off timer stops and OffWaitTime is cleared
 // (OffWaitTime is kept during a timed-on phase, :104). The invalidation
 // follows the sink's consent: matter.js would roll it back with the
-// refused command's transaction.
+// refused command's transaction. "A change to on" compares with OnOff as
+// stored after the sink returned ([Server.setOnOff]).
 func (s *Server) on(ctx context.Context, st *state) error {
-	if err := s.setOnOff(ctx, true); err != nil {
+	if err := s.setOnOff(ctx, st, true); err != nil {
 		return err
 	}
 	if !st.onOff {
@@ -354,9 +404,10 @@ func (s *Server) on(ctx context.Context, st *state) error {
 // off is OnOffServer.ts:119-139: a change to off invalidates the current
 // scene (:120-122); OnOff false; with LT the timed-on timer stops, OnTime
 // is 0, and OffWaitTime in 1..0xFFFE starts the delayed-off timer
-// (:129-137).
+// (:129-137). As in on, the comparison reads OnOff as stored after the
+// sink returned.
 func (s *Server) off(ctx context.Context, st *state) error {
-	if err := s.setOnOff(ctx, false); err != nil {
+	if err := s.setOnOff(ctx, st, false); err != nil {
 		return err
 	}
 	if st.onOff {
@@ -475,7 +526,9 @@ func (s *Server) MatterApplySceneValues(ctx context.Context, values map[uint32]u
 // applySceneValues is #applySceneValues on st; it reports whether st
 // changed. The caller holds s.op.
 func (s *Server) applySceneValues(ctx context.Context, st *state, values map[uint32]uint64, transitionMs uint32) bool {
+	s.mu.Lock()
 	s.clearSceneApply()
+	s.mu.Unlock()
 	v, ok := values[AttrOnOff]
 	if !ok || v > 1 || (v == 1) == st.onOff {
 		return false
@@ -490,6 +543,8 @@ func (s *Server) applySceneValues(ctx context.Context, st *state, values map[uin
 		}
 		return err == nil
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.sceneApply.pending, s.sceneApply.onOff = true, on
 	s.sceneApply.gen++
 	gen := s.sceneApply.gen
@@ -503,7 +558,7 @@ func (s *Server) applySceneValues(ctx context.Context, st *state, values map[uin
 }
 
 // clearSceneApply is #clearDelayedSceneApplyData (:291-297). The caller
-// holds s.op.
+// holds s.mu.
 func (s *Server) clearSceneApply() {
 	if !s.sceneApply.pending {
 		return
@@ -521,11 +576,14 @@ func (s *Server) clearSceneApply() {
 func (s *Server) applyDelayedSceneOnOffValue(gen uint64) {
 	s.op.Lock()
 	defer s.op.Unlock()
+	s.mu.Lock()
 	if !s.sceneApply.pending || s.sceneApply.gen != gen {
+		s.mu.Unlock()
 		return
 	}
 	on := s.sceneApply.onOff
 	s.clearSceneApply()
+	s.mu.Unlock()
 	st := s.load()
 	var err error
 	if on {
@@ -683,15 +741,27 @@ func (s *Server) MatterQuiesce() {
 	defer s.op.Unlock()
 	s.setTimer(&s.timedOn, false, nil)
 	s.setTimer(&s.delayedOff, false, nil)
+	s.mu.Lock()
 	s.clearSceneApply()
+	s.mu.Unlock()
 }
 
 // Set records an OnOff change the device made itself: the value is
 // stored and reported, the sink is not called and no timer moves — a
 // matter.js host setting the state rather than invoking a command.
+//
+// Set takes only the state lock, never the command queue, so it may be
+// called from inside the [Sink] — before SetOnOff returns, on the same
+// goroutine — and from any other goroutine while a Sink call is in
+// flight, without waiting for the command (issue #63). Its value is
+// stored and reported at once. A command whose Sink is in flight then
+// compares with it (a scene is invalidated only if the command changes
+// what Set stored) and, once the Sink consents, stores its own OnOff over
+// it: the command wins its own attribute, and the host's echo of the very
+// change carries the same value.
 func (s *Server) Set(on bool) {
-	s.op.Lock()
-	defer s.op.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if on != s.OnOff() {
 		s.clearSceneApply() // :62, onOff$Changed
 	}
@@ -716,7 +786,7 @@ type ticker struct {
 }
 
 // setTimer starts or stops t; a start of a running timer and a stop of a
-// stopped one change nothing. The caller holds s.op.
+// stopped one change nothing. The caller holds s.op, not s.mu.
 func (s *Server) setTimer(t *ticker, run bool, tick func()) {
 	switch {
 	case run && !t.running:

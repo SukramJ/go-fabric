@@ -24,6 +24,7 @@ German, briefly. Six waves were planned against the phases:
 | 7 | phase-5 preparation and release: AddNOC test commissioner, device-layer gaps, Tier-3 transport findings + OnOff scenes, v0.2.0 deprecations removed, `v0.3.0` | S, T, U, V | #53; docs PR `docs/wave-7-followups` | #53 merged 2026-10-12 (`b0b97ff`); tag `v0.3.0` after the docs PR (normal release, no pre-release flag — owner 2026-10-12) |
 | 8 | the three Tier-3 session findings of #54: RemoveFabric/UpdateNOC CloseSession, handshakes hold a TCP connection, first chunk of a chunked report is peer loss | W | `wave/2026-10-12-tranche-8`; docs PR `docs/wave-8-followups` | see §8 |
 | 9 | the five owner issues #57, #58, #60, #61, #62 (openccu-loom ADR 0084 migration): generated device-type names, store migrations + fingerprint, node observers + basic window + knobs, Thermostat Sink, WindowCovering Mover | X, Y, Z | `wave/2026-10-12-tranche-9`; docs PR `docs/wave-9-followups` | see §9 |
+| 10 | the owner issues #63 (a host port under the lock the setter takes) and #66 (ColorControlServer.Set) | AA, AB | `wave/2026-10-12-tranche-10`; docs PR `docs/wave-10-followups` | see §10 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -460,3 +461,71 @@ the deadband finding (Tier 3, with the Go line and a fix package), two
 open-items rows. Then delete `wave9/*`, `planning/briefs-wave-9`, `wave/2026-10-12-tranche-9`
 and the `.claude/worktrees/wave9-*` worktrees. Next: wave 10 = the pin lift
 to `0ceb202d` and ADR 0020 (concept v2 Teil E).
+
+## 10. Wave 10 (2026-10-12, the owner away; everything local)
+
+Two more owner issues before the pin lift: #63 (the onoff Sink ran under
+the lock `Server.Set` takes, so a device that confirms synchronously
+deadlocked the command; the wave-9 thermostat Sink had the same cycle)
+and #66 (ColorControl had no path for a device-originated colour). Briefs
+AA, AB on `planning/briefs-wave-10` (`eb2ed1f`); agent branches
+`wave10/locks` (AA, head `78964f6`) and `wave10/color` (AB, `8a9b4d2`).
+Integration `wave/2026-10-12-tranche-10` = AA then AB cherry-picked plus
+this section; CHANGELOG and the inventory were the only conflicts
+(regenerated once at the end, unreached 5, entry points 4482 → 4497).
+
+- **AA (#63):** the rule — a server never holds a lock across a host-port
+  call that the inbound setter takes; the command queue stays a lock the
+  host never takes. `onoff`: `op` (queue) + new `mu` (state); `Set` takes
+  only `mu`; after the Sink consents the handler adopts a host `Set` that
+  landed meanwhile and then stores its own OnOff (the command wins its
+  attribute). `thermo`: the setters take only `mu`; a write computes,
+  releases `mu` for the Sink, re-reads, stores the consented value and
+  re-runs the reconcile (companions that moved are logged
+  `matter.thermostat.sink_companions_moved`); the Sink hears the value the
+  server stores (Q3 — a branch the limits make unreachable, proven by a
+  brute-force run, the rule stated anyway). `cover` was already the
+  pattern. Four onoff and five thermostat deadlock tests, each red on the
+  old code. Decisions: command wins the overlap (matter.js's transaction
+  would let the host's write wait and win, `Tx.ts:194-203,479-501` — by
+  design); RaiseLower keeps no reconcile until the deadband finding;
+  `OnOff()`/`MatterRead` read through spec's lock; DEM/EVSE unchanged.
+- **AB (#66):** `light.ColorControlServer.Set(c Color)`, the twin of
+  `onoff.Server.Set`: stores the device's colour under `mu` only,
+  converts on a mode switch as `switchColorMode` does
+  (`ColorControlServer.ts:1454-1540`), reports through the quieters, calls
+  no writer, ignores an unserved mode (logged). The brief's "stop the
+  movement" was dropped: the issue's claim that matter.js stops a
+  transition on an external `$Changed` does not hold at the pin — nothing
+  in `ColorControlServer.ts` stops on a state write, and
+  `Transitions.ts:455-574` lets the next step overwrite an external value;
+  the finish-on-target of `#instrumentProperty` (`:659-693`) is not
+  mirrored (`Engine.Finish` needs the engine lock the writers run under).
+  A writer that calls `Set` with a different colour: the device's colour
+  stays, the command answers SUCCESS. Hue and enhanced hue stay uncoupled
+  (neither matter.js nor the server couples them).
+
+Local guards on the agents' heads: `make ci`, race on the touched
+packages, reachability; AA ran `make chiptool-test` and the families
+OO/TSTAT (7 passed, 6 skipped, 0 failed); AB ran no harness (single-user,
+AA had it). The tranche runs `make ci`, `make race`,
+`make reachability-check`, `make chiptool-test` and the families
+OO/TSTAT/CC before the PR.
+
+**Docs PR `docs/wave-10-followups`** (after the tranche merges):
+by_design — host port outside the setter's lock, command wins the overlap
+(`Tx.ts:194-203,479-501`); thermostat companions recomputed after the Sink
+(`ThermostatServer.ts:599-606`, one transaction in matter.js);
+ColorControl `Set` does not stop movement (`Transitions.ts:455-574`,
+finish-on-target `:659-693` not mirrored); `Set` converts as
+`switchColorMode` without its stop (`:1454-1540`, `:1458`). Findings —
+Tier 3: `handleArmFailSafe` runs `onFailSafeArmed` with `g.mu` held
+(`general_commissioning.go:637`, deferred unlock at `:500-504`) although
+`:622-624` says it does not; the disarm branch releases first
+(`:566-568`); no cycle with today's wiring. Open items — DEM and EVSE
+call their host ports under the state lock by documented contract
+(`devicemanagement.go:123-124`, `evse.go:131-132`, chip's delegate model),
+the one place the AA rule does not hold. Close #63, #66. Then delete
+`wave10/*`, `planning/briefs-wave-10`, `wave/2026-10-12-tranche-10` and
+the `.claude/worktrees/wave10-*` worktrees. Next: wave 11 = the pin lift
+to `0ceb202d`, then ADR 0020.

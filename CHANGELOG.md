@@ -12,6 +12,20 @@ pseudo-version of `main`.
 
 ### Added
 
+- `light.ColorControlServer.Set(light.Color)`: records a colour the device
+  took on itself, the twin of `onoff.Server.Set`. `Color.Mode` is the
+  EnhancedColorMode the device reports; that mode's fields become the
+  current colour (the colour temperature cropped to the physical range,
+  the other fields to their attributes' ranges), a mode change converts as
+  a command's mode switch does, and every changed attribute is reported
+  through the change notifier. The writers are not called. As in matter.js,
+  a running transition or colour loop is not stopped: its next step
+  overwrites the device's value, and RemainingTime is unchanged. Set takes
+  only the state lock, so a `ColorWriter` or `ColorTemperatureWriter` may
+  call it from inside its own call; the device's colour then stays stored
+  and the command answers SUCCESS, and a Set of the colour being written
+  is a confirmation. A colour of a mode the server has no feature for is
+  logged and ignored (issue #66).
 - `thermo.ThermostatConfig.Sink` (`thermo.Sink`, `thermo.SetpointChange`):
   an optional host port for a bridged thermostat. A controller's SystemMode
   write, OccupiedHeating/CoolingSetpoint write (with the companions the
@@ -89,6 +103,30 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `onoff.Server`: the host `Sink` no longer runs under a lock `Set` takes.
+  Commands, writes, the countdown ticks and scene applies stay serialised
+  in one queue the host never takes; the stored state has a lock of its
+  own that `Set` takes alone. A Sink may now confirm the change through
+  `Set` before it returns — on its own goroutine or from another — where
+  it used to block the command for the host's write timeout and the
+  confirming goroutine for good (issue #63). A `Set` that lands while a
+  command's Sink runs is stored and reported at once; once the Sink
+  consents, the command compares with it (the scene invalidation) and
+  stores its own OnOff over it.
+- `thermo.ThermostatServer`: the inbound setters (`SetSystemMode`,
+  `SetOccupiedHeatingSetpoint`, `SetOccupiedCoolingSetpoint`) no longer
+  wait for a write or SetpointRaiseLower whose `Sink` is in flight, so a
+  Sink may confirm through them before it returns (the cycle of issue #63,
+  introduced with the Sink). Writes and the command stay serialised behind
+  the Sink. Once it consented, a write stores its value on the state as it
+  is then and reruns the reconcile there; when the companions it computes
+  differ from the ones the Sink was told about, the recomputed ones are
+  stored and `matter.thermostat.sink_companions_moved` is logged. The
+  Sink is told the written setpoint as the reconcile leaves it — the value
+  the server stores — rather than the value the controller wrote (the two
+  are equal for every write the limits admit). A SetpointRaiseLower stores
+  what it moved as the Sink saw it and leaves a setpoint it did not move
+  as the host stored it.
 - RemoveFabric tells every other session of the removed fabric with a
   Secure-Channel CloseSession before they close (matter.js `Fabric.leave`);
   the session that carried the command still closes after its response,

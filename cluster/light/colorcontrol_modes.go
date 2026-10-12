@@ -34,11 +34,7 @@ func (s *ColorControlServer) setEnhancedColorMode(ctx context.Context, mode Colo
 	if s.state().enhancedMode == mode {
 		return nil
 	}
-	colorMode := mode
-	if mode == ColorModeEnhancedHueSaturation {
-		colorMode = ColorModeHueSaturation
-	}
-	if err := s.setColorMode(ctx, colorMode); err != nil {
+	if err := s.setColorMode(ctx, colorModeOf(mode)); err != nil {
 		return err
 	}
 	return s.update(ctx, func(st *colorState) { st.enhancedMode = mode })
