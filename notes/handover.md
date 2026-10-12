@@ -371,7 +371,7 @@ Owner decisions on report W (verified against `Fabric.ts:403-427,456-460`,
   by_design (matter.js has no constant either; `node` wires the 1-minute
   TTL).
 
-**Docs PR `docs/wave-8-followups`** (after merge): findings — close the three
+**Docs PR `docs/wave-8-followups`** (written from this list, after #55): findings — close the three
 Tier-3 bullets (RemoveFabric without CloseSession, handshake sessions on
 TCP, first chunk of a chunked report); add UpdateNOC keeps the invoking
 session open (`Fabric.ts:403-410` closes it after the exchange) and
