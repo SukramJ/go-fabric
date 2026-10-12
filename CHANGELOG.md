@@ -895,6 +895,16 @@ the same `ColorTemperatureWriter` as before.
 
 ### Fixed
 
+- An ongoing subscription report the controller never acknowledges is peer
+  loss, as matter.js treats an exhausted first message on any exchange
+  (`MessageExchange.ts:616-621`, `SessionManager.ts:677-695`): every
+  session with that peer established before the report's exchange is
+  force-closed without a CloseSession, and their other subscriptions close
+  with them. Before, only the one subscription was closed and the peer's
+  sessions stayed in the table. A later chunk of a chunked report, sent
+  after the peer answered the previous one, still closes only its
+  subscription.
+
 - **A peer that stops answering an exchange this node opened is lost, and
   its sessions go.** When the outbound-reliable tracker gave up on a
   message of an exchange the bridge itself opened (the OTA requestor's

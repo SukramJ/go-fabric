@@ -567,8 +567,9 @@ func (b *Bridge) closeSubscriptionByCounter(sessionID uint16, counter uint32) {
 func (b *Bridge) rememberReportExchange(subID uint32, sessionID, exchangeID uint16) {
 	key := mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true}
 	if prev, loaded := b.subReportExchange.Swap(subID, key); loaded {
-		if prevKey, ok := prev.(mrp.ExchangeKey); ok {
+		if prevKey, ok := prev.(mrp.ExchangeKey); ok && prevKey != key {
 			b.reportExchangeOwner.Delete(prevKey)
+			b.reportExchangeOrigins.Delete(prevKey)
 		}
 	}
 	b.reportExchangeOwner.Store(key, subID)
@@ -581,8 +582,16 @@ func (b *Bridge) forgetReportExchange(subID uint32) {
 	if prev, loaded := b.subReportExchange.LoadAndDelete(subID); loaded {
 		if prevKey, ok := prev.(mrp.ExchangeKey); ok {
 			b.reportExchangeOwner.Delete(prevKey)
+			b.reportExchangeOrigins.Delete(prevKey)
 		}
 	}
+}
+
+// reportExchangeOrigin is when an ongoing report's exchange was opened
+// and the counter of the first message sent on it.
+type reportExchangeOrigin struct {
+	createdAt    time.Time
+	firstCounter uint32
 }
 
 // closeSubscriptionByExchange ends the subscription whose latest ongoing
@@ -794,9 +803,16 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 	// `Initiator: !target.peerInitiator` evaluates to true — we are the
 	// exchange initiator on this fresh exchange.
 	freshTarget.peerInitiator = false
+	// The exchange context's creation time bounds a peer-loss sweep this
+	// report may trigger (matter.js ExchangeManager.ts:544, :571 asOf).
+	createdAt := time.Now()
 	counters, err = b.sendReportChunks(freshTarget, report)
 	if err != nil {
 		return nil, 0, err
+	}
+	if len(counters) > 0 {
+		b.reportExchangeOrigins.Store(mrp.ExchangeKey{SessionID: target.sessionID, ExchangeID: freshExchangeID, Initiator: true},
+			reportExchangeOrigin{createdAt: createdAt, firstCounter: counters[0]})
 	}
 	return counters, freshExchangeID, nil
 }

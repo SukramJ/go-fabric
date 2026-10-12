@@ -648,6 +648,13 @@ type Bridge struct {
 	// map[mrp.ExchangeKey]uint32 / map[uint32]mrp.ExchangeKey
 	reportExchangeOwner sync.Map
 	subReportExchange   sync.Map
+	// reportExchangeOrigins holds, per report exchange in
+	// reportExchangeOwner, when it was opened and the counter of its first
+	// message (map[mrp.ExchangeKey]reportExchangeOrigin) — what the
+	// peer-loss path needs when that message is never acknowledged
+	// (ackpump.go tickOutboundReliable). Kept and dropped with the two
+	// maps above.
+	reportExchangeOrigins sync.Map
 
 	// resumption holds subscription persistence and the re-establishment
 	// of former subscriptions after a restart (docs/adr/0008). See

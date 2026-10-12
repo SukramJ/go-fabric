@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4424,
+  "entry_points": 4426,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10391,
+    "total_exported": 10393,
     "reachable": 7335,
-    "whitelisted": 3051,
+    "whitelisted": 3053,
     "unreachable": 5
   },
   "by_package": [
@@ -3272,14 +3272,14 @@
       "identifier": "TestInitiatedExchangePeerLoss_ForceClosesPeerSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 44
+      "line": 45
     },
     {
       "package": "bridge",
       "identifier": "TestInitiatedPeerLoss_UnknownExchangeIsNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 127
+      "line": 128
     },
     {
       "package": "bridge",
@@ -4267,6 +4267,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/bridge_helpers_test.go",
       "line": 509
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
+      "line": 149
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestReportPeerLoss_OnlyFirstMessageOfExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/peer_loss_test.go",
+      "line": 251
     },
     {
       "package": "bridge",

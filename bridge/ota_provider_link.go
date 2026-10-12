@@ -248,8 +248,8 @@ type peerLossCloser interface {
 // ExchangeManager.ts:556-580 (a commissioned peer: SessionManager.
 // handlePeerLoss for the peer address, asOf the exchange context's
 // creation; otherwise the session alone) → SessionManager.ts:677-695.
-// An exhausted counter that belongs to no initiated exchange (a
-// subscription report) is left to [Bridge.closeSubscriptionByCounter].
+// An exhausted counter of a subscription report takes the same path
+// through [Bridge.reportPeerLoss].
 func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	raw, ok := b.resumption.initiated.Load(secureExchangeKey{sessionID: sessionID, exchangeID: exchangeID})
 	if !ok {
@@ -259,6 +259,40 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	if !ok {
 		return
 	}
+	b.closeLostPeer(sessionID, exchangeID, ex.createdAt, "an exchange this node opened")
+}
+
+// reportPeerLoss reports whether the exhausted message (sessionID,
+// exchangeID, counter) is evidence that the peer is lost, and the exchange's
+// creation time to bound the sweep: the message is a live ongoing report's
+// (its counter is still owned) and the first one sent on its exchange, so
+// nothing was heard from the peer on it. matter.js reports peer loss when a
+// send fails "only if we never heard from it on this exchange"
+// (MessageExchange.ts:616-621, #reportsPeerLoss :630-633,
+// #messageReceivedCounter === 0); a later chunk is sent only after the
+// peer's StatusResponse to the previous one, so its loss is not.
+func (b *Bridge) reportPeerLoss(sessionID, exchangeID uint16, counter uint32) (time.Time, bool) {
+	if _, owned := b.reportCounterOwner.Load(reportCounterKey(sessionID, counter)); !owned {
+		return time.Time{}, false
+	}
+	raw, ok := b.reportExchangeOrigins.Load(mrp.ExchangeKey{SessionID: sessionID, ExchangeID: exchangeID, Initiator: true})
+	if !ok {
+		return time.Time{}, false
+	}
+	origin, ok := raw.(reportExchangeOrigin)
+	if !ok || origin.firstCounter != counter {
+		return time.Time{}, false
+	}
+	return origin.createdAt, true
+}
+
+// closeLostPeer force-closes the sessions of the peer of sessionID that
+// were created before asOf — every one with a commissioned peer
+// (SessionManager.ts:677-695 #handlePeerLoss), the session alone without a
+// fabric or node id (ExchangeManager.ts:556-566). The sessions'
+// subscriptions fall with them through the registry's close hook. what
+// names the exchange for the log.
+func (b *Bridge) closeLostPeer(sessionID, exchangeID uint16, asOf time.Time, what string) {
 	b.mu.RLock()
 	sessions := b.sessions
 	registry := b.sessionRegistry
@@ -278,7 +312,7 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 	closed := 0
 	closer, perPeer := registry.(peerLossCloser)
 	if perPeer && fabricIndex != 0 && peerNodeID != 0 {
-		closed = closer.ClosePeerLost(fabricIndex, peerNodeID, ex.createdAt)
+		closed = closer.ClosePeerLost(fabricIndex, peerNodeID, asOf)
 	} else if err := registry.Close(sessionID); err == nil {
 		closed = 1
 	}
@@ -289,7 +323,7 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 			slog.Int("fabric", int(fabricIndex)),
 			slog.Uint64("peer_node", peerNodeID),
 			slog.Int("closed", closed),
-			slog.String("hint", "max retransmissions reached on an exchange this node opened; the peer's sessions are force-closed"))
+			slog.String("hint", "max retransmissions reached on "+what+"; the peer's sessions are force-closed"))
 	}
 }
 
