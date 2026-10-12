@@ -541,6 +541,16 @@ the same `ColorTemperatureWriter` as before.
 
 ### Changed
 
+- `cluster/spec` decides a revision condition ("Rev >= vN") against the
+  definition's own revision instead of leaving it conditional, as matter.js's
+  runtime conformance compiler does (`conformance-compiler.ts:250-254`): an
+  element "Rev >= vN" or "Rev >= vN, O" is served by default at or above
+  revision N, and refused when declared below it. `spec.Context` returns a
+  `spec.RevisionContext`; a `FeatureContext` without a revision keeps the
+  condition conditional, and `CheckFeatures` still ignores the revision
+  (`IllegalFeatureCombinations.ts`). A default LevelControl from `device/`
+  now serves MinLevel and MaxLevel with the device type's defaults
+  (DimmableLight: 1 and 254).
 - `examples/reference-bridge` runs on the device layer and the node facade
   (ADR 0018 decision 6), the shape the README points a host at:
   `node.New(cfg)`, one `device.New<Type>` call per device added to

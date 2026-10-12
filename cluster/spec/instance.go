@@ -90,7 +90,16 @@ func (f featureContext) feature(name string) *Feature {
 	return nil
 }
 
-// Context returns the conformance context of a feature selection.
+// Revision implements [RevisionContext]: the definition's revision.
+func (f featureContext) Revision() uint16 { return f.def.Revision }
+
+// featuresOnly hides the revision of a context, so a revision condition
+// stays conditional ([RevisionContext]).
+type featuresOnly struct{ FeatureContext }
+
+// Context returns the conformance context of a feature selection. It is a
+// [RevisionContext]: a "Rev >= vN" condition is decided against the
+// definition's revision.
 func Context(def *Cluster, features uint32) FeatureContext {
 	return featureContext{def: def, features: features}
 }
@@ -103,7 +112,12 @@ func CheckFeatures(def *Cluster, features uint32) error {
 	if extra := features &^ def.FeatureMask(); extra != 0 {
 		return fmt.Errorf("%w: %s 0x%X", ErrUnknownFeature, def.Name, extra)
 	}
-	ctx := Context(def, features)
+	// A feature selection is judged on features alone: matter.js's
+	// IllegalFeatureCombinations lets a revision condition gate nothing
+	// ("Revision gates presence on the cluster revision rather than on
+	// features", IllegalFeatureCombinations.ts:441-443; an optionalIf on a
+	// revision disallows nothing, :464-468).
+	ctx := featuresOnly{Context(def, features)}
 	type group struct {
 		choice   *Choice
 		selected []string

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4419,
+  "entry_points": 4421,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10387,
-    "reachable": 7335,
-    "whitelisted": 3047,
+    "total_exported": 10389,
+    "reachable": 7336,
+    "whitelisted": 3048,
     "unreachable": 5
   },
   "by_package": [
@@ -13849,14 +13849,14 @@
       "identifier": "TestClientListCarriesTheMandatoryClientClusters",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 440
+      "line": 470
     },
     {
       "package": "device",
       "identifier": "TestDefaultSelectionKeepsTheClusterMandatedFeatures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 468
+      "line": 498
     },
     {
       "package": "device",
@@ -13867,10 +13867,17 @@
     },
     {
       "package": "device",
+      "identifier": "TestDimmableLightServesMinAndMaxLevel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/device_test.go",
+      "line": 196
+    },
+    {
+      "package": "device",
       "identifier": "TestElementAlterationsApply",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 186
+      "line": 216
     },
     {
       "package": "device",
@@ -13884,7 +13891,7 @@
       "identifier": "TestFeatureMasksMatchTheDefinitions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 389
+      "line": 419
     },
     {
       "package": "device",
@@ -13905,7 +13912,7 @@
       "identifier": "TestOnChangedFiresOnSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 220
+      "line": 250
     },
     {
       "package": "device",
@@ -13926,7 +13933,7 @@
       "identifier": "TestParts",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 255
+      "line": 285
     },
     {
       "package": "device",
@@ -13940,21 +13947,21 @@
       "identifier": "TestSpec",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 306
+      "line": 336
     },
     {
       "package": "device",
       "identifier": "TestTypeLookups",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 332
+      "line": 362
     },
     {
       "package": "device",
       "identifier": "TestTypedDefault",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 363
+      "line": 393
     },
     {
       "package": "device",
@@ -13968,7 +13975,7 @@
       "identifier": "TestWithElements",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
-      "line": 482
+      "line": 512
     },
     {
       "package": "device",

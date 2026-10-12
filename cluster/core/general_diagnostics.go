@@ -196,8 +196,8 @@ const (
 
 // gendiagInst is the definition bound to what the server serves: DMTEST,
 // TotalOperationalHours (optional, from the persisted counters) and
-// DeviceLoadStatus ("Rev >= v3", declared because the runtime leaves
-// revision conditions to the server). BootReason and the three fault
+// DeviceLoadStatus ("Rev >= v3", mandatory at revision 3, which
+// cluster/spec resolves; declared to keep the list explicit). BootReason and the three fault
 // lists stay out — matter.js's bridge sample does not advertise them.
 var gendiagInst = mustInstance(gendiagdef.Definition, spec.Options{
 	Features:   gendiagFeatureDataModelTest,
