@@ -7,8 +7,8 @@ Entry points: 4435 across 171 test packages.
 
 | Metric | Count |
 |---|---|
-| Total exported | 10412 |
-| Reached by a test | 7349 |
+| Total exported | 10410 |
+| Reached by a test | 7347 |
 | Whitelisted | 3058 |
 | **Unreached** | **5** |
 
