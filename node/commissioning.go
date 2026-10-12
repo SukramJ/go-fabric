@@ -118,10 +118,19 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 		basic, endedBasic = nil, true
 	}
 	if window.IsOwnWindow() {
+		if basic != nil && !h.consumeOpening(basic) {
+			// The own window was (re)opened directly
+			// (CommissioningWindow().OpenOwnWindow) while a basic window
+			// was open: the basic window ends, and the restarted window
+			// runs with the configured credentials and discriminator.
+			h.endBasic(basic)
+			basic = nil
+		}
 		// The node's own window: PASE with the configured passcode,
-		// advertised CM=1 (matter.js allowBasicCommissioning) — or, while
-		// a basic window with its own credentials is open, its acceptor
-		// (installed, so attachPase leaves it) and its discriminator.
+		// advertised CM=1 (matter.js allowBasicCommissioning) — or, for
+		// the transition OpenBasicWindow's own open fires, the basic
+		// window's acceptor (installed, so attachPase leaves it) and its
+		// discriminator.
 		h.attachPase(h.baseline)
 		adv := h.advert
 		if basic != nil {
@@ -157,6 +166,18 @@ func (h *commissioningHost) transition(ctx context.Context, window *bridge.Commi
 type basicWindow struct {
 	discriminator uint16
 	restore       func()
+	// opening marks the window until the transition its own
+	// OpenOwnWindow fires has consumed it (guarded by basicMu).
+	opening bool
+}
+
+// consumeOpening reports whether b was marked opening, clearing the mark.
+func (h *commissioningHost) consumeOpening(b *basicWindow) bool {
+	h.basicMu.Lock()
+	defer h.basicMu.Unlock()
+	was := b.opening
+	b.opening = false
+	return was
 }
 
 // currentBasic returns the open basic window, nil without one.
@@ -188,7 +209,7 @@ func (h *commissioningHost) openBasic(ctx context.Context, vc *spake2.VerifierCo
 		return bridge.ErrAdministratorWindowOpen
 	}
 	//nolint:contextcheck // the provider outlives this call; the adapters it builds carry no ctx of their own (as InstallVerifier's)
-	b := &basicWindow{discriminator: discriminator, restore: h.installVerifierContext(vc, iterations, salt)}
+	b := &basicWindow{discriminator: discriminator, restore: h.installVerifierContext(vc, iterations, salt), opening: true}
 	h.basicMu.Lock()
 	prev := h.basic
 	h.basic = b
@@ -409,7 +430,10 @@ func (c *WindowCredentials) validate() error {
 // CommissioningComplete and on RevokeCommissioning. Opened while a basic
 // window or the node's own window is open, it replaces that window; while
 // an administrator's window is open it returns
-// bridge.ErrAdministratorWindowOpen. Once it closes, the configured
+// bridge.ErrAdministratorWindowOpen. A direct
+// CommissioningWindow().OpenOwnWindow while it is open ends it: the
+// restarted window runs with the configured credentials and is advertised
+// under the configured discriminator. Once it closes, the configured
 // credentials are back: a node without a fabric reopens its own window
 // under the configured discriminator, a commissioned node publishes no
 // commissionable record until the next window — the facade's window

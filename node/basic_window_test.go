@@ -222,3 +222,33 @@ func TestOpenBasicWindowRefusals(t *testing.T) {
 		t.Errorf("OpenBasicWindow over an administrator's window = %v, want ErrAdministratorWindowOpen", err)
 	}
 }
+
+// TestOwnWindowOpenEndsBasicWindow: a direct OpenOwnWindow while a basic
+// window is open ends the basic window — the restarted window is
+// advertised under the configured discriminator and PASE runs against the
+// configured passcode.
+func TestOwnWindowOpenEndsBasicWindow(t *testing.T) {
+	t.Parallel()
+	adv := mdns.NewNoop()
+	n := startedNode(t, adv)
+	ctx := context.Background()
+	creds := randomCredentials(t, 0)
+	if err := n.OpenBasicWindow(ctx, creds); err != nil {
+		t.Fatalf("OpenBasicWindow: %v", err)
+	}
+	if d, _, ok := commissionableRecord(adv); !ok || d != uint64(creds.Discriminator) {
+		t.Fatalf("basic window record D=%d present=%v; want D=%d", d, ok, creds.Discriminator)
+	}
+	if err := n.CommissioningWindow().OpenOwnWindow(ctx, 0); err != nil {
+		t.Fatalf("OpenOwnWindow: %v", err)
+	}
+	if d, m, ok := commissionableRecord(adv); !ok || d != 3840 || m != 1 {
+		t.Fatalf("record after OpenOwnWindow D=%d CM=%d present=%v; want the configured D=3840 CM=1", d, m, ok)
+	}
+	opts := commissionerOptions()
+	opts.Advertiser = adv
+	c := bridgetest.Dial(t, n.Bridge().LocalAddr(), opts)
+	if _, err := c.Commission(ctx); err != nil {
+		t.Fatalf("Commission with the configured credentials after OpenOwnWindow: %v", err)
+	}
+}
