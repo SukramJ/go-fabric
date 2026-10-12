@@ -358,6 +358,74 @@ var (
 	_ contract.AttributeChangeNotifier       = (*ScenesManagement)(nil)
 )
 
+// The global scene: matter.js GLOBAL_SCENE_ID in UNDEFINED_GROUP
+// (ScenesManagementServer.ts:77-80), the scene OnOff's OffWithEffect
+// stores and OnWithRecallGlobalScene recalls.
+const (
+	scenesGlobalSceneID   uint8  = 0
+	scenesUndefinedGroup  uint16 = 0
+	scenesGlobalSceneName        = "Global Scene"
+)
+
+// MakeAllFabricSceneInfoEntriesInvalid mirrors matter.js
+// ScenesManagementServer.makeAllFabricSceneInfoEntriesInvalid
+// (ScenesManagementServer.ts:966-975), the call OnOffServer makes when a
+// command changes OnOff (OnOffServer.ts:114-117): the current scene is no
+// longer valid. One of the three operations of the OnOff server's scenes
+// port (cluster/onoff Scenes).
+func (s *ScenesManagement) MakeAllFabricSceneInfoEntriesInvalid() {
+	s.cfg.State.InvalidateCurrentScene()
+}
+
+// StoreGlobalScene mirrors matter.js storeGlobalScene
+// (ScenesManagementServer.ts:563-582), called by OnOffServer.offWithEffect
+// while GlobalSceneControl is true (OnOffServer.ts:159-165): the endpoint's
+// scene-able values are stored as the fabric's global scene — a new entry
+// named "Global Scene" with transition time 0, or the existing entry with
+// its values replaced. The current scene does not change.
+func (s *ScenesManagement) StoreGlobalScene(_ context.Context, fabricIndex uint8) {
+	st := s.cfg.State
+	defer st.reportIfChanged(st.snapshot())
+	values := s.captureValues()
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	i := st.indexOf(fabricIndex, scenesUndefinedGroup, scenesGlobalSceneID)
+	entry := SceneEntry{
+		FabricIndex: fabricIndex, GroupID: scenesUndefinedGroup, SceneID: scenesGlobalSceneID,
+		Name: scenesGlobalSceneName, TransitionTime: 0, Values: values,
+	}
+	if i != -1 {
+		entry = st.table[i]
+		entry.Values = values
+	}
+	// matter.js ignores the status of #addOrReplaceSceneEntry here: a
+	// fabric at capacity stores no global scene.
+	_ = st.addOrReplace(entry, i)
+}
+
+// RecallGlobalScene mirrors matter.js recallGlobalScene
+// (ScenesManagementServer.ts:552-561), called by
+// OnOffServer.onWithRecallGlobalScene (OnOffServer.ts:175-184): the
+// fabric's global scene, if stored, is applied with its transition time and
+// becomes the fabric's current scene. ctx is passed on to the servers that
+// apply the values.
+func (s *ScenesManagement) RecallGlobalScene(ctx context.Context, fabricIndex uint8) {
+	st := s.cfg.State
+	defer st.reportIfChanged(st.snapshot())
+	st.mu.Lock()
+	i := st.indexOf(fabricIndex, scenesUndefinedGroup, scenesGlobalSceneID)
+	if i == -1 {
+		st.mu.Unlock()
+		return
+	}
+	e := st.table[i]
+	st.mu.Unlock()
+	s.applyValues(ctx, e.Values, e.TransitionTime)
+	st.mu.Lock()
+	st.activate(fabricIndex, scenesUndefinedGroup, scenesGlobalSceneID)
+	st.mu.Unlock()
+}
+
 // OnMatterAttributesChanged implements [contract.AttributeChangeNotifier]:
 // FabricSceneInfo reports whenever a scene count, the current scene or its
 // validity changes (matter.js fabricSceneInfo is behavior state). The

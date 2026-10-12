@@ -138,6 +138,13 @@ func (f *fixture) mustInvoke(cmd uint32, fields any) {
 	}
 }
 
+func (f *fixture) mustInvokeCtx(ctx context.Context, cmd uint32, fields any) {
+	f.t.Helper()
+	if _, err := f.srv.MatterInvoke(ctx, cmd, fields); err != nil {
+		f.t.Fatalf("invoke 0x%02X: %v", cmd, err)
+	}
+}
+
 func (f *fixture) read(attr uint32) any {
 	f.t.Helper()
 	v, ok := f.srv.MatterRead(attr)

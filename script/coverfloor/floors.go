@@ -48,7 +48,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarmbase", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/appliance", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/closure", min: 96},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/core", min: 89},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/core", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/energy", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/fan", min: 98},

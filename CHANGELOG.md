@@ -18,6 +18,22 @@ the same `ColorTemperatureWriter` as before.
 
 ### Added
 
+- `onoff.Server` carries matter.js's scene paths (`OnOffServer.ts`) through
+  an optional ScenesManagement port, `onoff.Scenes` (`Config.Scenes`,
+  `Server.SetScenes`), whose three operations are named after
+  `ScenesManagementServer`'s: `MakeAllFabricSceneInfoEntriesInvalid`,
+  `StoreGlobalScene`, `RecallGlobalScene`. `core.ScenesManagement`
+  implements them, and the endpoint layer hands an endpoint's
+  ScenesManagement to its `onoff.Server` when it mounts one. With the port,
+  a command that changes OnOff invalidates the current scene (one that
+  leaves it unchanged does not; the endpoint's blanket invalidation after
+  every OnOff command is skipped for such a server,
+  `core.SceneInvalidator`); OffWithEffect stores the accessing fabric's
+  global scene while GlobalSceneControl is true; OnWithRecallGlobalScene
+  recalls it; and a recalled scene's OnOff value is applied by the server
+  (`MatterApplySceneValues`) at once, or after the scene's transition time
+  on the server's clock, dropped when OnOff changes in between.
+
 - `Bridge.SessionClosed(sessionID)`: the host calls it from the session
   registry's close hook, next to the subscription manager's
   `CloseSession` (`node/` does). The bridge forgets the session's route

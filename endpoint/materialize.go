@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/bootid"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
+	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -511,8 +512,14 @@ func mountScenes(ep *Endpoint, inner []contract.ClusterServer) []contract.Cluste
 		return inner
 	}
 	for _, s := range kept {
-		if g, ok := s.(*mattercore.Groups); ok {
-			g.SetScenes(state)
+		switch c := s.(type) {
+		case *mattercore.Groups:
+			c.SetScenes(state)
+		case interface{ SetScenes(onoff.Scenes) }:
+			// The OnOff server's scene paths (OnOffServer.ts:97-122,
+			// :159-184) reach the endpoint's ScenesManagement, as
+			// matter.js's agent.maybeGet(ScenesManagementServer) does.
+			c.SetScenes(srv)
 		}
 	}
 	return append(kept, srv)

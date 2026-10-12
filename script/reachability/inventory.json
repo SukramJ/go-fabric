@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4426,
+  "entry_points": 4430,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10393,
-    "reachable": 7335,
-    "whitelisted": 3053,
+    "total_exported": 10397,
+    "reachable": 7337,
+    "whitelisted": 3055,
     "unreachable": 5
   },
   "by_package": [
@@ -6479,6 +6479,13 @@
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/onoff/server.go",
       "line": 21
+    },
+    {
+      "package": "cluster/onoff",
+      "identifier": "TestDelayedSceneApplyStaleRun",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/onoff/server_internal_test.go",
+      "line": 77
     },
     {
       "package": "cluster/onoff",
@@ -14157,7 +14164,7 @@
       "identifier": "TestAssemblerStampsGroupState",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 147
+      "line": 149
     },
     {
       "package": "endpoint",
@@ -14430,7 +14437,7 @@
       "identifier": "TestGroupsServerIsMountedWhereTheDeviceTypeMandatesIt",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 85
+      "line": 87
     },
     {
       "package": "endpoint",
@@ -14812,10 +14819,17 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestScenesMountWiresOnOffScenesPort",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/groups_mount_test.go",
+      "line": 245
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestScenesServerReplacesTheStub",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
-      "line": 202
+      "line": 204
     },
     {
       "package": "endpoint",

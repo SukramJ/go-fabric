@@ -63,6 +63,25 @@ type Sink interface {
 	SetOnOff(ctx context.Context, on bool) error
 }
 
+// Scenes is the optional port to the endpoint's ScenesManagement: the
+// three operations matter.js's OnOffServer calls on
+// ScenesManagementServer, named after them. cluster/core's
+// ScenesManagement implements it; the endpoint layer hands the endpoint's
+// one to the server ([Server.SetScenes]).
+type Scenes interface {
+	// MakeAllFabricSceneInfoEntriesInvalid ends the current scene's
+	// validity: a command changed OnOff (OnOffServer.ts:97-100,
+	// :114-117, :119-122).
+	MakeAllFabricSceneInfoEntriesInvalid()
+	// StoreGlobalScene stores the endpoint's scene-able values as the
+	// fabric's global scene (OffWithEffect, :159-165).
+	StoreGlobalScene(ctx context.Context, fabricIndex uint8)
+	// RecallGlobalScene applies the fabric's global scene, if stored
+	// (OnWithRecallGlobalScene, :175-184). The OnOff value comes back to
+	// the server through [Server.MatterApplySceneValues] with ctx.
+	RecallGlobalScene(ctx context.Context, fabricIndex uint8)
+}
+
 // Clock is the timer seam. AfterFunc runs f once after d; stop prevents
 // a run that has not begun. The default is time.AfterFunc; tests pass a
 // clock they advance by hand.
@@ -102,6 +121,10 @@ type Config struct {
 	// (OnOffServer.ts:37, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
 	// The device layer sets it for a device added under the Aggregator.
 	Bridged bool
+	// Scenes is the optional ScenesManagement port; nil serves OnOff
+	// without scenes, and the endpoint layer sets it where the endpoint
+	// mounts ScenesManagement ([Server.SetScenes]).
+	Scenes Scenes
 }
 
 // ErrInvalidConfig reports a configuration the cluster's model refuses.
@@ -115,12 +138,13 @@ var ErrInvalidConfig = errors.New("onoff: configuration outside the cluster's mo
 // delayed off) are matter.js's, cited by line.
 //
 // The DeadFrontBehavior feature has no logic here, as it has none in
-// matter.js (:27-28). Scenes are left to ScenesManagement: it recalls an
-// OnOff value through the On / Off commands (cluster/core
-// scenes_attributes.go applyValues); the transition-delayed apply
-// (:268-310), the scene invalidation on a change (:98-100, :114-117,
-// :120-122) and the global-scene store / recall (:159-165, :175-184) are
-// not carried out by this server.
+// matter.js (:27-28). With a [Scenes] port the scene paths are matter.js's:
+// a change of OnOff by a command invalidates the current scene (:97-100,
+// :114-117, :119-122), OffWithEffect stores the global scene while
+// GlobalSceneControl is true (:159-165), OnWithRecallGlobalScene recalls
+// it (:175-184), and a scene's OnOff value is applied by the server itself
+// — at once without a transition time, after it otherwise
+// ([Server.MatterApplySceneValues], :268-310).
 //
 // Every operation — a command, a write, a timer tick, a host change — runs
 // under one lock, as matter.js runs the timer callbacks with `lock: true`
@@ -136,7 +160,26 @@ type Server struct {
 	timedOn    ticker
 	delayedOff ticker
 
+	// sceneApply is the pending transition-delayed scene apply (matter.js
+	// applySceneDelayTimer / applyScenePendingOnOff, :283-288), under op.
+	sceneApply pendingSceneApply
+
 	op sync.Mutex
+
+	// scenes is the ScenesManagement port, nil without one. It has its
+	// own lock so [Server.SetScenes] never waits for a command (a host
+	// may reassemble from inside its sink).
+	scenesMu sync.RWMutex
+	scenes   Scenes
+}
+
+// pendingSceneApply is one scene OnOff value waiting for its transition
+// time; gen tells a stale timer run to do nothing.
+type pendingSceneApply struct {
+	pending bool
+	onOff   bool
+	gen     uint64
+	stop    func() bool
 }
 
 // Compile-time assertions.
@@ -159,7 +202,7 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
-	s := &Server{Instance: srv.Instance, srv: srv, sink: cfg.Sink, clock: cfg.Clock, lighting: srv.HasFeature("LT")}
+	s := &Server{Instance: srv.Instance, srv: srv, sink: cfg.Sink, clock: cfg.Clock, lighting: srv.HasFeature("LT"), scenes: cfg.Scenes}
 	if s.clock == nil {
 		s.clock = wallClock{}
 	}
@@ -239,6 +282,14 @@ func (s *Server) uint16Value(attrID uint32) uint16 {
 // commit stores st and starts or stops the timers to match it; the
 // caller holds s.op.
 func (s *Server) commit(st state) {
+	// matter.js clears a pending scene apply whenever OnOff changes
+	// (:62 reactTo(onOff$Changed, #clearDelayedSceneApplyData)); the
+	// event fires after the transaction commits
+	// (packages/node/src/behavior/state/managed/Datasource.ts:1072), so a
+	// value a command armed and then changed OnOff past is dropped here.
+	if st.onOff != s.OnOff() {
+		s.clearSceneApply()
+	}
 	values := map[uint32]any{AttrOnOff: st.onOff}
 	if s.lighting {
 		values[AttrGlobalSceneControl] = st.globalSceneControl
@@ -276,12 +327,18 @@ func (s *Server) setOnOff(ctx context.Context, on bool) error {
 	return nil
 }
 
-// on is OnOffServer.ts:97-112: OnOff true; with LT GlobalSceneControl
-// true, and with OnTime 0 the delayed-off timer stops and OffWaitTime is
-// cleared (OffWaitTime is kept during a timed-on phase, :104).
+// on is OnOffServer.ts:97-112: a change to on invalidates the current
+// scene (:98-100); OnOff true; with LT GlobalSceneControl true, and with
+// OnTime 0 the delayed-off timer stops and OffWaitTime is cleared
+// (OffWaitTime is kept during a timed-on phase, :104). The invalidation
+// follows the sink's consent: matter.js would roll it back with the
+// refused command's transaction.
 func (s *Server) on(ctx context.Context, st *state) error {
 	if err := s.setOnOff(ctx, true); err != nil {
 		return err
+	}
+	if !st.onOff {
+		s.invalidateScenes()
 	}
 	st.onOff = true
 	if s.lighting {
@@ -294,12 +351,16 @@ func (s *Server) on(ctx context.Context, st *state) error {
 	return nil
 }
 
-// off is OnOffServer.ts:119-139: OnOff false; with LT the timed-on timer
-// stops, OnTime is 0, and OffWaitTime in 1..0xFFFE starts the delayed-off
-// timer (:129-137).
+// off is OnOffServer.ts:119-139: a change to off invalidates the current
+// scene (:120-122); OnOff false; with LT the timed-on timer stops, OnTime
+// is 0, and OffWaitTime in 1..0xFFFE starts the delayed-off timer
+// (:129-137).
 func (s *Server) off(ctx context.Context, st *state) error {
 	if err := s.setOnOff(ctx, false); err != nil {
 		return err
+	}
+	if st.onOff {
+		s.invalidateScenes()
 	}
 	st.onOff = false
 	if s.lighting {
@@ -320,25 +381,177 @@ func (s *Server) toggle(ctx context.Context, st *state, _ any) error {
 	return s.on(ctx, st)
 }
 
-// offWithEffect is OnOffServer.ts:158-169: the effect is ignored;
-// GlobalSceneControl goes false, then off.
+// offWithEffect is OnOffServer.ts:158-169: the effect is ignored; while
+// GlobalSceneControl is true the global scene of the accessing fabric is
+// stored (:160-165, a remote actor with a fabric) and GlobalSceneControl
+// goes false; then off.
 func (s *Server) offWithEffect(ctx context.Context, st *state, _ any) error {
-	st.globalSceneControl = false
+	if st.globalSceneControl {
+		if sc := s.scenesPort(); sc != nil {
+			if fabric := accessingFabric(ctx); fabric != 0 {
+				sc.StoreGlobalScene(ctx, fabric)
+			}
+		}
+		st.globalSceneControl = false
+	}
 	return s.off(ctx, st)
 }
 
 // onWithRecallGlobalScene is OnOffServer.ts:171-191: nothing while
-// GlobalSceneControl is true; else GlobalSceneControl true, OffWaitTime
-// cleared with OnTime 0, then on.
+// GlobalSceneControl is true; else the global scene of the accessing
+// fabric is recalled (:175-184), GlobalSceneControl goes true, OffWaitTime
+// is cleared with OnTime 0, then on. The recall's OnOff value is applied to
+// this command's state (the same matter.js transaction), through the
+// context it carries.
 func (s *Server) onWithRecallGlobalScene(ctx context.Context, st *state, _ any) error {
 	if st.globalSceneControl {
 		return nil
+	}
+	if sc := s.scenesPort(); sc != nil {
+		if fabric := accessingFabric(ctx); fabric != 0 {
+			sc.RecallGlobalScene(context.WithValue(ctx, inCommandKey{}, &inCommand{srv: s, st: st}), fabric)
+		}
 	}
 	st.globalSceneControl = true
 	if st.onTime == 0 {
 		st.offWaitTime = 0
 	}
 	return s.on(ctx, st)
+}
+
+// accessingFabric is the fabric of the session a command arrived on, 0
+// for none — matter.js's `hasRemoteActor(this.context) &&
+// this.context.session.fabric !== undefined` (:160, :176-177).
+func accessingFabric(ctx context.Context) uint8 {
+	_, fabric := im.FabricFilterFromContext(ctx)
+	return fabric
+}
+
+// invalidateScenes is OnOffServer.ts:114-117 #invalidateScenes.
+func (s *Server) invalidateScenes() {
+	if sc := s.scenesPort(); sc != nil {
+		sc.MakeAllFabricSceneInfoEntriesInvalid()
+	}
+}
+
+func (s *Server) scenesPort() Scenes {
+	s.scenesMu.RLock()
+	defer s.scenesMu.RUnlock()
+	return s.scenes
+}
+
+// inCommandKey marks a context that carries the state of a command this
+// server is running (under s.op), so a scene value applied from inside it
+// — OnWithRecallGlobalScene's recall — changes that state instead of
+// waiting for the lock the command holds.
+type inCommandKey struct{}
+
+type inCommand struct {
+	srv *Server
+	st  *state
+}
+
+// MatterApplySceneValues implements cluster/core's SceneValuesApplier:
+// matter.js #applySceneValues (OnOffServer.ts:267-289), registered with
+// ScenesManagementServer.implementScenes (:60-63). A pending delayed apply
+// is dropped; a value that is not a boolean (0 / 1) or equals OnOff is
+// ignored; with transition time 0 the server turns on or off at once,
+// otherwise after transitionMs on the server's clock
+// (#applyDelayedSceneOnOffValue, :299-310). A change of OnOff in between
+// drops the pending value (:62, :291-297).
+func (s *Server) MatterApplySceneValues(ctx context.Context, values map[uint32]uint64, transitionMs uint32) {
+	if ic, ok := ctx.Value(inCommandKey{}).(*inCommand); ok && ic.srv == s {
+		s.applySceneValues(ctx, ic.st, values, transitionMs)
+		return
+	}
+	s.op.Lock()
+	defer s.op.Unlock()
+	st := s.load()
+	if s.applySceneValues(ctx, &st, values, transitionMs) {
+		s.commit(st)
+	}
+}
+
+// applySceneValues is #applySceneValues on st; it reports whether st
+// changed. The caller holds s.op.
+func (s *Server) applySceneValues(ctx context.Context, st *state, values map[uint32]uint64, transitionMs uint32) bool {
+	s.clearSceneApply()
+	v, ok := values[AttrOnOff]
+	if !ok || v > 1 || (v == 1) == st.onOff {
+		return false
+	}
+	on := v == 1
+	if transitionMs == 0 {
+		var err error
+		if on {
+			err = s.on(ctx, st)
+		} else {
+			err = s.off(ctx, st)
+		}
+		return err == nil
+	}
+	s.sceneApply.pending, s.sceneApply.onOff = true, on
+	s.sceneApply.gen++
+	gen := s.sceneApply.gen
+	// The timer's run outlives the call that started it, as matter.js
+	// runs #applyDelayedSceneOnOffValue as its own callback (:284-288).
+	//nolint:contextcheck // the run comes after the call that armed it returned
+	s.sceneApply.stop = s.clock.AfterFunc(time.Duration(transitionMs)*time.Millisecond, func() {
+		s.applyDelayedSceneOnOffValue(gen)
+	})
+	return false
+}
+
+// clearSceneApply is #clearDelayedSceneApplyData (:291-297). The caller
+// holds s.op.
+func (s *Server) clearSceneApply() {
+	if !s.sceneApply.pending {
+		return
+	}
+	s.sceneApply.pending = false
+	s.sceneApply.gen++
+	if s.sceneApply.stop != nil {
+		s.sceneApply.stop()
+		s.sceneApply.stop = nil
+	}
+}
+
+// applyDelayedSceneOnOffValue is #applyDelayedSceneOnOffValue (:299-310):
+// the pending value, if still pending, turns the server on or off.
+func (s *Server) applyDelayedSceneOnOffValue(gen uint64) {
+	s.op.Lock()
+	defer s.op.Unlock()
+	if !s.sceneApply.pending || s.sceneApply.gen != gen {
+		return
+	}
+	on := s.sceneApply.onOff
+	s.clearSceneApply()
+	st := s.load()
+	var err error
+	if on {
+		err = s.on(context.Background(), &st)
+	} else {
+		err = s.off(context.Background(), &st)
+	}
+	if err == nil {
+		s.commit(st)
+	}
+}
+
+// SetScenes sets the ScenesManagement port ([Config].Scenes); nil removes
+// it. The endpoint layer calls it with the endpoint's ScenesManagement
+// whenever it mounts one.
+func (s *Server) SetScenes(sc Scenes) {
+	s.scenesMu.Lock()
+	defer s.scenesMu.Unlock()
+	s.scenes = sc
+}
+
+// MatterInvalidatesScenes implements cluster/core's SceneInvalidator: with
+// a [Scenes] port the server invalidates the current scene itself, only
+// when a command changes OnOff (OnOffServer.ts:97-100, :119-122).
+func (s *Server) MatterInvalidatesScenes() bool {
+	return s.scenesPort() != nil
 }
 
 // onWithTimedOff is OnOffServer.ts:198-225.
@@ -461,12 +674,16 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 
 // MatterQuiesce implements [contract.ClusterQuiescer]: both countdown
 // timers stop without a report, as OnOffServer.ts's asyncDispose stops
-// them (:90-95). A later command starts them again.
+// them (:90-95). A later command starts them again. A pending
+// transition-delayed scene apply is dropped as well, which matter.js's
+// asyncDispose does not name: a quiesced server changes nothing on its
+// own.
 func (s *Server) MatterQuiesce() {
 	s.op.Lock()
 	defer s.op.Unlock()
 	s.setTimer(&s.timedOn, false, nil)
 	s.setTimer(&s.delayedOff, false, nil)
+	s.clearSceneApply()
 }
 
 // Set records an OnOff change the device made itself: the value is
@@ -475,6 +692,9 @@ func (s *Server) MatterQuiesce() {
 func (s *Server) Set(on bool) {
 	s.op.Lock()
 	defer s.op.Unlock()
+	if on != s.OnOff() {
+		s.clearSceneApply() // :62, onOff$Changed
+	}
 	_ = s.srv.Set(AttrOnOff, on)
 }
 

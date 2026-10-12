@@ -275,10 +275,20 @@ func asUint64(v any) (uint64, bool) {
 // cluster registers its own #applySceneValues. values holds the scene's
 // non-null values by attribute id (matter.js passes them as a struct and
 // each apply function tests `typeof value === "number"`); transitionMs is
-// the scene's transition in milliseconds. light.ColorControlServer
-// implements it.
+// the scene's transition in milliseconds. light.ColorControlServer and
+// onoff.Server implement it.
 type SceneValuesApplier interface {
 	MatterApplySceneValues(ctx context.Context, values map[uint32]uint64, transitionMs uint32)
+}
+
+// SceneInvalidator is the optional capability of a scene-able cluster
+// server that invalidates the current scene from its own command logic, as
+// matter.js's OnOffServer does only when OnOff actually changes
+// (OnOffServer.ts:97-100, :119-122). MatterInvalidatesScenes reports
+// whether it does so now; the endpoint then leaves the invalidation after
+// that server's commands to it. cluster/onoff's Server implements it.
+type SceneInvalidator interface {
+	MatterInvalidatesScenes() bool
 }
 
 // presentValues returns a scene's non-null values by attribute id.
