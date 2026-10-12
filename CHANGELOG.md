@@ -16,6 +16,26 @@ pseudo-version of `main`.
   ends every session of a fabric but one, telling each peer with a
   CloseSession first — the UpdateNOC path (matter.js `Fabric.replaced`).
   `node` calls it after UpdateNOC instead of closing the sessions silently.
+- `store.Migrations()` and `store.Migration{Version, Up, Down}` (#62): the
+  matter_* schema as ordered, versioned steps for a host that runs its own
+  migration tool and cannot call `store.Apply` — `v1` the DDL of v0.1.0
+  (`matter_group_key_map` with its foreign key into `matter_group_keys`),
+  `v2` the three tables of v0.2.0 (`matter_group_table`,
+  `matter_groupcast_groups`, `matter_server_subscriptions`), `v3` the
+  v0.2.0 `matter_group_key_map` rebuild without that foreign key (the
+  `store.Upgrade` step, which now runs the same text), `v4` the v0.3.0
+  `matter_ota_default_providers`. Each step's `Down` drops what it added,
+  `v3`'s rebuilds the foreign key. A host embeds the steps in order and
+  pins `len(Migrations())` (4) and the last version (`v4`); a test applies
+  the list to one database and `store.Apply` to another and compares
+  their `sqlite_schema`, so the list and `store.Schema()` cannot drift.
+  `store.Schema`, `store.Apply` and `store.Upgrade` are unchanged.
+- `store.SchemaFingerprint(ctx, db)`: SHA-256 of the database's matter_*
+  schema (the tables `store.Schema()` creates and their indexes, statements
+  normalised), so a host that carries the schema itself can compare it with
+  the release's at column and constraint level. This release, after
+  `store.Apply`:
+  `924e777a63a110753483a2dd08fb61c19bc5b9f96f09271b1bd265b9212bd924`.
 
 ### Changed
 
