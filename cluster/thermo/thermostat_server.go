@@ -137,9 +137,21 @@ type ThermostatConfig struct {
 // ([ThermostatServer.SetSystemMode], [ThermostatServer.SetOccupiedHeatingSetpoint],
 // [ThermostatServer.SetOccupiedCoolingSetpoint]) do not call it.
 //
-// The Sink runs with the server's write lock held: it may read the server
-// (MatterRead), but it must not call the server's inbound setters
-// synchronously — they wait for the write that called the Sink.
+// The Sink runs with no lock held that the inbound setters or a read
+// take: it may read the server (MatterRead) and may confirm the change
+// through the inbound setters before it returns — on its own goroutine or
+// from any other — without waiting for the write or command that called
+// it. Writes and SetpointRaiseLower stay serialised behind it (the next
+// one waits until it returned); the host never takes that queue. After
+// the Sink consented, the server stores on the state as it is then: the
+// value the Sink consented to, over whatever an inbound setter stored for
+// that attribute meanwhile, and — for a write — the companions the
+// reconcile computes on that state. When those differ from the
+// companions the Sink was told about (an inbound setter moved a setpoint
+// while the Sink ran), the recomputed ones are stored and the server logs
+// matter.thermostat.sink_companions_moved. The cover server's Mover
+// follows the same rule (cluster/cover windowcovering_server.go
+// invokeMover).
 type Sink interface {
 	// SetSystemMode is a SystemMode write the definition admitted.
 	SetSystemMode(ctx context.Context, mode uint8) error
@@ -188,9 +200,10 @@ func DefaultThermostatConfig() ThermostatConfig {
 // HEAT-only attributes are suppressed without HEAT; LocalTemperatureCalibration
 // is only served when LTNE is not set.
 type ThermostatServer struct {
-	// op serialises the changes (writes, commands, the inbound setters)
-	// so that what a change computed and handed to the Sink is what it
-	// stores; mu guards the values, and is not held while the Sink runs.
+	// op serialises the controller's changes (writes, commands): the
+	// queue, held across the Sink, never taken by the inbound setters. mu
+	// guards the values; the setters take only mu, and it is not held
+	// while the Sink runs (issue #63).
 	op       sync.Mutex
 	mu       sync.RWMutex
 	features uint32
@@ -336,12 +349,10 @@ func (s *ThermostatServer) SetSystemMode(mode uint8) {
 			slog.Int("system_mode", int(mode)), slog.String("reason", err.Error()))
 		return
 	}
-	s.op.Lock()
 	s.mu.Lock()
 	changed := s.systemMode != mode
 	s.systemMode = mode
 	s.mu.Unlock()
-	s.op.Unlock()
 	if changed {
 		s.changes.Notify(thermoAttrSystemMode)
 	}
@@ -371,7 +382,6 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 			slog.String("attribute", name), slog.Int("value", int(v)), slog.String("reason", "feature not served"))
 		return
 	}
-	s.op.Lock()
 	s.mu.Lock()
 	st := s.setpointState()
 	lo, hi := st.effectiveLimits(heat)
@@ -387,7 +397,6 @@ func (s *ThermostatServer) setInboundSetpoint(heat bool, v int16) {
 		changed = s.commitSetpoints(st)
 	}
 	s.mu.Unlock()
-	s.op.Unlock()
 	if err != nil {
 		slog.Default().Warn("matter.thermostat.inbound_setpoint_ignored",
 			slog.String("attribute", name), slog.Int("value", int(v)), slog.String("reason", err.Error()))
@@ -534,7 +543,10 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 //
 // With a [Sink] the mode goes to the host first (matter.js
 // systemMode$Changing, ThermostatServer.ts:619 at 4633bfd7, runs before
-// the state changes); a refusal stores nothing. The caller holds s.op.
+// the state changes); a refusal stores nothing. The Sink runs without
+// s.mu; once it consented the mode is stored over whatever
+// [ThermostatServer.SetSystemMode] stored meanwhile. The caller holds
+// s.op.
 func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:674-676
 	// (isDeepEqual skips an unchanged value on commit) and :956-957
@@ -568,8 +580,10 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 // reconcile, with what the reconcile would move, and before anything is
 // stored (matter.js occupied*Setpoint$Changing, ThermostatServer.ts:599-606
 // at 4633bfd7: the assert and the reconcile run before the state
-// changes). A limit does not: limits are configuration. The caller holds
-// s.op.
+// changes). A limit does not: limits are configuration. The Sink runs
+// without s.mu; afterwards the value goes onto the state as it is then
+// and the reconcile runs on that ([Sink] describes the rule). The caller
+// holds s.op.
 func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v int) ([]uint32, error) {
 	t := map[uint32]struct {
 		heat  bool
@@ -583,62 +597,116 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 		thermoAttrMinCoolSetpointLimit:    {false, true, spMinCoolLimit},
 		thermoAttrMaxCoolSetpointLimit:    {false, true, spMaxCoolLimit},
 	}[attrID]
-	s.mu.RLock()
+	s.mu.Lock()
 	// Served only with its feature, per ValidateWrite.
 	cur := s.setpointState()
-	s.mu.RUnlock()
 	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:674-676
 	// and :956-957 at 4633bfd7: an occupied setpoint equal to the stored
 	// one is no change — no $Changing, so neither the assert nor the Sink.
 	if (attrID == thermoAttrOccupiedHeatingSetpoint && v == cur.occupHeat) ||
 		(attrID == thermoAttrOccupiedCoolingSetpoint && v == cur.occupCool) {
+		s.mu.Unlock()
 		return nil, nil
 	}
 	st := cur
 	if t.limit {
 		if err := st.assertLimitWithinAbs(t.heat, v); err != nil {
+			s.mu.Unlock()
 			return nil, err
 		}
 	} else if err := st.assertSetpointWithinLimits(t.heat, v); err != nil {
+		s.mu.Unlock()
 		return nil, err
 	}
-	switch attrID {
-	case thermoAttrOccupiedHeatingSetpoint:
-		st.occupHeat = v
-	case thermoAttrOccupiedCoolingSetpoint:
-		st.occupCool = v
-	case thermoAttrMinHeatSetpointLimit:
-		st.minHeat = v
-	case thermoAttrMaxHeatSetpointLimit:
-		st.maxHeat = v
-	case thermoAttrMinCoolSetpointLimit:
-		st.minCool = v
-	case thermoAttrMaxCoolSetpointLimit:
-		st.maxCool = v
-	}
+	st.assign(attrID, v)
 	if err := st.reconcile(t.key); err != nil {
+		s.mu.Unlock()
 		return nil, err
 	}
-	if !t.limit && s.sink != nil {
-		var companions []SetpointChange
-		for _, c := range setpointDiff(cur, st) {
-			if c.AttrID != attrID {
-				companions = append(companions, c)
-			}
-		}
-		if err := s.sink.SetSetpoint(ctx, attrID, int16(v), companions); err != nil { //nolint:gosec // an int16 per ValidateWrite
-			return nil, sinkError(fmt.Sprintf("setpoint 0x%04X = %d", attrID, v), err)
-		}
+	if t.limit || s.sink == nil {
+		// No port call: computed and stored under one hold of s.mu, so an
+		// inbound setter cannot land in between.
+		coupled := withoutAttr(s.commitSetpoints(st), attrID)
+		s.mu.Unlock()
+		return coupled, nil
 	}
+	saw := withoutChange(setpointDiff(cur, st), attrID)
+	s.mu.Unlock()
+
+	if err := s.sink.SetSetpoint(ctx, attrID, int16(v), saw); err != nil { //nolint:gosec // an int16 per ValidateWrite
+		return nil, sinkError(fmt.Sprintf("setpoint 0x%04X = %d", attrID, v), err)
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var coupled []uint32
-	for _, id := range s.commitSetpoints(st) {
+	// The state as it is now: an inbound setter may have moved a setpoint
+	// while the Sink ran. The consented value goes onto it and the
+	// reconcile computes the companions afresh; the limits cannot have
+	// moved (only writes change them, and writes wait in s.op).
+	now := s.setpointState()
+	next := now
+	next.assign(attrID, v)
+	if err := next.reconcile(t.key); err != nil {
+		// The written value passed the same limits before the Sink ran, so
+		// the reconcile fits it on any setpoint the setters can store;
+		// should it not, the state the Sink consented to is stored.
+		slog.Default().Warn("matter.thermostat.sink_reconcile_failed",
+			slog.Uint64("attribute", uint64(attrID)), slog.Int("value", v), slog.String("reason", err.Error()))
+		next = st
+	}
+	if moved := companionsMoved(st, next, saw, withoutChange(setpointDiff(now, next), attrID)); len(moved) > 0 {
+		attrs := make([]any, 0, len(moved)+2)
+		attrs = append(attrs, slog.Uint64("attribute", uint64(attrID)), slog.Int("value", v))
+		for _, c := range moved {
+			attrs = append(attrs, slog.Int(fmt.Sprintf("0x%04X", c.AttrID), int(c.Value)))
+		}
+		slog.Default().Warn("matter.thermostat.sink_companions_moved", attrs...)
+	}
+	return withoutAttr(s.commitSetpoints(next), attrID), nil
+}
+
+// withoutAttr drops attrID from ids.
+func withoutAttr(ids []uint32, attrID uint32) []uint32 {
+	var out []uint32
+	for _, id := range ids {
 		if id != attrID {
-			coupled = append(coupled, id)
+			out = append(out, id)
 		}
 	}
-	return coupled, nil
+	return out
+}
+
+// withoutChange drops attrID's entry from changes.
+func withoutChange(changes []SetpointChange, attrID uint32) []SetpointChange {
+	var out []SetpointChange
+	for _, c := range changes {
+		if c.AttrID != attrID {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// companionsMoved lists, with the value that will be stored, every
+// companion — one the Sink was told about (saw) or one the reconcile
+// moves on the re-read state (recomputed) — whose stored value differs
+// from the one the Sink's call assumed (st). A host that echoed a
+// companion makes no difference; one that stored another value does.
+func companionsMoved(st, next setpointState, saw, recomputed []SetpointChange) []SetpointChange {
+	named := map[uint32]bool{}
+	for _, c := range saw {
+		named[c.AttrID] = true
+	}
+	for _, c := range recomputed {
+		named[c.AttrID] = true
+	}
+	var out []SetpointChange
+	for _, c := range setpointDiff(st, next) {
+		if named[c.AttrID] {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // OnMatterAttributesChanged implements [contract.AttributeChangeNotifier]:
@@ -706,6 +774,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	occupHeat, occupCool := s.occupHeat, s.occupCool
 	minHeat, maxHeat, minCool, maxCool := s.minHeat, s.maxHeat, s.minCool, s.maxCool
 	s.mu.RUnlock()
+	prevHeat, prevCool := occupHeat, occupCool
 
 	// amount is in 0.1°C steps in the command; setpoints are in 0.01°C units.
 	// matter.js ThermostatServer.ts:169: amount *= 10.
@@ -768,7 +837,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	default:
 		return thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower unsupported mode %d", mode)}
 	}
-	return s.applyRaiseLower(ctx, occupHeat, occupCool)
+	return s.applyRaiseLower(ctx, prevHeat, prevCool, occupHeat, occupCool)
 }
 
 // applyRaiseLower hands what SetpointRaiseLower moves to the Sink in one
@@ -777,17 +846,21 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 // :221, :223, :246, :268 at 4633bfd7), the one that moves alone otherwise —
 // and stores once the call succeeded. A setpoint that does not move is no
 // change (Datasource.ts:674-676, :956-957): when neither moves, the Sink is
-// not called. The caller holds s.op.
-func (s *ThermostatServer) applyRaiseLower(ctx context.Context, heat, cool int16) error {
-	s.mu.RLock()
+// not called. prevHeat / prevCool are the setpoints the command read.
+//
+// The Sink runs without s.mu. Once it consented, what the command moved is
+// stored as the Sink saw it, over whatever an inbound setter stored for it
+// meanwhile; a setpoint the command did not move keeps what is stored
+// then. The command runs no reconcile, before the Sink or after it. The
+// caller holds s.op.
+func (s *ThermostatServer) applyRaiseLower(ctx context.Context, prevHeat, prevCool, heat, cool int16) error {
 	moves := make([]SetpointChange, 0, 2)
-	if cool != s.occupCool {
+	if cool != prevCool {
 		moves = append(moves, SetpointChange{AttrID: thermoAttrOccupiedCoolingSetpoint, Value: cool})
 	}
-	if heat != s.occupHeat {
+	if heat != prevHeat {
 		moves = append(moves, SetpointChange{AttrID: thermoAttrOccupiedHeatingSetpoint, Value: heat})
 	}
-	s.mu.RUnlock()
 	if len(moves) == 0 {
 		return nil
 	}
@@ -801,7 +874,13 @@ func (s *ThermostatServer) applyRaiseLower(ctx context.Context, heat, cool int16
 		}
 	}
 	s.mu.Lock()
-	s.occupHeat, s.occupCool = heat, cool
+	for _, m := range moves {
+		if m.AttrID == thermoAttrOccupiedCoolingSetpoint {
+			s.occupCool = m.Value
+		} else {
+			s.occupHeat = m.Value
+		}
+	}
 	s.mu.Unlock()
 	return nil
 }

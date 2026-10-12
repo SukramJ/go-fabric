@@ -99,6 +99,17 @@ pseudo-version of `main`.
   command's Sink runs is stored and reported at once; once the Sink
   consents, the command compares with it (the scene invalidation) and
   stores its own OnOff over it.
+- `thermo.ThermostatServer`: the inbound setters (`SetSystemMode`,
+  `SetOccupiedHeatingSetpoint`, `SetOccupiedCoolingSetpoint`) no longer
+  wait for a write or SetpointRaiseLower whose `Sink` is in flight, so a
+  Sink may confirm through them before it returns (the cycle of issue #63,
+  introduced with the Sink). Writes and the command stay serialised behind
+  the Sink. Once it consented, a write stores its value on the state as it
+  is then and reruns the reconcile there; when the companions it computes
+  differ from the ones the Sink was told about, the recomputed ones are
+  stored and `matter.thermostat.sink_companions_moved` is logged. A
+  SetpointRaiseLower stores what it moved as the Sink saw it and leaves a
+  setpoint it did not move as the host stored it.
 - RemoveFabric tells every other session of the removed fabric with a
   Secure-Channel CloseSession before they close (matter.js `Fabric.leave`);
   the session that carried the command still closes after its response,
