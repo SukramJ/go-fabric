@@ -354,3 +354,57 @@ the others hold (`controller/exchange` 94.6 % ≥ 93, `controller/handshake`
 - **`Updated` receives merged reports**, not a chunk iterator; the final
   chunk's acknowledgement follows the callback, as matter.js's follows the
   consumer.
+
+## Owner's decisions
+
+Reviewed 2026-10-13 against `0ceb202d`: `CaseServer.ts:49-392` line by
+line beside `controller/handshake/server.go` (the error → StatusReport
+rule :61-100, the both-or-neither check :108-111, the record lookup
+:113-116, the timing parameters :120-123, the resume :148-222 and the full
+handshake :224-347, the session id taken by `getNextAvailableSessionId`
+with its eviction of the oldest session, `SessionManager.ts:532-550`,
+which `exchange.Manager.AllocateSessionID` does too), the dispatch
+additions of `ExchangeManager.ts:205-217, :244-265, :391-473`,
+`SecureChannelProtocol.ts:30-40, :96-100, :129-148`, the `im` client
+encoders against `TlvWriteRequest.ts`, `TlvTimedRequest.ts`,
+`TlvDataReport.ts` and `Write.ts:77`, `ClientSubscriptions.ts:34-278`,
+`PeerSubscription.ts:38-40`, `SustainedSubscription.ts:483-499`,
+`ClientSubscriptionHandler.ts:33-145`, `Invoke.ts:98-99`,
+`CaseClient.ts:333-334`. `packages/types/src/protocol` and `tlv` are
+identical at `0ceb202d` and `706a8463` (`git diff --stat` empty), so the
+fixtures generated against the checkout's build are the pin's.
+
+1. **InvokeRequest revision stays 12.** `Invoke()`'s 11 is
+   `SessionParameters.fallbacks.interactionModelRevision` (Invoke.ts:99,
+   SessionParameters.ts:131), the value for a peer whose revision is not
+   known; matter.js's own Read and Subscribe stamp
+   `Specification.INTERACTION_MODEL_REVISION` = 12, and so does every
+   message this module sends. `BD-Matter-Controller-InvokeRevision12`.
+2. **One resumption store for both roles, as matter.js.** `CaseClient.ts:334`
+   takes the record's `caseAuthenticatedTags` only when none are
+   configured; the controller's fabrics configure theirs, so a record a
+   node's inbound CASE wrote never lends it the node's CATs. Mirrored, no
+   entry; the Go record's `PeerCATs` beside `CaseAuthenticatedTags` keeps
+   the two readable apart.
+3. **A Sigma1 on a secure session is acknowledged and dropped.** Session
+   establishment runs over the unsecured session; the Go controller does
+   not open a second CASE inside an established one.
+   `BD-Matter-Controller-Sigma1OnSecureSessionIgnored`.
+4. **The inverted Go defaults** (`ReplaceSubscriptions`, `NoFabricFilter`,
+   `DisableListChunking`) and the `*time.Duration` intervals are the
+   surface: the zero value is matter.js's default, which is the rule this
+   module applies everywhere.
+5. **Other first IM messages answered InvalidAction** — agreed, the brief's
+   rule. `BD-Matter-Controller-NoIMServer`.
+
+by_design written: `BD-Matter-CASEServer-CloseOnUnfinishedEstablishment`,
+`BD-Matter-CASEServer-NoReportOnShutdown`,
+`BD-Matter-Controller-Sigma1OnSecureSessionIgnored`,
+`BD-Matter-Controller-EmptyListsNotEncoded`,
+`BD-Matter-Controller-InboundWithoutSourceNodeIDDropped`,
+`BD-Matter-Controller-NoIMServer`, `BD-Matter-Controller-ListIndexPastEnd`,
+`BD-Matter-Controller-MergedReports`,
+`BD-Matter-Controller-InvokeRevision12`. The two flaky-test fixes
+(9b97154, 4c8bbac) are accepted as they stand. The `node` gap the report
+names (no accessor for the subscription manager) closed the same day:
+`node.Node.Subscriptions()` and `Sessions()` (#88, issue #87).
