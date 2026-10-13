@@ -122,6 +122,12 @@ type live struct {
 
 func newLive(t *testing.T, regClock exchange.Clock) *live {
 	t.Helper()
+	return newLiveWith(t, regClock, discardLog())
+}
+
+// newLiveWith is newLive with the registry's logger.
+func newLiveWith(t *testing.T, regClock exchange.Clock, regLog *slog.Logger) *live {
+	t.Helper()
 	lv := &live{dbPath: filepath.Join(t.TempDir(), "node.db")}
 	l, err := udp.New(udp.Config{LocalAddr: "127.0.0.1:0", PreferIPv4: true})
 	if err != nil {
@@ -155,7 +161,7 @@ func newLive(t *testing.T, regClock exchange.Clock) *live {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lv.reg = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: regClock, Logger: discardLog()})
+	lv.reg = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: regClock, Logger: regLog})
 	lv.com, err = commissioner.New(commissioner.Context{
 		Exchanges: mgr, Peers: lv.set, Attestation: attestation.TestStore(), Logger: discardLog(),
 		Subscriptions: lv.reg, Fabrics: []*commissioner.Fabric{fabric}, Resumption: resumption,
@@ -285,7 +291,8 @@ func TestLiveWrite(t *testing.T) {
 // subscription we closed answered InvalidSubscription so the node drops it.
 func TestLiveSubscribe(t *testing.T) {
 	t.Parallel()
-	lv := newLive(t, nil)
+	unknown := make(chan uint64, 8)
+	lv := newLiveWith(t, nil, slog.New(&recordHandler{msg: "matter.controller.interaction.report_for_unknown_subscription", key: "subscription", seen: unknown}))
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	reports := make(chan *interaction.Report, 16)
@@ -317,11 +324,17 @@ func TestLiveSubscribe(t *testing.T) {
 		t.Fatal("ReplaceSubscriptions left the earlier subscription open")
 	}
 	// We forget the subscription; the node's next report on it is answered
-	// InvalidSubscription and the node drops it.
-	waitPersisted(t, lv.node, 1)
+	// InvalidSubscription (ClientSubscriptionHandler.ts:88-104).
 	second.Close()
 	lv.toggle(t)
-	waitPersisted(t, lv.node, 0)
+	select {
+	case id := <-unknown:
+		if id != uint64(second.ID()) {
+			t.Fatalf("InvalidSubscription for %d, want %d", id, second.ID())
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("the node's report on the closed subscription was not refused")
+	}
 }
 
 // TestLiveLivenessTimeout: on the registry's fake clock a subscription
@@ -387,6 +400,33 @@ func TestLiveSustainedSurvivesRestart(t *testing.T) {
 	}
 	lv.toggle(t)
 	waitOnOff(t, reports, lv.plugEP, true)
+}
+
+// recordHandler is a slog handler that reports the uint64 attribute key of
+// every record with message msg.
+type recordHandler struct {
+	msg  string
+	key  string
+	seen chan<- uint64
+}
+
+func (h *recordHandler) Enabled(context.Context, slog.Level) bool { return true }
+func (h *recordHandler) WithAttrs([]slog.Attr) slog.Handler       { return h }
+func (h *recordHandler) WithGroup(string) slog.Handler            { return h }
+func (h *recordHandler) Handle(_ context.Context, r slog.Record) error {
+	if r.Message != h.msg {
+		return nil
+	}
+	r.Attrs(func(a slog.Attr) bool {
+		if a.Key == h.key {
+			select {
+			case h.seen <- a.Value.Uint64():
+			default:
+			}
+		}
+		return true
+	})
+	return nil
 }
 
 // waitPersisted waits until the node holds want persisted subscriptions.
