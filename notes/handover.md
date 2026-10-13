@@ -24,7 +24,7 @@ German, briefly. Six waves were planned against the phases:
 | 7 | phase-5 preparation and release: AddNOC test commissioner, device-layer gaps, Tier-3 transport findings + OnOff scenes, v0.2.0 deprecations removed, `v0.3.0` | S, T, U, V | #53; docs PR `docs/wave-7-followups` | #53 merged 2026-10-12 (`b0b97ff`); tag `v0.3.0` after the docs PR (normal release, no pre-release flag — owner 2026-10-12) |
 | 8 | the three Tier-3 session findings of #54: RemoveFabric/UpdateNOC CloseSession, handshakes hold a TCP connection, first chunk of a chunked report is peer loss | W | `wave/2026-10-12-tranche-8`; docs PR `docs/wave-8-followups` | see §8 |
 | 9 | the five owner issues #57, #58, #60, #61, #62 (openccu-loom ADR 0084 migration): generated device-type names, store migrations + fingerprint, node observers + basic window + knobs, Thermostat Sink, WindowCovering Mover | X, Y, Z | `wave/2026-10-12-tranche-9`; docs PR `docs/wave-9-followups` | see §9 |
-| 10 | the owner issues #63 (a host port under the lock the setter takes) and #66 (ColorControlServer.Set) | AA, AB | `wave/2026-10-12-tranche-10`; docs PR `docs/wave-10-followups` | see §10 |
+| 10 | the owner issues #63 (a host port under the lock the setter takes) and #66 (ColorControlServer.Set) | AA, AB | `wave/2026-10-12-tranche-10`; docs PR `docs/wave-10-followups` | see §10; `v0.3.1` tagged after #69 (release PR) |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -535,5 +535,9 @@ after the tranche merged: four by_design entries
 `BD-Matter-ColorControl-DeviceSetConverts`), the ArmFailSafe finding, two
 open-items rows. Then delete
 `wave10/*`, `planning/briefs-wave-10`, `wave/2026-10-12-tranche-10` and
-the `.claude/worktrees/wave10-*` worktrees. Next: wave 11 = the pin lift
+the `.claude/worktrees/wave10-*` worktrees. Done: #67 merged (`1f8edc9`), #68 merged (`d1d9075`), #63
+and #66 closed. Then `v0.3.1` (owner 2026-10-13: a release before wave 11,
+so openccu-loom can take #57–#66; patch number by owner's choice, the
+release is additive) — CHANGELOG section `[0.3.1]`, tag on `main` after the
+release PR merges, `release.yml` publishes. Next: wave 11 = the pin lift
 to `0ceb202d`, then ADR 0020.
