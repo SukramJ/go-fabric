@@ -55,6 +55,16 @@ type CASEOptions struct {
 	MaxInitialRetransmissions    int
 	MaxInitialRetransmissionTime time.Duration
 	InitialRetransmissionTime    time.Duration
+	// Exchange configures the exchange the handshake runs on: its
+	// [exchange.Options.OnSend] and [exchange.Options.OnReceive] notifiers
+	// are how a connection process watches the Sigma messages — matter.js
+	// PeerConnection.ts:829-860 hands the same notifiers to the exchange it
+	// creates for CaseClient.pair.
+	Exchange exchange.Options
+	// OnExchange, when set, is called with the exchange once it is open,
+	// before Sigma1 goes out — the exchange whose retransmission count a
+	// connection process's kick reads (PeerConnection.ts:568-594).
+	OnExchange func(x *exchange.Exchange)
 	// Logger receives the warnings and debug diagnostics; nil discards them.
 	Logger *slog.Logger
 }
@@ -101,9 +111,12 @@ func CASE(ctx context.Context, mgr *exchange.Manager, addr *net.UDPAddr, fabric 
 		return nil, false, err
 	}
 	defer us.Close()
-	x, err := mgr.Initiate(us, mrp.SecureChannelProtocolID, exchange.Options{})
+	x, err := mgr.Initiate(us, mrp.SecureChannelProtocolID, opts.Exchange)
 	if err != nil {
 		return nil, false, err
+	}
+	if opts.OnExchange != nil {
+		opts.OnExchange(x)
 	}
 	c := &caseClient{mgr: mgr, us: us, x: x, fabric: fabric, peer: peerNodeID, opts: opts, log: log}
 	s, rec, resumed, err := c.pair(ctx)
