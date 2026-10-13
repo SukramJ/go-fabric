@@ -13,38 +13,6 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// ReadRequestMessage tags — matter.js
-// packages/types/src/protocol/messages/TlvReadRequest.ts:19-35.
-const (
-	tagReadAttributeRequests = 0
-	tagReadIsFabricFiltered  = 3
-	tagRevision              = 0xFF
-)
-
-// ReportDataMessage tags (Matter §10.7.3; matter.js TlvDataReport) and
-// those of its AttributeReportIB, AttributeDataIB, AttributeStatusIB,
-// StatusIB and AttributePathIB.
-const (
-	tagReportAttributeReports = 1
-	tagReportMoreChunked      = 3
-	tagReportSuppressResponse = 4
-	tagAttrReportStatus       = 0
-	tagAttrReportData         = 1
-	tagAttrStatusPath         = 0
-	tagAttrStatusStatus       = 1
-	tagStatusIBStatus         = 0
-	tagStatusIBClusterStatus  = 1
-	tagAttrDataDataVersion    = 0
-	tagAttrDataPath           = 1
-	tagAttrDataData           = 2
-	tagAttrPathEndpoint       = 2
-	tagAttrPathCluster        = 3
-	tagAttrPathAttribute      = 4
-	tagAttrPathListIndex      = 5
-	tagAttrPathNode           = 1
-	listIndexNullType         = tlv.TypeNull
-)
-
 // AttributeData is one attribute value of a report.
 type AttributeData struct {
 	Path        im.ConcreteAttributePath
@@ -94,7 +62,9 @@ func (c *Interaction) Read(ctx context.Context, paths ...im.ConcreteAttributePat
 		return nil, err
 	}
 	defer m.x.Close()
-	req, err := encodeReadRequest(paths, true)
+	enc := tlv.NewEncoder()
+	im.ReadRequest{AttributeRequests: paths, FabricFiltered: true}.MarshalTLV(enc)
+	req, err := enc.Bytes()
 	if err != nil {
 		return nil, err
 	}
@@ -126,72 +96,44 @@ func (c *Interaction) Read(ctx context.Context, paths ...im.ConcreteAttributePat
 	}
 }
 
-// encodeReadRequest is TlvReadRequest.encode of a Read(): [0] the
-// attribute paths when there are any, [3] isFabricFiltered, [255] the
-// InteractionModelRevision.
-func encodeReadRequest(paths []im.ConcreteAttributePath, fabricFiltered bool) ([]byte, error) {
-	enc := tlv.NewEncoder()
-	enc.StartStruct(tlv.AnonymousTag())
-	if len(paths) > 0 {
-		enc.StartArray(tlv.ContextTag(tagReadAttributeRequests))
-		for _, p := range paths {
-			p.MarshalTLV(enc, tlv.AnonymousTag())
-		}
-		_ = enc.EndContainer()
-	}
-	enc.PutBool(tlv.ContextTag(tagReadIsFabricFiltered), fabricFiltered)
-	enc.PutUint(tlv.ContextTag(tagRevision), uint64(im.MatterInteractionModelRevision))
-	_ = enc.EndContainer()
-	return enc.Bytes()
-}
-
-// merge decodes one ReportData chunk into r and returns its
-// MoreChunkedMessages and SuppressResponse flags.
+// merge decodes one ReportData chunk into r — im.UnmarshalReportDataTLV
+// with the values as node trees — and returns its MoreChunkedMessages and
+// SuppressResponse flags.
 func (r *Report) merge(payload []byte) (more, suppress bool, err error) {
-	n, err := decodeNode(payload)
+	rd, err := im.UnmarshalReportDataTLV(tlv.NewDecoder(payload), readAttributeValue, nil)
 	if err != nil {
-		return false, false, err
+		return false, false, fmt.Errorf("%w: %w", ErrUnexpectedMessage, err)
 	}
-	if n.El.Type != tlv.TypeStructure {
-		return false, false, fmt.Errorf("%w: ReportData is not a structure", ErrUnexpectedMessage)
-	}
-	if f, ok := child(n, tagReportMoreChunked); ok {
-		more = f.El.Bool
-	}
-	if f, ok := child(n, tagReportSuppressResponse); ok {
-		suppress = f.El.Bool
-	}
-	reports, _ := child(n, tagReportAttributeReports)
-	for _, ib := range reports.Children {
-		if data, ok := child(ib, tagAttrReportData); ok {
-			r.addData(data)
+	for i := range rd.Reports {
+		rep := &rd.Reports[i]
+		if !rep.IsStatus {
+			r.addData(rep)
 			continue
 		}
-		status, ok := child(ib, tagAttrReportStatus)
-		if !ok {
-			continue
-		}
-		path, _ := child(status, tagAttrStatusPath)
-		sib, _ := child(status, tagAttrStatusStatus)
-		s := AttributeStatus{Path: decodePath(path)}
-		if code, ok := child(sib, tagStatusIBStatus); ok {
-			s.Status = im.StatusCode(code.El.Uint) //nolint:gosec // a status code is one byte on the wire
-		}
-		if cs, ok := child(sib, tagStatusIBClusterStatus); ok {
-			v := uint8(cs.El.Uint) //nolint:gosec // a cluster status is one byte on the wire
+		s := AttributeStatus{Path: rep.Path, Status: rep.Status.Status}
+		if rep.Status.HasClusterStatus {
+			v := rep.Status.ClusterStatus
 			s.ClusterStatus = &v
 		}
 		r.Statuses = append(r.Statuses, s)
 	}
-	return more, suppress, nil
+	return rd.MoreChunkedMessages, rd.SuppressResponse, nil
+}
+
+// readAttributeValue keeps a report's value as a node tree.
+func readAttributeValue(_ im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
+	if el.IsContainer {
+		n, err := spec.ReadContainer(dec, el)
+		return im.AttributeValue{Value: n}, err
+	}
+	return im.AttributeValue{Value: spec.Node{El: el}}, nil
 }
 
 // addData adds one AttributeDataIB: a null ListIndex appends its value to
 // the list the same path carried last.
-func (r *Report) addData(data spec.Node) {
-	pathNode, _ := child(data, tagAttrDataPath)
-	path := decodePath(pathNode)
-	value, _ := child(data, tagAttrDataData)
+func (r *Report) addData(rep *im.AttributeReport) {
+	path := rep.Path
+	value, _ := rep.Value.Value.(spec.Node)
 	if path.ListAppend {
 		for i := len(r.Attributes) - 1; i >= 0; i-- {
 			a := &r.Attributes[i]
@@ -203,35 +145,5 @@ func (r *Report) addData(data spec.Node) {
 		}
 		return
 	}
-	d := AttributeData{Path: path, Value: value}
-	if v, ok := child(data, tagAttrDataDataVersion); ok {
-		d.DataVersion = uint32(v.El.Uint) //nolint:gosec // a data version is 32 bits on the wire
-	}
-	r.Attributes = append(r.Attributes, d)
-}
-
-// decodePath reads an AttributePathIB (TlvAttributePath: [1] node, [2]
-// endpoint, [3] cluster, [4] attribute, [5] listIndex, null to append).
-func decodePath(n spec.Node) im.ConcreteAttributePath {
-	var p im.ConcreteAttributePath
-	if v, ok := child(n, tagAttrPathNode); ok {
-		p.Node, p.HasNode = v.El.Uint, true
-	}
-	if v, ok := child(n, tagAttrPathEndpoint); ok {
-		p.Endpoint, p.HasEndpoint = uint16(v.El.Uint), true //nolint:gosec // an endpoint id is 16 bits on the wire
-	}
-	if v, ok := child(n, tagAttrPathCluster); ok {
-		p.Cluster, p.HasCluster = uint32(v.El.Uint), true //nolint:gosec // a cluster id is 32 bits on the wire
-	}
-	if v, ok := child(n, tagAttrPathAttribute); ok {
-		p.Attribute, p.HasAttribute = uint32(v.El.Uint), true //nolint:gosec // an attribute id is 32 bits on the wire
-	}
-	if v, ok := child(n, tagAttrPathListIndex); ok {
-		if v.El.Type == listIndexNullType {
-			p.ListAppend = true
-		} else {
-			p.ListIndex, p.HasListIndex = uint16(v.El.Uint), true //nolint:gosec // a list index is 16 bits on the wire
-		}
-	}
-	return p
+	r.Attributes = append(r.Attributes, AttributeData{Path: path, DataVersion: rep.DataVersion, Value: value})
 }

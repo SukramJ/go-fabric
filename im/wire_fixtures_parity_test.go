@@ -323,12 +323,15 @@ func TestIMWireFixtures_MarshalParity(t *testing.T) {
 			case "InvokeResponse":
 				got = encodeInvokeResponse(t, rec.Fixture)
 			default:
-				// Types without a Go MarshalTLV (ReadRequest, SubscribeRequest,
-				// WriteRequest, InvokeRequest, TimedRequest) are decode-only and
-				// cannot be exercised here. They are recorded as fixtures for
-				// documentation and Stage-3 round-trip tests.
-				t.Skipf("type %q is decode-only — no MarshalTLV to test", rec.Type)
-				return
+				// The client requests (ReadRequest, SubscribeRequest,
+				// WriteRequest, TimedRequest) are compared by
+				// TestParityClientRequestFixtures; InvokeRequest is recorded
+				// for documentation.
+				var ok bool
+				if got, ok = encodeClientRequest(t, rec); !ok {
+					t.Skipf("type %q has no encoder exercised here", rec.Type)
+					return
+				}
 			}
 
 			if rec.ByDesignDivergence {

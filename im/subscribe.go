@@ -105,25 +105,24 @@ type SubscribeRequest struct {
 	DataVersionFilters []DataVersionFilter
 }
 
-// MarshalTLV encodes r.
+// MarshalTLV encodes r as a client sends it. Mirrors matter.js
+// packages/types/src/protocol/messages/TlvSubscribeRequest.ts:19-44 at
+// 0ceb202d: KeepSubscriptions (0), MinIntervalFloor (1) and
+// MaxIntervalCeiling (2) in seconds, the optional lists —
+// AttributeRequests (3), EventRequests (4), EventFilters (5) — only with
+// members, IsFabricFiltered (7), DataVersionFilters (8) only with members,
+// InteractionModelRevision (0xFF), in field order.
 func (r SubscribeRequest) MarshalTLV(enc *tlv.Encoder) {
 	enc.StartStruct(tlv.AnonymousTag())
 	enc.PutBool(tlv.ContextTag(tagSubReqKeepSubscriptions), r.KeepSubscriptions)
 	enc.PutUint(tlv.ContextTag(tagSubReqMinIntervalFloor), uint64(r.MinIntervalFloor))
 	enc.PutUint(tlv.ContextTag(tagSubReqMaxIntervalCeiling), uint64(r.MaxIntervalCeiling))
-	enc.StartArray(tlv.ContextTag(tagSubReqAttributeRequests))
-	for _, p := range r.AttributeRequests {
-		p.MarshalTLV(enc, tlv.AnonymousTag())
-	}
-	_ = enc.EndContainer()
-	if len(r.EventRequests) > 0 {
-		enc.StartArray(tlv.ContextTag(tagSubReqEventRequests))
-		for _, p := range r.EventRequests {
-			p.MarshalTLV(enc, tlv.AnonymousTag())
-		}
-		_ = enc.EndContainer()
-	}
+	marshalAttributePaths(enc, tagSubReqAttributeRequests, r.AttributeRequests)
+	marshalEventPaths(enc, tagSubReqEventRequests, r.EventRequests)
+	marshalEventFilters(enc, tagSubReqEventFilters, r.EventFilters)
 	enc.PutBool(tlv.ContextTag(tagSubReqFabricFiltered), r.FabricFiltered)
+	marshalDataVersionFilters(enc, tagSubReqDataVersionFilters, r.DataVersionFilters)
+	enc.PutUint(tlv.ContextTag(tagInteractionModelRevision), uint64(MatterInteractionModelRevision))
 	_ = enc.EndContainer()
 }
 

@@ -343,9 +343,31 @@ pseudo-version of `main`.
   `handshake.FabricResolver` and `FabricList` resolve the fabric;
   `handshake.ResumptionStore` gains `FindByResumptionID`
   (`MemoryResumptionStore` implements it).
+- `im`, the client side of the Interaction Model messages (ADR 0020, stage
+  3; matter.js `packages/types/src/protocol/messages/` at `0ceb202d`):
+  `WriteRequest.MarshalTLV(enc, valueWriter)` (SuppressResponse only when
+  set, MoreChunkedMessages false as `Write.ts:77` sends it),
+  `TimedRequest.MarshalTLV`, `UnmarshalWriteResponseTLV`,
+  `UnmarshalSubscribeResponseTLV`, `UnmarshalReportDataTLV(dec,
+  valueReader, eventReader)` (`EventDataReader`; `AttributeReport` gains
+  `HasDataVersion` and `TagCompression`, `EventReport` gains `Received`,
+  a `*ReceivedEventData` with the four timestamps and `HasData`), and
+  `DataVersionFilterSize`. The wire fixtures gain
+  `read_req_event_filters_dvf`, `subscribe_req_event_filters`,
+  `write_req_data_version` and `write_req_chunked_list`, and every
+  ReadRequest, SubscribeRequest, WriteRequest and TimedRequest fixture is
+  now byte-compared (`TestParityClientRequestFixtures`).
 
 ### Changed
 
+- `im.ReadRequest.MarshalTLV` and `im.SubscribeRequest.MarshalTLV` encode
+  the request as matter.js's client sends it (`TlvReadRequest.ts:19-35`,
+  `TlvSubscribeRequest.ts:19-44` at `0ceb202d`): an empty AttributeRequests
+  array is no longer written, EventFilters and DataVersionFilters are
+  written when present (they were dropped), and the InteractionModelRevision
+  (12) is stamped. The device side decodes either shape. The wire fixtures'
+  WriteRequest entries now carry `moreChunkedMessages: false`, as matter.js's
+  `Write()` builds it.
 - `controller/exchange.Manager`: a send or wait that shows the peer is gone
   now closes that peer's secure sessions (every one created before the
   exchange, matter.js `ExchangeManager.ts:556-579` → `SessionManager.handlePeerLoss`),

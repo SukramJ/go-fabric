@@ -138,6 +138,28 @@ type EventReport struct {
 	Data      AttributeValue
 	Status    StatusIB
 	IsStatus  bool
+
+	// Received is what [UnmarshalReportDataTLV] read of a received
+	// EventDataIB beyond the fields above; nil on an event this node
+	// builds, which the encoder writes with Timestamp as the
+	// EpochTimestamp.
+	Received *ReceivedEventData
+}
+
+// ReceivedEventData is the part of a received EventDataIB the encoder
+// does not write (TlvEventData.ts): which timestamps were present — the
+// EpochTimestamp is EventReport.Timestamp — the other three, and whether
+// Data was.
+type ReceivedEventData struct {
+	HasEpochTimestamp       bool
+	SystemTimestamp         uint64 // tag 4, milliseconds since boot
+	HasSystemTimestamp      bool
+	DeltaEpochTimestamp     uint64 // tag 5
+	HasDeltaEpochTimestamp  bool
+	DeltaSystemTimestamp    uint64 // tag 6
+	HasDeltaSystemTimestamp bool
+	// HasData reports that the EventDataIB carried Data (tag 7).
+	HasData bool
 }
 
 // EventDataWriter writes the event-specific Data payload into TLV. It

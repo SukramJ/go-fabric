@@ -51,6 +51,9 @@ const {
     TlvInvokeResponseForSend,
     TlvTimedRequest,
     TlvBoolean,
+    TlvString,
+    TlvArray,
+    TlvUInt8,
 } = require(typesMain);
 
 // The IM revision matter.js stamps on every message it sends
@@ -241,12 +244,9 @@ add(
 // SubscribeRequest (TlvSubscribeRequest)
 // =============================================================
 
-// SubscribeRequest fixtures document the matter.js reference wire shape.
-// Go SubscribeRequest.MarshalTLV always emits an empty attributeRequests array
-// when no attributes are requested, whereas matter.js uses TlvOptionalField and
-// omits the field. Go also does not emit interactionModelRevision in this message.
-// All SubscribeRequest fixtures are by-design divergences; they serve as the
-// matter.js reference but are skipped in the strict byte-equality assertion.
+// SubscribeRequest fixtures: the client encoder (im.SubscribeRequest.MarshalTLV,
+// ADR 0020 stage 3) omits empty optional lists and stamps the IM revision, as
+// matter.js's TlvSubscribeRequest does; every fixture is byte-compared.
 
 add(
     "subscribe_req_minimal_keep_true",
@@ -260,10 +260,6 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision; matter.js uses TlvOptionalField for both",
-    },
 );
 
 add(
@@ -278,10 +274,6 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision; matter.js uses TlvOptionalField for both",
-    },
 );
 
 // With attribute requests
@@ -298,10 +290,6 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go SubscribeRequest.MarshalTLV omits interactionModelRevision; matter.js emits it",
-    },
 );
 
 // With event requests
@@ -318,10 +306,6 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision",
-    },
 );
 
 // With dataVersionFilters
@@ -338,10 +322,6 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvSubscribeRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision",
-    },
 );
 
 // =============================================================
@@ -440,10 +420,9 @@ add(
 // ReadRequest (TlvReadRequest)
 // =============================================================
 
-// ReadRequest fixtures document the matter.js reference wire shape.
-// Go ReadRequest.MarshalTLV always emits the attributeRequests array (even empty)
-// and does not emit interactionModelRevision. All ReadRequest fixtures are
-// by-design divergences from the matter.js reference.
+// ReadRequest fixtures: the client encoder (im.ReadRequest.MarshalTLV, ADR 0020
+// stage 3) omits empty optional lists and stamps the IM revision, as matter.js's
+// TlvReadRequest does; every fixture is byte-compared.
 
 add(
     "read_req_minimal",
@@ -451,10 +430,6 @@ add(
     "ReadRequest",
     { isFabricFiltered: false, interactionModelRevision: IM_REVISION },
     TlvReadRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go ReadRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision",
-    },
 );
 
 add(
@@ -467,10 +442,6 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvReadRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go ReadRequest.MarshalTLV omits interactionModelRevision; matter.js emits it",
-    },
 );
 
 add(
@@ -483,10 +454,6 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvReadRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go ReadRequest.MarshalTLV omits interactionModelRevision; matter.js emits it",
-    },
 );
 
 add(
@@ -499,10 +466,6 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvReadRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go ReadRequest.MarshalTLV omits interactionModelRevision; matter.js emits it",
-    },
 );
 
 add(
@@ -515,24 +478,20 @@ add(
         interactionModelRevision: IM_REVISION,
     },
     TlvReadRequest,
-    {
-        byDesign: true,
-        byDesignNote: "Go ReadRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision",
-    },
 );
 
 // =============================================================
 // WriteRequest (TlvWriteRequest)
 // =============================================================
 
-// WriteRequest fixtures: the bridge decodes WriteRequests (sent by controllers),
-// it does not encode them. These fixtures are used for Stage-3 round-trip decode
-// tests only. The encode path (MarshalTLV) does not exist for WriteRequest.
+// WriteRequest fixtures: the client encoder (im.WriteRequest.MarshalTLV, ADR 0020
+// stage 3). Write() always sets moreChunkedMessages false
+// (packages/protocol/src/action/request/Write.ts:77), so every fixture carries it.
 const boolTrueTlv = TlvBoolean.encodeTlv(true);
 
 add(
     "write_req_not_timed",
-    "WriteRequest: timedRequest=false, one AttributeDataIB (OnOff attr, bool true) — decode-only fixture",
+    "WriteRequest: timedRequest=false, one AttributeDataIB (OnOff attr, bool true)",
     "WriteRequest",
     {
         timedRequest: false,
@@ -542,18 +501,15 @@ add(
                 data: boolTrueTlv,
             },
         ],
+        moreChunkedMessages: false,
         interactionModelRevision: IM_REVISION,
     },
     TlvWriteRequest,
-    {
-        byDesign: true,
-        byDesignNote: "WriteRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test",
-    },
 );
 
 add(
     "write_req_timed",
-    "WriteRequest: timedRequest=true (timed write transaction) — decode-only fixture",
+    "WriteRequest: timedRequest=true (timed write transaction)",
     "WriteRequest",
     {
         timedRequest: true,
@@ -563,18 +519,15 @@ add(
                 data: boolTrueTlv,
             },
         ],
+        moreChunkedMessages: false,
         interactionModelRevision: IM_REVISION,
     },
     TlvWriteRequest,
-    {
-        byDesign: true,
-        byDesignNote: "WriteRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test",
-    },
 );
 
 add(
     "write_req_suppress_response",
-    "WriteRequest: suppressResponse=true, timedRequest=false — decode-only fixture",
+    "WriteRequest: suppressResponse=true, timedRequest=false",
     "WriteRequest",
     {
         suppressResponse: true,
@@ -585,13 +538,10 @@ add(
                 data: boolTrueTlv,
             },
         ],
+        moreChunkedMessages: false,
         interactionModelRevision: IM_REVISION,
     },
     TlvWriteRequest,
-    {
-        byDesign: true,
-        byDesignNote: "WriteRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test",
-    },
 );
 
 // =============================================================
@@ -762,44 +712,107 @@ add(
 // =============================================================
 // TimedRequest (TlvTimedRequest)
 // =============================================================
-// TimedRequest fixtures: the bridge decodes TimedRequests (sent by controllers),
-// it does not encode them. These fixtures are used for Stage-3 round-trip decode
-// tests only.
+// TimedRequest fixtures: the client encoder (im.TimedRequest.MarshalTLV, ADR 0020
+// stage 3), as InteractionClientMessenger.sendTimedRequest fills it.
 
 add(
     "timed_req_short",
-    "TimedRequest: timeout=6000ms (typical door-lock timed-request window) — decode-only fixture",
+    "TimedRequest: timeout=6000ms (typical door-lock timed-request window)",
     "TimedRequest",
     { timeout: 6000, interactionModelRevision: IM_REVISION },
     TlvTimedRequest,
-    {
-        byDesign: true,
-        byDesignNote: "TimedRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test",
-    },
 );
 
 add(
     "timed_req_max",
-    "TimedRequest: timeout=65535ms (maximum uint16 value) — decode-only fixture",
+    "TimedRequest: timeout=65535ms (maximum uint16 value)",
     "TimedRequest",
     { timeout: 65535, interactionModelRevision: IM_REVISION },
     TlvTimedRequest,
-    {
-        byDesign: true,
-        byDesignNote: "TimedRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test",
-    },
 );
 
 add(
     "timed_req_minimal",
-    "TimedRequest: timeout=1ms — decode-only fixture",
+    "TimedRequest: timeout=1ms",
     "TimedRequest",
     { timeout: 1, interactionModelRevision: IM_REVISION },
     TlvTimedRequest,
+);
+
+// =============================================================
+// Client requests with the optional lists (ADR 0020 stage 3)
+// =============================================================
+
+add(
+    "read_req_event_filters_dvf",
+    "ReadRequest: attribute and event paths, one eventFilter (eventMin only, Read.ts:171-176), one dataVersionFilter, fabric-filtered",
+    "ReadRequest",
     {
-        byDesign: true,
-        byDesignNote: "TimedRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test",
+        attributeRequests: [{ endpointId: 1, clusterId: 6 }],
+        eventRequests: [{ endpointId: 1, clusterId: 6 }],
+        eventFilters: [{ eventMin: 0x1_0000_0001 }],
+        isFabricFiltered: true,
+        dataVersionFilters: [{ path: { endpointId: 1, clusterId: 6 }, dataVersion: 0x8000_0001 }],
+        interactionModelRevision: IM_REVISION,
     },
+    TlvReadRequest,
+);
+
+add(
+    "subscribe_req_event_filters",
+    "SubscribeRequest: attribute and event paths, an eventFilter with nodeId, a dataVersionFilter, intervals 1/3600",
+    "SubscribeRequest",
+    {
+        keepSubscriptions: true,
+        minIntervalFloorSeconds: 1,
+        maxIntervalCeilingSeconds: 3600,
+        attributeRequests: [{ endpointId: 1, clusterId: 6, attributeId: 0 }],
+        eventRequests: [{ clusterId: 0x28 }],
+        eventFilters: [{ nodeId: 0x1234, eventMin: 7 }],
+        isFabricFiltered: false,
+        dataVersionFilters: [{ path: { endpointId: 0, clusterId: 0x28 }, dataVersion: 5 }],
+        interactionModelRevision: IM_REVISION,
+    },
+    TlvSubscribeRequest,
+);
+
+add(
+    "write_req_data_version",
+    "WriteRequest: one AttributeDataIB with dataVersion=0x01020304 (NodeLabel, a string)",
+    "WriteRequest",
+    {
+        timedRequest: false,
+        writeRequests: [
+            {
+                dataVersion: 0x01020304,
+                path: { endpointId: 0, clusterId: 0x28, attributeId: 5 },
+                data: TlvString.encodeTlv("label"),
+            },
+        ],
+        moreChunkedMessages: false,
+        interactionModelRevision: IM_REVISION,
+    },
+    TlvWriteRequest,
+);
+
+// The list chunking of Write.ts:149-171: REPLACE-ALL as the empty list
+// (listIndex undefined, ArraySchema.encodeAsChunkedArray, TlvArray.ts:156-164),
+// then one ADD per element with listIndex null.
+const chunked = TlvArray(TlvUInt8).encodeAsChunkedArray([1, 2]);
+add(
+    "write_req_chunked_list",
+    "WriteRequest: a list of two uint8 chunked into REPLACE-ALL [] and two appends (listIndex null), timed",
+    "WriteRequest",
+    {
+        timedRequest: true,
+        writeRequests: chunked.map(({ element, listIndex }: { element: any; listIndex: number | null | undefined }) => ({
+            path: { endpointId: 1, clusterId: 0x1e, attributeId: 0, listIndex },
+            data: element,
+        })),
+        moreChunkedMessages: false,
+        interactionModelRevision: IM_REVISION,
+    },
+    TlvWriteRequest,
 );
 
 console.log(JSON.stringify(out, null, 2));

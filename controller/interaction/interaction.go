@@ -8,10 +8,9 @@
 // half of interaction/InteractionMessenger.ts at 0ceb202d. Stage 3 grows
 // it into the full client (Write, Subscribe, batching, chunked requests).
 //
-// The requests are encoded here, not through im/'s server-side types,
-// until stage 3 moves the client encoders into im/ (docs/open-items.md):
-// a ReadRequest carries the InteractionModelRevision and no empty
-// AttributeRequests, as matter.js's TlvReadRequest does.
+// The messages are encoded and decoded with im/'s client encoders and
+// decoders (ADR 0020, stage 3), the shapes of matter.js's TLV message
+// definitions.
 package interaction
 
 import (
@@ -21,7 +20,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
@@ -157,23 +155,4 @@ func (m *messenger) next(ctx context.Context, want uint8, ept time.Duration) (*e
 		return nil, fmt.Errorf("%w: message type 0x%02X, expected 0x%02X", ErrUnexpectedMessage, msg.Opcode, want)
 	}
 	return msg, nil
-}
-
-// decodeNode reads a payload into a node tree.
-func decodeNode(b []byte) (spec.Node, error) {
-	n, err := spec.ReadElement(tlv.NewDecoder(b))
-	if err != nil {
-		return spec.Node{}, fmt.Errorf("%w: %w", ErrUnexpectedMessage, err)
-	}
-	return n, nil
-}
-
-// child returns the context-tagged child tag of n.
-func child(n spec.Node, tag uint8) (spec.Node, bool) {
-	for _, c := range n.Children {
-		if c.El.Tag.Kind == tlv.TagKindContext && c.El.Tag.Number == uint32(tag) {
-			return c, true
-		}
-	}
-	return spec.Node{}, false
 }

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4726,
+  "entry_points": 4729,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,9 +183,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10869,
-    "reachable": 7620,
-    "whitelisted": 3244,
+    "total_exported": 10881,
+    "reachable": 7629,
+    "whitelisted": 3247,
     "unreachable": 5
   },
   "by_package": [
@@ -17095,6 +17095,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestClientReportDataRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/client_parity_matterjs_test.go",
+      "line": 307
+    },
+    {
+      "package": "im",
       "identifier": "TestCommandPathRejectsMissingCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/im_test.go",
@@ -17490,14 +17497,14 @@
       "identifier": "TestIMWireFixtures_ByDesignCoverage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/wire_fixtures_parity_test.go",
-      "line": 410
+      "line": 413
     },
     {
       "package": "im",
       "identifier": "TestIMWireFixtures_F3Regression",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/wire_fixtures_parity_test.go",
-      "line": 371
+      "line": 374
     },
     {
       "package": "im",
@@ -17736,6 +17743,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/pase_authmode_acl_test.go",
       "line": 84
+    },
+    {
+      "package": "im",
+      "identifier": "TestParityClientDecoderFixtures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/client_parity_matterjs_test.go",
+      "line": 265
+    },
+    {
+      "package": "im",
+      "identifier": "TestParityClientRequestFixtures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/client_parity_matterjs_test.go",
+      "line": 237
     },
     {
       "package": "im",

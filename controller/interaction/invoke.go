@@ -161,10 +161,7 @@ func readFields(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any
 // milliseconds, [255] InteractionModelRevision).
 func (m *messenger) timed(ctx context.Context, timeout time.Duration) error {
 	enc := tlv.NewEncoder()
-	enc.StartStruct(tlv.AnonymousTag())
-	enc.PutUint(tlv.ContextTag(0), uint64(min(timeout.Milliseconds(), 0xFFFF))) //nolint:gosec // bounded to uint16 above
-	enc.PutUint(tlv.ContextTag(0xFF), uint64(im.MatterInteractionModelRevision))
-	_ = enc.EndContainer()
+	im.TimedRequest{TimeoutMs: uint16(min(timeout.Milliseconds(), 0xFFFF))}.MarshalTLV(enc) //nolint:gosec // bounded to uint16
 	req, err := enc.Bytes()
 	if err != nil {
 		return err
