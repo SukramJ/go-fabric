@@ -5,6 +5,8 @@ package peer
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"log/slog"
 	"net"
@@ -15,13 +17,13 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/channel"
-	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"github.com/SukramJ/go-fabric/secure/sigma"
 )
 
 // fakeClock is a manual exchange.Clock: timers fire, in order, inside
@@ -198,17 +200,42 @@ func aaaaRR(name, ip string, ttl uint32) dns.RR {
 	return &dns.AAAA{Hdr: rrHdr(name, dns.TypeAAAA, ttl), AAAA: net.ParseIP(ip)}
 }
 
-// testFabric is our side of a test fabric, with no device behind it.
+// testFabric is our side of a test fabric, with no device behind it:
+// controller node 112233 on fabric 0x0F0B, fabric index 1, its NOC issued
+// by a controller/ca authority of its own.
 func testFabric(t *testing.T) handshake.Fabric {
 	t.Helper()
-	c := bridgetest.Dial(t, "127.0.0.1:9", bridgetest.Options{Passcode: 20202021, FabricID: 0x0F0B, NodeID: 0x1234, Seed: 3})
-	id := c.ControllerIdentity(bridgetest.DefaultControllerNodeID)
-	id.FabricIndex = 1
-	v, err := mattercert.NewVerifier(c.RootPublicKey(), mattercert.SystemTime{})
+	const fabricID, nodeID uint64 = 0x0F0B, 112233
+	authority, err := ca.New(ca.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return handshake.Fabric{Identity: &id, RootPublicKey: c.RootPublicKey(), Verifier: v}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := key.PublicKey.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	noc, err := authority.GenerateNOC(pub, fabricID, nodeID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := authority.RootPublicKey()
+	cfid, err := ca.CompressedFabricID(root, fabricID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ipk, err := sigma.DeriveOperationalIPK(make([]byte, 16), cfid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := &sigma.Identity{
+		NOC: noc, ICAC: authority.ICACCert(), PrivateKey: key,
+		NodeID: nodeID, FabricID: fabricID, CompressedFabricID: cfid, IPK: ipk, FabricIndex: 1,
+	}
+	return handshake.Fabric{Identity: id, RootPublicKey: root, Verifier: authority.Verifier()}
 }
 
 // harness is a set on a fake socket, a fake mDNS and a fake clock.

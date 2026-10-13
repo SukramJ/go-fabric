@@ -124,8 +124,12 @@ func uintList(v bridgetest.TLV) []uint64 {
 // completes PASE over UDP (the PASE provider and the node's own
 // commissioning window, the session lookup, the ACK tracker), reads the
 // root and a bridged endpoint through the dispatcher (root and Aggregator
-// clusters, both PartsList providers), and holds a subscription that
-// reports an Aggregator change (the subscription manager, Reassemble).
+// clusters, both PartsList providers), then commissions the node and
+// holds a subscription over the CASE session that reports an Aggregator
+// change (the subscription manager, Reassemble). The subscription rides
+// CASE because a controller subscribes only to a commissioned peer
+// (matter.js packages/protocol/src/action/client/ClientInteraction.ts:991-994
+// at 0ceb202d).
 func TestNodeServesPASEReadAndSubscription(t *testing.T) {
 	t.Parallel()
 	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
@@ -175,6 +179,11 @@ func TestNodeServesPASEReadAndSubscription(t *testing.T) {
 		t.Errorf("bridged OnOff %+v (%v), want false", v, ok)
 	}
 
+	s.Close()
+	s, err = c.Commission(ctx)
+	if err != nil {
+		t.Fatalf("Commission: %v", err)
+	}
 	sub, err := s.Subscribe(ctx, 0, 60, attr(1, 0x001D, 0x0003))
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)

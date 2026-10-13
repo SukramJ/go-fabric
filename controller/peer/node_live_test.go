@@ -3,7 +3,7 @@
 
 //go:build !race
 
-package peer
+package peer_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/controller/discovery"
+	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/mdns"
 )
 
@@ -38,7 +39,7 @@ func TestConnectLiveThroughMulticast(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	s, err := p.Connect(ctx, ConnectOptions{})
+	s, err := p.Connect(ctx, peer.ConnectOptions{})
 	if err != nil {
 		if len(p.Service().Addresses()) == 0 {
 			t.Skipf("the node's operational record was not seen: multicast unavailable here (%v)", err)
