@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4738,
+  "entry_points": 4743,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,9 +183,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10899,
-    "reachable": 7647,
-    "whitelisted": 3247,
+    "total_exported": 10908,
+    "reachable": 7652,
+    "whitelisted": 3251,
     "unreachable": 5
   },
   "by_package": [
@@ -14873,6 +14873,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/handshake/parity_matterjs_test.go",
       "line": 28
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestAssemblerEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/report_internal_test.go",
+      "line": 128
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestAssemblerLists",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/report_internal_test.go",
+      "line": 81
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestAssemblerTagCompression",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/report_internal_test.go",
+      "line": 48
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestEncodeFitting",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/report_internal_test.go",
+      "line": 161
     },
     {
       "package": "controller/peer",

@@ -381,6 +381,21 @@ pseudo-version of `main`.
   writes a node tree; `StatusError.Path` names the failing path;
   `ErrMalformedRequest`. `controller/exchange.UnexpectedMessageError`
   carries the message that answered an ack-only send.
+- `controller/interaction.Interaction.ReadWith(ctx, ReadRequest{Attributes,
+  Events, EventFilters, DataVersionFilters, NoFabricFilter})` (ADR 0020,
+  stage 3; matter.js `ClientInteraction.read`, `#encodeReadingRequest` and
+  `InputChunk` at `0ceb202d`): DataVersionFilters are dropped or trimmed
+  when the request would not fit one message (`ErrRequestTooLarge` when it
+  does not fit without them, `exchange.MaxPayloadSize` 1178 bytes); the
+  reports are assembled as `InputChunk` does — adjacent entries of a path
+  form a list (replace, append, set, remove), a list at the end of a chunk
+  continues in the next, tag compression resolves against the last
+  complete path with its data version, a malformed entry is skipped — and
+  events are decoded with their four timestamps and the precedence of
+  `Timestamp` (`Report.Events`, `EventStatuses`, `EventData`,
+  `EventStatus`, `Report.Empty`). `Read(ctx, paths...)` is `ReadWith` over
+  attribute paths; a list split across chunks is now joined only when it
+  continues the previous chunk's last entry, as matter.js joins it.
 
 ### Changed
 

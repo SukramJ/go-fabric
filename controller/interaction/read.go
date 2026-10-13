@@ -5,145 +5,139 @@ package interaction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
-	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// AttributeData is one attribute value of a report.
-type AttributeData struct {
-	Path        im.ConcreteAttributePath
-	DataVersion uint32
-	Value       spec.Node
+// ReadRequest is a read — matter.js Read() (action/request/Read.ts:28-91)
+// with numeric paths.
+type ReadRequest struct {
+	// Attributes are the attribute paths, wildcards allowed.
+	Attributes []im.ConcreteAttributePath
+	// Events are the event paths, wildcards allowed.
+	Events []im.ConcreteEventPath
+	// EventFilters are the minimum event numbers; matter.js sets eventMin
+	// only (Read.ts:171-176).
+	EventFilters []im.EventMinimumNumber
+	// DataVersionFilters skip clusters whose data the client holds; dropped
+	// or trimmed when the request would not fit one message
+	// (InteractionMessenger.ts:998-1050).
+	DataVersionFilters []im.DataVersionFilter
+	// NoFabricFilter reads fabric-scoped lists unfiltered; a read is
+	// fabric-filtered by default (fabricFilter = true, Read.ts:40).
+	NoFabricFilter bool
 }
 
-// AttributeStatus is one attribute status of a report.
-type AttributeStatus struct {
-	Path          im.ConcreteAttributePath
-	Status        im.StatusCode
-	ClusterStatus *uint8
-}
+// ErrRequestTooLarge is a request that does not fit one message even
+// without its DataVersionFilters — matter.js's MatterFlowError of
+// InteractionMessenger.ts:1010-1014.
+var ErrRequestTooLarge = errors.New("interaction: request does not fit one message")
 
-// Report is the data of a read, its chunks merged.
-type Report struct {
-	Attributes []AttributeData
-	Statuses   []AttributeStatus
-}
-
-// Value returns the value the report carries for the attribute.
-func (r *Report) Value(endpoint uint16, cluster, attribute uint32) (spec.Node, bool) {
-	for i := range r.Attributes {
-		if a := &r.Attributes[i]; a.Path.Endpoint == endpoint && a.Path.Cluster == cluster && a.Path.Attribute == attribute {
-			return a.Value, true
-		}
-	}
-	return spec.Node{}, false
-}
-
-// Read reads attributes on a fresh exchange and returns the report.
-// Mirrors matter.js ClientInteraction.read (ClientInteraction.ts:262-298)
-// with a Read() of attribute selectors (action/request/Read.ts:28-91:
-// fabric-filtered by default, the InteractionModelRevision set) and
-// IncomingInteractionClientMessenger.readDataReports
-// (interaction/InteractionMessenger.ts:938-972) at 0ceb202d: a
-// StatusResponse Success after every chunk with more to come, and after
-// the last one unless it suppresses the response — that last one sent
-// before the exchange closes (the tracked end message, :951-961), a
-// failure to send it only logged. A list split across chunks (an
-// AttributeDataIB with a null ListIndex appends an element) is
-// reassembled into one value, as matter.js's InputChunk does. Errors of
-// the exchange layer pass through unchanged.
+// Read reads attributes on a fresh exchange — [Interaction.ReadWith] with
+// attribute paths only.
 func (c *Interaction) Read(ctx context.Context, paths ...im.ConcreteAttributePath) (*Report, error) {
+	return c.ReadWith(ctx, ReadRequest{Attributes: paths})
+}
+
+// ReadWith reads attributes and events on a fresh exchange and returns the
+// report, its chunks merged. Mirrors matter.js ClientInteraction.read
+// (ClientInteraction.ts:262-298) at 0ceb202d: more paths than the
+// provider's readPathsSupported is only logged (:263-268); the request is
+// encoded to fit one message (InteractionMessenger.ts:994-1050); the
+// reports are read as readDataReports does (:938-972) and each chunk goes
+// through InputChunk (action/client/InputChunk.ts) — a list continued in
+// the next chunk is reassembled, a malformed entry skipped. Errors of the
+// exchange layer pass through unchanged.
+func (c *Interaction) ReadWith(ctx context.Context, r ReadRequest) (*Report, error) {
+	if n := len(r.Attributes) + len(r.Events); n > c.provider.ReadPathsSupported() {
+		c.log.Info("matter.controller.interaction.read_paths", slog.Int("paths", n), slog.Int("supported", c.provider.ReadPathsSupported()))
+	}
+	req, err := encodeReadingRequest(im.ReadRequest{
+		AttributeRequests: r.Attributes, EventRequests: r.Events, EventFilters: r.EventFilters,
+		FabricFiltered: !r.NoFabricFilter, DataVersionFilters: r.DataVersionFilters,
+	})
+	if err != nil {
+		return nil, err
+	}
 	m, err := c.begin(ctx, ExchangeOptions{})
 	if err != nil {
 		return nil, err
 	}
 	defer m.x.Close()
-	enc := tlv.NewEncoder()
-	im.ReadRequest{AttributeRequests: paths, FabricFiltered: true}.MarshalTLV(enc)
-	req, err := enc.Bytes()
-	if err != nil {
-		return nil, err
-	}
 	if err := m.send(ctx, im.OpcodeReadRequest, req, 0); err != nil {
 		return nil, err
 	}
-	report := &Report{}
-	for {
-		msg, err := m.next(ctx, im.OpcodeReportData, 0)
-		if err != nil {
-			return nil, err
-		}
-		more, suppress, err := report.merge(msg.Payload)
-		if err != nil {
-			return nil, err
-		}
-		if more {
-			if err := m.sendStatus(ctx, im.StatusSuccess); err != nil {
-				return nil, err
-			}
-			continue
-		}
-		if !suppress {
-			if err := m.sendStatus(context.WithoutCancel(ctx), im.StatusSuccess); err != nil {
-				c.log.Info("matter.controller.interaction.read_final_status_failed", slog.String("err", err.Error()))
-			}
-		}
-		return report, nil
+	a := newAssembler(c.log)
+	if err := c.readDataReports(ctx, m, nil, func(rd *im.ReportData) error {
+		a.add(rd)
+		return nil
+	}); err != nil {
+		return nil, err
 	}
+	return a.report, nil
 }
 
-// merge decodes one ReportData chunk into r — im.UnmarshalReportDataTLV
-// with the values as node trees — and returns its MoreChunkedMessages and
-// SuppressResponse flags.
-func (r *Report) merge(payload []byte) (more, suppress bool, err error) {
-	rd, err := im.UnmarshalReportDataTLV(tlv.NewDecoder(payload), readAttributeValue, nil)
+// readingRequest is a ReadRequest or a SubscribeRequest, whose
+// DataVersionFilters #encodeReadingRequest may shorten.
+type readingRequest interface {
+	encode(filters []im.DataVersionFilter) ([]byte, error)
+	filters() []im.DataVersionFilter
+}
+
+type readRequest im.ReadRequest
+
+func (r readRequest) encode(filters []im.DataVersionFilter) ([]byte, error) {
+	req := im.ReadRequest(r)
+	req.DataVersionFilters = filters
+	enc := tlv.NewEncoder()
+	req.MarshalTLV(enc)
+	return enc.Bytes()
+}
+
+func (r readRequest) filters() []im.DataVersionFilter { return r.DataVersionFilters }
+
+// encodeReadingRequest encodes a ReadRequest to fit one message.
+func encodeReadingRequest(r im.ReadRequest) ([]byte, error) {
+	return encodeFitting(readRequest(r))
+}
+
+// emptyArraySize is what matter.js's `dataVersionFilters: []` adds to the
+// request it measures (InteractionMessenger.ts:1006-1009): the array's
+// control byte, context tag and end of container.
+const emptyArraySize = 3
+
+// encodeFitting is #encodeReadingRequest and #shortenDataVersionFilters
+// (InteractionMessenger.ts:998-1050): the request as it is when it fits
+// exchange.MaxPayloadSize; otherwise without filters, an error when even
+// that does not fit; otherwise with as many filters, in order, as fit the
+// space left, the first that does not fit ending the list.
+func encodeFitting(r readingRequest) ([]byte, error) {
+	b, err := r.encode(r.filters())
+	if err != nil || len(b) <= exchange.MaxPayloadSize {
+		return b, err
+	}
+	without, err := r.encode(nil)
 	if err != nil {
-		return false, false, fmt.Errorf("%w: %w", ErrUnexpectedMessage, err)
+		return nil, err
 	}
-	for i := range rd.Reports {
-		rep := &rd.Reports[i]
-		if !rep.IsStatus {
-			r.addData(rep)
-			continue
+	base := len(without) + emptyArraySize
+	if base > exchange.MaxPayloadSize {
+		return nil, fmt.Errorf("%w: %d bytes without DataVersionFilters", ErrRequestTooLarge, len(without))
+	}
+	available := exchange.MaxPayloadSize - base
+	var kept []im.DataVersionFilter
+	for _, f := range r.filters() {
+		size := im.DataVersionFilterSize(f)
+		if size > available {
+			break
 		}
-		s := AttributeStatus{Path: rep.Path, Status: rep.Status.Status}
-		if rep.Status.HasClusterStatus {
-			v := rep.Status.ClusterStatus
-			s.ClusterStatus = &v
-		}
-		r.Statuses = append(r.Statuses, s)
+		kept = append(kept, f)
+		available -= size
 	}
-	return rd.MoreChunkedMessages, rd.SuppressResponse, nil
-}
-
-// readAttributeValue keeps a report's value as a node tree.
-func readAttributeValue(_ im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decoder) (im.AttributeValue, error) {
-	if el.IsContainer {
-		n, err := spec.ReadContainer(dec, el)
-		return im.AttributeValue{Value: n}, err
-	}
-	return im.AttributeValue{Value: spec.Node{El: el}}, nil
-}
-
-// addData adds one AttributeDataIB: a null ListIndex appends its value to
-// the list the same path carried last.
-func (r *Report) addData(rep *im.AttributeReport) {
-	path := rep.Path
-	value, _ := rep.Value.Value.(spec.Node)
-	if path.ListAppend {
-		for i := len(r.Attributes) - 1; i >= 0; i-- {
-			a := &r.Attributes[i]
-			if a.Path.Endpoint == path.Endpoint && a.Path.Cluster == path.Cluster && a.Path.Attribute == path.Attribute {
-				value.El.Tag = tlv.AnonymousTag()
-				a.Value.Children = append(a.Value.Children, value)
-				return
-			}
-		}
-		return
-	}
-	r.Attributes = append(r.Attributes, AttributeData{Path: path, DataVersion: rep.DataVersion, Value: value})
+	return r.encode(kept)
 }
