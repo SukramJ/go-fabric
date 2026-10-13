@@ -396,6 +396,24 @@ pseudo-version of `main`.
   `EventStatus`, `Report.Empty`). `Read(ctx, paths...)` is `ReadWith` over
   attribute paths; a list split across chunks is now joined only when it
   continues the previous chunk's last entry, as matter.js joins it.
+- `controller/interaction.Interaction.Subscribe` and the subscription
+  registry (ADR 0020, stage 3; matter.js `ClientInteraction.subscribe`,
+  `ClientSubscriptions`, `PeerSubscription`, `ClientSubscription` at
+  `0ceb202d`): `Subscribe(ctx, SubscribeRequest{Attributes, Events,
+  EventFilters, DataVersionFilters, NoFabricFilter, ReplaceSubscriptions,
+  MinIntervalFloor, MaxIntervalCeiling, Updated, KeepaliveReceived,
+  Closed})` → `*Subscription` (`ID`, `Peer`, `MaxInterval`, `Close`,
+  `Done`): the intervals default to 1 s and 60 min, the priming report's
+  chunks are acknowledged and handed to `Updated`, and the subscription is
+  registered by (peer, id). `NewSubscriptions(SubscriptionsConfig{Clock,
+  Logger, ReportStarted})` is the registry (`AddPeer`, `GetPeer`, `Delete`,
+  `CloseForPeer`, `Active`, `ResetTimer`, `BlockNewActivity`, `Close`):
+  one timer for the earliest deadline, a subscription closing after its
+  maximum interval plus twice the maximum peer response time. A closed
+  subscription tells the peer nothing. `Config.Subscriptions`,
+  `Interval(d)`, `NoSubscription`, `ErrNoSubscriptions`,
+  `ErrUncommissioned`; `peer.Context.SessionMigrated` is called after the
+  address monitor moved a session, for `CloseForPeer`.
 
 ### Changed
 

@@ -396,7 +396,7 @@ var errStopReports = errors.New("interaction: reports stopped")
 // (the tracked end message, :950-966). first, when set, is the chunk
 // already received. A consumer returning errStopReports ends the reading
 // with nil and no answer.
-func (c *Interaction) readDataReports(ctx context.Context, m *messenger, first *im.ReportData, consume func(rd *im.ReportData) error) error {
+func readDataReports(ctx context.Context, log *slog.Logger, m *messenger, first *im.ReportData, consume func(rd *im.ReportData) error) error {
 	rd := first
 	for {
 		if rd == nil {
@@ -423,7 +423,7 @@ func (c *Interaction) readDataReports(ctx context.Context, m *messenger, first *
 		}
 		if !rd.SuppressResponse {
 			if err := m.sendStatus(context.WithoutCancel(ctx), im.StatusSuccess); err != nil {
-				c.log.Info("matter.controller.interaction.final_status_failed", slog.String("err", err.Error()))
+				log.Info("matter.controller.interaction.final_status_failed", slog.String("err", err.Error()))
 			}
 		}
 		return nil

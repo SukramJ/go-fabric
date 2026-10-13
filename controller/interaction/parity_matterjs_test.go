@@ -47,3 +47,24 @@ func TestParityWriteExemption(t *testing.T) {
 		}
 	}
 }
+
+// TestParitySubscriptionConstants: ClientInteraction.ts:96
+// (SUBSCRIPTION_PROCESSING_TIME), :149 (DEFAULT_MIN_INTERVAL_FLOOR), :157
+// (SUBSCRIPTION_MAX_INTERVAL_PUBLISHER_LIMIT); ClientSubscription.ts:104
+// (NO_SUBSCRIPTION = -1, as the uint32 SubscriptionId).
+func TestParitySubscriptionConstants(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name      string
+		got, want any
+	}{
+		{"SUBSCRIPTION_PROCESSING_TIME", interaction.SubscriptionProcessingTime, 10 * time.Second},
+		{"DEFAULT_MIN_INTERVAL_FLOOR", interaction.DefaultMinIntervalFloor, time.Second},
+		{"SUBSCRIPTION_MAX_INTERVAL_PUBLISHER_LIMIT", interaction.SubscriptionMaxIntervalPublisherLimit, 60 * time.Minute},
+		{"NO_SUBSCRIPTION", interaction.NoSubscription, uint32(0xFFFFFFFF)},
+	} {
+		if c.got != c.want {
+			t.Errorf("%s = %v, want %v", c.name, c.got, c.want)
+		}
+	}
+}

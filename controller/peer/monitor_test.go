@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
@@ -16,7 +17,12 @@ import (
 // test plays.
 func monitored(t *testing.T) (*harness, *Peer, nodeSide) {
 	t.Helper()
-	h := newHarness(t, nil)
+	return monitoredWith(t, nil)
+}
+
+func monitoredWith(t *testing.T, edit func(*Context)) (*harness, *Peer, nodeSide) {
+	t.Helper()
+	h := newHarness(t, edit)
 	s, ch := h.securePair(t, 0x50, udpAddr(addr1))
 	p := h.set.Adopt(s)
 	return h, p, nodeSide{h: h, s: s, ch: ch}
@@ -122,10 +128,12 @@ func TestMonitorStillDiscoveredAndCooldown(t *testing.T) {
 
 // TestMonitorMigratesToAnAlternate: the current address fails, a
 // discovered alternate answers: the session moves there in place and the
-// operational address follows (PeerAddressMonitor.ts:219-252).
+// operational address follows, and the set's SessionMigrated hook closes
+// the peer's subscriptions (PeerAddressMonitor.ts:219-252).
 func TestMonitorMigratesToAnAlternate(t *testing.T) {
 	t.Parallel()
-	h, p, n := monitored(t)
+	migrated := make(chan handshake.PeerAddress, 1)
+	h, p, n := monitoredWith(t, func(c *Context) { c.SessionMigrated = func(a handshake.PeerAddress) { migrated <- a } })
 	h.clock.Advance(time.Hour)
 	h.announceAddrs(t, "fd00::2")
 	eventually(t, "the address", func() bool { return len(p.Service().Addresses()) == 1 })
@@ -149,6 +157,9 @@ func TestMonitorMigratesToAnAlternate(t *testing.T) {
 		t.Fatalf("session at %v", n.s.Addr())
 	}
 	eventually(t, "the operational address", func() bool { return p.Descriptor().OperationalAddress.String() == addr2 })
+	if a := <-migrated; a != p.Address() {
+		t.Fatalf("SessionMigrated(%+v)", a)
+	}
 }
 
 // TestMonitorAllProbesFail: no address answers: the session is lost with

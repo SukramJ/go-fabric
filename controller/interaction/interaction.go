@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 SukramJ.
 
-// Package interaction is the controller's Interaction Model client, as
-// far as commissioning needs it (ADR 0020, stage 2): one Invoke and one
-// Read on an existing secure session, ported from matter.js
-// packages/protocol/src/action/client/ClientInteraction.ts and the client
-// half of interaction/InteractionMessenger.ts at 0ceb202d. Stage 3 grows
-// it into the full client (Write, Subscribe, batching, chunked requests).
+// Package interaction is the controller's Interaction Model client (ADR
+// 0020, stages 2 and 3), ported from matter.js
+// packages/protocol/src/action/client/ (ClientInteraction.ts, InputChunk.ts,
+// subscription/) and the client half of interaction/InteractionMessenger.ts
+// at 0ceb202d: Invoke (one command), Read with events and filters, Write,
+// Subscribe with the registry of subscriptions and their liveness, the
+// handler of the reports a peer pushes, and sustained subscriptions. An
+// [Interaction] is bound to an exchange [Provider]: one session, or a peer
+// whose sessions come and go. Invoke batching and splitting, ICD
+// wakefulness, TCP and large messages are not ported.
 //
 // The messages are encoded and decoded with im/'s client encoders and
-// decoders (ADR 0020, stage 3), the shapes of matter.js's TLV message
-// definitions.
+// decoders, the shapes of matter.js's TLV message definitions.
 package interaction
 
 import (
@@ -78,6 +81,7 @@ func (e *StatusError) Error() string {
 // each call runs on its own exchange.
 type Interaction struct {
 	provider Provider
+	subs     *Subscriptions
 	log      *slog.Logger
 	clock    exchange.Clock
 	rand     func() float64
@@ -86,6 +90,10 @@ type Interaction struct {
 // Config configures an [Interaction] — what matter.js ClientInteraction
 // takes from its context (ClientInteraction.ts:140-147).
 type Config struct {
+	// Subscriptions is the controller's subscription registry
+	// ([NewSubscriptions]); Subscribe needs it — matter.js takes it from
+	// the environment (ClientInteraction.ts:188-190, :252-257).
+	Subscriptions *Subscriptions
 	// Logger receives the diagnostics; nil discards them.
 	Logger *slog.Logger
 	// Clock paces the sustained subscriptions' retries; nil is the
@@ -105,7 +113,7 @@ func New(mgr *exchange.Manager, s *exchange.Session, log *slog.Logger) *Interact
 
 // Bind returns the interaction over provider p.
 func Bind(p Provider, cfg Config) *Interaction {
-	c := &Interaction{provider: p, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand}
+	c := &Interaction{provider: p, subs: cfg.Subscriptions, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand}
 	if c.log == nil {
 		c.log = slog.New(slog.DiscardHandler)
 	}

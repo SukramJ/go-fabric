@@ -73,7 +73,7 @@ func (c *Interaction) ReadWith(ctx context.Context, r ReadRequest) (*Report, err
 		return nil, err
 	}
 	a := newAssembler(c.log)
-	if err := c.readDataReports(ctx, m, nil, func(rd *im.ReportData) error {
+	if err := readDataReports(ctx, c.log, m, nil, func(rd *im.ReportData) error {
 		a.add(rd)
 		return nil
 	}); err != nil {

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4743,
+  "entry_points": 4748,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,8 +183,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10908,
-    "reachable": 7652,
+    "total_exported": 10920,
+    "reachable": 7664,
     "whitelisted": 3251,
     "unreachable": 5
   },
@@ -15033,35 +15033,35 @@
       "identifier": "TestMonitorAllProbesFail",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 156
+      "line": 167
     },
     {
       "package": "controller/peer",
       "identifier": "TestMonitorMigratesToAnAlternate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 126
+      "line": 133
     },
     {
       "package": "controller/peer",
       "identifier": "TestMonitorScheduledByAServiceChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 213
+      "line": 224
     },
     {
       "package": "controller/peer",
       "identifier": "TestMonitorSessionSuspect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 182
+      "line": 193
     },
     {
       "package": "controller/peer",
       "identifier": "TestMonitorStillDiscoveredAndCooldown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 89
+      "line": 95
     },
     {
       "package": "controller/peer",

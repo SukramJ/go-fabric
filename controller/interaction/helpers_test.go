@@ -146,7 +146,7 @@ func newScripted(t *testing.T) *scripted {
 	t.Cleanup(m.Close)
 	i2r, r2i := bytes.Repeat([]byte{0x11}, 16), bytes.Repeat([]byte{0x22}, 16)
 	s, err := m.NewSecureSession(exchange.SecureSessionConfig{
-		ID: 0x0101, Addr: peerAddr,
+		ID: 0x0101, Addr: peerAddr, FabricIndex: 1,
 		Channel:        channel.Config{EncryptKey: i2r, DecryptKey: r2i, LocalNodeID: 0x1111, PeerNodeID: 0x2222, PeerSessionID: 0x7101},
 		PeerParameters: exchange.PeerParameters(nil),
 	})

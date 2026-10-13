@@ -29,7 +29,10 @@ func TestSessionProvider(t *testing.T) {
 	t.Parallel()
 	s := newScripted(t)
 	p := interaction.SessionProvider(s.mgr, s.session)
-	if _, ok := p.PeerAddress(); ok {
+	if addr, ok := p.PeerAddress(); !ok || addr != (exchange.PeerAddress{FabricIndex: 1, NodeID: 0x2222}) {
+		t.Fatalf("peer address %+v, %v", addr, ok)
+	}
+	if _, ok := interaction.SessionProvider(s.mgr, paseLike(t, s)).PeerAddress(); ok {
 		t.Fatal("a session without a fabric index has a peer address")
 	}
 	if !p.VerifyReachability(context.Background()) || p.ReadPathsSupported() != 9 || p.SubscribePathsSupported() != 3 {
@@ -53,6 +56,19 @@ func TestSessionProvider(t *testing.T) {
 	if _, err := p.InitiateExchange(context.Background(), interaction.ExchangeOptions{}); !errors.Is(err, exchange.ErrSessionClosed) {
 		t.Fatalf("exchange on a closed session: %v", err)
 	}
+}
+
+// paseLike is a secure session of s's manager without a fabric index.
+func paseLike(t *testing.T, s *scripted) *exchange.Session {
+	t.Helper()
+	ps, err := s.mgr.NewSecureSession(exchange.SecureSessionConfig{
+		ID: 0x0109, Addr: peerAddr, PeerParameters: exchange.PeerParameters(nil),
+		Channel: channel.Config{EncryptKey: bytes.Repeat([]byte{3}, 16), DecryptKey: bytes.Repeat([]byte{4}, 16), PeerSessionID: 9},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ps
 }
 
 // fakeMDNS is an mDNS socket that sends nowhere and receives nothing.
