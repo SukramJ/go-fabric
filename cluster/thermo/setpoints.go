@@ -184,9 +184,6 @@ func (c changedKeys) has(keys ...string) bool {
 	return false
 }
 
-// valid is matter.js #setpointViolation() === undefined.
-func (st *setpointState) valid() bool { return st.violation() == "" }
-
 // violation describes the first violated setpoint invariant, "" when all
 // hold. Mirrors matter.js 0ceb202d packages/node/src/behaviors/thermostat/
 // ThermostatServer.ts:941-986 (#setpointViolation, chip
