@@ -104,9 +104,11 @@ func (p Parameters) EffectiveMaxTCPMessageSize() uint32 {
 }
 
 // Encode writes the structure as a sub-structure tagged outer: every
-// stated field with its spec width (PaseMessages.ts:28-58; matter.js's
-// TlvUInt16 / TlvUInt32 decoders refuse a narrower element even when the
-// value fits), tag 9 only when the bitmap names TCP.
+// stated field at its spec width (PaseMessages.ts:28-58), tag 9 only when
+// the bitmap names TCP. matter.js itself encodes the minimal width and
+// its decoder checks only the element type (TlvNumber.ts:118-143 at
+// 0ceb202d), so either width is accepted on the wire; the fixed width
+// keeps the fixtures stable.
 func (p Parameters) Encode(enc *tlv.Encoder, outer tlv.Tag) {
 	enc.StartStruct(outer)
 	if p.SessionIdleInterval != 0 {

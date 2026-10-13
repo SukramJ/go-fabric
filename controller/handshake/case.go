@@ -78,8 +78,10 @@ type CASEOptions struct {
 //     session's timing; the NOC must name the expected node on our
 //     fabric and its chain verify (an ICAC's fabric must match the NOC's,
 //     mattercert's chain check, so the fabric's); Sigma3 and the Success
-//     status; the session's CATs are the option's or the record's; a new
-//     record with the responder's resumption id;
+//     status; the session's CATs are the option's or the record's, the
+//     channel's peer CATs the responder NOC's (by_design
+//     BD-Matter-CaseInitiatorPeerCATs, as the device-side initiator); a
+//     new record with the responder's resumption id;
 //  4. the record is saved after the session exists, a failure only
 //     logged (:369-381).
 //
@@ -169,7 +171,7 @@ func (c *caseClient) pair(ctx context.Context) (*exchange.Session, ResumptionRec
 			ResumptionID: record.ResumptionID,
 			FabricIndex:  record.Peer.FabricIndex,
 			PeerNodeID:   record.Peer.NodeID,
-			PeerCATs:     record.CaseAuthenticatedTags,
+			PeerCATs:     record.PeerCATs,
 		}
 	}
 	init, err := sigma.NewPeerInitiator(cfg)
@@ -230,7 +232,7 @@ func (c *caseClient) resume(ctx context.Context, init *sigma.Initiator, record *
 			DecryptKey:    res.Keys.R2IKey[:],
 			LocalNodeID:   c.fabric.Identity.NodeID,
 			PeerNodeID:    c.peer,
-			PeerCATs:      cats,
+			PeerCATs:      res.PeerCATs,
 			PeerSessionID: res.PeerSessionID,
 		},
 		PeerParameters:        params,
@@ -286,7 +288,7 @@ func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, record *Re
 			DecryptKey:    res.Keys.R2IKey[:],
 			LocalNodeID:   c.fabric.Identity.NodeID,
 			PeerNodeID:    c.peer,
-			PeerCATs:      cats,
+			PeerCATs:      res.PeerCATs,
 			PeerSessionID: res.PeerSessionID,
 		},
 		PeerParameters:        params,
@@ -303,6 +305,7 @@ func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, record *Re
 		ResumptionID:          res.ResumptionID,
 		SessionParameters:     s.Parameters(),
 		CaseAuthenticatedTags: cats,
+		PeerCATs:              res.PeerCATs,
 	}, nil
 }
 

@@ -35,6 +35,11 @@ type ResumptionRecord struct {
 	SessionParameters sessionparams.Parameters
 	// CaseAuthenticatedTags are the session's CATs.
 	CaseAuthenticatedTags []uint32
+	// PeerCATs are the peer's CATs, lifted from its NOC at the full
+	// handshake (notes/parity/by_design.md
+	// BD-Matter-CaseInitiatorPeerCATs); a resumed session carries them
+	// forward. Usually empty: a device NOC rarely names CATs.
+	PeerCATs []uint32
 }
 
 // ResumptionStore keeps resumption records by peer.
@@ -75,5 +80,6 @@ func (r ResumptionRecord) clone() ResumptionRecord {
 	r.SharedSecret = append([]byte(nil), r.SharedSecret...)
 	r.ResumptionID = append([]byte(nil), r.ResumptionID...)
 	r.CaseAuthenticatedTags = append([]uint32(nil), r.CaseAuthenticatedTags...)
+	r.PeerCATs = append([]uint32(nil), r.PeerCATs...)
 	return r
 }

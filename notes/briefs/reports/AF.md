@@ -193,4 +193,26 @@ the CATs from the responder's NOC (`BD-Matter-CaseInitiatorPeerCATs`).
 
 ## Owner's decisions
 
-(to follow)
+Verified 2026-10-13 against `0ceb202d`: every citation above re-read (the
+`../matter.js` checkout has moved on to `706a8463`, ten commits later, none of
+which touch the cited files). On the questions:
+
+1. **Channel `PeerCATs` come from the responder NOC**, the session's
+   `CaseAuthenticatedTags` from the option or the record. The two are different
+   things: the session's CATs are ours (what the device's ACL grants us,
+   matter.js's only notion), the channel's are the device's (the subjects of
+   anything it sends us). `sigma.Initiator` already lifts them
+   (`BD-Matter-CaseInitiatorPeerCATs`); `handshake.ResumptionRecord` gains
+   `PeerCATs` so a resumed session carries them. Done on this branch (owner commit).
+2. **by_design.** `sigma.Initiator` verifies the chain first because the chain
+   check is what yields the key the transcript signature is checked with;
+   matter.js takes the key straight from the unverified NOC and verifies the
+   chain last. Only the error class of a NOC that is both foreign and
+   mismatched differs. `BD-Matter-SigmaInitiatorCheckOrder` in the docs PR.
+3. **Corrected** (owner commit, `secure/sessionparams`).
+4. **They stay.** Stage 2 decides when the commissioner moves onto `controller/`.
+5. **No by_design entry.** They are Go-side error surface, not behaviour a
+   peer can observe; the list above and handover §12 record them.
+6. **Fallback 1 stays.** `im.DefaultMaxPathsPerInvoke` is the responder's
+   capability; the controller answers no Invoke until stage 3 decides otherwise.
+7. **Open item**, not a ticket: `docs/open-items.md` §1 row.
