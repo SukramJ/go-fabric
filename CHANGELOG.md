@@ -31,6 +31,12 @@ pseudo-version of `main`.
   the generated definition; the package links every generated definition,
   so `spec.Lookup` knows each. `cluster/spec.DecodeValue` decodes a value
   by its `spec.Type` (the attribute-level counterpart of `TlvOfModel`).
+  The tree follows the peer's Descriptor as `ClientStructure` builds it —
+  device types, server lists, the parts lists with their full-family and
+  tree compositions, endpoints and clusters the peer drops — and is
+  reported through `Node.Endpoints`, `Endpoint.Clusters` and the
+  `Hooks` (`EndpointInstalled`, `ClusterInstalled`, `ClusterReplaced`,
+  `ClusterDeleted`, `Changed`).
 
 - `controller/interaction.Report` carries `SubscriptionID` (the report's
   subscription id, the first chunk's; 0 for a read's report) and `Session`

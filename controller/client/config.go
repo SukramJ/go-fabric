@@ -81,8 +81,25 @@ type SubscribeOptions struct {
 }
 
 // Hooks are a node's callbacks. Each is optional; they run after the
-// node's lock is released.
+// node's lock is released, in the order the structure produced them
+// (events delivered at once, the structure events, Changed, then the
+// delayed events — ClientStructure.ts:375-379). A panic in a structure
+// hook is logged, never raised (ClientStructureEvents.ts:138-144).
 type Hooks struct {
+	// EndpointInstalled: an endpoint joined the image under its owner. Its
+	// clusters come with it; no ClusterInstalled follows for them
+	// (ClientStructureEvents.ts:88-107).
+	EndpointInstalled func(ep *Endpoint)
+	// ClusterInstalled: a cluster joined an installed endpoint.
+	ClusterInstalled func(ep *Endpoint, c *Cluster)
+	// ClusterReplaced: an installed cluster's shape changed (its revision,
+	// features, attribute or command lists).
+	ClusterReplaced func(ep *Endpoint, c *Cluster)
+	// ClusterDeleted: the peer's ServerList dropped the cluster.
+	ClusterDeleted func(ep *Endpoint, c *Cluster)
+	// Changed: a read or report was applied (ClientStructure.ts:166-168,
+	// :1550).
+	Changed func()
 	// ConnectionStateChanged: the connection state changed
 	// (ClientNodeLifecycle.ts:101-107).
 	ConnectionStateChanged func(s ConnectionState)

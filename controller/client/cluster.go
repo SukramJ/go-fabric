@@ -41,9 +41,12 @@ type Cluster struct {
 	in shapeInput
 	// current is the shape the structure built and keeps (the cluster's
 	// behavior), nil until there is one or after a definition change reset
-	// it (:632-659); injected is the shape the endpoint exposes
-	// (endpoint.behaviors.supported).
-	current, injected *shape
+	// it (:632-659); pending is one built for an installed endpoint, which
+	// the next structural change applies (pendingBehavior); injected is the
+	// shape the endpoint exposes (endpoint.behaviors.supported).
+	current, pending, injected *shape
+	// pendingDelete: the peer's ServerList dropped the cluster (:922-934).
+	pendingDelete bool
 }
 
 // shapeInput are a cluster's shape inputs: the fields matter.js keeps on a

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4784,
+  "entry_points": 4796,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,9 +184,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10955,
-    "reachable": 7687,
-    "whitelisted": 3263,
+    "total_exported": 10969,
+    "reachable": 7689,
+    "whitelisted": 3275,
     "unreachable": 5
   },
   "by_package": [
@@ -14069,6 +14069,90 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
       "line": 317
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureAttributeListAndFeatures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 377
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureBridge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 228
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 485
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureHookPanics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 517
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureReload",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 438
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureRetractedClaim",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 578
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureRootListErases",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 302
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureServerList",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 339
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureTree",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 258
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureUnknownCompositionWaits",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 278
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureVersionAndFabricFilter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 412
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestStructureVersionFilters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/structure_internal_test.go",
+      "line": 539
     },
     {
       "package": "controller/commissioner",

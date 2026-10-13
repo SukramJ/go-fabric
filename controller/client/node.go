@@ -7,10 +7,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	mrand "math/rand/v2"
+	"slices"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/controller/exchange"
+	"github.com/SukramJ/go-fabric/controller/interaction"
 )
 
 // Node is the image of one remote node — matter.js ClientNode
@@ -23,6 +26,7 @@ type Node struct {
 	rand    func() float64
 	store   Store
 	persist *persister
+	s       *structure
 
 	mu        sync.RWMutex
 	settings  settings
@@ -71,6 +75,10 @@ func New(cfg Config) (*Node, error) {
 			}
 		}
 	}
+	n.s = newStructure(&n.mu, n.log, n.persist)
+	if err := n.s.loadCache(stored); err != nil {
+		return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
+	}
 	changed := false
 	if cfg.AutoSubscribe && !n.settings.autoSubscribe {
 		n.settings.autoSubscribe, changed = true, true
@@ -81,7 +89,86 @@ func New(cfg Config) (*Node, error) {
 	if changed {
 		n.saveSettingsLocked()
 	}
+	n.s.subscribedFabricFiltered = n.settings.defaultSubscription == nil || !n.settings.defaultSubscription.NoFabricFilter
+	n.deliver(n.s.takeEmissions())
 	return n, nil
+}
+
+// apply applies a report to the image under the lock and delivers what it
+// produced after — ClientStructure.mutate (D8 of the brief: no job queue,
+// the callbacks after the lock).
+func (n *Node) apply(sc scope, r *interaction.Report) {
+	n.mu.Lock()
+	n.s.mutate(sc, r)
+	em := n.s.takeEmissions()
+	n.mu.Unlock()
+	n.deliver(em)
+}
+
+// deliver runs the hooks of what the structure emitted, in order.
+func (n *Node) deliver(em []emission) {
+	h := n.cfg.Hooks
+	for i := range em {
+		e := &em[i]
+		switch e.kind {
+		case emitEndpointInstalled:
+			if h.EndpointInstalled != nil {
+				n.structureHook("endpoint_installed", func() { h.EndpointInstalled(e.ep) })
+			}
+		case emitClusterInstalled:
+			if h.ClusterInstalled != nil {
+				n.structureHook("cluster_installed", func() { h.ClusterInstalled(e.ep, e.c) })
+			}
+		case emitClusterReplaced:
+			if h.ClusterReplaced != nil {
+				n.structureHook("cluster_replaced", func() { h.ClusterReplaced(e.ep, e.c) })
+			}
+		case emitClusterDeleted:
+			if h.ClusterDeleted != nil {
+				n.structureHook("cluster_deleted", func() { h.ClusterDeleted(e.ep, e.c) })
+			}
+		case emitChanged:
+			if h.Changed != nil {
+				h.Changed()
+			}
+		case emitEvent:
+		}
+	}
+}
+
+// structureHook runs a structure hook; a panic in it is logged, never
+// raised (ClientStructureEvents.ts:138-144).
+func (n *Node) structureHook(kind string, f func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			n.log.Error("matter.controller.client.hook_failed", slog.String("hook", kind), slog.Any("panic", r))
+		}
+	}()
+	f()
+}
+
+// Endpoints are the image's installed endpoints in number order, endpoint
+// 0 first.
+func (n *Node) Endpoints() []*Endpoint {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	var out []*Endpoint
+	for _, no := range slices.Sorted(maps.Keys(n.s.endpoints)) {
+		if ep := n.s.endpoints[no]; ep.installed {
+			out = append(out, ep)
+		}
+	}
+	return out
+}
+
+// Endpoint is installed endpoint number, nil when the image has none.
+func (n *Node) Endpoint(number uint16) *Endpoint {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	if ep := n.s.endpoints[number]; ep != nil && ep.installed {
+		return ep
+	}
+	return nil
 }
 
 // saveSettingsLocked persists the settings; a store error is logged. The
@@ -180,6 +267,12 @@ func (n *Node) Erase(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.settings = settings{}
+	for _, ep := range n.s.endpoints {
+		for _, c := range ep.clusters {
+			c.cache.discard()
+		}
+	}
+	n.s = newStructure(&n.mu, n.log, n.persist)
 	if err := n.store.EraseNode(n.cfg.ID); err != nil {
 		n.log.Warn("matter.controller.client.store_erase_failed", slog.String("err", err.Error()))
 	}
