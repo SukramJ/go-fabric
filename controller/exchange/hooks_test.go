@@ -32,7 +32,7 @@ func (r *hookRecorder) onReceive() {
 	r.mu.Unlock()
 }
 
-func (r *hookRecorder) snapshot() ([]int, int) {
+func (r *hookRecorder) snapshot() (sends []int, receipts int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return slices.Clone(r.sends), r.receipts

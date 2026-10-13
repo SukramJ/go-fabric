@@ -160,7 +160,7 @@ func (s *Service) maybeStartResolving() {
 		why = "some of the " + strconv.Itoa(n) + " known addresses are unreachable"
 	}
 	s.names.logger.Info("matter.discovery.status.resolving", slog.String("service", s.name.qname), slog.String("why", why))
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(s.names.ctx)
 	done := make(chan struct{})
 	s.status.resolveCancel = cancel
 	s.status.resolving = done

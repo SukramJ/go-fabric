@@ -100,30 +100,6 @@ func WithHooks(ctx context.Context, h Hooks) context.Context {
 	return context.WithValue(ctx, hooksKey{}, &h)
 }
 
-// adoptHooks takes the hooks ctx carries, once per Hooks value.
-func (x *Exchange) adoptHooks(ctx context.Context) {
-	h, _ := ctx.Value(hooksKey{}).(*Hooks)
-	if h == nil {
-		return
-	}
-	x.mu.Lock()
-	if x.hooks == h {
-		x.mu.Unlock()
-		return
-	}
-	x.hooks = h
-	if x.onSend == nil {
-		x.onSend = h.OnSend
-	}
-	if x.onReceive == nil {
-		x.onReceive = h.OnReceive
-	}
-	x.mu.Unlock()
-	if h.Exchange != nil {
-		h.Exchange(x)
-	}
-}
-
 // SendOptions configures [Exchange.Send] — matter.js ExchangeSendOptions
 // (MessageExchange.ts:82-132).
 type SendOptions struct {
@@ -253,6 +229,30 @@ func newExchange(m *Manager, s *Session, id, protocol uint16, initiator bool, op
 		signal:           make(chan struct{}, 1),
 		lastActive:       m.clock.Now(),
 		createdAt:        m.clock.Now(),
+	}
+}
+
+// adoptHooks takes the hooks ctx carries, once per Hooks value.
+func (x *Exchange) adoptHooks(ctx context.Context) {
+	h, _ := ctx.Value(hooksKey{}).(*Hooks)
+	if h == nil {
+		return
+	}
+	x.mu.Lock()
+	if x.hooks == h {
+		x.mu.Unlock()
+		return
+	}
+	x.hooks = h
+	if x.onSend == nil {
+		x.onSend = h.OnSend
+	}
+	if x.onReceive == nil {
+		x.onReceive = h.OnReceive
+	}
+	x.mu.Unlock()
+	if h.Exchange != nil {
+		h.Exchange(x)
 	}
 }
 

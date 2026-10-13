@@ -395,6 +395,7 @@ func (s *Scanner) FindCommissionable(ctx context.Context, id Identifier, found f
 	removeWaiter := func() { _ = s.names.loop.call(func() { s.removeWaiter(w) }) }
 
 	invokedCached := false
+	//nolint:contextcheck // loop work is ctx-free; a status resolution it may start runs on the cache's own context
 	if err := s.names.loop.call(func() { invokedCached = s.register(w) }); err != nil {
 		return result, err
 	}

@@ -4,6 +4,7 @@
 package discovery
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -96,6 +97,11 @@ type Names struct {
 	closeOnce sync.Once
 	solicitor *Solicitor
 
+	// ctx is the base of the work the cache starts on its own (a
+	// service status's resolution); Close cancels it.
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	// Loop-owned state below.
 	names        *omap[string, *Name]
 	stagedIPs    *omap[string, []stagedIP]
@@ -159,6 +165,7 @@ func newNames(conn mdns.QueryConn, logger *slog.Logger, cfg namesConfig) *Names 
 	if n.interfaceName == nil {
 		n.interfaceName = interfaceNameOf
 	}
+	n.ctx, n.cancel = context.WithCancel(context.Background())
 	n.filters = append(n.filters, &ingressFilter{accept: isMatterServiceRecord})
 	n.solicitor = newSolicitor(n)
 	n.armPrune()
@@ -204,6 +211,7 @@ func (n *Names) run() {
 // connection closes. Idempotent.
 func (n *Names) Close() error {
 	n.closeOnce.Do(func() {
+		n.cancel()
 		close(n.loop.closing)
 		<-n.loop.done
 		if n.conn != nil {
