@@ -292,13 +292,24 @@ func (s *ColorControlServer) state() colorState {
 // startTransition is matter.js #startTransition: a hue transition stops
 // the other hue's, then the engine starts it.
 func (s *ColorControlServer) startTransition(t transition.Transition) error {
-	switch t.Name {
-	case propHue:
-		s.engine.Stop(propEnhancedHue)
-	case propEnhancedHue:
-		s.engine.Stop(propHue)
+	return s.startTransitions(t)
+}
+
+// startTransitions starts the transitions of one command as one
+// (matter.js starts them inside the command's transaction, so the
+// immediate ones commit together — one update, one write to the
+// ColorWriter, #84): #startTransition's hue rule for each, then
+// [transition.Engine.StartAll].
+func (s *ColorControlServer) startTransitions(ts ...transition.Transition) error {
+	for _, t := range ts {
+		switch t.Name {
+		case propHue:
+			s.engine.Stop(propEnhancedHue)
+		case propEnhancedHue:
+			s.engine.Stop(propHue)
+		}
 	}
-	return s.engine.Start(t)
+	return s.engine.StartAll(ts...)
 }
 
 // stopHueAndSaturationMovement is matter.js stopHueAndSaturationMovement.

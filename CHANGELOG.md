@@ -332,6 +332,18 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `light.ColorControlServer`: a command that moves two attributes —
+  MoveToColor (x and y), StepColor, MoveColor, MoveToHueAndSaturation and
+  its enhanced form — drives the `ColorWriter` once, with both targets
+  (#84). matter.js starts the two transitions inside the command's
+  transaction (`moveToColorLogic`, `ColorControlServer.ts:797-813` at
+  `0ceb202d`), so a hook on the committed state sees both at once; on
+  the hand-off path (no transition engine) the writer here saw the
+  target x with the old y first, and a device that takes hue and
+  saturation showed an intermediate colour per command.
+  `transition.Engine.StartAll` starts one command's transitions as one:
+  the immediate ones apply in a single `Apply`, as a step already applied
+  every property together.
 - `light.ColorControlServer`: a colour mode switch no longer drives the
   `ColorWriter` with the converted current colour (#79) — matter.js's
   `switchColorMode` changes state only (`ColorControlServer.ts:1454-1540`

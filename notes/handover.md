@@ -740,11 +740,11 @@ mode switch converts the attributes without the `ColorWriter`
 command back to the state it started from (matter.js's transaction), and
 `Set` matches an echo against the in-flight colour in the device's colour
 mode within one attribute unit (`confirms`); an echo that contradicts the
-write bumps `setGen` even when it equals the stored colour. Follow-up not
-done: `moveToColorLogic` and `moveToHueAndSaturationLogic` still apply x
-then y (hue then saturation) as two updates, so an HS device sees one
-intermediate colour per x/y command; a batched apply in the transition
-engine would remove it.
+write bumps `setGen` even when it equals the stored colour. Follow-up done
+the same day as issue #84: `transition.Engine.StartAll` starts one
+command's transitions as one, so `moveToColorLogic`, `stepColor`,
+`moveColor` and `moveToHueAndSaturationLogic` apply both attributes in
+one update and the writer is driven once with both targets.
 
 ## 13. Wave 13 (2026-10-13, the owner away; everything local)
 
