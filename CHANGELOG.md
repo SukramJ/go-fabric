@@ -289,6 +289,12 @@ pseudo-version of `main`.
   `ErrFabricLabelConflict`, `ErrNodeIDConflict`,
   `ErrOperativeConnectionFailed`), `PairRetransmissionLimitReachedError`
   and `PeerCommunicationError`.
+- `internal/chiptool`: `TestGoControllerCommissionsReferenceBridge`
+  (`make chiptool-test`) — the module's own commissioner finds the
+  reference daemon over the host's multicast DNS-SD, commissions it
+  against the CSA test trust store and reads VendorID back over CASE; it
+  needs only the daemon binary and multicast, and skips without the
+  latter.
 
 ### Changed
 
