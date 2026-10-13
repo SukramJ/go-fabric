@@ -265,7 +265,7 @@ Gerätetyp; `NetworkCommissioning` bleibt Ethernet-only. Eine halbe Welle.
 | Phase | Inhalt | ADR | Abschluss |
 | --- | --- | --- | --- |
 | 5 | Apple Home, Alexa mit dem Referenz-Daemon; parallel zu 6–10, sobald der Owner am Gerät ist | — | Befunde in `docs/matter-ecosystem-observations.md` |
-| 6 | matter.js-Pin auf `0ceb202d` (Snapshot-Diff klassifiziert, Generatoren, Zitate geprüft); `certifiability.md` §„Families“ korrigiert; Register Tier 1/2 abgearbeitet | — | `chipdm-check` grün; Register ohne Tier 1/2 |
+| 6 | matter.js-Pin auf `0ceb202d` (Snapshot-Diff klassifiziert, Generatoren, Zitate geprüft); `certifiability.md` §„Families“ korrigiert; Register Tier 1/2 abgearbeitet | — | `chipdm-check` grün; Register ohne Tier 1/2  **Erledigt in Welle 11 (2026-10-13; Briefs AC, AD; Register Tier 1/2 bis auf CountryCode geschlossen).** |
 | 7 | Commissioner Stufen 1–5 (B.1), sechs bis acht Wellen; Stufe 6 (Joint Fabric, DCL) als eigene Welle am Ende | 0020 | Harness kommissioniert mit dem eigenen Commissioner; BIND grün; 74 Gerätetypen |
 | 8 | OTA-Provider und DLOG über BDX (B.2) | 0021 (ergänzt 0019) | SU-Provider-Fälle und DLOG-Transfer gegen den eigenen Requestor/Commissioner |
 | 9 | Media/Content (B.3) | 0022 | 116 Cluster, 77 Gerätetypen; Media-Familien |
