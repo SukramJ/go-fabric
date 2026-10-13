@@ -175,6 +175,7 @@ type Service struct {
 	notified     bool
 	paramSig     string
 	reachable    bool
+	status       statusState
 	closed       bool
 }
 
@@ -235,8 +236,7 @@ func (s *Service) HasTXTRecord() bool {
 
 // Reachable reports whether the service is believed reachable: set when a
 // new address appears (matter.js IpServiceStatus.isReachable, set by
-// IpService.ts:324-325). Clearing it on a failed connection belongs to the
-// peer layer.
+// IpService.ts:324-325), and by [Status].
 func (s *Service) Reachable() bool {
 	var out bool
 	_ = s.names.loop.call(func() { out = s.reachable })
@@ -244,9 +244,22 @@ func (s *Service) Reachable() bool {
 }
 
 // Close releases the service's observers, letting the cache drop its
-// names once nothing else holds them. Idempotent.
+// names once nothing else holds them, and stops an active resolution of
+// its [Status], waiting for it to end (matter.js IpService.ts:85-88 with
+// IpServiceStatus.ts:36-41). Idempotent.
 func (s *Service) Close() {
-	_ = s.names.loop.call(s.close)
+	var resolving chan struct{}
+	_ = s.names.loop.call(func() {
+		s.close()
+		s.stopResolving()
+		resolving = s.status.resolving
+	})
+	if resolving != nil {
+		select {
+		case <-resolving:
+		case <-s.names.loop.done:
+		}
+	}
 }
 
 // AddressChanges streams the service's addresses: first every known
@@ -513,7 +526,7 @@ func (s *Service) updateAddress(e *srvEntry, ip netip.Addr) {
 		return
 	}
 	s.addresses.set(k, a)
-	s.reachable = true
+	s.setReachable(true)
 	s.notify()
 }
 

@@ -12,7 +12,9 @@ import (
 	"log/slog"
 	mrand "math/rand/v2"
 	"net"
+	"slices"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
@@ -164,8 +166,10 @@ func (m *Manager) NewUnsecuredSession(addr *net.UDPAddr, peer *sessionparams.Par
 		window:    mrp.NewWindow(),
 		params:    PeerParameters(peer),
 		exchanges: make(map[*Exchange]struct{}),
+		closing:   make(chan struct{}),
 	}
 	s.timestamp = m.clock.Now()
+	s.createdAt = s.timestamp
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
@@ -267,6 +271,10 @@ type SecureSessionConfig struct {
 	SuppressPeerLoss bool
 	// Resumed marks a session from Sigma2_Resume.
 	Resumed bool
+	// FabricIndex is our fabric index of a CASE session, 0 for PASE: with
+	// the channel's peer node id it is the session's peer address
+	// (NodeSession.ts:408-413), the key of [Manager.HandlePeerLoss].
+	FabricIndex uint8
 }
 
 // NewSecureSession registers the secure session a handshake established.
@@ -293,6 +301,9 @@ func (m *Manager) NewSecureSession(cfg SecureSessionConfig) (*Session, error) {
 		attestationChallenge: append([]byte(nil), cfg.AttestationChallenge...),
 		suppressPeerLoss:     cfg.SuppressPeerLoss,
 		resumed:              cfg.Resumed,
+		fabricIndex:          cfg.FabricIndex,
+		createdAt:            now,
+		closing:              make(chan struct{}),
 		params:               cfg.PeerParameters,
 		timestamp:            now,
 		activeTimestamp:      now,
@@ -338,7 +349,8 @@ func (m *Manager) forget(s *Session) {
 	}
 }
 
-// CloseSession ends a session: a secure session first sends CloseSession
+// CloseSession ends a session: a secure session whose peer is not lost
+// (NodeSession.ts:389-395) first sends CloseSession
 // on a fresh exchange — a StatusReport (Success, CloseSession) without an
 // acknowledgement request — then is dropped. Mirrors matter.js
 // ExchangeManager.ts:716-726 (#sendCloseSession) and
@@ -349,7 +361,7 @@ func (m *Manager) CloseSession(ctx context.Context, s *Session) {
 	if s.IsClosed() {
 		return
 	}
-	if s.secure != nil {
+	if s.secure != nil && !s.IsPeerLost() {
 		if x, err := m.Initiate(s, mrp.SecureChannelProtocolID, Options{}); err == nil {
 			report := StatusReport{
 				GeneralCode:  mrp.SCStatusGeneralSuccess,
@@ -398,8 +410,8 @@ func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange
 	m.mu.Lock()
 	m.exchangeID++
 	id := m.exchangeID
-	x := newExchange(m, s, id, protocol, opts)
-	m.exchanges[uint32(id)|initiatedExchangeFlag] = x
+	x := newExchange(m, s, id, protocol, true, opts)
+	m.exchanges[x.index] = x
 	m.mu.Unlock()
 	s.addExchange(x)
 	m.cleanupSessionExchanges(s)
@@ -408,13 +420,13 @@ func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange
 
 // removeExchange drops x from the table if the index still maps to it.
 func (m *Manager) removeExchange(x *Exchange) {
-	idx := uint32(x.id) | initiatedExchangeFlag
 	m.mu.Lock()
-	if m.exchanges[idx] == x {
-		delete(m.exchanges, idx)
+	if m.exchanges[x.index] == x {
+		delete(m.exchanges, x.index)
 	}
 	m.mu.Unlock()
 	x.session.deleteExchange(x)
+	x.session.closeIfDeferred()
 }
 
 // cleanupSessionExchanges closes the least recently active exchange of s
@@ -554,10 +566,29 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 		x.onMessageReceived(msg, duplicate)
 		return
 	}
-	// No exchange of ours: the controller of stage 1 serves no protocol,
-	// so the message is acknowledged when it asks for it
+	// A new exchange on a closing session is declined
+	// (ExchangeManager.ts:386-389).
+	if s.IsClosed() || s.IsPeerLost() {
+		m.log.Debug("matter.controller.drop", slog.String("reason", "session closing"), slog.Int("session", int(s.id)))
+		return
+	}
+	// A Secure Channel message that opens an exchange on a secure session
+	// goes to the Secure Channel handler (ExchangeManager.ts:407-440); an
+	// unsolicited standalone ack opens nothing (:413-420).
+	if s.secure != nil && msg.ProtocolID == mrp.SecureChannelProtocolID && msg.Initiator && !duplicate {
+		if msg.isStandaloneAck() && !msg.RequiresAck {
+			m.log.Debug("matter.controller.drop", slog.String("reason", "unsolicited standalone ack"), slog.Int("session", int(s.id)))
+			return
+		}
+		x := m.accept(s, msg)
+		x.onMessageReceived(msg, false)
+		m.handleSecureChannel(x, msg)
+		return
+	}
+	// Any other protocol has no handler on the controller until stage 3:
+	// the message is acknowledged when it asks for it
 	// (ExchangeManager.ts:441-452) and dropped otherwise (:453-473).
-	if msg.RequiresAck && !s.IsClosed() {
+	if msg.RequiresAck {
 		m.sendAck(s, msg, 0)
 	}
 	m.log.Debug("matter.controller.unsolicited",
@@ -574,7 +605,7 @@ func (m *Manager) unsolicitedUnsecured(hdr *message.Header, body []byte, src *ne
 	if err != nil || !proto.NeedsAck || !hdr.HasSourceNodeID {
 		return
 	}
-	s := &Session{m: m, addr: src, exchanges: make(map[*Exchange]struct{})}
+	s := &Session{m: m, addr: src, exchanges: make(map[*Exchange]struct{}), closing: make(chan struct{})}
 	m.sendAck(s, &Message{Counter: hdr.MessageCounter, ExchangeID: proto.ExchangeID, Initiator: proto.Initiator, RequiresAck: true}, hdr.SourceNodeID)
 	m.log.Debug("matter.controller.unsolicited", slog.Int("session", 0), slog.Int("exchange", int(proto.ExchangeID)))
 }
@@ -594,7 +625,7 @@ func (m *Manager) sendAck(s *Session, msg *Message, dest uint64) {
 	if err != nil {
 		return
 	}
-	_ = m.conn.Send(s.addr, datagram)
+	_ = m.conn.Send(s.Addr(), datagram)
 }
 
 // seal frames one message on s: on the unsecured session with the global
@@ -621,11 +652,120 @@ func (m *Manager) seal(s *Session, proto message.ProtocolHeader, payload []byte,
 	return append(hdr.Marshal(), sealed.Ciphertext...), sealed.Counter, nil
 }
 
-// reportPeerLost calls the PeerLost hook for a secure session; matter.js
-// ExchangeManager.ts:556-560 ignores a peer loss on any other session.
+// reportPeerLost calls the PeerLost hook once for a secure session that
+// became lost ([Session.HandlePeerLoss]).
 func (m *Manager) reportPeerLost(s *Session, cause error) {
 	if m.peerLost == nil || s.secure == nil {
 		return
 	}
 	m.peerLost(s, cause)
+}
+
+// exchangePeerLost is the peer loss an exchange observed. Mirrors matter.js
+// ExchangeManager.ts:556-579 (MessageExchangeContext.peerLost): ignored
+// off a secure session; a session without a peer address (PASE, or no
+// node id) alone is lost, sparing the exchange; otherwise every session of
+// the peer created before the exchange is (SessionManager.ts:636-638,
+// asOf the exchange's context creation, :549).
+func (m *Manager) exchangePeerLost(x *Exchange, cause error) {
+	s := x.session
+	if s.secure == nil {
+		return
+	}
+	if s.fabricIndex == 0 || s.PeerNodeID() == 0 {
+		s.handlePeerLoss(cause, x)
+		return
+	}
+	m.handlePeerLoss(PeerAddress{FabricIndex: s.fabricIndex, NodeID: s.PeerNodeID()}, cause, x.createdAt, x)
+}
+
+// PeerAddress names a peer on one of our fabrics: our fabric index and
+// the peer's operational node id — matter.js PeerAddress
+// (packages/protocol/src/peer/PeerAddress.ts); handshake.PeerAddress and
+// the peer package use this type.
+type PeerAddress struct {
+	FabricIndex uint8
+	NodeID      uint64
+}
+
+// SessionsFor returns the open secure sessions with peer — matter.js
+// SessionManager.sessionsFor.
+func (m *Manager) SessionsFor(peer PeerAddress) []*Session {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []*Session
+	for _, s := range m.sessions {
+		if s.fabricIndex == peer.FabricIndex && s.secure.PeerNodeID() == peer.NodeID && peer.FabricIndex != 0 {
+			out = append(out, s)
+		}
+	}
+	slices.SortFunc(out, func(a, b *Session) int { return a.createdAt.Compare(b.createdAt) })
+	return out
+}
+
+// HandlePeerLoss gives up every secure session with peer created before
+// asOf (a zero asOf: all of them) — each as [Session.HandlePeerLoss] does.
+// Mirrors matter.js SessionManager.ts:636-638 (handlePeerLoss, asOf
+// defaulting to now) and :677-696 (#handlePeerLoss: a session created at
+// or after asOf is kept).
+func (m *Manager) HandlePeerLoss(peer PeerAddress, cause error, asOf time.Time) {
+	m.handlePeerLoss(peer, cause, asOf, nil)
+}
+
+func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, current *Exchange) {
+	for _, s := range m.SessionsFor(peer) {
+		if !asOf.IsZero() && !s.createdAt.Before(asOf) {
+			continue
+		}
+		s.handlePeerLoss(cause, current)
+	}
+}
+
+// accept registers the exchange the peer opened with msg — matter.js
+// MessageExchange.fromInitialMessage and #addExchange
+// (ExchangeManager.ts:423-434, :494-508).
+func (m *Manager) accept(s *Session, msg *Message) *Exchange {
+	x := newExchange(m, s, msg.ExchangeID, msg.ProtocolID, false, Options{})
+	m.mu.Lock()
+	m.exchanges[x.index] = x
+	m.mu.Unlock()
+	s.addExchange(x)
+	m.cleanupSessionExchanges(s)
+	return x
+}
+
+// handleSecureChannel is the Secure Channel handler of a controller for an
+// exchange the peer opened on a secure session. Mirrors matter.js
+// packages/protocol/src/securechannel/SecureChannelProtocol.ts:30-88
+// (StatusReportOnlySecureChannelProtocol) at 0ceb202d: an initial
+// StatusReport Success / CloseSession means the peer closed the session —
+// NodeSession.handlePeerClose (NodeSession.ts:305-309), the session lost
+// with a [PeerInitiatedCloseError] — and the exchange that carried it
+// closes, acknowledging it; any other initial StatusReport is ignored
+// (:69-77); a standalone ack ends there, unacknowledged as every
+// standalone ack (:43-45, MessageExchange.ts:519-522);
+// any other message is refused as unexpected (:46-49). Every branch closes
+// the exchange, so an ack the message asked for goes out.
+func (m *Manager) handleSecureChannel(x *Exchange, msg *Message) {
+	switch {
+	case msg.Opcode == mrp.SCOpcodeStatusReport:
+		r, ok := DecodeStatusReport(msg.Payload)
+		if !ok || r.GeneralCode != mrp.SCStatusGeneralSuccess || r.ProtocolCode != statusCloseSession {
+			m.log.Debug("matter.controller.secure_channel.ignored_status",
+				slog.Int("session", int(x.session.id)), slog.Int("exchange", int(x.id)),
+				slog.Int("general", int(r.GeneralCode)), slog.Int("protocol", int(r.ProtocolCode)))
+			x.Close()
+			return
+		}
+		m.log.Debug("matter.controller.secure_channel.closed_by_peer", slog.Int("session", int(x.session.id)))
+		x.session.handlePeerLoss(&PeerInitiatedCloseError{}, x)
+		x.Close()
+	case msg.isStandaloneAck():
+		x.Close()
+	default:
+		m.log.Warn("matter.controller.secure_channel.unexpected",
+			slog.Int("session", int(x.session.id)), slog.Int("exchange", int(x.id)), slog.Int("opcode", int(msg.Opcode)),
+			slog.String("err", ErrFlow.Error()))
+		x.Close()
+	}
 }

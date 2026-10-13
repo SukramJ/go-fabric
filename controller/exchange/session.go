@@ -25,7 +25,6 @@ type Session struct {
 	m    *Manager
 	id   uint16
 	peer uint16 // the peer's session id, stamped into outbound headers
-	addr *net.UDPAddr
 
 	// Secure session state; secure is nil on the unsecured session.
 	secure               *channel.Session
@@ -34,6 +33,10 @@ type Session struct {
 	attestationChallenge []byte
 	suppressPeerLoss     bool
 	resumed              bool
+	fabricIndex          uint8
+	createdAt            time.Time
+	closing              chan struct{}
+	closingOnce          sync.Once
 
 	// Unsecured session state: our ephemeral initiator node id and the
 	// reception window of the peer's counters (matter.js
@@ -42,11 +45,14 @@ type Session struct {
 	window *mrp.Window
 
 	mu              sync.Mutex
+	addr            *net.UDPAddr
 	params          sessionparams.Parameters
 	timestamp       time.Time
 	activeTimestamp time.Time
 	exchanges       map[*Exchange]struct{}
 	closed          bool
+	peerLost        bool
+	deferredClose   bool
 }
 
 // ID is the local session id: [UnsecuredSessionID] for the unsecured
@@ -57,7 +63,25 @@ func (s *Session) ID() uint16 { return s.id }
 func (s *Session) PeerSessionID() uint16 { return s.peer }
 
 // Addr is the peer's UDP address.
-func (s *Session) Addr() *net.UDPAddr { return s.addr }
+func (s *Session) Addr() *net.UDPAddr {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.addr
+}
+
+// SetAddr moves the session to the peer's address addr: every later
+// transmission on the session goes there, an exchange with an address
+// override aside — matter.js `session.channel.networkAddress = address`,
+// the in-place migration of PeerAddressMonitor.ts:243 and :170
+// (packages/protocol/src/peer/, 0ceb202d). A nil addr is ignored.
+func (s *Session) SetAddr(addr *net.UDPAddr) {
+	if addr == nil {
+		return
+	}
+	s.mu.Lock()
+	s.addr = addr
+	s.mu.Unlock()
+}
 
 // IsSecure reports whether the session is encrypted (PASE or CASE).
 func (s *Session) IsSecure() bool { return s.secure != nil }
@@ -128,6 +152,11 @@ func (s *Session) AttestationChallenge() []byte {
 	return append([]byte(nil), s.attestationChallenge...)
 }
 
+// FabricIndex is our fabric index of a CASE session, 0 on the unsecured
+// and on a PASE session — the fabric half of matter.js
+// NodeSession.peerAddress (NodeSession.ts:408-413).
+func (s *Session) FabricIndex() uint8 { return s.fabricIndex }
+
 // Resumed reports that a CASE session came from Sigma2_Resume.
 func (s *Session) Resumed() bool { return s.resumed }
 
@@ -168,6 +197,18 @@ func (s *Session) lastTimestamp() time.Time {
 	return s.timestamp
 }
 
+// ActiveTimestamp is the time of the last message received from the peer
+// on the session — matter.js Session.activeTimestamp (session/Session.ts:61-65,
+// updated by notifyActivity :141-147), the order of Peer.newestSession
+// (peer/Peer.ts:581-601). A secure session starts at its creation time
+// (Session.ts:119-121 with NodeSession.ts:119); the unsecured session is
+// zero until the peer's first message.
+func (s *Session) ActiveTimestamp() time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeTimestamp
+}
+
 // timing is the peer's intervals and whether the peer is active now.
 func (s *Session) timing() (Intervals, bool) {
 	now := s.m.clock.Now()
@@ -181,6 +222,72 @@ func (s *Session) IsClosed() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.closed
+}
+
+// IsPeerLost reports whether the session was given up because the peer
+// is gone or closed it — matter.js NodeSession.isPeerLost
+// (NodeSession.ts:320-322). A lost session is closing: no CloseSession
+// goes to the peer.
+func (s *Session) IsPeerLost() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.peerLost
+}
+
+// Closing is closed once the session begins to close — [Session.Close],
+// [Manager.CloseSession] or a peer loss — matter.js Session.closing
+// (Session.ts:70, emitted at :299), which a peer watches to drop the
+// session (Peer.ts:169-174).
+func (s *Session) Closing() <-chan struct{} { return s.closing }
+
+func (s *Session) markClosing() {
+	s.closingOnce.Do(func() { close(s.closing) })
+}
+
+// HandlePeerLoss gives the session up because the peer is gone: it is
+// marked lost, the manager's PeerLost hook is called, every exchange on it
+// is aborted with cause, and it is closed without a CloseSession on the
+// wire. Mirrors matter.js NodeSession.ts:311-314 (handlePeerLoss) and
+// :349-352 with Session.ts:318-331 (initiateForceClose). It is a no-op on
+// a session already closed or lost.
+func (s *Session) HandlePeerLoss(cause error) { s.handlePeerLoss(cause, nil) }
+
+// handlePeerLoss is HandlePeerLoss sparing current, the exchange that
+// observed the loss: matter.js lets it finish (PeerLossContext.currentExchange,
+// Session.ts:324-327) and closes the session once it has
+// (NodeSession.ts:354-362, deferredClose).
+func (s *Session) handlePeerLoss(cause error, current *Exchange) {
+	s.mu.Lock()
+	if s.closed || s.peerLost {
+		s.mu.Unlock()
+		return
+	}
+	s.peerLost = true
+	_, spared := s.exchanges[current]
+	s.deferredClose = spared && current != nil
+	s.mu.Unlock()
+	s.markClosing()
+	s.m.reportPeerLost(s, cause)
+	for _, x := range s.liveExchanges() {
+		if x != current {
+			x.abort(cause)
+		}
+	}
+	if !spared || current == nil {
+		s.Close()
+		return
+	}
+	s.closeIfDeferred()
+}
+
+// closeIfDeferred closes a lost session whose last exchange ended.
+func (s *Session) closeIfDeferred() {
+	s.mu.Lock()
+	ready := s.deferredClose && len(s.exchanges) == 0
+	s.mu.Unlock()
+	if ready {
+		s.Close()
+	}
 }
 
 func (s *Session) addExchange(x *Exchange) {
@@ -218,6 +325,7 @@ func (s *Session) Close() {
 	}
 	s.closed = true
 	s.mu.Unlock()
+	s.markClosing()
 	for _, x := range s.liveExchanges() {
 		x.abort(ErrSessionClosed)
 	}

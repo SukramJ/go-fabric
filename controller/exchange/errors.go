@@ -96,6 +96,17 @@ func (e *PeerMessageMissingError) Is(target error) bool {
 	return ok
 }
 
+// PeerInitiatedCloseError is the cause a session ends with when the peer
+// closed it with a CloseSession StatusReport — matter.js
+// PeerInitiatedCloseError (PeerCommunicationError.ts:71-75), raised by
+// NodeSession.handlePeerClose (NodeSession.ts:305-309). It is transient.
+type PeerInitiatedCloseError struct{}
+
+func (*PeerInitiatedCloseError) Error() string { return "exchange: session ended by peer" }
+
+// Is makes the error match [ErrTransient].
+func (*PeerInitiatedCloseError) Is(target error) bool { return target == ErrTransient }
+
 // StatusReport is a Secure Channel StatusReport body: general code,
 // protocol id, protocol code and optional protocol data, little-endian —
 // the layout transport/mrp.EncodeStatusReport writes.

@@ -1,0 +1,230 @@
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2026 SukramJ.
+
+package peer
+
+import (
+	"context"
+	"database/sql"
+	"log/slog"
+	"net"
+	"path/filepath"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/miekg/dns"
+	_ "modernc.org/sqlite"
+
+	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/controller/discovery"
+	"github.com/SukramJ/go-fabric/controller/exchange"
+	"github.com/SukramJ/go-fabric/controller/handshake"
+	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/secure/mattercert"
+	"github.com/SukramJ/go-fabric/tlv"
+	"github.com/SukramJ/go-fabric/transport/udp"
+)
+
+const (
+	nodePasscode uint32 = 20202021
+	nodeFabricID uint64 = 0x0000_0000_0000_0F0B
+)
+
+// startNode starts an uncommissioned node on loopback, as
+// controller/handshake's tests do, advertising with adv (nil: nothing) and
+// listening on listen.
+func startNode(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *net.UDPAddr) {
+	t.Helper()
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	n, err := node.New(node.Config{
+		Network:       node.Network{Listen: listen, PreferIPv4: listen == "127.0.0.1:0"},
+		Advertiser:    adv,
+		Commissioning: node.Commissioning{Passcode: nodePasscode, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
+		ProductDescription: node.ProductDescription{
+			VendorID: 0xFFF1, ProductID: 0x8001,
+		},
+		BasicInformation: node.BasicInformation{
+			VendorName: "go-fabric test", ProductName: "peer test", NodeLabel: "peer node", SerialNumber: "PEER-1",
+			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
+		},
+		Store:  node.Store{DB: db},
+		Logger: slog.New(slog.DiscardHandler),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = n.Stop(context.Background()) })
+	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n, addr
+}
+
+// commissioned starts a node, commissions it with the test commissioner
+// and returns it, its address and our side of the fabric as controller
+// node 112233 on fabric index 1.
+func commissioned(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *net.UDPAddr, handshake.Fabric) {
+	t.Helper()
+	n, addr := startNode(t, adv, listen)
+	c := bridgetest.Dial(t, n.Bridge().LocalAddr(), bridgetest.Options{
+		Passcode: nodePasscode, Discriminator: 3840, FabricID: nodeFabricID, NodeID: testNode, Seed: 7,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	s, err := c.Commission(ctx)
+	if err != nil {
+		t.Fatalf("Commission: %v", err)
+	}
+	s.Close()
+	id := c.ControllerIdentity(bridgetest.DefaultControllerNodeID)
+	id.FabricIndex = 1
+	v, err := mattercert.NewVerifier(c.RootPublicKey(), mattercert.SystemTime{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n, addr, handshake.Fabric{Identity: &id, RootPublicKey: c.RootPublicKey(), Verifier: v}
+}
+
+// liveSet is a set on a real loopback socket and the system clock.
+type liveSet struct {
+	set    *Set
+	mgr    *exchange.Manager
+	resume *MemoryResumptionStore
+	names  *discovery.Names
+}
+
+func newLiveSet(t *testing.T, names *discovery.Names, fabric handshake.Fabric, listen string, edit func(*Context)) *liveSet {
+	t.Helper()
+	l, err := udp.New(udp.Config{LocalAddr: listen, PreferIPv4: listen == "127.0.0.1:0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mgr, err := exchange.NewManager(l, exchange.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	served := make(chan struct{})
+	go func() {
+		defer close(served)
+		_ = l.Serve(ctx, mgr.HandleDatagram)
+	}()
+	ls := &liveSet{mgr: mgr, resume: &MemoryResumptionStore{}, names: names}
+	c := Context{
+		Exchanges:  mgr,
+		Names:      names,
+		Fabrics:    func(a handshake.PeerAddress) (handshake.Fabric, bool) { return fabric, a.FabricIndex == 1 },
+		Resumption: ls.resume,
+		Logger:     slog.New(slog.DiscardHandler),
+	}
+	if edit != nil {
+		edit(&c)
+	}
+	ls.set, err = NewSet(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ls.set.Close(context.Background())
+		mgr.Close()
+		cancel()
+		<-served
+		_ = names.Close()
+	})
+	return ls
+}
+
+func aRR(name, ip string, ttl uint32) dns.RR {
+	return &dns.A{Hdr: rrHdr(name, dns.TypeA, ttl), A: net.ParseIP(ip).To4()}
+}
+
+// TestConnectToANodeThroughTheProcess: the process finds the node through
+// its operational record — injected here, so the path runs under -race —
+// and establishes CASE; a second Connect reuses the session; the node's
+// CloseSession on stop drops the session and fires Disconnected; Delete
+// forgets the resumption record.
+func TestConnectToANodeThroughTheProcess(t *testing.T) {
+	t.Parallel()
+	n, addr, fabric := commissioned(t, nil, "127.0.0.1:0")
+	conn := newFakeMDNS()
+	names := discovery.NewNames(conn, slog.New(slog.DiscardHandler))
+	var disconnected atomic.Int32
+	ls := newLiveSet(t, names, fabric, "127.0.0.1:0", func(c *Context) { c.Disconnected = func(*Peer) { disconnected.Add(1) } })
+	p, err := ls.set.For(testAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qname := discovery.OperationalQName(fabric.Identity.CompressedFabricID, testNode)
+	conn.announce(t, srvRR(qname, "peer-node.local", uint16(addr.Port), 120), txtRR(qname, 120, "SII=500", "SAI=300"), aRR("peer-node.local", "127.0.0.1", 120))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	s, err := p.Connect(ctx, ConnectOptions{})
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	if s.PeerNodeID() != testNode || s.FabricIndex() != 1 || p.Descriptor().OperationalAddress.String() != addr.String() {
+		t.Fatalf("session to 0x%X on fabric %d, operational address %v", s.PeerNodeID(), s.FabricIndex(), p.Descriptor().OperationalAddress)
+	}
+	if again, err := p.Connect(ctx, ConnectOptions{}); err != nil || again != s {
+		t.Fatal("a second Connect did not reuse the session")
+	}
+	if !p.Service().Reachable() {
+		t.Fatal("a connected service is not reachable")
+	}
+	if _, ok := ls.resume.FindResumptionRecord(testAddr); !ok {
+		t.Fatal("CASE saved no resumption record")
+	}
+	// The node tells a session it has routed a message of (bridge.go's
+	// notify path); the probe gives it the route, and proves the session.
+	if !probe(ctx, ls.mgr, s, nil, slog.New(slog.DiscardHandler)) {
+		t.Fatal("the probe failed on a live session")
+	}
+	if err := n.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the node's CloseSession", func() bool { return s.IsPeerLost() && !p.HasSession() && disconnected.Load() == 1 })
+	if probe(ctx, ls.mgr, s, nil, slog.New(slog.DiscardHandler)) {
+		t.Fatal("the probe succeeded on a closed session")
+	}
+	p.Delete(ctx)
+	if _, ok := ls.resume.FindResumptionRecord(testAddr); ok {
+		t.Fatal("Delete kept the resumption record")
+	}
+}
+
+// readOnce reads BasicInformation.NodeLabel over s.
+func readOnce(t *testing.T, m *exchange.Manager, s *exchange.Session) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	x, err := m.Initiate(s, im.InteractionModelProtocolID, exchange.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer x.Close()
+	enc := tlv.NewEncoder()
+	im.ReadRequest{AttributeRequests: []im.ConcreteAttributePath{{
+		Endpoint: 0, Cluster: 0x0028, Attribute: 0x0005, HasEndpoint: true, HasCluster: true, HasAttribute: true,
+	}}, FabricFiltered: true}.MarshalTLV(enc)
+	req, err := enc.Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := x.Send(ctx, im.OpcodeReadRequest, req, exchange.SendOptions{}); err != nil {
+		t.Fatalf("ReadRequest: %v", err)
+	}
+	if msg, err := x.Next(ctx, exchange.ReceiveOptions{}); err != nil || msg.Opcode != im.OpcodeReportData {
+		t.Fatalf("ReportData: %v", err)
+	}
+}

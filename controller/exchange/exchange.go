@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"sync"
 	"time"
 
@@ -43,12 +44,60 @@ func (m *Message) isStatusReport() bool {
 	return m.ProtocolID == mrp.SecureChannelProtocolID && m.Opcode == mrp.SCOpcodeStatusReport
 }
 
-// Options configures [Manager.Initiate].
+// Options configures [Manager.Initiate] — matter.js
+// MessageExchange.Options (MessageExchange.ts:1239-1274).
 type Options struct {
 	// SuppressPeerLoss waives the peer-loss report for this exchange —
 	// matter.js MessageExchange.Options.suppressPeerLoss
 	// (MessageExchange.ts:1272-1273).
 	SuppressPeerLoss bool
+
+	// OnSend is called before every transmission of a message on the
+	// exchange with its retransmission number: 0 for a first
+	// transmission (a standalone ack included), n for the n-th
+	// retransmission — matter.js MessageExchange.Options.onSend
+	// (:1240-1243), called at :768 and :943. It runs on the sending
+	// goroutine, for a first transmission with the exchange locked, so it
+	// must not block for long or call back into the exchange.
+	OnSend func(retransmission int)
+
+	// AddressOverride sends the exchange's messages to this address instead
+	// of the session's, leaving the session's address and its other
+	// exchanges alone — matter.js MessageExchange.Options.addressOverride
+	// (:1266-1270), stored at :297 and used for every transmission (:488,
+	// :771-774, :953). Nil sends to the session's address.
+	AddressOverride *net.UDPAddr
+
+	// OnReceive is called for every message the exchange takes, a
+	// duplicate and a standalone ack included — matter.js
+	// MessageExchange.Options.onReceive (:1245-1248), called at :469
+	// after the protocol check.
+	OnReceive func()
+}
+
+// Hooks attach [Options.OnSend] and [Options.OnReceive] through a
+// context to an exchange the caller does not open itself — the exchange
+// handshake.CASE opens for its Sigma messages, whose retransmissions the
+// connection process of controller/peer watches. The exchange adopts them
+// at its first [Exchange.Send] or [Exchange.Next] under such a context,
+// each hook only when its Options left it unset — the setters of matter.js
+// MessageExchange.ts:351-369 ("sets the send-notifier when none was
+// provided at construction time"), which serve the same purpose there.
+type Hooks struct {
+	// Exchange is called once with the exchange that adopted the hooks.
+	Exchange func(x *Exchange)
+	// OnSend is [Options.OnSend].
+	OnSend func(retransmission int)
+	// OnReceive is [Options.OnReceive].
+	OnReceive func()
+}
+
+type hooksKey struct{}
+
+// WithHooks returns a context that carries h to the exchanges sending or
+// receiving under it (see [Hooks]).
+func WithHooks(ctx context.Context, h Hooks) context.Context {
+	return context.WithValue(ctx, hooksKey{}, &h)
 }
 
 // SendOptions configures [Exchange.Send] — matter.js ExchangeSendOptions
@@ -127,9 +176,15 @@ type Exchange struct {
 	id               uint16
 	protocol         uint16
 	suppressPeerLoss bool
+	initiator        bool
+	index            uint32
 	done             chan struct{}
 
 	mu              sync.Mutex
+	addressOverride *net.UDPAddr
+	onSend          func(retransmission int)
+	onReceive       func()
+	hooks           *Hooks
 	queue           []*Message
 	signal          chan struct{}
 	sentToAck       *pending
@@ -146,23 +201,72 @@ type Exchange struct {
 	closeTimer      Timer
 	receivedCount   int
 	lastActive      time.Time
+	createdAt       time.Time
 }
 
-func newExchange(m *Manager, s *Session, id, protocol uint16, opts Options) *Exchange {
+// newExchange builds an exchange we initiate (initiator) or one the peer
+// opened; index is its key in the manager's table.
+func newExchange(m *Manager, s *Session, id, protocol uint16, initiator bool, opts Options) *Exchange {
+	index := uint32(id)
+	if initiator {
+		index |= initiatedExchangeFlag
+	}
 	return &Exchange{
-		m:                m,
-		session:          s,
-		id:               id,
-		protocol:         protocol,
+		m:         m,
+		session:   s,
+		id:        id,
+		protocol:  protocol,
+		initiator: initiator,
+		index:     index,
+		// An exchange the peer opened is in use from its first message
+		// (MessageExchange.ts:303).
+		used:             !initiator,
 		suppressPeerLoss: opts.SuppressPeerLoss,
+		addressOverride:  opts.AddressOverride,
+		onSend:           opts.OnSend,
+		onReceive:        opts.OnReceive,
 		done:             make(chan struct{}),
 		signal:           make(chan struct{}, 1),
 		lastActive:       m.clock.Now(),
+		createdAt:        m.clock.Now(),
+	}
+}
+
+// adoptHooks takes the hooks ctx carries, once per Hooks value.
+func (x *Exchange) adoptHooks(ctx context.Context) {
+	h, _ := ctx.Value(hooksKey{}).(*Hooks)
+	if h == nil {
+		return
+	}
+	x.mu.Lock()
+	if x.hooks == h {
+		x.mu.Unlock()
+		return
+	}
+	x.hooks = h
+	if x.onSend == nil {
+		x.onSend = h.OnSend
+	}
+	if x.onReceive == nil {
+		x.onReceive = h.OnReceive
+	}
+	x.mu.Unlock()
+	if h.Exchange != nil {
+		h.Exchange(x)
 	}
 }
 
 // ID is the exchange id.
 func (x *Exchange) ID() uint16 { return x.id }
+
+// dest is where the exchange's messages go: the override, or the
+// session's current address.
+func (x *Exchange) dest() *net.UDPAddr {
+	if x.addressOverride != nil {
+		return x.addressOverride
+	}
+	return x.session.Addr()
+}
 
 // Session is the session the exchange runs on.
 func (x *Exchange) Session() *Session { return x.session }
@@ -180,12 +284,40 @@ func (x *Exchange) HasUnackedMessage() bool {
 	return x.sentToAck != nil
 }
 
+// RetransmissionCount is the number of retransmissions of the message the
+// exchange sent last, reset by a new send and by its acknowledgement —
+// matter.js MessageExchange.ts:410-413 (retransmissionCount): the counter
+// of :263, reset at :508 (ack), :611 (send) and :786 (first
+// transmission), incremented at :886 and taken back at :907 when only the
+// final wait remains.
+func (x *Exchange) RetransmissionCount() int {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	return x.retransCount
+}
+
+// RetransmissionRestartSaving is how much restarting the exchange — a
+// fresh exchange whose first transmission waits the base backoff — would
+// shorten the wait until the next (re)transmission: the interval of the
+// retransmission timer armed last minus the backoff of transmission 0,
+// never negative, and 0 before the exchange armed a timer. Mirrors
+// matter.js MessageExchange.ts:1227-1235 (retransmissionRestartSaving),
+// which reads the last timer's interval whether or not it still runs.
+func (x *Exchange) RetransmissionRestartSaving() time.Duration {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if x.retransTimer == nil {
+		return 0
+	}
+	return max(0, x.retransInterval-x.backoffLocked(0))
+}
+
 // considerClosed is matter.js MessageExchange.ts:376-378: closed, or —
-// for an exchange we initiated, which every exchange here is — closing.
+// for an exchange we initiated — closing.
 func (x *Exchange) considerClosed() bool {
 	x.mu.Lock()
 	defer x.mu.Unlock()
-	return x.closed || x.closing
+	return x.closed || (x.initiator && x.closing)
 }
 
 func (x *Exchange) lastActivity() time.Time {
@@ -222,6 +354,7 @@ func (x *Exchange) notifySentLocked() {
 // acknowledgement stops the retransmissions and leaves the message
 // unacknowledged (:793-805). Both return ctx's error.
 func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts SendOptions) error {
+	x.adoptHooks(ctx)
 	x.mu.Lock()
 	if x.closed {
 		cause := x.closeCause
@@ -240,7 +373,7 @@ func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts 
 		err = x.awaitAck(ctx, p, opts.ExpectAckOnly)
 	}
 	if err != nil && x.reportsPeerLoss(opts.SuppressPeerLoss) && (errors.Is(err, ErrTransient) || errors.Is(err, ErrNetwork)) {
-		x.m.reportPeerLost(x.session, err)
+		x.m.exchangePeerLost(x, err)
 	}
 	return err
 }
@@ -277,7 +410,7 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 	x.used = true
 	x.notifySentLocked()
 	proto := message.ProtocolHeader{
-		Initiator:  true,
+		Initiator:  x.initiator,
 		NeedsAck:   requiresAck,
 		Opcode:     opcode,
 		ExchangeID: x.id,
@@ -295,6 +428,9 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 	if err != nil {
 		return nil, err
 	}
+	if x.onSend != nil {
+		x.onSend(0)
+	}
 	var p *pending
 	if requiresAck && !x.sendOpts.DisableMRP {
 		p = &pending{
@@ -307,7 +443,7 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 		}
 		x.sentToAck = p
 	}
-	if err := x.m.conn.Send(x.session.addr, datagram); err != nil {
+	if err := x.m.conn.Send(x.dest(), datagram); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrNetwork, err)
 	}
 	if p != nil {
@@ -415,8 +551,12 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 	x.notifySentLocked()
 	backoff := x.backoffLocked(x.retransCount)
 	count := x.retransCount
+	onSend := x.onSend
 	x.mu.Unlock()
-	if err := x.m.conn.Send(x.session.addr, p.datagram); err != nil {
+	if onSend != nil {
+		onSend(count)
+	}
+	if err := x.m.conn.Send(x.dest(), p.datagram); err != nil {
 		x.m.log.Debug("matter.controller.retransmit_failed", slog.Int("exchange", int(x.id)), slog.String("err", err.Error()))
 	}
 	x.m.log.Debug("matter.controller.retransmit", slog.Int("exchange", int(x.id)), slog.Int("retransmission", count), slog.Duration("backoff", backoff))
@@ -446,6 +586,11 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		return
 	}
 	x.lastActive = x.m.clock.Now()
+	if onReceive := x.onReceive; onReceive != nil {
+		x.mu.Unlock()
+		onReceive()
+		x.mu.Lock()
+	}
 	if duplicate {
 		if msg.RequiresAck {
 			_, _ = x.transmitLocked(mrp.StandaloneAckOpcode, nil, &msg.Counter)
@@ -457,7 +602,7 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		x.notifySentLocked()
 		datagram := p.datagram
 		x.mu.Unlock()
-		_ = x.m.conn.Send(x.session.addr, datagram)
+		_ = x.m.conn.Send(x.dest(), datagram)
 		return
 	}
 	if p := x.sentToAck; p != nil {
@@ -536,6 +681,7 @@ func (x *Exchange) sendStandaloneAckFor(msg *Message) {
 // peer lost when nothing was received on the exchange. On a closed
 // session the wait is unbounded but for ctx.
 func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, error) {
+	x.adoptHooks(ctx)
 	timeout := opts.Timeout
 	if timeout == 0 && !x.session.IsClosed() {
 		ept := opts.ExpectedProcessingTime
@@ -572,7 +718,7 @@ func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, err
 		case <-expired:
 			err := &PeerMessageMissingError{Timeout: timeout}
 			if x.reportsPeerLoss(opts.SuppressPeerLoss) {
-				x.m.reportPeerLost(x.session, err)
+				x.m.exchangePeerLost(x, err)
 			}
 			return nil, err
 		}

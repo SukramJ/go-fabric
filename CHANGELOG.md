@@ -112,9 +112,113 @@ pseudo-version of `main`.
 - `bridgetest.Commissioner.ControllerIdentity` and `RootPublicKey`: the
   commissioner's controller identity and fabric root, for a CASE
   initiator outside the package.
+- `exchange.Exchange.RetransmissionCount` and
+  `RetransmissionRestartSaving` (ADR 0020, stage 1): the retransmissions
+  of the pending message and how much a restarted exchange would shorten
+  the wait for the next one — matter.js `MessageExchange.retransmissionCount`
+  and `retransmissionRestartSaving` at `0ceb202d`, the inputs of the
+  connection process's kick.
+- `exchange.Options.OnSend` / `OnReceive` and `exchange.WithHooks`: the
+  transmission and receipt notifiers of matter.js
+  `MessageExchange.Options.onSend` / `onReceive` (called with the
+  retransmission number before every transmission, and for every message
+  the exchange takes), and a context that carries them to an exchange the
+  caller does not open itself — the CASE exchange of `handshake.CASE`,
+  adopted at its first send as matter.js's `onSend` / `onReceive` setters
+  adopt them.
+- `exchange.Options.AddressOverride`, `exchange.Session.SetAddr` and
+  `Session.ActiveTimestamp`: one exchange's messages to another address
+  while the session keeps its own (matter.js
+  `MessageExchange.Options.addressOverride`), the in-place migration of a
+  session to a new peer address (`session.channel.networkAddress = …`,
+  `PeerAddressMonitor.ts`), and the time of the last message received on
+  a session (`Session.activeTimestamp`), which orders a peer's sessions.
+- Peer loss in `controller/exchange`: `Session.HandlePeerLoss` /
+  `IsPeerLost` / `Closing` / `FabricIndex`, `Manager.HandlePeerLoss`
+  (every session of a peer created before a point in time) and
+  `Manager.SessionsFor`, keyed by `exchange.PeerAddress`. A lost session
+  aborts its exchanges with the cause, calls the `PeerLost` hook once and
+  closes without a CloseSession on the wire. A send or wait that shows
+  the peer gone now loses the peer's sessions as matter.js
+  `ExchangeManager` does (its own session once the failing exchange
+  ends), where it only called the hook before. `handshake.CASE` stamps
+  the fabric index on the CASE session (`SecureSessionConfig.FabricIndex`).
+- Peer-initiated Secure Channel exchanges on a controller session
+  (matter.js `StatusReportOnlySecureChannelProtocol`): a CloseSession
+  StatusReport from the peer ends the session with
+  `exchange.PeerInitiatedCloseError` and is acknowledged; any other
+  initial Secure Channel message is acknowledged and ignored. A message
+  that opens an exchange on a closing session is declined. Other
+  protocols' peer-initiated messages stay acknowledged-and-dropped until
+  stage 3.
+- `discovery.Service.Status` (`discovery.Status`), the rest of matter.js
+  `IpServiceStatus`: `Connecting` registers a connection attempt whose
+  outcome marks the service reachable or not, `IsConnecting`,
+  `ConnectionInitiatedAt`, `SetReachable`, `IsResolving`,
+  `LastReceiptAt` / `SetLastReceiptAt`; while the service is unreachable
+  and an attempt is outstanding the status resolves it actively
+  (`Service.Resolve`) until it is reachable with no attempt left, and
+  `Service.Close` stops and waits for that resolution.
+  `Service.Changes` signals every address or TXT change (matter.js
+  `IpService.changed`).
+- `controller/peer` (ADR 0020, stage 1), first part: `peer.Descriptor`
+  (matter.js `PeerDescriptor`: address, data model revision, operational
+  UDP address, discovery data, reported session parameters, CATs),
+  `peer.Store` with `MemoryStore`, `peer.ResumptionStore` (a
+  `handshake.ResumptionStore` that can delete a record) with
+  `MemoryResumptionStore`, and `peer.Timing` with `DefaultTiming` and
+  `Merge` (matter.js `PeerTimingParameters` and its defaults at
+  `0ceb202d`).
+- `peer.Set` and `peer.Peer` (matter.js `PeerSet`, `Peer`): `NewSet`
+  over a `peer.Context` (exchange manager, DNS-SD cache, fabrics,
+  resumption and descriptor stores, timing, error handler, hooks),
+  `For` / `Get` / `Has` / `Peers` / `Size`, `AddKnownPeer` with
+  matter.js's merge rules, `Adopt` (a CASE session of one of our fabrics
+  becomes its peer's), `Disconnect`, `Close`, `Timing` / `SetTiming`,
+  `SetHandleError`. A peer follows its operational DNS-SD service (the
+  TXT record's SII/SAI/SAT/T/ICD as a group), its sessions' address and
+  reported parameters, saves its descriptor once per burst of changes,
+  and offers `Descriptor`, `Sessions`, `HasSession`, `NewestSession`,
+  `SessionParameters`, `Disconnect`, `Close` and `Delete`.
+- `peer.Peer.Connect`, `Kick` and `TimeOffline`, and the connection
+  process behind them (matter.js `PeerConnection`): one process per peer
+  that registers with the service status (resolving while the peer is
+  unreachable), follows the service's addresses — the most desirable
+  first, `DelayBeforeNextAddress` apart, earlier attempts kept — falls
+  back to the operational address while nothing is discovered (with the
+  long initial backoff when it is not the first address), retires a
+  fallback discovery has superseded after the stabilisation delay, keeps
+  the operational address as fallback when every discovered address
+  expires, runs CASE with unlimited first retransmissions, restarts an
+  attempt's exchange on a kick when that pays, and pauses after a failure
+  by matter.js's table (Busy delay with jitter, NoSharedTrustRoots clears
+  the resumption record and retries at once, peer error, transient,
+  unhandled; `peer.ErrorHandler` may replace a delay or end the process).
+  `Connect` shares the process, waits the connection timeout less the
+  time offline and ends in `peer.UnreachableError`.
+- The liveness probe of `controller/peer` (matter.js
+  `ClientInteraction.probe`, the one piece of stage 3 the address monitor
+  needs): an empty, unfiltered ReadRequest on an existing session —
+  optionally to another address — with suppressed peer loss and at most
+  two transmissions, the reports read and answered as matter.js reads
+  them.
+- The address monitor of `controller/peer` and `Peer.VerifyReachability`
+  (matter.js `PeerAddressMonitor`): a service change with a live session
+  arms a stabilisation timer; the check probes the session when its
+  address left DNS-SD and the last probe or receipt is older than the
+  Fibonacci cooldown (10, 10, 20, 30, 50 … minutes up to 24 h), migrates
+  the session in place to a discovered address that answers, and gives
+  the session up as unresponsive when none does. Concurrent checks join
+  one run; `peer.ReasonSessionSuspect` probes the current address only.
 
 ### Changed
 
+- `controller/exchange.Manager`: a send or wait that shows the peer is gone
+  now closes that peer's secure sessions (every one created before the
+  exchange, matter.js `ExchangeManager.ts:556-579` → `SessionManager.handlePeerLoss`),
+  not only the `PeerLost` hook; the hook fires once per session lost.
+  `handshake.PeerAddress` is `exchange.PeerAddress`;
+  `handshake.ResumptionStore` gains `DeleteResumptionRecord`.
 - The Matter data model snapshot (`parity/schema.json`) moves from
   matter.js `85cf6647` (behaviour cited at the code pin `4633bfd7`) to
   `0ceb202d`, and every matter.js line citation follows it. No cluster or

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4612,
+  "entry_points": 4664,
   "entry_packages": [
     ".",
     "bdx",
@@ -138,6 +138,7 @@
     "controller/discovery",
     "controller/exchange",
     "controller/handshake",
+    "controller/peer",
     "device",
     "diagevent",
     "eligibility",
@@ -178,9 +179,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10653,
-    "reachable": 7492,
-    "whitelisted": 3156,
+    "total_exported": 10731,
+    "reachable": 7516,
+    "whitelisted": 3210,
     "unreachable": 5
   },
   "by_package": [
@@ -14304,6 +14305,13 @@
     },
     {
       "package": "controller/discovery",
+      "identifier": "TestService_Changes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/status_test.go",
+      "line": 104
+    },
+    {
+      "package": "controller/discovery",
       "identifier": "TestService_NotificationsCoalesceAndTXTBySignature",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/service_test.go",
@@ -14359,6 +14367,34 @@
       "line": 25
     },
     {
+      "package": "controller/discovery",
+      "identifier": "TestStatus_ConnectingResolvesUntilAnAddressAppears",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/status_test.go",
+      "line": 30
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestStatus_FailedAttemptAndReachabilityStopResolving",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/status_test.go",
+      "line": 67
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestActiveTimestamp",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/address_test.go",
+      "line": 65
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestAddressOverrideAndSetAddr",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/address_test.go",
+      "line": 21
+    },
+    {
       "package": "controller/exchange",
       "identifier": "TestCloseBehaviour",
       "reason": "auto-whitelist:pattern=test-file",
@@ -14409,10 +14445,38 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestExchangePeerLossClosesThePeersSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/peerloss_test.go",
+      "line": 120
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestHooksAdoptedFromContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/hooks_test.go",
+      "line": 72
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestManagerHandlePeerLossAsOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/peerloss_test.go",
+      "line": 95
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestNextTimeoutIsMaxPeerResponseTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 365
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestOnSendAndOnReceive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/hooks_test.go",
+      "line": 44
     },
     {
       "package": "controller/exchange",
@@ -14451,10 +14515,31 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestPeerCloseSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/securechannel_test.go",
+      "line": 30
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestPeerLostHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 590
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestPeerSecureChannelOthers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/securechannel_test.go",
+      "line": 64
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestRetransmissionCountAndRestartSaving",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/retransmission_test.go",
+      "line": 19
     },
     {
       "package": "controller/exchange",
@@ -14507,6 +14592,13 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestSessionHandlePeerLoss",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/peerloss_test.go",
+      "line": 61
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestSessionIDAllocation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
@@ -14532,6 +14624,293 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 69
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "PeerAddress",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/resumption.go",
+      "line": 20
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "MemoryResumptionStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/store.go",
+      "line": 92
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ResumptionStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/store.go",
+      "line": 88
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestAddKnownPeerMergeAndCoalescedSave",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 68
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestAdoptSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 152
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestCloseDeleteAndDisconnect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 209
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestConnectDiscoveredAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 59
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestConnectLiveThroughMulticast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/node_live_test.go",
+      "line": 23
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestConnectReuseSharedProcessAndTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 312
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestConnectToANodeThroughTheProcess",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/node_test.go",
+      "line": 157
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestConnectionErrorDelays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 189
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestDiscoverKick",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 403
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestEstablishmentUnresponsive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 436
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestFallbackOnlyAndNotFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 91
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestFallbackRetiredAfterStabilization",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 121
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestHandleErrorOverrideAndFatal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 259
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestKickRestartsTheExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 355
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMemoryResumptionStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/store_test.go",
+      "line": 45
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMemoryStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/store_test.go",
+      "line": 15
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMonitorAllProbesFail",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 156
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMonitorMigratesToAnAlternate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 126
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMonitorScheduledByAServiceChange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 213
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMonitorSessionSuspect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 182
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMonitorStillDiscoveredAndCooldown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 89
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestNewSetNeedsItsCollaborators",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 22
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestNoSharedTrustRootsDeletesTheRecordAndRetries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 243
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestOperationalAddressStaysAsFallback",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 164
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityErrorDelays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 93
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityKnownPeerMerge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 176
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityProbeCooldownFibonacci",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 153
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityTimingDefaults",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 23
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityTimingMerge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 58
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityUnresponsiveDetector",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 132
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestProbeFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/probe_test.go",
+      "line": 132
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestProbeReadsTheReports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/probe_test.go",
+      "line": 86
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestServiceChangeUpdatesDiscoveryData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 124
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestSessionParametersPreferTheReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 191
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestSetForGetAndUnknownFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 43
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestStoresImplementTheInterfaces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/store_test.go",
+      "line": 72
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestTwoAddressesStaggered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 145
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestUnhandledErrorAndDisconnectedSet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 292
     },
     {
       "package": "device",

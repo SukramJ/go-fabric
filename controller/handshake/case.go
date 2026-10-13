@@ -240,6 +240,7 @@ func (c *caseClient) resume(ctx context.Context, init *sigma.Initiator, record *
 		CaseAuthenticatedTags: cats,
 		AttestationChallenge:  res.Keys.AttestationChallenge[:],
 		Resumed:               true,
+		FabricIndex:           c.fabric.Identity.FabricIndex,
 	})
 	if err != nil {
 		return nil, ResumptionRecord{}, err
@@ -295,6 +296,7 @@ func (c *caseClient) full(ctx context.Context, init *sigma.Initiator, record *Re
 		ReportedParameters:    sigma2.SessionParams,
 		CaseAuthenticatedTags: cats,
 		AttestationChallenge:  res.Keys.AttestationChallenge[:],
+		FabricIndex:           c.fabric.Identity.FabricIndex,
 	})
 	if err != nil {
 		return nil, ResumptionRecord{}, err
