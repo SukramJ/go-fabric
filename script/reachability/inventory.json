@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4613,
+  "entry_points": 4616,
   "entry_packages": [
     ".",
     "bdx",
@@ -178,9 +178,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10665,
-    "reachable": 7494,
-    "whitelisted": 3166,
+    "total_exported": 10669,
+    "reachable": 7495,
+    "whitelisted": 3169,
     "unreachable": 5
   },
   "by_package": [
@@ -14304,6 +14304,13 @@
     },
     {
       "package": "controller/discovery",
+      "identifier": "TestService_Changes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/status_test.go",
+      "line": 104
+    },
+    {
+      "package": "controller/discovery",
       "identifier": "TestService_NotificationsCoalesceAndTXTBySignature",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/service_test.go",
@@ -14357,6 +14364,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/solicitor_test.go",
       "line": 25
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestStatus_ConnectingResolvesUntilAnAddressAppears",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/status_test.go",
+      "line": 30
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestStatus_FailedAttemptAndReachabilityStopResolving",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/status_test.go",
+      "line": 67
     },
     {
       "package": "controller/exchange",

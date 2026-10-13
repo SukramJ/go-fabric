@@ -151,6 +151,16 @@ pseudo-version of `main`.
   that opens an exchange on a closing session is declined. Other
   protocols' peer-initiated messages stay acknowledged-and-dropped until
   stage 3.
+- `discovery.Service.Status` (`discovery.Status`), the rest of matter.js
+  `IpServiceStatus`: `Connecting` registers a connection attempt whose
+  outcome marks the service reachable or not, `IsConnecting`,
+  `ConnectionInitiatedAt`, `SetReachable`, `IsResolving`,
+  `LastReceiptAt` / `SetLastReceiptAt`; while the service is unreachable
+  and an attempt is outstanding the status resolves it actively
+  (`Service.Resolve`) until it is reachable with no attempt left, and
+  `Service.Close` stops and waits for that resolution.
+  `Service.Changes` signals every address or TXT change (matter.js
+  `IpService.changed`).
 
 ### Changed
 
