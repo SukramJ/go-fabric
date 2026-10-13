@@ -132,7 +132,9 @@ func matterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
 
 // parseHexID is parseInt(hexString, 16) as matter.js applies it to a
 // vendor or product id attribute (Certificate.ts:345-352): the leading
-// hex digits; a value without one is absent.
+// hex digits; a value without one is absent. A value above 16 bits is
+// absent here too — matter.js keeps the number, which then matches no
+// 16-bit id either.
 func parseHexID(s string) *uint16 {
 	end := 0
 	for end < len(s) && strings.ContainsRune("0123456789abcdefABCDEF", rune(s[end])) {
@@ -141,11 +143,11 @@ func parseHexID(s string) *uint16 {
 	if end == 0 {
 		return nil
 	}
-	v, err := strconv.ParseUint(s[:end], 16, 64)
+	v, err := strconv.ParseUint(s[:end], 16, 16)
 	if err != nil {
 		return nil
 	}
-	id := uint16(v) //nolint:gosec // a Matter vendor or product id is 16 bits; matter.js keeps the number as parsed
+	id := uint16(v)
 	return &id
 }
 
