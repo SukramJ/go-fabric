@@ -143,6 +143,14 @@ pseudo-version of `main`.
   `ExchangeManager` does (its own session once the failing exchange
   ends), where it only called the hook before. `handshake.CASE` stamps
   the fabric index on the CASE session (`SecureSessionConfig.FabricIndex`).
+- Peer-initiated Secure Channel exchanges on a controller session
+  (matter.js `StatusReportOnlySecureChannelProtocol`): a CloseSession
+  StatusReport from the peer ends the session with
+  `exchange.PeerInitiatedCloseError` and is acknowledged; any other
+  initial Secure Channel message is acknowledged and ignored. A message
+  that opens an exchange on a closing session is declined. Other
+  protocols' peer-initiated messages stay acknowledged-and-dropped until
+  stage 3.
 
 ### Changed
 

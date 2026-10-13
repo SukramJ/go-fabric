@@ -18,8 +18,10 @@
 // reliably and returns once the peer acknowledged, [Exchange.Next]
 // waits for the peer's next message, [Exchange.Close] ends it.
 //
-// Scope: UDP only (no TCP, which is stage 3 material), unicast only (no
-// group sessions), and no unsolicited exchanges — the controller of
-// stage 1 receives none, so a peer-initiated message is acknowledged
-// when it asks for an acknowledgement and is otherwise dropped.
+// Scope: UDP only (no TCP, which is stage 3 material) and unicast only
+// (no group sessions). Of the exchanges a peer opens only the Secure
+// Channel's are served — a CloseSession ends the session, as matter.js's
+// StatusReportOnlySecureChannelProtocol does; any other protocol's
+// (an IM report before stage 3) is acknowledged when it asks for an
+// acknowledgement and is otherwise dropped.
 package exchange

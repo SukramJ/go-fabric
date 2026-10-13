@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4611,
+  "entry_points": 4613,
   "entry_packages": [
     ".",
     "bdx",
@@ -178,9 +178,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10662,
-    "reachable": 7493,
-    "whitelisted": 3164,
+    "total_exported": 10665,
+    "reachable": 7494,
+    "whitelisted": 3166,
     "unreachable": 5
   },
   "by_package": [
@@ -14493,10 +14493,24 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestPeerCloseSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/securechannel_test.go",
+      "line": 30
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestPeerLostHook",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 590
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestPeerSecureChannelOthers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/securechannel_test.go",
+      "line": 64
     },
     {
       "package": "controller/exchange",

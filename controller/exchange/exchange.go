@@ -200,6 +200,8 @@ type Exchange struct {
 	id               uint16
 	protocol         uint16
 	suppressPeerLoss bool
+	initiator        bool
+	index            uint32
 	done             chan struct{}
 
 	mu              sync.Mutex
@@ -226,12 +228,23 @@ type Exchange struct {
 	createdAt       time.Time
 }
 
-func newExchange(m *Manager, s *Session, id, protocol uint16, opts Options) *Exchange {
+// newExchange builds an exchange we initiate (initiator) or one the peer
+// opened; index is its key in the manager's table.
+func newExchange(m *Manager, s *Session, id, protocol uint16, initiator bool, opts Options) *Exchange {
+	index := uint32(id)
+	if initiator {
+		index |= initiatedExchangeFlag
+	}
 	return &Exchange{
-		m:                m,
-		session:          s,
-		id:               id,
-		protocol:         protocol,
+		m:         m,
+		session:   s,
+		id:        id,
+		protocol:  protocol,
+		initiator: initiator,
+		index:     index,
+		// An exchange the peer opened is in use from its first message
+		// (MessageExchange.ts:303).
+		used:             !initiator,
 		suppressPeerLoss: opts.SuppressPeerLoss,
 		addressOverride:  opts.AddressOverride,
 		onSend:           opts.OnSend,
@@ -300,11 +313,11 @@ func (x *Exchange) RetransmissionRestartSaving() time.Duration {
 }
 
 // considerClosed is matter.js MessageExchange.ts:376-378: closed, or —
-// for an exchange we initiated, which every exchange here is — closing.
+// for an exchange we initiated — closing.
 func (x *Exchange) considerClosed() bool {
 	x.mu.Lock()
 	defer x.mu.Unlock()
-	return x.closed || x.closing
+	return x.closed || (x.initiator && x.closing)
 }
 
 func (x *Exchange) lastActivity() time.Time {
@@ -397,7 +410,7 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 	x.used = true
 	x.notifySentLocked()
 	proto := message.ProtocolHeader{
-		Initiator:  true,
+		Initiator:  x.initiator,
 		NeedsAck:   requiresAck,
 		Opcode:     opcode,
 		ExchangeID: x.id,

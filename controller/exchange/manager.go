@@ -410,8 +410,8 @@ func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange
 	m.mu.Lock()
 	m.exchangeID++
 	id := m.exchangeID
-	x := newExchange(m, s, id, protocol, opts)
-	m.exchanges[uint32(id)|initiatedExchangeFlag] = x
+	x := newExchange(m, s, id, protocol, true, opts)
+	m.exchanges[x.index] = x
 	m.mu.Unlock()
 	s.addExchange(x)
 	m.cleanupSessionExchanges(s)
@@ -420,10 +420,9 @@ func (m *Manager) Initiate(s *Session, protocol uint16, opts Options) (*Exchange
 
 // removeExchange drops x from the table if the index still maps to it.
 func (m *Manager) removeExchange(x *Exchange) {
-	idx := uint32(x.id) | initiatedExchangeFlag
 	m.mu.Lock()
-	if m.exchanges[idx] == x {
-		delete(m.exchanges, idx)
+	if m.exchanges[x.index] == x {
+		delete(m.exchanges, x.index)
 	}
 	m.mu.Unlock()
 	x.session.deleteExchange(x)
@@ -567,10 +566,29 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 		x.onMessageReceived(msg, duplicate)
 		return
 	}
-	// No exchange of ours: the controller of stage 1 serves no protocol,
-	// so the message is acknowledged when it asks for it
+	// A new exchange on a closing session is declined
+	// (ExchangeManager.ts:386-389).
+	if s.IsClosed() || s.IsPeerLost() {
+		m.log.Debug("matter.controller.drop", slog.String("reason", "session closing"), slog.Int("session", int(s.id)))
+		return
+	}
+	// A Secure Channel message that opens an exchange on a secure session
+	// goes to the Secure Channel handler (ExchangeManager.ts:407-440); an
+	// unsolicited standalone ack opens nothing (:413-420).
+	if s.secure != nil && msg.ProtocolID == mrp.SecureChannelProtocolID && msg.Initiator && !duplicate {
+		if msg.isStandaloneAck() && !msg.RequiresAck {
+			m.log.Debug("matter.controller.drop", slog.String("reason", "unsolicited standalone ack"), slog.Int("session", int(s.id)))
+			return
+		}
+		x := m.accept(s, msg)
+		x.onMessageReceived(msg, false)
+		m.handleSecureChannel(x, msg)
+		return
+	}
+	// Any other protocol has no handler on the controller until stage 3:
+	// the message is acknowledged when it asks for it
 	// (ExchangeManager.ts:441-452) and dropped otherwise (:453-473).
-	if msg.RequiresAck && !s.IsClosed() {
+	if msg.RequiresAck {
 		m.sendAck(s, msg, 0)
 	}
 	m.log.Debug("matter.controller.unsolicited",
@@ -700,5 +718,54 @@ func (m *Manager) handlePeerLoss(peer PeerAddress, cause error, asOf time.Time, 
 			continue
 		}
 		s.handlePeerLoss(cause, current)
+	}
+}
+
+// accept registers the exchange the peer opened with msg — matter.js
+// MessageExchange.fromInitialMessage and #addExchange
+// (ExchangeManager.ts:423-434, :494-508).
+func (m *Manager) accept(s *Session, msg *Message) *Exchange {
+	x := newExchange(m, s, msg.ExchangeID, msg.ProtocolID, false, Options{})
+	m.mu.Lock()
+	m.exchanges[x.index] = x
+	m.mu.Unlock()
+	s.addExchange(x)
+	m.cleanupSessionExchanges(s)
+	return x
+}
+
+// handleSecureChannel is the Secure Channel handler of a controller for an
+// exchange the peer opened on a secure session. Mirrors matter.js
+// packages/protocol/src/securechannel/SecureChannelProtocol.ts:30-88
+// (StatusReportOnlySecureChannelProtocol) at 0ceb202d: an initial
+// StatusReport Success / CloseSession means the peer closed the session —
+// NodeSession.handlePeerClose (NodeSession.ts:305-309), the session lost
+// with a [PeerInitiatedCloseError] — and the exchange that carried it
+// closes, acknowledging it; any other initial StatusReport is ignored
+// (:69-77); a standalone ack ends there, unacknowledged as every
+// standalone ack (:43-45, MessageExchange.ts:519-522);
+// any other message is refused as unexpected (:46-49). Every branch closes
+// the exchange, so an ack the message asked for goes out.
+func (m *Manager) handleSecureChannel(x *Exchange, msg *Message) {
+	switch {
+	case msg.Opcode == mrp.SCOpcodeStatusReport:
+		r, ok := DecodeStatusReport(msg.Payload)
+		if !ok || r.GeneralCode != mrp.SCStatusGeneralSuccess || r.ProtocolCode != statusCloseSession {
+			m.log.Debug("matter.controller.secure_channel.ignored_status",
+				slog.Int("session", int(x.session.id)), slog.Int("exchange", int(x.id)),
+				slog.Int("general", int(r.GeneralCode)), slog.Int("protocol", int(r.ProtocolCode)))
+			x.Close()
+			return
+		}
+		m.log.Debug("matter.controller.secure_channel.closed_by_peer", slog.Int("session", int(x.session.id)))
+		x.session.handlePeerLoss(&PeerInitiatedCloseError{}, x)
+		x.Close()
+	case msg.isStandaloneAck():
+		x.Close()
+	default:
+		m.log.Warn("matter.controller.secure_channel.unexpected",
+			slog.Int("session", int(x.session.id)), slog.Int("exchange", int(x.id)), slog.Int("opcode", int(msg.Opcode)),
+			slog.String("err", ErrFlow.Error()))
+		x.Close()
 	}
 }
