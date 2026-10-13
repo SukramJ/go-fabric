@@ -64,6 +64,16 @@ type EventStatus struct {
 // Report is the data of a read or of one subscription report, its chunks
 // merged.
 type Report struct {
+	// SubscriptionID is the report's subscription id, 0 for a read's
+	// report: the first chunk's — matter.js hands each chunk's DataReport,
+	// subscriptionId included, to InputChunk (action/client/InputChunk.ts:166-169)
+	// and the handler reads the id off the initial report
+	// (ClientSubscriptionHandler.ts:77) at 0ceb202d.
+	SubscriptionID uint32
+	// Session is the session the report arrived over — the exchange's
+	// session matter.js takes the peer from and hands to reportStarted
+	// (ClientSubscriptionHandler.ts:89, :108-112).
+	Session       *exchange.Session
 	Attributes    []AttributeData
 	Statuses      []AttributeStatus
 	Events        []EventData
@@ -104,6 +114,7 @@ type assembler struct {
 	report   *Report
 	leftover []im.AttributeReport
 	log      *slog.Logger
+	chunks   int
 }
 
 func newAssembler(log *slog.Logger) *assembler {
@@ -113,6 +124,10 @@ func newAssembler(log *slog.Logger) *assembler {
 // add takes one DataReport chunk — InputChunk (:166-172): the attributes,
 // then the events.
 func (a *assembler) add(rd *im.ReportData) {
+	if a.chunks == 0 && rd.HasSubscription {
+		a.report.SubscriptionID = rd.SubscriptionID
+	}
+	a.chunks++
 	a.emitAttributes(rd)
 	a.emitEvents(rd)
 }

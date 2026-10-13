@@ -112,6 +112,9 @@ func TestSubscribe(t *testing.T) {
 	if v, ok := r.Value(1, 6, 0); !ok || !v.El.Bool || len(r.Attributes) != 2 {
 		t.Fatalf("priming report %+v", r)
 	}
+	if r.Session != s.session {
+		t.Fatalf("priming report over session %p, want %p", r.Session, s.session)
+	}
 	sub.Close()
 	sub.Close()
 	<-sub.Done()

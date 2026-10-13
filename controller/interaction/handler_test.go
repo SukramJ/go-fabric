@@ -94,6 +94,11 @@ func TestInboundReports(t *testing.T) {
 	if v, ok := r.Value(1, 6, 0); !ok || !v.El.Bool {
 		t.Fatalf("pushed report %+v", r)
 	}
+	// The report carries its subscription id (the first chunk's) and the
+	// session it arrived over.
+	if r.SubscriptionID != 5 || r.Session != s.session {
+		t.Fatalf("pushed report on subscription %d over session %p, want 5 over %p", r.SubscriptionID, r.Session, s.session)
+	}
 
 	s.push(t, 0x7002, im.OpcodeReportData, pushedReport(t, 5, false, false, true, false))
 	select {

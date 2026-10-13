@@ -12,6 +12,14 @@ pseudo-version of `main`.
 
 ### Added
 
+- `controller/interaction.Report` carries `SubscriptionID` (the report's
+  subscription id, the first chunk's; 0 for a read's report) and `Session`
+  (the `*exchange.Session` the report arrived over) — what matter.js keeps
+  on the chunk's exchange (`InputChunk.ts:166-169`,
+  `ClientSubscriptionHandler.ts:77`, `:89`, `:108-112` at `0ceb202d`). A
+  subscriber that serves several sessions to one peer tells their reports
+  apart by them.
+
 - `node.Config.Groups` and `Node.Groups()` (#89): a host that assembles
   its own topology (`Config.Topology`) hands the facade the
   `groups.Manager` its assembler mounts the Groups and ScenesManagement

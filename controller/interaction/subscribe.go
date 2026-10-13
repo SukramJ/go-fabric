@@ -181,6 +181,7 @@ func (c *Interaction) subscribeOnce(ctx context.Context, peer exchange.PeerAddre
 		return nil, err
 	}
 	a := newAssembler(c.log)
+	a.report.Session = m.x.Session()
 	if err := readDataReports(ctx, c.log, m, nil, func(rd *im.ReportData) error {
 		a.add(rd)
 		if !rd.MoreChunkedMessages && req.Updated != nil {
