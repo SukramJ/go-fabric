@@ -354,6 +354,9 @@ func TestReadTwoChunks(t *testing.T) {
 	if _, ok := r.r.Value(1, 0x0028, 0x0002); ok {
 		t.Fatal("a value for another endpoint")
 	}
+	if r.r.SubscriptionID != 0 || r.r.Session != s.session {
+		t.Fatalf("a read's report on subscription %d over session %p, want 0 over %p", r.r.SubscriptionID, r.r.Session, s.session)
+	}
 	if len(r.r.Statuses) != 1 || r.r.Statuses[0].Status != im.StatusUnsupportedCluster || *r.r.Statuses[0].ClusterStatus != 2 {
 		t.Fatalf("statuses %+v", r.r.Statuses)
 	}

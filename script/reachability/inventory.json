@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4768,
+  "entry_points": 4770,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,9 +183,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10925,
+    "total_exported": 10924,
     "reachable": 7666,
-    "whitelisted": 3254,
+    "whitelisted": 3253,
     "unreachable": 5
   },
   "by_package": [
@@ -14925,6 +14925,13 @@
     },
     {
       "package": "controller/peer",
+      "identifier": "Probe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/export_test.go",
+      "line": 16
+    },
+    {
+      "package": "controller/peer",
       "identifier": "ResumptionStore",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/peer/store.go",
@@ -14960,24 +14967,10 @@
     },
     {
       "package": "controller/peer",
-      "identifier": "TestConnectLiveThroughMulticast",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/node_live_test.go",
-      "line": 23
-    },
-    {
-      "package": "controller/peer",
       "identifier": "TestConnectReuseSharedProcessAndTimeout",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/connection_test.go",
       "line": 312
-    },
-    {
-      "package": "controller/peer",
-      "identifier": "TestConnectToANodeThroughTheProcess",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/peer/node_test.go",
-      "line": 157
     },
     {
       "package": "controller/peer",

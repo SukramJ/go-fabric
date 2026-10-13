@@ -17,6 +17,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	bidef "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
@@ -276,8 +277,12 @@ func TestRemoveFabricFromHost(t *testing.T) {
 }
 
 // TestSessionAndSubscriptionDiagnostics: Node.Sessions lists the PASE
-// session a commissioner holds, and Node.Subscriptions counts the
-// subscription riding on it.
+// session a commissioner holds, then the CASE session of the fabric it
+// commissioned, and Node.Subscriptions counts the subscription riding on
+// that CASE session — a controller subscribes over CASE only, matter.js
+// ClientInteraction.subscribe refusing a peer without a peer address
+// (packages/protocol/src/action/client/ClientInteraction.ts:991-994 at
+// 0ceb202d).
 func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -285,10 +290,31 @@ func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 	if got := n.Sessions().Sessions(); len(got) != 0 {
 		t.Errorf("sessions before any peer: %+v", got)
 	}
-	s := paseSession(t, n)
+	if err := n.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	c := bridgetest.Dial(t, n.Bridge().LocalAddr(), commissionerOptions())
+	pase, err := c.PASE(ctx)
+	if err != nil {
+		t.Fatalf("PASE: %v", err)
+	}
 	sessions := n.Sessions().Sessions()
 	if len(sessions) != 1 || !sessions[0].IsPASE || sessions[0].FabricIndex != 0 {
 		t.Fatalf("sessions after PASE %+v, want one PASE session on fabric 0", sessions)
+	}
+	pase.Close()
+	s, err := c.Commission(ctx)
+	if err != nil {
+		t.Fatalf("Commission: %v", err)
+	}
+	var operational []uint16
+	for _, e := range n.Sessions().Sessions() {
+		if !e.IsPASE && e.FabricIndex == c.FabricIndex() {
+			operational = append(operational, e.SessionID)
+		}
+	}
+	if len(operational) != 1 {
+		t.Fatalf("sessions after commissioning %+v, want one CASE session on fabric %d", n.Sessions().Sessions(), c.FabricIndex())
 	}
 	if _, err := s.Subscribe(ctx, 0, 60, attr(0, 0x001D, 0x0003)); err != nil {
 		t.Fatalf("Subscribe: %v", err)
@@ -296,8 +322,8 @@ func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 	if n.Subscriptions().Active() != 1 {
 		t.Errorf("active subscriptions %d, want 1", n.Subscriptions().Active())
 	}
-	if got := n.Subscriptions().CountBySession(); got[sessions[0].SessionID] != 1 {
-		t.Errorf("subscriptions by session %v, want one on session %d", got, sessions[0].SessionID)
+	if got := n.Subscriptions().CountBySession(); got[operational[0]] != 1 {
+		t.Errorf("subscriptions by session %v, want one on session %d", got, operational[0])
 	}
 }
 

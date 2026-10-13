@@ -154,6 +154,11 @@ type Config struct {
 	// stored CA must match it.
 	IntermediateCA bool
 	// Rand is the randomness of keys and signatures; nil is crypto/rand.
+	// Since Go 1.26 crypto/ecdsa ignores a caller's reader for key
+	// generation and signing (a secure source is always used; see
+	// ecdsa.GenerateKey), so a seeded reader no longer makes the
+	// certificates reproducible — a test that needs that uses
+	// testing/cryptotest.SetGlobalRandom.
 	Rand io.Reader
 }
 

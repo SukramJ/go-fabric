@@ -137,9 +137,8 @@ type StatusReport struct {
 // packages/protocol/src/protocol/ProtocolStatusMessage.ts:50-66
 // (decodeInternal) at 0ceb202d, which SecureChannelStatusMessageSchema.ts:14
 // instantiates for the Secure Channel; ProtocolID carries the vendor id
-// in its upper 16 bits as on the wire. It is the decoder
-// bridge/bridgetest/transport.go:217 carries for its own use. ok is false
-// for a body shorter than 8 bytes.
+// in its upper 16 bits as on the wire. ok is false for a body shorter
+// than 8 bytes.
 func DecodeStatusReport(payload []byte) (StatusReport, bool) {
 	if len(payload) < 8 {
 		return StatusReport{}, false

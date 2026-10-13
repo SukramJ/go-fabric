@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (C) 2026 SukramJ.
 
-package peer
+package peer_test
 
 import (
 	"context"
@@ -20,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
+	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
@@ -28,10 +29,61 @@ import (
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
+// The node proofs commission a node.Node through bridge/bridgetest, which
+// imports this package: they live in the external test package (brief AJ
+// §5), with their own copies of the DNS-SD helpers of helpers_test.go.
+
 const (
 	nodePasscode uint32 = 20202021
 	nodeFabricID uint64 = 0x0000_0000_0000_0F0B
+	testNode     uint64 = 0x1234
 )
+
+var testAddr = handshake.PeerAddress{FabricIndex: 1, NodeID: testNode}
+
+// fakeMDNS is an mDNS socket that sends nowhere; announce injects responses.
+type fakeMDNS struct{ out chan mdns.QueryResponse }
+
+func newFakeMDNS() *fakeMDNS                             { return &fakeMDNS{out: make(chan mdns.QueryResponse, 256)} }
+func (f *fakeMDNS) Send([]byte) error                    { return nil }
+func (f *fakeMDNS) Responses() <-chan mdns.QueryResponse { return f.out }
+func (f *fakeMDNS) Close() error                         { return nil }
+
+// announce injects one response with rrs.
+func (f *fakeMDNS) announce(t *testing.T, rrs ...dns.RR) {
+	t.Helper()
+	m := new(dns.Msg)
+	m.Response = true
+	m.Answer = rrs
+	b, err := m.Pack()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.out <- mdns.QueryResponse{Msg: b}
+}
+
+func rrHdr(name string, typ uint16, ttl uint32) dns.RR_Header {
+	return dns.RR_Header{Name: dns.Fqdn(name), Rrtype: typ, Class: dns.ClassINET | 0x8000, Ttl: ttl}
+}
+
+func srvRR(name, target string, port uint16, ttl uint32) dns.RR {
+	return &dns.SRV{Hdr: rrHdr(name, dns.TypeSRV, ttl), Target: dns.Fqdn(target), Port: port}
+}
+
+func txtRR(name string, ttl uint32, entries ...string) dns.RR {
+	return &dns.TXT{Hdr: rrHdr(name, dns.TypeTXT, ttl), Txt: entries}
+}
+
+func eventually(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
 
 // startNode starts an uncommissioned node on loopback, as
 // controller/handshake's tests do, advertising with adv (nil: nothing) and
@@ -98,13 +150,13 @@ func commissioned(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node,
 
 // liveSet is a set on a real loopback socket and the system clock.
 type liveSet struct {
-	set    *Set
+	set    *peer.Set
 	mgr    *exchange.Manager
-	resume *MemoryResumptionStore
+	resume *peer.MemoryResumptionStore
 	names  *discovery.Names
 }
 
-func newLiveSet(t *testing.T, names *discovery.Names, fabric handshake.Fabric, listen string, edit func(*Context)) *liveSet {
+func newLiveSet(t *testing.T, names *discovery.Names, fabric handshake.Fabric, listen string, edit func(*peer.Context)) *liveSet {
 	t.Helper()
 	l, err := udp.New(udp.Config{LocalAddr: listen, PreferIPv4: listen == "127.0.0.1:0"})
 	if err != nil {
@@ -120,8 +172,8 @@ func newLiveSet(t *testing.T, names *discovery.Names, fabric handshake.Fabric, l
 		defer close(served)
 		_ = l.Serve(ctx, mgr.HandleDatagram)
 	}()
-	ls := &liveSet{mgr: mgr, resume: &MemoryResumptionStore{}, names: names}
-	c := Context{
+	ls := &liveSet{mgr: mgr, resume: &peer.MemoryResumptionStore{}, names: names}
+	c := peer.Context{
 		Exchanges:  mgr,
 		Names:      names,
 		Fabrics:    func(a handshake.PeerAddress) (handshake.Fabric, bool) { return fabric, a.FabricIndex == 1 },
@@ -131,7 +183,7 @@ func newLiveSet(t *testing.T, names *discovery.Names, fabric handshake.Fabric, l
 	if edit != nil {
 		edit(&c)
 	}
-	ls.set, err = NewSet(c)
+	ls.set, err = peer.NewSet(c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +212,7 @@ func TestConnectToANodeThroughTheProcess(t *testing.T) {
 	conn := newFakeMDNS()
 	names := discovery.NewNames(conn, slog.New(slog.DiscardHandler))
 	var disconnected atomic.Int32
-	ls := newLiveSet(t, names, fabric, "127.0.0.1:0", func(c *Context) { c.Disconnected = func(*Peer) { disconnected.Add(1) } })
+	ls := newLiveSet(t, names, fabric, "127.0.0.1:0", func(c *peer.Context) { c.Disconnected = func(*peer.Peer) { disconnected.Add(1) } })
 	p, err := ls.set.For(testAddr)
 	if err != nil {
 		t.Fatal(err)
@@ -169,14 +221,14 @@ func TestConnectToANodeThroughTheProcess(t *testing.T) {
 	conn.announce(t, srvRR(qname, "peer-node.local", uint16(addr.Port), 120), txtRR(qname, 120, "SII=500", "SAI=300"), aRR("peer-node.local", "127.0.0.1", 120))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	s, err := p.Connect(ctx, ConnectOptions{})
+	s, err := p.Connect(ctx, peer.ConnectOptions{})
 	if err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
 	if s.PeerNodeID() != testNode || s.FabricIndex() != 1 || p.Descriptor().OperationalAddress.String() != addr.String() {
 		t.Fatalf("session to 0x%X on fabric %d, operational address %v", s.PeerNodeID(), s.FabricIndex(), p.Descriptor().OperationalAddress)
 	}
-	if again, err := p.Connect(ctx, ConnectOptions{}); err != nil || again != s {
+	if again, err := p.Connect(ctx, peer.ConnectOptions{}); err != nil || again != s {
 		t.Fatal("a second Connect did not reuse the session")
 	}
 	if !p.Service().Reachable() {
@@ -187,14 +239,14 @@ func TestConnectToANodeThroughTheProcess(t *testing.T) {
 	}
 	// The node tells a session it has routed a message of (bridge.go's
 	// notify path); the probe gives it the route, and proves the session.
-	if !probe(ctx, ls.mgr, s, nil, slog.New(slog.DiscardHandler)) {
+	if !peer.Probe(ctx, ls.mgr, s) {
 		t.Fatal("the probe failed on a live session")
 	}
 	if err := n.Stop(ctx); err != nil {
 		t.Fatal(err)
 	}
 	eventually(t, "the node's CloseSession", func() bool { return s.IsPeerLost() && !p.HasSession() && disconnected.Load() == 1 })
-	if probe(ctx, ls.mgr, s, nil, slog.New(slog.DiscardHandler)) {
+	if peer.Probe(ctx, ls.mgr, s) {
 		t.Fatal("the probe succeeded on a closed session")
 	}
 	p.Delete(ctx)

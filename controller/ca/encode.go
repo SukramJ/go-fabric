@@ -7,8 +7,9 @@ package ca
 // packages/protocol/src/certificate/kinds/definitions/operational.ts
 // (BaseMatterCertificate :123-153, TlvCertificateExtension :36-49) at
 // 0ceb202d, which secure/mattercert decodes (decode.go, the tags of
-// Matter §6.5.1.1 and §6.5.6.1). Ported from bridge/bridgetest/ca.go
-// (certFields, sign, encode), which stays as it is until brief AI.
+// Matter §6.5.1.1 and §6.5.6.1). Ported from the test CA
+// bridge/bridgetest carried until brief AJ, which now mints through this
+// package.
 
 import (
 	"crypto/ecdsa"

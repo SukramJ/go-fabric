@@ -19,8 +19,7 @@ import (
 // at 0ceb202d).
 const probeMaxRetransmissions = 2
 
-// Tags of ReportDataMessage the probe reads (Matter §10.7.3; the decoder
-// of bridge/bridgetest/report.go reads the same).
+// Tags of ReportDataMessage the probe reads (Matter §10.7.3).
 const (
 	tagReportMoreChunked      = 3
 	tagReportSuppressResponse = 4

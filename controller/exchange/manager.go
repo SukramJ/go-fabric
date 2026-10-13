@@ -424,7 +424,7 @@ func (m *Manager) CloseSession(ctx context.Context, s *Session) {
 }
 
 // statusCloseSession is the Secure Channel protocol code CloseSession
-// (Matter §4.10.1.3; bridge/bridgetest/transport.go:211).
+// (Matter §4.10.1.3).
 const statusCloseSession uint16 = 0x0003
 
 // Close closes every exchange and session without telling the peers. It

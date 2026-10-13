@@ -124,6 +124,7 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 		})
 	}
 	a := newAssembler(r.log)
+	a.report.Session = session
 	return readDataReports(ctx, r.log, m, initial, func(rd *im.ReportData) error {
 		if rd != initial && (!rd.HasSubscription || rd.SubscriptionID != initial.SubscriptionID) {
 			r.log.Debug("matter.controller.interaction.report_for_another_subscription", slog.Uint64("subscription", uint64(rd.SubscriptionID)))

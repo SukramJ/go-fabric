@@ -12,6 +12,14 @@ pseudo-version of `main`.
 
 ### Added
 
+- `controller/interaction.Report` carries `SubscriptionID` (the report's
+  subscription id, the first chunk's; 0 for a read's report) and `Session`
+  (the `*exchange.Session` the report arrived over) — what matter.js keeps
+  on the chunk's exchange (`InputChunk.ts:166-169`,
+  `ClientSubscriptionHandler.ts:77`, `:89`, `:108-112` at `0ceb202d`). A
+  subscriber that serves several sessions to one peer tells their reports
+  apart by them.
+
 - `node.Config.Groups` and `Node.Groups()` (#89): a host that assembles
   its own topology (`Config.Topology`) hands the facade the
   `groups.Manager` its assembler mounts the Groups and ScenesManagement
@@ -465,6 +473,28 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `bridge/bridgetest.Commissioner` runs on the module's own controller
+  (ADR 0020, stage 2 close-out): one `udp.Listener` with
+  `controller/exchange` (MRP retransmission), the CA of `controller/ca`
+  (matter.js's certificate shape: root id 0, serials from the counter, NOC
+  subject fabric id, node id, CATs, validity −1 y / +10 y around a fixed
+  instant), `controller/commissioner`'s commissioning flow (matter.js's,
+  attestation against the CSA test trust store), `controller/handshake`'s
+  PASE, CASE and CASE responder, and `controller/interaction` per session.
+  Every exported identifier keeps its signature. Behaviour that moves:
+  `Session.Subscribe` on a PASE session fails with an error wrapping
+  `interaction.ErrUncommissioned` (matter.js's client subscribes only to a
+  peer with a peer address, `ClientInteraction.ts:991-994` at `0ceb202d`);
+  `Options.Seed` seeds the IPK, the nonces, the keys `CASEAs` mints and the
+  MRP jitter, but the root and fabric keys and every certificate signature
+  are random (`crypto/ecdsa` ignores a caller's reader since Go 1.26), so
+  two `Dial`s with one seed no longer mint the same certificates;
+  `Options.FailSafeSeconds` and `Options.AdminSubject` have no effect (the
+  flow's failsafe budget and the fabric's root node id); `Commission`,
+  `PASE`, `CASE` and the session calls are bounded by the controller's
+  budgets and the caller's context instead of a 10 s default (kept for
+  `Accept` and `NextReport`); `NextReport` no longer delivers keepalives
+  (empty reports).
 - `im.ReadRequest.MarshalTLV` and `im.SubscribeRequest.MarshalTLV` encode
   the request as matter.js's client sends it (`TlvReadRequest.ts:19-35`,
   `TlvSubscribeRequest.ts:19-44` at `0ceb202d`): an empty AttributeRequests
