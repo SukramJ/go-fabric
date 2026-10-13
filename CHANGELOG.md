@@ -328,6 +328,21 @@ pseudo-version of `main`.
   InvalidParam (`SecureChannelProtocol.ts:129-137`). Anything else is
   acknowledged and dropped as before. `Exchange.ConsiderClosed` and
   `Session.IsInbound` are new.
+- `controller/handshake.CASEServer`, the controller's CASE responder (ADR
+  0020, stage 3; matter.js `CaseServer.ts:49-347` at `0ceb202d` over
+  `secure/sigma.Responder`): `NewCASEServer(mgr, CASEServerConfig{Fabrics,
+  Resumption, OnSession, Logger})`, `Register` (the manager's Secure Channel
+  handler for a peer's Sigma1), `Serve`, `Close`. A resuming Sigma1 is
+  looked up by its resumption id and answered with Sigma2_Resume, a MIC
+  that does not decrypt falling back to the full handshake; otherwise the
+  fabric the destination id names answers Sigma2, verifies Sigma3 and sends
+  Success. Failures answer NoSharedTrustRoots (no fabric) or InvalidParam,
+  nothing when the peer reported the failure or stopped answering; the
+  unsecured session closes either way. Every session reaches `OnSession`
+  with its fabric index and its resumption record is saved.
+  `handshake.FabricResolver` and `FabricList` resolve the fabric;
+  `handshake.ResumptionStore` gains `FindByResumptionID`
+  (`MemoryResumptionStore` implements it).
 
 ### Changed
 

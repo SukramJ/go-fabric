@@ -4,6 +4,7 @@
 package handshake
 
 import (
+	"bytes"
 	"sync"
 
 	"github.com/SukramJ/go-fabric/controller/exchange"
@@ -46,6 +47,12 @@ type ResumptionRecord struct {
 type ResumptionStore interface {
 	// FindResumptionRecord returns the record of peer, if any.
 	FindResumptionRecord(peer PeerAddress) (ResumptionRecord, bool)
+	// FindByResumptionID returns the record whose resumption id is id, if
+	// any — matter.js SessionManager.findResumptionRecordById
+	// (session/SessionManager.ts:841-849 at 0ceb202d), which scans every
+	// record; the CASE responder looks a resuming Sigma1 up with it
+	// (CaseServer.ts:113-116).
+	FindByResumptionID(id []byte) (ResumptionRecord, bool)
 	// SaveResumptionRecord stores rec, replacing the peer's earlier one.
 	SaveResumptionRecord(rec ResumptionRecord) error
 	// DeleteResumptionRecord forgets the record of peer and reports
@@ -68,6 +75,18 @@ func (s *MemoryResumptionStore) FindResumptionRecord(peer PeerAddress) (Resumpti
 	defer s.mu.Unlock()
 	rec, ok := s.records[peer]
 	return rec.clone(), ok
+}
+
+// FindByResumptionID implements [ResumptionStore].
+func (s *MemoryResumptionStore) FindByResumptionID(id []byte) (ResumptionRecord, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for peer := range s.records {
+		if bytes.Equal(s.records[peer].ResumptionID, id) {
+			return s.records[peer].clone(), true
+		}
+	}
+	return ResumptionRecord{}, false
 }
 
 // SaveResumptionRecord implements [ResumptionStore].

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4718,
+  "entry_points": 4726,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,9 +183,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10862,
-    "reachable": 7615,
-    "whitelisted": 3242,
+    "total_exported": 10869,
+    "reachable": 7620,
+    "whitelisted": 3244,
     "unreachable": 5
   },
   "by_package": [
@@ -14858,7 +14858,21 @@
       "identifier": "PeerAddress",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/handshake/resumption.go",
-      "line": 20
+      "line": 21
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "TestParityCASEServerErrorReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/handshake/parity_matterjs_test.go",
+      "line": 53
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "TestParityCASEServerStatusCodes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/handshake/parity_matterjs_test.go",
+      "line": 28
     },
     {
       "package": "controller/peer",
