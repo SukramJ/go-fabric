@@ -144,7 +144,7 @@ Three of the ○ rows above are decisions, not backlog. Restating them so they
 are not re-opened by accident:
 
 1. **No controller / commissioner role** — *superseded by
-   [ADR 0020](./adr/0020-commissioner-and-controller-role.md) (proposed
+   [ADR 0020](./adr/0020-commissioner-and-controller-role.md) (accepted
    2026-10-13): the role enters as `controller/`, a sibling of `bridge/`,
    in six stages; the responder side is unchanged by it, and this item's
    text stays as the history of the decision.* `go-fabric` is a responder. It does
