@@ -20,7 +20,7 @@ const (
 	DoorbellRevision uint16 = 2
 )
 
-// DoorbellType is the Doorbell device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// DoorbellType is the Doorbell device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/doorbell.ts.
 var DoorbellType = Type{
 	ID: DoorbellID, Name: "Doorbell", Revision: DoorbellRevision,

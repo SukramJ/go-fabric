@@ -21,7 +21,7 @@ const (
 	FanRevision uint16 = 5
 )
 
-// FanType is the Fan device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// FanType is the Fan device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/fan.ts.
 var FanType = Type{
 	ID: FanID, Name: "Fan", Revision: FanRevision,

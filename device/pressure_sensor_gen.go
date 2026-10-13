@@ -18,7 +18,7 @@ const (
 	PressureSensorRevision uint16 = 3
 )
 
-// PressureSensorType is the PressureSensor device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// PressureSensorType is the PressureSensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/pressure-sensor.ts.
 var PressureSensorType = Type{
 	ID: PressureSensorID, Name: "PressureSensor", Revision: PressureSensorRevision,

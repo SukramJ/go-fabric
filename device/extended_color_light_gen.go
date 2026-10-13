@@ -23,7 +23,7 @@ const (
 	ExtendedColorLightRevision uint16 = 5
 )
 
-// ExtendedColorLightType is the ExtendedColorLight device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// ExtendedColorLightType is the ExtendedColorLight device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/extended-color-light.ts.
 var ExtendedColorLightType = Type{
 	ID: ExtendedColorLightID, Name: "ExtendedColorLight", Revision: ExtendedColorLightRevision,

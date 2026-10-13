@@ -22,7 +22,7 @@ const (
 	BridgedNodeRevision uint16 = 3
 )
 
-// BridgedNodeType is the BridgedNode device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// BridgedNodeType is the BridgedNode device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/endpoints/bridged-node.ts.
 var BridgedNodeType = Type{
 	ID: BridgedNodeID, Name: "BridgedNode", Revision: BridgedNodeRevision,

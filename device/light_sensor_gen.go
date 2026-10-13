@@ -18,7 +18,7 @@ const (
 	LightSensorRevision uint16 = 4
 )
 
-// LightSensorType is the LightSensor device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// LightSensorType is the LightSensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/light-sensor.ts.
 var LightSensorType = Type{
 	ID: LightSensorID, Name: "LightSensor", Revision: LightSensorRevision,

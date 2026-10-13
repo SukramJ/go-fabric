@@ -19,7 +19,7 @@ const (
 	ElectricalSensorRevision uint16 = 1
 )
 
-// ElectricalSensorType is the ElectricalSensor device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// ElectricalSensorType is the ElectricalSensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/endpoints/electrical-sensor.ts.
 var ElectricalSensorType = Type{
 	ID: ElectricalSensorID, Name: "ElectricalSensor", Revision: ElectricalSensorRevision,

@@ -22,7 +22,7 @@ const (
 	SmokeCoAlarmRevision uint16 = 2
 )
 
-// SmokeCoAlarmType is the SmokeCoAlarm device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// SmokeCoAlarmType is the SmokeCoAlarm device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/smoke-co-alarm.ts.
 var SmokeCoAlarmType = Type{
 	ID: SmokeCoAlarmID, Name: "SmokeCoAlarm", Revision: SmokeCoAlarmRevision,

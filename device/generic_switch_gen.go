@@ -18,7 +18,7 @@ const (
 	GenericSwitchRevision uint16 = 3
 )
 
-// GenericSwitchType is the GenericSwitch device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// GenericSwitchType is the GenericSwitch device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/generic-switch.ts.
 var GenericSwitchType = Type{
 	ID: GenericSwitchID, Name: "GenericSwitch", Revision: GenericSwitchRevision,

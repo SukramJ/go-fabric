@@ -20,7 +20,7 @@ const (
 	ElectricalEnergyTariffRevision uint16 = 1
 )
 
-// ElectricalEnergyTariffType is the ElectricalEnergyTariff device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// ElectricalEnergyTariffType is the ElectricalEnergyTariff device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/electrical-energy-tariff.ts.
 var ElectricalEnergyTariffType = Type{
 	ID: ElectricalEnergyTariffID, Name: "ElectricalEnergyTariff", Revision: ElectricalEnergyTariffRevision,

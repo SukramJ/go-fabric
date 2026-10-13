@@ -19,7 +19,7 @@ const (
 	WaterLeakDetectorRevision uint16 = 2
 )
 
-// WaterLeakDetectorType is the WaterLeakDetector device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// WaterLeakDetectorType is the WaterLeakDetector device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/water-leak-detector.ts.
 var WaterLeakDetectorType = Type{
 	ID: WaterLeakDetectorID, Name: "WaterLeakDetector", Revision: WaterLeakDetectorRevision,

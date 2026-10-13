@@ -22,7 +22,7 @@ const (
 	DimmablePlugInUnitRevision uint16 = 6
 )
 
-// DimmablePlugInUnitType is the DimmablePlugInUnit device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// DimmablePlugInUnitType is the DimmablePlugInUnit device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/dimmable-plug-in-unit.ts.
 var DimmablePlugInUnitType = Type{
 	ID: DimmablePlugInUnitID, Name: "DimmablePlugInUnit", Revision: DimmablePlugInUnitRevision,

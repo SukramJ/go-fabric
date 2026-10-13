@@ -18,7 +18,7 @@ const (
 	HumiditySensorRevision uint16 = 3
 )
 
-// HumiditySensorType is the HumiditySensor device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// HumiditySensorType is the HumiditySensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/humidity-sensor.ts.
 var HumiditySensorType = Type{
 	ID: HumiditySensorID, Name: "HumiditySensor", Revision: HumiditySensorRevision,

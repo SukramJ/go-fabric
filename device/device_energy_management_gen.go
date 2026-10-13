@@ -18,7 +18,7 @@ const (
 	DeviceEnergyManagementRevision uint16 = 3
 )
 
-// DeviceEnergyManagementType is the DeviceEnergyManagement device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// DeviceEnergyManagementType is the DeviceEnergyManagement device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/endpoints/device-energy-management.ts.
 var DeviceEnergyManagementType = Type{
 	ID: DeviceEnergyManagementID, Name: "DeviceEnergyManagement", Revision: DeviceEnergyManagementRevision,

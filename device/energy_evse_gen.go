@@ -20,7 +20,7 @@ const (
 	EnergyEvseRevision uint16 = 2
 )
 
-// EnergyEvseType is the EnergyEvse device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// EnergyEvseType is the EnergyEvse device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/energy-evse.ts.
 var EnergyEvseType = Type{
 	ID: EnergyEvseID, Name: "EnergyEvse", Revision: EnergyEvseRevision,

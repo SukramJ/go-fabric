@@ -20,7 +20,7 @@ const (
 	CookSurfaceRevision uint16 = 2
 )
 
-// CookSurfaceType is the CookSurface device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// CookSurfaceType is the CookSurface device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/cook-surface.ts.
 var CookSurfaceType = Type{
 	ID: CookSurfaceID, Name: "CookSurface", Revision: CookSurfaceRevision,

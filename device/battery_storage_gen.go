@@ -16,7 +16,7 @@ const (
 	BatteryStorageRevision uint16 = 2
 )
 
-// BatteryStorageType is the BatteryStorage device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// BatteryStorageType is the BatteryStorage device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/battery-storage.ts.
 var BatteryStorageType = Type{
 	ID: BatteryStorageID, Name: "BatteryStorage", Revision: BatteryStorageRevision,

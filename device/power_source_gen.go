@@ -17,7 +17,7 @@ const (
 	PowerSourceRevision uint16 = 1
 )
 
-// PowerSourceType is the PowerSource device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// PowerSourceType is the PowerSource device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/endpoints/power-source.ts.
 var PowerSourceType = Type{
 	ID: PowerSourceID, Name: "PowerSource", Revision: PowerSourceRevision,
