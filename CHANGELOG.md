@@ -424,6 +424,15 @@ pseudo-version of `main`.
   subscription id, for an unknown one, or arriving while the registry is
   blocked is answered InvalidSubscription; any other first message of an IM
   exchange InvalidAction.
+- Sustained subscriptions (ADR 0020, stage 3; matter.js
+  `SustainedSubscription` at `0ceb202d`, without ICD):
+  `SubscribeRequest.Sustain` returns at once a subscription that
+  establishes its underlying one with an unbounded connection, retries on
+  `DefaultSustainRetries` (15 s, ×2, at most an hour, jitter 0.25), verifies
+  the peer's reachability before replacing a lost subscription, and reports
+  `Active()` / `ActiveChanged`; `BootstrapRead` is the hook of
+  `bootstrapWithRead`. `Config.Clock` and `Config.Rand` pace the retries;
+  `RetrySchedule`.
 
 ### Changed
 

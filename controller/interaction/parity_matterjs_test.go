@@ -68,3 +68,14 @@ func TestParitySubscriptionConstants(t *testing.T) {
 		}
 	}
 }
+
+// TestParitySustainRetries: SustainedSubscription.DefaultRetrySchedule
+// (SustainedSubscription.ts:483-499): 15 s initial, an hour at most, no
+// timeout, ×2, jitter 0.25.
+func TestParitySustainRetries(t *testing.T) {
+	t.Parallel()
+	want := interaction.RetrySchedule{InitialInterval: 15 * time.Second, BackoffFactor: 2, MaximumInterval: time.Hour, JitterFactor: 0.25}
+	if interaction.DefaultSustainRetries != want {
+		t.Errorf("DefaultSustainRetries = %+v, want %+v", interaction.DefaultSustainRetries, want)
+	}
+}

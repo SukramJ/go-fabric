@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4750,
+  "entry_points": 4754,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,9 +183,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10920,
-    "reachable": 7664,
-    "whitelisted": 3251,
+    "total_exported": 10923,
+    "reachable": 7666,
+    "whitelisted": 3252,
     "unreachable": 5
   },
   "by_package": [
@@ -14901,6 +14901,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/interaction/report_internal_test.go",
       "line": 161
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestRetries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/sustained_internal_test.go",
+      "line": 14
     },
     {
       "package": "controller/peer",

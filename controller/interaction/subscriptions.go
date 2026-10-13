@@ -262,7 +262,8 @@ func (r *Subscriptions) ResetTimer() {
 // Subscription is a subscription with a peer. A plain one is the Matter
 // subscription the peer granted — matter.js PeerSubscription
 // (PeerSubscription.ts:15-54) over ClientSubscription
-// (ClientSubscription.ts:19-101).
+// (ClientSubscription.ts:19-101); a sustained one keeps re-establishing
+// its underlying subscription ([SubscribeRequest.Sustain]).
 type Subscription struct {
 	reg     *Subscriptions
 	peer    exchange.PeerAddress
@@ -284,6 +285,10 @@ type Subscription struct {
 	isReading           bool
 	timeoutAt           time.Time
 	isClosed            bool
+
+	// sustained is the state of a sustained subscription, nil for a
+	// plain one.
+	sustained *sustainedState
 }
 
 // NoSubscription is the id of a subscription the peer has not granted
@@ -291,7 +296,8 @@ type Subscription struct {
 // :104).
 const NoSubscription = ^uint32(0)
 
-// ID is the subscription id.
+// ID is the subscription id; [NoSubscription] for a sustained subscription
+// between underlying ones.
 func (s *Subscription) ID() uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -301,8 +307,16 @@ func (s *Subscription) ID() uint32 {
 // Peer is the peer's address.
 func (s *Subscription) Peer() exchange.PeerAddress { return s.peer }
 
-// MaxInterval is the maximum interval the peer granted.
+// MaxInterval is the maximum interval the peer granted; for a sustained
+// subscription the underlying one's, one hour without one
+// (SustainedSubscription.ts:426-428).
 func (s *Subscription) MaxInterval() time.Duration {
+	if s.sustained != nil {
+		if inner := s.sustained.current(); inner != nil {
+			return inner.MaxInterval()
+		}
+		return time.Hour
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return time.Duration(s.maxInterval) * time.Second
@@ -326,7 +340,8 @@ func (s *Subscription) timedOut() {
 }
 
 // Close closes the subscription: its work is aborted, it leaves the
-// registry and the request's Closed callback runs. The peer is told nothing
+// registry and the request's Closed callback runs — after a sustained
+// subscription's loop ended. The peer is told nothing
 // (ClientRequest.ts:60-61): it learns from the InvalidSubscription its
 // next report gets. Mirrors ClientSubscription.close
 // (ClientSubscription.ts:60-92). It is idempotent.
@@ -342,10 +357,21 @@ func (s *Subscription) Close() {
 	if s.closed != nil {
 		s.closed()
 	}
-	if s.request.Closed != nil {
-		s.request.Closed()
+	finish := func() {
+		if s.request.Closed != nil {
+			s.request.Closed()
+		}
+		close(s.done)
 	}
-	close(s.done)
+	if s.sustained != nil {
+		// A sustained subscription's worker ends first (:76-82).
+		go func() {
+			<-s.sustained.finished
+			finish()
+		}()
+		return
+	}
+	finish()
 }
 
 // newSubscription builds a subscription of the registry.

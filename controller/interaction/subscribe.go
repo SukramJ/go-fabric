@@ -70,6 +70,18 @@ type SubscribeRequest struct {
 	KeepaliveReceived func()
 	// Closed is called when the subscription closed (Subscribe.ts:28-31).
 	Closed func()
+	// Sustain keeps the subscription alive: when the underlying
+	// subscription is lost it is re-established, the peer's reachability
+	// verified first (ClientSubscribe.ts:14-19, SustainedSubscription.ts).
+	Sustain bool
+	// BootstrapRead, for a sustained subscription, runs before an attempt
+	// until it succeeds — the hook of bootstrapWithRead
+	// (SustainedSubscription.ts:187-204), which the node layer fills; an
+	// error fails the attempt.
+	BootstrapRead func(ctx context.Context) error
+	// ActiveChanged, for a sustained subscription, is called when it gains
+	// or loses its underlying subscription (SustainedSubscription.ts:83-95).
+	ActiveChanged func(active bool)
 }
 
 // Interval returns d as a subscription interval bound.
@@ -93,7 +105,9 @@ func Interval(d time.Duration) *time.Duration { return &d }
 //     liveness timeout its maximum interval plus twice the maximum peer
 //     response time for a 10 s processing time (:1054-1063).
 //
-// ctx bounds the establishment.
+// ctx bounds the establishment of a plain subscription. A sustained one
+// (Sustain) is returned at once and establishes itself on its own until
+// closed (:1092-1115).
 func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Subscription, error) {
 	paths := len(req.Attributes) + len(req.Events)
 	if paths == 0 {
@@ -131,6 +145,9 @@ func (c *Interaction) Subscribe(ctx context.Context, req SubscribeRequest) (*Sub
 				s.Close()
 			}
 		}
+	}
+	if req.Sustain {
+		return c.sustain(peer, req, floor, ceiling), nil
 	}
 	sub, err := c.subscribeOnce(ctx, peer, req, floor, ceiling, ExchangeOptions{})
 	if err != nil {
