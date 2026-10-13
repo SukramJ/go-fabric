@@ -152,6 +152,19 @@ func (c *Commissioner) identity(nodeID uint64, cats []uint32) *caseIdentity {
 	return id
 }
 
+// ControllerIdentity is the operational identity of controller nodeID on
+// the commissioner's fabric — its key and NOC with cats, minted on first
+// use as [Commissioner.CASEAs] mints them — for a CASE initiator outside
+// this package (controller/handshake's tests). The IPK is the operational
+// one.
+func (c *Commissioner) ControllerIdentity(nodeID uint64, cats ...uint32) sigma.Identity {
+	return c.identity(nodeID, cats).Identity
+}
+
+// RootPublicKey is the 65-byte uncompressed public key of the
+// commissioner's fabric root.
+func (c *Commissioner) RootPublicKey() []byte { return append([]byte(nil), c.ca.rootPub...) }
+
 // verifier checks a peer NOC against the commissioner's root.
 func (c *Commissioner) verifier() *mattercert.Verifier {
 	v, err := mattercert.NewVerifier(c.ca.rootPub, mattercert.SystemTime{})

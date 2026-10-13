@@ -81,6 +81,18 @@ pseudo-version of `main`.
   is reported with StatusReport InvalidParam (also when the context was
   cancelled), and the context no longer cancels once Pake3 is sent.
   Ported from matter.js `PaseClient.ts` at `0ceb202d`.
+- `controller/handshake.CASE`, the CASE client (ADR 0020, stage 1): Sigma1
+  with or without a resumption offer from a `ResumptionStore`
+  (`MemoryResumptionStore` in memory), Sigma2Resume with the resume MIC
+  and the record moved to the new resumption id, Sigma2 with the
+  responder's NOC bound to the expected node and fabric and its chain
+  verified, Sigma3, the CASE session on a `controller/exchange.Manager`,
+  the record saved after the session exists, and the InvalidParam report
+  on a failure the peer can be told of. Ported from matter.js
+  `CaseClient.ts` at `0ceb202d`.
+- `bridgetest.Commissioner.ControllerIdentity` and `RootPublicKey`: the
+  commissioner's controller identity and fabric root, for a CASE
+  initiator outside the package.
 
 ### Changed
 
