@@ -110,11 +110,19 @@ func TestPersistedKeys(t *testing.T) {
 	if got := string(p.LoadScenes(k)); got != "table" {
 		t.Errorf("scenes %q", got)
 	}
+	// A host's own key type is persisted under its String() (issue #87).
 	var other otherKey
 	p.storeLabel(other, "x")
-	p.SaveScenes(other, []byte("x"))
-	if p.label(ctx, other) != "" || p.LoadScenes(other) != nil || p.configVersion(ctx, other) != 0 {
-		t.Error("a non-StringKey was persisted")
+	p.SaveScenes(other, []byte("y"))
+	if p.label(ctx, other) != "x" || string(p.LoadScenes(other)) != "y" {
+		t.Error("a non-StringKey was not persisted under its String()")
+	}
+	if v, ok, _ := p.st.GetSetting(ctx, endpointLabelKeyRoot+"other"); !ok || v != "x" {
+		t.Errorf("label key for a host key: %q (%v)", v, ok)
+	}
+	p.storeLabel(nil, "x")
+	if p.label(ctx, nil) != "" || p.LoadScenes(nil) != nil || p.configVersion(ctx, nil) != 0 {
+		t.Error("a nil key was persisted")
 	}
 	if p.LoadScenes(endpoint.StringKey("none")) != nil || p.configVersion(ctx, k) != 0 {
 		t.Error("absent state read back")

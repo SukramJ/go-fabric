@@ -2133,13 +2133,35 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 	if !ok {
 		return nil, fmt.Errorf("%w: RemoveFabricRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
+	if err := o.RemoveFabric(ctx, req.FabricIndex); err != nil {
+		// matter.js answers InvalidFabricIndex for a fabric it does not
+		// hold (OperationalCredentialsServer.ts:412-419).
+		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+	}
+	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: req.FabricIndex}, nil
+}
+
+// RemoveFabric removes fabricIndex as the RemoveFabric command does, for a
+// host surface that has no commissioner behind it — a revoke, a factory
+// reset: the persisted rows, this cluster's own consequences
+// ([OperationalCredentials.NotifyFabricRemoved]) and every hook the wire
+// command fires, in its order — the fabric-removed hook, the mDNS
+// withdraw of the fabric's operational instance, the re-announce of the
+// remaining set. matter.js reaches the same path from the host through
+// Fabric.leave() (packages/protocol/src/fabric/Fabric.ts:423-433), the
+// call the command itself makes (OperationalCredentialsServer.ts:425):
+// the fabric's sessions close with their subscriptions, and the
+// FabricManager's deleting / deleted events fan out to every
+// fabric-scoped holder. A fabric the store does not hold is
+// store.ErrFabricNotFound.
+func (o *OperationalCredentials) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 	// Snapshot the doomed fabric's operational identity BEFORE the row
 	// is gone — the mDNS withdraw below needs (compressedID, nodeID) to
 	// name the stale <compressedID>-<nodeID> instance, and after
 	// RemoveFabric there is nothing left to compute it from.
-	removedFab, gerr := o.store.GetFabric(ctx, req.FabricIndex)
-	if err := o.store.RemoveFabric(ctx, req.FabricIndex); err != nil {
-		return NOCResponse{StatusCode: NOCStatusInvalidFabricIndex, DebugText: err.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+	removedFab, gerr := o.store.GetFabric(ctx, fabricIndex)
+	if err := o.store.RemoveFabric(ctx, fabricIndex); err != nil {
+		return err
 	}
 
 	// Explicit in-memory cleanup for the removed fabric. FK CASCADE has
@@ -2152,7 +2174,7 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 	// Also bumps DataVersion — see [OperationalCredentials.NotifyFabricRemoved],
 	// which every fabric-removal surface (this wire command, REST revoke,
 	// factory reset) runs so none of them skip a consequence the others apply.
-	o.notifyFabricRemoved(ctx, req.FabricIndex)
+	o.notifyFabricRemoved(ctx, fabricIndex)
 
 	o.mu.Lock()
 	hook := o.onFabricRemoved
@@ -2171,7 +2193,7 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 		// (which fans out to SessionManager + InteractionServer).
 		// Concrete daemon-side fan-out: opMgr.CloseFabric + subMgr.CloseFabric
 		// + store.RemoveResumptionsByFabric.
-		hook(ctx, req.FabricIndex)
+		hook(ctx, fabricIndex)
 	}
 	if withdrawHook != nil && gerr == nil {
 		// Withdraw the removed fabric's operational _matter._tcp
@@ -2188,7 +2210,7 @@ func (o *OperationalCredentials) handleRemoveFabric(ctx context.Context, fields 
 		// Fabric.remove() triggering MdnsServer.reannounceInstance.
 		mdnsHook(ctx)
 	}
-	return NOCResponse{StatusCode: NOCStatusOK, FabricIndex: req.FabricIndex}, nil
+	return nil
 }
 
 func (o *OperationalCredentials) handleAddTrustedRootCertificate(fields any) (any, error) {
@@ -2264,10 +2286,10 @@ func (o *OperationalCredentials) handleAddTrustedRootCertificate(fields any) (an
 
 // NotifyFabricRemoved runs the in-process consequences a removed fabric
 // owes on THIS cluster instance, regardless of which surface deleted the
-// persisted row: the wire RemoveFabric command's own [handleRemoveFabric]
-// calls it directly, and a surface that deletes the row without going
-// through the cluster — REST revoke, factory reset — must call it too, or
-// the cluster keeps answering stale data:
+// persisted row: [OperationalCredentials.RemoveFabric] — the wire command
+// and a host's revoke alike — calls it directly, and a surface that
+// deletes the row without going through the cluster at all must call it
+// too, or the cluster keeps answering stale data:
 //
 //   - Bumps DataVersion. A commissioner that cached CurrentFabricIndex /
 //     Fabrics / CommissionedFabricCount behind a DataVersionFilter compares
