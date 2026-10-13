@@ -2531,6 +2531,79 @@ own.
 
 ---
 
+### BD-Matter-ClientNode-NoGeneratedTypes — the client node carries the shape analysis, not a generated behaviour class
+
+matter.js builds a TypeScript behaviour class per discovered cluster shape
+(`PeerBehavior.ts:105-139`, `:169-285` at `0ceb202d`), memoised by a
+fingerprint of revision, features, attribute and command ids
+(`:290-378`), and installs it on the endpoint so the remote cluster reads
+as a typed `state`. Go has no run-time types: `controller/client.Cluster`
+carries the analysis those classes are built from (`:422-467` — revision,
+features, supported and extra attributes and commands) and its values stay
+`spec.Node`, decoded on access through the generated `Attribute.Decode` or
+`spec.DecodeValue`. The fingerprint cache is not ported; the shape is
+recomputed when its inputs change (`ClientStructure.ts:632-659`), which is
+what the cache keyed on. Report AK.
+
+By design (brief AK, D2). The same decisions, one struct instead of one
+class per shape.
+
+### BD-Matter-ClientNode-UnknownEventsDelivered — every event reaches the host
+
+matter.js drops an event of a cluster or event its model does not know,
+with a one-time notice (`ClientEventEmitter.ts:156-175` at `0ceb202d`),
+because it has no generated observable to emit on; the notice's set is
+module-wide (`:39`). `controller/client` delivers every event through
+`Hooks.Event` with its path and its decoded value, or the raw node when no
+definition decodes it; the one-time notice stays as an `Info` line,
+remembered per node. Nothing a host could observe in matter.js is lost;
+the host sees more. Report AK.
+
+By design (brief AK, D4).
+
+### BD-Matter-ClientNode-WriteNotThroughCache — the image changes when the peer reports, not when the host writes
+
+matter.js writes a client behaviour's state locally first, sends the
+remote Write through `RemoteWriter.ts`, and compensates the local value
+when the peer refuses (`DatasourceCache.ts:73-130` at `0ceb202d`).
+`controller/client.Node.Write` forwards to the interaction's Write and
+leaves the image alone: the value changes when the peer reports it, which
+the default subscription delivers. A host that reads the image right
+after a write sees the old value until the report arrives, where matter.js
+shows the new one at once; the image never shows a value the peer did not
+confirm. Report AK.
+
+By design (brief AK, D6). The compensation machinery is the price of
+optimistic local state; the port takes the pessimistic one.
+
+### BD-Matter-ClientNode-EndpointInstalledOnce — an installed endpoint's clusters are not emitted again
+
+matter.js emits an installed endpoint through `emitEndpoint`, which emits
+each of its clusters and recurses into its parts
+(`ClientStructureEvents.ts:88-107` at `0ceb202d`), and then emits every
+cluster of the endpoint once more (`ClientStructure.ts:1512-1519`, "a
+minor optimization" for cluster-level listeners). `Hooks.EndpointInstalled`
+is called once per installed endpoint; its clusters come with it and no
+`ClusterInstalled` follows for them. Report AK.
+
+By design. One typed hook per fact; a host that wants the clusters reads
+`Endpoint.Clusters()` in the hook.
+
+### BD-Matter-ClientNode-SettingsInStore — the node's settings are stored beside its image
+
+matter.js persists a client node's settings (`autoSubscribe`,
+`defaultSubscription`, `disabled`, the event cursor) as the state of its
+`NetworkClient` and `ClientEventEmitter` behaviours through the node's own
+storage (`NetworkClient.ts:121-128`, `ClientEventEmitter.ts:70-76` at
+`0ceb202d`). `controller/client` keeps them in the same `Store` as the
+image, as endpoint 0's cluster `0xFFFF_FFFF`, an id no Matter cluster can
+take. One store interface, one erase. Report AK.
+
+By design. A second store seam for a few settings would be a second thing
+to implement for every backend.
+
+---
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

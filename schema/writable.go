@@ -299,3 +299,13 @@ func AttributeChangesOmitted(clusterID, attrID uint32) bool {
 	_, ok := changesOmittedAttributes[clusterID][attrID]
 	return ok
 }
+
+// ClusterHasChangesOmittedAttribute reports whether any attribute of the
+// cluster carries the "C" quality — the set matter.js's client structure
+// enumerates on the ClusterModel when it decides whether a read may skip a
+// cluster's DataVersion filter (packages/node/src/node/client/ClientStructure.ts
+// hasChangesOmittedAttribute, :1674-1692 at 0ceb202d). The model knows every
+// snapshot cluster, so the answer does not depend on a generated definition.
+func ClusterHasChangesOmittedAttribute(clusterID uint32) bool {
+	return len(changesOmittedAttributes[clusterID]) > 0
+}

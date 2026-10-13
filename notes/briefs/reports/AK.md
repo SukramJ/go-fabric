@@ -242,3 +242,40 @@ Besides the owner's three (`BD-Matter-ClientNode-NoGeneratedTypes`,
 - A panic in a structure hook recovered and logged.
 - The unknown-event notice per node.
 - (If the owner decides so) the root's revision from its DeviceTypeList.
+
+## Owner's decisions (Fable, 2026-10-14, tranche 17)
+
+Reviewed against the pin: differences 1 (CS:876-892 — a RootNode root
+never takes a revision from its DeviceTypeList), 4 (NPP:154-167), 6
+(CS:1512-1519 with ClientStructureEvents.ts:88-107) and 9 (CS:1674-1692)
+are read correctly.
+
+1. **Root revision:** the literal port stands. matter.js leaves endpoint
+   0 at `UNKNOWN_DEVICE_REVISION`; so does the Go node. No `by_design`
+   entry — the behaviour is matter.js's, not a divergence.
+2. **`known.go` stays.** matter.js's node layer resolves every snapshot
+   cluster through its model; a controller binary that links the generated
+   definitions is the equivalent. A host that wants a smaller binary has
+   `cluster/spec` itself; the client package is the controller's full set.
+3. **No `EndpointErased` hook.** matter.js has no structure event for it;
+   `Changed` + `Endpoints()` is the mirror.
+4. **Named clusters carry `Features`.** PeerBehavior.ts:425-426 resolves a
+   named cluster's `ClusterModel` from the model, so its FeatureMap is
+   named there; `schema.ClusterFeatureNames` knows all 135, so `analyse`
+   now names them for every cluster the snapshot knows (owner commit).
+   Likewise `hasChangesOmittedAttribute` without the peer's AttributeList
+   now asks the schema's table (`schema.ClusterHasChangesOmittedAttribute`,
+   new, owner commit) instead of the definition — exact for named
+   clusters, as CS:1680-1684 enumerates the model. What stays approximate
+   for a named cluster is `Extra()` (every non-global id, since no table
+   enumerates the model's attributes) — findings register, Tier 3.
+5. **`RefreshRequest` keeps callbacks and bounds.** Accepted: the node's
+   hook changes filters and paths only; the surface documents it.
+6. `by_design`: the owner's three entries plus
+   `BD-Matter-ClientNode-EndpointInstalledOnce` and
+   `BD-Matter-ClientNode-SettingsInStore` are written. The recovered hook
+   panic is the Go reading of ClientStructureEvents.ts:138-144 (an error
+   logged, not raised) and needs none; the per-node notice is folded into
+   `-UnknownEventsDelivered`.
+7. Difference 8 (DeviceTypeList per entry) and 7 (`known.go`) are
+   implementation choices within the brief, no entry.

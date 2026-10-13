@@ -95,7 +95,14 @@ func TestClusterShape(t *testing.T) {
 		t.Fatal("an empty cluster has a shape")
 	}
 
-	// A named or unknown cluster: no features, every listed id extra.
+	// A named cluster: the schema names its features, every non-global
+	// listed id is extra (no definition to subtract).
+	a := shaped(0x001F, map[uint32]spec.Node{spec.AttrFeatureMap: uintNode(0b101), spec.AttrAttributeList: listNode(0, 0xFFFC)})
+	attrs, cmds = a.Extra()
+	if !reflect.DeepEqual(a.Features(), []string{"EXTS", "AUX"}) || !reflect.DeepEqual(attrs, []uint32{0}) || cmds != nil {
+		t.Fatalf("named cluster features %v extra %v %v", a.Features(), attrs, cmds)
+	}
+	// An unknown cluster: no features, every listed id extra.
 	u := shaped(0xFFF1FC01, map[uint32]spec.Node{spec.AttrFeatureMap: uintNode(1), spec.AttrAttributeList: listNode(0, 0xFFFC), spec.AttrAcceptedCommandList: listNode(3)})
 	attrs, cmds = u.Extra()
 	if u.Features() != nil || u.FeatureMap() != 1 || !reflect.DeepEqual(attrs, []uint32{0}) || !reflect.DeepEqual(cmds, []uint32{3}) || !u.Supports(0) {

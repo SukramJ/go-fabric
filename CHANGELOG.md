@@ -51,6 +51,13 @@ pseudo-version of `main`.
   is persisted; `Seeded` once BasicInformation and a second endpoint are
   in.
 
+- `schema.ClusterHasChangesOmittedAttribute(clusterID)`: whether any
+  attribute of a snapshot cluster carries the changes-omitted quality —
+  what matter.js's `ClientStructure.hasChangesOmittedAttribute` enumerates
+  on the `ClusterModel` (`ClientStructure.ts:1674-1692` at `0ceb202d`);
+  `controller/client` asks it for a cluster whose AttributeList the peer
+  has not reported.
+
 - `controller/peer.Peer.Observe(Observer)`: per-peer observers of a
   peer's sessions coming and going and of an unresponsive establishment —
   what matter.js's node layer observes on a `Peer` directly

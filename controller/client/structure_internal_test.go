@@ -570,7 +570,7 @@ func TestStructureVersionFilters(t *testing.T) {
 		t.Fatal("a cluster without its AttributeList kept its filter")
 	}
 	// A named cluster (AccessControl has no generated definition) is judged
-	// by the ids it lists: AuxiliaryAcl (0x0007) is "C".
+	// by the schema's table: AuxiliaryAcl (0x0007) is "C".
 	n.apply(wildcard, &(&report{}).cluster(0, 0x001F, 0, map[uint32]spec.Node{0: listNode(), 0x0007: listNode()}).r)
 	n.apply(wildcard, &(&report{}).cluster(1, 0x001F, 0, map[uint32]spec.Node{0: listNode()}).r)
 	n.mu.Lock()

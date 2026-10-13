@@ -152,9 +152,10 @@ func (c *Cluster) analyse() *shape {
 	if c.in.hasRevision && c.in.revision >= 1 && c.in.revision <= 0xFFFF {
 		s.revision = uint16(c.in.revision)
 	}
-	if c.def != nil {
-		s.features = schema.ClusterFeatureNames(c.id, c.in.featureMap)
-	}
+	// The features are named by the schema, which knows every snapshot
+	// cluster, generated definition or not (matter.clusters(shape.id) at
+	// PeerBehavior.ts:425-426 resolves a named cluster's model).
+	s.features = schema.ClusterFeatureNames(c.id, c.in.featureMap)
 	for _, id := range s.attributes {
 		if isGlobal(id) || (c.def != nil && c.def.Attribute(id) != nil) {
 			continue
@@ -240,7 +241,8 @@ func (c *Cluster) FeatureMap() uint32 {
 }
 
 // Features are the codes of the features the FeatureMap sets
-// (schema.ClusterFeatureNames), nil for a cluster without a definition.
+// (schema.ClusterFeatureNames), nil for a cluster the snapshot does not
+// know or whose FeatureMap sets none.
 func (c *Cluster) Features() []string {
 	if s := c.exposed(); s != nil {
 		return slices.Clone(s.features)

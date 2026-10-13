@@ -177,25 +177,19 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 
 // hasChangesOmittedAttribute: the peer has an attribute with the
 // changes-omitted quality in the cluster — every such attribute of the
-// definition without the peer's AttributeList, the listed ones with it
+// model without the peer's AttributeList, the listed ones with it
 // (ClientStructure.ts:1674-1692). A cluster without a built shape has none
-// (:1675-1678). schema.AttributeChangesOmitted is the table; a named
-// cluster has no definition to enumerate, so without its AttributeList
-// the ids received stand in for the model's.
+// (:1675-1678). The schema's tables stand for the ClusterModel: they know
+// every snapshot cluster, so a named cluster (no generated definition) is
+// judged exactly, as matter.js judges it.
 func hasChangesOmittedAttribute(c *Cluster) bool {
 	if c.current == nil {
 		return false
 	}
-	omitted := func(id uint32) bool { return schema.AttributeChangesOmitted(c.id, id) }
-	if c.in.attributeListReported || c.def == nil {
-		return slices.ContainsFunc(c.in.attributes, omitted)
+	if !c.in.attributeListReported {
+		return schema.ClusterHasChangesOmittedAttribute(c.id)
 	}
-	for i := range c.def.Attributes {
-		if omitted(c.def.Attributes[i].ID) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(c.in.attributes, func(id uint32) bool { return schema.AttributeChangesOmitted(c.id, id) })
 }
 
 // batch is an AttributeUpdates (ClientStructure.ts:1601-1605): the values
