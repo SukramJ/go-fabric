@@ -26,6 +26,7 @@ German, briefly. Six waves were planned against the phases:
 | 9 | the five owner issues #57, #58, #60, #61, #62 (openccu-loom ADR 0084 migration): generated device-type names, store migrations + fingerprint, node observers + basic window + knobs, Thermostat Sink, WindowCovering Mover | X, Y, Z | `wave/2026-10-12-tranche-9`; docs PR `docs/wave-9-followups` | see §9 |
 | 10 | the owner issues #63 (a host port under the lock the setter takes) and #66 (ColorControlServer.Set) | AA, AB | `wave/2026-10-12-tranche-10`; docs PR `docs/wave-10-followups` | see §10; `v0.3.1` tagged after #69 (release PR) |
 | 11 | concept v2 phase 6: matter.js pin lift to `0ceb202d` (snapshot, enum manufacturer ranges, chipdm, families doc, 330 citations, register Tier 1/2), the behaviour that moved upstream (AddNOC, DoorLock, Descriptor, Thermostat, mdns caps), ADR 0020 (proposed) | AC, AD | `wave/2026-10-13-tranche-11`; docs PR `docs/wave-11-followups` | see §11 |
+| 12 | concept v2 phase 7 stage 1, first half (ADR 0020): `controller/discovery` (DNS-SD browser, commissionable scanner, operational resolution), `controller/exchange` (initiator exchange layer with MRP), `controller/handshake` (PASE and CASE clients with resumption) | AE, AF | `wave/2026-10-13-tranche-12` (#73); docs PR `docs/wave-12-followups` | see §12 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -636,3 +637,83 @@ mapping), this section. Then delete `wave11/*`,
 the transport client — `CommissionableMdnsScanner.ts`, `Scanner.ts`,
 `PaseClient.ts`, `CaseClient.ts`, `PeerConnection.ts`, `PeerSet.ts`,
 `Peer.ts`, `PeerAddressMonitor.ts`) once the owner accepts ADR 0020.
+
+## 12. Wave 12 (2026-10-13, the owner away; everything local)
+
+Concept v2 phase 7, stage 1, first half, after ADR 0020 was accepted
+(#72). Briefs AE (`wave12/discovery`, head `a38a22b`) and AF
+(`wave12/handshake`, head `452ff70`), both on `planning/briefs-wave-12`
+(`1a109ed`); the two Opus agents ran in parallel, AF holding the harness.
+Integration `wave/2026-10-13-tranche-12` = the planning commit, AE's nine
+and AF's six commits cherry-picked (the last of each series is the
+owner's), plus one inventory regeneration (unreached 5). Conflicts:
+CHANGELOG and the inventory only.
+
+- **AE:** `controller/discovery` — `Names`/`Name` (the record cache of
+  `DnssdNames`/`DnssdName`: keys, 1.05 grace, 15 s floor for every record
+  type, goodbyes and cache-flush after 1 s, unavailable SRVs ignored),
+  `Service` (`IpService`: targets, zoned fe80 addresses, coalesced changes,
+  `AddressChanges`, desirability), `Solicitor` (`DnssdSolicitor` with the
+  `RetrySchedule`: 1 s ×2, 20 % jitter, 1 h cap, one packet per loop task,
+  known answers without the flush bit), `TXTData` (`DiscoveryData`; the
+  name yields to revive's stutter rule), `Scanner`
+  (`CommissionableMdnsScanner`: cache first, subtype queries, 30 s retry,
+  speculative targets ≤50/1 h), `Names.Service` + `Service.Resolve`
+  (`IpServiceResolution`). `mdns` exports `QueryConn` and a typed record
+  codec so the package stays free of `miekg/dns`. One goroutine per
+  `Names` stands in for the JavaScript loop; microtasks and `sleep(0)`
+  macrotasks are ordered as there. Lines the brief had wrong (the agent
+  re-read them, the owner re-verified): `IpServiceResolution.ts:26-134`,
+  `RetrySchedule.ts:28-60`, `Scanner.ts:71-145`/`:153-159`; matter.js
+  prefers the *higher* SRV priority (`ServerAddressSet.ts:179-181`), moot
+  for discovered addresses. Go-side: the retry base saturates instead of
+  wrapping after 33 doublings. Owner: the upstream re-entry leak is
+  guarded (`BD-Matter-ScannerPendingObserverOnce`); query splitting and
+  the relevance pre-filter are `BD-Matter-MdnsQueryNotSplit`.
+- **AF:** `controller/exchange` — `Manager` (session table with the
+  unsecured session 0 and id allocation `SessionManager.ts:504-557`,
+  exchange table, receive path `ExchangeManager.ts:220-475`), `Exchange`
+  (`Send` with MRP on `transport/mrp.BackoffDuration`, piggybacked and
+  per-exchange 200 ms standalone acks, duplicate detection, `Next` with
+  our-side-only maximum peer response time — `MessageExchange.ts:840-847`
+  passes no peer half — `Close`/`Abort`, the 30-exchange cap that evicts
+  the least recently active, `:494-531`), `StatusReport`, the error
+  classes. `controller/handshake` — `PASE` on `spake2.Prover` (own
+  PBKDFParamRequest encoder; 2 s for the PBKDF step, 35 s crypto
+  processing time elsewhere, `SecureChannelMessenger.ts:55`), `CASE` on
+  `sigma.NewPeerInitiator` with `ResumptionStore`/`MemoryResumptionStore`
+  (Sigma2Resume parameters = unsecured session's ⊕ record's ⊕
+  responder's, `CaseClient.ts:184-188`; Sigma2 decoded once more for the
+  parameters the initiator exposes only after processing), InvalidParam
+  on a reportable failure. `bridgetest.Commissioner` gains
+  `ControllerIdentity` and `RootPublicKey` for the CASE test. Owner: the
+  channel's `PeerCATs` come from the responder NOC
+  (`BD-Matter-CaseInitiatorPeerCATs`, `ResumptionRecord.PeerCATs`), the
+  session's CATs from the option or record as matter.js; the sigma check
+  order is `BD-Matter-SigmaInitiatorCheckOrder`; the `sessionparams`
+  width comment corrected (`TlvNumber.ts:118-143` encodes the minimal
+  width); the bridgetest accessors stay until stage 2; the local
+  `MaxPathsPerInvoke` fallback stays 1. Go-side differences not worth an
+  entry: a cancelled `Send` returns `ctx.Err()`, `Send` refuses on any
+  closed exchange, a ctx deadline is not peer loss, exchanges match by
+  session object.
+
+The `../matter.js` checkout moved to `706a8463` (ten commits past the pin)
+during the wave; none touch the files cited here, and the pin stays
+`0ceb202d` — cite with `git -C ../matter.js show 0ceb202d:<path>` when the
+checkout is not at the pin.
+
+Guards on the tranche: `make ci` (176 packages at or above their floor), `make race`, `make reachability-check` (unreached 5) green; `make chiptool-test` PASS (317 PASS, 0 FAIL). PR #73 (auto-merge).
+
+**Docs PR `docs/wave-12-followups`** (written on top of the tranche):
+three by_design entries, open items (the `secure/operational` flake, the
+live test under `-race`, the scope line), concept v2 B.1 stage-1 status,
+this section. Then delete `wave12/*`, `planning/briefs-wave-12`,
+`wave/2026-10-13-tranche-12` and the `.claude/worktrees/wave12-*`
+worktrees. Next: brief AG (wave 13, stage 1 second half: `Peer.ts`,
+`PeerSet.ts`, `PeerConnection.ts`, `PeerAddressMonitor.ts` on
+`controller/discovery` and `controller/handshake`), then stage 2
+(commissioning flow, CA, attestation; AF's list of what stage 2 needs:
+an Invoke path over a session, a Secure Channel handler for
+peer-initiated exchanges — an inbound CloseSession is ignored today —
+`PeerLost`/`SuppressPeerLoss`, a persistent `ResumptionStore`).
