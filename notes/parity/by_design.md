@@ -561,7 +561,7 @@ These rewrite TypeScript constructs into Go. Wire output is identical; the surfa
 | BD-Matter-RemainingAuditTestGaps | matter.js carries its own cluster-revision regression suite via `@matter/model` and per-behaviour parity tests | go-fabric has parity tests for the actively-pair-tested cluster surface (OnOff, LevelControl on Switch/Light/Siren projections, the BridgedDeviceBasicInformation surface, the Aggregator + Root composition) but not for every device-type-projection cluster | Audit drifts L1-D08 (DoorLock), L1-D09 (WindowCovering), L2-D04 (OnOffPlug→OnOffLight upgrade), L2-D05 (LevelControl OO feature-bit), L7-D06 (commissionable TXT golden test) are **PARITY-TEST-GAPs**, not code drifts. L2-D03 (Switch power-source-attachment) is closed rather than open: the cross-channel attachment it described no longer exists — the Device Library specifies neither electrical measurement cluster for OnOffPlugInUnit (0x010A), so the metering channel now projects its own ElectricalSensor (0x0510) endpoint and the Switch projection carries no measurement clusters at all. The corresponding production paths have been Apple-pair-verified end-to-end; adding parity tests is desirable but does not block release. Tracked as an open behavioural-parity-test gap; new cases are added per `docs/matter-parity-contract.md`. L1-D07 (Thermostat) is superseded: the formerly Apple-pair-verified SystemMode read path surfaced Auto(1) whenever the HM device sat in its factory-default CONTROL_MODE=AUTO, violating SystemModeEnum conformance — Auto has conformance "AUTO" (matter.js `packages/model/src/standard/elements/thermostat-cluster.element.ts:558`) while the projection advertises a HEAT-only FeatureMap. Pair-success never exercised the state-sync echo: a controller writing the read value back received ConstraintError from the projection's own write gate, and RunningMode could yield Auto(1), which is not a ThermostatRunningModeEnum member at all (`element.ts:568-573`). Fixed in `internal/model/custom/climate/matter.go` (`systemModeFromHmMode` / `runningModeFromHmMode` clamp reads to the FeatureMap); pinned by `TestParityMatterJS_SystemModeAutoRequiresAutoFeature` and `TestThermostatSystemModeReadClampsHmAutoToFeatureMap`. See `BD-Matter-Thermostat-NoAutoFeature` (next row). |
 | BD-Matter-Thermostat-NoAutoFeature | matter.js Thermostat composition may include the AUTO (AutoMode) feature, which mandates independent dual setpoints plus MinSetpointDeadBand (0x0019, conformance "AUTO" — `packages/model/src/standard/elements/thermostat-cluster.element.ts:100-104`) and requires HEAT+COOL (FeatureMap conformance "AUTO, O.a+", `element.ts:24-25,28`) | `internal/model/custom/climate/matter.go::featureMap` advertises HEAT always and COOL for SupportsCool profiles, but never AUTO — even on cooling-capable hybrids | HM climates are single-setpoint devices: the Matter Cool setpoint aliases the one HM setpoint and the projection implements no MinSetpointDeadBand, so advertising AUTO would be a conformance violation. HM's AUTO (week-program) mode is a single-setpoint schedule, not Matter AutoMode; SystemMode reads surface it as Heat(4), or Cool(3) when HEATING_COOLING==COOLING. ThermostatRunningMode stays feature-gated on AUTO ("TEVT & AUTO, [AUTO]", `element.ts:117-120`) and its value space is ThermostatRunningModeEnum (Off/Cool/Heat — no Auto member, `element.ts:568-573`). Precondition for lighting AUTO up: a true dual-setpoint surface plus MinSetpointDeadBand. Aligned with thermo.ThermostatServer's AUTO-clearing constructor; pinned by `TestParityMatterJS_SystemModeAutoRequiresAutoFeature`. |
 | BD-Matter-TouchLastReport-Timing | matter.js sets the subscription's `lastReport` timestamp in the SubscribeResponse handler after the final Initial-Chunk has been pushed | `im/subscription/subscription.go:192-197` calls `TouchLastReport()` immediately after the Initial-Report flush sequence completes from the bridge's perspective | Audit drift L10-D04 is a timing-shape difference, not a correctness drift: the chunked Initial-Report sequence is owned by the bridge, which only signals "done" to the subscription after every chunk has been ack'd. The two stacks therefore land on the same effective `lastReport` instant; the only observable difference would be if a peer raced a Report into the gap before the final ack, which the bridge's ack-walk prevents. |
-| BD-Matter-CloseSession-PeerAddrHeuristic | matter.js binds every session to its MessageChannel (`packages/protocol/src/session/Session.ts` `get channel()`), so an outbound CloseSession StatusReport can always be routed | go-fabric's UDP listener is connectionless and sessions do not own a channel object; the bridge resolves the peer address at send time from (1) the last authenticated Secure-Channel datagram per session (`Bridge.sessionPeerAddrs`), (2) the per-subscription routing target, (3) the owed-ack exchange table | A session whose peer address was never observed (no SC datagram, no subscription, no pending reliable exchange) skips the farewell with a debug log — acceptable because the notification is best-effort in matter.js too (try/catch-and-warn around `ExchangeManager.ts:658-666` `#sendCloseSession`) and the dominant controllers (Apple Home, chip-tool) always match at least one source. |
+| BD-Matter-CloseSession-PeerAddrHeuristic | matter.js binds every session to its MessageChannel (`packages/protocol/src/session/Session.ts` `get channel()`), so an outbound CloseSession StatusReport can always be routed | go-fabric's UDP listener is connectionless and sessions do not own a channel object; the bridge resolves the peer address at send time from (1) the last authenticated Secure-Channel datagram per session (`Bridge.sessionPeerAddrs`), (2) the per-subscription routing target, (3) the owed-ack exchange table | A session whose peer address was never observed (no SC datagram, no subscription, no pending reliable exchange) skips the farewell with a debug log — acceptable because the notification is best-effort in matter.js too (try/catch-and-warn around `ExchangeManager.ts:663-671` `#sendCloseSession`) and the dominant controllers (Apple Home, chip-tool) always match at least one source. |
 | BD-Matter-CloseSession-FabricTeardownSilent | matter.js emits gracefulClose (and therefore a CloseSession StatusReport) on every non-peer-lost session close, including fabric removal | go-fabric deliberately keeps CloseFabric / CloseFabricExcept / ClosePASESessions notification-free | The daemon defers the operational teardown after RemoveFabric so the NOCResponse can ride out on the closing session, and injecting a CloseSession farewell into that window would race the in-flight IM reply; the peer initiated the fabric operation and drops its sessions per protocol anyway. The graceful farewell is scoped to idle reap, same-peer stale-CASE eviction, on-demand ClosePeer invalidation, and daemon shutdown. |
 | BD-Matter-IdleSessionReaper | matter.js keeps established operational sessions indefinitely — reclaim happens only on same-peer replacement, explicit close, or session-id exhaustion (`packages/protocol/src/session/SessionManager.ts` `findOldestInactiveSession`, ~:455-476) | go-fabric additionally runs a periodic idle reaper on the operational session manager (`cmd/openccu-loom/daemon_matter.go` — 60 s sweep, 5-min idle TTL); activity semantics mirror `Session.ts:127` `notifyActivity` exactly (refreshed on every authenticated receive including duplicates, and on every secure send), and reaped sessions ship the graceful CloseSession farewell | Headless long-running bridges accumulate dead CASE sessions from controllers that vanish without CloseSession. The TTL sits far above the subscription publisher heartbeat cadence, which `im/subscription/subscription.go` caps at `maxSendInterval` = 2 min (a deliberate divergence from matter.js, which needs no cap because it never reaps idle sessions; pinned by `TestSendInterval_LongMaxIntervalStillBeatsSessionIdleTimeout`), so live subscriptions are never evicted, and a dead controller stops earning send-side activity once the report retransmit cap reaps its subscription. Never-used sessions (lastActivity unset) stay exempt as commissioning protection. |
 | L7-D07 | matter.js `MdnsAdvertiser.ts:213-232` — `DefaultBroadcastSchedule` with exponential back-off starting at 1 s, max 90 s; chip is event-driven (re-advertise on fabric change / reconnect) | `mdns/zeroconf.go::StartReannounceLoop` + `cmd/openccu-loom/daemon_matter.go:226` — fixed 30-min `StartReannounceLoop` | The 30-min cadence keeps Apple's `mDNSResponder` cache warm (TTL=4500 s ≈ 75 min). No controller correctness issue — all known commissioners accept periodic re-announcement. Event-driven re-announce (fabric add/remove, reconnect) plus a backoff burst matching matter.js's `DefaultBroadcastSchedule` is a v1.2 milestone. Drift L7-D07 (LOW by-design for v1.0). |
@@ -1283,7 +1283,7 @@ implementation wave.
 
 ### BD-Matter-P2-D13-18 — SetVidVerificationStatement returns InvalidCommand
 
-**matter.js reference:** `node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:486-505` — validates all three optional fields and calls `fabric.update` with the VID verification statement.
+**matter.js reference:** `node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:504-523` — validates all three optional fields and calls `fabric.update` with the VID verification statement.
 
 **Go path:** `cluster/core/operational_credentials.go::handleSetVidVerificationStatement` (line ~1726) — returns `InvalidCommand` unconditionally.
 
@@ -1901,7 +1901,7 @@ endpoint that exists without the cluster.
 ### BD-Matter-Device-AddPartComposition — `AddPart` refuses a part the owner's type does not name as a component
 
 matter.js validates a parts insertion for endpoint-number identity only
-(`packages/node/src/endpoint/properties/Parts.ts:170-201`) and leaves
+(`packages/node/src/endpoint/properties/Parts.ts:195-213`) and leaves
 composition to device-type validation. `Device.AddPart`
 (`device/device.go`) refuses a part whose device type the owner's type does
 not name through its deviceType requirements (through the base types),
@@ -1984,7 +1984,7 @@ support only; nothing of it is on the device path.
 
 matter.js's runtime conformance compiler resolves a revision condition
 against the cluster's revision for element presence
-(`support/codegen`-fed `conformance-compiler.ts:250-254`), while its
+(`support/codegen`-fed `conformance-compiler.ts:252-256`), while its
 feature-combination judgement ignores revisions
 (`IllegalFeatureCombinations.ts:441-443`, `:464-468`). `cluster/spec`
 does the same since wave 7: `Instance` resolves `Rev >= vN` against
@@ -2040,8 +2040,8 @@ stopped matter.js timer would be.
 ### BD-Matter-SessionClosed-HostCall — a host wiring its own session registry calls `Bridge.SessionClosed`
 
 matter.js's ExchangeManager observes every session removal itself and
-closes a TCP channel whose last session went (`ExchangeManager.ts:669-676`,
-`:700-706`). The bridge learns of a close through
+closes a TCP channel whose last session went (`ExchangeManager.ts:674-681`,
+`:705-711`). The bridge learns of a close through
 `operational.Manager.SetOnSessionClose`, a single callback the host owns;
 the inbound and outbound CloseSession paths close the connection by
 themselves, every other close (fabric removal, NOC rotation, the idle
@@ -2056,7 +2056,7 @@ takes more than one observer (report U, question 1).
 
 matter.js `Fabric.leave` / `replaced` run `initiateClose` on every session
 of the fabric; a session with an exchange in flight defers its close
-(`NodeSession.ts:312-322`), and the force close that follows marks it
+(`NodeSession.ts:337-347`), and the force close that follows marks it
 peer-lost (`:324-327`), so that session closes after its exchange without
 a CloseSession. The bridge has no per-session view of active exchanges:
 `EmitFabricRemovedContext` and `Bridge.CloseFabricSessionsExcept` send the
@@ -2064,13 +2064,13 @@ CloseSession to every routed session of the fabric except the invoking
 one, then close them at once. A peer whose exchange was in flight sees a
 CloseSession where matter.js would have let the exchange finish. The
 invoking session itself matches matter.js: closed after its response,
-without a CloseSession (`Fabric.ts:456-460`). Retire when the bridge
+without a CloseSession (`Fabric.ts:461-465`). Retire when the bridge
 tracks exchanges per session.
 
 ### BD-Matter-FabricClose-NoSubscriptionFlush — no final report before the sessions of a removed or rotated fabric close
 
 matter.js `leave` and `replaced` run `closeSubscriptions(true)` on every
-session before closing it (`Fabric.ts:405-407`, `:421-423`), flushing a
+session before closing it (`Fabric.ts:410-412`, `:421-423`), flushing a
 last report so a `leave` event reaches the peer. The bridge forgets the
 fabric's subscriptions without a final report, as it did before wave 8;
 the sessions close right after, and a report that raced the close would
@@ -2080,7 +2080,7 @@ to wait for that last report.
 ### BD-Matter-CaseHold-BoundedByEvictionOnly — an abandoned Sigma1 holds its TCP connection until the CASE state is evicted
 
 A CASE handshake in flight holds its TCP connection open
-(`ExchangeManager.ts:669-676`); the hold ends with the handshake, a peer
+(`ExchangeManager.ts:674-681`); the hold ends with the handshake, a peer
 failure StatusReport, the connection dropping, or the eviction of the
 per-exchange CASE state (`Bridge.ForgetSigma1Replied`, which
 `node/security.go:327` wires to the CASE provider's one-minute TTL through
@@ -2114,7 +2114,7 @@ because no matter.js path opens a window with credentials of its own.
 
 `OperationalCredentialsServer.initialize` sets `supportedFabrics` to 254
 when unset, the FabricBuilder's maximum
-(`OperationalCredentialsServer.ts:84-88`). `cluster/core` keeps that
+(`OperationalCredentialsServer.ts:85-89`). `cluster/core` keeps that
 default; the facade (`node/root.go:146-148`) passes 5 when
 `Config.SupportedFabrics` is 0, the value the reference daemon has
 advertised since wave 6 and the fixture runs were made with. A host that
@@ -2126,7 +2126,7 @@ different behaviour: AddNOC answers TableFull at the limit either way.
 
 matter.js's `commissioned` event is a transition: `#syncCommissioned`
 compares the fabric count with the stored `commissioned` flag and emits
-only when the count crosses zero (`CommissioningServer.ts:157-171`). The
+only when the count crosses zero (`CommissioningServer.ts:143-157`). The
 facade's `OnCommissioningComplete(fabricIndex)` runs after every successful
 CommissioningComplete, the second and later fabrics included, after the
 facade's own body (`ClearPendingState`, OTA `Commissioned`) and before
@@ -2211,7 +2211,7 @@ not call the server from them — `cluster/energy/devicemanagement.go:123-124`,
 
 matter.js validates and reconciles a setpoint write inside the write's
 transaction (`occupied*Setpoint$Changing` → `#assert…Changing`,
-`ThermostatServer.ts:599-606`): no other write can land between the
+`ThermostatServer.ts:594-601`): no other write can land between the
 reconcile and the commit. The Go write releases the state lock for the
 Sink (`BD-Matter-HostPort-OutsideTheSetterLock`), so the host's inbound
 setters may move a setpoint meanwhile. The server tells the Sink the
@@ -2254,6 +2254,34 @@ not coupled — neither matter.js nor the server derives one from the
 other — and a colour whose mode the server has no feature for is logged
 (`matter.colorcontrol.inbound_color_mode_ignored`) and ignored, as the
 thermostat treats an inbound SystemMode it cannot serve.
+
+### BD-Matter-DoorLock-HostFailureStatus — a failed `LockInvoke` answers the error's own IM status; matter.js answers FAILURE
+
+matter.js's `#actuate` calls the `handleLockOperation` hook and, when it
+throws, emits LockOperationError with the reason `hardwareFailureReason`
+derives and answers **FAILURE** whatever the error was
+(`DoorLockServer.ts:1033-1038`). The Go server emits the same event and
+answers the error's IM status when it carries one (`im.StatusCode`),
+FAILURE otherwise — the rule every other host port follows
+(`thermo.Sink`, `cover.Mover`, `BD-Matter-WindowCovering-MoverOperationalStatus`),
+so a host that knows its lock is busy can say BUSY. The OperationError in
+the event is Unspecified; a typed host error carrying one (matter.js
+`LockOperationFailedError`, `:76-84`) is an open item
+(`docs/open-items.md`). Report AD, question 3.
+
+### BD-Matter-ModeBase-HostStatusGuard — a host's ChangeToMode status outside the definition is refused
+
+matter.js's ModeBase server checks nothing a host returns from its
+`changeToMode` override (`packages/node/src/behaviors/mode-base/ModeUtils.ts:46-53`
+answers UnsupportedMode or Success itself; the derived servers only compare
+against Success). The Go server refuses a status the derivation's
+`ModeChangeStatus` does not define — the manufacturer range 128–191
+(`MfgCodes`) included since the `0ceb202d` snapshot — with FAILURE and
+`ErrInvalidHostStatus` (`cluster/modebase/modebase_server.go` `validHostStatus`,
+on `spec.EnumSupported`), and never lets a host answer UnsupportedMode,
+which is the server's own verdict. A Go-side guard: a value the enum does
+not define is a wiring error, and a controller should not see it as a
+status code. Report AC, question 2.
 
 ## Removed (built, tested, never wired)
 

@@ -25,6 +25,7 @@ German, briefly. Six waves were planned against the phases:
 | 8 | the three Tier-3 session findings of #54: RemoveFabric/UpdateNOC CloseSession, handshakes hold a TCP connection, first chunk of a chunked report is peer loss | W | `wave/2026-10-12-tranche-8`; docs PR `docs/wave-8-followups` | see §8 |
 | 9 | the five owner issues #57, #58, #60, #61, #62 (openccu-loom ADR 0084 migration): generated device-type names, store migrations + fingerprint, node observers + basic window + knobs, Thermostat Sink, WindowCovering Mover | X, Y, Z | `wave/2026-10-12-tranche-9`; docs PR `docs/wave-9-followups` | see §9 |
 | 10 | the owner issues #63 (a host port under the lock the setter takes) and #66 (ColorControlServer.Set) | AA, AB | `wave/2026-10-12-tranche-10`; docs PR `docs/wave-10-followups` | see §10; `v0.3.1` tagged after #69 (release PR) |
+| 11 | concept v2 phase 6: matter.js pin lift to `0ceb202d` (snapshot, enum manufacturer ranges, chipdm, families doc, 330 citations, register Tier 1/2), the behaviour that moved upstream (AddNOC, DoorLock, Descriptor, Thermostat, mdns caps), ADR 0020 (proposed) | AC, AD | `wave/2026-10-13-tranche-11`; docs PR `docs/wave-11-followups` | see §11 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -541,3 +542,96 @@ so openccu-loom can take #57–#66; patch number by owner's choice, the
 release is additive) — CHANGELOG section `[0.3.1]`, tag on `main` after the
 release PR merges, `release.yml` publishes. Next: wave 11 = the pin lift
 to `0ceb202d`, then ADR 0020.
+
+## 11. Wave 11 (2026-10-13, the owner away; everything local)
+
+Concept v2 phase 6, after `v0.3.1` (#69, tagged on `77952a7`): the pin
+lift. The owner regenerated the snapshot from matter.js `0ceb202d`
+(`npm run build` in `packages/model`, `make generate-matter-schema
+MATTERJS_DIR=<absolute path>` — the relative default does not resolve from
+a worktree — then `gofumpt`, clustergen, devicegen, goldens) and read the
+diff before anything else: the source commit, the manufacturer value
+ranges of 1.6.1 as id-less enum members with a constraint (matter.js
+`9892fa39`: ModeTag MfgTags 32768–49151 and ModeChangeStatus MfgCodes
+128–191 in the ten mode clusters, ErrorStateEnum ManufacturerError and
+OperationalStateEnum ManufacturerStates 128–191 in the three operational
+state clusters, ClosureErrorEnum ManufacturerError, LightSensorTypeEnum Ms
+64–254), and IlluminanceMeasurement LightSensorType typed as that enum. No
+cluster or device-type revision moved. Committed as the base of
+`planning/briefs-wave-11` (`7677c1f`), so both agents branched from a
+reviewed snapshot. The 65 upstream commits were read by two Sonnet
+readers (behaviours, protocol) whose reports the owner verified at the
+source before writing the briefs; a citation-drift table
+(`notes/briefs/data/2026-10-13-citation-drift-4633bfd7-0ceb202d.md`, 412
+citations: 154 same, 152 moved, 54 to re-read, 10 changed) gave AC the
+renumbering.
+
+Briefs AC (`wave11/schema`, head `56f307e`) and AD (`wave11/behaviour`,
+head `04b36de`), both on `planning/briefs-wave-11` (`e576eea`); ADR 0020
+written by the owner on the same branch (`6de7b36`). Integration
+`wave/2026-10-13-tranche-11` = the three planning commits, AC's eight
+and AD's seven commits cherry-picked, plus one inventory regeneration
+(unreached 5). Conflicts: CHANGELOG and the inventory (routine), and the
+three DoorLock files where AC had renumbered comment lines AD rewrote —
+AD's side taken (its comments cite `0ceb202d`).
+
+- **AC:** `spec.Enum.Ranges` from the id-less range members; `EnumSupported`
+  accepts a value inside a range (`ValueValidator.ts:172-178`); the
+  opstate setters rest on the definition; `modebase.validHostStatus` too
+  (owner decision: matter.js checks no host status, `ModeUtils.ts:46-53`,
+  so the Go guard follows the definition — 0xC0–0xFF now refused). chipdm:
+  five path patterns classify the 18 ranges as class (i), the stale
+  LightSensorType acknowledgement removed, the doc block regenerated.
+  `certifiability.md` §"Families this module does not run yet" corrected:
+  label and localisation families run; PWRTL, ILL, PRS, DISHM, EEM, EPM
+  are "(c) not yet run"; media stays (b); DLOG over BDX stays unserved
+  (the OTA requestor's BDX is the receiving side). 330 citations in 107
+  files renumbered; many were wrong before the lift and now point at the
+  construct the comment describes; the released CHANGELOG sections keep
+  their numbers (history). Register §6: every Tier 1/2 bullet without a
+  marker verified — fixed with proof except SetRegulatoryConfig
+  CountryCode (still deferred).
+- **AD:** AddNOC answers a reserved AdminVendorId with IM InvalidCommand
+  (matter.js `OperationalCredentialsServer.ts:217-222`, chip
+  `OperationalCredentialsCluster.cpp:470`; Go had answered a NOCResponse
+  InvalidAdminSubject, which neither reference does) and a NOC node ID
+  outside the operational range with InvalidNodeOpId (`Noc.ts:83-85`,
+  `:179-183`; new `mattercert.ErrNonOperationalNodeID`; UpdateNOC too, as
+  matter.js's one mapper serves both). DoorLock: UnboltDoor reports
+  Unlock (`:208-217`), no fabric → UNSUPPORTED_ACCESS (`:1017-1022`),
+  NoRemoteLockUnlock/Privacy → LockOperationError + FAILURE
+  (`:1049-1056`), a failed `LockInvoke` → LockOperationError and the
+  error's status (owner: `BD-Matter-DoorLock-HostFailureStatus`).
+  Descriptor DeviceTypeList de-duplicated in `core.NewDescriptor`
+  (`DescriptorServer.ts:105`). `thermo.New` repairs an invalid setpoint
+  configuration and logs it, `ErrSetpoints` when it cannot
+  (`#reconcileInitialSetpoints` `:1015-1046`). mdns caps SII/SAI at one
+  hour and SAT at 65535 (`SessionIntervals.ts:69-91`). Verify-only:
+  parity holds for RemoveFabric under a foreign fail-safe,
+  fabric-sensitive list writes, the OTA single query and the peer session
+  parameters; differs — reset after the last fabric, mandatory command
+  without a handler, `queryRunning` without `defer` (all Tier 3 now).
+
+Owner decisions beyond the briefs: the four "cited behaviour changed"
+items of AC §4 outside AD (peer-loss suppression is the commissioner's
+PASE session only; `Parts.add` ancestor/endpoint-0 checks and
+`#validateInsertion` duplicate-leaf detection are the device layer's —
+`device/device.go:515-517` cites them, no behaviour change needed for a
+bridge whose numbers the assembler allots; MEI range unchanged for a
+`uint32`). ADR 0020 proposed, acceptance at the start of phase 7.
+
+Guards on the tranche: `make ci`, `make race`, `make chipdm-check`,
+`make reachability-check` green; `make chiptool-test` PASS; families
+(passed/skipped/failed) OPCREDS 6/3/0, DRLK 7/7/0, DESC 2/1/0, TSTAT 3/3/0,
+RVCRUNM 3/0/0, RVCCLEANM 3/0/0, OPSTATE 6/0/0, RVCOPSTATE 4/0/0; no golden
+or PICS change. PR #70 (auto-merge).
+
+**Docs PR `docs/wave-11-followups`** (written on top of the tranche):
+register Tier 1/2 verified, three Tier-3 findings, two by_design entries,
+open items, 38 citations in the owner-only files renumbered (AC's §4
+mapping), this section. Then delete `wave11/*`,
+`planning/briefs-wave-11`, `wave/2026-10-13-tranche-11` and the
+`.claude/worktrees/wave11-*` worktrees. Next: phase 7 stage 1 (brief AE:
+the transport client — `CommissionableMdnsScanner.ts`, `Scanner.ts`,
+`PaseClient.ts`, `CaseClient.ts`, `PeerConnection.ts`, `PeerSet.ts`,
+`Peer.ts`, `PeerAddressMonitor.ts`) once the owner accepts ADR 0020.
