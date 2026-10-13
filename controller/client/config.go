@@ -27,6 +27,11 @@ type Config struct {
 	// Interaction is the interaction bound to Peer —
 	// commissioner.Commissioner.Interaction(Peer).
 	Interaction *interaction.Interaction
+	// Store persists the image; nil is a [MemoryStore] of this node's own.
+	Store Store
+	// FlushInterval batches store writes (storage/client/ClientCacheBuffer.ts:41-48);
+	// 0 writes through.
+	FlushInterval time.Duration
 	// AutoSubscribe starts the default subscription in Start
 	// (NetworkClient.ts:432-439; a newly commissioned node sets it,
 	// CommissioningClient.ts:308-327). It is persisted: true sets the

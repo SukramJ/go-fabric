@@ -17,10 +17,12 @@ import (
 // (node/ClientNode.ts:55-409 at 0ceb202d) with the subscription and
 // connection-state half of NetworkClient. It is safe for concurrent use.
 type Node struct {
-	cfg   Config
-	log   *slog.Logger
-	clock exchange.Clock
-	rand  func() float64
+	cfg     Config
+	log     *slog.Logger
+	clock   exchange.Clock
+	rand    func() float64
+	store   Store
+	persist *persister
 
 	mu        sync.RWMutex
 	settings  settings
@@ -29,21 +31,15 @@ type Node struct {
 	connState ConnectionState
 }
 
-// settings are the node's own persisted state — matter.js
-// NetworkClient.State (NetworkClient.ts:331-372, quality N).
-type settings struct {
-	disabled            bool
-	autoSubscribe       bool
-	defaultSubscription *SubscribeOptions
-}
-
-// New builds the node cfg describes. Mirrors ClientNode.initialize
-// (ClientNode.ts:105-133): synchronous, nothing installed but the image.
+// New builds the node cfg describes and loads its image from the store.
+// Mirrors ClientNode.initialize (ClientNode.ts:105-133): synchronous,
+// nothing installed but the image. Config.AutoSubscribe true and a
+// Config.DefaultSubscription replace the stored settings.
 func New(cfg Config) (*Node, error) {
 	if cfg.Interaction == nil {
 		return nil, fmt.Errorf("%w: no Interaction", ErrConfig)
 	}
-	n := &Node{cfg: cfg, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand, connState: Disconnected}
+	n := &Node{cfg: cfg, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand, store: cfg.Store, connState: Disconnected}
 	if n.log == nil {
 		n.log = slog.New(slog.DiscardHandler)
 	}
@@ -54,9 +50,50 @@ func New(cfg Config) (*Node, error) {
 	if n.rand == nil {
 		n.rand = mrand.Float64
 	}
-	n.settings.autoSubscribe = cfg.AutoSubscribe
-	n.settings.defaultSubscription = cfg.DefaultSubscription
+	if n.store == nil {
+		n.store = &MemoryStore{}
+	}
+	n.persist = &persister{store: n.store, nodeID: cfg.ID, interval: cfg.FlushInterval, clock: n.clock, log: n.log, image: &n.mu}
+	stored, err := n.store.Load(cfg.ID)
+	if err != nil {
+		return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
+	}
+	for _, ep := range stored {
+		if ep.Number != 0 {
+			continue
+		}
+		for _, c := range ep.Clusters {
+			if c.ID != settingsCluster {
+				continue
+			}
+			if n.settings, err = decodeSettings(c.Values); err != nil {
+				return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
+			}
+		}
+	}
+	changed := false
+	if cfg.AutoSubscribe && !n.settings.autoSubscribe {
+		n.settings.autoSubscribe, changed = true, true
+	}
+	if cfg.DefaultSubscription != nil {
+		n.settings.defaultSubscription, changed = cfg.DefaultSubscription.clone(), true
+	}
+	if changed {
+		n.saveSettingsLocked()
+	}
 	return n, nil
+}
+
+// saveSettingsLocked persists the settings; a store error is logged. The
+// caller holds n.mu (or owns n exclusively).
+func (n *Node) saveSettingsLocked() {
+	values, err := n.settings.encode()
+	if err == nil {
+		err = n.store.Save(n.cfg.ID, 0, settingsCluster, values, nil)
+	}
+	if err != nil {
+		n.log.Warn("matter.controller.client.store_write_failed", slog.String("what", "settings"), slog.String("err", err.Error()))
+	}
 }
 
 // Start brings the node online — ClientNode start through
@@ -73,15 +110,18 @@ func (n *Node) Start(ctx context.Context) error {
 		return ErrDisabled
 	}
 	n.started = true
+	n.persist.restart()
 	return nil
 }
 
-// Stop takes the node offline.
+// Stop takes the node offline and flushes its store
+// (ClientCacheBuffer.ts:94-101).
 func (n *Node) Stop(ctx context.Context) error {
 	_ = ctx
 	n.mu.Lock()
-	defer n.mu.Unlock()
 	n.started = false
+	n.mu.Unlock()
+	n.persist.stop()
 	return nil
 }
 
@@ -94,13 +134,10 @@ func (n *Node) Close(ctx context.Context) error {
 	return err
 }
 
-// Disable takes the node offline and keeps it so — ClientNode.disable
-// (ClientNode.ts:236-250).
+// Disable takes the node offline and keeps it so, persisted
+// (NetworkClient.ts:344-349) — ClientNode.disable (ClientNode.ts:236-250).
 func (n *Node) Disable(ctx context.Context) error {
-	n.mu.RLock()
-	disabled := n.settings.disabled
-	n.mu.RUnlock()
-	if disabled {
+	if n.Disabled() {
 		return nil
 	}
 	if err := n.Stop(ctx); err != nil {
@@ -108,6 +145,7 @@ func (n *Node) Disable(ctx context.Context) error {
 	}
 	n.mu.Lock()
 	n.settings.disabled = true
+	n.saveSettingsLocked()
 	n.mu.Unlock()
 	return nil
 }
@@ -121,6 +159,7 @@ func (n *Node) Enable(ctx context.Context) error {
 		return nil
 	}
 	n.settings.disabled = false
+	n.saveSettingsLocked()
 	n.mu.Unlock()
 	return n.Start(ctx)
 }
@@ -132,15 +171,18 @@ func (n *Node) Disabled() bool {
 	return n.settings.disabled
 }
 
-// Erase stops the node and forgets its image — ClientNode.erase
-// (ClientNode.ts:227-229, :266-271).
+// Erase stops the node and forgets its image, its store included —
+// ClientNode.erase (ClientNode.ts:227-229, :266-271).
 func (n *Node) Erase(ctx context.Context) error {
 	if err := n.Stop(ctx); err != nil {
 		return err
 	}
 	n.mu.Lock()
+	defer n.mu.Unlock()
 	n.settings = settings{}
-	n.mu.Unlock()
+	if err := n.store.EraseNode(n.cfg.ID); err != nil {
+		n.log.Warn("matter.controller.client.store_erase_failed", slog.String("err", err.Error()))
+	}
 	return nil
 }
 

@@ -20,7 +20,10 @@ pseudo-version of `main`.
   properties with the subscription interval bounds, at `0ceb202d`.
   `client.New(Config)` over a peer and its interaction; `Start`, `Stop`,
   `Close`, `Disable`, `Enable`, `Erase`; `ConnectionState` (matter.js
-  `NodeConnectionState`).
+  `NodeConnectionState`). The image persists through `client.Store`
+  (`MemoryStore` here; values as TLV, the DataVersion beside them, the
+  node's settings with them), written through or batched by
+  `Config.FlushInterval` as matter.js's `ClientCacheBuffer` batches.
 
 - `controller/interaction.Report` carries `SubscriptionID` (the report's
   subscription id, the first chunk's; 0 for a read's report) and `Session`

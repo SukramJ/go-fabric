@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4772,
+  "entry_points": 4778,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,9 +184,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10938,
-    "reachable": 7679,
-    "whitelisted": 3254,
+    "total_exported": 10947,
+    "reachable": 7683,
+    "whitelisted": 3259,
     "unreachable": 5
   },
   "by_package": [
@@ -14002,10 +14002,45 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestCacheBuffered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/cache_internal_test.go",
+      "line": 195
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestCacheWriteThrough",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/cache_internal_test.go",
+      "line": 161
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestMemoryStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/cache_internal_test.go",
+      "line": 257
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestMemoryStoreConcurrent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/cache_internal_test.go",
+      "line": 293
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestScope",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/scope_internal_test.go",
       "line": 30
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestSettingsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/cache_internal_test.go",
+      "line": 317
     },
     {
       "package": "controller/commissioner",
