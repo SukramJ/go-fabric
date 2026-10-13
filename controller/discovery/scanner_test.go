@@ -201,13 +201,13 @@ func TestScanner_InvalidTXTNeverBuildsAndNameExpiryDropsTheCache(t *testing.T) {
 		t.Fatalf("discovered = %+v", got)
 	}
 	onLoop(t, n, func() {
-		// The invalid instance waits for a valid TXT. matter.js's search
-		// re-runs #onDiscovered over every discovered name
-		// (CommissionableMdnsScanner.ts:173-175), and an instance that is
-		// not cached gets a further IpService and pending observer each
-		// time (:344-376): one from the announcement, one from the search.
-		if len(s.pending) != 2 {
-			t.Errorf("pending = %d, want 2", len(s.pending))
+		// The invalid instance waits for a valid TXT with one Service and
+		// one observer. matter.js's search re-runs #onDiscovered over every
+		// discovered name (CommissionableMdnsScanner.ts:173-175) and opens a
+		// further pair each time (:344-376), which it never releases —
+		// by_design BD-Matter-ScannerPendingObserverOnce guards that here.
+		if len(s.pending) != 1 {
+			t.Errorf("pending = %d, want 1", len(s.pending))
 		}
 	})
 	// The node goes away (goodbyes); its cached device goes with its name.

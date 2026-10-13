@@ -607,6 +607,16 @@ func (s *Scanner) onDiscovered(nm *Name) {
 	if s.cache.has(lower) {
 		return
 	}
+	// An instance already waiting for a valid TXT keeps its one Service
+	// and observer. matter.js (:344-376) opens another pair per search
+	// start (:173-175) and never releases the earlier one once the TXT
+	// arrives — see notes/parity/by_design.md
+	// BD-Matter-ScannerPendingObserverOnce.
+	for _, p := range s.pending {
+		if p.name == nm {
+			return
+		}
+	}
 
 	svc := newService(s.names, nm.qname)
 	if d, ok := buildDevice(nm); ok {

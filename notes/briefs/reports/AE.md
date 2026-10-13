@@ -191,3 +191,29 @@ depends on it.
 7. **`by_design` candidates** (not written, per the rules): the omitted
    relevance pre-filter and query splitting (Q4); per-byte U+FFFD decoding;
    `FindCommissionable`'s error contract.
+
+## Owner's decisions
+
+Verified 2026-10-13 against `0ceb202d`: the corrected line ranges above
+(`IpServiceResolution.ts:26-134`, `RetrySchedule.ts:28-60`, `Scanner.ts:71-145`
+and `:153-159`, `ServerAddressSet.ts:165-184`, `DnssdNames.ts:192-200`,
+`CommissionableMdnsScanner.ts:170-176` and `:344-376`, `MdnsSocket.ts:155-222`)
+re-read; all hold. The `../matter.js` checkout has moved to `706a8463`, ten
+commits later, none touching these files.
+
+1. **Guarded.** A leak is not behaviour to mirror. `onDiscovered` returns when
+   the instance is already pending; one Service and one observer per instance.
+   `BD-Matter-ScannerPendingObserverOnce` in the docs PR (owner commit here).
+2. **`TXTData` stays.** The lint rule wins over the name; the type map and the
+   `// Mirrors` comment keep the provenance.
+3. **Fine.** Same-task coalescing is matter.js's same-tick rule; two exported
+   calls are two ticks there too.
+4. **by_design.** `BD-Matter-MdnsQueryNotSplit`, together with the omitted
+   relevance pre-filter: neither changes what a peer can observe below the
+   fragmentation limit. Port the splitting if a query ever exceeds 1232 bytes.
+5. **The codec stays in `mdns`.** `controller/discovery` stays free of
+   `miekg/dns`, as `bridge/` and the rest of the module outside `mdns` are.
+6. **Noted** in handover §12 as a follow-up for the race-clean advertiser.
+7. Per-byte U+FFFD is a one-liner in `BD-Matter-MdnsQueryNotSplit`'s
+   neighbour entry; the `FindCommissionable` error contract is Go surface, no
+   entry.
