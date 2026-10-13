@@ -12,6 +12,25 @@ pseudo-version of `main`.
 
 ### Added
 
+- `cover.WindowCoveringServer` serves the tilt axis (#77): `Config.FeatureMap`
+  accepts `cover.ServedTiltFeatureMap` (TL | PA_TL) and
+  `cover.ServedLiftTiltFeatureMap` (LF | TL | PA_LF | PA_TL) besides the
+  lift-only default, with `Config.InitialTiltPositionPercent100ths`, the
+  tilt position attributes, GoToTiltPercentage, ConfigStatus
+  TiltPositionAware and OperationalStatus bits 4-5 (global follows lift
+  while it moves, else tilt — matter.js `WindowCoveringServer.ts:203-214`
+  at `0ceb202d`). UpOrOpen and DownOrClose set every served axis's target
+  (`:521-535`, `:545-559`) and reach `cover.Mover.GoTo(ctx, lift, tilt)`
+  as one call with both targets; GoToTiltPercentage carries tilt alone;
+  StopMotion snaps both targets (`:491-496`). `SetCurrentPosition` honours
+  its tilt argument on a server that serves tilt.
+- `cover.WindowCoveringServer.SetTargetPosition(lift, tilt)` (#76): the
+  inbound twin of `SetCurrentPosition` for a target the host infers from
+  the device's own movement (a wall button, a programme) — stored without
+  the Mover, reported through the change notifier, OperationalStatus left
+  to the host. A target that lands while a command's Mover runs stands;
+  the command no longer restores its own target over it when the Mover
+  fails (the #63 overlap rule).
 - `controller/discovery`, the controller's DNS-SD browser (ADR 0020,
   stage 1): `Names` / `Name`, the record cache of matter.js `DnssdNames` /
   `DnssdName` at `0ceb202d` — records keyed as matter.js keys them, TTLs

@@ -15,30 +15,37 @@ import (
 )
 
 // TestServerMatchesTheGeneratedDefinition holds the server against matter.js
-// window-covering-cluster.element.ts (spectest.CheckServer) for the one
-// FeatureMap it serves, LF | PA_LF, whether the host names it or leaves it
-// zero.
+// window-covering-cluster.element.ts (spectest.CheckServer) for each
+// FeatureMap it serves — LF | PA_LF (also when the host leaves it zero),
+// TL | PA_TL and both.
 func TestServerMatchesTheGeneratedDefinition(t *testing.T) {
 	t.Parallel()
-	for _, fm := range []uint32{0, cover.ServedFeatureMap} {
-		srv, err := cover.New(cover.Config{FeatureMap: fm})
+	for _, c := range []struct{ cfg, want uint32 }{
+		{0, cover.ServedFeatureMap},
+		{cover.ServedFeatureMap, cover.ServedFeatureMap},
+		{cover.ServedTiltFeatureMap, cover.ServedTiltFeatureMap},
+		{cover.ServedLiftTiltFeatureMap, cover.ServedLiftTiltFeatureMap},
+	} {
+		srv, err := cover.New(cover.Config{FeatureMap: c.cfg})
 		if err != nil {
-			t.Fatalf("FeatureMap 0x%X: %v", fm, err)
+			t.Fatalf("FeatureMap 0x%X: %v", c.cfg, err)
 		}
-		spectest.CheckServer(t, srv, wcdef.Definition, cover.ServedFeatureMap)
+		spectest.CheckServer(t, srv, wcdef.Definition, c.want)
 	}
 }
 
 // TestFeatureMapIsDerivedFromWhatTheServerServes pins the refusal of every
 // other FeatureMap — New with ErrFeatureMap, NewWindowCoveringServer with a
-// panic.
+// panic: an axis without its position-aware feature, and a feature the
+// server has no state for.
 func TestFeatureMapIsDerivedFromWhatTheServerServes(t *testing.T) {
 	t.Parallel()
 	for _, fm := range []uint32{
 		uint32(wcdef.FeatureLift),
 		uint32(wcdef.FeatureTilt),
-		uint32(wcdef.FeatureTilt | wcdef.FeaturePositionAwareTilt),
 		cover.ServedFeatureMap | uint32(wcdef.FeatureTilt),
+		cover.ServedTiltFeatureMap | uint32(wcdef.FeatureLift),
+		cover.ServedLiftTiltFeatureMap | 1<<3, // AbsolutePosition (bit 3)
 	} {
 		if _, err := cover.New(cover.Config{FeatureMap: fm}); !errors.Is(err, cover.ErrFeatureMap) {
 			t.Errorf("FeatureMap 0x%X: New error %v, want ErrFeatureMap", fm, err)
