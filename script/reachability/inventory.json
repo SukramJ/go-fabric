@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4771,
+  "entry_points": 4772,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,9 +184,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10937,
+    "total_exported": 10938,
     "reachable": 7679,
-    "whitelisted": 3253,
+    "whitelisted": 3254,
     "unreachable": 5
   },
   "by_package": [
@@ -13999,6 +13999,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/attestation/cert_internal_test.go",
       "line": 19
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestScope",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/scope_internal_test.go",
+      "line": 30
     },
     {
       "package": "controller/commissioner",
