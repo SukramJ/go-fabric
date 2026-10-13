@@ -161,6 +161,14 @@ pseudo-version of `main`.
   `Service.Close` stops and waits for that resolution.
   `Service.Changes` signals every address or TXT change (matter.js
   `IpService.changed`).
+- `controller/peer` (ADR 0020, stage 1), first part: `peer.Descriptor`
+  (matter.js `PeerDescriptor`: address, data model revision, operational
+  UDP address, discovery data, reported session parameters, CATs),
+  `peer.Store` with `MemoryStore`, `peer.ResumptionStore` (a
+  `handshake.ResumptionStore` that can delete a record) with
+  `MemoryResumptionStore`, and `peer.Timing` with `DefaultTiming` and
+  `Merge` (matter.js `PeerTimingParameters` and its defaults at
+  `0ceb202d`).
 
 ### Changed
 

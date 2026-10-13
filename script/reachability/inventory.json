@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4616,
+  "entry_points": 4621,
   "entry_packages": [
     ".",
     "bdx",
@@ -138,6 +138,7 @@
     "controller/discovery",
     "controller/exchange",
     "controller/handshake",
+    "controller/peer",
     "device",
     "diagevent",
     "eligibility",
@@ -178,9 +179,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10669,
-    "reachable": 7495,
-    "whitelisted": 3169,
+    "total_exported": 10684,
+    "reachable": 7505,
+    "whitelisted": 3174,
     "unreachable": 5
   },
   "by_package": [
@@ -14623,6 +14624,41 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 69
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMemoryResumptionStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/store_test.go",
+      "line": 45
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMemoryStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/store_test.go",
+      "line": 15
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityTimingDefaults",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 13
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityTimingMerge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 48
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestStoresImplementTheInterfaces",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/store_test.go",
+      "line": 72
     },
     {
       "package": "device",
