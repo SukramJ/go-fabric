@@ -259,6 +259,36 @@ pseudo-version of `main`.
   closes — returning an `interaction.Report` with `Value(endpoint,
   cluster, attribute)`. `MaximumPeerResponseTime` is matter.js's
   `maximumPeerResponseTime`.
+- `controller/commissioner`, the commissioner (ADR 0020, stage 2;
+  matter.js `ControllerCommissioner`, `CommissioningConnection` and
+  `ControllerCommissioningFlow` at `0ceb202d`, on an IP network):
+  `commissioner.New(Context{Exchanges, Peers, Attestation, Logger, Clock,
+  Rand})` and `Commission(ctx, Options)` — the requested node id checked
+  against the peers, the addresses deduplicated and ordered by
+  desirability (one candidate per device instance, else one per address),
+  PASE with the device's TXT intervals, addresses 10 s apart and never
+  while an attempt holds the responder, a wrong passcode dropping the
+  device, the budget (default 30 s) ending in
+  `PeerCommunicationError("Could not connect to device")`; then the flow:
+  the initial reads (a full fabric table refused), ArmFailSafe with the
+  device's BasicCommissioningInfo, SetRegulatoryConfig for a Wi-Fi or
+  Thread node (the "XX" retry), device attestation through
+  `controller/attestation` and the `OnAttestationFailure` policy, the CSR
+  checked against the DAC, AddTrustedRootCertificate and AddNOC with a
+  NOC from the fabric's `controller/ca`, the operational CASE connection
+  through `controller/peer` (a NoSharedTrustRoots refusal retried after
+  15 s), CommissioningComplete and UpdateFabricLabel — re-arming the
+  failsafe below half its time, failing past the device's cumulative
+  maximum, disarming it on a commissioning or status error. The PASE
+  session closes on every path. `FinalizeCommissioning` replaces the
+  CASE step; `EstablishPASE` opens a session without the flow.
+  `commissioner.Fabric` / `NewFabric` mint the controller's own NOC and
+  operational identity from a `ca.CA`. Errors are `*CommissioningError`
+  with matter.js's kinds (`ErrMaximumCommissionedFabricsReached`,
+  `ErrCommissioningTimeout`, `ErrDeviceAlreadyCommissionedToThisFabric`,
+  `ErrFabricLabelConflict`, `ErrNodeIDConflict`,
+  `ErrOperativeConnectionFailed`), `PairRetransmissionLimitReachedError`
+  and `PeerCommunicationError`.
 
 ### Changed
 
