@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4604,
+  "entry_points": 4606,
   "entry_packages": [
     ".",
     "bdx",
@@ -178,9 +178,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10652,
-    "reachable": 7490,
-    "whitelisted": 3157,
+    "total_exported": 10656,
+    "reachable": 7492,
+    "whitelisted": 3159,
     "unreachable": 5
   },
   "by_package": [
@@ -14409,10 +14409,24 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestHooksAdoptedFromContext",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/hooks_test.go",
+      "line": 72
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestNextTimeoutIsMaxPeerResponseTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 365
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestOnSendAndOnReceive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/hooks_test.go",
+      "line": 44
     },
     {
       "package": "controller/exchange",

@@ -118,6 +118,14 @@ pseudo-version of `main`.
   the wait for the next one — matter.js `MessageExchange.retransmissionCount`
   and `retransmissionRestartSaving` at `0ceb202d`, the inputs of the
   connection process's kick.
+- `exchange.Options.OnSend` / `OnReceive` and `exchange.WithHooks`: the
+  transmission and receipt notifiers of matter.js
+  `MessageExchange.Options.onSend` / `onReceive` (called with the
+  retransmission number before every transmission, and for every message
+  the exchange takes), and a context that carries them to an exchange the
+  caller does not open itself — the CASE exchange of `handshake.CASE`,
+  adopted at its first send as matter.js's `onSend` / `onReceive` setters
+  adopt them.
 
 ### Changed
 
