@@ -10,6 +10,19 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-10-13
+
+**What a host must do.** Nothing. Every change in this release is additive
+or a behavioural fix behind an unchanged signature: no identifier is
+removed, renamed or deprecated, the store schema is the one `v0.3.0`
+created (`store.Migrations()` ends at `v4`; an existing database opens
+unchanged), and a host that does not set the new ports and knobs sees the
+same wire behaviour as before. The one visible timing change is
+intentional: a host `Sink` of `onoff.Server` that confirms through `Set`
+from inside its own call no longer deadlocks (issue #63); it used to block
+the command until the host's write timeout and leave the confirming
+goroutine stuck for good.
+
 ### Added
 
 - `light.ColorControlServer.Set(light.Color)`: records a colour the device
@@ -3017,7 +3030,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/SukramJ/go-fabric/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/SukramJ/go-fabric/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/SukramJ/go-fabric/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/SukramJ/go-fabric/releases/tag/v0.1.0
