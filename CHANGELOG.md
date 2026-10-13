@@ -24,6 +24,13 @@ pseudo-version of `main`.
   (`MemoryStore` here; values as TLV, the DataVersion beside them, the
   node's settings with them), written through or batched by
   `Config.FlushInterval` as matter.js's `ClientCacheBuffer` batches.
+  A `client.Cluster` carries the analysis matter.js's `PeerBehavior` makes
+  of a discovered cluster — revision, FeatureMap and feature codes, the
+  attribute and command lists, `Supports`, `SupportsCommand`, `Extra` —
+  and its values as `spec.Node`, decoded on access (`Decoded`) through
+  the generated definition; the package links every generated definition,
+  so `spec.Lookup` knows each. `cluster/spec.DecodeValue` decodes a value
+  by its `spec.Type` (the attribute-level counterpart of `TlvOfModel`).
 
 - `controller/interaction.Report` carries `SubscriptionID` (the report's
   subscription id, the first chunk's; 0 for a read's report) and `Session`
