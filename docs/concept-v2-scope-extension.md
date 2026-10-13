@@ -173,7 +173,7 @@ Stand 2026-10-13: Stufe 1 ist zweigeteilt — `controller/discovery`,
 `controller/exchange` und `controller/handshake` (Scanner, Exchange-Schicht,
 PASE- und CASE-Client) in Welle 12 (#73), die Peer-Verwaltung
 (`PeerConnection.ts`, `PeerSet.ts`, `Peer.ts`, `PeerAddressMonitor.ts`) als
-Brief AG in Welle 13 (#81). Stufe 2 (`controller/ca`, `controller/attestation`, `controller/interaction` als Invoke/Read-Minimum, `controller/commissioner`) als Brief AH in Welle 14 (#83): der eigene Commissioner kommissioniert den Referenz-Daemon über Multicast-DNS-SD und liest über CASE. Stufe 3 (`controller/interaction` mit Write, Subscribe, Subscription-Registry, Sustained Subscriptions und eingehenden Reports; der CASE-Responder `controller/handshake.CASEServer`; die Client-Encoder in `im/`) als Brief AI in Welle 15 (#90): der eigene Controller abonniert den Referenz-Daemon und empfängt nach dessen Neustart die wiederhergestellte Subscription über die vom Daemon geöffnete CASE-Session. Brief AJ verschiebt `bridgetest.Commissioner` auf `controller/`; danach Stufe 4.
+Brief AG in Welle 13 (#81). Stufe 2 (`controller/ca`, `controller/attestation`, `controller/interaction` als Invoke/Read-Minimum, `controller/commissioner`) als Brief AH in Welle 14 (#83): der eigene Commissioner kommissioniert den Referenz-Daemon über Multicast-DNS-SD und liest über CASE. Stufe 3 (`controller/interaction` mit Write, Subscribe, Subscription-Registry, Sustained Subscriptions und eingehenden Reports; der CASE-Responder `controller/handshake.CASEServer`; die Client-Encoder in `im/`) als Brief AI in Welle 15 (#90): der eigene Controller abonniert den Referenz-Daemon und empfängt nach dessen Neustart die wiederhergestellte Subscription über die vom Daemon geöffnete CASE-Session. Brief AJ (Welle 16, #93) hat `bridgetest.Commissioner` auf `controller/` verschoben (Oberfläche unverändert, Stufe 2 damit abgeschlossen); danach Stufe 4.
 
 Gesamt rund 22 000 matter.js-Zeilen. Go-Einschätzung 25 000–35 000 Zeilen
 mit Tests, sechs bis acht Wellen. Stufe 6 ist abtrennbar; der DCL-Client
@@ -186,9 +186,9 @@ go-fabric, wie der Adapter-Daemon aus Konzept v1 Teil C; Arbeitstitel
 Geräte einem Host an. (2) Das Harness: `internal/chiptool` kommissioniert
 den Referenz-Daemon heute mit chip-tool und dem matter.js-Controller; der
 eigene Commissioner wird dritte Gegenstelle und trägt die BIND- und
-Controller-Fälle. `bridgetest.Commissioner` geht in Stufe 2 auf; seine
-Test-CA wird die Default-CA des Pakets (feste Validität bleibt
-by_design).
+Controller-Fälle. `bridgetest.Commissioner` ist seit Welle 16 ein
+Wrapper über `controller/`; seine Test-CA ist in `controller/ca`
+aufgegangen (der feste Ausstellungszeitpunkt bleibt by_design).
 
 **Öffnet.** BIND (3), 11 Gerätetypen, Groupcast-Sender, Joint Fabric;
 Parität in `docs/matterjs-comparison.md` §1–§3 auf ✅.

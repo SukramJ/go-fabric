@@ -30,6 +30,7 @@ German, briefly. Six waves were planned against the phases:
 | 13 | concept v2 phase 7 stage 1, second half (ADR 0020): `controller/peer` (descriptor, timing, store, Set and Peer, the connection process, the address monitor with the liveness probe) and the `controller/exchange` / `controller/discovery` additions it needs | AG | `wave/2026-10-13-tranche-13` (#81); docs PR `docs/wave-13-followups` | see §13 |
 | 14 | concept v2 phase 7 stage 2 (ADR 0020): `controller/ca` (the certificate authority), `controller/attestation` (device attestation against a PAA store), `controller/interaction` (Invoke and Read for the flow), `controller/commissioner` (the commissioner, the PASE connection, the commissioning flow); `CASEOptions.Exchange` / `OnExchange` replace `exchange.WithHooks` | AH | `wave/2026-10-13-tranche-14` (#83); docs PR `docs/wave-14-followups` | see §14 |
 | 15 | concept v2 phase 7 stage 3 (ADR 0020): `controller/interaction` Write, Subscribe, the subscription registry with its liveness timer, sustained subscriptions, the inbound report handler, Read with events and filters; `controller/handshake.CASEServer` (the CASE responder); `controller/exchange.Manager.SetProtocolHandler`; the client encoders and decoders in `im/` | AI | `wave/2026-10-13-tranche-15` (#90); docs PR `docs/wave-15-followups` | see §15 |
+| 16 | ADR 0020 stage-2 close-out: `bridge/bridgetest.Commissioner` runs on `controller/` (surface kept); `interaction.Report.SubscriptionID` / `Session` | AJ | `wave/2026-10-13-tranche-16` (#93); docs PR `docs/wave-16-followups` | see §16 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -1002,3 +1003,59 @@ surface (README §API stability): `Dial`/`Options` → `commissioner.New` +
 `Accept` → the CASE responder via `Context.Fabrics`, `CASEAs` →
 `ca.CA.GenerateNOC` + `handshake.CASE`; `EstablishSubscriptionTarget` /
 `AckPumpTick` stay device-side test seams. Then stage 4.
+
+## 16. Wave 16 (2026-10-13, the owner away; everything local)
+
+ADR 0020 stage-2 close-out: `bridge/bridgetest.Commissioner` onto
+`controller/`. Brief AJ (`wave16/bridgetest`, head `a4da9fc`) on
+`planning/briefs-wave-16` (`ac1497c`). Integration
+`wave/2026-10-13-tranche-16` = the two planning commits and the four
+branch commits cherry-picked onto `main` (`b11840f`) without a conflict,
+plus the owner's commit (decisions, by_design, comment fixes); the
+inventory was current (unreached 5).
+
+- **`bridge/bridgetest`:** every exported identifier keeps its signature
+  and `bridgetest.go` (the device-side seams) is untouched; inside, one
+  `udp.Listener` + `exchange.Manager`, `controller/ca` at a fixed issuing
+  instant, `commissioner.NewFabric`, `peer.Set`, `interaction.Subscriptions`,
+  `commissioner.New` (no `Fabrics`: the package registers its own
+  `handshake.CASEServer` over every minted identity so `Accept` sees the
+  sessions), `interaction.Interaction` per session, the device's
+  operational record fed into a `discovery.Names` through a fake
+  `mdns.QueryConn` (on every query too — with an advertiser the record
+  exists only after AddNOC, inside the flow). `transport.go`,
+  `handshake.go`, `ca.go` and the hand-written encoders are gone
+  (−1 500 lines). Behaviour that moved (CHANGELOG Changed): `Subscribe`
+  on a PASE session fails with `interaction.ErrUncommissioned`
+  (CI:991-994); `Seed` fixes the IPK, nonces, further identity keys and
+  MRP jitter but not the root/fabric keys or signatures — **`crypto/ecdsa`
+  ignores a caller's reader since Go 1.26** (`go doc ecdsa.GenerateKey`;
+  `ca.Config.Rand` and `FabricConfig.Rand` now say so); `FailSafeSeconds`
+  and `AdminSubject` have no effect; the 10 s default timeout stays for
+  `Accept`/`NextReport` only; `NextReport` delivers no keepalives.
+- **`controller/interaction.Report`** gains `SubscriptionID` and `Session`
+  (InputChunk.ts:166-169, CSH:77, :89, :108-112) — how `bridgetest` routes
+  a re-established subscription's report to the accepted session.
+- **Tests:** `controller/peer`'s in-package tests lost their `bridgetest`
+  import (cycle): the fabric helper mints through `ca`, the node proofs
+  moved to `package peer_test` with a test-only `export_test.go` (`Probe`);
+  the two node tests that subscribed over PASE commission first.
+  `bridge/bridgetest` floor 90 → 92.
+- **Owner:** the five questions decided as the report records (export
+  helper ok; the narrower seed promise; responder over all identities;
+  no keepalives; the one unreproduced `-race` failure in `node` watched).
+  `BD-Matter-Commissioner-TestCA` rewritten (fixed instant only); the
+  comments in `controller/exchange`, `controller/ca`, `controller/peer`
+  and the findings register that cited the deleted files fixed.
+
+Guards on the tranche (tool PATH exported, HEAD logged): `make ci`,
+`make race`, `make reachability-check` (unreached 5), `make chiptool-test`
+— GUARDS. PR #93 (auto-merge).
+
+**Docs PR `docs/wave-16-followups`:** ADR 0020 (the stage-2 row done, the
+CA decision's wording, the by_design pointer), concept v2 B.1 (AJ done,
+stage 2 closed), this section. Then delete `wave16/bridgetest`,
+`planning/briefs-wave-16`, the tranche and docs branches and the
+`.claude/worktrees/wave16-bridgetest` worktree. Next: stage 4 (brief AK:
+`ClientNode.ts`, `node/client/` — a typed image of a remote node from the
+schema; `device/` types as the client view), after a first read.

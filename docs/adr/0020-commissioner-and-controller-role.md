@@ -13,7 +13,7 @@
   [`../matterjs-comparison.md`](../matterjs-comparison.md) §1–§3 and §Non-goals,
   concept v1 [`../concept-matter-1.6.1-and-device-layer.md`](../concept-matter-1.6.1-and-device-layer.md) §F.1,
   `notes/parity/by_design.md` `BD-Matter-GroupcastNoSender`,
-  `BD-Matter-Commissioner-TestCA` (the `bridgetest` CA's fixed validity)
+  `BD-Matter-Commissioner-TestCA` (the test commissioner's fixed issuing instant)
 
 ## Context
 
@@ -87,8 +87,8 @@ boundary:
    Wi-Fi commissioning over BLE — those non-goals stand (concept v2
    decisions 0.4, 0.6).
 5. **The certificate authority is the package's default CA**, grown from
-   `bridgetest`'s test CA (stage 2); its fixed validity stays `by_design`
-   until a host supplies its own. Attestation is verified against a PAA
+   `bridgetest`'s test CA (stage 2; since wave 16 `bridgetest` mints
+   through it, its fixed issuing instant staying `by_design`). Attestation is verified against a PAA
    store the host supplies, with the CSA test PAAs as the default for the
    harness. The DCL client (stage 6) is an HTTP client against the CSA
    ledger over `net/http`; it is the last stage and separable.
@@ -108,7 +108,7 @@ The stages and their acceptance (from concept v2 §B.1):
 | Stage | Ports | Done when |
 | --- | --- | --- |
 | 1 Transport client | `CommissionableMdnsScanner.ts`, `common/Scanner.ts`, `PaseClient.ts`, `CaseClient.ts`, `peer/PeerConnection.ts`, `PeerSet.ts`, `Peer.ts`, `PeerAddressMonitor.ts` | the module browses DNS-SD, opens PASE and CASE sessions to any node and follows its addresses |
-| 2 Commissioning | `ControllerCommissioningFlow.ts`, `ControllerCommissioner.ts`, `CommissioningConnection.ts`, `DeviceCommissioner.ts`, the CA, attestation with a PAA store | the harness commissions the reference daemon with `controller/`; `bridgetest.Commissioner` is a thin wrapper or gone |
+| 2 Commissioning | `ControllerCommissioningFlow.ts`, `ControllerCommissioner.ts`, `CommissioningConnection.ts`, `DeviceCommissioner.ts`, the CA, attestation with a PAA store | the harness commissions the reference daemon with `controller/`; `bridgetest.Commissioner` is a thin wrapper or gone — done: #83 (wave 14) and #93 (wave 16, the wrapper) |
 | 3 Client interaction | `action/client/` (`ClientInteraction.ts`, subscriptions, `InputChunk.ts`) | Read, Write, Invoke, Subscribe with chunking and resumption, proved against the responder |
 | 4 Client node model | `ClientNode.ts`, `node/client/` | a typed image of a remote node from the schema; `device/` types as the client view |
 | 5 Binding, Groupcast sender, controller device types | `behaviors/binding/`, the sender half of `GroupcastServer.ts`, the 11 controller device types in `script/devicegen` | the BIND family runs green with the own commissioner; `BD-Matter-GroupcastNoSender` retires |
