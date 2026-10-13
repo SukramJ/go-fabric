@@ -10,7 +10,7 @@ closed it is removed here in the same change.
 Scope boundaries are not open items: no Bluetooth, no Thread, and
 certification itself is not pursued; the controller/commissioner role enters
 in stages ([ADR 0020](./adr/0020-commissioner-and-controller-role.md),
-stage 1 in #73 and #81, stage 2 in #83), nothing outside `controller/` changes
+stage 1 in #73 and #81, stage 2 in #83, stage 3 in #90), nothing outside `controller/` changes
 for a stage until it lands
 ([ADR 0011](./adr/0011-certifiability-is-a-goal.md)). TCP and BDX landed
 with #49 ([ADR 0019](./adr/0019-tcp-bdx-and-the-ota-requestor.md)) as the
@@ -49,7 +49,6 @@ last family run and held by `TestCertifiabilityDocument`.
 | **SetpointRaiseLower in Heat/Cool mode does not keep the deadband on an AUTO thermostat** | findings register, Tier 3 | matter.js moves the other setpoint or answers INVALID_COMMAND (`ThermostatServer.ts:229-267`); the Go handler clamps one setpoint. Fix package in the register (report Y). |
 | **After the last fabric is removed the node reopens its window at once** | findings register, Tier 3 | matter.js waits for the fail-safe and open sessions, then erases the node (`CommissioningServer.ts:178-199`); the facade needs a reset policy (report AD). |
 | **A mandatory command without a handler is advertised** | findings register, Tier 3 | matter.js refuses at initialisation or drops it from AcceptedCommandList (`ValidatedElements.ts:357-370`); `spectest.CheckServer` should verify a handler per accepted command (report AD). |
-| **The client-side ReadRequest encodes an empty AttributeRequests array and no InteractionModelRevision** | `im.ReadRequest.MarshalTLV`, report AG | matter.js omits an empty list and sends the revision the spec makes mandatory in every IM message (`action/request/Read.ts:40-77`); the peer liveness probe uses the encoder as it is and the node answers it. The client interaction of ADR 0020 stage 3 gets the client encoders. |
 | **DoorLock has no typed host error carrying an OperationError** | `BD-Matter-DoorLock-HostFailureStatus` | A failed `LockInvoke` always reports Unspecified; matter.js's `LockOperationFailedError` lets a lock say e.g. InsufficientBattery (`DoorLockServer.ts:76-84`). |
 | **ArmFailSafe runs the armed hook under `g.mu`** | findings register, Tier 3 | The comment says otherwise; the disarm branch is the pattern. No cycle today. Fix package in the register (report AA). |
 | **DEM and EVSE call their host ports under the state lock** | `BD-Matter-HostPort-OutsideTheSetterLock` | The documented exception to the wave-10 rule (chip's delegate model: the host must not call the server from a port). A host whose DEM/EVSE device confirms synchronously meets the #63 cycle there; moving them to the two-lock shape is a brief when a host needs it. |
