@@ -36,11 +36,13 @@ type Peer struct {
 	cancel  context.CancelFunc
 	workers sync.WaitGroup
 
-	mu       sync.Mutex
-	desc     Descriptor
-	sessions []*exchange.Session
-	saving   bool
-	closed   bool
+	mu                    sync.Mutex
+	desc                  Descriptor
+	sessions              []*exchange.Session
+	saving                bool
+	closed                bool
+	connecting            *connection
+	connectionInitiatedAt time.Time
 }
 
 // newPeer builds the peer d describes — Peer.ts:95-188. The peer's
@@ -358,10 +360,6 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 // arrives with brief AG §4.
 func (p *Peer) scheduleAddressCheck() {}
 
-// sessionAdded aborts the connection process when a session is added from
-// any source (Peer.ts:638-639); the process arrives with brief AG §3.
-func (p *Peer) sessionAdded() {}
-
 // Disconnect aborts the connection process and waits for it to end; with
 // a cause it also gives up every session with the peer, as one known
 // unreachable (we removed our fabric from it, say), without the
@@ -374,10 +372,6 @@ func (p *Peer) Disconnect(ctx context.Context, cause error) {
 		p.set.ctx.Exchanges.HandlePeerLoss(exchange.PeerAddress(p.address), cause, time.Time{})
 	}
 }
-
-// stopConnecting aborts the connection process and waits for it; the
-// process arrives with brief AG §3.
-func (p *Peer) stopConnecting(context.Context) {}
 
 // Close closes the peer without removing what is stored of it: it stops
 // observing, aborts its work, closes each of its sessions gracefully

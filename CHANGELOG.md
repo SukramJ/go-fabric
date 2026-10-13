@@ -180,6 +180,22 @@ pseudo-version of `main`.
   reported parameters, saves its descriptor once per burst of changes,
   and offers `Descriptor`, `Sessions`, `HasSession`, `NewestSession`,
   `SessionParameters`, `Disconnect`, `Close` and `Delete`.
+- `peer.Peer.Connect`, `Kick` and `TimeOffline`, and the connection
+  process behind them (matter.js `PeerConnection`): one process per peer
+  that registers with the service status (resolving while the peer is
+  unreachable), follows the service's addresses — the most desirable
+  first, `DelayBeforeNextAddress` apart, earlier attempts kept — falls
+  back to the operational address while nothing is discovered (with the
+  long initial backoff when it is not the first address), retires a
+  fallback discovery has superseded after the stabilisation delay, keeps
+  the operational address as fallback when every discovered address
+  expires, runs CASE with unlimited first retransmissions, restarts an
+  attempt's exchange on a kick when that pays, and pauses after a failure
+  by matter.js's table (Busy delay with jitter, NoSharedTrustRoots clears
+  the resumption record and retries at once, peer error, transient,
+  unhandled; `peer.ErrorHandler` may replace a delay or end the process).
+  `Connect` shares the process, waits the connection timeout less the
+  time offline and ends in `peer.UnreachableError`.
 
 ### Changed
 

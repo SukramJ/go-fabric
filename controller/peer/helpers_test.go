@@ -6,6 +6,7 @@ package peer
 import (
 	"context"
 	"crypto/rand"
+	"log/slog"
 	"net"
 	"sort"
 	"sync"
@@ -223,6 +224,10 @@ type harness struct {
 	resume *MemoryResumptionStore
 	qname  string
 	hostQ  string
+
+	mu      sync.Mutex
+	seen    map[uint32]bool
+	counter uint32
 }
 
 const testNode uint64 = 0x1234
@@ -237,7 +242,7 @@ func newHarness(t *testing.T, edit func(*Context)) *harness {
 		t.Fatal(err)
 	}
 	h.mgr = mgr
-	h.names = discovery.NewNames(h.mdns, nil)
+	h.names = discovery.NewNames(h.mdns, slog.New(slog.DiscardHandler))
 	c := Context{
 		Exchanges:  mgr,
 		Names:      h.names,

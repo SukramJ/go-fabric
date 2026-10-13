@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4628,
+  "entry_points": 4645,
   "entry_packages": [
     ".",
     "bdx",
@@ -179,9 +179,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10696,
-    "reachable": 7510,
-    "whitelisted": 3181,
+    "total_exported": 10717,
+    "reachable": 7514,
+    "whitelisted": 3198,
     "unreachable": 5
   },
   "by_package": [
@@ -14648,6 +14648,83 @@
     },
     {
       "package": "controller/peer",
+      "identifier": "TestConnectDiscoveredAddress",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 59
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestConnectLiveThroughMulticast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/node_live_test.go",
+      "line": 23
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestConnectReuseSharedProcessAndTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 312
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestConnectToANodeThroughTheProcess",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/node_test.go",
+      "line": 157
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestConnectionErrorDelays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 189
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestDiscoverKick",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 403
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestEstablishmentUnresponsive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 436
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestFallbackOnlyAndNotFirst",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 91
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestFallbackRetiredAfterStabilization",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 121
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestHandleErrorOverrideAndFatal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 259
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestKickRestartsTheExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 355
+    },
+    {
+      "package": "controller/peer",
       "identifier": "TestMemoryResumptionStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/store_test.go",
@@ -14669,17 +14746,45 @@
     },
     {
       "package": "controller/peer",
+      "identifier": "TestNoSharedTrustRootsDeletesTheRecordAndRetries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 243
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestOperationalAddressStaysAsFallback",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 164
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityErrorDelays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 86
+    },
+    {
+      "package": "controller/peer",
       "identifier": "TestParityTimingDefaults",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
-      "line": 13
+      "line": 16
     },
     {
       "package": "controller/peer",
       "identifier": "TestParityTimingMerge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
-      "line": 48
+      "line": 51
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityUnresponsiveDetector",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 125
     },
     {
       "package": "controller/peer",
@@ -14708,6 +14813,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/store_test.go",
       "line": 72
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestTwoAddressesStaggered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 145
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestUnhandledErrorAndDisconnectedSet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/connection_test.go",
+      "line": 292
     },
     {
       "package": "device",
