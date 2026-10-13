@@ -279,7 +279,7 @@ the same `ColorTemperatureWriter` as before.
   and closes a TCP connection when its last session goes — by
   CloseSession, fabric removal, NOC rotation or the idle reaper — as
   matter.js's `#closeTcpChannelIfLastSession` does
-  (`ExchangeManager.ts:674-681`). Before, such a connection stayed open
+  (`ExchangeManager.ts:669-676`). Before, such a connection stayed open
   until the peer closed it. An inbound or outbound CloseSession closes the
   connection without the hook. A host that wires the registry itself
   should add the call.
@@ -314,7 +314,7 @@ the same `ColorTemperatureWriter` as before.
 - `endpoint.Spec.ClientClusters`: the client clusters an endpoint declares,
   served as its Descriptor ClientList (bridged endpoints and parts), as
   matter.js `MutableEndpoint.ts:53-61` registers a type's mandatory client
-  clusters and `DescriptorServer.ts:290-296` lists them. Unset, the
+  clusters and `DescriptorServer.ts:284-290` lists them. Unset, the
   ClientList stays empty as before.
 - `node/`: the node facade (ADR 0018 decision 5), mirroring matter.js
   `ServerNode` / `Node`. `node.Config` groups the configuration by
@@ -352,7 +352,7 @@ the same `ColorTemperatureWriter` as before.
 - Session establishment over TCP: a PASE or CASE message that arrives on a
   TCP connection is served on it, as matter.js creates the unsecured
   session from whichever channel carried the message
-  (`ExchangeManager.ts:242-265`); replies go back on the connection without
+  (`ExchangeManager.ts:241-264`); replies go back on the connection without
   MRP. Reply chunking is route-aware: over a reliable connection the
   ReportData and InvokeResponse chunkers fill the connection's frame,
   bounded by the peer's stated MaxTcpMessageSize
@@ -381,7 +381,7 @@ the same `ColorTemperatureWriter` as before.
   handshakes exchange, tags 1–9 as matter.js `PaseMessages.ts:28-58`
   declares them, including SupportedTransports (tag 8) and
   MaxTCPMessageSize (tag 9, written only when the bitmap names TCP) with
-  the Matter 1.5 gate on a peer's TCP bits (`SessionParameters.ts:49-63`).
+  the Matter 1.5 gate on a peer's TCP bits (`SessionParameters.ts:50-62`).
   `sigma.SessionParameters` is this type; Sigma1/Sigma2/Sigma2_Resume carry
   the two new fields. `bridge.SessionParametersFor` states the node's
   transports for a host that listens on TCP; `operational.Entry` keeps the
@@ -817,7 +817,7 @@ the same `ColorTemperatureWriter` as before.
   matter.js reports each behavior's change through its own Datasource.
 - `cluster/spec` decides a revision condition ("Rev >= vN") against the
   definition's own revision instead of leaving it conditional, as matter.js's
-  runtime conformance compiler does (`conformance-compiler.ts:252-256`): an
+  runtime conformance compiler does (`conformance-compiler.ts:250-254`): an
   element "Rev >= vN" or "Rev >= vN, O" is served by default at or above
   revision N, and refused when declared below it. `spec.Context` returns a
   `spec.RevisionContext`; a `FeatureContext` without a revision keeps the
@@ -834,7 +834,7 @@ the same `ColorTemperatureWriter` as before.
   they run without MRP and carry the connection's message size, and
   `ConnectOtaProvider` (and subscription re-establishment) reuse a live
   session bound to a TCP connection as they reuse one on UDP (matter.js
-  `Peer.ts:439-459`).
+  `Peer.ts:418-438`).
 
 - The operational DNS-SD record carries the `T` key only when a TCP mode
   is advertised (`T=2`, `4` or `6`); with TCP off the key is absent instead
@@ -1217,7 +1217,7 @@ left to keep.
   exchange, without a CloseSession to a peer that is gone, so the next
   connect runs a fresh CASE. `operational.Manager.ClosePeerLost` is the
   new primitive; `Entry.CreatedAt` bounds the sweep. Mirrors matter.js
-  `MessageExchange.ts:620` → `ExchangeManager.ts:561-585` →
+  `MessageExchange.ts:620` → `ExchangeManager.ts:556-580` →
   `SessionManager.ts:677-695`. A subscription report that runs out of
   retransmissions still closes only the subscription, as before.
 - **Harness: the OTA provider's store is removed after the provider is
@@ -2626,7 +2626,7 @@ consumer of an older pseudo-version should read.
   exchange.** Attribute reports had moved to a bridge-initiated exchange for
   exactly this failure; event reports still went out with `Initiator=false`
   on the peer's Subscribe exchange, which a matter.js controller acks and
-  discards (`ExchangeManager.ts:441-452`). Reproduced live with chip-tool.
+  discards (`ExchangeManager.ts:411-418`). Reproduced live with chip-tool.
   Event reports now take the same bridge-initiated path.
 - **A Sigma1 addressed at a fabric this node does not hold is refused with
   NoSharedTrustRoots** before any key material is generated
@@ -2715,7 +2715,7 @@ consumer of an older pseudo-version should read.
   `channel.PrivacyKeystream` now yields as many blocks as the region needs.
   Alongside it, a unicast frame carrying the P bit is dropped rather than
   unmasked — privacy enhancements are defined for group messages, and
-  matter.js (`ExchangeManager.ts:230-235`) and the chip SDK both drop the
+  matter.js (`ExchangeManager.ts:220-224`) and the chip SDK both drop the
   unicast case.
 - **The AEAD nonce used a Security Flags byte rebuilt from typed fields.**
   Reserved bits 4-2 of a received frame were dropped on decode and read back
@@ -2725,7 +2725,7 @@ consumer of an older pseudo-version should read.
   received for a decoded header.
 - **The nonce node id came from the header's Source Node ID when present,
   not from the session.** matter.js and chip build the nonce from the peer id
-  the session was established with (`NodeSession.ts:203`); reading it off the
+  the session was established with (`NodeSession.ts:187`); reading it off the
   header made a mismatched label fail the tag and a matching one partly
   sender-chosen. `Session.Decrypt` uses the session's peer id unconditionally.
 - **PASE session parameters decoded the two retransmit timeouts into 16
