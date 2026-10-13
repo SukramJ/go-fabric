@@ -49,7 +49,7 @@ func deviceTypeRevision(id uint32) uint16 {
 }
 
 // RootClusters is endpoint 0's server set: matter.js's root endpoint
-// composition (ServerNode.ts:264-298) as the reference daemon builds it
+// composition (ServerNode.ts:274-309) as the reference daemon builds it
 // (examples/reference-bridge/wiring.go:93-299, buildRootClusters, and
 // root_optional.go). The fields are the servers a host may need a hook
 // on; [RootClusters.Servers] is the mounted set in mount order.

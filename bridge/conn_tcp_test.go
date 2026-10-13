@@ -214,7 +214,7 @@ func TestTCPRequestRepliedOnSameConnWithoutMRP(t *testing.T) {
 
 // TestTCPConnectionDropEvictsBoundSessions: when the connection closes,
 // every session bound to it is closed without a farewell, as matter.js
-// ExchangeManager.ts:650-665 #onConnectionDisconnect does.
+// ExchangeManager.ts:655-670 #onConnectionDisconnect does.
 func TestTCPConnectionDropEvictsBoundSessions(t *testing.T) {
 	h := newTCPHarness(t)
 	conn, replies := h.dial()
@@ -250,8 +250,8 @@ func TestTCPConnectionDropEvictsBoundSessions(t *testing.T) {
 // TestTCPConnClosedWhenLastSessionGoes: a connection whose sessions all
 // closed the other way round — here through the registry's close hook,
 // as the reaper or a fabric removal closes them — is closed when its
-// last session goes, and not before (matter.js ExchangeManager.ts:669-676
-// #closeTcpChannelIfLastSession, scheduled from :691-708).
+// last session goes, and not before (matter.js ExchangeManager.ts:674-681
+// #closeTcpChannelIfLastSession, scheduled from :696-713).
 func TestTCPConnClosedWhenLastSessionGoes(t *testing.T) {
 	h := newTCPHarness(t)
 	conn, replies := h.dial()
@@ -395,7 +395,7 @@ func (f *fakeConn) Reliable() bool   { return true }
 
 // TestReceiveOverReliableServesUnsecuredDropsGroup: an unsecured
 // (handshake) message over TCP reaches the dispatcher like one over UDP
-// (matter.js ExchangeManager.ts:241-264 creates the unsecured session from
+// (matter.js ExchangeManager.ts:242-265 creates the unsecured session from
 // whichever channel carried the message; ADR 0019), while group messages
 // stay UDP multicast only.
 func TestReceiveOverReliableServesUnsecuredDropsGroup(t *testing.T) {
@@ -471,7 +471,7 @@ func TestBindSessionRouteNeverSwitchesTransport(t *testing.T) {
 
 // TestUnsolicitedReportOverTCPHasNoMRP: an ongoing report routed to a
 // TCP-bound session is sent on the connection without the R flag and is
-// not tracked for retransmission (MessageExchange.ts:660, :752).
+// not tracked for retransmission (MessageExchange.ts:665, :757).
 func TestUnsolicitedReportOverTCPHasNoMRP(t *testing.T) {
 	h := newTCPHarness(t)
 	c := &fakeConn{}

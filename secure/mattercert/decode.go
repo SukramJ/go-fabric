@@ -63,6 +63,14 @@ var (
 	// ErrMalformed is returned when the TLV structure violates the
 	// Matter §6.5 cert schema (missing mandatory fields, wrong types).
 	ErrMalformed = errors.New("mattercert: malformed certificate")
+	// ErrNonOperationalNodeID is returned, alongside [ErrMalformed], when a
+	// NOC's matter-node-id lies outside the operational node ID range
+	// 0x0000_0000_0000_0001 .. 0xFFFF_FFEF_FFFF_FFFF. AddNOC and UpdateNOC
+	// answer it with NOCResponse InvalidNodeOpId instead of InvalidNOC.
+	// Mirrors matter.js 0ceb202d
+	// packages/protocol/src/certificate/kinds/Noc.ts:20 (OperationalNodeIdError
+	// extends CertificateError) thrown at :83-85.
+	ErrNonOperationalNodeID = errors.New("mattercert: NOC node id is not an operational node id")
 	// ErrUnsupportedAlgorithm is returned for non-ECDSA signatures or
 	// non-P-256 keys.
 	ErrUnsupportedAlgorithm = errors.New("mattercert: unsupported algorithm")

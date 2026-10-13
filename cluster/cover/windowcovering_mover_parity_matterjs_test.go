@@ -88,7 +88,7 @@ func readU16(t *testing.T, srv *cover.WindowCoveringServer, attrID uint32) uint1
 // TestMoverGetsOneGoToPerCommand: each moving command is one GoTo with the
 // target the server inferred — UpOrOpen 0, DownOrClose 10000,
 // GoToLiftPercentage the value (matter.js WindowCoveringServer.ts:518-530,
-// :542-554, :576-584 at 4633bfd7) — the target attribute holds it, and the
+// :542-554, :576-584 at 0ceb202d) — the target attribute holds it, and the
 // server does not move the lift itself (handleMovement is the host's,
 // :328, :338).
 func TestMoverGetsOneGoToPerCommand(t *testing.T) {
@@ -126,7 +126,7 @@ func TestMoverGetsOneGoToPerCommand(t *testing.T) {
 
 // TestMoverStopSetsTargetToCurrent: StopMotion calls Stop, and the target
 // follows the current position (matter.js handleStopMovement,
-// WindowCoveringServer.ts:491-493 at 4633bfd7).
+// WindowCoveringServer.ts:491-493 at 0ceb202d).
 func TestMoverStopSetsTargetToCurrent(t *testing.T) {
 	t.Parallel()
 	m := &recordingMover{}

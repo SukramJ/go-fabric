@@ -295,11 +295,11 @@ func TestRemoveFabricDropsSession(t *testing.T) {
 // TestRemoveFabricClosesSessionsWithCloseSession: RemoveFabric tells every
 // other session of the fabric with a CloseSession before the NOCResponse,
 // and closes the session that carried it after the response without one —
-// matter.js Fabric.leave (Fabric.ts:418-427): the other sessions close at
-// once and their close sends CloseSession (NodeSession.ts:359-368,
-// ExchangeManager.ts:688, :711-721); the invoking session's close waits for
+// matter.js Fabric.leave (Fabric.ts:423-432): the other sessions close at
+// once and their close sends CloseSession (NodeSession.ts:384-393,
+// ExchangeManager.ts:693, :716-726); the invoking session's close waits for
 // its exchange and is then a force close, which sends nothing
-// (NodeSession.ts:312-327, Fabric.ts:456-460). The fabric and its ACL are
+// (NodeSession.ts:337-352, Fabric.ts:461-465). The fabric and its ACL are
 // gone afterwards, as before.
 func TestRemoveFabricClosesSessionsWithCloseSession(t *testing.T) {
 	t.Parallel()

@@ -6,8 +6,8 @@
 // host adds its bridged endpoints to (ADR 0018 decision 5).
 //
 // It mirrors matter.js ServerNode (packages/node/src/node/ServerNode.ts:
-// 106-126 create, :264-298 the root endpoint composition) and Node
-// (Node.ts:113-131 start, :178-181 run, :188 stop): a node is configured
+// 107-127 create, :274-309 the root endpoint composition) and Node
+// (Node.ts:114-132 start, :183-186 run, :193 stop): a node is configured
 // by behaviour ids — `network`, `commissioning`, `productDescription`,
 // `basicInformation` — and its root carries the system servers without
 // the host composing them.

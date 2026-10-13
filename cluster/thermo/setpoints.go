@@ -3,7 +3,11 @@
 
 package thermo
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
 
 // setpointState is the part of the Thermostat state the setpoint and
 // setpoint-limit writes reconcile: a value copy, so a write is tried on a
@@ -166,46 +170,129 @@ func (st *setpointState) assertSetpointWithinLimits(heat bool, v int) error {
 	return nil
 }
 
-// valid is matter.js #setpointsValid.
-func (st *setpointState) valid() bool {
+// changedKeys is the reconcile's "changed" set: the state keys whose
+// value the reconcile preserves, moving the others (matter.js passes a
+// Set<string> of state property names).
+type changedKeys []string
+
+func (c changedKeys) has(keys ...string) bool {
+	for _, k := range keys {
+		if slices.Contains(c, k) {
+			return true
+		}
+	}
+	return false
+}
+
+// violation describes the first violated setpoint invariant, "" when all
+// hold. Mirrors matter.js 0ceb202d packages/node/src/behaviors/thermostat/
+// ThermostatServer.ts:941-986 (#setpointViolation, chip
+// Setpoints::Valid()): per served mode, ordered absolute limits, user
+// limits ordered and nested in them, the occupied setpoint within the user
+// limits; with AUTO, the deadband between the max limits, the min limits
+// and the occupied setpoints. The texts are matter.js's.
+func (st *setpointState) violation() string {
 	for _, heat := range []bool{true, false} {
 		if (heat && !st.heat) || (!heat && !st.cool) {
 			continue
 		}
-		absMin, absMax := st.absMinCool, st.absMaxCool
-		occ := st.occupCool
+		scope, absMin, absMax := "Cool", st.absMinCool, st.absMaxCool
+		key, occ := spOccupiedCooling, st.occupCool
 		if heat {
-			absMin, absMax, occ = st.absMinHeat, st.absMaxHeat, st.occupHeat
+			scope, absMin, absMax = "Heat", st.absMinHeat, st.absMaxHeat
+			key, occ = spOccupiedHeating, st.occupHeat
 		}
 		if absMin > absMax {
-			return false
+			return fmt.Sprintf("absMin%sSetpointLimit (%d) is above absMax%sSetpointLimit (%d)", scope, absMin, scope, absMax)
 		}
 		minV, maxV := st.userLimits(heat)
 		if minV > maxV || minV < absMin || maxV > absMax {
-			return false
+			return fmt.Sprintf("%s setpoint limits [%d, %d] are not ordered within absolute limits [%d, %d]", scope, minV, maxV, absMin, absMax)
 		}
 		if occ < minV || occ > maxV {
-			return false
+			return fmt.Sprintf("%s (%d) is outside %s setpoint limits [%d, %d]", key, occ, scope, minV, maxV)
 		}
 	}
 	if st.auto {
-		if st.maxCool-st.maxHeat < st.deadband || st.minCool-st.minHeat < st.deadband {
-			return false
+		if st.maxCool-st.maxHeat < st.deadband {
+			return fmt.Sprintf("maxCoolSetpointLimit (%d) - maxHeatSetpointLimit (%d) is below the deadband (%d)", st.maxCool, st.maxHeat, st.deadband)
+		}
+		if st.minCool-st.minHeat < st.deadband {
+			return fmt.Sprintf("minCoolSetpointLimit (%d) - minHeatSetpointLimit (%d) is below the deadband (%d)", st.minCool, st.minHeat, st.deadband)
 		}
 		if st.occupCool-st.occupHeat < st.deadband {
-			return false
+			return fmt.Sprintf("occupiedCoolingSetpoint (%d) - occupiedHeatingSetpoint (%d) is below the deadband (%d)", st.occupCool, st.occupHeat, st.deadband)
 		}
 	}
-	return true
+	return ""
 }
 
 // reconcile is matter.js #reconcileSetpoints: repair what a write left
 // inconsistent by moving the values the write did not touch, and refuse
 // with ConstraintError when no repair fits.
 func (st *setpointState) reconcile(changed string) error {
-	if st.valid() {
+	violation := st.violation()
+	if violation == "" {
 		return nil
 	}
+	st.fixSetpoints(changedKeys{changed})
+	if remaining := st.violation(); remaining != "" {
+		return thermoConstraintErr{fmt.Sprintf("thermostat: setpoints could not be reconciled within the configured limits: %s; after adjusting, %s", violation, remaining)}
+	}
+	return nil
+}
+
+// reconcileInitial repairs a configuration that violates the setpoint
+// invariants, preferring the heating side (the cooling side without HEAT):
+// the kept side's user limits and occupied setpoint and
+// MinCoolSetpointLimit are the "changed" set, so the other side moves
+// first. It returns the violation found ("" when the configuration was
+// valid) and the adjustments as "key before -> after"; an error when a
+// violation remains. Mirrors matter.js 0ceb202d packages/node/src/
+// behaviors/thermostat/ThermostatServer.ts:1015-1042
+// (#reconcileInitialSetpoints; the unoccupied setpoint of its set is not
+// served here).
+func (st *setpointState) reconcileInitial() (violation string, adjusted []string, err error) {
+	violation = st.violation()
+	if violation == "" {
+		return "", nil, nil
+	}
+	before := *st
+	kept := "Heat"
+	occupied := spOccupiedHeating
+	if !st.heat {
+		kept, occupied = "Cool", spOccupiedCooling
+	}
+	st.fixSetpoints(changedKeys{"min" + kept + "SetpointLimit", "max" + kept + "SetpointLimit", occupied, spMinCoolLimit})
+	if remaining := st.violation(); remaining != "" {
+		return violation, nil, fmt.Errorf("%w: %s; after adjusting, %s", ErrSetpoints, violation, remaining)
+	}
+	for _, c := range []struct {
+		key     string
+		was, is int
+	}{
+		{spMinHeatLimit, before.minHeat, st.minHeat},
+		{spMaxHeatLimit, before.maxHeat, st.maxHeat},
+		{spMinCoolLimit, before.minCool, st.minCool},
+		{spMaxCoolLimit, before.maxCool, st.maxCool},
+		{spOccupiedHeating, before.occupHeat, st.occupHeat},
+		{spOccupiedCooling, before.occupCool, st.occupCool},
+	} {
+		if c.was != c.is {
+			adjusted = append(adjusted, fmt.Sprintf("%s %d -> %d", c.key, c.was, c.is))
+		}
+	}
+	return violation, adjusted, nil
+}
+
+// adjustedText joins reconcileInitial's adjustments as matter.js's warning
+// does.
+func adjustedText(adjusted []string) string { return strings.Join(adjusted, ", ") }
+
+// fixSetpoints is matter.js #fixSetpoints (ThermostatServer.ts:1058-1073):
+// user limits, then the AUTO limit deadband (max, then min), then the
+// setpoint range.
+func (st *setpointState) fixSetpoints(changed changedKeys) {
 	if st.heat {
 		st.fixUserLimits(true, changed)
 	}
@@ -217,14 +304,10 @@ func (st *setpointState) reconcile(changed string) error {
 		st.fixLimitDeadband(false, changed)
 	}
 	st.fixSetpointRange(changed)
-	if !st.valid() {
-		return thermoConstraintErr{"thermostat: setpoints could not be reconciled within the configured limits"}
-	}
-	return nil
 }
 
 // fixUserLimits is matter.js #fixUserLimits (chip FixUserLimits).
-func (st *setpointState) fixUserLimits(heat bool, changed string) {
+func (st *setpointState) fixUserLimits(heat bool, changed changedKeys) {
 	absMin, absMax := st.absMinCool, st.absMaxCool
 	minP, maxP := &st.minCool, &st.maxCool
 	minKey, maxKey := spMinCoolLimit, spMaxCoolLimit
@@ -243,10 +326,10 @@ func (st *setpointState) fixUserLimits(heat bool, changed string) {
 		*maxP = absMax
 	}
 	if *minP > *maxP {
-		switch changed {
-		case minKey:
+		switch {
+		case changed.has(minKey):
 			*maxP = *minP
-		case maxKey:
+		case changed.has(maxKey):
 			*minP = *maxP
 		}
 	}
@@ -254,7 +337,7 @@ func (st *setpointState) fixUserLimits(heat bool, changed string) {
 
 // fixLimitDeadband is matter.js #fixLimitDeadband (chip
 // FixUserLimitDeadband) for the max (upper=true) or min limit pair.
-func (st *setpointState) fixLimitDeadband(upper bool, changed string) {
+func (st *setpointState) fixLimitDeadband(upper bool, changed changedKeys) {
 	heatP, coolP := &st.minHeat, &st.minCool
 	if upper {
 		heatP, coolP = &st.maxHeat, &st.maxCool
@@ -263,8 +346,8 @@ func (st *setpointState) fixLimitDeadband(upper bool, changed string) {
 	if *coolP-*heatP >= dead {
 		return
 	}
-	switch changed {
-	case spMinHeatLimit, spMaxHeatLimit:
+	switch {
+	case changed.has(spMinHeatLimit, spMaxHeatLimit):
 		newCool := *heatP + dead
 		if newCool >= st.absMinCool && newCool <= st.absMaxCool {
 			*coolP = newCool
@@ -276,7 +359,7 @@ func (st *setpointState) fixLimitDeadband(upper bool, changed string) {
 			*coolP = pinned
 			*heatP = pinned - dead
 		}
-	case spMinCoolLimit, spMaxCoolLimit:
+	case changed.has(spMinCoolLimit, spMaxCoolLimit):
 		newHeat := *coolP - dead
 		if newHeat >= st.absMinHeat && newHeat <= st.absMaxHeat {
 			*heatP = newHeat
@@ -293,7 +376,7 @@ func (st *setpointState) fixLimitDeadband(upper bool, changed string) {
 
 // fixSetpointRange is matter.js #fixSetpointRange (chip FixRange) for the
 // occupied setpoints.
-func (st *setpointState) fixSetpointRange(changed string) {
+func (st *setpointState) fixSetpointRange(changed changedKeys) {
 	if st.heat {
 		st.occupHeat = min(max(st.occupHeat, st.minHeat), st.maxHeat)
 	}
@@ -304,8 +387,8 @@ func (st *setpointState) fixSetpointRange(changed string) {
 		return
 	}
 	dead := st.deadband
-	switch changed {
-	case spOccupiedHeating, spMinHeatLimit, spMaxHeatLimit:
+	switch {
+	case changed.has(spOccupiedHeating, spMinHeatLimit, spMaxHeatLimit):
 		newCool := st.occupHeat + dead
 		if newCool >= st.minCool && newCool <= st.maxCool {
 			st.occupCool = newCool
@@ -313,7 +396,7 @@ func (st *setpointState) fixSetpointRange(changed string) {
 			st.occupCool = st.maxCool
 			st.occupHeat = st.maxCool - dead
 		}
-	case spOccupiedCooling, spMinCoolLimit, spMaxCoolLimit:
+	case changed.has(spOccupiedCooling, spMinCoolLimit, spMaxCoolLimit):
 		newHeat := st.occupCool - dead
 		if newHeat >= st.minHeat && newHeat <= st.maxHeat {
 			st.occupHeat = newHeat

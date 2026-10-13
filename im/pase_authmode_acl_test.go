@@ -56,7 +56,7 @@ func caseFabricCtx(fabricIndex uint8) context.Context {
 // the implicit Administer grant is keyed on the session's auth mode, not on
 // the fabric: FabricAccessControl.ts:189-191
 // (`subjectDesc.authMode === Pase && subjectDesc.isCommissioning`), while
-// OperationalCredentialsServer.ts:266-270 associates the new fabric with the
+// OperationalCredentialsServer.ts:279-283 associates the new fabric with the
 // very same PASE session.
 func TestPASEAdoptedSessionKeepsAdministerOnRead(t *testing.T) {
 	d := &paseAdoptedACLDispatcher{fakeDispatcher{readVal: AttributeValue{Value: true}, readStat: StatusSuccess}}

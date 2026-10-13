@@ -18,7 +18,7 @@ const (
 	AggregatorRevision uint16 = 2
 )
 
-// AggregatorType is the Aggregator device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// AggregatorType is the Aggregator device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/endpoints/aggregator.ts.
 var AggregatorType = Type{
 	ID: AggregatorID, Name: "Aggregator", Revision: AggregatorRevision,

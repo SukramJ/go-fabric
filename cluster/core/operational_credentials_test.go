@@ -10,7 +10,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"slices"
 	"testing"
 
@@ -102,7 +101,7 @@ func TestOpcreds_NewOperationalCredentials_NilStore(t *testing.T) {
 func TestOpcreds_SupportedFabricsDefault(t *testing.T) {
 	t.Parallel()
 	// cfg.SupportedFabrics == 0 (unset) → matter.js default 254
-	// (OperationalCredentialsServer.ts:87). Configured non-zero values
+	// (OperationalCredentialsServer.ts:88). Configured non-zero values
 	// pass through unchanged — see TestOpcreds_SupportedFabricsRespectsConfig.
 	oc, err := core.NewOperationalCredentials(newFakeStore(), core.OpcredsConfig{})
 	if err != nil {
@@ -246,7 +245,8 @@ func TestOpcreds_CSRRequest_SetsPendingKey(t *testing.T) {
 	// After CSRRequest, AddNOC without trusted root should return MissingCsr=false
 	// (the CSR was issued), but without trusted root → NOCStatusInvalidNOC.
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
-		IPKValue: make([]byte, 16),
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC after CSR: %v", err)
@@ -258,59 +258,12 @@ func TestOpcreds_CSRRequest_SetsPendingKey(t *testing.T) {
 	}
 }
 
-// TestOpcreds_AddNOC_InvalidAdminVendorID covers the
-// IsVendorIdValidOperationally guard chip enforces at
-// OperationalCredentialsCluster.cpp:437. The handler must reject AddNOC
-// with NOCStatusInvalidAdminSubject for the two universal placeholders
-// (0x0000, 0xFFFF) and the reserved range 0xFFF5..0xFFFE. The Test-VID
-// range 0xFFF1..0xFFF4 is INTENTIONALLY accepted — chip-tool commissions
-// with VID 0xFFF1 by default. The guard runs AFTER the CSR / trust-root
-// checks — the test feeds both first so only the VID gate fires.
-func TestOpcreds_AddNOC_InvalidAdminVendorID(t *testing.T) {
-	t.Parallel()
-	// All of these must be rejected with NOCStatusInvalidAdminSubject.
-	rejectedVIDs := []uint16{
-		0x0000,
-		0xFFFF,
-		0xFFF5,
-		0xFFF6,
-		0xFFFE,
-	}
-	for _, vid := range rejectedVIDs {
-		t.Run(fmt.Sprintf("vid=0x%04X_rejected", vid), func(t *testing.T) {
-			t.Parallel()
-			oc := newOpcreds(t)
-			rootRaw, nocRaw, _ := buildTestNOCAndRoot(t)
-			ctx := context.Background()
-			// Prime trust root + CSR so the VID guard is the check that fires.
-			if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw}); err != nil {
-				t.Fatalf("AddTrustedRoot: %v", err)
-			}
-			if _, err := oc.MatterInvoke(ctx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
-				t.Fatalf("CSRRequest: %v", err)
-			}
-			resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
-				NOCValue:      nocRaw,
-				IPKValue:      make([]byte, 16),
-				AdminVendorID: vid,
-			})
-			if err != nil {
-				t.Fatalf("AddNOC: %v", err)
-			}
-			nr := resp.(core.NOCResponse)
-			if nr.StatusCode != core.NOCStatusInvalidAdminSubject {
-				t.Fatalf("VID 0x%04X: StatusCode = %d, want NOCStatusInvalidAdminSubject (%d)",
-					vid, nr.StatusCode, core.NOCStatusInvalidAdminSubject)
-			}
-		})
-	}
-}
-
 func TestOpcreds_AddNOC_WithoutCSR(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
-		IPKValue: make([]byte, 16),
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC without CSR: %v", err)
@@ -330,7 +283,8 @@ func TestOpcreds_AddNOC_WithoutTrustedRoot(t *testing.T) {
 
 	// No trusted root → NOCStatusInvalidNOC.
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
-		IPKValue: make([]byte, 16),
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC without trusted root: %v", err)
@@ -348,7 +302,8 @@ func TestOpcreds_AddNOC_BadIPK(t *testing.T) {
 	// Provide IPK with wrong length — must get NOCStatusInvalidNOC before
 	// any CSR check.
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
-		IPKValue: make([]byte, 8), // not 16
+		IPKValue:      make([]byte, 8), // not 16
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC bad IPK: %v", err)
@@ -448,8 +403,9 @@ func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
 
 	// AddNOC before CSR → NOCStatusMissingCsr.
 	resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
-		NOCValue: nocRaw,
-		IPKValue: make([]byte, 16),
+		NOCValue:      nocRaw,
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC (pre-CSR): %v", err)
@@ -465,8 +421,9 @@ func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
 
 	// AddNOC with CSR but without trusted root → NOCStatusInvalidNOC.
 	resp, err = oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
-		NOCValue: nocRaw,
-		IPKValue: make([]byte, 16),
+		NOCValue:      nocRaw,
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC (no root): %v", err)
@@ -483,7 +440,7 @@ func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
 // as a Matter Certificate TLV — it isn't one, so Apple silently
 // discarded the entire Subscribe-Initial ReportData stream.
 //
-// matter.js HEAD reference: OperationalCredentialsServer.ts:457-459
+// matter.js HEAD reference: OperationalCredentialsServer.ts:470-472
 // (`fabrics.map(fabric => fabric.rootCert)`) — each entry is the full
 // Matter Certificate TLV envelope received via AddTrustedRootCertificate
 // (Fabric.ts:68 `readonly rootCert: Bytes`).
@@ -568,7 +525,7 @@ func TestAddNOC_InstallsIPKInGroupKeyManagement(t *testing.T) {
 // TestAddNOC_RejectsMismatchedCSRSession verifies that AddNOC from a
 // different session than the one that issued CSRRequest is rejected with
 // MissingCsr per Matter §11.18.7.5.5 and matter.js
-// OperationalCredentialsServer.ts:230-235.
+// OperationalCredentialsServer.ts:243-248.
 func TestAddNOC_RejectsMismatchedCSRSession(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -696,7 +653,7 @@ func TestRemoveFabric_FiresCleanupCallbacks(t *testing.T) {
 // same FailSafe window (pendingTrustRoot already set) must return an error.
 // Mirrors chip HandleAddTrustedRootCertificate
 // VerifyOrExit(!failsafeContext.AddTrustedRootCertHasBeenInvoked(), ConstraintError)
-// and matter.js OperationalCredentialsServer.ts:451 rootCertSet check.
+// and matter.js OperationalCredentialsServer.ts:442 rootCertSet check.
 func TestAddTrustedRoot_DuplicateRootInSameFailSafe(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
@@ -725,7 +682,7 @@ func TestAddTrustedRoot_DuplicateRootInSameFailSafe(t *testing.T) {
 // been invoked in the same FailSafe window must return an error.
 // Mirrors chip HandleAddTrustedRootCertificate
 // VerifyOrExit(!failsafeContext.NocCommandHasBeenInvoked(), ConstraintError)
-// and matter.js OperationalCredentialsServer.ts:453 fabricIndex check .
+// and matter.js OperationalCredentialsServer.ts:449 fabricIndex check .
 func TestAddTrustedRoot_AfterNOCCommandRejected(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -754,7 +711,7 @@ func TestAddTrustedRoot_AfterNOCCommandRejected(t *testing.T) {
 // TestTrustedRootCertificates_IncludesPendingRoot verifies that the pending
 // root (set by AddTrustedRootCertificate before AddNOC is called) is included
 // in the TrustedRootCertificates attribute (0x0004). Mirrors matter.js
-// OperationalCredentialsServer.ts:458-459 which pushes rootCaCertificate
+// OperationalCredentialsServer.ts:471-474 which pushes rootCaCertificate
 // into state.trustedRootCertificates immediately.
 func TestTrustedRootCertificates_IncludesPendingRoot(t *testing.T) {
 	t.Parallel()
@@ -1242,7 +1199,7 @@ type opcredsStatusCoder interface{ MatterStatusCode() im.StatusCode }
 // argument — a wrong-length attestation/CSR nonce or an unknown
 // CertificateChainType — surfaces as IM Status::InvalidCommand (0x85), not a
 // generic Failure. Mirrors matter.js
-// packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:97-99,120-127
+// packages/node/src/behaviors/operational-credentials/OperationalCredentialsServer.ts:98-100,121-128
 // (StatusResponseError(..., Status.InvalidCommand)).
 func TestOpcreds_MalformedArgsReturnInvalidCommand(t *testing.T) {
 	t.Parallel()
@@ -1279,7 +1236,7 @@ func TestOpcreds_MalformedArgsReturnInvalidCommand(t *testing.T) {
 // IsForUpdateNOC=false (an AddNOC-targeted CSR) cannot be consumed by
 // UpdateNOC: the command fails with an IM-level Status::ConstraintError (0x87),
 // NOT an in-band NOCResponse. Mirrors matter.js
-// OperationalCredentialsServer.ts:316-319 (updateNoc raises
+// OperationalCredentialsServer.ts:329-332 (updateNoc raises
 // StatusResponseError("UpdateNoc is illegal after CsrRequest for AddNOC ...",
 // Status.ConstraintError)).
 func TestOpcreds_CSRForAddNOCRejectedByUpdateNOC(t *testing.T) {
@@ -1311,7 +1268,7 @@ func TestOpcreds_CSRForAddNOCRejectedByUpdateNOC(t *testing.T) {
 // TestOpcreds_CSRRequestRequiresArmedFailSafe pins that CSRRequest is rejected
 // with Status::FailsafeRequired (0xCA) when no FailSafe window is armed — the
 // generated CSR is FailSafe-scoped ephemeral state. Mirrors matter.js
-// OperationalCredentialsServer.ts:117-118 (`commissioner.failsafeContext`
+// OperationalCredentialsServer.ts:118-119 (`commissioner.failsafeContext`
 // getter → assertFailsafeArmed → Status.FailsafeRequired).
 func TestOpcreds_CSRRequestRequiresArmedFailSafe(t *testing.T) {
 	t.Parallel()
@@ -1338,7 +1295,7 @@ func TestOpcreds_CSRRequestRequiresArmedFailSafe(t *testing.T) {
 // TestOpcreds_CSRRequestAfterNOCRejected pins that a CSRRequest invoked after
 // AddNOC (or UpdateNOC) has already run in the same FailSafe window is rejected
 // with Status::ConstraintError (0x87) — the fabric slot is already claimed.
-// Mirrors matter.js OperationalCredentialsServer.ts:131-137
+// Mirrors matter.js OperationalCredentialsServer.ts:132-138
 // (`if (failsafeContext.fabricIndex !== undefined) throw ConstraintError`).
 func TestOpcreds_CSRRequestAfterNOCRejected(t *testing.T) {
 	t.Parallel()

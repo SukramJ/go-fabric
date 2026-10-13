@@ -604,7 +604,7 @@ type Bridge struct {
 	// equivalent association on the session itself via its
 	// MessageChannel (packages/protocol/src/session/Session.ts,
 	// `get channel()`) and refreshes it from inbound traffic
-	// (ExchangeManager.ts:400-405).
+	// (ExchangeManager.ts:425-431).
 	// Entries are dropped on an inbound CloseSession and on every
 	// graceful close the operational manager notifies. Teardown paths
 	// that skip that notifier (fabric removal, NOC rotation, manager
@@ -1197,18 +1197,18 @@ type fabricSessionExceptCloser interface {
 // [SessionRegistry] that can close by fabric (the operational manager
 // does).
 //
-// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:418-427
-// `leave(currentExchange)` (OperationalCredentialsServer.ts:412
+// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:423-432
+// `leave(currentExchange)` (OperationalCredentialsServer.ts:425
 // `fabric.leave(this.context.exchange)`): each session of the fabric runs
 // `initiateClose` — a session without active exchanges closes at once and
-// its close emits gracefulClose (NodeSession.ts:359-368), which the
+// its close emits gracefulClose (NodeSession.ts:384-393), which the
 // ExchangeManager answers with a CloseSession on a fresh exchange
-// (ExchangeManager.ts:688, :711-721 #sendCloseSession); the session of the
+// (ExchangeManager.ts:693, :716-726 #sendCloseSession); the session of the
 // current exchange defers its close until that exchange ends
-// (NodeSession.ts:312-322, Session.ts:292-308). `delete` → `#closeSessions`
-// (Fabric.ts:435-460) then force-closes what is left with the current
+// (NodeSession.ts:337-347, Session.ts:292-308). `delete` → `#closeSessions`
+// (Fabric.ts:440-465) then force-closes what is left with the current
 // exchange: `NodeSession.initiateForceClose` marks the session peer-lost
-// (NodeSession.ts:324-327), so the deferred close of the invoking session
+// (NodeSession.ts:349-352), so the deferred close of the invoking session
 // emits no gracefulClose — it closes after its exchange without a
 // CloseSession.
 func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8) {
@@ -1237,14 +1237,14 @@ func (b *Bridge) EmitFabricRemovedContext(ctx context.Context, fabricIndex uint8
 // one session (operational.Manager.CloseFabricExcept); without one it
 // does nothing.
 //
-// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:403-410
-// `replaced(currentExchange)` (OperationalCredentialsServer.ts:360): each
+// Mirrors matter.js packages/protocol/src/fabric/Fabric.ts:408-415
+// `replaced(currentExchange)` (OperationalCredentialsServer.ts:373): each
 // session of the fabric runs `initiateClose`, whose close emits
-// gracefulClose and so a CloseSession (NodeSession.ts:359-368,
-// ExchangeManager.ts:688, :711-721), before `initiateForceClose`. The
+// gracefulClose and so a CloseSession (NodeSession.ts:384-393,
+// ExchangeManager.ts:693, :716-726), before `initiateForceClose`. The
 // invoking session is kept open here, where matter.js closes it after its
 // exchange without a CloseSession (the force close marks it peer-lost,
-// NodeSession.ts:324-327); keeping it is the existing rule of
+// NodeSession.ts:349-352); keeping it is the existing rule of
 // operational.Manager.CloseFabricExcept, which this does not change.
 func (b *Bridge) CloseFabricSessionsExcept(fabricIndex uint8, exceptSessionID uint16) {
 	b.mu.RLock()
@@ -1541,7 +1541,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	// CASE sessions and show the bridge unresponsive for minutes after
 	// a restart. Mirrors matter.js's shutdown ordering: sessions close
 	// gracefully (Session.ts:248 initiateClose → gracefulClose →
-	// ExchangeManager.ts:658 #sendCloseSession) before the transport
+	// ExchangeManager.ts:716-726 #sendCloseSession) before the transport
 	// is torn down (ServerNetworkRuntime.ts:410-447 stop()).
 	b.closeSecureSessionsForShutdown()
 	b.mu.Lock()

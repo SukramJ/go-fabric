@@ -97,7 +97,7 @@ type AckObligation struct {
 // every peer, so two concurrent controllers (or an old and a new CASE
 // session of the same controller) can carry the same 16-bit exchange ID
 // — matter.js treats an exchange whose session no longer matches as a
-// different exchange (ExchangeManager.ts:287 invalidates the lookup when
+// different exchange (ExchangeManager.ts:340 invalidates the lookup when
 // `exchange.session.id !== session.id`).
 //
 // Initiator is the same distinction matter.js encodes by ORing 0x10000

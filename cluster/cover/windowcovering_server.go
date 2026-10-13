@@ -63,7 +63,7 @@ var ErrMoverWithMoveStep = errors.New("windowcovering: Config.Mover and Config.M
 // Mover is the optional host port: the device that moves. It is the Go
 // form of a matter.js host overriding handleMovement / handleStopMovement
 // (packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338,
-// :487 at matter.js 4633bfd7; "do not invoke super.handleMovement()",
+// :487 at matter.js 0ceb202d; "do not invoke super.handleMovement()",
 // :328): the server validates the command, infers the target (UpOrOpen
 // open, DownOrClose closed, GoToLiftPercentage the percentage, :518-530,
 // :542-554, :576-592), stores the target attribute and calls the Mover —
@@ -360,7 +360,7 @@ func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, f
 // invokeMover is MatterInvoke with a [Mover]: the command is validated,
 // its target inferred (UpOrOpen 0, DownOrClose 10000, GoToLiftPercentage
 // the value — WindowCoveringServer.ts:518-530, :542-554, :576-584 at
-// matter.js 4633bfd7 — and StopMotion the current position, :491-493) and
+// matter.js 0ceb202d — and StopMotion the current position, :491-493) and
 // stored, and the Mover called: GoTo with the lift target, Stop for
 // StopMotion. The server neither moves the lift nor changes
 // OperationalStatus: both are the device's, reported through the inbound
@@ -443,7 +443,7 @@ func (s *WindowCoveringServer) SetCurrentPosition(lift, _ *uint16) {
 
 // SetOperationalStatus records the OperationalStatus bitmap the device
 // reports (global in bits 0-1, lift in bits 2-3, tilt in bits 4-5 —
-// window-covering-cluster.element.ts:128-131 at matter.js 4633bfd7),
+// window-covering-cluster.element.ts:128-131 at matter.js 0ceb202d),
 // stored without the [Mover] and reported through the change notifier.
 // Bits above the attribute's "max 63" (:55-56) are dropped and logged.
 func (s *WindowCoveringServer) SetOperationalStatus(status uint8) {

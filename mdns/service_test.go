@@ -596,7 +596,7 @@ func hasTXTKey(svc mdns.Service, key string) bool {
 // value collapses the controller's retry timer and the bridge ends
 // up as "Reachable: NO / Nodeid: (null)" in the Home App.
 //
-// Mirrors matter.js's NodeSession.ts:147 emission pattern.
+// Mirrors matter.js's NodeSession.ts:153 emission pattern.
 // The operational defaults are tighter than the commissionable defaults
 // — chip (Advertiser_ImplMinimalMdns.cpp) and matter.js
 // (MdnsBroadcaster.ts MATTER_OPERATION_*_DEFAULT) both emit
@@ -655,7 +655,7 @@ func TestBuildOperationalService_SII_SAI_RespectsCaller(t *testing.T) {
 
 // TestBuildCommissionableService_RotatingID_Emitted verifies that a
 // non-empty RotatingID is emitted as the `RI` TXT key.
-// Mirrors matter.js Scanner.ts:38 / chip Advertiser_ImplMinimalMdns.cpp:878-881
+// Mirrors matter.js Scanner.ts:47 / chip Advertiser_ImplMinimalMdns.cpp:878-881
 // — RI emitted only when the platform supplies it.
 func TestBuildCommissionableService_RotatingID_Emitted(t *testing.T) {
 	t.Parallel()

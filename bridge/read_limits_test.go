@@ -103,7 +103,7 @@ func TestSubscribeRequestAbovePathCeilingIsRejectedWithPathsExhausted(t *testing
 // peer never answers ends the interaction instead of releasing the
 // next chunk: matter.js's per-chunk waitForSuccess runs under the
 // exchange timeout and a missing answer throws PeerMessageMissingError
-// (MessageExchange.ts:829-858), abandoning the read. Falling through
+// (MessageExchange.ts:834-863), abandoning the read. Falling through
 // instead lets a silent peer hold one dispatch slot for every chunk of
 // the whole report.
 func TestReadChunkLoopAbortsWhenThePeerNeverAnswers(t *testing.T) {

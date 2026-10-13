@@ -181,8 +181,8 @@ func TestParityMatterJS_DoorLockLockStateMapping(t *testing.T) {
 }
 
 // TestParityMatterJS_DoorLockCommandDispatch verifies that MatterInvoke
-// routes LockDoor / UnlockDoor / UnboltDoor to the source and bumps
-// DataVersion.
+// routes LockDoor / UnlockDoor / UnboltDoor of a requester with a fabric
+// to the source and bumps DataVersion.
 func TestParityMatterJS_DoorLockCommandDispatch(t *testing.T) {
 	t.Parallel()
 
@@ -199,7 +199,7 @@ func TestParityMatterJS_DoorLockCommandDispatch(t *testing.T) {
 			srv := doorlockcluster.NewDoorLockServer(doorlockcluster.DoorLockConfig{Source: src})
 			dvBefore := srv.MatterDataVersion()
 
-			_, err := srv.MatterInvoke(context.Background(), cmdID, nil)
+			_, err := srv.MatterInvoke(im.WithFabricFilter(context.Background(), false, 1), cmdID, nil)
 			if err != nil {
 				t.Fatalf("MatterInvoke(0x%02X) error: %v", cmdID, err)
 			}

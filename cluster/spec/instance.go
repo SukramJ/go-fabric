@@ -464,18 +464,31 @@ func (i *Instance) EventPriority(eventID uint32) contract.EventPriority {
 }
 
 // EnumSupported reports whether v is a value of e the feature selection
-// allows: defined, and its conformance not disallowed (OperationModeEnum
-// Minimum needs SPD). It is the membership check matter.js's enum validator
-// makes against the conformant members (ValueValidator.createEnumValidator).
+// allows: defined, or inside one of e's ranges, and its conformance not
+// disallowed (OperationModeEnum Minimum needs SPD). It is the membership
+// check matter.js's enum validator makes against the conformant members
+// (ValueValidator.createEnumValidator).
 func (i *Instance) EnumSupported(e *Enum, v uint64) bool {
 	return EnumSupported(e, v, i.Context())
 }
 
 // EnumSupported is [Instance.EnumSupported] for a conformance context.
+//
+// Mirrors matter.js packages/node/src/behavior/state/validation/ValueValidator.ts:172-178
+// (createEnumValidator: a value is valid when it is a member's id or lies in
+// a range member's constraint) and conformance-compiler.ts:857-858
+// (addEnumMemberValidation: a member's id is looked up first, then the
+// range whose constraint holds the value, and that member's conformance
+// decides).
 func EnumSupported(e *Enum, v uint64, ctx FeatureContext) bool {
 	for vi := range e.Values {
 		if ev := &e.Values[vi]; ev.Value == v {
 			return ev.Conformance.Applicability(ctx) != ApplicabilityNone
+		}
+	}
+	for ri := range e.Ranges {
+		if r := &e.Ranges[ri]; r.Contains(v) {
+			return r.Conformance.Applicability(ctx) != ApplicabilityNone
 		}
 	}
 	return false

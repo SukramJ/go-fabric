@@ -26,7 +26,7 @@ const (
 	PumpRevision uint16 = 4
 )
 
-// PumpType is the Pump device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// PumpType is the Pump device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/pump.ts.
 var PumpType = Type{
 	ID: PumpID, Name: "Pump", Revision: PumpRevision,

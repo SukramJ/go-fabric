@@ -58,7 +58,7 @@ matter.js HEAD as checked out at `../matter.js`.
 | PASE (Spake2+) responder | `secure/spake2`, `commissioning/pase.go` | ✅ | — | |
 | CASE (Sigma1/2/3) responder + Sigma2Resume | `secure/sigma`, `store/resumption.go` | ✅ | — | Resumption is persisted and survives a restart. |
 | CASE initiator (`CaseClient`) | `secure/sigma.NewPeerInitiator`, `bridge/case_initiator.go` | ◐ | — | Only for re-establishing former subscriptions, as matter.js's server node uses it ([ADR 0008](./adr/0008-subscription-resumption.md)); offers resumption with a stored record. Not a controller role. |
-| Session parameters (Matter 1.3+ `TlvSessionParameters`, 1.5+ transports) | full structure on CASE and PASE (`secure/sessionparams`, tags 1–9; PBKDFParamResponse states the node's parameters as `PaseServer.ts:151`) | ✅ | — | Wave 5 (ADR 0019). The peer's TCP bits pass the Matter 1.5 gate (`SessionParameters.ts:50-54`); `operational.Entry` keeps them for the TCP sender. |
+| Session parameters (Matter 1.3+ `TlvSessionParameters`, 1.5+ transports) | full structure on CASE and PASE (`secure/sessionparams`, tags 1–9; PBKDFParamResponse states the node's parameters as `PaseServer.ts:151`) | ✅ | — | Wave 5 (ADR 0019). The peer's TCP bits pass the Matter 1.5 gate (`SessionParameters.ts:49-56`); `operational.Entry` keeps them for the TCP sender. |
 | DAC / PAI / PAA validation, Certification Declaration | `secure/attestation` | ✅ | — | |
 | Matter-TLV certificate codec | `secure/mattercert` | ✅ | — | |
 | Fabric management, NOC install, multi-fabric | `cluster/core/operational_credentials.go`, `store/fabric.go` | ✅ | — | Multiple ecosystems on one bridge is the normal case and is exercised in CI. |
@@ -143,7 +143,11 @@ measured gap and the four tranches are in
 Three of the ○ rows above are decisions, not backlog. Restating them so they
 are not re-opened by accident:
 
-1. **No controller / commissioner role.** `go-fabric` is a responder. It does
+1. **No controller / commissioner role** — *superseded by
+   [ADR 0020](./adr/0020-commissioner-and-controller-role.md) (proposed
+   2026-10-13): the role enters as `controller/`, a sibling of `bridge/`,
+   in six stages; the responder side is unchanged by it, and this item's
+   text stays as the history of the decision.* `go-fabric` is a responder. It does
    not discover, commission or drive other nodes. The one exception is
    bounded and on record: to re-establish its former subscriptions after a
    restart, the device resolves the controller that held them and opens a

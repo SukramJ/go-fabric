@@ -210,7 +210,7 @@ func TestNodeServesPASEReadAndSubscription(t *testing.T) {
 }
 
 // TestStartStopIdempotent: Start twice is one start (matter.js Node.start,
-// Node.ts:113-131), Stop twice one stop, and a stopped node does not
+// Node.ts:114-132), Stop twice one stop, and a stopped node does not
 // start again.
 func TestStartStopIdempotent(t *testing.T) {
 	t.Parallel()
@@ -241,7 +241,7 @@ func TestStopWithoutStart(t *testing.T) {
 }
 
 // TestRunStopsWithTheContext: Run starts the node and stops it when its
-// context ends (matter.js Node.run, Node.ts:178-181).
+// context ends (matter.js Node.run, Node.ts:183-186).
 func TestRunStopsWithTheContext(t *testing.T) {
 	t.Parallel()
 	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))

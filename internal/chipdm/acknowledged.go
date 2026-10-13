@@ -63,7 +63,10 @@ const (
 	fieldSelected = "matter.js keeps the field the conformance selects; CHIP names only the command"
 	modeStatus    = "matter.js names the status codes of the mode clusters ModeChangeStatus; CHIP types the field as the global status"
 	respMax       = "matter.js resolves the RESP_MAX constant the specification defines; CHIP keeps the name"
-	wncvTable     = "matter.js states the lift / tilt feature each covering type needs; the specification's enum table " +
+	elements      = "matter.js packages/model/src/standard/elements/"
+	enumRange     = "The specification reserves the manufacturer range of this enum; matter.js models it as a range " +
+		"member so a value in it validates (ValueValidator.ts:172-178), chip's XML lists only the named values"
+	wncvTable = "matter.js states the lift / tilt feature each covering type needs; the specification's enum table " +
 		"has no conformance column, so CHIP marks every value M"
 )
 
@@ -150,11 +153,6 @@ var Acknowledged = []Acknowledgement{
 		"\"[Low]\" names another enum value, which a value's conformance cannot be evaluated against", localOverride + "FanControl.ts", "",
 	},
 	{
-		ClassMatterJS, "IlluminanceMeasurement.LightSensorType", "type", "lightsensortypeenum", "uint8",
-		"The specification defines LightSensorTypeEnum but permits values outside it; uint8 is the same wire type",
-		localOverride + "IlluminanceMeasurementOverrides.ts", "",
-	},
-	{
 		ClassMatterJS, "JointFabricDatastore.DatastoreAccessControlEntryStruct.Subjects", "constraint", "maxsubjectsperaccesscontrolentry", "none",
 		"The bound is an attribute of another cluster (Access Control), which a constraint cannot reach", localOverride + "JointFabricDatastoreOverrides.ts", "",
 	},
@@ -227,6 +225,13 @@ var Acknowledged = []Acknowledgement{
 		ClassMatterJS, "WindowCovering.MovementStatus", "datatype", "absent", "present",
 		"The formal type of the OperationalStatus bit fields, which the specification describes in prose", localOverride + "WindowCoveringOverrides.ts", "",
 	},
+
+	// --- (i) matter.js models the specification's enum ranges --------------
+	{ClassMatterJS, "*.ModeTag.MfgTags", "field", "absent", "present", enumRange, elements + "mode-base.element.ts", ""},
+	{ClassMatterJS, "*.ErrorStateEnum.ManufacturerError", "field", "absent", "present", enumRange, elements + "operational-state.element.ts", ""},
+	{ClassMatterJS, "*.OperationalStateEnum.ManufacturerStates", "field", "absent", "present", enumRange, elements + "operational-state.element.ts", ""},
+	{ClassMatterJS, "ClosureControl.ClosureErrorEnum.ManufacturerError", "field", "absent", "present", enumRange, elements + "closure-control.element.ts", ""},
+	{ClassMatterJS, "IlluminanceMeasurement.LightSensorTypeEnum.Ms", "field", "absent", "present", enumRange, elements + "illuminance-measurement.element.ts", ""},
 
 	// --- (ii) CHIP is right, the snapshot is wrong --------------------------
 	{

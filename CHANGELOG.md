@@ -10,6 +10,69 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- The Matter data model snapshot (`parity/schema.json`) moves from
+  matter.js `85cf6647` (behaviour cited at the code pin `4633bfd7`) to
+  `0ceb202d`, and every matter.js line citation follows it. No cluster or
+  device-type revision moved.
+- Enum manufacturer ranges are accepted. The snapshot carries the reserved
+  ranges of Matter 1.6.1 as enum range members (`ModeTag` MfgTags
+  32768–49151 and `ModeChangeStatus` MfgCodes 128–191 in the ten mode
+  clusters, `OperationalStateEnum` ManufacturerStates and `ErrorStateEnum`
+  ManufacturerError 128–191 in OperationalState, RvcOperationalState and
+  OvenCavityOperationalState, `ClosureErrorEnum` ManufacturerError
+  128–191, `LightSensorTypeEnum` Ms 64–254). `spec.Enum` gains `Ranges`
+  (`spec.EnumRange`), and `spec.EnumSupported` and every write and host
+  setter that checks an enum value against the definition accept a value
+  inside a range, as matter.js validates it. A value past the range is
+  still CONSTRAINT_ERROR. A mode server's `ModeChanger` status is checked
+  against the derivation's ModeChangeStatus as the definition allows: 0x80–0xBF
+  (MfgCodes) still pass, 0xC0–0xFF now fail the invoke with
+  `ErrInvalidHostStatus` (they were accepted before).
+- `IlluminanceMeasurement.LightSensorType` is typed `LightSensorTypeEnum`
+  in the generated definition (it was `uint8`).
+- `mdns` caps the advertised session intervals as matter.js `0ceb202d`'s
+  `SessionIntervals.forAdvertisement` does: SII and SAI above one hour are
+  advertised as 3 600 000 ms, SAT above 65 535 ms as 65 535, each cap
+  logged as `matter.mdns.interval_capped`, on the operational and the
+  commissionable record; zero still means the default.
+
+### Fixed
+
+- AddNOC refuses a reserved AdminVendorId (0x0000, 0xFFF5..0xFFFF) with
+  the IM status InvalidCommand before every other check, the fail-safe
+  included, as matter.js `0ceb202d` and chip do; it used to answer a
+  NOCResponse InvalidAdminSubject after the CSR and trust-root checks. The
+  test vendor IDs 0xFFF1..0xFFF4 stay accepted.
+- AddNOC and UpdateNOC answer a NOC whose matter-node-id lies outside the
+  operational node ID range with NOCResponse InvalidNodeOpId instead of
+  InvalidNOC (`mattercert.ErrNonOperationalNodeID`, wrapped alongside
+  `ErrMalformed`).
+- DoorLock follows matter.js `0ceb202d`'s lock-operation rules:
+  UnboltDoor reports LockOperationType Unlock (was Unlatch); a lock
+  command without an accessing fabric (a PASE session before AddNOC) is
+  refused with UNSUPPORTED_ACCESS before the `StateSource` is called; with
+  OperatingMode NoRemoteLockUnlock every lock command emits
+  LockOperationError (OperationError Unspecified) and answers FAILURE; a
+  failing `LockInvoke` emits LockOperationError and answers the error's IM
+  status if it carries one, FAILURE otherwise (it used to return the
+  error unchanged with no event).
+- `core.NewDescriptor` lists a device type once, at the revision of its
+  first entry, as matter.js `0ceb202d`'s `addDeviceTypes` does: a bridged
+  endpoint whose host device type is BridgedNode no longer reports
+  BridgedNode twice in its DeviceTypeList.
+- `thermo.New` checks the configured setpoint limits and initial setpoints
+  against the setpoint rules, as matter.js `0ceb202d`'s
+  `#reconcileInitialSetpoints` does: a violation is repaired preferring the
+  heating side (an initial heating setpoint above its maximum is cropped,
+  the cooling setpoint and limits move to keep the AUTO deadband), logged
+  as `matter.thermostat.initial_setpoints_adjusted`, and a configuration
+  that cannot be repaired (unordered absolute limits, no room for the
+  deadband) is refused with the new `thermo.ErrSetpoints`;
+  `NewThermostatServer` panics on it. It used to be accepted unchecked,
+  and every later setpoint write then failed.
+
 ## [0.3.1] — 2026-10-13
 
 **What a host must do.** Nothing. Every change in this release is additive

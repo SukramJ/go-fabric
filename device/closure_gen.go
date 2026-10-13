@@ -19,7 +19,7 @@ const (
 	ClosureRevision uint16 = 1
 )
 
-// ClosureType is the Closure device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// ClosureType is the Closure device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/closure.ts.
 var ClosureType = Type{
 	ID: ClosureID, Name: "Closure", Revision: ClosureRevision,

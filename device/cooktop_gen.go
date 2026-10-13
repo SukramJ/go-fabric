@@ -18,7 +18,7 @@ const (
 	CooktopRevision uint16 = 1
 )
 
-// CooktopType is the Cooktop device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// CooktopType is the Cooktop device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/cooktop.ts.
 var CooktopType = Type{
 	ID: CooktopID, Name: "Cooktop", Revision: CooktopRevision,

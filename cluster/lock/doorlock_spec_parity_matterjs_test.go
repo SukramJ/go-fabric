@@ -38,7 +38,7 @@ func TestRequestsTakeTheGeneratedStructs(t *testing.T) {
 		lockdef.CmdUnlockDoor: lockdef.UnlockDoorRequest{},
 		lockdef.CmdUnboltDoor: lockdef.UnboltDoorRequest{},
 	} {
-		if _, err := srv.MatterInvoke(context.Background(), cmd, req); err != nil {
+		if _, err := srv.MatterInvoke(im.WithFabricFilter(context.Background(), false, 1), cmd, req); err != nil {
 			t.Errorf("command 0x%02X: %v", cmd, err)
 		}
 	}

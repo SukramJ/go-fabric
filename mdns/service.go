@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"runtime"
@@ -231,7 +232,7 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 	// retry budget; SII=0 / SAI=0 on the wire collapses to a default
 	// the controller cannot interpret and the bridge appears
 	// "Reachable: NO / Nodeid: (null)" in the iPhone Home app. Mirrors
-	// matter.js's per-session SII/SAI emission (NodeSession.ts:147
+	// matter.js's per-session SII/SAI emission (NodeSession.ts:153
 	// `Duration.format(this.idleInterval)`).
 	//
 	// The operational defaults differ from the commissionable defaults
@@ -249,6 +250,7 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 	if sai == 0 {
 		sai = defaultOperationalSAI
 	}
+	sii, sai, sat = capAdvertisedIntervals(sii, sai, sat)
 	txt := []TXTRecord{
 		{Key: "SII", Value: strconv.FormatUint(uint64(sii), 10)},
 		{Key: "SAI", Value: strconv.FormatUint(uint64(sai), 10)},
@@ -322,7 +324,7 @@ type CommissionableServiceConfig struct {
 	// §4.3.1.6 `RI` TXT key). When non-empty, emitted verbatim so
 	// controllers that use the rotating ID for "already added?"
 	// checks can correlate devices.
-	// matter.js CommissionableMdnsAdvertisement.ts (Scanner.ts:38
+	// matter.js CommissionableMdnsAdvertisement.ts (Scanner.ts:47
 	// `RI?: string`) and chip
 	// Advertiser_ImplMinimalMdns.cpp:878-881 both emit RI only when
 	// the platform supplies it; go-fabric does the same.
@@ -397,6 +399,41 @@ const defaultOperationalSAI uint32 = 300
 // read SAT to size their MRP retry budget.
 const defaultSessionActiveThreshold uint32 = 4000
 
+// Advertised interval bounds: SII and SAI at most one hour, SAT at most
+// 65535 ms. Mirrors matter.js 0ceb202d packages/protocol/src/session/
+// SessionIntervals.ts:57 (maxAdvertisedInterval = Hours.one) and :63
+// (maxActiveThreshold = Millis(65535)).
+const (
+	maxAdvertisedInterval uint32 = 3_600_000
+	maxActiveThreshold    uint32 = 65535
+)
+
+// capAdvertisedIntervals reduces SII, SAI and SAT above their bound to the
+// bound, logging matter.mdns.interval_capped once per capped value; a
+// value within its bound is kept. Mirrors matter.js 0ceb202d
+// packages/protocol/src/session/SessionIntervals.ts:69-91
+// (forAdvertisement: "Out-of-range values are reduced to the maximum
+// rather than rejected", each cap logged at :72-83), applied to every
+// advertisement by packages/protocol/src/advertisement/mdns/
+// MdnsAdvertisement.ts:51. matter.js logs the cap at info level; here it
+// is a warning, since it means a host configured an interval the record
+// cannot carry.
+func capAdvertisedIntervals(sii, sai, sat uint32) (cappedSII, cappedSAI, cappedSAT uint32) {
+	capped := func(key string, v, bound uint32) uint32 {
+		if v <= bound {
+			return v
+		}
+		slog.Default().Warn("matter.mdns.interval_capped",
+			slog.String("key", key),
+			slog.Uint64("configured_ms", uint64(v)),
+			slog.Uint64("advertised_ms", uint64(bound)))
+		return bound
+	}
+	return capped("SII", sii, maxAdvertisedInterval),
+		capped("SAI", sai, maxAdvertisedInterval),
+		capped("SAT", sat, maxActiveThreshold)
+}
+
 // BuildCommissionableService constructs the `_matterc._udp` record.
 // Subtypes:
 //   - `_L<long>`         long discriminator  (always)
@@ -424,6 +461,7 @@ func BuildCommissionableService(cfg CommissionableServiceConfig) Service {
 	if sat == 0 {
 		sat = defaultSessionActiveThreshold
 	}
+	sii, sai, sat = capAdvertisedIntervals(sii, sai, sat)
 
 	txt := []TXTRecord{
 		{Key: "D", Value: strconv.FormatUint(uint64(long), 10)},
@@ -463,7 +501,7 @@ func BuildCommissionableService(cfg CommissionableServiceConfig) Service {
 		txt = append(txt, TXTRecord{Key: "PI", Value: cfg.PairingInstruction})
 	}
 	// RI (Rotating Device Identifier) per Matter §4.3.1.6, matter.js
-	// Scanner.ts:38 `RI?: string` — emitted only when the platform
+	// Scanner.ts:47 `RI?: string` — emitted only when the platform
 	// supplies it. Absent on a non-RI bridge; present once a rotating
 	// ID generator is wired.
 	if cfg.RotatingID != "" {

@@ -22,7 +22,7 @@ const (
 	DimmableLightRevision uint16 = 4
 )
 
-// DimmableLightType is the DimmableLight device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// DimmableLightType is the DimmableLight device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/dimmable-light.ts.
 var DimmableLightType = Type{
 	ID: DimmableLightID, Name: "DimmableLight", Revision: DimmableLightRevision,

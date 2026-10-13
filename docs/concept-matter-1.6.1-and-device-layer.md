@@ -208,7 +208,7 @@ Abschluss: 101 Server; jeder Gerätetyp im Scope montierbar.
 höchstens drei Verbindungen je Peer-IP, 10 s bis zum ersten Byte),
 transportneutrale Verbindung in `bridge/` statt `*net.UDPAddr`, kein MRP
 über TCP, Sitzungs-Evakuierung bei Verbindungsabriss
-(`ExchangeManager.ts:628-655`), mDNS-`T`-Flag und TCP-Listener im
+(`ExchangeManager.ts:633-660`), mDNS-`T`-Flag und TCP-Listener im
 Referenz-Daemon; Sitzungsparameter `supportedTransports` (Tag 8) und
 `maxTcpMessageSize` (Tag 9) auf CASE und PASE, PASE auf
 `sigma.SessionParameters` vereinheitlicht, CASE/PASE auch über TCP
@@ -505,6 +505,10 @@ Entscheidung steht, und was es kosten würde, ihn später hereinzuholen.
 „Wizard“ heißt: am 2026-10-08 so festgelegt, bei Bedarf neu zu entscheiden.
 
 ### F.1 Rollen und Transport
+
+> Stand 2026-10-13: die ersten beiden Zeilen (Controller-/Commissioner-
+> Rolle, Minimal-Controller) sind durch [ADR 0020](./adr/0020-commissioner-and-controller-role.md)
+> (Konzept v2, Entscheidung 0.1) überholt; der Rest gilt.
 
 | Punkt | Warum draußen | Quelle | Weg herein |
 | --- | --- | --- | --- |

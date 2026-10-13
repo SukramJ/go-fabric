@@ -25,14 +25,14 @@ import (
 // Config is the node's configuration, code-first (ADR 0018 decision 5).
 // Its groups are the behaviour ids matter.js's ServerNode.Configuration
 // keys its options by — `network`, `commissioning`, `productDescription`,
-// `basicInformation` (packages/node/src/node/ServerNode.ts:106-126) — for
+// `basicInformation` (packages/node/src/node/ServerNode.ts:107-127) — for
 // the subset the reference daemon uses; the rest is what the daemon's
 // bring-up needs beyond them (examples/reference-bridge/main.go:84-497).
 type Config struct {
 	// Network mirrors matter.js `network` (NetworkServer.ts:202-222).
 	Network Network
 	// Commissioning mirrors matter.js `commissioning`
-	// (CommissioningServer.ts:370-380).
+	// (CommissioningServer.ts:400-410).
 	Commissioning Commissioning
 	// ProductDescription mirrors matter.js `productDescription`
 	// (ProductDescriptionServer.ts:70-90): the identity the commissionable
@@ -191,7 +191,7 @@ const setupPasscodeMax = 99999998
 
 // Fabric-table bounds: Matter §11.18.4.4 limits SupportedFabrics to 1..254
 // (matter.js: "FabricBuilder uses 254 as max",
-// OperationalCredentialsServer.ts:85); the facade's default is 5.
+// OperationalCredentialsServer.ts:86); the facade's default is 5.
 const (
 	maxSupportedFabrics     = 254
 	defaultSupportedFabrics = 5

@@ -459,7 +459,7 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 		// An error status or a missing answer aborts the Subscribe: the
 		// peer is not consuming the priming report, and matter.js's
 		// waitForSuccess throws in both cases (InteractionMessenger.ts:721,
-		// MessageExchange.ts:850-858).
+		// MessageExchange.ts:855-863).
 		if err := b.awaitChunkStatusResponse(waitCh, "subscribe", src, requestHdr.SessionID, proto.ExchangeID, !proto.Initiator, i, chunk); err != nil {
 			return err
 		}

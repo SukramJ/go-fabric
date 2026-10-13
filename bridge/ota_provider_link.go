@@ -32,7 +32,7 @@ import (
 // otaProviderConnectTimeout bounds reaching a provider: matter.js
 // PeerTimingParameters.defaultConnectionTimeout (packages/protocol/src/peer/
 // PeerTimingParameters.ts:188, Seconds(90)), which Peer.connect applies
-// when the caller names none (Peer.ts:446) — the requestor's
+// when the caller names none (Peer.ts:467) — the requestor's
 // `peers.forAddress` names none.
 const otaProviderConnectTimeout = 90 * time.Second
 
@@ -93,7 +93,7 @@ func (e *invokeStatusError) MatterStatusCode() im.StatusCode { return e.status.S
 
 // Invoke implements [core.OtaProviderSession]: one InvokeRequest on a new
 // exchange, the InvokeResponse awaited for as long as matter.js's exchange
-// waits for a peer's response (MessageExchange.ts:834-845,
+// waits for a peer's response (MessageExchange.ts:839-850,
 // calculateMaximumPeerResponseTime — [Bridge.chunkStatusResponseTimeout]).
 // A command answered with data returns its fields; one answered with
 // Success returns nil; any other status is an error carrying it.
@@ -203,7 +203,7 @@ type initiatedSecureExchange struct {
 	exchangeID uint16
 	// createdAt bounds the peer-loss sweep this exchange may trigger:
 	// a session the peer established after the exchange was opened is
-	// not what went unanswered (matter.js ExchangeManager.ts:549 takes
+	// not what went unanswered (matter.js ExchangeManager.ts:554 takes
 	// the context's creation time, SessionManager.ts:688 compares).
 	createdAt time.Time
 	in        chan bdx.Message
@@ -245,7 +245,7 @@ type peerLossCloser interface {
 // a session the peer no longer knows (a provider restarted under the same
 // node id answers nothing on the old keys). Mirrors matter.js
 // MessageExchange.ts:620 (retransmissions exhausted → context.peerLost) →
-// ExchangeManager.ts:556-580 (a commissioned peer: SessionManager.
+// ExchangeManager.ts:561-585 (a commissioned peer: SessionManager.
 // handlePeerLoss for the peer address, asOf the exchange context's
 // creation; otherwise the session alone) → SessionManager.ts:677-695.
 // An exhausted counter of a subscription report takes the same path
@@ -289,7 +289,7 @@ func (b *Bridge) reportPeerLoss(sessionID, exchangeID uint16, counter uint32) (t
 // closeLostPeer force-closes the sessions of the peer of sessionID that
 // were created before asOf — every one with a commissioned peer
 // (SessionManager.ts:677-695 #handlePeerLoss), the session alone without a
-// fabric or node id (ExchangeManager.ts:556-566). The sessions'
+// fabric or node id (ExchangeManager.ts:561-571). The sessions'
 // subscriptions fall with them through the registry's close hook. what
 // names the exchange for the log.
 func (b *Bridge) closeLostPeer(sessionID, exchangeID uint16, asOf time.Time, what string) {
@@ -367,7 +367,7 @@ func (e *initiatedSecureExchange) route() net.Addr {
 // Reliable reports whether the exchange runs over a reliable connection
 // (TCP) — the Go form of matter.js's `messenger.channel.type === "tcp"`,
 // on which the OTA requestor picks its BDX block size
-// (OtaSoftwareUpdateRequestorServer.ts:962-963). A session never moves
+// (OtaSoftwareUpdateRequestorServer.ts:975-976). A session never moves
 // between transports (bindSessionRoute), so the answer holds for the
 // exchange's life.
 func (e *initiatedSecureExchange) Reliable() bool {

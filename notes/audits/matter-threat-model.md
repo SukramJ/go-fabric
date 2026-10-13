@@ -203,7 +203,7 @@ or an established CASE session on a fabric.
   gold standard does it. matter.js enumerates the fail-safe rollback steps 1–8
   and leaves step 9 — *"Optionally … it is RECOMMENDED that the Node rollback
   the state of all non fabric-scoped data"* — as a TODO
-  (`packages/protocol/src/common/FailsafeContext.ts:284-330`), and its server
+  (`packages/protocol/src/common/FailsafeContext.ts:273-319`), and its server
   restores only the NetworkCommissioning networks and the breadcrumb
   (`ServerNodeFailsafeContext.ts`). chip's `src/app/FailSafeContext.cpp` carries
   no regulatory handling at all. Recorded as a known gap at RECOMMENDED tier
@@ -245,7 +245,7 @@ the two cases by access class on the same cluster: `UpdateFabricLabel` (0x9) is
 field**, constraint `"1 to 254"`
 (matter.js `packages/model/src/standard/elements/operational-credentials.element.ts:120-124`
 and `:127-130`). Both references read it off the wire deliberately — matter.js
-`OperationalCredentialsServer.ts:395-398` against
+`OperationalCredentialsServer.ts:408-411` against
 `this.context.session.associatedFabric` two methods above, and chip
 `OperationalCredentialsCluster.cpp:817-862`, whose post-step treats removing
 *another* fabric as the normal case. The gate there is privilege, not scope:

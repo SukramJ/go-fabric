@@ -21,7 +21,7 @@ const (
 	ThermostatRevision uint16 = 7
 )
 
-// ThermostatType is the Thermostat device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// ThermostatType is the Thermostat device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/thermostat.ts.
 var ThermostatType = Type{
 	ID: ThermostatID, Name: "Thermostat", Revision: ThermostatRevision,

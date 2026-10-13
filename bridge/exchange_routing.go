@@ -151,7 +151,7 @@ func (r *exchangeRouting) maybeSweepExpiredTimedDeadlines(now time.Time) int {
 // deadline is unambiguously garbage: [Bridge.checkTimedGate] rejects
 // the follow-up Write / Invoke with TIMEOUT once it passes, so nothing
 // downstream can ever consume the entry again. matter.js arms one
-// per-exchange timer instead (MessageExchange.ts:1009); a table plus a
+// per-exchange timer instead (MessageExchange.ts:1014); a table plus a
 // periodic sweep costs one Range a minute rather than one goroutine
 // per in-flight timed interaction.
 func (r *exchangeRouting) sweepExpiredTimedDeadlines(now time.Time) int {
@@ -170,7 +170,7 @@ func (r *exchangeRouting) sweepExpiredTimedDeadlines(now time.Time) int {
 // dropSessionTimedDeadlines deletes every timed deadline registered by
 // sessionID. An exchange cannot outlive its session — matter.js lets
 // the exchange's timer die
-// with the exchange (MessageExchange.ts:1143 close) and the exchange
+// with the exchange (MessageExchange.ts:1148 close) and the exchange
 // die with the session — so a peer that rotates sessions must not be
 // able to leave one entry behind per abandoned interaction.
 func (r *exchangeRouting) dropSessionTimedDeadlines(sessionID uint16) {

@@ -366,7 +366,7 @@ func (b *Bridge) dispatchSecureChannel(src net.Addr, requestHdr *message.Header,
 			return nil
 		}
 		// The handshake holds a TCP connection it runs on open until it
-		// ends (matter.js ExchangeManager.ts:629-643 counts the unsecured
+		// ends (matter.js ExchangeManager.ts:634-648 counts the unsecured
 		// session on the channel).
 		b.holdHandshake(src, proto.ExchangeID, false)
 		ch := b.resolveCaseHandler(proto.ExchangeID)
@@ -957,7 +957,7 @@ type SessionRegistry interface {
 // [SessionRegistry] implements to receive the bridge's outbound
 // CloseSession sender. The operational manager fires it once per
 // session before zeroising the keys on graceful teardown — the Go
-// translation of matter.js ExchangeManager.ts:635 observing
+// translation of matter.js ExchangeManager.ts:693 observing
 // session.gracefulClose and shipping the report via #sendCloseSession.
 type gracefulCloseNotifierSetter interface {
 	SetGracefulCloseNotifier(fn func(sessionID uint16, sess *channel.Session))
@@ -1080,7 +1080,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 	// Deferred: the route goes after the session, and with the session's
 	// last route a TCP connection — matter.js closes the channel from
 	// #deleteSession, after the session left the table
-	// (ExchangeManager.ts:691-708).
+	// (ExchangeManager.ts:696-713).
 	defer b.unbindSessionRoute(requestHdr.SessionID)
 	// Every exchange the session carried dies with it, so any timed
 	// deadline it registered can never be consumed.
@@ -1127,7 +1127,7 @@ func (b *Bridge) handleSecureChannelStatusReport(src net.Addr, requestHdr *messa
 //
 // Returns nil when the peer address was never observed; the caller
 // skips the notification (best-effort, matching the try/catch around
-// matter.js ExchangeManager.ts:658-666 #sendCloseSession).
+// matter.js ExchangeManager.ts:663-671 #sendCloseSession).
 func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) net.Addr {
 	if raw, ok := b.sessionPeerAddrs.Load(sessionID); ok {
 		if addr, ok := raw.(net.Addr); ok && !isNilRoute(addr) {
@@ -1166,7 +1166,7 @@ func (b *Bridge) resolveSessionPeerAddr(sessionID uint16) net.Addr {
 // the session keys are still live. Strictly best-effort: any failure
 // (unknown peer address, encrypt error, socket error) is logged at
 // debug and swallowed — matter.js wraps the same send in a
-// try/catch-and-warn (ExchangeManager.ts:658-666 #sendCloseSession).
+// try/catch-and-warn (ExchangeManager.ts:663-671 #sendCloseSession).
 //
 // Wire shape mirrors matter.js SecureChannelMessenger.ts:156-158
 // sendCloseSession → #sendStatusReport(Success, CloseSession,

@@ -58,7 +58,7 @@ func TestCounter_NextNoRollover_ReturnsSequentialValues(t *testing.T) {
 // call still succeeds (returning the pre-ceiling value and advancing
 // to 0xFFFFFFFF), and every call from then on returns
 // [mrp.ErrCounterExhausted] without advancing further — the counter
-// is refused, never wrapped. Mirrors matter.js NodeSession.ts:111 +
+// is refused, never wrapped. Mirrors matter.js NodeSession.ts:115 +
 // MessageCounter.ts:64-67 (a secure session's counter closes the
 // session instead of rolling over).
 func TestCounter_NextNoRollover_ExhaustsAtCeiling(t *testing.T) {

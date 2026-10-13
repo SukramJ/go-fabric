@@ -342,7 +342,7 @@ func TestTimedOnCountdown(t *testing.T) {
 }
 
 // TestDelayedOffCountdown: OffWaitTime counts down every 100 ms and the
-// timer stops at 0 (OnOffServer.ts:312-324).
+// timer stops at 0 (OnOffServer.ts:310-322).
 func TestDelayedOffCountdown(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, onoff.FeatureLT, map[uint32]any{onoff.AttrOnOff: true, onoff.AttrOffWaitTime: uint16(2)})

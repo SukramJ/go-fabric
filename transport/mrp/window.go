@@ -33,7 +33,7 @@ const maxCounter32 = int64(0xFFFFFFFF)
 //     rolls the window forward onto it. See [Window.diff].
 //   - [NewWindowNoRollover] — the no-rollover variant used for secure
 //     sessions, mirroring matter.js
-//     MessageReceptionStateEncryptedWithoutRollover (NodeSession.ts:118).
+//     MessageReceptionStateEncryptedWithoutRollover (NodeSession.ts:122).
 //     Diffs are plain subtraction: a counter that appears to roll over
 //     is rejected as a duplicate, because a secure session MUST
 //     re-establish before its counter wraps rather than reuse a nonce.

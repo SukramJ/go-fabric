@@ -736,15 +736,17 @@ func changeToModeRequest(fields any) (clusterwire.ChangeToModeRequest, bool) {
 	return clusterwire.ChangeToModeRequest{NewMode: mode}, true
 }
 
-// validHostStatus accepts what a device may answer: a value of the
-// derivation's ModeChangeStatus enum — Success, GenericFailure,
-// InvalidInMode or one the derivation defines — or a product-specific one
-// (0x80 and above). UnsupportedMode is the server's own answer.
+// validHostStatus accepts what a device may answer: ModeChangeStatus as
+// the definition allows, incl. the manufacturer range — Success,
+// GenericFailure, InvalidInMode, a status the derivation defines, or one
+// in MfgCodes (128..191). UnsupportedMode is the server's own answer. This
+// is the module's own guard on the host port: matter.js's ModeBase server
+// checks no host status.
 func (s *Server) validHostStatus(st Status) bool {
 	if st == StatusUnsupportedMode {
 		return false
 	}
-	return st >= 0x80 || slices.ContainsFunc(s.k.statuses.Values, func(v spec.EnumValue) bool { return v.Value == uint64(st) })
+	return s.inst.EnumSupported(s.k.statuses, uint64(st))
 }
 
 // truncate cuts text to at most n bytes on a rune boundary.

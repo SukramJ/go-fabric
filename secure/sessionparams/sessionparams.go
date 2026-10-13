@@ -40,7 +40,7 @@ const MinTCPSpecificationVersion uint32 = 0x01050000
 
 // DefaultMaxTCPMessageSize is matter.js's fallback for
 // MaxTCPMessageSize when a TCP-capable node states none
-// (SessionParameters.ts:133, PaseMessages.ts:54 "default: 64000").
+// (SessionParameters.ts:152, PaseMessages.ts:54 "default: 64000").
 const DefaultMaxTCPMessageSize uint32 = 64000
 
 // Parameters is one SessionParameters structure. A zero field is "not
@@ -59,7 +59,7 @@ type Parameters struct {
 	SupportedTransports uint16 // [8]
 	// MaxTCPMessageSize (matter.js `maxTcpMessageSize`) is the largest message the node accepts over TCP
 	// in bytes (TlvUInt32). Encoded only when SupportedTransports names
-	// TCP (SessionParameters.ts:55-62: "The MAX_TCP_MESSAGE_SIZE field
+	// TCP (SessionParameters.ts:58-63: "The MAX_TCP_MESSAGE_SIZE field
 	// SHALL only be present if the SUPPORTED_TRANSPORTS field indicates
 	// that TCP is supported").
 	MaxTCPMessageSize uint32 // [9]
@@ -79,7 +79,7 @@ func (p Parameters) SupportsTCP() bool {
 
 // EffectiveTransports is the SupportedTransports bitmap a reader may act
 // on: the stated bits with TCP cleared when the peer's
-// SpecificationVersion is below Matter 1.5.0 or unknown (SessionParameters.ts:50-54
+// SpecificationVersion is below Matter 1.5.0 or unknown (SessionParameters.ts:49-56
 // — "clear it for older or unknown spec versions so supportedTransports is
 // the single source of truth for transport selection").
 func (p Parameters) EffectiveTransports() uint16 {
@@ -91,7 +91,7 @@ func (p Parameters) EffectiveTransports() uint16 {
 
 // EffectiveMaxTCPMessageSize is the TCP message bound a reader may act
 // on: the stated size, matter.js's fallback when a TCP-capable peer
-// stated none (SessionParameters.ts:59-62), and 0 when the effective
+// stated none (SessionParameters.ts:60-63), and 0 when the effective
 // transports name no TCP.
 func (p Parameters) EffectiveMaxTCPMessageSize() uint32 {
 	if p.EffectiveTransports()&(TransportTCPClient|TransportTCPServer) == 0 {

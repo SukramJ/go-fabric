@@ -99,17 +99,42 @@ var descriptorInst = mustInstance(descdef.Definition, spec.Options{})
 var errDescriptorReadOnly = errors.New("matter: Descriptor is read-only")
 
 // NewDescriptor returns a Descriptor with the supplied static lists.
-// deviceTypes must contain at least one entry per Matter §9.5.5.1.
+// deviceTypes must contain at least one entry per Matter §9.5.5.1. A
+// device type listed twice is kept once, at the revision of its first
+// entry (see [dedupeDeviceTypes]).
 func NewDescriptor(deviceTypes []DeviceTypeStruct, serverList, clientList []uint32, partsList []uint16) (*Descriptor, error) {
 	if len(deviceTypes) == 0 {
 		return nil, errors.New("matter: Descriptor requires at least one DeviceType entry")
 	}
 	return &Descriptor{
-		deviceTypes: append([]DeviceTypeStruct(nil), deviceTypes...),
+		deviceTypes: dedupeDeviceTypes(deviceTypes),
 		serverList:  append([]uint32(nil), serverList...),
 		clientList:  append([]uint32(nil), clientList...),
 		partsList:   append([]uint16(nil), partsList...),
 	}, nil
+}
+
+// dedupeDeviceTypes returns a copy of deviceTypes in which every device
+// type ID appears once, in the order of its first entry and at that
+// entry's revision. Mirrors matter.js 0ceb202d packages/node/src/behaviors/
+// descriptor/DescriptorServer.ts:91-111 (addDeviceTypes: `if
+// (existingDeviceType.deviceType === newDeviceType.deviceType) continue
+// nextInput` at :104-108 — "A device type that is already listed keeps its
+// listed revision", :86-87). It catches a bridged endpoint whose host
+// device type is BridgedNode itself, which endpoint.Materialize lists
+// next to the BridgedNode entry it adds.
+func dedupeDeviceTypes(deviceTypes []DeviceTypeStruct) []DeviceTypeStruct {
+	out := make([]DeviceTypeStruct, 0, len(deviceTypes))
+next:
+	for _, dt := range deviceTypes {
+		for _, listed := range out {
+			if listed.DeviceType == dt.DeviceType {
+				continue next
+			}
+		}
+		out = append(out, dt)
+	}
+	return out
 }
 
 // Compile-time assertion: Descriptor satisfies MatterClusterServer.
@@ -130,7 +155,7 @@ func (d *Descriptor) MatterRead(attrID uint32) (any, bool) {
 		// arrives for a cluster that is NOT in ServerList — or when a
 		// cluster IS in ServerList but never produces an AttributeReport.
 		// Mirrors matter.js DescriptorServer.#serverList
-		// (DescriptorServer.ts:236-244): always derived from the set of
+		// (DescriptorServer.ts:241-250): always derived from the set of
 		// mounted behaviors, never hardcoded. The provider closure is
 		// the go-fabric equivalent — set after endpoint composition
 		// is complete so the list cannot drift from the actual mounted
@@ -270,7 +295,7 @@ func (d *Descriptor) SetPartsListProvider(p func() []uint16) {
 // the advertised ServerList cannot drift from it.
 //
 // Mirrors matter.js DescriptorServer.#serverList
-// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:236-244):
+// (packages/node/src/behaviors/descriptor/DescriptorServer.ts:241-250):
 // always derived from `endpoint.behaviors.supported`, never hardcoded.
 //
 // Pass nil to revert to the static list (only used by unit tests that

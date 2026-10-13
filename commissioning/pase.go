@@ -122,7 +122,7 @@ func (r *PASEResponder) HandlePake3(pake3 []byte) error {
 // nil. The responder encrypts with R2I and decrypts with I2R — the
 // same orientation [secure/operational.Manager.OpenFromPase] gives the
 // running bridge, and the one matter.js PaseServer.ts:184-192 hands to
-// NodeSession.ts:76-86 (`isInitiator: false`).
+// NodeSession.ts:78-88 (`isInitiator: false`).
 func (r *PASEResponder) Session() (*channel.Session, error) {
 	if !r.finished {
 		return nil, ErrPASEStateMismatch
@@ -164,7 +164,7 @@ type paseKeys struct {
 // sessionKeys runs the one PASE key schedule of Matter §4.13.2.5 /
 // §4.13.4.2: HKDF-SHA256(IKM=Ke, salt="", info="SessionKeys", L=48),
 // split into I2RKey (16) || R2IKey (16) || AttestationChallenge (16).
-// Mirrors matter.js NodeSession.ts:76-86 (`createHkdfKey(sharedSecret,
+// Mirrors matter.js NodeSession.ts:78-88 (`createHkdfKey(sharedSecret,
 // salt, SESSION_KEYS_INFO, 16*3)`, `attestationKey = keys.slice(32, 48)`)
 // and this module's secure/operational OpenFromPase.
 func (r *PASEResponder) sessionKeys() (paseKeys, error) {

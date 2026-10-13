@@ -91,7 +91,7 @@ var _ contract.ChangeNotifier = (*dial)(nil)
 // change, reach a subscriber of a device on a node although the device was
 // built without WithChangeNotifier — the bridge hears every mounted
 // server's notifier (bridge/subscribe.go), as matter.js reports each
-// behavior's change through its own Datasource (Datasource.ts:690-710).
+// behavior's change through its own Datasource (Datasource.ts:776-796).
 func TestServerChangesReachASubscriberWithoutWithChangeNotifier(t *testing.T) {
 	t.Parallel()
 	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")

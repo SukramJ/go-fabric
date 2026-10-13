@@ -152,7 +152,7 @@ func (s *reachAttrReporterSpy) reported(clusterID uint32) []uint32 {
 // TestServerChangeNotifierIsHeardWithoutASourceNotifier: a mounted server
 // that notifies its own change reaches a subscriber although the
 // endpoint's source notifies nothing — matter.js reports each behavior's
-// change through its own Datasource (Datasource.ts:690-710).
+// change through its own Datasource (Datasource.ts:776-796).
 func TestServerChangeNotifierIsHeardWithoutASourceNotifier(t *testing.T) {
 	t.Parallel()
 	srv := newNotifyingServer(0xFFF1_FC02)

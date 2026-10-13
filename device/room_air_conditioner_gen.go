@@ -28,7 +28,7 @@ const (
 	RoomAirConditionerRevision uint16 = 4
 )
 
-// RoomAirConditionerType is the RoomAirConditioner device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// RoomAirConditionerType is the RoomAirConditioner device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/room-air-conditioner.ts.
 var RoomAirConditionerType = Type{
 	ID: RoomAirConditionerID, Name: "RoomAirConditioner", Revision: RoomAirConditionerRevision,

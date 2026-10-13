@@ -748,6 +748,12 @@ func (g *generator) writeDatatype(w *writer, di *dataInfo) error {
 				w.p("\t{Value: %d, Name: %q%s},", *f.ID, f.Name, confField(f.Conformance))
 			}
 		}
+		if ranges := enumRanges(d.Fields); len(ranges) > 0 {
+			w.p("}, Ranges: []spec.EnumRange{")
+			for _, r := range ranges {
+				w.p("\t{Name: %q, Min: %d, Max: %d%s},", r.f.Name, r.lo, r.hi, confField(r.f.Conformance))
+			}
+		}
 		w.p("}}")
 		w.p("")
 	case kindBitmap:
@@ -838,6 +844,30 @@ func bitsOf(c *constraint) (bit, width uint, ok bool) {
 		return uint(lo), uint(hi - lo + 1), true //nolint:gosec // bit positions
 	}
 	return 0, 0, false
+}
+
+// enumRange is a range member of an enum.
+type enumRange struct {
+	f      *value
+	lo, hi int64
+}
+
+// enumRanges are the range members of an enum's fields: a member without
+// an id whose constraint states a minimum and a maximum. Mirrors matter.js
+// packages/model/src/models/FieldModel.ts:isEnumRange.
+func enumRanges(fields []*value) []enumRange {
+	var out []enumRange
+	for _, f := range fields {
+		if f.ID != nil || f.Constraint == nil {
+			continue
+		}
+		lo, okLo := intOf(f.Constraint.Min)
+		hi, okHi := intOf(f.Constraint.Max)
+		if okLo && okHi && lo >= 0 && hi >= lo {
+			out = append(out, enumRange{f, lo, hi})
+		}
+	}
+	return out
 }
 
 func intOf(raw json.RawMessage) (int64, bool) {

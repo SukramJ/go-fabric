@@ -1079,7 +1079,7 @@ func aclIsValidCASESubject(id uint64) bool {
 }
 
 // aclIsValidClusterID reports whether id is a well-formed Matter ClusterId.
-// Mirrors matter.js packages/types/src/datatype/ClusterId.ts:22-32 (the
+// Mirrors matter.js packages/types/src/datatype/ClusterId.ts:22-41 (the
 // ClusterId constructor validation via Mei.fromMei): a standard cluster has a
 // zero vendor prefix (upper 16 bits) and a type suffix (low 16 bits) in
 // 0x0000..0x7FFF; a manufacturer-specific cluster has a non-zero vendor prefix
@@ -1089,7 +1089,7 @@ func aclIsValidClusterID(id uint32) bool {
 	vendorPrefix := id >> 16
 	typeSuffix := id & 0xFFFF
 	// Mei.fromMei rejects a vendor prefix above 0xFFF4 or a type suffix of
-	// 0xFFFF outright (ManufacturerExtensibleIdentifier.ts:23-38).
+	// 0xFFFF outright (ManufacturerExtensibleIdentifier.ts:28-51).
 	if vendorPrefix > 0xFFF4 || typeSuffix > 0xFFFE {
 		return false
 	}

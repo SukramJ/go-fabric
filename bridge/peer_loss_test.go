@@ -40,7 +40,7 @@ func peerLossKeys(t *testing.T) sigma.SessionKeys {
 // exchange is force-closed without a CloseSession, a session the peer
 // established afterwards survives, and the next connect no longer finds
 // a session to reuse. Mirrors matter.js MessageExchange.ts:620 →
-// ExchangeManager.ts:556-580 → SessionManager.ts:677-695. Observed in
+// ExchangeManager.ts:561-585 → SessionManager.ts:677-695. Observed in
 // TC-SU-2.2 step 2: the provider restarted under the same node id, the
 // requestor kept invoking on the dead session and never reached it.
 func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
@@ -141,7 +141,7 @@ func TestInitiatedPeerLoss_UnknownExchangeIsNoOp(t *testing.T) {
 // TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions: an
 // ongoing report the peer never acknowledges is peer loss, as on any
 // exchange this node opens (matter.js MessageExchange.ts:616-621 →
-// ExchangeManager.ts:569-573 → SessionManager.ts:677-695): both sessions of
+// ExchangeManager.ts:574-578 → SessionManager.ts:677-695): both sessions of
 // the subscriber established before the report's exchange are force-closed
 // without a CloseSession, the subscription on the other session falls with
 // its session through the registry's close hook, and a session of the same
@@ -248,7 +248,7 @@ func TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions(t *testing.
 // TestReportPeerLoss_OnlyFirstMessageOfExchange: a counter that is not the
 // first message of its report's exchange (a later chunk, sent after the
 // peer's StatusResponse) or no longer owned by a report is not peer loss
-// (matter.js #reportsPeerLoss, MessageExchange.ts:630-633).
+// (matter.js #reportsPeerLoss, MessageExchange.ts:630-638).
 func TestReportPeerLoss_OnlyFirstMessageOfExchange(t *testing.T) {
 	t.Parallel()
 	b := newStartedBridgeWithSnapshotter(t, wbEmptySnapshotter)
@@ -477,7 +477,7 @@ func TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss(t *testing.T) {
 // being sent (the reporter registers the counters once the whole report
 // is out, subscribe.go reportSubscription), so its exhaustion closes
 // neither the subscription nor any session — the peer answered on the
-// exchange (matter.js #reportsPeerLoss, MessageExchange.ts:626-633) — and
+// exchange (matter.js #reportsPeerLoss, MessageExchange.ts:626-638) — and
 // the send ends with the StatusResponse wait's timeout, which the
 // reporter counts as one send failure (noteSubscriptionSendError).
 func TestChunkedReportLaterChunkUnacknowledged(t *testing.T) {

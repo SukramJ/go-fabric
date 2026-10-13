@@ -21,7 +21,7 @@ const (
 	RoboticVacuumCleanerRevision uint16 = 4
 )
 
-// RoboticVacuumCleanerType is the RoboticVacuumCleaner device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// RoboticVacuumCleanerType is the RoboticVacuumCleaner device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/robotic-vacuum-cleaner.ts.
 var RoboticVacuumCleanerType = Type{
 	ID: RoboticVacuumCleanerID, Name: "RoboticVacuumCleaner", Revision: RoboticVacuumCleanerRevision,

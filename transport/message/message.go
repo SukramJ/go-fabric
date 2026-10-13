@@ -229,7 +229,7 @@ func (h Header) SecurityFlags() uint8 {
 // 4-2 and fail the tag for any frame that set one. matter.js keeps the
 // raw byte for the same reason (packages/protocol/src/codec/
 // MessageCodec.ts:45 "The SecurityFlags as pure data field to be used
-// as nonce"; NodeSession.ts:187). A header built in memory has no wire
+// as nonce"; NodeSession.ts:203). A header built in memory has no wire
 // byte and encodes to [Header.SecurityFlags], which is what its
 // Marshal writes, so the two stay consistent for outbound frames.
 func (h Header) NonceSecurityFlags() uint8 {

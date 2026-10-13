@@ -35,6 +35,12 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/modebase"
 	"github.com/SukramJ/go-fabric/cluster/opstate"
 	"github.com/SukramJ/go-fabric/cluster/pump"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	closuredef "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol"
+	dishdef "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode"
+	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
+	rvcopdef "github.com/SukramJ/go-fabric/cluster/spec/rvcoperationalstate"
+	rvcrundef "github.com/SukramJ/go-fabric/cluster/spec/rvcrunmode"
 	"github.com/SukramJ/go-fabric/cluster/thermo"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/im"
@@ -266,7 +272,7 @@ func TestNegativeWriteParity(t *testing.T) {
 
 	cases := []negativeWriteCase{
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:879
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:890
 			// #assertSetpointWithinLimits — rejects values above MaxHeatSetpointLimit.
 			name: "Thermostat/OccupiedHeatingSetpoint above maxHeat → ConstraintError",
 			build: func() interface {
@@ -279,7 +285,7 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:879
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:890
 			// #assertSetpointWithinLimits — rejects values below MinHeatSetpointLimit.
 			name: "Thermostat/OccupiedHeatingSetpoint below minHeat → ConstraintError",
 			build: func() interface {
@@ -292,7 +298,7 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:615-634
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:610-629
 			// #assertSystemModeChanging — CoolingOnly sequence forbids SystemMode=Heat(4).
 			name: "Thermostat/SystemMode=Heat(4) on CoolingOnly server → ConstraintError",
 			build: func() interface {
@@ -305,8 +311,8 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:599-606
-			// (4633bfd7): a host refusing in occupiedHeatingSetpoint$Changing
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601
+			// (0ceb202d): a host refusing in occupiedHeatingSetpoint$Changing
 			// fails the write; thermo.Sink is its Go form, a plain error → Failure.
 			name: "Thermostat/OccupiedHeatingSetpoint refused by the host Sink → Failure",
 			build: func() interface {
@@ -319,8 +325,8 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusFailure,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:619
-			// (4633bfd7): a host refusing in systemMode$Changing fails the write.
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:614
+			// (0ceb202d): a host refusing in systemMode$Changing fails the write.
 			name: "Thermostat/SystemMode refused by the host Sink → Failure",
 			build: func() interface {
 				MatterWrite(context.Context, uint32, any) error
@@ -620,7 +626,7 @@ func TestNegativeInvokeParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:158-166
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:189-193
 			// setpointRaiseLower — mode=Heat without HEAT feature → InvalidCommand.
 			// Heat is 0x0 per SetpointRaiseLowerModeEnum
 			// (thermostat-cluster.element.ts:511); the payload is the bridge's
@@ -636,9 +642,9 @@ func TestNegativeInvokeParity(t *testing.T) {
 			wantStatus: im.StatusInvalidCommand,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:187-219
-			// (4633bfd7): setpointRaiseLower assigns the setpoints, which pass
-			// occupied*Setpoint$Changing (:599-606) where a host refuses.
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:188-220
+			// (0ceb202d): setpointRaiseLower assigns the setpoints, which pass
+			// occupied*Setpoint$Changing (:594-601) where a host refuses.
 			name: "Thermostat/SetpointRaiseLower refused by the host Sink → Failure",
 			build: func() interface {
 				MatterInvoke(context.Context, uint32, any) (any, error)
@@ -666,7 +672,7 @@ func TestNegativeInvokeParity(t *testing.T) {
 		},
 		{
 			// Mirrors matter.js packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338
-			// (4633bfd7): a host's handleMovement that throws fails the command;
+			// (0ceb202d): a host's handleMovement that throws fails the command;
 			// cover.Mover is its Go form, an error → Failure.
 			name: "WindowCovering/UpOrOpen refused by the host Mover → Failure",
 			build: func() interface {
@@ -871,4 +877,68 @@ func TestPositiveInvokeControl(t *testing.T) {
 			t.Errorf("CurrentPositionLiftPercent100ths = %d, want 10000", v.(uint16))
 		}
 	})
+}
+
+// TestEnumManufacturerRangeParity holds the manufacturer ranges the
+// snapshot carries as enum range members (matter.js 9892fa39:
+// mode-base.element.ts ModeChangeStatus MfgCodes 128..191 and ModeTag
+// MfgTags 32768..49151, operational-state.element.ts OperationalStateEnum
+// ManufacturerStates and ErrorStateEnum ManufacturerError 128..191,
+// closure-control.element.ts ClosureErrorEnum ManufacturerError 128..191)
+// to matter.js's enum validator: a value inside a range is valid, the first
+// value past it is ConstraintError
+// (packages/node/src/behavior/state/validation/ValueValidator.ts:172-178).
+//
+// No enum of these backs a writable attribute (every one is read-only or
+// sits inside a read-only struct), so the rows go against
+// spec.EnumSupported for each shape and, where an attribute is typed by the
+// enum directly, against spec.Instance.CheckValue — the value checks
+// ValidateWrite makes after access.
+func TestEnumManufacturerRangeParity(t *testing.T) {
+	t.Parallel()
+	ctx := spec.Context(opdef.Definition, 0)
+	for _, c := range []struct {
+		name   string
+		def    *spec.Enum
+		lo, hi uint64
+	}{
+		{"RvcRunMode.ModeChangeStatus.MfgCodes", rvcrundef.ModeChangeStatusDef, 128, 191},
+		{"RvcRunMode.ModeTag.MfgTags", rvcrundef.ModeTagDef, 32768, 49151},
+		{"DishwasherMode.ModeTag.MfgTags", dishdef.ModeTagDef, 32768, 49151},
+		{"OperationalState.OperationalStateEnum.ManufacturerStates", opdef.OperationalStateEnumDef, 128, 191},
+		{"OperationalState.ErrorStateEnum.ManufacturerError", opdef.ErrorStateEnumDef, 128, 191},
+		{"RvcOperationalState.ErrorStateEnum.ManufacturerError", rvcopdef.ErrorStateEnumDef, 128, 191},
+		{"ClosureControl.ClosureErrorEnum.ManufacturerError", closuredef.ClosureErrorEnumDef, 128, 191},
+	} {
+		for _, v := range []uint64{c.lo, c.hi} {
+			if !spec.EnumSupported(c.def, v, ctx) {
+				t.Errorf("%s: %d refused, matter.js accepts it", c.name, v)
+			}
+		}
+		if spec.EnumSupported(c.def, c.hi+1, ctx) {
+			t.Errorf("%s: %d accepted, matter.js answers ConstraintError", c.name, c.hi+1)
+		}
+		// The value just below each range is not a named value either.
+		if spec.EnumSupported(c.def, c.lo-1, ctx) {
+			t.Errorf("%s: %d accepted, matter.js answers ConstraintError", c.name, c.lo-1)
+		}
+	}
+
+	inst, err := spec.New(opdef.Definition, spec.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := inst.CheckValue(opdef.AttrOperationalState, uint8(191), nil); err != nil {
+		t.Errorf("OperationalState 191 (ManufacturerStates): %v", err)
+	}
+	_, err = inst.CheckValue(opdef.AttrOperationalState, uint8(192), nil)
+	var sc statusCoder
+	if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusConstraintError {
+		t.Errorf("OperationalState 192: err = %v, want CONSTRAINT_ERROR", err)
+	}
+	// A read-only attribute stays UNSUPPORTED_WRITE whatever the value.
+	_, err = inst.ValidateWrite(opdef.AttrOperationalState, uint8(191), nil)
+	if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusUnsupportedWrite {
+		t.Errorf("write OperationalState 191: err = %v, want UNSUPPORTED_WRITE", err)
+	}
 }

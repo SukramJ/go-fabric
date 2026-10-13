@@ -192,7 +192,7 @@ func TestAckTrackerMultipleExchangesIndependent(t *testing.T) {
 // IDs are picked independently by every peer, so a bare-exchange key would
 // let a second controller (or a fresh CASE session replacing an old one)
 // silently clobber or discharge the first controller's pending obligation.
-// Mirrors matter.js ExchangeManager.ts:287, which invalidates an exchange
+// Mirrors matter.js ExchangeManager.ts:340, which invalidates an exchange
 // lookup as soon as `exchange.session.id !== session.id` — the session id
 // is part of the exchange identity, not just routing metadata.
 func TestAckTrackerSessionScopedExchangeCollision(t *testing.T) {

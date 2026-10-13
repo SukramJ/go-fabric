@@ -23,7 +23,7 @@ const (
 	AirPurifierRevision uint16 = 3
 )
 
-// AirPurifierType is the AirPurifier device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// AirPurifierType is the AirPurifier device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/air-purifier.ts.
 var AirPurifierType = Type{
 	ID: AirPurifierID, Name: "AirPurifier", Revision: AirPurifierRevision,

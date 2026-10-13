@@ -35,7 +35,7 @@ func clusterDataVersion(srv contract.ClusterServer) uint32 {
 // instance-embedded tracker would report a new random initial version
 // on every read, so their version identity lives on the persistent
 // [Endpoint] keyed by cluster id instead. Mirrors matter.js
-// Datasource.ts:349 (version set once per lifetime, not per access).
+// Datasource.ts:410 (version set once per lifetime, not per access).
 func clusterDataVersionFor(ep *Endpoint, srv contract.ClusterServer) uint32 {
 	if ep == nil || ep.IsRoot() || ep.IsAggregator() {
 		return clusterDataVersion(srv)
@@ -350,7 +350,7 @@ func (d *TopologyDispatcher) WriteAuthorized(ctx context.Context, path im.Concre
 				// A successful write mutated cluster state; advance the
 				// endpoint-hosted DataVersion so DataVersionFilters miss
 				// and subscribers see the change (matter.js
-				// Datasource.ts:949). Root/Aggregator servers bump their
+				// Datasource.ts:1035). Root/Aggregator servers bump their
 				// own persistent trackers inside the write handler.
 				if res.Status == im.StatusSuccess && !ep.IsRoot() && !ep.IsAggregator() {
 					ep.BumpClusterDataVersion(cPath.Cluster)
@@ -962,7 +962,7 @@ const FabricIndexUnresolvable uint8 = 255
 // gate before this is called; the same grant is repeated here so a direct
 // caller cannot lose it. It is keyed on the session's AUTH MODE as well as
 // on fabricIndex 0, because AddNOC adopts the commissioner's PASE session
-// onto the new fabric (matter.js OperationalCredentialsServer.ts:266-270
+// onto the new fabric (matter.js OperationalCredentialsServer.ts:279-283
 // `session.fabric = fabric`) while the implicit Administer grant stays
 // (FabricAccessControl.ts:189-191 `authMode === Pase && isCommissioning`).
 // Without the auth-mode term every post-AddNOC ACL write, GroupKeySetWrite

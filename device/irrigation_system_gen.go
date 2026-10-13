@@ -19,7 +19,7 @@ const (
 	IrrigationSystemRevision uint16 = 1
 )
 
-// IrrigationSystemType is the IrrigationSystem device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// IrrigationSystemType is the IrrigationSystem device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/irrigation-system.ts.
 var IrrigationSystemType = Type{
 	ID: IrrigationSystemID, Name: "IrrigationSystem", Revision: IrrigationSystemRevision,

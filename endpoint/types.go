@@ -230,7 +230,7 @@ type Endpoint struct {
 	// endpoint's DataVersion survives an UNRELATED topology change (a
 	// sibling endpoint added / removed), and only a state change on the
 	// endpoint itself bumps it. Mirrors matter.js
-	// packages/node/src/behavior/state/managed/Datasource.ts:349 (version
+	// packages/node/src/behavior/state/managed/Datasource.ts:410 (version
 	// sampled once per behavior lifetime, bound to the endpoint's own
 	// lifecycle) / :949 (increment per committed change). nil for the
 	// root + aggregator endpoints (they keep their reattached
@@ -494,7 +494,7 @@ func (e *Endpoint) ClusterDataVersion(clusterID uint32) uint32 {
 // BumpClusterDataVersion advances the per-(endpoint, cluster)
 // DataVersion after a state change so DataVersionFilters miss and
 // subscribers receive the fresh value. Mirrors matter.js
-// Datasource.ts:949.
+// Datasource.ts:1035.
 func (e *Endpoint) BumpClusterDataVersion(clusterID uint32) {
 	e.clusterTracker(clusterID).Bump()
 }

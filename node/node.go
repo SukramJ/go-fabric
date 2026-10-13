@@ -376,7 +376,7 @@ func (n *Node) commissioningCompleted(_ context.Context, fabricIndex uint8) {
 // previous run installed, the re-establishment of their subscriptions,
 // the OTA requestor, their operational records, and the node's own
 // commissioning window when no fabric exists. Start is idempotent, as
-// matter.js Node.start (Node.ts:113-131); after Stop it is [ErrStopped].
+// matter.js Node.start (Node.ts:114-132); after Stop it is [ErrStopped].
 func (n *Node) Start(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -446,7 +446,7 @@ func (n *Node) Start(ctx context.Context) error {
 // operational time stored once more, BasicInformation ShutDown (when the
 // node was started), the PASE providers, the CASE reaper, the
 // subscription engine, the bridge and the advertiser. Stop is idempotent
-// (matter.js Node.stop, Node.ts:188) and safe without Start.
+// (matter.js Node.stop, Node.ts:193) and safe without Start.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -478,7 +478,7 @@ func (n *Node) Stop(ctx context.Context) error {
 }
 
 // Run starts the node, waits for ctx to end and stops it — matter.js
-// Node.run (Node.ts:178-181).
+// Node.run (Node.ts:183-186).
 func (n *Node) Run(ctx context.Context) error {
 	if err := n.Start(ctx); err != nil {
 		return err
@@ -518,7 +518,7 @@ func (n *Node) Store() *store.Store { return n.st }
 
 // PairingCodes returns the QR code payload and the manual pairing code of
 // the configured passcode and discriminator — matter.js
-// `commissioning.pairingCodes` (CommissioningServer.ts:370-380), as the
+// `commissioning.pairingCodes` (CommissioningServer.ts:400-410), as the
 // daemon prints them (main.go:504-518).
 func (n *Node) PairingCodes() (qr, manual string, err error) {
 	cm, pd := n.cfg.Commissioning, n.cfg.ProductDescription

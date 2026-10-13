@@ -156,7 +156,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// current address; ongoing subscription reports and the CloseSession
 	// farewell route on it. matter.js adopts the newest inbound address
 	// on the session's channel — "the new message wins"
-	// (packages/protocol/src/protocol/ExchangeManager.ts:400-405).
+	// (packages/protocol/src/protocol/ExchangeManager.ts:425-431).
 	if hdr.SessionID != 0 && !isNilRoute(src) {
 		b.bindSessionRoute(hdr.SessionID, src)
 	}
@@ -583,7 +583,7 @@ func (b *Bridge) NotifyDeviceReachable(scope, deviceAddress string, reachable bo
 			contract.EventPriorityInfo)
 		// Advance the endpoint-hosted BDBI DataVersion — the reachability
 		// flip is a cluster state change, so DataVersionFilters must miss
-		// afterwards (matter.js Datasource.ts:949).
+		// afterwards (matter.js Datasource.ts:1035).
 		ep.BumpClusterDataVersion(core.BridgedDeviceBasicInformationClusterID)
 		// Also dirty the Reachable ATTRIBUTE (BDBI 0x0039 / 0x0011), not
 		// just fire the event: a controller subscribed to the attribute

@@ -16,11 +16,8 @@ Dieses Dokument hat vier Teile:
 - **Teil C** ordnet die gewählten Kandidaten in Phasen und nennt die ADRs.
 
 Jede Zahl trägt ihre Quelle. matter.js-Zeilen sind `wc -l` auf dem lokalen
-Checkout `../matter.js` am 2026-10-12. **Achtung:** der Checkout steht seit
-dem Pull von 11:57 auf `0ceb202d`, 65 Commits vor dem Pin `4633bfd7`, den
-`parity/schema.json` und jede Zeilenangabe im Repo tragen. Die Maße hier
-sind Größenordnungen; Zeilenzitate im Code bleiben auf dem Pin, bis Frage
-0.9 entschieden ist.
+Checkout `../matter.js` am 2026-10-12. Seit Welle 11 ist `0ceb202d` der
+Pin, den `parity/schema.json` und jede Zeilenangabe im Repo tragen.
 
 ---
 

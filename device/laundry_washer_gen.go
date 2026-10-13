@@ -23,7 +23,7 @@ const (
 	LaundryWasherRevision uint16 = 2
 )
 
-// LaundryWasherType is the LaundryWasher device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// LaundryWasherType is the LaundryWasher device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/laundry-washer.ts.
 var LaundryWasherType = Type{
 	ID: LaundryWasherID, Name: "LaundryWasher", Revision: LaundryWasherRevision,

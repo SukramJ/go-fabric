@@ -40,7 +40,7 @@ var ErrAckWaitTimeout = errors.New("bridge: outbound ack wait: timeout")
 // counter key lets session A's ACK clear session B's pending entry
 // when their counters happen to coincide. Keying on the session too
 // mirrors matter.js's per-session ExchangeManager bookkeeping
-// (ExchangeManager.ts:287). The inbound ACK path supplies the session
+// (ExchangeManager.ts:340). The inbound ACK path supplies the session
 // from the received message header.
 type outboundKey struct {
 	sessionID uint16

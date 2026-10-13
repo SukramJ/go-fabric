@@ -32,7 +32,7 @@ var levelControlAlteration = []ElementRequirement{
 }
 
 // TestDeviceRequirementsParityMatterJS holds the generated DimmableLight and
-// OnOffLight to matter.js 4633bfd7:
+// OnOffLight to matter.js 0ceb202d:
 //
 //   - packages/node/src/devices/dimmable-light.ts:38 IdentifyServer
 //     .alter({commands:{triggerEffect:{optional:false}}}); :52

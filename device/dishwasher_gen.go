@@ -23,7 +23,7 @@ const (
 	DishwasherRevision uint16 = 2
 )
 
-// DishwasherType is the Dishwasher device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// DishwasherType is the Dishwasher device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/dishwasher.ts.
 var DishwasherType = Type{
 	ID: DishwasherID, Name: "Dishwasher", Revision: DishwasherRevision,

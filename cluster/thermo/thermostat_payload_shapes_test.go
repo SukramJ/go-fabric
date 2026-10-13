@@ -65,7 +65,7 @@ func readInt16(t *testing.T, srv *thermo.ThermostatServer, attrID uint32) int16 
 //
 // Amount is in 0.1 °C steps and setpoints in 0.01 °C, so +15 raises the
 // 20.00 °C heating setpoint by 1.5 °C to 2150 (matter.js
-// packages/node/src/behaviors/thermostat/ThermostatServer.ts:169
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:200
 // multiplies the amount by 10).
 func TestSetpointRaiseLowerAcceptsEveryPayloadShape(t *testing.T) {
 	t.Parallel()
@@ -171,7 +171,7 @@ func TestSetpointRaiseLowerStringMapAmountDefaultsToZero(t *testing.T) {
 }
 
 // TestSetpointRaiseLowerCoolOnlyBothMovesTheCoolingSetpoint covers the
-// Both arm on a server without HEAT. matter.js ThermostatServer.ts:202-219
+// Both arm on a server without HEAT. matter.js ThermostatServer.ts:203-220
 // clamps the pair together when both features are present; with only COOL
 // there is nothing to coordinate and the cooling setpoint moves on its
 // own.
@@ -197,7 +197,7 @@ func TestSetpointRaiseLowerCoolOnlyBothMovesTheCoolingSetpoint(t *testing.T) {
 // TestSetpointRaiseLowerCoolOnlyRejectsHeatMode pins the feature guard on
 // the Cool arm. Mode Cool is conformance COOL and Mode Heat conformance
 // HEAT (thermostat-cluster.element.ts:511-512); matter.js
-// ThermostatServer.ts:186-196 rejects the mode whose feature is absent
+// ThermostatServer.ts:189-198 rejects the mode whose feature is absent
 // with InvalidCommand rather than silently doing nothing.
 func TestSetpointRaiseLowerCoolOnlyRejectsHeatMode(t *testing.T) {
 	t.Parallel()

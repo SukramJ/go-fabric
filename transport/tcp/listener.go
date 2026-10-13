@@ -135,7 +135,7 @@ func (l *Listener) Conns() int {
 // the ordering contract); onClose, when non-nil, runs once per
 // accepted connection after it closed — the disconnect notification
 // matter.js's ExchangeManager subscribes to for session eviction
-// (TcpTransport.ts:216-223, ExchangeManager.ts:600-609). It is safe to
+// (TcpTransport.ts:216-223, ExchangeManager.ts:605-614). It is safe to
 // call Serve at most once.
 func (l *Listener) Serve(ctx context.Context, handler Handler, onClose func(*Conn)) error {
 	if handler == nil {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"testing"
 
+	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 )
 
@@ -177,4 +178,43 @@ func TestBridgedNodeRevisionFromSchema(t *testing.T) {
 	if got < 3 {
 		t.Errorf("deviceTypeRevision(0x0013) = %d; matter.js HEAD baseline is 3 (Matter 1.5)", got)
 	}
+}
+
+// TestClusterServersBridgedNodeHostTypeListedOnce verifies that a bridged
+// endpoint whose host device type is BridgedNode itself lists BridgedNode
+// once in its Descriptor's DeviceTypeList — the Descriptor keeps the first
+// entry of a device type (matter.js 0ceb202d packages/node/src/behaviors/
+// descriptor/DescriptorServer.ts:104-108).
+func TestClusterServersBridgedNodeHostTypeListedOnce(t *testing.T) {
+	t.Parallel()
+	dt := uint16(matterDeviceTypeBridgedNode)
+	a, err := New(newInternalFakeStore(), Config{VendorID: 1, ProductID: 1, NodeLabel: "x"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	topo, err := a.Assemble(context.Background(), []Snapshot{{Scope: "s", ModelComplete: true, Endpoints: []Spec{{
+		StableKey: StringKey("node"), DeviceType: dt, FriendlyName: "Node",
+		Source: deviceTypeSource{dt: dt, servers: []contract.ClusterServer{dtServer{id: 0x0006}}},
+	}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ep := range topo.Endpoints {
+		if ep.IsRoot() || ep.IsAggregator() {
+			continue
+		}
+		for _, srv := range ClusterServers(ep) {
+			if srv.MatterClusterID() != 0x001D {
+				continue
+			}
+			v, _ := srv.MatterRead(0x0000)
+			list, _ := v.([]mattercore.DeviceTypeStruct)
+			if len(list) != 1 || list[0].DeviceType != matterDeviceTypeBridgedNode {
+				t.Errorf("DeviceTypeList = %v, want BridgedNode once", list)
+			}
+			return
+		}
+		t.Fatalf("endpoint %d has no Descriptor", ep.ID)
+	}
+	t.Fatal("no bridged endpoint assembled")
 }

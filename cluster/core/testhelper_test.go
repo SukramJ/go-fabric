@@ -534,7 +534,7 @@ func buildCoreSignedCertForSubject(t *testing.T, pub []byte, isRoot bool, signer
 // whatever AddNOC/UpdateNOC currently holds as the pending key. That
 // makes this fixture correct for exactly one purpose: exercising the
 // NOCStatusInvalidPublicKey rejection path (chip
-// FabricTable.cpp:890 / matter.js Fabric.ts:524-526). Tests that need
+// FabricTable.cpp:890 / matter.js Fabric.ts:557-559). Tests that need
 // a NOC that actually installs must mint over the cluster's real
 // pending key instead — see [commissionTestFabric],
 // [issueCSRPendingPubKey], and [buildCoreSignedCertForPubKey].
@@ -695,7 +695,7 @@ func mintUpdateNOC(fabCtx context.Context, t *testing.T, oc *core.OperationalCre
 	// re-arms ArmFailSafe (→ ClearPendingState) before the update CSRRequest.
 	// Without that reset, the CSRRequest lands in the same window as the
 	// initial AddNOC and is rejected with ConstraintError — matter.js
-	// OperationalCredentialsServer.ts:131-137 (failsafeContext.fabricIndex !==
+	// OperationalCredentialsServer.ts:132-138 (failsafeContext.fabricIndex !==
 	// undefined). Simulate the re-arm here so the helper reflects the real flow.
 	oc.ClearPendingState()
 	pendingPub := issueCSRPendingPubKey(fabCtx, t, oc, true)

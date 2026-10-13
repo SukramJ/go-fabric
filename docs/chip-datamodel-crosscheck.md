@@ -143,7 +143,7 @@ block below.
 
 | Side | Source |
 | --- | --- |
-| snapshot | `parity/schema.json`, matter.js `85cf66472b02763fe3b9c736ebab443b999a95a1`, Matter 1.6.1, SHA-256 `854113df1ee2eae0795d2df168ae14c70d1d01ae8b817ef3c86bacd93785418c` |
+| snapshot | `parity/schema.json`, matter.js `0ceb202d28edc82f1ce131afde06e18a87c58a11`, Matter 1.6.1, SHA-256 `b0ee58b4e5d7e9eeeb372b9db10444ce1f7a27dff3220f5ddcfa3ddad40cd70f` |
 | CHIP | connectedhomeip `6170af8461b10b1766044122ac83332c6d00ab20`, `data_model/1.6.1` (git tree `77969732bddf4bd12ba57eb1c6fa032eb2613425`) |
 | CHIP's source | specification `1.6.1-attempt-4` (`49f70c101b4211df3febb975a7f7f9d6e4c4bc94`), alchemy version: v1.7.10 |
 | read | at test time from a connectedhomeip checkout; nothing of it is committed (ADR 0015) |
@@ -172,7 +172,7 @@ block below.
 
 | Class | Differences |
 | --- | ---: |
-| (i) matter.js right or deliberate | 96 |
+| (i) matter.js right or deliberate | 113 |
 | (ii) CHIP right, snapshot wrong | 2 |
 | (iii) representation, normalized in code | 539 |
 | (iv) excused by the harness | 2 |
@@ -265,7 +265,6 @@ CHIP marks these cluster ids provisional. A certification run rejects a provisio
 | CommodityTariff.TariffComponentStruct.PeakPeriod | default | `0` | `undefined` | 1 | The specification states 0 as the default of a struct-typed field, which no struct can be | matter.js support/models/src/local/CommodityTariffOverrides.ts |
 | CommodityTariff.TariffComponentStruct.PowerThreshold | default | `0` | `undefined` | 1 | The specification states 0 as the default of a struct-typed field, which no struct can be | matter.js support/models/src/local/CommodityTariffOverrides.ts |
 | FanControl.FanModeEnum.Medium | conformance | `[low]` | `o` | 1 | "[Low]" names another enum value, which a value's conformance cannot be evaluated against | matter.js support/models/src/local/FanControl.ts |
-| IlluminanceMeasurement.LightSensorType | type | `lightsensortypeenum` | `uint8` | 1 | The specification defines LightSensorTypeEnum but permits values outside it; uint8 is the same wire type | matter.js support/models/src/local/IlluminanceMeasurementOverrides.ts |
 | JointFabricDatastore.DatastoreAccessControlEntryStruct.Subjects | constraint | `maxsubjectsperaccesscontrolentry` | `none` | 1 | The bound is an attribute of another cluster (Access Control), which a constraint cannot reach | matter.js support/models/src/local/JointFabricDatastoreOverrides.ts |
 | JointFabricDatastore.DatastoreAccessControlEntryStruct.Targets | constraint | `maxtargetsperaccesscontrolentry` | `none` | 1 | The bound is an attribute of another cluster (Access Control), which a constraint cannot reach | matter.js support/models/src/local/JointFabricDatastoreOverrides.ts |
 | LocalizationConfiguration.ActiveLocale | constraint | `max35` | `insupportedlocales` | 1 | Validates the value against SupportedLocales, whose entries the specification bounds to 35 | matter.js support/models/src/local/LocalizationConfigurationOverrides.ts |
@@ -289,6 +288,11 @@ CHIP marks these cluster ids provisional. A certification run rejects a provisio
 | WindowCovering.GoToTiltPercentage.Ignored | field | `absent` | `present` | 1 | The specification defines a second field CHIP does not use; matter.js disallows it (X) to follow the de-facto standard | matter.js support/models/src/local/WindowCoveringOverrides.ts |
 | ModeSelect.StandardNamespace | type | `enum16` | `namespace` | 1 | The namespace type enumerates exactly the standard namespace ids, at the width of the semantic tag's NamespaceID (enum8), which every standard namespace id fits; TLV carries the value at its own width | matter.js support/models/src/local/ModeSelectOverrides.ts |
 | WindowCovering.MovementStatus | datatype | `absent` | `present` | 1 | The formal type of the OperationalStatus bit fields, which the specification describes in prose | matter.js support/models/src/local/WindowCoveringOverrides.ts |
+| *.ModeTag.MfgTags | field | `absent` | `present` | 10 | The specification reserves the manufacturer range of this enum; matter.js models it as a range member so a value in it validates (ValueValidator.ts:172-178), chip's XML lists only the named values | matter.js packages/model/src/standard/elements/mode-base.element.ts |
+| *.ErrorStateEnum.ManufacturerError | field | `absent` | `present` | 3 | The specification reserves the manufacturer range of this enum; matter.js models it as a range member so a value in it validates (ValueValidator.ts:172-178), chip's XML lists only the named values | matter.js packages/model/src/standard/elements/operational-state.element.ts |
+| *.OperationalStateEnum.ManufacturerStates | field | `absent` | `present` | 3 | The specification reserves the manufacturer range of this enum; matter.js models it as a range member so a value in it validates (ValueValidator.ts:172-178), chip's XML lists only the named values | matter.js packages/model/src/standard/elements/operational-state.element.ts |
+| ClosureControl.ClosureErrorEnum.ManufacturerError | field | `absent` | `present` | 1 | The specification reserves the manufacturer range of this enum; matter.js models it as a range member so a value in it validates (ValueValidator.ts:172-178), chip's XML lists only the named values | matter.js packages/model/src/standard/elements/closure-control.element.ts |
+| IlluminanceMeasurement.LightSensorTypeEnum.Ms | field | `absent` | `present` | 1 | The specification reserves the manufacturer range of this enum; matter.js models it as a range member so a value in it validates (ValueValidator.ts:172-178), chip's XML lists only the named values | matter.js packages/model/src/standard/elements/illuminance-measurement.element.ts |
 
 ### (ii) CHIP is right, the snapshot is wrong
 

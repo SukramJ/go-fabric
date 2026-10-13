@@ -25,7 +25,7 @@ import (
 
 // TestAddNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey verifies that
 // AddNOC rejects a NOC minted over a key other than the pending CSR key
-// with NOCStatusInvalidPublicKey. Mirrors matter.js Fabric.ts:524-526
+// with NOCStatusInvalidPublicKey. Mirrors matter.js Fabric.ts:557-559
 // (PublicKeyError → InvalidPublicKey) and chip FabricTable.cpp:890
 // `existingOpKey->Pubkey().Matches(nocPubKey)`.
 func TestAddNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
@@ -66,7 +66,7 @@ func TestAddNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
 // TestAddNOC_SameFabricIDAndRootTwiceRejectedAsFabricConflict verifies
 // that installing a second NOC for the same (FabricID, RootPublicKey)
 // pair is rejected with NOCStatusFabricConflict, even from a fresh
-// FailSafe/CSR cycle. Mirrors matter.js FailsafeContext.ts:255-259
+// FailSafe/CSR cycle. Mirrors matter.js FailsafeContext.ts:244-248
 // (globalId hash over fabricId + root public key) and chip's
 // pre-AddFabric duplicate check.
 func TestAddNOC_SameFabricIDAndRootTwiceRejectedAsFabricConflict(t *testing.T) {
@@ -115,7 +115,7 @@ func TestAddNOC_SameFabricIDAndRootTwiceRejectedAsFabricConflict(t *testing.T) {
 // UpdateNOC validates the new NOC's chain against the fabric's STORED
 // root — a NOC signed by an unrelated root fails chain verification and
 // is rejected with NOCStatusInvalidNOC. Mirrors matter.js
-// FailsafeContext.ts:217-224 buildUpdatedFabric → Fabric.ts:508-538
+// FailsafeContext.ts:216-223 buildUpdatedFabric → Fabric.ts:541-579
 // setOperationalCert and chip FabricTable.cpp:854-882.
 func TestUpdateNOC_SignedByDifferentRootRejectedAsInvalidNOC(t *testing.T) {
 	t.Parallel()
@@ -151,7 +151,7 @@ func TestUpdateNOC_SignedByDifferentRootRejectedAsInvalidNOC(t *testing.T) {
 // TestUpdateNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey verifies
 // that UpdateNOC rejects a NOC minted over a key other than the pending
 // IsForUpdateNOC CSR key, even when correctly signed by the fabric's
-// real root. Mirrors matter.js Fabric.ts:524-526 and chip
+// real root. Mirrors matter.js Fabric.ts:557-559 and chip
 // FabricTable.cpp:890.
 func TestUpdateNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
 	t.Parallel()
@@ -169,7 +169,7 @@ func TestUpdateNOC_MintedOverWrongKeyRejectedAsInvalidPublicKey(t *testing.T) {
 	// A real UpdateNOC opens a fresh FailSafe window (ArmFailSafe →
 	// ClearPendingState) before its CSRRequest; without the reset the CSR
 	// lands in the AddNOC window and is rejected with ConstraintError
-	// (matter.js OperationalCredentialsServer.ts:131-137).
+	// (matter.js OperationalCredentialsServer.ts:132-138).
 	oc.ClearPendingState()
 	// Issue the update CSR (sets a pending key) but mint the NOC over an
 	// unrelated throwaway key instead of the one the CSR carried.
@@ -233,7 +233,7 @@ func TestUpdateNOC_DifferentFabricIDRejectedAsInvalidNOC(t *testing.T) {
 // updates the fabric row's NodeID via [store.Store.UpdateFabricNodeID]
 // and (b) fires onFabricWithdraw with the OLD (CompressedID, NodeID) so
 // the stale mDNS operational instance is retracted. Mirrors matter.js
-// Fabric.ts:543 (nodeId lifted from the new NOC) + DeviceAdvertiser.ts:
+// Fabric.ts:548 (nodeId lifted from the new NOC) + DeviceAdvertiser.ts:
 // 65-76 (close the fabric's advertisement when nodeId changed, then
 // re-advertise).
 func TestUpdateNOC_NewNodeIDUpdatesStoreAndFiresWithdraw(t *testing.T) {

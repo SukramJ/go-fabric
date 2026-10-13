@@ -271,3 +271,28 @@ func TestDefinitionLookups(t *testing.T) {
 		t.Error("registry")
 	}
 }
+
+// TestEnumSupportedRanges: a value inside a range member is a value of the
+// enum, decided by the range's conformance; a named value wins over a
+// range that also holds it. Mirrors matter.js
+// packages/node/src/behavior/state/validation/conformance-compiler.ts:857-858
+// (the member id first, then the range whose constraint holds the value).
+func TestEnumSupportedRanges(t *testing.T) {
+	t.Parallel()
+	e := &spec.Enum{Name: "E", Bits: 8, Values: []spec.EnumValue{
+		{Value: 0, Name: "Zero"},
+		{Value: 130, Name: "Named", Conformance: spec.Conformance{Text: "X", Op: spec.ConfDisallowed}},
+	}, Ranges: []spec.EnumRange{
+		{Name: "Mfg", Min: 128, Max: 191},
+		{Name: "Gone", Min: 200, Max: 210, Conformance: spec.Conformance{Text: "X", Op: spec.ConfDisallowed}},
+	}}
+	ctx := spec.Context(rvcrunmode.Definition, 0)
+	for v, want := range map[uint64]bool{0: true, 127: false, 128: true, 191: true, 192: false, 130: false, 205: false} {
+		if got := spec.EnumSupported(e, v, ctx); got != want {
+			t.Errorf("EnumSupported(%d) = %v, want %v", v, got, want)
+		}
+	}
+	if r := (spec.EnumRange{Min: 1, Max: 2}); r.Contains(0) || !r.Contains(1) || !r.Contains(2) || r.Contains(3) {
+		t.Error("EnumRange.Contains bounds")
+	}
+}

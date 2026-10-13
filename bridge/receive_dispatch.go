@@ -31,7 +31,7 @@ var errChunkRejected = errors.New("receive: peer rejected ReportData chunk")
 
 // errChunkUnanswered is returned by a chunk loop when the peer never
 // answered a ReportData chunk within the exchange timeout. matter.js
-// aborts the interaction on that timeout (MessageExchange.ts:829-858
+// aborts the interaction on that timeout (MessageExchange.ts:834-863
 // PeerMessageMissingError); continuing would stream every remaining
 // chunk to a peer that is not listening, holding the dispatch slot for
 // the whole report.

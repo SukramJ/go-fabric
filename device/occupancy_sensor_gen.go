@@ -19,7 +19,7 @@ const (
 	OccupancySensorRevision uint16 = 4
 )
 
-// OccupancySensorType is the OccupancySensor device type, from the matter.js model at 85cf664 (Matter 1.6.1):
+// OccupancySensorType is the OccupancySensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/occupancy-sensor.ts.
 var OccupancySensorType = Type{
 	ID: OccupancySensorID, Name: "OccupancySensor", Revision: OccupancySensorRevision,

@@ -389,7 +389,7 @@ func TestOngoingReportWaitsForEachChunksStatusResponse(t *testing.T) {
 // without piggyback ack when we are waiting for an ack") — TC-IDM-4.3
 // step 10 lost the tail of a two-chunk report to exactly that. matter.js
 // piggybacks the pending ack on every send (packages/protocol/src/
-// protocol/MessageExchange.ts:674).
+// protocol/MessageExchange.ts:679).
 func TestOngoingReportChunkPiggybacksTheStatusResponseAck(t *testing.T) {
 	t.Parallel()
 	const sessionID uint16 = 74

@@ -177,7 +177,7 @@ func TestMRPAckAdapter_DischargeRoundTrip(t *testing.T) {
 // keyed on (session, exchange), not the bare exchange ID: two sessions
 // sharing an exchange ID must not clear each other's obligation. Exchange
 // IDs are picked independently by every peer, so this collision is a real
-// scenario, not a hypothetical — mirrors matter.js ExchangeManager.ts:287.
+// scenario, not a hypothetical — mirrors matter.js ExchangeManager.ts:340.
 func TestMRPAckAdapter_DischargeIsSessionScoped(t *testing.T) {
 	t.Parallel()
 	tracker := mrp.NewAckTracker(0)

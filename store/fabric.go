@@ -34,7 +34,7 @@ type FabricRecord struct {
 	// AddTrustedRootCertificate (Matter §11.18.7.12). Mirrors matter.js
 	// `Fabric.rootCert` (Fabric.ts:68); served verbatim as each entry
 	// of OperationalCredentials.TrustedRootCertificates
-	// (matter.js OperationalCredentialsServer.ts:457-459). Apple Home
+	// (matter.js OperationalCredentialsServer.ts:470-472). Apple Home
 	// validates every entry as a Matter Certificate TLV and silently
 	// drops the entire ReportData stream on schema mismatch.
 	//
@@ -219,7 +219,7 @@ WHERE fabric_index = ?`, vendorID, fabricIndex)
 // UpdateNOC installs a NOC that may carry a new NodeID for the same
 // fabric; the stored row must follow so destinationID resolution and
 // the operational mDNS instance name (<compressedID>-<nodeID>) match
-// the new certificate. Mirrors matter.js Fabric.ts:543 lifting nodeId
+// the new certificate. Mirrors matter.js Fabric.ts:548 lifting nodeId
 // from the new NOC into the rebuilt fabric. Returns
 // [ErrFabricNotFound] when no row exists.
 func (s *Store) UpdateFabricNodeID(ctx context.Context, fabricIndex uint8, nodeID uint64) error {

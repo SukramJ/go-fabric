@@ -182,7 +182,7 @@ func readSetpoint(t *testing.T, srv *thermo.ThermostatServer, attrID uint32, nam
 // TestSetpointRaiseLower_Both_NoClamp verifies the no-clamp path: when
 // both setpoints are mid-range and the delta keeps them within limits,
 // both shift by exactly amount*10. Mirrors matter.js
-// ThermostatServer.ts:170-189.
+// ThermostatServer.ts:202-220.
 func TestSetpointRaiseLower_Both_NoClamp(t *testing.T) {
 	t.Parallel()
 	// HEAT+COOL+AUTO, minHeat=700 maxHeat=3000, minCool=1600 maxCool=3200

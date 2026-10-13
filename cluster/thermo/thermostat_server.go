@@ -67,6 +67,12 @@ const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | Thermosta
 // ErrFeatures reports a ThermostatConfig.Features the server refuses.
 var ErrFeatures = errors.New("thermostat: feature selection not served")
 
+// ErrSetpoints reports a ThermostatConfig whose setpoint limits and
+// initial setpoints violate the setpoint rules in a way [New] cannot
+// repair — an absolute minimum above its maximum, or an AUTO deadband the
+// absolute limits leave no room for.
+var ErrSetpoints = errors.New("thermostat: setpoint configuration cannot be fixed")
+
 // Thermostat attribute IDs.
 const (
 	thermoAttrLocalTemperature            = tdef.AttrLocalTemperature
@@ -127,8 +133,8 @@ type ThermostatConfig struct {
 // nothing is stored. It is the Go form of a matter.js host refusing by
 // throwing in occupied*Setpoint$Changing / systemMode$Changing: the
 // validation runs before the state changes
-// (packages/node/src/behaviors/thermostat/ThermostatServer.ts:599-606,
-// :619 at matter.js 4633bfd7). For comparison, onoff's Sink answers every
+// (packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601,
+// :614 at matter.js 0ceb202d). For comparison, onoff's Sink answers every
 // error, a status error included, with FAILURE.
 //
 // The setpoint limits (Min/MaxHeat/CoolSetpointLimit) are configuration,
@@ -164,14 +170,14 @@ type Sink interface {
 	// wrote — and the companions are what the reconcile moves besides it. A SetpointRaiseLower makes one call: in Both
 	// mode on a HEAT+COOL thermostat the cooling setpoint is the primary
 	// and the heating setpoint its companion (matter.js assigns cooling
-	// first, ThermostatServer.ts:218-219); when only one of them moves it
+	// first, ThermostatServer.ts:219-220); when only one of them moves it
 	// travels alone, and a single-mode command moves one with no
 	// companions.
 	//
 	// A value equal to the stored one is no change: the write or command
 	// answers SUCCESS without calling the Sink (matter.js Datasource.ts
-	// skips an equal value on commit, :674-676, and fires $Changing only
-	// for fields that changed, :956-957).
+	// skips an equal value on commit, :760-762, and fires $Changing only
+	// for fields that changed, :1042-1043).
 	SetSetpoint(ctx context.Context, attrID uint32, value int16, companions []SetpointChange) error
 }
 
@@ -244,6 +250,18 @@ type ThermostatServer struct {
 // COOL being "AUTO, O.a+" (thermostat-cluster.element.ts) — or naming a
 // feature the server does not serve (Occupancy, Setback, the schedule,
 // preset, event and suggestion features) is refused with [ErrFeatures].
+//
+// Limits and initial setpoints that violate the setpoint rules are
+// repaired, preferring the heating side (the cooling side without HEAT):
+// the other side's limits and setpoint move first, the preferred side is
+// pulled back only where the other would leave its absolute limits. New
+// logs matter.thermostat.initial_setpoints_adjusted with the violation and
+// every adjustment, and refuses with [ErrSetpoints] only when a violation
+// remains. Mirrors matter.js 0ceb202d packages/node/src/behaviors/
+// thermostat/ThermostatServer.ts:1015-1042 (#reconcileInitialSetpoints,
+// run from #setupValidations at :582-583, after the deadband is captured
+// at :154-164); here the deadband is the fixed default, set before the
+// reconcile.
 func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	features := cfg.Features
 	// AUTO requires HEAT+COOL — clear it if either is missing.
@@ -283,6 +301,18 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		s.maxCool = cfg.AbsMaxCoolSetpointLimit
 	}
 
+	st := s.setpointState()
+	violation, adjusted, err := st.reconcileInitial()
+	if err != nil {
+		return nil, err
+	}
+	if violation != "" {
+		s.commitSetpoints(st)
+		slog.Default().Warn("matter.thermostat.initial_setpoints_adjusted",
+			slog.String("violation", violation),
+			slog.String("adjusted", adjustedText(adjusted)))
+	}
+
 	// SystemMode default: Auto with the AUTO feature, Heat with HEAT,
 	// Cool when COOL-only.
 	switch {
@@ -297,7 +327,8 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 }
 
 // NewThermostatServer constructs the cluster as [New] does; it panics on a
-// selection [New] refuses — a wiring error, not a runtime condition.
+// selection or setpoint configuration [New] refuses — a wiring error, not
+// a runtime condition.
 func NewThermostatServer(cfg ThermostatConfig) *ThermostatServer {
 	s, err := New(cfg)
 	if err != nil {
@@ -544,15 +575,15 @@ func (s *ThermostatServer) MatterWrite(ctx context.Context, attrID uint32, value
 // derives or which forbid nothing the enum allows.
 //
 // With a [Sink] the mode goes to the host first (matter.js
-// systemMode$Changing, ThermostatServer.ts:619 at 4633bfd7, runs before
+// systemMode$Changing, ThermostatServer.ts:614 at 0ceb202d, runs before
 // the state changes); a refusal stores nothing. The Sink runs without
 // s.mu; once it consented the mode is stored over whatever
 // [ThermostatServer.SetSystemMode] stored meanwhile. The caller holds
 // s.op.
 func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
-	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:674-676
-	// (isDeepEqual skips an unchanged value on commit) and :956-957
-	// ($Changing only for changed fields) at 4633bfd7: an unchanged mode
+	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:760-762
+	// (isDeepEqual skips an unchanged value on commit) and :1042-1043
+	// ($Changing only for changed fields) at 0ceb202d: an unchanged mode
 	// is no change, and the Sink is not called.
 	s.mu.RLock()
 	same := s.systemMode == v
@@ -580,8 +611,8 @@ func (s *ThermostatServer) writeSystemMode(ctx context.Context, v uint8) error {
 //
 // An occupied setpoint goes to the [Sink] after the assert and the
 // reconcile, with what the reconcile would move, and before anything is
-// stored (matter.js occupied*Setpoint$Changing, ThermostatServer.ts:599-606
-// at 4633bfd7: the assert and the reconcile run before the state
+// stored (matter.js occupied*Setpoint$Changing, ThermostatServer.ts:594-601
+// at 0ceb202d: the assert and the reconcile run before the state
 // changes). A limit does not: limits are configuration. The Sink runs
 // without s.mu; afterwards the value goes onto the state as it is then
 // and the reconcile runs on that ([Sink] describes the rule). The caller
@@ -602,8 +633,8 @@ func (s *ThermostatServer) writeSetpoint(ctx context.Context, attrID uint32, v i
 	s.mu.Lock()
 	// Served only with its feature, per ValidateWrite.
 	cur := s.setpointState()
-	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:674-676
-	// and :956-957 at 4633bfd7: an occupied setpoint equal to the stored
+	// Mirrors matter.js packages/node/src/behavior/state/managed/Datasource.ts:760-762
+	// and :1042-1043 at 0ceb202d: an occupied setpoint equal to the stored
 	// one is no change — no $Changing, so neither the assert nor the Sink.
 	if (attrID == thermoAttrOccupiedHeatingSetpoint && v == cur.occupHeat) ||
 		(attrID == thermoAttrOccupiedCoolingSetpoint && v == cur.occupCool) {
@@ -759,8 +790,8 @@ func abs16(x int16) int16 {
 // The new setpoints are computed first; with a [Sink] what moves goes to
 // it in one call before anything is stored (cooling primary, heating its
 // companion, for Both on a HEAT+COOL thermostat — matter.js's assignment
-// order, ThermostatServer.ts:218-219 at 4633bfd7); in matter.js those
-// assignments pass occupied*Setpoint$Changing (:599-606), where a host
+// order, ThermostatServer.ts:219-220 at 0ceb202d); in matter.js those
+// assignments pass occupied*Setpoint$Changing (:594-601), where a host
 // refuses. A refusal answers the command and stores neither setpoint.
 func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields any) error { //nolint:funlen // single-purpose setpoint command handler with many mode/feature branches
 	req, err := setpointRaiseLowerRequest(fields)
@@ -769,7 +800,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	}
 	mode, amount := req.Mode, req.Amount
 
-	// matter.js ThermostatServer.ts:186-196: reject Heat/Cool modes when feature absent.
+	// matter.js ThermostatServer.ts:189-198: reject Heat/Cool modes when feature absent.
 	switch mode {
 	case uint8(tdef.SetpointRaiseLowerModeHeat):
 		if s.features&ThermostatFeatureHEAT == 0 {
@@ -790,7 +821,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	prevHeat, prevCool := occupHeat, occupCool
 
 	// amount is in 0.1°C steps in the command; setpoints are in 0.01°C units.
-	// matter.js ThermostatServer.ts:169: amount *= 10.
+	// matter.js ThermostatServer.ts:200: amount *= 10.
 	delta := int16(amount) * 10
 
 	clampHeat := func(v int16) int16 {
@@ -822,7 +853,7 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 			// setpoint's overshoot past its limit, then subtract the more
 			// limiting overshoot from BOTH setpoints so their spacing is
 			// kept. Clamping each independently would skew the deadband.
-			// matter.js ThermostatServer.ts:202-219.
+			// matter.js ThermostatServer.ts:203-220.
 			desiredCool := occupCool + delta
 			coolLimit := desiredCool - clampCool(desiredCool)
 			desiredHeat := occupHeat + delta
@@ -855,10 +886,10 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 
 // applyRaiseLower hands what SetpointRaiseLower moves to the Sink in one
 // call — the cooling setpoint as the primary and the heating setpoint as
-// its companion when both move, matter.js's order (ThermostatServer.ts:218-219,
-// :221, :223, :246, :268 at 4633bfd7), the one that moves alone otherwise —
+// its companion when both move, matter.js's order (ThermostatServer.ts:219-220,
+// :222, :224, :247, :269 at 0ceb202d), the one that moves alone otherwise —
 // and stores once the call succeeded. A setpoint that does not move is no
-// change (Datasource.ts:674-676, :956-957): when neither moves, the Sink is
+// change (Datasource.ts:760-762, :1042-1043): when neither moves, the Sink is
 // not called. prevHeat / prevCool are the setpoints the command read.
 //
 // The Sink runs without s.mu. Once it consented, what the command moved is

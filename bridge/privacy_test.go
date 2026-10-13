@@ -438,7 +438,7 @@ func TestSendReply_PrivacyFlaggedRequestGetsMaskedReply(t *testing.T) {
 	// The peer unmasks with its own view of the session, then decrypts.
 	// Both only work when the bridge applied the mask. The unmask uses
 	// the channel primitives directly: the bridge's inbound gate drops
-	// unicast frames carrying P (matter.js ExchangeManager.ts:220-224),
+	// unicast frames carrying P (matter.js ExchangeManager.ts:230-235),
 	// so this reply is only ever decodable by a peer that unmasks below
 	// the gate — which is what makes the P echo on unicast dead code in
 	// practice, and what this test pins about the masking itself.
@@ -466,7 +466,7 @@ func TestSendReply_PrivacyFlaggedRequestGetsMaskedReply(t *testing.T) {
 // TestPrivacy_UnicastWithPBitIsDropped — privacy enhancements are defined
 // for group messages only; a unicast frame carrying the P bit is invalid
 // and is dropped rather than unmasked and handed to a unicast session.
-// Mirrors matter.js ExchangeManager.ts:220-224 and the chip SDK.
+// Mirrors matter.js ExchangeManager.ts:230-235 and the chip SDK.
 func TestPrivacy_UnicastWithPBitIsDropped(t *testing.T) {
 	t.Parallel()
 	bridgeKey := bytes.Repeat([]byte{0xAA}, 16)

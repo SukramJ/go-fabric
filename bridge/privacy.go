@@ -47,7 +47,7 @@ const (
 //
 // Privacy enhancements are only defined for group messages (Matter
 // §4.9 applies them to group sessions). A unicast frame carrying the P
-// bit is invalid and is dropped — matter.js ExchangeManager.ts:220-224
+// bit is invalid and is dropped — matter.js ExchangeManager.ts:230-235
 // and the chip SDK do the same — rather than unmasked and handed to a
 // unicast session. SessionID==0 (PASE pre-fabric) likewise MUST NOT
 // carry the P bit; both are reported as errors so the caller drops the

@@ -177,11 +177,29 @@ type EnumValue struct {
 	Conformance Conformance
 }
 
+// EnumRange is a range of values an enum reserves as a whole, such as
+// the manufacturer range 128..191 of ErrorStateEnum: a member that states
+// no id but a constraint with a minimum and a maximum.
+//
+// Mirrors matter.js packages/model/src/models/FieldModel.ts:isEnumRange
+// (a field without an id whose constraint has min and max, under an enum).
+type EnumRange struct {
+	Name        string
+	Min, Max    uint64
+	Conformance Conformance
+}
+
+// Contains reports whether v lies in the range, both ends included.
+func (r EnumRange) Contains(v uint64) bool { return v >= r.Min && v <= r.Max }
+
 // Enum is an enum datatype.
 type Enum struct {
 	Name   string
 	Bits   int
 	Values []EnumValue
+	// Ranges are the enum's range members; a value inside one is a
+	// value of the enum.
+	Ranges []EnumRange
 }
 
 // BitmapMember is one bit, or range of bits, of a bitmap.

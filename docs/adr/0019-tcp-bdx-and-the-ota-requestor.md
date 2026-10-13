@@ -35,7 +35,7 @@ HEAD and the harness pin 6170af84:
   and server support (`DeviceAdvertiser.ts:376`, `ServerNetworkRuntime.ts:337`),
   frames carry a 4-byte little-endian length (`TcpChannel.ts:37-41`), and
   a dropped connection evicts every session bound to it
-  (`ExchangeManager.ts:628-655`, "mimics CHIP SDK").
+  (`ExchangeManager.ts:633-660`, "mimics CHIP SDK").
 
 ## Decision
 

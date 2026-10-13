@@ -4,6 +4,7 @@
 package opstate_test
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
@@ -276,5 +277,38 @@ func TestParityMatterJS_OperationalStateEnumValues(t *testing.T) {
 	}
 	if !slices.Equal(errs, want) {
 		t.Errorf("ErrorStateEnum %v, want %v", errs, want)
+	}
+}
+
+// TestParityMatterJS_OperationalStateManufacturerRanges pins the host
+// setters to the manufacturer ranges the snapshot carries as enum range
+// members (OperationalStateEnum ManufacturerStates and ErrorStateEnum
+// ManufacturerError, 128..191; matter.js 9892fa39): a value inside is
+// accepted, as matter.js packages/node/src/behavior/state/validation/
+// ValueValidator.ts:172-178 accepts it, and the first value past the range
+// stays refused.
+func TestParityMatterJS_OperationalStateManufacturerRanges(t *testing.T) {
+	t.Parallel()
+	base := []opstate.StateEntry{{ID: opstate.StateStopped}, {ID: opstate.StateError}}
+	for _, c := range []struct {
+		id   opstate.State
+		want error
+	}{{0x80, nil}, {0xBF, nil}, {0xC0, opstate.ErrUnknownState}, {0x7F, opstate.ErrUnknownState}} {
+		states := append(slices.Clone(base), opstate.StateEntry{ID: c.id, Label: "mfg"})
+		if _, err := opstate.NewServer(opstate.Config{States: states}); !errors.Is(err, c.want) {
+			t.Errorf("state 0x%02X: err = %v, want %v", uint8(c.id), err, c.want)
+		}
+	}
+	srv, err := opstate.NewServer(opstate.Config{States: base, State: opstate.StateStopped})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		id   opstate.ErrorID
+		want error
+	}{{0x80, nil}, {0xBF, nil}, {0xC0, opstate.ErrUnknownError}, {0x7F, opstate.ErrUnknownError}} {
+		if err := srv.SetOperationalError(opstate.ErrorState{ID: c.id, Label: "mfg"}); !errors.Is(err, c.want) {
+			t.Errorf("error 0x%02X: err = %v, want %v", uint8(c.id), err, c.want)
+		}
 	}
 }

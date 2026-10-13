@@ -11,6 +11,9 @@ package core_test
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"errors"
 	"testing"
 
@@ -392,7 +395,7 @@ func TestParityFabricManager_OpcredsRemoveFabricMissReturnsInvalidFabricIndex(t 
 // dangling pending fabric in the store.
 //
 // Source-Origin: derived from matter.js packages/node/src/behaviors/
-// operational-credentials/OperationalCredentialsServer.ts:218
+// operational-credentials/OperationalCredentialsServer.ts:224
 // (#failsafeContext check before AddNOC) and chip
 // src/app/clusters/operational-credentials/operational-credentials-server.cpp
 // VerifyOrExit(failSafeContext.IsFailSafeArmed(...), errorStatus=FailsafeRequired).
@@ -408,7 +411,7 @@ func TestParityOpcreds_FailSafeRequiredForAddNOC(t *testing.T) {
 		t.Fatalf("NewOperationalCredentials: %v", err)
 	}
 
-	_, invokeErr := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{IPKValue: make([]byte, 16)})
+	_, invokeErr := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1})
 	if invokeErr == nil {
 		t.Fatal("AddNOC without armed FailSafe: expected error, got nil")
 	}
@@ -431,7 +434,7 @@ func TestParityOpcreds_FailSafeRequiredForAddNOC(t *testing.T) {
 // the fabric-authentication guard on UpdateNOC.
 //
 // Source-Origin: matter.js packages/node/src/behaviors/
-// operational-credentials/OperationalCredentialsServer.ts:234-239 — the
+// operational-credentials/OperationalCredentialsServer.ts:247-252 — the
 // addNoc path raises StatusResponseError("AddNoc is illegal after CsrRequest
 // for UpdateNOC in same failsafe context", Status.ConstraintError).
 func TestParityOpcreds_CSRForUpdateNOCRejectedByAddNOC(t *testing.T) {
@@ -458,7 +461,7 @@ func TestParityOpcreds_CSRForUpdateNOCRejectedByAddNOC(t *testing.T) {
 	// Now call AddNOC from the same session — must be rejected with an
 	// IM-level ConstraintError (not an in-band NOCResponse).
 	addNOCCtx := core.WithInvokeSessionID(caseCtx, 100)
-	_, err = oc.MatterInvoke(addNOCCtx, 0x06, core.AddNOCRequest{IPKValue: make([]byte, 16)})
+	_, err = oc.MatterInvoke(addNOCCtx, 0x06, core.AddNOCRequest{IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1})
 	if err == nil {
 		t.Fatal("AddNOC with UpdateNOC-targeted CSR: expected IM error, got nil")
 	}
@@ -514,4 +517,114 @@ func TestParityOpcreds_PendingRootAppearsInTrustedRoots(t *testing.T) {
 	// available in this package. Skip the post-install assertion and record
 	// the gap so the full list-extension contract is tracked.
 	t.Skip("FixMe: go-fabric gap — AddTrustedRootCertificate requires a valid Matter RCAC TLV blob; a test-key generator fixture is needed to complete the pending-root list-extension parity test")
+}
+
+// TestParityOpcreds_AddNOCReservedAdminVendorIDIsInvalidCommand verifies
+// that AddNOC refuses a reserved AdminVendorId with the IM status
+// InvalidCommand — not a NOCResponse — before every other guard, the
+// fail-safe included, and that the test vendor IDs 0xFFF1..0xFFF4 pass
+// the guard.
+//
+// Mirrors matter.js 0ceb202d packages/node/src/behaviors/
+// operational-credentials/OperationalCredentialsServer.ts:217-222 (`if
+// (!VendorId.isOperational(adminVendorId)) throw new
+// StatusResponseError(…, Status.InvalidCommand)`), with isOperational at
+// packages/types/src/datatype/VendorId.ts:44 (non-zero, valid 0..0xFFF4).
+func TestParityOpcreds_AddNOCReservedAdminVendorIDIsInvalidCommand(t *testing.T) {
+	t.Parallel()
+	type statusCoder interface{ MatterStatusCode() im.StatusCode }
+	for _, vid := range []uint16{0x0000, 0xFFF5, 0xFFF6, 0xFFFE, 0xFFFF} {
+		s := newFakeStore()
+		oc, err := core.NewOperationalCredentials(s, core.OpcredsConfig{
+			SupportedFabrics: 5,
+			IsFailSafeArmed:  func() bool { return false }, // the VID guard precedes FailsafeRequired
+		})
+		if err != nil {
+			t.Fatalf("NewOperationalCredentials: %v", err)
+		}
+		resp, invokeErr := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
+			IPKValue:      make([]byte, 16),
+			AdminVendorID: vid,
+		})
+		var sc statusCoder
+		if !errors.As(invokeErr, &sc) {
+			t.Fatalf("VID 0x%04X: AddNOC = (%v, %v), want an IM InvalidCommand error", vid, resp, invokeErr)
+		}
+		if got := sc.MatterStatusCode(); got != im.StatusInvalidCommand {
+			t.Errorf("VID 0x%04X: MatterStatusCode()=0x%02X, want StatusInvalidCommand (0x85)", vid, uint8(got))
+		}
+	}
+	for _, vid := range []uint16{0x0001, 0xFFF1, 0xFFF4} {
+		oc, _ := opcredsWithFakeStore(t)
+		resp, invokeErr := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
+			IPKValue:      make([]byte, 16),
+			AdminVendorID: vid,
+		})
+		if invokeErr != nil {
+			t.Fatalf("VID 0x%04X: AddNOC error %v, want the guard passed", vid, invokeErr)
+		}
+		if nr := resp.(core.NOCResponse); nr.StatusCode != core.NOCStatusMissingCsr {
+			t.Errorf("VID 0x%04X: StatusCode = %d, want MissingCsr (the next guard)", vid, nr.StatusCode)
+		}
+	}
+}
+
+// TestParityOpcreds_NonOperationalNOCNodeIDIsInvalidNodeOpID verifies
+// that AddNOC and UpdateNOC answer a NOC whose matter-node-id lies outside
+// the operational range 0x0000_0000_0000_0001..0xFFFF_FFEF_FFFF_FFFF with
+// NOCResponse InvalidNodeOpId, and that AddNOC stores no fabric.
+//
+// Mirrors matter.js 0ceb202d packages/protocol/src/certificate/kinds/
+// Noc.ts:83-85 (`if (!NodeId.isOperationalNodeId(nodeId)) throw new
+// OperationalNodeIdError(…)`), mapped by packages/node/src/behaviors/
+// operational-credentials/OperationalCredentialsServer.ts:179-183
+// (#mapNocErrors → InvalidNodeOpId) for addNoc (:271-273) and updateNoc
+// (:379-386).
+func TestParityOpcreds_NonOperationalNOCNodeIDIsInvalidNodeOpID(t *testing.T) {
+	t.Parallel()
+	for _, nodeID := range []uint64{0, 0xFFFF_FFF0_0000_0000, 0xFFFF_FFFD_0001_0001, 0xFFFF_FFFF_FFFF_FFFF} {
+		ctx := context.Background()
+		oc, s := opcredsWithFakeStore(t)
+		rootPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatalf("GenerateKey: %v", err)
+		}
+		if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{
+			RootCACertificate: buildCoreSignedCert(t, rootPriv, true, rootPriv),
+		}); err != nil {
+			t.Fatalf("AddTrustedRootCertificate: %v", err)
+		}
+		pendingPub := issueCSRPendingPubKey(ctx, t, oc, false)
+		nocRaw := buildCoreSignedCertForPubKey(t, pendingPub, false, rootPriv, testDefaultFabricID, nodeID)
+		resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
+			NOCValue:         nocRaw,
+			IPKValue:         make([]byte, 16),
+			CaseAdminSubject: 0xABCD,
+			AdminVendorID:    0xFFF1,
+		})
+		if err != nil {
+			t.Fatalf("node 0x%016X: AddNOC: %v", nodeID, err)
+		}
+		if nr := resp.(core.NOCResponse); nr.StatusCode != core.NOCStatusInvalidNodeOpID {
+			t.Errorf("node 0x%016X: AddNOC StatusCode = %d (%s), want InvalidNodeOpId (%d)",
+				nodeID, nr.StatusCode, nr.DebugText, core.NOCStatusInvalidNodeOpID)
+		}
+		if fabrics, _ := s.ListFabrics(ctx); len(fabrics) != 0 {
+			t.Errorf("node 0x%016X: %d fabrics stored after a refused AddNOC, want 0", nodeID, len(fabrics))
+		}
+	}
+
+	ctx := context.Background()
+	oc, _ := opcredsWithFakeStore(t)
+	_, rootPriv, fabricIndex := commissionTestFabric(ctx, t, oc)
+	fabCtx := im.WithFabricFilter(ctx, true, fabricIndex)
+	nocRaw := mintUpdateNOC(fabCtx, t, oc, rootPriv, testDefaultFabricID, 0)
+	resp, err := oc.MatterInvoke(fabCtx, 0x07, core.UpdateNOCRequest{NOCValue: nocRaw})
+	if err != nil {
+		t.Fatalf("UpdateNOC: %v", err)
+	}
+	if nr := resp.(core.NOCResponse); nr.StatusCode != core.NOCStatusInvalidNodeOpID {
+		t.Errorf("UpdateNOC StatusCode = %d (%s), want InvalidNodeOpId (%d)",
+			nr.StatusCode, nr.DebugText, core.NOCStatusInvalidNodeOpID)
+	}
 }
