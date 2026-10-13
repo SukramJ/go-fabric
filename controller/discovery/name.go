@@ -78,6 +78,20 @@ func recordOf(r mdns.DNSRecord) *Record {
 	}
 }
 
+// dnsRecord converts back to the wire shape, for a query's known answers.
+func (r *Record) dnsRecord() mdns.DNSRecord {
+	return mdns.DNSRecord{
+		Name:       r.Name,
+		Type:       r.Type,
+		TTL:        uint32(min(r.TTL/time.Second, math.MaxUint32)), //nolint:gosec // clamped to the uint32 range
+		CacheFlush: r.CacheFlush,
+		IP:         r.IP,
+		PTR:        r.PTR,
+		SRV:        r.SRV,
+		TXT:        r.TXT,
+	}
+}
+
 // ipString is the value matter.js keys and compares an A/AAAA record by.
 func (r *Record) ipString() string { return r.IP.String() }
 

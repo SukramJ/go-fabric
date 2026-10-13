@@ -38,6 +38,28 @@ func (f *fakeConn) Send(msg []byte) error {
 	return nil
 }
 
+// queries decodes every sent message.
+func (f *fakeConn) queries(t *testing.T) []mdns.DNSMessage {
+	t.Helper()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]mdns.DNSMessage, 0, len(f.sent))
+	for _, b := range f.sent {
+		m, err := mdns.ParseDNSMessage(b)
+		if err != nil {
+			t.Fatalf("sent message does not parse: %v", err)
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+func (f *fakeConn) reset() {
+	f.mu.Lock()
+	f.sent = nil
+	f.mu.Unlock()
+}
+
 func (f *fakeConn) Responses() <-chan mdns.QueryResponse { return f.out }
 
 func (f *fakeConn) Close() error {

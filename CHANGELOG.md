@@ -26,6 +26,12 @@ pseudo-version of `main`.
   first, then additions in desirability order), and
   `discovery.CompareDesirability` / `discovery.SelectionPreference`
   (link-local, ULA, global IPv6, IPv4; then health; then SRV priority).
+- `discovery.Solicitor`, the query loop of matter.js `DnssdSolicitor`:
+  solicitations of one loop task go out as one packet whose known answers
+  are the names' cached records without the cache-flush bit; `Discover`
+  sends the first query at once and repeats on `discovery.DefaultRetries`
+  (1 s, ×2, jitter up to 20 % added before the 1 h cap), the first caller
+  per name owning the schedule and later callers joining it.
 - `mdns.QueryConn` / `mdns.OpenQueryConn` export the multicast query
   transport `mdns.OperationalResolver` already used, and
   `mdns.ParseDNSMessage` / `mdns.PackDNSQuery` with `mdns.DNSRecord`,

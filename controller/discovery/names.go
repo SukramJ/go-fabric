@@ -94,6 +94,7 @@ type Names struct {
 	ttlGraceFactor float64
 
 	closeOnce sync.Once
+	solicitor *Solicitor
 
 	// Loop-owned state below.
 	names        *omap[string, *Name]
@@ -159,6 +160,7 @@ func newNames(conn mdns.QueryConn, logger *slog.Logger, cfg namesConfig) *Names 
 		n.interfaceName = interfaceNameOf
 	}
 	n.filters = append(n.filters, &ingressFilter{accept: isMatterServiceRecord})
+	n.solicitor = newSolicitor(n)
 	n.armPrune()
 	go n.run()
 	return n
@@ -594,6 +596,7 @@ func (n *Names) expireDue() {
 // shutdown runs on the loop when Close is called.
 func (n *Names) shutdown() {
 	n.closed = true
+	n.solicitor.close()
 	if n.expiryTimer != nil {
 		n.expiryTimer.Stop()
 	}

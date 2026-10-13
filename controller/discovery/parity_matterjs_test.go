@@ -7,6 +7,7 @@ package discovery
 // browser mirrors, each case citing the lines it pins.
 
 import (
+	"context"
 	"net/netip"
 	"testing"
 	"time"
@@ -274,4 +275,77 @@ func TestParityDiscovery_ServiceAddressShape(t *testing.T) {
 			t.Errorf("ipOf(%v) gave an address", r.Type)
 		}
 	}
+}
+
+func intervals(cfg Retries, random uint32, n int) []time.Duration {
+	s := newRetrySchedule(cfg, func() uint32 { return random })
+	var out []time.Duration
+	for range n {
+		d, ok := s.next()
+		if !ok {
+			break
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// TestParityDiscovery_RetrySchedule pins the solicitor's schedule: the
+// default is 1 s, ×2, jitter up to 20 %, capped at 1 h
+// (DnssdSolicitor.ts:94-99); the jitter is floor(0.2 × interval ×
+// random/2³²) ms, added before the cap (RetrySchedule.ts:42-59); the first
+// query goes out at once (DnssdSolicitor.ts:189-193); a scanner's
+// discovery caps the interval at 30 s (CommissionableMdnsScanner.ts:73).
+func TestParityDiscovery_RetrySchedule(t *testing.T) {
+	t.Parallel()
+	s := time.Second
+	if got := intervals(DefaultRetries, 0, 14); !slicesEqual(got, []time.Duration{1 * s, 2 * s, 4 * s, 8 * s, 16 * s, 32 * s, 64 * s, 128 * s, 256 * s, 512 * s, 1024 * s, 2048 * s, time.Hour, time.Hour}) {
+		t.Errorf("no jitter = %v", got)
+	}
+	if got := intervals(DefaultRetries, ^uint32(0), 3); !slicesEqual(got, []time.Duration{1199 * time.Millisecond, 2399 * time.Millisecond, 4799 * time.Millisecond}) {
+		t.Errorf("full jitter = %v", got)
+	}
+	capped := DefaultRetries.merge(&Retries{MaximumInterval: 30 * s})
+	if got := intervals(capped, ^uint32(0), 6); !slicesEqual(got, []time.Duration{1199 * time.Millisecond, 2399 * time.Millisecond, 4799 * time.Millisecond, 9599 * time.Millisecond, 19199 * time.Millisecond, 30 * s}) {
+		t.Errorf("30 s cap = %v", got)
+	}
+	if got := intervals(Retries{Timeout: 2500 * time.Millisecond}, 0, 5); !slicesEqual(got, []time.Duration{s, 1500 * time.Millisecond}) {
+		t.Errorf("timeout = %v", got)
+	}
+	if got := intervals(Retries{InitialInterval: 3 * s, BackoffFactor: 3, MaximumCount: 2}, 0, 5); !slicesEqual(got, []time.Duration{3 * s, 9 * s}) {
+		t.Errorf("count = %v", got)
+	}
+	if got := DefaultRetries.merge(&Retries{Timeout: s, MaximumCount: 1, InitialInterval: 2 * s, BackoffFactor: 3, JitterFactor: 0.5}); got != (Retries{Timeout: s, MaximumCount: 1, InitialInterval: 2 * s, BackoffFactor: 3, MaximumInterval: time.Hour, JitterFactor: 0.5}) {
+		t.Errorf("merge = %+v", got)
+	}
+
+	// The first query of a discovery goes out at once, the next after the
+	// first interval.
+	n, conn, clk := testNames(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	go func() {
+		_ = n.Solicitor().Discover(ctx, Discovery{Solicitation: Solicitation{Name: n.Get(instQ), RecordTypes: []mdns.DNSType{TypeSRV}}})
+	}()
+	waitFor(t, func() bool { return len(conn.queries(t)) == 1 })
+	clk.advance(n, 999*time.Millisecond)
+	if len(conn.queries(t)) != 1 {
+		t.Fatal("second query before 1 s")
+	}
+	clk.advance(n, time.Millisecond)
+	if len(conn.queries(t)) != 2 {
+		t.Fatal("no second query at 1 s")
+	}
+	cancel()
+}
+
+func slicesEqual(a, b []time.Duration) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
