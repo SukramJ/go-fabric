@@ -56,6 +56,16 @@ pseudo-version of `main`.
   first entry, as matter.js `0ceb202d`'s `addDeviceTypes` does: a bridged
   endpoint whose host device type is BridgedNode no longer reports
   BridgedNode twice in its DeviceTypeList.
+- `thermo.New` checks the configured setpoint limits and initial setpoints
+  against the setpoint rules, as matter.js `0ceb202d`'s
+  `#reconcileInitialSetpoints` does: a violation is repaired preferring the
+  heating side (an initial heating setpoint above its maximum is cropped,
+  the cooling setpoint and limits move to keep the AUTO deadband), logged
+  as `matter.thermostat.initial_setpoints_adjusted`, and a configuration
+  that cannot be repaired (unordered absolute limits, no room for the
+  deadband) is refused with the new `thermo.ErrSetpoints`;
+  `NewThermostatServer` panics on it. It used to be accepted unchecked,
+  and every later setpoint write then failed.
 
 ## [0.3.1] — 2026-10-13
 

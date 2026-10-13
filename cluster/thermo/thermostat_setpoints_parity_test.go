@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/thermo"
@@ -260,4 +261,118 @@ func TestParityMatterJS_Thermostat_IgnoredWrites(t *testing.T) {
 	if err := s.MatterWrite(ctx, deadband, "x"); err == nil {
 		t.Error("a non-numeric MinSetpointDeadBand was accepted")
 	}
+}
+
+// TestParityMatterJS_Thermostat_StartupReconciliation mirrors matter.js
+// 0ceb202d packages/node/test/behaviors/thermostat/ThermostatBehaviorTest.ts
+// "startup reconciliation" (:57-173) over ThermostatServer.ts:1015-1042
+// (#reconcileInitialSetpoints): New repairs a configuration that violates
+// the setpoint rules, preferring the heating side, and refuses one it
+// cannot repair. The server's user limits start at the absolute ones and
+// the deadband is the default 2.0 °C, so the cases that set user limits or
+// another deadband are run on the absolute limits instead.
+func TestParityMatterJS_Thermostat_StartupReconciliation(t *testing.T) {
+	t.Parallel()
+	read := func(t *testing.T, s *thermo.ThermostatServer, attrID uint32) int16 {
+		t.Helper()
+		v, ok := s.MatterRead(attrID)
+		if !ok {
+			t.Fatalf("attribute 0x%04X not served", attrID)
+		}
+		return v.(int16)
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(*thermo.ThermostatConfig)
+		want map[uint32]int16
+	}{
+		{
+			// :83-93
+			name: "moves the cooling setpoint when the setpoints violate the deadband",
+			edit: func(c *thermo.ThermostatConfig) { c.InitialHeatingSetpoint, c.InitialCoolingSetpoint = 2100, 2200 },
+			want: map[uint32]int16{attrOccupiedHeating: 2100, attrOccupiedCooling: 2300},
+		},
+		{
+			// :95-102
+			name: "clamps a setpoint outside its limits and moves the cooling setpoint to keep the deadband",
+			edit: func(c *thermo.ThermostatConfig) { c.InitialHeatingSetpoint = 3100 },
+			want: map[uint32]int16{attrOccupiedHeating: 3000, attrOccupiedCooling: 3200},
+		},
+		{
+			// :74-81, on the absolute limit: the cool limit moves up.
+			name: "raises the cool limit when it can keep the deadband within its absolute limits",
+			edit: func(c *thermo.ThermostatConfig) { c.AbsMinHeatSetpointLimit = 1500 },
+			want: map[uint32]int16{attrMinHeatLimit: 1500, attrMinCoolLimit: 1700},
+		},
+		{
+			// :58-72, at the default deadband: the heat limit is pulled back.
+			name: "pulls a heat limit back when the cool limit cannot keep the deadband",
+			edit: func(c *thermo.ThermostatConfig) { c.AbsMaxHeatSetpointLimit = 3500 },
+			want: map[uint32]int16{attrMaxCoolLimit: 3200, attrMaxHeatLimit: 3000},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cfg := thermo.DefaultThermostatConfig()
+			tc.edit(&cfg)
+			s, err := thermo.New(cfg)
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+			for attrID, want := range tc.want {
+				if got := read(t, s, attrID); got != want {
+					t.Errorf("attribute 0x%04X = %d, want %d", attrID, got, want)
+				}
+			}
+			if err := s.MatterWrite(context.Background(), attrOccupiedHeating, int16(2200)); err != nil {
+				t.Errorf("a setpoint write after the repair: %v", err)
+			}
+		})
+	}
+
+	t.Run("a heating-only setpoint above its limit is cropped", func(t *testing.T) {
+		t.Parallel()
+		s, err := thermo.New(thermo.ThermostatConfig{
+			Features:                thermo.ThermostatFeatureHEAT,
+			AbsMinHeatSetpointLimit: 700, AbsMaxHeatSetpointLimit: 3000,
+			InitialHeatingSetpoint: 3500,
+		})
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		if got := read(t, s, attrOccupiedHeating); got != 3000 {
+			t.Errorf("OccupiedHeatingSetpoint = %d, want 3000", got)
+		}
+	})
+
+	t.Run("fails with the violated condition when the absolute limits leave no room for the deadband", func(t *testing.T) {
+		t.Parallel()
+		// :104-123
+		cfg := thermo.DefaultThermostatConfig()
+		cfg.AbsMinHeatSetpointLimit, cfg.AbsMaxCoolSetpointLimit = 2900, 3000
+		cfg.InitialHeatingSetpoint, cfg.InitialCoolingSetpoint = 2900, 3000
+		_, err := thermo.New(cfg)
+		if !errors.Is(err, thermo.ErrSetpoints) {
+			t.Fatalf("New = %v, want ErrSetpoints", err)
+		}
+		const want = "cannot be fixed: maxCoolSetpointLimit (3000) - maxHeatSetpointLimit (3000) is below the deadband (200); after adjusting,"
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	})
+
+	t.Run("fails for unordered absolute limits", func(t *testing.T) {
+		t.Parallel()
+		// :164-173
+		cfg := thermo.DefaultThermostatConfig()
+		cfg.AbsMinHeatSetpointLimit, cfg.AbsMaxHeatSetpointLimit = 2500, 2000
+		_, err := thermo.New(cfg)
+		if !errors.Is(err, thermo.ErrSetpoints) {
+			t.Fatalf("New = %v, want ErrSetpoints", err)
+		}
+		const want = "absMinHeatSetpointLimit (2500) is above absMaxHeatSetpointLimit (2000)"
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err, want)
+		}
+	})
 }

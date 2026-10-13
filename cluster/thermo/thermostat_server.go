@@ -67,6 +67,12 @@ const servedFeatures = ThermostatFeatureHEAT | ThermostatFeatureCOOL | Thermosta
 // ErrFeatures reports a ThermostatConfig.Features the server refuses.
 var ErrFeatures = errors.New("thermostat: feature selection not served")
 
+// ErrSetpoints reports a ThermostatConfig whose setpoint limits and
+// initial setpoints violate the setpoint rules in a way [New] cannot
+// repair — an absolute minimum above its maximum, or an AUTO deadband the
+// absolute limits leave no room for.
+var ErrSetpoints = errors.New("thermostat: setpoint configuration cannot be fixed")
+
 // Thermostat attribute IDs.
 const (
 	thermoAttrLocalTemperature            = tdef.AttrLocalTemperature
@@ -244,6 +250,18 @@ type ThermostatServer struct {
 // COOL being "AUTO, O.a+" (thermostat-cluster.element.ts) — or naming a
 // feature the server does not serve (Occupancy, Setback, the schedule,
 // preset, event and suggestion features) is refused with [ErrFeatures].
+//
+// Limits and initial setpoints that violate the setpoint rules are
+// repaired, preferring the heating side (the cooling side without HEAT):
+// the other side's limits and setpoint move first, the preferred side is
+// pulled back only where the other would leave its absolute limits. New
+// logs matter.thermostat.initial_setpoints_adjusted with the violation and
+// every adjustment, and refuses with [ErrSetpoints] only when a violation
+// remains. Mirrors matter.js 0ceb202d packages/node/src/behaviors/
+// thermostat/ThermostatServer.ts:1015-1042 (#reconcileInitialSetpoints,
+// run from #setupValidations at :582-583, after the deadband is captured
+// at :154-164); here the deadband is the fixed default, set before the
+// reconcile.
 func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 	features := cfg.Features
 	// AUTO requires HEAT+COOL — clear it if either is missing.
@@ -283,6 +301,18 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 		s.maxCool = cfg.AbsMaxCoolSetpointLimit
 	}
 
+	st := s.setpointState()
+	violation, adjusted, err := st.reconcileInitial()
+	if err != nil {
+		return nil, err
+	}
+	if violation != "" {
+		s.commitSetpoints(st)
+		slog.Default().Warn("matter.thermostat.initial_setpoints_adjusted",
+			slog.String("violation", violation),
+			slog.String("adjusted", adjustedText(adjusted)))
+	}
+
 	// SystemMode default: Auto with the AUTO feature, Heat with HEAT,
 	// Cool when COOL-only.
 	switch {
@@ -297,7 +327,8 @@ func New(cfg ThermostatConfig) (*ThermostatServer, error) {
 }
 
 // NewThermostatServer constructs the cluster as [New] does; it panics on a
-// selection [New] refuses — a wiring error, not a runtime condition.
+// selection or setpoint configuration [New] refuses — a wiring error, not
+// a runtime condition.
 func NewThermostatServer(cfg ThermostatConfig) *ThermostatServer {
 	s, err := New(cfg)
 	if err != nil {
