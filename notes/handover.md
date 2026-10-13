@@ -621,8 +621,10 @@ bridge whose numbers the assembler allots; MEI range unchanged for a
 `uint32`). ADR 0020 proposed, acceptance at the start of phase 7.
 
 Guards on the tranche: `make ci`, `make race`, `make chipdm-check`,
-`make reachability-check` green; `make chiptool-test` and the families
-HARNESS_NUMBERS.
+`make reachability-check` green; `make chiptool-test` PASS; families
+(passed/skipped/failed) OPCREDS 6/3/0, DRLK 7/7/0, DESC 2/1/0, TSTAT 3/3/0,
+RVCRUNM 3/0/0, RVCCLEANM 3/0/0, OPSTATE 6/0/0, RVCOPSTATE 4/0/0; no golden
+or PICS change. PR #70 (auto-merge).
 
 **Docs PR `docs/wave-11-followups`** (written on top of the tranche):
 register Tier 1/2 verified, three Tier-3 findings, two by_design entries,
