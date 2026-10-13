@@ -29,6 +29,7 @@ German, briefly. Six waves were planned against the phases:
 | 12 | concept v2 phase 7 stage 1, first half (ADR 0020): `controller/discovery` (DNS-SD browser, commissionable scanner, operational resolution), `controller/exchange` (initiator exchange layer with MRP), `controller/handshake` (PASE and CASE clients with resumption) | AE, AF | `wave/2026-10-13-tranche-12` (#73); docs PR `docs/wave-12-followups` | see §12 |
 | 13 | concept v2 phase 7 stage 1, second half (ADR 0020): `controller/peer` (descriptor, timing, store, Set and Peer, the connection process, the address monitor with the liveness probe) and the `controller/exchange` / `controller/discovery` additions it needs | AG | `wave/2026-10-13-tranche-13` (#81); docs PR `docs/wave-13-followups` | see §13 |
 | 14 | concept v2 phase 7 stage 2 (ADR 0020): `controller/ca` (the certificate authority), `controller/attestation` (device attestation against a PAA store), `controller/interaction` (Invoke and Read for the flow), `controller/commissioner` (the commissioner, the PASE connection, the commissioning flow); `CASEOptions.Exchange` / `OnExchange` replace `exchange.WithHooks` | AH | `wave/2026-10-13-tranche-14` (#83); docs PR `docs/wave-14-followups` | see §14 |
+| 15 | concept v2 phase 7 stage 3 (ADR 0020): `controller/interaction` Write, Subscribe, the subscription registry with its liveness timer, sustained subscriptions, the inbound report handler, Read with events and filters; `controller/handshake.CASEServer` (the CASE responder); `controller/exchange.Manager.SetProtocolHandler`; the client encoders and decoders in `im/` | AI | `wave/2026-10-13-tranche-15` (#90); docs PR `docs/wave-15-followups` | see §15 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -913,3 +914,91 @@ into a `discovery.Names`, its Session → `interaction.Interaction`; Write
 and Subscribe come with stage 3); then stage 3 (client interaction:
 Write, Subscribe, batching, chunked requests; the client encoders into
 `im/`; persistent `peer.Store`, `ResumptionStore`, `ca.Store`).
+
+## 15. Wave 15 (2026-10-13, the owner away; everything local)
+
+Concept v2 phase 7, stage 3: the client interaction and the CASE
+responder. Brief AI (`wave15/interaction`, head `fa75b7e`) on
+`planning/briefs-wave-15` (`b28c4ce`). Integration
+`wave/2026-10-13-tranche-15` = the planning commit and the twelve branch
+commits cherry-picked onto `main` (`141d1d7`, after #88) without a
+conflict, plus the owner's decisions, nine by_design entries and the
+inventory regenerated (unreached 5).
+
+- **§0 `controller/exchange`:** `SetProtocolHandler(protocol, h)`
+  (EM:391-473): a peer-opened exchange's first message reaches the
+  protocol's handler on its own goroutine; on an unsecured session — now
+  a session of its own, keyed by the peer's source node id, released once
+  no exchange holds it (EM:205-217, :261-264) — a Sigma1 for the CASE
+  responder and a PBKDFParamRequest refused InvalidParam
+  (`SecureChannelProtocol.ts:129-137`); on a secure session any protocol
+  but the Secure Channel.
+- **§1 `controller/handshake.CASEServer`:** `CaseServer.ts:49-347` over
+  `secure/sigma.Responder`, read line by line by the owner: the status
+  rule :61-100 (NoSharedTrustRoots for no fabric, nothing when the peer
+  reported or went silent, InvalidParam otherwise, skipped when the
+  exchange is closing or a send unacked), both-or-neither :108-111, the
+  record lookup :113-116, the initiator's timing parameters :120-123,
+  resume :148-222 (fresh id in Sigma2_Resume, the record's id replaced,
+  Success awaited, record saved), full :224-347 (Sigma2, Sigma3 verified,
+  Success, record with the NOC's CATs). The session id comes from
+  `AllocateSessionID`, which evicts the oldest session when none is free
+  as `getNextAvailableSessionId` does (`SessionManager.ts:532-550`).
+  `FabricResolver` / `FabricList`, `ResumptionStore.FindByResumptionID`.
+- **§2 `im/`:** `WriteRequest.MarshalTLV` (MoreChunkedMessages false,
+  `Write.ts:77`), `TimedRequest.MarshalTLV`, the WriteResponse,
+  SubscribeResponse and ReportData decoders (readers for the values, `im`
+  cannot import `cluster/spec`); ReadRequest and SubscribeRequest now the
+  client shape with revision 12 (Changed). Every request fixture
+  byte-compared; `packages/types` protocol and tlv identical at
+  `0ceb202d` and `706a8463`, so the generator's run against the checkout
+  is the pin's. The open item "client ReadRequest encoding" is closed.
+- **§3 `controller/interaction`:** `Provider` / `SessionProvider` /
+  `PeerProvider` / `ForPeer` / `Bind`; `Write` (list chunking with the
+  ACL/Extension exemption, `Write.ts:149-171`; timed; suppressed);
+  `ReadWith` (events, filters, DataVersionFilters trimmed to one message,
+  the `InputChunk` assembler); `Subscribe` + `Subscriptions` (liveness
+  = max interval + 2 × max peer response time, `PeerSubscription.ts:38-40`;
+  `CloseForPeer` from `peer.Context.SessionMigrated`); the inbound report
+  handler (`ClientSubscriptionHandler.ts:33-145`); sustained
+  subscriptions (15 s ×2 cap 1 h jitter 0.25, no timeout,
+  `SustainedSubscription.ts:483-499`; no ICD).
+- **§4:** `commissioner.Context.Subscriptions`, `Fabrics`, `Resumption`;
+  `Commissioner.Interaction`, `Close`. Proven in-process against
+  `node.Node` with the module's own commissioner (write, subscribe,
+  liveness, a node restart re-establishing over inbound CASE) and in
+  `internal/chiptool` `TestGoControllerSubscribesReferenceBridge`
+  (priming, pushed report after Toggle, NodeLabel written, restart,
+  re-established report over the daemon's CASE session, resumed).
+- **Owner:** the five open questions decided as the report records
+  (Invoke revision stays 12 — `Invoke.ts:99` is the fallback for an
+  unknown peer; one resumption store, `CaseClient.ts:334` prefers the
+  configured CATs; a Sigma1 on a secure session dropped; the inverted
+  Go defaults are the surface; InvalidAction for other first IM
+  messages). by_design: `BD-Matter-CASEServer-CloseOnUnfinishedEstablishment`,
+  `-NoReportOnShutdown`, `BD-Matter-Controller-Sigma1OnSecureSessionIgnored`,
+  `-EmptyListsNotEncoded`, `-InboundWithoutSourceNodeIDDropped`,
+  `-NoIMServer`, `-ListIndexPastEnd`, `-MergedReports`,
+  `-InvokeRevision12`.
+- **Side work the same day:** issue #84 (one ColorWriter write per
+  command, #86) and issue #87 (the node facade's host seams:
+  `Config.Topology`, the UniqueID pin, `Sessions`/`Subscriptions`,
+  `RemoveFabric`, `LocationCapability`, persistence keyed by
+  `SourceKey.String()`, #88) — the report's `node` gap closed by #88.
+
+Guards on the tranche (tool PATH exported): `make ci`, `make race`,
+`make reachability-check` (unreached 5), `make chiptool-test` — all exit 0; chip-tool 319 PASS, 0 FAIL.
+PR #90 (auto-merge).
+
+**Docs PR `docs/wave-15-followups`** (written on top of the tranche): the
+open item removed and the scope line, concept v2 B.1 (stage 3 complete,
+AJ moves bridgetest), this section. Then delete `wave15/interaction`,
+`planning/briefs-wave-15`, `wave/2026-10-13-tranche-15` and the
+`.claude/worktrees/wave15-interaction` worktree. Next: brief AJ —
+`bridge/bridgetest.Commissioner` onto `controller/` keeping its public
+surface (README §API stability): `Dial`/`Options` → `commissioner.New` +
+`Commission` with the node's record injected into `discovery.Names`,
+`Session` → `interaction.Interaction` (`NextReport` → `Updated`),
+`Accept` → the CASE responder via `Context.Fabrics`, `CASEAs` →
+`ca.CA.GenerateNOC` + `handshake.CASE`; `EstablishSubscriptionTarget` /
+`AckPumpTick` stay device-side test seams. Then stage 4.
