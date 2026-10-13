@@ -39,6 +39,17 @@ pseudo-version of `main`.
   the `T` transports bitmap, SII/SAI up to one hour and SAT 1..65535 ms —
   an invalid value is absent so the MRP defaults apply.
   `Service.TXTData` serves operational TXT records the same way.
+- `discovery.Scanner`, matter.js `CommissionableMdnsScanner`:
+  `FindCommissionable(ctx, Identifier, found)` reports cached matches
+  first and then queries `_matterc._udp.local` plus the identifier's
+  `_L`/`_S`/`_V`/`_T`/`_CM` subtype or instance name, retrying at most
+  every 30 s, until ctx ends or `Cancel` cancels it; `Discovered` reads
+  the cache only. PTR targets without SRV/TXT are solicited speculatively
+  (at most 50, forgotten after an hour); an instance becomes a
+  `discovery.Device` once its TXT carries a valid D and CM, and is
+  reported once it has an address. Identifiers: `ByInstanceID`,
+  `ByLongDiscriminator`, `ByShortDiscriminator`, `ByVendor`,
+  `ByVendorProduct`, `ByDeviceType`, `ByProduct`, `AnyCommissionable`.
 - `mdns.QueryConn` / `mdns.OpenQueryConn` export the multicast query
   transport `mdns.OperationalResolver` already used, and
   `mdns.ParseDNSMessage` / `mdns.PackDNSQuery` with `mdns.DNSRecord`,

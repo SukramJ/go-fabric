@@ -303,6 +303,26 @@ func (n *Names) deleteName(nm *Name) {
 	}
 }
 
+func (n *Names) onDiscovered(fn func(*Name)) *discoveredObserver {
+	o := &discoveredObserver{fn: fn}
+	n.discovered = append(n.discovered, o)
+	return o
+}
+
+func (n *Names) offDiscovered(o *discoveredObserver) {
+	n.discovered = slices.DeleteFunc(n.discovered, func(x *discoveredObserver) bool { return x == o })
+}
+
+func (n *Names) addFilter(accept func(*Record) bool) *ingressFilter {
+	f := &ingressFilter{accept: accept}
+	n.filters = append(n.filters, f)
+	return f
+}
+
+func (n *Names) deleteFilter(f *ingressFilter) {
+	n.filters = slices.DeleteFunc(n.filters, func(x *ingressFilter) bool { return x == f })
+}
+
 func (n *Names) emitDiscovered(nm *Name) {
 	for _, o := range slices.Clone(n.discovered) {
 		o.fn(nm)

@@ -209,3 +209,34 @@ func onLoop(t *testing.T, n *Names, fn func()) {
 func mdnsResponse(b []byte, ifIndex int) mdns.QueryResponse {
 	return mdns.QueryResponse{Msg: b, IfIndex: ifIndex}
 }
+
+func ptrRR(name, target string, ttl uint32) dns.RR {
+	return &dns.PTR{Hdr: hdr(name, dns.TypePTR, ttl, false), Ptr: dns.Fqdn(target)}
+}
+
+// inject queues a response on the fake connection, as the network would.
+func inject(t *testing.T, c *fakeConn, ifIndex int, answers []dns.RR, extra ...dns.RR) {
+	t.Helper()
+	m := new(dns.Msg)
+	m.Response = true
+	m.Answer = answers
+	m.Extra = extra
+	b, err := m.Pack()
+	if err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	c.out <- mdns.QueryResponse{Msg: b, IfIndex: ifIndex}
+}
+
+// asked reports whether any sent query asks for name/type.
+func asked(t *testing.T, c *fakeConn, name string, typ mdns.DNSType) bool {
+	t.Helper()
+	for _, q := range c.queries(t) {
+		for _, qq := range q.Questions {
+			if qq.Name == name && qq.Type == typ {
+				return true
+			}
+		}
+	}
+	return false
+}

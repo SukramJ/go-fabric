@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4548,
+  "entry_points": 4560,
   "entry_packages": [
     ".",
     "bdx",
@@ -176,9 +176,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10534,
-    "reachable": 7416,
-    "whitelisted": 3113,
+    "total_exported": 10559,
+    "reachable": 7429,
+    "whitelisted": 3125,
     "unreachable": 5
   },
   "by_package": [
@@ -14099,10 +14099,31 @@
     },
     {
       "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_CommissionableDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 546
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_IdentifierMatches",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 494
+    },
+    {
+      "package": "controller/discovery",
       "identifier": "TestParityDiscovery_IngressFilter",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/parity_matterjs_test.go",
       "line": 174
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_QueryNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 469
     },
     {
       "package": "controller/discovery",
@@ -14117,6 +14138,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/parity_matterjs_test.go",
       "line": 299
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_ScannerFilter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 608
     },
     {
       "package": "controller/discovery",
@@ -14137,7 +14165,7 @@
       "identifier": "TestParityDiscovery_TXTData",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/parity_matterjs_test.go",
-      "line": 358
+      "line": 363
     },
     {
       "package": "controller/discovery",
@@ -14152,6 +14180,62 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/parity_matterjs_test.go",
       "line": 124
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestScanner_CachedMatchesFirstAndCancelInCallbackSkipsTheNetwork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/scanner_test.go",
+      "line": 116
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestScanner_CachedWithoutAddressIsSolicitedOnSearch",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/scanner_test.go",
+      "line": 227
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestScanner_CancelCloseAndClosedCache",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/scanner_test.go",
+      "line": 251
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestScanner_CleanupTimerRunsEveryHalfHour",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/scanner_test.go",
+      "line": 321
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestScanner_FindByLongDiscriminator",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/scanner_test.go",
+      "line": 66
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestScanner_FollowsPointersSpeculatively",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/scanner_test.go",
+      "line": 140
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestScanner_InvalidTXTNeverBuildsAndNameExpiryDropsTheCache",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/scanner_test.go",
+      "line": 187
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestScanner_SpeculativeTargetsAreBoundedAndPruned",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/scanner_test.go",
+      "line": 287
     },
     {
       "package": "controller/discovery",

@@ -302,6 +302,11 @@ func TestParityDiscovery_RetrySchedule(t *testing.T) {
 	if got := intervals(DefaultRetries, 0, 14); !slicesEqual(got, []time.Duration{1 * s, 2 * s, 4 * s, 8 * s, 16 * s, 32 * s, 64 * s, 128 * s, 256 * s, 512 * s, 1024 * s, 2048 * s, time.Hour, time.Hour}) {
 		t.Errorf("no jitter = %v", got)
 	}
+	// The doubling base never wraps: the schedule holds at the cap.
+	long := intervals(DefaultRetries, ^uint32(0), 100)
+	if len(long) != 100 || long[99] != time.Hour || long[40] != time.Hour {
+		t.Errorf("long schedule ends %v", long[len(long)-1])
+	}
 	if got := intervals(DefaultRetries, ^uint32(0), 3); !slicesEqual(got, []time.Duration{1199 * time.Millisecond, 2399 * time.Millisecond, 4799 * time.Millisecond}) {
 		t.Errorf("full jitter = %v", got)
 	}
@@ -454,4 +459,164 @@ func paramsOf(kvs ...string) Parameters {
 		}
 	}
 	return p
+}
+
+// TestParityDiscovery_QueryNames pins the names a commissionable search
+// queries for PTRs: always _matterc._udp.local, plus the instance name or
+// the subtype the identifier selects by — _CM for a product and for "any".
+// matter.js packages/protocol/src/mdns/CommissionableMdnsScanner.ts
+// :574-593 with MdnsConsts.ts:38-45.
+func TestParityDiscovery_QueryNames(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		id   Identifier
+		want string
+	}{
+		{ByInstanceID("ABCD"), "ABCD._matterc._udp.local"},
+		{ByLongDiscriminator(3840), "_L3840._sub._matterc._udp.local"},
+		{ByShortDiscriminator(15), "_S15._sub._matterc._udp.local"},
+		{ByVendor(65521), "_V65521._sub._matterc._udp.local"},
+		{ByVendorProduct(65521, 32769), "_V65521._sub._matterc._udp.local"},
+		{ByDeviceType(257), "_T257._sub._matterc._udp.local"},
+		{ByProduct(32769), "_CM._sub._matterc._udp.local"},
+		{AnyCommissionable(), "_CM._sub._matterc._udp.local"},
+	} {
+		if got := queryQNames(c.id); !equalStrings(got, []string{"_matterc._udp.local", c.want}) {
+			t.Errorf("%+v: %v, want [_matterc._udp.local %s]", c.id, got, c.want)
+		}
+	}
+}
+
+// TestParityDiscovery_IdentifierMatches pins how a found node is matched:
+// instance id; long discriminator = D; short = (D >> 8) & 0x0F; vendor
+// (and product) from VP; device type = DT; product alone from VP; "any" =
+// CM 1 or 2. CommissionableMdnsScanner.ts:533-561.
+func TestParityDiscovery_IdentifierMatches(t *testing.T) {
+	t.Parallel()
+	vp := func(s string) *string { return &s }
+	dt := uint32(257)
+	dev := Device{InstanceID: "ABCD", D: 0xF00, CM: 1, TXTData: TXTData{VP: vp("65521+32769"), DT: &dt}}
+	vendorOnly := Device{InstanceID: "EF", D: 0x123, CM: 0, TXTData: TXTData{VP: vp("65521")}}
+	noVP := Device{InstanceID: "01", D: 1, CM: 2}
+	for _, c := range []struct {
+		id   Identifier
+		d    Device
+		want bool
+	}{
+		{ByInstanceID("ABCD"), dev, true},
+		{ByInstanceID("abcd"), dev, false},
+		{ByLongDiscriminator(0xF00), dev, true},
+		{ByLongDiscriminator(0xF01), dev, false},
+		{ByShortDiscriminator(15), dev, true},
+		{ByShortDiscriminator(1), vendorOnly, true},
+		{ByShortDiscriminator(0), dev, false},
+		{ByVendor(65521), dev, true},
+		{ByVendor(65521), vendorOnly, true},
+		{ByVendor(65522), dev, false},
+		{ByVendor(65521), noVP, false},
+		{ByVendorProduct(65521, 32769), dev, true},
+		{ByVendorProduct(65521, 32770), dev, false},
+		{ByVendorProduct(65521, 32769), vendorOnly, false},
+		{ByDeviceType(257), dev, true},
+		{ByDeviceType(258), dev, false},
+		{ByDeviceType(257), noVP, false},
+		{ByProduct(32769), dev, true},
+		{ByProduct(32769), vendorOnly, false},
+		{ByProduct(32769), noVP, false},
+		{AnyCommissionable(), dev, true},
+		{AnyCommissionable(), noVP, true},
+		{AnyCommissionable(), vendorOnly, false},
+	} {
+		if got := c.id.matches(&c.d); got != c.want {
+			t.Errorf("%+v matches %s = %v, want %v", c.id, c.d.InstanceID, got, c.want)
+		}
+	}
+	a, b := ByVendor(1), ByVendor(1)
+	if a != b || a == ByVendorProduct(1, 0) || AnyCommissionable() != (Identifier{}) {
+		t.Error("identifiers compare structurally")
+	}
+}
+
+// TestParityDiscovery_CommissionableDevice pins when an instance becomes a
+// device: D ≤ 0xFFF and CM ≤ 255, both valid decimals, else nothing is
+// built (CommissionableMdnsScanner.ts:470-477); T defaults to no TCP and
+// ICD to 0 (:484-486); the instance id is the name's first label (:480);
+// the hostname is the single distinct SRV target's first label, absent
+// while targets disagree (:508-516).
+func TestParityDiscovery_CommissionableDevice(t *testing.T) {
+	t.Parallel()
+	n, _, clk := testNames(t)
+	build := func(q string, entries ...string) (Device, bool) {
+		deliver(t, n, 0, []dns.RR{txtRR(q, 120, false, entries...)})
+		var d Device
+		var ok bool
+		onLoop(t, n, func() { d, ok = buildDevice(n.get(q)) })
+		return d, ok
+	}
+	for i, c := range []struct {
+		entries []string
+		ok      bool
+	}{
+		{[]string{"D=3840", "CM=1"}, true},
+		{[]string{"D=0", "CM=0"}, true},
+		{[]string{"D=4095", "CM=255"}, true},
+		{[]string{"D=0abc", "CM=1"}, false},
+		{[]string{"D=4096", "CM=1"}, false},
+		{[]string{"D=3840", "CM=256"}, false},
+		{[]string{"D=3840"}, false},
+		{[]string{"CM=1"}, false},
+		{[]string{"D=03840", "CM=1"}, false},
+	} {
+		q := "I" + string(rune('A'+i)) + "._matterc._udp.local"
+		if _, ok := build(q, c.entries...); ok != c.ok {
+			t.Errorf("%v: built = %v, want %v", c.entries, ok, c.ok)
+		}
+	}
+	d, _ := build("XY._matterc._udp.local", "D=1", "CM=1", "T=4")
+	if d.InstanceID != "XY" || d.T == nil || !d.T.TCPServer || d.ICD == nil || *d.ICD != 0 {
+		t.Errorf("device = %+v", d)
+	}
+	d, _ = build("Z._matterc._udp.local", "D=1", "CM=1")
+	if d.T == nil || *d.T != (SupportedTransports{}) || d.Hostname != "" {
+		t.Errorf("defaults = %+v", d)
+	}
+
+	deliver(t, n, 0, []dns.RR{srvRR("Z._matterc._udp.local", "hostA.local", 5540, 120, true)})
+	onLoop(t, n, func() {
+		if h := hostnameOf(n.get("Z._matterc._udp.local")); h != "hostA" {
+			t.Errorf("hostname = %q", h)
+		}
+	})
+	deliver(t, n, 0, []dns.RR{srvRR("Z._matterc._udp.local", "hostA.local", 5541, 120, false)})
+	onLoop(t, n, func() {
+		if h := hostnameOf(n.get("Z._matterc._udp.local")); h != "hostA" {
+			t.Errorf("one host on two ports: %q", h)
+		}
+	})
+	clk.advance(n, 2*time.Second)
+	deliver(t, n, 0, []dns.RR{srvRR("Z._matterc._udp.local", "hostB.local", 5540, 120, false)})
+	onLoop(t, n, func() {
+		if h := hostnameOf(n.get("Z._matterc._udp.local")); h != "" {
+			t.Errorf("two hosts: %q, want none", h)
+		}
+	})
+}
+
+// TestParityDiscovery_ScannerFilter pins the scanner's ingress filter:
+// _matterc._udp.local and _matterd._udp.local themselves and every name
+// under them, case-insensitively. CommissionableMdnsScanner.ts:95-105.
+func TestParityDiscovery_ScannerFilter(t *testing.T) {
+	t.Parallel()
+	for name, want := range map[string]bool{
+		"_matterc._udp.local":             true,
+		"_MATTERD._UDP.LOCAL":             true,
+		"_L3840._sub._matterc._udp.local": true,
+		"AB._matterd._udp.local":          true,
+		"AB-CD._matter._tcp.local":        false,
+		"x_matterc._udp.local":            false,
+	} {
+		if got := isCommissionableRecord(&Record{Name: name}); got != want {
+			t.Errorf("%s: %v, want %v", name, got, want)
+		}
+	}
 }

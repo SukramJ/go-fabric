@@ -100,8 +100,8 @@ func (r *retrySchedule) next() (time.Duration, bool) {
 	}
 	r.count++
 	maxJitterMs := r.cfg.JitterFactor * float64(r.base) / float64(time.Millisecond)
-	jitter := time.Duration(math.Floor(maxJitterMs*float64(r.random())/(1<<32))) * time.Millisecond
-	interval := r.base + jitter
+	jitter := saturate(math.Floor(maxJitterMs*float64(r.random())/(1<<32)) * float64(time.Millisecond))
+	interval := saturate(float64(r.base) + float64(jitter))
 	if r.cfg.Timeout != 0 && r.soFar+interval > r.cfg.Timeout {
 		interval = r.cfg.Timeout - r.soFar
 	}
@@ -109,8 +109,18 @@ func (r *retrySchedule) next() (time.Duration, bool) {
 		interval = r.cfg.MaximumInterval
 	}
 	r.soFar += interval
-	r.base = time.Duration(float64(r.base) * r.cfg.BackoffFactor)
+	r.base = saturate(float64(r.base) * r.cfg.BackoffFactor)
 	return interval, true
+}
+
+// saturate converts to a Duration, holding at the largest one: matter.js
+// computes intervals in floating point, where the doubling base never
+// wraps, and the maximum interval clamps it.
+func saturate(ns float64) time.Duration {
+	if ns >= math.MaxInt64 {
+		return math.MaxInt64
+	}
+	return time.Duration(ns)
 }
 
 // Solicitation asks for record types of one name, matter.js
