@@ -7,9 +7,11 @@ detail pages are the ones a test holds true (`docs/certifiability.md`,
 (`notes/parity/matter_behaviour_findings.md`) and the ADRs. When an item is
 closed it is removed here in the same change.
 
-Scope boundaries are not open items: no controller/commissioner role beyond
-the narrow initiator of [ADR 0008](./adr/0008-subscription-resumption.md), no
-Bluetooth, no Thread, and certification itself is not pursued
+Scope boundaries are not open items: no Bluetooth, no Thread, and
+certification itself is not pursued; the controller/commissioner role enters
+in stages ([ADR 0020](./adr/0020-commissioner-and-controller-role.md),
+stage 1 in #73 and the next wave), nothing outside `controller/` changes
+for a stage until it lands
 ([ADR 0011](./adr/0011-certifiability-is-a-goal.md)). TCP and BDX landed
 with #49 ([ADR 0019](./adr/0019-tcp-bdx-and-the-ota-requestor.md)) as the
 OTA requestor's download path; the DiagnosticLogs transfer still answers
@@ -66,6 +68,8 @@ per-fabric subscription quota either (`BD-Matter-TimedAndQuotaDeferred`).
 | --- | --- | --- |
 | **Manual operator cases** | `docs/certifiability.md`, class (c) | 89 cases have a test-lab operator perform a step (`PICS_USER_PROMPT`). They have no stand-in and stay unrun. |
 | **Families without a mounted server** | `docs/certifiability.md` | ICDManagement (a mains-powered bridge is not an ICD) and Binding (no endpoint declares a client cluster) are classified, not run. Mounting either is a product decision, not a module gap. The OTA requestor's SU cases run since #49 (2.2, 2.4 and 4.1 pass; the other ten are manual); the eleven BDX cases are manual at the harness pin. |
+| **`secure/operational TestStartReaper_ActiveSessionSurvivesSweeps` flaked once** | report AF | "Active() = 0 during live traffic" once under a full `make ci`; 10 of 10 alone. A timing test; make it deterministic (fake clock) before it fails a release gate. |
+| **The discovery live test is excluded under `-race`** | `controller/discovery/scanner_live_test.go` | It advertises with `mdns.Zeroconf`, whose upstream Shutdown/recv race already skips the `mdns` live tests under the detector; a race-clean advertiser lets it run there (report AE, question 6). |
 | **Local multicast cases need IPv6 on the LAN interface** | `internal/chiptool/doc.go` | On a host whose interface has no IPv6 the group-messaging and SC-4.x cases host-skip with the command that enables it; CI runs them. |
 
 ## 3. Data model and generation

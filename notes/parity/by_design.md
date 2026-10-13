@@ -2283,6 +2283,74 @@ which is the server's own verdict. A Go-side guard: a value the enum does
 not define is a wiring error, and a controller should not see it as a
 status code. Report AC, question 2.
 
+### BD-Matter-SigmaInitiatorCheckOrder — the CASE initiator verifies the responder's chain before its node and fabric id
+
+matter.js `packages/protocol/src/session/case/CaseClient.ts:284-309` (at
+`0ceb202d`) takes the responder's public key straight out of the still
+unverified NOC, checks the transcript signature with it, then the NOC's
+node id and fabric id against the peer it set out to reach, then the
+ICAC's fabric id, and verifies the certificate chain last
+(`fabric.verifyCredentials`). go-fabric's `secure/sigma/initiator.go`
+(`Initiator.processSigma2`) verifies the chain first
+(`PeerVerifier.VerifyAndExtractPubKey`, which also holds the ICAC's fabric
+to the NOC's, `mattercert.checkICACShape`), then the transcript signature
+with the key that check yielded, then node id and fabric id.
+
+By design. The chain check is what produces a key worth checking a
+signature with; a key lifted from an unverified NOC authenticates nothing
+until the chain is verified. Every input matter.js refuses is refused here
+too; only the error class differs for a NOC that is at once unverifiable
+and mismatched — `ErrSignatureInvalid` here, the identity mismatch there —
+and no peer can observe which. `controller/handshake.CASE` reports
+InvalidParam either way (`CaseClient.ts:83-99`). Report AF, question 2.
+
+---
+
+### BD-Matter-ScannerPendingObserverOnce — one pending Service and observer per commissionable instance
+
+matter.js `packages/protocol/src/mdns/CommissionableMdnsScanner.ts:344-376`
+(at `0ceb202d`) opens an `IpService` and a pending name observer for an
+instance whose TXT cannot build a device yet, and every search start
+re-runs that over every discovered name (`:173-175`), so an instance that
+stays invalid across two searches holds two pairs. Once its TXT becomes
+valid every pending observer calls `#cacheDevice`; the later overwrites
+the cache entry and the earlier `IpService` and name observer are never
+released, so the name is observed, and never evicted, for the scanner's
+lifetime. `controller/discovery.Scanner.onDiscovered` returns when the
+instance is already pending.
+
+By design. A leak is not behaviour to mirror; what a peer observes — the
+solicitation of the missing records and the device reported once its TXT
+is valid — is unchanged. Pinned by
+`TestScanner_InvalidTXTNeverBuildsAndNameExpiryDropsTheCache` (one pending
+pair after an announcement and a search). An upstream issue candidate.
+Report AE, question 1.
+
+---
+
+### BD-Matter-MdnsQueryNotSplit — a DNS-SD query goes out as one packet; no relevance pre-filter; U+FFFD per invalid byte
+
+matter.js `packages/general/src/net/dns-sd/MdnsSocket.ts:155-222` (at
+`0ceb202d`) splits a query whose questions and known answers exceed
+`MAX_MDNS_MESSAGE_SIZE` (1232 bytes) into several packets, and
+`MdnsRelevanceFilter.ts` drops packets that name no Matter service before
+decoding them. `controller/discovery.Solicitor` sends one packet whatever
+its known-answer count, and `discovery.Names` decodes every packet and
+filters on the decoded names. A TXT value that is not valid UTF-8 decodes
+to one U+FFFD per invalid byte (`Parameters.Get`), where `TextDecoder`'s
+maximal-subpart rule can yield fewer replacement characters for a
+multi-byte fragment.
+
+By design. Below the fragmentation limit a peer sees the same questions
+and known answers; a continuous search of a handful of instances stays
+far below 1232 bytes. The pre-filter is an optimisation with no
+observable effect. The U+FFFD count only matters for a value the parser
+rejects anyway. Port the splitting into `mdns` when a query can exceed
+the limit (a `Names` with hundreds of cached instances). Report AE,
+questions 4 and 7.
+
+---
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

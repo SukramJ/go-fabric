@@ -169,6 +169,12 @@ in Stufen:
 | 5 Binding, Groupcast, Controller-Typen | `behaviors/binding/` (998), Sender-Anteil von `GroupcastServer.ts` (940), 11 Controller-Gerätetypen im Generator | ~1 500 | Binding wirkt, BIND-Familie, Groupcast-Sender-Feature |
 | 6 Joint Fabric, DCL | `joint-fabric-*`, `commissioner-control` (3 Cluster), `protocol/src/dcl/` (4 691) | ~5 500 | fabric-übergreifende Administration; DCL-Prüfung von Attestation und OTA-URLs |
 
+Stand 2026-10-13: Stufe 1 ist zweigeteilt — `controller/discovery`,
+`controller/exchange` und `controller/handshake` (Scanner, Exchange-Schicht,
+PASE- und CASE-Client) in Welle 12 (#73), die Peer-Verwaltung
+(`PeerConnection.ts`, `PeerSet.ts`, `Peer.ts`, `PeerAddressMonitor.ts`) als
+Brief AG in Welle 13.
+
 Gesamt rund 22 000 matter.js-Zeilen. Go-Einschätzung 25 000–35 000 Zeilen
 mit Tests, sechs bis acht Wellen. Stufe 6 ist abtrennbar; der DCL-Client
 ist ein HTTP-Client gegen die CSA-Ledger-API und zieht keine Abhängigkeit
