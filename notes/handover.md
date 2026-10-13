@@ -717,3 +717,17 @@ worktrees. Next: brief AG (wave 13, stage 1 second half: `Peer.ts`,
 an Invoke path over a session, a Secure Channel handler for
 peer-initiated exchanges — an inbound CloseSession is ignored today —
 `PeerLost`/`SuppressPeerLoss`, a persistent `ResumptionStore`).
+
+**Side PR after wave 12 (owner, 2026-10-13): issues #76 and #77.** The
+owner implemented both directly (one Opus at a time is the rule from this
+day on, and the one agent was on brief AG): `cover.WindowCoveringServer`
+serves the tilt axis (`ServedTiltFeatureMap`, `ServedLiftTiltFeatureMap`,
+`Config.InitialTiltPositionPercent100ths`; UpOrOpen/DownOrClose on every
+served axis as one `Mover.GoTo` with both targets,
+`WindowCoveringServer.ts:521-535`, `:545-559`; global status from lift
+while it moves, else tilt, `:203-214`) and gains
+`SetTargetPosition(lift, tilt)` — the inbound twin of `SetCurrentPosition`
+for a host-inferred target, OperationalStatus left to the host
+(`BD-Matter-WindowCovering-MoverOperationalStatus` unchanged), with the
+#63 overlap rule: a target set while a command's Mover runs stands when
+the Mover then fails. Branch `issues/cover-tilt-and-target`.
