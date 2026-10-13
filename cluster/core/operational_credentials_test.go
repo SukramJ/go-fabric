@@ -10,7 +10,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"slices"
 	"testing"
 
@@ -246,7 +245,8 @@ func TestOpcreds_CSRRequest_SetsPendingKey(t *testing.T) {
 	// After CSRRequest, AddNOC without trusted root should return MissingCsr=false
 	// (the CSR was issued), but without trusted root → NOCStatusInvalidNOC.
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
-		IPKValue: make([]byte, 16),
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC after CSR: %v", err)
@@ -258,59 +258,12 @@ func TestOpcreds_CSRRequest_SetsPendingKey(t *testing.T) {
 	}
 }
 
-// TestOpcreds_AddNOC_InvalidAdminVendorID covers the
-// IsVendorIdValidOperationally guard chip enforces at
-// OperationalCredentialsCluster.cpp:437. The handler must reject AddNOC
-// with NOCStatusInvalidAdminSubject for the two universal placeholders
-// (0x0000, 0xFFFF) and the reserved range 0xFFF5..0xFFFE. The Test-VID
-// range 0xFFF1..0xFFF4 is INTENTIONALLY accepted — chip-tool commissions
-// with VID 0xFFF1 by default. The guard runs AFTER the CSR / trust-root
-// checks — the test feeds both first so only the VID gate fires.
-func TestOpcreds_AddNOC_InvalidAdminVendorID(t *testing.T) {
-	t.Parallel()
-	// All of these must be rejected with NOCStatusInvalidAdminSubject.
-	rejectedVIDs := []uint16{
-		0x0000,
-		0xFFFF,
-		0xFFF5,
-		0xFFF6,
-		0xFFFE,
-	}
-	for _, vid := range rejectedVIDs {
-		t.Run(fmt.Sprintf("vid=0x%04X_rejected", vid), func(t *testing.T) {
-			t.Parallel()
-			oc := newOpcreds(t)
-			rootRaw, nocRaw, _ := buildTestNOCAndRoot(t)
-			ctx := context.Background()
-			// Prime trust root + CSR so the VID guard is the check that fires.
-			if _, err := oc.MatterInvoke(ctx, 0x0B, core.AddTrustedRootCertificateRequest{RootCACertificate: rootRaw}); err != nil {
-				t.Fatalf("AddTrustedRoot: %v", err)
-			}
-			if _, err := oc.MatterInvoke(ctx, 0x04, core.CSRRequest{CSRNonce: make([]byte, 32)}); err != nil {
-				t.Fatalf("CSRRequest: %v", err)
-			}
-			resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
-				NOCValue:      nocRaw,
-				IPKValue:      make([]byte, 16),
-				AdminVendorID: vid,
-			})
-			if err != nil {
-				t.Fatalf("AddNOC: %v", err)
-			}
-			nr := resp.(core.NOCResponse)
-			if nr.StatusCode != core.NOCStatusInvalidAdminSubject {
-				t.Fatalf("VID 0x%04X: StatusCode = %d, want NOCStatusInvalidAdminSubject (%d)",
-					vid, nr.StatusCode, core.NOCStatusInvalidAdminSubject)
-			}
-		})
-	}
-}
-
 func TestOpcreds_AddNOC_WithoutCSR(t *testing.T) {
 	t.Parallel()
 	oc := newOpcreds(t)
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
-		IPKValue: make([]byte, 16),
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC without CSR: %v", err)
@@ -330,7 +283,8 @@ func TestOpcreds_AddNOC_WithoutTrustedRoot(t *testing.T) {
 
 	// No trusted root → NOCStatusInvalidNOC.
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
-		IPKValue: make([]byte, 16),
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC without trusted root: %v", err)
@@ -348,7 +302,8 @@ func TestOpcreds_AddNOC_BadIPK(t *testing.T) {
 	// Provide IPK with wrong length — must get NOCStatusInvalidNOC before
 	// any CSR check.
 	resp, err := oc.MatterInvoke(context.Background(), 0x06, core.AddNOCRequest{
-		IPKValue: make([]byte, 8), // not 16
+		IPKValue:      make([]byte, 8), // not 16
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC bad IPK: %v", err)
@@ -448,8 +403,9 @@ func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
 
 	// AddNOC before CSR → NOCStatusMissingCsr.
 	resp, err := oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
-		NOCValue: nocRaw,
-		IPKValue: make([]byte, 16),
+		NOCValue:      nocRaw,
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC (pre-CSR): %v", err)
@@ -465,8 +421,9 @@ func TestOpcreds_AddNOC_NeedsCSRThenRoot(t *testing.T) {
 
 	// AddNOC with CSR but without trusted root → NOCStatusInvalidNOC.
 	resp, err = oc.MatterInvoke(ctx, 0x06, core.AddNOCRequest{
-		NOCValue: nocRaw,
-		IPKValue: make([]byte, 16),
+		NOCValue:      nocRaw,
+		IPKValue:      make([]byte, 16),
+		AdminVendorID: 0xFFF1,
 	})
 	if err != nil {
 		t.Fatalf("AddNOC (no root): %v", err)

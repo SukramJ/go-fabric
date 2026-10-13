@@ -351,7 +351,7 @@ func checkNOCShape(c *Certificate) error {
 		return fmt.Errorf("%w: NOC subject must not carry an ICAC-ID or RCAC-ID", ErrMalformed)
 	}
 	if c.Subject.MatterNodeID == 0 || c.Subject.MatterNodeID > maxOperationalNodeID {
-		return fmt.Errorf("%w: NOC node id 0x%016X is not an operational node id", ErrMalformed, c.Subject.MatterNodeID)
+		return fmt.Errorf("%w: %w: 0x%016X", ErrMalformed, ErrNonOperationalNodeID, c.Subject.MatterNodeID)
 	}
 	if c.Subject.MatterFabricID == 0 {
 		return fmt.Errorf("%w: NOC fabric id must not be 0", ErrMalformed)

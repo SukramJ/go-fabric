@@ -1543,6 +1543,18 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if !ok {
 		return nil, fmt.Errorf("%w: AddNOCRequest expected, got %T", errOpcredsInvalidArg, fields)
 	}
+	// A reserved AdminVendorId is an IM-level InvalidCommand, checked
+	// before the fail-safe and every other guard. Mirrors matter.js
+	// 0ceb202d packages/node/src/behaviors/operational-credentials/
+	// OperationalCredentialsServer.ts:217-222 (`if
+	// (!VendorId.isOperational(adminVendorId)) throw new
+	// StatusResponseError(…, Status.InvalidCommand)`) and chip 6170af84
+	// OperationalCredentialsCluster.cpp:470 (`VerifyOrExit(
+	// IsVendorIdValidOperationally(adminVendorId), errorStatus =
+	// Status::InvalidCommand)`).
+	if !isOperationalAdminVendorID(req.AdminVendorID) {
+		return nil, opcredsInvalidCommandErr{msg: fmt.Sprintf("matter: AdminVendorId 0x%04X is reserved", req.AdminVendorID)}
+	}
 	// Matter §11.18.6.8 requires Status::FailsafeRequired when AddNOC is
 	// invoked outside an armed FailSafe window. Mirrors chip
 	// operational-credentials-server.cpp:399 and matter.js
@@ -1632,18 +1644,6 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	if len(root) == 0 {
 		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "no trusted root"}, nil
 	}
-	if !isOperationalAdminVendorID(req.AdminVendorID) {
-		// chip OperationalCredentialsCluster.cpp:437
-		// `IsVendorIdValidOperationally(adminVendorId)` rejects 0 / 0xFFFF
-		// (anonymous) and the test-VID range 0xFFF1..0xFFF4 outside lab
-		// use. Apple's commissioner mirrors the guard; without it a
-		// malformed VID is accepted into the ACL admin-subject and the
-		// next CASE lookup fails silently. Placed after the CSR /
-		// trust-root checks so a missing CSR still surfaces as
-		// MissingCsr (chip orders this guard earlier; the failure
-		// surface to Apple is identical either way).
-		return NOCResponse{StatusCode: NOCStatusInvalidAdminSubject, DebugText: "AdminVendorID invalid"}, nil
-	}
 	// Validate CaseAdminSubject BEFORE anything is persisted. Mirrors
 	// chip OperationalCredentialsCluster.cpp:452-454:
 	//   VerifyOrExit(IsOperationalNodeId(caseAdminSubject) || IsCASEAuthTag(caseAdminSubject),
@@ -1695,7 +1695,7 @@ func (o *OperationalCredentials) handleAddNOC(ctx context.Context, fields any) (
 	}
 	nocPub, verr := verifier.VerifyAndExtractPubKey(req.NOCValue, req.ICACValue)
 	if verr != nil {
-		return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "NOC chain verification failed: " + verr.Error()}, nil //nolint:nilerr // cluster-command failure encoded in NOCResponse.StatusCode, not via the IM-error channel
+		return nocVerificationFailure(verr), nil
 	}
 	if !nocCertifiesPendingKey(nocPub, priv) {
 		return NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}, nil
@@ -1908,7 +1908,8 @@ func validateUpdateNOCCert(fab store.FabricRecord, priv *ecdsa.PrivateKey, nocVa
 	}
 	nocPub, verr := verifier.VerifyAndExtractPubKey(nocValue, icacValue)
 	if verr != nil {
-		return nil, &NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "NOC chain verification failed: " + verr.Error()}
+		resp := nocVerificationFailure(verr)
+		return nil, &resp
 	}
 	if !nocCertifiesPendingKey(nocPub, priv) {
 		return nil, &NOCResponse{StatusCode: NOCStatusInvalidPublicKey, DebugText: "NOC public key does not match pending CSR key"}
@@ -2346,6 +2347,22 @@ func (o *OperationalCredentials) revertAddNOC(ctx context.Context, fabricIndex u
 	_ = o.store.RemoveFabric(ctx, fabricIndex)
 }
 
+// nocVerificationFailure maps a failed NOC chain verification to its
+// NOCResponse: a matter-node-id outside the operational range is
+// InvalidNodeOpId, every other certificate failure InvalidNOC. Mirrors
+// matter.js 0ceb202d packages/node/src/behaviors/operational-credentials/
+// OperationalCredentialsServer.ts:179-183 (#mapNocErrors:
+// OperationalNodeIdError → InvalidNodeOpId, checked before the
+// CertificateError → InvalidNoc branch at :184-193), applied to addNoc
+// (:271-273) and updateNoc (:379-386) alike; the error is thrown by
+// packages/protocol/src/certificate/kinds/Noc.ts:83-85.
+func nocVerificationFailure(err error) NOCResponse {
+	if errors.Is(err, mattercert.ErrNonOperationalNodeID) {
+		return NOCResponse{StatusCode: NOCStatusInvalidNodeOpID, DebugText: "NOC node id is not an operational node id: " + err.Error()}
+	}
+	return NOCResponse{StatusCode: NOCStatusInvalidNOC, DebugText: "NOC chain verification failed: " + err.Error()}
+}
+
 // opcredsInvalidCommandErr is returned by VID-Verification commands when
 // the bridge does not support VID-Verification mode. The IM layer maps
 // this to StatusInvalidCommand (0x85) per Matter §8.9.
@@ -2356,9 +2373,10 @@ func (e opcredsInvalidCommandErr) MatterStatusCode() im.StatusCode { return im.S
 
 // isOperationalAdminVendorID reports whether v is a Vendor-ID a
 // commissioner may legitimately bind into a fabric's admin subject.
-// Mirrors chip's `IsVendorIdValidOperationally`
-// (data-model-providers helper invoked at
-// OperationalCredentialsCluster.cpp:437):
+// Mirrors matter.js 0ceb202d packages/types/src/datatype/VendorId.ts:44
+// `isOperational` (non-zero and valid, valid being 0..0xFFF4 at :21-26)
+// and chip's `IsVendorIdValidOperationally` (invoked at 6170af84
+// OperationalCredentialsCluster.cpp:470):
 //
 //   - 0x0000 is the "anonymous / unspecified" placeholder — rejected.
 //   - 0xFFFF is the "not-applicable" reserved value — rejected.

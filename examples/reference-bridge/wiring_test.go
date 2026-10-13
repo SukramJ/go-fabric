@@ -69,7 +69,7 @@ func TestCommissioningCompleteClearsThePendingCredentialState(t *testing.T) {
 	// OnFailSafeArmed and so clears nothing by itself.
 	root.GeneralCommissioning.AutoArmOnPaseEstablished(ctx)
 
-	raw, err = root.OperationalCredentials.MatterInvoke(ctx, 0x06, mattercore.AddNOCRequest{NOCValue: []byte{0x15}, IPKValue: make([]byte, 16)})
+	raw, err = root.OperationalCredentials.MatterInvoke(ctx, 0x06, mattercore.AddNOCRequest{NOCValue: []byte{0x15}, IPKValue: make([]byte, 16), AdminVendorID: 0xFFF1})
 	if err != nil {
 		t.Fatalf("AddNOC: %v", err)
 	}

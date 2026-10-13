@@ -32,6 +32,17 @@ pseudo-version of `main`.
   `ErrInvalidHostStatus` (they were accepted before).
 - `IlluminanceMeasurement.LightSensorType` is typed `LightSensorTypeEnum`
   in the generated definition (it was `uint8`).
+### Fixed
+
+- AddNOC refuses a reserved AdminVendorId (0x0000, 0xFFF5..0xFFFF) with
+  the IM status InvalidCommand before every other check, the fail-safe
+  included, as matter.js `0ceb202d` and chip do; it used to answer a
+  NOCResponse InvalidAdminSubject after the CSR and trust-root checks. The
+  test vendor IDs 0xFFF1..0xFFF4 stay accepted.
+- AddNOC and UpdateNOC answer a NOC whose matter-node-id lies outside the
+  operational node ID range with NOCResponse InvalidNodeOpId instead of
+  InvalidNOC (`mattercert.ErrNonOperationalNodeID`, wrapped alongside
+  `ErrMalformed`).
 
 ## [0.3.1] — 2026-10-13
 
