@@ -54,13 +54,21 @@ type StatusError struct {
 	Status im.StatusCode
 	// ClusterStatus is the cluster-specific status, nil when absent.
 	ClusterStatus *uint8
+	// Path is the attribute the status is for — a write's failing path
+	// (matter.js PathError, action/response/WriteResult.ts:41-59) — nil for
+	// an interaction-level status.
+	Path *im.ConcreteAttributePath
 }
 
 func (e *StatusError) Error() string {
-	if e.ClusterStatus != nil {
-		return fmt.Sprintf("interaction: status %s, cluster status %d", e.Status, *e.ClusterStatus)
+	var path string
+	if e.Path != nil {
+		path = fmt.Sprintf(" at %d/0x%04X/0x%04X", e.Path.Endpoint, e.Path.Cluster, e.Path.Attribute)
 	}
-	return "interaction: status " + e.Status.String()
+	if e.ClusterStatus != nil {
+		return fmt.Sprintf("interaction: status %s, cluster status %d%s", e.Status, *e.ClusterStatus, path)
+	}
+	return "interaction: status " + e.Status.String() + path
 }
 
 // Interaction is the client side of the Interaction Model towards one

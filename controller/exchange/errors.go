@@ -58,6 +58,22 @@ var (
 	ErrNoSessionID = errors.New("exchange: no session id available")
 )
 
+// UnexpectedMessageError is the message that answered a send expecting an
+// acknowledgement only — matter.js UnexpectedMessageError
+// (protocol/errors.ts:22-28) with its receivedMessage, thrown at
+// MessageExchange.ts:815-817, which InteractionMessenger.ts:1155-1161
+// inspects. It matches [ErrUnexpectedMessage].
+type UnexpectedMessageError struct {
+	Message *Message
+}
+
+func (e *UnexpectedMessageError) Error() string {
+	return fmt.Sprintf("%v: expected an ack only, got protocol 0x%04X opcode 0x%02X", ErrUnexpectedMessage, e.Message.ProtocolID, e.Message.Opcode)
+}
+
+// Is makes the error match [ErrUnexpectedMessage].
+func (e *UnexpectedMessageError) Is(target error) bool { return target == ErrUnexpectedMessage }
+
 // PeerUnresponsiveError is a reliable message the peer never acknowledged
 // within MaxTransmissions transmissions and the final wait — matter.js
 // PeerUnresponsiveError (PeerCommunicationError.ts:40-46), raised by

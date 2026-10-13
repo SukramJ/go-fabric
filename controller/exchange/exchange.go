@@ -436,7 +436,7 @@ func (x *Exchange) awaitAck(ctx context.Context, p *pending, expectAckOnly bool)
 			return r.err
 		}
 		if expectAckOnly && r.msg != nil && !r.msg.isStandaloneAck() {
-			return fmt.Errorf("%w: expected an ack only, got protocol 0x%04X opcode 0x%02X", ErrUnexpectedMessage, r.msg.ProtocolID, r.msg.Opcode)
+			return &UnexpectedMessageError{Message: r.msg}
 		}
 		return nil
 	case <-ctx.Done():

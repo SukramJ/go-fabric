@@ -367,6 +367,20 @@ pseudo-version of `main`.
   `ExchangeOptions{RequireExistingSession, AddressOverride,
   ConnectionTimeout}`, `DefaultReadPathsSupported` (9) and
   `DefaultSubscribePathsSupported` (3). `peer.Peer.Exchanges` is new.
+- `controller/interaction.Interaction.Write` (ADR 0020, stage 3; matter.js
+  `ClientInteraction.write`, `Write()` and `sendWriteCommand` at
+  `0ceb202d`): `Write(ctx, []WriteRequest{Path, Value, DataVersion},
+  WriteOptions{Timed, TimedTimeout, SuppressResponse,
+  DisableListChunking})` → `WriteStatuses` (each path with its ListIndex,
+  status and cluster status; `Err()` the failing path's `*StatusError`, or
+  the failures joined). A list value is written as REPLACE-ALL with the
+  empty list and one append per element, AccessControl ACL and Extension
+  excepted (`ListChunked`); a timed write sends its TimedRequest on the
+  same exchange; a suppressed write expects an acknowledgement only and
+  tolerates a stray answer that is not an error StatusResponse. `Raw(node)`
+  writes a node tree; `StatusError.Path` names the failing path;
+  `ErrMalformedRequest`. `controller/exchange.UnexpectedMessageError`
+  carries the message that answered an ack-only send.
 
 ### Changed
 
