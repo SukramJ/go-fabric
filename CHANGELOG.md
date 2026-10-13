@@ -63,6 +63,17 @@ pseudo-version of `main`.
   `mdns.DNSQuestion`, `mdns.DNSMessage`, `mdns.DNSSRV` and `mdns.DNSType`
   give the browser a typed record codec. `OperationalResolver` behaves as
   before.
+- `controller/exchange`, the controller's message layer (ADR 0020, stage 1):
+  a `Manager` over one UDP socket with the session table (the unsecured
+  session of a handshake, secure PASE / CASE sessions over
+  `secure/channel`), the exchange table and the receive path, and
+  `Exchange` with MRP — reliable `Send` with retransmission on the
+  §4.12.2.1 schedule and the final wait, piggybacked and standalone acks,
+  duplicate detection, `Next` with the maximum peer response time,
+  graceful `Close` and `Abort`, the 30-exchange cap per session, session
+  id allocation with reuse of the least recently used session's id, and
+  `CloseSession`. Ported from matter.js `ExchangeManager.ts` and
+  `MessageExchange.ts` at `0ceb202d`.
 
 ### Changed
 
