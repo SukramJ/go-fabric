@@ -408,16 +408,18 @@ func assertRvcGoHome(st State) ErrorID {
 }
 
 // validState reports whether s is a state of the derivation: a value of
-// its OperationalStateEnum, or a manufacturer-specific one (0x80-0xBF).
-// No enum value carries a feature conformance, so an empty context
-// decides them.
+// its OperationalStateEnum, or one in the enum's ManufacturerStates range
+// (128..191), which the generated definition carries as a range member
+// (operational-state.element.ts, matter.js 9892fa39). No enum value
+// carries a feature conformance, so an empty context decides them.
 func (v variant) validState(s State) bool {
-	return spec.EnumSupported(v.states, uint64(s), spec.Context(v.def, 0)) || clusterwire.HasOperationalStateLabel(uint8(s))
+	return spec.EnumSupported(v.states, uint64(s), spec.Context(v.def, 0))
 }
 
-// validError is validState for the ErrorStateEnum.
+// validError is validState for the ErrorStateEnum and its
+// ManufacturerError range.
 func (v variant) validError(e ErrorID) bool {
-	return spec.EnumSupported(v.errors, uint64(e), spec.Context(v.def, 0)) || clusterwire.HasOperationalStateLabel(uint8(e))
+	return spec.EnumSupported(v.errors, uint64(e), spec.Context(v.def, 0))
 }
 
 // Server implements [contract.ClusterServer] for OperationalState or

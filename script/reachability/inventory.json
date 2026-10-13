@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4497,
+  "entry_points": 4500,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,8 +175,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10440,
-    "reachable": 7360,
+    "total_exported": 10441,
+    "reachable": 7361,
     "whitelisted": 3075,
     "unreachable": 5
   },
@@ -7507,14 +7507,14 @@
       "identifier": "CurrentPositionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 99
+      "line": 101
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "CurrentPositionEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 114
+      "line": 116
     },
     {
       "package": "cluster/spec/closurecontrol",
@@ -7528,56 +7528,56 @@
       "identifier": "LatchControlModesBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 126
+      "line": 128
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "LatchControlModesBitmapDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 137
+      "line": 139
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "MainStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 145
+      "line": 147
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "MainStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 162
+      "line": 164
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "OverallCurrentStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 204
+      "line": 206
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "OverallTargetStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 262
+      "line": 264
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "TargetPositionEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 271
+      "line": 273
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "TargetPositionEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 285
+      "line": 287
     },
     {
       "package": "cluster/spec/closurecontrol",
@@ -7598,14 +7598,14 @@
       "identifier": "ThreeLevelAutoEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 214
+      "line": 216
     },
     {
       "package": "cluster/spec/closurecontrol",
       "identifier": "ThreeLevelAutoEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/closurecontrol/definition_gen.go",
-      "line": 227
+      "line": 229
     },
     {
       "package": "cluster/spec/closuredimension",
@@ -8557,28 +8557,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "cluster/spec/deviceenergymanagementmode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/spec/deviceenergymanagementmode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
-      "line": 165
+      "line": 167
     },
     {
       "package": "cluster/spec/deviceenergymanagementmode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/deviceenergymanagementmode/definition_gen.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "cluster/spec/deviceenergymanagementmode",
@@ -8718,28 +8718,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/dishwashermode/definition_gen.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "cluster/spec/dishwashermode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/dishwashermode/definition_gen.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/spec/dishwashermode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/dishwashermode/definition_gen.go",
-      "line": 164
+      "line": 166
     },
     {
       "package": "cluster/spec/dishwashermode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/dishwashermode/definition_gen.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "cluster/spec/dishwashermode",
@@ -9495,28 +9495,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevsemode/definition_gen.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "cluster/spec/energyevsemode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevsemode/definition_gen.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/spec/energyevsemode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevsemode/definition_gen.go",
-      "line": 165
+      "line": 167
     },
     {
       "package": "cluster/spec/energyevsemode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/energyevsemode/definition_gen.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "cluster/spec/energyevsemode",
@@ -10384,28 +10384,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/laundrywashermode/definition_gen.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "cluster/spec/laundrywashermode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/laundrywashermode/definition_gen.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/spec/laundrywashermode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/laundrywashermode/definition_gen.go",
-      "line": 165
+      "line": 167
     },
     {
       "package": "cluster/spec/laundrywashermode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/laundrywashermode/definition_gen.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "cluster/spec/laundrywashermode",
@@ -10608,28 +10608,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/microwaveovenmode/definition_gen.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "cluster/spec/microwaveovenmode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/microwaveovenmode/definition_gen.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/spec/microwaveovenmode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/microwaveovenmode/definition_gen.go",
-      "line": 163
+      "line": 165
     },
     {
       "package": "cluster/spec/microwaveovenmode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/microwaveovenmode/definition_gen.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "cluster/spec/microwaveovenmode",
@@ -11035,7 +11035,7 @@
       "identifier": "ErrorStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 109
+      "line": 111
     },
     {
       "package": "cluster/spec/operationalstate",
@@ -11049,21 +11049,21 @@
       "identifier": "OperationalStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 118
+      "line": 120
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "OperationalStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 131
+      "line": 133
     },
     {
       "package": "cluster/spec/operationalstate",
       "identifier": "OperationalStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/operationalstate/definition_gen.go",
-      "line": 163
+      "line": 167
     },
     {
       "package": "cluster/spec/operationalstate",
@@ -11231,7 +11231,7 @@
       "identifier": "ErrorStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 109
+      "line": 111
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
@@ -11245,21 +11245,21 @@
       "identifier": "OperationalStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 118
+      "line": 120
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "OperationalStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 131
+      "line": 133
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
       "identifier": "OperationalStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovencavityoperationalstate/definition_gen.go",
-      "line": 163
+      "line": 167
     },
     {
       "package": "cluster/spec/ovencavityoperationalstate",
@@ -11301,28 +11301,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovenmode/definition_gen.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "cluster/spec/ovenmode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovenmode/definition_gen.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/spec/ovenmode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovenmode/definition_gen.go",
-      "line": 174
+      "line": 176
     },
     {
       "package": "cluster/spec/ovenmode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/ovenmode/definition_gen.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "cluster/spec/ovenmode",
@@ -12001,28 +12001,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
-      "line": 163
+      "line": 165
     },
     {
       "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode/definition_gen.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "cluster/spec/refrigeratorandtemperaturecontrolledcabinetmode",
@@ -12085,28 +12085,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvccleanmode/definition_gen.go",
-      "line": 106
+      "line": 108
     },
     {
       "package": "cluster/spec/rvccleanmode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvccleanmode/definition_gen.go",
-      "line": 145
+      "line": 147
     },
     {
       "package": "cluster/spec/rvccleanmode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvccleanmode/definition_gen.go",
-      "line": 168
+      "line": 170
     },
     {
       "package": "cluster/spec/rvccleanmode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvccleanmode/definition_gen.go",
-      "line": 137
+      "line": 139
     },
     {
       "package": "cluster/spec/rvccleanmode",
@@ -12141,7 +12141,7 @@
       "identifier": "ErrorStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 140
+      "line": 142
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
@@ -12155,21 +12155,21 @@
       "identifier": "OperationalStateEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 149
+      "line": 151
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "OperationalStateEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 169
+      "line": 171
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
       "identifier": "OperationalStateStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcoperationalstate/definition_gen.go",
-      "line": 208
+      "line": 212
     },
     {
       "package": "cluster/spec/rvcoperationalstate",
@@ -12211,28 +12211,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcrunmode/definition_gen.go",
-      "line": 120
+      "line": 122
     },
     {
       "package": "cluster/spec/rvcrunmode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcrunmode/definition_gen.go",
-      "line": 159
+      "line": 161
     },
     {
       "package": "cluster/spec/rvcrunmode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcrunmode/definition_gen.go",
-      "line": 181
+      "line": 183
     },
     {
       "package": "cluster/spec/rvcrunmode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/rvcrunmode/definition_gen.go",
-      "line": 151
+      "line": 153
     },
     {
       "package": "cluster/spec/rvcrunmode",
@@ -13632,28 +13632,28 @@
       "identifier": "ModeOptionStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/waterheatermode/definition_gen.go",
-      "line": 103
+      "line": 105
     },
     {
       "package": "cluster/spec/waterheatermode",
       "identifier": "ModeTag",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/waterheatermode/definition_gen.go",
-      "line": 142
+      "line": 144
     },
     {
       "package": "cluster/spec/waterheatermode",
       "identifier": "ModeTagDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/waterheatermode/definition_gen.go",
-      "line": 164
+      "line": 166
     },
     {
       "package": "cluster/spec/waterheatermode",
       "identifier": "ModeTagStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/waterheatermode/definition_gen.go",
-      "line": 134
+      "line": 136
     },
     {
       "package": "cluster/spec/waterheatermode",

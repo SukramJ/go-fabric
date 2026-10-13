@@ -87,6 +87,8 @@ var ModeChangeStatusDef = &spec.Enum{Name: "ModeChangeStatus", Bits: 8, Values: 
 	{Value: 70, Name: "WaterTankLidOpen"},
 	{Value: 71, Name: "MopCleaningPadMissing"},
 	{Value: 72, Name: "BatteryLow"},
+}, Ranges: []spec.EnumRange{
+	{Name: "MfgCodes", Min: 128, Max: 191},
 }}
 
 // ModeOptionStruct is the ModeOptionStruct struct.
@@ -192,6 +194,8 @@ var ModeTagDef = &spec.Enum{Name: "ModeTag", Bits: 16, Values: []spec.EnumValue{
 	{Value: 16384, Name: "Idle"},
 	{Value: 16385, Name: "Cleaning"},
 	{Value: 16386, Name: "Mapping"},
+}, Ranges: []spec.EnumRange{
+	{Name: "MfgTags", Min: 32768, Max: 49151},
 }}
 
 // ChangeToModeRequest is the ChangeToMode command payload.

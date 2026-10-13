@@ -53,6 +53,8 @@ const (
 var LightSensorTypeEnumDef = &spec.Enum{Name: "LightSensorTypeEnum", Bits: 8, Values: []spec.EnumValue{
 	{Value: 0, Name: "Photodiode", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 1, Name: "Cmos", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+}, Ranges: []spec.EnumRange{
+	{Name: "Ms", Min: 64, Max: 254, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}},
 }}
 
 // Definition is the IlluminanceMeasurement cluster definition.

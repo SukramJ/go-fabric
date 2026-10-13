@@ -91,6 +91,8 @@ var ClosureErrorEnumDef = &spec.Enum{Name: "ClosureErrorEnum", Bits: 8, Values: 
 	{Value: 2, Name: "TemperatureLimited", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 3, Name: "MaintenanceRequired", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 4, Name: "InternalInterference", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+}, Ranges: []spec.EnumRange{
+	{Name: "ManufacturerError", Min: 128, Max: 191},
 }}
 
 // CurrentPositionEnum is the CurrentPositionEnum enum8.

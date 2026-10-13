@@ -76,6 +76,8 @@ var ErrorStateEnumDef = &spec.Enum{Name: "ErrorStateEnum", Bits: 8, Values: []sp
 	{Value: 1, Name: "UnableToStartOrResume", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 2, Name: "UnableToCompleteOperation", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 3, Name: "CommandInvalidInState", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+}, Ranges: []spec.EnumRange{
+	{Name: "ManufacturerError", Min: 128, Max: 191},
 }}
 
 // ErrorStateStruct is the ErrorStateStruct struct.
@@ -133,6 +135,8 @@ var OperationalStateEnumDef = &spec.Enum{Name: "OperationalStateEnum", Bits: 8, 
 	{Value: 1, Name: "Running", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 2, Name: "Paused", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 3, Name: "Error", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
+}, Ranges: []spec.EnumRange{
+	{Name: "ManufacturerStates", Min: 128, Max: 191},
 }}
 
 // OperationalStateStruct is the OperationalStateStruct struct.
