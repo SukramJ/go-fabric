@@ -262,3 +262,43 @@ Coverage floors (new): `controller/ca` 88 (measured 88.0 %),
   (CF:149, :1355), marked there for removal; the one to turn off later.
 - **The NOC subject order** differs from `bridgetest`'s (not from matter.js) —
   only relevant if `BD-Matter-Commissioner-TestCA` describes the bytes.
+
+## Owner's decisions
+
+Reviewed 2026-10-13 against `0ceb202d`: every cited line of
+`DeviceAttestationValidator.ts` (DAV:28-140, :170-537),
+`kinds/AttestationCertificates.ts:22-72`, `kinds/Certificate.ts:249-258,
+:345-401, :549-551, :587-622, :650`, `kinds/CertificationDeclaration.ts:68-159,
+:220-226`, `definitions/certification-declaration.ts:20-48`,
+`common/OperationalCredentialsTypes.ts:10-15`,
+`kinds/CertificateSignature.ts:46-57, :101-120`,
+`general/src/crypto/EcdsaSignature.ts:23-44` (the attestation signature is
+IEEE P1363, the CD signature DER), `ControllerCommissioningFlow.ts:129-155,
+:1218-1338, :1341-1368`, `CertificateAuthority.ts:150-185, :287-320`,
+`definitions/operational.ts:109-110`. `controller/attestation` is DAV check
+for check and in its order; the eighteen points above hold.
+
+1. **PASE close without CloseSession stays.** matter.js's
+   `initiateForceClose` (CC:313-319) is what the Go `HandlePeerLoss` is. The
+   device's `pase_busy` answer to a second PBKDFParamRequest while the first
+   PASE lives is `PaseServer.ts:82` on both sides — no finding, a handover
+   note.
+2. **`Policy.Decide`'s empty reason stays a string.** A `*string` buys the
+   distinction "empty message" — a `CommissioningError("")` — which nobody
+   wants. Go surface, documented on the field.
+3. **No `Scanner` in `commissioner.Context`.** `forgetCommissionedDevice` is
+   BLE-only upstream (`common/BleScanner.ts:305`) and BLE is out of scope.
+4. **`FabricConfig.IPK` nil draws a random key.** matter.js's
+   `FabricAuthority.createFabric` does the same
+   (`fabric/FabricAuthority.ts:135`, `crypto.randomBytes(CRYPTO_SYMMETRIC_KEY_LENGTH)`).
+5. **by_design:** `BD-Matter-CA-CounterSavedPerNOC` (the counter saved after
+   every NOC; matter.js writes its storage at creation only,
+   `CertificateAuthority.ts:181-183`, the one `options.set` in the file) and
+   `BD-Matter-Attestation-RevocationsOptional` (a `PAAStore` without
+   `Revocations` revokes nothing). The zero `Policy` is matter.js's
+   `undefined` — no entry. The NOC subject order differs from `bridgetest`'s
+   bytes only; brief AI moves `bridgetest` onto `controller/ca`, which ends
+   the difference — handover note, no entry.
+6. **Open items for stage 3** stay as the report lists them: the client
+   encoders into `im/`, Write/Subscribe/batching on `interaction`, persistent
+   `peer.Store`, `ResumptionStore` and `ca.Store`.
