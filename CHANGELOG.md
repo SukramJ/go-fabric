@@ -245,6 +245,20 @@ pseudo-version of `main`.
   `Reject`, the zero value's backward-compatible accept, or a `Decide`
   function) and `Policy.Resolve` are matter.js's `onFailure` and
   `#resolveAttestationFindings`.
+- `controller/interaction`, the Interaction Model client as far as
+  commissioning needs it (ADR 0020, stage 2; matter.js `ClientInteraction`
+  and `InteractionMessenger` at `0ceb202d`): `interaction.New(manager,
+  session, logger)` and `Invoke` — one command on a fresh exchange, a
+  TimedRequest first when `InvokeOptions.Timed` (default 10 s), no
+  commandRef, the processing time of the option or 30 s with
+  `ExtendedFailSafeTimeout`, chunked InvokeResponses acknowledged and
+  accumulated, a status other than Success an `*interaction.StatusError`
+  — and `Read` — a fabric-filtered ReadRequest with the IM revision,
+  ReportData chunks acknowledged and merged (lists continued by a null
+  ListIndex reassembled), the final Success sent before the exchange
+  closes — returning an `interaction.Report` with `Value(endpoint,
+  cluster, attribute)`. `MaximumPeerResponseTime` is matter.js's
+  `maximumPeerResponseTime`.
 
 ### Changed
 
