@@ -423,3 +423,34 @@ func TestParityMatterJS_DescriptorServer_TagListGatedByFeatureMap(t *testing.T) 
 		}
 	}
 }
+
+// TestParityMatterJS_DescriptorServer_KeepsAListedDeviceTypeAtItsListedRevision
+// verifies that a device type listed twice appears once in DeviceTypeList,
+// at the revision of its first entry, in first-entry order.
+//
+// Mirrors matter.js 0ceb202d packages/node/test/behaviors/descriptor/
+// DescriptorServerTest.ts:166-182 (case "keeps a listed device type at its
+// listed revision") over packages/node/src/behaviors/descriptor/
+// DescriptorServer.ts:104-108 (addDeviceTypes skips a listed device type).
+func TestParityMatterJS_DescriptorServer_KeepsAListedDeviceTypeAtItsListedRevision(t *testing.T) {
+	t.Parallel()
+	in := []core.DeviceTypeStruct{
+		{DeviceType: 2, Revision: 1},
+		{DeviceType: 2, Revision: 2},
+		{DeviceType: 3, Revision: 1},
+		{DeviceType: 3, Revision: 1},
+	}
+	d, err := core.NewDescriptor(in, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("NewDescriptor: %v", err)
+	}
+	v, _ := d.MatterRead(0x0000)
+	got := v.([]core.DeviceTypeStruct)
+	want := []core.DeviceTypeStruct{{DeviceType: 2, Revision: 1}, {DeviceType: 3, Revision: 1}}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("deviceTypeList = %v, want %v", got, want)
+	}
+	if in[1].Revision != 2 || len(in) != 4 {
+		t.Error("NewDescriptor modified its argument")
+	}
+}

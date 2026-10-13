@@ -52,6 +52,10 @@ pseudo-version of `main`.
   failing `LockInvoke` emits LockOperationError and answers the error's IM
   status if it carries one, FAILURE otherwise (it used to return the
   error unchanged with no event).
+- `core.NewDescriptor` lists a device type once, at the revision of its
+  first entry, as matter.js `0ceb202d`'s `addDeviceTypes` does: a bridged
+  endpoint whose host device type is BridgedNode no longer reports
+  BridgedNode twice in its DeviceTypeList.
 
 ## [0.3.1] — 2026-10-13
 
