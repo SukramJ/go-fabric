@@ -16,9 +16,13 @@ import "log/slog"
 // command's mode switch converts them (switchColorMode). Every attribute
 // that changed is reported through the change notifier, the "Q" ones by
 // their quieter rules, and a Read returns the new colour at once. The
-// writers are not called. A colour equal to the current one, or to the
-// one a writer is being given, is no change. A colour of a mode the
-// server has no feature for is logged and ignored.
+// writers are not called. A colour equal to the current one is no change,
+// and so is the device confirming the colour a writer is being given —
+// compared in the device's own colour mode, the in-flight colour
+// converted into it as switchColorMode converts, within one attribute
+// unit (the quantisation of the conversions, issue #79): a device that
+// takes hue and saturation echoes an x/y write as hue and saturation. A
+// colour of a mode the server has no feature for is logged and ignored.
 //
 // Set does not stop a running transition or colour loop and leaves
 // RemainingTime alone: the movement's next step overwrites the device's
@@ -48,10 +52,19 @@ func (s *ColorControlServer) Set(c Color) {
 	s.mu.Lock()
 	prev := s.st
 	next := s.deviceColor(prev, c)
+	if s.inflight != nil {
+		if s.confirms(*s.inflight, c) {
+			s.mu.Unlock()
+			return
+		}
+		// The device contradicts the colour being written: its colour
+		// stands, whether or not it is the one stored before the write.
+		s.setGen++
+	}
 	// An unchanged value is no change (matter.js
 	// packages/node/src/behavior/state/managed/Datasource.ts:759-761
 	// skips a deep-equal value on commit).
-	if next == prev || (s.inflight != nil && s.deviceColor(*s.inflight, c) == *s.inflight) {
+	if next == prev {
 		s.mu.Unlock()
 		return
 	}
@@ -81,4 +94,33 @@ func (s *ColorControlServer) deviceColor(st colorState, c Color) colorState {
 		s.setMireds(&st, float64(c.ColorTemperatureMireds))
 	}
 	return st
+}
+
+// confirms reports whether the device's colour c is the in-flight colour
+// st seen in c's colour mode: st converted into that mode
+// (switchColorMode), the mode's own fields compared within one attribute
+// unit, hue around the wrap. The caller holds mu.
+func (s *ColorControlServer) confirms(st colorState, c Color) bool {
+	mode := colorModeOf(c.Mode)
+	s.switchColorMode(&st, st.mode, mode)
+	near := func(a, b uint16) bool { return a == b || a+1 == b || b+1 == a }
+	switch c.Mode {
+	case ColorModeHueSaturation:
+		dh := absDiff(uint16(st.hue), uint16(min(c.Hue, maxHueValue)))
+		return (dh <= 1 || dh >= maxHueValue-1) && near(uint16(st.saturation), uint16(min(c.Saturation, maxSaturationValue)))
+	case ColorModeEnhancedHueSaturation:
+		return near(st.enhancedHue, c.EnhancedHue) && near(uint16(st.saturation), uint16(min(c.Saturation, maxSaturationValue)))
+	case ColorModeXY:
+		return near(st.x, min(c.X, maxCIEXYValue)) && near(st.y, min(c.Y, maxCIEXYValue))
+	case ColorModeColorTemperature:
+		return near(st.mireds, uint16(s.cropMireds(float64(c.ColorTemperatureMireds))))
+	}
+	return false
+}
+
+func absDiff(a, b uint16) uint16 {
+	if a > b {
+		return a - b
+	}
+	return b - a
 }

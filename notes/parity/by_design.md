@@ -2255,6 +2255,19 @@ other — and a colour whose mode the server has no feature for is logged
 (`matter.colorcontrol.inbound_color_mode_ignored`) and ignored, as the
 thermostat treats an inbound SystemMode it cannot serve.
 
+A `Set` that lands while a writer runs is the device confirming the
+write when it names the in-flight colour in the device's own colour
+mode — the in-flight colour converted into that mode as `switchColorMode`
+converts, each attribute within one unit (the quantisation of the
+conversions: hsvToXy of 0°/100 % gives Y 19614 for a target of 19615) —
+and is then no change; any other colour is the device's and wins over
+the write, even one equal to the colour stored before it (issue #79).
+matter.js has no such path: its host writes state directly. The mode
+switch itself drives no writer, as matter.js's `switchColorMode` changes
+state only (`ColorControlServer.ts:1454-1540`), and a command whose
+movement the writer refuses rolls the switch back as matter.js's
+transaction rolls back a command that throws.
+
 ### BD-Matter-DoorLock-HostFailureStatus — a failed `LockInvoke` answers the error's own IM status; matter.js answers FAILURE
 
 matter.js's `#actuate` calls the `handleLockOperation` hook and, when it

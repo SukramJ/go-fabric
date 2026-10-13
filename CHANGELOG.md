@@ -143,6 +143,18 @@ pseudo-version of `main`.
 
 ### Fixed
 
+- `light.ColorControlServer`: a colour mode switch no longer drives the
+  `ColorWriter` with the converted current colour (#79) — matter.js's
+  `switchColorMode` changes state only (`ColorControlServer.ts:1454-1540`
+  at `0ceb202d`); the command's own movement writes the target, and a
+  command whose write the writer refuses rolls the switch back, as
+  matter.js's transaction does. A `Set` that lands while a writer runs is
+  matched against the in-flight colour in the device's own colour mode,
+  within one attribute unit of the conversions' quantisation, so a device
+  that takes hue and saturation confirms an x/y write with its echo; an
+  echo that contradicts the write wins even when it equals the colour
+  stored before it. A MoveToColor on an HS device now ends at its target
+  instead of the converted colour of an intermediate step.
 - AddNOC refuses a reserved AdminVendorId (0x0000, 0xFFF5..0xFFFF) with
   the IM status InvalidCommand before every other check, the fail-safe
   included, as matter.js `0ceb202d` and chip do; it used to answer a

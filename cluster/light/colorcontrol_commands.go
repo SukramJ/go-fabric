@@ -25,7 +25,33 @@ func (s *ColorControlServer) MatterInvoke(ctx context.Context, cmdID uint32, fie
 	}
 	s.cmd.Lock()
 	defer s.cmd.Unlock()
-	return nil, s.invoke(ctx, cmdID, fields)
+	s.mu.Lock()
+	prev, gen := s.st, s.setGen
+	s.mu.Unlock()
+	err := s.invoke(ctx, cmdID, fields)
+	if err != nil {
+		s.rollback(prev, gen)
+	}
+	return nil, err
+}
+
+// rollback restores the state a failed command started from — its mode
+// switch included, which changed state without the writers — as
+// matter.js's transaction rolls back every state change of a command
+// that throws. A colour the device reported meanwhile
+// ([ColorControlServer.Set], setGen moved) stands.
+func (s *ColorControlServer) rollback(prev colorState, gen uint64) {
+	s.commit.Lock()
+	defer s.commit.Unlock()
+	s.mu.Lock()
+	cur := s.st
+	if s.setGen != gen || cur == prev {
+		s.mu.Unlock()
+		return
+	}
+	s.st = prev
+	s.mu.Unlock()
+	s.report(cur, prev)
 }
 
 func (s *ColorControlServer) invoke(ctx context.Context, cmdID uint32, fields any) error { //nolint:gocyclo // a dispatch table: one case per command
