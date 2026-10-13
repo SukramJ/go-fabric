@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4645,
+  "entry_points": 4647,
   "entry_packages": [
     ".",
     "bdx",
@@ -179,9 +179,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10717,
+    "total_exported": 10719,
     "reachable": 7514,
-    "whitelisted": 3198,
+    "whitelisted": 3200,
     "unreachable": 5
   },
   "by_package": [
@@ -14785,6 +14785,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
       "line": 125
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestProbeFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/probe_test.go",
+      "line": 132
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestProbeReadsTheReports",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/probe_test.go",
+      "line": 86
     },
     {
       "package": "controller/peer",

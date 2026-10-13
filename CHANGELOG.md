@@ -196,6 +196,12 @@ pseudo-version of `main`.
   unhandled; `peer.ErrorHandler` may replace a delay or end the process).
   `Connect` shares the process, waits the connection timeout less the
   time offline and ends in `peer.UnreachableError`.
+- The liveness probe of `controller/peer` (matter.js
+  `ClientInteraction.probe`, the one piece of stage 3 the address monitor
+  needs): an empty, unfiltered ReadRequest on an existing session —
+  optionally to another address — with suppressed peer loss and at most
+  two transmissions, the reports read and answered as matter.js reads
+  them.
 
 ### Changed
 

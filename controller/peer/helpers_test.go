@@ -273,6 +273,14 @@ func newHarness(t *testing.T, edit func(*Context)) *harness {
 // secureSession registers a CASE-like session with the test node.
 func (h *harness) secureSession(t *testing.T, id uint16, addr *net.UDPAddr) *exchange.Session {
 	t.Helper()
+	s, _ := h.securePair(t, id, addr)
+	return s
+}
+
+// securePair registers a CASE-like session with the test node and
+// returns the node's side of its keys.
+func (h *harness) securePair(t *testing.T, id uint16, addr *net.UDPAddr) (s *exchange.Session, node *channel.Session) {
+	t.Helper()
 	key := make([]byte, 16)
 	_, _ = rand.Read(key)
 	s, err := h.mgr.NewSecureSession(exchange.SecureSessionConfig{
@@ -285,7 +293,11 @@ func (h *harness) secureSession(t *testing.T, id uint16, addr *net.UDPAddr) *exc
 	if err != nil {
 		t.Fatal(err)
 	}
-	return s
+	node, err = channel.New(channel.Config{EncryptKey: key, DecryptKey: key, LocalNodeID: testNode, PeerNodeID: 1, PeerSessionID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s, node
 }
 
 func udpAddr(s string) *net.UDPAddr {

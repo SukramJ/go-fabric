@@ -186,12 +186,17 @@ func TestConnectToANodeThroughTheProcess(t *testing.T) {
 		t.Fatal("CASE saved no resumption record")
 	}
 	// The node tells a session it has routed a message of (bridge.go's
-	// notify path); one read gives it the route.
-	readOnce(t, ls.mgr, s)
+	// notify path); the probe gives it the route, and proves the session.
+	if !probe(ctx, ls.mgr, s, nil, slog.New(slog.DiscardHandler)) {
+		t.Fatal("the probe failed on a live session")
+	}
 	if err := n.Stop(ctx); err != nil {
 		t.Fatal(err)
 	}
 	eventually(t, "the node's CloseSession", func() bool { return s.IsPeerLost() && !p.HasSession() && disconnected.Load() == 1 })
+	if probe(ctx, ls.mgr, s, nil, slog.New(slog.DiscardHandler)) {
+		t.Fatal("the probe succeeded on a closed session")
+	}
 	p.Delete(ctx)
 	if _, ok := ls.resume.FindResumptionRecord(testAddr); ok {
 		t.Fatal("Delete kept the resumption record")
