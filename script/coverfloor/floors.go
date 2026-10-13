@@ -75,6 +75,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/controller/ca", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/controller/discovery", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
 	// The module's lowest measured package (76.7 when last raised).

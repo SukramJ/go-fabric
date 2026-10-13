@@ -212,6 +212,19 @@ pseudo-version of `main`.
   the session in place to a discovered address that answers, and gives
   the session up as unresponsive when none does. Concurrent checks join
   one run; `peer.ReasonSessionSuspect` probes the current address only.
+- `controller/ca`, the controller's certificate authority (ADR 0020,
+  stage 2; matter.js `CertificateAuthority.ts` at `0ceb202d`): `ca.New`
+  loads the CA a `ca.Store` holds (`MemoryStore` in memory) or creates a
+  P-256 root — RCAC with root cert id 0, validity now −1 / +10 years, a CA
+  with keyCertSign and cRLSign, SHA-1 key identifiers — and, with
+  `Config.IntermediateCA`, an ICAC that signs the NOCs; a stored CA whose
+  ICAC presence differs from the configuration is `ca.ErrConfig`.
+  `GenerateNOC` issues a NOC (subject fabric id, node id, CATs in
+  matter.js's order; digitalSignature; clientAuth and serverAuth) and
+  saves the certificate counter after every issue, so serial numbers do
+  not repeat after a restart. `RootCert`, `RootPublicKey`, `ICACCert`,
+  `Verifier`, `ca.KeyIdentifier` and `ca.CompressedFabricID` (matter.js
+  `GlobalFabricId.compute`).
 
 ### Changed
 
