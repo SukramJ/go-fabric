@@ -25,7 +25,6 @@ type Session struct {
 	m    *Manager
 	id   uint16
 	peer uint16 // the peer's session id, stamped into outbound headers
-	addr *net.UDPAddr
 
 	// Secure session state; secure is nil on the unsecured session.
 	secure               *channel.Session
@@ -42,6 +41,7 @@ type Session struct {
 	window *mrp.Window
 
 	mu              sync.Mutex
+	addr            *net.UDPAddr
 	params          sessionparams.Parameters
 	timestamp       time.Time
 	activeTimestamp time.Time
@@ -57,7 +57,25 @@ func (s *Session) ID() uint16 { return s.id }
 func (s *Session) PeerSessionID() uint16 { return s.peer }
 
 // Addr is the peer's UDP address.
-func (s *Session) Addr() *net.UDPAddr { return s.addr }
+func (s *Session) Addr() *net.UDPAddr {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.addr
+}
+
+// SetAddr moves the session to the peer's address addr: every later
+// transmission on the session goes there, an exchange with an address
+// override aside — matter.js `session.channel.networkAddress = address`,
+// the in-place migration of PeerAddressMonitor.ts:243 and :170
+// (packages/protocol/src/peer/, 0ceb202d). A nil addr is ignored.
+func (s *Session) SetAddr(addr *net.UDPAddr) {
+	if addr == nil {
+		return
+	}
+	s.mu.Lock()
+	s.addr = addr
+	s.mu.Unlock()
+}
 
 // IsSecure reports whether the session is encrypted (PASE or CASE).
 func (s *Session) IsSecure() bool { return s.secure != nil }
@@ -166,6 +184,18 @@ func (s *Session) lastTimestamp() time.Time {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.timestamp
+}
+
+// ActiveTimestamp is the time of the last message received from the peer
+// on the session — matter.js Session.activeTimestamp (session/Session.ts:61-65,
+// updated by notifyActivity :141-147), the order of Peer.newestSession
+// (peer/Peer.ts:581-601). A secure session starts at its creation time
+// (Session.ts:119-121 with NodeSession.ts:119); the unsecured session is
+// zero until the peer's first message.
+func (s *Session) ActiveTimestamp() time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeTimestamp
 }
 
 // timing is the peer's intervals and whether the peer is active now.

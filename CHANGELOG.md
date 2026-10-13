@@ -126,6 +126,13 @@ pseudo-version of `main`.
   caller does not open itself — the CASE exchange of `handshake.CASE`,
   adopted at its first send as matter.js's `onSend` / `onReceive` setters
   adopt them.
+- `exchange.Options.AddressOverride`, `exchange.Session.SetAddr` and
+  `Session.ActiveTimestamp`: one exchange's messages to another address
+  while the session keeps its own (matter.js
+  `MessageExchange.Options.addressOverride`), the in-place migration of a
+  session to a new peer address (`session.channel.networkAddress = …`,
+  `PeerAddressMonitor.ts`), and the time of the last message received on
+  a session (`Session.activeTimestamp`), which orders a peer's sessions.
 
 ### Changed
 

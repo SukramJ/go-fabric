@@ -594,7 +594,7 @@ func (m *Manager) sendAck(s *Session, msg *Message, dest uint64) {
 	if err != nil {
 		return
 	}
-	_ = m.conn.Send(s.addr, datagram)
+	_ = m.conn.Send(s.Addr(), datagram)
 }
 
 // seal frames one message on s: on the unsecured session with the global

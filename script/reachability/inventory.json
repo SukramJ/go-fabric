@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4606,
+  "entry_points": 4608,
   "entry_packages": [
     ".",
     "bdx",
@@ -178,9 +178,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10656,
+    "total_exported": 10658,
     "reachable": 7492,
-    "whitelisted": 3159,
+    "whitelisted": 3161,
     "unreachable": 5
   },
   "by_package": [
@@ -14357,6 +14357,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/solicitor_test.go",
       "line": 25
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestActiveTimestamp",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/address_test.go",
+      "line": 65
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestAddressOverrideAndSetAddr",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/address_test.go",
+      "line": 21
     },
     {
       "package": "controller/exchange",

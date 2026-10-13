@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"sync"
 	"time"
 
@@ -59,6 +60,13 @@ type Options struct {
 	// goroutine, for a first transmission with the exchange locked, so it
 	// must not block for long or call back into the exchange.
 	OnSend func(retransmission int)
+
+	// AddressOverride sends the exchange's messages to this address instead
+	// of the session's, leaving the session's address and its other
+	// exchanges alone — matter.js MessageExchange.Options.addressOverride
+	// (:1266-1270), stored at :297 and used for every transmission (:488,
+	// :771-774, :953). Nil sends to the session's address.
+	AddressOverride *net.UDPAddr
 
 	// OnReceive is called for every message the exchange takes, a
 	// duplicate and a standalone ack included — matter.js
@@ -195,6 +203,7 @@ type Exchange struct {
 	done             chan struct{}
 
 	mu              sync.Mutex
+	addressOverride *net.UDPAddr
 	onSend          func(retransmission int)
 	onReceive       func()
 	hooks           *Hooks
@@ -223,6 +232,7 @@ func newExchange(m *Manager, s *Session, id, protocol uint16, opts Options) *Exc
 		id:               id,
 		protocol:         protocol,
 		suppressPeerLoss: opts.SuppressPeerLoss,
+		addressOverride:  opts.AddressOverride,
 		onSend:           opts.OnSend,
 		onReceive:        opts.OnReceive,
 		done:             make(chan struct{}),
@@ -233,6 +243,15 @@ func newExchange(m *Manager, s *Session, id, protocol uint16, opts Options) *Exc
 
 // ID is the exchange id.
 func (x *Exchange) ID() uint16 { return x.id }
+
+// dest is where the exchange's messages go: the override, or the
+// session's current address.
+func (x *Exchange) dest() *net.UDPAddr {
+	if x.addressOverride != nil {
+		return x.addressOverride
+	}
+	return x.session.Addr()
+}
 
 // Session is the session the exchange runs on.
 func (x *Exchange) Session() *Session { return x.session }
@@ -409,7 +428,7 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 		}
 		x.sentToAck = p
 	}
-	if err := x.m.conn.Send(x.session.addr, datagram); err != nil {
+	if err := x.m.conn.Send(x.dest(), datagram); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrNetwork, err)
 	}
 	if p != nil {
@@ -522,7 +541,7 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 	if onSend != nil {
 		onSend(count)
 	}
-	if err := x.m.conn.Send(x.session.addr, p.datagram); err != nil {
+	if err := x.m.conn.Send(x.dest(), p.datagram); err != nil {
 		x.m.log.Debug("matter.controller.retransmit_failed", slog.Int("exchange", int(x.id)), slog.String("err", err.Error()))
 	}
 	x.m.log.Debug("matter.controller.retransmit", slog.Int("exchange", int(x.id)), slog.Int("retransmission", count), slog.Duration("backoff", backoff))
@@ -568,7 +587,7 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		x.notifySentLocked()
 		datagram := p.datagram
 		x.mu.Unlock()
-		_ = x.m.conn.Send(x.session.addr, datagram)
+		_ = x.m.conn.Send(x.dest(), datagram)
 		return
 	}
 	if p := x.sentToAck; p != nil {
