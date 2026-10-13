@@ -618,7 +618,8 @@ PASE session only; `Parts.add` ancestor/endpoint-0 checks and
 `#validateInsertion` duplicate-leaf detection are the device layer's —
 `device/device.go:515-517` cites them, no behaviour change needed for a
 bridge whose numbers the assembler allots; MEI range unchanged for a
-`uint32`). ADR 0020 proposed, acceptance at the start of phase 7.
+`uint32`). ADR 0020 proposed, then accepted by the owner on 2026-10-13 (docs PR
+`docs/adr-0020-accepted`); phase 7 starts with brief AE.
 
 Guards on the tranche: `make ci`, `make race`, `make chipdm-check`,
 `make reachability-check` green; `make chiptool-test` PASS; families

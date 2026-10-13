@@ -121,8 +121,8 @@ support (`paritytest`) and the chip-tool suite.
 Scope boundaries that are decisions, not backlog — do not "fix" them:
 no Bluetooth, no Thread. The controller/commissioner role was a third
 until [ADR 0020](./docs/adr/0020-commissioner-and-controller-role.md)
-(proposed 2026-10-13, concept v2): it enters as `controller/` in stages,
-and until a stage lands nothing outside that package changes for it.
+(accepted 2026-10-13, concept v2): it enters as `controller/` in stages;
+until a stage lands nothing outside that package changes for it.
 `docs/matterjs-comparison.md` records each with its reasoning. CSA
 certification is not pursued by this project and nothing built on it may be
 described as certified, but certifiability is a goal, tracked in

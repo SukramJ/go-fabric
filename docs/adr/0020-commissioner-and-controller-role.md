@@ -1,9 +1,9 @@
 # ADR 0020 — The commissioner and controller role enters the scope as `controller/`; the responder side stays as it is
 
-- **Status**: Proposed (2026-10-13; concept v2
+- **Status**: Accepted (owner, 2026-10-13; proposed the same day; concept v2
   [`../concept-v2-scope-extension.md`](../concept-v2-scope-extension.md)
-  decision 0.1, phase 7). Acceptance is the owner's call at the start of
-  phase 7; until then the non-goal it supersedes stays in force for code.
+  decision 0.1, phase 7). The non-goal it supersedes is retired; phase 7
+  starts with stage 1.
 - **Date**: 2026-10-13
 - **Related**:
   [ADR 0008 — subscription resumption (the narrow CASE initiator)](./0008-subscription-resumption.md),
