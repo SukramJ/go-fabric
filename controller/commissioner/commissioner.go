@@ -24,6 +24,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/controller/peer"
+	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -59,6 +60,22 @@ type Context struct {
 	// Rand is the randomness of the nonces and the node ids; nil is
 	// crypto/rand.
 	Rand io.Reader
+	// Subscriptions is the controller's subscription registry: when set,
+	// New registers its handler of the reports peers push on Exchanges
+	// (matter.js Peers.#configureInteractionServer,
+	// packages/node/src/node/client/Peers.ts:546-563) and [Commissioner.Interaction]
+	// binds it.
+	Subscriptions *interaction.Subscriptions
+	// Fabrics are the fabrics a peer may open CASE to us on: when set, New
+	// registers a CASE responder answering for them (matter.js's
+	// SecureChannelProtocol creates the CaseServer,
+	// securechannel/SecureChannelProtocol.ts:96-100), and every session it
+	// establishes joins Peers (Set.Adopt) — the session a restarted node
+	// re-establishes its subscriptions on.
+	Fabrics []*Fabric
+	// Resumption holds the CASE responder's resumption records, usually the
+	// peer set's store; nil keeps none.
+	Resumption handshake.ResumptionStore
 }
 
 // Options configures [Commissioner.Commission] — matter.js
@@ -131,8 +148,9 @@ type PASEOptions struct {
 // ControllerCommissioner (ControllerCommissioner.ts:230-737) at 0ceb202d.
 // It is safe for concurrent use.
 type Commissioner struct {
-	ctx Context
-	log *slog.Logger
+	ctx        Context
+	log        *slog.Logger
+	caseServer *handshake.CASEServer
 }
 
 // New returns a commissioner over c.
@@ -149,7 +167,45 @@ func New(c Context) (*Commissioner, error) {
 	if c.Rand == nil {
 		c.Rand = rand.Reader
 	}
-	return &Commissioner{ctx: c, log: c.Logger}, nil
+	com := &Commissioner{ctx: c, log: c.Logger}
+	if c.Subscriptions != nil {
+		c.Subscriptions.Register(c.Exchanges)
+	}
+	if len(c.Fabrics) > 0 {
+		fabrics := make(handshake.FabricList, 0, len(c.Fabrics))
+		for _, f := range c.Fabrics {
+			fabrics = append(fabrics, f.Fabric)
+		}
+		server, err := handshake.NewCASEServer(c.Exchanges, handshake.CASEServerConfig{
+			Fabrics:    fabrics,
+			Resumption: c.Resumption,
+			OnSession:  func(s *exchange.Session, _ uint8) { c.Peers.Adopt(s) },
+			Logger:     c.Logger,
+		})
+		if err != nil {
+			return nil, err
+		}
+		server.Register()
+		com.caseServer = server
+	}
+	return com, nil
+}
+
+// Close removes the handlers New registered: the CASE responder (its
+// handshakes in flight ended) and the report handler.
+func (c *Commissioner) Close() {
+	if c.caseServer != nil {
+		c.caseServer.Close()
+	}
+	if c.ctx.Subscriptions != nil {
+		c.ctx.Exchanges.SetProtocolHandler(im.InteractionModelProtocolID, nil)
+	}
+}
+
+// Interaction is the interaction with peer p over its sessions, bound to
+// the commissioner's subscription registry (interaction.ForPeer).
+func (c *Commissioner) Interaction(p *peer.Peer) *interaction.Interaction {
+	return interaction.ForPeer(p, interaction.Config{Subscriptions: c.ctx.Subscriptions, Logger: c.log, Clock: c.ctx.Clock})
 }
 
 // Commission commissions the node at opts.Addresses. Mirrors matter.js

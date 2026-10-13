@@ -433,6 +433,19 @@ pseudo-version of `main`.
   `Active()` / `ActiveChanged`; `BootstrapRead` is the hook of
   `bootstrapWithRead`. `Config.Clock` and `Config.Rand` pace the retries;
   `RetrySchedule`.
+- `controller/commissioner.Context` gains `Subscriptions`, `Fabrics` and
+  `Resumption` (ADR 0020, stage 3): `New` registers the registry's report
+  handler and a CASE responder answering for the fabrics, whose sessions
+  join the peer set — a restarted node re-establishes its subscriptions to
+  the controller over them. `Commissioner.Interaction(peer)` binds an
+  interaction to the registry; `Commissioner.Close` removes the handlers.
+- `internal/chiptool`: `TestGoControllerSubscribesReferenceBridge`
+  (`make chiptool-test`) — the module's own controller commissions the
+  reference daemon, subscribes to OnOff on a bridged light (sustained),
+  toggles it and receives the pushed report, writes NodeLabel, and after
+  the daemon's restart receives the re-established subscription's reports
+  over the CASE session the daemon opened to it (the controller advertises
+  its operational record on the host's DNS-SD).
 
 ### Changed
 
