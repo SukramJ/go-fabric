@@ -10,7 +10,7 @@ closed it is removed here in the same change.
 Scope boundaries are not open items: no Bluetooth, no Thread, and
 certification itself is not pursued; the controller/commissioner role enters
 in stages ([ADR 0020](./adr/0020-commissioner-and-controller-role.md),
-stage 1 in #73 and the next wave), nothing outside `controller/` changes
+stage 1 in #73 and #81, stage 2 in #83), nothing outside `controller/` changes
 for a stage until it lands
 ([ADR 0011](./adr/0011-certifiability-is-a-goal.md)). TCP and BDX landed
 with #49 ([ADR 0019](./adr/0019-tcp-bdx-and-the-ota-requestor.md)) as the

@@ -2383,6 +2383,38 @@ question 6.
 
 ---
 
+### BD-Matter-CA-CounterSavedPerNOC — the controller's CA saves its certificate counter after every issued NOC
+
+matter.js `CertificateAuthority.ts:150-185` (at `0ceb202d`) writes its
+storage once, when it creates the root (and the ICAC) — the one
+`options.set(this.#buildStorageData())` in the file, `:181-183` — and
+`generateNoc` only increments `#nextCertificateId` in memory (`:294`), so
+a restarted CA re-issues serial numbers it already used.
+`controller/ca.CA.GenerateNOC` saves the counter through `ca.Store` after
+every NOC it issues, so a serial is used once across restarts; a store
+error fails the issue. Report AH.
+
+By design. A serial that repeats is an X.509 defect the spec's
+certificate rules do not forgive, and the save is one small record per
+commissioning.
+
+### BD-Matter-Attestation-RevocationsOptional — a trust store without a revocation check revokes nothing
+
+matter.js's `DclCertificateService` always answers `isRevoked` for the
+DAC and the PAI (`DeviceAttestationValidator.ts:342-363` at `0ceb202d`):
+with the DCL present the revocation check runs. `attestation.PAAStore` is
+the trust store the validator consults; `attestation.Revocations` is the
+optional second interface a store implements when it has revocation data,
+and a store without it is treated as "nothing revoked" — the DAC and PAI
+pass step 5. The static test store has none.
+
+By design. A static PAA set (the CSA test roots, a vendor's own root)
+has no revocation source; forcing every store to answer `false` would
+only hide the same fact behind a method. The DCL client of ADR 0020
+stage 6 implements `Revocations`. Report AH, by_design candidate 2.
+
+---
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

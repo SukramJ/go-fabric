@@ -28,6 +28,7 @@ German, briefly. Six waves were planned against the phases:
 | 11 | concept v2 phase 6: matter.js pin lift to `0ceb202d` (snapshot, enum manufacturer ranges, chipdm, families doc, 330 citations, register Tier 1/2), the behaviour that moved upstream (AddNOC, DoorLock, Descriptor, Thermostat, mdns caps), ADR 0020 (proposed) | AC, AD | `wave/2026-10-13-tranche-11`; docs PR `docs/wave-11-followups` | see §11 |
 | 12 | concept v2 phase 7 stage 1, first half (ADR 0020): `controller/discovery` (DNS-SD browser, commissionable scanner, operational resolution), `controller/exchange` (initiator exchange layer with MRP), `controller/handshake` (PASE and CASE clients with resumption) | AE, AF | `wave/2026-10-13-tranche-12` (#73); docs PR `docs/wave-12-followups` | see §12 |
 | 13 | concept v2 phase 7 stage 1, second half (ADR 0020): `controller/peer` (descriptor, timing, store, Set and Peer, the connection process, the address monitor with the liveness probe) and the `controller/exchange` / `controller/discovery` additions it needs | AG | `wave/2026-10-13-tranche-13` (#81); docs PR `docs/wave-13-followups` | see §13 |
+| 14 | concept v2 phase 7 stage 2 (ADR 0020): `controller/ca` (the certificate authority), `controller/attestation` (device attestation against a PAA store), `controller/interaction` (Invoke and Read for the flow), `controller/commissioner` (the commissioner, the PASE connection, the commissioning flow); `CASEOptions.Exchange` / `OnExchange` replace `exchange.WithHooks` | AH | `wave/2026-10-13-tranche-14` (#83); docs PR `docs/wave-14-followups` | see §14 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -824,3 +825,91 @@ and AG listed: an invoke path over a session, `CASEOptions.Exchange`,
 the PASE session outside the set with `SuppressPeerLoss`, `Set.Adopt`
 for the operational CASE, a persistent `peer.Store` and
 `ResumptionStore`).
+
+## 14. Wave 14 (2026-10-13, the owner away; everything local)
+
+Concept v2 phase 7, stage 2: the commissioner. Brief AH
+(`wave14/commissioner`, head `cc430c2`) on `planning/briefs-wave-14`
+(`2d50846`). Integration `wave/2026-10-13-tranche-14` = the planning
+commit and the seven branch commits cherry-picked onto `main` (`666609d`)
+without a conflict, plus the owner's decisions on the report; the
+inventory was current (unreached 5, none in `controller/`).
+
+- **§0:** `handshake.CASEOptions.Exchange` (the options of the exchange
+  CASE opens) and `OnExchange` (called with the exchange after `Initiate`,
+  before Sigma1 — the peer's kick reads it, `PeerConnection.ts:829-860`)
+  replace `exchange.WithHooks` / `Hooks`, which are gone (CHANGELOG entry
+  rewritten; both were unreleased). `controller/peer` passes its
+  OnSend/OnReceive through them.
+- **`controller/ca`:** `CertificateAuthority.ts:50-437` — root id 0 and
+  the ICAC and every NOC serial from the counter (CA:52, :252, :294), validity −1 y / +10 y
+  (`asn.ts:18-22`), subject order fabric id, node id, CATs (the caller's
+  order, `operational.ts:109-110`, CA:306 — `bridgetest/ca.go` writes
+  node id first, so the minted bytes differ until brief AI), `Stored` /
+  `Store` / `MemoryStore`, `CompressedFabricID`, `KeyIdentifier`;
+  `IntermediateCA` must agree with a stored CA (Go's bool has no
+  undefined, CA:159).
+- **`controller/attestation`:** `DeviceAttestationValidator.ts:170-537`
+  check for check and in its order — the owner read it line by line:
+  parse with the 600-byte limit, the required extensions and the DAC's
+  P-256 key (all `CertificateUnparseable`); vendor id DAC = PAI; nonce;
+  the P1363 signature over elements ‖ challenge; with a store: the PAA by
+  the PAI's AKID, test root under production policy (error finding
+  `TrustedAsTestCertificate`), fetched-after-notBefore info, the chain
+  (a trust-store PAA that does not parse is a plain error, DAV:270; its
+  key is read inside the try, :272-279, so `CertificateChainInvalid`),
+  validity at the DAC's notBefore, PAA vendor id, revocation of DAC then
+  PAI; the CD's CMS walk (`CertificationDeclaration.ts:68-159`), its DER
+  signature by the signer the store knows, the field checks of
+  DAV:402-526. `PAAStore` + optional `Revocations`, `StaticStore`,
+  `TestStore()` (the two `secure/attestation` test PAAs, the Appendix F
+  CD signer). `Policy` (`Accept`, `Reject`, `Decide`; the zero value is
+  matter.js's backward-compatible `undefined`, CF:149, :1355) with
+  `Resolve` (CF:1341-1368).
+- **`controller/interaction`:** a value bound to (manager, session):
+  `Invoke` (CI:434-475, `Timed` + `TimedTimeout`) and `Read`
+  (fabric-filtered by default, `Read.ts:40`; no empty AttributeRequests
+  array, the IM revision sent — the client encoders it carries move into
+  `im/` in stage 3), `MaximumPeerResponseTime` (CI:157-161), the 30 s
+  extended failsafe timeout.
+- **`controller/commissioner`:** `Fabric` (`Fabric.ts`; `FabricConfig.IPK`
+  nil draws a random key as `FabricAuthority.ts:135` does), `Commission`
+  (CC:255-308), the PASE connection (CN:60-250: 10 s stagger, holding,
+  passcode drop, budget, winner; a wrong passcode ends with
+  `handshake.ErrPasscodeMismatch`, CN's non-retryable error, and only
+  `PairRetransmissionLimitReached` becomes `PeerCommunicationError`,
+  CC:402-407), the flow with the step table 0.1 … 20.1 incl. 8.2 and 15.1
+  (Skipped, CF:563-568, :588-593), 0.1's wildcard read (CF:773-784), the
+  post-increment breadcrumb (CF:1141), AddNOC always with `IcacValue`
+  (CF:1448), the CSR checked in full (`Certificate.ts:782-843`), only a
+  top-level status error repacked (CF:459), the PASE session given up
+  without CloseSession (`initiateForceClose`, CC:313-319 =
+  `Session.HandlePeerLoss`), retryable incl. `ErrRetransmissionLimit`
+  (`protocol/errors.ts:17`). Proven in-process under `-race`, over live
+  multicast, and in `internal/chiptool`
+  `TestGoControllerCommissionsReferenceBridge` (found, commissioned,
+  VendorID read over CASE).
+- **Owner:** the four open questions decided as the report records
+  (PASE close stays without CloseSession; `Decide`'s empty reason; no
+  `Scanner` — `forgetCommissionedDevice` is BLE-only,
+  `BleScanner.ts:305`; IPK default). `BD-Matter-CA-CounterSavedPerNOC`,
+  `BD-Matter-Attestation-RevocationsOptional`. Observation, both sides
+  matter.js: while a PASE session of its window lives the device answers
+  a second PBKDFParamRequest with an ack only (`PaseServer.ts:82`,
+  `matter.rx.sc.pase_busy`), so a second PASE right after a close waits
+  out its timeout.
+
+Guards on the tranche: `make ci` (lint and cover-check rerun with the tool PATH), `make race`, `make reachability-check` (unreached 5), `make chiptool-test` (318 PASS, 0 FAIL) — all exit 0. PR #83 (auto-merge).
+
+**Docs PR `docs/wave-14-followups`** (written on top of the tranche): the
+two by_design entries, the open-items scope line, concept v2 B.1 (stage 2
+complete), this section. Then delete `wave14/commissioner`,
+`planning/briefs-wave-14`, `wave/2026-10-13-tranche-14` and the
+`.claude/worktrees/wave14-commissioner` worktree. Next: brief AI —
+`bridge/bridgetest.Commissioner` onto `controller/` (`bridgetest/ca.go` →
+`controller/ca` with `ca.Config.Rand` seeded, the commissioning →
+`commissioner.Commission` with the node's operational record injected
+into a `discovery.Names`, its Session → `interaction.Interaction`; Write
+and Subscribe come with stage 3); then stage 3 (client interaction:
+Write, Subscribe, batching, chunked requests; the client encoders into
+`im/`; persistent `peer.Store`, `ResumptionStore`, `ca.Store`).
