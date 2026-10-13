@@ -173,7 +173,7 @@ Stand 2026-10-13: Stufe 1 ist zweigeteilt — `controller/discovery`,
 `controller/exchange` und `controller/handshake` (Scanner, Exchange-Schicht,
 PASE- und CASE-Client) in Welle 12 (#73), die Peer-Verwaltung
 (`PeerConnection.ts`, `PeerSet.ts`, `Peer.ts`, `PeerAddressMonitor.ts`) als
-Brief AG in Welle 13.
+Brief AG in Welle 13 (#81). Stufe 1 ist damit vollständig; Stufe 2 folgt.
 
 Gesamt rund 22 000 matter.js-Zeilen. Go-Einschätzung 25 000–35 000 Zeilen
 mit Tests, sechs bis acht Wellen. Stufe 6 ist abtrennbar; der DCL-Client

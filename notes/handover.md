@@ -27,6 +27,7 @@ German, briefly. Six waves were planned against the phases:
 | 10 | the owner issues #63 (a host port under the lock the setter takes) and #66 (ColorControlServer.Set) | AA, AB | `wave/2026-10-12-tranche-10`; docs PR `docs/wave-10-followups` | see §10; `v0.3.1` tagged after #69 (release PR) |
 | 11 | concept v2 phase 6: matter.js pin lift to `0ceb202d` (snapshot, enum manufacturer ranges, chipdm, families doc, 330 citations, register Tier 1/2), the behaviour that moved upstream (AddNOC, DoorLock, Descriptor, Thermostat, mdns caps), ADR 0020 (proposed) | AC, AD | `wave/2026-10-13-tranche-11`; docs PR `docs/wave-11-followups` | see §11 |
 | 12 | concept v2 phase 7 stage 1, first half (ADR 0020): `controller/discovery` (DNS-SD browser, commissionable scanner, operational resolution), `controller/exchange` (initiator exchange layer with MRP), `controller/handshake` (PASE and CASE clients with resumption) | AE, AF | `wave/2026-10-13-tranche-12` (#73); docs PR `docs/wave-12-followups` | see §12 |
+| 13 | concept v2 phase 7 stage 1, second half (ADR 0020): `controller/peer` (descriptor, timing, store, Set and Peer, the connection process, the address monitor with the liveness probe) and the `controller/exchange` / `controller/discovery` additions it needs | AG | `wave/2026-10-13-tranche-13` (#81); docs PR `docs/wave-13-followups` | see §13 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -743,3 +744,83 @@ done: `moveToColorLogic` and `moveToHueAndSaturationLogic` still apply x
 then y (hue then saturation) as two updates, so an HS device sees one
 intermediate colour per x/y command; a batched apply in the transition
 engine would remove it.
+
+## 13. Wave 13 (2026-10-13, the owner away; everything local)
+
+Concept v2 phase 7, stage 1, second half; the first wave under the
+one-Opus rule. Brief AG (`wave13/peer`, head `5ac9e19` with the owner's
+commit) on `planning/briefs-wave-13` (`c438293`). Integration
+`wave/2026-10-13-tranche-13` = the planning commit and the fourteen
+branch commits cherry-picked onto a main that already carried the two
+side PRs (#78 cover tilt and target setter, #80 colour mode switch),
+plus one inventory regeneration (unreached 5). Conflicts: CHANGELOG and
+the inventory only.
+
+- **§0 additions:** `exchange.Exchange.RetransmissionCount` /
+  `RetransmissionRestartSaving` (`MessageExchange.ts:411-413`,
+  `:1227-1235`), `Options.OnSend`/`OnReceive` (called at `:768`, `:943`,
+  `:469`) and `exchange.WithHooks` (the hooks travel in the CASE context
+  because `handshake.CASE` opens its own exchange — a stage-2 cleanup:
+  `CASEOptions.Exchange exchange.Options`), `Options.AddressOverride` (an
+  exchange option, `:1266-1270`), `Session.SetAddr`, `ActiveTimestamp`
+  (a secure session's starts at creation, `NodeSession.ts:119`),
+  `HandlePeerLoss`/`IsPeerLost`/`Closing`/`FabricIndex`,
+  `Manager.HandlePeerLoss`/`SessionsFor`, `exchange.PeerAddress` (now the
+  one type; `handshake.PeerAddress` is its alias). Exchange-level peer
+  loss now closes the peer's sessions (`ExchangeManager.ts:556-579`) —
+  CHANGELOG Changed. The Secure Channel handler for peer-opened
+  exchanges: CloseSession → `PeerInitiatedCloseError`
+  (`SecureChannelProtocol.ts:36-83`), a stray StatusReport ignored, any
+  other initial message refused (`:43-50`), a standalone ack never
+  acknowledged, a new exchange on a closing session declined
+  (`ExchangeManager.ts:386-389`). `discovery.Service.Status`
+  (`IpServiceStatus.ts`: connecting, reachable, the resolution loop) and
+  `Service.Changes`.
+- **`controller/peer`:** `Descriptor`, `Store`/`MemoryStore`, `Timing`
+  (`PeerTimingParameters.ts:187-209`), `Set` (`PeerSet.ts`: `For`, `Get`,
+  `AddKnownPeer` merge rules `:315-337`, `Adopt`, `Disconnect`, `Close`),
+  `Peer` (`Peer.ts`: service, descriptor follow-up on session and
+  service changes, `SessionParameters`, `Connect` with the shared
+  process and `UnreachableError`, `Kick`, `Disconnect`, `Delete`,
+  `Close`, `NewestSession`, `VerifyReachability`), the connection
+  process (`PeerConnection.ts:93-753`: desirability heap, 45 s stagger,
+  fallback and its retirement after 10 s, the error-to-delay table with
+  Busy only when both codes are Busy and two data bytes,
+  `SecureChannelMessenger.ts:44-50`, NoSharedTrustRoots clearing the
+  record, the kick with the set's thresholds `:569-581`), the address
+  monitor (`PeerAddressMonitor.ts`: stabilisation, Fibonacci cooldown
+  10 min … 24 h, probe current then alternates, migration by
+  `SetAddr`, all failed → peer loss) and the liveness probe (an empty
+  ReadRequest with `SuppressPeerLoss` and two retransmissions,
+  `ClientInteraction.ts:300-360`). Proven against the in-process node
+  with injected records (under `-race`) and over live multicast.
+- **Owner:** `DeleteResumptionRecord` moved into
+  `handshake.ResumptionStore`; `peer.ResumptionStore` and
+  `peer.MemoryResumptionStore` are aliases; `BD-Matter-Peer-SaveOncePerBurst`;
+  the probe's ReadRequest encoding (empty array, no IM revision) is an
+  open item for stage 3; the bridge's silent close of a session that
+  never carried a message confirms the existing Tier-3 bullet. Go
+  surface noted, no entry: `ErrorHandler` returns `(delay, replace,
+  fatal)`; `Set.For`/`AddKnownPeer` fail on an unknown fabric;
+  `ConnectionTimeout` 0 = default, negative = unbounded, no "at once";
+  `TimeOffline` on the peer's clock; `UnreachableError` (stutter rule).
+
+Side PRs this day, before the tranche: #78 (issues #76, #77: cover tilt
+axis and `SetTargetPosition`) and #80 (issue #79: the colour mode switch
+without the writer, rollback of a failed command, the in-flight echo
+matched in the device's colour mode) — both the owner's, both merged.
+
+Guards on the tranche: `make ci` (177 packages at or above their floor), `make race`, `make reachability-check` (unreached 5) green; `make chiptool-test` PASS. PR #81 (auto-merge).
+
+**Docs PR `docs/wave-13-followups`** (written on top of the tranche): the
+by_design entry, the register note, the open item, concept v2 B.1 (stage
+1 complete), this section. Then delete `wave13/peer`,
+`planning/briefs-wave-13`, `wave/2026-10-13-tranche-13` and the
+`.claude/worktrees/wave13-peer` worktree. Next: stage 2 (brief AH:
+`ControllerCommissioningFlow.ts`, `ControllerCommissioner.ts`,
+`CommissioningConnection.ts`, `DeviceCommissioner.ts`, the CA — today
+`bridgetest`'s test CA — and attestation against a PAA store; what AF
+and AG listed: an invoke path over a session, `CASEOptions.Exchange`,
+the PASE session outside the set with `SuppressPeerLoss`, `Set.Adopt`
+for the operational CASE, a persistent `peer.Store` and
+`ResumptionStore`).
