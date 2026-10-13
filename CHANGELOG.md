@@ -10,6 +10,26 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- The Matter data model snapshot (`parity/schema.json`) moves from
+  matter.js `85cf6647` (behaviour cited at the code pin `4633bfd7`) to
+  `0ceb202d`, and every matter.js line citation follows it. No cluster or
+  device-type revision moved.
+- Enum manufacturer ranges are accepted. The snapshot carries the reserved
+  ranges of Matter 1.6.1 as enum range members (`ModeTag` MfgTags
+  32768–49151 and `ModeChangeStatus` MfgCodes 128–191 in the ten mode
+  clusters, `OperationalStateEnum` ManufacturerStates and `ErrorStateEnum`
+  ManufacturerError 128–191 in OperationalState, RvcOperationalState and
+  OvenCavityOperationalState, `ClosureErrorEnum` ManufacturerError
+  128–191, `LightSensorTypeEnum` Ms 64–254). `spec.Enum` gains `Ranges`
+  (`spec.EnumRange`), and `spec.EnumSupported` and every write and host
+  setter that checks an enum value against the definition accept a value
+  inside a range, as matter.js validates it. A value past the range is
+  still CONSTRAINT_ERROR.
+- `IlluminanceMeasurement.LightSensorType` is typed `LightSensorTypeEnum`
+  in the generated definition (it was `uint8`).
+
 ## [0.3.1] — 2026-10-13
 
 **What a host must do.** Nothing. Every change in this release is additive
