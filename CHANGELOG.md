@@ -32,6 +32,12 @@ pseudo-version of `main`.
   `ErrInvalidHostStatus` (they were accepted before).
 - `IlluminanceMeasurement.LightSensorType` is typed `LightSensorTypeEnum`
   in the generated definition (it was `uint8`).
+- `mdns` caps the advertised session intervals as matter.js `0ceb202d`'s
+  `SessionIntervals.forAdvertisement` does: SII and SAI above one hour are
+  advertised as 3 600 000 ms, SAT above 65 535 ms as 65 535, each cap
+  logged as `matter.mdns.interval_capped`, on the operational and the
+  commissionable record; zero still means the default.
+
 ### Fixed
 
 - AddNOC refuses a reserved AdminVendorId (0x0000, 0xFFF5..0xFFFF) with
