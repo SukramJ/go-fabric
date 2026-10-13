@@ -42,7 +42,7 @@ var floors = []packageFloor{
 		min: 83,
 		why: "Go 1.27.2 counts statements per cover block differently: against 1.27.1 the profile has the same blocks and the same covered/uncovered set, only fewer statements per block, so the percentage fell without any test or code change (84.9 % to 83.6 %)",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/bridge/bridgetest", min: 92},
 	{pkg: "github.com/SukramJ/go-fabric/cluster", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarm", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/alarmbase", min: 90},

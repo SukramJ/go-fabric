@@ -3,12 +3,13 @@
 
 package bridgetest
 
-// Decoded TLV and the ReportData the device sends, in the shape a test
-// asserts over.
+// Decoded TLV and the reports the device sends, in the shape a test
+// asserts over — converted from controller/interaction's, which reads the
+// ReportData chunks and merges them.
 
 import (
-	"errors"
-
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -29,11 +30,9 @@ func (n TLV) Child(tag uint8) (TLV, bool) {
 	return TLV{}, false
 }
 
-// u8, u16 and u32 narrow an unsigned value to the width its field
-// declares; the device encodes no wider value there.
-func (n TLV) u8() uint8   { return uint8(n.Uint & 0xFF) }
-func (n TLV) u16() uint16 { return uint16(n.Uint & 0xFFFF) }
-func (n TLV) u32() uint32 { return uint32(n.Uint & 0xFFFF_FFFF) }
+// u8 narrows an unsigned value to the width its field declares; the
+// device encodes no wider value there.
+func (n TLV) u8() uint8 { return uint8(n.Uint & 0xFF) }
 
 // DecodeTLV decodes the first element of raw.
 func DecodeTLV(raw []byte) (TLV, error) {
@@ -66,6 +65,18 @@ func decodeNode(dec *tlv.Decoder, el tlv.Element) (TLV, error) {
 	}
 }
 
+// fromNode converts a node tree of controller/interaction into a TLV.
+func fromNode(n spec.Node) TLV {
+	t := TLV{Element: n.El}
+	if len(n.Children) > 0 {
+		t.Children = make([]TLV, len(n.Children))
+		for i, c := range n.Children {
+			t.Children[i] = fromNode(c)
+		}
+	}
+	return t
+}
+
 // AttributeData is one AttributeDataIB of a report.
 type AttributeData struct {
 	Path        im.ConcreteAttributePath
@@ -85,8 +96,19 @@ type Report struct {
 	SubscriptionID uint32
 	Attributes     []AttributeData
 	Statuses       []AttributeStatus
+}
 
-	more, suppress bool // of the last chunk
+// fromReport converts a report of controller/interaction.
+func fromReport(r *interaction.Report) *Report {
+	out := &Report{SubscriptionID: r.SubscriptionID}
+	for i := range r.Attributes {
+		a := &r.Attributes[i]
+		out.Attributes = append(out.Attributes, AttributeData{Path: a.Path, DataVersion: a.DataVersion, Value: fromNode(a.Value)})
+	}
+	for _, s := range r.Statuses {
+		out.Statuses = append(out.Statuses, AttributeStatus{Path: s.Path, Status: s.Status})
+	}
+	return out
 }
 
 // Value returns the first value the report carries for the attribute.
@@ -107,71 +129,4 @@ func (r *Report) Status(endpoint uint16, cluster, attribute uint32) (im.StatusCo
 		}
 	}
 	return 0, false
-}
-
-// merge appends chunk to r (nil r starts a report).
-func (r *Report) merge(chunk *Report) *Report {
-	if r == nil {
-		return chunk
-	}
-	r.Attributes = append(r.Attributes, chunk.Attributes...)
-	r.Statuses = append(r.Statuses, chunk.Statuses...)
-	r.more, r.suppress = chunk.more, chunk.suppress
-	return r
-}
-
-// decodeReport decodes one ReportData message (im/read.go:28-45:
-// [0] SubscriptionId, [1] AttributeReports of AttributeReportIB {[0]
-// AttributeStatusIB {[0] path, [1] StatusIB}, [1] AttributeDataIB {[0]
-// DataVersion, [1] path, [2] data}}, [3] MoreChunkedMessages, [4]
-// SuppressResponse).
-func decodeReport(payload []byte) (*Report, error) {
-	tree, err := DecodeTLV(payload)
-	if err != nil {
-		return nil, err
-	}
-	if tree.Type != tlv.TypeStructure {
-		return nil, errors.New("bridgetest: ReportData is not a structure")
-	}
-	r := &Report{}
-	if id, ok := tree.Child(0); ok {
-		r.SubscriptionID = id.u32()
-	}
-	if more, ok := tree.Child(3); ok {
-		r.more = more.Bool
-	}
-	if suppress, ok := tree.Child(4); ok {
-		r.suppress = suppress.Bool
-	}
-	reports, _ := tree.Child(1)
-	for _, ib := range reports.Children {
-		if data, ok := ib.Child(1); ok {
-			version, _ := data.Child(0)
-			path, _ := data.Child(1)
-			value, _ := data.Child(2)
-			r.Attributes = append(r.Attributes, AttributeData{Path: attributePath(path), DataVersion: version.u32(), Value: value})
-			continue
-		}
-		status, _ := ib.Child(0)
-		path, _ := status.Child(0)
-		sib, _ := status.Child(1)
-		code, _ := sib.Child(0)
-		r.Statuses = append(r.Statuses, AttributeStatus{Path: attributePath(path), Status: im.StatusCode(code.u8())})
-	}
-	return r, nil
-}
-
-// attributePath reads an AttributePathIB (im/path.go:17-22).
-func attributePath(n TLV) im.ConcreteAttributePath {
-	var p im.ConcreteAttributePath
-	if v, ok := n.Child(2); ok {
-		p.Endpoint, p.HasEndpoint = v.u16(), true
-	}
-	if v, ok := n.Child(3); ok {
-		p.Cluster, p.HasCluster = v.u32(), true
-	}
-	if v, ok := n.Child(4); ok {
-		p.Attribute, p.HasAttribute = v.u32(), true
-	}
-	return p
 }

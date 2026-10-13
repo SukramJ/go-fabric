@@ -4,6 +4,7 @@
 package bridgetest_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -16,9 +17,11 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
+	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
+	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -265,6 +268,73 @@ func TestCommissionerAcceptsReestablishment(t *testing.T) {
 		t.Errorf("NextReport with nothing due = %v", err)
 	}
 	resumed.Close()
+}
+
+// TestPASESession: a PASE session reads over the commissioning window, a
+// subscription on it is refused — matter.js's client subscribes only to a
+// peer with a peer address (ClientInteraction.ts:991-994 at 0ceb202d) —
+// and a closed one answers ErrSessionClosed.
+func TestPASESession(t *testing.T) {
+	t.Parallel()
+	n := startNode(t, nil, filepath.Join(t.TempDir(), "node.db"))
+	ctx := context.Background()
+	s, err := bridgetest.Dial(t, n.Bridge().LocalAddr(), options()).PASE(ctx)
+	if err != nil {
+		t.Fatalf("PASE: %v", err)
+	}
+	if s.PeerNodeID() != 0 || s.LocalNodeID() != 0 {
+		t.Errorf("PASE session nodes %X → %X, want none", s.LocalNodeID(), s.PeerNodeID())
+	}
+	if v, _ := mustRead(t, s, path(0, 0x0028, 0x0005)).Value(0, 0x0028, 0x0005); v.String != "device" {
+		t.Errorf("NodeLabel over PASE = %q", v.String)
+	}
+	if _, err := s.Subscribe(ctx, 0, 30, path(0, 0x0028, 0x0005)); !errors.Is(err, interaction.ErrUncommissioned) {
+		t.Errorf("Subscribe over PASE = %v, want interaction.ErrUncommissioned", err)
+	}
+	s.Close()
+	s.Close()
+	if _, err := s.Read(ctx, path(0, 0x0028, 0x0005)); !errors.Is(err, bridgetest.ErrSessionClosed) {
+		t.Errorf("read on a closed PASE session = %v", err)
+	}
+}
+
+// TestControllerIdentities: the fabric's own identity is ControllerNodeID's
+// with the fabric's CATs, another controller's is minted once, both carry
+// the fabric's ids and the operational IPK, and ResolveSigma1Destination
+// finds the identity a Sigma1 addresses.
+func TestControllerIdentities(t *testing.T) {
+	t.Parallel()
+	opts := options()
+	opts.CAT = []uint32{0x0001_0001}
+	c := bridgetest.Dial(t, "127.0.0.1:9", opts)
+	root := c.RootPublicKey()
+	if len(root) != 65 || root[0] != 0x04 {
+		t.Fatalf("root public key %X", root)
+	}
+	own := c.ControllerIdentity(bridgetest.DefaultControllerNodeID)
+	other := c.ControllerIdentity(0x42, 0x0002_0001)
+	if again := c.ControllerIdentity(0x42); !bytes.Equal(again.NOC, other.NOC) {
+		t.Error("a second ControllerIdentity minted another NOC")
+	}
+	for _, id := range []sigma.Identity{own, other} {
+		if id.FabricID != fabricID || id.CompressedFabricID != c.CompressedFabricID() || id.FabricIndex != 1 || id.PrivateKey == nil {
+			t.Errorf("identity of node %X: %+v", id.NodeID, id)
+		}
+		if id.IPK != own.IPK {
+			t.Errorf("identity of node %X has another IPK", id.NodeID)
+		}
+	}
+	var random [sigma.RandomSize]byte
+	random[0] = 7
+	for _, id := range []sigma.Identity{own, other} {
+		got, verifier, ok := c.ResolveSigma1Destination(sigma.ComputeDestinationID(id.IPK, random, root, fabricID, id.NodeID), random)
+		if !ok || got.NodeID != id.NodeID || verifier == nil {
+			t.Errorf("ResolveSigma1Destination for node %X = %+v, %v", id.NodeID, got, ok)
+		}
+	}
+	if _, _, ok := c.ResolveSigma1Destination([32]byte{1}, random); ok {
+		t.Error("ResolveSigma1Destination resolved a destination of no identity")
+	}
 }
 
 func mustRead(t *testing.T, s *bridgetest.Session, p im.ConcreteAttributePath) *bridgetest.Report {
