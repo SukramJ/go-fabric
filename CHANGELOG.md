@@ -74,6 +74,13 @@ pseudo-version of `main`.
   id allocation with reuse of the least recently used session's id, and
   `CloseSession`. Ported from matter.js `ExchangeManager.ts` and
   `MessageExchange.ts` at `0ceb202d`.
+- `controller/handshake.PASE`, the PASE client (ADR 0020, stage 1): the
+  PBKDF parameter exchange, SPAKE2+ Pake1–Pake3 over `secure/spake2`'s
+  prover and the PASE session on a `controller/exchange.Manager`; a wrong
+  passcode is `ErrPasscodeMismatch`, a failure the device can be told of
+  is reported with StatusReport InvalidParam (also when the context was
+  cancelled), and the context no longer cancels once Pake3 is sent.
+  Ported from matter.js `PaseClient.ts` at `0ceb202d`.
 
 ### Changed
 
