@@ -36,7 +36,10 @@ pseudo-version of `main`.
   tree compositions, endpoints and clusters the peer drops — and is
   reported through `Node.Endpoints`, `Endpoint.Clusters` and the
   `Hooks` (`EndpointInstalled`, `ClusterInstalled`, `ClusterReplaced`,
-  `ClusterDeleted`, `Changed`).
+  `ClusterDeleted`, `Changed`). `Node.Properties` are the node's
+  physical properties (matter.js `PhysicalDeviceProperties` as
+  `NodePhysicalProperties` computes them) and `Node.IntervalBounds` the
+  subscription interval bounds they imply.
 
 - `controller/interaction.Report` carries `SubscriptionID` (the report's
   subscription id, the first chunk's; 0 for a read's report) and `Session`

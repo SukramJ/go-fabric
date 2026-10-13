@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4796,
+  "entry_points": 4799,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,9 +184,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10969,
-    "reachable": 7689,
-    "whitelisted": 3275,
+    "total_exported": 10973,
+    "reachable": 7690,
+    "whitelisted": 3278,
     "unreachable": 5
   },
   "by_package": [
@@ -14044,6 +14044,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestIntervalBounds",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/properties_internal_test.go",
+      "line": 26
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestMemoryStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
@@ -14055,6 +14062,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
       "line": 293
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestProperties",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/properties_internal_test.go",
+      "line": 89
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestPropertiesFromDiagnostics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/properties_internal_test.go",
+      "line": 153
     },
     {
       "package": "controller/client",

@@ -11,6 +11,7 @@ import (
 	mrand "math/rand/v2"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/interaction"
@@ -33,6 +34,10 @@ type Node struct {
 	started   bool
 	closed    bool
 	connState ConnectionState
+	// props are the physical properties, nil until computed after a change;
+	// frozen while the node is stopped (ClientNodePhysicalProperties.ts:100-133).
+	props  *Properties
+	frozen bool
 }
 
 // New builds the node cfg describes and loads its image from the store.
@@ -101,8 +106,38 @@ func (n *Node) apply(sc scope, r *interaction.Report) {
 	n.mu.Lock()
 	n.s.mutate(sc, r)
 	em := n.s.takeEmissions()
+	if !n.frozen {
+		n.props = nil
+	}
 	n.mu.Unlock()
 	n.deliver(em)
+}
+
+// Properties are the node's physical properties, computed from the image
+// after each change and frozen while the node is stopped — matter.js
+// ClientNodePhysicalProperties (node/client/ClientNodePhysicalProperties.ts:19-134).
+func (n *Node) Properties() Properties {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.propertiesLocked()
+}
+
+func (n *Node) propertiesLocked() Properties {
+	if n.props == nil {
+		p := n.s.computeProperties()
+		n.props = &p
+	}
+	return *n.props
+}
+
+// IntervalBounds are the reporting interval bounds of a subscription to the
+// node, the caller's floor and ceiling (nil for the node's default)
+// adjusted to its physical properties —
+// PhysicalDeviceProperties.subscriptionIntervalBoundsFor
+// (PhysicalDeviceProperties.ts:64-164), as ClientNodeInteraction.subscribe
+// applies it (ClientNodeInteraction.ts:129-133).
+func (n *Node) IntervalBounds(floor, ceiling *time.Duration) (minFloor, maxCeiling time.Duration) {
+	return intervalBounds(n.Properties(), floor, ceiling, n.rand, n.log)
 }
 
 // deliver runs the hooks of what the structure emitted, in order.
@@ -197,6 +232,7 @@ func (n *Node) Start(ctx context.Context) error {
 		return ErrDisabled
 	}
 	n.started = true
+	n.frozen, n.props = false, nil
 	n.persist.restart()
 	return nil
 }
@@ -207,6 +243,10 @@ func (n *Node) Stop(ctx context.Context) error {
 	_ = ctx
 	n.mu.Lock()
 	n.started = false
+	if !n.frozen {
+		n.propertiesLocked()
+		n.frozen = true
+	}
 	n.mu.Unlock()
 	n.persist.stop()
 	return nil
@@ -273,6 +313,8 @@ func (n *Node) Erase(ctx context.Context) error {
 		}
 	}
 	n.s = newStructure(&n.mu, n.log, n.persist)
+	n.props = nil
+	n.frozen = false
 	if err := n.store.EraseNode(n.cfg.ID); err != nil {
 		n.log.Warn("matter.controller.client.store_erase_failed", slog.String("err", err.Error()))
 	}
