@@ -86,7 +86,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/contract", min: 76, why: "lowest in the module; see the note above this entry"},
 	{pkg: "github.com/SukramJ/go-fabric/controller/exchange", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/controller/handshake", min: 86},
-	{pkg: "github.com/SukramJ/go-fabric/controller/peer", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/controller/peer", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/device", min: 97},

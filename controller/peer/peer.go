@@ -43,6 +43,7 @@ type Peer struct {
 	closed                bool
 	connecting            *connection
 	connectionInitiatedAt time.Time
+	monitor               *monitor
 }
 
 // newPeer builds the peer d describes — Peer.ts:95-188. The peer's
@@ -274,6 +275,14 @@ func (p *Peer) followAddressLocked(s *exchange.Session) {
 	}
 }
 
+// followAddress makes the session's address, after a migration, the
+// operational address (Peer.ts:161-163, MessageChannel.networkAddressChanged).
+func (p *Peer) followAddress(s *exchange.Session) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.followAddressLocked(s)
+}
+
 // removeSession drops a closing session; the set's Disconnected hook runs
 // when it was the last (PeerSet.ts:97-101).
 func (p *Peer) removeSession(s *exchange.Session) {
@@ -356,10 +365,6 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 	return exchange.PeerParameters(&r)
 }
 
-// scheduleAddressCheck schedules the address monitor's check; the monitor
-// arrives with brief AG §4.
-func (p *Peer) scheduleAddressCheck() {}
-
 // Disconnect aborts the connection process and waits for it to end; with
 // a cause it also gives up every session with the peer, as one known
 // unreachable (we removed our fabric from it, say), without the
@@ -374,7 +379,7 @@ func (p *Peer) Disconnect(ctx context.Context, cause error) {
 }
 
 // Close closes the peer without removing what is stored of it: it stops
-// observing, aborts its work, closes each of its sessions gracefully
+// observing, aborts its work, waits for the address monitor's run, closes each of its sessions gracefully
 // (CloseSession on the wire), waits for its workers, closes its service
 // and leaves the set. Mirrors matter.js Peer.close (Peer.ts:543-565).
 func (p *Peer) Close(ctx context.Context) {
@@ -384,8 +389,12 @@ func (p *Peer) Close(ctx context.Context) {
 		return
 	}
 	p.closed = true
+	mon := p.monitor
 	p.mu.Unlock()
 	p.cancel()
+	if mon != nil {
+		mon.close()
+	}
 	mgr := p.set.ctx.Exchanges
 	for _, s := range mgr.SessionsFor(exchange.PeerAddress(p.address)) {
 		mgr.CloseSession(ctx, s)

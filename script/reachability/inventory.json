@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4647,
+  "entry_points": 4654,
   "entry_packages": [
     ".",
     "bdx",
@@ -179,9 +179,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10719,
-    "reachable": 7514,
-    "whitelisted": 3200,
+    "total_exported": 10729,
+    "reachable": 7517,
+    "whitelisted": 3207,
     "unreachable": 5
   },
   "by_package": [
@@ -14739,6 +14739,41 @@
     },
     {
       "package": "controller/peer",
+      "identifier": "TestMonitorAllProbesFail",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 156
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMonitorMigratesToAnAlternate",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 126
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMonitorScheduledByAServiceChange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 213
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMonitorSessionSuspect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 182
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestMonitorStillDiscoveredAndCooldown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/monitor_test.go",
+      "line": 89
+    },
+    {
+      "package": "controller/peer",
       "identifier": "TestNewSetNeedsItsCollaborators",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/set_test.go",
@@ -14763,28 +14798,42 @@
       "identifier": "TestParityErrorDelays",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
-      "line": 86
+      "line": 93
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityKnownPeerMerge",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 176
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestParityProbeCooldownFibonacci",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/parity_matterjs_test.go",
+      "line": 153
     },
     {
       "package": "controller/peer",
       "identifier": "TestParityTimingDefaults",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
-      "line": 16
+      "line": 23
     },
     {
       "package": "controller/peer",
       "identifier": "TestParityTimingMerge",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
-      "line": 51
+      "line": 58
     },
     {
       "package": "controller/peer",
       "identifier": "TestParityUnresponsiveDetector",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
-      "line": 125
+      "line": 132
     },
     {
       "package": "controller/peer",

@@ -8,7 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/controller/exchange"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
+)
+
+type (
+	discoveryTXT  = discovery.TXTData
+	sessionParams = sessionparams.Parameters
 )
 
 // TestParityTimingDefaults: every default of matter.js
@@ -136,5 +143,90 @@ func TestParityUnresponsiveDetector(t *testing.T) {
 	latch(6)
 	if fired != 2 {
 		t.Fatal("the latch did not re-arm at 0")
+	}
+}
+
+// TestParityProbeCooldownFibonacci: the address-change probe cooldown
+// grows 10, 10, 20, 30, 50 … minutes, capped at 24 h, and resets to the
+// minimum (PeerAddressMonitor.ts:269-292 with the defaults of
+// PeerTimingParameters.ts:205-208).
+func TestParityProbeCooldownFibonacci(t *testing.T) {
+	t.Parallel()
+	d := DefaultTiming()
+	m := &monitor{min: d.AddressChangeProbeCooldown.Min, max: d.AddressChangeProbeCooldown.Max}
+	// The cooldown before the first probe is the minimum; each answered
+	// probe advances it: 10 (initial), 10, 20, 30, 50, … minutes.
+	if m.cooldownLocked() != 10*time.Minute {
+		t.Fatal("the initial cooldown is not the minimum")
+	}
+	want := []time.Duration{10, 20, 30, 50, 80, 130, 210, 340, 550, 890, 1440, 1440}
+	for i, w := range want {
+		if got := m.advanceBackoff(); got != w*time.Minute {
+			t.Fatalf("advance %d = %v, want %v", i+1, got, w*time.Minute)
+		}
+	}
+	m.resetBackoff()
+	if m.cooldownLocked() != 10*time.Minute || m.advanceBackoff() != 10*time.Minute {
+		t.Fatal("reset does not return to the minimum")
+	}
+}
+
+// TestParityKnownPeerMerge: the merge rules of PeerSet.addKnownPeer
+// (PeerSet.ts:315-337) — one row per field.
+func TestParityKnownPeerMerge(t *testing.T) {
+	t.Parallel()
+	old := 800 * time.Millisecond
+	nw := 1000 * time.Millisecond
+	sai := 400 * time.Millisecond
+	rows := []struct {
+		name  string
+		known Descriptor
+		given Descriptor
+		check func(Descriptor) bool
+		line  string
+	}{
+		{
+			"operational address replaces",
+			Descriptor{OperationalAddress: udpAddr(addr1)},
+			Descriptor{OperationalAddress: udpAddr(addr2)},
+			func(d Descriptor) bool { return d.OperationalAddress.String() == addr2 }, ":317-319",
+		},
+		{
+			"absent operational address keeps",
+			Descriptor{OperationalAddress: udpAddr(addr1)},
+			Descriptor{},
+			func(d Descriptor) bool { return d.OperationalAddress.String() == addr1 }, ":317",
+		},
+		{
+			"CATs replace",
+			Descriptor{CaseAuthenticatedTags: []uint32{1}},
+			Descriptor{CaseAuthenticatedTags: []uint32{2}},
+			func(d Descriptor) bool { return d.CaseAuthenticatedTags[0] == 2 }, ":321-323",
+		},
+		{
+			"discovery data: the peer's wins",
+			Descriptor{DiscoveryData: &discoveryTXT{SII: &old}},
+			Descriptor{DiscoveryData: &discoveryTXT{SII: &nw, SAI: &sai}},
+			func(d Descriptor) bool { return *d.DiscoveryData.SII == old && *d.DiscoveryData.SAI == sai }, ":325-327",
+		},
+		{
+			"reported parameters only when unknown",
+			Descriptor{ReportedSessionParameters: &sessionParams{SessionIdleInterval: 1}},
+			Descriptor{ReportedSessionParameters: &sessionParams{SessionIdleInterval: 2}},
+			func(d Descriptor) bool { return d.ReportedSessionParameters.SessionIdleInterval == 1 }, ":329-331",
+		},
+		{
+			"reported parameters fill an unknown",
+			Descriptor{},
+			Descriptor{ReportedSessionParameters: &sessionParams{SessionIdleInterval: 2}},
+			func(d Descriptor) bool { return d.ReportedSessionParameters.SessionIdleInterval == 2 }, ":329-331",
+		},
+	}
+	for _, r := range rows {
+		p := &Peer{desc: r.known, closed: true}
+		p.mergeKnown(r.given)
+		if !r.check(p.desc) {
+			t.Errorf("%s (PeerSet.ts%s): %+v", r.name, r.line, p.desc)
+		}
 	}
 }

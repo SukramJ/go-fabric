@@ -202,6 +202,14 @@ pseudo-version of `main`.
   optionally to another address — with suppressed peer loss and at most
   two transmissions, the reports read and answered as matter.js reads
   them.
+- The address monitor of `controller/peer` and `Peer.VerifyReachability`
+  (matter.js `PeerAddressMonitor`): a service change with a live session
+  arms a stabilisation timer; the check probes the session when its
+  address left DNS-SD and the last probe or receipt is older than the
+  Fibonacci cooldown (10, 10, 20, 30, 50 … minutes up to 24 h), migrates
+  the session in place to a discovered address that answers, and gives
+  the session up as unresponsive when none does. Concurrent checks join
+  one run; `peer.ReasonSessionSuspect` probes the current address only.
 
 ### Changed
 
