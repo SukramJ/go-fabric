@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4664,
+  "entry_points": 4711,
   "entry_packages": [
     ".",
     "bdx",
@@ -135,9 +135,13 @@
     "commissioning",
     "conformance",
     "contract",
+    "controller/attestation",
+    "controller/ca",
+    "controller/commissioner",
     "controller/discovery",
     "controller/exchange",
     "controller/handshake",
+    "controller/interaction",
     "controller/peer",
     "device",
     "diagevent",
@@ -179,9 +183,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10731,
-    "reachable": 7516,
-    "whitelisted": 3210,
+    "total_exported": 10854,
+    "reachable": 7614,
+    "whitelisted": 3235,
     "unreachable": 5
   },
   "by_package": [
@@ -13982,6 +13986,188 @@
       "line": 19
     },
     {
+      "package": "controller/attestation",
+      "identifier": "TestCertificateRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/cert_internal_test.go",
+      "line": 65
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestFallbackIDs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/cert_internal_test.go",
+      "line": 19
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestAcceptedFailedAttestation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/node_test.go",
+      "line": 370
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestAddressesToCandidates",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/connection_test.go",
+      "line": 301
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestCommissionLiveThroughMulticast",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/node_live_test.go",
+      "line": 24
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestCommissionTheNode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/node_test.go",
+      "line": 205
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConfigureRegulatoryInformation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/steps_test.go",
+      "line": 61
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConnectionBudget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/connection_test.go",
+      "line": 229
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConnectionErrorClasses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/connection_test.go",
+      "line": 268
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConnectionHoldingResponder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/connection_test.go",
+      "line": 179
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConnectionPasscodeDropsDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/connection_test.go",
+      "line": 206
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestConnectionStaggerAndWinner",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/connection_test.go",
+      "line": 154
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestEnsureFailsafeTimerFor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/flow_test.go",
+      "line": 261
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestEstablishPASE",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/node_test.go",
+      "line": 339
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFinalizeCommissioning",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/node_test.go",
+      "line": 281
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFlowCumulativeTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/flow_test.go",
+      "line": 177
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFlowErrorClasses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/flow_test.go",
+      "line": 201
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFlowRearmsBelowHalf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/flow_test.go",
+      "line": 146
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestInitialDataFullFabricTable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/steps_test.go",
+      "line": 157
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestParityAddNOCFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/parity_matterjs_test.go",
+      "line": 180
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestParityConstants",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/parity_matterjs_test.go",
+      "line": 25
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestParityErrorClassification",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/parity_matterjs_test.go",
+      "line": 97
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestParityOperationalCredentialsResults",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/parity_matterjs_test.go",
+      "line": 138
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestParityStepTable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/parity_matterjs_test.go",
+      "line": 57
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestRejectedAttestation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/node_test.go",
+      "line": 313
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestUpdateFabricLabel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/steps_test.go",
+      "line": 113
+    },
+    {
       "package": "controller/discovery",
       "identifier": "TestDiffAddresses_RestartKeepsInterruptedRoundKnown",
       "reason": "auto-whitelist:pattern=test-file",
@@ -14452,13 +14638,6 @@
     },
     {
       "package": "controller/exchange",
-      "identifier": "TestHooksAdoptedFromContext",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "controller/exchange/hooks_test.go",
-      "line": 72
-    },
-    {
-      "package": "controller/exchange",
       "identifier": "TestManagerHandlePeerLossAsOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/peerloss_test.go",
@@ -14476,7 +14655,7 @@
       "identifier": "TestOnSendAndOnReceive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/hooks_test.go",
-      "line": 44
+      "line": 43
     },
     {
       "package": "controller/exchange",

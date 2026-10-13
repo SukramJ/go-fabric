@@ -75,31 +75,6 @@ type Options struct {
 	OnReceive func()
 }
 
-// Hooks attach [Options.OnSend] and [Options.OnReceive] through a
-// context to an exchange the caller does not open itself — the exchange
-// handshake.CASE opens for its Sigma messages, whose retransmissions the
-// connection process of controller/peer watches. The exchange adopts them
-// at its first [Exchange.Send] or [Exchange.Next] under such a context,
-// each hook only when its Options left it unset — the setters of matter.js
-// MessageExchange.ts:351-369 ("sets the send-notifier when none was
-// provided at construction time"), which serve the same purpose there.
-type Hooks struct {
-	// Exchange is called once with the exchange that adopted the hooks.
-	Exchange func(x *Exchange)
-	// OnSend is [Options.OnSend].
-	OnSend func(retransmission int)
-	// OnReceive is [Options.OnReceive].
-	OnReceive func()
-}
-
-type hooksKey struct{}
-
-// WithHooks returns a context that carries h to the exchanges sending or
-// receiving under it (see [Hooks]).
-func WithHooks(ctx context.Context, h Hooks) context.Context {
-	return context.WithValue(ctx, hooksKey{}, &h)
-}
-
 // SendOptions configures [Exchange.Send] — matter.js ExchangeSendOptions
 // (MessageExchange.ts:82-132).
 type SendOptions struct {
@@ -184,7 +159,6 @@ type Exchange struct {
 	addressOverride *net.UDPAddr
 	onSend          func(retransmission int)
 	onReceive       func()
-	hooks           *Hooks
 	queue           []*Message
 	signal          chan struct{}
 	sentToAck       *pending
@@ -229,30 +203,6 @@ func newExchange(m *Manager, s *Session, id, protocol uint16, initiator bool, op
 		signal:           make(chan struct{}, 1),
 		lastActive:       m.clock.Now(),
 		createdAt:        m.clock.Now(),
-	}
-}
-
-// adoptHooks takes the hooks ctx carries, once per Hooks value.
-func (x *Exchange) adoptHooks(ctx context.Context) {
-	h, _ := ctx.Value(hooksKey{}).(*Hooks)
-	if h == nil {
-		return
-	}
-	x.mu.Lock()
-	if x.hooks == h {
-		x.mu.Unlock()
-		return
-	}
-	x.hooks = h
-	if x.onSend == nil {
-		x.onSend = h.OnSend
-	}
-	if x.onReceive == nil {
-		x.onReceive = h.OnReceive
-	}
-	x.mu.Unlock()
-	if h.Exchange != nil {
-		h.Exchange(x)
 	}
 }
 
@@ -354,7 +304,6 @@ func (x *Exchange) notifySentLocked() {
 // acknowledgement stops the retransmissions and leaves the message
 // unacknowledged (:793-805). Both return ctx's error.
 func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts SendOptions) error {
-	x.adoptHooks(ctx)
 	x.mu.Lock()
 	if x.closed {
 		cause := x.closeCause
@@ -681,7 +630,6 @@ func (x *Exchange) sendStandaloneAckFor(msg *Message) {
 // peer lost when nothing was received on the exchange. On a closed
 // session the wait is unbounded but for ctx.
 func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, error) {
-	x.adoptHooks(ctx)
 	timeout := opts.Timeout
 	if timeout == 0 && !x.session.IsClosed() {
 		ept := opts.ExpectedProcessingTime

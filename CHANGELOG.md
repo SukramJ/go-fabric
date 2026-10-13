@@ -118,14 +118,16 @@ pseudo-version of `main`.
   the wait for the next one — matter.js `MessageExchange.retransmissionCount`
   and `retransmissionRestartSaving` at `0ceb202d`, the inputs of the
   connection process's kick.
-- `exchange.Options.OnSend` / `OnReceive` and `exchange.WithHooks`: the
-  transmission and receipt notifiers of matter.js
-  `MessageExchange.Options.onSend` / `onReceive` (called with the
-  retransmission number before every transmission, and for every message
-  the exchange takes), and a context that carries them to an exchange the
-  caller does not open itself — the CASE exchange of `handshake.CASE`,
-  adopted at its first send as matter.js's `onSend` / `onReceive` setters
-  adopt them.
+- `exchange.Options.OnSend` / `OnReceive`: the transmission and receipt
+  notifiers of matter.js `MessageExchange.Options.onSend` / `onReceive`
+  (called with the retransmission number before every transmission, and
+  for every message the exchange takes).
+- `handshake.CASEOptions.Exchange` and `OnExchange`: the options the CASE
+  exchange opens with and a callback with that exchange, how the
+  connection process of `controller/peer` watches its Sigma messages
+  (matter.js `PeerConnection` hands the same notifiers to the exchange it
+  creates). They replace the context-carried `exchange.WithHooks` /
+  `exchange.Hooks` of wave 13 (report AG, owner decision 1).
 - `exchange.Options.AddressOverride`, `exchange.Session.SetAddr` and
   `Session.ActiveTimestamp`: one exchange's messages to another address
   while the session keeps its own (matter.js
@@ -210,6 +212,89 @@ pseudo-version of `main`.
   the session in place to a discovered address that answers, and gives
   the session up as unresponsive when none does. Concurrent checks join
   one run; `peer.ReasonSessionSuspect` probes the current address only.
+- `controller/ca`, the controller's certificate authority (ADR 0020,
+  stage 2; matter.js `CertificateAuthority.ts` at `0ceb202d`): `ca.New`
+  loads the CA a `ca.Store` holds (`MemoryStore` in memory) or creates a
+  P-256 root — RCAC with root cert id 0, validity now −1 / +10 years, a CA
+  with keyCertSign and cRLSign, SHA-1 key identifiers — and, with
+  `Config.IntermediateCA`, an ICAC that signs the NOCs; a stored CA whose
+  ICAC presence differs from the configuration is `ca.ErrConfig`.
+  `GenerateNOC` issues a NOC (subject fabric id, node id, CATs in
+  matter.js's order; digitalSignature; clientAuth and serverAuth) and
+  saves the certificate counter after every issue, so serial numbers do
+  not repeat after a restart. `RootCert`, `RootPublicKey`, `ICACCert`,
+  `Verifier`, `ca.KeyIdentifier` and `ca.CompressedFabricID` (matter.js
+  `GlobalFabricId.compute`).
+- `controller/attestation`, device attestation for the commissioner (ADR
+  0020, stage 2; matter.js `DeviceAttestationValidator.validate` at
+  `0ceb202d`, check for check and in its order): `attestation.Validate`
+  parses DAC and PAI (X.509, the 600-byte limit, the required extensions,
+  the Matter vendor and product id from the OID attributes or the
+  `Mvid:`/`Mpid:` common-name fallback), checks the vendor ids, the
+  attestation nonce and the signature over elements ‖ challenge, then —
+  with a `PAAStore` — the PAA by the PAI's authority key identifier, the
+  test-root policy, the chain signatures, the validity at the DAC's
+  notBefore (never against the current time, as matter.js), the PAA vendor
+  id and, when the store implements `Revocations`, revocation; then the
+  Certification Declaration's CMS signature by its signer and its content
+  (certification type, vendor id, product ids, DAC origin, authorized PAA
+  list). Hard failures are `*attestation.Error` with matter.js's
+  `DeviceAttestationCheck` names; warnings and information are
+  `Finding`s. `StaticStore` and `TestStore()` (the CSA test PAAs and test
+  CD signer) stand in for the DCL. `attestation.Policy` (`Accept`,
+  `Reject`, the zero value's backward-compatible accept, or a `Decide`
+  function) and `Policy.Resolve` are matter.js's `onFailure` and
+  `#resolveAttestationFindings`.
+- `controller/interaction`, the Interaction Model client as far as
+  commissioning needs it (ADR 0020, stage 2; matter.js `ClientInteraction`
+  and `InteractionMessenger` at `0ceb202d`): `interaction.New(manager,
+  session, logger)` and `Invoke` — one command on a fresh exchange, a
+  TimedRequest first when `InvokeOptions.Timed` (default 10 s), no
+  commandRef, the processing time of the option or 30 s with
+  `ExtendedFailSafeTimeout`, chunked InvokeResponses acknowledged and
+  accumulated, a status other than Success an `*interaction.StatusError`
+  — and `Read` — a fabric-filtered ReadRequest with the IM revision,
+  ReportData chunks acknowledged and merged (lists continued by a null
+  ListIndex reassembled), the final Success sent before the exchange
+  closes — returning an `interaction.Report` with `Value(endpoint,
+  cluster, attribute)`. `MaximumPeerResponseTime` is matter.js's
+  `maximumPeerResponseTime`.
+- `controller/commissioner`, the commissioner (ADR 0020, stage 2;
+  matter.js `ControllerCommissioner`, `CommissioningConnection` and
+  `ControllerCommissioningFlow` at `0ceb202d`, on an IP network):
+  `commissioner.New(Context{Exchanges, Peers, Attestation, Logger, Clock,
+  Rand})` and `Commission(ctx, Options)` — the requested node id checked
+  against the peers, the addresses deduplicated and ordered by
+  desirability (one candidate per device instance, else one per address),
+  PASE with the device's TXT intervals, addresses 10 s apart and never
+  while an attempt holds the responder, a wrong passcode dropping the
+  device, the budget (default 30 s) ending in
+  `PeerCommunicationError("Could not connect to device")`; then the flow:
+  the initial reads (a full fabric table refused), ArmFailSafe with the
+  device's BasicCommissioningInfo, SetRegulatoryConfig for a Wi-Fi or
+  Thread node (the "XX" retry), device attestation through
+  `controller/attestation` and the `OnAttestationFailure` policy, the CSR
+  checked against the DAC, AddTrustedRootCertificate and AddNOC with a
+  NOC from the fabric's `controller/ca`, the operational CASE connection
+  through `controller/peer` (a NoSharedTrustRoots refusal retried after
+  15 s), CommissioningComplete and UpdateFabricLabel — re-arming the
+  failsafe below half its time, failing past the device's cumulative
+  maximum, disarming it on a commissioning or status error. The PASE
+  session closes on every path. `FinalizeCommissioning` replaces the
+  CASE step; `EstablishPASE` opens a session without the flow.
+  `commissioner.Fabric` / `NewFabric` mint the controller's own NOC and
+  operational identity from a `ca.CA`. Errors are `*CommissioningError`
+  with matter.js's kinds (`ErrMaximumCommissionedFabricsReached`,
+  `ErrCommissioningTimeout`, `ErrDeviceAlreadyCommissionedToThisFabric`,
+  `ErrFabricLabelConflict`, `ErrNodeIDConflict`,
+  `ErrOperativeConnectionFailed`), `PairRetransmissionLimitReachedError`
+  and `PeerCommunicationError`.
+- `internal/chiptool`: `TestGoControllerCommissionsReferenceBridge`
+  (`make chiptool-test`) — the module's own commissioner finds the
+  reference daemon over the host's multicast DNS-SD, commissions it
+  against the CSA test trust store and reads VendorID back over CASE; it
+  needs only the daemon binary and multicast, and skips without the
+  latter.
 
 ### Changed
 

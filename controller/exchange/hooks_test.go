@@ -4,7 +4,6 @@
 package exchange
 
 import (
-	"context"
 	"slices"
 	"sync"
 	"testing"
@@ -64,50 +63,4 @@ func TestOnSendAndOnReceive(t *testing.T) {
 	if !slices.Equal(sends, []int{0, 1, 0}) || receipts != 1 {
 		t.Fatalf("OnSend %v, OnReceive %d; want [0 1 0], 1", sends, receipts)
 	}
-}
-
-// TestHooksAdoptedFromContext: an exchange takes the hooks of the context
-// of its first Send, calls Exchange once, and keeps a hook its Options
-// set (MessageExchange.ts:351-369).
-func TestHooksAdoptedFromContext(t *testing.T) {
-	t.Parallel()
-	m, conn, _ := newTestManager(t, Config{})
-	s, p := newSecurePair(t, m, 0x0312, false)
-	var viaCtx, viaOpts hookRecorder
-	var adopted []*Exchange
-	ctx := WithHooks(context.Background(), Hooks{
-		Exchange:  func(x *Exchange) { adopted = append(adopted, x) },
-		OnSend:    viaCtx.onSend,
-		OnReceive: viaCtx.onReceive,
-	})
-	x, _ := m.Initiate(s, im.InteractionModelProtocolID, Options{OnSend: viaOpts.onSend})
-	done := make(chan error, 1)
-	go func() { done <- x.Send(ctx, im.OpcodeReadRequest, nil, SendOptions{}) }()
-	first := p.decode(t, conn.nextOn(t, x).bytes)
-	reply := message.ProtocolHeader{HasAck: true, AckCounter: first.hdr.MessageCounter, Opcode: im.OpcodeReportData, ExchangeID: x.ID(), ProtocolID: im.InteractionModelProtocolID}
-	p.send(t, s.ID(), reply, nil)
-	if err := waitErr(t, done); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := x.Next(ctx, ReceiveOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	if len(adopted) != 1 || adopted[0] != x {
-		t.Fatalf("Exchange hook called %d times", len(adopted))
-	}
-	ctxSends, ctxReceipts := viaCtx.snapshot()
-	optSends, _ := viaOpts.snapshot()
-	if len(ctxSends) != 0 || !slices.Equal(optSends, []int{0}) || ctxReceipts != 1 {
-		t.Fatalf("context sends %v receipts %d, options sends %v", ctxSends, ctxReceipts, optSends)
-	}
-	// A context without hooks changes nothing.
-	if _, err := x.Next(canceled(), ReceiveOptions{}); err == nil {
-		t.Fatal("Next on a cancelled context succeeded")
-	}
-}
-
-func canceled() context.Context {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	return ctx
 }

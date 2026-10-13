@@ -651,8 +651,7 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 			p.goWork(func() { h(p) })
 		}
 	})
-	hooks := exchange.Hooks{
-		Exchange: att.exchange.Store,
+	notifiers := exchange.Options{
 		OnSend: func(n int) {
 			if n > 0 {
 				// Retransmitting: let discovery look for a fresh address.
@@ -680,6 +679,8 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 		CaseAuthenticatedTags:        p.Descriptor().CaseAuthenticatedTags,
 		MaxInitialRetransmissions:    -1,
 		MaxInitialRetransmissionTime: c.timing.MaxDelayBetweenInitialContactRetries,
+		Exchange:                     notifiers,
+		OnExchange:                   att.exchange.Store,
 		Logger:                       p.log,
 	}
 	if isFallback {
@@ -688,7 +689,7 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 	if r := p.set.ctx.Resumption; r != nil {
 		opts.Resumption = r
 	}
-	s, _, err := handshake.CASE(exchange.WithHooks(local, hooks), p.set.ctx.Exchanges, att.addr.UDPAddr(), fabric, p.address.NodeID, opts)
+	s, _, err := handshake.CASE(local, p.set.ctx.Exchanges, att.addr.UDPAddr(), fabric, p.address.NodeID, opts)
 	if err == nil {
 		c.mu.Lock()
 		c.session = s

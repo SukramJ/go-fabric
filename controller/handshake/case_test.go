@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -60,9 +61,23 @@ func TestCASEAndResumption(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	s, resumed, err := handshake.CASE(ctx, m, addr, fabric, testNodeID, handshake.CASEOptions{Resumption: store, CaseAuthenticatedTags: []uint32{}})
+	// The exchange options reach the Sigma exchange (CASEOptions.Exchange,
+	// OnExchange): the connection process's notifiers.
+	var sends, receipts atomic.Int32
+	var opened atomic.Pointer[exchange.Exchange]
+	s, resumed, err := handshake.CASE(ctx, m, addr, fabric, testNodeID, handshake.CASEOptions{
+		Resumption: store, CaseAuthenticatedTags: []uint32{},
+		Exchange: exchange.Options{
+			OnSend:    func(int) { sends.Add(1) },
+			OnReceive: func() { receipts.Add(1) },
+		},
+		OnExchange: opened.Store,
+	})
 	if err != nil {
 		t.Fatalf("CASE: %v", err)
+	}
+	if opened.Load() == nil || sends.Load() < 2 || receipts.Load() < 2 {
+		t.Fatalf("exchange options: opened %v, %d sends, %d receipts", opened.Load() != nil, sends.Load(), receipts.Load())
 	}
 	if resumed || s.Resumed() || s.PeerNodeID() != testNodeID || s.NodeID() != bridgetest.DefaultControllerNodeID {
 		t.Fatalf("session resumed=%v peer 0x%X local %d", resumed, s.PeerNodeID(), s.NodeID())

@@ -75,6 +75,9 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 89},
+	{pkg: "github.com/SukramJ/go-fabric/controller/ca", min: 88},
+	{pkg: "github.com/SukramJ/go-fabric/controller/commissioner", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/controller/discovery", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
 	// The module's lowest measured package (76.7 when last raised).
@@ -85,6 +88,7 @@ var floors = []packageFloor{
 	// about what deserves a test, not a ratchet setting.
 	{pkg: "github.com/SukramJ/go-fabric/contract", min: 76, why: "lowest in the module; see the note above this entry"},
 	{pkg: "github.com/SukramJ/go-fabric/controller/exchange", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/controller/interaction", min: 87},
 	{pkg: "github.com/SukramJ/go-fabric/controller/handshake", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/controller/peer", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
