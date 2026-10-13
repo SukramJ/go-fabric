@@ -502,6 +502,14 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `controller/interaction.SubscribeRequest.RefreshRequest`: a sustained
+  subscription rewrites its request through the hook before every attempt
+  but the very first and again right after a successful bootstrap read —
+  matter.js `refreshRequest` (`ClientSubscribe.ts:30-34`,
+  `SustainedSubscription.ts:182-186`, `:200-203` at `0ceb202d`) — so a
+  re-subscription sends the caller's current DataVersionFilters and event
+  minimum. The interval bounds and the callbacks stay the subscription's.
+
 - `bridge/bridgetest.Commissioner` runs on the module's own controller
   (ADR 0020, stage 2 close-out): one `udp.Listener` with
   `controller/exchange` (MRP retransmission), the CA of `controller/ca`

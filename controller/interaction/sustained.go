@@ -156,6 +156,9 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		close(st.finished)
 	}()
 	bootstrap := outer.request.BootstrapRead
+	// needRefresh is false only for the very first attempt
+	// (SustainedSubscription.ts:104, :182-186).
+	needRefresh := false
 	for {
 		closed := make(chan struct{})
 		var closeOnce sync.Once
@@ -187,7 +190,7 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 		}
 		schedule := newRetries(DefaultSustainRetries, c.rand)
 		for {
-			inner, err := c.sustainAttempt(ctx, outer.peer, req, floor, ceiling, &bootstrap)
+			inner, err := c.sustainAttempt(ctx, outer.peer, &req, floor, ceiling, &bootstrap, &needRefresh)
 			if err == nil {
 				st.mu.Lock()
 				st.inner = inner
@@ -226,16 +229,36 @@ func (c *Interaction) runSustained(outer *Subscription, floor, ceiling time.Dura
 	}
 }
 
-// sustainAttempt is one attempt: the bootstrap read while it has not
-// succeeded, then the subscription.
-func (c *Interaction) sustainAttempt(ctx context.Context, peer exchange.PeerAddress, req SubscribeRequest, floor, ceiling time.Duration, bootstrap *func(ctx context.Context) error) (*Subscription, error) {
+// sustainAttempt is one attempt (SustainedSubscription.ts:180-211): the
+// request refreshed unless this is the very first attempt (:182-186), the
+// bootstrap read while it has not succeeded and the request refreshed
+// after it (:187-204), then the subscription.
+func (c *Interaction) sustainAttempt(ctx context.Context, peer exchange.PeerAddress, req *SubscribeRequest, floor, ceiling time.Duration, bootstrap *func(ctx context.Context) error, needRefresh *bool) (*Subscription, error) {
+	if *needRefresh {
+		*req = refreshed(*req)
+	}
+	*needRefresh = true
 	if *bootstrap != nil {
 		if err := (*bootstrap)(ctx); err != nil {
 			return nil, err
 		}
 		*bootstrap = nil
+		*req = refreshed(*req)
 	}
-	return c.subscribeOnce(ctx, peer, req, floor, ceiling, ExchangeOptions{ConnectionTimeout: -1})
+	return c.subscribeOnce(ctx, peer, *req, floor, ceiling, ExchangeOptions{ConnectionTimeout: -1})
+}
+
+// refreshed is the request its RefreshRequest hook rewrites, with the
+// attempt's own callbacks kept; without a hook the request as it is.
+func refreshed(req SubscribeRequest) SubscribeRequest {
+	if req.RefreshRequest == nil {
+		return req
+	}
+	out := req.RefreshRequest(req)
+	out.Sustain, out.BootstrapRead, out.ActiveChanged = false, nil, nil
+	out.Updated, out.KeepaliveReceived, out.Closed, out.RefreshRequest = req.Updated, req.KeepaliveReceived, req.Closed, req.RefreshRequest
+	out.MinIntervalFloor, out.MaxIntervalCeiling = req.MinIntervalFloor, req.MaxIntervalCeiling
+	return out
 }
 
 // sleep waits d on the interaction's clock; false when ctx ended first.

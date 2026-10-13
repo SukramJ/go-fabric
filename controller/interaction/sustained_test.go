@@ -12,6 +12,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/tlv"
 )
 
 // establish answers the next SubscribeRequest with a priming report and
@@ -131,4 +132,102 @@ func TestSustainedCloseWhileRetrying(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("not done after Close")
 	}
+}
+
+// TestSustainedRefreshRequest: the request is refreshed before every
+// attempt but the very first and right after a successful bootstrap read
+// (SustainedSubscription.ts:182-186, :200-203); the refreshed paths and
+// filters go out, the subscription keeps its own callbacks.
+func TestSustainedRefreshRequest(t *testing.T) {
+	t.Parallel()
+	s := newScripted(t)
+	reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+	c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg, Clock: s.clock, Rand: func() float64 { return 0 }})
+	var mu sync.Mutex
+	refreshes := 0
+	active := make(chan bool, 8)
+	sub, err := c.Subscribe(context.Background(), interaction.SubscribeRequest{
+		Attributes: []im.ConcreteAttributePath{onOff}, Sustain: true,
+		ActiveChanged: func(a bool) { active <- a },
+		RefreshRequest: func(r interaction.SubscribeRequest) interaction.SubscribeRequest {
+			mu.Lock()
+			refreshes++
+			v := uint32(refreshes)
+			mu.Unlock()
+			r.DataVersionFilters = []im.DataVersionFilter{{Endpoint: 1, Cluster: 0x0006, DataVersion: v}}
+			r.EventFilters = []im.EventMinimumNumber{{EventMin: uint64(v) + 100}}
+			r.Closed, r.ActiveChanged = nil, nil
+			return r
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	filters := func(m msg) ([]im.DataVersionFilter, []im.EventMinimumNumber) {
+		t.Helper()
+		req, err := im.UnmarshalSubscribeRequestTLV(tlv.NewDecoder(m.payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return req.DataVersionFilters, req.EventFilters
+	}
+	first := s.next(t)
+	if dv, ev := filters(first); len(dv) != 0 || len(ev) != 0 {
+		t.Fatalf("the first attempt was refreshed: %+v %+v", dv, ev)
+	}
+	s.reply(t, first, im.InteractionModelProtocolID, im.OpcodeStatusResponse, statusResponse(t, im.StatusBusy))
+	s.clock.waitTimer(t, 15*time.Second)
+	s.clock.Advance(15 * time.Second)
+	second := s.next(t)
+	if dv, ev := filters(second); len(dv) != 1 || dv[0].DataVersion != 1 || len(ev) != 1 || ev[0].EventMin != 101 {
+		t.Fatalf("second attempt %+v %+v", dv, ev)
+	}
+	s.reply(t, second, im.InteractionModelProtocolID, im.OpcodeReportData, reportChunk(t, false, true))
+	s.reply(t, second, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 21, 30))
+	if a := <-active; !a {
+		t.Fatal("not active")
+	}
+	// A replacement is refreshed from the original request.
+	reg.CloseForPeer(sub.Peer())
+	if a := <-active; a {
+		t.Fatal("active after the loss")
+	}
+	third := s.next(t)
+	if dv, _ := filters(third); len(dv) != 1 || dv[0].DataVersion != 2 {
+		t.Fatalf("replacement %+v", dv)
+	}
+	s.reply(t, third, im.InteractionModelProtocolID, im.OpcodeReportData, reportChunk(t, false, true))
+	s.reply(t, third, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 22, 30))
+	if a := <-active; !a || sub.ID() != 22 {
+		t.Fatalf("replacement active %v id %d", a, sub.ID())
+	}
+	sub.Close()
+	<-sub.Done()
+}
+
+// TestSustainedRefreshAfterBootstrap: a successful bootstrap read refreshes
+// the request before the first subscription (SustainedSubscription.ts:199-203).
+func TestSustainedRefreshAfterBootstrap(t *testing.T) {
+	t.Parallel()
+	s := newScripted(t)
+	reg := interaction.NewSubscriptions(interaction.SubscriptionsConfig{Clock: s.clock})
+	c := interaction.Bind(interaction.SessionProvider(s.mgr, s.session), interaction.Config{Subscriptions: reg, Clock: s.clock, Rand: func() float64 { return 0 }})
+	sub, err := c.Subscribe(context.Background(), interaction.SubscribeRequest{
+		Attributes: []im.ConcreteAttributePath{onOff}, Sustain: true,
+		BootstrapRead: func(context.Context) error { return nil },
+		RefreshRequest: func(r interaction.SubscribeRequest) interaction.SubscribeRequest {
+			r.DataVersionFilters = []im.DataVersionFilter{{Endpoint: 1, Cluster: 0x0006, DataVersion: 9}}
+			return r
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := s.next(t)
+	req, err := im.UnmarshalSubscribeRequestTLV(tlv.NewDecoder(m.payload))
+	if err != nil || len(req.DataVersionFilters) != 1 || req.DataVersionFilters[0].DataVersion != 9 {
+		t.Fatalf("the request after the bootstrap read %+v (%v)", req.DataVersionFilters, err)
+	}
+	sub.Close()
+	<-sub.Done()
 }

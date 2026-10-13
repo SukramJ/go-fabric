@@ -82,6 +82,15 @@ type SubscribeRequest struct {
 	// ActiveChanged, for a sustained subscription, is called when it gains
 	// or loses its underlying subscription (SustainedSubscription.ts:83-95).
 	ActiveChanged func(active bool)
+	// RefreshRequest, for a sustained subscription, rewrites the request
+	// before every attempt but the very first and again right after a
+	// successful bootstrap read — matter.js refreshRequest
+	// (subscription/ClientSubscribe.ts:30-34; SustainedSubscription.ts:182-186,
+	// :200-203), which the node layer fills to send its current
+	// DataVersionFilters and event minimum. It rewrites the paths and
+	// filters; the interval bounds stay Subscribe's and the subscription
+	// keeps its callbacks.
+	RefreshRequest func(SubscribeRequest) SubscribeRequest
 }
 
 // Interval returns d as a subscription interval bound.
