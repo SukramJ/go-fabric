@@ -316,9 +316,147 @@ pseudo-version of `main`.
   against the CSA test trust store and reads VendorID back over CASE; it
   needs only the daemon binary and multicast, and skips without the
   latter.
+- `controller/exchange.Manager.SetProtocolHandler(protocol,
+  ProtocolHandler)` (ADR 0020, stage 3; matter.js `ExchangeManager.ts:391-473`
+  at `0ceb202d`): the first message of an exchange a peer opens reaches the
+  protocol's handler on a goroutine of its own, the exchange closed when
+  it returns. On a secure session any protocol but the Secure Channel
+  (whose CloseSession handling stays built in); on an unsecured session
+  the peer opens — now a session of its own, keyed by the peer's source
+  node id and released once no exchange holds it — a Sigma1 for the CASE
+  responder, and a PBKDFParamRequest is answered with StatusReport
+  InvalidParam (`SecureChannelProtocol.ts:129-137`). Anything else is
+  acknowledged and dropped as before. `Exchange.ConsiderClosed` and
+  `Session.IsInbound` are new.
+- `controller/handshake.CASEServer`, the controller's CASE responder (ADR
+  0020, stage 3; matter.js `CaseServer.ts:49-347` at `0ceb202d` over
+  `secure/sigma.Responder`): `NewCASEServer(mgr, CASEServerConfig{Fabrics,
+  Resumption, OnSession, Logger})`, `Register` (the manager's Secure Channel
+  handler for a peer's Sigma1), `Serve`, `Close`. A resuming Sigma1 is
+  looked up by its resumption id and answered with Sigma2_Resume, a MIC
+  that does not decrypt falling back to the full handshake; otherwise the
+  fabric the destination id names answers Sigma2, verifies Sigma3 and sends
+  Success. Failures answer NoSharedTrustRoots (no fabric) or InvalidParam,
+  nothing when the peer reported the failure or stopped answering; the
+  unsecured session closes either way. Every session reaches `OnSession`
+  with its fabric index and its resumption record is saved.
+  `handshake.FabricResolver` and `FabricList` resolve the fabric;
+  `handshake.ResumptionStore` gains `FindByResumptionID`
+  (`MemoryResumptionStore` implements it).
+- `im`, the client side of the Interaction Model messages (ADR 0020, stage
+  3; matter.js `packages/types/src/protocol/messages/` at `0ceb202d`):
+  `WriteRequest.MarshalTLV(enc, valueWriter)` (SuppressResponse only when
+  set, MoreChunkedMessages false as `Write.ts:77` sends it),
+  `TimedRequest.MarshalTLV`, `UnmarshalWriteResponseTLV`,
+  `UnmarshalSubscribeResponseTLV`, `UnmarshalReportDataTLV(dec,
+  valueReader, eventReader)` (`EventDataReader`; `AttributeReport` gains
+  `HasDataVersion` and `TagCompression`, `EventReport` gains `Received`,
+  a `*ReceivedEventData` with the four timestamps and `HasData`), and
+  `DataVersionFilterSize`. The wire fixtures gain
+  `read_req_event_filters_dvf`, `subscribe_req_event_filters`,
+  `write_req_data_version` and `write_req_chunked_list`, and every
+  ReadRequest, SubscribeRequest, WriteRequest and TimedRequest fixture is
+  now byte-compared (`TestParityClientRequestFixtures`).
+- `controller/interaction.Provider` (ADR 0020, stage 3; matter.js
+  `ExchangeProvider.ts`, `PeerExchangeProvider.ts` at `0ceb202d`): an
+  interaction is bound to a provider of exchanges — `SessionProvider(mgr,
+  s)`, what `New` keeps using, or `PeerProvider(p)` / `ForPeer(p, Config)`,
+  which connects through `peer.Peer.Connect` and runs each exchange on the
+  peer's newest session, verifying reachability through
+  `Peer.VerifyReachability`. `Bind(provider, Config{Logger, Clock, Rand})`,
+  `ExchangeOptions{RequireExistingSession, AddressOverride,
+  ConnectionTimeout}`, `DefaultReadPathsSupported` (9) and
+  `DefaultSubscribePathsSupported` (3). `peer.Peer.Exchanges` is new.
+- `controller/interaction.Interaction.Write` (ADR 0020, stage 3; matter.js
+  `ClientInteraction.write`, `Write()` and `sendWriteCommand` at
+  `0ceb202d`): `Write(ctx, []WriteRequest{Path, Value, DataVersion},
+  WriteOptions{Timed, TimedTimeout, SuppressResponse,
+  DisableListChunking})` → `WriteStatuses` (each path with its ListIndex,
+  status and cluster status; `Err()` the failing path's `*StatusError`, or
+  the failures joined). A list value is written as REPLACE-ALL with the
+  empty list and one append per element, AccessControl ACL and Extension
+  excepted (`ListChunked`); a timed write sends its TimedRequest on the
+  same exchange; a suppressed write expects an acknowledgement only and
+  tolerates a stray answer that is not an error StatusResponse. `Raw(node)`
+  writes a node tree; `StatusError.Path` names the failing path;
+  `ErrMalformedRequest`. `controller/exchange.UnexpectedMessageError`
+  carries the message that answered an ack-only send.
+- `controller/interaction.Interaction.ReadWith(ctx, ReadRequest{Attributes,
+  Events, EventFilters, DataVersionFilters, NoFabricFilter})` (ADR 0020,
+  stage 3; matter.js `ClientInteraction.read`, `#encodeReadingRequest` and
+  `InputChunk` at `0ceb202d`): DataVersionFilters are dropped or trimmed
+  when the request would not fit one message (`ErrRequestTooLarge` when it
+  does not fit without them, `exchange.MaxPayloadSize` 1178 bytes); the
+  reports are assembled as `InputChunk` does — adjacent entries of a path
+  form a list (replace, append, set, remove), a list at the end of a chunk
+  continues in the next, tag compression resolves against the last
+  complete path with its data version, a malformed entry is skipped — and
+  events are decoded with their four timestamps and the precedence of
+  `Timestamp` (`Report.Events`, `EventStatuses`, `EventData`,
+  `EventStatus`, `Report.Empty`). `Read(ctx, paths...)` is `ReadWith` over
+  attribute paths; a list split across chunks is now joined only when it
+  continues the previous chunk's last entry, as matter.js joins it.
+- `controller/interaction.Interaction.Subscribe` and the subscription
+  registry (ADR 0020, stage 3; matter.js `ClientInteraction.subscribe`,
+  `ClientSubscriptions`, `PeerSubscription`, `ClientSubscription` at
+  `0ceb202d`): `Subscribe(ctx, SubscribeRequest{Attributes, Events,
+  EventFilters, DataVersionFilters, NoFabricFilter, ReplaceSubscriptions,
+  MinIntervalFloor, MaxIntervalCeiling, Updated, KeepaliveReceived,
+  Closed})` → `*Subscription` (`ID`, `Peer`, `MaxInterval`, `Close`,
+  `Done`): the intervals default to 1 s and 60 min, the priming report's
+  chunks are acknowledged and handed to `Updated`, and the subscription is
+  registered by (peer, id). `NewSubscriptions(SubscriptionsConfig{Clock,
+  Logger, ReportStarted})` is the registry (`AddPeer`, `GetPeer`, `Delete`,
+  `CloseForPeer`, `Active`, `ResetTimer`, `BlockNewActivity`, `Close`):
+  one timer for the earliest deadline, a subscription closing after its
+  maximum interval plus twice the maximum peer response time. A closed
+  subscription tells the peer nothing. `Config.Subscriptions`,
+  `Interval(d)`, `NoSubscription`, `ErrNoSubscriptions`,
+  `ErrUncommissioned`; `peer.Context.SessionMigrated` is called after the
+  address monitor moved a session, for `CloseForPeer`.
+- `controller/interaction.Subscriptions.Register(mgr)` and
+  `HandleExchange` (ADR 0020, stage 3; matter.js
+  `ClientSubscriptionHandler` at `0ceb202d`): the reports a peer pushes on
+  its subscriptions reach the controller — matched by (peer, subscription
+  id), each chunk acknowledged, `ReportStarted` called, an empty report a
+  keepalive (`KeepaliveReceived`), a report with data assembled and handed
+  to `Updated`, the liveness deadline restarted. A report without a
+  subscription id, for an unknown one, or arriving while the registry is
+  blocked is answered InvalidSubscription; any other first message of an IM
+  exchange InvalidAction.
+- Sustained subscriptions (ADR 0020, stage 3; matter.js
+  `SustainedSubscription` at `0ceb202d`, without ICD):
+  `SubscribeRequest.Sustain` returns at once a subscription that
+  establishes its underlying one with an unbounded connection, retries on
+  `DefaultSustainRetries` (15 s, ×2, at most an hour, jitter 0.25), verifies
+  the peer's reachability before replacing a lost subscription, and reports
+  `Active()` / `ActiveChanged`; `BootstrapRead` is the hook of
+  `bootstrapWithRead`. `Config.Clock` and `Config.Rand` pace the retries;
+  `RetrySchedule`.
+- `controller/commissioner.Context` gains `Subscriptions`, `Fabrics` and
+  `Resumption` (ADR 0020, stage 3): `New` registers the registry's report
+  handler and a CASE responder answering for the fabrics, whose sessions
+  join the peer set — a restarted node re-establishes its subscriptions to
+  the controller over them. `Commissioner.Interaction(peer)` binds an
+  interaction to the registry; `Commissioner.Close` removes the handlers.
+- `internal/chiptool`: `TestGoControllerSubscribesReferenceBridge`
+  (`make chiptool-test`) — the module's own controller commissions the
+  reference daemon, subscribes to OnOff on a bridged light (sustained),
+  toggles it and receives the pushed report, writes NodeLabel, and after
+  the daemon's restart receives the re-established subscription's reports
+  over the CASE session the daemon opened to it (the controller advertises
+  its operational record on the host's DNS-SD).
 
 ### Changed
 
+- `im.ReadRequest.MarshalTLV` and `im.SubscribeRequest.MarshalTLV` encode
+  the request as matter.js's client sends it (`TlvReadRequest.ts:19-35`,
+  `TlvSubscribeRequest.ts:19-44` at `0ceb202d`): an empty AttributeRequests
+  array is no longer written, EventFilters and DataVersionFilters are
+  written when present (they were dropped), and the InteractionModelRevision
+  (12) is stamped. The device side decodes either shape. The wire fixtures'
+  WriteRequest entries now carry `moreChunkedMessages: false`, as matter.js's
+  `Write()` builds it.
 - `controller/exchange.Manager`: a send or wait that shows the peer is gone
   now closes that peer's secure sessions (every one created before the
   exchange, matter.js `ExchangeManager.ts:556-579` → `SessionManager.handlePeerLoss`),

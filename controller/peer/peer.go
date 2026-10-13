@@ -296,6 +296,11 @@ func (p *Peer) removeSession(s *exchange.Session) {
 	}
 }
 
+// Exchanges is the exchange manager the peer's sessions live on — the
+// one of its set (matter.js PeerConnection.Context.exchanges, read by
+// PeerExchangeProvider.ts:127-135).
+func (p *Peer) Exchanges() *exchange.Manager { return p.set.ctx.Exchanges }
+
 // Address is the peer's address.
 func (p *Peer) Address() handshake.PeerAddress { return p.address }
 

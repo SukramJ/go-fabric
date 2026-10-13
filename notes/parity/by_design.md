@@ -2415,6 +2415,117 @@ stage 6 implements `Revocations`. Report AH, by_design candidate 2.
 
 ---
 
+### BD-Matter-CASEServer-CloseOnUnfinishedEstablishment — the controller's CASE responder closes a session whose establishment did not finish
+
+matter.js `CaseServer.ts` (at `0ceb202d`) registers the resumed session
+once Sigma2_Resume is out (`:211`) and keeps it when the initiator's
+Success never arrives (`:216` throws past it); on the full handshake it
+registers the session before sending Success (`:316-332`) and keeps it
+when that send fails. Only a Sigma2_Resume that cannot be sent closes the
+session (`:202-206`). `handshake.CASEServer` closes the session in all
+three cases: a session the initiator never confirmed, or that never
+learned of our success, is a key the peer may not hold. Report AI.
+
+By design. The controller holds no subscription on such a session that a
+close could lose, and the peer that does hold the key opens CASE again,
+which the responder answers. The brief asked for the symmetric rule.
+
+### BD-Matter-CASEServer-NoReportOnShutdown — a handshake the responder's Close cut short reports nothing
+
+matter.js `CaseServer.ts:68-77` logs a `ShutdownError` at info and still
+sends InvalidParam unless the exchange is closing (`:84-93`).
+`CASEServer.Close` cancels the handshakes in flight and `Serve` sends no
+StatusReport for one its context ended. Report AI.
+
+By design. Close precedes the manager's own close; a report sent into a
+socket about to close would only fail with a flow error, the case `:84-86`
+skips for an exchange already closing.
+
+### BD-Matter-Controller-Sigma1OnSecureSessionIgnored — a Sigma1 on a secure session is acknowledged and dropped
+
+matter.js's full `SecureChannelProtocol` takes every session
+(`requiresSecureSession = undefined`, `SecureChannelProtocol.ts:34`) and
+hands a Sigma1 to the CaseServer wherever it arrived (`:146-148`).
+`exchange.Manager.handlerFor` consults the installed Secure Channel
+handler only on an unsecured session; on a secure one a Sigma1 is
+acknowledged and dropped as any unhandled message. Report AI.
+
+By design. Session establishment runs over the unsecured session; a
+Sigma1 inside an established session is a peer error the controller does
+not reward with a second session.
+
+### BD-Matter-Controller-EmptyListsNotEncoded — client requests omit an optional list that is empty
+
+matter.js writes an optional list whenever the field is set, an empty
+array included: `#encodeReadingRequest` (`InteractionMessenger.ts:998-1023`
+at `0ceb202d`) that dropped every DataVersionFilter still sends
+`dataVersionFilters: []`. `im.ReadRequest.MarshalTLV`,
+`SubscribeRequest.MarshalTLV` and `WriteRequest.MarshalTLV` write a list
+only when it has members; the request's space budget still counts the
+empty array's three bytes, so what fits is what fits matter.js. Report AI.
+
+By design. Go's nil and empty slice are one value; an empty optional
+list carries no information the receiver reads.
+
+### BD-Matter-Controller-InboundWithoutSourceNodeIDDropped — an unsecured request without a source node id is dropped
+
+matter.js keys the unsecured session a peer's request creates by the
+request's source node id, `NodeId.UNSPECIFIED_NODE_ID` when it carries
+none (`ExchangeManager.ts:261-264` at `0ceb202d`). `exchange.Manager`
+drops such a request: two peers without a source node id could not be
+told apart. A Sigma1 always carries one. Report AI.
+
+By design.
+
+### BD-Matter-Controller-NoIMServer — a first Interaction Model message other than a report is answered InvalidAction
+
+matter.js's controller is a ServerNode whose InteractionServer serves a
+Read or Invoke a peer opens (`InteractionServer.ts:218-240` at `0ceb202d`);
+only a ReportData reaches the `ClientSubscriptionHandler`.
+`interaction.Subscriptions.HandleExchange` answers any other first IM
+message with StatusResponse InvalidAction. Report AI.
+
+By design. The controller of ADR 0020 is not a node and serves no
+attributes; InvalidAction is what an InteractionServer answers an
+unsupported message (`InteractionMessenger.ts:357-361`).
+
+### BD-Matter-Controller-ListIndexPastEnd — a list index past the end of a chunked list makes the entry malformed
+
+matter.js assigns `list[index] = value` (`TlvArray.ts:150` at `0ceb202d`),
+which in JavaScript extends the array with holes. The report assembler of
+`controller/interaction` treats such an entry as malformed and skips it,
+as it skips every other malformed entry (`InputChunk.ts:233-241`). Report AI.
+
+By design. Go slices do not hold holes; a report whose set-at-index
+exceeds the list the peer sent is the peer's defect.
+
+### BD-Matter-Controller-MergedReports — `Updated` receives a report with its chunks merged
+
+matter.js hands a subscription's consumer an iterator of `InputChunk`s
+(`ClientSubscriptionHandler.ts:129-138`, `processReports :163-196` at
+`0ceb202d`). `interaction.SubscribeRequest.Updated` is called once per
+report, after its last chunk was assembled and before that chunk's
+acknowledgement — the point matter.js's iterator has drained. Report AI.
+
+By design. A Go callback that receives the whole report is the iterator's
+equivalent surface; the order of acknowledgement is matter.js's.
+
+### BD-Matter-Controller-InvokeRevision12 — the client's InvokeRequest stamps InteractionModelRevision 12
+
+matter.js's `Invoke()` defaults the request's revision to
+`SessionParameters.fallbacks.interactionModelRevision`, 11 (`Invoke.ts:99`,
+`SessionParameters.ts:131` at `0ceb202d`), the value assumed for a peer
+whose revision is unknown; its Read and Subscribe stamp
+`Specification.INTERACTION_MODEL_REVISION`, 12
+(`InteractionMessenger.ts:998-1023`, `Specification.ts:124`).
+`im.InvokeRequest`'s client encoder stamps 12, as every message this
+module sends (`BD-Matter-InteractionModelRevision`). Reports AH and AI.
+
+By design. One revision per module; the fallback is not the controller's
+own.
+
+---
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

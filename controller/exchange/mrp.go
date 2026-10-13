@@ -28,6 +28,14 @@ const (
 	// MRP.ts:55 (DEFAULT_EXPECTED_PROCESSING_TIME = 2 s).
 	DefaultExpectedProcessingTime = 2 * time.Second
 
+	// MaxPayloadSize is the largest message payload an exchange sends over
+	// UDP: the 1232-byte UDP payload of an IPv6 minimum MTU less the Matter
+	// message overhead (26 + 12 + 16). Mirrors matter.js
+	// packages/protocol/src/protocol/MessageExchange.ts:156
+	// (MATTER_MESSAGE_OVERHEAD), :435-439 (maxPayloadSize) and
+	// packages/general/src/net/udp/UdpSocket.ts:12 (MAX_UDP_MESSAGE_SIZE).
+	MaxPayloadSize = 1232 - (26 + 12 + 16)
+
 	// peerResponseTimeBuffer is the margin added to the peer's worst-case
 	// response time. Mirrors matter.js MRP.ts:61 (PEER_RESPONSE_TIME_BUFFER
 	// = 5 s).

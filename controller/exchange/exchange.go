@@ -270,6 +270,25 @@ func (x *Exchange) considerClosed() bool {
 	return x.closed || (x.initiator && x.closing)
 }
 
+// ConsiderClosed reports whether the exchange counts as closed: closed,
+// or — for an exchange we initiated — closing. It is matter.js
+// MessageExchange.considerClosed (MessageExchange.ts:376-378), which a
+// CASE responder reads before its error report (CaseServer.ts:82-86).
+func (x *Exchange) ConsiderClosed() bool { return x.considerClosed() }
+
+// takeFirst removes msg, the message that opened a peer-opened exchange,
+// from the queue [Exchange.Next] reads: its handler receives it directly.
+func (x *Exchange) takeFirst(msg *Message) {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	for i, q := range x.queue {
+		if q == msg {
+			x.queue = append(x.queue[:i], x.queue[i+1:]...)
+			return
+		}
+	}
+}
+
 func (x *Exchange) lastActivity() time.Time {
 	x.mu.Lock()
 	defer x.mu.Unlock()
@@ -417,7 +436,7 @@ func (x *Exchange) awaitAck(ctx context.Context, p *pending, expectAckOnly bool)
 			return r.err
 		}
 		if expectAckOnly && r.msg != nil && !r.msg.isStandaloneAck() {
-			return fmt.Errorf("%w: expected an ack only, got protocol 0x%04X opcode 0x%02X", ErrUnexpectedMessage, r.msg.ProtocolID, r.msg.Opcode)
+			return &UnexpectedMessageError{Message: r.msg}
 		}
 		return nil
 	case <-ctx.Done():

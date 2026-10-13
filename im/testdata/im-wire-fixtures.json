@@ -114,9 +114,7 @@
       "isFabricFiltered": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "15290024010024023c280724ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision; matter.js uses TlvOptionalField for both"
+    "bytesHex": "15290024010024023c280724ff0c18"
   },
   {
     "label": "subscribe_req_minimal_keep_false",
@@ -129,9 +127,7 @@
       "isFabricFiltered": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "15280024010024021e280724ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision; matter.js uses TlvOptionalField for both"
+    "bytesHex": "15280024010024021e280724ff0c18"
   },
   {
     "label": "subscribe_req_with_attrs_fabric_filtered",
@@ -151,9 +147,7 @@
       "isFabricFiltered": true,
       "interactionModelRevision": 12
     },
-    "bytesHex": "15280024010124021e3603172402012403062404001818290724ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go SubscribeRequest.MarshalTLV omits interactionModelRevision; matter.js emits it"
+    "bytesHex": "15280024010124021e3603172402012403062404001818290724ff0c18"
   },
   {
     "label": "subscribe_req_with_events",
@@ -173,9 +167,7 @@
       "isFabricFiltered": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "15290024010024023c3604172401012402062403001818280724ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision"
+    "bytesHex": "15290024010024023c3604172401012402062403001818280724ff0c18"
   },
   {
     "label": "subscribe_req_with_dvf",
@@ -197,9 +189,7 @@
       ],
       "interactionModelRevision": 12
     },
-    "bytesHex": "15280024010024021e2807360815370024010124020618240164181824ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go SubscribeRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision"
+    "bytesHex": "15280024010024021e2807360815370024010124020618240164181824ff0c18"
   },
   {
     "label": "subscribe_resp_canonical",
@@ -295,9 +285,7 @@
       "isFabricFiltered": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "15280324ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go ReadRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision"
+    "bytesHex": "15280324ff0c18"
   },
   {
     "label": "read_req_with_attrs",
@@ -314,9 +302,7 @@
       "isFabricFiltered": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "153600172402012403062404001818280324ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go ReadRequest.MarshalTLV omits interactionModelRevision; matter.js emits it"
+    "bytesHex": "153600172402012403062404001818280324ff0c18"
   },
   {
     "label": "read_req_wildcard",
@@ -329,9 +315,7 @@
       "isFabricFiltered": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "153600171818280324ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go ReadRequest.MarshalTLV omits interactionModelRevision; matter.js emits it"
+    "bytesHex": "153600171818280324ff0c18"
   },
   {
     "label": "read_req_fabric_filtered",
@@ -348,9 +332,7 @@
       "isFabricFiltered": true,
       "interactionModelRevision": 12
     },
-    "bytesHex": "1536001724020024031f2404001818290324ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go ReadRequest.MarshalTLV omits interactionModelRevision; matter.js emits it"
+    "bytesHex": "1536001724020024031f2404001818290324ff0c18"
   },
   {
     "label": "read_req_with_events",
@@ -367,13 +349,11 @@
       "isFabricFiltered": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "153601172401012402062403001818280324ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go ReadRequest.MarshalTLV always emits empty attributeRequests array and omits interactionModelRevision"
+    "bytesHex": "153601172401012402062403001818280324ff0c18"
   },
   {
     "label": "write_req_not_timed",
-    "description": "WriteRequest: timedRequest=false, one AttributeDataIB (OnOff attr, bool true) — decode-only fixture",
+    "description": "WriteRequest: timedRequest=false, one AttributeDataIB (OnOff attr, bool true)",
     "type": "WriteRequest",
     "fixture": {
       "timedRequest": false,
@@ -394,15 +374,14 @@
           ]
         }
       ],
+      "moreChunkedMessages": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "1528013602153701240201240306240400182902181824ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "WriteRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
+    "bytesHex": "15280136021537012402012403062404001829021818280324ff0c18"
   },
   {
     "label": "write_req_timed",
-    "description": "WriteRequest: timedRequest=true (timed write transaction) — decode-only fixture",
+    "description": "WriteRequest: timedRequest=true (timed write transaction)",
     "type": "WriteRequest",
     "fixture": {
       "timedRequest": true,
@@ -423,15 +402,14 @@
           ]
         }
       ],
+      "moreChunkedMessages": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "1529013602153701240201240306240400182902181824ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "WriteRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
+    "bytesHex": "15290136021537012402012403062404001829021818280324ff0c18"
   },
   {
     "label": "write_req_suppress_response",
-    "description": "WriteRequest: suppressResponse=true, timedRequest=false — decode-only fixture",
+    "description": "WriteRequest: suppressResponse=true, timedRequest=false",
     "type": "WriteRequest",
     "fixture": {
       "suppressResponse": true,
@@ -453,11 +431,10 @@
           ]
         }
       ],
+      "moreChunkedMessages": false,
       "interactionModelRevision": 12
     },
-    "bytesHex": "15290028013602153701240201240306240400182902181824ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "WriteRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
+    "bytesHex": "152900280136021537012402012403062404001829021818280324ff0c18"
   },
   {
     "label": "write_resp_success_single",
@@ -618,38 +595,204 @@
   },
   {
     "label": "timed_req_short",
-    "description": "TimedRequest: timeout=6000ms (typical door-lock timed-request window) — decode-only fixture",
+    "description": "TimedRequest: timeout=6000ms (typical door-lock timed-request window)",
     "type": "TimedRequest",
     "fixture": {
       "timeout": 6000,
       "interactionModelRevision": 12
     },
-    "bytesHex": "152500701724ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "TimedRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
+    "bytesHex": "152500701724ff0c18"
   },
   {
     "label": "timed_req_max",
-    "description": "TimedRequest: timeout=65535ms (maximum uint16 value) — decode-only fixture",
+    "description": "TimedRequest: timeout=65535ms (maximum uint16 value)",
     "type": "TimedRequest",
     "fixture": {
       "timeout": 65535,
       "interactionModelRevision": 12
     },
-    "bytesHex": "152500ffff24ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "TimedRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
+    "bytesHex": "152500ffff24ff0c18"
   },
   {
     "label": "timed_req_minimal",
-    "description": "TimedRequest: timeout=1ms — decode-only fixture",
+    "description": "TimedRequest: timeout=1ms",
     "type": "TimedRequest",
     "fixture": {
       "timeout": 1,
       "interactionModelRevision": 12
     },
-    "bytesHex": "1524000124ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "TimedRequest is decode-only in go-fabric (bridge receives, never sends); no MarshalTLV to test"
+    "bytesHex": "1524000124ff0c18"
+  },
+  {
+    "label": "read_req_event_filters_dvf",
+    "description": "ReadRequest: attribute and event paths, one eventFilter (eventMin only, Read.ts:171-176), one dataVersionFilter, fabric-filtered",
+    "type": "ReadRequest",
+    "fixture": {
+      "attributeRequests": [
+        {
+          "endpointId": 1,
+          "clusterId": 6
+        }
+      ],
+      "eventRequests": [
+        {
+          "endpointId": 1,
+          "clusterId": 6
+        }
+      ],
+      "eventFilters": [
+        {
+          "eventMin": 4294967297
+        }
+      ],
+      "isFabricFiltered": true,
+      "dataVersionFilters": [
+        {
+          "path": {
+            "endpointId": 1,
+            "clusterId": 6
+          },
+          "dataVersion": 2147483649
+        }
+      ],
+      "interactionModelRevision": 12
+    },
+    "bytesHex": "15360017240201240306181836011724010124020618183602152701010000000100000018182903360415370024010124020618260101000080181824ff0c18"
+  },
+  {
+    "label": "subscribe_req_event_filters",
+    "description": "SubscribeRequest: attribute and event paths, an eventFilter with nodeId, a dataVersionFilter, intervals 1/3600",
+    "type": "SubscribeRequest",
+    "fixture": {
+      "keepSubscriptions": true,
+      "minIntervalFloorSeconds": 1,
+      "maxIntervalCeilingSeconds": 3600,
+      "attributeRequests": [
+        {
+          "endpointId": 1,
+          "clusterId": 6,
+          "attributeId": 0
+        }
+      ],
+      "eventRequests": [
+        {
+          "clusterId": 40
+        }
+      ],
+      "eventFilters": [
+        {
+          "nodeId": 4660,
+          "eventMin": 7
+        }
+      ],
+      "isFabricFiltered": false,
+      "dataVersionFilters": [
+        {
+          "path": {
+            "endpointId": 0,
+            "clusterId": 40
+          },
+          "dataVersion": 5
+        }
+      ],
+      "interactionModelRevision": 12
+    },
+    "bytesHex": "1529002401012502100e360317240201240306240400181836041724022818183605152500341224010718182807360815370024010024022818240105181824ff0c18"
+  },
+  {
+    "label": "write_req_data_version",
+    "description": "WriteRequest: one AttributeDataIB with dataVersion=0x01020304 (NodeLabel, a string)",
+    "type": "WriteRequest",
+    "fixture": {
+      "timedRequest": false,
+      "writeRequests": [
+        {
+          "dataVersion": 16909060,
+          "path": {
+            "endpointId": 0,
+            "clusterId": 40,
+            "attributeId": 5
+          },
+          "data": [
+            {
+              "typeLength": {
+                "type": 12,
+                "length": 0
+              },
+              "value": "label"
+            }
+          ]
+        }
+      ],
+      "moreChunkedMessages": false,
+      "interactionModelRevision": 12
+    },
+    "bytesHex": "1528013602152600040302013701240200240328240405182c02056c6162656c1818280324ff0c18"
+  },
+  {
+    "label": "write_req_chunked_list",
+    "description": "WriteRequest: a list of two uint8 chunked into REPLACE-ALL [] and two appends (listIndex null), timed",
+    "type": "WriteRequest",
+    "fixture": {
+      "timedRequest": true,
+      "writeRequests": [
+        {
+          "path": {
+            "endpointId": 1,
+            "clusterId": 30,
+            "attributeId": 0
+          },
+          "data": [
+            {
+              "typeLength": {
+                "type": 22
+              }
+            },
+            {
+              "typeLength": {
+                "type": 24
+              }
+            }
+          ]
+        },
+        {
+          "path": {
+            "endpointId": 1,
+            "clusterId": 30,
+            "attributeId": 0,
+            "listIndex": null
+          },
+          "data": [
+            {
+              "typeLength": {
+                "type": 4,
+                "length": 0
+              },
+              "value": 1
+            }
+          ]
+        },
+        {
+          "path": {
+            "endpointId": 1,
+            "clusterId": 30,
+            "attributeId": 0,
+            "listIndex": null
+          },
+          "data": [
+            {
+              "typeLength": {
+                "type": 4,
+                "length": 0
+              },
+              "value": 2
+            }
+          ]
+        }
+      ],
+      "moreChunkedMessages": false,
+      "interactionModelRevision": 12
+    },
+    "bytesHex": "152901360215370124020124031e240400183602181815370124020124031e2404003405182402011815370124020124031e2404003405182402021818280324ff0c18"
   }
 ]

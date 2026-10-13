@@ -48,7 +48,7 @@ func TestExchangeIDsAreConsecutiveAndIndexedApart(t *testing.T) {
 	// The peer opens its own exchange with x1's id: not ours.
 	p.counter++
 	hdr := message.Header{MessageCounter: p.counter, HasSourceNodeID: true, SourceNodeID: 0x5555}
-	proto := message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: 0x20, ExchangeID: x1.ID(), ProtocolID: 0}
+	proto := message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: mrp.SCOpcodeStatusReport, ExchangeID: x1.ID(), ProtocolID: 0}
 	m.HandleDatagram(append(hdr.Marshal(), proto.Marshal()...), peerAddr)
 	ack := decodeUnsecured(t, conn.next(t).bytes)
 	if ack.proto.Opcode != mrp.StandaloneAckOpcode || ack.proto.Initiator || !ack.proto.HasAck || ack.proto.AckCounter != p.counter ||

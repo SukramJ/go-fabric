@@ -91,6 +91,7 @@ type Manager struct {
 
 	mu             sync.Mutex
 	closed         bool
+	handlers       map[uint16]ProtocolHandler
 	sessions       map[uint16]*Session
 	unsecured      map[uint64]*Session
 	exchanges      map[uint32]*Exchange
@@ -125,6 +126,7 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		// (SessionManager.ts:446-454).
 		unsecured: make(map[uint64]*Session),
 		exchanges: make(map[uint32]*Exchange),
+		handlers:  make(map[uint16]ProtocolHandler),
 		// The exchange counter and the session-id cursor start at a
 		// random value (ExchangeManager.ts:729-734, SessionManager.ts:264).
 		exchangeID:     binary.LittleEndian.Uint16(seed[0:2]),
@@ -148,6 +150,50 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 
 // LocalParameters is our session parameters.
 func (m *Manager) LocalParameters() sessionparams.Parameters { return m.local }
+
+// ProtocolHandler handles an exchange the peer opened: x is the new
+// exchange, first its first message, already taken by x — acknowledged as
+// x acknowledges any message, and not returned by [Exchange.Next], which
+// waits for the message after it. It is matter.js
+// ProtocolHandler.onNewExchange (packages/protocol/src/protocol/ProtocolHandler.ts:22-23
+// at 0ceb202d). It runs on a goroutine of its own, one per exchange, so
+// the receive path never waits for it; the exchange is closed when it
+// returns, if the handler did not close it.
+type ProtocolHandler func(x *Exchange, first *Message)
+
+// SetProtocolHandler installs h for the exchanges the peer opens with
+// protocol — matter.js ExchangeManager.addProtocolHandler, consulted for
+// the first message of an exchange at ExchangeManager.ts:391-440. A nil h
+// removes it. The Secure Channel protocol is special:
+//
+//   - on a secure session its handler stays the built-in one (the
+//     StatusReport-only handler of SecureChannelProtocol.ts:30-88), h is
+//     not consulted;
+//   - on an unsecured session h receives a Sigma1 — matter.js
+//     SecureChannelProtocol.ts:146-148 hands it to the CaseServer — and a
+//     PBKDFParamRequest is refused with InvalidParam, the controller having
+//     no PASE server (:129-137).
+//
+// Every other protocol's handler runs for the exchanges opened on a
+// secure session only, as matter.js's InteractionServer and
+// ClientSubscriptionHandler require (requiresSecureSession,
+// ExchangeManager.ts:393-405). A message no handler takes is acknowledged
+// when it asks for it and dropped (:441-473).
+func (m *Manager) SetProtocolHandler(protocol uint16, h ProtocolHandler) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if h == nil {
+		delete(m.handlers, protocol)
+		return
+	}
+	m.handlers[protocol] = h
+}
+
+func (m *Manager) handler(protocol uint16) ProtocolHandler {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.handlers[protocol]
+}
 
 // NewUnsecuredSession opens the unsecured session of a handshake with the
 // peer at addr. peer is what is known of the peer's session parameters
@@ -476,9 +522,14 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 		return
 	}
 	body := append([]byte(nil), buf[hl:]...)
-	s, duplicate, ok := m.openSession(&hdr, &body, src)
+	s, duplicate, inbound, ok := m.openSession(&hdr, &body, src)
 	if !ok {
 		return
+	}
+	if inbound {
+		// An unsecured session created for this message does not outlive
+		// it unless a handler took an exchange on it (ExchangeManager.ts:205-217).
+		defer m.releaseInbound(s)
 	}
 	proto, pl, err := message.UnmarshalProtocolHeader(body)
 	if err != nil {
@@ -503,8 +554,9 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 }
 
 // openSession resolves the session of a received message and decrypts
-// it. ok is false when the message is dropped.
-func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAddr) (s *Session, duplicate, ok bool) {
+// it. ok is false when the message is dropped; inbound is true when the
+// session was created for this message.
+func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAddr) (s *Session, duplicate, inbound, ok bool) {
 	if hdr.SessionID == UnsecuredSessionID {
 		// A response names our ephemeral node id as destination; a
 		// request names the peer's as source (ExchangeManager.ts:244-265).
@@ -520,26 +572,72 @@ func (m *Manager) openSession(hdr *message.Header, body *[]byte, src *net.UDPAdd
 		s = m.unsecured[initiator]
 		m.mu.Unlock()
 		if s == nil {
-			if !hasDest {
-				m.unsolicitedUnsecured(hdr, *body, src)
-			} else {
+			if hasDest {
+				// A late response to a session that no longer exists
+				// (ExchangeManager.ts:250-259).
 				m.log.Debug("matter.controller.drop", slog.String("reason", "unsecured response for unknown session"))
+				return nil, false, false, false
 			}
-			return nil, false, false
+			if s = m.newInboundSession(hdr, src); s == nil {
+				return nil, false, false, false
+			}
+			inbound = true
 		}
-		return s, !s.window.Accept(hdr.MessageCounter), true
+		return s, !s.window.Accept(hdr.MessageCounter), inbound, true
 	}
 	if s = m.Session(hdr.SessionID); s == nil {
 		m.log.Debug("matter.controller.drop", slog.String("reason", "unknown session"), slog.Int("session", int(hdr.SessionID)))
-		return nil, false, false
+		return nil, false, false, false
 	}
 	plain, dup, err := s.secure.Decrypt(hdr, hdr.NonceSecurityFlags(), *body)
 	if err != nil {
 		m.log.Debug("matter.controller.drop", slog.String("reason", "decrypt"), slog.String("err", err.Error()))
-		return nil, false, false
+		return nil, false, false, false
 	}
 	*body = plain
-	return s, dup, true
+	return s, dup, false, true
+}
+
+// newInboundSession creates the unsecured session of a peer's initiating
+// message, keyed by the peer's source node id — matter.js
+// ExchangeManager.ts:261-264 (createUnsecuredSession with the initiator's
+// node id). A request without a source node id is dropped: the session
+// could not be told apart from another peer's.
+func (m *Manager) newInboundSession(hdr *message.Header, src *net.UDPAddr) *Session {
+	if !hdr.HasSourceNodeID {
+		m.log.Debug("matter.controller.drop", slog.String("reason", "unsecured request without source node id"))
+		return nil
+	}
+	s := &Session{
+		m:         m,
+		addr:      src,
+		nodeID:    hdr.SourceNodeID,
+		inbound:   true,
+		window:    mrp.NewWindow(),
+		params:    PeerParameters(nil),
+		exchanges: make(map[*Exchange]struct{}),
+		closing:   make(chan struct{}),
+	}
+	s.timestamp = m.clock.Now()
+	s.createdAt = s.timestamp
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return nil
+	}
+	if _, taken := m.unsecured[s.nodeID]; taken {
+		return nil
+	}
+	m.unsecured[s.nodeID] = s
+	return s
+}
+
+// releaseInbound closes an inbound session no exchange holds —
+// ExchangeManager.ts:210-216.
+func (m *Manager) releaseInbound(s *Session) {
+	if !s.IsClosed() && len(s.liveExchanges()) == 0 {
+		s.Close()
+	}
 }
 
 // route hands msg to the exchange it belongs to — its index sets the
@@ -585,8 +683,16 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 		m.handleSecureChannel(x, msg)
 		return
 	}
-	// Any other protocol has no handler on the controller until stage 3:
-	// the message is acknowledged when it asks for it
+	// A handler takes the first message of an exchange the peer opens
+	// (ExchangeManager.ts:407-440): on an unsecured session a Sigma1 or a
+	// PBKDFParamRequest, on a secure session any other protocol's message.
+	if msg.Initiator && !duplicate {
+		if h := m.handlerFor(s, msg); h != nil {
+			m.dispatch(s, msg, h)
+			return
+		}
+	}
+	// Anything else is acknowledged when it asks for it
 	// (ExchangeManager.ts:441-452) and dropped otherwise (:453-473).
 	if msg.RequiresAck {
 		m.sendAck(s, msg, 0)
@@ -596,18 +702,61 @@ func (m *Manager) route(s *Session, msg *Message, duplicate bool) {
 		slog.Int("protocol", int(msg.ProtocolID)), slog.Int("opcode", int(msg.Opcode)), slog.Bool("duplicate", duplicate))
 }
 
-// unsolicitedUnsecured handles an unsecured message a peer initiates
-// towards us: it is acknowledged when it asks for it, nothing else
-// (ExchangeManager.ts:261-264 creates a session for it that the handler
-// of :441-452 then only acknowledges on).
-func (m *Manager) unsolicitedUnsecured(hdr *message.Header, body []byte, src *net.UDPAddr) {
-	proto, _, err := message.UnmarshalProtocolHeader(body)
-	if err != nil || !proto.NeedsAck || !hdr.HasSourceNodeID {
-		return
+// handlerFor is the handler of the exchange msg opens on s, nil for
+// none: on an unsecured session the installed Secure Channel handler for
+// a Sigma1 (SecureChannelProtocol.ts:146-148) and the built-in refusal for
+// a PBKDFParamRequest (:129-137); on a secure session the installed
+// handler of any protocol but the Secure Channel, whose secure-session
+// handler is built in.
+func (m *Manager) handlerFor(s *Session, msg *Message) ProtocolHandler {
+	if msg.ProtocolID == mrp.SecureChannelProtocolID {
+		if s.secure != nil {
+			return nil
+		}
+		switch msg.Opcode {
+		case mrp.SCOpcodeSigma1:
+			return m.handler(mrp.SecureChannelProtocolID)
+		case mrp.SCOpcodePBKDFParamRequest:
+			return m.refusePASE
+		}
+		return nil
 	}
-	s := &Session{m: m, addr: src, exchanges: make(map[*Exchange]struct{}), closing: make(chan struct{})}
-	m.sendAck(s, &Message{Counter: hdr.MessageCounter, ExchangeID: proto.ExchangeID, Initiator: proto.Initiator, RequiresAck: true}, hdr.SourceNodeID)
-	m.log.Debug("matter.controller.unsolicited", slog.Int("session", 0), slog.Int("exchange", int(proto.ExchangeID)))
+	if s.secure == nil {
+		return nil
+	}
+	return m.handler(msg.ProtocolID)
+}
+
+// dispatch opens the exchange msg starts, lets it take msg — owing the
+// acknowledgement — and runs h on a goroutine of its own
+// (ExchangeManager.ts:423-437: fromInitialMessage, #addExchange,
+// onMessageReceived, then onNewExchange). Once h returns the exchange is
+// closed, and an inbound unsecured session no exchange holds any longer is
+// closed with it (:205-217).
+func (m *Manager) dispatch(s *Session, msg *Message, h ProtocolHandler) {
+	x := m.accept(s, msg)
+	x.onMessageReceived(msg, false)
+	x.takeFirst(msg)
+	go func() {
+		h(x, msg)
+		x.Close()
+		if s.inbound {
+			<-x.Done()
+			m.releaseInbound(s)
+		}
+	}()
+}
+
+// refusePASE answers a PBKDFParamRequest with a StatusReport
+// InvalidParam: the controller runs no PASE server. Mirrors matter.js
+// SecureChannelProtocol.ts:129-137 (SecureChannelMessenger.sendError,
+// :170-172, a reliable StatusReport with general code Failure), then the
+// exchange closes.
+func (m *Manager) refusePASE(x *Exchange, _ *Message) {
+	report := StatusReport{GeneralCode: mrp.SCStatusGeneralFailure, ProtocolID: uint32(mrp.SecureChannelProtocolID), ProtocolCode: mrp.SCStatusProtocolInvalidParameter}
+	if err := x.Send(context.Background(), mrp.SCOpcodeStatusReport, report.Encode(), SendOptions{}); err != nil {
+		m.log.Debug("matter.controller.pase_refusal_failed", slog.Int("exchange", int(x.id)), slog.String("err", err.Error()))
+	}
 }
 
 // sendAck sends a standalone ack for msg on s, outside any exchange.
@@ -639,6 +788,10 @@ func (m *Manager) seal(s *Session, proto message.ProtocolHeader, payload []byte,
 		switch {
 		case dest != 0:
 			hdr.DestSize, hdr.DestNodeID = message.DestNodeID, dest
+		case s.inbound:
+			// Our messages on a session the peer opened name the peer's
+			// ephemeral node id as destination (ExchangeManager.ts:244-247).
+			hdr.DestSize, hdr.DestNodeID = message.DestNodeID, s.nodeID
 		case s.nodeID != 0:
 			hdr.HasSourceNodeID, hdr.SourceNodeID = true, s.nodeID
 		}

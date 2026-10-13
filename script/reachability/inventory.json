@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4718,
+  "entry_points": 4766,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,9 +183,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10854,
-    "reachable": 7614,
-    "whitelisted": 3235,
+    "total_exported": 10924,
+    "reachable": 7666,
+    "whitelisted": 3253,
     "unreachable": 5
   },
   "by_package": [
@@ -14071,6 +14071,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestContextWiring",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/wiring_test.go",
+      "line": 53
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestEnsureFailsafeTimerFor",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
@@ -14638,6 +14645,20 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestHandlerNotForUnsecuredOrSecureChannel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 106
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestHandlerTakesPeerOpenedIMExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 51
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestManagerHandlePeerLossAsOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/peerloss_test.go",
@@ -14659,38 +14680,52 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestPBKDFParamRequestIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 242
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestParityMRPConstants",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 22
+      "line": 23
     },
     {
       "package": "controller/exchange",
       "identifier": "TestParityMaxPeerResponseTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 78
+      "line": 79
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestParityPeerOpenedExchangeDispatch",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/parity_matterjs_test.go",
+      "line": 192
     },
     {
       "package": "controller/exchange",
       "identifier": "TestParityRetransmissionInterval",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "controller/exchange",
       "identifier": "TestParitySessionParameterFallbacks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 99
+      "line": 100
     },
     {
       "package": "controller/exchange",
       "identifier": "TestParityStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 143
+      "line": 144
     },
     {
       "package": "controller/exchange",
@@ -14705,6 +14740,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 590
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestPeerOpenedExchangeOnClosingSessionDeclined",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 269
     },
     {
       "package": "controller/exchange",
@@ -14785,6 +14827,20 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestSigma1ReachesHandlerOnInboundSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 170
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestSigma1WithoutHandlerIsAcknowledged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 224
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestStatusReportTravelsOnSecureChannel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
@@ -14809,7 +14865,56 @@
       "identifier": "PeerAddress",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "controller/handshake/resumption.go",
-      "line": 20
+      "line": 21
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "TestParityCASEServerErrorReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/handshake/parity_matterjs_test.go",
+      "line": 53
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "TestParityCASEServerStatusCodes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/handshake/parity_matterjs_test.go",
+      "line": 28
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestAssemblerEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/report_internal_test.go",
+      "line": 128
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestAssemblerLists",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/report_internal_test.go",
+      "line": 81
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestAssemblerTagCompression",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/report_internal_test.go",
+      "line": 48
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestEncodeFitting",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/report_internal_test.go",
+      "line": 161
+    },
+    {
+      "package": "controller/interaction",
+      "identifier": "TestRetries",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/interaction/sustained_internal_test.go",
+      "line": 14
     },
     {
       "package": "controller/peer",
@@ -14942,35 +15047,35 @@
       "identifier": "TestMonitorAllProbesFail",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 156
+      "line": 167
     },
     {
       "package": "controller/peer",
       "identifier": "TestMonitorMigratesToAnAlternate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 126
+      "line": 133
     },
     {
       "package": "controller/peer",
       "identifier": "TestMonitorScheduledByAServiceChange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 213
+      "line": 224
     },
     {
       "package": "controller/peer",
       "identifier": "TestMonitorSessionSuspect",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 182
+      "line": 193
     },
     {
       "package": "controller/peer",
       "identifier": "TestMonitorStillDiscoveredAndCooldown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/monitor_test.go",
-      "line": 89
+      "line": 95
     },
     {
       "package": "controller/peer",
@@ -17032,6 +17137,13 @@
     },
     {
       "package": "im",
+      "identifier": "TestClientReportDataRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/client_parity_matterjs_test.go",
+      "line": 307
+    },
+    {
+      "package": "im",
       "identifier": "TestCommandPathRejectsMissingCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/im_test.go",
@@ -17427,14 +17539,14 @@
       "identifier": "TestIMWireFixtures_ByDesignCoverage",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/wire_fixtures_parity_test.go",
-      "line": 410
+      "line": 413
     },
     {
       "package": "im",
       "identifier": "TestIMWireFixtures_F3Regression",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/wire_fixtures_parity_test.go",
-      "line": 371
+      "line": 374
     },
     {
       "package": "im",
@@ -17673,6 +17785,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/pase_authmode_acl_test.go",
       "line": 84
+    },
+    {
+      "package": "im",
+      "identifier": "TestParityClientDecoderFixtures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/client_parity_matterjs_test.go",
+      "line": 265
+    },
+    {
+      "package": "im",
+      "identifier": "TestParityClientRequestFixtures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/client_parity_matterjs_test.go",
+      "line": 237
     },
     {
       "package": "im",

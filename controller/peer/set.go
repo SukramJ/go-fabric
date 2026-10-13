@@ -63,6 +63,13 @@ type Context struct {
 	// Updated is called after a peer's descriptor was saved — matter.js
 	// Peer.updated (Peer.ts:190-195, :575-579).
 	Updated func(p *Peer)
+	// SessionMigrated is called after the address monitor moved a session
+	// to another of the peer's addresses: subscriptions still target the
+	// old address for the peer's reports, so matter.js closes them to be
+	// re-established (PeerAddressMonitor.ts:244-246,
+	// ClientSubscriptions.closeForPeer) — interaction.Subscriptions.CloseForPeer.
+	// Nil ignores it.
+	SessionMigrated func(addr handshake.PeerAddress)
 	// EstablishmentUnresponsive is called when a CASE establishment
 	// attempt retransmitted past the MRP budget — matter.js
 	// Peer.establishmentUnresponsive (Peer.ts:197-204).

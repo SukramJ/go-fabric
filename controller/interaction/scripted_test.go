@@ -291,8 +291,9 @@ func attrStatus(path im.ConcreteAttributePath, status im.StatusCode) func(e *tlv
 
 // TestReadTwoChunks: the ReadRequest's shape (TlvReadRequest: the paths,
 // fabric-filtered, the revision), a report in two chunks with a list
-// continued by a null ListIndex, the Success after the first chunk and
-// after the last (InteractionMessenger.ts:938-972).
+// that ends the first and is continued by a null ListIndex in the second,
+// the Success after the first chunk and after the last
+// (InteractionMessenger.ts:938-972).
 func TestReadTwoChunks(t *testing.T) {
 	t.Parallel()
 	s := newScripted(t)
@@ -316,13 +317,15 @@ func TestReadTwoChunks(t *testing.T) {
 	}
 	appendPath := parts
 	appendPath.ListAppend = true
+	// The list ends the first chunk and continues in the second
+	// (InputChunk.ts:233-241).
 	s.reply(t, req, im.InteractionModelProtocolID, im.OpcodeReportData, reportChunk(t, true, false,
+		data(vendor, func(e *tlv.Encoder, tag tlv.Tag) { e.PutUint(tag, 0xFFF1) }),
 		data(parts, func(e *tlv.Encoder, tag tlv.Tag) {
 			e.StartArray(tag)
 			e.PutUint(tlv.AnonymousTag(), 1)
 			_ = e.EndContainer()
 		}),
-		data(vendor, func(e *tlv.Encoder, tag tlv.Tag) { e.PutUint(tag, 0xFFF1) }),
 	))
 	ack := s.next(t)
 	if ack.proto.Opcode != im.OpcodeStatusResponse || decodeStatus(t, ack.payload) != im.StatusSuccess {
@@ -345,7 +348,7 @@ func TestReadTwoChunks(t *testing.T) {
 	if !ok || len(list.Children) != 2 || list.Children[1].El.Uint != 2 {
 		t.Fatalf("PartsList %+v", list)
 	}
-	if v, ok := r.r.Value(0, 0x0028, 0x0002); !ok || v.El.Uint != 0xFFF1 || r.r.Attributes[1].DataVersion != 7 {
+	if v, ok := r.r.Value(0, 0x0028, 0x0002); !ok || v.El.Uint != 0xFFF1 || r.r.Attributes[0].DataVersion != 7 {
 		t.Fatalf("VendorID %+v", v)
 	}
 	if _, ok := r.r.Value(1, 0x0028, 0x0002); ok {
@@ -392,5 +395,50 @@ func TestReadSuppressedAndRefused(t *testing.T) {
 	s.reply(t, s.next(t), 0x0001, 0x40, nil)
 	if err := await(t, done); !errors.Is(err, interaction.ErrUnexpectedMessage) {
 		t.Fatalf("foreign protocol: %v", err)
+	}
+}
+
+// TestReadEvents: ReadWith sends the event paths, the event filters and the
+// DataVersionFilters, unfiltered when asked (Read.ts:40, :171-176), and
+// decodes the event reports (InputChunk.ts:356-432).
+func TestReadEvents(t *testing.T) {
+	t.Parallel()
+	s := newScripted(t)
+	c := interaction.New(s.mgr, s.session, nil)
+	ev := im.ConcreteEventPath{Endpoint: 0, Cluster: 0x0028, Event: 0, HasEndpoint: true, HasCluster: true, HasEvent: true}
+	type readResult struct {
+		r   *interaction.Report
+		err error
+	}
+	done := make(chan readResult, 1)
+	go func() {
+		r, err := c.ReadWith(context.Background(), interaction.ReadRequest{
+			Events:             []im.ConcreteEventPath{ev},
+			EventFilters:       []im.EventMinimumNumber{{EventMin: 3}},
+			DataVersionFilters: []im.DataVersionFilter{{Endpoint: 0, Cluster: 0x28, DataVersion: 4}},
+			NoFabricFilter:     true,
+		})
+		done <- readResult{r, err}
+	}()
+	req := s.next(t)
+	rr, err := im.UnmarshalReadRequestTLV(tlv.NewDecoder(req.payload))
+	if err != nil || rr.FabricFiltered || len(rr.AttributeRequests) != 0 || len(rr.EventRequests) != 1 || len(rr.EventFilters) != 1 ||
+		rr.EventFilters[0].EventMin != 3 || len(rr.DataVersionFilters) != 1 {
+		t.Fatalf("ReadRequest %+v (%v)", rr, err)
+	}
+	s.reply(t, req, im.InteractionModelProtocolID, im.OpcodeReportData, encode(t, func(e *tlv.Encoder) {
+		im.ReportData{EventReports: []im.EventReport{{Path: ev, Number: 7, Priority: 2, Timestamp: 1234, Data: im.AttributeValue{Value: uint64(1)}}}, SuppressResponse: true}.
+			MarshalTLV(e, func(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
+				e.StartStruct(tag)
+				e.PutUint(tlv.ContextTag(0), v.Value.(uint64))
+				_ = e.EndContainer()
+			})
+	}))
+	r := await(t, done)
+	if r.err != nil || len(r.r.Events) != 1 {
+		t.Fatalf("report %+v, %v", r.r, r.err)
+	}
+	if e := r.r.Events[0]; e.Number != 7 || e.Priority != 2 || e.Timestamp != 1234 || e.EpochTimestamp == nil || !e.HasValue || len(e.Value.Children) != 1 {
+		t.Fatalf("event %+v", e)
 	}
 }

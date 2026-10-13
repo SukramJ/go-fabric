@@ -164,8 +164,8 @@ func (m *monitor) verify(ctx context.Context, reason ReachabilityReason) (bool, 
 }
 
 // run is one verification (PeerAddressMonitor.ts:129-267, the ICD branch
-// aside). The subscription close after a migration (:244-246) belongs to
-// stage 3's client interaction.
+// aside). The subscription close after a migration (:244-246) is the
+// set's SessionMigrated hook.
 func (m *monitor) run(reason ReachabilityReason) bool {
 	p := m.p
 	ctx := p.ctx
@@ -223,6 +223,9 @@ func (m *monitor) run(reason ReachabilityReason) bool {
 				log.Info("matter.controller.peer.session_migrated", slog.String("to", a.String()))
 				s.SetAddr(a.UDPAddr())
 				p.followAddress(s)
+				if migrated := p.set.ctx.SessionMigrated; migrated != nil {
+					migrated(p.address)
+				}
 				m.resetBackoff()
 				return true
 			}

@@ -70,7 +70,7 @@ type Result struct {
 //
 // Errors of the exchange layer pass through unchanged.
 func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable, opts InvokeOptions) (Result, error) {
-	m, err := c.begin()
+	m, err := c.begin(ctx, ExchangeOptions{})
 	if err != nil {
 		return Result{}, err
 	}
@@ -161,10 +161,7 @@ func readFields(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element) (any
 // milliseconds, [255] InteractionModelRevision).
 func (m *messenger) timed(ctx context.Context, timeout time.Duration) error {
 	enc := tlv.NewEncoder()
-	enc.StartStruct(tlv.AnonymousTag())
-	enc.PutUint(tlv.ContextTag(0), uint64(min(timeout.Milliseconds(), 0xFFFF))) //nolint:gosec // bounded to uint16 above
-	enc.PutUint(tlv.ContextTag(0xFF), uint64(im.MatterInteractionModelRevision))
-	_ = enc.EndContainer()
+	im.TimedRequest{TimeoutMs: uint16(min(timeout.Milliseconds(), 0xFFFF))}.MarshalTLV(enc) //nolint:gosec // bounded to uint16
 	req, err := enc.Bytes()
 	if err != nil {
 		return err

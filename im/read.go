@@ -78,15 +78,23 @@ type ReadRequest struct {
 	DataVersionFilters []DataVersionFilter
 }
 
-// MarshalTLV encodes r at the top level (always anonymous tag).
+// MarshalTLV encodes r at the top level (always anonymous tag) as a
+// client sends it. Mirrors matter.js
+// packages/types/src/protocol/messages/TlvReadRequest.ts:19-35 at
+// 0ceb202d with the request action/request/Read.ts:40-89 builds: the
+// optional lists — AttributeRequests (0), EventRequests (1), EventFilters
+// (2) — only when they have members, IsFabricFiltered (3) always,
+// DataVersionFilters (4) only with members, and InteractionModelRevision
+// (0xFF) [MatterInteractionModelRevision]
+// (packages/model/src/common/Specification.ts:124), in field order.
 func (r ReadRequest) MarshalTLV(enc *tlv.Encoder) {
 	enc.StartStruct(tlv.AnonymousTag())
-	enc.StartArray(tlv.ContextTag(tagReadReqAttributeRequests))
-	for _, p := range r.AttributeRequests {
-		p.MarshalTLV(enc, tlv.AnonymousTag())
-	}
-	_ = enc.EndContainer()
+	marshalAttributePaths(enc, tagReadReqAttributeRequests, r.AttributeRequests)
+	marshalEventPaths(enc, tagReadReqEventRequests, r.EventRequests)
+	marshalEventFilters(enc, tagReadReqEventFilters, r.EventFilters)
 	enc.PutBool(tlv.ContextTag(tagReadReqFabricFiltered), r.FabricFiltered)
+	marshalDataVersionFilters(enc, tagReadReqDataVersionFilters, r.DataVersionFilters)
+	enc.PutUint(tlv.ContextTag(tagInteractionModelRevision), uint64(MatterInteractionModelRevision))
 	_ = enc.EndContainer()
 }
 
@@ -299,6 +307,15 @@ type AttributeReport struct {
 	// the marshaller default to 1" — controllers tolerate any
 	// non-zero version on first read.
 	DataVersion uint32
+	// HasDataVersion reports that a received AttributeDataIB carried a
+	// DataVersion — it is optional on the wire (TlvAttributeReportData.ts).
+	// Set by [UnmarshalReportDataTLV]; the encoder ignores it.
+	HasDataVersion bool
+	// TagCompression is the received path's EnableTagCompression flag
+	// (TlvAttributePath.ts tag 0): the omitted path fields are the
+	// previous path's (InputChunk.ts:252-273). Set by
+	// [UnmarshalReportDataTLV]; the encoder ignores it.
+	TagCompression bool
 }
 
 // AttributeValueWriter is the function the Dispatcher's caller
