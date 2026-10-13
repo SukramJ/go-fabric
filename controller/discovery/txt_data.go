@@ -4,6 +4,7 @@
 package discovery
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -120,15 +121,15 @@ func ParseTXTData(p Parameters) TXTData {
 		}
 	}
 	if v, ok := parseTxtDecimalPtr(p, "DT", maxUint32); ok {
-		dt := uint32(v) //nolint:gosec // v <= maxUint32 by ParseTxtDecimal
+		dt := narrow32(v)
 		dd.DT = &dt
 	}
 	if v, ok := parseTxtDecimalPtr(p, "PH", maxUint32); ok && v != 0 {
-		ph := uint32(v) //nolint:gosec // v <= maxUint32 by ParseTxtDecimal
+		ph := narrow32(v)
 		dd.PH = &ph
 	}
 	if v, ok := parseTxtDecimalPtr(p, "ICD", 1); ok {
-		icd := uint8(v) //nolint:gosec // v <= 1 by ParseTxtDecimal
+		icd := narrow8(v)
 		dd.ICD = &icd
 	}
 	if v, ok := parseTxtDecimalPtr(p, "T", maxUint16); ok {
@@ -140,7 +141,7 @@ func ParseTXTData(p Parameters) TXTData {
 		if !ok || (zeroAbsent && v == 0) {
 			return nil
 		}
-		d := time.Duration(v) * time.Millisecond //nolint:gosec // v <= 3 600 000 by ParseTxtDecimal
+		d := time.Duration(narrow32(v)) * time.Millisecond
 		return &d
 	}
 	dd.SII = interval("SII", maxSessionIntervalMs, false)
@@ -152,4 +153,28 @@ func ParseTXTData(p Parameters) TXTData {
 // TXTData parses the service's TXT parameters ([ParseTXTData]).
 func (s *Service) TXTData() TXTData {
 	return ParseTXTData(s.Parameters())
+}
+
+// narrow32, narrow16 and narrow8 narrow a value [ParseTxtDecimal] already
+// held to the limit; the guard is restated on a constant so a static
+// analyser sees the bound too. Saturation is unreachable.
+func narrow32(v uint64) uint32 {
+	if v > math.MaxUint32 {
+		return math.MaxUint32
+	}
+	return uint32(v)
+}
+
+func narrow16(v uint64) uint16 {
+	if v > math.MaxUint16 {
+		return math.MaxUint16
+	}
+	return uint16(v)
+}
+
+func narrow8(v uint64) uint8 {
+	if v > math.MaxUint8 {
+		return math.MaxUint8
+	}
+	return uint8(v)
 }

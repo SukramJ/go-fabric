@@ -213,8 +213,8 @@ func buildDevice(nm *Name) (Device, bool) {
 	return Device{
 		TXTData:    dd,
 		InstanceID: instance,
-		D:          uint16(d), //nolint:gosec // d <= 0xFFF by ParseTxtDecimal
-		CM:         uint8(cm), //nolint:gosec // cm <= 0xFF by ParseTxtDecimal
+		D:          narrow16(d),
+		CM:         narrow8(cm),
 		Hostname:   hostnameOf(nm),
 	}, true
 }
