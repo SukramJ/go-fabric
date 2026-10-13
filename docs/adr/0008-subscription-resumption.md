@@ -1,6 +1,10 @@
 # ADR 0008 — Server-side subscription persistence and re-establishment after restart
 
-- **Status**: Accepted
+- **Status**: Accepted. Note (2026-10-13): the "one bounded exception" this
+  ADR made to the no-controller rule is overtaken by
+  [ADR 0020](./0020-commissioner-and-controller-role.md); once its stage 1
+  lands, the initiator here becomes the first user of `controller/`'s
+  session client. The behaviour this ADR specifies does not change.
 - **Date**: 2026-10-04
 - **Related**:
   [ADR 0003 — Sigma resumption extraction](./0003-sigma-resume-extraction.md),

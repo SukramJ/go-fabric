@@ -25,6 +25,7 @@ an oversight to the next reader — including choices to *not* do something.
 | [0017](./0017-generated-default-cluster-server.md) | A generated default cluster server in `cluster/spec`, so a cluster without matter.js logic costs its definition and a host port; the hand-written schema tables are generated too | accepted, implemented in #40 |
 | [0018](./0018-device-layer-and-node-facade.md) | A device layer `device/` generated from the device-type model and a `node/` facade — the port of matter.js `devices/`, `endpoints/` and `ServerNode`; the existing `contract/` level stays beneath it, foreign-source projection stays outside | proposed (concept phase 4) |
 | [0019](./0019-tcp-bdx-and-the-ota-requestor.md) | TCP (full large-payload path), BDX and the complete OTA Software Update Requestor enter the scope in wave 5; DiagnosticLogs stays without BDX (matter.js has none); the OTA Provider stays out. | Accepted |
+| [0020](./0020-commissioner-and-controller-role.md) | The commissioner and controller role enters the scope as `controller/`, a sibling of `bridge/`, ported from matter.js in six stages; on-network only; the responder side and `contract/` are unchanged; supersedes the no-controller non-goal (CLAUDE.md, comparison §Non-goals 1, ADR 0008's exception, concept v1 §F.1) | proposed (concept v2 phase 7) |
 
 ## Provenance
 

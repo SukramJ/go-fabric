@@ -506,6 +506,10 @@ Entscheidung steht, und was es kosten würde, ihn später hereinzuholen.
 
 ### F.1 Rollen und Transport
 
+> Stand 2026-10-13: die ersten beiden Zeilen (Controller-/Commissioner-
+> Rolle, Minimal-Controller) sind durch [ADR 0020](./adr/0020-commissioner-and-controller-role.md)
+> (Konzept v2, Entscheidung 0.1) überholt; der Rest gilt.
+
 | Punkt | Warum draußen | Quelle | Weg herein |
 | --- | --- | --- | --- |
 | Controller- und Commissioner-Rolle (`ClientNode`, `DeviceCommissioner`, mDNS-Browsing, DCL-Client) | Eine Bridge antwortet; sie entdeckt, kommissioniert und steuert keine anderen Nodes. | `docs/matterjs-comparison.md` Non-goal 1 | Zweite Zustandsmaschine, Zertifikats-Aussteller-Rolle, Gerätecache. Ein anderes Produkt, kein Ausbau. |
