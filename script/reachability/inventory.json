@@ -184,8 +184,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10979,
-    "reachable": 7692,
+    "total_exported": 10980,
+    "reachable": 7693,
     "whitelisted": 3282,
     "unreachable": 5
   },
@@ -14033,7 +14033,7 @@
       "identifier": "TestClusterDecoded",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
-      "line": 107
+      "line": 114
     },
     {
       "package": "controller/client",
@@ -14054,7 +14054,7 @@
       "identifier": "TestEveryGeneratedClusterIsKnown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
-      "line": 146
+      "line": 153
     },
     {
       "package": "controller/client",
