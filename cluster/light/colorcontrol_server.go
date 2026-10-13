@@ -198,7 +198,8 @@ type Color struct {
 
 // ColorWriter is the optional sink a [ColorControlServer] drives with the
 // whole colour whenever it changes: a command that applies at once, each
-// step of a transition, a colour mode switch and the colour loop. It is
+// step of a transition and the colour loop — not a colour mode switch,
+// which converts the attributes while the device keeps its colour. It is
 // how a host whose device takes x/y or hue and saturation receives them; a
 // [ColorTemperatureWriter], when one is wired as well, still receives
 // every colour temperature. Errors behave as for the

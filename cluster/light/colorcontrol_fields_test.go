@@ -199,34 +199,38 @@ func TestColorControlStopMoveStepWithoutFields(t *testing.T) {
 	}
 }
 
-// TestColorControlRefusedModeSwitch: a ColorWriter that refuses the
-// converted colour of a mode switch fails every command that switches,
-// and the state keeps its mode.
+// TestColorControlRefusedModeSwitch: a mode switch converts the attributes
+// without the ColorWriter (issue #79); a command whose own movement the
+// writer then refuses fails and rolls the switch back, so the state keeps
+// its mode. A movement at a rate writes nothing before its first step, so
+// such a command succeeds and the mode switches (matter.js commits the
+// switch; the device is written by the steps).
 func TestColorControlRefusedModeSwitch(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		start light.ColorMode
-		cmd   uint32
-		req   any
+		start    light.ColorMode
+		cmd      uint32
+		req      any
+		switches bool
 	}{
-		{light.ColorModeXY, ccdef.CmdMoveToHue, ccdef.MoveToHueRequest{Hue: 1}},
-		{light.ColorModeXY, ccdef.CmdMoveHue, ccdef.MoveHueRequest{MoveMode: 1, Rate: 1}},
-		{light.ColorModeXY, ccdef.CmdStepHue, ccdef.StepHueRequest{StepMode: 1, StepSize: 1}},
-		{light.ColorModeXY, ccdef.CmdMoveToSaturation, ccdef.MoveToSaturationRequest{Saturation: 1}},
-		{light.ColorModeXY, ccdef.CmdMoveSaturation, ccdef.MoveSaturationRequest{MoveMode: 1, Rate: 1}},
-		{light.ColorModeXY, ccdef.CmdStepSaturation, ccdef.StepSaturationRequest{StepMode: 1, StepSize: 1}},
-		{light.ColorModeXY, ccdef.CmdMoveToHueAndSaturation, ccdef.MoveToHueAndSaturationRequest{Hue: 1}},
-		{light.ColorModeXY, ccdef.CmdEnhancedMoveToHue, ccdef.EnhancedMoveToHueRequest{EnhancedHue: 1}},
-		{light.ColorModeXY, ccdef.CmdEnhancedMoveHue, ccdef.EnhancedMoveHueRequest{MoveMode: 1, Rate: 1}},
-		{light.ColorModeXY, ccdef.CmdEnhancedStepHue, ccdef.EnhancedStepHueRequest{StepMode: 1, StepSize: 1}},
-		{light.ColorModeXY, ccdef.CmdEnhancedMoveToHueAndSaturation, ccdef.EnhancedMoveToHueAndSaturationRequest{EnhancedHue: 1}},
-		{light.ColorModeXY, ccdef.CmdColorLoopSet, ccdef.ColorLoopSetRequest{UpdateFlags: ccdef.UpdateFlagsUpdateAction, Action: 1}},
-		{light.ColorModeXY, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300}},
-		{light.ColorModeXY, ccdef.CmdMoveColorTemperature, ccdef.MoveColorTemperatureRequest{MoveMode: 1, Rate: 1}},
-		{light.ColorModeXY, ccdef.CmdStepColorTemperature, ccdef.StepColorTemperatureRequest{StepMode: 1, StepSize: 1}},
-		{light.ColorModeHueSaturation, ccdef.CmdMoveToColor, ccdef.MoveToColorRequest{ColorX: 1}},
-		{light.ColorModeHueSaturation, ccdef.CmdMoveColor, ccdef.MoveColorRequest{RateX: 1}},
-		{light.ColorModeHueSaturation, ccdef.CmdStepColor, ccdef.StepColorRequest{StepX: 1}},
+		{light.ColorModeXY, ccdef.CmdMoveToHue, ccdef.MoveToHueRequest{Hue: 1}, false},
+		{light.ColorModeXY, ccdef.CmdMoveHue, ccdef.MoveHueRequest{MoveMode: 1, Rate: 1}, true},
+		{light.ColorModeXY, ccdef.CmdStepHue, ccdef.StepHueRequest{StepMode: 1, StepSize: 1}, false},
+		{light.ColorModeXY, ccdef.CmdMoveToSaturation, ccdef.MoveToSaturationRequest{Saturation: 1}, false},
+		{light.ColorModeXY, ccdef.CmdMoveSaturation, ccdef.MoveSaturationRequest{MoveMode: 1, Rate: 1}, true},
+		{light.ColorModeXY, ccdef.CmdStepSaturation, ccdef.StepSaturationRequest{StepMode: 1, StepSize: 1}, false},
+		{light.ColorModeXY, ccdef.CmdMoveToHueAndSaturation, ccdef.MoveToHueAndSaturationRequest{Hue: 1}, false},
+		{light.ColorModeXY, ccdef.CmdEnhancedMoveToHue, ccdef.EnhancedMoveToHueRequest{EnhancedHue: 1}, false},
+		{light.ColorModeXY, ccdef.CmdEnhancedMoveHue, ccdef.EnhancedMoveHueRequest{MoveMode: 1, Rate: 1}, true},
+		{light.ColorModeXY, ccdef.CmdEnhancedStepHue, ccdef.EnhancedStepHueRequest{StepMode: 1, StepSize: 1}, false},
+		{light.ColorModeXY, ccdef.CmdEnhancedMoveToHueAndSaturation, ccdef.EnhancedMoveToHueAndSaturationRequest{EnhancedHue: 1}, false},
+		{light.ColorModeXY, ccdef.CmdColorLoopSet, ccdef.ColorLoopSetRequest{UpdateFlags: ccdef.UpdateFlagsUpdateAction, Action: 1}, false},
+		{light.ColorModeXY, ccdef.CmdMoveToColorTemperature, ccdef.MoveToColorTemperatureRequest{ColorTemperatureMireds: 300}, false},
+		{light.ColorModeXY, ccdef.CmdMoveColorTemperature, ccdef.MoveColorTemperatureRequest{MoveMode: 1, Rate: 1}, false},
+		{light.ColorModeXY, ccdef.CmdStepColorTemperature, ccdef.StepColorTemperatureRequest{StepMode: 1, StepSize: 1}, false},
+		{light.ColorModeHueSaturation, ccdef.CmdMoveToColor, ccdef.MoveToColorRequest{ColorX: 1}, false},
+		{light.ColorModeHueSaturation, ccdef.CmdMoveColor, ccdef.MoveColorRequest{RateX: 1}, true},
+		{light.ColorModeHueSaturation, ccdef.CmdStepColor, ccdef.StepColorRequest{StepX: 1}, false},
 	} {
 		start := tc.start
 		srv := light.NewColorControlServer(light.ColorControlServerConfig{
@@ -234,11 +238,21 @@ func TestColorControlRefusedModeSwitch(t *testing.T) {
 			InitialHue: 100, InitialSaturation: 100,
 		})
 		srv.SetColorWriter(&colorSink{err: context.Canceled})
-		if _, err := srv.MatterInvoke(context.Background(), tc.cmd, tc.req); err == nil {
-			t.Errorf("command 0x%02X switched mode past a refusing writer", tc.cmd)
+		_, err := srv.MatterInvoke(context.Background(), tc.cmd, tc.req)
+		if tc.switches {
+			if err != nil {
+				t.Errorf("command 0x%02X failed without a write: %v", tc.cmd, err)
+			}
+			if srv.Color().Mode == start {
+				t.Errorf("command 0x%02X did not switch the mode", tc.cmd)
+			}
+			continue
+		}
+		if err == nil {
+			t.Errorf("command 0x%02X succeeded past a refusing writer", tc.cmd)
 		}
 		if srv.Color().Mode != start {
-			t.Errorf("command 0x%02X left mode %d", tc.cmd, srv.Color().Mode)
+			t.Errorf("command 0x%02X left mode %d, want the switch rolled back", tc.cmd, srv.Color().Mode)
 		}
 	}
 	for _, err := range []error{

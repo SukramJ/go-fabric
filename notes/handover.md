@@ -731,3 +731,15 @@ for a host-inferred target, OperationalStatus left to the host
 (`BD-Matter-WindowCovering-MoverOperationalStatus` unchanged), with the
 #63 overlap rule: a target set while a command's Mover runs stands when
 the Mover then fails. Branch `issues/cover-tilt-and-target`.
+
+**Side PR (owner, 2026-10-13): issue #79.** `light.ColorControlServer`'s
+mode switch converts the attributes without the `ColorWriter`
+(`setColorMode` on a state-only `convert`), `MatterInvoke` rolls a failed
+command back to the state it started from (matter.js's transaction), and
+`Set` matches an echo against the in-flight colour in the device's colour
+mode within one attribute unit (`confirms`); an echo that contradicts the
+write bumps `setGen` even when it equals the stored colour. Follow-up not
+done: `moveToColorLogic` and `moveToHueAndSaturationLogic` still apply x
+then y (hue then saturation) as two updates, so an HS device sees one
+intermediate colour per x/y command; a batched apply in the transition
+engine would remove it.

@@ -8,20 +8,44 @@ import (
 	"math"
 )
 
-// setColorMode is matter.js setColorMode: a command of another colour mode
-// first switches to it — every colour movement stops and the current
-// colour is converted into the new mode's attributes (switchColorMode) —
-// and ColorMode and EnhancedColorMode both take the new mode.
-func (s *ColorControlServer) setColorMode(ctx context.Context, mode ColorMode) error {
+// setColorMode is matter.js setColorMode (ColorControlServer.ts:1411-1420
+// at 0ceb202d): a command of another colour mode first switches to it —
+// every colour movement stops and the current colour is converted into
+// the new mode's attributes (switchColorMode, :1454-1540) — and ColorMode
+// and EnhancedColorMode both take the new mode. The switch changes state
+// only, as matter.js's does: the device shows the same colour before and
+// after, so the writers are not driven with the converted colour; the
+// command's own movement writes the target (issue #79). A command whose
+// movement then fails rolls the switch back ([ColorControlServer.MatterInvoke]).
+func (s *ColorControlServer) setColorMode(_ context.Context, mode ColorMode) error {
 	if s.state().mode == mode {
 		return nil
 	}
 	s.stopAllColorMovement()
-	return s.update(ctx, func(st *colorState) {
+	s.convert(func(st *colorState) {
 		s.switchColorMode(st, st.mode, mode)
 		st.mode = mode
 		st.enhancedMode = mode
 	})
+	return nil
+}
+
+// convert changes the colour state without the writers: the attributes
+// take the new values and what changed is reported.
+func (s *ColorControlServer) convert(change func(st *colorState)) {
+	s.commit.Lock()
+	defer s.commit.Unlock()
+	s.mu.Lock()
+	prev := s.st
+	next := prev
+	change(&next)
+	if next == prev {
+		s.mu.Unlock()
+		return
+	}
+	s.st = next
+	s.mu.Unlock()
+	s.report(prev, next)
 }
 
 // setEnhancedColorMode is matter.js setEnhancedColorMode: the enhanced hue
@@ -37,7 +61,8 @@ func (s *ColorControlServer) setEnhancedColorMode(ctx context.Context, mode Colo
 	if err := s.setColorMode(ctx, colorModeOf(mode)); err != nil {
 		return err
 	}
-	return s.update(ctx, func(st *colorState) { st.enhancedMode = mode })
+	s.convert(func(st *colorState) { st.enhancedMode = mode })
+	return nil
 }
 
 // switchColorMode is matter.js switchColorMode: the colour of the old mode

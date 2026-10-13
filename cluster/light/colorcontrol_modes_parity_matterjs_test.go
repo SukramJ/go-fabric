@@ -492,8 +492,16 @@ func TestColorModeSwitchConverts(t *testing.T) {
 	if read(t, srv, ccdef.AttrCurrentX) != uint64(jsRound(hx*65536)) || read(t, srv, ccdef.AttrCurrentY) != uint64(jsRound(hy*65536)) {
 		t.Error("HS → XY")
 	}
-	if c := sink.last(); c.Mode != light.ColorModeXY {
-		t.Errorf("the ColorWriter's last colour is in mode %d, want XY", c.Mode)
+	// The switch converts the attributes without the writer: the device
+	// keeps its colour (matter.js switchColorMode changes state only,
+	// ColorControlServer.ts:1454-1540; issue #79). MoveColor at rate 1
+	// without a transition engine writes nothing, so the last write is
+	// still the hue and saturation command's.
+	if c := sink.last(); c.Mode != light.ColorModeHueSaturation {
+		t.Errorf("the ColorWriter's last colour is in mode %d, want HS (a mode switch is not written)", c.Mode)
+	}
+	if read(t, srv, ccdef.AttrColorMode) != uint64(light.ColorModeXY) {
+		t.Error("the mode did not switch to XY")
 	}
 	// XY → HS through xyToHsv (BD-Matter-ColorControl-XYToHS).
 	x, y := read(t, srv, ccdef.AttrCurrentX), read(t, srv, ccdef.AttrCurrentY)
