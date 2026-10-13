@@ -183,9 +183,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10854,
-    "reachable": 7614,
-    "whitelisted": 3235,
+    "total_exported": 10862,
+    "reachable": 7615,
+    "whitelisted": 3242,
     "unreachable": 5
   },
   "by_package": [
@@ -14638,6 +14638,20 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestHandlerNotForUnsecuredOrSecureChannel",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 106
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestHandlerTakesPeerOpenedIMExchange",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 51
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestManagerHandlePeerLossAsOf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/peerloss_test.go",
@@ -14659,38 +14673,52 @@
     },
     {
       "package": "controller/exchange",
+      "identifier": "TestPBKDFParamRequestIsRefused",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 233
+    },
+    {
+      "package": "controller/exchange",
       "identifier": "TestParityMRPConstants",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 22
+      "line": 23
     },
     {
       "package": "controller/exchange",
       "identifier": "TestParityMaxPeerResponseTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 78
+      "line": 79
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestParityPeerOpenedExchangeDispatch",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/parity_matterjs_test.go",
+      "line": 192
     },
     {
       "package": "controller/exchange",
       "identifier": "TestParityRetransmissionInterval",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 50
+      "line": 51
     },
     {
       "package": "controller/exchange",
       "identifier": "TestParitySessionParameterFallbacks",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 99
+      "line": 100
     },
     {
       "package": "controller/exchange",
       "identifier": "TestParityStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/parity_matterjs_test.go",
-      "line": 143
+      "line": 144
     },
     {
       "package": "controller/exchange",
@@ -14705,6 +14733,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 590
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestPeerOpenedExchangeOnClosingSessionDeclined",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 260
     },
     {
       "package": "controller/exchange",
@@ -14782,6 +14817,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 670
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestSigma1ReachesHandlerOnInboundSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 159
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestSigma1WithoutHandlerIsAcknowledged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/handler_test.go",
+      "line": 213
     },
     {
       "package": "controller/exchange",

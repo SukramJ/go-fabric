@@ -18,10 +18,12 @@
 // reliably and returns once the peer acknowledged, [Exchange.Next]
 // waits for the peer's next message, [Exchange.Close] ends it.
 //
-// Scope: UDP only (no TCP, which is stage 3 material) and unicast only
-// (no group sessions). Of the exchanges a peer opens only the Secure
-// Channel's are served — a CloseSession ends the session, as matter.js's
-// StatusReportOnlySecureChannelProtocol does; any other protocol's
-// (an IM report before stage 3) is acknowledged when it asks for an
-// acknowledgement and is otherwise dropped.
+// Scope: UDP only and unicast only (no group sessions). An exchange a
+// peer opens reaches a [ProtocolHandler] installed with
+// [Manager.SetProtocolHandler] (ADR 0020, stage 3): on a secure session
+// any protocol's but the Secure Channel's, whose CloseSession handling is
+// built in as matter.js's StatusReportOnlySecureChannelProtocol; on an
+// unsecured session the peer opens, a Sigma1 for the CASE responder, a
+// PBKDFParamRequest being refused. A message no handler takes is
+// acknowledged when it asks for an acknowledgement and otherwise dropped.
 package exchange

@@ -316,6 +316,18 @@ pseudo-version of `main`.
   against the CSA test trust store and reads VendorID back over CASE; it
   needs only the daemon binary and multicast, and skips without the
   latter.
+- `controller/exchange.Manager.SetProtocolHandler(protocol,
+  ProtocolHandler)` (ADR 0020, stage 3; matter.js `ExchangeManager.ts:391-473`
+  at `0ceb202d`): the first message of an exchange a peer opens reaches the
+  protocol's handler on a goroutine of its own, the exchange closed when
+  it returns. On a secure session any protocol but the Secure Channel
+  (whose CloseSession handling stays built in); on an unsecured session
+  the peer opens — now a session of its own, keyed by the peer's source
+  node id and released once no exchange holds it — a Sigma1 for the CASE
+  responder, and a PBKDFParamRequest is answered with StatusReport
+  InvalidParam (`SecureChannelProtocol.ts:129-137`). Anything else is
+  acknowledged and dropped as before. `Exchange.ConsiderClosed` and
+  `Session.IsInbound` are new.
 
 ### Changed
 

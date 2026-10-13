@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -178,4 +179,58 @@ func TestParityStatusReport(t *testing.T) {
 	if pu.Error() == "" || pm.Error() == "" || pm.Is(ErrFlow) {
 		t.Fatal("error strings")
 	}
+}
+
+// TestParityPeerOpenedExchangeDispatch: which handler a peer-opened
+// exchange's first message reaches — ExchangeManager.ts:391-440 with the
+// requiresSecureSession of the handlers matter.js installs: the Secure
+// Channel handler takes any session (SecureChannelProtocol.ts:34, undefined)
+// and dispatches Sigma1 to the CaseServer (:146-148) and a
+// PBKDFParamRequest without a PASE server to an InvalidParam answer
+// (:129-137); the IM handlers require a secure session
+// (ClientSubscriptionHandler.ts:25, true).
+func TestParityPeerOpenedExchangeDispatch(t *testing.T) {
+	t.Parallel()
+	m, _, _ := newTestManager(t, Config{})
+	installed := func(*Exchange, *Message) {}
+	m.SetProtocolHandler(mrp.SecureChannelProtocolID, installed)
+	m.SetProtocolHandler(im.InteractionModelProtocolID, installed)
+	unsecured := &Session{}
+	secure := &Session{secure: mustChannel(t)}
+	for _, c := range []struct {
+		name     string
+		s        *Session
+		protocol uint16
+		opcode   uint8
+		want     string
+	}{
+		{"Sigma1 unsecured (SecureChannelProtocol.ts:146-148)", unsecured, mrp.SecureChannelProtocolID, mrp.SCOpcodeSigma1, "installed"},
+		{"PBKDFParamRequest unsecured (:129-137)", unsecured, mrp.SecureChannelProtocolID, mrp.SCOpcodePBKDFParamRequest, "refusal"},
+		{"StatusReport unsecured (:152-153, no answer but the ack)", unsecured, mrp.SecureChannelProtocolID, mrp.SCOpcodeStatusReport, "none"},
+		{"Sigma1 secure (built-in StatusReport-only handler)", secure, mrp.SecureChannelProtocolID, mrp.SCOpcodeSigma1, "none"},
+		{"ReportData secure (ClientSubscriptionHandler.ts:25)", secure, im.InteractionModelProtocolID, im.OpcodeReportData, "installed"},
+		{"ReportData unsecured (requiresSecureSession mismatch, ExchangeManager.ts:393-405)", unsecured, im.InteractionModelProtocolID, im.OpcodeReportData, "none"},
+	} {
+		h := m.handlerFor(c.s, &Message{ProtocolID: c.protocol, Opcode: c.opcode})
+		got := "none"
+		switch {
+		case h == nil:
+		case c.protocol == mrp.SecureChannelProtocolID && c.opcode == mrp.SCOpcodePBKDFParamRequest:
+			got = "refusal"
+		default:
+			got = "installed"
+		}
+		if got != c.want {
+			t.Errorf("%s: %s, want %s", c.name, got, c.want)
+		}
+	}
+}
+
+func mustChannel(t *testing.T) *channel.Session {
+	t.Helper()
+	ch, err := channel.New(newSecureConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ch
 }

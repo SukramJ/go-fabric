@@ -38,11 +38,16 @@ type Session struct {
 	closing              chan struct{}
 	closingOnce          sync.Once
 
-	// Unsecured session state: our ephemeral initiator node id and the
-	// reception window of the peer's counters (matter.js
+	// Unsecured session state: the initiator's ephemeral node id — ours,
+	// or the peer's on an inbound session — and the reception window of
+	// the peer's counters (matter.js
 	// MessageReceptionStateUnencryptedWithRollover, UnsecuredSession.ts:31).
 	nodeID uint64
 	window *mrp.Window
+	// inbound marks the unsecured session a peer's initiating message
+	// created (ExchangeManager.ts:261-264): nodeID is the peer's, and our
+	// messages name it as their destination.
+	inbound bool
 
 	mu              sync.Mutex
 	addr            *net.UDPAddr
@@ -87,14 +92,23 @@ func (s *Session) SetAddr(addr *net.UDPAddr) {
 func (s *Session) IsSecure() bool { return s.secure != nil }
 
 // NodeID is our node id on the session: the ephemeral initiator node id
-// on the unsecured session, the operational node id on a CASE session and
-// 0 on a PASE session.
+// on an unsecured session we opened, the operational node id on a CASE
+// session and 0 on a PASE session and on an unsecured session the peer
+// opened.
 func (s *Session) NodeID() uint64 {
 	if s.secure != nil {
 		return s.secure.LocalNodeID()
 	}
+	if s.inbound {
+		return 0
+	}
 	return s.nodeID
 }
+
+// IsInbound reports whether the session is an unsecured session the peer
+// opened with an initiating message — the session a CASE responder runs
+// on (matter.js ExchangeManager.ts:261-264).
+func (s *Session) IsInbound() bool { return s.inbound }
 
 // PeerNodeID is the peer's operational node id: 0 on the unsecured and on
 // a PASE session.
