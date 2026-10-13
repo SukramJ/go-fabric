@@ -50,6 +50,13 @@ pseudo-version of `main`.
   reported once it has an address. Identifiers: `ByInstanceID`,
   `ByLongDiscriminator`, `ByShortDiscriminator`, `ByVendor`,
   `ByVendorProduct`, `ByDeviceType`, `ByProduct`, `AnyCommissionable`.
+- `discovery.Names.Service(compressedFabricID, nodeID)` gives a node's
+  operational service (`discovery.OperationalQName`, matter.js
+  `getOperationalDeviceQname`), and `Service.Resolve` runs matter.js
+  `IpServiceResolution`: SRV and TXT for the instance with its SRV targets
+  as known answers, A/AAAA for each target without an address, on the
+  default schedule, until an address not known before appears or ctx
+  ends. `mdns.OperationalResolver` stays for the bridge (ADR 0008).
 - `mdns.QueryConn` / `mdns.OpenQueryConn` export the multicast query
   transport `mdns.OperationalResolver` already used, and
   `mdns.ParseDNSMessage` / `mdns.PackDNSQuery` with `mdns.DNSRecord`,

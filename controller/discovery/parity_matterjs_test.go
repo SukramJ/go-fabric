@@ -620,3 +620,41 @@ func TestParityDiscovery_ScannerFilter(t *testing.T) {
 		}
 	}
 }
+
+// TestParityDiscovery_OperationalQName pins the operational instance name:
+// `<CFID>-<NODEID>._matter._tcp.local`, both ids as 16 upper-case hex
+// digits. matter.js packages/protocol/src/mdns/MdnsConsts.ts:36-37,
+// GlobalFabricId.strOf / NodeId.strOf (hex.fixed(…, 16)).
+func TestParityDiscovery_OperationalQName(t *testing.T) {
+	t.Parallel()
+	if got := OperationalQName([8]byte{0xAB, 0xCD, 0, 0, 0, 0, 0, 1}, 0xFEDCBA9876543210); got != "ABCD000000000001-FEDCBA9876543210._matter._tcp.local" {
+		t.Errorf("qname = %s", got)
+	}
+	if got := OperationalQName([8]byte{}, 1); got != "0000000000000000-0000000000000001._matter._tcp.local" {
+		t.Errorf("qname = %s", got)
+	}
+}
+
+// TestParityDiscovery_ResolutionQueries pins what a resolution asks: SRV
+// and TXT of the service name together (TXT explicitly,
+// IpServiceResolution.ts:119-130), and A and AAAA of an SRV target that has
+// no address (:39-64), with the target's records as known answers of the
+// service query (:126-128).
+func TestParityDiscovery_ResolutionQueries(t *testing.T) {
+	t.Parallel()
+	n, conn, _ := testNames(t)
+	deliver(t, n, 0, []dns.RR{srvRR(opQ, "ctrl.local", 5540, 120, true)})
+	s := n.Service(opCFID, opNode)
+	defer s.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go func() { _, _ = s.Resolve(ctx) }()
+	waitFor(t, func() bool { return len(conn.queries(t)) >= 1 })
+	q := conn.queries(t)[0]
+	if got := questionsOf(q); !equalStrings(got, []string{"ctrl.local/A", "ctrl.local/AAAA", opQ + "/SRV", opQ + "/TXT"}) {
+		t.Errorf("questions = %v", got)
+	}
+	if len(q.Answers) != 1 || q.Answers[0].Type != TypeSRV {
+		t.Errorf("known answers = %+v", q.Answers)
+	}
+}
