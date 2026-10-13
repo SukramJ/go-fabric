@@ -185,16 +185,16 @@ func (n *Names) run() {
 	}
 	for {
 		select {
-		case fn := <-n.loop.ops:
-			n.loop.exec(fn)
+		case t := <-n.loop.ops:
+			n.loop.exec(t)
 		case r, ok := <-responses:
 			if !ok {
 				responses = nil
 				continue
 			}
-			n.loop.exec(func() { n.handleMessage(r) })
+			n.loop.exec(task{fn: func() { n.handleMessage(r) }})
 		case <-n.loop.closing:
-			n.loop.exec(n.shutdown)
+			n.loop.exec(task{fn: n.shutdown})
 			return
 		}
 	}

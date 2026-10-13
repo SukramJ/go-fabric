@@ -32,6 +32,13 @@ pseudo-version of `main`.
   sends the first query at once and repeats on `discovery.DefaultRetries`
   (1 s, ×2, jitter up to 20 % added before the 1 h cap), the first caller
   per name owning the schedule and later callers joining it.
+- `discovery.TXTData` / `discovery.ParseTXTData`, the TXT parser of
+  matter.js `DiscoveryData` (`Scanner.ts`): `ParseTxtDecimal`
+  (`^(0|[1-9]\d*)$` up to a maximum, else absent), DN/RI/PI verbatim, VP
+  with vendor and product parsed independently, DT, PH (0 illegal), ICD,
+  the `T` transports bitmap, SII/SAI up to one hour and SAT 1..65535 ms —
+  an invalid value is absent so the MRP defaults apply.
+  `Service.TXTData` serves operational TXT records the same way.
 - `mdns.QueryConn` / `mdns.OpenQueryConn` export the multicast query
   transport `mdns.OperationalResolver` already used, and
   `mdns.ParseDNSMessage` / `mdns.PackDNSQuery` with `mdns.DNSRecord`,

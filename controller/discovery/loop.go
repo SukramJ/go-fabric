@@ -34,7 +34,7 @@ func (wallClock) AfterFunc(d time.Duration, f func()) stopper { return time.Afte
 // coalescing (one query packet per tick, one service notification per
 // batch of record changes) relies on.
 type loop struct {
-	ops     chan func()
+	ops     chan task
 	closing chan struct{}
 	done    chan struct{}
 	micro   []func()
@@ -43,33 +43,44 @@ type loop struct {
 
 func newLoop() *loop {
 	return &loop{
-		ops:     make(chan func(), 64),
+		ops:     make(chan task, 64),
 		closing: make(chan struct{}),
 		done:    make(chan struct{}),
 	}
 }
 
+// task is one unit of loop work; done, when set, is closed once the task
+// and everything it deferred have run.
+type task struct {
+	fn   func()
+	done chan struct{}
+}
+
 // post hands fn to the loop without waiting for it to run. It reports
 // false once the loop has stopped. Never call it from the loop itself.
 func (l *loop) post(fn func()) bool {
+	return l.enqueue(task{fn: fn})
+}
+
+func (l *loop) enqueue(t task) bool {
 	select {
 	case <-l.done:
 		return false
 	default:
 	}
 	select {
-	case l.ops <- fn:
+	case l.ops <- t:
 		return true
 	case <-l.done:
 		return false
 	}
 }
 
-// call runs fn on the loop and waits for it. Never call it from the loop
-// itself.
+// call runs fn on the loop and waits until it and the micro- and
+// macrotasks it deferred have run. Never call it from the loop itself.
 func (l *loop) call(fn func()) error {
 	ran := make(chan struct{})
-	if !l.post(func() { defer close(ran); fn() }) {
+	if !l.enqueue(task{fn: fn, done: ran}) {
 		return ErrClosed
 	}
 	select {
@@ -86,8 +97,11 @@ func (l *loop) call(fn func()) error {
 }
 
 // exec runs one loop task and everything it deferred.
-func (l *loop) exec(fn func()) {
-	fn()
+func (l *loop) exec(t task) {
+	if t.done != nil {
+		defer close(t.done)
+	}
+	t.fn()
 	l.drainMicro()
 	for len(l.macro) > 0 {
 		m := l.macro[0]

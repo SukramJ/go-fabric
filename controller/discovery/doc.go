@@ -13,8 +13,8 @@
 //     IpService; [Service.Resolve] runs IpServiceResolution.
 //   - [Solicitor] is the query loop with its retry schedule, matter.js
 //     DnssdSolicitor / QueryMulticaster.
-//   - [DiscoveryData] and [ParseDiscoveryData] are the TXT parser of
-//     packages/protocol/src/common/Scanner.ts.
+//   - [TXTData] and [ParseTXTData] are the TXT parser, matter.js
+//     DiscoveryData of packages/protocol/src/common/Scanner.ts.
 //   - [Scanner] is matter.js's CommissionableMdnsScanner
 //     (packages/protocol/src/mdns/).
 //   - [Names.Service] gives the operational service of one node, the way

@@ -349,3 +349,109 @@ func slicesEqual(a, b []time.Duration) bool {
 	}
 	return true
 }
+
+// TestParityDiscovery_TXTData pins the TXT parser, one row per key and
+// edge. matter.js packages/protocol/src/common/Scanner.ts: parseTxtDecimal
+// :153-159; DN/RI/PI verbatim :78-82; VP :84-94; DT :96-102; PH (0
+// illegal) :104-111; ICD :113-119; T :121-127 with
+// SupportedTransportsBitmap.ts:9-23; SII/SAI/SAT :129-140.
+func TestParityDiscovery_TXTData(t *testing.T) {
+	t.Parallel()
+	str := func(p *string) string {
+		if p == nil {
+			return "<absent>"
+		}
+		return *p
+	}
+	num := func(p *uint32) string {
+		if p == nil {
+			return "<absent>"
+		}
+		return time.Duration(*p).String()
+	}
+	dur := func(p *time.Duration) string {
+		if p == nil {
+			return "<absent>"
+		}
+		return p.String()
+	}
+	cases := []struct {
+		kv   string
+		get  func(TXTData) string
+		want string
+	}{
+		{"DN=Kitchen Light", func(d TXTData) string { return str(d.DN) }, "Kitchen Light"},
+		{"DN=", func(d TXTData) string { return str(d.DN) }, ""},
+		{"RI=0102AB", func(d TXTData) string { return str(d.RI) }, "0102AB"},
+		{"PI=10", func(d TXTData) string { return str(d.PI) }, "10"},
+		{"VP=65521+32769", func(d TXTData) string { return str(d.VP) }, "65521+32769"},
+		{"VP=65521", func(d TXTData) string { return str(d.VP) }, "65521"},
+		{"VP=65536+1", func(d TXTData) string { return str(d.VP) }, "<absent>"},
+		{"VP=1+x", func(d TXTData) string { return str(d.VP) }, "1"},
+		{"VP=1+65536", func(d TXTData) string { return str(d.VP) }, "1"},
+		{"VP=01+2", func(d TXTData) string { return str(d.VP) }, "<absent>"},
+		{"VP=1+2+3", func(d TXTData) string { return str(d.VP) }, "1+2"},
+		{"DT=4294967295", func(d TXTData) string { return num(d.DT) }, time.Duration(4294967295).String()},
+		{"DT=4294967296", func(d TXTData) string { return num(d.DT) }, "<absent>"},
+		{"PH=33", func(d TXTData) string { return num(d.PH) }, time.Duration(33).String()},
+		{"PH=0", func(d TXTData) string { return num(d.PH) }, "<absent>"},
+		{"SII=3600000", func(d TXTData) string { return dur(d.SII) }, "1h0m0s"},
+		{"SII=3600001", func(d TXTData) string { return dur(d.SII) }, "<absent>"},
+		{"SAI=0", func(d TXTData) string { return dur(d.SAI) }, "0s"},
+		{"SAI=+1", func(d TXTData) string { return dur(d.SAI) }, "<absent>"},
+		{"SAT=0", func(d TXTData) string { return dur(d.SAT) }, "<absent>"},
+		{"SAT=65535", func(d TXTData) string { return dur(d.SAT) }, "1m5.535s"},
+		{"SAT=65536", func(d TXTData) string { return dur(d.SAT) }, "<absent>"},
+	}
+	for _, c := range cases {
+		dd := ParseTXTData(paramsOf(c.kv))
+		if got := c.get(dd); got != c.want {
+			t.Errorf("%s: %q, want %q", c.kv, got, c.want)
+		}
+	}
+
+	icd := func(kv string) string {
+		d := ParseTXTData(paramsOf(kv))
+		if d.ICD == nil {
+			return "<absent>"
+		}
+		return string(rune('0' + *d.ICD))
+	}
+	for kv, want := range map[string]string{"ICD=0": "0", "ICD=1": "1", "ICD=2": "<absent>"} {
+		if got := icd(kv); got != want {
+			t.Errorf("%s: %s, want %s", kv, got, want)
+		}
+	}
+
+	for kv, want := range map[string]*SupportedTransports{
+		"T=6":     {TCPClient: true, TCPServer: true},
+		"T=2":     {TCPClient: true},
+		"T=1":     {},
+		"T=65535": {TCPClient: true, TCPServer: true},
+		"T=65536": nil,
+	} {
+		got := ParseTXTData(paramsOf(kv)).T
+		if (got == nil) != (want == nil) || (got != nil && *got != *want) {
+			t.Errorf("%s: %+v, want %+v", kv, got, want)
+		}
+	}
+
+	for v, want := range map[string]bool{"0": true, "7": true, "4095": true, "0abc": false, "00": false, "07": false, "-1": false, "": false, "1e3": false, "4096": false, "99999999999999999999999": false} {
+		if _, ok := ParseTxtDecimal(v, 0xFFF); ok != want {
+			t.Errorf("ParseTxtDecimal(%q, 0xFFF) ok = %v, want %v", v, ok, want)
+		}
+	}
+}
+
+func paramsOf(kvs ...string) Parameters {
+	p := Parameters{}
+	for _, kv := range kvs {
+		for i := range len(kv) {
+			if kv[i] == '=' {
+				p[kv[:i]] = []byte(kv[i+1:])
+				break
+			}
+		}
+	}
+	return p
+}
