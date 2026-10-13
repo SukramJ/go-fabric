@@ -12,6 +12,27 @@ pseudo-version of `main`.
 
 ### Added
 
+- The node facade gains the seams a bridge host with its own topology
+  assembler and its own operator surface needs to adopt `node.New` (#87):
+  `node.Config.Topology` hands the bridge the host's own `bridge.Snapshotter`
+  (the facade then builds no assembler and `Node.Aggregator()` is nil);
+  `node.BasicInformation.UniqueID` pins BasicInformation UniqueID, and
+  unset the facade pins it itself — derived on the first boot of a store,
+  kept under `store.SettingUniqueID`, served from there afterwards, as
+  matter.js creates `uniqueId` once and persists it
+  (`BasicInformationServer.ts:89-91` at `0ceb202d`); `Node.Sessions()` and
+  `Node.Subscriptions()` expose the session and subscription managers for
+  diagnostics; `Node.RemoveFabric(ctx, fabricIndex)` removes a fabric
+  without a commissioner through the new
+  `core.OperationalCredentials.RemoveFabric`, the RemoveFabric command's
+  own path with the same fan-out (matter.js `Fabric.leave()`,
+  `Fabric.ts:423-433`, the call the command makes,
+  `OperationalCredentialsServer.ts:425`); `node.Commissioning.LocationCapability`
+  sets GeneralCommissioning LocationCapability (default Indoor, unchanged).
+  The facade's label, configuration-version and scene persistence is now
+  keyed by a stable key's `String()`, so a host's own `endpoint.SourceKey`
+  type is persisted too (an `endpoint.StringKey` keeps its key).
+
 - `cover.WindowCoveringServer` serves the tilt axis (#77): `Config.FeatureMap`
   accepts `cover.ServedTiltFeatureMap` (TL | PA_TL) and
   `cover.ServedLiftTiltFeatureMap` (LF | TL | PA_LF | PA_TL) besides the

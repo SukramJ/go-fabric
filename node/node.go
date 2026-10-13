@@ -21,7 +21,9 @@ import (
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
 	"github.com/SukramJ/go-fabric/groups"
+	"github.com/SukramJ/go-fabric/im/subscription"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
 )
@@ -114,23 +116,29 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 
 	// --- the topology assembler and the Aggregator (main.go:167-186) ----
+	// A host with its own assembler supplies the bridge's Snapshotter
+	// instead (Config.Topology), as the daemon did before the facade.
 	pd, bi := cfg.ProductDescription, cfg.BasicInformation
-	n.assembler, err = endpoint.New(n.cfg.Store.Endpoints, endpoint.Config{
-		VendorID:           pd.VendorID,
-		ProductID:          pd.ProductID,
-		NodeLabel:          bi.NodeLabel,
-		VendorName:         bi.VendorName,
-		Groups:             n.groups,
-		OnNodeLabelWritten: n.persisted.storeLabel,
-		Scenes:             n.persisted,
-	}, n.logger)
-	if err != nil {
-		return nil, fmt.Errorf("node: endpoint assembler: %w", err)
+	snapshotter := cfg.Topology
+	if snapshotter == nil {
+		n.assembler, err = endpoint.New(n.cfg.Store.Endpoints, endpoint.Config{
+			VendorID:           pd.VendorID,
+			ProductID:          pd.ProductID,
+			NodeLabel:          bi.NodeLabel,
+			VendorName:         bi.VendorName,
+			Groups:             n.groups,
+			OnNodeLabelWritten: n.persisted.storeLabel,
+			Scenes:             n.persisted,
+		}, n.logger)
+		if err != nil {
+			return nil, fmt.Errorf("node: endpoint assembler: %w", err)
+		}
+		n.agg = &Aggregator{n: n}
+		snapshotter = n.agg.snapshot
 	}
-	n.agg = &Aggregator{n: n}
 
 	// --- the bridge (main.go:188-228) -----------------------------------
-	n.br, err = bridge.New(n.agg.snapshot, n.advertiser, bridge.Config{
+	n.br, err = bridge.New(snapshotter, n.advertiser, bridge.Config{
 		Listen:        cfg.Network.Listen,
 		PreferIPv4:    cfg.Network.PreferIPv4,
 		TCP:           cfg.Network.TCP,
@@ -160,6 +168,16 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.br.AttachDiagnosticEvents(n.diagRing)
 
 	// --- root + Aggregator endpoints (main.go:253-321) ------------------
+	// UniqueID is pinned before the root is built: the host's value, or
+	// the one the store keeps (persist.go uniqueID).
+	if n.cfg.BasicInformation.UniqueID == "" {
+		n.cfg.BasicInformation.UniqueID, err = n.persisted.uniqueID(ctx, func() string {
+			return mattercore.DeriveUniqueID(pd.VendorID, pd.ProductID, bi.NodeLabel, bi.SerialNumber)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("node: unique id: %w", err)
+		}
+	}
 	n.caseIDs = newCaseIdentities(n.logger)
 	n.root, err = buildRoot(ctx, rootDeps{
 		cfg: &n.cfg, bootReason: n.bootReason, st: n.st, groups: n.groups, connector: n.br,
@@ -390,7 +408,9 @@ func (n *Node) Start(ctx context.Context) error {
 		return fmt.Errorf("node: bridge start: %w", err)
 	}
 	n.started = true
-	n.agg.setStarted()
+	if n.agg != nil {
+		n.agg.setStarted()
+	}
 
 	n.root.DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})
 	// BasicInformation StartUp, then GeneralDiagnostics BootReason, the
@@ -496,8 +516,35 @@ func (n *Node) Bridge() *bridge.Bridge { return n.br }
 // Root returns the root endpoint's servers.
 func (n *Node) Root() *RootClusters { return n.root }
 
-// Aggregator returns the Aggregator endpoint's bridged-device set.
+// Aggregator returns the Aggregator endpoint's bridged-device set — nil
+// when the host assembles its own topology ([Config].Topology).
 func (n *Node) Aggregator() *Aggregator { return n.agg }
+
+// Sessions returns the secure-session manager, for a host's diagnostics
+// (operational.Manager.Sessions, Occupancy): which peers hold a PASE or
+// CASE session, on which fabric, and when each was last active. The
+// facade owns its lifecycle; a host reads it and leaves closing to the
+// node.
+func (n *Node) Sessions() *operational.Manager { return n.sec.sessions }
+
+// Subscriptions returns the subscription manager, for a host's
+// diagnostics (subscription.Manager.CountBySession, Active): the
+// subscriptions riding on each session. The facade owns its lifecycle;
+// a host reads it and leaves closing to the node.
+func (n *Node) Subscriptions() *subscription.Manager { return n.sec.subs }
+
+// RemoveFabric removes a fabric without a commissioner — a host's revoke
+// or factory reset — exactly as the RemoveFabric command does: the
+// fabric's rows go, and the same fan-out runs (the Leave event, the OTA
+// providers, the CASE identity and the operational record, the sessions
+// and subscriptions, the group state, the node's own window once the last
+// fabric is gone) followed by the host's OnFabricRemoved observer. matter.js
+// reaches it the same way from the host, Fabric.leave() (Fabric.ts:423-433),
+// the call the command itself makes (OperationalCredentialsServer.ts:425).
+// An unknown index is store.ErrFabricNotFound.
+func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
+	return n.root.OperationalCredentials.RemoveFabric(ctx, fabricIndex)
+}
 
 // CommissioningWindow returns the commissioning window.
 func (n *Node) CommissioningWindow() *bridge.CommissioningWindow { return n.br.CommissioningWindow() }

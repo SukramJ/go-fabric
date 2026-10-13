@@ -38,6 +38,13 @@
 // package name the daemon as it stood before it moved onto the facade
 // (commit 30fe7f1; brief R): the code they cite is the facade's now.
 //
+// A host that assembles its own topology — its own endpoint.Assembler
+// over its own device model — hands the bridge its Snapshotter through
+// Config.Topology and gets no [Aggregator]; everything else stays the
+// facade's. Its operator surface reads [Node.Sessions] and
+// [Node.Subscriptions], and removes a fabric without a commissioner
+// through [Node.RemoveFabric] (issue #87).
+//
 // Left to the configuration on purpose: a nil Config.Advertiser publishes
 // nothing, a nil Config.OTA mounts no OTA requestor. Left to the host:
 // GeneralDiagnostics' TestEventTrigger enable key, the PowerSource

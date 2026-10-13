@@ -68,6 +68,16 @@ type Config struct {
 	// neither (LocalizationConfigurationServer.ts:14-21 initialize); a host
 	// states its own, as the reference daemon does (en-US, de-DE).
 	Locales []string
+	// Topology, when set, is the host's own topology — a host that
+	// assembles its endpoints itself (its own endpoint.Assembler over its
+	// own device model, one endpoint.Snapshot per scope, its own label and
+	// scene persistence) hands the bridge its Snapshotter here, as the
+	// reference daemon did before the facade (main.go:188, bridge.New's
+	// first argument). The facade then builds no assembler and no
+	// [Aggregator] ([Node.Aggregator] is nil); the root and Aggregator
+	// endpoints' servers, the PartsList providers and every port stay the
+	// facade's. nil is the facade's [Aggregator] under one scope.
+	Topology bridge.Snapshotter
 	// AggregatorServers are mounted on the Aggregator endpoint after
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
 	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345).
@@ -120,6 +130,12 @@ type Commissioning struct {
 	// Salt is the SPAKE2+ salt, spake2.PBKDFMinSaltSize to
 	// spake2.PBKDFMaxSaltSize bytes.
 	Salt []byte
+	// LocationCapability is GeneralCommissioning's LocationCapability
+	// (Matter §11.10.5.3), the regulatory locations the node supports and
+	// SetRegulatoryConfig admits (GeneralCommissioningServer.ts:172-191):
+	// mattercore.RegulatoryIndoor (the zero value, the facade's default),
+	// RegulatoryOutdoor or RegulatoryIndoorOutdoor.
+	LocationCapability uint8
 }
 
 // ProductDescription is matter.js `productDescription`
@@ -139,11 +155,21 @@ type ProductDescription struct {
 // (examples/reference-bridge/wiring.go:105-116, buildRootClusters), plus
 // ProductLabel from matter.js's example (BridgedDevicesNode.ts:29-65).
 type BasicInformation struct {
-	VendorName            string
-	ProductName           string
-	ProductLabel          string
-	NodeLabel             string // mandatory
-	SerialNumber          string
+	VendorName   string
+	ProductName  string
+	ProductLabel string
+	NodeLabel    string // mandatory
+	SerialNumber string
+	// UniqueID pins BasicInformation.UniqueID (quality F, Matter
+	// §11.1.5.13) to a value the host persisted itself; at most 32 UTF-8
+	// bytes. Empty, the facade pins it: the first boot of a store derives
+	// one (mattercore.DeriveUniqueID over the vendor, product, NodeLabel
+	// and SerialNumber) and keeps it under store.SettingUniqueID, every
+	// later boot serves the stored value — matter.js creates uniqueId
+	// once when the state has none and persists it
+	// (BasicInformationServer.ts:89-91), so a later edit to NodeLabel does
+	// not re-identify the node under a controller's cache.
+	UniqueID              string
 	HardwareVersion       uint16
 	HardwareVersionString string
 	SoftwareVersion       uint32
@@ -197,6 +223,11 @@ const (
 	defaultSupportedFabrics = 5
 )
 
+// maxUniqueIDBytes is the UniqueID attribute's length ceiling (Matter
+// §11.1.5.13, 32 UTF-8 bytes), the bound mattercore.NewBasicInformation
+// enforces too.
+const maxUniqueIDBytes = 32
+
 // Validate holds the checks the daemon applies to its flags
 // (main.go:113-131): the discriminator's 12 bits, the passcode's range
 // and the trivially-guessable list, the PBKDF iteration range and salt
@@ -225,6 +256,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Store.DB == nil && (c.Store.Credentials == nil || c.Store.Endpoints == nil) {
 		errs = append(errs, errors.New("Store needs DB, or both Credentials and Endpoints"))
+	}
+	if cm.LocationCapability > mattercore.RegulatoryIndoorOutdoor {
+		errs = append(errs, fmt.Errorf("LocationCapability %d is not a RegulatoryLocationTypeEnum value", cm.LocationCapability))
+	}
+	if len(c.BasicInformation.UniqueID) > maxUniqueIDBytes {
+		errs = append(errs, fmt.Errorf("BasicInformation.UniqueID is %d bytes, at most %d", len(c.BasicInformation.UniqueID), maxUniqueIDBytes))
 	}
 	if c.SupportedFabrics > maxSupportedFabrics {
 		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))

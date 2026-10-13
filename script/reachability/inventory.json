@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4713,
+  "entry_points": 4718,
   "entry_packages": [
     ".",
     "bdx",
@@ -19373,7 +19373,7 @@
       "identifier": "TestRingLogs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 136
+      "line": 144
     },
     {
       "package": "node",

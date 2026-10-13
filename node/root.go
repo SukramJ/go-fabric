@@ -114,6 +114,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		SoftwareVersion:    bi.SoftwareVersion,
 		SoftwareVersionStr: bi.SoftwareVersionString,
 		SerialNumber:       bi.SerialNumber,
+		UniqueID:           bi.UniqueID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("basic information: %w", err)
@@ -135,7 +136,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.GeneralDiagnostics.SetPersistedOperationalTime(opTime)
 
 	r.GeneralCommissioning, err = mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
-		LocationCapability:           mattercore.RegulatoryIndoor,
+		LocationCapability:           cfg.Commissioning.LocationCapability,
 		SupportsConcurrentConnection: true,
 	})
 	if err != nil {

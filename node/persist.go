@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/SukramJ/go-fabric/bootid"
 	"github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -37,11 +38,21 @@ const (
 // the store's settings table: a bridged endpoint's NodeLabel and
 // ConfigurationVersion under its stable key, its scene table, and the
 // root's NodeLabel, Location and ConfigurationVersion — the daemon's
-// persistedLabels (persist.go:62-188). Only an [endpoint.StringKey]
-// stable key is persisted, as there.
+// persistedLabels (persist.go:62-188). A stable key is persisted under
+// its String(), the identity the assembler keys endpoint numbers by —
+// an [endpoint.StringKey] under the string itself, so a database the
+// daemon wrote reads back; a host's own key type under what it prints.
 type persisted struct {
 	st     *store.Store
 	logger *slog.Logger
+}
+
+// keyString is the settings-key suffix of a stable key, false for nil.
+func keyString(key endpoint.SourceKey) (string, bool) {
+	if key == nil {
+		return "", false
+	}
+	return key.String(), true
 }
 
 func (p persisted) loadUint32(ctx context.Context, key string) uint32 {
@@ -59,11 +70,11 @@ func (p persisted) loadUint32(ctx context.Context, key string) uint32 {
 // configVersion returns the ConfigurationVersion persisted for a bridged
 // endpoint, 0 for none.
 func (p persisted) configVersion(ctx context.Context, key endpoint.SourceKey) uint32 {
-	k, ok := key.(endpoint.StringKey)
+	k, ok := keyString(key)
 	if !ok {
 		return 0
 	}
-	return p.loadUint32(ctx, endpointConfigVersionKey+string(k))
+	return p.loadUint32(ctx, endpointConfigVersionKey+k)
 }
 
 // storeConfigVersions persists what bridge.IncreaseConfigurationVersion
@@ -80,8 +91,8 @@ func (p persisted) storeConfigVersions(topo *endpoint.Topology, v bridge.Configu
 	}
 	for id, n := range v.Bridged {
 		if ep := topo.FindByID(id); ep != nil {
-			if k, ok := ep.SourceKey.(endpoint.StringKey); ok {
-				set(endpointConfigVersionKey+string(k), n)
+			if k, ok := keyString(ep.SourceKey); ok {
+				set(endpointConfigVersionKey+k, n)
 			}
 		}
 	}
@@ -89,22 +100,22 @@ func (p persisted) storeConfigVersions(topo *endpoint.Topology, v bridge.Configu
 
 // storeLabel implements endpoint.Config.OnNodeLabelWritten.
 func (p persisted) storeLabel(key endpoint.SourceKey, label string) {
-	k, ok := key.(endpoint.StringKey)
+	k, ok := keyString(key)
 	if !ok {
 		return
 	}
-	if err := p.st.SetSetting(context.Background(), endpointLabelKeyRoot+string(k), label); err != nil {
+	if err := p.st.SetSetting(context.Background(), endpointLabelKeyRoot+k, label); err != nil {
 		p.logger.Warn("label.persist", slog.String("err", err.Error()))
 	}
 }
 
 // label returns the label persisted for a bridged endpoint, "" for none.
 func (p persisted) label(ctx context.Context, key endpoint.SourceKey) string {
-	k, ok := key.(endpoint.StringKey)
+	k, ok := keyString(key)
 	if !ok {
 		return ""
 	}
-	label, found, err := p.st.GetSetting(ctx, endpointLabelKeyRoot+string(k))
+	label, found, err := p.st.GetSetting(ctx, endpointLabelKeyRoot+k)
 	if err != nil || !found {
 		return ""
 	}
@@ -132,11 +143,11 @@ func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformati
 
 // LoadScenes implements endpoint.ScenesStore.
 func (p persisted) LoadScenes(key endpoint.SourceKey) []byte {
-	k, ok := key.(endpoint.StringKey)
+	k, ok := keyString(key)
 	if !ok {
 		return nil
 	}
-	v, found, err := p.st.GetSetting(context.Background(), scenesKeyRoot+string(k))
+	v, found, err := p.st.GetSetting(context.Background(), scenesKeyRoot+k)
 	if err != nil || !found {
 		return nil
 	}
@@ -145,13 +156,50 @@ func (p persisted) LoadScenes(key endpoint.SourceKey) []byte {
 
 // SaveScenes implements endpoint.ScenesStore.
 func (p persisted) SaveScenes(key endpoint.SourceKey, table []byte) {
-	k, ok := key.(endpoint.StringKey)
+	k, ok := keyString(key)
 	if !ok {
 		return
 	}
-	if err := p.st.SetSetting(context.Background(), scenesKeyRoot+string(k), string(table)); err != nil {
+	if err := p.st.SetSetting(context.Background(), scenesKeyRoot+k, string(table)); err != nil {
 		p.logger.Warn("scenes.persist", slog.String("err", err.Error()))
 	}
+}
+
+// uniqueID returns the BasicInformation UniqueID the store pinned on an
+// earlier boot, or derives one, pins it and returns it — matter.js
+// BasicInformationServer initialize (BasicInformationServer.ts:89-91):
+// uniqueId is created once when the state holds none and persisted
+// (quality N), so the attribute keeps its F quality across a config edit
+// to the label the derivation reads. The key is the daemon's
+// (store.SettingUniqueID). A boot with bootid rotation enabled derives a
+// per-boot value and pins nothing; a stored value the daemon flagged as
+// written under rotation (store.SettingUniqueIDRotated) is stale to a
+// boot without it, which re-derives, pins and clears the flag.
+func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, error) {
+	if bootid.Salt() != [16]byte{} {
+		return derive(), nil
+	}
+	stored, found, err := p.st.GetSetting(ctx, store.SettingUniqueID)
+	if err != nil {
+		return "", err
+	}
+	rotated, _, err := p.st.GetSetting(ctx, store.SettingUniqueIDRotated)
+	if err != nil {
+		return "", err
+	}
+	if found && stored != "" && rotated != "1" {
+		return stored, nil
+	}
+	id := derive()
+	if err := p.st.SetSetting(ctx, store.SettingUniqueID, id); err != nil {
+		return "", err
+	}
+	if rotated == "1" {
+		if err := p.st.SetSetting(ctx, store.SettingUniqueIDRotated, ""); err != nil {
+			return "", err
+		}
+	}
+	return id, nil
 }
 
 // countBoot returns this boot's RebootCount and persists it: 0 on the
