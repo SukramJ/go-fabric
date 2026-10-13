@@ -251,9 +251,9 @@ keeps `map[*exchange.Session]*Session` so a report can find its queue.
   `Subscription.Priming` (the first `Updated` call during `Subscribe` is
   the priming report; later ones are queued, §4b). `Subscription.ID` and
   `MaxInterval` from the returned `*interaction.Subscription` (`ID()`,
-  `MaxInterval()` in seconds). A PASE session: the error of
-  `ix.Subscribe` (`ErrUncommissioned`) is returned wrapped in
-  `ErrSessionClosed`? No — returned as is, documented on `Subscribe`.
+  `MaxInterval()` in seconds). On a PASE session `ix.Subscribe` fails
+  with `ErrUncommissioned`; return that error as it is and document it
+  on `Subscribe` (§0, Changed).
 - `Write(ctx, path, value)`: `ix.Write(ctx, []interaction.WriteRequest{{Path:
   path, Value: encodable(value)}}, interaction.WriteOptions{DisableListChunking:
   true})` — today writes one AttributeDataIB whatever the value
