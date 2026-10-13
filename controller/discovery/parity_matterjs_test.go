@@ -185,3 +185,93 @@ func TestParityDiscovery_IngressFilter(t *testing.T) {
 		}
 	}
 }
+
+func mustAddr(s string) netip.Addr { return netip.MustParseAddr(s) }
+
+// TestParityDiscovery_AddressOrder pins the desirability order a service
+// hands its addresses out in: IPv6 link-local, ULA (/^f[cd]/i), other
+// IPv6, IPv4 (ServerAddress.ts:170-176, :178-209); within a class an
+// unhealthy address after the others and the most recently healthy first
+// (ServerAddressSet.ts:191-229); then the higher DNS priority value when
+// both are known (:178-181). Equal addresses keep their order.
+func TestParityDiscovery_AddressOrder(t *testing.T) {
+	t.Parallel()
+	for ip, want := range map[string]int{
+		"fe80::1":        PreferenceIPv6LinkLocal,
+		"febf::1":        PreferenceIPv6LinkLocal,
+		"fec0::1":        PreferenceIPv6,
+		"fc00::1":        PreferenceIPv6ULA,
+		"FD12::1":        PreferenceIPv6ULA,
+		"2001:db8::1":    PreferenceIPv6,
+		"::ffff:1.2.3.4": PreferenceIPv6,
+		"192.0.2.1":      PreferenceIPv4,
+	} {
+		if got := SelectionPreference(mustAddr(ip)); got != want {
+			t.Errorf("SelectionPreference(%s) = %d, want %d", ip, got, want)
+		}
+	}
+
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	p := func(v uint16) *uint16 { return &v }
+	addrs := []Address{
+		{IP: mustAddr("192.0.2.1"), Port: 1},
+		{IP: mustAddr("2001:db8::1"), Port: 1},
+		{IP: mustAddr("fd00::1"), Port: 1},
+		{IP: mustAddr("fe80::1").WithZone("eth0"), Port: 1},
+	}
+	sortByDesirability(addrs)
+	if got := addrStrings(addrs); !equalStrings(got, []string{"[fe80::1%eth0]:1", "[fd00::1]:1", "[2001:db8::1]:1", "192.0.2.1:1"}) {
+		t.Errorf("order = %v", got)
+	}
+
+	health := []Address{
+		{IP: mustAddr("fd00::1"), Port: 1, UnhealthyAt: t0.Add(2 * time.Second)},
+		{IP: mustAddr("fd00::2"), Port: 1, UnhealthyAt: t0.Add(time.Second)},
+		{IP: mustAddr("fd00::3"), Port: 1},
+		{IP: mustAddr("fd00::4"), Port: 1, HealthyAt: t0},
+		{IP: mustAddr("fd00::5"), Port: 1, HealthyAt: t0.Add(time.Second)},
+		{IP: mustAddr("fd00::6"), Port: 1, HealthyAt: t0.Add(3 * time.Second), UnhealthyAt: t0.Add(2 * time.Second)},
+	}
+	sortByDesirability(health)
+	if got := addrStrings(health); !equalStrings(got, []string{"[fd00::6]:1", "[fd00::5]:1", "[fd00::4]:1", "[fd00::3]:1", "[fd00::2]:1", "[fd00::1]:1"}) {
+		t.Errorf("health order = %v", got)
+	}
+
+	prio := []Address{
+		{IP: mustAddr("fd00::1"), Port: 1, Priority: p(1)},
+		{IP: mustAddr("fd00::2"), Port: 1, Priority: p(5)},
+		{IP: mustAddr("fd00::3"), Port: 1},
+	}
+	sortByDesirability(prio)
+	if got := addrStrings(prio); !equalStrings(got, []string{"[fd00::2]:1", "[fd00::1]:1", "[fd00::3]:1"}) {
+		t.Errorf("priority order = %v", got)
+	}
+}
+
+// TestParityDiscovery_ServiceAddressShape pins what a service makes of its
+// SRV target's records: {ip, port} with the SRV's port
+// (IpService.ts:315-316), an fe80::/10 AAAA zoned to its receive
+// interface unless already zoned (:392-408), an A as is.
+func TestParityDiscovery_ServiceAddressShape(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		rec  Record
+		want string
+	}{
+		{Record{Type: TypeAAAA, IP: mustAddr("fe80::1"), SourceIntf: "en0"}, "fe80::1%en0"},
+		{Record{Type: TypeAAAA, IP: mustAddr("fe80::1").WithZone("x"), SourceIntf: "en0"}, "fe80::1%x"},
+		{Record{Type: TypeAAAA, IP: mustAddr("fd00::1"), SourceIntf: "en0"}, "fd00::1"},
+		{Record{Type: TypeAAAA, IP: mustAddr("fe80::1")}, "fe80::1"},
+		{Record{Type: TypeA, IP: mustAddr("192.0.2.1")}, "192.0.2.1"},
+	} {
+		got, ok := ipOf(&c.rec)
+		if !ok || got.String() != c.want {
+			t.Errorf("ipOf(%+v) = %v %v, want %s", c.rec, got, ok, c.want)
+		}
+	}
+	for _, r := range []Record{{Type: TypePTR}, {Type: TypeA}, {Type: TypeAAAA}} {
+		if _, ok := ipOf(&r); ok {
+			t.Errorf("ipOf(%v) gave an address", r.Type)
+		}
+	}
+}

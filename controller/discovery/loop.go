@@ -108,3 +108,7 @@ func (l *loop) drainMicro() {
 // microtask defers fn to run after the current loop task (matter.js: an
 // awaited promise continuation).
 func (l *loop) microtask(fn func()) { l.micro = append(l.micro, fn) }
+
+// macrotask defers fn to run after the current task and its microtasks
+// (matter.js: Time.sleep(…, 0)).
+func (l *loop) macrotask(fn func()) { l.macro = append(l.macro, fn) }

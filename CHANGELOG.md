@@ -19,6 +19,13 @@ pseudo-version of `main`.
   supersession after the 1 s eviction delay, unavailable SRVs ignored, TXT
   parameters by matter.js's rules, the Matter service-type ingress filter,
   and A/AAAA staging for SRV targets from relevant packets only.
+- `discovery.Service`, the live view of one DNS-SD service name (matter.js
+  `IpService`): SRV targets keyed target:port, `{ip, port}` addresses with
+  fe80:: zoned to the receiving interface, coalesced change notification,
+  TXT changes detected by parameter signature, `AddressChanges` (deletions
+  first, then additions in desirability order), and
+  `discovery.CompareDesirability` / `discovery.SelectionPreference`
+  (link-local, ULA, global IPv6, IPv4; then health; then SRV priority).
 - `mdns.QueryConn` / `mdns.OpenQueryConn` export the multicast query
   transport `mdns.OperationalResolver` already used, and
   `mdns.ParseDNSMessage` / `mdns.PackDNSQuery` with `mdns.DNSRecord`,

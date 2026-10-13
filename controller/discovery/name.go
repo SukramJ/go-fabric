@@ -149,6 +149,22 @@ func (p Parameters) Get(key string) (string, bool) {
 	return decodeUTF8(v), true
 }
 
+// signature is the canonical form matter.js compares parameter sets by:
+// the sorted keys with their hex values, NUL-separated. Mirrors matter.js
+// 0ceb202d packages/general/src/net/dns-sd/IpService.ts:381-386.
+func (p Parameters) signature() string {
+	keys := make([]string, 0, len(p))
+	for k := range p {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, k+"="+hex.EncodeToString(p[k]))
+	}
+	return strings.Join(parts, "\x00")
+}
+
 func decodeUTF8(b []byte) string {
 	if utf8.Valid(b) {
 		return string(b)

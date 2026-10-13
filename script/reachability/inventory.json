@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4532,
+  "entry_points": 4540,
   "entry_packages": [
     ".",
     "bdx",
@@ -176,9 +176,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10496,
-    "reachable": 7394,
-    "whitelisted": 3097,
+    "total_exported": 10517,
+    "reachable": 7407,
+    "whitelisted": 3105,
     "unreachable": 5
   },
   "by_package": [
@@ -13980,6 +13980,13 @@
     },
     {
       "package": "controller/discovery",
+      "identifier": "TestDiffAddresses_RestartKeepsInterruptedRoundKnown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/service_test.go",
+      "line": 172
+    },
+    {
+      "package": "controller/discovery",
       "identifier": "TestNames_ChangesAreCoalescedPerTask",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/names_test.go",
@@ -14078,6 +14085,13 @@
     },
     {
       "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_AddressOrder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 197
+    },
+    {
+      "package": "controller/discovery",
       "identifier": "TestParityDiscovery_CacheFlushRetiresOlderUniqueRecords",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/parity_matterjs_test.go",
@@ -14099,6 +14113,13 @@
     },
     {
       "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_ServiceAddressShape",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 255
+    },
+    {
+      "package": "controller/discovery",
       "identifier": "TestParityDiscovery_TTLRules",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/parity_matterjs_test.go",
@@ -14117,6 +14138,41 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/discovery/parity_matterjs_test.go",
       "line": 123
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestService_AddressChanges",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/service_test.go",
+      "line": 114
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestService_AddressChangesEndWithTheService",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/service_test.go",
+      "line": 152
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestService_AddressesFollowTheSRVTarget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/service_test.go",
+      "line": 34
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestService_NotificationsCoalesceAndTXTBySignature",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/service_test.go",
+      "line": 73
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestService_SeededFromTheCacheAndUnzonedWithoutInterface",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/service_test.go",
+      "line": 62
     },
     {
       "package": "device",
