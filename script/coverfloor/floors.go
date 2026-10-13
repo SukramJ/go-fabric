@@ -75,6 +75,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/wire", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/controller/discovery", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
 	// The module's lowest measured package (76.7 when last raised).
 	// contract is the host-facing interface vocabulary, and much of what is uncovered
@@ -83,6 +84,8 @@ var floors = []packageFloor{
 	// where it stands; whether it should be raised is a separate decision
 	// about what deserves a test, not a ratchet setting.
 	{pkg: "github.com/SukramJ/go-fabric/contract", min: 76, why: "lowest in the module; see the note above this entry"},
+	{pkg: "github.com/SukramJ/go-fabric/controller/exchange", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/controller/handshake", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/device", min: 97},

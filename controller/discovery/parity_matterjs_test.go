@@ -1,0 +1,660 @@
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2026 SukramJ.
+
+package discovery
+
+// Parity with matter.js 0ceb202d: the discovery rules the controller's
+// browser mirrors, each case citing the lines it pins.
+
+import (
+	"context"
+	"net/netip"
+	"testing"
+	"time"
+
+	"github.com/miekg/dns"
+
+	"github.com/SukramJ/go-fabric/mdns"
+)
+
+// TestParityDiscovery_RecordKeys pins the cache identity of a record:
+// A/AAAA/PTR by type and value, SRV by type and target:port, TXT by type
+// and its hex entries sorted; any other type has none.
+// matter.js packages/general/src/net/dns-sd/DnssdName.ts:352-377 (keyOf).
+func TestParityDiscovery_RecordKeys(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		rec  Record
+		want string
+	}{
+		{Record{Type: TypeA, IP: netip.MustParseAddr("192.0.2.1")}, "1 192.0.2.1"},
+		{Record{Type: TypeAAAA, IP: netip.MustParseAddr("fd00::1")}, "28 fd00::1"},
+		{Record{Type: TypePTR, PTR: "X._matterc._udp.local"}, "12 X._matterc._udp.local"},
+		{Record{Type: TypeSRV, SRV: mdns.DNSSRV{Target: "host.local", Port: 5540, Priority: 9}}, "33 host.local:5540"},
+		{Record{Type: TypeTXT, TXT: [][]byte{[]byte("D=1"), []byte("CM=1")}}, "16 434d3d31 443d31"},
+		{Record{Type: TypeTXT, TXT: [][]byte{[]byte("CM=1"), []byte("D=1")}}, "16 434d3d31 443d31"},
+		{Record{Type: TypeA}, ""},
+		{Record{Type: mdns.DNSType(dns.TypeNSEC)}, ""},
+	}
+	for _, c := range cases {
+		if got := recordKey(&c.rec); got != c.want {
+			t.Errorf("recordKey(%v) = %q, want %q", c.rec.Type, got, c.want)
+		}
+	}
+}
+
+// TestParityDiscovery_TTLRules pins the expiry arithmetic: expiresAt =
+// installedAt + round(ttl × 1.05) (DnssdName.ts:25, :156); a TTL under
+// 15 s is raised to 15 s (DnssdNames.ts:195-198, defaults :549-552); a
+// TTL of 0 is a goodbye that takes effect after the 1 s eviction delay
+// (DnssdNames.ts:206-211, DnssdName.ts:202-209, :225-236).
+func TestParityDiscovery_TTLRules(t *testing.T) {
+	t.Parallel()
+	n, _, clk := testNames(t)
+	at := clk.Now()
+	deliver(t, n, 0, []dns.RR{
+		txtRR("A._matterc._udp.local", 120, false, "D=1"),
+		txtRR("B._matterc._udp.local", 5, false, "D=2"),
+	})
+	a := n.Get("A._matterc._udp.local").Records()[0]
+	if a.TTL != 120*time.Second || !a.ExpiresAt.Equal(at.Add(126*time.Second)) {
+		t.Errorf("ttl 120: TTL %v expires %v, want 120s at+126s", a.TTL, a.ExpiresAt.Sub(at))
+	}
+	b := n.Get("B._matterc._udp.local").Records()[0]
+	if b.TTL != 15*time.Second || !b.ExpiresAt.Equal(at.Add(15750*time.Millisecond)) {
+		t.Errorf("ttl 5: TTL %v expires %v, want raised to 15s, at+15.75s", b.TTL, b.ExpiresAt.Sub(at))
+	}
+
+	// Goodbye: the record survives the eviction delay, then goes.
+	deliver(t, n, 0, []dns.RR{txtRR("A._matterc._udp.local", 0, false, "D=1")})
+	g := n.Get("A._matterc._udp.local").Records()
+	if len(g) != 1 || g[0].TTL != time.Second || !g[0].ExpiresAt.Equal(at.Add(time.Second)) {
+		t.Fatalf("after goodbye = %+v, want the record retired to 1 s", g)
+	}
+	clk.advance(n, 999*time.Millisecond)
+	if !n.Has("A._matterc._udp.local") {
+		t.Fatal("goodbye must not take effect before the eviction delay")
+	}
+	clk.advance(n, time.Millisecond)
+	if n.Has("A._matterc._udp.local") {
+		t.Fatal("goodbye must take effect after the eviction delay")
+	}
+	// A goodbye never extends a record's life (DnssdName.ts:228-230): at
+	// at+15.2 s, B has 0.55 s left, less than the delay.
+	clk.advance(n, 14200*time.Millisecond)
+	deliver(t, n, 0, []dns.RR{txtRR("B._matterc._udp.local", 0, false, "D=2")})
+	if r := n.Get("B._matterc._udp.local").Records(); len(r) != 1 || !r[0].ExpiresAt.Equal(at.Add(15750*time.Millisecond)) {
+		t.Fatalf("goodbye extended a record: %+v", r)
+	}
+}
+
+// TestParityDiscovery_CacheFlushRetiresOlderUniqueRecords pins RFC 6762
+// §10.2 as matter.js applies it: a cache-flush record of a unique type
+// retires the records of its type that arrived before the eviction-delay
+// window, after that delay; records inside the window (one record set
+// split over packets) survive. DnssdName.ts:148-150, :216-236; DnsCodec.ts
+// :198-207 (unique types SRV, TXT, A, AAAA).
+func TestParityDiscovery_CacheFlushRetiresOlderUniqueRecords(t *testing.T) {
+	t.Parallel()
+	n, _, clk := testNames(t)
+	deliver(t, n, 0, []dns.RR{srvRR(instQ, hostQ, 5540, 120, true)}, aRR(hostQ, "192.0.2.1", 120, true))
+	clk.advance(n, 500*time.Millisecond)
+	deliver(t, n, 0, nil, aRR(hostQ, "192.0.2.2", 120, true)) // same window: kept
+	clk.advance(n, 2*time.Second)
+	deliver(t, n, 0, nil, aRR(hostQ, "192.0.2.3", 120, true)) // retires both
+	if got := len(n.Get(hostQ).Records()); got != 3 {
+		t.Fatalf("records right after the flush = %d, want 3 (retired, not yet gone)", got)
+	}
+	clk.advance(n, time.Second)
+	recs := n.Get(hostQ).Records()
+	if len(recs) != 1 || recs[0].IP.String() != "192.0.2.3" {
+		t.Fatalf("records after the eviction delay = %+v, want only 192.0.2.3", recs)
+	}
+	// A non-flush record supersedes nothing.
+	deliver(t, n, 0, nil, aRR(hostQ, "192.0.2.4", 120, false))
+	clk.advance(n, 2*time.Second)
+	if got := len(n.Get(hostQ).Records()); got != 2 {
+		t.Fatalf("records = %d, want 2", got)
+	}
+}
+
+// TestParityDiscovery_UnavailableSRVIgnored pins that an SRV with target
+// "" or "." or port 0 designates no service and is not cached.
+// DnssdName.ts:125-135, :344-350.
+func TestParityDiscovery_UnavailableSRVIgnored(t *testing.T) {
+	t.Parallel()
+	for _, srv := range []mdns.DNSSRV{{Target: "", Port: 5540}, {Target: ".", Port: 5540}, {Target: "h.local", Port: 0}} {
+		if isAvailableService(srv) {
+			t.Errorf("isAvailableService(%+v) = true", srv)
+		}
+	}
+	if !isAvailableService(mdns.DNSSRV{Target: "h.local", Port: 1}) {
+		t.Error("a target with a port is a service")
+	}
+	n, _, _ := testNames(t)
+	deliver(t, n, 0, []dns.RR{srvRR(instQ, ".", 5540, 120, false), srvRR(instQ, hostQ, 0, 120, false)})
+	if n.Has(instQ) {
+		t.Fatal("an unavailable SRV must not be cached")
+	}
+}
+
+// TestParityDiscovery_TXTParameters pins the parameter rules: newest TXT
+// record first, an empty entry or an empty key skipped, the split at the
+// first "=", the first occurrence of a key winning, a bare key with an
+// empty value. DnssdName.ts:76-112.
+func TestParityDiscovery_TXTParameters(t *testing.T) {
+	t.Parallel()
+	n, _, clk := testNames(t)
+	deliver(t, n, 0, []dns.RR{txtRR(instQ, 120, false, "D=1", "OLD=x")})
+	clk.advance(n, 2*time.Second)
+	deliver(t, n, 0, []dns.RR{txtRR(instQ, 120, false, "D=2", "", "=nokey", "B64=YQ==", "D=3", "FLAG")})
+	p := n.Get(instQ).Parameters()
+	want := map[string]string{"D": "2", "B64": "YQ==", "FLAG": "", "OLD": "x"}
+	if len(p) != len(want) {
+		t.Fatalf("parameters = %q, want %q", p, want)
+	}
+	for k, v := range want {
+		if got, ok := p.Get(k); !ok || got != v {
+			t.Errorf("%s = %q (%v), want %q", k, got, ok, v)
+		}
+	}
+	if _, ok := p.Get("missing"); ok {
+		t.Error("absent key reported present")
+	}
+	if got, _ := (Parameters{"DN": []byte{'a', 0xFF, 'b'}}).Get("DN"); got != "a�b" {
+		t.Errorf("invalid UTF-8 = %q", got)
+	}
+}
+
+// TestParityDiscovery_IngressFilter pins which records enter the cache:
+// names ending in ._matter._tcp.local, ._matterc._udp.local or
+// ._matterd._udp.local (matter.js packages/protocol/src/mdns/MdnsService.ts
+// :25-27, :90-95), case-insensitively; the bare service-type name is not
+// one of them (a scanner adds its own filter for that).
+func TestParityDiscovery_IngressFilter(t *testing.T) {
+	t.Parallel()
+	for name, want := range map[string]bool{
+		"A-B._matter._tcp.local":     true,
+		"X._MATTERC._UDP.LOCAL":      true,
+		"Y._matterd._udp.local":      true,
+		"_matterc._udp.local":        false,
+		"printer._ipp._tcp.local":    false,
+		"x._matterc._udp.local.evil": false,
+	} {
+		if got := isMatterServiceRecord(&Record{Name: name}); got != want {
+			t.Errorf("%s: %v, want %v", name, got, want)
+		}
+	}
+}
+
+func mustAddr(s string) netip.Addr { return netip.MustParseAddr(s) }
+
+// TestParityDiscovery_AddressOrder pins the desirability order a service
+// hands its addresses out in: IPv6 link-local, ULA (/^f[cd]/i), other
+// IPv6, IPv4 (ServerAddress.ts:170-176, :178-209); within a class an
+// unhealthy address after the others and the most recently healthy first
+// (ServerAddressSet.ts:191-229); then the higher DNS priority value when
+// both are known (:178-181). Equal addresses keep their order.
+func TestParityDiscovery_AddressOrder(t *testing.T) {
+	t.Parallel()
+	for ip, want := range map[string]int{
+		"fe80::1":        PreferenceIPv6LinkLocal,
+		"febf::1":        PreferenceIPv6LinkLocal,
+		"fec0::1":        PreferenceIPv6,
+		"fc00::1":        PreferenceIPv6ULA,
+		"FD12::1":        PreferenceIPv6ULA,
+		"2001:db8::1":    PreferenceIPv6,
+		"::ffff:1.2.3.4": PreferenceIPv6,
+		"192.0.2.1":      PreferenceIPv4,
+	} {
+		if got := SelectionPreference(mustAddr(ip)); got != want {
+			t.Errorf("SelectionPreference(%s) = %d, want %d", ip, got, want)
+		}
+	}
+
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	p := func(v uint16) *uint16 { return &v }
+	addrs := []Address{
+		{IP: mustAddr("192.0.2.1"), Port: 1},
+		{IP: mustAddr("2001:db8::1"), Port: 1},
+		{IP: mustAddr("fd00::1"), Port: 1},
+		{IP: mustAddr("fe80::1").WithZone("eth0"), Port: 1},
+	}
+	sortByDesirability(addrs)
+	if got := addrStrings(addrs); !equalStrings(got, []string{"[fe80::1%eth0]:1", "[fd00::1]:1", "[2001:db8::1]:1", "192.0.2.1:1"}) {
+		t.Errorf("order = %v", got)
+	}
+
+	health := []Address{
+		{IP: mustAddr("fd00::1"), Port: 1, UnhealthyAt: t0.Add(2 * time.Second)},
+		{IP: mustAddr("fd00::2"), Port: 1, UnhealthyAt: t0.Add(time.Second)},
+		{IP: mustAddr("fd00::3"), Port: 1},
+		{IP: mustAddr("fd00::4"), Port: 1, HealthyAt: t0},
+		{IP: mustAddr("fd00::5"), Port: 1, HealthyAt: t0.Add(time.Second)},
+		{IP: mustAddr("fd00::6"), Port: 1, HealthyAt: t0.Add(3 * time.Second), UnhealthyAt: t0.Add(2 * time.Second)},
+	}
+	sortByDesirability(health)
+	if got := addrStrings(health); !equalStrings(got, []string{"[fd00::6]:1", "[fd00::5]:1", "[fd00::4]:1", "[fd00::3]:1", "[fd00::2]:1", "[fd00::1]:1"}) {
+		t.Errorf("health order = %v", got)
+	}
+
+	prio := []Address{
+		{IP: mustAddr("fd00::1"), Port: 1, Priority: p(1)},
+		{IP: mustAddr("fd00::2"), Port: 1, Priority: p(5)},
+		{IP: mustAddr("fd00::3"), Port: 1},
+	}
+	sortByDesirability(prio)
+	if got := addrStrings(prio); !equalStrings(got, []string{"[fd00::2]:1", "[fd00::1]:1", "[fd00::3]:1"}) {
+		t.Errorf("priority order = %v", got)
+	}
+}
+
+// TestParityDiscovery_ServiceAddressShape pins what a service makes of its
+// SRV target's records: {ip, port} with the SRV's port
+// (IpService.ts:315-316), an fe80::/10 AAAA zoned to its receive
+// interface unless already zoned (:392-408), an A as is.
+func TestParityDiscovery_ServiceAddressShape(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		rec  Record
+		want string
+	}{
+		{Record{Type: TypeAAAA, IP: mustAddr("fe80::1"), SourceIntf: "en0"}, "fe80::1%en0"},
+		{Record{Type: TypeAAAA, IP: mustAddr("fe80::1").WithZone("x"), SourceIntf: "en0"}, "fe80::1%x"},
+		{Record{Type: TypeAAAA, IP: mustAddr("fd00::1"), SourceIntf: "en0"}, "fd00::1"},
+		{Record{Type: TypeAAAA, IP: mustAddr("fe80::1")}, "fe80::1"},
+		{Record{Type: TypeA, IP: mustAddr("192.0.2.1")}, "192.0.2.1"},
+	} {
+		got, ok := ipOf(&c.rec)
+		if !ok || got.String() != c.want {
+			t.Errorf("ipOf(%+v) = %v %v, want %s", c.rec, got, ok, c.want)
+		}
+	}
+	for _, r := range []Record{{Type: TypePTR}, {Type: TypeA}, {Type: TypeAAAA}} {
+		if _, ok := ipOf(&r); ok {
+			t.Errorf("ipOf(%v) gave an address", r.Type)
+		}
+	}
+}
+
+func intervals(cfg Retries, random uint32, n int) []time.Duration {
+	s := newRetrySchedule(cfg, func() uint32 { return random })
+	var out []time.Duration
+	for range n {
+		d, ok := s.next()
+		if !ok {
+			break
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// TestParityDiscovery_RetrySchedule pins the solicitor's schedule: the
+// default is 1 s, ×2, jitter up to 20 %, capped at 1 h
+// (DnssdSolicitor.ts:94-99); the jitter is floor(0.2 × interval ×
+// random/2³²) ms, added before the cap (RetrySchedule.ts:42-59); the first
+// query goes out at once (DnssdSolicitor.ts:189-193); a scanner's
+// discovery caps the interval at 30 s (CommissionableMdnsScanner.ts:73).
+func TestParityDiscovery_RetrySchedule(t *testing.T) {
+	t.Parallel()
+	s := time.Second
+	if got := intervals(DefaultRetries, 0, 14); !slicesEqual(got, []time.Duration{1 * s, 2 * s, 4 * s, 8 * s, 16 * s, 32 * s, 64 * s, 128 * s, 256 * s, 512 * s, 1024 * s, 2048 * s, time.Hour, time.Hour}) {
+		t.Errorf("no jitter = %v", got)
+	}
+	// The doubling base never wraps: the schedule holds at the cap.
+	long := intervals(DefaultRetries, ^uint32(0), 100)
+	if len(long) != 100 || long[99] != time.Hour || long[40] != time.Hour {
+		t.Errorf("long schedule ends %v", long[len(long)-1])
+	}
+	if got := intervals(DefaultRetries, ^uint32(0), 3); !slicesEqual(got, []time.Duration{1199 * time.Millisecond, 2399 * time.Millisecond, 4799 * time.Millisecond}) {
+		t.Errorf("full jitter = %v", got)
+	}
+	capped := DefaultRetries.merge(&Retries{MaximumInterval: 30 * s})
+	if got := intervals(capped, ^uint32(0), 6); !slicesEqual(got, []time.Duration{1199 * time.Millisecond, 2399 * time.Millisecond, 4799 * time.Millisecond, 9599 * time.Millisecond, 19199 * time.Millisecond, 30 * s}) {
+		t.Errorf("30 s cap = %v", got)
+	}
+	if got := intervals(Retries{Timeout: 2500 * time.Millisecond}, 0, 5); !slicesEqual(got, []time.Duration{s, 1500 * time.Millisecond}) {
+		t.Errorf("timeout = %v", got)
+	}
+	if got := intervals(Retries{InitialInterval: 3 * s, BackoffFactor: 3, MaximumCount: 2}, 0, 5); !slicesEqual(got, []time.Duration{3 * s, 9 * s}) {
+		t.Errorf("count = %v", got)
+	}
+	if got := DefaultRetries.merge(&Retries{Timeout: s, MaximumCount: 1, InitialInterval: 2 * s, BackoffFactor: 3, JitterFactor: 0.5}); got != (Retries{Timeout: s, MaximumCount: 1, InitialInterval: 2 * s, BackoffFactor: 3, MaximumInterval: time.Hour, JitterFactor: 0.5}) {
+		t.Errorf("merge = %+v", got)
+	}
+
+	// The first query of a discovery goes out at once, the next after the
+	// first interval.
+	n, conn, clk := testNames(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	go func() {
+		_ = n.Solicitor().Discover(ctx, Discovery{Solicitation: Solicitation{Name: n.Get(instQ), RecordTypes: []mdns.DNSType{TypeSRV}}})
+	}()
+	waitFor(t, func() bool { return len(conn.queries(t)) == 1 })
+	clk.advance(n, 999*time.Millisecond)
+	if len(conn.queries(t)) != 1 {
+		t.Fatal("second query before 1 s")
+	}
+	clk.advance(n, time.Millisecond)
+	if len(conn.queries(t)) != 2 {
+		t.Fatal("no second query at 1 s")
+	}
+	cancel()
+}
+
+func slicesEqual(a, b []time.Duration) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestParityDiscovery_TXTData pins the TXT parser, one row per key and
+// edge. matter.js packages/protocol/src/common/Scanner.ts: parseTxtDecimal
+// :153-159; DN/RI/PI verbatim :78-82; VP :84-94; DT :96-102; PH (0
+// illegal) :104-111; ICD :113-119; T :121-127 with
+// SupportedTransportsBitmap.ts:9-23; SII/SAI/SAT :129-140.
+func TestParityDiscovery_TXTData(t *testing.T) {
+	t.Parallel()
+	str := func(p *string) string {
+		if p == nil {
+			return "<absent>"
+		}
+		return *p
+	}
+	num := func(p *uint32) string {
+		if p == nil {
+			return "<absent>"
+		}
+		return time.Duration(*p).String()
+	}
+	dur := func(p *time.Duration) string {
+		if p == nil {
+			return "<absent>"
+		}
+		return p.String()
+	}
+	cases := []struct {
+		kv   string
+		get  func(TXTData) string
+		want string
+	}{
+		{"DN=Kitchen Light", func(d TXTData) string { return str(d.DN) }, "Kitchen Light"},
+		{"DN=", func(d TXTData) string { return str(d.DN) }, ""},
+		{"RI=0102AB", func(d TXTData) string { return str(d.RI) }, "0102AB"},
+		{"PI=10", func(d TXTData) string { return str(d.PI) }, "10"},
+		{"VP=65521+32769", func(d TXTData) string { return str(d.VP) }, "65521+32769"},
+		{"VP=65521", func(d TXTData) string { return str(d.VP) }, "65521"},
+		{"VP=65536+1", func(d TXTData) string { return str(d.VP) }, "<absent>"},
+		{"VP=1+x", func(d TXTData) string { return str(d.VP) }, "1"},
+		{"VP=1+65536", func(d TXTData) string { return str(d.VP) }, "1"},
+		{"VP=01+2", func(d TXTData) string { return str(d.VP) }, "<absent>"},
+		{"VP=1+2+3", func(d TXTData) string { return str(d.VP) }, "1+2"},
+		{"DT=4294967295", func(d TXTData) string { return num(d.DT) }, time.Duration(4294967295).String()},
+		{"DT=4294967296", func(d TXTData) string { return num(d.DT) }, "<absent>"},
+		{"PH=33", func(d TXTData) string { return num(d.PH) }, time.Duration(33).String()},
+		{"PH=0", func(d TXTData) string { return num(d.PH) }, "<absent>"},
+		{"SII=3600000", func(d TXTData) string { return dur(d.SII) }, "1h0m0s"},
+		{"SII=3600001", func(d TXTData) string { return dur(d.SII) }, "<absent>"},
+		{"SAI=0", func(d TXTData) string { return dur(d.SAI) }, "0s"},
+		{"SAI=+1", func(d TXTData) string { return dur(d.SAI) }, "<absent>"},
+		{"SAT=0", func(d TXTData) string { return dur(d.SAT) }, "<absent>"},
+		{"SAT=65535", func(d TXTData) string { return dur(d.SAT) }, "1m5.535s"},
+		{"SAT=65536", func(d TXTData) string { return dur(d.SAT) }, "<absent>"},
+	}
+	for _, c := range cases {
+		dd := ParseTXTData(paramsOf(c.kv))
+		if got := c.get(dd); got != c.want {
+			t.Errorf("%s: %q, want %q", c.kv, got, c.want)
+		}
+	}
+
+	icd := func(kv string) string {
+		d := ParseTXTData(paramsOf(kv))
+		if d.ICD == nil {
+			return "<absent>"
+		}
+		return string(rune('0' + *d.ICD))
+	}
+	for kv, want := range map[string]string{"ICD=0": "0", "ICD=1": "1", "ICD=2": "<absent>"} {
+		if got := icd(kv); got != want {
+			t.Errorf("%s: %s, want %s", kv, got, want)
+		}
+	}
+
+	for kv, want := range map[string]*SupportedTransports{
+		"T=6":     {TCPClient: true, TCPServer: true},
+		"T=2":     {TCPClient: true},
+		"T=1":     {},
+		"T=65535": {TCPClient: true, TCPServer: true},
+		"T=65536": nil,
+	} {
+		got := ParseTXTData(paramsOf(kv)).T
+		if (got == nil) != (want == nil) || (got != nil && *got != *want) {
+			t.Errorf("%s: %+v, want %+v", kv, got, want)
+		}
+	}
+
+	for v, want := range map[string]bool{"0": true, "7": true, "4095": true, "0abc": false, "00": false, "07": false, "-1": false, "": false, "1e3": false, "4096": false, "99999999999999999999999": false} {
+		if _, ok := ParseTxtDecimal(v, 0xFFF); ok != want {
+			t.Errorf("ParseTxtDecimal(%q, 0xFFF) ok = %v, want %v", v, ok, want)
+		}
+	}
+}
+
+func paramsOf(kvs ...string) Parameters {
+	p := Parameters{}
+	for _, kv := range kvs {
+		for i := range len(kv) {
+			if kv[i] == '=' {
+				p[kv[:i]] = []byte(kv[i+1:])
+				break
+			}
+		}
+	}
+	return p
+}
+
+// TestParityDiscovery_QueryNames pins the names a commissionable search
+// queries for PTRs: always _matterc._udp.local, plus the instance name or
+// the subtype the identifier selects by — _CM for a product and for "any".
+// matter.js packages/protocol/src/mdns/CommissionableMdnsScanner.ts
+// :574-593 with MdnsConsts.ts:38-45.
+func TestParityDiscovery_QueryNames(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		id   Identifier
+		want string
+	}{
+		{ByInstanceID("ABCD"), "ABCD._matterc._udp.local"},
+		{ByLongDiscriminator(3840), "_L3840._sub._matterc._udp.local"},
+		{ByShortDiscriminator(15), "_S15._sub._matterc._udp.local"},
+		{ByVendor(65521), "_V65521._sub._matterc._udp.local"},
+		{ByVendorProduct(65521, 32769), "_V65521._sub._matterc._udp.local"},
+		{ByDeviceType(257), "_T257._sub._matterc._udp.local"},
+		{ByProduct(32769), "_CM._sub._matterc._udp.local"},
+		{AnyCommissionable(), "_CM._sub._matterc._udp.local"},
+	} {
+		if got := queryQNames(c.id); !equalStrings(got, []string{"_matterc._udp.local", c.want}) {
+			t.Errorf("%+v: %v, want [_matterc._udp.local %s]", c.id, got, c.want)
+		}
+	}
+}
+
+// TestParityDiscovery_IdentifierMatches pins how a found node is matched:
+// instance id; long discriminator = D; short = (D >> 8) & 0x0F; vendor
+// (and product) from VP; device type = DT; product alone from VP; "any" =
+// CM 1 or 2. CommissionableMdnsScanner.ts:533-561.
+func TestParityDiscovery_IdentifierMatches(t *testing.T) {
+	t.Parallel()
+	vp := func(s string) *string { return &s }
+	dt := uint32(257)
+	dev := Device{InstanceID: "ABCD", D: 0xF00, CM: 1, TXTData: TXTData{VP: vp("65521+32769"), DT: &dt}}
+	vendorOnly := Device{InstanceID: "EF", D: 0x123, CM: 0, TXTData: TXTData{VP: vp("65521")}}
+	noVP := Device{InstanceID: "01", D: 1, CM: 2}
+	for _, c := range []struct {
+		id   Identifier
+		d    Device
+		want bool
+	}{
+		{ByInstanceID("ABCD"), dev, true},
+		{ByInstanceID("abcd"), dev, false},
+		{ByLongDiscriminator(0xF00), dev, true},
+		{ByLongDiscriminator(0xF01), dev, false},
+		{ByShortDiscriminator(15), dev, true},
+		{ByShortDiscriminator(1), vendorOnly, true},
+		{ByShortDiscriminator(0), dev, false},
+		{ByVendor(65521), dev, true},
+		{ByVendor(65521), vendorOnly, true},
+		{ByVendor(65522), dev, false},
+		{ByVendor(65521), noVP, false},
+		{ByVendorProduct(65521, 32769), dev, true},
+		{ByVendorProduct(65521, 32770), dev, false},
+		{ByVendorProduct(65521, 32769), vendorOnly, false},
+		{ByDeviceType(257), dev, true},
+		{ByDeviceType(258), dev, false},
+		{ByDeviceType(257), noVP, false},
+		{ByProduct(32769), dev, true},
+		{ByProduct(32769), vendorOnly, false},
+		{ByProduct(32769), noVP, false},
+		{AnyCommissionable(), dev, true},
+		{AnyCommissionable(), noVP, true},
+		{AnyCommissionable(), vendorOnly, false},
+	} {
+		if got := c.id.matches(&c.d); got != c.want {
+			t.Errorf("%+v matches %s = %v, want %v", c.id, c.d.InstanceID, got, c.want)
+		}
+	}
+	a, b := ByVendor(1), ByVendor(1)
+	if a != b || a == ByVendorProduct(1, 0) || AnyCommissionable() != (Identifier{}) {
+		t.Error("identifiers compare structurally")
+	}
+}
+
+// TestParityDiscovery_CommissionableDevice pins when an instance becomes a
+// device: D ≤ 0xFFF and CM ≤ 255, both valid decimals, else nothing is
+// built (CommissionableMdnsScanner.ts:470-477); T defaults to no TCP and
+// ICD to 0 (:484-486); the instance id is the name's first label (:480);
+// the hostname is the single distinct SRV target's first label, absent
+// while targets disagree (:508-516).
+func TestParityDiscovery_CommissionableDevice(t *testing.T) {
+	t.Parallel()
+	n, _, clk := testNames(t)
+	build := func(q string, entries ...string) (Device, bool) {
+		deliver(t, n, 0, []dns.RR{txtRR(q, 120, false, entries...)})
+		var d Device
+		var ok bool
+		onLoop(t, n, func() { d, ok = buildDevice(n.get(q)) })
+		return d, ok
+	}
+	for i, c := range []struct {
+		entries []string
+		ok      bool
+	}{
+		{[]string{"D=3840", "CM=1"}, true},
+		{[]string{"D=0", "CM=0"}, true},
+		{[]string{"D=4095", "CM=255"}, true},
+		{[]string{"D=0abc", "CM=1"}, false},
+		{[]string{"D=4096", "CM=1"}, false},
+		{[]string{"D=3840", "CM=256"}, false},
+		{[]string{"D=3840"}, false},
+		{[]string{"CM=1"}, false},
+		{[]string{"D=03840", "CM=1"}, false},
+	} {
+		q := "I" + string(rune('A'+i)) + "._matterc._udp.local"
+		if _, ok := build(q, c.entries...); ok != c.ok {
+			t.Errorf("%v: built = %v, want %v", c.entries, ok, c.ok)
+		}
+	}
+	d, _ := build("XY._matterc._udp.local", "D=1", "CM=1", "T=4")
+	if d.InstanceID != "XY" || d.T == nil || !d.T.TCPServer || d.ICD == nil || *d.ICD != 0 {
+		t.Errorf("device = %+v", d)
+	}
+	d, _ = build("Z._matterc._udp.local", "D=1", "CM=1")
+	if d.T == nil || *d.T != (SupportedTransports{}) || d.Hostname != "" {
+		t.Errorf("defaults = %+v", d)
+	}
+
+	deliver(t, n, 0, []dns.RR{srvRR("Z._matterc._udp.local", "hostA.local", 5540, 120, true)})
+	onLoop(t, n, func() {
+		if h := hostnameOf(n.get("Z._matterc._udp.local")); h != "hostA" {
+			t.Errorf("hostname = %q", h)
+		}
+	})
+	deliver(t, n, 0, []dns.RR{srvRR("Z._matterc._udp.local", "hostA.local", 5541, 120, false)})
+	onLoop(t, n, func() {
+		if h := hostnameOf(n.get("Z._matterc._udp.local")); h != "hostA" {
+			t.Errorf("one host on two ports: %q", h)
+		}
+	})
+	clk.advance(n, 2*time.Second)
+	deliver(t, n, 0, []dns.RR{srvRR("Z._matterc._udp.local", "hostB.local", 5540, 120, false)})
+	onLoop(t, n, func() {
+		if h := hostnameOf(n.get("Z._matterc._udp.local")); h != "" {
+			t.Errorf("two hosts: %q, want none", h)
+		}
+	})
+}
+
+// TestParityDiscovery_ScannerFilter pins the scanner's ingress filter:
+// _matterc._udp.local and _matterd._udp.local themselves and every name
+// under them, case-insensitively. CommissionableMdnsScanner.ts:95-105.
+func TestParityDiscovery_ScannerFilter(t *testing.T) {
+	t.Parallel()
+	for name, want := range map[string]bool{
+		"_matterc._udp.local":             true,
+		"_MATTERD._UDP.LOCAL":             true,
+		"_L3840._sub._matterc._udp.local": true,
+		"AB._matterd._udp.local":          true,
+		"AB-CD._matter._tcp.local":        false,
+		"x_matterc._udp.local":            false,
+	} {
+		if got := isCommissionableRecord(&Record{Name: name}); got != want {
+			t.Errorf("%s: %v, want %v", name, got, want)
+		}
+	}
+}
+
+// TestParityDiscovery_OperationalQName pins the operational instance name:
+// `<CFID>-<NODEID>._matter._tcp.local`, both ids as 16 upper-case hex
+// digits. matter.js packages/protocol/src/mdns/MdnsConsts.ts:36-37,
+// GlobalFabricId.strOf / NodeId.strOf (hex.fixed(…, 16)).
+func TestParityDiscovery_OperationalQName(t *testing.T) {
+	t.Parallel()
+	if got := OperationalQName([8]byte{0xAB, 0xCD, 0, 0, 0, 0, 0, 1}, 0xFEDCBA9876543210); got != "ABCD000000000001-FEDCBA9876543210._matter._tcp.local" {
+		t.Errorf("qname = %s", got)
+	}
+	if got := OperationalQName([8]byte{}, 1); got != "0000000000000000-0000000000000001._matter._tcp.local" {
+		t.Errorf("qname = %s", got)
+	}
+}
+
+// TestParityDiscovery_ResolutionQueries pins what a resolution asks: SRV
+// and TXT of the service name together (TXT explicitly,
+// IpServiceResolution.ts:119-130), and A and AAAA of an SRV target that has
+// no address (:39-64), with the target's records as known answers of the
+// service query (:126-128).
+func TestParityDiscovery_ResolutionQueries(t *testing.T) {
+	t.Parallel()
+	n, conn, _ := testNames(t)
+	deliver(t, n, 0, []dns.RR{srvRR(opQ, "ctrl.local", 5540, 120, true)})
+	s := n.Service(opCFID, opNode)
+	defer s.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go func() { _, _ = s.Resolve(ctx) }()
+	waitFor(t, func() bool { return len(conn.queries(t)) >= 1 })
+	q := conn.queries(t)[0]
+	if got := questionsOf(q); !equalStrings(got, []string{"ctrl.local/A", "ctrl.local/AAAA", opQ + "/SRV", opQ + "/TXT"}) {
+		t.Errorf("questions = %v", got)
+	}
+	if len(q.Answers) != 1 || q.Answers[0].Type != TypeSRV {
+		t.Errorf("known answers = %+v", q.Answers)
+	}
+}

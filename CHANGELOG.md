@@ -10,6 +10,90 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `controller/discovery`, the controller's DNS-SD browser (ADR 0020,
+  stage 1): `Names` / `Name`, the record cache of matter.js `DnssdNames` /
+  `DnssdName` at `0ceb202d` — records keyed as matter.js keys them, TTLs
+  with the 1.05 grace factor and the 15 s floor, goodbyes and cache-flush
+  supersession after the 1 s eviction delay, unavailable SRVs ignored, TXT
+  parameters by matter.js's rules, the Matter service-type ingress filter,
+  and A/AAAA staging for SRV targets from relevant packets only.
+- `discovery.Service`, the live view of one DNS-SD service name (matter.js
+  `IpService`): SRV targets keyed target:port, `{ip, port}` addresses with
+  fe80:: zoned to the receiving interface, coalesced change notification,
+  TXT changes detected by parameter signature, `AddressChanges` (deletions
+  first, then additions in desirability order), and
+  `discovery.CompareDesirability` / `discovery.SelectionPreference`
+  (link-local, ULA, global IPv6, IPv4; then health; then SRV priority).
+- `discovery.Solicitor`, the query loop of matter.js `DnssdSolicitor`:
+  solicitations of one loop task go out as one packet whose known answers
+  are the names' cached records without the cache-flush bit; `Discover`
+  sends the first query at once and repeats on `discovery.DefaultRetries`
+  (1 s, ×2, jitter up to 20 % added before the 1 h cap), the first caller
+  per name owning the schedule and later callers joining it.
+- `discovery.TXTData` / `discovery.ParseTXTData`, the TXT parser of
+  matter.js `DiscoveryData` (`Scanner.ts`): `ParseTxtDecimal`
+  (`^(0|[1-9]\d*)$` up to a maximum, else absent), DN/RI/PI verbatim, VP
+  with vendor and product parsed independently, DT, PH (0 illegal), ICD,
+  the `T` transports bitmap, SII/SAI up to one hour and SAT 1..65535 ms —
+  an invalid value is absent so the MRP defaults apply.
+  `Service.TXTData` serves operational TXT records the same way.
+- `discovery.Scanner`, matter.js `CommissionableMdnsScanner`:
+  `FindCommissionable(ctx, Identifier, found)` reports cached matches
+  first and then queries `_matterc._udp.local` plus the identifier's
+  `_L`/`_S`/`_V`/`_T`/`_CM` subtype or instance name, retrying at most
+  every 30 s, until ctx ends or `Cancel` cancels it; `Discovered` reads
+  the cache only. PTR targets without SRV/TXT are solicited speculatively
+  (at most 50, forgotten after an hour); an instance becomes a
+  `discovery.Device` once its TXT carries a valid D and CM, and is
+  reported once it has an address. Identifiers: `ByInstanceID`,
+  `ByLongDiscriminator`, `ByShortDiscriminator`, `ByVendor`,
+  `ByVendorProduct`, `ByDeviceType`, `ByProduct`, `AnyCommissionable`.
+- `discovery.Names.Service(compressedFabricID, nodeID)` gives a node's
+  operational service (`discovery.OperationalQName`, matter.js
+  `getOperationalDeviceQname`), and `Service.Resolve` runs matter.js
+  `IpServiceResolution`: SRV and TXT for the instance with its SRV targets
+  as known answers, A/AAAA for each target without an address, on the
+  default schedule, until an address not known before appears or ctx
+  ends. `mdns.OperationalResolver` stays for the bridge (ADR 0008).
+- `mdns.QueryConn` / `mdns.OpenQueryConn` export the multicast query
+  transport `mdns.OperationalResolver` already used, and
+  `mdns.ParseDNSMessage` / `mdns.PackDNSQuery` with `mdns.DNSRecord`,
+  `mdns.DNSQuestion`, `mdns.DNSMessage`, `mdns.DNSSRV` and `mdns.DNSType`
+  give the browser a typed record codec. `OperationalResolver` behaves as
+  before.
+- `controller/exchange`, the controller's message layer (ADR 0020, stage 1):
+  a `Manager` over one UDP socket with the session table (the unsecured
+  session of a handshake, secure PASE / CASE sessions over
+  `secure/channel`), the exchange table and the receive path, and
+  `Exchange` with MRP — reliable `Send` with retransmission on the
+  §4.12.2.1 schedule and the final wait, piggybacked and standalone acks,
+  duplicate detection, `Next` with the maximum peer response time,
+  graceful `Close` and `Abort`, the 30-exchange cap per session, session
+  id allocation with reuse of the least recently used session's id, and
+  `CloseSession`. Ported from matter.js `ExchangeManager.ts` and
+  `MessageExchange.ts` at `0ceb202d`.
+- `controller/handshake.PASE`, the PASE client (ADR 0020, stage 1): the
+  PBKDF parameter exchange, SPAKE2+ Pake1–Pake3 over `secure/spake2`'s
+  prover and the PASE session on a `controller/exchange.Manager`; a wrong
+  passcode is `ErrPasscodeMismatch`, a failure the device can be told of
+  is reported with StatusReport InvalidParam (also when the context was
+  cancelled), and the context no longer cancels once Pake3 is sent.
+  Ported from matter.js `PaseClient.ts` at `0ceb202d`.
+- `controller/handshake.CASE`, the CASE client (ADR 0020, stage 1): Sigma1
+  with or without a resumption offer from a `ResumptionStore`
+  (`MemoryResumptionStore` in memory), Sigma2Resume with the resume MIC
+  and the record moved to the new resumption id, Sigma2 with the
+  responder's NOC bound to the expected node and fabric and its chain
+  verified, Sigma3, the CASE session on a `controller/exchange.Manager`,
+  the record saved after the session exists, and the InvalidParam report
+  on a failure the peer can be told of. Ported from matter.js
+  `CaseClient.ts` at `0ceb202d`.
+- `bridgetest.Commissioner.ControllerIdentity` and `RootPublicKey`: the
+  commissioner's controller identity and fabric root, for a CASE
+  initiator outside the package.
+
 ### Changed
 
 - The Matter data model snapshot (`parity/schema.json`) moves from

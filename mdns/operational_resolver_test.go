@@ -19,12 +19,12 @@ import (
 type fakeQueryConn struct {
 	mu      sync.Mutex
 	queries []*dns.Msg
-	out     chan received
-	respond func(q *dns.Msg, n int) []received
+	out     chan QueryResponse
+	respond func(q *dns.Msg, n int) []QueryResponse
 }
 
-func newFakeQueryConn(respond func(q *dns.Msg, n int) []received) *fakeQueryConn {
-	return &fakeQueryConn{out: make(chan received, 64), respond: respond}
+func newFakeQueryConn(respond func(q *dns.Msg, n int) []QueryResponse) *fakeQueryConn {
+	return &fakeQueryConn{out: make(chan QueryResponse, 64), respond: respond}
 }
 
 func (f *fakeQueryConn) Send(msg []byte) error {
@@ -42,8 +42,8 @@ func (f *fakeQueryConn) Send(msg []byte) error {
 	return nil
 }
 
-func (f *fakeQueryConn) Responses() <-chan received { return f.out }
-func (f *fakeQueryConn) Close() error               { return nil }
+func (f *fakeQueryConn) Responses() <-chan QueryResponse { return f.out }
+func (f *fakeQueryConn) Close() error                    { return nil }
 
 func (f *fakeQueryConn) sent() []*dns.Msg {
 	f.mu.Lock()
@@ -52,7 +52,7 @@ func (f *fakeQueryConn) sent() []*dns.Msg {
 }
 
 func resolverOver(c *fakeQueryConn) *OperationalResolver {
-	return &OperationalResolver{logger: nil, open: func() (queryConn, error) { return c, nil }}
+	return &OperationalResolver{logger: nil, open: func() (QueryConn, error) { return c, nil }}
 }
 
 func packResponse(t *testing.T, records ...dns.RR) []byte {
@@ -88,17 +88,17 @@ func aRR(host, ip string) dns.RR {
 func TestOperationalResolver_ResolvesFromOneResponseInPreferenceOrder(t *testing.T) {
 	t.Parallel()
 	instance := OperationalInstanceQName(testCFID, testNodeID)
-	conn := newFakeQueryConn(func(q *dns.Msg, _ int) []received {
+	conn := newFakeQueryConn(func(q *dns.Msg, _ int) []QueryResponse {
 		// Noise first: a foreign query and a goodbye for our instance.
 		noise := new(dns.Msg)
 		noise.SetQuestion("other.local.", dns.TypePTR)
 		noiseBytes, _ := noise.Pack()
 		goodbye := srvRR(instance, "stale.local.", 1)
 		goodbye.Header().Ttl = 0
-		return []received{
-			{msg: noiseBytes},
-			{msg: packResponse(t, goodbye)},
-			{msg: packResponse(
+		return []QueryResponse{
+			{Msg: noiseBytes},
+			{Msg: packResponse(t, goodbye)},
+			{Msg: packResponse(
 				t,
 				aRR("ctrl.local.", "192.168.1.20"),
 				aaaaRR("ctrl.local.", "2001:db8::20"),
@@ -134,13 +134,13 @@ func TestOperationalResolver_ResolvesFromOneResponseInPreferenceOrder(t *testing
 func TestOperationalResolver_AsksForHostAddressesAfterBareSRV(t *testing.T) {
 	t.Parallel()
 	instance := OperationalInstanceQName(testCFID, testNodeID)
-	conn := newFakeQueryConn(func(q *dns.Msg, n int) []received {
+	conn := newFakeQueryConn(func(q *dns.Msg, n int) []QueryResponse {
 		if n == 1 {
-			return []received{{msg: packResponse(t, srvRR(instance, "ctrl.local.", 5540))}}
+			return []QueryResponse{{Msg: packResponse(t, srvRR(instance, "ctrl.local.", 5540))}}
 		}
 		for _, qq := range q.Question {
 			if qq.Qtype == dns.TypeAAAA && strings.EqualFold(qq.Name, "ctrl.local.") {
-				return []received{{msg: packResponse(t, aaaaRR("CTRL.local.", "fd00::1"))}}
+				return []QueryResponse{{Msg: packResponse(t, aaaaRR("CTRL.local.", "fd00::1"))}}
 			}
 		}
 		return nil
@@ -158,7 +158,7 @@ func TestOperationalResolver_AsksForHostAddressesAfterBareSRV(t *testing.T) {
 
 func TestOperationalResolver_RetriesThenGivesUp(t *testing.T) {
 	t.Parallel()
-	conn := newFakeQueryConn(func(*dns.Msg, int) []received { return nil })
+	conn := newFakeQueryConn(func(*dns.Msg, int) []QueryResponse { return nil })
 	ctx, cancel := context.WithTimeout(t.Context(), 1500*time.Millisecond)
 	defer cancel()
 	_, err := resolverOver(conn).ResolveOperational(ctx, testCFID, testNodeID)
@@ -174,8 +174,8 @@ func TestOperationalResolver_RetriesThenGivesUp(t *testing.T) {
 func TestOperationalResolver_DropsLinkLocalWithoutZone(t *testing.T) {
 	t.Parallel()
 	instance := OperationalInstanceQName(testCFID, testNodeID)
-	conn := newFakeQueryConn(func(*dns.Msg, int) []received {
-		return []received{{msg: packResponse(
+	conn := newFakeQueryConn(func(*dns.Msg, int) []QueryResponse {
+		return []QueryResponse{{Msg: packResponse(
 			t,
 			srvRR(instance, "ctrl.local.", 5540),
 			aaaaRR("ctrl.local.", "fe80::1"),

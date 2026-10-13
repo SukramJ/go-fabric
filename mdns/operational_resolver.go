@@ -60,23 +60,7 @@ const (
 // restart (docs/adr/0008).
 type OperationalResolver struct {
 	logger *slog.Logger
-	open   func() (queryConn, error)
-}
-
-// queryConn is the multicast transport a resolution runs over. Production
-// joins the mDNS groups on UDP/5353; tests substitute a fake responder.
-type queryConn interface {
-	// Send multicasts one DNS message.
-	Send(msg []byte) error
-	// Responses delivers received DNS messages with the index of the
-	// interface they arrived on (0 when unknown).
-	Responses() <-chan received
-	Close() error
-}
-
-type received struct {
-	msg     []byte
-	ifIndex int
+	open   func() (QueryConn, error)
 }
 
 // NewOperationalResolver returns a resolver on the host's multicast
@@ -190,14 +174,14 @@ func (r *resolution) query() []byte {
 
 // absorb folds one received message in and reports whether it was a
 // response at all.
-func (r *resolution) absorb(in received) bool {
+func (r *resolution) absorb(in QueryResponse) bool {
 	m := new(dns.Msg)
-	if err := m.Unpack(in.msg); err != nil || !m.Response {
+	if err := m.Unpack(in.Msg); err != nil || !m.Response {
 		return false
 	}
 	zone := ""
-	if in.ifIndex > 0 {
-		if ifi, err := net.InterfaceByIndex(in.ifIndex); err == nil {
+	if in.IfIndex > 0 {
+		if ifi, err := net.InterfaceByIndex(in.IfIndex); err == nil {
 			zone = ifi.Name
 		}
 	}
@@ -275,18 +259,18 @@ func SelectionPreference(a netip.Addr) int {
 	}
 }
 
-// multicastQueryConn is the production [queryConn]: the mDNS groups on
+// multicastQueryConn is the production [QueryConn]: the mDNS groups on
 // every multicast interface, UDP/5353, shared with the advertiser.
 type multicastQueryConn struct {
 	pc4  *ipv4.PacketConn
 	pc6  *ipv6.PacketConn
-	out  chan received
+	out  chan QueryResponse
 	once sync.Once
 	wg   sync.WaitGroup
 }
 
-func openMulticastQueryConn() (queryConn, error) {
-	c := &multicastQueryConn{out: make(chan received, 16)}
+func openMulticastQueryConn() (QueryConn, error) {
+	c := &multicastQueryConn{out: make(chan QueryResponse, 16)}
 	pc4, err4 := joinMcast4()
 	if err4 == nil {
 		c.pc4 = pc4
@@ -329,7 +313,7 @@ func (c *multicastQueryConn) Send(msg []byte) error {
 func (c *multicastQueryConn) deliver(buf []byte, ifIndex int) {
 	msg := append([]byte(nil), buf...)
 	select {
-	case c.out <- received{msg: msg, ifIndex: ifIndex}:
+	case c.out <- QueryResponse{Msg: msg, IfIndex: ifIndex}:
 	default: // a full queue drops; the next retry asks again
 	}
 }
@@ -364,7 +348,7 @@ func (c *multicastQueryConn) read6() {
 	}
 }
 
-func (c *multicastQueryConn) Responses() <-chan received { return c.out }
+func (c *multicastQueryConn) Responses() <-chan QueryResponse { return c.out }
 
 func (c *multicastQueryConn) Close() error {
 	c.once.Do(func() {
