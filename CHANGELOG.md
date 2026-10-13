@@ -43,6 +43,15 @@ pseudo-version of `main`.
   operational node ID range with NOCResponse InvalidNodeOpId instead of
   InvalidNOC (`mattercert.ErrNonOperationalNodeID`, wrapped alongside
   `ErrMalformed`).
+- DoorLock follows matter.js `0ceb202d`'s lock-operation rules:
+  UnboltDoor reports LockOperationType Unlock (was Unlatch); a lock
+  command without an accessing fabric (a PASE session before AddNOC) is
+  refused with UNSUPPORTED_ACCESS before the `StateSource` is called; with
+  OperatingMode NoRemoteLockUnlock every lock command emits
+  LockOperationError (OperationError Unspecified) and answers FAILURE; a
+  failing `LockInvoke` emits LockOperationError and answers the error's IM
+  status if it carries one, FAILURE otherwise (it used to return the
+  error unchanged with no event).
 
 ## [0.3.1] — 2026-10-13
 

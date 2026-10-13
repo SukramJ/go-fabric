@@ -12,6 +12,8 @@ import (
 	"testing"
 
 	matterlock "github.com/SukramJ/go-fabric/cluster/lock"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/tlv"
 )
@@ -89,8 +91,9 @@ func TestDefaultAttributeValueWriter_LockOperationEvent_AllFieldsSet(t *testing.
 
 // TestDefaultAttributeValueWriter_LockOperationEvent_NullableFieldsNil
 // verifies that UserIndex, FabricIndex and SourceNode all encode as
-// TLV null when unset — the PASE / no-PIN-credential case matter.js
-// DoorLockServer.ts:1289-1301 falls back to.
+// TLV null when unset. The server always sets FabricIndex (a request
+// without a fabric is refused, matter.js 0ceb202d DoorLockServer.ts:1017-1022);
+// the writer still encodes the nullable shape.
 func TestDefaultAttributeValueWriter_LockOperationEvent_NullableFieldsNil(t *testing.T) {
 	t.Parallel()
 
@@ -116,5 +119,43 @@ func TestDefaultAttributeValueWriter_LockOperationEvent_NullableFieldsNil(t *tes
 		if !ok || !el.IsNull {
 			t.Errorf("tag %d = %+v, want IsNull=true", tag, el)
 		}
+	}
+}
+
+// TestDefaultAttributeValueWriter_LockOperationErrorEvent verifies the
+// DoorLock §5.2.10.4 LockOperationError TLV shape the server emits (the
+// generated payload, encoded through spec.Encodable): matter.js
+// door-lock-cluster.element.ts LockOperationError —
+//
+//	[0] LockOperationType, [1] OperationSource, [2] OperationError,
+//	[3] UserIndex nullable, [4] FabricIndex nullable, [5] SourceNode
+//	nullable; [6] Credentials ([USR]) absent.
+func TestDefaultAttributeValueWriter_LockOperationErrorEvent(t *testing.T) {
+	t.Parallel()
+
+	v := lockdef.LockOperationErrorEvent{
+		LockOperationType: lockdef.LockOperationTypeUnlock,
+		OperationSource:   lockdef.OperationSourceRemote,
+		OperationError:    lockdef.OperationErrorUnspecified,
+		UserIndex:         spec.NullOf[uint16](),
+		FabricIndex:       spec.ValueOf(uint8(2)),
+		SourceNode:        spec.NullOf[uint64](),
+	}
+
+	b := verifyNonEmpty(t, "LockOperationErrorEvent", callAttributeWriter(im.AttributeValue{Value: v}))
+	fields := decodeStructFields(t, b)
+
+	for tag, want := range map[uint32]uint64{0: 1, 1: 7, 2: 0, 4: 2} {
+		if el, ok := fields[tag]; !ok || el.IsNull || el.Uint != want {
+			t.Errorf("tag %d = %+v, want Uint=%d", tag, el, want)
+		}
+	}
+	for _, tag := range []uint32{3, 5} {
+		if el, ok := fields[tag]; !ok || !el.IsNull {
+			t.Errorf("tag %d = %+v, want IsNull=true", tag, el)
+		}
+	}
+	if _, ok := fields[6]; ok {
+		t.Error("tag 6 (Credentials) present, want absent")
 	}
 }

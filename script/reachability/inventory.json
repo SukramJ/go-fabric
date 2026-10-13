@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4498,
+  "entry_points": 4501,
   "entry_packages": [
     ".",
     "bdx",
@@ -175,9 +175,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10441,
+    "total_exported": 10442,
     "reachable": 7361,
-    "whitelisted": 3075,
+    "whitelisted": 3076,
     "unreachable": 5
   },
   "by_package": [
@@ -2303,17 +2303,24 @@
     },
     {
       "package": "bridge",
+      "identifier": "TestDefaultAttributeValueWriter_LockOperationErrorEvent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/reply_doorlock_event_test.go",
+      "line": 133
+    },
+    {
+      "package": "bridge",
       "identifier": "TestDefaultAttributeValueWriter_LockOperationEvent_AllFieldsSet",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_doorlock_event_test.go",
-      "line": 57
+      "line": 59
     },
     {
       "package": "bridge",
       "identifier": "TestDefaultAttributeValueWriter_LockOperationEvent_NullableFieldsNil",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/reply_doorlock_event_test.go",
-      "line": 94
+      "line": 97
     },
     {
       "package": "bridge",

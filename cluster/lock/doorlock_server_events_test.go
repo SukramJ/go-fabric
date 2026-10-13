@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/SukramJ/go-fabric/cluster/lock"
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	lockdef "github.com/SukramJ/go-fabric/cluster/spec/doorlock"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -68,8 +70,9 @@ func newWiredServer(t *testing.T, src *eventTestSource, endpoint uint16) (*lock.
 // successful LockDoor invoke fires exactly one LockOperation event
 // (0x02) with LockOperationType=Lock(0), OperationSource=Remote(7),
 // and FabricIndex/SourceNode lifted from the invoking context. Mirrors
-// matter.js DoorLockServer.ts:193-196 (#lockDoor ends in
-// #emitLockOperation) and :1289-1301 (payload assembly).
+// matter.js 0ceb202d DoorLockServer.ts:1041 (#actuate ends in
+// #completeOperation → #emitLockOperation) and :1289-1301 (payload
+// assembly).
 func TestDoorLockServer_EmitLockOperation_LockDoor(t *testing.T) {
 	t.Parallel()
 	src := &eventTestSource{observed: true}
@@ -124,11 +127,15 @@ func TestDoorLockServer_EmitLockOperation_LockDoor(t *testing.T) {
 	}
 }
 
+// fabricCtx is the context of a CASE requester on fabric 1 without a
+// node subject.
+func fabricCtx() context.Context { return im.WithFabricFilter(context.Background(), false, 1) }
+
 // TestDoorLockServer_EmitLockOperation_OperationTypeMapping verifies
-// the LockOperationType wire value per command: LockDoor→Lock(0),
-// UnlockDoor→Unlock(1), UnboltDoor→Unlatch(4). UnboltDoor reporting
-// Unlatch rather than Unlock mirrors matter.js
-// DoorLockServer.ts:209-214.
+// the LockOperationType wire value per command: UnlockDoor→Unlock(1),
+// UnboltDoor→Unlock(1). Unbolting retracts the bolt without pulling the
+// latch, so the lock ends up Unlocked and reports an Unlock — matter.js
+// 0ceb202d DoorLockServer.ts:208-217 and :1024-1025.
 func TestDoorLockServer_EmitLockOperation_OperationTypeMapping(t *testing.T) {
 	t.Parallel()
 
@@ -138,7 +145,7 @@ func TestDoorLockServer_EmitLockOperation_OperationTypeMapping(t *testing.T) {
 		wantOp uint8
 	}{
 		{"UnlockDoor", wire.DoorLockCmdUnlockDoor, 1},
-		{"UnboltDoor", wire.DoorLockCmdUnboltDoor, 4},
+		{"UnboltDoor", wire.DoorLockCmdUnboltDoor, 1},
 	}
 
 	for _, tc := range cases {
@@ -147,7 +154,7 @@ func TestDoorLockServer_EmitLockOperation_OperationTypeMapping(t *testing.T) {
 			src := &eventTestSource{observed: true}
 			srv, emitter := newWiredServer(t, src, 1)
 
-			if _, err := srv.MatterInvoke(context.Background(), tc.cmdID, nil); err != nil {
+			if _, err := srv.MatterInvoke(fabricCtx(), tc.cmdID, nil); err != nil {
 				t.Fatalf("MatterInvoke(0x%02X): %v", tc.cmdID, err)
 			}
 			if len(emitter.calls) != 1 {
@@ -164,17 +171,34 @@ func TestDoorLockServer_EmitLockOperation_OperationTypeMapping(t *testing.T) {
 	}
 }
 
-// TestDoorLockServer_EmitLockOperation_UnstampedContext verifies that
-// a plain context.Background() (the PASE case, no fabric/subject
-// stamped) yields FabricIndex=nil and SourceNode=nil — matching
-// matter.js's null fallback for pre-fabric sessions
-// (DoorLockServer.ts:1289-1301).
-func TestDoorLockServer_EmitLockOperation_UnstampedContext(t *testing.T) {
+// TestDoorLockServer_NoFabricIsUnsupportedAccess verifies that a lock
+// command without an accessing fabric (a PASE session before AddNOC) is
+// refused with UNSUPPORTED_ACCESS before the source is called, and emits
+// no event. Mirrors matter.js 0ceb202d DoorLockServer.ts:1017-1022.
+func TestDoorLockServer_NoFabricIsUnsupportedAccess(t *testing.T) {
+	t.Parallel()
+	for _, cmdID := range []uint32{wire.DoorLockCmdLockDoor, wire.DoorLockCmdUnlockDoor, wire.DoorLockCmdUnboltDoor} {
+		src := &eventTestSource{observed: true}
+		srv, emitter := newWiredServer(t, src, 3)
+		_, err := srv.MatterInvoke(context.Background(), cmdID, nil)
+		if got := statusOf(err); got != im.StatusUnsupportedAccess {
+			t.Errorf("0x%02X: status = %v (%v), want UnsupportedAccess", cmdID, got, err)
+		}
+		if len(src.invoked) != 0 || len(emitter.calls) != 0 {
+			t.Errorf("0x%02X: LockInvoke %v, events %d — want neither", cmdID, src.invoked, len(emitter.calls))
+		}
+	}
+}
+
+// TestDoorLockServer_EmitLockOperation_NoSubjectNode verifies that a
+// requester with a fabric but no node subject yields SourceNode=nil —
+// matter.js 0ceb202d DoorLockServer.ts:943-949 (#sourceNode).
+func TestDoorLockServer_EmitLockOperation_NoSubjectNode(t *testing.T) {
 	t.Parallel()
 	src := &eventTestSource{observed: true}
 	srv, emitter := newWiredServer(t, src, 3)
 
-	if _, err := srv.MatterInvoke(context.Background(), wire.DoorLockCmdLockDoor, nil); err != nil {
+	if _, err := srv.MatterInvoke(fabricCtx(), wire.DoorLockCmdLockDoor, nil); err != nil {
 		t.Fatalf("MatterInvoke: %v", err)
 	}
 	if len(emitter.calls) != 1 {
@@ -184,32 +208,115 @@ func TestDoorLockServer_EmitLockOperation_UnstampedContext(t *testing.T) {
 	if !ok {
 		t.Fatalf("data type = %T, want lock.LockOperationEvent", emitter.calls[0].data)
 	}
-	if payload.FabricIndex != nil {
-		t.Errorf("FabricIndex = %d, want nil", *payload.FabricIndex)
+	if payload.FabricIndex == nil || *payload.FabricIndex != 1 {
+		t.Errorf("FabricIndex = %v, want 1", payload.FabricIndex)
 	}
 	if payload.SourceNode != nil {
 		t.Errorf("SourceNode = 0x%X, want nil", *payload.SourceNode)
 	}
 }
 
-// TestDoorLockServer_EmitLockOperation_InvokeErrorSuppressesEvent
-// verifies that a failing LockInvoke neither emits an event nor bumps
-// the DataVersion tracker.
-func TestDoorLockServer_EmitLockOperation_InvokeErrorSuppressesEvent(t *testing.T) {
-	t.Parallel()
-	src := &eventTestSource{observed: true, invokeErr: errInvokeFailed}
-	srv, emitter := newWiredServer(t, src, 4)
-	dvBefore := srv.MatterDataVersion()
+// lockOperationError returns the single LockOperationError payload the
+// emitter recorded.
+func lockOperationError(t *testing.T, emitter *fakeEventEmitter) lockdef.LockOperationErrorEvent {
+	t.Helper()
+	if len(emitter.calls) != 1 {
+		t.Fatalf("emitter.calls = %d, want exactly 1", len(emitter.calls))
+	}
+	c := emitter.calls[0]
+	if c.event != wire.DoorLockEventLockOperationError || c.priority != contract.EventPriorityCritical {
+		t.Fatalf("event 0x%02X priority %v, want LockOperationError (0x03), critical", c.event, c.priority)
+	}
+	payload, ok := c.data.(lockdef.LockOperationErrorEvent)
+	if !ok {
+		t.Fatalf("data type = %T, want lockdef.LockOperationErrorEvent", c.data)
+	}
+	return payload
+}
 
-	_, err := srv.MatterInvoke(context.Background(), wire.DoorLockCmdLockDoor, nil)
-	if !errors.Is(err, errInvokeFailed) {
-		t.Fatalf("MatterInvoke error = %v, want errInvokeFailed", err)
+func statusOf(err error) im.StatusCode {
+	var sc im.StatusCodeError
+	if errors.As(err, &sc) {
+		return sc.MatterStatusCode()
 	}
-	if len(emitter.calls) != 0 {
-		t.Errorf("emitter.calls = %d, want 0 on failed invoke", len(emitter.calls))
+	return 0
+}
+
+// TestDoorLockServer_InvokeErrorEmitsLockOperationError verifies that a
+// failing LockInvoke emits LockOperationError (OperationError Unspecified,
+// the requester's fabric and node) and answers FAILURE — or the error's
+// own IM status when it carries one — without a DataVersion bump. Mirrors
+// matter.js 0ceb202d DoorLockServer.ts:1033-1038 (hardwareFailureReason
+// :1605-1624 picks Unspecified for an error that is not a
+// LockOperationFailedError); matter.js answers FAILURE in both cases.
+func TestDoorLockServer_InvokeErrorEmitsLockOperationError(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		err  error
+		want im.StatusCode
+	}{
+		{errInvokeFailed, im.StatusFailure},
+		{spec.Errorf(im.StatusBusy, "busy"), im.StatusBusy},
+	} {
+		src := &eventTestSource{observed: true, invokeErr: tc.err}
+		srv, emitter := newWiredServer(t, src, 4)
+		dvBefore := srv.MatterDataVersion()
+
+		ctx := im.WithSubject(im.WithFabricFilter(context.Background(), false, 2), 0xAABB, nil)
+		_, err := srv.MatterInvoke(ctx, wire.DoorLockCmdUnboltDoor, nil)
+		if got := statusOf(err); got != tc.want {
+			t.Errorf("%v: status = %v (%v), want %v", tc.err, got, err, tc.want)
+		}
+		ev := lockOperationError(t, emitter)
+		if ev.LockOperationType != lockdef.LockOperationTypeUnlock || ev.OperationSource != lockdef.OperationSourceRemote ||
+			ev.OperationError != lockdef.OperationErrorUnspecified {
+			t.Errorf("payload = %+v, want Unlock / Remote / Unspecified", ev)
+		}
+		if !ev.UserIndex.Null || ev.FabricIndex != spec.ValueOf(uint8(2)) || ev.SourceNode != spec.ValueOf(uint64(0xAABB)) {
+			t.Errorf("payload = %+v, want UserIndex null, FabricIndex 2, SourceNode 0xAABB", ev)
+		}
+		if ev.Credentials != nil {
+			t.Error("Credentials present, want absent (no USR)")
+		}
+		if srv.MatterDataVersion() != dvBefore {
+			t.Error("DataVersion bumped despite failed invoke")
+		}
 	}
-	if srv.MatterDataVersion() != dvBefore {
-		t.Error("DataVersion bumped despite failed invoke")
+}
+
+// TestDoorLockServer_NoRemoteLockUnlockRefusesRemoteOperations verifies
+// that with OperatingMode NoRemoteLockUnlock (3) every lock command emits
+// LockOperationError (Unspecified) and answers FAILURE without calling
+// the source. Mirrors matter.js 0ceb202d DoorLockServer.ts:1050-1056
+// (#authorize: Privacy or NoRemoteLockUnlock); Privacy is not a supported
+// mode here (SupportedOperatingModes 0xFFF6), so it cannot be written.
+func TestDoorLockServer_NoRemoteLockUnlockRefusesRemoteOperations(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		cmdID  uint32
+		wantOp lockdef.LockOperationTypeEnum
+	}{
+		{wire.DoorLockCmdLockDoor, lockdef.LockOperationTypeLock},
+		{wire.DoorLockCmdUnlockDoor, lockdef.LockOperationTypeUnlock},
+		{wire.DoorLockCmdUnboltDoor, lockdef.LockOperationTypeUnlock},
+	} {
+		src := &eventTestSource{observed: true}
+		srv, emitter := newWiredServer(t, src, 5)
+		if err := srv.MatterWrite(context.Background(), wire.DoorLockAttrOperatingMode, uint8(3)); err != nil {
+			t.Fatalf("write OperatingMode=3: %v", err)
+		}
+		_, err := srv.MatterInvoke(fabricCtx(), tc.cmdID, nil)
+		if got := statusOf(err); got != im.StatusFailure {
+			t.Errorf("0x%02X: status = %v (%v), want Failure", tc.cmdID, got, err)
+		}
+		if len(src.invoked) != 0 {
+			t.Errorf("0x%02X: LockInvoke called %v, want not called", tc.cmdID, src.invoked)
+		}
+		ev := lockOperationError(t, emitter)
+		if ev.LockOperationType != tc.wantOp || ev.OperationError != lockdef.OperationErrorUnspecified ||
+			ev.FabricIndex != spec.ValueOf(uint8(1)) || !ev.SourceNode.Null {
+			t.Errorf("0x%02X: payload = %+v, want type %d, Unspecified, fabric 1, no node", tc.cmdID, ev, tc.wantOp)
+		}
 	}
 }
 
@@ -222,7 +329,7 @@ func TestDoorLockServer_EmitLockOperation_NoEmitterWired(t *testing.T) {
 	src := &eventTestSource{observed: true}
 	srv := lock.NewDoorLockServer(lock.DoorLockConfig{Source: src})
 
-	if _, err := srv.MatterInvoke(context.Background(), wire.DoorLockCmdLockDoor, nil); err != nil {
+	if _, err := srv.MatterInvoke(fabricCtx(), wire.DoorLockCmdLockDoor, nil); err != nil {
 		t.Fatalf("MatterInvoke without emitter: %v", err)
 	}
 }

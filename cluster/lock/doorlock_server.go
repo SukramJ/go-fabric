@@ -49,12 +49,11 @@ const (
 // LockType is DeadBolt.
 const lockTypeDeadBolt = uint8(lockdef.LockTypeDeadBolt)
 
-// LockOperationTypeEnum values of the LockOperation event: Lock, Unlock,
-// Unlatch.
+// LockOperationTypeEnum values of the LockOperation and
+// LockOperationError events: Lock, Unlock. UnboltDoor reports Unlock.
 const (
-	lockOperationTypeLock    = uint8(lockdef.LockOperationTypeLock)
-	lockOperationTypeUnlock  = uint8(lockdef.LockOperationTypeUnlock)
-	lockOperationTypeUnlatch = uint8(lockdef.LockOperationTypeUnlatch)
+	lockOperationTypeLock   = uint8(lockdef.LockOperationTypeLock)
+	lockOperationTypeUnlock = uint8(lockdef.LockOperationTypeUnlock)
 )
 
 // operationSourceRemote is the OperationSourceEnum value for a
@@ -86,7 +85,12 @@ var errUnknownCommand = errors.New("doorlock: unknown command")
 // IsLocked returns (locked=true, observed=true) when the lock state is known
 // and the lock is in the locked position.
 // LockInvoke dispatches LockDoor / UnlockDoor / UnboltDoor commands to the
-// CCU. cmdID is one of the [wire.DoorLockCmd*] constants. The
+// CCU. cmdID is one of the [wire.DoorLockCmd*] constants. A returned error
+// fails the command: the server emits LockOperationError (OperationError
+// Unspecified) and answers the error's IM status if it carries one
+// ([im.StatusCodeError]), FAILURE otherwise. It is not called for a
+// request without an accessing fabric or while OperatingMode refuses
+// remote operations. The
 // implementation owns the southbound urgency of the write it performs:
 // the cluster contract carries no priority, so a host whose command
 // queue ranks by urgency names the value it wants inside LockInvoke.
@@ -117,7 +121,7 @@ type DoorLockConfig struct {
 // OperatingMode is fixed to Normal (0); SupportedOperatingModes is 0xFFF6
 // — all alwaysSet bits (2047 = bits 0-10) set plus bits for vacation,
 // privacy, passage; Normal (bit 0) and NoRemoteLockUnlock (bit 3) are
-// both clear = supported. Mirrors matter.js DoorLockServer.ts:119
+// both clear = supported. Mirrors matter.js DoorLockServer.ts:69
 // ({vacation:true,privacy:true,passage:true,alwaysSet:2047}) → 0xFFF6.
 type DoorLockServer struct {
 	embedded cluster.DataVersionTracker // used when cfg.DataVersion is nil
@@ -191,7 +195,7 @@ func (s *DoorLockServer) MatterRead(attrID uint32) (any, bool) {
 		// 0xFFF6: alwaysSet bits (0x07FF, bits 0-10) | vacation (bit 1) |
 		// privacy (bit 2) | passage (bit 4) — Normal (bit 0) and
 		// NoRemoteLockUnlock (bit 3) clear = supported.
-		// Mirrors matter.js DoorLockServer.ts:119.
+		// Mirrors matter.js DoorLockServer.ts:69.
 		return supportedOperatingModes, true
 	default:
 		return nil, false
@@ -200,7 +204,7 @@ func (s *DoorLockServer) MatterRead(attrID uint32) (any, bool) {
 
 // supportedOperatingModes is SupportedOperatingModes: 0xFFF6 — Normal (bit 0)
 // and NoRemoteLockUnlock (bit 3) clear, i.e. supported (matter.js
-// DoorLockServer.ts:119 default).
+// DoorLockServer.ts:69 default).
 const supportedOperatingModes uint16 = 0xFFF6
 
 // MatterWrite implements [contract.ClusterServer]. OperatingMode ("R[W] VM",
@@ -245,50 +249,81 @@ type doorLockConstraintErr struct{ msg string }
 func (e doorLockConstraintErr) Error() string                 { return e.msg }
 func (doorLockConstraintErr) MatterStatusCode() im.StatusCode { return im.StatusConstraintError }
 
-// MatterInvoke implements [contract.ClusterServer]. Dispatches
-// LockDoor / UnlockDoor / UnboltDoor to the underlying source and fires
-// the LockOperation event on success.
+// MatterInvoke implements [contract.ClusterServer]. LockDoor, UnlockDoor
+// and UnboltDoor run matter.js's #actuate in its order:
+//
+//  1. no accessing fabric (a PASE session before AddNOC) — UNSUPPORTED_ACCESS,
+//     the source is not called and no event is emitted;
+//  2. OperatingMode Privacy or NoRemoteLockUnlock — a LockOperationError
+//     event (OperationError Unspecified) and FAILURE;
+//  3. the source's LockInvoke fails — a LockOperationError event
+//     (OperationError Unspecified) and the error's IM status if it carries
+//     one, FAILURE otherwise;
+//  4. success — a DataVersion bump and the LockOperation event.
+//
+// Mirrors matter.js 0ceb202d packages/node/src/behaviors/door-lock/
+// DoorLockServer.ts:1015-1042 (#actuate) and :1049-1056 (#authorize's
+// operating-mode refusal).
 func (s *DoorLockServer) MatterInvoke(ctx context.Context, cmdID uint32, _ any) (any, error) {
 	switch cmdID {
 	case lockdef.CmdLockDoor, lockdef.CmdUnlockDoor, lockdef.CmdUnboltDoor:
-		if err := s.src.LockInvoke(ctx, cmdID); err != nil {
-			return nil, err
-		}
-		s.tracker().Bump()
-		s.emitLockOperation(ctx, cmdID)
-		return nil, nil
 	default:
 		return nil, fmt.Errorf("%w: 0x%02X", errUnknownCommand, cmdID)
 	}
+	// Events of a lock operation name the requesting fabric; without one
+	// the hardware must not move. matter.js DoorLockServer.ts:1017-1022.
+	if _, fabricIndex := im.FabricFilterFromContext(ctx); fabricIndex == 0 {
+		return nil, spec.Errorf(im.StatusUnsupportedAccess, "doorlock: lock commands need the fabric of a remote requester")
+	}
+	// UnboltDoor retracts the bolt without pulling the latch: the lock ends
+	// up Unlocked and reports an Unlock (§ 5.2.10.25, § 5.2.11.3).
+	// matter.js DoorLockServer.ts:208-217, :1024-1025 (`operationType =
+	// locking ? Lock : Unlock`).
+	opType := lockOperationTypeUnlock
+	if cmdID == lockdef.CmdLockDoor {
+		opType = lockOperationTypeLock
+	}
+	s.mu.Lock()
+	mode := lockdef.OperatingModeEnum(s.operatingMode)
+	s.mu.Unlock()
+	if mode == lockdef.OperatingModePrivacy || mode == lockdef.OperatingModeNoRemoteLockUnlock {
+		s.emitLockOperationError(ctx, opType, lockdef.OperationErrorUnspecified)
+		return nil, spec.Errorf(im.StatusFailure, "doorlock: remote lock operations are disabled in operating mode %d", mode)
+	}
+	if err := s.src.LockInvoke(ctx, cmdID); err != nil {
+		// matter.js DoorLockServer.ts:1033-1038: the error event with
+		// hardwareFailureReason (:1605-1624 — Unspecified for an error
+		// that is not a LockOperationFailedError) and FAILURE. The status
+		// rule is the one every host port here follows: the error's own
+		// IM status if it carries one, FAILURE otherwise.
+		s.emitLockOperationError(ctx, opType, lockdef.OperationErrorUnspecified)
+		var sc im.StatusCodeError
+		if errors.As(err, &sc) {
+			return nil, err
+		}
+		return nil, spec.Errorf(im.StatusFailure, "doorlock: command 0x%02X refused: %v", cmdID, err)
+	}
+	s.tracker().Bump()
+	s.emitLockOperation(ctx, opType)
+	return nil, nil
 }
 
 // emitLockOperation fires the Matter §5.2.10.3 LockOperation event
 // after a successful remote lock/unlock/unbolt. Mirrors matter.js
-// DoorLockServer.ts:193-214 (each command handler ends in
-// #emitLockOperation) and :1289-1301 (payload assembly:
+// 0ceb202d DoorLockServer.ts:1289-1301 (#emitLockOperation:
 // OperationSource=Remote, UserIndex/Credentials null without PIN
 // credentials, FabricIndex + SourceNode from the invoking session).
-// A PASE session carries fabric index 0 and no subject node — both
-// encode as TLV null, matching matter.js's null fallbacks. No-op until
-// the bridge wires an emitter via [SetMatterEventEmitter].
-func (s *DoorLockServer) emitLockOperation(ctx context.Context, cmdID uint32) {
+// MatterInvoke refuses a request without a fabric, so FabricIndex is
+// always set; SourceNode is null unless the subject is a node
+// (DoorLockServer.ts:943-949 #sourceNode). No-op until the bridge wires
+// an emitter via [SetMatterEventEmitter].
+func (s *DoorLockServer) emitLockOperation(ctx context.Context, opType uint8) {
 	s.mu.Lock()
 	emitter := s.emitter
 	endpoint := s.endpoint
 	s.mu.Unlock()
 	if emitter == nil {
 		return
-	}
-	var opType uint8
-	switch cmdID {
-	case wire.DoorLockCmdLockDoor:
-		opType = lockOperationTypeLock
-	case wire.DoorLockCmdUnlockDoor:
-		opType = lockOperationTypeUnlock
-	case wire.DoorLockCmdUnboltDoor:
-		// UnboltDoor reports Unlatch, not Unlock — matter.js
-		// DoorLockServer.ts:209-214.
-		opType = lockOperationTypeUnlatch
 	}
 	ev := LockOperationEvent{
 		LockOperationType: opType,
@@ -303,6 +338,38 @@ func (s *DoorLockServer) emitLockOperation(ctx context.Context, cmdID uint32) {
 	emitter.MatterEmitEvent(endpoint, lockdef.ClusterID,
 		lockdef.EventLockOperation, ev,
 		instance.EventPriority(lockdef.EventLockOperation))
+}
+
+// emitLockOperationError fires the Matter §5.2.10.4 LockOperationError
+// event (0x03, critical) with the generated payload: the LockOperation
+// fields plus OperationError; Credentials ([USR]) is absent. Mirrors
+// matter.js 0ceb202d DoorLockServer.ts:1303-1320
+// (#emitLockOperationError). No-op until an emitter is wired.
+func (s *DoorLockServer) emitLockOperationError(ctx context.Context, opType uint8, operationError lockdef.OperationErrorEnum) {
+	s.mu.Lock()
+	emitter := s.emitter
+	endpoint := s.endpoint
+	s.mu.Unlock()
+	if emitter == nil {
+		return
+	}
+	ev := lockdef.LockOperationErrorEvent{
+		LockOperationType: lockdef.LockOperationTypeEnum(opType),
+		OperationSource:   lockdef.OperationSourceRemote,
+		OperationError:    operationError,
+		UserIndex:         spec.NullOf[uint16](),
+		FabricIndex:       spec.NullOf[uint8](),
+		SourceNode:        spec.NullOf[uint64](),
+	}
+	if _, fabricIndex := im.FabricFilterFromContext(ctx); fabricIndex != 0 {
+		ev.FabricIndex = spec.ValueOf(fabricIndex)
+	}
+	if nodeID, _ := im.SubjectFromContext(ctx); nodeID != 0 {
+		ev.SourceNode = spec.ValueOf(nodeID)
+	}
+	emitter.MatterEmitEvent(endpoint, lockdef.ClusterID,
+		lockdef.EventLockOperationError, ev,
+		instance.EventPriority(lockdef.EventLockOperationError))
 }
 
 // SetMatterEventEmitter implements [contract.EventReceiver].
@@ -348,8 +415,7 @@ func (*DoorLockServer) MatterGeneratedCommands() []uint32 { return instance.Matt
 // three conformance-M DoorLock events are advertised (DoorLockAlarm,
 // LockOperation, LockOperationError); DoorStateChange (DPS) and
 // LockUserChange (USR) are feature-gated and absent. The server emits
-// LockOperation on successful remote operations; DoorLockAlarm and
-// LockOperationError have no emission path without PIN-credential
-// support, matching matter.js where they fire only from the wrong-code
-// path (DoorLockServer.ts:1188 / :941).
+// LockOperation on successful remote operations and LockOperationError
+// on a refused or failed one ([DoorLockServer.MatterInvoke]);
+// DoorLockAlarm has no emission path without PIN-credential support.
 func (*DoorLockServer) MatterEvents() []uint32 { return instance.MatterEvents() }
