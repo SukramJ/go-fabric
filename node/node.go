@@ -111,8 +111,13 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.cfg.Store.Credentials = n.st
 	n.persisted = persisted{st: n.st, logger: n.logger}
 	var err error
-	if n.groups, err = groups.NewManager(n.st, n.logger); err != nil {
-		return nil, fmt.Errorf("node: group state: %w", err)
+	// The host's group manager when it supplies one (its assembler mounts
+	// the Groups servers over it), else the facade's own.
+	n.groups = cfg.Groups
+	if n.groups == nil {
+		if n.groups, err = groups.NewManager(n.st, n.logger); err != nil {
+			return nil, fmt.Errorf("node: group state: %w", err)
+		}
 	}
 
 	// --- the topology assembler and the Aggregator (main.go:167-186) ----
@@ -199,7 +204,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	cm := cfg.Commissioning
 	n.sec = wireSecurity(n.life, n.br, n.st, n.root, n.caseIDs, paseParams{
 		passcode: cm.Passcode, salt: cm.Salt, iterations: cm.PBKDFIterations,
-	}, n.logger)
+	}, responderSessionParams(cfg.Network.TCP), n.logger)
 
 	// --- the commissioning window (main.go:329-360) ---------------------
 	advert, err := n.advertisement()
@@ -209,6 +214,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.window = &commissioningHost{
 		br: n.br, sessions: n.sec.sessions, root: n.root, logger: n.logger,
 		baseline: n.sec.pase, advert: advert, observer: cfg.Observers.OnWindowTransition,
+		responderParams: n.sec.responderParams,
 	}
 	wireCommissioningWindow(n.life, n.window, n.st)
 
@@ -562,6 +568,13 @@ func (n *Node) BootReason() uint8 { return n.bootReason }
 
 // Store returns the credential store the node runs on.
 func (n *Node) Store() *store.Store { return n.st }
+
+// Groups returns the group state the node runs on — [Config].Groups, or
+// the manager the facade built. A host that assembles its own topology
+// binds it into its assembler (endpoint.Config.Groups), so the endpoints'
+// Groups servers, the bridge's group-message routing and the root's
+// GroupKeyManagement share one state.
+func (n *Node) Groups() *groups.Manager { return n.groups }
 
 // PairingCodes returns the QR code payload and the manual pairing code of
 // the configured passcode and discriminator — matter.js

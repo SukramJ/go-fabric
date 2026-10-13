@@ -22,6 +22,7 @@ import (
 	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/endpoint/sqlitestore"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/store"
@@ -297,5 +298,36 @@ func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 	}
 	if got := n.Subscriptions().CountBySession(); got[sessions[0].SessionID] != 1 {
 		t.Errorf("subscriptions by session %v, want one on session %d", got, sessions[0].SessionID)
+	}
+}
+
+// TestHostGroups: a host that assembles its own topology hands the facade
+// the group manager its assembler mounts the Groups servers over
+// (Config.Groups, issue #89); the facade runs on it and Node.Groups
+// returns it. Without one the facade builds its own, which Node.Groups
+// returns for a host binding its assembler after New.
+func TestHostGroups(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := openDB(t, filepath.Join(t.TempDir(), "node.db"))
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	gm, err := groups.NewManager(store.New(db), slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := minimalConfig(db)
+	cfg.Groups = gm
+	n := newNode(t, cfg)
+	if n.Groups() != gm {
+		t.Fatal("the facade did not run on the host's group manager")
+	}
+	if err := n.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	own := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "own.db"))))
+	if own.Groups() == nil {
+		t.Fatal("no group manager without Config.Groups")
 	}
 }
