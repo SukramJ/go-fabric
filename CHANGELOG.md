@@ -133,6 +133,16 @@ pseudo-version of `main`.
   session to a new peer address (`session.channel.networkAddress = …`,
   `PeerAddressMonitor.ts`), and the time of the last message received on
   a session (`Session.activeTimestamp`), which orders a peer's sessions.
+- Peer loss in `controller/exchange`: `Session.HandlePeerLoss` /
+  `IsPeerLost` / `Closing` / `FabricIndex`, `Manager.HandlePeerLoss`
+  (every session of a peer created before a point in time) and
+  `Manager.SessionsFor`, keyed by `exchange.PeerAddress`. A lost session
+  aborts its exchanges with the cause, calls the `PeerLost` hook once and
+  closes without a CloseSession on the wire. A send or wait that shows
+  the peer gone now loses the peer's sessions as matter.js
+  `ExchangeManager` does (its own session once the failing exchange
+  ends), where it only called the hook before. `handshake.CASE` stamps
+  the fabric index on the CASE session (`SecureSessionConfig.FabricIndex`).
 
 ### Changed
 

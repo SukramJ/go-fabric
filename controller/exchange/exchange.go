@@ -223,6 +223,7 @@ type Exchange struct {
 	closeTimer      Timer
 	receivedCount   int
 	lastActive      time.Time
+	createdAt       time.Time
 }
 
 func newExchange(m *Manager, s *Session, id, protocol uint16, opts Options) *Exchange {
@@ -238,6 +239,7 @@ func newExchange(m *Manager, s *Session, id, protocol uint16, opts Options) *Exc
 		done:             make(chan struct{}),
 		signal:           make(chan struct{}, 1),
 		lastActive:       m.clock.Now(),
+		createdAt:        m.clock.Now(),
 	}
 }
 
@@ -358,7 +360,7 @@ func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts 
 		err = x.awaitAck(ctx, p, opts.ExpectAckOnly)
 	}
 	if err != nil && x.reportsPeerLoss(opts.SuppressPeerLoss) && (errors.Is(err, ErrTransient) || errors.Is(err, ErrNetwork)) {
-		x.m.reportPeerLost(x.session, err)
+		x.m.exchangePeerLost(x, err)
 	}
 	return err
 }
@@ -703,7 +705,7 @@ func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, err
 		case <-expired:
 			err := &PeerMessageMissingError{Timeout: timeout}
 			if x.reportsPeerLoss(opts.SuppressPeerLoss) {
-				x.m.reportPeerLost(x.session, err)
+				x.m.exchangePeerLost(x, err)
 			}
 			return nil, err
 		}
