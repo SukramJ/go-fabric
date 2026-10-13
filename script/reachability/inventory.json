@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4621,
+  "entry_points": 4628,
   "entry_packages": [
     ".",
     "bdx",
@@ -179,9 +179,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10684,
-    "reachable": 7505,
-    "whitelisted": 3174,
+    "total_exported": 10696,
+    "reachable": 7510,
+    "whitelisted": 3181,
     "unreachable": 5
   },
   "by_package": [
@@ -14627,6 +14627,27 @@
     },
     {
       "package": "controller/peer",
+      "identifier": "TestAddKnownPeerMergeAndCoalescedSave",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 68
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestAdoptSessions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 152
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestCloseDeleteAndDisconnect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 209
+    },
+    {
+      "package": "controller/peer",
       "identifier": "TestMemoryResumptionStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/store_test.go",
@@ -14641,6 +14662,13 @@
     },
     {
       "package": "controller/peer",
+      "identifier": "TestNewSetNeedsItsCollaborators",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 22
+    },
+    {
+      "package": "controller/peer",
       "identifier": "TestParityTimingDefaults",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
@@ -14652,6 +14680,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/parity_matterjs_test.go",
       "line": 48
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestServiceChangeUpdatesDiscoveryData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 124
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestSessionParametersPreferTheReport",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 191
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestSetForGetAndUnknownFabric",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/set_test.go",
+      "line": 43
     },
     {
       "package": "controller/peer",

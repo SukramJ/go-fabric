@@ -169,6 +169,17 @@ pseudo-version of `main`.
   `MemoryResumptionStore`, and `peer.Timing` with `DefaultTiming` and
   `Merge` (matter.js `PeerTimingParameters` and its defaults at
   `0ceb202d`).
+- `peer.Set` and `peer.Peer` (matter.js `PeerSet`, `Peer`): `NewSet`
+  over a `peer.Context` (exchange manager, DNS-SD cache, fabrics,
+  resumption and descriptor stores, timing, error handler, hooks),
+  `For` / `Get` / `Has` / `Peers` / `Size`, `AddKnownPeer` with
+  matter.js's merge rules, `Adopt` (a CASE session of one of our fabrics
+  becomes its peer's), `Disconnect`, `Close`, `Timing` / `SetTiming`,
+  `SetHandleError`. A peer follows its operational DNS-SD service (the
+  TXT record's SII/SAI/SAT/T/ICD as a group), its sessions' address and
+  reported parameters, saves its descriptor once per burst of changes,
+  and offers `Descriptor`, `Sessions`, `HasSession`, `NewestSession`,
+  `SessionParameters`, `Disconnect`, `Close` and `Delete`.
 
 ### Changed
 
