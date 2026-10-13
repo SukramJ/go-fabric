@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4612,
+  "entry_points": 4604,
   "entry_packages": [
     ".",
     "bdx",
@@ -178,9 +178,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10653,
-    "reachable": 7492,
-    "whitelisted": 3156,
+    "total_exported": 10652,
+    "reachable": 7490,
+    "whitelisted": 3157,
     "unreachable": 5
   },
   "by_package": [
@@ -14455,6 +14455,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 590
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestRetransmissionCountAndRestartSaving",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/retransmission_test.go",
+      "line": 19
     },
     {
       "package": "controller/exchange",

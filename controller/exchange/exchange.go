@@ -180,6 +180,34 @@ func (x *Exchange) HasUnackedMessage() bool {
 	return x.sentToAck != nil
 }
 
+// RetransmissionCount is the number of retransmissions of the message the
+// exchange sent last, reset by a new send and by its acknowledgement —
+// matter.js MessageExchange.ts:410-413 (retransmissionCount): the counter
+// of :263, reset at :508 (ack), :611 (send) and :786 (first
+// transmission), incremented at :886 and taken back at :907 when only the
+// final wait remains.
+func (x *Exchange) RetransmissionCount() int {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	return x.retransCount
+}
+
+// RetransmissionRestartSaving is how much restarting the exchange — a
+// fresh exchange whose first transmission waits the base backoff — would
+// shorten the wait until the next (re)transmission: the interval of the
+// retransmission timer armed last minus the backoff of transmission 0,
+// never negative, and 0 before the exchange armed a timer. Mirrors
+// matter.js MessageExchange.ts:1227-1235 (retransmissionRestartSaving),
+// which reads the last timer's interval whether or not it still runs.
+func (x *Exchange) RetransmissionRestartSaving() time.Duration {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if x.retransTimer == nil {
+		return 0
+	}
+	return max(0, x.retransInterval-x.backoffLocked(0))
+}
+
 // considerClosed is matter.js MessageExchange.ts:376-378: closed, or —
 // for an exchange we initiated, which every exchange here is — closing.
 func (x *Exchange) considerClosed() bool {

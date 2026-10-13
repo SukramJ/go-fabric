@@ -112,6 +112,12 @@ pseudo-version of `main`.
 - `bridgetest.Commissioner.ControllerIdentity` and `RootPublicKey`: the
   commissioner's controller identity and fabric root, for a CASE
   initiator outside the package.
+- `exchange.Exchange.RetransmissionCount` and
+  `RetransmissionRestartSaving` (ADR 0020, stage 1): the retransmissions
+  of the pending message and how much a restarted exchange would shorten
+  the wait for the next one — matter.js `MessageExchange.retransmissionCount`
+  and `retransmissionRestartSaving` at `0ceb202d`, the inputs of the
+  connection process's kick.
 
 ### Changed
 
