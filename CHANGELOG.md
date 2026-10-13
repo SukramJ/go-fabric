@@ -12,6 +12,22 @@ pseudo-version of `main`.
 
 ### Added
 
+- `node.Config.Groups` and `Node.Groups()` (#89): a host that assembles
+  its own topology (`Config.Topology`) hands the facade the
+  `groups.Manager` its assembler mounts the Groups and ScenesManagement
+  servers over, or takes the facade's, so the endpoints' Groups servers,
+  the bridge's group-message routing and the root GroupKeyManagement
+  share one state.
+
+### Fixed
+
+- The node facade's PASE and CASE responders advertise the TCP roles of
+  `node.Network.TCP` in their session parameters (PBKDFParamResponse tag
+  5, Sigma2's responderSessionParams: tcpServer for Incoming, tcpClient
+  for Outgoing; #89) — matter.js `ServerNetworkRuntime.ts:355-363` at
+  `0ceb202d` — so a peer learns them during the handshake; they advertised
+  no transport before. The MRP intervals stay `bridge.DefaultSessionParameters`.
+
 - The node facade gains the seams a bridge host with its own topology
   assembler and its own operator surface needs to adopt `node.New` (#87):
   `node.Config.Topology` hands the bridge the host's own `bridge.Snapshotter`

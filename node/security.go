@@ -26,6 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/secure/spake2"
@@ -208,6 +209,30 @@ type security struct {
 	subs     *subscription.Manager
 	pase     *bridge.PerExchangePaseProvider
 	casep    *bridge.PerExchangeCaseProvider
+	// responderParams is what every PASE and CASE responder advertises.
+	responderParams *sessionparams.Parameters
+}
+
+// responderSessionParams is the SessionParameters the node's PASE and
+// CASE responders advertise (PBKDFParamResponse tag 5, Sigma2's
+// responderSessionParams): bridge.DefaultSessionParameters with the TCP
+// roles the node serves — tcpServer for incoming, tcpClient for outgoing
+// — so a peer learns them during the handshake and may open TCP to us,
+// and nothing when TCP is off. Mirrors matter.js ServerNetworkRuntime.ts:
+// 355-363 (`SessionManager.sessionParameters = {…, supportedTransports:
+// {tcpClient: outgoing, tcpServer: incoming}}` only with a TCP role) at
+// 0ceb202d; the size bound is sessionparams.DefaultMaxTCPMessageSize
+// (bridge.SessionParametersFor).
+func responderSessionParams(tcp bridge.TCPConfig) *sessionparams.Parameters {
+	var transports uint16
+	if tcp.Incoming {
+		transports |= sessionparams.TransportTCPServer
+	}
+	if tcp.Outgoing {
+		transports |= sessionparams.TransportTCPClient
+	}
+	p := bridge.SessionParametersFor(transports, 0)
+	return &p
 }
 
 // wireSecurity attaches everything between an inbound datagram and a served
@@ -225,6 +250,7 @@ func wireSecurity(
 	root *RootClusters,
 	ids *caseIdentities,
 	pase paseParams,
+	responderParams *sessionparams.Parameters,
 	logger *slog.Logger,
 ) *security {
 	sessions := operational.NewManager(st)
@@ -302,7 +328,7 @@ func wireSecurity(
 	// everything the commissioner sends after Pake3.
 	//nolint:contextcheck // the factory signature is fixed by the provider; the adapters it builds carry no ctx of their own
 	paseProvider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
-		adapter, err := buildPaseAdapter(sessions, root, pase)
+		adapter, err := buildPaseAdapter(sessions, root, pase, responderParams)
 		if err != nil {
 			logger.Warn("pase.build_failed", slog.String("err", err.Error()))
 			return nil
@@ -317,7 +343,7 @@ func wireSecurity(
 	// CASE, likewise per exchange. A single responder lands in `Finished`
 	// after the first Sigma3 and rejects every later Sigma1.
 	caseProvider := bridge.NewPerExchangeCaseProvider(func() *bridge.CaseAdapter { //nolint:contextcheck // the adapter outlives this call; its callbacks run per handshake
-		adapter, err := buildCaseAdapter(sessions, ids, logger)
+		adapter, err := buildCaseAdapter(sessions, ids, responderParams, logger)
 		if err != nil {
 			logger.Warn("case.build_failed", slog.String("err", err.Error()))
 			return nil
@@ -339,7 +365,7 @@ func wireSecurity(
 	br.AttachOperationalResolver(mdns.NewOperationalResolver(logger))
 	br.AttachCaseInitiatorProvider(caseInitiatorProvider(st, sessions, ids, logger))
 
-	return &security{sessions: sessions, subs: subs, pase: paseProvider, casep: caseProvider}
+	return &security{sessions: sessions, subs: subs, pase: paseProvider, casep: caseProvider, responderParams: responderParams}
 }
 
 // caseInitiatorProvider prepares the CASE handshakes the bridge opens to
@@ -415,7 +441,7 @@ type paseParams struct {
 // SPAKE2+ verifier in, and on success an operational session registered under
 // the pre-allocated id with the attestation challenge handed to
 // OperationalCredentials.
-func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseParams) (*bridge.PaseAdapter, error) {
+func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseParams, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
 	if !setup.IsValidSetupPIN(p.passcode) {
 		return nil, fmt.Errorf("passcode %d is invalid or trivially guessable", p.passcode)
 	}
@@ -423,13 +449,13 @@ func buildPaseAdapter(sessions *operational.Manager, root *RootClusters, p paseP
 	if err != nil {
 		return nil, fmt.Errorf("spake2 verifier context: %w", err)
 	}
-	return buildPaseAdapterFromContext(sessions, root, vc, p.salt, p.iterations)
+	return buildPaseAdapterFromContext(sessions, root, vc, p.salt, p.iterations, responderParams)
 }
 
 // buildPaseAdapterFromContext is the passcode-independent half of
 // buildPaseAdapter, shared with the enhanced commissioning window, whose
 // verifier arrives precomputed from the commissioner (commissioning.go).
-func buildPaseAdapterFromContext(sessions *operational.Manager, root *RootClusters, vc *spake2.VerifierContext, salt []byte, iterations int) (*bridge.PaseAdapter, error) {
+func buildPaseAdapterFromContext(sessions *operational.Manager, root *RootClusters, vc *spake2.VerifierContext, salt []byte, iterations int, responderParams *sessionparams.Parameters) (*bridge.PaseAdapter, error) {
 	sessionID, err := sessions.AllocateID()
 	if err != nil {
 		return nil, fmt.Errorf("allocate PASE session id: %w", err)
@@ -438,6 +464,13 @@ func buildPaseAdapterFromContext(sessions *operational.Manager, root *RootCluste
 		return spake2.NewVerifier(vc, nil, nil, transcript)
 	})
 	adapter.SetPBKDFParams(uint32(iterations), salt, sessionID) //nolint:gosec // NewVerifierContext / the window's command validation bound the iteration count
+	// Our session parameters, the TCP roles included (PaseServer.ts:151
+	// responderSessionParams = sessions.sessionParameters); nil keeps the
+	// adapter's defaults.
+	if responderParams != nil {
+		p := *responderParams
+		adapter.SetResponderSessionParams(&p)
+	}
 	adapter.SetOnSessionEstablished(func(sharedSecret []byte, peerSessionID uint16) error {
 		// PASE predates the fabric, so both node ids are zero.
 		entry, err := sessions.OpenFromPaseWithID(sessionID, 0, 0, peerSessionID, sharedSecret)
@@ -467,7 +500,7 @@ func buildPaseAdapterFromContext(sessions *operational.Manager, root *RootCluste
 // current operational identity, the multi-fabric destination resolver, and on
 // success an operational session registered under whichever id the
 // handshake ended up using.
-func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, logger *slog.Logger) (*bridge.CaseAdapter, error) {
+func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, responderParams *sessionparams.Parameters, logger *slog.Logger) (*bridge.CaseAdapter, error) {
 	current := ids.current()
 	sessionID, err := sessions.AllocateID()
 	if err != nil {
@@ -492,6 +525,13 @@ func buildCaseAdapter(sessions *operational.Manager, ids *caseIdentities, logger
 
 	responder := sigma.NewResponder(identity, verifier, sessionID)
 	responder.SetIdentityResolver(ids)
+	// Our session parameters ride in Sigma2 (CaseServer.ts:272
+	// responderSessionParams: sessions.sessionParameters); nil leaves
+	// NewCaseAdapter's defaults.
+	if responderParams != nil {
+		p := *responderParams
+		responder.SetSessionParameters(&p)
+	}
 	// A second Sigma1 on the same exchange — Apple grafts its iCloud
 	// companion fabric onto one — must not reuse the first session's slot.
 	responder.SetSessionIDRenewer(func(previous uint16) (uint16, bool) {

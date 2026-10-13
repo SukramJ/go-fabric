@@ -14,6 +14,7 @@ import (
 	"github.com/SukramJ/go-fabric/bridge"
 	"github.com/SukramJ/go-fabric/cluster/wire"
 	"github.com/SukramJ/go-fabric/secure/operational"
+	"github.com/SukramJ/go-fabric/secure/sessionparams"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/secure/spake2"
 	"github.com/SukramJ/go-fabric/store"
@@ -40,14 +41,17 @@ import (
 // commissioningHost is what the window needs from the node. Each field is
 // set once during wiring.
 type commissioningHost struct {
-	br        *bridge.Bridge
-	sessions  *operational.Manager
-	root      *RootClusters
-	logger    *slog.Logger
-	baseline  *bridge.PerExchangePaseProvider // the configured-passcode provider
-	advert    bridge.CommissioningAdvertisement
-	installMu sync.Mutex
-	active    *bridge.PerExchangePaseProvider // the window's provider, nil between windows
+	br       *bridge.Bridge
+	sessions *operational.Manager
+	root     *RootClusters
+	logger   *slog.Logger
+	baseline *bridge.PerExchangePaseProvider // the configured-passcode provider
+	// responderParams is what the window's PASE adapters advertise
+	// (security.go responderSessionParams).
+	responderParams *sessionparams.Parameters
+	advert          bridge.CommissioningAdvertisement
+	installMu       sync.Mutex
+	active          *bridge.PerExchangePaseProvider // the window's provider, nil between windows
 	// observer is the host's OnWindowTransition (nil: none).
 	observer func(WindowSnapshot) error
 
@@ -314,7 +318,7 @@ func (h *commissioningHost) InstallVerifier(verifier []byte, iterations uint32, 
 // (InstallVerifier) and [Node.OpenBasicWindow]'s credentials take.
 func (h *commissioningHost) installVerifierContext(vc *spake2.VerifierContext, iterations uint32, salt []byte) (restore func()) {
 	provider := bridge.NewPerExchangePaseProvider(func() *bridge.PaseAdapter {
-		adapter, err := buildPaseAdapterFromContext(h.sessions, h.root, vc, salt, int(iterations))
+		adapter, err := buildPaseAdapterFromContext(h.sessions, h.root, vc, salt, int(iterations), h.responderParams)
 		if err != nil {
 			h.logger.Warn("pase.window.build_failed", slog.String("err", err.Error()))
 			return nil

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4766,
+  "entry_points": 4768,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,9 +183,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10924,
+    "total_exported": 10925,
     "reachable": 7666,
-    "whitelisted": 3253,
+    "whitelisted": 3254,
     "unreachable": 5
   },
   "by_package": [
@@ -19493,6 +19493,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
       "line": 100
+    },
+    {
+      "package": "node",
+      "identifier": "TestResponderSessionParamsCarryTCP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/issue89_internal_test.go",
+      "line": 29
     },
     {
       "package": "node",

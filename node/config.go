@@ -15,6 +15,7 @@ import (
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
+	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/secure/attestation"
 	"github.com/SukramJ/go-fabric/secure/setup"
@@ -68,6 +69,16 @@ type Config struct {
 	// neither (LocalizationConfigurationServer.ts:14-21 initialize); a host
 	// states its own, as the reference daemon does (en-US, de-DE).
 	Locales []string
+	// Groups, when set, is the group state the node runs on, for a host
+	// whose own assembler ([Config].Topology) mounts the stack's Groups and
+	// ScenesManagement servers over it (endpoint.Config.Groups): one
+	// manager serves the endpoints' servers, the bridge's group-message
+	// routing and the root's GroupKeyManagement and Groupcast, as matter.js
+	// has one GroupKeyManagementServer the GroupsServers of every endpoint
+	// write (GroupsServer.ts). The facade loads it (groups.Manager.Load)
+	// and attaches it; nil builds one over the credential store, which
+	// [Node.Groups] returns for a host that binds its assembler after New.
+	Groups *groups.Manager
 	// Topology, when set, is the host's own topology — a host that
 	// assembles its endpoints itself (its own endpoint.Assembler over its
 	// own device model, one endpoint.Snapshot per scope, its own label and
@@ -112,7 +123,12 @@ type Network struct {
 	Listen string
 	// PreferIPv4 forces an IPv4-only socket.
 	PreferIPv4 bool
-	// TCP selects the Matter TCP transport; the zero value is TCP off.
+	// TCP selects the Matter TCP transport; the zero value is TCP off. A
+	// TCP role is also what the node's PASE and CASE responders advertise
+	// in their session parameters (SupportedTransports: tcpServer for
+	// Incoming, tcpClient for Outgoing), so a peer learns it during the
+	// handshake and may open TCP to us — matter.js
+	// ServerNetworkRuntime.ts:355-363.
 	TCP bridge.TCPConfig
 }
 

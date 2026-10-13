@@ -41,7 +41,7 @@
 // A host that assembles its own topology — its own endpoint.Assembler
 // over its own device model — hands the bridge its Snapshotter through
 // Config.Topology and gets no [Aggregator]; everything else stays the
-// facade's. Its operator surface reads [Node.Sessions] and
+// facade's, the group state included (Config.Groups, [Node.Groups]). Its operator surface reads [Node.Sessions] and
 // [Node.Subscriptions], and removes a fabric without a commissioner
 // through [Node.RemoveFabric] (issue #87).
 //
