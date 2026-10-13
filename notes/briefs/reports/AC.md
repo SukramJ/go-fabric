@@ -78,7 +78,7 @@ Host setters:
 | --- | --- | --- |
 | `opstate` `validState` / `validError` (OperationalStateList entries, `SetOperationalError`, `ReportError` event codes) | already accepted 0x80–0xBF through the extra `clusterwire.HasOperationalStateLabel` clause | **changed**: the clause is gone, `spec.EnumSupported` on the generated definition decides (same set: 128–191 accepted, 192 refused). `TestParityMatterJS_OperationalStateManufacturerRanges` pins 0x80/0xBF accepted, 0x7F/0xC0 refused for states and errors |
 | `modebase` SupportedModes tags | no value check on a tag at all — any value, manufacturer range included, was and is accepted | unchanged |
-| `modebase` `validHostStatus` (ChangeToMode status from the host) | accepts `st >= 0x80` | unchanged — wider than the range (192–255 accepted); open question 2 |
+| `modebase` `validHostStatus` (ChangeToMode status from the host) | accepted `st >= 0x80` (192–255 too) | **changed (follow-up B, owner decision on question 2)**: `spec.EnumSupported` on the derivation's ModeChangeStatus, UnsupportedMode still refused; 0xBF accepted, 0xC0/0xFF answer FAILURE with `ErrInvalidHostStatus` (`modebase_server_test.go`). Our own guard: matter.js's ModeBase server checks no host status (`ModeUtils.ts:46-53`) |
 | `closure` `ReportError` (CurrentErrorList / OperationalError) | no value check | unchanged |
 
 LightSensorType: there is no setter. `cluster/measurement`'s Illuminance

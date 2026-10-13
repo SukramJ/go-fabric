@@ -26,7 +26,10 @@ pseudo-version of `main`.
   (`spec.EnumRange`), and `spec.EnumSupported` and every write and host
   setter that checks an enum value against the definition accept a value
   inside a range, as matter.js validates it. A value past the range is
-  still CONSTRAINT_ERROR.
+  still CONSTRAINT_ERROR. A mode server's `ModeChanger` status is checked
+  against the derivation's ModeChangeStatus as the definition allows: 0x80–0xBF
+  (MfgCodes) still pass, 0xC0–0xFF now fail the invoke with
+  `ErrInvalidHostStatus` (they were accepted before).
 - `IlluminanceMeasurement.LightSensorType` is typed `LightSensorTypeEnum`
   in the generated definition (it was `uint8`).
 

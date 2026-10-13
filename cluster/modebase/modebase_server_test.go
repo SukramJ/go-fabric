@@ -228,11 +228,13 @@ func TestChangeToModeFollowsModeUtils(t *testing.T) {
 			t.Errorf("status 0x%02X answered %+v", uint8(st), r)
 		}
 	}
-	// Reserved statuses from the device: FAILURE.
+	// Reserved statuses from the device: FAILURE. 0xC0 and above lie past
+	// the manufacturer range MfgCodes (128..191) the definition carries.
 	var sce im.StatusCodeError
-	for _, st := range []modebase.Status{modebase.StatusUnsupportedMode, modebase.StatusCleaningInProgress, 0x04} {
+	for _, st := range []modebase.Status{modebase.StatusUnsupportedMode, modebase.StatusCleaningInProgress, 0x04, 0xC0, 0xFF} {
 		c.status = st
-		if _, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, clusterwire.ChangeToModeRequest{NewMode: 2}); !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure {
+		_, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, clusterwire.ChangeToModeRequest{NewMode: 2})
+		if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure || !strings.Contains(err.Error(), modebase.ErrInvalidHostStatus.Error()) {
 			t.Errorf("host status 0x%02X: %v", uint8(st), err)
 		}
 	}
