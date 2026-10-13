@@ -70,7 +70,7 @@ type Result struct {
 //
 // Errors of the exchange layer pass through unchanged.
 func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable, opts InvokeOptions) (Result, error) {
-	m, err := c.begin()
+	m, err := c.begin(ctx, ExchangeOptions{})
 	if err != nil {
 		return Result{}, err
 	}

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4729,
+  "entry_points": 4732,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,8 +183,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10881,
-    "reachable": 7629,
+    "total_exported": 10891,
+    "reachable": 7639,
     "whitelisted": 3247,
     "unreachable": 5
   },

@@ -357,6 +357,16 @@ pseudo-version of `main`.
   `write_req_data_version` and `write_req_chunked_list`, and every
   ReadRequest, SubscribeRequest, WriteRequest and TimedRequest fixture is
   now byte-compared (`TestParityClientRequestFixtures`).
+- `controller/interaction.Provider` (ADR 0020, stage 3; matter.js
+  `ExchangeProvider.ts`, `PeerExchangeProvider.ts` at `0ceb202d`): an
+  interaction is bound to a provider of exchanges — `SessionProvider(mgr,
+  s)`, what `New` keeps using, or `PeerProvider(p)` / `ForPeer(p, Config)`,
+  which connects through `peer.Peer.Connect` and runs each exchange on the
+  peer's newest session, verifying reachability through
+  `Peer.VerifyReachability`. `Bind(provider, Config{Logger, Clock, Rand})`,
+  `ExchangeOptions{RequireExistingSession, AddressOverride,
+  ConnectionTimeout}`, `DefaultReadPathsSupported` (9) and
+  `DefaultSubscribePathsSupported` (3). `peer.Peer.Exchanges` is new.
 
 ### Changed
 

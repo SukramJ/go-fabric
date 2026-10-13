@@ -22,3 +22,12 @@ func TestParityConstants(t *testing.T) {
 		t.Errorf("DEFAULT_MINIMUM_RESPONSE_TIMEOUT_WITH_FAILSAFE (:160) = %v, want 30s", interaction.DefaultMinimumResponseTimeoutWithFailsafe)
 	}
 }
+
+// TestParityProviderPathFloors: ExchangeProvider.readPathsSupported /
+// subscribePathsSupported (protocol/ExchangeProvider.ts:85-90): 9 and 3.
+func TestParityProviderPathFloors(t *testing.T) {
+	t.Parallel()
+	if interaction.DefaultReadPathsSupported != 9 || interaction.DefaultSubscribePathsSupported != 3 {
+		t.Errorf("path floors %d/%d, want 9/3", interaction.DefaultReadPathsSupported, interaction.DefaultSubscribePathsSupported)
+	}
+}

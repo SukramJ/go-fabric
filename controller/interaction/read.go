@@ -57,7 +57,7 @@ func (r *Report) Value(endpoint uint16, cluster, attribute uint32) (spec.Node, b
 // reassembled into one value, as matter.js's InputChunk does. Errors of
 // the exchange layer pass through unchanged.
 func (c *Interaction) Read(ctx context.Context, paths ...im.ConcreteAttributePath) (*Report, error) {
-	m, err := c.begin()
+	m, err := c.begin(ctx, ExchangeOptions{})
 	if err != nil {
 		return nil, err
 	}
