@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4801,
+  "entry_points": 4807,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,9 +184,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10973,
-    "reachable": 7690,
-    "whitelisted": 3278,
+    "total_exported": 10979,
+    "reachable": 7692,
+    "whitelisted": 3282,
     "unreachable": 5
   },
   "by_package": [
@@ -14002,6 +14002,20 @@
     },
     {
       "package": "controller/client",
+      "identifier": "ConnectionStateFor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 9
+    },
+    {
+      "package": "controller/client",
+      "identifier": "ObserveRequests",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 13
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestCacheBuffered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
@@ -15259,6 +15273,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/connection_test.go",
       "line": 243
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestObserve",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/observer_test.go",
+      "line": 18
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "TestObserveEstablishmentUnresponsive",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/peer/observer_test.go",
+      "line": 62
     },
     {
       "package": "controller/peer",

@@ -39,7 +39,25 @@ pseudo-version of `main`.
   `ClusterDeleted`, `Changed`). `Node.Properties` are the node's
   physical properties (matter.js `PhysicalDeviceProperties` as
   `NodePhysicalProperties` computes them) and `Node.IntervalBounds` the
-  subscription interval bounds they imply.
+  subscription interval bounds they imply. `Node.Read` (with the cached
+  DataVersions as filters unless `IncludeKnownVersions`), `Subscribe`
+  (each report applied to the image first; a sustained one re-subscribes
+  with the versions then current and the event minimum), `Write` and
+  `Invoke` (to the peer; the image follows the peer's report). `Start`
+  runs the default sustained wildcard subscription when `AutoSubscribe`
+  (a newly commissioned node reads first) and tracks the connection state
+  from it and the peer's sessions; `Hooks.Event` delivers every event,
+  decoded through its definition when there is one, and the event cursor
+  is persisted; `Seeded` once BasicInformation and a second endpoint are
+  in.
+
+- `controller/peer.Peer.Observe(Observer)`: per-peer observers of a
+  peer's sessions coming and going and of an unresponsive establishment —
+  what matter.js's node layer observes on a `Peer` directly
+  (`NetworkClient.ts:81-83`, `Peer.ts:68`, `:90-92`, `:197-204`,
+  `:258-260` at `0ceb202d`) — called after the peer's lock is released,
+  in registration order; the returned function removes the observer.
+  The set-wide `Context` hooks are unchanged.
 
 - `controller/interaction.Report` carries `SubscriptionID` (the report's
   subscription id, the first chunk's; 0 for a read's report) and `Session`

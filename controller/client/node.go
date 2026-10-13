@@ -32,12 +32,25 @@ type Node struct {
 	mu        sync.RWMutex
 	settings  settings
 	started   bool
-	closed    bool
 	connState ConnectionState
 	// props are the physical properties, nil until computed after a change;
 	// frozen while the node is stopped (ClientNodePhysicalProperties.ts:100-133).
 	props  *Properties
 	frozen bool
+	// closing: Close began; events are dropped (ClientEventEmitter.ts:47-53).
+	closing bool
+	// newlyCommissioned is Internal.isNewlyCommissioned (NetworkClient.ts:385-391).
+	newlyCommissioned bool
+	// sub is the default subscription, activeSubscription (:380-382).
+	sub *interaction.Subscription
+	// likelyOffline is the latch of :393-398.
+	likelyOffline bool
+	seeded        bool
+	stopObserve   func()
+	warned        map[[2]uint64]bool
+	// requestObserver is a test seam: it sees each subscription request the
+	// node hands to the interaction.
+	requestObserver func(interaction.SubscribeRequest)
 }
 
 // New builds the node cfg describes and loads its image from the store.
@@ -48,7 +61,7 @@ func New(cfg Config) (*Node, error) {
 	if cfg.Interaction == nil {
 		return nil, fmt.Errorf("%w: no Interaction", ErrConfig)
 	}
-	n := &Node{cfg: cfg, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand, store: cfg.Store, connState: Disconnected}
+	n := &Node{cfg: cfg, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand, store: cfg.Store, connState: Disconnected, newlyCommissioned: cfg.NewlyCommissioned, warned: map[[2]uint64]bool{}}
 	if n.log == nil {
 		n.log = slog.New(slog.DiscardHandler)
 	}
@@ -166,7 +179,9 @@ func (n *Node) deliver(em []emission) {
 			if h.Changed != nil {
 				h.Changed()
 			}
+			n.evaluateSeeded()
 		case emitEvent:
+			n.deliverEvent(&e.event)
 		}
 	}
 }
@@ -219,46 +234,76 @@ func (n *Node) saveSettingsLocked() {
 }
 
 // Start brings the node online — ClientNode start through
-// NetworkClient.startup (NetworkClient.ts:60-102). A disabled node does
-// not start: [ErrDisabled] (ClientNetworkRuntime.ts:41-43).
+// NetworkClient.startup (NetworkClient.ts:60-102): the peer's signals are
+// bound (:79-83), the default subscription established when AutoSubscribe
+// (:88, a newly commissioned node reading first), and the connection state
+// recomputed (:98). A disabled node does not start: [ErrDisabled]
+// (ClientNetworkRuntime.ts:41-43). An error of the initial read is
+// returned; the node stays started.
 func (n *Node) Start(ctx context.Context) error {
-	_ = ctx
 	n.mu.Lock()
-	defer n.mu.Unlock()
 	switch {
-	case n.closed:
+	case n.closing:
+		n.mu.Unlock()
 		return ErrClosed
 	case n.settings.disabled:
+		n.mu.Unlock()
 		return ErrDisabled
+	case n.started:
+		n.mu.Unlock()
+		return nil
 	}
 	n.started = true
 	n.frozen, n.props = false, nil
+	n.mu.Unlock()
 	n.persist.restart()
-	return nil
+	stop := n.observePeer()
+	n.mu.Lock()
+	n.stopObserve = stop
+	n.mu.Unlock()
+	err := n.syncAutoSubscribe(ctx)
+	n.recompute()
+	return err
 }
 
-// Stop takes the node offline and flushes its store
-// (ClientCacheBuffer.ts:94-101).
+// Stop takes the node offline: the default subscription closes
+// (NetworkClient.ts:309-313), the peer's signals are released, the
+// properties freeze, the store is flushed (ClientCacheBuffer.ts:94-101)
+// and the connection state is recomputed.
 func (n *Node) Stop(ctx context.Context) error {
-	_ = ctx
 	n.mu.Lock()
 	n.started = false
+	sub, stop := n.sub, n.stopObserve
+	n.sub, n.stopObserve = nil, nil
 	if !n.frozen {
 		n.propertiesLocked()
 		n.frozen = true
 	}
 	n.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
+	var err error
+	if sub != nil {
+		sub.Close()
+		select {
+		case <-sub.Done():
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
+	}
 	n.persist.stop()
-	return nil
+	n.recompute()
+	return err
 }
 
-// Close stops the node and releases it; it is idempotent.
+// Close stops the node and releases it; it is idempotent. Events that
+// arrive meanwhile are dropped.
 func (n *Node) Close(ctx context.Context) error {
-	err := n.Stop(ctx)
 	n.mu.Lock()
-	n.closed = true
+	n.closing = true
 	n.mu.Unlock()
-	return err
+	return n.Stop(ctx)
 }
 
 // Disable takes the node offline and keeps it so, persisted
@@ -274,6 +319,7 @@ func (n *Node) Disable(ctx context.Context) error {
 	n.settings.disabled = true
 	n.saveSettingsLocked()
 	n.mu.Unlock()
+	n.recompute()
 	return nil
 }
 

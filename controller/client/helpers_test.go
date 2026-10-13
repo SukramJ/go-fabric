@@ -16,6 +16,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/secure/channel"
+	"github.com/SukramJ/go-fabric/transport/message"
 )
 
 // fakeClock is a manual exchange.Clock: timers fire, in order, inside
@@ -109,6 +110,7 @@ type scripted struct {
 	conn    *fakeConn
 	session *exchange.Session
 	peer    *channel.Session
+	counter uint32
 }
 
 func newScripted(t *testing.T) *scripted {
@@ -134,6 +136,61 @@ func newScripted(t *testing.T) *scripted {
 		t.Fatal(err)
 	}
 	return &scripted{mgr: m, clock: clock, conn: conn, session: s, peer: peer}
+}
+
+// msg is one message the manager sent.
+type msg struct {
+	hdr     message.Header
+	proto   message.ProtocolHeader
+	payload []byte
+}
+
+// next returns the next message the manager sent, skipping standalone
+// acknowledgements.
+func (s *scripted) next(t *testing.T) msg {
+	t.Helper()
+	for {
+		select {
+		case b := <-s.conn.ch:
+			hdr, hl, err := message.UnmarshalHeader(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plain, _, err := s.peer.Decrypt(&hdr, hdr.NonceSecurityFlags(), b[hl:])
+			if err != nil {
+				t.Fatal(err)
+			}
+			proto, pl, err := message.UnmarshalProtocolHeader(plain)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if proto.ProtocolID == 0 && proto.Opcode == 0x10 { // standalone ack
+				continue
+			}
+			return msg{hdr: hdr, proto: proto, payload: plain[pl:]}
+		case <-time.After(5 * time.Second):
+			t.Fatal("the manager sent nothing")
+			return msg{}
+		}
+	}
+}
+
+// reply answers to with a reliable message of the peer on its exchange,
+// acknowledging it.
+func (s *scripted) reply(t *testing.T, to msg, protocol uint16, opcode uint8, payload []byte) {
+	t.Helper()
+	s.send(t, message.ProtocolHeader{NeedsAck: true, HasAck: true, AckCounter: to.hdr.MessageCounter, Opcode: opcode, ExchangeID: to.proto.ExchangeID, ProtocolID: protocol}, payload)
+}
+
+func (s *scripted) send(t *testing.T, proto message.ProtocolHeader, payload []byte) {
+	t.Helper()
+	s.counter++
+	hdr := message.Header{SessionID: 0x0101, MessageCounter: 0x100 + s.counter}
+	sealed, err := s.peer.Encrypt(&hdr, hdr.SecurityFlags(), append(proto.Marshal(), payload...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.mgr.HandleDatagram(append(hdr.Marshal(), sealed.Ciphertext...), peerAddr)
 }
 
 // scriptedNode is a client node over a scripted session.

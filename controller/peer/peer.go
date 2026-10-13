@@ -44,6 +44,7 @@ type Peer struct {
 	connecting            *connection
 	connectionInitiatedAt time.Time
 	monitor               *monitor
+	observers             []*observerEntry
 }
 
 // newPeer builds the peer d describes — Peer.ts:95-188. The peer's
@@ -257,6 +258,11 @@ func (p *Peer) addSession(s *exchange.Session) {
 	}
 	p.mu.Unlock()
 	p.sessionAdded()
+	for _, o := range p.observing() {
+		if o.SessionAdded != nil {
+			o.SessionAdded(s)
+		}
+	}
 	p.goWork(func() {
 		select {
 		case <-s.Closing():
@@ -284,15 +290,25 @@ func (p *Peer) followAddress(s *exchange.Session) {
 }
 
 // removeSession drops a closing session; the set's Disconnected hook runs
-// when it was the last (PeerSet.ts:97-101).
+// when it was the last (PeerSet.ts:97-101), then the observers'
+// SessionDeleted (the set observes the peer's sessions first).
 func (p *Peer) removeSession(s *exchange.Session) {
 	p.mu.Lock()
 	n := len(p.sessions)
 	p.sessions = slices.DeleteFunc(p.sessions, func(x *exchange.Session) bool { return x == s })
-	last := n > len(p.sessions) && len(p.sessions) == 0
+	removed := n > len(p.sessions)
+	last := removed && len(p.sessions) == 0
 	p.mu.Unlock()
 	if last && p.set.ctx.Disconnected != nil {
 		p.set.ctx.Disconnected(p)
+	}
+	if !removed {
+		return
+	}
+	for _, o := range p.observing() {
+		if o.SessionDeleted != nil {
+			o.SessionDeleted(s)
+		}
 	}
 }
 
