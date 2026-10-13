@@ -12,6 +12,16 @@ pseudo-version of `main`.
 
 ### Added
 
+- `controller/client` (ADR 0020, stage 4, first half): the controller's
+  image of a remote node — matter.js `ClientNode` with its
+  `ClientStructure`, `PeerBehavior` shape analysis, `ClientNodeInteraction`,
+  `ClientEventEmitter`, the subscription and connection-state half of
+  `NetworkClient`, the client cache and its persistence, and the physical
+  properties with the subscription interval bounds, at `0ceb202d`.
+  `client.New(Config)` over a peer and its interaction; `Start`, `Stop`,
+  `Close`, `Disable`, `Enable`, `Erase`; `ConnectionState` (matter.js
+  `NodeConnectionState`).
+
 - `controller/interaction.Report` carries `SubscriptionID` (the report's
   subscription id, the first chunk's; 0 for a read's report) and `Session`
   (the `*exchange.Session` the report arrived over) — what matter.js keeps
