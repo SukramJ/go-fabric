@@ -31,7 +31,7 @@ func encode(t *testing.T, f func(e *tlv.Encoder)) []byte {
 	return b
 }
 
-func node(f func(e *tlv.Encoder, tag tlv.Tag)) spec.Node {
+func tlvNode(f func(e *tlv.Encoder, tag tlv.Tag)) spec.Node {
 	e := tlv.NewEncoder()
 	f(e, tlv.AnonymousTag())
 	b, _ := e.Bytes()
@@ -40,7 +40,7 @@ func node(f func(e *tlv.Encoder, tag tlv.Tag)) spec.Node {
 }
 
 func listN(vs ...uint64) spec.Node {
-	return node(func(e *tlv.Encoder, tag tlv.Tag) {
+	return tlvNode(func(e *tlv.Encoder, tag tlv.Tag) {
 		e.StartArray(tag)
 		for _, v := range vs {
 			e.PutUint(tlv.AnonymousTag(), v)
@@ -72,7 +72,7 @@ func value(ep uint16, cluster, attr, version uint32, v spec.Node) im.AttributeRe
 // light on endpoint 1 with OnOff at version onOffVersion.
 func image(onOffVersion uint32) []im.AttributeReport {
 	dts := func(dt uint64) spec.Node {
-		return node(func(e *tlv.Encoder, tag tlv.Tag) {
+		return tlvNode(func(e *tlv.Encoder, tag tlv.Tag) {
 			e.StartArray(tag)
 			e.StartStruct(tlv.AnonymousTag())
 			e.PutUint(tlv.ContextTag(0), dt)
@@ -86,11 +86,11 @@ func image(onOffVersion uint32) []im.AttributeReport {
 		value(0, descriptor.ClusterID, descriptor.AttrServerList, 2, listN(uint64(descriptor.ClusterID), uint64(basicinfo.ClusterID))),
 		value(0, descriptor.ClusterID, descriptor.AttrPartsList, 2, listN(1)),
 		value(0, descriptor.ClusterID, spec.AttrAttributeList, 2, listN(0, 1, 3, 0xFFFB)),
-		value(0, basicinfo.ClusterID, basicinfo.AttrNodeLabel, 3, node(func(e *tlv.Encoder, tag tlv.Tag) { e.PutUTF8(tag, "n") })),
+		value(0, basicinfo.ClusterID, basicinfo.AttrNodeLabel, 3, tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutUTF8(tag, "n") })),
 		value(1, descriptor.ClusterID, descriptor.AttrDeviceTypeList, 4, dts(0x0100)),
 		value(1, descriptor.ClusterID, descriptor.AttrServerList, 4, listN(uint64(descriptor.ClusterID), uint64(onoff.ClusterID))),
 		value(1, descriptor.ClusterID, descriptor.AttrPartsList, 4, listN()),
-		value(1, onoff.ClusterID, onoff.AttrOnOff, onOffVersion, node(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, false) })),
+		value(1, onoff.ClusterID, onoff.AttrOnOff, onOffVersion, tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, false) })),
 	}
 }
 
@@ -98,7 +98,7 @@ func startUp(number uint64) im.EventReport {
 	return im.EventReport{
 		Path:   im.ConcreteEventPath{Endpoint: 0, Cluster: basicinfo.ClusterID, Event: basicinfo.EventStartUp, HasEndpoint: true, HasCluster: true, HasEvent: true},
 		Number: number, Priority: im.EventPriorityCritical, Timestamp: 1,
-		Data: im.AttributeValue{Value: node(func(e *tlv.Encoder, tag tlv.Tag) { basicinfo.StartUpEvent{SoftwareVersion: 3}.EncodeTLV(e, tag) })},
+		Data: im.AttributeValue{Value: tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { basicinfo.StartUpEvent{SoftwareVersion: 3}.EncodeTLV(e, tag) })},
 	}
 }
 
@@ -239,7 +239,7 @@ func TestDefaultSubscription(t *testing.T) {
 		len(sr.EventFilters) != 1 || sr.EventFilters[0].EventMin != 1 || sr.KeepSubscriptions || sr.MinIntervalFloor != 0 || sr.MaxIntervalCeiling != 60 {
 		t.Fatalf("default subscription %+v", sr)
 	}
-	sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 33, []im.AttributeReport{value(1, onoff.ClusterID, onoff.AttrOnOff, 6, node(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, true) }))}, startUp(7)))
+	sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 33, []im.AttributeReport{value(1, onoff.ClusterID, onoff.AttrOnOff, 6, tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, true) }))}, startUp(7)))
 	sn.reply(t, sub, im.InteractionModelProtocolID, im.OpcodeSubscribeResponse, subscribeResponse(t, 33))
 	hl.wait(t, client.Connected)
 	if !sn.node.SubscriptionActive() {
@@ -287,7 +287,7 @@ func TestDefaultSubscription(t *testing.T) {
 	if !hasFilter(br.DataVersionFilters, 1, onoff.ClusterID, 6) || len(br.EventFilters) != 1 || br.EventFilters[0].EventMin != 8 {
 		t.Fatalf("bootstrap read %+v", br)
 	}
-	sn2.reply(t, boot, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, []im.AttributeReport{value(1, onoff.ClusterID, onoff.AttrOnOff, 9, node(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, false) }))}))
+	sn2.reply(t, boot, im.InteractionModelProtocolID, im.OpcodeReportData, dataReport(t, 0, []im.AttributeReport{value(1, onoff.ClusterID, onoff.AttrOnOff, 9, tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutBool(tag, false) }))}))
 	after := subscribeRequestOf(t, sn2.next(t))
 	if !hasFilter(after.DataVersionFilters, 1, onoff.ClusterID, 9) || after.EventFilters[0].EventMin != 8 {
 		t.Fatalf("subscription after the bootstrap read %+v", after)
@@ -370,7 +370,7 @@ func TestWriteAndInvokeForward(t *testing.T) {
 	path := attrPath(0, basicinfo.ClusterID, basicinfo.AttrNodeLabel)
 	wrote := make(chan error, 1)
 	go func() {
-		_, err := sn.node.Write(ctx, []interaction.WriteRequest{{Path: path, Value: interaction.Raw(node(func(e *tlv.Encoder, tag tlv.Tag) { e.PutUTF8(tag, "x") }))}}, interaction.WriteOptions{})
+		_, err := sn.node.Write(ctx, []interaction.WriteRequest{{Path: path, Value: interaction.Raw(tlvNode(func(e *tlv.Encoder, tag tlv.Tag) { e.PutUTF8(tag, "x") }))}}, interaction.WriteOptions{})
 		wrote <- err
 	}()
 	w := sn.next(t)
