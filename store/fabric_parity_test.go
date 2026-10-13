@@ -334,7 +334,7 @@ func TestParityChip_AddFabric_ChipStagedCommit_NotApplicable(t *testing.T) {
 // TestPersistence (line 1490) which verifies full serialisation of the root
 // certificate field alongside other fabric fields. The RCAC-blob invariant
 // maps directly to matter.js Fabric.ts:68 `rootCert` field and
-// OperationalCredentialsServer.ts:457-459 verbatim-serve requirement.
+// OperationalCredentialsServer.ts:470-472 verbatim-serve requirement.
 func TestParityChip_TrustedRootCerts_FullRCACTLV_RoundTrip(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

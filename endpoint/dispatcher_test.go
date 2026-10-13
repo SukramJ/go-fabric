@@ -1184,7 +1184,7 @@ func TestCurrentDataVersion_ClusterNotFound(t *testing.T) {
 // bridged endpoint's DataVersion comes from the endpoint-hosted
 // tracker: non-zero, ok=true, and IDENTICAL across calls — regardless
 // of what the (per-dispatch throwaway) server instance reports.
-// Mirrors matter.js Datasource.ts:349 (version set once per lifetime).
+// Mirrors matter.js Datasource.ts:410 (version set once per lifetime).
 func TestCurrentDataVersion_BridgedStableAcrossCalls(t *testing.T) {
 	t.Parallel()
 	// Server WITHOUT the version interface — previously (0, false);

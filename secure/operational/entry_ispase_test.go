@@ -13,7 +13,7 @@ import (
 // reads to stamp the commissioning channel's auth mode. AddNOC adopts the
 // PASE session onto the new fabric (matter.js
 // packages/node/src/behaviors/operational-credentials/
-// OperationalCredentialsServer.ts:266-270), so FabricIndex stops being 0
+// OperationalCredentialsServer.ts:279-283), so FabricIndex stops being 0
 // while the session stays PASE — and matter.js keys the implicit
 // Administer grant on exactly that (FabricAccessControl.ts:189-191).
 func TestEntryIsPASE_SurvivesAdoptFabricIndex(t *testing.T) {

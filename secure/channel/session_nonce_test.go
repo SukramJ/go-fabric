@@ -16,7 +16,7 @@ import (
 // localNodeID), and the receiver has that id as PeerNodeID — a header
 // that names a different Source Node ID must not change the nonce, or
 // the frame fails the tag on a mismatch and the nonce becomes partly
-// sender-chosen on a match. Mirrors matter.js NodeSession.ts:187
+// sender-chosen on a match. Mirrors matter.js NodeSession.ts:203
 // (generateNonce with this.#peerNodeId).
 func TestDecryptNonceUsesTheSessionPeerNotTheHeaderSourceNodeID(t *testing.T) {
 	t.Parallel()

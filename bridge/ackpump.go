@@ -120,7 +120,7 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 		// unique per session AND per side, so two controllers sharing an
 		// exchange ID — or a peer-opened exchange colliding with a
 		// bridge-opened one — must not overwrite each other's reply
-		// route. Mirrors matter.js ExchangeManager.ts:287 (session-scoped
+		// route. Mirrors matter.js ExchangeManager.ts:340 (session-scoped
 		// resolution) and :138 (role folded into the exchange key).
 		b.routing.exchangeSrcs.Store(mrp.ExchangeKey{SessionID: hdr.SessionID, ExchangeID: proto.ExchangeID, Initiator: !proto.Initiator}, exchangeReplyTarget{
 			src:                 src,
@@ -138,7 +138,7 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 	// pump stamps the flag verbatim, and a StandaloneAck that does not
 	// invert the peer's flag is discarded as unsolicited (chip
 	// src/messaging/ExchangeContext.cpp:384, matter.js
-	// packages/protocol/src/protocol/ExchangeManager.ts:319), leaving
+	// packages/protocol/src/protocol/ExchangeManager.ts:324), leaving
 	// the peer to retransmit until its cap fires.
 	tracker.Owe(hdr.MessageCounter, hdr.SessionID, proto.ExchangeID, !proto.Initiator, time.Now())
 }

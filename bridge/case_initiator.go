@@ -185,8 +185,8 @@ func (b *Bridge) existingPeerSession(fabricIndex uint8, peerNodeID uint64) (peer
 		// A session bound to a TCP connection is reused like one on UDP:
 		// matter.js Peer.connect takes the newest live session of the
 		// peer, of any channel type when no transport is required
-		// (packages/protocol/src/peer/Peer.ts:418-438, newestSession
-		// :560-580).
+		// (packages/protocol/src/peer/Peer.ts:439-459, newestSession
+		// :581-601).
 		raw, known := b.sessionPeerAddrs.Load(id)
 		addr, isAddr := raw.(net.Addr)
 		if known && isAddr && !isNilRoute(addr) {

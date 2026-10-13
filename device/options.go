@@ -44,7 +44,7 @@ type Options struct {
 
 // Option configures one device at construction, as matter.js's
 // `Behavior.with(...)` and the endpoint's initial state configure an
-// Endpoint (packages/node/src/endpoint/Endpoint.ts:595-636).
+// Endpoint (packages/node/src/endpoint/Endpoint.ts:596-637).
 type Option func(*settings)
 
 // settings is what the Options of one New call collected.
@@ -159,8 +159,8 @@ func WithChangeNotifier(n contract.ChangeNotifier) Option {
 //
 // It is the Go form of a matter.js host setting a measurement behavior's
 // state from its own reading, which the behavior's Datasource then reports
-// (packages/node/src/behavior/state/managed/Datasource.ts:200-203
-// `onChange`, :690-710). New refuses a nil m and a class that materialises
+// (packages/node/src/behavior/state/managed/Datasource.ts:261-264
+// `onChange`, :776-796). New refuses a nil m and a class that materialises
 // no cluster from m. A later call replaces an earlier one.
 func WithMeasurement(m contract.MeasurementSource) Option {
 	return func(s *settings) {

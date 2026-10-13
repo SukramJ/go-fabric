@@ -116,7 +116,7 @@ func SubjectFromContext(ctx context.Context) (nodeID uint64, cats []uint32) {
 // succeeds: OperationalCredentials associates the freshly built fabric
 // with the very PASE session that issued the command
 // (matter.js packages/node/src/behaviors/operational-credentials/
-// OperationalCredentialsServer.ts:266-270 `session.fabric = fabric`),
+// OperationalCredentialsServer.ts:279-283 `session.fabric = fabric`),
 // so from then on the session reports a non-zero FabricIndex while
 // still being a PASE session.
 type authModePASEContext struct{}

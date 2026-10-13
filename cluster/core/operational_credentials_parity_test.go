@@ -392,7 +392,7 @@ func TestParityFabricManager_OpcredsRemoveFabricMissReturnsInvalidFabricIndex(t 
 // dangling pending fabric in the store.
 //
 // Source-Origin: derived from matter.js packages/node/src/behaviors/
-// operational-credentials/OperationalCredentialsServer.ts:218
+// operational-credentials/OperationalCredentialsServer.ts:224
 // (#failsafeContext check before AddNOC) and chip
 // src/app/clusters/operational-credentials/operational-credentials-server.cpp
 // VerifyOrExit(failSafeContext.IsFailSafeArmed(...), errorStatus=FailsafeRequired).
@@ -431,7 +431,7 @@ func TestParityOpcreds_FailSafeRequiredForAddNOC(t *testing.T) {
 // the fabric-authentication guard on UpdateNOC.
 //
 // Source-Origin: matter.js packages/node/src/behaviors/
-// operational-credentials/OperationalCredentialsServer.ts:234-239 — the
+// operational-credentials/OperationalCredentialsServer.ts:247-252 — the
 // addNoc path raises StatusResponseError("AddNoc is illegal after CsrRequest
 // for UpdateNOC in same failsafe context", Status.ConstraintError).
 func TestParityOpcreds_CSRForUpdateNOCRejectedByAddNOC(t *testing.T) {

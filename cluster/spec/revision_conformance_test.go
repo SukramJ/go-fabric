@@ -12,7 +12,7 @@ import (
 // TestRevisionConditionResolvesAgainstTheDefinition: "Rev >= vN" is
 // decided against the definition's revision, as matter.js's runtime
 // conformance compiler decides it (packages/node/src/behavior/state/
-// validation/conformance-compiler.ts:250-254): an element "Rev >= v7" or
+// validation/conformance-compiler.ts:252-256): an element "Rev >= v7" or
 // "Rev >= v7, O" is served by default on a v7 definition and refused on a
 // v6 one; "[Rev >= v7]" is optional on v7 and not applicable on v6. A
 // feature selection is not judged on the revision

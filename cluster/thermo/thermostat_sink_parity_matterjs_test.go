@@ -71,7 +71,7 @@ func sinkStatus(t *testing.T, err error) im.StatusCode {
 // TestSinkRefusalKeepsTheStoredSetpoint: a refused occupied-setpoint write
 // answers FAILURE and stores nothing — matter.js refuses in
 // occupied*Setpoint$Changing, before the state changes
-// (ThermostatServer.ts:599-606 at 4633bfd7).
+// (ThermostatServer.ts:594-601 at 0ceb202d).
 func TestSinkRefusalKeepsTheStoredSetpoint(t *testing.T) {
 	t.Parallel()
 	sink := &recordingThermoSink{err: errors.New("radio timeout")}
@@ -166,8 +166,8 @@ func TestSinkNotCalledForLimitsOrRefusedWrites(t *testing.T) {
 
 // TestSetpointRaiseLowerGoesThroughTheSink: Both on a HEAT+COOL thermostat
 // is one Sink call — the cooling setpoint as the primary, the heating
-// setpoint its companion (matter.js ThermostatServer.ts:218-219 at
-// 4633bfd7 assigns cooling first); a single-mode command is one call with
+// setpoint its companion (matter.js ThermostatServer.ts:219-220 at
+// 0ceb202d assigns cooling first); a single-mode command is one call with
 // no companions; a refusal stores neither.
 func TestSetpointRaiseLowerGoesThroughTheSink(t *testing.T) {
 	t.Parallel()
@@ -212,8 +212,8 @@ func TestSetpointRaiseLowerGoesThroughTheSink(t *testing.T) {
 
 // TestUnchangedValueDoesNotCallTheSink: a write of the stored SystemMode
 // or setpoint, and a SetpointRaiseLower that moves nothing, answer SUCCESS
-// without the Sink — matter.js Datasource.ts:674-676 skips an equal value
-// on commit and :956-957 fires $Changing only for changed fields (4633bfd7).
+// without the Sink — matter.js Datasource.ts:760-762 skips an equal value
+// on commit and :1042-1043 fires $Changing only for changed fields (0ceb202d).
 // A cooling-only Both moves one setpoint, which travels alone.
 func TestUnchangedValueDoesNotCallTheSink(t *testing.T) {
 	t.Parallel()

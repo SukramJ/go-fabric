@@ -115,7 +115,7 @@ func TestParityMatterJS_DescriptorServer_DoesNotAddDeviceTypeWhenUnnecessary(t *
 // TestParityMatterJS_DescriptorServer_AddsServersAutomatically verifies
 // that SetServerListProvider can supply a dynamic server list — parity with
 // matter.js DescriptorServer auto-updating ServerList when behaviors are
-// required (packages/node/src/behaviors/descriptor/DescriptorServer.ts:236-244).
+// required (packages/node/src/behaviors/descriptor/DescriptorServer.ts:241-250).
 //
 // Mirrors matter.js packages/node/test/behaviors/descriptor/
 // DescriptorServerTest.ts:75 (case "adds servers automatically").

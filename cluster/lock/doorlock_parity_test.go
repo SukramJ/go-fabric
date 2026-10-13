@@ -24,7 +24,7 @@ func (f *fakeLockSource) LockInvoke(_ context.Context, _ uint32) error {
 // LockType is DeadBolt (0) and SupportedOperatingModes is 0xFFF6.
 // 0xFFF6 = alwaysSet (bits 0-10, 0x07FF) | vacation | privacy | passage
 // with Normal (bit 0) and NoRemoteLockUnlock (bit 3) clear = supported.
-// Mirrors matter.js DoorLockServer.ts:69
+// Mirrors matter.js DoorLockServer.ts:119
 // ({vacation:true,privacy:true,passage:true,alwaysSet:2047}).
 func TestParity_DoorLock_LockType_SupportedOperatingModes(t *testing.T) {
 	t.Parallel()
@@ -42,7 +42,7 @@ func TestParity_DoorLock_LockType_SupportedOperatingModes(t *testing.T) {
 	if !ok {
 		t.Fatal("SupportedOperatingModes: ok=false")
 	}
-	// 0xFFF6: matter.js DoorLockServer.ts:69 initializes
+	// 0xFFF6: matter.js DoorLockServer.ts:119 initializes
 	// {vacation:true,privacy:true,passage:true,alwaysSet:2047}.
 	const wantSOM uint16 = 0xFFF6
 	if got := som.(uint16); got != wantSOM {

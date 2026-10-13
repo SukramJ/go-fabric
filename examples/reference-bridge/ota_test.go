@@ -194,7 +194,7 @@ func (e *otaEvents) saw(id uint32) bool {
 // TestOtaHarness_UpdateReportedInPlace: in harness mode an announced update
 // is downloaded, applied in place — SoftwareVersion reads the new version —
 // and reported as after a restart: VersionApplied and NotifyUpdateApplied
-// (#handlePreviousUpdateOnStart, OtaSoftwareUpdateRequestorServer.ts:255-313).
+// (#handlePreviousUpdateOnStart, OtaSoftwareUpdateRequestorServer.ts:256-314).
 func TestOtaHarness_UpdateReportedInPlace(t *testing.T) {
 	t.Parallel()
 	bi, err := mattercore.NewBasicInformation(mattercore.Config{VendorID: testVendorID, ProductID: testProductID, NodeLabel: "ota", SoftwareVersion: 1, SoftwareVersionStr: "1"})

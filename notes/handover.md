@@ -238,7 +238,7 @@ Owner decisions on R's questions (ADR 0018 stays as written):
    the server reads unset as false (`OnOffServer.ts:105`). Daemon-only
    by_design entry, not a library divergence.
 4. ServerList order on endpoints 14, 27, 32 now follows the type's
-   requirement order (`DescriptorServer.ts:270-279`): accepted.
+   requirement order (`DescriptorServer.ts:276-285`): accepted.
 5. Harness fix `77a6677` (explicit `--paa-trust-store-path`) stays; it
    names the store CHIP's walk finds from a shallower checkout, CI is
    unchanged.
@@ -247,7 +247,7 @@ Owner decisions on R's questions (ADR 0018 stays as written):
 
 **Docs PR `docs/wave-6-followups`** (same shape as §3), written from this list: by_design — mandatory-
 with-extension refuses `New` (`RequirementGenerator.ts:188-199`,
-`EndpointFile.ts:144-158`); `AddPart` stricter than `Parts.ts:170-201`;
+`EndpointFile.ts:144-158`); `AddPart` stricter than `Parts.ts:195-213`;
 the assembler's five clusters never mounted by `device/`; feature masks
 as literals; `onoff.Sink` as on()/off() override; Clock-seam countdowns;
 a refused countdown off keeps state; measurement-backed daemon endpoints
@@ -256,7 +256,7 @@ bypass the device layer (`Spec.Measurement`, `Spec.PowerSource`);
 daemon. findings — `spec.Instance` treats "Rev >= v7" as conditional so a
 default LevelControl lacks MinLevel/MaxLevel (`LevelControlServer.ts:114-116`);
 OnOff scene invalidation, global scene and delayed scene apply not ported
-(`OnOffServer.ts:98-100,120-122,159-165,175-184,268-310`); optional
+(`OnOffServer.ts:98-100,120-122,159-165,175-184,268-308`); optional
 Groups/ScenesManagement not opt-in-able; no default for fabric-scoped
 clusters; no device-layer binding for a host `MeasurementSource`; the
 bridge wires only source-level notifiers. Also: ADR 0018 says 65 types,
@@ -312,10 +312,10 @@ Owner decisions on the reports:
   CloseSession) are findings to verify against matter.js in the docs PR.
 - T: revision conditions decide element presence only, features stay
   conditional (`IllegalFeatureCombinations.ts:441-443,464-468`,
-  `conformance-compiler.ts:250-254`) — confirmed; Source and Measurement
+  `conformance-compiler.ts:252-256`) — confirmed; Source and Measurement
   both served — accepted; the `WithMeasurement` probe at `New` — accepted;
   Binding default is a store without peer resolution — finding.
-- U: TCP-bound session reuse in `existingPeerSession` (`Peer.ts:418-438`)
+- U: TCP-bound session reuse in `existingPeerSession` (`Peer.ts:439-459`)
   confirmed; `SetOnSessionClose` single callback (host must call
   `Bridge.SessionClosed`) — open item; unsecured handshake sessions not
   counted on a TCP connection, and the first chunk of a multi-chunk report
@@ -357,14 +357,14 @@ step 15b (an 84-chunk wildcard read, no item-1/2/3 path) and passed alone —
 read as a timing flake, to be confirmed by the owner's fixture run. No
 chip-tool test, PICS or golden changed.
 
-Owner decisions on report W (verified against `Fabric.ts:403-427,456-460`,
-`NodeSession.ts:312-327,359-368` at 4633bfd7):
+Owner decisions on report W (verified against `Fabric.ts:408-432,461-465`,
+`NodeSession.ts:337-352,384-393` at 0ceb202d):
 - Q1: matter.js wins over the brief — the invoking session of RemoveFabric
   closes after its response **without** a CloseSession (`initiateForceClose`
   marks it peer-lost, `close()` skips `gracefulClose`); the brief's wording
   was wrong. The other sessions get the CloseSession.
 - Q2: a failed handshake never closes a connection; only a secure session's
-  deletion schedules the check (`ExchangeManager.ts:678-708`) — parity,
+  deletion schedules the check (`ExchangeManager.ts:683-713`) — parity,
   no change.
 - Q3: UDP sessions without a route close silently — finding (Tier 3), not
   moved in this wave: binding a UDP session at establishment changes the
@@ -376,11 +376,11 @@ Owner decisions on report W (verified against `Fabric.ts:403-427,456-460`,
 **Docs PR `docs/wave-8-followups`** (written from this list, after #55): findings — close the three
 Tier-3 bullets (RemoveFabric without CloseSession, handshake sessions on
 TCP, first chunk of a chunked report); add UpdateNOC keeps the invoking
-session open (`Fabric.ts:403-410` closes it after the exchange) and
+session open (`Fabric.ts:408-415` closes it after the exchange) and
 unrouted sessions closed silently (Q3). by_design — CloseSession to every
-other routed session regardless of active exchanges (`NodeSession.ts:312-327`
+other routed session regardless of active exchanges (`NodeSession.ts:337-352`
 defers and then sends none); no subscription flush on fabric removal or
-rotation (`Fabric.ts:405-407,421-423`); CASE hold bounded only by eviction
+rotation (`Fabric.ts:410-412,426-428`); CASE hold bounded only by eviction
 (Q4). `docs/open-items.md`: the three rows closed, two new rows. Then
 delete `wave8/sessions`, `planning/briefs-wave-8`,
 `wave/2026-10-12-tranche-8` and `.claude/worktrees/wave8-sessions`.
@@ -412,9 +412,9 @@ the end, unreached 5, entry points 4444 → 4482).
   `SetCurrentPosition`, `SetOperationalStatus`). Decisions: one status rule
   for both new ports (onoff untouched — open item); SetpointRaiseLower in
   Both mode is one Sink call, cooling primary, heating companion
-  (`ThermostatServer.ts:218-219`); an unchanged value skips the Sink
-  (matter.js `Datasource.ts:674-676` skips equal values on commit,
-  `$Changing` only for changed fields `:956-957` — verified at the pin);
+  (`ThermostatServer.ts:219-220`); an unchanged value skips the Sink
+  (matter.js `Datasource.ts:760-762` skips equal values on commit,
+  `$Changing` only for changed fields `:1042-1043` — verified at the pin);
   OperationalStatus stays the host's with a Mover; calibration outside the
   Sink.
 - **Z (#58):** `node.Config.Observers` (`OnFabricAdded/Removed/Updated`
@@ -429,7 +429,7 @@ the end, unreached 5, entry points 4444 → 4482).
   concurrent pairings always on. Decisions: `ConcurrentPairings` stays a
   constant; observers take no ctx and return a logged error;
   `OnCommissioningComplete` fires per command (matter.js `commissioned`
-  only when the fabric count crosses zero, `CommissioningServer.ts:157-171`
+  only when the fabric count crosses zero, `CommissioningServer.ts:143-157`
   — by_design); a basic window closing on an uncommissioned node reopens
   the own window with a fresh timeout.
 
@@ -442,14 +442,14 @@ tranche runs the full set again before the PR.
 **Docs PR `docs/wave-9-followups`** (after the tranche merges): by_design —
 per-window basic credentials (`AdministratorCommissioningServer.ts:105-121`,
 `DeviceCommissioner.ts:236-256`), SupportedFabrics default 5 vs matter.js
-254 (`OperationalCredentialsServer.ts:84-88`), `OnCommissioningComplete`
+254 (`OperationalCredentialsServer.ts:85-89`), `OnCommissioningComplete`
 per command, observers synchronous before the response, Mover synchronous
 inside the command (`WindowCoveringServer.ts:378-392,455-463`),
 OperationalStatus host-owned with a Mover (`WindowCoveringServer.ts:217-224,
 412-420,237-248`); unchanged values skipping the Sink is parity, not
-by_design (`Datasource.ts:674-676`). Findings — Tier 3:
+by_design (`Datasource.ts:760-762`). Findings — Tier 3:
 SetpointRaiseLower in Heat/Cool mode on an AUTO thermostat does not keep the
-deadband (`ThermostatServer.ts:228-266`). Open items — `SetOnFabricAdded`
+deadband (`ThermostatServer.ts:229-267`). Open items — `SetOnFabricAdded`
 never fires under the facade; `onoff.setOnOff` maps every Sink error to
 FAILURE (`cluster/onoff/server.go:319-328`). Close #57, #58, #60, #61, #62.
 Written on `docs/wave-9-followups` on top of the tranche, cherry-picked
@@ -516,7 +516,7 @@ false, 9.1–9.3 excluded as in matter.js), 0 failed.
 **Docs PR `docs/wave-10-followups`** (after the tranche merges):
 by_design — host port outside the setter's lock, command wins the overlap
 (`Tx.ts:194-203,479-501`); thermostat companions recomputed after the Sink
-(`ThermostatServer.ts:599-606`, one transaction in matter.js);
+(`ThermostatServer.ts:594-601`, one transaction in matter.js);
 ColorControl `Set` does not stop movement (`Transitions.ts:455-574`,
 finish-on-target `:659-693` not mirrored); `Set` converts as
 `switchColorMode` without its stop (`:1454-1540`, `:1458`). Findings —

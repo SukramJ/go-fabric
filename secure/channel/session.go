@@ -154,7 +154,7 @@ func New(cfg Config) (*Session, error) {
 		// Secure sessions use a no-rollover reception window: a counter
 		// that appears to wrap is a duplicate, not a fresh value — the
 		// session re-establishes before the counter rolls over. Mirrors
-		// matter.js NodeSession.ts:118 (MessageReceptionStateEncryptedWithoutRollover).
+		// matter.js NodeSession.ts:122 (MessageReceptionStateEncryptedWithoutRollover).
 		in: mrp.NewWindowNoRollover(),
 	}
 	sess.encCipher.Store(enc)
@@ -192,7 +192,7 @@ func (s *Session) Encrypt(header *message.Header, secFlags uint8, plaintext []by
 	// reuses an AES-CCM nonce under the live key (Matter §4.6.6). An
 	// exhausted counter makes the session permanently unusable; the
 	// peer re-establishes via CASE/PASE. matter.js closes the session
-	// before rollover (NodeSession.ts:111).
+	// before rollover (NodeSession.ts:115).
 	counter, err := s.out.NextNoRollover()
 	if err != nil {
 		return nil, fmt.Errorf("channel: %w", err)
@@ -201,7 +201,7 @@ func (s *Session) Encrypt(header *message.Header, secFlags uint8, plaintext []by
 	// Secure unicast omits the Source Node ID on the wire (S flag = 0):
 	// the peer derives the nonce node id from the resolved session
 	// context, not from the header. Mirrors matter.js NodeSession.ts
-	// encode (packages/protocol/src/session/NodeSession.ts:204-217),
+	// encode (packages/protocol/src/session/NodeSession.ts:218-231),
 	// which stamps only the peer session id and builds the nonce from
 	// the local fabric node id. The nonce below still binds to
 	// s.localNodeID so the peer's session-derived node id matches.
@@ -245,7 +245,7 @@ func (s *Session) Decrypt(header *message.Header, secFlags uint8, ciphertext []b
 	// the Source Node ID on the wire, and a frame that does carry one
 	// still has to authenticate under the session's own identity, or
 	// the nonce becomes partly sender-chosen. Mirrors matter.js
-	// NodeSession.ts:187 (generateNonce with this.#peerNodeId) and chip
+	// NodeSession.ts:203 (generateNonce with this.#peerNodeId) and chip
 	// CryptoContext::BuildNonce fed from session->GetPeerNodeId().
 	nonce := buildNonce(secFlags, header.MessageCounter, s.peerNodeID)
 	// Authenticate the exact raw received header bytes, not a re-encoded
@@ -312,7 +312,7 @@ func (s *Session) PeerCATs() []uint32 {
 // The operational manager owns that ordering via its graceful-close
 // notifier; the split mirrors matter.js, where Session.ts:248
 // initiateClose emits gracefulClose while the keys are live and the
-// exchange layer ships the report (ExchangeManager.ts:658
+// exchange layer ships the report (ExchangeManager.ts:716-726
 // #sendCloseSession) before the session state is dropped.
 func (s *Session) Close() {
 	s.closed.Store(true)

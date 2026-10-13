@@ -96,7 +96,7 @@ type FeatureContext interface {
 // ("Rev >= vN") is decided against it: present at or above revision N,
 // absent below — matter.js's runtime conformance compiler resolves the
 // node "at compile time since the cluster revision is static"
-// (packages/node/src/behavior/state/validation/conformance-compiler.ts:250-254,
+// (packages/node/src/behavior/state/validation/conformance-compiler.ts:252-256,
 // `revision >= ast.param ? ConformantNode : NonconformantNode`, the
 // schema's revision defaulting to 1). A context without a revision leaves
 // the condition conditional, as matter.js's model-level
@@ -117,7 +117,7 @@ func revisionApplicability(c Conformance, ctx FeatureContext) Applicability {
 	}
 	rev := int(rc.Revision())
 	if rev == 0 {
-		rev = 1 // conformance-compiler.ts:252, `?? 1`
+		rev = 1 // conformance-compiler.ts:254, `?? 1`
 	}
 	if rev >= c.Rev {
 		return ApplicabilityMandatory

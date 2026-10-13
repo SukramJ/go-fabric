@@ -644,7 +644,7 @@ type BoolMeasurementSource interface {
 //
 // Mirrors matter.js's reactor-style observation of
 // `events.<attr>$Changed` (see matter.js
-// packages/node/src/behaviors/thermostat/ThermostatServer.ts:450 for
+// packages/node/src/behaviors/thermostat/ThermostatServer.ts:451 for
 // the canonical `reactTo(...measuredValue$Changed, handler)` pattern).
 // Without this push path the Subscribe engine emits only empty
 // heartbeats and Apple Home shows bridged sensors as "not responding"

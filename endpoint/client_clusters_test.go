@@ -14,7 +14,7 @@ import (
 // TestSpecClientClustersReadBackInTheDescriptor: Spec.ClientClusters is the
 // Descriptor's ClientList, on a bridged endpoint and on a part — matter.js
 // MutableEndpoint.ts:53-61 registers a type's mandatory client clusters,
-// DescriptorServer.ts:284-290 lists them. A Spec without any serves an
+// DescriptorServer.ts:290-296 lists them. A Spec without any serves an
 // empty ClientList, as before the field existed.
 func TestSpecClientClustersReadBackInTheDescriptor(t *testing.T) {
 	t.Parallel()

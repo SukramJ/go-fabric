@@ -55,7 +55,7 @@ type Observers struct {
 	// scheduled), with the fabric the commissioning completed for. It
 	// fires on every CommissioningComplete, whereas matter.js's
 	// `commissioned` event fires when the fabric count crosses zero
-	// (CommissioningServer.ts:157-171 #syncCommissioned).
+	// (CommissioningServer.ts:143-157 #syncCommissioned).
 	OnCommissioningComplete func(fabricIndex uint8) error
 	// OnWindowTransition runs on every commissioning-window transition
 	// (open, close, an administrator's AdminFabricIndex cleared), after

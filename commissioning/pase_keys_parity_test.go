@@ -19,7 +19,7 @@ import (
 // TestPASEResponderKeysMatchTheOperationalPasePath runs one SPAKE2+
 // handshake and holds this package's PASE key schedule against the one
 // the running bridge uses (secure/operational OpenFromPase, itself the
-// port of matter.js NodeSession.ts:76-86 via PaseServer.ts:184-192).
+// port of matter.js NodeSession.ts:78-88 via PaseServer.ts:184-192).
 //
 // Both halves are needed. The attestation challenge is what the DAC
 // signature over AttestationElements / NOCSRElements binds to; a
@@ -74,7 +74,7 @@ func TestPASEResponderKeysMatchTheOperationalPasePath(t *testing.T) {
 	}
 
 	// The initiator's view of the same key block: matter.js
-	// NodeSession.ts:76-86 — I2R = keys[0:16], R2I = keys[16:32]; an
+	// NodeSession.ts:78-88 — I2R = keys[0:16], R2I = keys[16:32]; an
 	// initiator encrypts with I2R and decrypts with R2I.
 	block, err := hkdf.Key(sha256.New, ke, nil, "SessionKeys", 48)
 	if err != nil {

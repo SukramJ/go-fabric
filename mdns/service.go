@@ -231,7 +231,7 @@ func BuildOperationalService(cfg OperationalServiceConfig) Service {
 	// retry budget; SII=0 / SAI=0 on the wire collapses to a default
 	// the controller cannot interpret and the bridge appears
 	// "Reachable: NO / Nodeid: (null)" in the iPhone Home app. Mirrors
-	// matter.js's per-session SII/SAI emission (NodeSession.ts:147
+	// matter.js's per-session SII/SAI emission (NodeSession.ts:153
 	// `Duration.format(this.idleInterval)`).
 	//
 	// The operational defaults differ from the commissionable defaults
@@ -322,7 +322,7 @@ type CommissionableServiceConfig struct {
 	// §4.3.1.6 `RI` TXT key). When non-empty, emitted verbatim so
 	// controllers that use the rotating ID for "already added?"
 	// checks can correlate devices.
-	// matter.js CommissionableMdnsAdvertisement.ts (Scanner.ts:38
+	// matter.js CommissionableMdnsAdvertisement.ts (Scanner.ts:47
 	// `RI?: string`) and chip
 	// Advertiser_ImplMinimalMdns.cpp:878-881 both emit RI only when
 	// the platform supplies it; go-fabric does the same.
@@ -463,7 +463,7 @@ func BuildCommissionableService(cfg CommissionableServiceConfig) Service {
 		txt = append(txt, TXTRecord{Key: "PI", Value: cfg.PairingInstruction})
 	}
 	// RI (Rotating Device Identifier) per Matter §4.3.1.6, matter.js
-	// Scanner.ts:38 `RI?: string` — emitted only when the platform
+	// Scanner.ts:47 `RI?: string` — emitted only when the platform
 	// supplies it. Absent on a non-RI bridge; present once a rotating
 	// ID generator is wired.
 	if cfg.RotatingID != "" {

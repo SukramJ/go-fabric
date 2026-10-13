@@ -89,7 +89,7 @@ var assemblerMounted = map[uint32]string{
 //
 // Mirrors matter.js's construction of an Endpoint from its generated
 // MutableEndpoint type (packages/node/src/devices/dimmable-light.ts:103-116,
-// packages/node/src/endpoint/Endpoint.ts:595-636).
+// packages/node/src/endpoint/Endpoint.ts:596-637).
 func New(t *Type, opts Options, with ...Option) (*Device, error) {
 	if t == nil {
 		return nil, fmt.Errorf("%w: no device type", ErrConfiguration)
@@ -512,9 +512,9 @@ func serverAs[T contract.ClusterServer](d *Device, clusterID uint32) T {
 }
 
 // AddPart makes p a part of the device — matter.js's `endpoint.parts.add`
-// (packages/node/src/endpoint/properties/Parts.ts:36-61). matter.js
+// (packages/node/src/endpoint/properties/Parts.ts:37-73). matter.js
 // validates an insertion for endpoint-number identity only
-// (Parts.ts:170-201) and leaves composition to device-type validation;
+// (Parts.ts:195-213) and leaves composition to device-type validation;
 // the device layer refuses here what it can judge without a topology: a
 // part whose device type the device type does not name as a component
 // (its deviceType requirements, schema.DeviceTypeDefinitionOf, through its
@@ -619,7 +619,7 @@ func (d *Device) Spec() endpoint.Spec {
 // clientClusters are the client clusters the device type mandates — what
 // matter.js's MutableEndpoint registers into the type
 // (packages/node/src/endpoint/type/MutableEndpoint.ts:53-61) and its
-// DescriptorServer lists as ClientList (DescriptorServer.ts:284-290).
+// DescriptorServer lists as ClientList (DescriptorServer.ts:290-296).
 func (d *Device) clientClusters() []uint32 {
 	var out []uint32
 	for _, r := range d.typ.Clients {

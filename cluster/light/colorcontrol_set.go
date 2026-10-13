@@ -49,7 +49,7 @@ func (s *ColorControlServer) Set(c Color) {
 	prev := s.st
 	next := s.deviceColor(prev, c)
 	// An unchanged value is no change (matter.js
-	// packages/node/src/behavior/state/managed/Datasource.ts:673-675
+	// packages/node/src/behavior/state/managed/Datasource.ts:759-761
 	// skips a deep-equal value on commit).
 	if next == prev || (s.inflight != nil && s.deviceColor(*s.inflight, c) == *s.inflight) {
 		s.mu.Unlock()

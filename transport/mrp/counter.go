@@ -14,7 +14,7 @@ import (
 // 32-bit space is used up. A secure session whose counter is exhausted
 // must be replaced, never wrapped — reusing a counter value under the
 // same key reuses an AES-CCM nonce. matter.js expires the session
-// before the rollover (NodeSession.ts:111 onRollover → initiateClose)
+// before the rollover (NodeSession.ts:115 onRollover → initiateClose)
 // and throws when a forbidden rollover is attempted
 // (MessageCounter.ts:64-67).
 var ErrCounterExhausted = errors.New("mrp: message counter exhausted")
@@ -69,7 +69,7 @@ func (c *Counter) Next() uint32 {
 // returns [ErrCounterExhausted]. Secure sessions MUST use this variant
 // — a wrapped counter reuses an AES-CCM nonce under the same session
 // key (Matter §4.6.6 forbids rollover for encrypted sessions).
-// Mirrors matter.js NodeSession.ts:111 (secure-session counter closes
+// Mirrors matter.js NodeSession.ts:115 (secure-session counter closes
 // the session instead of rolling over) + MessageCounter.ts:64-67.
 func (c *Counter) NextNoRollover() (uint32, error) {
 	for {

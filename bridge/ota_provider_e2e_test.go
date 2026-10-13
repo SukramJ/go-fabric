@@ -269,8 +269,8 @@ func (r *peerListingRegistry) SessionIDsForPeer(uint8, uint64) []uint16 { return
 
 // TestOtaRequestor_EndToEnd_TCPBlockSize: over a session bound to a TCP
 // connection, the requestor reuses that session for the provider (matter.js
-// Peer.ts:418-438 newestSession of any channel) and asks for 8192-byte BDX
-// blocks (OtaSoftwareUpdateRequestorServer.ts:54, :962-963); the provider's
+// Peer.ts:439-459 newestSession of any channel) and asks for 8192-byte BDX
+// blocks (OtaSoftwareUpdateRequestorServer.ts:54, :975-976); the provider's
 // accept of that size carries the download in 8192-byte blocks, without
 // MRP on the exchange the bridge opened.
 func TestOtaRequestor_EndToEnd_TCPBlockSize(t *testing.T) {

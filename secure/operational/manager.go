@@ -43,14 +43,14 @@ type Manager struct {
 	// layer wires a best-effort Secure-Channel CloseSession
 	// StatusReport sender here so the peer learns the session is gone
 	// instead of retransmitting into a void. Mirrors matter.js
-	// packages/protocol/src/protocol/ExchangeManager.ts:635
+	// packages/protocol/src/protocol/ExchangeManager.ts:693
 	// (`observers.on(session.gracefulClose, () =>
 	// this.#sendCloseSession(session))`) — the session emits
 	// gracefulClose while its keys are still live
-	// (packages/protocol/src/session/NodeSession.ts:343) and the
+	// (packages/protocol/src/session/NodeSession.ts:368) and the
 	// exchange layer ships the CloseSession report. Deliberately NOT
 	// fired for peer-initiated closes ([Manager.Close] — the peer
-	// already knows; NodeSession.ts:284 handlePeerClose marks the peer
+	// already knows; NodeSession.ts:305 handlePeerClose marks the peer
 	// lost so close() skips the gracefulClose emit) nor for the fabric
 	// teardown paths (CloseFabric / CloseFabricExcept /
 	// ClosePASESessions), where the close is the protocol-visible
@@ -101,7 +101,7 @@ func (m *Manager) SetReannounceTrigger(fn func()) {
 // invoke this BEFORE closeStaleEntries — the hook encrypts the
 // CloseSession StatusReport under the session's still-live keys, the
 // same ordering matter.js guarantees by emitting gracefulClose from
-// NodeSession.ts:343 close() before the key state is dropped.
+// NodeSession.ts:368 close() before the key state is dropped.
 //
 // A non-zero deadline bounds the sweep: once passed, the remaining
 // notifications are skipped so a shutdown never blocks on a slow or
@@ -542,7 +542,7 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		fabricIndex: fabricIndex,
 		Session:     sess,
 		// As openFromSigma: the Sigma key schedule's third block
-		// (matter.js NodeSession.ts:80).
+		// (matter.js NodeSession.ts:82).
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
 		createdAt:            time.Now(),
 	}
@@ -643,7 +643,7 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 	// AttestationChallenge is the third 16-byte slice of the 48-byte
 	// HKDF-SHA256(IKM=sharedSecret, salt=sessionKeysSalt, info="SessionKeys")
 	// output produced by the Sigma key schedule.
-	// Mirrors matter.js packages/protocol/src/session/NodeSession.ts:80 —
+	// Mirrors matter.js packages/protocol/src/session/NodeSession.ts:82 —
 	// `const attestationKey = keys.slice(32, 48)` — and
 	// chip CASESession.cpp:615 — derived from the same 48-byte block.
 	// OpenFromPase sets this identically (manager.go:241); CASE must match.
@@ -660,9 +660,9 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 	// (Session==nil) that is overwritten here. A LIVE session can hold
 	// the slot too; it goes through the graceful close cascade rather
 	// than being dropped silently. Tell its peer BEFORE zeroising the
-	// keys — matter.js emits gracefulClose (NodeSession.ts:343) while
+	// keys — matter.js emits gracefulClose (NodeSession.ts:368) while
 	// the session can still encrypt, and the exchange layer ships the
-	// CloseSession StatusReport (ExchangeManager.ts:658).
+	// CloseSession StatusReport (ExchangeManager.ts:716-726).
 	var occupied []*Entry
 	if occupant := m.installEntryLocked(id, entry); occupant != nil {
 		occupied = append(occupied, occupant)
@@ -877,7 +877,7 @@ func (m *Manager) AdoptFabricIndex(sessionID uint16, newFabricIndex uint8) error
 // CloseSession StatusReport) among others, so it deliberately does
 // NOT fire the graceful-close notifier — echoing a CloseSession back
 // at a peer that just closed would be wrong. Mirrors matter.js
-// NodeSession.ts:284-288 handlePeerClose, which marks the peer lost so
+// NodeSession.ts:305-309 handlePeerClose, which marks the peer lost so
 // close() skips the gracefulClose emit. The reannounce trigger still
 // fires when the peer has no remaining session, matching matter.js
 // DeviceAdvertiser.ts:132-149 (every session deletion conditionally
@@ -915,9 +915,9 @@ func (m *Manager) Close(sessionID uint16) error {
 // (packages/node/src/behavior/system/network/ServerNetworkRuntime.ts:427).
 //
 // Mirrors the matter.js shutdown chain: each session's close emits
-// gracefulClose (Session.ts:248 initiateClose → NodeSession.ts:343)
+// gracefulClose (Session.ts:248 initiateClose → NodeSession.ts:368)
 // and the exchange layer ships a CloseSession StatusReport per session
-// (ExchangeManager.ts:658 #sendCloseSession).
+// (ExchangeManager.ts:716-726 #sendCloseSession).
 func (m *Manager) CloseAllGraceful(deadline time.Time) int {
 	m.mu.Lock()
 	victims := make([]*Entry, 0, len(m.sessions))
@@ -981,8 +981,8 @@ func (m *Manager) CloseFabricExcept(fabricIndex uint8, exceptSessionID uint16) {
 // PASE nature). Matter §11.10.6.6 step 4 requires the server to clear
 // any still-established PASE session on a successful
 // CommissioningComplete, and the fail-safe expiry path does the same.
-// Mirrors matter.js FailsafeContext.ts:154 (completeCommission) and
-// :291 (fail-safe expired) → closePaseSession. Returns the number of
+// Mirrors matter.js FailsafeContext.ts:153 (completeCommission) and
+// :280 (fail-safe expired) → closePaseSession. Returns the number of
 // sessions closed.
 func (m *Manager) ClosePASESessions() int {
 	m.mu.Lock()
@@ -1024,7 +1024,7 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 	}
 	m.mu.Unlock()
 	// Graceful close notification before key zeroise, then the
-	// conditional broadcast resume — matter.js ExchangeManager.ts:658
+	// conditional broadcast resume — matter.js ExchangeManager.ts:716-726
 	// / DeviceAdvertiser.ts:132-149 (see the hook field docs).
 	m.notifyGracefulClose(victims, time.Time{})
 	closeStaleEntries(victims)
@@ -1038,7 +1038,7 @@ func (m *Manager) ClosePeer(fabricIndex uint8, peerNodeID uint64) int {
 // sessions a peer held when an exchange on one of them ran out of MRP
 // retransmissions. No CloseSession goes on the wire: the peer is
 // lost, so matter.js marks the session peer-lost and force-closes it
-// (NodeSession.ts:300-303 handlePeerLoss → initiateForceClose), and
+// (NodeSession.ts:325-328 handlePeerLoss → initiateForceClose), and
 // the session manager applies that to every session of the peer
 // created before the reporting exchange (SessionManager.ts:677-695
 // #handlePeerLoss, the `asOf` check at :688). A zero asOf closes them
@@ -1206,7 +1206,7 @@ func (m *Manager) reapIdle(idleTimeout time.Duration) {
 	// still seal the CloseSession StatusReport, then resume mDNS
 	// broadcast for peers left with zero sessions so they rediscover
 	// the bridge instead of retransmitting into a dead session.
-	// Mirrors matter.js ExchangeManager.ts:635/658 (gracefulClose →
+	// Mirrors matter.js ExchangeManager.ts:693/716-726 (gracefulClose →
 	// #sendCloseSession) + DeviceAdvertiser.ts:132-149.
 	m.notifyGracefulClose(victims, time.Time{})
 	closeStaleEntries(victims)

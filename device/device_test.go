@@ -463,7 +463,7 @@ func descriptorClientList(t *testing.T, topo *endpoint.Topology, d *Device) []ui
 
 // TestClientListCarriesTheMandatoryClientClusters: the device type's
 // mandatory client clusters reach the Descriptor's ClientList
-// (MutableEndpoint.ts:53-61, DescriptorServer.ts:284-290) — OtaRequestor's
+// (MutableEndpoint.ts:53-61, DescriptorServer.ts:290-296) — OtaRequestor's
 // OtaSoftwareUpdateProvider, Doorbell's Chime; a type with only optional
 // clients declares none.
 func TestClientListCarriesTheMandatoryClientClusters(t *testing.T) {

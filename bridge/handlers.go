@@ -626,8 +626,8 @@ func (a *PaseAdapter) responderSessionParamsLocked() *sessionparams.Parameters {
 // transports stated: the SupportedTransports bitmap
 // ([sessionparams.TransportTCPClient], [sessionparams.TransportTCPServer])
 // and, when it names TCP, MaxTCPMessageSize — matter.js's fallback of
-// 64000 bytes unless the host passes its own bound (SessionParameters.ts:55-62,
-// :133). A node without TCP states neither field.
+// 64000 bytes unless the host passes its own bound (SessionParameters.ts:58-63,
+// :152). A node without TCP states neither field.
 func SessionParametersFor(transports uint16, maxTCPMessageSize uint32) sigma.SessionParameters {
 	p := DefaultSessionParameters()
 	p.SupportedTransports = transports
@@ -989,7 +989,7 @@ type SessionSubjectResolver interface {
 // over PASE. It cannot be inferred from the FabricIndex: AddNOC adopts
 // the commissioner's PASE session onto the freshly built fabric
 // (matter.js packages/node/src/behaviors/operational-credentials/
-// OperationalCredentialsServer.ts:266-270 `session.fabric = fabric`),
+// OperationalCredentialsServer.ts:279-283 `session.fabric = fabric`),
 // after which the session reports a non-zero fabric while still being
 // PASE and still carrying the implicit Administer grant
 // (FabricAccessControl.ts:189-191). Returning (_, false) signals

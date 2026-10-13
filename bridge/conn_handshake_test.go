@@ -58,8 +58,8 @@ func unsecuredSC(opcode uint8, xid uint16, counter uint32) []byte {
 // connection closes while a CASE handshake is in flight on it — the
 // connection stays, the handshake completes and its session binds to the
 // connection, and the connection closes when that session goes. matter.js
-// counts the unsecured session on the channel (ExchangeManager.ts:629-643,
-// :639-640) and creates the secure session on it (CaseServer.ts:316-317).
+// counts the unsecured session on the channel (ExchangeManager.ts:634-648,
+// :644-645) and creates the secure session on it (CaseServer.ts:316-317).
 func TestTCPHandshakeHoldsConnection(t *testing.T) {
 	h := newTCPHarness(t)
 	const established = harnessLocalSessionID + 7

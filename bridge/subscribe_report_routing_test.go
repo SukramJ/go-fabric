@@ -68,7 +68,7 @@ func encryptIMFromPeer(t *testing.T, peerSess *channel.Session, localSessionID u
 // Subscribe exchange when the SubscribeResponse landed; a report sent
 // there with Initiator=false is an unsolicited message on an unknown
 // exchange, which matter.js answers with a standalone ack and drops
-// (packages/protocol/src/protocol/ExchangeManager.ts:411-418). Ongoing
+// (packages/protocol/src/protocol/ExchangeManager.ts:441-452). Ongoing
 // server reports are always new server-initiated exchanges
 // (packages/node/src/node/server/ServerSubscription.ts:823
 // initiateExchange).
@@ -115,7 +115,7 @@ func TestReportSubscriptionEventsRidesAFreshBridgeInitiatedExchange(t *testing.T
 // (IPv6 temporary-address rotation, interface switch) keeps sending
 // authenticated traffic from the new address; matter.js adopts it —
 // "the new message wins" (packages/protocol/src/protocol/
-// ExchangeManager.ts:400-405) — and routes subscription reports through
+// ExchangeManager.ts:425-431) — and routes subscription reports through
 // the session's current channel (ServerSubscription.ts:823).
 func TestOngoingReportsFollowThePeerAddressOfLaterInboundTraffic(t *testing.T) {
 	t.Parallel()

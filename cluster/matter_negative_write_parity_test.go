@@ -272,7 +272,7 @@ func TestNegativeWriteParity(t *testing.T) {
 
 	cases := []negativeWriteCase{
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:879
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:890
 			// #assertSetpointWithinLimits — rejects values above MaxHeatSetpointLimit.
 			name: "Thermostat/OccupiedHeatingSetpoint above maxHeat → ConstraintError",
 			build: func() interface {
@@ -285,7 +285,7 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:879
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:890
 			// #assertSetpointWithinLimits — rejects values below MinHeatSetpointLimit.
 			name: "Thermostat/OccupiedHeatingSetpoint below minHeat → ConstraintError",
 			build: func() interface {
@@ -298,7 +298,7 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:615-634
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:610-629
 			// #assertSystemModeChanging — CoolingOnly sequence forbids SystemMode=Heat(4).
 			name: "Thermostat/SystemMode=Heat(4) on CoolingOnly server → ConstraintError",
 			build: func() interface {
@@ -311,8 +311,8 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:599-606
-			// (4633bfd7): a host refusing in occupiedHeatingSetpoint$Changing
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:594-601
+			// (0ceb202d): a host refusing in occupiedHeatingSetpoint$Changing
 			// fails the write; thermo.Sink is its Go form, a plain error → Failure.
 			name: "Thermostat/OccupiedHeatingSetpoint refused by the host Sink → Failure",
 			build: func() interface {
@@ -325,8 +325,8 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusFailure,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:619
-			// (4633bfd7): a host refusing in systemMode$Changing fails the write.
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:614
+			// (0ceb202d): a host refusing in systemMode$Changing fails the write.
 			name: "Thermostat/SystemMode refused by the host Sink → Failure",
 			build: func() interface {
 				MatterWrite(context.Context, uint32, any) error
@@ -626,7 +626,7 @@ func TestNegativeInvokeParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:158-166
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:189-193
 			// setpointRaiseLower — mode=Heat without HEAT feature → InvalidCommand.
 			// Heat is 0x0 per SetpointRaiseLowerModeEnum
 			// (thermostat-cluster.element.ts:511); the payload is the bridge's
@@ -642,9 +642,9 @@ func TestNegativeInvokeParity(t *testing.T) {
 			wantStatus: im.StatusInvalidCommand,
 		},
 		{
-			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:187-219
-			// (4633bfd7): setpointRaiseLower assigns the setpoints, which pass
-			// occupied*Setpoint$Changing (:599-606) where a host refuses.
+			// Mirrors matter.js packages/node/src/behaviors/thermostat/ThermostatServer.ts:188-220
+			// (0ceb202d): setpointRaiseLower assigns the setpoints, which pass
+			// occupied*Setpoint$Changing (:594-601) where a host refuses.
 			name: "Thermostat/SetpointRaiseLower refused by the host Sink → Failure",
 			build: func() interface {
 				MatterInvoke(context.Context, uint32, any) (any, error)
@@ -672,7 +672,7 @@ func TestNegativeInvokeParity(t *testing.T) {
 		},
 		{
 			// Mirrors matter.js packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338
-			// (4633bfd7): a host's handleMovement that throws fails the command;
+			// (0ceb202d): a host's handleMovement that throws fails the command;
 			// cover.Mover is its Go form, an error → Failure.
 			name: "WindowCovering/UpOrOpen refused by the host Mover → Failure",
 			build: func() interface {

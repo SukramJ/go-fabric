@@ -90,7 +90,7 @@ func TestDefaultAttributeValueWriter_LockOperationEvent_AllFieldsSet(t *testing.
 // TestDefaultAttributeValueWriter_LockOperationEvent_NullableFieldsNil
 // verifies that UserIndex, FabricIndex and SourceNode all encode as
 // TLV null when unset — the PASE / no-PIN-credential case matter.js
-// DoorLockServer.ts:911-939 falls back to.
+// DoorLockServer.ts:1289-1301 falls back to.
 func TestDefaultAttributeValueWriter_LockOperationEvent_NullableFieldsNil(t *testing.T) {
 	t.Parallel()
 

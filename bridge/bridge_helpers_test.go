@@ -128,7 +128,7 @@ func TestSignalStatusResponseRX_IdempotentOnClosedChannel(t *testing.T) {
 // sessions sharing the same exchange ID keep independent rendezvous
 // channels: signalling the wrong session's (session, exchange) pair must
 // not release a waiter armed for a different session on the same exchange
-// ID. Mirrors matter.js ExchangeManager.ts:287 — exchange identity is
+// ID. Mirrors matter.js ExchangeManager.ts:340 — exchange identity is
 // scoped to its owning session.
 func TestStatusResponseWait_SessionScopedExchangeCollision(t *testing.T) {
 	t.Parallel()

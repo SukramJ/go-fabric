@@ -68,8 +68,8 @@ func newWiredServer(t *testing.T, src *eventTestSource, endpoint uint16) (*lock.
 // successful LockDoor invoke fires exactly one LockOperation event
 // (0x02) with LockOperationType=Lock(0), OperationSource=Remote(7),
 // and FabricIndex/SourceNode lifted from the invoking context. Mirrors
-// matter.js DoorLockServer.ts:119-127 (#lockDoor ends in
-// #emitLockOperation) and :911-939 (payload assembly).
+// matter.js DoorLockServer.ts:193-196 (#lockDoor ends in
+// #emitLockOperation) and :1289-1301 (payload assembly).
 func TestDoorLockServer_EmitLockOperation_LockDoor(t *testing.T) {
 	t.Parallel()
 	src := &eventTestSource{observed: true}
@@ -128,7 +128,7 @@ func TestDoorLockServer_EmitLockOperation_LockDoor(t *testing.T) {
 // the LockOperationType wire value per command: LockDoor→Lock(0),
 // UnlockDoor→Unlock(1), UnboltDoor→Unlatch(4). UnboltDoor reporting
 // Unlatch rather than Unlock mirrors matter.js
-// DoorLockServer.ts:140-142.
+// DoorLockServer.ts:209-214.
 func TestDoorLockServer_EmitLockOperation_OperationTypeMapping(t *testing.T) {
 	t.Parallel()
 
@@ -168,7 +168,7 @@ func TestDoorLockServer_EmitLockOperation_OperationTypeMapping(t *testing.T) {
 // a plain context.Background() (the PASE case, no fabric/subject
 // stamped) yields FabricIndex=nil and SourceNode=nil — matching
 // matter.js's null fallback for pre-fabric sessions
-// (DoorLockServer.ts:911-939).
+// (DoorLockServer.ts:1289-1301).
 func TestDoorLockServer_EmitLockOperation_UnstampedContext(t *testing.T) {
 	t.Parallel()
 	src := &eventTestSource{observed: true}

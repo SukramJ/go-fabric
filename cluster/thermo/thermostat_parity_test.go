@@ -134,7 +134,7 @@ func TestParityMatterJS_Thermostat_SetpointConstraintError(t *testing.T) {
 }
 
 // TestParityMatterJS_Thermostat_SetpointWithinLimitsAccepted verifies that
-// valid setpoints are accepted. Mirrors matter.js ThermostatServer.ts:732,879.
+// valid setpoints are accepted. Mirrors matter.js ThermostatServer.ts:727,890.
 func TestParityMatterJS_Thermostat_SetpointWithinLimitsAccepted(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -274,7 +274,7 @@ func TestParityMatterJS_Thermostat_SetpointRaiseLowerClampsToLimits(t *testing.T
 // TestParityMatterJS_Thermostat_SetpointRaiseLowerModeEnum pins the mode
 // dispatch against SetpointRaiseLowerModeEnum
 // (thermostat-cluster.element.ts:510-514: Heat 0x0, Cool 0x1, Both 0x2)
-// and matter.js ThermostatServer.ts:201-233 (Both moves both setpoints,
+// and matter.js ThermostatServer.ts:202-234 (Both moves both setpoints,
 // Heat only the heating one, Cool only the cooling one). A handler that
 // reads 0 as Both and 1 as Heat answers Success while moving the wrong
 // setpoint, which no status code reveals.

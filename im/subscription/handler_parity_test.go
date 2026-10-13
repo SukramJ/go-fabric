@@ -155,13 +155,13 @@ func TestHandlerParity_SendInterval_CfgCeilingCaps_PublisherWins(t *testing.T) {
 }
 
 // ---- Case 4 ---------------------------------------------------------------
-// Mirrors matter.js packages/node/test/node/ServerSubscriptionTest.ts:48-65
+// Mirrors matter.js packages/node/test/node/ServerSubscriptionTest.ts:47-64
 // (case "sets isCanceledByPeer and removes from session when peer cancels")
 //
 // After ClosePeer(fabric, peer) the subscription must be IsClosed and
 // removed from Active(); Active() must fall to 0.
 func TestHandlerParity_PeerCancel_RemovesSubscriptionFromActive(t *testing.T) {
-	// Mirrors matter.js packages/node/test/node/ServerSubscriptionTest.ts:48-65
+	// Mirrors matter.js packages/node/test/node/ServerSubscriptionTest.ts:47-64
 	t.Parallel()
 	m := newManager(subscription.Config{}, nil)
 
@@ -193,14 +193,14 @@ func TestHandlerParity_PeerCancel_RemovesSubscriptionFromActive(t *testing.T) {
 }
 
 // ---- Case 5 ---------------------------------------------------------------
-// Mirrors matter.js packages/node/test/node/ServerSubscriptionTest.ts:67-111
+// Mirrors matter.js packages/node/test/node/ServerSubscriptionTest.ts:66-110
 // (case "closes subscription even when in-flight exchange close throws")
 //
 // In go-fabric there is no per-subscription exchange object; the
 // equivalent invariant is that Close() on a mid-send subscription
 // (IsClosed is called while dirty) still marks closed + removes from Active.
 func TestHandlerParity_Close_WhileDirty_StillMarksClosed(t *testing.T) {
-	// Mirrors matter.js packages/node/test/node/ServerSubscriptionTest.ts:67-111
+	// Mirrors matter.js packages/node/test/node/ServerSubscriptionTest.ts:66-110
 	// (try/finally guarantee: this.close() runs even if exchange.close() throws)
 	t.Parallel()
 

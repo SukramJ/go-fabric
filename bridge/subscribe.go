@@ -282,7 +282,7 @@ func (b *Bridge) reportSubscriptionEvents(ctx context.Context, sub *subscription
 	// SubscribeResponse landed, and a report sent there with
 	// Initiator=false is an unsolicited message on an unknown exchange —
 	// matter.js answers it with a standalone ack and drops it
-	// (ExchangeManager.ts:411-418), which the MRP layer here would then
+	// (ExchangeManager.ts:441-452), which the MRP layer here would then
 	// mistake for delivery. Ongoing server reports are always fresh
 	// server-initiated exchanges (ServerSubscription.ts:823).
 	counters, freshExch, err := b.sendInitiatedReport(target, report)
@@ -766,7 +766,7 @@ func (b *Bridge) sendReportChunksNotify(target subTarget, report im.ReportData, 
 			// [Bridge.streamInitialReportChunks] honours through
 			// refreshAckCounter. matter.js gets it for free: its
 			// MessageExchange piggybacks the pending ack on the next send
-			// (packages/protocol/src/protocol/MessageExchange.ts:674 send).
+			// (packages/protocol/src/protocol/MessageExchange.ts:679 send).
 			target = b.piggybackOwedAck(target, ourRole)
 		}
 		counter, err := b.sendUnsolicitedIM(target, im.OpcodeReportData, body)
@@ -821,7 +821,7 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 	// exchange initiator on this fresh exchange.
 	freshTarget.peerInitiator = false
 	// The exchange context's creation time bounds a peer-loss sweep this
-	// report may trigger (matter.js ExchangeManager.ts:544, :571 asOf).
+	// report may trigger (matter.js ExchangeManager.ts:549, :576 asOf).
 	createdAt := time.Now()
 	key := mrp.ExchangeKey{SessionID: target.sessionID, ExchangeID: freshExchangeID, Initiator: true}
 	// The first message's counter belongs to the report's exchange from
@@ -880,14 +880,14 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	// not the one frozen into the target at Subscribe time: a controller
 	// whose source address rotates mid-session keeps authenticating from
 	// the new one, and matter.js adopts it ("the new message wins",
-	// ExchangeManager.ts:400-405) before routing reports through the
+	// ExchangeManager.ts:425-431) before routing reports through the
 	// session's current channel (ServerSubscription.ts:823).
 	dest := b.currentPeerAddr(target.sessionID, target.src)
 	if listener == nil && !isConnRoute(dest) {
 		return 0, ErrUnsolicitedListenerMissing
 	}
 	// Over a reliable connection MRP is off: no R flag, no piggybacked
-	// acknowledgement (matter.js MessageExchange.ts:660, :680-686).
+	// acknowledgement (matter.js MessageExchange.ts:665, :685-691).
 	usesMRP := routeUsesMRP(dest)
 
 	// sendUnsolicitedIM is the low-level primitive that ships an IM
@@ -1155,7 +1155,7 @@ func (b *Bridge) subscriptionManagerLocked() *subscription.Manager {
 // Apple Home flags bridged sensors as "not responding" once the
 // initial ReportData expires.
 //
-// Mirrors matter.js's reactor wiring (e.g. ThermostatServer.ts:450's
+// Mirrors matter.js's reactor wiring (e.g. ThermostatServer.ts:451's
 // `reactTo(...measuredValue$Changed, handler)`) translated to Go:
 // the cluster server is a struct, not a behavior with attached
 // observables, so the source notifies and the bridge looks up the
@@ -1242,7 +1242,7 @@ func (b *Bridge) wireMeasurementListenersLocked() {
 		// — whether or not the source notifies: matter.js reports a
 		// change of any behavior's state through that behavior's own
 		// Datasource (packages/node/src/behavior/state/managed/
-		// Datasource.ts:690-710, onChange then the $Changed events), so a
+		// Datasource.ts:776-796, onChange then the $Changed events), so a
 		// server need not be relayed by its source to be heard. A metering
 		// switch hosts sub-cluster servers (ElectricalPower /
 		// ElectricalEnergy) backed by sibling meter-channel sensors in
@@ -1372,7 +1372,7 @@ func (b *Bridge) wireAttributeNotifiersLocked(mgr *subscription.Manager) {
 // advances the touched clusters' endpoint-hosted DataVersion BEFORE dirty-
 // marking (so the shipped report carries the post-change version and a
 // controller's DataVersionFilter misses on the next read — mirrors matter.js
-// Datasource.ts:949), then marks every path dirty on the Subscribe manager. The
+// Datasource.ts:1035), then marks every path dirty on the Subscribe manager. The
 // unsubscribe is tracked so a reassemble tears every listener down.
 func (b *Bridge) wireMeasurementNotifier(mgr *subscription.Manager, ep *endpointpkg.Endpoint, notifier contract.ChangeNotifier, pathSet []im.ConcreteAttributePath) {
 	epID := ep.ID

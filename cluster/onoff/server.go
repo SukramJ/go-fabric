@@ -139,7 +139,7 @@ type Config struct {
 var ErrInvalidConfig = errors.New("onoff: configuration outside the cluster's model")
 
 // Server is the default OnOff server: matter.js OnOffBaseServer
-// (packages/node/src/behaviors/on-off/OnOffServer.ts, HEAD 4633bfd7). The
+// (packages/node/src/behaviors/on-off/OnOffServer.ts, HEAD 0ceb202d). The
 // lists, globals, privileges, codecs and write checks come from the
 // generated definition through [spec.Server]; the command logic, the
 // StartUpOnOff at construction and the two countdown timers (timed on,
@@ -323,7 +323,7 @@ func (s *Server) store(st state) {
 	// matter.js clears a pending scene apply whenever OnOff changes
 	// (:62 reactTo(onOff$Changed, #clearDelayedSceneApplyData)); the
 	// event fires after the transaction commits
-	// (packages/node/src/behavior/state/managed/Datasource.ts:1072), so a
+	// (packages/node/src/behavior/state/managed/Datasource.ts:1163), so a
 	// value a command armed and then changed OnOff past is dropped here.
 	if st.onOff != s.OnOff() {
 		s.clearSceneApply()
@@ -664,7 +664,7 @@ func (s *Server) timedOnTick() {
 	s.commit(st)
 }
 
-// delayedOffTick is OnOffServer.ts:312-324: 0xFFFF holds (the timer
+// delayedOffTick is OnOffServer.ts:310-322: 0xFFFF holds (the timer
 // stops); otherwise OffWaitTime counts down and the timer stops at 0.
 // The caller holds s.op.
 func (s *Server) delayedOffTick() {

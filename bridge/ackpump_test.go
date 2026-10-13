@@ -263,7 +263,7 @@ func TestAckPump_Discharge(t *testing.T) {
 // Exchange IDs are picked independently by every peer, so two controllers
 // (or an old and a new CASE session of the same controller) sharing an
 // exchange ID is a real scenario, not hypothetical — mirrors matter.js
-// ExchangeManager.ts:287 (an exchange lookup is invalidated as soon as the
+// ExchangeManager.ts:340 (an exchange lookup is invalidated as soon as the
 // session no longer matches).
 func TestAckPump_SessionScopedExchangeCollision(t *testing.T) {
 	t.Parallel()
@@ -356,11 +356,11 @@ func TestAckPump_SessionScopedExchangeCollision(t *testing.T) {
 // discarded as unsolicited — chip's ExchangeContext::MatchExchange
 // requires `payloadHeader.IsInitiator() != IsInitiator()`
 // (src/messaging/ExchangeContext.cpp:384) and matter.js applies the
-// same rule (packages/protocol/src/protocol/ExchangeManager.ts:319) —
+// same rule (packages/protocol/src/protocol/ExchangeManager.ts:324) —
 // leaving the StatusResponse unacked until the peer's retransmit cap
 // fires. matter.js stamps every message it sends, standalone acks
 // included, with the exchange's own role
-// (packages/protocol/src/protocol/MessageExchange.ts:738).
+// (packages/protocol/src/protocol/MessageExchange.ts:743).
 func TestAckPumpStandaloneAckCarriesTheBridgeExchangeRole(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -57,7 +57,7 @@ func (w *hookWriter) calls() int {
 // TestSetStoresAndReportsWithoutTheWriter: the device's colour in the
 // current mode is stored, read back and reported; the writers are not
 // called; an unchanged colour reports nothing (matter.js
-// Datasource.ts:673-675).
+// Datasource.ts:759-761).
 func TestSetStoresAndReportsWithoutTheWriter(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		srv := colorLight(t, allColorFeatures, false)

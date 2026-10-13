@@ -208,7 +208,7 @@ Abschluss: 101 Server; jeder Gerätetyp im Scope montierbar.
 höchstens drei Verbindungen je Peer-IP, 10 s bis zum ersten Byte),
 transportneutrale Verbindung in `bridge/` statt `*net.UDPAddr`, kein MRP
 über TCP, Sitzungs-Evakuierung bei Verbindungsabriss
-(`ExchangeManager.ts:628-655`), mDNS-`T`-Flag und TCP-Listener im
+(`ExchangeManager.ts:633-660`), mDNS-`T`-Flag und TCP-Listener im
 Referenz-Daemon; Sitzungsparameter `supportedTransports` (Tag 8) und
 `maxTcpMessageSize` (Tag 9) auf CASE und PASE, PASE auf
 `sigma.SessionParameters` vereinheitlicht, CASE/PASE auch über TCP

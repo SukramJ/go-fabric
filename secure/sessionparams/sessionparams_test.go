@@ -59,7 +59,7 @@ func TestEncodeShapeMatchesTlvSessionParameters(t *testing.T) {
 }
 
 // TestMaxTCPMessageSizeOnlyWithTCP: tag 9 is written only when the
-// bitmap names TCP (SessionParameters.ts:55-62), and an unstated field is
+// bitmap names TCP (SessionParameters.ts:58-63), and an unstated field is
 // omitted.
 func TestMaxTCPMessageSizeOnlyWithTCP(t *testing.T) {
 	t.Parallel()

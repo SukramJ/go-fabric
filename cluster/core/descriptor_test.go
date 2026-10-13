@@ -255,7 +255,7 @@ func TestDescriptor_WriteErrorWrapsReadOnly(t *testing.T) {
 // TestDescriptor_ServerListProvider_Overrides pins the Bug K fix:
 // SetServerListProvider replaces the static list and every MatterRead
 // reflects the provider's current return value. Mirrors matter.js
-// DescriptorServer.#serverList (DescriptorServer.ts:236-244) — the
+// DescriptorServer.#serverList (DescriptorServer.ts:241-250) — the
 // advertised ServerList is always the set of mounted behaviors, never
 // a hardcoded list that can drift when a cluster is added without
 // updating the list.

@@ -1305,7 +1305,7 @@ func TestEntry_FabricIndex_RaceAgainstAdopt(t *testing.T) {
 // OpenFromSigmaWithID populates Entry.AttestationChallenge from
 // keys.AttestationChallenge, matching the pattern in OpenFromPase.
 //
-// Mirrors matter.js packages/protocol/src/session/NodeSession.ts:80 —
+// Mirrors matter.js packages/protocol/src/session/NodeSession.ts:82 —
 // `const attestationKey = keys.slice(32, 48)` — and chip
 // CASESession.cpp:615 where the same 48-byte HKDF block provides the
 // attestation key.

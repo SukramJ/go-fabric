@@ -48,7 +48,7 @@ func TestPaseAdapterAdvertisesDefaultSessionParameters(t *testing.T) {
 
 // TestSessionParametersForStatesTCPOnlyWhenOffered: the node's defaults
 // name no transport; with a TCP role the bitmap and the size bound are
-// stated (SessionParameters.ts:55-62), the host's bound winning.
+// stated (SessionParameters.ts:58-63), the host's bound winning.
 func TestSessionParametersForStatesTCPOnlyWhenOffered(t *testing.T) {
 	t.Parallel()
 	if d := DefaultSessionParameters(); d.SupportedTransports != 0 || d.MaxTCPMessageSize != 0 {

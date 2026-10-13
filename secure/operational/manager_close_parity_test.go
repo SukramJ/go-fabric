@@ -8,11 +8,11 @@ package operational
 //
 //   - packages/protocol/src/session/Session.ts:248 initiateClose —
 //     graceful close begins while the session keys are still live.
-//   - packages/protocol/src/session/NodeSession.ts:343 close() emits
+//   - packages/protocol/src/session/NodeSession.ts:368 close() emits
 //     gracefulClose (unless the peer is lost) BEFORE state is dropped.
-//   - packages/protocol/src/protocol/ExchangeManager.ts:635/:658 —
+//   - packages/protocol/src/protocol/ExchangeManager.ts:693/:716-726 —
 //     gracefulClose observer ships the CloseSession StatusReport.
-//   - packages/protocol/src/session/NodeSession.ts:284 handlePeerClose
+//   - packages/protocol/src/session/NodeSession.ts:305 handlePeerClose
 //     marks the peer lost, so a peer-initiated close never echoes a
 //     CloseSession back.
 //   - packages/protocol/src/protocol/DeviceAdvertiser.ts:132-149 —
@@ -85,8 +85,8 @@ func closeParityKeys(seed byte) sigma.SessionKeys {
 
 // TestReapIdle_NotifiesPeerBeforeKeyZeroise verifies the reaper fires
 // the graceful-close notifier while the session can still encrypt
-// (matter.js NodeSession.ts:343 emits gracefulClose before state is
-// dropped; ExchangeManager.ts:658 seals the CloseSession report under
+// (matter.js NodeSession.ts:368 emits gracefulClose before state is
+// dropped; ExchangeManager.ts:716-726 seals the CloseSession report under
 // the live keys) and only then zeroises + cascades the close hook.
 func TestReapIdle_NotifiesPeerBeforeKeyZeroise(t *testing.T) {
 	t.Parallel()
@@ -259,7 +259,7 @@ func TestClosePeer_NotifiesAndResumesBroadcast(t *testing.T) {
 // TestClose_PeerInitiated_DoesNotEchoGracefulClose verifies that
 // [Manager.Close] — the inbound-CloseSession teardown path — never
 // fires the graceful-close notifier: matter.js marks the peer lost in
-// handlePeerClose (NodeSession.ts:284-288) so close() skips the
+// handlePeerClose (NodeSession.ts:305-309) so close() skips the
 // gracefulClose emit, and no CloseSession is echoed back. The
 // subscription cascade and the conditional broadcast resume still run.
 func TestClose_PeerInitiated_DoesNotEchoGracefulClose(t *testing.T) {
@@ -291,7 +291,7 @@ func TestClose_PeerInitiated_DoesNotEchoGracefulClose(t *testing.T) {
 // TestCloseAllGraceful_NotifiesEveryPeerWithoutReannounce verifies the
 // shutdown drain: every live session is notified before its keys are
 // zeroised (matter.js shutdown chain Session.ts:248 →
-// ExchangeManager.ts:658), placeholders are dropped silently, and the
+// ExchangeManager.ts:716-726), placeholders are dropped silently, and the
 // reannounce trigger stays silent — matter.js shuts the advertiser
 // down before removing sessions to prevent re-announces during
 // teardown (ServerNetworkRuntime.ts:427).
@@ -379,7 +379,7 @@ func TestCloseAllGraceful_DeadlinePastSkipsNotifications(t *testing.T) {
 
 // TestClosePeerLost_ForceClosesWithoutCloseSession verifies the peer-loss
 // sweep: every session of the lost peer created before asOf is closed
-// without a CloseSession on the wire (matter.js NodeSession.ts:300-303
+// without a CloseSession on the wire (matter.js NodeSession.ts:325-328
 // handlePeerLoss → initiateForceClose), the onSessionClose hook still
 // fires per session, a session established after the loss was observed
 // survives (SessionManager.ts:688-690), and the reannounce trigger stays

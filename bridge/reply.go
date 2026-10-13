@@ -150,8 +150,8 @@ func (b *Bridge) sendReplyOpts(
 	// has a tracker wired — degrading to best-effort on a missing
 	// tracker keeps test fixtures (which never wire one) functional.
 	// Over a reliable connection MRP is off altogether: no R flag, no
-	// piggybacked acknowledgement (matter.js MessageExchange.ts:660,
-	// :680-686; transport/mrp UsesMRP).
+	// piggybacked acknowledgement (matter.js MessageExchange.ts:665,
+	// :685-691; transport/mrp UsesMRP).
 	usesMRP := routeUsesMRP(src)
 	needsAck := reliable && tracker != nil && usesMRP
 

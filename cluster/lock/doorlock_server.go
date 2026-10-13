@@ -117,7 +117,7 @@ type DoorLockConfig struct {
 // OperatingMode is fixed to Normal (0); SupportedOperatingModes is 0xFFF6
 // — all alwaysSet bits (2047 = bits 0-10) set plus bits for vacation,
 // privacy, passage; Normal (bit 0) and NoRemoteLockUnlock (bit 3) are
-// both clear = supported. Mirrors matter.js DoorLockServer.ts:69
+// both clear = supported. Mirrors matter.js DoorLockServer.ts:119
 // ({vacation:true,privacy:true,passage:true,alwaysSet:2047}) → 0xFFF6.
 type DoorLockServer struct {
 	embedded cluster.DataVersionTracker // used when cfg.DataVersion is nil
@@ -191,7 +191,7 @@ func (s *DoorLockServer) MatterRead(attrID uint32) (any, bool) {
 		// 0xFFF6: alwaysSet bits (0x07FF, bits 0-10) | vacation (bit 1) |
 		// privacy (bit 2) | passage (bit 4) — Normal (bit 0) and
 		// NoRemoteLockUnlock (bit 3) clear = supported.
-		// Mirrors matter.js DoorLockServer.ts:69.
+		// Mirrors matter.js DoorLockServer.ts:119.
 		return supportedOperatingModes, true
 	default:
 		return nil, false
@@ -200,7 +200,7 @@ func (s *DoorLockServer) MatterRead(attrID uint32) (any, bool) {
 
 // supportedOperatingModes is SupportedOperatingModes: 0xFFF6 — Normal (bit 0)
 // and NoRemoteLockUnlock (bit 3) clear, i.e. supported (matter.js
-// DoorLockServer.ts:69 default).
+// DoorLockServer.ts:119 default).
 const supportedOperatingModes uint16 = 0xFFF6
 
 // MatterWrite implements [contract.ClusterServer]. OperatingMode ("R[W] VM",
@@ -264,8 +264,8 @@ func (s *DoorLockServer) MatterInvoke(ctx context.Context, cmdID uint32, _ any) 
 
 // emitLockOperation fires the Matter §5.2.10.3 LockOperation event
 // after a successful remote lock/unlock/unbolt. Mirrors matter.js
-// DoorLockServer.ts:119-143 (each command handler ends in
-// #emitLockOperation) and :911-939 (payload assembly:
+// DoorLockServer.ts:193-214 (each command handler ends in
+// #emitLockOperation) and :1289-1301 (payload assembly:
 // OperationSource=Remote, UserIndex/Credentials null without PIN
 // credentials, FabricIndex + SourceNode from the invoking session).
 // A PASE session carries fabric index 0 and no subject node — both
@@ -287,7 +287,7 @@ func (s *DoorLockServer) emitLockOperation(ctx context.Context, cmdID uint32) {
 		opType = lockOperationTypeUnlock
 	case wire.DoorLockCmdUnboltDoor:
 		// UnboltDoor reports Unlatch, not Unlock — matter.js
-		// DoorLockServer.ts:140-142.
+		// DoorLockServer.ts:209-214.
 		opType = lockOperationTypeUnlatch
 	}
 	ev := LockOperationEvent{
@@ -351,5 +351,5 @@ func (*DoorLockServer) MatterGeneratedCommands() []uint32 { return instance.Matt
 // LockOperation on successful remote operations; DoorLockAlarm and
 // LockOperationError have no emission path without PIN-credential
 // support, matching matter.js where they fire only from the wrong-code
-// path (DoorLockServer.ts:889 / :941).
+// path (DoorLockServer.ts:1188 / :941).
 func (*DoorLockServer) MatterEvents() []uint32 { return instance.MatterEvents() }

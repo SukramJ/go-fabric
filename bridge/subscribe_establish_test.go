@@ -33,7 +33,7 @@ import (
 // StatusResponse(Success). Since the chunk loop abandons the
 // interaction when a chunk goes unanswered (matter.js
 // InteractionMessenger.ts:719-721 waitForSuccess →
-// MessageExchange.ts:829-858), a peer that only reads never reaches the
+// MessageExchange.ts:834-863), a peer that only reads never reaches the
 // SubscribeResponse — so the reader and the request must run
 // concurrently. The returned channel carries the opcodes the peer saw,
 // in order, and closes when the peer's read deadline expires.

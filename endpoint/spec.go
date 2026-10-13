@@ -100,7 +100,7 @@ type Spec struct {
 	// ClientClusters are the client clusters the endpoint declares: the
 	// Descriptor's ClientList, as matter.js MutableEndpoint.ts:53-61
 	// registers a type's mandatory client clusters and
-	// DescriptorServer.ts:284-290 lists them. nil declares none.
+	// DescriptorServer.ts:290-296 lists them. nil declares none.
 	ClientClusters []uint32
 	// OptIn names the stack-mounted optional server clusters the endpoint
 	// opts into: Groups (0x0004) and ScenesManagement (0x0062), which the
