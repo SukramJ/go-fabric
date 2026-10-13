@@ -225,6 +225,26 @@ pseudo-version of `main`.
   not repeat after a restart. `RootCert`, `RootPublicKey`, `ICACCert`,
   `Verifier`, `ca.KeyIdentifier` and `ca.CompressedFabricID` (matter.js
   `GlobalFabricId.compute`).
+- `controller/attestation`, device attestation for the commissioner (ADR
+  0020, stage 2; matter.js `DeviceAttestationValidator.validate` at
+  `0ceb202d`, check for check and in its order): `attestation.Validate`
+  parses DAC and PAI (X.509, the 600-byte limit, the required extensions,
+  the Matter vendor and product id from the OID attributes or the
+  `Mvid:`/`Mpid:` common-name fallback), checks the vendor ids, the
+  attestation nonce and the signature over elements ‖ challenge, then —
+  with a `PAAStore` — the PAA by the PAI's authority key identifier, the
+  test-root policy, the chain signatures, the validity at the DAC's
+  notBefore (never against the current time, as matter.js), the PAA vendor
+  id and, when the store implements `Revocations`, revocation; then the
+  Certification Declaration's CMS signature by its signer and its content
+  (certification type, vendor id, product ids, DAC origin, authorized PAA
+  list). Hard failures are `*attestation.Error` with matter.js's
+  `DeviceAttestationCheck` names; warnings and information are
+  `Finding`s. `StaticStore` and `TestStore()` (the CSA test PAAs and test
+  CD signer) stand in for the DCL. `attestation.Policy` (`Accept`,
+  `Reject`, the zero value's backward-compatible accept, or a `Decide`
+  function) and `Policy.Resolve` are matter.js's `onFailure` and
+  `#resolveAttestationFindings`.
 
 ### Changed
 

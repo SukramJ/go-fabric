@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4670,
+  "entry_points": 4679,
   "entry_packages": [
     ".",
     "bdx",
@@ -135,6 +135,7 @@
     "commissioning",
     "conformance",
     "contract",
+    "controller/attestation",
     "controller/ca",
     "controller/discovery",
     "controller/exchange",
@@ -180,9 +181,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10743,
-    "reachable": 7529,
-    "whitelisted": 3209,
+    "total_exported": 10789,
+    "reachable": 7573,
+    "whitelisted": 3211,
     "unreachable": 5
   },
   "by_package": [
@@ -13980,6 +13981,20 @@
       "identifier": "TestDataVersionTracker_Bump_WrapAround",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "contract/dataversion_internal_test.go",
+      "line": 19
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestCertificateRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/cert_internal_test.go",
+      "line": 65
+    },
+    {
+      "package": "controller/attestation",
+      "identifier": "TestFallbackIDs",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/attestation/cert_internal_test.go",
       "line": 19
     },
     {
