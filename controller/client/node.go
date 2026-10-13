@@ -269,7 +269,8 @@ func (n *Node) Start(ctx context.Context) error {
 // Stop takes the node offline: the default subscription closes
 // (NetworkClient.ts:309-313), the peer's signals are released, the
 // properties freeze, the store is flushed (ClientCacheBuffer.ts:94-101)
-// and the connection state is recomputed.
+// and the connection state is recomputed. It waits, within ctx, for the
+// subscription to end, so a hook must not call it.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	n.started = false

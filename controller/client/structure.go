@@ -179,25 +179,19 @@ func (s *structure) injectVersionFilters(sc scope, refreshChangesOmitted bool) [
 // changes-omitted quality in the cluster — every such attribute of the
 // definition without the peer's AttributeList, the listed ones with it
 // (ClientStructure.ts:1674-1692). A cluster without a built shape has none
-// (:1675-1678).
+// (:1675-1678). schema.AttributeChangesOmitted is the table; a named
+// cluster has no definition to enumerate, so without its AttributeList
+// the ids received stand in for the model's.
 func hasChangesOmittedAttribute(c *Cluster) bool {
-	if c.current == nil || c.def == nil {
+	if c.current == nil {
 		return false
 	}
-	var ids []uint32
+	omitted := func(id uint32) bool { return schema.AttributeChangesOmitted(c.id, id) }
+	if c.in.attributeListReported || c.def == nil {
+		return slices.ContainsFunc(c.in.attributes, omitted)
+	}
 	for i := range c.def.Attributes {
-		if a := &c.def.Attributes[i]; schema.AttributeChangesOmitted(c.id, a.ID) {
-			ids = append(ids, a.ID)
-		}
-	}
-	if len(ids) == 0 {
-		return false
-	}
-	if !c.in.attributeListReported {
-		return true
-	}
-	for _, id := range c.in.attributes {
-		if slices.Contains(ids, id) {
+		if omitted(c.def.Attributes[i].ID) {
 			return true
 		}
 	}

@@ -569,6 +569,16 @@ func TestStructureVersionFilters(t *testing.T) {
 	if has(refreshed, 1, powerSource) {
 		t.Fatal("a cluster without its AttributeList kept its filter")
 	}
+	// A named cluster (AccessControl has no generated definition) is judged
+	// by the ids it lists: AuxiliaryAcl (0x0007) is "C".
+	n.apply(wildcard, &(&report{}).cluster(0, 0x001F, 0, map[uint32]spec.Node{0: listNode(), 0x0007: listNode()}).r)
+	n.apply(wildcard, &(&report{}).cluster(1, 0x001F, 0, map[uint32]spec.Node{0: listNode()}).r)
+	n.mu.Lock()
+	refreshed = n.s.injectVersionFilters(wildcard, true)
+	n.mu.Unlock()
+	if has(refreshed, 0, 0x001F) || !has(refreshed, 1, 0x001F) {
+		t.Fatalf("named clusters' filters %+v", refreshed)
+	}
 }
 
 const powerSource = 0x002F

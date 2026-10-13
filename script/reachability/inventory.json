@@ -14145,7 +14145,7 @@
       "identifier": "TestStructureRetractedClaim",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/structure_internal_test.go",
-      "line": 578
+      "line": 588
     },
     {
       "package": "controller/client",
