@@ -142,20 +142,25 @@ func (s *ColorControlServer) moveToHue(ctx context.Context, fields any) error {
 // the direction implies (HueDistance) over TransitionTime, the distance
 // rule carried into the cyclic transition.
 func (s *ColorControlServer) moveToHueLogic(target float64, direction ccdef.DirectionEnum, transitionTime float64, enhanced bool) error {
+	return s.startTransition(s.hueTransition(target, direction, transitionTime, enhanced))
+}
+
+// hueTransition is the transition moveToHueLogic starts.
+func (s *ColorControlServer) hueTransition(target float64, direction ccdef.DirectionEnum, transitionTime float64, enhanced bool) transition.Transition {
 	name, maxHue := propHue, float64(maxHueValue)
 	if enhanced {
 		name, maxHue = propEnhancedHue, maxEnhancedHueValue
 	}
 	current, _ := s.state().property(name)
 	dir := transition.HueDirection(direction)
-	return s.startTransition(transition.Transition{
+	return transition.Transition{
 		Name:   name,
 		Rate:   transition.HueDistance(current, target, dir, maxHue) / transitionTime * 10,
 		Target: target,
 		CyclicDistance: func(c, t float64) float64 {
 			return transition.HueDistance(c, t, dir, maxHue)
 		},
-	})
+	}
 }
 
 func (s *ColorControlServer) moveHue(ctx context.Context, fields any) error {
@@ -268,13 +273,18 @@ func (s *ColorControlServer) moveToSaturation(ctx context.Context, fields any) e
 
 // moveToSaturationLogic is matter.js moveToSaturationLogic.
 func (s *ColorControlServer) moveToSaturationLogic(target, transitionTime float64) error {
-	// The rate is computed from the value the engine reads under its lock
-	// (transition.Transition.RateFrom), as matter.js computes it in the
-	// same synchronous handler that starts the transition.
-	return s.startTransition(transition.Transition{
+	return s.startTransition(saturationTransition(target, transitionTime))
+}
+
+// saturationTransition is the transition moveToSaturationLogic starts.
+// The rate is computed from the value the engine reads under its lock
+// (transition.Transition.RateFrom), as matter.js computes it in the same
+// synchronous handler that starts the transition.
+func saturationTransition(target, transitionTime float64) transition.Transition {
+	return transition.Transition{
 		Name: propSaturation, Target: target,
 		RateFrom: func(current float64) float64 { return (target - current) / transitionTime * 10 },
-	})
+	}
 }
 
 func (s *ColorControlServer) moveSaturation(ctx context.Context, fields any) error {
@@ -343,10 +353,12 @@ func (s *ColorControlServer) moveToHueAndSaturation(ctx context.Context, fields 
 // moveToEnhancedHueAndSaturationLogic: the shortest way round to the hue,
 // then the saturation, over the same TransitionTime.
 func (s *ColorControlServer) moveToHueAndSaturationLogic(hue, saturation, transitionTime float64, enhanced bool) error {
-	if err := s.moveToHueLogic(hue, ccdef.DirectionShortest, transitionTime, enhanced); err != nil {
-		return err
-	}
-	return s.moveToSaturationLogic(saturation, transitionTime)
+	// Both as one command's transitions (matter.js moveToHueAndSaturationLogic
+	// starts them in one transaction): one update, one write.
+	return s.startTransitions(
+		s.hueTransition(hue, ccdef.DirectionShortest, transitionTime, enhanced),
+		saturationTransition(saturation, transitionTime),
+	)
 }
 
 func (s *ColorControlServer) enhancedMoveToHue(ctx context.Context, fields any) error {
@@ -409,18 +421,17 @@ func (s *ColorControlServer) moveToColor(ctx context.Context, fields any) error 
 	return s.moveToColorLogic(float64(r.ColorX), float64(r.ColorY), float64(r.TransitionTime))
 }
 
-// moveToColorLogic is matter.js moveToColorLogic: x and y each at the rate
-// that reaches its target in TransitionTime.
+// moveToColorLogic is matter.js moveToColorLogic (ColorControlServer.ts:
+// 797-813 at 0ceb202d): x and y each at the rate that reaches its target
+// in TransitionTime, started as one command's transitions so that an
+// immediate move applies both in one update — one write to the
+// ColorWriter with both targets (#84).
 func (s *ColorControlServer) moveToColorLogic(x, y, transitionTime float64) error {
 	st := s.state()
-	if err := s.startTransition(transition.Transition{
-		Name: propX, Rate: (x - float64(st.x)) / transitionTime * 10, Target: x,
-	}); err != nil {
-		return err
-	}
-	return s.startTransition(transition.Transition{
-		Name: propY, Rate: (y - float64(s.state().y)) / transitionTime * 10, Target: y,
-	})
+	return s.startTransitions(
+		transition.Transition{Name: propX, Rate: (x - float64(st.x)) / transitionTime * 10, Target: x},
+		transition.Transition{Name: propY, Rate: (y - float64(st.y)) / transitionTime * 10, Target: y},
+	)
 }
 
 // moveColor is matter.js moveColor and moveColorLogic: x and y at RateX /
@@ -443,15 +454,14 @@ func (s *ColorControlServer) moveColor(ctx context.Context, fields any) error {
 	if err := s.setColorMode(ctx, ColorModeXY); err != nil {
 		return err
 	}
+	var ts []transition.Transition
 	if r.RateX != 0 {
-		if err := s.startTransition(transition.Transition{Name: propX, Rate: float64(r.RateX), NoTarget: true}); err != nil {
-			return err
-		}
+		ts = append(ts, transition.Transition{Name: propX, Rate: float64(r.RateX), NoTarget: true})
 	}
 	if r.RateY != 0 {
-		return s.startTransition(transition.Transition{Name: propY, Rate: float64(r.RateY), NoTarget: true})
+		ts = append(ts, transition.Transition{Name: propY, Rate: float64(r.RateY), NoTarget: true})
 	}
-	return nil
+	return s.startTransitions(ts...)
 }
 
 // stepColor is matter.js stepColor and stepColorLogic: StepX / StepY from
@@ -472,21 +482,17 @@ func (s *ColorControlServer) stepColor(ctx context.Context, fields any) error {
 		return err
 	}
 	tt := float64(r.TransitionTime)
+	st := s.state()
+	var ts []transition.Transition
 	if r.StepX != 0 {
 		step := float64(r.StepX)
-		if err := s.startTransition(transition.Transition{
-			Name: propX, Rate: step / tt * 10, Target: float64(s.state().x) + step,
-		}); err != nil {
-			return err
-		}
+		ts = append(ts, transition.Transition{Name: propX, Rate: step / tt * 10, Target: float64(st.x) + step})
 	}
 	if r.StepY != 0 {
 		step := float64(r.StepY)
-		return s.startTransition(transition.Transition{
-			Name: propY, Rate: step / tt * 10, Target: float64(s.state().y) + step,
-		})
+		ts = append(ts, transition.Transition{Name: propY, Rate: step / tt * 10, Target: float64(st.y) + step})
 	}
-	return nil
+	return s.startTransitions(ts...)
 }
 
 // --- colour temperature (CT) --------------------------------------------------

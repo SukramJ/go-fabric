@@ -208,9 +208,36 @@ func immediate(rate float64) bool {
 // Start begins a transition of t.Name, replacing any it has (matter.js
 // Transitions.start). An immediate transition is applied before Start
 // returns, and Apply's error is returned.
-func (e *Engine) Start(t Transition) error {
+func (e *Engine) Start(t Transition) error { return e.StartAll(t) }
+
+// StartAll starts the transitions of one command as one: each as [Start]
+// does, the targets of the immediate ones applied in a single Apply.
+// matter.js starts a command's transitions inside the command's
+// transaction (moveToColorLogic starts currentX then currentY,
+// ColorControlServer.ts:797-813 at 0ceb202d), so an immediate transition's
+// values reach the state in one commit and a hook on the committed state
+// sees both at once; a step of a gradual transition applies every
+// property's value together anyway (Transitions.ts:537-574). Apply's error
+// is returned.
+func (e *Engine) StartAll(ts ...Transition) error {
 	e.op.Lock()
 	defer e.op.Unlock()
+	var changes []Change
+	for _, t := range ts {
+		if c, ok := e.startLocked(t); ok {
+			changes = append(changes, c)
+		}
+	}
+	if len(changes) == 0 {
+		return nil
+	}
+	return e.cfg.Apply(changes)
+}
+
+// startLocked is one transition of [StartAll]: it registers a gradual
+// transition and returns the change of an immediate one for the caller
+// to apply. The caller holds op.
+func (e *Engine) startLocked(t Transition) (Change, bool) {
 	e.stopLocked(t.Name)
 
 	current, known := e.cfg.Read(t.Name)
@@ -218,23 +245,23 @@ func (e *Engine) Start(t Transition) error {
 		t.Rate = t.RateFrom(current)
 	}
 	if known && !t.NoTarget && current == t.Target {
-		return nil
+		return Change{}, false
 	}
 	prop := e.cfg.Properties[t.Name]
 	if !e.cfg.Manage || immediate(t.Rate) {
 		if t.NoTarget {
-			return nil
+			return Change{}, false
 		}
 		target := min(max(t.Target, prop.Min), prop.Max)
 		if known && jsRound(target) == current {
-			return nil
+			return Change{}, false
 		}
-		return e.cfg.Apply([]Change{{Name: t.Name, Value: jsRound(target)}})
+		return Change{Name: t.Name, Value: jsRound(target)}, true
 	}
 	if !known {
 		// matter.js steps a value that is not a number into a step error,
 		// which ends the transition at its first step.
-		return nil
+		return Change{}, false
 	}
 
 	st := &state{t: t, current: current, changePerMs: t.Rate / 1000}
@@ -246,11 +273,11 @@ func (e *Engine) Start(t Transition) error {
 			}
 			st.distance, st.hasDistance = math.Abs(distance(current, t.Target)), true
 			if st.distance == 0 {
-				return nil
+				return Change{}, false
 			}
 		}
 	} else if (t.Rate < 0 && current == prop.Min) || (t.Rate > 0 && current == prop.Max) {
-		return nil
+		return Change{}, false
 	}
 
 	now := time.Now()
@@ -264,17 +291,17 @@ func (e *Engine) Start(t Transition) error {
 	e.mu.Unlock()
 
 	if e.cfg.RemainingTimeChanged == nil {
-		return nil
+		return Change{}, false
 	}
 	remaining := e.RemainingTime()
 	if remaining < reportFloor {
 		e.mu.Lock()
 		st.quietFinish = true
 		e.mu.Unlock()
-		return nil
+		return Change{}, false
 	}
 	e.updateRemainingTime(remaining, true)
-	return nil
+	return Change{}, false
 }
 
 // DirectionalDistance is matter.js Transitions.calculateCyclicDistance:

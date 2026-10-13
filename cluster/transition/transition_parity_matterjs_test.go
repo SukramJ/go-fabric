@@ -23,6 +23,7 @@ type attr struct {
 	values   map[string]float64
 	known    map[string]bool
 	applied  []sample
+	applies  int   // Apply calls
 	reports  []int // RemainingTime at each RemainingTimeChanged
 	settled  []string
 	applyErr error
@@ -51,6 +52,7 @@ func newAttr(manage bool, props map[string]transition.Property, values map[strin
 		Apply: func(changes []transition.Change) error {
 			a.mu.Lock()
 			defer a.mu.Unlock()
+			a.applies++
 			if a.applyErr != nil {
 				return a.applyErr
 			}
@@ -664,4 +666,81 @@ func TestAddWithOverflow(t *testing.T) {
 			t.Errorf("AddWithOverflow(%v, %v) = %v, want %v", v.value, v.add, got, v.want)
 		}
 	}
+}
+
+var xy = map[string]transition.Property{"currentX": {Min: 0, Max: 0xFEFF}, "currentY": {Min: 0, Max: 0xFEFF}}
+
+// TestStartAllAppliesOneCommandTogether: the transitions of one command
+// started as one — matter.js starts them inside the command's transaction
+// (moveToColorLogic, ColorControlServer.ts:797-813 at 0ceb202d), so the
+// immediate ones reach the state in one commit; a step applies every
+// property together (Transitions.ts:537-574). Issue #84.
+func TestStartAllAppliesOneCommandTogether(t *testing.T) {
+	t.Run("immediate: one Apply with both values", func(t *testing.T) {
+		a := newAttr(false, xy, map[string]float64{"currentX": 13102, "currentY": 22196})
+		if err := a.engine.StartAll(
+			transition.Transition{Name: "currentX", Rate: 1, Target: 45914},
+			transition.Transition{Name: "currentY", Rate: 1, Target: 19615},
+		); err != nil {
+			t.Fatal(err)
+		}
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if a.applies != 1 || len(a.applied) != 2 {
+			t.Fatalf("Apply calls = %d with %d changes, want 1 call with 2", a.applies, len(a.applied))
+		}
+		if a.values["currentX"] != 45914 || a.values["currentY"] != 19615 {
+			t.Errorf("values = %v", a.values)
+		}
+	})
+	t.Run("one already at its target: one Apply with the other", func(t *testing.T) {
+		a := newAttr(false, xy, map[string]float64{"currentX": 45914, "currentY": 22196})
+		if err := a.engine.StartAll(
+			transition.Transition{Name: "currentX", Rate: 1, Target: 45914},
+			transition.Transition{Name: "currentY", Rate: 1, Target: 19615},
+		); err != nil {
+			t.Fatal(err)
+		}
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if a.applies != 1 || len(a.applied) != 1 || a.applied[0].name != "currentY" {
+			t.Fatalf("applies = %d, applied = %v", a.applies, a.applied)
+		}
+	})
+	t.Run("nothing to do: no Apply", func(t *testing.T) {
+		a := newAttr(false, xy, map[string]float64{"currentX": 1, "currentY": 2})
+		if err := a.engine.StartAll(transition.Transition{Name: "currentX", Rate: 1, Target: 1}); err != nil {
+			t.Fatal(err)
+		}
+		if a.applies != 0 {
+			t.Fatalf("applies = %d", a.applies)
+		}
+	})
+	t.Run("gradual: both run and each step applies both", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			a := newAttr(true, xy, map[string]float64{"currentX": 0, "currentY": 0})
+			if err := a.engine.StartAll(
+				transition.Transition{Name: "currentX", Rate: 1000, Target: 1000},
+				transition.Transition{Name: "currentY", Rate: 2000, Target: 2000},
+			); err != nil {
+				t.Fatal(err)
+			}
+			if !a.engine.Active("currentX") || !a.engine.Active("currentY") {
+				t.Fatal("both transitions should run")
+			}
+			sleep(100 * time.Millisecond)
+			a.mu.Lock()
+			defer a.mu.Unlock()
+			if a.applies != 1 || len(a.applied) != 2 {
+				t.Fatalf("after one step: Apply calls = %d with %d changes, want 1 with 2", a.applies, len(a.applied))
+			}
+		})
+	})
+	t.Run("Apply error is returned", func(t *testing.T) {
+		a := newAttr(false, xy, map[string]float64{"currentX": 0, "currentY": 0})
+		a.applyErr = errors.New("refused")
+		if err := a.engine.StartAll(transition.Transition{Name: "currentX", Rate: 1, Target: 5}); !errors.Is(err, a.applyErr) {
+			t.Fatalf("err = %v", err)
+		}
+	})
 }
