@@ -2364,6 +2364,25 @@ questions 4 and 7.
 
 ---
 
+### BD-Matter-Peer-SaveOncePerBurst — a peer's descriptor is saved once per burst of changes
+
+matter.js `Peer.ts:99-106` (at `0ceb202d`) wraps the descriptor in an
+`ObservablePeerDescriptor` whose change callback starts `#save`
+(`:575-579`) unless one is already running; `#save` is an async function
+that runs synchronously up to its `await this.#updated.emit(this)`, so
+the `#isSaving` guard coalesces nothing in practice and the node layer
+sees one `updated` per changed field. `controller/peer.Peer` starts one
+save worker per burst — the fields `AddKnownPeer` or a session adoption
+change together reach `Store.SavePeer` as one descriptor — and logs a
+store error, as `BasicMultiplex.add` logs a rejected worker
+(`packages/general/src/util/Multiplex.ts:41-47`).
+
+By design. The persisted descriptor is the same after the burst; a store
+that writes a row per save is spared one write per field. Report AG,
+question 6.
+
+---
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was
