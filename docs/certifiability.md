@@ -489,10 +489,15 @@ another problem appears or a recorded one disappears.
 
 The reference set is matter.js's (`support/chip-testing/test/core`,
 `test/app-*`) plus the family of every cluster server this module ships.
+The families the harness runs are `chipFamilies` in
+`internal/chiptool/families_table_test.go`; a cluster this module serves
+whose family is not in that list is "not yet run", not "not supported".
 
 | Family | Why not | Class |
 | --- | --- | --- |
-| PWRTL, LTIME, LUNIT, LCFG, ULABEL, FLABEL, and the measurement, energy, media and appliance clusters matter.js runs | no server in this module | (b) not supported |
+| PWRTL, ILL, PRS, DISHM | the module serves the cluster (`cluster/measurement` PowerTopology, Illuminance and Pressure; `cluster/modebase` DishwasherMode), but the reference daemon exposes no endpoint with it and the harness does not run the family | (c) not yet run |
+| EEM, EPM | the module serves both clusters (`cluster/measurement`) and the reference daemon's ElectricalMeter carries them, but the harness does not run the families | (c) not yet run |
+| APBSC, LOWPOWER, WAKEONLAN and the other media families | no media server in this module (concept v2 phase 9) | (b) not supported |
 | ICDB | the module is not an ICD | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
 | CNET Wi-Fi and Thread cases | NetworkCommissioning is Ethernet-only | (d) out of scope |
@@ -504,9 +509,13 @@ The OTA Software Update Requestor is mounted since #49 (ADR 0019) and its
 automated SU cases run. The image lists
 the DLOG case, the BIND cases and the SU YAML cases as manual, so the
 status block records them as class (c); on substance BIND tests the binding
-client (`BIND.C`, a controller-side role, (d)), the SU provider cases an OTA
-provider (b), and DLOG and the SU requestor cases need BDX, which the module
-does not implement (`BD-chip-DiagLogs-NoBDX`).
+client (`BIND.C`, a controller-side role, (d)), and the SU provider cases an
+OTA provider (b). BDX shipped with the OTA requestor in `v0.3.0` (ADR 0019),
+but that is the receiving side; DLOG needs the sending side. A
+RetrieveLogsRequest that asks for BDX with a `TransferFileDesignator` is
+still answered inline (`cluster/core/diagnostic_logs.go`,
+`BD-chip-DiagLogs-NoBDX`), so DiagnosticLogs over BDX is not served until
+concept v2 phase 8.
 
 ## What a product owner must supply
 
