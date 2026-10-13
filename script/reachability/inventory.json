@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4508,
+  "entry_points": 4532,
   "entry_packages": [
     ".",
     "bdx",
@@ -135,6 +135,7 @@
     "commissioning",
     "conformance",
     "contract",
+    "controller/discovery",
     "device",
     "diagevent",
     "eligibility",
@@ -175,9 +176,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10445,
-    "reachable": 7363,
-    "whitelisted": 3077,
+    "total_exported": 10496,
+    "reachable": 7394,
+    "whitelisted": 3097,
     "unreachable": 5
   },
   "by_package": [
@@ -13976,6 +13977,146 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "contract/dataversion_internal_test.go",
       "line": 19
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_ChangesAreCoalescedPerTask",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 165
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_ClosedCacheRefusesWork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 210
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_Constructors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 239
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_DependencyReleasedWithTheSRV",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 196
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_ExpiryRemovesRecordsAndTheName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 148
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_InterfaceNameOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 232
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_IrrelevantPacketIsNotStaged",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 85
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_PruneCapsStagedHosts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 132
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_QueryKnownAnswersAreNotCached",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 50
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_SRVTargetAddressesEnterWithTheSRV",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 19
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_SourceInterfaceKeptForAAAAOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 181
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_StagedAddressReplayedWhenAnSRVNamesTheHost",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 64
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_StagedGoodbyeAndFlushAndPrune",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 95
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestNames_UnrelatedRecordsStayOut",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/names_test.go",
+      "line": 38
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_CacheFlushRetiresOlderUniqueRecords",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 96
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_IngressFilter",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 173
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_RecordKeys",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 23
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_TTLRules",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 50
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_TXTParameters",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 144
+    },
+    {
+      "package": "controller/discovery",
+      "identifier": "TestParityDiscovery_UnavailableSRVIgnored",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/discovery/parity_matterjs_test.go",
+      "line": 123
     },
     {
       "package": "device",

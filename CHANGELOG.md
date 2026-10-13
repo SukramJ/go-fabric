@@ -10,6 +10,22 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `controller/discovery`, the controller's DNS-SD browser (ADR 0020,
+  stage 1): `Names` / `Name`, the record cache of matter.js `DnssdNames` /
+  `DnssdName` at `0ceb202d` — records keyed as matter.js keys them, TTLs
+  with the 1.05 grace factor and the 15 s floor, goodbyes and cache-flush
+  supersession after the 1 s eviction delay, unavailable SRVs ignored, TXT
+  parameters by matter.js's rules, the Matter service-type ingress filter,
+  and A/AAAA staging for SRV targets from relevant packets only.
+- `mdns.QueryConn` / `mdns.OpenQueryConn` export the multicast query
+  transport `mdns.OperationalResolver` already used, and
+  `mdns.ParseDNSMessage` / `mdns.PackDNSQuery` with `mdns.DNSRecord`,
+  `mdns.DNSQuestion`, `mdns.DNSMessage`, `mdns.DNSSRV` and `mdns.DNSType`
+  give the browser a typed record codec. `OperationalResolver` behaves as
+  before.
+
 ### Changed
 
 - The Matter data model snapshot (`parity/schema.json`) moves from

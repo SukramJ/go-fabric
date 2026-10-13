@@ -83,12 +83,12 @@ func TestResolution_ZonesLinkLocalByInterface(t *testing.T) {
 	r := newResolution(instance)
 	stale := aaaaRR("ctrl.local.", "fd00::99")
 	stale.Header().Ttl = 0
-	r.absorb(received{msg: packResponse(t, srvRR(instance, "ctrl.local.", 5540), aaaaRR("ctrl.local.", "fe80::7"), stale), ifIndex: ifi.Index})
+	r.absorb(QueryResponse{Msg: packResponse(t, srvRR(instance, "ctrl.local.", 5540), aaaaRR("ctrl.local.", "fe80::7"), stale), IfIndex: ifi.Index})
 	addrs := r.addresses()
 	if len(addrs) != 1 || addrs[0].Zone != ifi.Name || addrs[0].IP.String() != "fe80::7" {
 		t.Fatalf("addresses = %v, want fe80::7%%%s only (TTL-0 record ignored)", addrs, ifi.Name)
 	}
-	if r.absorb(received{msg: []byte{1, 2, 3}}) {
+	if r.absorb(QueryResponse{Msg: []byte{1, 2, 3}}) {
 		t.Fatal("garbage must not count as a response")
 	}
 }
