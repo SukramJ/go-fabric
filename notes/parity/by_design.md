@@ -1968,17 +1968,22 @@ daemon's own invariant (its wire shape is what the fixtures and the
 ecosystem observations were taken against). Daemon only; the library
 default is matter.js's.
 
-### BD-Matter-Commissioner-TestCA — `bridgetest.Commissioner`'s CA issues certificates with a fixed validity window, no retransmission, a random ephemeral id
+### BD-Matter-Commissioner-TestCA — `bridgetest.Commissioner` issues its certificates at a fixed instant
 
-matter.js's `CertificateAuthority.ts` dates a certificate now − 1 year to
-now + 10 years; the test CA in `bridge/bridgetest` uses a fixed NotBefore
-and NotAfter 0 so that keys, certificates and nonces follow the test seed
-alone and a fixture is reproducible. The commissioner sends every message
-once (no MRP retransmission: a lost datagram fails the test rather than
-hiding a flake), and keeps the unsecured ephemeral node id and message
-counter random — seeded values made two commissioners in one test
-collide and the device dropped the second Sigma1 as a duplicate. Test
-support only; nothing of it is on the device path.
+`bridge/bridgetest.Commissioner` is the module's own controller
+(`controller/`, ADR 0020) wired for a test, since brief AJ: `controller/ca`
+with a fixed issuing instant (2026-01-01, so the validity is matter.js's
+−1 y / +10 y of `CertificateAuthority.ts:233, :304` around that instant
+rather than around now), MRP retransmission through `controller/exchange`,
+the commissioning flow of `controller/commissioner`, the handshakes and the
+CASE responder of `controller/handshake`, and DNS-SD answers injected into
+the controller's cache from the device's advertiser or the dialled address
+instead of multicast. `Options.Seed` seeds the IPK, the flow's nonces, the
+keys of further controller identities and the MRP jitter; the root and
+fabric keys and the certificate signatures are random, because
+`crypto/ecdsa` ignores a caller's reader since Go 1.26. The unsecured
+ephemeral node id and message counter are the exchange manager's own
+(random). Test support only; nothing of it is on the device path.
 
 ### BD-Matter-RevisionConditions-TwoReadings — a `Rev >= vN` condition decides element presence, never feature legality
 

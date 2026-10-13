@@ -35,6 +35,8 @@ type FabricConfig struct {
 	// CATs are the CASE Authenticated Tags of our own NOC.
 	CATs []uint32
 	// Rand is the randomness of our key and the IPK; nil is crypto/rand.
+	// The key's generation ignores it since Go 1.26 (crypto/ecdsa; see
+	// ca.Config.Rand); the IPK is drawn from it.
 	Rand io.Reader
 }
 

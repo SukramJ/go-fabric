@@ -209,3 +209,32 @@ The deleted files are still cited in:
   `BD-Matter-Commissioner-TestCA`, see above).
 - None for `controller/interaction`. The two `Report` fields are a
   parity-neutral addition: matter.js carries both on the chunk's exchange.
+
+## Owner's decisions
+
+Reviewed 2026-10-13: `bridge/bridgetest/commissioner.go`, `session.go`,
+`seed.go`, `names.go`, `report.go` and the `controller/interaction` and
+`controller/peer` diffs read in full; the Go 1.26 `crypto/ecdsa` behaviour
+confirmed on this toolchain (`go doc crypto/ecdsa.GenerateKey`,
+`SignASN1`: the reader is ignored unless `GODEBUG=cryptocustomrand=1`).
+
+1. **`controller/peer/export_test.go`** is accepted: the test-only export
+   is the standard idiom, and the node proof keeps its probe checks.
+2. **The narrower seed promise stands.** `Options.Seed`'s doc, the
+   CHANGELOG and `BD-Matter-Commissioner-TestCA` (rewritten) say what the
+   seed still fixes. A fully reproducible certificate would need a
+   caller-supplied key in `controller/ca` and nil-reader signing, and
+   nothing in the module needs it. `ca.Config.Rand` and
+   `commissioner.FabricConfig.Rand` now say that the key generation
+   ignores them since Go 1.26 (a test that needs reproducible keys uses
+   `testing/cryptotest.SetGlobalRandom`).
+3. **The CASE responder answers for every minted identity** — kept; it is
+   what `ResolveOperational` promises and what the old responder did.
+4. **`NextReport` delivers no keepalives** — kept; a test that needs them
+   uses `controller/interaction` directly (`KeepaliveReceived`).
+5. **The unreproduced `-race` failure in `node`** is watched in CI; the
+   tranche's own `make race` and the agent's full run passed.
+6. **Dangling references** to the deleted files
+   (`controller/exchange/manager.go`, `errors.go`, `controller/ca/encode.go`,
+   `controller/peer/probe.go`, the findings register) are fixed on the
+   tranche; `notes/handover.md` in the docs PR.
