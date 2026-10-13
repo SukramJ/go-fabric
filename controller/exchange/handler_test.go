@@ -124,9 +124,7 @@ func TestHandlerNotForUnsecuredOrSecureChannel(t *testing.T) {
 		t.Fatalf("handler called for %+v", c.first)
 	case <-time.After(20 * time.Millisecond):
 	}
-	if n := countInbound(m); n != 0 {
-		t.Fatalf("%d inbound sessions left", n)
-	}
+	waitNoInbound(t, m)
 }
 
 // unsecuredRequest delivers a peer-initiated unsecured message from source
@@ -135,6 +133,19 @@ func unsecuredRequest(m *Manager, src uint64, counter uint32, xid, protocol uint
 	hdr := message.Header{MessageCounter: counter, HasSourceNodeID: true, SourceNodeID: src}
 	proto := message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: opcode, ExchangeID: xid, ProtocolID: protocol}
 	m.HandleDatagram(append(append(hdr.Marshal(), proto.Marshal()...), payload...), peerAddr)
+}
+
+// waitNoInbound waits until no inbound session is left: the release runs
+// after the datagram's answer went out.
+func waitNoInbound(t *testing.T, m *Manager) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for countInbound(m) != 0 {
+		if time.Now().After(deadline) {
+			t.Fatalf("%d inbound sessions left", countInbound(m))
+		}
+		time.Sleep(time.Millisecond)
+	}
 }
 
 func countInbound(m *Manager) int {
@@ -197,13 +208,13 @@ func TestSigma1ReachesHandlerOnInboundSession(t *testing.T) {
 		t.Fatalf("Next = %+v, %v", msg, err)
 	}
 	close(done)
-	select {
-	case <-s.Closing():
-	case <-time.After(5 * time.Second):
-		t.Fatal("inbound session not closed after the handler")
-	}
-	if n := countInbound(m); n != 0 {
-		t.Fatalf("%d inbound sessions left", n)
+	// The session closes — Closing fires first, then it leaves the table.
+	deadline := time.Now().Add(5 * time.Second)
+	for !s.IsClosed() || countInbound(m) != 0 {
+		if time.Now().After(deadline) {
+			t.Fatalf("inbound session not released after the handler: closed %v, %d left", s.IsClosed(), countInbound(m))
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
 
@@ -222,9 +233,7 @@ func TestSigma1WithoutHandlerIsAcknowledged(t *testing.T) {
 	proto := message.ProtocolHeader{Initiator: true, NeedsAck: true, Opcode: mrp.SCOpcodeSigma1, ExchangeID: 0x6201}
 	m.HandleDatagram(append(hdr.Marshal(), proto.Marshal()...), peerAddr)
 	conn.none(t)
-	if n := countInbound(m); n != 0 {
-		t.Fatalf("%d inbound sessions left", n)
-	}
+	waitNoInbound(t, m)
 }
 
 // TestPBKDFParamRequestIsRefused: a PBKDFParamRequest is answered with a

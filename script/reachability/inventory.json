@@ -14683,7 +14683,7 @@
       "identifier": "TestPBKDFParamRequestIsRefused",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 233
+      "line": 242
     },
     {
       "package": "controller/exchange",
@@ -14746,7 +14746,7 @@
       "identifier": "TestPeerOpenedExchangeOnClosingSessionDeclined",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 260
+      "line": 269
     },
     {
       "package": "controller/exchange",
@@ -14830,14 +14830,14 @@
       "identifier": "TestSigma1ReachesHandlerOnInboundSession",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 159
+      "line": 170
     },
     {
       "package": "controller/exchange",
       "identifier": "TestSigma1WithoutHandlerIsAcknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/handler_test.go",
-      "line": 213
+      "line": 224
     },
     {
       "package": "controller/exchange",
