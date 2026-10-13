@@ -681,8 +681,8 @@ func (m *Manager) exchangePeerLost(x *Exchange, cause error) {
 
 // PeerAddress names a peer on one of our fabrics: our fabric index and
 // the peer's operational node id — matter.js PeerAddress
-// (packages/protocol/src/peer/PeerAddress.ts). handshake.PeerAddress has
-// the same fields and converts to it.
+// (packages/protocol/src/peer/PeerAddress.ts); handshake.PeerAddress and
+// the peer package use this type.
 type PeerAddress struct {
 	FabricIndex uint8
 	NodeID      uint64

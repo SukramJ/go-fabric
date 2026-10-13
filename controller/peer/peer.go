@@ -374,7 +374,7 @@ func (p *Peer) SessionParameters() sessionparams.Parameters {
 func (p *Peer) Disconnect(ctx context.Context, cause error) {
 	p.stopConnecting(ctx)
 	if cause != nil {
-		p.set.ctx.Exchanges.HandlePeerLoss(exchange.PeerAddress(p.address), cause, time.Time{})
+		p.set.ctx.Exchanges.HandlePeerLoss(p.address, cause, time.Time{})
 	}
 }
 
@@ -396,7 +396,7 @@ func (p *Peer) Close(ctx context.Context) {
 		mon.close()
 	}
 	mgr := p.set.ctx.Exchanges
-	for _, s := range mgr.SessionsFor(exchange.PeerAddress(p.address)) {
+	for _, s := range mgr.SessionsFor(p.address) {
 		mgr.CloseSession(ctx, s)
 	}
 	p.workers.Wait()

@@ -213,6 +213,12 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `controller/exchange.Manager`: a send or wait that shows the peer is gone
+  now closes that peer's secure sessions (every one created before the
+  exchange, matter.js `ExchangeManager.ts:556-579` → `SessionManager.handlePeerLoss`),
+  not only the `PeerLost` hook; the hook fires once per session lost.
+  `handshake.PeerAddress` is `exchange.PeerAddress`;
+  `handshake.ResumptionStore` gains `DeleteResumptionRecord`.
 - The Matter data model snapshot (`parity/schema.json`) moves from
   matter.js `85cf6647` (behaviour cited at the code pin `4633bfd7`) to
   `0ceb202d`, and every matter.js line citation follows it. No cluster or

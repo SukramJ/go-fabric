@@ -180,8 +180,8 @@
   ],
   "summary": {
     "total_exported": 10729,
-    "reachable": 7517,
-    "whitelisted": 3207,
+    "reachable": 7514,
+    "whitelisted": 3210,
     "unreachable": 5
   },
   "by_package": [
@@ -14624,6 +14624,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/exchange_test.go",
       "line": 69
+    },
+    {
+      "package": "controller/handshake",
+      "identifier": "PeerAddress",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/handshake/resumption.go",
+      "line": 20
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "MemoryResumptionStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/store.go",
+      "line": 92
+    },
+    {
+      "package": "controller/peer",
+      "identifier": "ResumptionStore",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "controller/peer/store.go",
+      "line": 88
     },
     {
       "package": "controller/peer",

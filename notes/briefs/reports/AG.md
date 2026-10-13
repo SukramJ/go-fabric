@@ -262,3 +262,35 @@ Coverage floors: `controller/peer` 93 (measured 94.7 %); `controller/exchange`
    the Go form of the notifier setters; the save coalescing per burst
    versus matter.js's per-change emit; `TimeOffline` on the peer's clock;
    no explicit "at once" connection timeout.
+
+## Owner's decisions
+
+Verified 2026-10-13 against `0ceb202d`: `ExchangeManager.ts:548-579`
+(peer loss → `SessionManager.handlePeerLoss` with `asOf` = the context's
+creation), `:384-389` (declined on a closing session),
+`SecureChannelProtocol.ts:36-52`, `SecureChannelMessenger.ts:44-50` (Busy
+needs both codes and two bytes), `MessageExchange.ts:1266-1270`, `:468-469`,
+`:519-522`, `:768`, `:943`, `Session.ts:119-121`, `:322-328`,
+`NodeSession.ts:119` — all as the report states.
+
+1. **The hooks stay in the context** (`exchange.WithHooks`) for this wave.
+   Stage 2 touches `handshake.CASE` anyway (the commissioning flow's CASE
+   and the ports AF listed); it moves them to a `CASEOptions.Exchange
+   exchange.Options` then. Handover §13 carries the item.
+2. **Moved.** `handshake.ResumptionStore` has `DeleteResumptionRecord`,
+   `handshake.MemoryResumptionStore` implements it, and `peer.ResumptionStore`
+   / `peer.MemoryResumptionStore` are aliases (owner commit).
+3. **Aliased.** `handshake.PeerAddress = exchange.PeerAddress` (owner commit).
+4. **Yes**, a CHANGELOG "Changed" line (owner commit): a session the hook
+   alone used to keep open now closes, as matter.js's does.
+5. **Stage 3.** The client-side IM request encoding (no empty
+   AttributeRequests array, the InteractionModelRevision the spec makes
+   mandatory in every IM message) is the client interaction's; open item
+   until then — the node answers the probe as it is.
+6. **One by_design entry**, `BD-Matter-Peer-SaveOncePerBurst` (docs PR);
+   the hooks, the clock of `TimeOffline` and the missing "at once" timeout
+   are Go surface, recorded in handover §13, not divergences a peer can
+   observe.
+
+The `bridge/` observation (CloseSession on stop only for sessions that
+carried a message) is a Tier-3 finding in the register (docs PR).

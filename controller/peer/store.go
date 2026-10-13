@@ -81,49 +81,12 @@ func (s *MemoryStore) Saves() int {
 	return s.saves
 }
 
-// ResumptionStore is the resumption-record store a peer set uses: a
-// handshake.ResumptionStore that can also forget a peer's record, as
-// matter.js SessionManager.deleteResumptionRecord does
-// (session/SessionManager.ts:468-480), for the NoSharedTrustRoots retry
-// (PeerConnection.ts:681-685) and [Peer.Delete] (Peer.ts:532-541).
-type ResumptionStore interface {
-	handshake.ResumptionStore
-	// DeleteResumptionRecord removes the record of peer and reports
-	// whether there was one.
-	DeleteResumptionRecord(peer handshake.PeerAddress) (bool, error)
-}
+// ResumptionStore is the resumption-record store a peer set uses:
+// handshake.ResumptionStore, whose DeleteResumptionRecord serves the
+// NoSharedTrustRoots retry (PeerConnection.ts:681-685) and [Peer.Delete]
+// (Peer.ts:529-541).
+type ResumptionStore = handshake.ResumptionStore
 
-// MemoryResumptionStore is a [ResumptionStore] in memory. The zero value
-// is ready to use; it is safe for concurrent use.
-type MemoryResumptionStore struct {
-	mu      sync.Mutex
-	records map[handshake.PeerAddress]handshake.ResumptionRecord
-}
-
-// FindResumptionRecord implements handshake.ResumptionStore.
-func (s *MemoryResumptionStore) FindResumptionRecord(peer handshake.PeerAddress) (handshake.ResumptionRecord, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	rec, ok := s.records[peer]
-	return rec, ok
-}
-
-// SaveResumptionRecord implements handshake.ResumptionStore.
-func (s *MemoryResumptionStore) SaveResumptionRecord(rec handshake.ResumptionRecord) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.records == nil {
-		s.records = make(map[handshake.PeerAddress]handshake.ResumptionRecord)
-	}
-	s.records[rec.Peer] = rec
-	return nil
-}
-
-// DeleteResumptionRecord implements [ResumptionStore].
-func (s *MemoryResumptionStore) DeleteResumptionRecord(peer handshake.PeerAddress) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	_, ok := s.records[peer]
-	delete(s.records, peer)
-	return ok, nil
-}
+// MemoryResumptionStore is a [ResumptionStore] in memory
+// (handshake.MemoryResumptionStore).
+type MemoryResumptionStore = handshake.MemoryResumptionStore

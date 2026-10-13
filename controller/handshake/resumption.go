@@ -6,6 +6,8 @@ package handshake
 import (
 	"sync"
 
+	"github.com/SukramJ/go-fabric/controller/exchange"
+
 	"github.com/SukramJ/go-fabric/secure/sessionparams"
 )
 
@@ -13,11 +15,9 @@ import (
 // the peer's operational node id — matter.js
 // packages/protocol/src/peer/PeerAddress.ts, the key of
 // SessionManager.findResumptionRecordByAddress (SessionManager.ts:851-857,
-// called at CaseClient.ts:127).
-type PeerAddress struct {
-	FabricIndex uint8
-	NodeID      uint64
-}
+// called at CaseClient.ts:127). The one type of the controller packages
+// (exchange.PeerAddress).
+type PeerAddress = exchange.PeerAddress
 
 // ResumptionRecord is what a CASE client keeps of its last session with a
 // peer to resume the next one — matter.js ResumptionRecord
@@ -48,6 +48,11 @@ type ResumptionStore interface {
 	FindResumptionRecord(peer PeerAddress) (ResumptionRecord, bool)
 	// SaveResumptionRecord stores rec, replacing the peer's earlier one.
 	SaveResumptionRecord(rec ResumptionRecord) error
+	// DeleteResumptionRecord forgets the record of peer and reports
+	// whether there was one — matter.js SessionManager.deleteResumptionRecord
+	// (session/SessionManager.ts:468-480), for the NoSharedTrustRoots retry
+	// (PeerConnection.ts:681-685) and a peer's deletion (Peer.ts:529-541).
+	DeleteResumptionRecord(peer PeerAddress) (bool, error)
 }
 
 // MemoryResumptionStore is a [ResumptionStore] in memory. The zero value
@@ -74,6 +79,15 @@ func (s *MemoryResumptionStore) SaveResumptionRecord(rec ResumptionRecord) error
 	}
 	s.records[rec.Peer] = rec.clone()
 	return nil
+}
+
+// DeleteResumptionRecord implements [ResumptionStore].
+func (s *MemoryResumptionStore) DeleteResumptionRecord(peer PeerAddress) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.records[peer]
+	delete(s.records, peer)
+	return ok, nil
 }
 
 func (r ResumptionRecord) clone() ResumptionRecord {
