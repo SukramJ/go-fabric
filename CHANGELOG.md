@@ -414,6 +414,16 @@ pseudo-version of `main`.
   `Interval(d)`, `NoSubscription`, `ErrNoSubscriptions`,
   `ErrUncommissioned`; `peer.Context.SessionMigrated` is called after the
   address monitor moved a session, for `CloseForPeer`.
+- `controller/interaction.Subscriptions.Register(mgr)` and
+  `HandleExchange` (ADR 0020, stage 3; matter.js
+  `ClientSubscriptionHandler` at `0ceb202d`): the reports a peer pushes on
+  its subscriptions reach the controller — matched by (peer, subscription
+  id), each chunk acknowledged, `ReportStarted` called, an empty report a
+  keepalive (`KeepaliveReceived`), a report with data assembled and handed
+  to `Updated`, the liveness deadline restarted. A report without a
+  subscription id, for an unknown one, or arriving while the registry is
+  blocked is answered InvalidSubscription; any other first message of an IM
+  exchange InvalidAction.
 
 ### Changed
 
