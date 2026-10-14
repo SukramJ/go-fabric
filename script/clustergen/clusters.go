@@ -133,4 +133,21 @@ var committed = []string{
 	"PowerSourceConfiguration",
 	"EcosystemInformation",
 	"Actions",
+	// cluster/media (ADR 0022)
+	"MediaPlayback",
+	"KeypadInput",
+	"ContentLauncher",
+	"ApplicationLauncher",
+	"ApplicationBasic",
+	"AccountLogin",
+	"AudioOutput",
+	"Channel",
+	"TargetNavigator",
+	"MediaInput",
+	"LowPower",
+	"WakeOnLan",
+	"ContentControl",
+	"ContentAppObserver",
+	// cluster/core Messages (ADR 0022)
+	"Messages",
 }
