@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4884,
+  "entry_points": 4898,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11151,
-    "reachable": 7807,
-    "whitelisted": 3339,
+    "total_exported": 11189,
+    "reachable": 7831,
+    "whitelisted": 3353,
     "unreachable": 5
   },
   "by_package": [
@@ -5611,6 +5611,83 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestOTAProvider_BDXNotEnabled",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 469
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_BusyWhileDownloading",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 259
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_Consent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 389
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_DelayedActionTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 361
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_DirectConsentApply",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 438
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_DownloadToApply",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 306
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_NeedsACASEPeer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 486
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_NotAvailable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 166
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_Protocols",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 452
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_RebootDetected",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 285
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTAProvider_UpdateAvailable",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_test.go",
+      "line": 181
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestOTARequestorMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
@@ -5867,6 +5944,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/parity_matterjs_test.go",
       "line": 411
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_OTAProviderConstants",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_parity_matterjs_test.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_OTAProviderDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_parity_matterjs_test.go",
+      "line": 24
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_OTAProviderResponseFields",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_provider_parity_matterjs_test.go",
+      "line": 80
     },
     {
       "package": "cluster/core",
