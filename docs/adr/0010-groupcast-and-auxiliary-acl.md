@@ -7,7 +7,7 @@
 - **Related**:
   [`../matterjs-comparison.md`](../matterjs-comparison.md) §2,
   [`../../notes/parity/by_design.md`](../../notes/parity/by_design.md)
-  (`BD-Matter-GroupcastNoSender`, `BD-Matter-GroupcastListOrder`,
+  (`BD-Matter-GroupcastListOrder`,
   `BD-Matter-AuxiliaryAccessAdminNode`)
 
 ## Context

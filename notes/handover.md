@@ -34,6 +34,7 @@ German, briefly. Six waves were planned against the phases:
 | 17 | ADR 0020 stage 4, first half: `controller/client` (the client node image, cache and store, shape analysis, default subscription, connection state, physical properties); `peer.Peer.Observe`; `interaction.SubscribeRequest.RefreshRequest`; `spec.DecodeValue`; `schema.ClusterHasChangesOmittedAttribute` | AK | `wave/2026-10-14-tranche-17` (#95); docs PR `docs/wave-17-followups` | see §17 |
 | 18 | ADR 0020 stage 4, second half: `client.Registry` (`peerN` ids, restore, record and address book with the 15 min TTL / 1 min cull, `ForDevice`/`ForAddress`, commission/decommission with the fabric-operation guard, leave/shutDown/startUp, fabric-label reconciliation), `controller/client/sqlstore`, `exchange.Session.CreatedAt` | AL | `wave/2026-10-14-tranche-18` (#97); docs PR `docs/wave-18-followups` | see §18 |
 | 19 | concept v2 phase 10: WiFiNetworkDiagnostics server with `core.WiFiReporter`, SecondaryNetworkInterface, `node.Network.WiFi` + conditions, reference-bridge `--wifi`, DGWIFI family | AM | `wave/2026-10-14-tranche-19` (#99); docs PR `docs/wave-19-followups` | see §19 |
+| 20 | ADR 0020 stage 5, part 1: the group message sender (`groups.Manager.Sender`, `channel.EncryptGroup`, the group header constraint, `udp.Listener.SendMulticast`, the persisted group data counter), the Groupcast Sender feature (FeatureMap 0x07) | AN | `wave/2026-10-14-tranche-20` (#101); docs PR `docs/wave-20-followups` | see §20 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -1234,3 +1235,52 @@ tranche and docs branches and the `.claude/worktrees/wave19-wifi`
 worktree. Next: ADR 0020 stage 5 (binding client, Groupcast sender,
 controller device types) after a Sonnet first read; a second parallel
 wave needs an independent area (phase 8 needs ADR 0021 first).
+
+## 20. Wave 20 (2026-10-14, the owner away; everything local; ran in parallel with wave 21 on a second Opus)
+
+ADR 0020 stage 5, part 1. Brief AN (`wave20/groupsend`, head `a59e17e`) on
+`planning/briefs-wave-20` (`bc1f744`), written after Sonnet's stage-5
+read (`read-stage5.md`): matter.js has no sending "binding client"; the
+group sender is protocol (GroupSession/SessionManager), the Groupcast
+server's Sender half is membership bookkeeping, chip's BIND cases are
+manual YAML. Tranche `wave/2026-10-14-tranche-20` = the branch
+cherry-picked onto `main` (`379216a`, after wave 19) plus the owner's
+commit.
+
+- **`groups/`:** `Manager.Sender` (key through GroupKeyMap, `ErrNoKey` /
+  `ErrKeyNotStarted`, cache by fabric + session id + key — two key sets
+  hashing to one id are tested), `Sender.Send`/`Invoke`/`Write`
+  (`RequestOptions{Timed}` refused, no endpoint in a group path, forced
+  suppressResponse), `counter.go` (`groupDataCounter`, reserve 1000,
+  rollover to 0 with one warning; `CounterStore` found by type
+  assertion), `ForgetFabric` closes the fabric's senders.
+- **`secure/channel`:** `EncryptGroup`, `ObfuscateGroupHeader`,
+  `PrivacyNonce`, `Obfuscate`; **`transport/message`:** the group-header
+  constraint (MC:481-488), `FuzzMarshalPacket`; **`transport/udp`:**
+  `SendMulticast` on every joined interface.
+- **Groupcast:** FeatureMap 0x07, sender-only memberships
+  (`RemoveEndpointRetainingSender`), EnableSenderTesting with the 60 s
+  period; five parity tests flipped (listed in report AN).
+- **node:** a `[::]:0` send socket at Start (the bridge keeps its
+  listener private) — `BD-Matter-GroupSendFromEphemeralPort`.
+- **Proof:** `TestLiveGroupSend` over the receiver's unicast address
+  (in-process nodes on 127.0.0.1 get no IPv6 multicast on 5540; the
+  bridge accepts a group header on any datagram),
+  `TestSendMulticastReachesAJoinedListener` for the multicast leg.
+- **Owner:** both no-sender `by_design` entries retired, two new ones
+  (every interface, ephemeral port); findings note (matter.js compares
+  the epoch start as Unix ms — mirrored; no list chunking for group
+  writes); the docs that named `BD-Matter-GroupcastNoSender` updated
+  here (comparison rows, ADR 0010, concept v1).
+
+Guards on the tranche (tool PATH exported, HEAD logged): `make ci`,
+`make race`, `make reachability-check` (unreached 5), `make fuzz`,
+`make chiptool-test` (313 pass, 0 fail, 1 skip) — all green at `3be8ae8`. PR #101 (auto-merge).
+
+**Docs PR `docs/wave-20-followups`:** ADR 0020 (stage-5 row: part 1
+done), the comparison rows 52 and 99, ADR 0010, concept v1 row, concept
+v2 B.1 (the stage-5 split), this section. Then delete `wave20/groupsend`,
+`planning/briefs-wave-20`, the tranche and docs branches and the
+`.claude/worktrees/wave20-groupsend` worktree. Next: wave 21 (brief AO)
+lands on top; then the `device/` types as the client view, stage 6 or
+phase 8 (ADR 0021 first).
