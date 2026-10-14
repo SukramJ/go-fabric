@@ -281,3 +281,19 @@ streaming/playing; an ecosystem proof (phase 5).
 - Findings-register candidates: `defaultValue` does not render list
   defaults (ChannelList, AcceptHeader `[]`, applied by hand in
   `cluster/media`); clustergen's cross-cluster datatype entries (question 3).
+
+## Owner's decisions (2026-10-14, tranche 24)
+
+- **Q1:** accepted as committed; the four edits are what the guards ask
+  for.
+- **Q2:** `cluster/doc.go` names `media/` in the tranche's owner commit.
+- **Q3:** recorded in the findings register (clustergen cross-cluster
+  datatypes), together with the list-default hand-off.
+- **Q4:** `BD-chip-Messages-CoreHeld`.
+- **Q5:** kept — a TESTING-ONLY daemon may carry a lever no case needs
+  today.
+- Differences 1–6 accepted; 1 (the player is a CastingVideoPlayer,
+  `tv-app.matter:4384-4385`) and 2 correct ADR 0022's wording in the
+  docs PR; 4 (the image over `manualTests.json`) is the harness's
+  existing rule; 6 is in `BD-Matter-Media-HostPorts`.
+
