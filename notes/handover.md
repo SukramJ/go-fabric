@@ -38,6 +38,7 @@ German, briefly. Six waves were planned against the phases:
 | 21 | ADR 0020 stage 5, part 2: `binding.Manager`, `core.Binding.OnChange` + fabric-scoped writes, the bridge decoding Binding writes, `node.Config.Client` (the node's client stack), the 11 controller device types, `TestLiveBinding` (TC-BIND-2.1) | AO | `wave/2026-10-14-tranche-21` (#103); docs PR `docs/wave-21-followups` | see §21 |
 | 22 | ADR 0020 stage 4 close-out: `device.Lookup`, the validator input seam (`endpoint.DeviceTypeTree`), `client.Endpoint.Device()`/`Conformance()`, `core.Binding.Persist` + node persistence; owner: the doubled group-sender start/stop fixed | AP | `wave/2026-10-14-tranche-22` (#105); docs PR `docs/wave-22-followups` | see §22 |
 | 24 | concept v2 phase 9 (ADR 0022): 15 media definitions, `cluster/media` (14 servers over typed host ports, state transaction), `core.Messages`, three media device types, daemon `--media` (CastingVideoPlayer + ContentApp after chip's tv-app), 13 media families, PICS ep45/ep46, `app-media` CI group | AR | `wave/2026-10-14-tranche-24` (#111); docs PR `docs/wave-24-followups` | see §24 |
+| 26 | `v0.4.0`: `examples/reference-controller` (pair/unpair/nodes/node/read/write/invoke/subscribe/events/group/bind/ota serve), `secure/setup` QR + manual-code decoders, the persisted controller fabric (`ca.SettingStore`, `FabricConfig.Store`), `spec.EncodeJSON`/`DecodeJSON`, `docs/manual-test-plan-0.4.0.md`, CHANGELOG `[0.4.0]`, tag `v0.4.0` | AT | `wave/2026-10-14-tranche-26` (#113); docs PR `docs/wave-26-followups` | see §26 |
 | 25 | ADR 0020 stage 6a+6b: `controller/dcl` (DCL client, certificate store as `attestation.PAAStore`/`Revocations`, OTA version lookup; opt-in), `core.CommissionerControl` after chip + `node.Config.CommissionerControl`, daemon `--dcl`, `TestLiveCommissionerControl`; Joint Fabric (6c) deferred past v1.0.0 | AS | `wave/2026-10-14-tranche-25` (#109); docs PR `docs/wave-25-followups` | see §25 |
 | 23 | concept v2 phase 8 (ADR 0021): the BDX sender roles, `bridge.AttachBDXResponder`/`OpenSessionExchange`, `core.OTAProvider` + `node.Config.OTAProvider` (OtaProvider endpoint), DiagnosticLogs over BDX after chip, reference-bridge `--ota-provider`, in-repo proofs | AQ | `wave/2026-10-14-tranche-23` (#107); docs PR `docs/wave-23-followups` | see §23 |
 
@@ -1548,4 +1549,56 @@ pairing-code decoders, a persisted controller fabric, the JSON codec),
 then `docs/manual-test-plan-0.4.0.md`, CHANGELOG `[0.4.0]` and the tag
 `v0.4.0` — the owner's decision of 2026-10-14: integrate into loom and
 test against the ecosystems before the `v1.0.0` freeze.
+
+## 26. Wave 26 (2026-10-14, the owner away; everything local; `v0.4.0`)
+
+The owner's decision of 2026-10-14: release `v0.4.0` first (no API
+freeze), integrate it into loom and test against the ecosystems and
+real devices; `v1.0.0` follows the findings. Sonnet's `read-AT.md`
+found three gaps for a controller consumer: no pairing-code decoder,
+no persisted controller fabric, no CLI-string-to-TLV path. Brief AT
+(`wave26/controller-cli`, head `29cf714`) on `planning/briefs-wave-26`
+(`789cb4b`). Tranche `wave/2026-10-14-tranche-26` = the branch, a
+`git merge origin/main` (CHANGELOG unioned, inventory regenerated) and
+the owner's commit. Guards `make ci`, `make race`,
+`make reachability-check` green; no chip-tool (the daemon is unchanged).
+The owner's `make race` found a stdout race in the CLI's OTA test (fixed);
+CodeQL flagged a narrowing in the manual-code decoder (bounded explicitly).
+`TestSessionAndSubscriptionDiagnostics` failed on CI four times in five
+runs at its second PASE ("expected message missing after 11 s": the
+bridge answers no PBKDFParamRequest after a PASE session was closed);
+not reproducible locally under race or on two CPUs; the test now keeps
+the node's debug log for the next failure, and `PeerCommunicationError`
+names its cause. Open — see the findings register.
+
+- **secure/setup:** `DecodeQRCode(s)`, `DecodeManualCode` after
+  `PairingCodeSchema.ts` with matter.js's own vectors; an unparseable
+  QR tail is kept as raw bytes (matter.js's vector has one). The
+  encoder stays laxer than matter.js's (findings note).
+- **controller/ca, commissioner:** `ca.SettingStore`, `FabricConfig.Store`
+  — one fabric record per database with key, NOC, IPK, ids
+  (`Fabric.Config`); a live test reopens the stack from the same
+  SQLite file and reads over CASE without commissioning again.
+- **cluster/spec/json.go:** `EncodeJSON`/`DecodeJSON` over every
+  definition (2468 values round-trip through JSON, node and wire);
+  chip-tool's conventions plus names (`BD-chip-ControllerCLI-JSON`).
+- **examples/reference-controller:** the commands in its README;
+  `--dcl` opens the trust store for `pair` only; `--attestation
+  accept|reject|ask`; its own `node.Node` for `group send` and `ota
+  serve`; OTA consent at offer time; `group create` falls back to
+  chip's `TestGroupMessaging.yaml` path without Groupcast
+  (`BD-chip-ControllerCLI-OwnNode`). `TestReferenceController` and
+  `TestReferenceControllerOTA` are the proof; floor 70 (83 % measured).
+- **Owner:** `docs/manual-test-plan-0.4.0.md` (German, for the owner:
+  loom + Apple Home/Alexa/Google, the controller against real devices,
+  network and time); CHANGELOG `[0.4.0]` cut; three `by_design`
+  entries; `TestSessionAndSubscriptionDiagnostics` no longer parallel
+  after two CI flakes.
+
+Cleanup after the merge: `wave26/controller-cli`,
+`planning/briefs-wave-26`, the tranche and docs branches and the
+`.claude/worktrees/wave26-controller-cli` worktree. Then the tag
+`v0.4.0` on `main` and the GitHub release with the notes. Next: the
+owner's findings from the test plan; the `v1.0.0` freeze wave after
+them.
 
