@@ -261,6 +261,15 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	if opts.enableKey != "" {
 		args = append(args, "--enable-key", opts.enableKey)
 	}
+	// --wifi serves WiFiNetworkDiagnostics on the root from the daemon's
+	// simulated Wi-Fi link (examples/reference-bridge/wifi.go, brief AM),
+	// for the DGWIFI family. Every daemon of the suite carries it, not only
+	// the family's: the PICS slices are generated once from one daemon
+	// (devicePICS) and TC-IDM-10.4 holds them against every run, so the
+	// device has to be the same device in every case.
+	if flags["wifi"] {
+		args = append(args, "--wifi")
+	}
 	// On a host whose LAN interfaces have no IPv6, the MAC-derived SRV
 	// target carries only IPv4 address records, and the image's chip-tool
 	// resolves operational nodes over IPv6 only. The OS host name's

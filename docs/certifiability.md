@@ -145,6 +145,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | LUNIT | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | DGSW | 4 | 1 | 0 | 0 | 2 | 1 | 0 |
 | DGETH | 3 | 2 | 0 | 0 | 1 | 0 | 0 |
+| DGWIFI | 4 | 2 | 0 | 0 | 1 | 1 | 0 |
 | ACT | 3 | 0 | 0 | 0 | 0 | 3 | 0 |
 | PSCFG | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | ECOINFO | 2 | 0 | 0 | 0 | 0 | 2 | 0 |
@@ -211,7 +212,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WHM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **608** | **351** | **0** | **1** | **111** | **140** | **5** |
+| **all** | **612** | **353** | **0** | **1** | **112** | **141** | **5** |
 
 ### Cases not run
 
@@ -348,6 +349,8 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | DGSW/2.2 | (b) not supported | not applicable: the case's PICS `DGSW.S.E00` is false for the reference DUT |
 | DGSW/2.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DGSW/3.2.Simulated | (b) not supported | not applicable: the case's PICS `DGSW.C` is false for the reference DUT |
+| DGWIFI/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| DGWIFI/3.2.Simulated | (b) not supported | not applicable: the case's PICS `DGWIFI.C` is false for the reference DUT |
 | DISHALM/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DISHALM/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | DISHALM/3.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -516,6 +519,13 @@ RetrieveLogsRequest that asks for BDX with a `TransferFileDesignator` is
 still answered inline (`cluster/core/diagnostic_logs.go`,
 `BD-chip-DiagLogs-NoBDX`), so DiagnosticLogs over BDX is not served until
 concept v2 phase 8.
+
+DGWIFI runs against a Wi-Fi link the daemon simulates: the harness starts
+every daemon with `--wifi` (TESTING ONLY), which serves WiFiNetworkDiagnostics
+on the root from fixed values and counters the app pipe steps
+(`examples/reference-bridge/wifi.go`), while NetworkCommissioning stays
+Ethernet-only and `MCORE.COM.WIFI` stays 0 — a product on Wi-Fi supplies its
+own reporter (`node.Network.WiFi`).
 
 ## What a product owner must supply
 

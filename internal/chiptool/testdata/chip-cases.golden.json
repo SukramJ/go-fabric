@@ -540,6 +540,14 @@
       "steps": 5,
       "stepsSkipped": 4
     },
+    "DGWIFI/2.1": {
+      "steps": 7,
+      "stepsSkipped": 7
+    },
+    "DGWIFI/2.3": {
+      "steps": 1,
+      "stepsSkipped": 7
+    },
     "DISHALM/2.1": {
       "tests": 1,
       "steps": 5,
@@ -2174,6 +2182,12 @@
       "2.3",
       "3.2.Simulated"
     ],
+    "DGWIFI": [
+      "2.1",
+      "2.2",
+      "2.3",
+      "3.2.Simulated"
+    ],
     "DISHALM": [
       "2.1",
       "3.1",
@@ -2737,6 +2751,7 @@
     "DGETH/3.2.Simulated": "DGETH.C",
     "DGSW/2.2": "DGSW.S.E00",
     "DGSW/3.2.Simulated": "DGSW.C",
+    "DGWIFI/3.2.Simulated": "DGWIFI.C",
     "DRLK/2.11": "DRLK.S \u0026 DRLK.S.F00 \u0026 DRLK.S.F01 \u0026 DRLK.S.F02",
     "DRLK/2.13": "DRLK.S.F0d",
     "DRLK/2.5": "DRLK.S \u0026 DRLK.S.F04",
@@ -2853,6 +2868,7 @@
     "DESC/2.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DGGEN/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DGSW/2.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "DGWIFI/2.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DISHALM/3.1": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DISHALM/3.2": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DISHALM/3.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",

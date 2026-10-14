@@ -419,6 +419,12 @@ var chipFamilies = []family{
 	{name: "LUNIT"},
 	{name: "DGSW"},
 	{name: "DGETH"},
+	// WiFiNetworkDiagnostics on the root, from the daemon's simulated Wi-Fi
+	// link (--wifi, examples/reference-bridge/wifi.go; brief AM), which the
+	// suite starts every daemon with (startBridgeWith). TC-DGWIFI-2.2 is
+	// manual in the descriptor (every step `disabled: true`); 3.2 is the
+	// DUT-as-client case (DGWIFI.C, false in testdata/reference-bridge.pics).
+	{name: "DGWIFI"},
 	// The node clusters of brief J. Actions is on the Aggregator
 	// (examples/reference-bridge/fleet_node.go); every step of
 	// Test_TC_ACT_2_1/2_2/3_2.yaml is manual (`disabled: true`) at the

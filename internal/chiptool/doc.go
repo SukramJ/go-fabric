@@ -79,6 +79,10 @@
 // the YAML runner's accessory protocol (SystemCommands Reboot and
 // FactoryReset), served on a loopback port by accessory_test.go the way
 // matter.js serves it.
+// Every daemon the suite starts also carries --wifi, a simulated Wi-Fi link
+// behind WiFiNetworkDiagnostics on the root for the DGWIFI family: the PICS
+// slices are generated from one daemon, so every case runs against the
+// same device.
 //
 // Nothing is skipped silently on a machine that has the prerequisites: a
 // missing harness skips with the command that provides it, and a missing
