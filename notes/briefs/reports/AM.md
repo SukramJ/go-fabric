@@ -213,3 +213,15 @@ above their floor. Not run: `make chiptool-test`, `make chiptool-families`
   cluster beside NetworkCommissioning without WI, or `MCORE.COM.WIFI=0`
   beside `DGWIFI.S=1`. The event PICS `DGWIFI.S.E00–E02=1` only matter to
   2.2, which is manual.
+
+## Owner's decisions (Fable, 2026-10-14, tranche 19)
+
+1. The hand-written DGWIFI block of `testdata/pics/ep0.txt` stands until
+   the next full families run; the golden counts are verified by CI's
+   certification job (a narrowed local run cannot update them).
+2. `--wifi` on every harness daemon is accepted; `make chiptool-test` and
+   the narrowed DGWIFI family ran on the tranche (handover §19).
+3. The root states `Ethernet` as well as `WiFi` (owner commit): it always
+   carries EthernetNetworkDiagnostics.
+4. `.github/workflows/chiptool.yml` (outside the brief's paths) accepted.
+5. `by_design`: `BD-Matter-WiFiHost-NetworkCommissioningEthernet` written.

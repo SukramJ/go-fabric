@@ -158,15 +158,22 @@ type WiFi struct {
 
 // conditionWiFi is the RootNode device-type condition a Wi-Fi node states
 // (the Base condition "WiFi", schema/devicetype_requirements_gen.go).
-const conditionWiFi = "WiFi"
+const (
+	conditionWiFi     = "WiFi"
+	conditionEthernet = "Ethernet"
+)
 
 // rootDeviceConditions are the device-type conditions the node states for
 // its root endpoint: WiFi when it serves WiFiNetworkDiagnostics.
 func (c *Config) rootDeviceConditions() []string {
+	// The root always carries EthernetNetworkDiagnostics (buildRootOptional,
+	// unknownEthernet), so it states the Base condition "Ethernet" its
+	// `[Ethernet]` requirement names; a Wi-Fi reporter adds "WiFi".
+	out := []string{conditionEthernet}
 	if c.Network.WiFi.Reporter != nil {
-		return []string{conditionWiFi}
+		out = append(out, conditionWiFi)
 	}
-	return nil
+	return out
 }
 
 // Commissioning is matter.js `commissioning` (CommissioningServer.ts:
