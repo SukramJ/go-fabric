@@ -9,6 +9,7 @@ package node_test
 // host-initiated fabric removal and LocationCapability.
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
@@ -288,7 +289,18 @@ func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
 	// a fresh discovery) lost the node under the package's parallel live
 	// tests twice on CI on 2026-10-14 ("Could not connect to device").
 	ctx := context.Background()
-	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+	// The node's debug log is kept and printed only when the test fails:
+	// its second connection failed on CI with nothing at INFO to explain
+	// why the bridge answered no PBKDFParamRequest.
+	var nodeLog bytes.Buffer
+	cfg.Logger = slog.New(slog.NewTextHandler(&nodeLog, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("node log:\n%s", nodeLog.String())
+		}
+	})
+	n := newNode(t, cfg)
 	if got := n.Sessions().Sessions(); len(got) != 0 {
 		t.Errorf("sessions before any peer: %+v", got)
 	}
