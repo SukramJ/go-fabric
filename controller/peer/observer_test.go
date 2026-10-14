@@ -42,10 +42,16 @@ func TestObserve(t *testing.T) {
 	eventually(t, "the session to leave", func() bool { return len(p.Sessions()) == 1 })
 	stopA()
 	s1.Close()
-	eventually(t, "the last session to leave", func() bool { return len(p.Sessions()) == 0 })
+	want := []string{"a added", "b added", "a deleted", "b deleted", "set disconnected", "b deleted"}
+	// The session leaves the peer under its lock and the observers hear of
+	// it after the lock: wait for the notification, not for the list.
+	eventually(t, "the last session's observers", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(seen) >= len(want)
+	})
 	mu.Lock()
 	defer mu.Unlock()
-	want := []string{"a added", "b added", "a deleted", "b deleted", "set disconnected", "b deleted"}
 	if len(seen) != len(want) {
 		t.Fatalf("seen %v, want %v", seen, want)
 	}
