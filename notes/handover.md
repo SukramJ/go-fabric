@@ -31,6 +31,7 @@ German, briefly. Six waves were planned against the phases:
 | 14 | concept v2 phase 7 stage 2 (ADR 0020): `controller/ca` (the certificate authority), `controller/attestation` (device attestation against a PAA store), `controller/interaction` (Invoke and Read for the flow), `controller/commissioner` (the commissioner, the PASE connection, the commissioning flow); `CASEOptions.Exchange` / `OnExchange` replace `exchange.WithHooks` | AH | `wave/2026-10-13-tranche-14` (#83); docs PR `docs/wave-14-followups` | see §14 |
 | 15 | concept v2 phase 7 stage 3 (ADR 0020): `controller/interaction` Write, Subscribe, the subscription registry with its liveness timer, sustained subscriptions, the inbound report handler, Read with events and filters; `controller/handshake.CASEServer` (the CASE responder); `controller/exchange.Manager.SetProtocolHandler`; the client encoders and decoders in `im/` | AI | `wave/2026-10-13-tranche-15` (#90); docs PR `docs/wave-15-followups` | see §15 |
 | 16 | ADR 0020 stage-2 close-out: `bridge/bridgetest.Commissioner` runs on `controller/` (surface kept); `interaction.Report.SubscriptionID` / `Session` | AJ | `wave/2026-10-13-tranche-16` (#93); docs PR `docs/wave-16-followups` | see §16 |
+| 17 | ADR 0020 stage 4, first half: `controller/client` (the client node image, cache and store, shape analysis, default subscription, connection state, physical properties); `peer.Peer.Observe`; `interaction.SubscribeRequest.RefreshRequest`; `spec.DecodeValue`; `schema.ClusterHasChangesOmittedAttribute` | AK | `wave/2026-10-14-tranche-17` (#95); docs PR `docs/wave-17-followups` | see §17 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -1059,3 +1060,78 @@ stage 2 closed), this section. Then delete `wave16/bridgetest`,
 `.claude/worktrees/wave16-bridgetest` worktree. Next: stage 4 (brief AK:
 `ClientNode.ts`, `node/client/` — a typed image of a remote node from the
 schema; `device/` types as the client view), after a first read.
+
+## 17. Wave 17 (2026-10-14, the owner away; everything local)
+
+ADR 0020 stage 4, first half. Brief AK (`wave17/client`, head `cf40431`)
+on `planning/briefs-wave-17` (`b3565cd`); the stage was split by the
+owner into AK (`ClientNode.ts`, `ClientStructure.ts`, `PeerBehavior.ts`,
+`ClientNodeInteraction.ts`, `ClientEventEmitter.ts`, the subscription half
+of `NetworkClient.ts`, `ClientCacheBuffer.ts`, `NodePhysicalProperties.ts`)
+and AL (`Peers.ts` and the rest). Integration
+`wave/2026-10-14-tranche-17` = the branch as it was (linear on `main`
+`9551c63`), plus the owner's commit and the regenerated inventory.
+
+- **`controller/client`:** `Node` (`New`, `Start`, `Stop`, `Close`,
+  `Disable`, `Enable`, `Erase`), `Endpoint` and `Cluster` read through
+  methods (the subscription mutates the image while the host reads it),
+  `Store` with `MemoryStore` (values as TLV plus the DataVersion; the
+  node's settings as endpoint 0's cluster `0xFFFF_FFFF`; write-through
+  or batched by `FlushInterval`), the Descriptor-driven tree with part
+  claims (tree vs full-family composition), erase and rebuild, version
+  filters (refresh skips a cluster with a changes-omitted attribute),
+  the default sustained wildcard subscription with the event cursor,
+  the connection-state table, `Hooks` (structure events once per
+  endpoint, `Changed`, `Event` for every cluster, `Seeded`,
+  `ConnectionStateChanged`, `SubscriptionStatusChanged`,
+  `SubscriptionAlive`), `Properties` and `IntervalBounds`
+  (`PhysicalDeviceProperties.ts` with its constants). `known.go` links
+  all 97 generated definitions so `spec.Lookup` knows each. Floor 85
+  (measured 93.6 %).
+- **Outside the package:** `peer.Peer.Observe(Observer)` (per-peer
+  session added/deleted and establishment-unresponsive signals, after the
+  set-level hooks); `interaction.SubscribeRequest.RefreshRequest` (the
+  request rewritten before every attempt but the first and after a
+  bootstrap read; callbacks and bounds kept); `cluster/spec.DecodeValue`;
+  `schema.ClusterHasChangesOmittedAttribute` (owner).
+- **Live proof** (`TestLiveClientNode`, `node` + `bridgetest`): root,
+  aggregator, plug with OnOff decoded; the first subscription carries the
+  initial read's filters and event minimum; a toggle reaches the image;
+  after the node's restart on its database the node resumed the
+  subscription itself (no new request from the controller — the refreshed
+  request was proven by closing the registry's subscription); the removed
+  plug is erased; a second `Node` on the same store has the tree without
+  a read. Named clusters met: AccessControl, GroupKeyManagement,
+  Groupcast, OperationalCredentials.
+- **Brief lines corrected by the agent, verified by the owner at the
+  pin:** a RootNode root never takes a revision from its DeviceTypeList
+  (CS:876-892) — the literal port stands; NPP:154-167's BatChargeLevel
+  check never decides; `emitEndpoint` already emits the clusters
+  (CSE:88-107, so CS:1512-1519 re-emits) — `EndpointInstalled` once
+  (`BD-Matter-ClientNode-EndpointInstalledOnce`); `ClientRead.ts` lives
+  under `protocol/src/action/client/`; the element files are kebab-case.
+- **Owner:** named clusters now name their `Features` and are judged by
+  the schema's changes-omitted table (PB:425-426 resolves a named
+  cluster's model); `Extra()` of a named cluster stays approximate —
+  findings register, Tier 3 (38 clusters without a generated definition).
+  Five `by_design` entries (`BD-Matter-ClientNode-*`). No
+  `EndpointErased` hook; `known.go` stays; `RefreshRequest` keeps
+  callbacks and bounds.
+
+Guards on the tranche (tool PATH exported, HEAD logged): `make ci`,
+`make race`, `make reachability-check` (unreached 5), `make chiptool-test`
+(313 pass, 0 fail, 1 skip) — all green at `92444c3`; the first `make ci`
+run failed only on golangci-lint's own timeout after it had printed
+"0 issues", and `make lint` + `make cover-check` rerun green. PR #95
+(auto-merge).
+
+**Docs PR `docs/wave-17-followups`:** ADR 0020 (the stage-4 row: first
+half done, AL open), concept v2 B.1 (the split), this section. Then
+delete `wave17/client`, `planning/briefs-wave-17`, the tranche and docs
+branches and the `.claude/worktrees/wave17-client` worktree. Next: brief
+AL (`Peers.ts:1-966` and the rest of `CommissioningClient.ts` first read
+by Sonnet, then the brief by the owner): the Peers registry (`peerN`
+ids, restore on start, the address book with its 15 min TTL and 1 min
+cull, the leave/shutdown/startUp reactions, `forAddress`, fabric-label
+reconciliation) and a SQLite `client.Store`; then the `device/` types as
+the client view.
