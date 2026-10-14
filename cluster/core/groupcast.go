@@ -56,6 +56,12 @@ const (
 	groupcastKeyLength = 16
 	// groupcastLeaveMaxEndpoints is LeaveGroup.Endpoints' "1 to 20".
 	groupcastLeaveMaxEndpoints = 20
+	// groupcastJoinMaxEndpoints is JoinGroup.Endpoints' "desc" constraint
+	// (groupcast.element.ts:66 at 0ceb202d), which matter.js does not model;
+	// chip enforces kMaxCommandEndpoints, 20 (GroupcastCluster.cpp:428-440
+	// at the harness pin: more than 20 is ConstraintError before the key
+	// set is looked up — TC-GC-2.2 step 12).
+	groupcastJoinMaxEndpoints = 20
 
 	// GroupcastTestingEnum values.
 	groupcastTestingDisable        uint8 = 0
@@ -591,6 +597,9 @@ func (g *Groupcast) validateJoin(ctx context.Context, req JoinGroupRequest) erro
 	}
 	if req.GroupID > groupcastMaxGroupID {
 		return groupcastErr(im.StatusConstraintError, "Invalid group ID")
+	}
+	if len(req.Endpoints) > groupcastJoinMaxEndpoints {
+		return groupcastErr(im.StatusConstraintError, "JoinGroup: Endpoints lists more than %d endpoints", groupcastJoinMaxEndpoints)
 	}
 	if req.Key != nil || req.UseAuxiliaryACL != nil {
 		if err := g.requireAdmin(ctx); err != nil {

@@ -221,6 +221,10 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 			"KeySetId 0":     {GroupID: 1, Endpoints: []uint16{3}, KeySetID: 0},
 			"15-byte key":    {GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: make([]byte, 15)},
 			"policy 2":       {GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey, McastAddrPolicy: u8p(2)},
+			// 21 endpoints with an unknown key set: the "desc" constraint
+			// (chip kMaxCommandEndpoints, TC-GC-2.2 step 12) answers before
+			// the key set is looked up.
+			"21 endpoints": {GroupID: 1, Endpoints: twentyOneEndpoints(), KeySetID: 9},
 		} {
 			if _, st := f.invoke(admin, 0x00, req); st != im.StatusConstraintError {
 				t.Errorf("%s: %v, want ConstraintError", name, st)
@@ -966,4 +970,13 @@ func TestGroupcastAndAuxiliarySurfaceMatchSchema(t *testing.T) {
 	if _, ok := plain.MatterRead(0x0007); ok {
 		t.Error("AuxiliaryAcl readable without the Auxiliary feature")
 	}
+}
+
+// twentyOneEndpoints is a JoinGroup endpoint list one past the limit.
+func twentyOneEndpoints() []uint16 {
+	out := make([]uint16, 21)
+	for i := range out {
+		out[i] = uint16(i + 1)
+	}
+	return out
 }
