@@ -70,7 +70,7 @@ Commissioner entfällt.
 | 2 Cluster-Breite 2a–2d | erledigt, #42–#47 (101 Server) |
 | 3 TCP, BDX, OTA-Requestor (ADR 0019) | erledigt, #49 |
 | 4 `device/` und `node/` (ADR 0018) | erledigt, #51 (63 Typen) |
-| 5 Nachweis und `v1.0.0` | **offen**: Apple-Home- und Alexa-Läufe brauchen den Owner am Gerät |
+| 5 Nachweis und `v1.0.0` | **offen**: Apple-Home- und Alexa-Läufe brauchen den Owner am Gerät. Owner-Entscheidung 2026-10-14: erst `v0.4.0` (Welle 26, #113) mit dem Referenz-Controller und dem Testplan `docs/manual-test-plan-0.4.0.md`, Integration in loom und die Läufe aus dem Plan; der `v1.0.0`-Freeze folgt den Befunden. |
 
 Danach kamen Welle 7 (#53: Test-Commissioner in `bridge/bridgetest`,
 Tier-3-Transportbefunde, `v0.3.0`) und Welle 8 (#55: Session-Schluss-
