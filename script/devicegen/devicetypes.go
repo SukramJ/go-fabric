@@ -10,9 +10,9 @@ package main
 // mandatory clusters are the excluded camera and media families (owner's
 // decision, 2026-10-11) — with OtaRequestor, which ADR 0018 ("Decisions
 // taken at the start of wave 6", 1) takes in since the requestor joined in
-// wave 5 (ADR 0019), and SecondaryNetworkInterface, which concept v2 §B.4
-// takes in with the WiFiNetworkDiagnostics server (brief AM). Sorted by
-// name.
+// wave 5 (ADR 0019), and the eleven controller device types ADR 0020's
+// stage 5 takes in (brief AO): their client clusters are what the binding
+// manager selects for a Binding entry. Sorted by name.
 var committed = []string{
 	"Aggregator",
 	"AirPurifier",
@@ -20,16 +20,21 @@ var committed = []string{
 	"BatteryStorage",
 	"BridgedNode",
 	"Closure",
+	"ClosureController",
 	"ClosurePanel",
+	"ColorDimmerSwitch",
 	"ColorTemperatureLight",
 	"ContactSensor",
+	"ControlBridge",
 	"CookSurface",
 	"Cooktop",
 	"DeviceEnergyManagement",
 	"DimmableLight",
 	"DimmablePlugInUnit",
+	"DimmerSwitch",
 	"Dishwasher",
 	"DoorLock",
+	"DoorLockController",
 	"Doorbell",
 	"ElectricalEnergyTariff",
 	"ElectricalMeter",
@@ -54,12 +59,15 @@ var committed = []string{
 	"MountedOnOffControl",
 	"OccupancySensor",
 	"OnOffLight",
+	"OnOffLightSwitch",
 	"OnOffPlugInUnit",
+	"OnOffSensor",
 	"OtaRequestor",
 	"Oven",
 	"PowerSource",
 	"PressureSensor",
 	"Pump",
+	"PumpController",
 	"RainSensor",
 	"Refrigerator",
 	"RoboticVacuumCleaner",
@@ -73,11 +81,14 @@ var committed = []string{
 	"TemperatureControlledCabinet",
 	"TemperatureSensor",
 	"Thermostat",
+	"ThermostatController",
+	"VideoRemoteControl",
 	"WaterFreezeDetector",
 	"WaterHeater",
 	"WaterLeakDetector",
 	"WaterValve",
 	"WindowCovering",
+	"WindowCoveringController",
 }
 
 // cameraMedia is the group of the device types not named in Appendix F.3
@@ -103,19 +114,6 @@ var excluded = map[string]string{
 	"NetworkInfrastructureManager": "F.3 infrastructure",
 	"JointFabricAdministrator":     "F.3 infrastructure",
 	"OtaProvider":                  "F.3 infrastructure",
-	// Controller device types: client clusters and Binding only, the
-	// initiator role.
-	"OnOffLightSwitch":         "F.3 controller device types",
-	"DimmerSwitch":             "F.3 controller device types",
-	"ColorDimmerSwitch":        "F.3 controller device types",
-	"ControlBridge":            "F.3 controller device types",
-	"OnOffSensor":              "F.3 controller device types",
-	"DoorLockController":       "F.3 controller device types",
-	"WindowCoveringController": "F.3 controller device types",
-	"ThermostatController":     "F.3 controller device types",
-	"PumpController":           "F.3 controller device types",
-	"ClosureController":        "F.3 controller device types",
-	"VideoRemoteControl":       "F.3 controller device types",
 	// Camera / media by their mandatory requirements (owner's decision,
 	// 2026-10-11), read from parity/schema.json effective.requirements:
 	// VideoDoorbell and FloodlightCamera mandate a Camera component

@@ -53,6 +53,9 @@ type Device struct {
 	// optIn are the assembler's optional clusters the host opted into
 	// ([WithOptional] for Groups or ScenesManagement).
 	optIn []uint32
+	// clients are the client clusters the host declared beyond the type's
+	// mandatory ones ([WithClientClusters]).
+	clients []uint32
 
 	mu    sync.Mutex
 	parts []*Device
@@ -108,7 +111,7 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 	if err := checkOptedClusters(t, s, measured); err != nil {
 		return nil, err
 	}
-	d := &Device{typ: t, opts: opts, measurement: s.measurement, measured: measured}
+	d := &Device{typ: t, opts: opts, measurement: s.measurement, measured: measured, clients: slices.Clone(s.clients)}
 	for id := range optInMounted {
 		if s.optional[id] {
 			d.optIn = append(d.optIn, id)
@@ -619,12 +622,19 @@ func (d *Device) Spec() endpoint.Spec {
 // clientClusters are the client clusters the device type mandates — what
 // matter.js's MutableEndpoint registers into the type
 // (packages/node/src/endpoint/type/MutableEndpoint.ts:53-61) and its
-// DescriptorServer lists as ClientList (DescriptorServer.ts:290-296).
+// DescriptorServer lists as ClientList (DescriptorServer.ts:290-296) —
+// followed by those the host declared ([WithClientClusters],
+// MutableEndpoint.ts:123-129), each once.
 func (d *Device) clientClusters() []uint32 {
 	var out []uint32
 	for _, r := range d.typ.Clients {
 		if r.Mandatory {
 			out = append(out, r.ID)
+		}
+	}
+	for _, id := range d.clients {
+		if !slices.Contains(out, id) {
+			out = append(out, id)
 		}
 	}
 	return out

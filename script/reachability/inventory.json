@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4839,
+  "entry_points": 4841,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11023,
-    "reachable": 7717,
-    "whitelisted": 3301,
+    "total_exported": 11081,
+    "reachable": 7773,
+    "whitelisted": 3303,
     "unreachable": 5
   },
   "by_package": [
@@ -15618,6 +15618,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/device_test.go",
       "line": 469
+    },
+    {
+      "package": "device",
+      "identifier": "TestControllerDeviceDeclaresClients",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/controller_types_test.go",
+      "line": 179
+    },
+    {
+      "package": "device",
+      "identifier": "TestControllerDeviceTypesParity",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/controller_types_test.go",
+      "line": 122
     },
     {
       "package": "device",

@@ -142,6 +142,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("Closure") {
 		t.Errorf("Closure: %v", err)
 	}
+	if _, err := NewClosureController(Options{}); err == nil {
+		t.Error("ClosureController: constructed without a StableKey")
+	}
+	if d, err := NewClosureController(testOptions("ClosureController"), testWith(t, "ClosureController")...); err == nil {
+		if d.Type() != &ClosureControllerType {
+			t.Errorf("ClosureController: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("ClosureController: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("ClosureController") {
+		t.Errorf("ClosureController: %v", err)
+	}
 	if _, err := NewClosurePanel(Options{}); err == nil {
 		t.Error("ClosurePanel: constructed without a StableKey")
 	}
@@ -154,6 +167,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("ClosurePanel") {
 		t.Errorf("ClosurePanel: %v", err)
+	}
+	if _, err := NewColorDimmerSwitch(Options{}); err == nil {
+		t.Error("ColorDimmerSwitch: constructed without a StableKey")
+	}
+	if d, err := NewColorDimmerSwitch(testOptions("ColorDimmerSwitch"), testWith(t, "ColorDimmerSwitch")...); err == nil {
+		if d.Type() != &ColorDimmerSwitchType {
+			t.Errorf("ColorDimmerSwitch: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("ColorDimmerSwitch: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("ColorDimmerSwitch") {
+		t.Errorf("ColorDimmerSwitch: %v", err)
 	}
 	if _, err := NewColorTemperatureLight(Options{}); err == nil {
 		t.Error("ColorTemperatureLight: constructed without a StableKey")
@@ -189,6 +215,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("ContactSensor") {
 		t.Errorf("ContactSensor: %v", err)
+	}
+	if _, err := NewControlBridge(Options{}); err == nil {
+		t.Error("ControlBridge: constructed without a StableKey")
+	}
+	if d, err := NewControlBridge(testOptions("ControlBridge"), testWith(t, "ControlBridge")...); err == nil {
+		if d.Type() != &ControlBridgeType {
+			t.Errorf("ControlBridge: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("ControlBridge: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("ControlBridge") {
+		t.Errorf("ControlBridge: %v", err)
 	}
 	if _, err := NewCookSurface(Options{}); err == nil {
 		t.Error("CookSurface: constructed without a StableKey")
@@ -270,6 +309,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("DimmablePlugInUnit") {
 		t.Errorf("DimmablePlugInUnit: %v", err)
 	}
+	if _, err := NewDimmerSwitch(Options{}); err == nil {
+		t.Error("DimmerSwitch: constructed without a StableKey")
+	}
+	if d, err := NewDimmerSwitch(testOptions("DimmerSwitch"), testWith(t, "DimmerSwitch")...); err == nil {
+		if d.Type() != &DimmerSwitchType {
+			t.Errorf("DimmerSwitch: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("DimmerSwitch: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("DimmerSwitch") {
+		t.Errorf("DimmerSwitch: %v", err)
+	}
 	if _, err := NewDishwasher(Options{}); err == nil {
 		t.Error("Dishwasher: constructed without a StableKey")
 	}
@@ -307,6 +359,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("DoorLock") {
 		t.Errorf("DoorLock: %v", err)
+	}
+	if _, err := NewDoorLockController(Options{}); err == nil {
+		t.Error("DoorLockController: constructed without a StableKey")
+	}
+	if d, err := NewDoorLockController(testOptions("DoorLockController"), testWith(t, "DoorLockController")...); err == nil {
+		if d.Type() != &DoorLockControllerType {
+			t.Errorf("DoorLockController: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("DoorLockController: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("DoorLockController") {
+		t.Errorf("DoorLockController: %v", err)
 	}
 	if _, err := NewDoorbell(Options{}); err == nil {
 		t.Error("Doorbell: constructed without a StableKey")
@@ -704,6 +769,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("OnOffLight") {
 		t.Errorf("OnOffLight: %v", err)
 	}
+	if _, err := NewOnOffLightSwitch(Options{}); err == nil {
+		t.Error("OnOffLightSwitch: constructed without a StableKey")
+	}
+	if d, err := NewOnOffLightSwitch(testOptions("OnOffLightSwitch"), testWith(t, "OnOffLightSwitch")...); err == nil {
+		if d.Type() != &OnOffLightSwitchType {
+			t.Errorf("OnOffLightSwitch: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("OnOffLightSwitch: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("OnOffLightSwitch") {
+		t.Errorf("OnOffLightSwitch: %v", err)
+	}
 	if _, err := NewOnOffPlugInUnit(Options{}); err == nil {
 		t.Error("OnOffPlugInUnit: constructed without a StableKey")
 	}
@@ -719,6 +797,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("OnOffPlugInUnit") {
 		t.Errorf("OnOffPlugInUnit: %v", err)
+	}
+	if _, err := NewOnOffSensor(Options{}); err == nil {
+		t.Error("OnOffSensor: constructed without a StableKey")
+	}
+	if d, err := NewOnOffSensor(testOptions("OnOffSensor"), testWith(t, "OnOffSensor")...); err == nil {
+		if d.Type() != &OnOffSensorType {
+			t.Errorf("OnOffSensor: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("OnOffSensor: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("OnOffSensor") {
+		t.Errorf("OnOffSensor: %v", err)
 	}
 	if _, err := NewOtaRequestor(Options{}); err == nil {
 		t.Error("OtaRequestor: constructed without a StableKey")
@@ -796,6 +887,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("Pump") {
 		t.Errorf("Pump: %v", err)
+	}
+	if _, err := NewPumpController(Options{}); err == nil {
+		t.Error("PumpController: constructed without a StableKey")
+	}
+	if d, err := NewPumpController(testOptions("PumpController"), testWith(t, "PumpController")...); err == nil {
+		if d.Type() != &PumpControllerType {
+			t.Errorf("PumpController: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("PumpController: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("PumpController") {
+		t.Errorf("PumpController: %v", err)
 	}
 	if _, err := NewRainSensor(Options{}); err == nil {
 		t.Error("RainSensor: constructed without a StableKey")
@@ -1089,6 +1193,32 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("Thermostat") {
 		t.Errorf("Thermostat: %v", err)
 	}
+	if _, err := NewThermostatController(Options{}); err == nil {
+		t.Error("ThermostatController: constructed without a StableKey")
+	}
+	if d, err := NewThermostatController(testOptions("ThermostatController"), testWith(t, "ThermostatController")...); err == nil {
+		if d.Type() != &ThermostatControllerType {
+			t.Errorf("ThermostatController: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("ThermostatController: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("ThermostatController") {
+		t.Errorf("ThermostatController: %v", err)
+	}
+	if _, err := NewVideoRemoteControl(Options{}); err == nil {
+		t.Error("VideoRemoteControl: constructed without a StableKey")
+	}
+	if d, err := NewVideoRemoteControl(testOptions("VideoRemoteControl"), testWith(t, "VideoRemoteControl")...); err == nil {
+		if d.Type() != &VideoRemoteControlType {
+			t.Errorf("VideoRemoteControl: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("VideoRemoteControl: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("VideoRemoteControl") {
+		t.Errorf("VideoRemoteControl: %v", err)
+	}
 	if _, err := NewWaterFreezeDetector(Options{}); err == nil {
 		t.Error("WaterFreezeDetector: constructed without a StableKey")
 	}
@@ -1168,5 +1298,18 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("WindowCovering") {
 		t.Errorf("WindowCovering: %v", err)
+	}
+	if _, err := NewWindowCoveringController(Options{}); err == nil {
+		t.Error("WindowCoveringController: constructed without a StableKey")
+	}
+	if d, err := NewWindowCoveringController(testOptions("WindowCoveringController"), testWith(t, "WindowCoveringController")...); err == nil {
+		if d.Type() != &WindowCoveringControllerType {
+			t.Errorf("WindowCoveringController: type %v", d.Type().Name)
+		}
+		if s := d.Binding(); d.Server(0x001E) == nil || s != nil && d.Server(0x001E) != s {
+			t.Error("WindowCoveringController: mandatory Binding not mounted")
+		}
+	} else if !refusesFixture("WindowCoveringController") {
+		t.Errorf("WindowCoveringController: %v", err)
 	}
 }
