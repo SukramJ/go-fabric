@@ -49,8 +49,10 @@ read at the pin (`0ceb202d`, 2026-10-14) measured:
 - **Device types:** BasicVideoPlayer (0x0028), CastingVideoPlayer
   (0x0023), ContentApp (0x0024), all revision 2, generated with no logic;
   the conditions `PhysicalInputs`, `ContentAppPlatform` and
-  `ObserverClient` gate MediaInput, ApplicationLauncher's AP feature and
-  the ContentAppObserver client. CastingVideoClient stays out (the
+  `ObserverClient` gate MediaInput, ApplicationLauncher and the
+  ContentAppObserver client (wave 24 measured: on CastingVideoPlayer
+  `ContentAppPlatform` gates the whole ApplicationLauncher cluster with
+  the AP feature mandatory inside it; on ContentApp AP is disallowed). CastingVideoClient stays out (the
   client role).
 - **chip's families:** about 33 server-side YAML cases (ALOGIN, APBSC,
   APPLAUNCHER, APPOBSERVER, AUDIOOUTPUT, CHANNEL, CONTENTLAUNCHER,
@@ -72,8 +74,13 @@ read at the pin (`0ceb202d`, 2026-10-14) measured:
    matter.js emits its event.
 2. **The three device types are generated** (`script/devicegen`); their
    conditions are stated by the host as the root's are.
-3. **The reference daemon** exposes a player endpoint (BasicVideoPlayer
-   with a simulated transport, channel list, inputs and outputs) and a
+3. **The reference daemon** exposes a player endpoint (a
+   CastingVideoPlayer — chip's tv-app endpoint 1 is
+   `ma_casting_videoplayer`, `tv-app.matter:4384-4385`, and the families
+   need ContentLauncher and ApplicationLauncher there, which
+   BasicVideoPlayer lists neither of; the first draft said
+   BasicVideoPlayer — with a simulated transport, channel list, inputs
+   and outputs) and a
    content-app endpoint (ContentApp with ApplicationBasic and
    AccountLogin) behind a TESTING-ONLY flag, driven by the app-pipe
    where a case needs a state change; the chip media families join the
@@ -82,7 +89,10 @@ read at the pin (`0ceb202d`, 2026-10-14) measured:
 4. **The ecosystem proof waits for phase 5** (Apple Home, Alexa with
    the owner at the device); nothing built on this is described as
    certified (ADR 0011). The parity count moves to 116 clusters and 77
-   device types, as concept v2's phase table says.
+   device types, as concept v2's phase table says (measured after wave
+   24, #111: 118 served clusters — 115 generated definitions plus the
+   three hand-written — and 79 generated device types, the OtaProvider
+   and the 11 controller types of waves 21–23 included).
 
 ## Consequences
 

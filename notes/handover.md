@@ -37,6 +37,7 @@ German, briefly. Six waves were planned against the phases:
 | 20 | ADR 0020 stage 5, part 1: the group message sender (`groups.Manager.Sender`, `channel.EncryptGroup`, the group header constraint, `udp.Listener.SendMulticast`, the persisted group data counter), the Groupcast Sender feature (FeatureMap 0x07) | AN | `wave/2026-10-14-tranche-20` (#101); docs PR `docs/wave-20-followups` | see §20 |
 | 21 | ADR 0020 stage 5, part 2: `binding.Manager`, `core.Binding.OnChange` + fabric-scoped writes, the bridge decoding Binding writes, `node.Config.Client` (the node's client stack), the 11 controller device types, `TestLiveBinding` (TC-BIND-2.1) | AO | `wave/2026-10-14-tranche-21` (#103); docs PR `docs/wave-21-followups` | see §21 |
 | 22 | ADR 0020 stage 4 close-out: `device.Lookup`, the validator input seam (`endpoint.DeviceTypeTree`), `client.Endpoint.Device()`/`Conformance()`, `core.Binding.Persist` + node persistence; owner: the doubled group-sender start/stop fixed | AP | `wave/2026-10-14-tranche-22` (#105); docs PR `docs/wave-22-followups` | see §22 |
+| 24 | concept v2 phase 9 (ADR 0022): 15 media definitions, `cluster/media` (14 servers over typed host ports, state transaction), `core.Messages`, three media device types, daemon `--media` (CastingVideoPlayer + ContentApp after chip's tv-app), 13 media families, PICS ep45/ep46, `app-media` CI group | AR | `wave/2026-10-14-tranche-24` (#111); docs PR `docs/wave-24-followups` | see §24 |
 | 25 | ADR 0020 stage 6a+6b: `controller/dcl` (DCL client, certificate store as `attestation.PAAStore`/`Revocations`, OTA version lookup; opt-in), `core.CommissionerControl` after chip + `node.Config.CommissionerControl`, daemon `--dcl`, `TestLiveCommissionerControl`; Joint Fabric (6c) deferred past v1.0.0 | AS | `wave/2026-10-14-tranche-25` (#109); docs PR `docs/wave-25-followups` | see §25 |
 | 23 | concept v2 phase 8 (ADR 0021): the BDX sender roles, `bridge.AttachBDXResponder`/`OpenSessionExchange`, `core.OTAProvider` + `node.Config.OTAProvider` (OtaProvider endpoint), DiagnosticLogs over BDX after chip, reference-bridge `--ota-provider`, in-repo proofs | AQ | `wave/2026-10-14-tranche-23` (#107); docs PR `docs/wave-23-followups` | see §23 |
 
@@ -1494,4 +1495,57 @@ tranche and docs branches and the `.claude/worktrees/wave25-dcl`
 worktree. Next: wave 24 (brief AR, media) lands on top by merge, then
 the `v1.0.0` preparation (README §API stability for `device/`, `node/`,
 `controller/`) and phase 5 with the owner at the device.
+
+## 24. Wave 24 (2026-10-14, the owner away; everything local; ran in parallel with wave 25; landed after it)
+
+Concept v2 phase 9, ADR 0022 (written by the owner after Sonnet's
+`read-phase9.md`: fourteen matter.js stubs, LowPower the one with
+logic, `spec.NewServer` refuses the fabric-scoped Messages list). Brief
+AR (`wave24/media`, head `cf6e23b`) on `planning/briefs-wave-24`
+(`061b129`). Tranche `wave/2026-10-14-tranche-24` = the branch plus the
+owner's commit, then **`git merge origin/main`** after #109 and #110
+(the clustergen list, CHANGELOG, by_design and findings unioned by
+hand; definitions, device types and the inventory regenerated). Guards
+all green at `dd21324` including `make chiptool-test`; the media
+families' update and confirming runs were the agent's (report AR §5).
+CI: one `TestSessionAndSubscriptionDiagnostics` flake, rerun.
+
+- **cluster/spec:** the fifteen definitions; `controller/client/known.go`
+  links them (`TestEveryGeneratedClusterIsKnown`).
+- **cluster/media:** fourteen servers; a port command gets `st *XState`
+  and the server commits the copy only on success (matter.js's
+  transaction); optional commands as optional interfaces
+  (`ProtocolService.ts:541-545`), `ErrNotImplemented`,
+  `ErrMissingState`; the two model list defaults applied by hand.
+- **core.Messages:** chip's `messages-server.cpp` checks and the
+  tv-app manager's lifecycle; beyond both: RESOURCE_EXHAUSTED on the
+  ninth, per-fabric cancel, host-reported presentation
+  (`BD-chip-Messages-CoreHeld`).
+- **device:** BasicVideoPlayer, CastingVideoPlayer, ContentApp
+  generated; CastingVideoClient stays excluded (`registry_test.go`'s
+  probe moved to it).
+- **daemon `--media`:** the player is a **CastingVideoPlayer**
+  (`tv-app.matter:4384-4385`; the ADR said BasicVideoPlayer — corrected
+  in the docs PR) with MediaPlayback TT/AT/AA (0x1F) and tracks so
+  MEDIAPLAYBACK-6.9 runs; ApplicationBasic on the content app as
+  `{ep:0x0024}`; one app-pipe command `MediaPlaybackState`.
+- **harness:** 13 families + IDM in the update run (IDM/10.4 needs the
+  new endpoints' golden entries), 4 h timeout; MEDIAPLAYBACK/6.8
+  excluded (class c: ActiveTextTrack `{ID:"", TrackAttributes:null}`
+  expected, the model makes TrackAttributes mandatory, not nullable);
+  the Python cases needing PICS past the pin not applicable; chip's
+  `manualTests.json` disagrees with the image on five cases — the
+  image rules, as before.
+- **Owner:** `cluster/doc.go` names `media/`; `BD-Matter-Media-HostPorts`;
+  findings: clustergen renders a cross-cluster datatype as an empty
+  struct (Channel's `ExternalIdList`, `definition_gen.go:332`) and no
+  list defaults.
+
+Cleanup after the merge: `wave24/media`, `planning/briefs-wave-24`, the
+tranche and docs branches and the `.claude/worktrees/wave24-media`
+worktree. Next: wave 26 (brief AT: the reference controller CLI,
+pairing-code decoders, a persisted controller fabric, the JSON codec),
+then `docs/manual-test-plan-0.4.0.md`, CHANGELOG `[0.4.0]` and the tag
+`v0.4.0` — the owner's decision of 2026-10-14: integrate into loom and
+test against the ecosystems before the `v1.0.0` freeze.
 
