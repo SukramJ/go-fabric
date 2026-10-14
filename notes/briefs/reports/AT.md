@@ -391,5 +391,9 @@ at QueryImage; the tool's own node for group send and OTA.
 - **Owner commit also:** `docs/manual-test-plan-0.4.0.md` (from the
   README's command list), CHANGELOG `[0.4.0]` cut, and
   `TestSessionAndSubscriptionDiagnostics` no longer parallel (two CI
-  flakes on 2026-10-14).
+  flakes on 2026-10-14).- **Owner's `make race` at bab36cf** failed in `TestReferenceControllerOTA`:
+  `env.printf` wrote stdout from the OTA provider's offer (the bridge's
+  receive goroutine) and the serving loop at once. Fixed in 42115d9
+  (`env.outMu`, `writeJSON`); the agent's race run at 5073b7f did not
+  hit it.
 
