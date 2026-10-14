@@ -15505,7 +15505,7 @@
       "identifier": "TestObserveEstablishmentUnresponsive",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/peer/observer_test.go",
-      "line": 62
+      "line": 68
     },
     {
       "package": "controller/peer",
