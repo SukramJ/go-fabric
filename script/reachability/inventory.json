@@ -17917,14 +17917,14 @@
       "identifier": "TestReferenceController",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/main_test.go",
-      "line": 297
+      "line": 323
     },
     {
       "package": "examples/reference-controller",
       "identifier": "TestReferenceControllerOTA",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/main_test.go",
-      "line": 401
+      "line": 468
     },
     {
       "package": "groups",

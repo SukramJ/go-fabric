@@ -146,6 +146,12 @@ type responder struct {
 	operational map[uint64]int
 }
 
+func (r *responder) commissionablePort() uint16 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return uint16(r.port) //nolint:gosec // a test port
+}
+
 type fakeConn struct {
 	r   *responder
 	out chan mdns.QueryResponse
@@ -173,7 +179,7 @@ func (c *fakeConn) Send(b []byte) error {
 		case strings.HasSuffix(name, "_matterc._udp.local."):
 			answers = append(answers,
 				&dns.PTR{Hdr: dns.RR_Header{Name: "_matterc._udp.local.", Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: 4500}, Ptr: inst},
-				&dns.SRV{Hdr: hdr(inst, dns.TypeSRV), Target: host, Port: uint16(c.r.port)}, //nolint:gosec // a test port
+				&dns.SRV{Hdr: hdr(inst, dns.TypeSRV), Target: host, Port: c.r.commissionablePort()}, //nolint:gosec // a test port
 				&dns.TXT{Hdr: hdr(inst, dns.TypeTXT), Txt: []string{"D=" + strconv.Itoa(int(harnessDiscriminator)), "CM=1", "VP=65521+32769", "SII=500", "SAI=300"}},
 				a)
 			if name != "_matterc._udp.local." {
@@ -220,18 +226,37 @@ func (c *fakeConn) Send(b []byte) error {
 // unicastRedirect delivers the own node's group datagrams to the harness
 // on loopback — node/groupsend_live_test.go's unicastRedirect.
 type unicastRedirect struct {
-	l   *udp.Listener
-	dst *net.UDPAddr
+	l  *udp.Listener
+	tl *tool
 }
 
 func (r *unicastRedirect) SendMulticast(_ net.IP, _ int, payload []byte) error {
-	return r.l.Send(r.dst, payload)
+	r.tl.mu.Lock()
+	dst := r.tl.groupDst
+	r.tl.mu.Unlock()
+	return r.l.Send(dst, payload)
 }
 
 // tool runs the CLI against one database with the test's seams.
 type tool struct {
 	t  *testing.T
 	db string
+	r  *responder
+
+	mu       sync.Mutex
+	groupDst *net.UDPAddr // where the own node's group datagrams go
+}
+
+// target points the responder's commissionable record and the group
+// datagrams at another harness, known under nodeID once paired.
+func (tl *tool) target(h *harness, nodeID uint64) {
+	tl.r.mu.Lock()
+	tl.r.port = h.addr.Port
+	tl.r.operational[nodeID] = h.addr.Port
+	tl.r.mu.Unlock()
+	tl.mu.Lock()
+	tl.groupDst = h.addr
+	tl.mu.Unlock()
 }
 
 func newTool(t *testing.T, h *harness) *tool {
@@ -245,7 +270,8 @@ func newTool(t *testing.T, h *harness) *tool {
 		t.Fatal(err)
 	}
 	selfHooks.advertiser = func() mdns.Advertiser { return mdns.NewNoop() }
-	selfHooks.transport = func() groups.MulticastTransport { return &unicastRedirect{l: tx, dst: h.addr} }
+	tl := &tool{t: t, db: filepath.Join(t.TempDir(), "controller.db"), r: r, groupDst: h.addr}
+	selfHooks.transport = func() groups.MulticastTransport { return &unicastRedirect{l: tx, tl: tl} }
 	selfHooks.started = func(id uint64, a *net.UDPAddr) {
 		r.mu.Lock()
 		r.operational[id] = a.Port
@@ -256,7 +282,7 @@ func newTool(t *testing.T, h *harness) *tool {
 		_ = tx.Close()
 		hooks.names, selfHooks.advertiser, selfHooks.transport, selfHooks.started = nil, nil, nil, nil
 	})
-	return &tool{t: t, db: filepath.Join(t.TempDir(), "controller.db")}
+	return tl
 }
 
 func (tl *tool) args(args ...string) []string {
@@ -384,6 +410,47 @@ func TestReferenceController(t *testing.T) {
 	if out := tl.run("nodes"); !strings.Contains(out, "no paired nodes") {
 		t.Fatalf("nodes after unpair:\n%s", out)
 	}
+
+	// §5: a node whose root does not list Groupcast gets the pre-1.5 group
+	// provisioning (GroupKeyMap, Groups AddGroup, a Group ACL entry), and
+	// a group Toggle from the own node reaches its plug.
+	legacy := startHarness(t, nil)
+	hideGroupcast(t, legacy.n)
+	tl.target(legacy, 0x4322)
+	tl.run("pair", "--code", manual, "--node-id", "0x4322")
+	out = tl.run("group", "create", "258", "--key", "random", "--nodes", "0x4322", "--endpoints", strconv.Itoa(int(legacy.plugEP)))
+	if !strings.Contains(out, "(Groups)") || !strings.Contains(out, "group 258 created") {
+		t.Fatalf("legacy group create:\n%s", out)
+	}
+	before = onOff(legacy.plug)
+	tl.run("group", "send", "258", "OnOff/Toggle")
+	waitFor(t, "the legacy group Toggle", func() bool { return onOff(legacy.plug) != before })
+}
+
+// hideGroupcast drops Groupcast from the root's Descriptor ServerList. The
+// node facade always mounts Groupcast on the root (node/root.go:209-268)
+// and node.Config has no option that leaves it out, so the existing seam
+// is the exported root Descriptor's server-list provider
+// (node.Node.Root().Descriptor, cluster/core Descriptor.SetServerListProvider):
+// the node then presents itself as one without Groupcast, which is what
+// the tool decides by. The server itself stays mounted.
+func hideGroupcast(t *testing.T, n *node.Node) {
+	t.Helper()
+	v, ok := n.Root().Descriptor.MatterRead(0x0001)
+	ids, _ := v.([]uint32)
+	if !ok || len(ids) == 0 {
+		t.Fatalf("root ServerList %v", v)
+	}
+	var kept []uint32
+	for _, id := range ids {
+		if id != clusterGroupcast {
+			kept = append(kept, id)
+		}
+	}
+	if len(kept) == len(ids) {
+		t.Fatal("the root listed no Groupcast")
+	}
+	n.Root().Descriptor.SetServerListProvider(func() []uint32 { return kept })
 }
 
 // staticOperational resolves every operational address to one socket —

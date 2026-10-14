@@ -109,7 +109,10 @@ its error on stderr.
   — writes the key set (GroupKeyManagement KeySetWrite) on each node and
   joins the group on its endpoints with Groupcast JoinGroup and the
   auxiliary ACL entry; the controller's own node gets the key set as a
-  sender-only member. The key set id defaults to the group id.
+  sender-only member. The key set id defaults to the group id. A node whose
+  root ServerList lacks Groupcast (before Matter 1.5) is provisioned the
+  pre-1.5 way instead: GroupKeyMap entry, Groups AddGroup on each endpoint
+  and a Group ACL entry granting the group Operate on them.
 
   ```sh
   reference-controller group create 257 --key random --nodes 0x4321,0x4322 --endpoints 1

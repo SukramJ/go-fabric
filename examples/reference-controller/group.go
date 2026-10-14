@@ -15,6 +15,9 @@ import (
 	"strings"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	descdef "github.com/SukramJ/go-fabric/cluster/spec/descriptor"
+	groupsdef "github.com/SukramJ/go-fabric/cluster/spec/groups"
+	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/groups"
 	"github.com/SukramJ/go-fabric/im"
@@ -151,7 +154,8 @@ func parseList[T uint16 | uint64](s string, bits int) ([]T, error) {
 
 // cmdGroupCreate provisions a group: the key set and the group's
 // membership on every node (GroupKeyManagement KeySetWrite, Groupcast
-// JoinGroup with the auxiliary ACL entry on the endpoints), and the key set
+// JoinGroup with the auxiliary ACL entry on the endpoints — or, on a node
+// whose ServerList lacks Groupcast, legacyJoin), and the key set
 // on the own node as a sender-only member — the provisioning of
 // TestLiveGroupSend (node/groupsend_live_test.go).
 func cmdGroupCreate(e *env, args []string) error {
@@ -204,10 +208,22 @@ func cmdGroupCreate(e *env, args []string) error {
 			if err := invokeOK(ctx, n, clusterGroupKeyManagement, keySetWrite(g.KeySetID, key)); err != nil {
 				return fmt.Errorf("node %d KeySetWrite: %w", id, err)
 			}
-			if err := invokeOK(ctx, n, clusterGroupcast, joinGroup(g.GroupID, g.KeySetID, g.Endpoints, true)); err != nil {
-				return fmt.Errorf("node %d JoinGroup: %w", id, err)
+			hasGroupcast, err := servesGroupcast(ctx, n)
+			if err != nil {
+				return fmt.Errorf("node %d ServerList: %w", id, err)
 			}
-			e.printf("node %d joined group %d on endpoints %v\n", id, g.GroupID, g.Endpoints)
+			how := "Groupcast"
+			if hasGroupcast {
+				if err := invokeOK(ctx, n, clusterGroupcast, joinGroup(g.GroupID, g.KeySetID, g.Endpoints, true)); err != nil {
+					return fmt.Errorf("node %d JoinGroup: %w", id, err)
+				}
+			} else {
+				how = "Groups"
+				if err := legacyJoin(ctx, n, g); err != nil {
+					return fmt.Errorf("node %d: %w", id, err)
+				}
+			}
+			e.printf("node %d joined group %d on endpoints %v (%s)\n", id, g.GroupID, g.Endpoints, how)
 		}
 		self, err := s.ensureSelf(ctx)
 		if err != nil {
@@ -282,4 +298,66 @@ func cmdGroupSend(e *env, args []string) error {
 		e.printf("sent to group %d from node %d\n", gid, sender.NodeID())
 		return nil
 	})
+}
+
+// servesGroupcast reports whether the root's Descriptor ServerList names
+// Groupcast (0x0065), the Matter 1.5 group membership cluster.
+func servesGroupcast(ctx context.Context, n *client.Node) (bool, error) {
+	path := im.ConcreteAttributePath{Endpoint: 0, Cluster: descdef.ClusterID, Attribute: descdef.AttrServerList, HasEndpoint: true, HasCluster: true, HasAttribute: true}
+	rep, err := n.Read(ctx, client.ReadRequest{ReadRequest: interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{path}}, IncludeKnownVersions: true})
+	if err != nil {
+		return false, err
+	}
+	v, ok := rep.Value(0, descdef.ClusterID, descdef.AttrServerList)
+	if !ok {
+		return false, errors.New("no ServerList")
+	}
+	for _, c := range v.Children {
+		if c.El.Uint == uint64(clusterGroupcast) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// legacyJoin provisions a node without Groupcast the way chip's
+// TestGroupMessaging.yaml does at the harness pin (src/app/tests/suites/
+// TestGroupMessaging.yaml:84-211, the IsLegacyGroupsRevision steps): after
+// the KeySetWrite (TrustFirst, :84-102) the GroupKeyMap entry group →
+// key set (:122-132), Groups AddGroup on each endpoint (:134-168), and an
+// ACL entry for the group (:188-211). The ACL entry here is narrower than
+// the YAML's "any group can manage": AuthMode Group granting the group
+// Operate on the member endpoints. Its subject is the bare group id — the
+// wire form chip stores (src/app/server/AclStorage.cpp:162-171 converts
+// the internal 0xFFFFFFFFFFFF0000|group node id to GroupIdFromNodeId) and
+// the one cluster/core's AccessControl accepts (0x0001..0xFFFF).
+func legacyJoin(ctx context.Context, n *client.Node, g groupRecord) error {
+	gid := uint64(g.GroupID)
+	if err := appendToList(ctx, n, listPath(0, clusterGroupKeyManagement),
+		structNode(tlv.AnonymousTag(), uintNode(1, gid), uintNode(2, uint64(g.KeySetID))), mapsGroup(gid)); err != nil {
+		return fmt.Errorf("GroupKeyMap: %w", err)
+	}
+	name := "group " + strconv.Itoa(int(g.GroupID))
+	targets := make([]spec.Node, 0, len(g.Endpoints))
+	for _, ep := range g.Endpoints {
+		res, err := n.Invoke(ctx, im.ConcreteCommandPath{Endpoint: ep, Cluster: groupsdef.ClusterID, Command: groupsdef.CmdAddGroup, HasEndpoint: true, HasCluster: true, HasCommand: true},
+			groupsdef.AddGroupRequest{GroupId: g.GroupID, GroupName: name}, interaction.InvokeOptions{})
+		if err != nil {
+			return fmt.Errorf("AddGroup on endpoint %d: %w", ep, err)
+		}
+		// AddGroupResponse: Status 0 (TestGroupMessaging.yaml:145-150).
+		if len(res.Fields.Children) == 0 || res.Fields.Children[0].El.Uint != 0 {
+			return fmt.Errorf("AddGroup on endpoint %d: status %s", ep, valueJSON(nil, res.Fields))
+		}
+		targets = append(targets, structNode(tlv.AnonymousTag(), nullNode(0), uintNode(1, uint64(ep)), nullNode(2)))
+	}
+	// AccessControlEntryStruct: Privilege 1 (Operate 3), AuthMode 2
+	// (Group 3), Subjects 3, Targets 4.
+	entry := structNode(tlv.AnonymousTag(), uintNode(1, 3), uintNode(2, 3),
+		arrayNode(tlv.ContextTag(3), spec.Node{El: tlv.Element{Tag: tlv.AnonymousTag(), Type: tlv.TypeUnsignedInt8, Uint: gid}}),
+		arrayNode(tlv.ContextTag(4), targets...))
+	if err := appendToList(ctx, n, listPath(0, clusterAccessControl), entry, nil); err != nil {
+		return fmt.Errorf("ACL: %w", err)
+	}
+	return nil
 }
