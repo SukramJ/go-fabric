@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4904,
+  "entry_points": 4905,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11201,
+    "total_exported": 11202,
     "reachable": 7843,
-    "whitelisted": 3353,
+    "whitelisted": 3354,
     "unreachable": 5
   },
   "by_package": [
@@ -17179,6 +17179,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_node_test.go",
       "line": 63
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestOTAProviderFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/ota_provider_test.go",
+      "line": 24
     },
     {
       "package": "examples/reference-bridge",
