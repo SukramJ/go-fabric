@@ -152,6 +152,17 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   the values from the kernel (nl80211, or `iw`) behind its own
   `mattercore.WiFiReporter` and hands it to `node.Network.WiFi`.
 
+- `--ota-provider` (TESTING ONLY) serves one embedded test OTA image
+  (`ota_provider.go`) through the node's OTA Software Update Provider
+  (ADR 0021): an OtaProvider endpoint beside the Aggregator, the image —
+  software version 2 of the test vendor/product, 4 KiB of pattern bytes in
+  the OTA image format — over BDX to a requestor that asks with version 1.
+  The user's consent is granted and an allowed apply proceeds at once; the
+  app pipe's `{"Name": "OtaProviderConsent", "Action": "withhold"}` makes
+  the image need a consent the provider denies, `"grant"` restores it. A
+  product's provider serves the images its vendor signed behind its own
+  `mattercore.OTAImageSource`.
+
 Each applied command is logged as `apppipe.applied`. None of these flags
 belongs in a real deployment.
 

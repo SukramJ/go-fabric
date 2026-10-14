@@ -76,6 +76,9 @@ func TestDiagLogs_InvokeRetrieveLogsRequest(t *testing.T) {
 	if len(r.LogContent) != 0 {
 		t.Fatalf("LogContent len=%d, want 0", len(r.LogContent))
 	}
+	if utc, boot := r.HasTimestamps(); utc || boot {
+		t.Fatal("NoLogs carries no timestamps (DiagnosticLogsCluster.cpp:44-49)")
+	}
 }
 
 func TestDiagLogs_InvokeUnknownCmdReturnsError(t *testing.T) {
@@ -144,37 +147,47 @@ func TestDiagLogs_AttachProvider_SuccessSmallPayload(t *testing.T) {
 	}
 }
 
-func TestDiagLogs_AttachProvider_ExhaustedLargePayload(t *testing.T) {
+// TestDiagLogs_AttachProvider_LargePayloadNewestBytes: the response
+// payload protocol answers Success with the newest 1024 bytes — chip's
+// GetLogForIntent fills a kMaxLogContentSize buffer with "the newest
+// diagnostic log entries" (DiagnosticLogsProviderDelegate.h:112-113,
+// DiagnosticLogsCluster.cpp:76-95 at the harness pin). Before ADR 0021 the
+// server answered Exhausted with the first 1024 bytes.
+func TestDiagLogs_AttachProvider_LargePayloadNewestBytes(t *testing.T) {
 	t.Parallel()
 	d := core.NewDiagnosticLogs()
-	// Payload larger than MatterDiagnosticLogsInlineCap (1024).
-	big := bytes.Repeat([]byte("X"), core.MatterDiagnosticLogsInlineCap+1)
+	big := append(bytes.Repeat([]byte("X"), core.MatterDiagnosticLogsInlineCap), []byte("newest")...)
 	d.AttachProvider(&fakeLogProvider{payload: big})
 	resp, err := d.MatterInvoke(context.Background(), 0x00, nil)
 	if err != nil {
-		t.Fatalf("MatterInvoke exhausted: %v", err)
+		t.Fatalf("MatterInvoke: %v", err)
 	}
 	r := resp.(core.RetrieveLogsResponse)
-	if r.Status != core.LogStatusExhausted {
-		t.Fatalf("Status = %d, want LogStatusExhausted", r.Status)
+	if r.Status != core.LogStatusSuccess {
+		t.Fatalf("Status = %d, want LogStatusSuccess", r.Status)
 	}
-	if len(r.LogContent) != core.MatterDiagnosticLogsInlineCap {
-		t.Fatalf("LogContent len = %d, want %d", len(r.LogContent), core.MatterDiagnosticLogsInlineCap)
+	if len(r.LogContent) != core.MatterDiagnosticLogsInlineCap || !bytes.HasSuffix(r.LogContent, []byte("newest")) {
+		t.Fatalf("LogContent len = %d, want the newest %d bytes", len(r.LogContent), core.MatterDiagnosticLogsInlineCap)
 	}
 }
 
+// TestDiagLogs_AttachProvider_ProviderError: a failing provider is Denied
+// (DiagnosticLogsCluster.cpp:93 at the harness pin); before ADR 0021 the
+// server answered Busy.
 func TestDiagLogs_AttachProvider_ProviderError(t *testing.T) {
 	t.Parallel()
 	d := core.NewDiagnosticLogs()
 	d.AttachProvider(&fakeLogProvider{err: errors.New("transient I/O failure")})
 	resp, err := d.MatterInvoke(context.Background(), 0x00, nil)
 	if err != nil {
-		// Provider errors must NOT surface as IM errors per §11.11.6.1.
 		t.Fatalf("MatterInvoke must not return IM error on provider failure: %v", err)
 	}
 	r := resp.(core.RetrieveLogsResponse)
-	if r.Status != core.LogStatusBusy {
-		t.Fatalf("Status = %d, want LogStatusBusy (transient provider failure)", r.Status)
+	if r.Status != core.LogStatusDenied {
+		t.Fatalf("Status = %d, want LogStatusDenied", r.Status)
+	}
+	if utc, boot := r.HasTimestamps(); utc || boot {
+		t.Fatal("a failure carries no timestamps (DiagnosticLogsCluster.cpp:44-49)")
 	}
 }
 
@@ -195,6 +208,7 @@ func TestDiagLogs_AttachProvider_EmptyPayloadIsNoLogs(t *testing.T) {
 func TestDiagLogs_SetBootEpoch(t *testing.T) {
 	t.Parallel()
 	d := core.NewDiagnosticLogs()
+	d.AttachProvider(&fakeLogProvider{payload: []byte("x")})
 	past := time.Now().Add(-5 * time.Second)
 	d.SetBootEpoch(past)
 	resp, err := d.MatterInvoke(context.Background(), 0x00, nil)
@@ -310,6 +324,7 @@ func TestDiagLogs_MatterAttributesIsEmpty(t *testing.T) {
 func TestDiagLogs_UTCTimeStampIsMatterEpochMicros(t *testing.T) {
 	t.Parallel()
 	d := core.NewDiagnosticLogs()
+	d.AttachProvider(&fakeLogProvider{payload: []byte("x")})
 	before := time.Now()
 	resp, err := d.MatterInvoke(context.Background(), 0x00, nil)
 	if err != nil {

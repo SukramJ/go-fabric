@@ -194,9 +194,19 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 		spec.ConfigurationVersion = max(spec.ConfigurationVersion, a.n.persisted.configVersion(ctx, spec.StableKey))
 		specs = append(specs, spec)
 	}
-	return a.n.assembler.Assemble(ctx, []endpoint.Snapshot{{
+	// The OTA provider's endpoint is numbered in the same scope and placed
+	// under the root (ota_provider.go).
+	if a.n.otaProvider != nil {
+		specs = append(specs, otaProviderEndpoint{a.n.otaProvider}.spec())
+	}
+	topo, err := a.n.assembler.Assemble(ctx, []endpoint.Snapshot{{
 		Scope:         Scope,
 		Endpoints:     specs,
 		ModelComplete: complete,
 	}})
+	if err != nil {
+		return nil, err
+	}
+	placeOTAProvider(topo)
+	return topo, nil
 }

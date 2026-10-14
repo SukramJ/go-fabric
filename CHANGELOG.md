@@ -221,6 +221,43 @@ pseudo-version of `main`.
   `Manager.HandlePeerLoss` takes (the registry's `startUp` reaction keeps
   the sessions created at or after the newest one).
 
+- The OTA Software Update Provider (ADR 0021; matter.js `OtaSoftwareUpdateProviderServer.ts`
+  at `0ceb202d`): `core.OTAProvider` answers QueryImage (NotAvailable; Busy for two minutes
+  while a transfer runs, five when BDX cannot be enabled; a rebooted requestor's old transfer
+  cancelled; an entry stale after 15 minutes; the 32-byte update token; the consent asked
+  through `core.OTAConsent`, Obtaining retried after 120 s; BDX synchronous offered as
+  `bdx://<node id>/ota/<file>`, HTTPS, DownloadProtocolNotSupported), ApplyUpdateRequest
+  (Discontinue without consent; Proceed with the DelayedActionTime rounded up and capped at a
+  day; `core.OTAApplyPolicy`) and NotifyUpdateApplied. The images come from the host's
+  `core.OTAImageSource`; `OTAProviderConfig.OnStatusChange` observes each requestor's update.
+- `node.Config.OTAProvider` (`node.OTAProviderConfig{ImageSource, Consent, ApplyPolicy, …}`)
+  mounts the provider on an endpoint of device type OtaProvider (0x0014) beside the
+  Aggregator — in the root's PartsList, not the Aggregator's — attaches a BDX responder, and
+  adds an Operate/CASE ACL entry for the provider cluster on the node's first fabric, as
+  matter.js does. `Node.OTAProvider()` returns it. `device.OtaProviderType` /
+  `device.NewOtaProvider` are generated (`script/devicegen` takes OtaProvider in).
+- `bdx` gains the sender roles and the responder (matter.js `OutboundFlow`,
+  `DrivenSendingFlow`, `FollowingReceivingFlow`, `BdxSession.fromMessage`, `BdxProtocol`):
+  `bdx.Send` / `bdx.StartSend` / `Transfer.Run` (initiator and sender), `bdx.Serve`
+  (responder to a SendInit or ReceiveInit), `bdx.Responder` (peers enabled per storage scope,
+  `ServerSession` with progress, finished, cancelled and closed observers), `bdx.Blob`,
+  `bdx.Storage`, `bdx.SinkStorage`, `bdx.Peer`, `bdx.DefaultMaxTransferSize`.
+- `bridge.Bridge.AttachBDXResponder` routes the BDX exchanges a peer opens on a secure session
+  to the responder (without one they are refused as before); `Bridge.OpenSessionExchange`
+  opens an exchange on the session a command arrived on.
+- DiagnosticLogs over BDX, as chip's `diagnostic-logs-server` at the harness pin:
+  `RetrieveLogsRequest` with the BDX protocol starts a BDX transfer this node initiates on the
+  requesting session (SendInit with sender drive and 1024-byte blocks, Success with the
+  collection's timestamps once the receiver accepted, the blocks after the response), Busy
+  while one runs, Exhausted with the content when the logs fit the response, InvalidCommand
+  without a designator. `core.LogCollector` / `core.LogSession` are chip's delegate
+  (`GetSizeForIntent`, `GetLogForIntent`, `StartLogCollection`, `CollectLog`,
+  `EndLogCollection`), attached with `DiagnosticLogs.AttachCollector`; `AttachExchangeOpener`
+  takes the exchanges (the node attaches its bridge).
+- `examples/reference-bridge --ota-provider` (TESTING ONLY): one embedded test image served
+  from the provider endpoint; the app pipe's `OtaProviderConsent` withholds and grants the
+  consent.
+
 ### Fixed
 
 - The node facade's PASE and CASE responders advertise the TCP roles of
@@ -736,6 +773,11 @@ pseudo-version of `main`.
   advertised as 3 600 000 ms, SAT above 65 535 ms as 65 535, each cap
   logged as `matter.mdns.interval_capped`, on the operational and the
   commissionable record; zero still means the default.
+
+- DiagnosticLogs follows chip's statuses (ADR 0021): a failing log provider is answered Denied
+  (was Busy); the response payload protocol answers Success with the newest 1024 bytes of a
+  larger log (was Exhausted with the first 1024); a failure — NoLogs, Denied, Busy — carries
+  no timestamps, a success the collector's (`RetrieveLogsResponse.HasTimestamps`).
 
 ### Fixed
 
