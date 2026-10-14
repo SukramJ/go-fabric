@@ -517,7 +517,7 @@ Entscheidung steht, und was es kosten würde, ihn später hereinzuholen.
 | Bluetooth / BTP | Löst ein Problem, das eine LAN-Bridge nicht hat: Netzwerk-Credentials auf ein Gerät ohne Netz bringen. Zieht BlueZ/CoreBluetooth in ein Modul, dessen einzige OS-Abhängigkeit ein UDP-Socket ist. | Non-goal 2 | Plattform-Radio-Stack als eigenes Modul; `commissioning/` um BTP-Framing erweitern. |
 | Thread, Thread-Border-Router-Client, Thread-Netzwerk-Diagnose | Der Host hängt an Ethernet oder Wi-Fi; NetworkCommissioning meldet Ethernet. | Non-goal, `docs/matterjs-comparison.md` §2 | Setzt Thread-Hardware oder einen Border-Router voraus. |
 | Wi-Fi-Commissioning (NetworkCommissioning Feature WI) | Ohne BLE gibt es keinen Weg, Credentials vor dem Netzbeitritt zu übergeben. | Wizard, Runde 1 | Folgt BLE. |
-| Groupcast-Sender-Feature, Gruppen-Senden | Senden ist Initiator-Verhalten. | `BD-Matter-GroupcastNoSender` | Folgt dem Minimal-Controller. |
+| Groupcast-Sender-Feature, Gruppen-Senden | Senden ist Initiator-Verhalten. | — (seit Welle 20 gebaut, #101; ADR 0020 Stufe 5) | Erledigt. |
 | TCP für Kamera-Streams | TCP kommt (Phase 3) als Large-Payload-Pfad und als BDX-Träger für den OTA-Requestor (ADR 0019). Streaming-Nutzlasten brauchen die Kamera-Cluster aus F.2. | Wizard, Runde 1 | Mit F.2 Kamera. |
 
 ### F.2 Cluster-Familien (32 Cluster)
