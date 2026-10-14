@@ -275,7 +275,7 @@ Gerätetyp; `NetworkCommissioning` bleibt Ethernet-only. Eine halbe Welle.
 | 7 | Commissioner Stufen 1–5 (B.1), sechs bis acht Wellen; Stufe 6 (Joint Fabric, DCL) als eigene Welle am Ende | 0020 | Harness kommissioniert mit dem eigenen Commissioner; BIND grün; 74 Gerätetypen |
 | 8 | OTA-Provider und DLOG über BDX (B.2) | 0021 (ergänzt 0019) | SU-Provider-Fälle und DLOG-Transfer gegen den eigenen Requestor/Commissioner |
 | 9 | Media/Content (B.3) | 0022 | 116 Cluster, 77 Gerätetypen; Media-Familien |
-| 10 | Wi-Fi-Diagnose, SecondaryNetworkInterface (B.4) | — | DGWIFI grün |
+| 10 | Wi-Fi-Diagnose, SecondaryNetworkInterface (B.4) | — | DGWIFI grün  **Erledigt in Welle 19 (2026-10-14; Brief AM, #99): DGWIFI 2.1 und 2.3 grün mit dem simulierten Reporter des Referenz-Daemons, `BD-Matter-WiFiHost-NetworkCommissioningEthernet`.** |
 | `v1.0.0` | nach 7–9; friert `device/`, `node/` und `controller/` | — | README §API stability |
 
 Querschnitt wie in v1: `make chipdm-check`, Parity-Guards, Ratchets,

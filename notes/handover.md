@@ -33,6 +33,7 @@ German, briefly. Six waves were planned against the phases:
 | 16 | ADR 0020 stage-2 close-out: `bridge/bridgetest.Commissioner` runs on `controller/` (surface kept); `interaction.Report.SubscriptionID` / `Session` | AJ | `wave/2026-10-13-tranche-16` (#93); docs PR `docs/wave-16-followups` | see §16 |
 | 17 | ADR 0020 stage 4, first half: `controller/client` (the client node image, cache and store, shape analysis, default subscription, connection state, physical properties); `peer.Peer.Observe`; `interaction.SubscribeRequest.RefreshRequest`; `spec.DecodeValue`; `schema.ClusterHasChangesOmittedAttribute` | AK | `wave/2026-10-14-tranche-17` (#95); docs PR `docs/wave-17-followups` | see §17 |
 | 18 | ADR 0020 stage 4, second half: `client.Registry` (`peerN` ids, restore, record and address book with the 15 min TTL / 1 min cull, `ForDevice`/`ForAddress`, commission/decommission with the fabric-operation guard, leave/shutDown/startUp, fabric-label reconciliation), `controller/client/sqlstore`, `exchange.Session.CreatedAt` | AL | `wave/2026-10-14-tranche-18` (#97); docs PR `docs/wave-18-followups` | see §18 |
+| 19 | concept v2 phase 10: WiFiNetworkDiagnostics server with `core.WiFiReporter`, SecondaryNetworkInterface, `node.Network.WiFi` + conditions, reference-bridge `--wifi`, DGWIFI family | AM | `wave/2026-10-14-tranche-19` (#99); docs PR `docs/wave-19-followups` | see §19 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -1191,3 +1192,45 @@ branches and the `.claude/worktrees/wave18-registry` worktree. Next:
 stage 5 (binding client, Groupcast sender, controller device types)
 after a first read; wave 19 (brief AM, Wi-Fi diagnostics) lands first
 or second depending on its guards.
+
+## 19. Wave 19 (2026-10-14, the owner away; everything local; ran in parallel with wave 18 on a second Opus)
+
+Concept v2 phase 10, §B.4. Brief AM (`wave19/wifi`, head `e3d8bb3`) on
+`planning/briefs-wave-19` (`8b5b24f`), written after a Sonnet first read;
+matter.js has only the empty generated server, chip's
+`WiFiNetworkDiagnosticsCluster.cpp` is the behaviour reference. Tranche
+`wave/2026-10-14-tranche-19` = tranche 18 plus the wave-19 commits
+cherry-picked (clean) plus the owner's commit; opened after #97 merged.
+
+- **Server:** `core.NewWiFiNetworkDiagnostics` over `core.WiFiReporter`
+  (every method `ok=false` → null, chip's convention), features
+  PKTCNT/ERRCNT gate the counters, `ResetCounts` accepted with ERRCNT,
+  events `OnDisconnectionDetected`/`OnAssociationFailureDetected`/
+  `OnConnectionStatusChanged` (chip's names). Generated definition and
+  the SecondaryNetworkInterface device type through the generators.
+- **node:** `Network.WiFi` mounts the cluster on the root; the root
+  states `WiFi` and (owner) `Ethernet`.
+- **reference-bridge `--wifi`:** simulated link; app-pipe and
+  test-event triggers step counters and raise events. Every harness
+  daemon starts with `--wifi` (no per-family daemon setting), so cluster
+  0x0036 sits on ep0 for every family.
+- **DGWIFI:** table, workflow `core` group, PICS (`ep0.txt` DGWIFI block
+  hand-written in `gen_pics.py`'s shape; `reference-bridge.pics` only
+  `DGWIFI.C=0` and the event codes), golden counts predicted (2.1: 7 run
+  / 7 skip; 2.3: 1 / 7; 2.2 manual; 3.2.Simulated n/a) — CI's
+  certification job confirms them.
+- **Owner:** Ethernet condition; `BD-Matter-WiFiHost-NetworkCommissioningEthernet`;
+  the workflow change outside the brief accepted. The disk filled under
+  two parallel agents (Go build cache 67 GB); trimmed.
+
+Guards on the tranche: `make ci`, `make race`, `make reachability-check`,
+`make chipdm-check`, `make chiptool-test`, the narrowed DGWIFI family —
+all green at `ac16d20`: chip-tool 313 pass / 0 fail / 1 skip, DGWIFI 2.1 and
+2.3 pass (2.3: 1 run / 7 skipped), 2.2 manual, 3.2.Simulated n/a. PR #99 (auto-merge).
+
+**Docs PR `docs/wave-19-followups`:** concept v2 phase-10 row done, this
+section. Then delete `wave19/wifi`, `planning/briefs-wave-19`, the
+tranche and docs branches and the `.claude/worktrees/wave19-wifi`
+worktree. Next: ADR 0020 stage 5 (binding client, Groupcast sender,
+controller device types) after a Sonnet first read; a second parallel
+wave needs an independent area (phase 8 needs ADR 0021 first).
