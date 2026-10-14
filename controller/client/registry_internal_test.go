@@ -138,12 +138,6 @@ func commissionedRecord(nodeID uint64) Record {
 	}
 }
 
-func (n *Node) isStarted() bool {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-	return n.started
-}
-
 func ids(nodes []*Node) []string {
 	out := make([]string, 0, len(nodes))
 	for _, n := range nodes {
