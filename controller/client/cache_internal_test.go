@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -282,9 +283,16 @@ func TestMemoryStore(t *testing.T) {
 	if len(eps) != 2 || len(eps[1].Clusters) != 1 {
 		t.Fatalf("after the erases %+v", eps)
 	}
+	_ = st.Save("m", 0, 6, map[uint32][]byte{0: b}, nil)
+	if ids, err := st.NodeIDs(); err != nil || !slices.Equal(ids, []string{"m", "n"}) {
+		t.Fatalf("NodeIDs %v %v", ids, err)
+	}
 	_ = st.EraseNode("n")
 	if eps, _ := st.Load("n"); len(eps) != 0 {
 		t.Fatal("EraseNode left endpoints")
+	}
+	if ids, _ := st.NodeIDs(); !slices.Equal(ids, []string{"m"}) {
+		t.Fatalf("NodeIDs after EraseNode %v", ids)
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/controller/peer"
 )
 
 // Node is the image of one remote node — matter.js ClientNode
@@ -31,6 +32,7 @@ type Node struct {
 
 	mu        sync.RWMutex
 	settings  settings
+	record    Record
 	started   bool
 	connState ConnectionState
 	// props are the physical properties, nil until computed after a change;
@@ -46,8 +48,12 @@ type Node struct {
 	// likelyOffline is the latch of :393-398.
 	likelyOffline bool
 	seeded        bool
-	stopObserve   func()
-	warned        map[[2]uint64]bool
+	// labelReconciled is NetworkClient's fabricLabelReconciled latch
+	// (NetworkClient.ts:268-273): set by the first SubscriptionAlive after
+	// Start, cleared by Stop.
+	labelReconciled bool
+	stopObserve     func()
+	warned          map[[2]uint64]bool
 	// requestObserver is a test seam: it sees each subscription request the
 	// node hands to the interaction.
 	requestObserver func(interaction.SubscribeRequest)
@@ -61,6 +67,12 @@ func New(cfg Config) (*Node, error) {
 	if cfg.Interaction == nil {
 		return nil, fmt.Errorf("%w: no Interaction", ErrConfig)
 	}
+	return newNode(cfg)
+}
+
+// newNode is New without the Interaction check: a [Registry] builds an
+// uncommissioned node unbound and binds it when it is commissioned.
+func newNode(cfg Config) (*Node, error) {
 	n := &Node{cfg: cfg, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand, store: cfg.Store, connState: Disconnected, newlyCommissioned: cfg.NewlyCommissioned, warned: map[[2]uint64]bool{}}
 	if n.log == nil {
 		n.log = slog.New(slog.DiscardHandler)
@@ -80,18 +92,23 @@ func New(cfg Config) (*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
 	}
-	for _, ep := range stored {
+	for i, ep := range stored {
 		if ep.Number != 0 {
 			continue
 		}
 		for _, c := range ep.Clusters {
-			if c.ID != settingsCluster {
-				continue
+			switch c.ID {
+			case settingsCluster:
+				n.settings, err = decodeSettings(c.Values)
+			case recordCluster:
+				n.record, err = decodeRecord(c.Values)
 			}
-			if n.settings, err = decodeSettings(c.Values); err != nil {
+			if err != nil {
 				return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
 			}
 		}
+		// The record is no cluster of the image.
+		stored[i].Clusters = slices.DeleteFunc(slices.Clone(ep.Clusters), func(c StoredCluster) bool { return c.ID == recordCluster })
 	}
 	n.s = newStructure(&n.mu, n.log, n.persist)
 	if err := n.s.loadCache(stored); err != nil {
@@ -274,6 +291,7 @@ func (n *Node) Start(ctx context.Context) error {
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	n.started = false
+	n.labelReconciled = false
 	sub, stop := n.sub, n.stopObserve
 	n.sub, n.stopObserve = nil, nil
 	if !n.frozen {
@@ -354,6 +372,7 @@ func (n *Node) Erase(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.settings = settings{}
+	n.record = Record{}
 	for _, ep := range n.s.endpoints {
 		for _, c := range ep.clusters {
 			c.cache.discard()
@@ -378,3 +397,30 @@ func (n *Node) ConnectionState() ConnectionState {
 
 // ID is the node's local id.
 func (n *Node) ID() string { return n.cfg.ID }
+
+// bind sets the node's peer and interaction — a [Registry] binds a node
+// it created unbound once the node is commissioned
+// (CommissioningClient.ts:637-641, #bindPeer :685-714).
+func (n *Node) bind(p *peer.Peer, ia *interaction.Interaction) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.cfg.Peer, n.cfg.Interaction = p, ia
+}
+
+// interaction is the node's interaction; [ErrNotCommissioned] while the
+// node is unbound.
+func (n *Node) interaction() (*interaction.Interaction, error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	if n.cfg.Interaction == nil {
+		return nil, ErrNotCommissioned
+	}
+	return n.cfg.Interaction, nil
+}
+
+// peer is the node's peer, nil while it has none.
+func (n *Node) peer() *peer.Peer {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.cfg.Peer
+}

@@ -135,7 +135,11 @@ func (n *Node) bootstrapRead(ctx context.Context, req interaction.SubscribeReque
 		DataVersionFilters: n.s.injectVersionFilters(sc, false),
 	}
 	n.mu.RUnlock()
-	rep, err := n.cfg.Interaction.ReadWith(ctx, r)
+	ia, err := n.interaction()
+	if err != nil {
+		return err
+	}
+	rep, err := ia.ReadWith(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -156,7 +160,7 @@ func (n *Node) SubscriptionActive() bool {
 // unresponsive establishment sets the likely-offline latch (:244-247), a
 // new session clears it (:254-257), each recomputes the connection state.
 func (n *Node) observePeer() func() {
-	p := n.cfg.Peer
+	p := n.peer()
 	if p == nil {
 		return nil
 	}

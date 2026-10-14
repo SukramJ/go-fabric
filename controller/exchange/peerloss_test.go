@@ -103,7 +103,10 @@ func TestManagerHandlePeerLossAsOf(t *testing.T) {
 	if got := m.SessionsFor(PeerAddress{FabricIndex: 1, NodeID: 0x2222}); len(got) != 2 || got[0] != old || got[1] != fresh {
 		t.Fatalf("SessionsFor = %v", got)
 	}
-	m.HandlePeerLoss(PeerAddress{FabricIndex: 1, NodeID: 0x2222}, errors.New("x"), asOf)
+	if !fresh.CreatedAt().Equal(asOf) || !old.CreatedAt().Before(asOf) {
+		t.Fatalf("CreatedAt: old %v fresh %v asOf %v", old.CreatedAt(), fresh.CreatedAt(), asOf)
+	}
+	m.HandlePeerLoss(PeerAddress{FabricIndex: 1, NodeID: 0x2222}, errors.New("x"), fresh.CreatedAt())
 	if !old.IsPeerLost() || fresh.IsPeerLost() || other.IsPeerLost() {
 		t.Fatalf("lost: old %v fresh %v other %v", old.IsPeerLost(), fresh.IsPeerLost(), other.IsPeerLost())
 	}
