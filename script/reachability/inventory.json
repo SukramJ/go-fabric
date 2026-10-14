@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4894,
+  "entry_points": 4899,
   "entry_packages": [
     ".",
     "bdx",
@@ -187,9 +187,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11226,
-    "reachable": 7865,
-    "whitelisted": 3356,
+    "total_exported": 11237,
+    "reachable": 7871,
+    "whitelisted": 3361,
     "unreachable": 5
   },
   "by_package": [
@@ -14250,6 +14250,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestConformanceStatusString",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/conformance_internal_test.go",
+      "line": 267
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestCullCommissioned",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/addresses_internal_test.go",
@@ -14261,6 +14268,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/addresses_internal_test.go",
       "line": 46
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestEndpointConformance",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/conformance_internal_test.go",
+      "line": 121
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestEndpointConformanceUnknown",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/conformance_internal_test.go",
+      "line": 188
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestEndpointDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/conformance_internal_test.go",
+      "line": 95
     },
     {
       "package": "controller/client",
@@ -14303,6 +14331,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
       "line": 301
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestNodeConditionsOfTheImage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/conformance_internal_test.go",
+      "line": 241
     },
     {
       "package": "controller/client",
