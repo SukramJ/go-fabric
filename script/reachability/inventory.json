@@ -14963,7 +14963,7 @@
       "identifier": "TestExchangePeerLossClosesThePeersSessions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/peerloss_test.go",
-      "line": 120
+      "line": 123
     },
     {
       "package": "controller/exchange",

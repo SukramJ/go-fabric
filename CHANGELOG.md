@@ -89,6 +89,12 @@ pseudo-version of `main`.
   interface is unreleased, so no deprecation window applies; a host
   `Store` adds the method.
 
+- `controller/exchange.Session.CreatedAt()`: when the session was
+  established — matter.js `Session.createdAt`, the cutoff
+  `SessionManager.#handlePeerLoss` compares and the `asOf` a
+  `Manager.HandlePeerLoss` takes (the registry's `startUp` reaction keeps
+  the sessions created at or after the newest one).
+
 ### Fixed
 
 - The node facade's PASE and CASE responders advertise the TCP roles of
