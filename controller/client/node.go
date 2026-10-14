@@ -15,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/controller/peer"
 )
 
 // Node is the image of one remote node — matter.js ClientNode
@@ -62,6 +63,12 @@ func New(cfg Config) (*Node, error) {
 	if cfg.Interaction == nil {
 		return nil, fmt.Errorf("%w: no Interaction", ErrConfig)
 	}
+	return newNode(cfg)
+}
+
+// newNode is New without the Interaction check: a [Registry] builds an
+// uncommissioned node unbound and binds it when it is commissioned.
+func newNode(cfg Config) (*Node, error) {
 	n := &Node{cfg: cfg, log: cfg.Logger, clock: cfg.Clock, rand: cfg.Rand, store: cfg.Store, connState: Disconnected, newlyCommissioned: cfg.NewlyCommissioned, warned: map[[2]uint64]bool{}}
 	if n.log == nil {
 		n.log = slog.New(slog.DiscardHandler)
@@ -385,3 +392,30 @@ func (n *Node) ConnectionState() ConnectionState {
 
 // ID is the node's local id.
 func (n *Node) ID() string { return n.cfg.ID }
+
+// bind sets the node's peer and interaction — a [Registry] binds a node
+// it created unbound once the node is commissioned
+// (CommissioningClient.ts:637-641, #bindPeer :685-714).
+func (n *Node) bind(p *peer.Peer, ia *interaction.Interaction) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.cfg.Peer, n.cfg.Interaction = p, ia
+}
+
+// interaction is the node's interaction; [ErrNotCommissioned] while the
+// node is unbound.
+func (n *Node) interaction() (*interaction.Interaction, error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	if n.cfg.Interaction == nil {
+		return nil, ErrNotCommissioned
+	}
+	return n.cfg.Interaction, nil
+}
+
+// peer is the node's peer, nil while it has none.
+func (n *Node) peer() *peer.Peer {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.cfg.Peer
+}
