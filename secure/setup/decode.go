@@ -430,6 +430,12 @@ func DecodeManualCode(s string) (ManualPayload, error) {
 	if err := assertValidPayloadIdentity(vid, pid); err != nil {
 		return ManualPayload{}, err
 	}
+	// Five decimal digits reach 99999; the identity check above already
+	// bounds both to 16 bits — restated here so the narrowing is
+	// visibly guarded.
+	if vid > 0xFFFF || pid > 0xFFFF {
+		return ManualPayload{}, invalid("Invalid vendor/product ID %d/%d in onboarding payload", vid, pid)
+	}
 	mp.VendorID, mp.ProductID = uint16(vid), uint16(pid)
 	return mp, nil
 }
