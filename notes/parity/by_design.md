@@ -2604,6 +2604,41 @@ to implement for every backend.
 
 ---
 
+### BD-Matter-ClientRegistry-RestoreSkipsFailedNode — a node that fails to restore is skipped, not kept unavailable
+
+matter.js's `Peers.initialize` creates every stored node and adds it;
+one whose construction fails stays in the container as unavailable, its
+error logged (`Peers.ts:134-151` at `0ceb202d`). `client.NewRegistry`
+logs the failure with the node's id and does not add the node; its
+stored data stays for the next start. Report AL.
+
+By design. A Go node has no "crashed" lifecycle state to hold; a host
+sees the id in the log and the data in the store.
+
+### BD-Matter-ClientRegistry-ReactionsInBackground — the BasicInformation reactions and the label reconciliation run as registry work
+
+matter.js runs `#onLeave` as a mutex task and `#onShutdown`/`#onStartUp`
+as async event handlers (`Peers.ts:790`, `:837`, `:864` at `0ceb202d`),
+and `#reconcileFabricLabel` from the `subscriptionAlive` reactor
+(`NetworkClient.ts:56`). The Go registry runs each as background work
+it starts from the node's `Event`/`SubscriptionAlive` hook and that
+`Close` cancels and waits for: a leave that deletes the node must not
+run on the goroutine of the subscription that delivered it. Report AL.
+
+By design. The same order of effects; the hook returns at once.
+
+### BD-Matter-ClientRegistry-CommissionAddressesOverride — the commissioner's address option overrides the record's addresses
+
+matter.js's `commission` takes the addresses from the node's record only
+(`CommissioningClient.ts:220-223` at `0ceb202d`). `Registry.Commission`
+uses `CommissionOptions.Addresses` when given and the record's otherwise,
+so a host that knows the address can commission without a prior
+`ForDevice`. Report AL.
+
+By design. An extension of the surface; the record's path is matter.js's.
+
+---
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

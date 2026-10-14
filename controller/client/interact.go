@@ -35,7 +35,11 @@ func (n *Node) Read(ctx context.Context, req ReadRequest) (*interaction.Report, 
 		r.DataVersionFilters = append(slices.Clone(r.DataVersionFilters), n.s.injectVersionFilters(sc, true)...)
 	}
 	n.mu.RUnlock()
-	rep, err := n.cfg.Interaction.ReadWith(ctx, r)
+	ia, err := n.interaction()
+	if err != nil {
+		return nil, err
+	}
+	rep, err := ia.ReadWith(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -72,8 +76,12 @@ func (n *Node) Subscribe(ctx context.Context, req interaction.SubscribeRequest) 
 		n.observeRequest(x)
 		return x
 	}
+	ia, err := n.interaction()
+	if err != nil {
+		return nil, err
+	}
 	n.observeRequest(r)
-	return n.cfg.Interaction.Subscribe(ctx, r)
+	return ia.Subscribe(ctx, r)
 }
 
 // observeRequest hands a subscription request to the test seam.
@@ -86,16 +94,27 @@ func (n *Node) observeRequest(r interaction.SubscribeRequest) {
 	}
 }
 
+// Read, Subscribe, Write and Invoke fail with [ErrNotCommissioned] on a
+// node a [Registry] holds before it is commissioned: it has no peer yet.
+
 // Write writes to the peer — ClientNodeInteraction.write
 // (ClientNodeInteraction.ts:175-186). The image changes when the peer
 // reports the new value, not through the write (matter.js's RemoteWriter
 // sets the cache and compensates a refusal).
 func (n *Node) Write(ctx context.Context, writes []interaction.WriteRequest, opts interaction.WriteOptions) (interaction.WriteStatuses, error) {
-	return n.cfg.Interaction.Write(ctx, writes, opts)
+	ia, err := n.interaction()
+	if err != nil {
+		return nil, err
+	}
+	return ia.Write(ctx, writes, opts)
 }
 
 // Invoke invokes a command on the peer — ClientNodeInteraction.invoke
 // (ClientNodeInteraction.ts:197-210).
 func (n *Node) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable, opts interaction.InvokeOptions) (interaction.Result, error) {
-	return n.cfg.Interaction.Invoke(ctx, path, fields, opts)
+	ia, err := n.interaction()
+	if err != nil {
+		return interaction.Result{}, err
+	}
+	return ia.Invoke(ctx, path, fields, opts)
 }

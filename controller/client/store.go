@@ -31,6 +31,11 @@ type Store interface {
 	// EraseNode removes the node (ClientNodeStore.erase,
 	// ClientNodeStore.ts:88-107).
 	EraseNode(nodeID string) error
+	// NodeIDs are the ids of the nodes the store holds, sorted — matter.js
+	// ClientNodeStores.knownIds (storage/client/ClientNodeStores.ts:117-121),
+	// the storage contexts restored at construction (:44-57). A [Registry]
+	// restores one node per id.
+	NodeIDs() ([]string, error)
 }
 
 // StoredEndpoint is one endpoint of a node as a [Store] holds it.
@@ -135,4 +140,12 @@ func (m *MemoryStore) EraseNode(nodeID string) error {
 	defer m.mu.Unlock()
 	delete(m.nodes, nodeID)
 	return nil
+}
+
+// NodeIDs implements [Store]: every id saved for since its last
+// EraseNode, sorted.
+func (m *MemoryStore) NodeIDs() ([]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Sorted(maps.Keys(m.nodes)), nil
 }

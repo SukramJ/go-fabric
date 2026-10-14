@@ -35,13 +35,24 @@
 // named "Cluster$<hex>" as matter.js names it (PeerBehavior.ts:399-401,
 // :426-427).
 //
+// # The registry
+//
+// [Registry] is matter.js Peers (node/client/Peers.ts) with the per-node
+// half of CommissioningClient and NetworkClient's fabric-label
+// reconciliation: it restores every node a [Store] holds, allocates the
+// local ids, finds or creates a node for a discovered device
+// ([Registry.ForDevice]) or a peer address ([Registry.ForAddress]),
+// commissions and decommissions through the node one fabric operation at
+// a time, culls expired commissionable nodes and addresses, and reacts to
+// the peer's BasicInformation leave, shutDown and startUp. A node's
+// commissioning record ([Record]) is stored beside its settings.
+// controller/client/sqlstore is a durable [Store].
+//
 // # Not here
 //
-// The registry of nodes (matter.js Peers: local ids, restore on start, the
-// address book, forAddress, the reactions to BasicInformation's leave,
-// shutDown and startUp, the fabric-label reconciliation), commissioning and
-// decommissioning through the node, a durable Store, ICD clients, groups,
-// TCP and the transport preference, matter.js's remote API
+// Groups, ICD clients, split commissioning, matter.js's discovery runners
+// (the host runs discovery.Scanner and hands the registry a device), TCP
+// and the transport preference, matter.js's remote API
 // (applyWireChanges), writes through the cache (RemoteWriter.ts) and
 // generated client behaviour types. Writes go to the peer; the image
 // follows when the peer reports the new value.

@@ -174,6 +174,11 @@ func (s *Session) FabricIndex() uint8 { return s.fabricIndex }
 // Resumed reports that a CASE session came from Sigma2_Resume.
 func (s *Session) Resumed() bool { return s.resumed }
 
+// CreatedAt is when the session was established — matter.js
+// Session.createdAt, the cutoff SessionManager.#handlePeerLoss compares
+// (SessionManager.ts:690-692 at 0ceb202d).
+func (s *Session) CreatedAt() time.Time { return s.createdAt }
+
 // IsPeerActive reports whether the peer sent a message within its active
 // threshold — matter.js Session.ts:149-151. The unsecured session of an
 // initiator starts idle (UnsecuredSession.ts:30), a secure one active
