@@ -26,6 +26,7 @@ an oversight to the next reader — including choices to *not* do something.
 | [0018](./0018-device-layer-and-node-facade.md) | A device layer `device/` generated from the device-type model and a `node/` facade — the port of matter.js `devices/`, `endpoints/` and `ServerNode`; the existing `contract/` level stays beneath it, foreign-source projection stays outside | proposed (concept phase 4) |
 | [0019](./0019-tcp-bdx-and-the-ota-requestor.md) | TCP (full large-payload path), BDX and the complete OTA Software Update Requestor enter the scope in wave 5; DiagnosticLogs stays without BDX (matter.js has none); the OTA Provider stays out. | Accepted |
 | [0020](./0020-commissioner-and-controller-role.md) | The commissioner and controller role enters the scope as `controller/`, a sibling of `bridge/`, ported from matter.js in six stages; on-network only; the responder side and `contract/` are unchanged; supersedes the no-controller non-goal (CLAUDE.md, comparison §Non-goals 1, ADR 0008's exception, concept v1 §F.1) | accepted 2026-10-13 (concept v2 phase 7) |
+| [0021](./0021-ota-provider-and-diagnosticlogs-over-bdx.md) | The OTA Software Update Provider (own OtaProvider endpoint, host ports for image source, consent and apply policy, the BDX sender roles) and DiagnosticLogs over BDX (chip as the reference: matter.js has no DiagnosticLogs server) enter the scope; supersedes ADR 0019's two exclusions; in-repo device-to-device proofs; the harness image pin stays | accepted 2026-10-14 (concept v2 phase 8) |
 
 ## Provenance
 
