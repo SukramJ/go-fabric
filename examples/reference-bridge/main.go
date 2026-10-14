@@ -47,6 +47,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	"github.com/SukramJ/go-fabric/contract"
+	"github.com/SukramJ/go-fabric/controller/dcl"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
@@ -84,7 +85,7 @@ func main() {
 // flags are the daemon's command line.
 type flags struct {
 	dbPath, listen, tcp, label, salt, logLevel string
-	appPipe, enableKey, otaDir                 string
+	appPipe, enableKey, otaDir, dcl            string
 	passcode, discriminator                    uint
 	iterations                                 int
 	advertise, osHostName, otaHarness, wifi    bool
@@ -109,6 +110,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.otaDir, "ota-dir", "", "directory OTA images are downloaded to (default: an \"ota\" directory beside --db)")
 	flag.BoolVar(&f.otaHarness, "ota-harness", false, "TESTING ONLY: apply a downloaded OTA image in place — report its version as running without a restart, as the CHIP SU cases read it; see ota.go")
 	flag.BoolVar(&f.otaProvider, "ota-provider", false, "TESTING ONLY: serve one embedded test OTA image (software version 2 of the test vendor/product) from an OtaProvider endpoint, consent granted unless the app pipe withholds it; see ota_provider.go")
+	flag.StringVar(&f.dcl, "dcl", "off", "prod, testnet or off: look the --ota-provider image up in the CSA Distributed Compliance Ledger (sends the requestor's vendor/product id and the offered version to the ledger); see dcl.go")
 	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
 	flag.Parse()
 	return f
@@ -132,6 +134,9 @@ func checkFlags(f flags) (passcode uint32, discriminator uint16, err error) {
 	}
 	if f.iterations < 0 {
 		return 0, 0, fmt.Errorf("--pbkdf-iterations %d must be positive", f.iterations)
+	}
+	if _, err := dclClient(f.dcl); err != nil {
+		return 0, 0, err
 	}
 	return passcode, uint16(f.discriminator), nil
 }
@@ -224,6 +229,15 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 		}
 		devices.otaImages = images
 		cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: images, Consent: images}
+		// The ledger lookup of the offered image (dcl.go), off by default.
+		if ledger, err := dclClient(f.dcl); err != nil {
+			return err
+		} else if ledger != nil {
+			cfg.OTAProvider.ImageSource = &ledgerCheckedImages{
+				OTAImageSource: images, versions: &dcl.OTAVersions{Client: ledger, Logger: logger},
+				image: func(string) []byte { return images.image }, logger: logger,
+			}
+		}
 	}
 	n, err := assemble(ctx, devices, cfg, applier)
 	if err != nil {

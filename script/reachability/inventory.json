@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4982,
+  "entry_points": 4985,
   "entry_packages": [
     ".",
     "bdx",
@@ -189,9 +189,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11448,
-    "reachable": 8018,
-    "whitelisted": 3425,
+    "total_exported": 11451,
+    "reachable": 8019,
+    "whitelisted": 3427,
     "unreachable": 5
   },
   "by_package": [
@@ -17549,6 +17549,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestDCLFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/dcl_test.go",
+      "line": 28
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestDelayedOffReportsItsCountdown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
@@ -17637,6 +17644,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/kitchen_test.go",
       "line": 108
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestLedgerCheckedImages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/dcl_test.go",
+      "line": 77
     },
     {
       "package": "examples/reference-bridge",

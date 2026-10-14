@@ -28,7 +28,9 @@
 //     AttachCaseInitiatorProvider — the commissioning window
 //     (AttachCommissioningWindow, with the PASE provider attached while a
 //     window is open), the fabric hooks and the event-number persistence;
-//     with Config.OTAProvider the OTA provider and AttachBDXResponder.
+//     with Config.OTAProvider the OTA provider and AttachBDXResponder;
+//     with Config.CommissionerControl the CommissionerControl server on
+//     the Aggregator.
 //   - Start: bridge.Start, the DiagnosticLogs provider, StartUp and
 //     BootReason, the operational-time keeper, both PartsList providers,
 //     the stored fabrics' CASE identities, ReestablishFormerSubscriptions,
@@ -49,7 +51,8 @@
 //
 // Left to the configuration on purpose: a nil Config.Advertiser publishes
 // nothing, a nil Config.OTA mounts no OTA requestor, a nil
-// Config.OTAProvider no OTA provider. Left to the host:
+// Config.OTAProvider no OTA provider, a nil Config.CommissionerControl no
+// CommissionerControl server. Left to the host:
 // GeneralDiagnostics' TestEventTrigger enable key, the PowerSource
 // endpoints of PowerSourceConfiguration, and the bridge's observer hooks
 // (SetOnReassembled, SetOnFabricAdded) — reachable through [Node.Root] and

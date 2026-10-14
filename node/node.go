@@ -71,6 +71,9 @@ type Node struct {
 	// Config.OTAProvider (ota_provider.go).
 	bdx         *bdx.Responder
 	otaProvider *mattercore.OTAProvider
+	// commissionerControl is the Aggregator's CommissionerControl server,
+	// nil without Config.CommissionerControl (commissioner_control.go).
+	commissionerControl *mattercore.CommissionerControl
 
 	// life bounds the goroutines New and Start begin (subscription
 	// engine, reapers, the operational-time keeper); Stop cancels it.
@@ -216,7 +219,14 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	n.root.DiagnosticLogs.AttachExchangeOpener(n.br)
 	n.root.DiagnosticLogs.SetLogger(n.logger)
 	n.br.AttachRootClusters(n.root.Servers())
-	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, cfg.AggregatorServers)
+	if n.commissionerControl, err = n.buildCommissionerControl(); err != nil {
+		return nil, err
+	}
+	aggExtra := cfg.AggregatorServers
+	if n.commissionerControl != nil {
+		aggExtra = append(slices.Clone(aggExtra), n.commissionerControl)
+	}
+	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, aggExtra)
 	if err != nil {
 		return nil, fmt.Errorf("node: %w", err)
 	}
@@ -549,6 +559,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.stopGroupSender()
 	if n.bdx != nil {
 		n.bdx.Close()
+	}
+	if n.commissionerControl != nil {
+		n.commissionerControl.Close()
 	}
 	err := n.br.Stop(ctx)
 	_ = n.advertiser.Close()
