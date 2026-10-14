@@ -12,6 +12,7 @@ import (
 	"net"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/secure/aesccm"
 	"github.com/SukramJ/go-fabric/store"
@@ -63,6 +64,9 @@ type epochKey struct {
 	privacy   []byte
 	sessionID uint16
 	ccm       *aesccm.CCM
+	// start is the epoch's EpochStartTime in microseconds, which
+	// selects the current key a sender uses (KeySets.currentKeyForId).
+	start uint64
 }
 
 // keySet is the operational form of one group key set — matter.js
@@ -80,6 +84,10 @@ type fabricGroups struct {
 	index      uint8
 	fabricID   uint64
 	compressed [8]byte
+	// nodeID is this node's operational node id on the fabric — the
+	// source node id and the nonce node id of the group messages it
+	// sends (matter.js GroupSession.nodeId, fabric.nodeId).
+	nodeID uint64
 
 	keySets map[uint16]*keySet
 	idMap   map[uint16]uint16
@@ -132,6 +140,16 @@ type Manager struct {
 	counterMu     sync.Mutex
 	counter       *dataCounter
 	counterRandom func() (uint32, error)
+
+	// The send side (sender.go): the outbound group sessions, the
+	// socket they leave through, the exchange id counter and the clock
+	// that selects the current epoch key.
+	senderMu       sync.Mutex
+	senders        map[senderKey]*Sender
+	transport      MulticastTransport
+	exchangeID     uint16
+	exchangeSeeded bool
+	now            func() time.Time
 }
 
 // NewManager returns a manager over st. logger may be nil.
@@ -150,6 +168,8 @@ func NewManager(st Store, logger *slog.Logger) (*Manager, error) {
 		reception: make(map[string]map[uint64]*mrp.Window),
 
 		counterRandom: randomCounterStart,
+		senders:       make(map[senderKey]*Sender),
+		now:           time.Now,
 	}, nil
 }
 
@@ -230,7 +250,7 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 		return nil, fmt.Errorf("groups: load fabric %d: %w", idx, err)
 	}
 	f := &fabricGroups{
-		index: idx, fabricID: rec.FabricID, compressed: rec.CompressedID,
+		index: idx, fabricID: rec.FabricID, compressed: rec.CompressedID, nodeID: rec.NodeID,
 		keySets: make(map[uint16]*keySet), idMap: make(map[uint16]uint16), table: make(map[uint16]*TableEntry),
 		props: make(map[uint16]GroupProperties),
 	}
@@ -281,7 +301,8 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 // Mirrors matter.js FabricGroups.setFromGroupKeySet.
 func deriveKeySet(s store.GroupKeySet, compressed [8]byte) (*keySet, error) {
 	ks := &keySet{id: s.GroupKeySetID}
-	for _, ek := range [][]byte{s.EpochKey0, s.EpochKey1, s.EpochKey2} {
+	starts := [3]uint64{s.EpochStart0, s.EpochStart1, s.EpochStart2}
+	for slot, ek := range [][]byte{s.EpochKey0, s.EpochKey1, s.EpochKey2} {
 		if len(ek) == 0 {
 			continue
 		}
@@ -301,7 +322,7 @@ func deriveKeySet(s store.GroupKeySet, compressed [8]byte) (*keySet, error) {
 		if err != nil {
 			return nil, err
 		}
-		ks.epochs = append(ks.epochs, epochKey{key: op, privacy: priv, sessionID: sid, ccm: ccm})
+		ks.epochs = append(ks.epochs, epochKey{key: op, privacy: priv, sessionID: sid, ccm: ccm, start: starts[slot]})
 	}
 	if len(ks.epochs) == 0 {
 		return nil, fmt.Errorf("groups: key set %d has no epoch key", s.GroupKeySetID)
@@ -409,6 +430,7 @@ func (m *Manager) ForgetFabric(fabricIndex uint8) {
 	_, had := m.fabrics[fabricIndex]
 	delete(m.fabrics, fabricIndex)
 	m.mu.Unlock()
+	m.closeSenders(fabricIndex)
 	m.forgetUnreferenced()
 	if had {
 		m.notify()

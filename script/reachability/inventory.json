@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4850,
+  "entry_points": 4858,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11044,
-    "reachable": 7727,
-    "whitelisted": 3312,
+    "total_exported": 11059,
+    "reachable": 7734,
+    "whitelisted": 3320,
     "unreachable": 5
   },
   "by_package": [
@@ -17448,6 +17448,13 @@
     },
     {
       "package": "groups",
+      "identifier": "TestNextExchangeIDWraps",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/sender_test.go",
+      "line": 345
+    },
+    {
+      "package": "groups",
       "identifier": "TestOperationalKeyRejectsShortEpochKey",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/manager_test.go",
@@ -17459,6 +17466,41 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/manager_test.go",
       "line": 311
+    },
+    {
+      "package": "groups",
+      "identifier": "TestSenderCacheIsKeyedByKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/sender_test.go",
+      "line": 183
+    },
+    {
+      "package": "groups",
+      "identifier": "TestSenderDatagramMatchesMatterJS",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/sender_test.go",
+      "line": 223
+    },
+    {
+      "package": "groups",
+      "identifier": "TestSenderInvokeAndWrite",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/sender_test.go",
+      "line": 392
+    },
+    {
+      "package": "groups",
+      "identifier": "TestSenderKeySelection",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/sender_test.go",
+      "line": 90
+    },
+    {
+      "package": "groups",
+      "identifier": "TestSenderSendsTheGroupMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/sender_test.go",
+      "line": 264
     },
     {
       "package": "groups",
@@ -23464,21 +23506,21 @@
       "identifier": "TestJoinAndLeaveGroupOnLiveInterfaces",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/multicast_test.go",
-      "line": 50
+      "line": 53
     },
     {
       "package": "transport/udp",
       "identifier": "TestJoinGroupRejectsNonMulticastAndClosedListeners",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/multicast_test.go",
-      "line": 12
+      "line": 15
     },
     {
       "package": "transport/udp",
       "identifier": "TestJoinGroupWithoutInterfaces",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/multicast_test.go",
-      "line": 30
+      "line": 33
     },
     {
       "package": "transport/udp",
@@ -23507,6 +23549,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/listener_test.go",
       "line": 182
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestSendMulticastReachesAJoinedListener",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/multicast_test.go",
+      "line": 102
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestSendMulticastRefusals",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/multicast_test.go",
+      "line": 68
     },
     {
       "package": "transport/udp",

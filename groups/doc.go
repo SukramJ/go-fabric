@@ -23,6 +23,11 @@
 // Group membership is stack state, as in matter.js: a host neither
 // supplies nor observes it.
 //
-// This module has no controller role, so nothing here sends group
-// messages; there is no group data message counter to keep.
+// The send half mirrors SessionManager.groupSessionForAddress and
+// GroupSession.create / encode: [Manager.Sender] resolves a group's current
+// operational key into an outbound group session, and [Sender.Send] —
+// with [Sender.Invoke] and [Sender.Write] on top — frames, seals and
+// privacy-obfuscates a message and sends it to the group's multicast
+// address. Every message is numbered by the node-global, persisted group
+// data message counter (counter.go).
 package groups
