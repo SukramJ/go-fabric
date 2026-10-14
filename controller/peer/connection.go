@@ -647,9 +647,16 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 	local, restart := context.WithCancel(att.ctx)
 	defer restart()
 	unresponsive := unresponsiveDetector(func() {
-		if h := p.set.ctx.EstablishmentUnresponsive; h != nil {
-			p.goWork(func() { h(p) })
-		}
+		p.goWork(func() {
+			if h := p.set.ctx.EstablishmentUnresponsive; h != nil {
+				h(p)
+			}
+			for _, o := range p.observing() {
+				if o.EstablishmentUnresponsive != nil {
+					o.EstablishmentUnresponsive()
+				}
+			}
+		})
 	})
 	notifiers := exchange.Options{
 		OnSend: func(n int) {

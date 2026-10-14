@@ -70,4 +70,18 @@ func TestAttributeChangesOmitted(t *testing.T) {
 			t.Errorf("AttributeChangesOmitted(0x%04X, 0x%04X) = %v, want %v", c.cluster, c.attr, got, c.want)
 		}
 	}
+	for _, c := range []struct {
+		cluster uint32
+		want    bool
+	}{
+		{0x003F, true},  // GroupKeyManagement
+		{0x001F, true},  // AccessControl: AuxiliaryAcl "C"
+		{0x0033, true},  // GeneralDiagnostics
+		{0x0006, false}, // OnOff
+		{0x9999, false}, // unknown cluster
+	} {
+		if got := schema.ClusterHasChangesOmittedAttribute(c.cluster); got != c.want {
+			t.Errorf("ClusterHasChangesOmittedAttribute(0x%04X) = %v, want %v", c.cluster, got, c.want)
+		}
+	}
 }

@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2026 SukramJ.
+
+package client
+
+import (
+	"context"
+	"slices"
+
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/im"
+)
+
+// ReadRequest is a read through the node — matter.js ClientRead
+// (packages/protocol/src/action/client/ClientRead.ts:12 at 0ceb202d).
+type ReadRequest struct {
+	interaction.ReadRequest
+	// IncludeKnownVersions skips the version filters, so the peer sends
+	// every value (ClientRead.ts:12).
+	IncludeKnownVersions bool
+}
+
+// Read reads from the peer and applies the report to the image —
+// ClientNodeInteraction.read (ClientNodeInteraction.ts:91-112): unless
+// IncludeKnownVersions, and when the read has the default subscription's
+// fabric filter (:103-106), the cached versions go along as filters, none
+// for a cluster with a changes-omitted attribute (:107). The caller gets
+// the report as the peer sent it, its chunks merged.
+func (n *Node) Read(ctx context.Context, req ReadRequest) (*interaction.Report, error) {
+	r := req.ReadRequest
+	sc := newScope(r.Attributes, r.NoFabricFilter)
+	n.mu.RLock()
+	if !req.IncludeKnownVersions && sc.fabricFiltered == n.s.subscribedFabricFiltered {
+		r.DataVersionFilters = append(slices.Clone(r.DataVersionFilters), n.s.injectVersionFilters(sc, true)...)
+	}
+	n.mu.RUnlock()
+	rep, err := n.cfg.Interaction.ReadWith(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	n.apply(sc, rep)
+	return rep, nil
+}
+
+// Subscribe subscribes through the node — ClientNodeInteraction.subscribe
+// (ClientNodeInteraction.ts:125-169): the cached versions go along as
+// filters (:128, no changes-omitted refresh); the interval bounds are the
+// node's for the request's (:129-133); each report is applied to the image
+// before req.Updated sees it (:139-146); a sustained subscription's
+// re-subscriptions send the versions then current and the event minimum
+// past the highest event seen (:148-155).
+func (n *Node) Subscribe(ctx context.Context, req interaction.SubscribeRequest) (*interaction.Subscription, error) {
+	sc := newScope(req.Attributes, req.NoFabricFilter)
+	r := req
+	n.mu.RLock()
+	r.DataVersionFilters = append(slices.Clone(req.DataVersionFilters), n.s.injectVersionFilters(sc, false)...)
+	n.mu.RUnlock()
+	floor, ceiling := n.IntervalBounds(req.MinIntervalFloor, req.MaxIntervalCeiling)
+	r.MinIntervalFloor, r.MaxIntervalCeiling = &floor, &ceiling
+	r.Updated = func(rep *interaction.Report) {
+		n.apply(sc, rep)
+		if req.Updated != nil {
+			req.Updated(rep)
+		}
+	}
+	r.RefreshRequest = func(x interaction.SubscribeRequest) interaction.SubscribeRequest {
+		n.mu.RLock()
+		x.EventFilters = []im.EventMinimumNumber{{EventMin: n.settings.maxEventNumber + 1}}
+		x.DataVersionFilters = n.s.injectVersionFilters(newScope(x.Attributes, x.NoFabricFilter), false)
+		n.mu.RUnlock()
+		n.observeRequest(x)
+		return x
+	}
+	n.observeRequest(r)
+	return n.cfg.Interaction.Subscribe(ctx, r)
+}
+
+// observeRequest hands a subscription request to the test seam.
+func (n *Node) observeRequest(r interaction.SubscribeRequest) {
+	n.mu.RLock()
+	f := n.requestObserver
+	n.mu.RUnlock()
+	if f != nil {
+		f(r)
+	}
+}
+
+// Write writes to the peer — ClientNodeInteraction.write
+// (ClientNodeInteraction.ts:175-186). The image changes when the peer
+// reports the new value, not through the write (matter.js's RemoteWriter
+// sets the cache and compensates a refusal).
+func (n *Node) Write(ctx context.Context, writes []interaction.WriteRequest, opts interaction.WriteOptions) (interaction.WriteStatuses, error) {
+	return n.cfg.Interaction.Write(ctx, writes, opts)
+}
+
+// Invoke invokes a command on the peer — ClientNodeInteraction.invoke
+// (ClientNodeInteraction.ts:197-210).
+func (n *Node) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable, opts interaction.InvokeOptions) (interaction.Result, error) {
+	return n.cfg.Interaction.Invoke(ctx, path, fields, opts)
+}

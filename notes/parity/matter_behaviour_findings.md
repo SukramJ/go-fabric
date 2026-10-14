@@ -437,6 +437,8 @@ Fixed-width integer encodes exceed the sanctioned SubscriptionID/DataVersion wor
 
 ---
 
+- **`controller/client`: 38 snapshot clusters have no generated definition** (AccessControl, OperationalCredentials, GroupKeyManagement, Groupcast, Thread/WiFi diagnostics, Switch, the media and camera clusters, the joint-fabric and TLS clusters among them; `script/clustergen/clusters.go` names the 97 that do). The client names them ("named clusters", brief AK D3), decodes their global attributes, names their features and judges their changes-omitted attributes from the schema's tables, and delivers their events raw. What stays approximate is `Cluster.Extra()`: matter.js subtracts the model's attributes and commands (`PeerBehavior.ts:443-455` at `0ceb202d`); the Go client has no per-cluster attribute table for a cluster without a definition, so every non-global listed id counts as extra. Closes when the generator covers them (ADR 0013's skip list) or the schema gains an attribute table. Report AK, 2026-10-14.
+
 ## Closed in 0.31–0.33 (duplicated Tier-2 bullets)
 
 These Tier-2 items were fixed by the batches above but had been left behind as

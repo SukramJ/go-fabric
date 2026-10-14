@@ -12,6 +12,60 @@ pseudo-version of `main`.
 
 ### Added
 
+- `controller/client` (ADR 0020, stage 4, first half): the controller's
+  image of a remote node — matter.js `ClientNode` with its
+  `ClientStructure`, `PeerBehavior` shape analysis, `ClientNodeInteraction`,
+  `ClientEventEmitter`, the subscription and connection-state half of
+  `NetworkClient`, the client cache and its persistence, and the physical
+  properties with the subscription interval bounds, at `0ceb202d`.
+  `client.New(Config)` over a peer and its interaction; `Start`, `Stop`,
+  `Close`, `Disable`, `Enable`, `Erase`; `ConnectionState` (matter.js
+  `NodeConnectionState`). The image persists through `client.Store`
+  (`MemoryStore` here; values as TLV, the DataVersion beside them, the
+  node's settings with them), written through or batched by
+  `Config.FlushInterval` as matter.js's `ClientCacheBuffer` batches.
+  A `client.Cluster` carries the analysis matter.js's `PeerBehavior` makes
+  of a discovered cluster — revision, FeatureMap and feature codes, the
+  attribute and command lists, `Supports`, `SupportsCommand`, `Extra` —
+  and its values as `spec.Node`, decoded on access (`Decoded`) through
+  the generated definition; the package links every generated definition,
+  so `spec.Lookup` knows each. `cluster/spec.DecodeValue` decodes a value
+  by its `spec.Type` (the attribute-level counterpart of `TlvOfModel`).
+  The tree follows the peer's Descriptor as `ClientStructure` builds it —
+  device types, server lists, the parts lists with their full-family and
+  tree compositions, endpoints and clusters the peer drops — and is
+  reported through `Node.Endpoints`, `Endpoint.Clusters` and the
+  `Hooks` (`EndpointInstalled`, `ClusterInstalled`, `ClusterReplaced`,
+  `ClusterDeleted`, `Changed`). `Node.Properties` are the node's
+  physical properties (matter.js `PhysicalDeviceProperties` as
+  `NodePhysicalProperties` computes them) and `Node.IntervalBounds` the
+  subscription interval bounds they imply. `Node.Read` (with the cached
+  DataVersions as filters unless `IncludeKnownVersions`), `Subscribe`
+  (each report applied to the image first; a sustained one re-subscribes
+  with the versions then current and the event minimum), `Write` and
+  `Invoke` (to the peer; the image follows the peer's report). `Start`
+  runs the default sustained wildcard subscription when `AutoSubscribe`
+  (a newly commissioned node reads first) and tracks the connection state
+  from it and the peer's sessions; `Hooks.Event` delivers every event,
+  decoded through its definition when there is one, and the event cursor
+  is persisted; `Seeded` once BasicInformation and a second endpoint are
+  in.
+
+- `schema.ClusterHasChangesOmittedAttribute(clusterID)`: whether any
+  attribute of a snapshot cluster carries the changes-omitted quality —
+  what matter.js's `ClientStructure.hasChangesOmittedAttribute` enumerates
+  on the `ClusterModel` (`ClientStructure.ts:1674-1692` at `0ceb202d`);
+  `controller/client` asks it for a cluster whose AttributeList the peer
+  has not reported.
+
+- `controller/peer.Peer.Observe(Observer)`: per-peer observers of a
+  peer's sessions coming and going and of an unresponsive establishment —
+  what matter.js's node layer observes on a `Peer` directly
+  (`NetworkClient.ts:81-83`, `Peer.ts:68`, `:90-92`, `:197-204`,
+  `:258-260` at `0ceb202d`) — called after the peer's lock is released,
+  in registration order; the returned function removes the observer.
+  The set-wide `Context` hooks are unchanged.
+
 - `controller/interaction.Report` carries `SubscriptionID` (the report's
   subscription id, the first chunk's; 0 for a read's report) and `Session`
   (the `*exchange.Session` the report arrived over) — what matter.js keeps
@@ -472,6 +526,14 @@ pseudo-version of `main`.
   its operational record on the host's DNS-SD).
 
 ### Changed
+
+- `controller/interaction.SubscribeRequest.RefreshRequest`: a sustained
+  subscription rewrites its request through the hook before every attempt
+  but the very first and again right after a successful bootstrap read —
+  matter.js `refreshRequest` (`ClientSubscribe.ts:30-34`,
+  `SustainedSubscription.ts:182-186`, `:200-203` at `0ceb202d`) — so a
+  re-subscription sends the caller's current DataVersionFilters and event
+  minimum. The interval bounds and the callbacks stay the subscription's.
 
 - `bridge/bridgetest.Commissioner` runs on the module's own controller
   (ADR 0020, stage 2 close-out): one `udp.Listener` with
