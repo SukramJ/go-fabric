@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4808,
+  "entry_points": 4813,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,9 +184,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 10980,
-    "reachable": 7693,
-    "whitelisted": 3282,
+    "total_exported": 10988,
+    "reachable": 7696,
+    "whitelisted": 3287,
     "unreachable": 5
   },
   "by_package": [
@@ -14079,6 +14079,13 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestNodeRecord",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/record_internal_test.go",
+      "line": 190
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestProperties",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/properties_internal_test.go",
@@ -14090,6 +14097,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/properties_internal_test.go",
       "line": 153
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRecordApplyPeer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/record_internal_test.go",
+      "line": 117
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRecordDecodeErrors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/record_internal_test.go",
+      "line": 93
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRecordDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/record_internal_test.go",
+      "line": 147
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRecordRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/record_internal_test.go",
+      "line": 45
     },
     {
       "package": "controller/client",

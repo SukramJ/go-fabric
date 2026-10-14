@@ -31,6 +31,7 @@ type Node struct {
 
 	mu        sync.RWMutex
 	settings  settings
+	record    Record
 	started   bool
 	connState ConnectionState
 	// props are the physical properties, nil until computed after a change;
@@ -80,18 +81,23 @@ func New(cfg Config) (*Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
 	}
-	for _, ep := range stored {
+	for i, ep := range stored {
 		if ep.Number != 0 {
 			continue
 		}
 		for _, c := range ep.Clusters {
-			if c.ID != settingsCluster {
-				continue
+			switch c.ID {
+			case settingsCluster:
+				n.settings, err = decodeSettings(c.Values)
+			case recordCluster:
+				n.record, err = decodeRecord(c.Values)
 			}
-			if n.settings, err = decodeSettings(c.Values); err != nil {
+			if err != nil {
 				return nil, fmt.Errorf("client: loading node %q: %w", cfg.ID, err)
 			}
 		}
+		// The record is no cluster of the image.
+		stored[i].Clusters = slices.DeleteFunc(slices.Clone(ep.Clusters), func(c StoredCluster) bool { return c.ID == recordCluster })
 	}
 	n.s = newStructure(&n.mu, n.log, n.persist)
 	if err := n.s.loadCache(stored); err != nil {
@@ -354,6 +360,7 @@ func (n *Node) Erase(ctx context.Context) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.settings = settings{}
+	n.record = Record{}
 	for _, ep := range n.s.endpoints {
 		for _, c := range ep.clusters {
 			c.cache.discard()
