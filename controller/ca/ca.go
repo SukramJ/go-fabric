@@ -87,11 +87,12 @@ type Store interface {
 	Save(s Stored) error
 }
 
-// MemoryStore is a [Store] in memory. The zero value is empty and ready to
+// MemoryStore is a [Store] and a [FabricStore] in memory. The zero value is empty and ready to
 // use; it is safe for concurrent use.
 type MemoryStore struct {
 	mu     sync.Mutex
 	stored *Stored
+	fabric *FabricRecord
 	saves  int
 }
 

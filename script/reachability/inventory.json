@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4997,
+  "entry_points": 5002,
   "entry_packages": [
     ".",
     "bdx",
@@ -189,9 +189,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11472,
-    "reachable": 8028,
-    "whitelisted": 3439,
+    "total_exported": 11480,
+    "reachable": 8034,
+    "whitelisted": 3441,
     "unreachable": 5
   },
   "by_package": [
@@ -14759,7 +14759,7 @@
       "identifier": "TestAcceptedFailedAttestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 370
+      "line": 385
     },
     {
       "package": "controller/commissioner",
@@ -14780,7 +14780,7 @@
       "identifier": "TestCommissionTheNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 205
+      "line": 220
     },
     {
       "package": "controller/commissioner",
@@ -14843,14 +14843,21 @@
       "identifier": "TestEstablishPASE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 339
+      "line": 354
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFabricPersistsAcrossRestart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_persist_test.go",
+      "line": 94
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestFinalizeCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 281
+      "line": 296
     },
     {
       "package": "controller/commissioner",
@@ -14879,6 +14886,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
       "line": 157
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestNewFabricLoadsOrMints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_persist_test.go",
+      "line": 28
     },
     {
       "package": "controller/commissioner",
@@ -14920,7 +14934,7 @@
       "identifier": "TestRejectedAttestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 313
+      "line": 328
     },
     {
       "package": "controller/commissioner",

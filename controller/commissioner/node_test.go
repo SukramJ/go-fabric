@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -111,6 +112,19 @@ type controller struct {
 
 func newController(t *testing.T, names *discovery.Names, listen string) *controller {
 	t.Helper()
+	authority, err := ca.New(ca.Config{Store: &ca.MemoryStore{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, _ := newControllerWith(t, names, listen, authority, FabricConfig{FabricID: testFabricID, RootNodeID: controllerNodeID, VendorID: 0xFFF1, Label: fabricLabel})
+	return c
+}
+
+// newControllerWith builds a controller over a given CA and fabric
+// configuration; the returned func tears it down (once; the test's
+// cleanup calls it too).
+func newControllerWith(t *testing.T, names *discovery.Names, listen string, authority *ca.CA, fcfg FabricConfig) (*controller, func()) {
+	t.Helper()
 	l, err := udp.New(udp.Config{LocalAddr: listen, PreferIPv4: listen == "127.0.0.1:0"})
 	if err != nil {
 		t.Fatal(err)
@@ -125,11 +139,7 @@ func newController(t *testing.T, names *discovery.Names, listen string) *control
 		defer close(served)
 		_ = l.Serve(ctx, mgr.HandleDatagram)
 	}()
-	authority, err := ca.New(ca.Config{Store: &ca.MemoryStore{}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	fabric, err := NewFabric(authority, FabricConfig{FabricID: testFabricID, RootNodeID: controllerNodeID, VendorID: 0xFFF1, Label: fabricLabel})
+	fabric, err := NewFabric(authority, fcfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,15 +152,20 @@ func newController(t *testing.T, names *discovery.Names, listen string) *control
 		t.Fatal(err)
 	}
 	c := &controller{mgr: mgr, names: names, scanner: discovery.NewScanner(names), set: set, fabric: fabric, com: com}
-	t.Cleanup(func() {
-		c.scanner.Close()
-		set.Close(context.Background())
-		mgr.Close()
-		cancel()
-		<-served
-		_ = names.Close()
-	})
-	return c
+	var once sync.Once
+	closeAll := func() {
+		once.Do(func() {
+			c.scanner.Close()
+			com.Close()
+			set.Close(context.Background())
+			mgr.Close()
+			cancel()
+			<-served
+			_ = names.Close()
+		})
+	}
+	t.Cleanup(closeAll)
+	return c, closeAll
 }
 
 // announceNode injects the node's commissionable record and its
