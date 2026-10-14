@@ -85,6 +85,7 @@ func announce(t *testing.T, conn *injectedMDNS, cfid [8]byte, ports map[uint64]u
 // bindNode is one in-process node of the test.
 type bindNode struct {
 	n    *node.Node
+	cfg  node.Config
 	port uint16
 	ep   uint16
 	plug *plug
@@ -106,7 +107,7 @@ func startBindNode(t *testing.T, name string, mutate func(*node.Config), add fun
 		t.Fatal(err)
 	}
 	port := netip.MustParseAddrPort(n.Bridge().LocalAddr()).Port()
-	return &bindNode{n: n, port: port}
+	return &bindNode{n: n, cfg: cfg, port: port}
 }
 
 // aclList is an AccessControl ACL value: TH1 administers, the DUT operates
@@ -532,5 +533,41 @@ func TestLiveBinding(t *testing.T) {
 	}
 	if got := host.nodes(); len(got) != 0 {
 		t.Fatalf("still established after Stop: %v", got)
+	}
+
+	// The restart: a new node.New on the DUT's database restores the
+	// switch's Binding list (nonvolatile, binding.element.ts:21-25) before
+	// the binding manager registers it (BindingServer.ts:120-126), so the
+	// host's handler sees both entries established again without a write.
+	restarted := newNode(t, dut.cfg)
+	sw2, err := device.NewOnOffLightSwitch(device.Options{StableKey: endpoint.StringKey("switch"), Name: "switch"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := restarted.Aggregator().Add(ctx, sw2); err != nil {
+		t.Fatal(err)
+	}
+	if err := restarted.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if got := sw2.Binding().Entries(); len(got) != 2 || got[0].Node != bindTH2 || got[1].Group != group || got[0].FabricIndex != dutFabric {
+		t.Fatalf("the restored Binding list %+v", got)
+	}
+	again := &bindHost{established: map[uint64]binding.Resolution{}}
+	restarted.Bindings().OnEstablished(again.onEstablished)
+	waitLive(t, "the restored entries established", func() bool {
+		return slices.Contains(again.nodes(), bindTH2) &&
+			slices.ContainsFunc(again.resolutions(), func(r binding.Resolution) bool { return r.Kind == binding.KindGroup })
+	})
+	// The restored client entry drives the plug as before.
+	host2 := &bindHost{established: map[uint64]binding.Resolution{}}
+	for _, r := range again.resolutions() {
+		if r.Kind == binding.KindClient {
+			host2.established[r.Entry.Node] = r
+		}
+	}
+	host2.switchCommand(ctx, t, 0x01) // On
+	if !onOff(targets[bindTH2].plug.srv) {
+		t.Fatal("TH2 is not on through the restored binding")
 	}
 }

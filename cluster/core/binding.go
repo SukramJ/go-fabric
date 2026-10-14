@@ -31,8 +31,13 @@ import (
 // 120-158). The binding manager (package binding) resolves the entries
 // into peers; the server itself originates no traffic.
 type Binding struct {
+	// writeMu serialises the list's changes with their persistence, so the
+	// saves land in the order the changes commit; mu guards the list for
+	// readers, which a save never blocks.
+	writeMu  sync.Mutex
 	mu       sync.RWMutex
 	bindings []TargetStruct
+	save     func([]TargetStruct) error
 
 	obsMu     sync.Mutex
 	observers []*bindingObserver
@@ -112,6 +117,51 @@ var bindingInst = mustInstance(bindingdef.Definition, spec.Options{})
 // NewBinding returns a Binding cluster server with an empty list.
 func NewBinding() *Binding {
 	return &Binding{bindings: []TargetStruct{}}
+}
+
+// BindingConfig keeps a Binding server's list across restarts: the
+// Binding attribute is nonvolatile (quality N, matter.js
+// packages/model/src/standard/elements/binding.element.ts:21-25), and
+// matter.js persists it as every nonvolatile behaviour state.
+type BindingConfig struct {
+	// Load returns the stored list: nil when none is stored (the server
+	// keeps its list), a non-nil list — empty included — to restore.
+	Load func() ([]TargetStruct, error)
+	// Save stores the list after a change; nil stores nothing. A write
+	// whose Save fails is refused and changes nothing.
+	Save func([]TargetStruct) error
+}
+
+// Persist restores the list cfg.Load returns and saves every later change
+// through cfg.Save — a write, and a removed fabric's entries
+// ([Binding.RemoveFabric]). Call it before the server's entries are
+// registered with a binding manager: matter.js's BindingServer registers
+// the entries its restored state holds when it initialises
+// (packages/node/src/behaviors/binding/BindingServer.ts:120-126), so the
+// manager sees the stored entries at start. A restore that changes the
+// list tells the [Binding.OnChange] observers, as a write does. A failed
+// Load returns its error and installs nothing.
+func (b *Binding) Persist(cfg BindingConfig) error {
+	b.writeMu.Lock()
+	var stored []TargetStruct
+	if cfg.Load != nil {
+		var err error
+		if stored, err = cfg.Load(); err != nil {
+			b.writeMu.Unlock()
+			return fmt.Errorf("matter: Binding restore: %w", err)
+		}
+	}
+	b.save = cfg.Save
+	b.mu.Lock()
+	before := b.bindings
+	if stored != nil {
+		b.bindings = append([]TargetStruct{}, stored...)
+	}
+	after := b.bindings
+	b.mu.Unlock()
+	b.writeMu.Unlock()
+	b.notify(before, after)
+	return nil
 }
 
 // Compile-time assertions: Binding satisfies MatterClusterServer, the
@@ -200,8 +250,10 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	if err != nil {
 		return err
 	}
-	b.mu.Lock()
+	b.writeMu.Lock()
+	b.mu.RLock()
 	before := b.bindings
+	b.mu.RUnlock()
 	var after []TargetStruct
 	if request {
 		after = slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex == fabric })
@@ -215,8 +267,19 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	if after == nil {
 		after = []TargetStruct{}
 	}
+	// The change is stored before it commits: a write the store refuses
+	// changes nothing, as a matter.js transaction whose persistence fails
+	// rolls back.
+	if b.save != nil {
+		if err := b.save(slices.Clone(after)); err != nil {
+			b.writeMu.Unlock()
+			return fmt.Errorf("matter: Binding persist: %w", err)
+		}
+	}
+	b.mu.Lock()
 	b.bindings = after
 	b.mu.Unlock()
+	b.writeMu.Unlock()
 	b.notify(before, after)
 	return nil
 }
@@ -226,16 +289,26 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 // strips a departed fabric's fabric-scoped attribute entries from every
 // endpoint (packages/node/src/behavior/cluster/FabricScopedDataHandler.ts:
 // 109-122).
+//
+// A persisted list ([Binding.Persist]) is saved; the fabric is gone
+// whether or not the save succeeds, so a failed save still drops the
+// entries here (the Save function reports its own failure).
 func (b *Binding) RemoveFabric(fabricIndex uint8) {
+	b.writeMu.Lock()
 	b.mu.Lock()
 	before := b.bindings
 	after := slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex == fabricIndex })
 	if len(after) == len(before) {
 		b.mu.Unlock()
+		b.writeMu.Unlock()
 		return
 	}
 	b.bindings = after
 	b.mu.Unlock()
+	if b.save != nil {
+		_ = b.save(slices.Clone(after))
+	}
+	b.writeMu.Unlock()
 	b.notify(before, after)
 }
 

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4899,
+  "entry_points": 4902,
   "entry_packages": [
     ".",
     "bdx",
@@ -187,9 +187,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11237,
-    "reachable": 7871,
-    "whitelisted": 3361,
+    "total_exported": 11239,
+    "reachable": 7872,
+    "whitelisted": 3362,
     "unreachable": 5
   },
   "by_package": [
@@ -20141,6 +20141,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "mdns/host_responder_parity_matterjs_test.go",
       "line": 331
+    },
+    {
+      "package": "node",
+      "identifier": "RemoveFabricBindings",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/export_test.go",
+      "line": 8
     },
     {
       "package": "node",

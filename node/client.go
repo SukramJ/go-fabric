@@ -191,19 +191,27 @@ type bindingSync struct {
 	mu      sync.Mutex
 	topo    *endpoint.Topology
 	running bool
+
+	// persistMu guards persisted: the Binding servers whose list the store
+	// keeps (persistBindings).
+	persistMu sync.Mutex
+	persisted map[*mattercore.Binding]bool
 }
 
 // observeTopology wraps the bridge's Snapshotter: every topology it hands
 // the bridge is the one the binding manager reads and whose Binding
 // servers it listens to — matter.js's BindingServer registers with the
 // manager as its endpoint comes up and leaves it on disposal
-// (BindingServer.ts:120-126, :160-163).
+// (BindingServer.ts:120-126, :160-163). Each Binding server's list is
+// restored from the store before the bridge serves it and before the
+// manager registers its entries (persistBindings).
 func (n *Node) observeTopology(inner func(context.Context) (*endpoint.Topology, error)) func(context.Context) (*endpoint.Topology, error) {
 	return func(ctx context.Context) (*endpoint.Topology, error) {
 		t, err := inner(ctx)
 		if err != nil || t == nil {
 			return t, err
 		}
+		n.persistBindings(ctx, t)
 		n.bindSync.mu.Lock()
 		n.bindSync.topo = t
 		running := n.bindSync.running
@@ -228,6 +236,40 @@ func (n *Node) startBindings() {
 	if t != nil {
 		n.syncBindings(t)
 	}
+}
+
+// persistBindings restores each Binding server of the topology the node
+// has not met before from the store and saves its later changes, under its
+// endpoint's key (bindingKey) — before the bridge serves the topology and
+// before startBindings registers its entries, so the binding manager sees
+// the stored entries at start (BindingServer.ts:120-126). A server met
+// again in a reassembly is not restored again: its list is the newer (and
+// the stored one, since every change is saved). One that left the topology
+// is forgotten.
+func (n *Node) persistBindings(ctx context.Context, t *endpoint.Topology) {
+	n.bindSync.persistMu.Lock()
+	defer n.bindSync.persistMu.Unlock()
+	current := map[*mattercore.Binding]bool{}
+	for _, ep := range t.Endpoints {
+		if ep == nil {
+			continue
+		}
+		for _, srv := range endpoint.ClusterServers(ep) {
+			b, ok := srv.(*mattercore.Binding)
+			if !ok || current[b] {
+				continue
+			}
+			if !n.bindSync.persisted[b] {
+				key := bindingKey(ep)
+				if err := b.Persist(n.persisted.bindingConfig(context.WithoutCancel(ctx), key)); err != nil {
+					n.logger.Warn("binding.restore", slog.String("key", key), slog.String("err", err.Error()))
+					continue
+				}
+			}
+			current[b] = true
+		}
+	}
+	n.bindSync.persisted = current
 }
 
 // bindingServers are the Binding servers of a topology by endpoint.
