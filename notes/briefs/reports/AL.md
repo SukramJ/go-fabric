@@ -317,3 +317,29 @@ cutoff). §0 carried stubs for the expiry timer that §3 replaced.
   every `peer.updated` (CC:711) — unless question 3 adds the observer.
 - The commissioner's address option kept as an override of the record's
   addresses (difference 4).
+
+## Owner's decisions (Fable, 2026-10-14, tranche 18)
+
+Spot-checked at the pin: differences 3 (CN:176-186), 7 (CC:637-646) and
+the `keepSubscriptions` reading (Session.ts:318-322: the flag closes a
+session's own server-side subscriptions only) are read correctly.
+
+1. **`keepSubscriptions`:** the mirror holds — a controller has no
+   server-side subscriptions to close, so every Go peer loss is matter.js's
+   `keepSubscriptions: true`. What matter.js does close on a node's
+   deletion is its interaction (ClientNode.ts:288-302); `deleteNode` now
+   calls `Subscriptions.CloseForPeer` for the peer (owner commit).
+2. **`Hooks.Commissioned`** added (CC:325), called after the record and
+   settings are saved and before `Start` (owner commit).
+3. **`Observer.Updated` on `controller/peer`:** not in this wave; the
+   record following `SessionAdded` plus commission instead of every
+   descriptor save is a gap — findings register, Tier 3.
+4. **Unbound node → `ErrNotCommissioned`** from Read/Subscribe/Write/Invoke:
+   accepted; the touch of `interact.go`/`network.go` is within the package.
+5. **`HooksFor` stays** in this shape.
+6. **`ErrPeerLeft`/`ErrPeerShutdown` stay in `client`**; the missing
+   `FabricRemovedError` counterpart is a findings-register note.
+7. `by_design`: `BD-Matter-ClientRegistry-RestoreSkipsFailedNode`,
+   `-ReactionsInBackground`, `-CommissionAddressesOverride` written.
+   `ForDevice`'s unknown TTL is a gap of `controller/discovery` (no TTL on
+   `Device`), not a divergence — findings register.

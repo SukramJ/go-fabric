@@ -12,6 +12,8 @@ pseudo-version of `main`.
 
 ### Added
 
+- `controller/client.Hooks.Commissioned`: the registry commissioned the node (matter.js `lifecycle.commissioned`, `CommissioningClient.ts:325` at `0ceb202d`), after the record and settings are saved and before the node starts. Deleting a node through the registry closes every client subscription the registry still holds for its peer (`ClientNode.ts:288-302`).
+
 - `controller/client` (ADR 0020, stage 4, first half): the controller's
   image of a remote node — matter.js `ClientNode` with its
   `ClientStructure`, `PeerBehavior` shape analysis, `ClientNodeInteraction`,

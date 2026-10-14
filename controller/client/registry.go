@@ -318,6 +318,13 @@ func (r *Registry) deleteNode(ctx context.Context, n *Node, addr *handshake.Peer
 	}
 	r.unbindPeer(n)
 	err := n.Close(ctx)
+	// The node's interaction closes with it (ClientNode.ts:288-302,
+	// cancelWithMutex: interaction.close()): every client subscription the
+	// registry still holds for the peer goes — the default one closed with
+	// Stop, the host's own with it.
+	if r.cfg.Subscriptions != nil && addr != nil {
+		r.cfg.Subscriptions.CloseForPeer(exchange.PeerAddress(*addr))
+	}
 	if err == nil {
 		err = n.Erase(ctx)
 	}

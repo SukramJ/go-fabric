@@ -215,6 +215,9 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	n.saveSettingsLocked()
 	n.mu.Unlock()
 	r.log.Info("matter.controller.client.registry.commissioned", slog.String("node", n.ID()), slog.String("peer", peerAddressString(res.Address)))
+	if h := n.cfg.Hooks.Commissioned; h != nil {
+		h()
+	}
 	return n.Start(ctx)
 }
 

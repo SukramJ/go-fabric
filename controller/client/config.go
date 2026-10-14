@@ -122,6 +122,11 @@ type Hooks struct {
 	// cleared (CommissioningClient.ts:637-646) and on a leave event
 	// (node/client/Peers.ts:827).
 	Decommissioned func()
+	// Commissioned: the registry commissioned the node — matter.js
+	// lifecycle.commissioned (CommissioningClient.ts:325 at 0ceb202d),
+	// emitted after the record and settings are saved and before the node
+	// starts.
+	Commissioned func()
 }
 
 // ConnectionState is a node's connection state — matter.js
