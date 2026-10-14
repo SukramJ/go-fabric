@@ -158,6 +158,11 @@ func TestGroupcastEventsAreAdministerAndFabricSensitive(t *testing.T) {
 	if eventReadPrivilege(0x0065) != 5 || !isFabricSensitiveEventCluster(0x0065) {
 		t.Error("Groupcast events are not gated like AccessControl's")
 	}
+	// CommissionerControl's CommissioningRequestResult is "S M"
+	// (commissioner-control.element.ts:28): fabric-sensitive, Manage.
+	if eventReadPrivilege(0x0751) != 4 || !isFabricSensitiveEventCluster(0x0751) {
+		t.Error("CommissionerControl's event is not fabric-sensitive at Manage")
+	}
 	if eventReadPrivilege(0x0006) != 1 || isFabricSensitiveEventCluster(0x0006) {
 		t.Error("an ordinary cluster's events are gated")
 	}

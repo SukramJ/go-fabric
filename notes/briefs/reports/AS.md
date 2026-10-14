@@ -215,3 +215,21 @@ GitHub fallback off by default; random passcode/discriminator for the
 reverse window; ScopedNodeId check in CommissionNode; sliding CRL cache
 without the hourly sweep; trust store as one blob; `nil Client` = offline;
 `ApprovalTimeout`/`ApprovalValidity`.
+
+## Owner's decisions (2026-10-14, tranche 25)
+
+- **Q1 (generated `device/` files):** kept as committed; the wave-24
+  merge regenerates them once more.
+- **Q2 (event access):** fixed in the tranche's owner commit —
+  `im/read.go` gates CommissionerControl's `CommissioningRequestResult`
+  at Manage and fabric-sensitive (`commissioner-control.element.ts:28`,
+  "S M"), with a case in `im/authority_test.go`.
+- **Q3:** the parsing copy stays and the seams keep their signature;
+  both recorded in the findings register (Tier 3) for a later fold.
+- **Q4:** `ApprovalTimeout` stays 0 (chip's behaviour) — a host that
+  wants a bound sets it.
+- Differences 1–8: all accepted. 1 and 5 are findings notes; 3, 6, 7
+  and the timeout fields are `BD-Matter-DCL-OptIn` and
+  `BD-chip-CommissionerControl-RandomWindow`; 2 is part of
+  `BD-Matter-DCL-OptIn`; 4 and 8 need no record.
+
