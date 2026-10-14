@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4867,
+  "entry_points": 4839,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11131,
-    "reachable": 7790,
-    "whitelisted": 3336,
+    "total_exported": 11023,
+    "reachable": 7717,
+    "whitelisted": 3301,
     "unreachable": 5
   },
   "by_package": [
@@ -15943,6 +15943,13 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestBaseMandatesBinding",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/binding_mount_test.go",
+      "line": 94
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestBooleanStateServerMeetsTheDetectorDeviceTypes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_module_test.go",
@@ -16080,6 +16087,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_test.go",
       "line": 1232
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeclaredClientMountsBinding",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/binding_mount_test.go",
+      "line": 24
     },
     {
       "package": "endpoint",
