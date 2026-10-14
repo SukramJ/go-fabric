@@ -323,7 +323,7 @@ func (r *Registry) deleteNode(ctx context.Context, n *Node, addr *handshake.Peer
 	// registry still holds for the peer goes — the default one closed with
 	// Stop, the host's own with it.
 	if r.cfg.Subscriptions != nil && addr != nil {
-		r.cfg.Subscriptions.CloseForPeer(exchange.PeerAddress(*addr))
+		r.cfg.Subscriptions.CloseForPeer(*addr)
 	}
 	if err == nil {
 		err = n.Erase(ctx)
