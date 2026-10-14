@@ -147,6 +147,16 @@ func TestMediaPlaybackLikeTheTvApp(t *testing.T) {
 	if r := invokeMounted(t, player, mpdef.ClusterID, mpdef.CmdSeek, mpdef.SeekRequest{Position: 100_000_000}).(mpdef.PlaybackResponse); r.Status != mpdef.StatusSeekOutOfRange {
 		t.Errorf("Seek past the end: %+v", r)
 	}
+	// MEDIAPLAYBACK-6.9: the second audio track becomes active.
+	invokeMounted(t, player, mpdef.ClusterID, mpdef.CmdActivateAudioTrack, mpdef.ActivateAudioTrackRequest{TrackId: "activeAudioTrackId_1", AudioOutputIndex: &spec.Nullable[uint8]{Value: 1}})
+	if tr := readMounted(t, player, mpdef.ClusterID, mpdef.AttrActiveAudioTrack).(mpdef.TrackStruct); tr.Id != "activeAudioTrackId_1" {
+		t.Errorf("ActiveAudioTrack %+v", tr)
+	}
+	invokeMounted(t, player, mpdef.ClusterID, mpdef.CmdActivateTextTrack, mpdef.ActivateTextTrackRequest{TrackId: "activeTextTrackId_0"})
+	invokeMounted(t, player, mpdef.ClusterID, mpdef.CmdDeactivateTextTrack, mpdef.DeactivateTextTrackRequest{})
+	if v := readMounted(t, player, mpdef.ClusterID, mpdef.AttrActiveTextTrack); v != nil {
+		t.Errorf("ActiveTextTrack %v after Deactivate", v)
+	}
 	invokeMounted(t, player, mpdef.ClusterID, mpdef.CmdStop, mpdef.StopRequest{})
 	if state() != uint8(2) {
 		t.Errorf("after Stop: %v", state())

@@ -18238,7 +18238,7 @@
       "identifier": "TestMediaPlatformMovesTheAppStatus",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/media_test.go",
-      "line": 241
+      "line": 251
     },
     {
       "package": "examples/reference-bridge",
@@ -18252,7 +18252,7 @@
       "identifier": "TestMediaPlayerClustersLikeTheTvApp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/media_test.go",
-      "line": 167
+      "line": 177
     },
     {
       "package": "examples/reference-bridge",

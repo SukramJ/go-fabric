@@ -39,7 +39,7 @@ import (
 //
 //   - "player" is a CastingVideoPlayer (tv-app endpoint 1, device type
 //     ma_casting_videoplayer, tv-app.matter:4384-4385) stating
-//     ContentAppPlatform and PhysicalInputs: OnOff, MediaPlayback (AS, VS),
+//     ContentAppPlatform and PhysicalInputs: OnOff, MediaPlayback (AS, VS, TT, AT, AA),
 //     KeypadInput (NV, LK, NK), ContentLauncher (CS, UP), ApplicationLauncher
 //     (AP), MediaInput (NU), AudioOutput (NU), Channel (CL, LI),
 //     TargetNavigator, LowPower and WakeOnLan.
@@ -116,15 +116,20 @@ func (m *demoMedia) buildPlayer() error {
 	// expectation, the header says), position 0, duration 80000.
 	duration, start := uint64(80000), uint64(0)
 	if m.playback, err = media.NewPlayback(media.PlaybackConfig{
-		Port:     playerTransport{},
-		Features: mpdef.FeatureAdvancedSeek | mpdef.FeatureVariableSpeed,
+		Port: playerTransport{},
+		// tv-app.matter:4475 (featureMap 0x001F: AS, VS, TT, AT, AA).
+		Features: mpdef.FeatureAdvancedSeek | mpdef.FeatureVariableSpeed | mpdef.FeatureTextTracks |
+			mpdef.FeatureAudioTracks | mpdef.FeatureAudioAdvance,
 		Initial: media.PlaybackState{
-			CurrentState:    mpdef.PlaybackStatePlaying,
-			StartTime:       &start,
-			Duration:        &duration,
-			SampledPosition: &mpdef.PlaybackPositionStruct{UpdatedAt: 0, Position: spec.Nullable[uint64]{Value: 0}},
-			SeekRangeStart:  &start,
-			SeekRangeEnd:    &duration,
+			CurrentState:         mpdef.PlaybackStatePlaying,
+			StartTime:            &start,
+			Duration:             &duration,
+			SampledPosition:      &mpdef.PlaybackPositionStruct{UpdatedAt: 0, Position: spec.Nullable[uint64]{Value: 0}},
+			SeekRangeStart:       &start,
+			SeekRangeEnd:         &duration,
+			ActiveAudioTrack:     &tvAudioTracks()[0],
+			AvailableAudioTracks: tvAudioTracks(),
+			AvailableTextTracks:  tvTextTracks(),
 		},
 	}); err != nil {
 		return err
@@ -425,6 +430,66 @@ func (playerTransport) Seek(_ context.Context, st *media.PlaybackState, req mpde
 	}
 	st.SampledPosition = position(req.Position)
 	return tvResponse(mpdef.StatusSuccess), nil
+}
+
+// tvTrack is one track of MediaPlaybackManager.h:77-118: its id, a
+// language code and a display name.
+func tvTrack(id, language, name string) mpdef.TrackStruct {
+	return mpdef.TrackStruct{Id: id, TrackAttributes: mpdef.TrackAttributesStruct{
+		LanguageCode: language, DisplayName: &spec.Nullable[string]{Value: name},
+	}}
+}
+
+// tvAudioTracks are the tv-app's two audio tracks (MediaPlaybackManager.h:
+// 86-101); the first is active (:77-85).
+func tvAudioTracks() []mpdef.TrackStruct {
+	return []mpdef.TrackStruct{
+		tvTrack("activeAudioTrackId_0", "languageCode1", "displayName1"),
+		tvTrack("activeAudioTrackId_1", "languageCode2", "displayName2"),
+	}
+}
+
+// tvTextTracks are the tv-app's two text tracks (:103-118); none is active
+// (:102).
+func tvTextTracks() []mpdef.TrackStruct {
+	return []mpdef.TrackStruct{
+		tvTrack("activeTextTrackId_0", "languageCode1", "displayName1"),
+		tvTrack("activeTextTrackId_1", "languageCode2", "displayName2"),
+	}
+}
+
+// errNoTrack refuses a track id the player does not offer:
+// HandleActivateAudioTrack and HandleActivateTextTrack answer false
+// (MediaPlaybackManager.cpp:305-333), which the server sends as FAILURE.
+var errNoTrack = errors.New("no such track")
+
+// ActivateAudioTrack is HandleActivateAudioTrack (:305-318); the audio
+// output index is not used.
+func (playerTransport) ActivateAudioTrack(_ context.Context, st *media.PlaybackState, req mpdef.ActivateAudioTrackRequest) error {
+	for _, tr := range st.AvailableAudioTracks {
+		if tr.Id == req.TrackId {
+			st.ActiveAudioTrack = &tr
+			return nil
+		}
+	}
+	return errNoTrack
+}
+
+// ActivateTextTrack is HandleActivateTextTrack (:320-333).
+func (playerTransport) ActivateTextTrack(_ context.Context, st *media.PlaybackState, req mpdef.ActivateTextTrackRequest) error {
+	for _, tr := range st.AvailableTextTracks {
+		if tr.Id == req.TrackId {
+			st.ActiveTextTrack = &tr
+			return nil
+		}
+	}
+	return errNoTrack
+}
+
+// DeactivateTextTrack is HandleDeactivateTextTrack (:335-343).
+func (playerTransport) DeactivateTextTrack(_ context.Context, st *media.PlaybackState) error { //nolint:unparam // the cluster/media port signature
+	st.ActiveTextTrack = nil
+	return nil
 }
 
 // tvKeys is KeypadInputManager.cpp:26-98: the navigation, menu and number
