@@ -217,7 +217,9 @@ Initiator; `cluster/core` OTA-Requestor als Port von
 `OtaSoftwareUpdateRequestorServer.ts` (1 436 Zeilen) mit Host-Port zum
 Anwenden; der ADR-0008-Initiator wird auf einen Invoke und einen
 BDX-Transfer zum Provider verallgemeinert. DiagnosticLogs bleibt ohne BDX
-(matter.js hat keines; DLOG/2.1 ist manuell). Abschluss: SU- und
+(matter.js hat keines; DLOG/2.1 ist manuell) — aufgehoben durch ADR 0021
+(Welle 23, #107): DiagnosticLogs sendet über BDX nach chip, der Provider
+ist gebaut. Abschluss: SU- und
 BDX-Familien laufen gegen `chip-ota-provider-app` aus dem Harness-Image;
 `BD-Matter-PASE-SessionParametersLegacy` entfällt.
 

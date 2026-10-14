@@ -37,6 +37,7 @@ German, briefly. Six waves were planned against the phases:
 | 20 | ADR 0020 stage 5, part 1: the group message sender (`groups.Manager.Sender`, `channel.EncryptGroup`, the group header constraint, `udp.Listener.SendMulticast`, the persisted group data counter), the Groupcast Sender feature (FeatureMap 0x07) | AN | `wave/2026-10-14-tranche-20` (#101); docs PR `docs/wave-20-followups` | see §20 |
 | 21 | ADR 0020 stage 5, part 2: `binding.Manager`, `core.Binding.OnChange` + fabric-scoped writes, the bridge decoding Binding writes, `node.Config.Client` (the node's client stack), the 11 controller device types, `TestLiveBinding` (TC-BIND-2.1) | AO | `wave/2026-10-14-tranche-21` (#103); docs PR `docs/wave-21-followups` | see §21 |
 | 22 | ADR 0020 stage 4 close-out: `device.Lookup`, the validator input seam (`endpoint.DeviceTypeTree`), `client.Endpoint.Device()`/`Conformance()`, `core.Binding.Persist` + node persistence; owner: the doubled group-sender start/stop fixed | AP | `wave/2026-10-14-tranche-22` (#105); docs PR `docs/wave-22-followups` | see §22 |
+| 23 | concept v2 phase 8 (ADR 0021): the BDX sender roles, `bridge.AttachBDXResponder`/`OpenSessionExchange`, `core.OTAProvider` + `node.Config.OTAProvider` (OtaProvider endpoint), DiagnosticLogs over BDX after chip, reference-bridge `--ota-provider`, in-repo proofs | AQ | `wave/2026-10-14-tranche-23` (#107); docs PR `docs/wave-23-followups` | see §23 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -1382,3 +1383,67 @@ ADR 0020 (stage-4 row: closed), concept v2 B.1, this section. Then delete
 `wave22/clientview`, `planning/briefs-wave-22`, the tranche and docs
 branches and the `.claude/worktrees/wave22-clientview` worktree. Next:
 wave 23 (brief AQ, phase 8) lands on top.
+
+## 23. Wave 23 (2026-10-14, the owner away; everything local; ran in parallel with wave 22)
+
+Concept v2 phase 8, ADR 0021 (written by the owner after Sonnet's
+`read-phase8.md`: matter.js's provider is full, its DiagnosticLogs
+server empty, the concept named a wrong BDX flow, the chip checkout lies
+after the pin but the cited files are identical). Brief AQ
+(`wave23/otaprovider`, head `d8d091e`) on `planning/briefs-wave-23`
+(`f8ce3d7`, which also carries the ADR). The branch was cut before #103
+landed, so the tranche is a **three-way merge** onto tranche 22
+(`node/node.go`, the devicegen lists and the generated device types
+unioned by hand, the inventory regenerated) plus the owner's commit.
+Lesson: cut a planning branch only from a `main` that has every tranche
+the brief depends on, and stack with `git merge`, never `cherry-pick -X theirs`,
+when two waves touched one file.
+
+- **bdx:** `Send`/`StartSend`/`Transfer.Run`, `Serve`, `Responder`
+  (matter.js `OutboundFlow`, `DrivenSendingFlow`, `FollowingReceivingFlow`,
+  `BdxProtocol`), `FuzzDecode`.
+- **bridge:** `AttachBDXResponder` (fail-closed as before),
+  `OpenSessionExchange`; the responder consumes a message before the
+  session's next IM message (the proof found ApplyUpdateRequest
+  overtaking BlockAckEof).
+- **core.OTAProvider:** OP's four consent states, Busy cases (OP:218,
+  :235, :302-305), the stale entry, tokens, caps; host ports
+  `OTAImageSource`/`OTAConsent`/`OTAApplyPolicy` (the apply policy may
+  also AwaitNextAction/Discontinue — `BD-Matter-OTAProvider-HostPorts`).
+  `node.Config.OTAProvider` → OtaProvider endpoint beside the Aggregator
+  with the Operate/CASE ACL entry (at Start and after each
+  CommissioningComplete); `device/ota_provider_gen.go`.
+- **DiagnosticLogs:** chip's `diagnostic-logs-server` line by line;
+  `LogCollector`/`LogSession` port, the old `LogProvider` adapted;
+  Exhausted/Denied/Busy/InvalidCommand/ConstraintError, timestamps on
+  Success only; `EndLogCollection` once (`BD-chip-DiagLogs-BDX`); six
+  tests that pinned the BDX-less behaviour changed (listed in report AQ).
+- **reference-bridge `--ota-provider`**, app-pipe `OtaProviderConsent`.
+- **Proofs:** `TestLiveOTAProvider` (AnnounceOTAProvider with
+  UpdateAvailable, since a DefaultOTAProviders write schedules the query
+  1–11 minutes out), `TestLiveDiagnosticLogsBDX` (test-only `ctlBDX`
+  receiver on `exchange.Manager.SetProtocolHandler`).
+- **Owner:** two entries retired, two written; findings note (consent
+  reset, `userConsentNeeded` after consent, first-fabric ACL — mirrored
+  matter.js, upstream look); clustergen comment.
+
+Guards on the tranche (tool PATH exported, `CHIP_ROOT` absolute, HEAD
+logged): `make ci`, `make race`, `make reachability-check`,
+`make chipdm-check`, `make fuzz`, `make chiptool-test`, a narrowed DGETH
+family run — all green (chip-tool 314 pass, 0 fail, 1 skip); on `main`
+again after #105 (`8a2f9ca`): ci, race, reachability, chipdm, chip-tool
+green (the one ci failure was the module-walk tests tripping over a
+worktree removed mid-run). The stacked-branch integration cost two
+mistakes worth remembering: a chained `git add -A; git commit` after a
+failed merge committed conflict markers (discarded), and `pkill -f` with
+a pattern that matched the owner's own shell. PR #107 (auto-merge).
+
+**Docs PR `docs/wave-23-followups`** (after the tranche merged): concept
+v2 phase-8 row done, `docs/matterjs-comparison.md` rows 109–111 (OTA
+provider ✅, DiagnosticLogs with BDX), ADR 0019 (a note that ADR 0021
+supersedes its two exclusions), concept v1 §B.2 line, `docs/certifiability.md`
+(SU and DLOG notes: provider cases manual, DLOG/2.1 manual at the pin),
+this section. Then delete `wave23/otaprovider`, `planning/briefs-wave-23`,
+the tranche and docs branches and the `.claude/worktrees/wave23-otaprovider`
+worktree. Next: phase 9 (media, ADR 0022) and/or ADR 0020 stage 6 —
+the owner's call; `v1.0.0` after phase 9.
