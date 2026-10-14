@@ -129,3 +129,23 @@ func (b *Bridge) bdxPeer(sessionID uint16) (bdx.Peer, bool) {
 	}
 	return peer, true
 }
+
+// OpenSessionExchange implements core.BDXExchangeOpener: a new exchange
+// this node initiates on the secure session sessionID — the session a
+// command arrived on, for the BDX transfer chip's DiagnosticLogs server
+// opens there (connectedhomeip BDXDiagnosticLogsProvider.cpp:67-70 at the
+// harness pin, exchangeMgr->NewContext(sessionHandle)). Called from that
+// command's handler, it hands the session's turn on (session_order.go):
+// the handler goes on to wait for the peer's SendAccept on this session.
+func (b *Bridge) OpenSessionExchange(ctx context.Context, sessionID uint16) (bdx.Exchange, error) {
+	addr := b.currentPeerAddr(sessionID, nil)
+	if addr == nil {
+		return nil, ErrUnsolicitedSessionMissing
+	}
+	ex, err := b.openInitiatedExchange(peerLink{sessionID: sessionID, addr: addr})
+	if err != nil {
+		return nil, err
+	}
+	leaveSessionOrder(ctx)
+	return ex, nil
+}

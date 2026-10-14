@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4900,
+  "entry_points": 4904,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,8 +186,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11195,
-    "reachable": 7837,
+    "total_exported": 11201,
+    "reachable": 7843,
     "whitelisted": 3353,
     "unreachable": 5
   },
@@ -5495,7 +5495,7 @@
       "identifier": "TestActionsMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 271
+      "line": 273
     },
     {
       "package": "cluster/core",
@@ -5572,7 +5572,7 @@
       "identifier": "TestEcosystemInformationMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 250
+      "line": 252
     },
     {
       "package": "cluster/core",
@@ -5691,7 +5691,7 @@
       "identifier": "TestOTARequestorMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 224
+      "line": 226
     },
     {
       "package": "cluster/core",
@@ -6020,7 +6020,7 @@
       "identifier": "TestPowerSourceConfigurationMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
-      "line": 241
+      "line": 243
     },
     {
       "package": "cluster/core",

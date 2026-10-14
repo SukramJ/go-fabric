@@ -210,7 +210,9 @@ func TestSmallSystemServersMatchTheGeneratedDefinitions(t *testing.T) {
 	}
 	r := resp.(RetrieveLogsResponse)
 	got, err := diaglogsdef.Definition.Command(diaglogsdef.CmdRetrieveLogsResponse, spec.Response).Decode(spectest.Decode(t, spectest.Encode(t, r)))
-	if g, _ := got.(diaglogsdef.RetrieveLogsResponse); err != nil || g.Status != diaglogsdef.StatusNoLogs || g.UtcTimeStamp == nil || g.TimeSinceBoot == nil {
+	// NoLogs is a failure: the status alone, no timestamps (chip
+	// DiagnosticLogsCluster.cpp:44-49 at the harness pin, ADR 0021).
+	if g, _ := got.(diaglogsdef.RetrieveLogsResponse); err != nil || g.Status != diaglogsdef.StatusNoLogs || g.UtcTimeStamp != nil || g.TimeSinceBoot != nil {
 		t.Errorf("RetrieveLogsResponse decoded as %+v (%v)", got, err)
 	}
 	if c, id := r.ResponseCommand(); c != diaglogsdef.ClusterID || id != diaglogsdef.CmdRetrieveLogsResponse {

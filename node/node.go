@@ -205,6 +205,10 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		return nil, fmt.Errorf("node: %w", err)
 	}
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
+	// DiagnosticLogs hands logs over BDX on the requesting session
+	// (ADR 0021).
+	n.root.DiagnosticLogs.AttachExchangeOpener(n.br)
+	n.root.DiagnosticLogs.SetLogger(n.logger)
 	n.br.AttachRootClusters(n.root.Servers())
 	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, cfg.AggregatorServers)
 	if err != nil {
