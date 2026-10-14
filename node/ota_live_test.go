@@ -216,7 +216,7 @@ func (l *statusLog) states() []mattercore.OTAUpdateStatus {
 // events walk Querying, Downloading, Applying and back to Idle, and it
 // runs the new version.
 func TestLiveOTAProvider(t *testing.T) {
-	t.Parallel()
+	// Not parallel: the nodes and commissioner here starve the package's other live tests of their handshake budget.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -331,7 +331,7 @@ func (m memLogs) Logs(context.Context, uint8) ([]byte, error) { return m, nil }
 // A 100-byte log is answered Exhausted with the content in the response
 // and no transfer (DiagnosticLogsCluster.cpp:137-140).
 func TestLiveDiagnosticLogsBDX(t *testing.T) {
-	t.Parallel()
+	// Not parallel: the nodes and commissioner here starve the package's other live tests of their handshake budget.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	n := liveNode(t, "logs", nil)
