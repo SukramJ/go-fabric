@@ -81,6 +81,36 @@ pseudo-version of `main`.
   the bridge's group-message routing and the root GroupKeyManagement
   share one state.
 
+- `controller/client.Registry` (ADR 0020, stage 4, second half; brief AL):
+  the controller's set of client nodes — matter.js `Peers` with the
+  per-node half of `CommissioningClient`, at `0ceb202d`.
+  `NewRegistry(RegistryConfig)` restores every node its `Store` holds,
+  binding a commissioned one to its protocol peer from its record; local
+  ids are `peerN`, the counter past every stored one. `Start` (with
+  `AutoStart`, every commissioned, enabled node), `Stop`, `Close`,
+  `Erase`; `Nodes`, `Commissioned`, `Get`, `GetByAddress`, `Size`.
+  `ForDevice(ctx, discovery.Device)` finds or creates the node of a device
+  the host's scanner found; `ForAddress(addr, id)` the node of a peer
+  address. `Commission(ctx, node, CommissionOptions)` and
+  `Decommission(ctx, node)` run one fabric operation per node at a time
+  (`ErrFabricOperationInProgress`): commission records the peer address,
+  time and our fabric index on the peer, subscribes and starts the node;
+  decommission reads `CurrentFabricIndex` when needed, sends
+  `RemoveFabric`, takes a leave event or a lost session as confirmation
+  and deletes the node. A node's commissioning record (`client.Record`:
+  peer address, CATs, addresses with their lifespans, the discovery data,
+  the reported session parameters) is stored beside its settings;
+  `Node.Record`, `Node.PeerAddress`, `Node.IsCommissioned`. Discovered
+  addresses and commissionable nodes expire (`DefaultTTL` 15 min, culled
+  every `ExpirationInterval`); a commissioned node keeps its freshest
+  address. The registry reacts to the peer's BasicInformation events:
+  `Leave` of our fabric deletes the node (`Hooks.Decommissioned`, new),
+  `ShutDown` gives up the peer's sessions, `StartUp` those older than its
+  newest. Our fabric label is pushed to the peer once per start when it
+  drifted. `RegistryConfig.HooksFor` gives each node its own hooks.
+  A node a registry created before commissioning has no peer yet: its
+  `Read`, `Subscribe`, `Write` and `Invoke` return `ErrNotCommissioned`.
+
 - `controller/client/sqlstore` (ADR 0020, stage 4; brief AL §8): the first
   durable `client.Store`, on SQLite (`modernc.org/sqlite`, no new
   dependency). `sqlstore.New(db)` over the tables `matter_client_values`
