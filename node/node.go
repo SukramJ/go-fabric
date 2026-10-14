@@ -26,6 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/secure/operational"
 	"github.com/SukramJ/go-fabric/secure/setup"
 	"github.com/SukramJ/go-fabric/store"
+	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 // ErrStopped is returned by [Node.Start] after [Node.Stop]: a node is not
@@ -58,6 +59,8 @@ type Node struct {
 	advertiser mdns.Advertiser
 	bootReason uint8
 	persisted  persisted
+	// groupTx is the socket group messages leave through (groupsend.go).
+	groupTx *udp.Listener
 
 	// life bounds the goroutines New and Start begin (subscription
 	// engine, reapers, the operational-time keeper); Stop cancels it.
@@ -420,6 +423,7 @@ func (n *Node) Start(ctx context.Context) error {
 	if n.agg != nil {
 		n.agg.setStarted()
 	}
+	n.startGroupSender()
 
 	n.root.DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})
 	// BasicInformation StartUp, then GeneralDiagnostics BootReason, the
@@ -496,6 +500,7 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.window.stop()
 	n.sec.casep.StopReaper()
 	n.sec.subs.Stop()
+	n.stopGroupSender()
 	err := n.br.Stop(ctx)
 	_ = n.advertiser.Close()
 	n.cancel()
