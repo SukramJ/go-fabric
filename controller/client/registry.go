@@ -549,5 +549,14 @@ func (r *Registry) hooksFor(id string, holder *nodeHolder) Hooks {
 			host(endpoint, cluster, event, e, value)
 		}
 	}
+	hostAlive := h.SubscriptionAlive
+	h.SubscriptionAlive = func() {
+		if n := holder.get(); n != nil && n.latchLabel() {
+			r.goWork(func() { r.reconcileLabel(n) })
+		}
+		if hostAlive != nil {
+			hostAlive()
+		}
+	}
 	return h
 }

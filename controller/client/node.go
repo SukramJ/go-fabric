@@ -48,8 +48,12 @@ type Node struct {
 	// likelyOffline is the latch of :393-398.
 	likelyOffline bool
 	seeded        bool
-	stopObserve   func()
-	warned        map[[2]uint64]bool
+	// labelReconciled is NetworkClient's fabricLabelReconciled latch
+	// (NetworkClient.ts:268-273): set by the first SubscriptionAlive after
+	// Start, cleared by Stop.
+	labelReconciled bool
+	stopObserve     func()
+	warned          map[[2]uint64]bool
 	// requestObserver is a test seam: it sees each subscription request the
 	// node hands to the interaction.
 	requestObserver func(interaction.SubscribeRequest)
@@ -287,6 +291,7 @@ func (n *Node) Start(ctx context.Context) error {
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
 	n.started = false
+	n.labelReconciled = false
 	sub, stop := n.sub, n.stopObserve
 	n.sub, n.stopObserve = nil, nil
 	if !n.frozen {

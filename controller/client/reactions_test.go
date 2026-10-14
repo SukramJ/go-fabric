@@ -114,7 +114,7 @@ func TestReactionLeave(t *testing.T) {
 			e.PutUint(tlv.ContextTag(2), 0xFFF1)
 			e.PutUint(tlv.ContextTag(3), sr.fabric.FabricID)
 			e.PutUint(tlv.ContextTag(4), 0x2222)
-			e.PutUTF8(tlv.ContextTag(5), "x")
+			e.PutUTF8(tlv.ContextTag(5), "ours")
 			e.PutUint(tlv.ContextTag(0xFE), uint64(f.idx))
 			_ = e.EndContainer()
 		}
