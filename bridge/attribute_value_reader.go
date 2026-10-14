@@ -8,6 +8,7 @@ import (
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/spec"
+	bindingdef "github.com/SukramJ/go-fabric/cluster/spec/binding"
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/im"
@@ -54,6 +55,10 @@ func attributeValueReader(path im.ConcreteAttributePath, el tlv.Element, dec *tl
 		return decodeGroupKeyMapList(el, dec)
 	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
 		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, false)
+	case path.Cluster == bindingdef.ClusterID && path.Attribute == bindingdef.AttrBinding && el.IsContainer:
+		// Binding (0x001E) is a list of TargetStruct; the generated
+		// definition decodes it (brief AO, question 1).
+		return generatedAttributeValue(bindingdef.Definition, path.Attribute, el, dec, false)
 	case path.Cluster == otadef.ClusterID && path.Attribute == otadef.AttrDefaultOtaProviders && el.IsContainer:
 		v, err := mattercore.DecodeDefaultOTAProvidersWrite(dec, el, false)
 		return im.AttributeValue{Value: v}, err
@@ -84,7 +89,11 @@ func generatedAttributeValue(def *spec.Cluster, attrID uint32, el tlv.Element, d
 	if item {
 		n = spec.Node{El: tlv.Element{Type: tlv.TypeArray, IsContainer: true}, Children: []spec.Node{n}}
 	}
-	v, derr := def.Attribute(attrID).Decode(n)
+	attr := def.Attribute(attrID)
+	if attr.Access.Fabric == "F" {
+		stampFabricPlaceholder(&n)
+	}
+	v, derr := attr.Decode(n)
 	if derr != nil {
 		v = undecodedValue{derr}
 	}
@@ -497,6 +506,8 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 		return im.AttributeValue{Value: []mattercore.GroupKeyMapStruct{e}}, err
 	case path.Cluster == userlabeldef.ClusterID && path.Attribute == userlabeldef.AttrLabelList && el.IsContainer:
 		return generatedAttributeValue(userlabeldef.Definition, path.Attribute, el, dec, true)
+	case path.Cluster == bindingdef.ClusterID && path.Attribute == bindingdef.AttrBinding && el.IsContainer:
+		return generatedAttributeValue(bindingdef.Definition, path.Attribute, el, dec, true)
 	case path.Cluster == otadef.ClusterID && path.Attribute == otadef.AttrDefaultOtaProviders && el.IsContainer:
 		v, err := mattercore.DecodeDefaultOTAProvidersWrite(dec, el, true)
 		return im.AttributeValue{Value: v}, err
@@ -506,4 +517,32 @@ func listItemValue(path im.ConcreteAttributePath, el tlv.Element, dec *tlv.Decod
 		return v, err
 	}
 	return im.AttributeValue{Value: []any{v.Value}}, nil
+}
+
+// stampFabricPlaceholder sets the FabricIndex field (context tag 254) of
+// every struct in a fabric-scoped list write to 1 before the generated
+// decoder judges it. A writer's fabric index is noise the server replaces
+// with the accessing fabric — matter.js AttributeWriteResponse.ts:461-467
+// (the accessing fabric is assigned before validation) — but the
+// generated decoder requires 1..254, so a client that encodes 0 (the
+// generated encoders do) would be refused at the codec.
+func stampFabricPlaceholder(n *spec.Node) {
+	fabricTag := tlv.ContextTag(254)
+	placeholder := spec.Node{El: tlv.Element{Tag: fabricTag, Type: tlv.TypeUnsignedInt1, Uint: 1}}
+	for i := range n.Children {
+		entry := &n.Children[i]
+		if !entry.El.IsContainer {
+			continue
+		}
+		found := false
+		for j := range entry.Children {
+			if entry.Children[j].El.Tag == fabricTag {
+				entry.Children[j] = placeholder
+				found = true
+			}
+		}
+		if !found {
+			entry.Children = append(entry.Children, placeholder)
+		}
+	}
 }

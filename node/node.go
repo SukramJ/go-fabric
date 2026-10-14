@@ -60,9 +60,11 @@ type Node struct {
 	advertiser mdns.Advertiser
 	bootReason uint8
 	persisted  persisted
-	client     *clientStack
-	bindings   *binding.Manager
-	bindSync   bindingSync
+	// groupTx is the socket group messages leave through (groupsend.go).
+	groupTx  *udp.Listener
+	client   *clientStack
+	bindings *binding.Manager
+	bindSync bindingSync
 
 	// life bounds the goroutines New and Start begin (subscription
 	// engine, reapers, the operational-time keeper); Stop cancels it.
@@ -442,6 +444,7 @@ func (n *Node) Start(ctx context.Context) error {
 		n.agg.setStarted()
 	}
 	n.startGroupSender()
+	n.startGroupSender()
 
 	n.root.DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})
 	// BasicInformation StartUp, then GeneralDiagnostics BootReason, the
@@ -528,6 +531,7 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.window.stop()
 	n.sec.casep.StopReaper()
 	n.sec.subs.Stop()
+	n.stopGroupSender()
 	n.stopGroupSender()
 	err := n.br.Stop(ctx)
 	_ = n.advertiser.Close()

@@ -241,6 +241,11 @@ func (b *Binding) RemoveFabric(fabricIndex uint8) {
 
 // bindingWriteList converts a written value into the server's entries.
 func bindingWriteList(value any, fabric uint8, request bool) ([]TargetStruct, error) {
+	// The generated decoder hands the list as spec.List (decodeAttrBinding);
+	// the bridge's write path delivers it that way.
+	if l, ok := value.(spec.List[bindingdef.TargetStruct]); ok {
+		value = []bindingdef.TargetStruct(l)
+	}
 	switch v := value.(type) {
 	case []TargetStruct:
 		return append([]TargetStruct(nil), v...), nil

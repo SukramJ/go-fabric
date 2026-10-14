@@ -520,8 +520,10 @@ func TestLiveBinding(t *testing.T) {
 	}}, interaction.WriteOptions{DisableListChunking: true}); err != nil || st.Err() != nil {
 		t.Fatalf("GroupKeyMap: %+v %v", st, err)
 	}
+	// Since brief AN the node has a group sender: the entry resolves to a
+	// group target once the key is held.
 	waitLive(t, "the group entry resolving to the group sender", func() bool {
-		return dutLog.has("WARN Group binding peer registration failed")
+		return slices.ContainsFunc(host.resolutions(), func(r binding.Resolution) bool { return r.Kind == binding.KindGroup })
 	})
 
 	// The node's shutdown removes the live binding.

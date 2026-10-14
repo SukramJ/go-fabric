@@ -10,6 +10,10 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/cluster/spec"
+	"github.com/SukramJ/go-fabric/groups"
+	"github.com/SukramJ/go-fabric/im"
+
 	"github.com/SukramJ/go-fabric/binding"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/controller/discovery"
@@ -159,6 +163,15 @@ func (n *Node) Bindings() *binding.Manager { return n.bindings }
 // newBindings builds the binding manager over the node.
 func (n *Node) newBindings() (*binding.Manager, error) {
 	cfg := binding.Config{Topology: nodeTopology{n}, Logger: n.logger, Interaction: interaction.Config{Logger: n.logger}}
+	// A group entry resolves through the node's group sender (brief AN):
+	// the target invokes without an endpoint, suppressResponse forced.
+	cfg.Groups = binding.GroupSenderFunc(func(ctx context.Context, fabricIndex uint8, groupID uint16) (binding.GroupTarget, error) {
+		s, err := n.groups.Sender(ctx, fabricIndex, groupID)
+		if err != nil {
+			return nil, err
+		}
+		return groupTarget{s}, nil
+	})
 	if n.client != nil {
 		cfg.Peers = n.client.peers
 	}
@@ -319,11 +332,18 @@ func (t nodeTopology) ClientClusters(id uint16) []uint32 {
 }
 
 // HasGroupKey implements [binding.Topology]: the fabric's GroupKeyMap maps
-// the group to a key set (groups.Manager.HasKeyMapping).
+// the group to a key set it holds (groups.Manager.HasUsableKey).
 func (t nodeTopology) HasGroupKey(fabricIndex uint8, groupID uint16) bool {
-	ok, err := t.n.groups.HasKeyMapping(context.Background(), fabricIndex, groupID)
+	ok, err := t.n.groups.HasUsableKey(context.Background(), fabricIndex, groupID)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		t.n.logger.Debug("binding.group_key.lookup_failed", slog.String("err", err.Error()))
 	}
 	return err == nil && ok
+}
+
+// groupTarget adapts a [groups.Sender] to [binding.GroupTarget].
+type groupTarget struct{ s *groups.Sender }
+
+func (g groupTarget) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields spec.Encodable) error {
+	return g.s.Invoke(ctx, path, fields, groups.RequestOptions{})
 }

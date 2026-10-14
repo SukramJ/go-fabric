@@ -214,3 +214,28 @@ at the pin. Each commit carries its regenerated reachability inventory
 - Client CASE resumption records in memory.
 - "client stack disabled" (Go-only reason).
 - `TargetStruct` sentinel encoding (endpoint 0 not a target).
+
+## Owner's decisions (Fable, 2026-10-14, tranche 21)
+
+1. **Binding writes over the wire** (question 1): the bridge now decodes
+   the Binding list through the generated definition
+   (`bridge/attribute_value_reader.go`), and a fabric-scoped list write
+   has each entry's FabricIndex stamped with a placeholder before the
+   generated decoder judges it (`stampFabricPlaceholder`,
+   AttributeWriteResponse.ts:461-467: the accessing fabric is assigned
+   before validation; the generated client encoders send 0, which the
+   decoder's 1..254 constraint refused). `TestLiveBinding` runs the wire
+   path. `core.bindingWriteList` accepts the decoder's `spec.List`.
+2. **Group sender wired** (question 2): `node.newBindings` resolves group
+   entries through `groups.Manager.Sender` (brief AN); `HasGroupKey` is
+   `groups.Manager.HasUsableKey` (map entry and held key set,
+   BindingManager.ts:488-489). The live test now expects the group
+   resolution.
+3. Binding persistence, in-memory client resumption, endpoint 0 as a
+   target and the worktree `CHIP_ROOT`: findings register.
+4. `OnGroupcastChanged` as the key-change signal: accepted. mDNS-only
+   target discovery: accepted (matter.js does the same; `AddKnownPeer` is
+   the host's seam).
+5. `by_design`: `BD-Matter-NodeClientStack-SecondSocket`,
+   `BD-Matter-BindingManager-Worker` written; "client stack disabled" and
+   the `Resolution` shape are folded into the second.

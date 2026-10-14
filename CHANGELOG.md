@@ -12,6 +12,8 @@ pseudo-version of `main`.
 
 ### Added
 
+- The bridge decodes a Binding (0x001E) list write through the generated definition, stamping each entry's FabricIndex with a placeholder before validation (matter.js `AttributeWriteResponse.ts:461-467` at `0ceb202d` assigns the accessing fabric first); a Binding write over the wire reached the server as nothing before. `groups.Manager.HasUsableKey`: the group's key set is mapped and held.
+
 - Group sending (ADR 0020, stage 5, part 1; matter.js `SessionManager.groupSessionForAddress`,
   `GroupSession.create` / `encode`, `MessageExchange.#send` on a group session and
   `ClientGroupInteraction` at `0ceb202d`). `groups.Manager.Sender(ctx, fabricIndex, groupID)`
