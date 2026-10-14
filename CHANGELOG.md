@@ -94,7 +94,11 @@ pseudo-version of `main`.
   `OnConnectionStatusChanged`. The device layer gains the
   SecondaryNetworkInterface device type (0x0019,
   `device.NewSecondaryNetworkInterface`), and `device.RootNode` serves the
-  cluster as its `[WiFi]` requirement.
+  cluster as its `[WiFi]` requirement. `node.Network.WiFi` (a reporter,
+  the features, the optional attributes) mounts it on the root beside
+  EthernetNetworkDiagnostics and states the RootNode condition `WiFi`
+  (`endpoint.Config.RootDeviceConditions`); `Node.Root()` exposes it as
+  `WiFiNetworkDiagnostics`. NetworkCommissioning stays Ethernet-only.
 
 ### Fixed
 

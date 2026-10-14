@@ -13,6 +13,7 @@ import (
 	"github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/groups"
@@ -130,6 +131,42 @@ type Network struct {
 	// handshake and may open TCP to us — matter.js
 	// ServerNetworkRuntime.ts:355-363.
 	TCP bridge.TCPConfig
+	// WiFi mounts WiFiNetworkDiagnostics (0x0036) on the root for a node on
+	// Wi-Fi; the zero value (no Reporter) mounts none. NetworkCommissioning
+	// stays Ethernet-only either way (concept v2 §B.4): the node states the
+	// RootNode device-type condition WiFi, under which RootNode lists the
+	// cluster ("[WiFi]", device/root_node_gen.go), through the assembler's
+	// RootDeviceConditions — with [Config].Topology the host's own
+	// assembler states it. EthernetNetworkDiagnostics stays mounted beside
+	// it.
+	WiFi WiFi
+}
+
+// WiFi is a Wi-Fi node's WiFiNetworkDiagnostics configuration.
+type WiFi struct {
+	// Reporter answers the cluster's reads and ResetCounts
+	// (mattercore.WiFiReporter); nil mounts no cluster.
+	Reporter mattercore.WiFiReporter
+	// Features is the cluster's FeatureMap: wifidiagdef.FeaturePacketCounts
+	// (PKTCNT) and wifidiagdef.FeatureErrorCounts (ERRCNT, which brings
+	// ResetCounts).
+	Features wifidiagdef.Feature
+	// Attributes are the optional attributes served
+	// (wifidiagdef.AttrCurrentMaxRate).
+	Attributes []uint32
+}
+
+// conditionWiFi is the RootNode device-type condition a Wi-Fi node states
+// (the Base condition "WiFi", schema/devicetype_requirements_gen.go).
+const conditionWiFi = "WiFi"
+
+// rootDeviceConditions are the device-type conditions the node states for
+// its root endpoint: WiFi when it serves WiFiNetworkDiagnostics.
+func (c *Config) rootDeviceConditions() []string {
+	if c.Network.WiFi.Reporter != nil {
+		return []string{conditionWiFi}
+	}
+	return nil
 }
 
 // Commissioning is matter.js `commissioning` (CommissioningServer.ts:
