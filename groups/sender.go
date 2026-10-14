@@ -188,7 +188,7 @@ func (f *fabricGroups) currentKey(groupID uint16, nowMs int64) (uint16, epochKey
 //   - :144-148 without a transport there is no interface for it
 //     ([ErrNoInterface]);
 //   - :163 the privacy key is derived from the operational key;
-//   - :739 the node-global group data counter numbers every message — a
+//   - :742 the node-global group data counter numbers every message — a
 //     store that cannot persist it refuses ([ErrNoCounterStore]).
 func (m *Manager) Sender(ctx context.Context, fabricIndex uint8, groupID uint16) (*Sender, error) {
 	if groupID == 0 {
