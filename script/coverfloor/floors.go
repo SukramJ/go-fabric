@@ -81,6 +81,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/controller/client", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/controller/client/sqlstore", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/controller/commissioner", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/controller/discovery", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
 	// The module's lowest measured package (76.7 when last raised).
