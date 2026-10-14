@@ -225,3 +225,23 @@ flipped:
 4. `ErrNoKey` now serves both the receive path ("no key candidate") and the
    send path (GroupKeySetMissingError); a separate sentinel if hosts need to
    tell them apart?
+
+## Owner's decisions (Fable, 2026-10-14, tranche 20)
+
+Spot-checked at the pin: MS:41-75 (legacy *send* counters) and
+`ServerGroupNetworking.ts:63, :87` (joins the groups with endpoints only)
+read as reported.
+
+1. The bridge keeps its listener private for now; the ephemeral send
+   socket is `BD-Matter-GroupSendFromEphemeralPort`, closing in the
+   findings register.
+2. Sender-only groups are not joined — confirmed.
+3. The epoch-start comparison is a findings-register note (matter.js
+   compares Matter-epoch µs as Unix ms; mirrored).
+4. `ErrNoKey` shared by both paths stands.
+5. `by_design`: `BD-Matter-GroupReceiveOnly` and `BD-Matter-GroupcastNoSender`
+   removed; `BD-Matter-GroupSendOnEveryMulticastInterface` and
+   `BD-Matter-GroupSendFromEphemeralPort` written. Candidate C (stale
+   multicast address in a cached sender) is matter.js's own behaviour, no
+   entry; D (no chunking) is a findings note. The two test assertions
+   outside the brief's paths are accepted.
