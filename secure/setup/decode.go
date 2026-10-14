@@ -175,14 +175,15 @@ func decodeQRPart(part string) (Payload, error) {
 		}
 		return v
 	}
+	// G115 below: field masks every value to its width, which fits its type.
 	p := Payload{
-		Version:       uint8(field(0, 3)),
-		VendorID:      uint16(field(3, 16)),
-		ProductID:     uint16(field(19, 16)),
-		CustomFlow:    uint8(field(35, 2)),
-		DiscoveryCaps: DiscoveryCaps(field(37, 8)),
-		Discriminator: uint16(field(45, 12)),
-		Passcode:      uint32(field(57, 27)),
+		Version:       uint8(field(0, 3)),          //nolint:gosec // G115: masked to width
+		VendorID:      uint16(field(3, 16)),        //nolint:gosec // G115: masked to width
+		ProductID:     uint16(field(19, 16)),       //nolint:gosec // G115: masked to width
+		CustomFlow:    uint8(field(35, 2)),         //nolint:gosec // G115: masked to width
+		DiscoveryCaps: DiscoveryCaps(field(37, 8)), //nolint:gosec // G115: masked to width
+		Discriminator: uint16(field(45, 12)),       //nolint:gosec // G115: masked to width
+		Passcode:      uint32(field(57, 27)),       //nolint:gosec // G115: masked to width
 	}
 	// PairingCodeSchema.ts:279-286 (validate).
 	if p.Version != 0 {
@@ -222,13 +223,13 @@ func base38Decode(s string) ([]byte, error) {
 			if c < 0 {
 				return invalid("Unexpected character %q at %d", s[off+i], off+i)
 			}
-			v = v*38 + uint32(c)
+			v = v*38 + uint32(c) //nolint:gosec // G115: an index of the 38-character alphabet
 		}
 		if v >= 1<<(8*bytes) {
 			return invalid("Base38 group at %d decodes to more than %d bytes", off, bytes)
 		}
 		for i := range bytes {
-			out = append(out, byte(v>>(8*i)))
+			out = append(out, byte(v>>(8*i))) //nolint:gosec // G115: one byte of the group, truncation intended
 		}
 		return nil
 	}
@@ -294,7 +295,7 @@ func DecodeExtra(b []byte) (Extra, error) {
 			if e.Vendor == nil {
 				e.Vendor = map[uint8][]byte{}
 			}
-			e.Vendor[uint8(tag)] = append([]byte(nil), b[start:dec.Pos()]...)
+			e.Vendor[uint8(tag)] = append([]byte(nil), b[start:dec.Pos()]...) //nolint:gosec // G115: a context tag, 0x80..0xFF
 			continue
 		}
 		if err := e.setDefault(tag, el); err != nil {

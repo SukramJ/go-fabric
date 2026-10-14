@@ -18,12 +18,12 @@ type mapSettings struct {
 	err error
 }
 
-func (s *mapSettings) GetSetting(_ context.Context, key string) (string, bool, error) {
+func (s *mapSettings) GetSetting(_ context.Context, key string) (value string, ok bool, err error) {
 	if s.err != nil {
 		return "", false, s.err
 	}
-	v, ok := s.m[key]
-	return v, ok, nil
+	value, ok = s.m[key]
+	return value, ok, nil
 }
 
 func (s *mapSettings) SetSetting(_ context.Context, key, value string) error {

@@ -279,7 +279,7 @@ func TestDecodeManualCode_RoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", code, err)
 		}
-		if m.Passcode != tc.p || m.ShortDiscriminator != uint8(tc.d>>8) {
+		if m.Passcode != tc.p || uint16(m.ShortDiscriminator) != tc.d>>8 {
 			t.Fatalf("%s: %+v", code, m)
 		}
 	}

@@ -123,7 +123,7 @@ func newController(t *testing.T, names *discovery.Names, listen string) *control
 // newControllerWith builds a controller over a given CA and fabric
 // configuration; the returned func tears it down (once; the test's
 // cleanup calls it too).
-func newControllerWith(t *testing.T, names *discovery.Names, listen string, authority *ca.CA, fcfg FabricConfig) (*controller, func()) {
+func newControllerWith(t *testing.T, names *discovery.Names, listen string, authority *ca.CA, fcfg FabricConfig) (c *controller, closeAll func()) {
 	t.Helper()
 	l, err := udp.New(udp.Config{LocalAddr: listen, PreferIPv4: listen == "127.0.0.1:0"})
 	if err != nil {
@@ -151,9 +151,9 @@ func newControllerWith(t *testing.T, names *discovery.Names, listen string, auth
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := &controller{mgr: mgr, names: names, scanner: discovery.NewScanner(names), set: set, fabric: fabric, com: com}
+	c = &controller{mgr: mgr, names: names, scanner: discovery.NewScanner(names), set: set, fabric: fabric, com: com}
 	var once sync.Once
-	closeAll := func() {
+	closeAll = func() {
 		once.Do(func() {
 			c.scanner.Close()
 			com.Close()
