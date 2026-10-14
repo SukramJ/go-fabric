@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4867,
+  "entry_points": 4884,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11131,
-    "reachable": 7790,
-    "whitelisted": 3336,
+    "total_exported": 11151,
+    "reachable": 7807,
+    "whitelisted": 3339,
     "unreachable": 5
   },
   "by_package": [
@@ -680,6 +680,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/event_acl_test.go",
       "line": 85
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXResponder_RefusedWithoutResponder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_responder_test.go",
+      "line": 149
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXResponder_RoutesReceiveInit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_responder_test.go",
+      "line": 90
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBDXResponder_UnknownScope",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/bdx_responder_test.go",
+      "line": 177
     },
     {
       "package": "bridge",

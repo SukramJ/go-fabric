@@ -206,6 +206,9 @@ type initiatedSecureExchange struct {
 	// not what went unanswered (matter.js ExchangeManager.ts:554 takes
 	// the context's creation time, SessionManager.ts:688 compares).
 	createdAt time.Time
+	// responder is set on an exchange the peer opened (bdx_responder.go):
+	// this node answers on it with the I flag clear.
+	responder bool
 	in        chan bdx.Message
 	done      chan struct{}
 	closeOnce sync.Once
@@ -407,14 +410,14 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 		return ErrUnsolicitedSessionMissing
 	}
 	proto := message.ProtocolHeader{
-		Initiator:  true,
+		Initiator:  !e.responder,
 		Opcode:     opcode,
 		ExchangeID: e.exchangeID,
 		ProtocolID: protocolID,
 		NeedsAck:   tracker != nil,
 	}
 	if ackTracker != nil {
-		if counter, owed := ackTracker.LookupAndDischarge(e.sessionID, e.exchangeID, true); owed {
+		if counter, owed := ackTracker.LookupAndDischarge(e.sessionID, e.exchangeID, !e.responder); owed {
 			proto.HasAck, proto.AckCounter = true, counter
 		}
 	}
@@ -479,8 +482,13 @@ func (e *initiatedSecureExchange) MaxPayloadSize() int {
 func (e *initiatedSecureExchange) Close() error {
 	e.closeOnce.Do(func() {
 		close(e.done)
-		e.b.resumption.initiated.Delete(secureExchangeKey{sessionID: e.sessionID, exchangeID: e.exchangeID})
-		e.b.expediteDuplicateAck(e.sessionID, e.exchangeID, true)
+		key := secureExchangeKey{sessionID: e.sessionID, exchangeID: e.exchangeID}
+		if e.responder {
+			e.b.bdx.exchanges.Delete(key)
+		} else {
+			e.b.resumption.initiated.Delete(key)
+		}
+		e.b.expediteDuplicateAck(e.sessionID, e.exchangeID, !e.responder)
 		e.b.RunAckPumpOnce(time.Now())
 	})
 	return nil
