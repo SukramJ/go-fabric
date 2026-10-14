@@ -294,7 +294,7 @@ func onOff(srv *onoff.Server) bool {
 // for TH3 — and the DUT switches off (step 10): TH2 is off (step 11), TH3
 // stays on (step 12).
 func TestLiveBinding(t *testing.T) {
-	t.Parallel()
+	// Not parallel: the nodes and commissioner here starve the package's other live tests of their handshake budget.
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
