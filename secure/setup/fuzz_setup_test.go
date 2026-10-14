@@ -146,3 +146,48 @@ func FuzzIsValidSetupPIN(f *testing.F) {
 		}
 	})
 }
+
+// FuzzDecodeQRCode: the decoder never panics, and every code it accepts
+// re-encodes to a code that decodes to the same payload. The re-encoding
+// is not byte-identical in general: the header's four padding bits are
+// dropped on decode, as matter.js's QrCodeDataSchema drops them.
+func FuzzDecodeQRCode(f *testing.F) {
+	for _, s := range []string{"MT:YNJV7VSC00CMVH7SR00", "MT:YNJV7VSC00CMVH7E4810AK00", "MT:000004KP00KA0648G00", "MT:", "MT:*"} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		p, err := DecodeQRCode(s)
+		if err != nil {
+			return
+		}
+		again, err := QRCode(p)
+		if err != nil {
+			t.Fatalf("decoded %q to %+v, which does not re-encode: %v", s, p, err)
+		}
+		back, err := DecodeQRCode(again)
+		if err != nil || back.Extra == nil != (p.Extra == nil) {
+			t.Fatalf("%q -> %q does not decode back: %v", s, again, err)
+		}
+		back.Extra, p.Extra = nil, nil
+		if back != p {
+			t.Fatalf("%q -> %q decodes to %+v, want %+v", s, again, back, p)
+		}
+	})
+}
+
+// FuzzDecodeManualCode: the decoder never panics, and an accepted 11-digit
+// code decodes to a passcode the encoder accepts.
+func FuzzDecodeManualCode(f *testing.F) {
+	for _, s := range []string{"26318621095", "0112 761 4316", "749701123365521327694", "80000000000"} {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		m, err := DecodeManualCode(s)
+		if err != nil {
+			return
+		}
+		if !IsValidPasscode(m.Passcode) || m.ShortDiscriminator > 0x0F {
+			t.Fatalf("accepted %q as %+v", s, m)
+		}
+	})
+}

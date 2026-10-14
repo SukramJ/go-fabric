@@ -111,6 +111,9 @@ var floors = []packageFloor{
 		min: 0,
 		why: "example daemon, exercised end to end by the chip-tool suite, which runs the built binary rather than its statements. It does have statement-level tests now — fleet_test.go drives a subscription through a mounted endpoint — but the floor stays at 0 because the daemon's value is the end-to-end run, and a number here would ratchet on the fake devices rather than on anything a consumer depends on",
 	},
+	// Brief AT §4: the floor the brief set; measured 74.0 with
+	// TestReferenceController and TestReferenceControllerOTA alone.
+	{pkg: "github.com/SukramJ/go-fabric/examples/reference-controller", min: 70},
 	{pkg: "github.com/SukramJ/go-fabric/im", min: 82},
 	// Measured 91.7-92.7 across six runs at varying GOMAXPROCS: this
 	// package has concurrent paths whose coverage depends on scheduling, so

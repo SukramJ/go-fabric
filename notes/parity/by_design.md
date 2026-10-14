@@ -2861,3 +2861,59 @@ Report AS.
 By design (ADR 0020 stage 6b). A fixed passcode on a reverse window is
 an example's convenience, not a protocol rule; the fabric comparison is
 what chip's TODO asks for.
+
+### BD-Matter-ControllerFabric-OneRecord — the controller keeps one fabric per database, with its key and NOC, and resumes sessions from memory only
+
+matter.js's `FabricManager.ts:41-114` at `0ceb202d` persists a list of
+`Fabric.Config` records under `"fabrics"` with a `nextFabricIndex`
+counter; each record carries the fabric id, root node id, IPK, operational
+certificate and key pair (`Fabric.ts:53-74`), and `FabricAuthority.ts:134-139`
+mints a random root node id, a random IPK and vendor 0xFFF1 on first use.
+`controller/ca`'s `SettingStore` and `commissioner.FabricConfig.Store`
+keep one record of the same fields in the host's settings table — no list,
+no counter — so a second run of the reference controller is the same
+identity every paired node trusts; session resumption stays in
+`peer.MemoryResumptionStore` (a restart re-runs Sigma1–3). Report AT.
+
+By design (ADR 0020). A controller daemon has one fabric; the list form
+returns when a second is wanted.
+
+### BD-chip-ControllerCLI-JSON — the JSON value codec extends chip-tool's conventions by names, and leaves a struct's FabricIndex to the server
+
+chip-tool's argument parser at the harness pin
+(`examples/chip-tool/commands/clusters/JsonParser.h`, `CustomArgument.h`,
+`CustomStringPrefix.h`) takes numbers, `hex:`/`base64:`/`str:` strings,
+`null`, nested objects by field name and arrays. `spec.EncodeJSON`/`DecodeJSON`
+(`cluster/spec/json.go`) take the same and also an enum by its value name,
+a bitmap as an object of member names, struct keys without regard to
+case or by field id, and let a fabric-scoped struct omit `FabricIndex`
+(the server stamps the accessing fabric, `AttributeWriteResponse.ts:461-467`).
+Signed integers are JSON numbers only, as in chip-tool. Report AT.
+
+By design (ADR 0020). chip is the authority for tool input; the names
+are a convenience the definitions make exact.
+
+### BD-chip-ControllerCLI-OwnNode — the reference controller runs its own node for group sending and OTA serving, asks OTA consent at offer time, and sets a group up the pre-1.5 way where Groupcast is absent
+
+`group send` and `ota serve` need a node on the fabric (the group sender
+and the OTA provider are node services, `node/client.go`,
+`node.Config.OTAProvider`), so the tool commissions a `node.Node` of its
+own into its fabric on first use, as the `node/` live tests do. OTA
+consent is asked when an image is offered, not through the provider's
+consent hook: with the hook, matter.js's requestor cancels the update at
+apply time for a device that consents itself (`BD-Matter-OTAProvider-HostPorts`,
+findings "OTA provider, mirrored"). `group create` reads the node's
+ServerList and, without Groupcast (0x0065), follows chip's
+`src/app/tests/suites/TestGroupMessaging.yaml` at the pin — KeySetWrite
+TrustFirst (`:84-102`), a GroupKeyMap entry (`:122-132`), Groups AddGroup
+per endpoint (`:134-168`), an ACL entry for the group subject (the bare
+16-bit group id, which `cluster/core/access_control.go:1122` accepts as
+matter.js does; chip stores its 64-bit group node id in that form,
+`src/app/server/AclStorage.cpp:162-171`) granting Operate on those
+endpoints where the YAML's own entry (`:188-211`) grants any group Manage.
+Report AT.
+
+By design (ADR 0020). A bare controller has no sender socket of its own;
+the narrower ACL is what the group needs; a device before Matter 1.5 has
+no Groupcast.
+

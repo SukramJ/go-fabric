@@ -4,6 +4,7 @@
 package commissioner
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -38,7 +39,19 @@ type FabricConfig struct {
 	// The key's generation ignores it since Go 1.26 (crypto/ecdsa; see
 	// ca.Config.Rand); the IPK is drawn from it.
 	Rand io.Reader
+	// Store keeps the fabric across restarts; nil keeps nothing (a new
+	// key, NOC and IPK every NewFabric). With a Store, NewFabric loads the
+	// stored record when there is one — the same fabric id, root node id,
+	// IPK, index, label, key and NOC — and otherwise mints them and saves
+	// the record. A stored record wins over the fields above; a non-zero
+	// FabricID or RootNodeID that differs from it is [ErrFabricMismatch].
+	Store ca.FabricStore
 }
+
+// ErrFabricMismatch is a stored fabric record that does not fit: its
+// fabric id or root node id differs from a non-zero FabricConfig value, or
+// it was made under another root than the CA's.
+var ErrFabricMismatch = errors.New("commissioner: stored fabric does not match")
 
 // Fabric is our side of a fabric the commissioner commissions into:
 // [handshake.Fabric] (our operational identity, the root public key, the
@@ -60,13 +73,22 @@ type Fabric struct {
 	CA *ca.CA
 }
 
-// NewFabric mints our own key and NOC through c and builds the fabric's
-// operational identity — the key, the NOC, the ICAC, the operational IPK
+// NewFabric loads the fabric cfg.Store keeps, or mints our own key and NOC
+// through c and builds the fabric's operational identity — the key, the NOC, the ICAC, the operational IPK
 // (sigma.DeriveOperationalIPK over the compressed fabric id), the ids —
 // as bridge/bridgetest's Commissioner.identity does for its test CA.
 func NewFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 	if c == nil {
 		return nil, errors.New("commissioner: NewFabric needs a CA")
+	}
+	if cfg.Store != nil {
+		rec, ok, err := cfg.Store.LoadFabric()
+		if err != nil {
+			return nil, fmt.Errorf("commissioner: load fabric: %w", err)
+		}
+		if ok {
+			return loadFabric(c, cfg, rec)
+		}
 	}
 	if cfg.FabricID == 0 {
 		return nil, errors.New("commissioner: fabric id 0")
@@ -102,6 +124,79 @@ func NewFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 	if err != nil {
 		return nil, err
 	}
+	f, err := buildFabric(c, cfg, ipk, key, noc)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Store != nil {
+		if err := cfg.Store.SaveFabric(fabricRecord(f, c)); err != nil {
+			return nil, fmt.Errorf("commissioner: save fabric: %w", err)
+		}
+	}
+	return f, nil
+}
+
+// loadFabric rebuilds a fabric from its stored record — the load half of
+// matter.js FabricManager's construction (FabricManager.ts:66-69,
+// Fabric.create over each stored Fabric.Config), for the one fabric a
+// controller owns.
+func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error) {
+	if cfg.FabricID != 0 && cfg.FabricID != rec.FabricID {
+		return nil, fmt.Errorf("%w: fabric id 0x%016X, stored 0x%016X", ErrFabricMismatch, cfg.FabricID, rec.FabricID)
+	}
+	if cfg.RootNodeID != 0 && cfg.RootNodeID != rec.RootNodeID {
+		return nil, fmt.Errorf("%w: root node id 0x%016X, stored 0x%016X", ErrFabricMismatch, cfg.RootNodeID, rec.RootNodeID)
+	}
+	if len(rec.RootPublicKey) > 0 && !bytes.Equal(rec.RootPublicKey, c.RootPublicKey()) {
+		return nil, fmt.Errorf("%w: the record was made under another root", ErrFabricMismatch)
+	}
+	if rec.FabricID == 0 || !isOperationalNodeID(rec.RootNodeID) || len(rec.IPK) != 16 {
+		return nil, fmt.Errorf("%w: stored record is incomplete", ErrFabricMismatch)
+	}
+	if rec.FabricIndex == 0 {
+		rec.FabricIndex = 1
+	}
+	cfg.FabricID, cfg.RootNodeID, cfg.VendorID = rec.FabricID, rec.RootNodeID, rec.RootVendorID
+	cfg.Label, cfg.FabricIndex = rec.Label, rec.FabricIndex
+	if rec.KeyPair == nil || len(rec.NOC) == 0 {
+		// No identity kept: mint one under the stored ids and save it.
+		cfg.IPK = rec.IPK
+		store := cfg.Store
+		cfg.Store = nil
+		f, err := NewFabric(c, cfg)
+		if err != nil {
+			return nil, err
+		}
+		if err := store.SaveFabric(fabricRecord(f, c)); err != nil {
+			return nil, fmt.Errorf("commissioner: save fabric: %w", err)
+		}
+		return f, nil
+	}
+	key, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), rec.KeyPair.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("%w: operational key: %w", ErrFabricMismatch, err)
+	}
+	return buildFabric(c, cfg, rec.IPK, key, rec.NOC)
+}
+
+// fabricRecord is the record of f, its key and NOC included.
+func fabricRecord(f *Fabric, c *ca.CA) ca.FabricRecord {
+	r := ca.FabricRecord{
+		FabricID: f.FabricID, RootNodeID: f.RootNodeID, RootVendorID: f.RootVendorID,
+		IPK: f.IPK, FabricIndex: f.FabricIndex, Label: f.Label, RootPublicKey: c.RootPublicKey(),
+	}
+	if id := f.Identity; id != nil && id.PrivateKey != nil {
+		pub, _ := id.PrivateKey.PublicKey.Bytes() // a P-256 key this package generated or parsed
+		priv, _ := id.PrivateKey.Bytes()
+		r.KeyPair, r.NOC = &ca.KeyPair{PublicKey: pub, PrivateKey: priv}, id.NOC
+	}
+	return r
+}
+
+// buildFabric is the operational identity over a key and its NOC: the
+// compressed fabric id, the operational IPK (sigma.DeriveOperationalIPK),
+// the root public key and the CA's verifier.
+func buildFabric(c *ca.CA, cfg FabricConfig, ipk []byte, key *ecdsa.PrivateKey, noc []byte) (*Fabric, error) {
 	root := c.RootPublicKey()
 	cfid, err := ca.CompressedFabricID(root, cfg.FabricID)
 	if err != nil {

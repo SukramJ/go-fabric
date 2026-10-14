@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5048,
+  "entry_points": 5073,
   "entry_packages": [
     ".",
     "bdx",
@@ -172,6 +172,7 @@
     "endpoint/endpointtest",
     "endpoint/sqlitestore",
     "examples/reference-bridge",
+    "examples/reference-controller",
     "groups",
     "im",
     "im/subscription",
@@ -205,9 +206,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12230,
-    "reachable": 8668,
-    "whitelisted": 3557,
+    "total_exported": 12268,
+    "reachable": 8689,
+    "whitelisted": 3574,
     "unreachable": 5
   },
   "by_package": [
@@ -15650,7 +15651,7 @@
       "identifier": "TestAcceptedFailedAttestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 370
+      "line": 385
     },
     {
       "package": "controller/commissioner",
@@ -15671,7 +15672,7 @@
       "identifier": "TestCommissionTheNode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 205
+      "line": 220
     },
     {
       "package": "controller/commissioner",
@@ -15734,14 +15735,21 @@
       "identifier": "TestEstablishPASE",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 339
+      "line": 354
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestFabricPersistsAcrossRestart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_persist_test.go",
+      "line": 94
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestFinalizeCommissioning",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 281
+      "line": 296
     },
     {
       "package": "controller/commissioner",
@@ -15770,6 +15778,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
       "line": 157
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestNewFabricLoadsOrMints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/fabric_persist_test.go",
+      "line": 28
     },
     {
       "package": "controller/commissioner",
@@ -15811,7 +15826,7 @@
       "identifier": "TestRejectedAttestation",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_test.go",
-      "line": 313
+      "line": 328
     },
     {
       "package": "controller/commissioner",
@@ -18815,6 +18830,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wifi_test.go",
       "line": 32
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestArguments",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/args_test.go",
+      "line": 19
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestReferenceController",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/main_test.go",
+      "line": 323
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestReferenceControllerOTA",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/main_test.go",
+      "line": 468
     },
     {
       "package": "groups",
@@ -22409,6 +22445,20 @@
     },
     {
       "package": "secure/setup",
+      "identifier": "FuzzDecodeManualCode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/fuzz_setup_test.go",
+      "line": 180
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "FuzzDecodeQRCode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/fuzz_setup_test.go",
+      "line": 154
+    },
+    {
+      "package": "secure/setup",
       "identifier": "FuzzIsValidSetupPIN",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/fuzz_setup_test.go",
@@ -22427,6 +22477,55 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/fuzz_setup_test.go",
       "line": 34
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeExtra",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 152
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeManualCode_MatterJSVectors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 241
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeManualCode_Rejects",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 293
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeManualCode_RoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 272
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeQRCode_MatterJSVectors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 35
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeQRCode_Rejects",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 81
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecode_EveryInvalidPasscode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 313
     },
     {
       "package": "secure/setup",
@@ -22542,10 +22641,31 @@
     },
     {
       "package": "secure/setup",
+      "identifier": "TestQRCode_RoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 101
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestQRCode_RoundTripWithTLVTail",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 123
+    },
+    {
+      "package": "secure/setup",
       "identifier": "TestQRCode_StartsWithMT",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
       "line": 132
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestQRCode_TooLong",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 209
     },
     {
       "package": "secure/setup",

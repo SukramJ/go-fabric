@@ -61,6 +61,11 @@ type Payload struct {
 	Discriminator uint16
 	// Passcode is the 27-bit Matter setup code (1..99999998).
 	Passcode uint32
+	// Extra is the optional TLV tail after the 88-bit header (§5.1.5):
+	// the serial number, the PBKDF parameters and the vendor-specific
+	// elements. [DecodeQRCode] fills it when the code carries a tail;
+	// [QRCode] appends its Raw bytes when set. Nil means no tail.
+	Extra *Extra
 }
 
 // Validate returns nil when the payload's bit-widths are observed.
@@ -123,14 +128,31 @@ func QRCode(p Payload) (string, error) {
 	put(0, 4) // padding to 88 bits.
 
 	// 88 bits → 11 bytes little-endian.
-	raw := make([]byte, 11)
+	raw := make([]byte, 11, 11+extraLen(p.Extra))
 	tmp := new(big.Int).Set(bits)
 	for i := range 11 {
 		raw[i] = byte(new(big.Int).And(tmp, big.NewInt(0xFF)).Uint64() & 0xFF)
 		tmp.Rsh(tmp, 8)
 	}
+	// Mirrors matter.js packages/types/src/schema/PairingCodeSchema.ts:308-318
+	// (QrPairingCodeSchema.encodeInternal): the TLV data follows the
+	// fixed-length header byte-aligned, and the whole code, prefix
+	// included, stays within 255 characters.
+	if p.Extra != nil {
+		raw = append(raw, p.Extra.Raw...)
+	}
+	code := qrPrefix + base38Encode(raw)
+	if len(code) > MaxQRCodeLength {
+		return "", fmt.Errorf("setup: encoded pairing code is too long: %d characters (max %d)", len(code), MaxQRCodeLength)
+	}
+	return code, nil
+}
 
-	return "MT:" + base38Encode(raw), nil
+func extraLen(e *Extra) int {
+	if e == nil {
+		return 0
+	}
+	return len(e.Raw)
 }
 
 // base38Encode encodes b into Matter base38 per §5.7.4. Each pair of

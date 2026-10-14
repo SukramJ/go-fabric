@@ -101,7 +101,15 @@ type PeerCommunicationError struct {
 	Cause   error
 }
 
-func (e *PeerCommunicationError) Error() string { return "commissioner: " + e.Message }
+func (e *PeerCommunicationError) Error() string {
+	// matter.js's PeerCommunicationError carries the message alone; the
+	// cause is appended here so a failed connection names what the last
+	// attempt saw (a retransmission limit, a refused address).
+	if e.Cause != nil {
+		return "commissioner: " + e.Message + ": " + e.Cause.Error()
+	}
+	return "commissioner: " + e.Message
+}
 
 // Unwrap returns the cause.
 func (e *PeerCommunicationError) Unwrap() error { return e.Cause }

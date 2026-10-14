@@ -10,8 +10,24 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-14
+
+The release with the controller role (ADR 0020, stages 1–6b: the
+commissioner, the client interaction, the client node model, bindings and
+the group sender, the DCL client and CommissionerControl; Joint Fabric is
+deferred), the OTA provider and DiagnosticLogs over BDX (ADR 0021), the
+media and content clusters (ADR 0022), Wi-Fi diagnostics, and the
+reference controller CLI. It freezes no API: `docs/manual-test-plan-0.4.0.md`
+is the plan the owner runs against OpenCCU-Loom, the ecosystems and real
+devices before the `v1.0.0` freeze. Everything below was `[Unreleased]`
+since 0.3.1.
+
 ### Added
 
+- `examples/reference-controller`, the controller role as a command-line tool (`package main`, not API): `pair` by QR or manual code or passcode and discriminator (DNS-SD discovery, PASE, attestation against the embedded test PAAs or, with `--dcl prod|testnet`, the ledger, under `--attestation accept|reject|ask`), `unpair`, `nodes`, `node`, `read`, `write`, `invoke`, `subscribe`, `events` with chip-tool-style JSON values, `group create`/`group send`, `bind`, and `ota serve`; the CA, the fabric, the paired nodes and the DCL trust store live in one SQLite file (`--db`), so every run is the same fabric. Group sending and the OTA provider run on a node of the tool's own, commissioned into its fabric on first use. Its README lists every command.
+- `cluster/spec` has a JSON codec over the generated definitions: `spec.EncodeJSON(field, raw)` builds a `spec.Node` from a JSON value and `spec.DecodeJSON(field, node)` renders one, walking `spec.Type` with chip-tool's argument conventions (`ComplexArgument.h`, `CustomArgument.h`: integers as numbers or `0x` strings, octet strings as `hex:`/`str:`/bare hex, plus `base64:`, structs as objects by field name, lists as arrays, `null`; enums also by value name and bitmaps as an object of member names); a nil field is chip-tool's untyped form (`u:`/`s:`/`f:`/`d:`/`hex:` prefixes, objects keyed by context tag). `spec.AttributeField`, `spec.CommandField` and `spec.EventField` give the field of an attribute, a command payload and an event payload.
+- The controller's fabric persists: `ca.SettingStore` keeps the CA (matter.js `CertificateAuthority.Configuration` field names, JSON) and a `ca.FabricRecord` (after matter.js `Fabric.Config`: fabric id, root node id, root vendor id, IPK, fabric index, label, the operational key and NOC) under keys of a `*store.Store`-shaped `ca.Settings`; `ca.MemoryStore` is a `ca.FabricStore` too. `commissioner.FabricConfig.Store` makes `NewFabric` load the stored fabric or mint and save one, so a restarted controller is the same fabric with the same root node id; a stored record that conflicts is `commissioner.ErrFabricMismatch`.
+- `secure/setup` decodes onboarding payloads: `DecodeQRCode` / `DecodeQRCodes` (the `MT:` prefix, Base38, the 88-bit header, the TLV tail as `Payload.Extra` with the serial number, PBKDF parameters and manufacturer-specific elements, `DecodeExtra`) and `DecodeManualCode` (the 11- and 21-digit forms, the Verhoeff check digit, `ManualPayload`), validated as matter.js's `PairingCodeSchema` validates a decoded code; `IsValidPasscode` names matter.js's `isValidPasscode`. `QRCode` appends `Payload.Extra.Raw` when set and rejects a code longer than 255 characters (`MaxQRCodeLength`).
 - The media and content clusters (ADR 0022, concept v2 phase 9): the fifteen definitions are generated (`cluster/spec/mediaplayback`, `keypadinput`, `contentlauncher`, `applicationlauncher`, `applicationbasic`, `accountlogin`, `audiooutput`, `channel`, `targetnavigator`, `mediainput`, `lowpower`, `wakeonlan`, `contentcontrol`, `contentappobserver`, `messages`), and the new package `cluster/media` serves fourteen of them over typed host ports — `media.NewPlayback`, `NewKeypad`, `NewContentLauncher`, `NewAppLauncher`, `NewAppBasic`, `NewAccountLogin`, `NewOutputs`, `NewChannels`, `NewTargets`, `NewInputs`, `NewLowPower`, `NewWakeOnLan`, `NewContentControl`, `NewContentAppObserver`, each `(cfg XConfig) (*XServer, error)` on the standard server. A command reaches the port with its decoded request and the attribute state as a pointer the port changes; the change commits when the command succeeds and rolls back when it fails (`media.StatusError{Status}` answers its IM status, any other error FAILURE). An optional command is accepted only when the port implements its interface (`media.PlaybackSkip`, `media.InputRenamer`, `media.ChannelGuide`, …); a feature whose commands the port lacks is `media.ErrNotImplemented`, a served list or struct attribute without state `media.ErrMissingState`. LowPower's Sleep calls the port, as matter.js `LowPowerServer.sleep` emits `enterLowPowerMode`. `core.NewMessages(core.MessagesConfig{Presenter, Features})` is the Messages server, held in `cluster/core` because the Messages list is fabric-scoped: per-fabric reads, PresentMessagesRequest / CancelMessagesRequest through a `core.MessagePresenter`, `Presented` / `Complete` for the display's progress, and the three events.
 - The device types BasicVideoPlayer (0x0028), CastingVideoPlayer (0x0023) and ContentApp (0x0024) are generated (`device.NewBasicVideoPlayer`, `NewCastingVideoPlayer`, `NewContentApp`); the host mounts the `cluster/media` servers with `device.WithServer` and states the conditions PhysicalInputs, ContentAppPlatform and ObserverClient in `device.Options.Conditions`. `device.Lookup` now finds them.
 - The reference daemon's `--media` (TESTING ONLY): a CastingVideoPlayer and a ContentApp simulating connectedhomeip's tv-app, for the media certification families, which the harness now runs (`internal/chiptool`, the `app-media` CI group).
@@ -3864,7 +3880,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/SukramJ/go-fabric/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/SukramJ/go-fabric/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/SukramJ/go-fabric/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/SukramJ/go-fabric/compare/v0.1.0...v0.2.0
