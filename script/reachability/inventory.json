@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4837,
+  "entry_points": 4810,
   "entry_packages": [
     ".",
     "bdx",
@@ -127,6 +127,7 @@
     "cluster/spec/valveconfigurationandcontrol",
     "cluster/spec/waterheatermanagement",
     "cluster/spec/waterheatermode",
+    "cluster/spec/wifinetworkdiagnostics",
     "cluster/spec/windowcovering",
     "cluster/thermo",
     "cluster/transition",
@@ -185,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11021,
-    "reachable": 7717,
-    "whitelisted": 3299,
+    "total_exported": 11042,
+    "reachable": 7744,
+    "whitelisted": 3293,
     "unreachable": 5
   },
   "by_package": [
@@ -13687,6 +13688,83 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "AssociationFailureCauseEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
+      "line": 71
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "AssociationFailureCauseEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
+      "line": 84
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "ConnectionStatusEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
+      "line": 94
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "ConnectionStatusEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
+      "line": 105
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
+      "line": 60
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "SecurityTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
+      "line": 113
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "SecurityTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
+      "line": 128
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "WiFiVersionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
+      "line": 140
+    },
+    {
+      "package": "cluster/spec/wifinetworkdiagnostics",
+      "identifier": "WiFiVersionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
+      "line": 156
+    },
+    {
       "package": "cluster/spec/windowcovering",
       "identifier": "ConfigStatusBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -15553,7 +15631,7 @@
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 254
+      "line": 261
     },
     {
       "package": "device",
@@ -15630,7 +15708,7 @@
       "identifier": "TestRefusalsWrapTheirSentinel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
-      "line": 310
+      "line": 317
     },
     {
       "package": "device",

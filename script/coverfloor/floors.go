@@ -225,6 +225,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/softwarediagnostics", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/soilmeasurement", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/powersourceconfiguration", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/ecosysteminformation", min: 100},

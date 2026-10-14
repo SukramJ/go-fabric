@@ -21,6 +21,7 @@ import (
 	timeformatlocalizationdef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
 	timesynchronizationdef "github.com/SukramJ/go-fabric/cluster/spec/timesynchronization"
 	unitlocalizationdef "github.com/SukramJ/go-fabric/cluster/spec/unitlocalization"
+	wifinetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
 	"github.com/SukramJ/go-fabric/schema"
 )
 
@@ -102,6 +103,7 @@ var RootNodeType = Type{
 		},
 		{
 			ID: 0x0036, Name: "WiFiNetworkDiagnostics", Conformance: "[WiFi]",
+			Definition: wifinetworkdiagnosticsdef.Definition,
 		},
 		{
 			ID: 0x0037, Name: "EthernetNetworkDiagnostics", Conformance: "[Ethernet]",
@@ -190,6 +192,11 @@ func (d *RootNode) DiagnosticLogs() *spec.Server { return serverAs[*spec.Server]
 // SoftwareDiagnostics returns the SoftwareDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
 func (d *RootNode) SoftwareDiagnostics() *spec.Server {
 	return serverAs[*spec.Server](d.Device, 0x0034)
+}
+
+// WiFiNetworkDiagnostics returns the WiFiNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+func (d *RootNode) WiFiNetworkDiagnostics() *spec.Server {
+	return serverAs[*spec.Server](d.Device, 0x0036)
 }
 
 // EthernetNetworkDiagnostics returns the EthernetNetworkDiagnostics server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.

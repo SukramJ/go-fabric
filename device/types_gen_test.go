@@ -928,6 +928,9 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.SoftwareDiagnostics(); s != nil && d.Server(0x0034) != s {
 			t.Error("RootNode: optional SoftwareDiagnostics is not the device's server")
 		}
+		if s := d.WiFiNetworkDiagnostics(); s != nil && d.Server(0x0036) != s {
+			t.Error("RootNode: optional WiFiNetworkDiagnostics is not the device's server")
+		}
 		if s := d.EthernetNetworkDiagnostics(); s != nil && d.Server(0x0037) != s {
 			t.Error("RootNode: optional EthernetNetworkDiagnostics is not the device's server")
 		}
@@ -939,6 +942,25 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("RootNode") {
 		t.Errorf("RootNode: %v", err)
+	}
+	if _, err := NewSecondaryNetworkInterface(Options{}); err == nil {
+		t.Error("SecondaryNetworkInterface: constructed without a StableKey")
+	}
+	if d, err := NewSecondaryNetworkInterface(testOptions("SecondaryNetworkInterface"), testWith(t, "SecondaryNetworkInterface")...); err == nil {
+		if d.Type() != &SecondaryNetworkInterfaceType {
+			t.Errorf("SecondaryNetworkInterface: type %v", d.Type().Name)
+		}
+		if s := d.NetworkCommissioning(); d.Server(0x0031) == nil || s != nil && d.Server(0x0031) != s {
+			t.Error("SecondaryNetworkInterface: mandatory NetworkCommissioning not mounted")
+		}
+		if s := d.WiFiNetworkDiagnostics(); s != nil && d.Server(0x0036) != s {
+			t.Error("SecondaryNetworkInterface: optional WiFiNetworkDiagnostics is not the device's server")
+		}
+		if s := d.EthernetNetworkDiagnostics(); s != nil && d.Server(0x0037) != s {
+			t.Error("SecondaryNetworkInterface: optional EthernetNetworkDiagnostics is not the device's server")
+		}
+	} else if !refusesFixture("SecondaryNetworkInterface") {
+		t.Errorf("SecondaryNetworkInterface: %v", err)
 	}
 	if _, err := NewSmokeCoAlarm(Options{}); err == nil {
 		t.Error("SmokeCoAlarm: constructed without a StableKey")

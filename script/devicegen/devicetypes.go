@@ -10,7 +10,9 @@ package main
 // mandatory clusters are the excluded camera and media families (owner's
 // decision, 2026-10-11) — with OtaRequestor, which ADR 0018 ("Decisions
 // taken at the start of wave 6", 1) takes in since the requestor joined in
-// wave 5 (ADR 0019). Sorted by name.
+// wave 5 (ADR 0019), and SecondaryNetworkInterface, which concept v2 §B.4
+// takes in with the WiFiNetworkDiagnostics server (brief AM). Sorted by
+// name.
 var committed = []string{
 	"Aggregator",
 	"AirPurifier",
@@ -63,6 +65,7 @@ var committed = []string{
 	"RoboticVacuumCleaner",
 	"RoomAirConditioner",
 	"RootNode",
+	"SecondaryNetworkInterface",
 	"SmokeCoAlarm",
 	"SoilSensor",
 	"SolarPower",
@@ -123,6 +126,4 @@ var excluded = map[string]string{
 	"VideoDoorbell":      cameraMedia,
 	"FloodlightCamera":   cameraMedia,
 	"CastingVideoClient": cameraMedia,
-	// The last row of F.3 (OtaRequestor moved in by ADR 0018).
-	"SecondaryNetworkInterface": "F.3 secondary network interface (Thread or Wi-Fi diagnostics)",
 }

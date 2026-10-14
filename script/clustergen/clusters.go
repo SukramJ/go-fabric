@@ -129,6 +129,7 @@ var committed = []string{
 	"UnitLocalization",
 	"SoftwareDiagnostics",
 	"EthernetNetworkDiagnostics",
+	"WiFiNetworkDiagnostics",
 	"PowerSourceConfiguration",
 	"EcosystemInformation",
 	"Actions",
