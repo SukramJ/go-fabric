@@ -51,6 +51,16 @@ supply that a library cannot is in
 | [`notes/reference/matter-conformance.md`](./notes/reference/matter-conformance.md) | Which tests run, when, and what gates on them. |
 | [`notes/audits/matter-threat-model.md`](./notes/audits/matter-threat-model.md) | Threat model for the responder role. |
 
+## Examples
+
+[`examples/reference-bridge`](./examples/reference-bridge) is the reference
+daemon: a bridge on this module, the binary the chip-tool suite runs
+against. [`examples/reference-controller`](./examples/reference-controller)
+is the controller role as a command-line tool — pair a node by its QR or
+manual code, read, write, invoke, subscribe, provision groups and bindings,
+serve an OTA image — with its fabric kept in one SQLite file; its
+[README](./examples/reference-controller/README.md) lists every command.
+
 ## API stability
 
 The module carries its own SemVer lane, independent of any host that embeds
@@ -82,9 +92,10 @@ is as expensive to break as its production code.
 Three things outside `internal/` are still not API. `conformance/` is this
 module's own suite, shaped for the tests in this repository rather than for a
 consumer -- one of its three exported identifiers takes a `*testing.T`, and the
-other two exist to serve it. `examples/reference-bridge` and everything
-under `script/` are `package main` — runnable, not importable. Copy from
-them; do not build against them.
+other two exist to serve it. `examples/reference-bridge`,
+`examples/reference-controller` and everything under `script/` are
+`package main` — runnable, not importable. Copy from them; do not build
+against them.
 
 One value-level caveat on `parity/` and `schema/`: their Go surface is
 covered by everything below, but the data behind it is a matter.js HEAD

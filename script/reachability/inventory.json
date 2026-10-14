@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5007,
+  "entry_points": 5010,
   "entry_packages": [
     ".",
     "bdx",
@@ -156,6 +156,7 @@
     "endpoint/endpointtest",
     "endpoint/sqlitestore",
     "examples/reference-bridge",
+    "examples/reference-controller",
     "groups",
     "im",
     "im/subscription",
@@ -189,9 +190,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11486,
+    "total_exported": 11489,
     "reachable": 8040,
-    "whitelisted": 3441,
+    "whitelisted": 3444,
     "unreachable": 5
   },
   "by_package": [
@@ -17903,6 +17904,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/wifi_test.go",
       "line": 32
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestArguments",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/args_test.go",
+      "line": 19
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestReferenceController",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/main_test.go",
+      "line": 297
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestReferenceControllerOTA",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/main_test.go",
+      "line": 401
     },
     {
       "package": "groups",
