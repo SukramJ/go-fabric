@@ -8,6 +8,8 @@ import (
 	"math"
 	"slices"
 	"sync"
+
+	fabricdevice "github.com/SukramJ/go-fabric/device"
 )
 
 // UnknownDeviceType is the device type of an endpoint whose Descriptor has
@@ -57,6 +59,25 @@ func (e *Endpoint) DeviceType() uint32 {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.deviceType
+}
+
+// Device is the generated device type ([fabricdevice.Type]) of the endpoint's
+// device type — the one [Endpoint.DeviceType] reports — or nil for a
+// device type device/ does not generate: the unknown device type, a
+// manufacturer-specific or unknown id, and the snapshot types
+// script/devicegen excludes (see [fabricdevice.Lookup]: the camera and media
+// families and ThreadBorderRouter, NetworkInfrastructureManager,
+// JointFabricAdministrator, OtaProvider).
+//
+// matter.js gives a client endpoint its type from the model
+// (packages/node/src/node/client/ClientStructure.ts:871-897,
+// this.#node.matter.deviceTypes(dt.deviceType)) and installs no generated
+// device type on it; the Go view answers the generated one beside it, so a
+// host reads the requirements the device layer mounts a server by. Its
+// Revision is the snapshot's; the peer's is [Endpoint.DeviceRevision].
+func (e *Endpoint) Device() *fabricdevice.Type {
+	t, _ := fabricdevice.Lookup(e.DeviceType())
+	return t
 }
 
 // DeviceRevision is the device type's revision; ok false while unknown

@@ -5,6 +5,7 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
@@ -29,6 +30,7 @@ const (
 	endpointLabelKeyRoot          = "bridged_node_label."
 	endpointConfigVersionKey      = "bridged_configuration_version."
 	scenesKeyRoot                 = "scenes."
+	bindingKeyRoot                = "binding."
 	rebootCountSetting            = "gendiag.reboot_count"
 	operationalTimeSetting        = "gendiag.operational_ms"
 	legacyOperationalHoursSetting = "gendiag.operational_hours"
@@ -271,5 +273,68 @@ func keepOperationalTime(ctx context.Context, st *store.Store, g *mattercore.Gen
 				logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
 			}
 		}
+	}
+}
+
+// bindingKey is the settings key an endpoint's Binding list is kept
+// under: "binding." and the endpoint's stable key, as its NodeLabel and
+// scene table are (keyString); an endpoint without one (the root, the
+// Aggregator, a host topology's unkeyed endpoint) under "@" and its
+// number, which is fixed for those.
+func bindingKey(ep *endpoint.Endpoint) string {
+	if k, ok := keyString(ep.SourceKey); ok {
+		return bindingKeyRoot + k
+	}
+	return bindingKeyRoot + "@" + strconv.FormatUint(uint64(ep.ID), 10)
+}
+
+// storedBinding is one Binding entry as the store keeps it; an absent
+// field is its zero (core.TargetStruct's sentinels).
+type storedBinding struct {
+	Node        uint64 `json:"node,omitempty"`
+	Group       uint16 `json:"group,omitempty"`
+	Endpoint    uint16 `json:"endpoint,omitempty"`
+	Cluster     uint32 `json:"cluster,omitempty"`
+	FabricIndex uint8  `json:"fabricIndex"`
+}
+
+// bindingConfig keeps the Binding list of the endpoint under key in the
+// settings table — the Binding attribute is nonvolatile (quality N,
+// matter.js packages/model/src/standard/elements/binding.element.ts:
+// 21-25), persisted as UserLabel's list is (buildLabels).
+func (p persisted) bindingConfig(ctx context.Context, key string) mattercore.BindingConfig {
+	return mattercore.BindingConfig{
+		Load: func() ([]mattercore.TargetStruct, error) {
+			v, ok, err := p.st.GetSetting(ctx, key)
+			if err != nil || !ok {
+				return nil, err
+			}
+			var stored []storedBinding
+			if err := json.Unmarshal([]byte(v), &stored); err != nil {
+				// A list that does not decode restores nothing; the next
+				// change overwrites it.
+				p.logger.Warn("binding.restore", slog.String("key", key), slog.String("err", err.Error()))
+				return nil, nil
+			}
+			out := make([]mattercore.TargetStruct, 0, len(stored))
+			for _, e := range stored {
+				out = append(out, mattercore.TargetStruct{Node: e.Node, Group: e.Group, Endpoint: e.Endpoint, Cluster: e.Cluster, FabricIndex: e.FabricIndex})
+			}
+			return out, nil
+		},
+		Save: func(list []mattercore.TargetStruct) error {
+			stored := make([]storedBinding, 0, len(list))
+			for _, e := range list {
+				stored = append(stored, storedBinding{Node: e.Node, Group: e.Group, Endpoint: e.Endpoint, Cluster: e.Cluster, FabricIndex: e.FabricIndex})
+			}
+			b, err := json.Marshal(stored)
+			if err == nil {
+				err = p.st.SetSetting(context.WithoutCancel(ctx), key, string(b))
+			}
+			if err != nil {
+				p.logger.Warn("binding.persist", slog.String("key", key), slog.String("err", err.Error()))
+			}
+			return err
+		},
 	}
 }

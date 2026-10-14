@@ -444,7 +444,6 @@ func (n *Node) Start(ctx context.Context) error {
 		n.agg.setStarted()
 	}
 	n.startGroupSender()
-	n.startGroupSender()
 
 	n.root.DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})
 	// BasicInformation StartUp, then GeneralDiagnostics BootReason, the
@@ -531,7 +530,6 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.window.stop()
 	n.sec.casep.StopReaper()
 	n.sec.subs.Stop()
-	n.stopGroupSender()
 	n.stopGroupSender()
 	err := n.br.Stop(ctx)
 	_ = n.advertiser.Close()

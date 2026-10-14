@@ -1517,6 +1517,42 @@ the device side (ADR 0020 decision 6). Report AO.
 By design. The same order of effects per entry; a host sends through the
 interaction it is handed.
 
+### BD-Matter-ClientView-RemoteConformance — the client image is judged against the generated device types
+
+matter.js validates device-type conformance on its own server node
+(`packages/model/src/logic/device-types/DeviceTypeFacts.ts`,
+`ResolvedEndpoint.ts` at `0ceb202d`); a client endpoint takes only its
+type's name and classification from the model
+(`ClientStructure.ts:851-1009`) and is never judged.
+`controller/client.Endpoint.Device()` returns the generated `device.Type`
+of a remote endpoint and `Conformance()` runs the module's one
+device-type validator (`endpoint.DeviceTypeTree`, the same code the
+server side uses, over a snapshot of the image: FeatureMap, AttributeList
+and command lists, never values) — unknown while the image is still
+being read, incomplete when a listed cluster has no shape yet. Report AP.
+
+By design (ADR 0020 stage 4, "the `device/` types as the client view").
+The verdict a lab's TC_DeviceConformance would give, available to a host
+before it trusts a remote endpoint; nothing a host could see in matter.js
+is lost.
+
+### BD-Matter-Binding-PersistedInSettings — the Binding list is persisted through the node's settings table and a failed save refuses the write
+
+matter.js persists `BindingServer`'s state as every nonvolatile
+behaviour state through the endpoint's datasource, where a storage
+failure surfaces after the transaction (`BindingServer.ts`, the `N`
+quality in `binding.element.ts:17-37` at `0ceb202d`).
+`core.Binding.Persist(BindingConfig{Load, Save})` saves the list
+*before* the write commits and answers the write with a failure when
+the save fails; the node keys each endpoint's list `binding.<stable key>`
+in the settings table, as the labels and scene tables are keyed, and
+restores it before the bridge serves the topology. A later device with
+the same stable key inherits the stored list, as labels do. Report AP.
+
+By design. The settings table is the module's one durable seam for
+per-endpoint state; a write the store cannot hold is refused rather than
+held in memory alone.
+
 ### BD-Matter-KeySetReadAllIndicesOrder — key set ids listed in id order
 
 matter.js `GroupKeyManagementServer.keySetReadAllIndices` lists key set 0

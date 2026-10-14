@@ -375,6 +375,14 @@ func TestLiveClientNode(t *testing.T) {
 	if v, err := c.Decoded(onoff.AttrOnOff); err != nil || v != false {
 		t.Fatalf("OnOff %v %v", v, err)
 	}
+	// The client view: the generated device type, and the image judged
+	// by the server-side validator.
+	if d := plugEP.Device(); d == nil || d.Name != "OnOffPlugInUnit" {
+		t.Fatalf("the plug's Device() %v", d)
+	}
+	if r := plugEP.Conformance(); r.Status != client.ConformanceClean {
+		t.Fatalf("the plug's conformance %v: %v, unjudged %v", r.Status, r.Violations, r.Unjudged)
+	}
 	rev, revOK := plugEP.DeviceRevision()
 	t.Logf("tree after the initial read: %v (plug revision %d %v)", tree(n), rev, revOK)
 	var named []string
