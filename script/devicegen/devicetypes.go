@@ -10,9 +10,10 @@ package main
 // mandatory clusters are the excluded camera and media families (owner's
 // decision, 2026-10-11) — with OtaRequestor, which ADR 0018 ("Decisions
 // taken at the start of wave 6", 1) takes in since the requestor joined in
-// wave 5 (ADR 0019), and SecondaryNetworkInterface, which concept v2 §B.4
-// takes in with the WiFiNetworkDiagnostics server (brief AM). Sorted by
-// name.
+// wave 5 (ADR 0019), SecondaryNetworkInterface, which concept v2 §B.4
+// takes in with the WiFiNetworkDiagnostics server (brief AM), and
+// OtaProvider, which ADR 0021 takes in with the OTA Software Update
+// Provider server (brief AQ). Sorted by name.
 var committed = []string{
 	"Aggregator",
 	"AirPurifier",
@@ -55,6 +56,7 @@ var committed = []string{
 	"OccupancySensor",
 	"OnOffLight",
 	"OnOffPlugInUnit",
+	"OtaProvider",
 	"OtaRequestor",
 	"Oven",
 	"PowerSource",
@@ -98,11 +100,11 @@ var excluded = map[string]string{
 	"BasicVideoPlayer":   "F.3 media device types",
 	"CastingVideoPlayer": "F.3 media device types",
 	"ContentApp":         "F.3 media device types",
-	// Infrastructure: F.2 Thread, Joint Fabric or OTA provider.
+	// Infrastructure: F.2 Thread or Joint Fabric. OtaProvider left the
+	// group with ADR 0021.
 	"ThreadBorderRouter":           "F.3 infrastructure",
 	"NetworkInfrastructureManager": "F.3 infrastructure",
 	"JointFabricAdministrator":     "F.3 infrastructure",
-	"OtaProvider":                  "F.3 infrastructure",
 	// Controller device types: client clusters and Binding only, the
 	// initiator role.
 	"OnOffLightSwitch":         "F.3 controller device types",

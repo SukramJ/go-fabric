@@ -13,6 +13,7 @@ var committedTypes = []*Type{
 	&PowerSourceType,
 	&OtaRequestorType,
 	&BridgedNodeType,
+	&OtaProviderType,
 	&ContactSensorType,
 	&RootNodeType,
 	&SolarPowerType,

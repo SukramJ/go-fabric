@@ -62,6 +62,12 @@ type Config struct {
 	// OTA mounts the OTA Software Update Requestor on the root when set;
 	// nil leaves it out (and the OtaRequestor device type with it).
 	OTA *OtaConfig
+	// OTAProvider serves OTA images: the OTA Software Update Provider on an
+	// endpoint of device type OtaProvider beside the Aggregator, its images
+	// over BDX (ADR 0021). nil, or no ImageSource, mounts none. With
+	// Topology set the node builds the provider ([Node.OTAProvider]) and
+	// the host mounts it.
+	OTAProvider *OTAProviderConfig
 	// FixedLabels is the root FixedLabel list; nil serves an empty list.
 	FixedLabels []fixedlabeldef.LabelStruct
 	// Locales are the root LocalizationConfiguration's SupportedLocales,
