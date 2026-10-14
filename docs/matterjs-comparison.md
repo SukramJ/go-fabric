@@ -82,10 +82,12 @@ matter.js HEAD as checked out at `../matter.js`.
 ## 5. Clusters
 
 matter.js ships **143** cluster behaviours generated from `@matter/model`;
-`go-fabric` serves **99** of the snapshot's 135 clusters (measured on
-2026-10-11 after #47: the 96 generated definitions under `cluster/spec/`,
+`go-fabric` serves **118** of the snapshot's 135 clusters (measured on
+2026-10-14 after #111: the 115 generated definitions under `cluster/spec/`,
 each with a server, plus the hand-written AccessControl,
-OperationalCredentials and GroupKeyManagement), chosen by what a
+OperationalCredentials and GroupKeyManagement; 99 on 2026-10-11 after
+#47, before the OTA provider, the media clusters and CommissionerControl
+entered), chosen by what a
 home-automation device type mandates or allows. The schema for all of them is present here (in `parity/` and
 `schema/`) — what is missing is server logic, not identifiers. The target
 since 2026-10-08 is every cluster a home-automation device type mandates or
@@ -111,7 +113,8 @@ measured gap and the four tranches are in
 | OTA Software Update **Provider** | ✅ | full (`cluster/core/ota_provider.go`): `OtaSoftwareUpdateProviderServer` rule for rule, on its own OtaProvider endpoint (`node.Config.OTAProvider`), the BDX sender roles in `bdx/`; the software-update manager's decisions are host ports | ✅ | — | Wave 23 ([ADR 0021](./adr/0021-ota-provider-and-diagnosticlogs-over-bdx.md)), `BD-Matter-OTAProvider-HostPorts`. Proven device-to-device: the module's requestor downloads from the module's provider. The reference daemon's `--ota-provider` is TESTING ONLY; chip's SU provider cases are manual. |
 | Network diagnostics (Ethernet / Wi-Fi / Thread / Software) | ✅ | GeneralDiagnostics only | ○ | **Low** | All optional. Useful telemetry, no controller depends on them. |
 | Home-automation remainder: energy (DeviceEnergyManagement + Mode, EnergyEvse + Mode, WaterHeaterManagement + Mode, EnergyPreference, MeterIdentification, Commodity*, ElectricalGridConditions, PowerSourceConfiguration), appliance extras (TemperatureControl, MicrowaveOven*, Oven*, Refrigerator*, Laundry*Controls, DishwasherAlarm, TemperatureAlarm, ServiceArea), the seven further concentration clusters, BooleanStateConfiguration, ClosureDimension, SoilMeasurement, ThermostatUserInterfaceConfiguration, labels, localization, Software / Ethernet / WiFi diagnostics, Actions, EcosystemInformation (46 clusters at the start, 38 left after #40 and #41 added FixedLabel, six ModeBase derivations and TemperatureControl) | ✅ (most of them generated only) | ◐ | **High** | In scope since 2026-10-08. 11 were mandated by a device type in scope, 35 allowed. Built in four tranches on the generated default server ([ADR 0017](./adr/0017-generated-default-cluster-server.md)); concept §A.3. |
-| Camera (7), media / content (15), TLS (2), Joint Fabric (2; CommissionerControl entered in wave 25, #109, ADR 0020 stage 6b), Thread / network infrastructure (4), OTA Provider (32 clusters) | ✅ | — | ○ | **No** | Out of scope by decision, each with its reason in the concept's Appendix F.2: streams need WebRTC and a media path in the host, media players are not bridge devices, Joint Fabric is deferred past `v1.0.0` (ADR 0020 stage 6c: no matter.js behaviour at the pin), Thread needs hardware, OTA provision is a distribution role. The schema and `script/clustergen` cover them should a host appear. AmbientContextSensing and WaterTankLevelMonitoring, which no device type mandates, await a decision. |
+| Media / content (15: MediaPlayback, KeypadInput, ContentLauncher, ApplicationLauncher, ApplicationBasic, AccountLogin, AudioOutput, Channel, TargetNavigator, MediaInput, LowPower, WakeOnLan, ContentControl, ContentAppObserver, Messages) | ✅ (fourteen generated stubs; `LowPowerServer.ts` the one with logic) | ✅ | **Med** | In scope since wave 24 (#111, [ADR 0022](./adr/0022-media-and-content-clusters.md), concept v2 phase 9): fourteen through the standard server behind typed host ports in `cluster/media`, Messages core-held for its fabric-scoped list; the three media device types generated; the reference daemon's `--media` player and content app carry chip's 13 media families (MEDIAPLAYBACK/6.8 excluded, a model contradiction). No ecosystem shows a player yet (phase 5). |
+| Camera (7), TLS (2), Joint Fabric (2; CommissionerControl entered in wave 25, #109, ADR 0020 stage 6b), Thread / network infrastructure (4) (15 clusters) | ✅ | — | ○ | **No** | Out of scope by decision, each with its reason in the concept's Appendix F.2: streams need WebRTC and a media path in the host, Joint Fabric is deferred past `v1.0.0` (ADR 0020 stage 6c: no matter.js behaviour at the pin), Thread needs hardware. The OTA provider and the media family, excluded there too, entered in waves 23 and 24. The schema and `script/clustergen` cover the rest should a host appear. AmbientContextSensing and WaterTankLevelMonitoring, which no device type mandates, await a decision. |
 
 ## 6. Device model and composition
 
