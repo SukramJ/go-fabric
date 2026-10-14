@@ -284,7 +284,9 @@ func TestRemoveFabricFromHost(t *testing.T) {
 // (packages/protocol/src/action/client/ClientInteraction.ts:991-994 at
 // 0ceb202d).
 func TestSessionAndSubscriptionDiagnostics(t *testing.T) {
-	t.Parallel()
+	// Not parallel: its second connection (PASE closed, then Commission over
+	// a fresh discovery) lost the node under the package's parallel live
+	// tests twice on CI on 2026-10-14 ("Could not connect to device").
 	ctx := context.Background()
 	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
 	if got := n.Sessions().Sessions(); len(got) != 0 {

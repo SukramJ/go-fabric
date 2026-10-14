@@ -10,6 +10,18 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-14
+
+The release with the controller role (ADR 0020, stages 1–6b: the
+commissioner, the client interaction, the client node model, bindings and
+the group sender, the DCL client and CommissionerControl; Joint Fabric is
+deferred), the OTA provider and DiagnosticLogs over BDX (ADR 0021), the
+media and content clusters (ADR 0022), Wi-Fi diagnostics, and the
+reference controller CLI. It freezes no API: `docs/manual-test-plan-0.4.0.md`
+is the plan the owner runs against OpenCCU-Loom, the ecosystems and real
+devices before the `v1.0.0` freeze. Everything below was `[Unreleased]`
+since 0.3.1.
+
 ### Added
 
 - `examples/reference-controller`, the controller role as a command-line tool (`package main`, not API): `pair` by QR or manual code or passcode and discriminator (DNS-SD discovery, PASE, attestation against the embedded test PAAs or, with `--dcl prod|testnet`, the ledger, under `--attestation accept|reject|ask`), `unpair`, `nodes`, `node`, `read`, `write`, `invoke`, `subscribe`, `events` with chip-tool-style JSON values, `group create`/`group send`, `bind`, and `ota serve`; the CA, the fabric, the paired nodes and the DCL trust store live in one SQLite file (`--db`), so every run is the same fabric. Group sending and the OTA provider run on a node of the tool's own, commissioned into its fabric on first use. Its README lists every command.
@@ -3868,7 +3880,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/SukramJ/go-fabric/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/SukramJ/go-fabric/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/SukramJ/go-fabric/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/SukramJ/go-fabric/compare/v0.1.0...v0.2.0

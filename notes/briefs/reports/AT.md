@@ -373,3 +373,23 @@ at QueryImage; the tool's own node for group send and OTA.
   reference-controller ota serve --image light-v2.ota --announce 0x4321 --once
   ```
 
+## Owner's decisions (2026-10-14, tranche 26)
+
+- **Q1:** done as §5. The ACL subject as the bare group id is right
+  (`access_control.go:1122`; chip normalises to it, `AclStorage.cpp:162-171`).
+- **Q2:** keep key and NOC — that is `Fabric.Config` (`Fabric.ts:53-74`).
+- **Q3, Q4:** no. The encoder's laxness is a findings note.
+- **`node/` without Groupcast:** no new option — a node of this module
+  always has Groupcast (Matter 1.5); the test's ServerList seam is the
+  right proof for a tool that decides by the listing.
+- **Differences:** all accepted. FabricManager's list form, the record's
+  fields and the memory resumption → `BD-Matter-ControllerFabric-OneRecord`;
+  the JSON extensions and the omitted FabricIndex →
+  `BD-chip-ControllerCLI-JSON`; the own node, consent at offer time and
+  the §5 fallback → `BD-chip-ControllerCLI-OwnNode`; the vendor/product
+  decoding as 0 needs no record (`Payload` has no optional ints).
+- **Owner commit also:** `docs/manual-test-plan-0.4.0.md` (from the
+  README's command list), CHANGELOG `[0.4.0]` cut, and
+  `TestSessionAndSubscriptionDiagnostics` no longer parallel (two CI
+  flakes on 2026-10-14).
+
