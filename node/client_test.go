@@ -5,6 +5,7 @@ package node_test
 
 import (
 	"context"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -26,7 +27,7 @@ func (s *silentMDNS) Close() error                         { return nil }
 
 func silentNames(t *testing.T) *discovery.Names {
 	t.Helper()
-	names := discovery.NewNames(&silentMDNS{out: make(chan mdns.QueryResponse)}, nil)
+	names := discovery.NewNames(&silentMDNS{out: make(chan mdns.QueryResponse)}, slog.New(slog.DiscardHandler))
 	t.Cleanup(func() { _ = names.Close() })
 	return names
 }
