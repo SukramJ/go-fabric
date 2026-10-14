@@ -288,3 +288,22 @@ the host mounts it).
   (asserts no timestamps); `cluster/core/spec_parity_matterjs_test.go`
   `TestSmallSystemServersMatchTheGeneratedDefinitions` (NoLogs decoded
   without timestamps).
+
+## Owner's decisions (Fable, 2026-10-14, tranche 23)
+
+1. Questions 1–3 (consent reset, `userConsentNeeded` after consent, the
+   ACL on the first fabric): mirrored matter.js stands; the three are a
+   findings-register note for an upstream look.
+2. `Bridge.OpenSessionExchange` (question 4) is accepted: only the bridge
+   owns sessions.
+3. The clustergen comment (question 5) fixed in the owner's commit.
+4. The bridge's ordering fix (the BDX responder consumes a message
+   before the next IM message of the session) is matter.js's event-loop
+   order; accepted, no entry.
+5. `by_design`: `BD-Matter-OTAProvider-NotExposed` and `BD-chip-DiagLogs-NoBDX`
+   retired; `BD-Matter-OTAProvider-HostPorts` and `BD-chip-DiagLogs-BDX`
+   written.
+6. Integration: the branch was cut before #103 (wave 21) landed; the
+   tranche is a three-way merge onto tranche 22 (`node/node.go`, the
+   devicegen lists and the generated device types unioned; the
+   inventory regenerated).
