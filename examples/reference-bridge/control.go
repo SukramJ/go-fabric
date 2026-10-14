@@ -245,6 +245,9 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		// The simulated Wi-Fi link of --wifi (wifi.go): CHIP's apps have no
 		// pipe command for it, only the TestEventTrigger codes.
 		return f.wifi.pipeCommand(cmd)
+	case "OtaProviderConsent":
+		// The test OTA provider of --ota-provider (ota_provider.go).
+		return f.otaImages.pipeCommand(cmd)
 	}
 	return fmt.Errorf("%q: %w", cmd.Name, errUnknownPipeCommand)
 }

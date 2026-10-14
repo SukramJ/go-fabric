@@ -21,7 +21,6 @@ func TestLookup(t *testing.T) {
 		t.Fatalf("Lookup(OnOffPlugInUnit) %v %v", ty, ok)
 	}
 	for _, id := range []uint32{
-		0x0014,      // OtaProvider: excluded (F.3 infrastructure)
 		0x0142,      // Camera: excluded (F.3 camera device types)
 		0x0023,      // CastingVideoPlayer: excluded (F.3 media device types)
 		0xFFF1_0001, // manufacturer-specific

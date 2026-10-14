@@ -1018,6 +1018,9 @@ type fleet struct {
 	esa *demoEsa
 	// wifi is the root's simulated Wi-Fi link (wifi.go), served with --wifi.
 	wifi *demoWiFi
+	// otaImages is the OTA provider's test image and consent
+	// (ota_provider.go), served with --ota-provider; nil without.
+	otaImages *testImages
 
 	// configChange raises the ConfigurationVersion of every bridged device
 	// (the app pipe's SimulateConfigurationVersionChange); wired by main.

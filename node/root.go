@@ -430,7 +430,9 @@ func attachPartsListProviders(br *bridge.Bridge) error {
 		return errors.New("node: root Descriptor missing: PartsList provider could not be attached")
 	}
 	if !br.AttachAggregatorPartsListProvider(func() []uint16 {
-		return endpointIDs(br, func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() && !ep.IsAggregator() })
+		// The Aggregator's siblings — the OTA provider's endpoint — are
+		// the root's parts, not its.
+		return endpointIDs(br, func(ep *endpoint.Endpoint) bool { return !ep.IsRoot() && !ep.IsAggregator() && !isRootChild(ep) })
 	}) {
 		return errors.New("node: aggregator Descriptor missing: PartsList provider could not be attached")
 	}

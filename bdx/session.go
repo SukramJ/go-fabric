@@ -96,19 +96,10 @@ func Receive(ctx context.Context, m *Messenger, opts ReceiveOptions) (Result, er
 		modes = []DriverMode{SenderDrive, ReceiverDrive}
 	}
 
-	f := &inboundFlow{m: m, sink: opts.Sink, progress: opts.Progress, counter: -1}
+	f := &inboundFlow{m: m, sink: opts.Sink, hooks: flowHooks{progress: opts.Progress}, counter: -1}
 	res, err := f.run(ctx, modes, opts)
 	if err != nil {
-		var be *Error
-		if errors.As(err, &be) {
-			// BdxSession.ts:188-195: report the code to the peer, best
-			// effort, and record how far the transfer came.
-			_ = m.SendError(ctx, be.Code)
-			be.BytesTransferred = f.transferred
-			be.TotalBytesLength = f.dataLength
-		}
-		_ = opts.Sink.Close(err)
-		return res, err
+		return res, f.fail(ctx, err)
 	}
 	return res, nil
 }
@@ -116,14 +107,32 @@ func Receive(ctx context.Context, m *Messenger, opts ReceiveOptions) (Result, er
 // inboundFlow is the state of one inbound transfer (flow/Flow.ts,
 // flow/InboundFlow.ts).
 type inboundFlow struct {
-	m        *Messenger
-	sink     Sink
-	progress func(uint64, *uint64)
+	m     *Messenger
+	sink  Sink
+	hooks flowHooks
 
 	counter     int64 // last block counter used; -1 before the first (Flow.ts:18)
 	transferred uint64
 	dataLength  *uint64
 	bytesLeft   *int64
+}
+
+// fail is BdxSession.processTransfer's catch for an inbound flow
+// (BdxSession.ts:186-196): a BDX [Error] is reported to the peer, best
+// effort, and records how far the transfer came; the sink is closed with
+// the error either way.
+func (f *inboundFlow) fail(ctx context.Context, err error) error {
+	var be *Error
+	if errors.As(err, &be) {
+		_ = f.m.SendError(ctx, be.Code)
+		be.BytesTransferred = f.transferred
+		be.TotalBytesLength = f.dataLength
+	}
+	if f.hooks.cancelled != nil {
+		f.hooks.cancelled()
+	}
+	_ = f.sink.Close(err)
+	return err
 }
 
 func (f *inboundFlow) run(ctx context.Context, modes []DriverMode, opts ReceiveOptions) (Result, error) {
@@ -153,18 +162,12 @@ func (f *inboundFlow) run(ctx context.Context, modes []DriverMode, opts ReceiveO
 	if accept.TransferControl.AsynchronousTransfer {
 		return Result{}, newError(StatusTransferMethodNotSupported, "Asynchronous transfer is not supported in this implementation")
 	}
-	blockSize := int(accept.MaxBlockSize)
-	if transport := f.m.MaxPayloadSize() - blockCounterOverhead; blockSize > transport {
-		blockSize = transport
-	}
+	blockSize := capBlockSizeToTransport(f.m, int(accept.MaxBlockSize))
 	if accept.Length != nil {
 		if *accept.Length > maxSafeInteger {
 			return Result{}, newError(StatusLengthTooLarge, "Accept message length field %d exceeds maximum safe integer value", *accept.Length)
 		}
-		l := *accept.Length
-		f.dataLength = &l
-		left := int64(l) //nolint:gosec // bounded by maxSafeInteger
-		f.bytesLeft = &left
+		f.setDataLength(*accept.Length)
 	}
 	mode := ReceiverDrive
 	if accept.TransferControl.SenderDrive {
@@ -173,18 +176,37 @@ func (f *inboundFlow) run(ctx context.Context, modes []DriverMode, opts ReceiveO
 	// As the receiver this node drives exactly when the sender does not.
 	isDriver := !accept.TransferControl.SenderDrive
 	res := Result{Length: f.dataLength, Mode: mode, BlockSize: uint16(blockSize)} //nolint:gosec // bounded by the accept's uint16
+	if err := f.process(ctx, isDriver); err != nil {
+		return res, err
+	}
+	res.Transferred = f.transferred
+	return res, nil
+}
 
-	// Flow.processTransfer (flow/Flow.ts:121-147).
+// setDataLength records a definite length the transfer must meet.
+func (f *inboundFlow) setDataLength(l uint64) {
+	f.dataLength = &l
+	left := int64(l) //nolint:gosec // bounded by maxSafeInteger by the callers
+	f.bytesLeft = &left
+}
+
+// process is Flow.processTransfer (flow/Flow.ts:121-147) for an inbound
+// flow: the blocks, queried when this node drives (DrivingReceivingFlow),
+// acknowledged when the peer does (FollowingSendingFlow), then
+// InboundFlow.finalizeTransfer (InboundFlow.ts:65-70): the write
+// completes, then BlockAckEof.
+func (f *inboundFlow) process(ctx context.Context, isDriver bool) error {
 	f.emit()
 	for {
 		var done bool
+		var err error
 		if isDriver {
 			done, err = f.drivingNext(ctx)
 		} else {
 			done, err = f.followingNext(ctx)
 		}
 		if err != nil {
-			return res, err
+			return err
 		}
 		if done {
 			break
@@ -192,21 +214,21 @@ func (f *inboundFlow) run(ctx context.Context, modes []DriverMode, opts ReceiveO
 		f.emit()
 	}
 	f.emit()
-	// InboundFlow.finalizeTransfer (InboundFlow.ts:65-70): the write
-	// completes, then BlockAckEof.
 	if err := f.sink.Close(nil); err != nil {
-		return res, err
+		return err
 	}
 	if err := f.m.SendBlockAckEOF(ctx, uint32(f.counter)); err != nil { //nolint:gosec // a block counter is 32-bit
-		return res, err
+		return err
 	}
-	res.Transferred = f.transferred
-	return res, nil
+	if f.hooks.finished != nil {
+		f.hooks.finished(f.transferred)
+	}
+	return nil
 }
 
 func (f *inboundFlow) emit() {
-	if f.progress != nil {
-		f.progress(f.transferred, f.dataLength)
+	if f.hooks.progress != nil {
+		f.hooks.progress(f.transferred, f.dataLength)
 	}
 }
 

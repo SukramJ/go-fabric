@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/binding"
 	"github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -65,6 +66,11 @@ type Node struct {
 	client   *clientStack
 	bindings *binding.Manager
 	bindSync bindingSync
+	// bdx serves the BDX transfers peers open (the provider's images) and
+	// otaProvider is the OTA Software Update Provider; both nil without
+	// Config.OTAProvider (ota_provider.go).
+	bdx         *bdx.Responder
+	otaProvider *mattercore.OTAProvider
 
 	// life bounds the goroutines New and Start begin (subscription
 	// engine, reapers, the operational-time keeper); Stop cancels it.
@@ -205,12 +211,20 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		return nil, fmt.Errorf("node: %w", err)
 	}
 	n.persisted.restoreRoot(ctx, n.root.BasicInformation)
+	// DiagnosticLogs hands logs over BDX on the requesting session
+	// (ADR 0021).
+	n.root.DiagnosticLogs.AttachExchangeOpener(n.br)
+	n.root.DiagnosticLogs.SetLogger(n.logger)
 	n.br.AttachRootClusters(n.root.Servers())
 	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, cfg.AggregatorServers)
 	if err != nil {
 		return nil, fmt.Errorf("node: %w", err)
 	}
 	n.br.AttachAggregatorClusters(aggregatorServers)
+	// The OTA provider and its BDX responder (ADR 0021).
+	if err := n.buildOTAProvider(); err != nil {
+		return nil, err
+	}
 
 	// --- sessions, PASE, CASE (main.go:323-328) -------------------------
 	cm := cfg.Commissioning
@@ -413,7 +427,8 @@ func (n *Node) observedFabricUpdated(ctx context.Context, fabricIndex uint8) {
 // commissioningCompleted runs the host's OnCommissioningComplete; the
 // root's CommissioningComplete hook calls it after its own body
 // (root.go).
-func (n *Node) commissioningCompleted(_ context.Context, fabricIndex uint8) {
+func (n *Node) commissioningCompleted(ctx context.Context, fabricIndex uint8) {
+	n.ensureOTAProviderACL(ctx)
 	if fn := n.cfg.Observers.OnCommissioningComplete; fn != nil {
 		observe(n.logger, "commissioning_complete", func() error { return fn(fabricIndex) })
 	}
@@ -459,6 +474,7 @@ func (n *Node) Start(ctx context.Context) error {
 	if err := attachPartsListProviders(n.br); err != nil {
 		return err
 	}
+	n.ensureOTAProviderACL(ctx)
 
 	// Fabrics of a previous run: their CASE identities, the subscriptions
 	// their controllers held, then their operational records — matter.js
@@ -531,6 +547,9 @@ func (n *Node) Stop(ctx context.Context) error {
 	n.sec.casep.StopReaper()
 	n.sec.subs.Stop()
 	n.stopGroupSender()
+	if n.bdx != nil {
+		n.bdx.Close()
+	}
 	err := n.br.Stop(ctx)
 	_ = n.advertiser.Close()
 	n.cancel()

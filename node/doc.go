@@ -27,12 +27,14 @@
 //     AttachSubscriptionStore, AttachOperationalResolver,
 //     AttachCaseInitiatorProvider — the commissioning window
 //     (AttachCommissioningWindow, with the PASE provider attached while a
-//     window is open), the fabric hooks and the event-number persistence.
+//     window is open), the fabric hooks and the event-number persistence;
+//     with Config.OTAProvider the OTA provider and AttachBDXResponder.
 //   - Start: bridge.Start, the DiagnosticLogs provider, StartUp and
 //     BootReason, the operational-time keeper, both PartsList providers,
 //     the stored fabrics' CASE identities, ReestablishFormerSubscriptions,
 //     the OTA requestor, AnnounceFabric for each fabric, and the node's
-//     own commissioning window when no fabric exists.
+//     own commissioning window when no fabric exists; the OTA provider's
+//     ACL entry once a fabric exists (and after each CommissioningComplete).
 //
 // The citations of examples/reference-bridge files and lines in this
 // package name the daemon as it stood before it moved onto the facade
@@ -46,7 +48,8 @@
 // through [Node.RemoveFabric] (issue #87).
 //
 // Left to the configuration on purpose: a nil Config.Advertiser publishes
-// nothing, a nil Config.OTA mounts no OTA requestor. Left to the host:
+// nothing, a nil Config.OTA mounts no OTA requestor, a nil
+// Config.OTAProvider no OTA provider. Left to the host:
 // GeneralDiagnostics' TestEventTrigger enable key, the PowerSource
 // endpoints of PowerSourceConfiguration, and the bridge's observer hooks
 // (SetOnReassembled, SetOnFabricAdded) — reachable through [Node.Root] and

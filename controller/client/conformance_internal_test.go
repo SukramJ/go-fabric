@@ -102,7 +102,7 @@ func TestEndpointDevice(t *testing.T) {
 	if rev, ok := plug.DeviceRevision(); !ok || rev != 1 || plug.Device().Revision != fabricdevice.OnOffPlugInUnitRevision {
 		t.Fatalf("peer revision %d %v, snapshot %d", rev, ok, plug.Device().Revision)
 	}
-	for _, dt := range []uint64{0xFFF1_0001, 0x0014} { // manufacturer-specific; OtaProvider (excluded)
+	for _, dt := range []uint64{0xFFF1_0001, 0x0142} { // manufacturer-specific; Camera (excluded, F.3 camera device types)
 		f := cleanPlug()
 		f.dt = dt
 		if d := f.node(t).Endpoint(1).Device(); d != nil {
