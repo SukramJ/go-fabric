@@ -106,3 +106,48 @@ func FuzzUnmarshalProtocolHeader(f *testing.F) {
 		}
 	})
 }
+
+// FuzzMarshalPacket drives the outbound encoder [Header.MarshalPacket]
+// with arbitrary header fields. Asserted: no panic; a header it refuses
+// breaks one of the two encodePacket constraints; a header it encodes
+// decodes back to the same typed header, and a group header keeps its
+// source node id and group id (matter.js MessageCodec.ts:481-504).
+func FuzzMarshalPacket(f *testing.F) {
+	f.Add(uint16(0x1234), uint32(7), true, uint64(0x1122334455667788), uint8(DestGroup), uint64(0), uint16(0x0101), uint8(SessionGroup), true, false)
+	f.Add(uint16(1), uint32(1), false, uint64(0), uint8(DestNodeID), uint64(9), uint16(0), uint8(SessionUnsecured), false, false)
+	f.Add(uint16(1), uint32(1), true, uint64(1), uint8(DestNone), uint64(0), uint16(0), uint8(SessionGroup), true, false)
+	f.Add(uint16(1), uint32(1), true, uint64(1), uint8(DestGroup), uint64(0), uint16(2), uint8(SessionGroup), true, true)
+
+	f.Fuzz(func(t *testing.T, session uint16, counter uint32, hasSource bool, source uint64, dsiz uint8, destNode uint64, destGroup uint16, sessionType uint8, privacy, ext bool) {
+		h := Header{
+			SessionID: session, MessageCounter: counter, HasSourceNodeID: hasSource,
+			DestSize: DestSize(dsiz % 3), SessionType: SessionType(sessionType % 2), Privacy: privacy, HasExtension: ext,
+		}
+		if hasSource {
+			h.SourceNodeID = source
+		}
+		switch h.DestSize {
+		case DestNone:
+		case DestNodeID:
+			h.DestNodeID = destNode
+		case DestGroup:
+			h.DestGroupID = destGroup
+		}
+		b, err := h.MarshalPacket()
+		if err != nil {
+			groupBroken := h.SessionType == SessionGroup && (h.DestSize != DestGroup || !h.HasSourceNodeID)
+			if !ext && !groupBroken {
+				t.Fatalf("refused a valid header %+v: %v", h, err)
+			}
+			return
+		}
+		got, n, err := UnmarshalHeader(b)
+		if err != nil || n != len(b) {
+			t.Fatalf("encoded header does not decode: %v (%d of %d)", err, n, len(b))
+		}
+		got.Raw = nil
+		if !reflect.DeepEqual(got, h) {
+			t.Fatalf("round trip:\nin  %+v\nout %+v", h, got)
+		}
+	})
+}

@@ -221,7 +221,10 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 			"KeySetId 0":     {GroupID: 1, Endpoints: []uint16{3}, KeySetID: 0},
 			"15-byte key":    {GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: make([]byte, 15)},
 			"policy 2":       {GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1, Key: testKey, McastAddrPolicy: u8p(2)},
-			"no endpoints":   {GroupID: 1, Endpoints: []uint16{}, KeySetID: 1, Key: testKey},
+			// 21 endpoints with an unknown key set: the "desc" constraint
+			// (chip kMaxCommandEndpoints, TC-GC-2.2 step 12) answers before
+			// the key set is looked up.
+			"21 endpoints": {GroupID: 1, Endpoints: twentyOneEndpoints(), KeySetID: 9},
 		} {
 			if _, st := f.invoke(admin, 0x00, req); st != im.StatusConstraintError {
 				t.Errorf("%s: %v, want ConstraintError", name, st)
@@ -234,6 +237,61 @@ func TestGroupcastJoinGroupParityMatterJS(t *testing.T) {
 		}
 		if len(f.membership(t)) != 0 {
 			t.Error("a rejected join left a membership")
+		}
+	})
+
+	// With the Sender feature an empty endpoint list is legal
+	// (GroupcastServer.ts:206-209 refuses it only without Sender): the
+	// group joins sender-only — a Membership entry from groupProperties
+	// alone, no group table entry, no multicast membership to receive on
+	// (ServerGroupNetworking joins groups with endpoints) and no
+	// auxiliary ACL entry (#emitAuxAcl, core§11.27.10).
+	t.Run("an empty endpoint list joins sender-only", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		ctx := context.Background()
+		if _, st := f.invoke(admin, 0x00, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{}, KeySetID: 1, Key: testKey, UseAuxiliaryACL: boolp(true)}); st != im.StatusSuccess {
+			t.Fatalf("empty endpoint list: %v, want Success", st)
+		}
+		m, ok := f.memberOf(t, 1, 1)
+		if !ok || len(m.Endpoints) != 0 || *m.KeySetID != 1 || m.McastAddrPolicy != groups.PolicyIanaAddr || !m.HasAuxiliaryACL {
+			t.Fatalf("sender-only membership = %+v (%v)", m, ok)
+		}
+		if table, _ := f.mgr.GroupTable(ctx, 1); len(table) != 0 {
+			t.Errorf("group table = %+v, want no entry", table)
+		}
+		if ms, _ := f.mgr.Memberships(ctx); len(ms) != 0 {
+			t.Errorf("multicast memberships = %+v, want none to receive on", ms)
+		}
+		if acl, _ := f.mgr.AuxiliaryACL(ctx, 0); len(acl) != 0 {
+			t.Errorf("auxiliary ACL = %+v, want none for a sender-only group", acl)
+		}
+		if ok, _ := f.mgr.HasKeyMapping(ctx, 1, 1); !ok {
+			t.Error("the GroupKeyMap binding is missing")
+		}
+		if v, _ := f.gc.MatterRead(0x0003); v != uint16(1) {
+			t.Errorf("UsedMcastAddrCount = %v, want 1", v)
+		}
+		// A later join with endpoints adds them to the same membership.
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3}, KeySetID: 1})
+		if m, _ := f.memberOf(t, 1, 1); !slices.Equal(m.Endpoints, []uint16{3}) {
+			t.Errorf("after joining endpoint 3: %v", m.Endpoints)
+		}
+	})
+
+	// ReplaceEndpoints with an empty list empties the group and keeps it
+	// sender-only (GroupcastServer.ts:268-269, :290-292 retainedSenderOnly).
+	t.Run("replacing the endpoints with none keeps the group sender-only", func(t *testing.T) {
+		t.Parallel()
+		f := newGCFixture(t, 1)
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{3, 4}, KeySetID: 1, Key: testKey, McastAddrPolicy: u8p(groups.PolicyPerGroup)})
+		f.join(admin, t, core.JoinGroupRequest{GroupID: 1, Endpoints: []uint16{}, KeySetID: 1, ReplaceEndpoints: boolp(true), McastAddrPolicy: u8p(groups.PolicyPerGroup)})
+		m, ok := f.memberOf(t, 1, 1)
+		if !ok || len(m.Endpoints) != 0 || m.McastAddrPolicy != groups.PolicyPerGroup {
+			t.Fatalf("after replacing with none: %+v (%v), want a sender-only member", m, ok)
+		}
+		if table, _ := f.mgr.GroupTable(context.Background(), 1); len(table) != 0 {
+			t.Errorf("group table = %+v", table)
 		}
 	})
 
@@ -349,9 +407,14 @@ func TestGroupcastLeaveGroupParityMatterJS(t *testing.T) {
 		}
 	})
 
-	t.Run("removes only the listed endpoints, and the group with the last", func(t *testing.T) {
+	// With the Sender feature the group losing its last listed endpoint
+	// stays a sender-only member, binding and properties included
+	// (GroupcastServer.ts:344-358, spec kKeepGroupIfEmpty); a LeaveGroup
+	// without endpoints then removes it (:340-342, :363-366).
+	t.Run("removes only the listed endpoints, and keeps the group sender-only with the last", func(t *testing.T) {
 		t.Parallel()
 		f := setup(t)
+		ctx := context.Background()
 		resp, _ := f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 1, Endpoints: []uint16{4, 9}, HasEndpoints: true})
 		if r := resp.(core.LeaveGroupResponse); !slices.Equal(r.Endpoints, []uint16{4}) {
 			t.Errorf("removed %v, want [4]", r.Endpoints)
@@ -359,9 +422,56 @@ func TestGroupcastLeaveGroupParityMatterJS(t *testing.T) {
 		if m, _ := f.memberOf(t, 1, 1); !slices.Equal(m.Endpoints, []uint16{3}) {
 			t.Errorf("remaining %v", m.Endpoints)
 		}
-		f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 1, Endpoints: []uint16{3}, HasEndpoints: true})
+		resp, _ = f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 1, Endpoints: []uint16{3}, HasEndpoints: true})
+		if r := resp.(core.LeaveGroupResponse); !slices.Equal(r.Endpoints, []uint16{3}) {
+			t.Errorf("removed %v, want [3]", r.Endpoints)
+		}
+		m, ok := f.memberOf(t, 1, 1)
+		if !ok || len(m.Endpoints) != 0 || m.McastAddrPolicy != groups.PolicyIanaAddr || *m.KeySetID != 1 {
+			t.Fatalf("after the last endpoint left: %+v (%v), want a sender-only member", m, ok)
+		}
+		if ok, _ := f.mgr.HasKeyMapping(ctx, 1, 1); !ok {
+			t.Error("the GroupKeyMap binding of a sender-only group was removed")
+		}
+		if acl, _ := f.mgr.AuxiliaryACL(ctx, 1); slices.ContainsFunc(acl, func(e mstore.ACLEntry) bool { return slices.Contains(e.Subjects, 1) }) {
+			t.Errorf("a sender-only group kept its auxiliary ACL entry: %+v", acl)
+		}
+		// Listing endpoints it no longer has removes nothing and keeps it.
+		resp, _ = f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 1, Endpoints: []uint16{3}, HasEndpoints: true})
+		if r := resp.(core.LeaveGroupResponse); len(r.Endpoints) != 0 {
+			t.Errorf("removed %v from a sender-only group", r.Endpoints)
+		}
+		if _, ok := f.memberOf(t, 1, 1); !ok {
+			t.Error("a sender-only group left on an empty removal")
+		}
+		f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 1})
 		if _, ok := f.memberOf(t, 1, 1); ok {
-			t.Error("a group without endpoints stayed a member — without the Sender feature it is removed")
+			t.Error("LeaveGroup without endpoints kept the group")
+		}
+		if ok, _ := f.mgr.HasKeyMapping(ctx, 1, 1); ok {
+			t.Error("the binding survived the group")
+		}
+	})
+
+	// A group the Groups cluster created keeps its policy when LeaveGroup
+	// keeps it sender-only (GroupcastServer.ts:354-358, "groupProperties
+	// keeps it a member" with entry.mcastAddrPolicy).
+	t.Run("a Groups-cluster group kept sender-only keeps its policy", func(t *testing.T) {
+		t.Parallel()
+		f := setup(t)
+		if _, err := f.gkm.MatterInvoke(admin, 0x00, core.KeySetWriteRequest{GroupKeySet: core.GroupKeySetStruct{GroupKeySetID: 7, EpochKey0: testKey, EpochStartTime0: 5}}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.gkm.MatterWrite(admin, 0, []core.GroupKeyMapStruct{{GroupID: 1, GroupKeySetID: 1}, {GroupID: 2, GroupKeySetID: 1}, {GroupID: 0x10, GroupKeySetID: 7}}); err != nil {
+			t.Fatal(err)
+		}
+		if resp, _ := f.ep3.MatterInvoke(admin, 0x00, core.AddGroupRequest{GroupID: 0x10}); resp.(core.AddGroupResponse).Status != im.StatusSuccess {
+			t.Fatal("AddGroup failed")
+		}
+		f.invoke(admin, 0x01, core.LeaveGroupRequest{GroupID: 0x10, Endpoints: []uint16{3}, HasEndpoints: true})
+		m, ok := f.memberOf(t, 1, 0x10)
+		if !ok || len(m.Endpoints) != 0 || m.McastAddrPolicy != groups.PolicyPerGroup {
+			t.Fatalf("legacy group after LeaveGroup = %+v (%v), want sender-only on PerGroup", m, ok)
 		}
 	})
 
@@ -484,10 +594,9 @@ func TestGroupcastTestingParityMatterJS(t *testing.T) {
 	defer unsub()
 
 	for name, req := range map[string]core.GroupcastTestingRequest{
-		"EnableSenderTesting without SD": {TestOperation: 2},
-		"unknown operation":              {TestOperation: 3},
-		"9 seconds":                      {TestOperation: 1, DurationSeconds: u16p(9)},
-		"1201 seconds":                   {TestOperation: 1, DurationSeconds: u16p(1201)},
+		"unknown operation": {TestOperation: 3},
+		"9 seconds":         {TestOperation: 1, DurationSeconds: u16p(9)},
+		"1201 seconds":      {TestOperation: 1, DurationSeconds: u16p(1201)},
 	} {
 		if _, st := f.invoke(admin, 0x05, req); st != im.StatusConstraintError {
 			t.Errorf("%s: %v, want ConstraintError", name, st)
@@ -560,6 +669,21 @@ func TestGroupcastTestingParityMatterJS(t *testing.T) {
 	f.timers[1].fire() // superseded
 	if v, _ := f.gc.MatterRead(0x0004); v != uint8(1) {
 		t.Errorf("a superseded timer cleared FabricUnderTest: %v", v)
+	}
+
+	// EnableSenderTesting (conformance SD) is accepted like
+	// EnableListenerTesting: FabricUnderTest is the accessing fabric for
+	// 60 s by default (GroupcastServer.ts:405-431).
+	if _, st := f.invoke(as(2, 5), 0x05, core.GroupcastTestingRequest{TestOperation: 2}); st != im.StatusSuccess {
+		t.Fatalf("EnableSenderTesting: %v", st)
+	}
+	last := f.timers[len(f.timers)-1]
+	if v, _ := f.gc.MatterRead(0x0004); v != uint8(2) || last.d != 60*time.Second || !f.timers[2].stopped {
+		t.Fatalf("EnableSenderTesting: FabricUnderTest %v, timer %v, previous stopped %v", v, last.d, f.timers[2].stopped)
+	}
+	last.fire()
+	if v, _ := f.gc.MatterRead(0x0004); v != uint8(0) {
+		t.Errorf("FabricUnderTest after the sender testing period = %v", v)
 	}
 }
 
@@ -666,10 +790,10 @@ func TestGroupcastMembershipReadsAndSurfaceParityMatterJS(t *testing.T) {
 	}
 
 	// The surface matter.js derives from groupcast.element.ts with
-	// Listener and PerGroup.
+	// Listener, Sender and PerGroup.
 	for attr, want := range map[uint32]any{
 		0x0001: uint16(44), 0x0002: uint16(44), 0x0003: uint16(1),
-		cluster.AttrGlobalFeatureMap: uint32(0x5), cluster.AttrGlobalClusterRevision: uint16(1),
+		cluster.AttrGlobalFeatureMap: uint32(0x7), cluster.AttrGlobalClusterRevision: uint16(1),
 	} {
 		if v, _ := f.gc.MatterRead(attr); v != want {
 			t.Errorf("attribute 0x%04X = %v, want %v", attr, v, want)
@@ -813,12 +937,13 @@ func surfaceFromSchema(t *testing.T, clusterID uint32, features ...string) schem
 
 // TestGroupcastAndAuxiliarySurfaceMatchSchema pins AttributeList,
 // AcceptedCommandList, GeneratedCommandList, EventList and FeatureMap of
-// Groupcast (Listener + PerGroup) and AccessControl (Extension +
-// Auxiliary) to parity/schema.json, the matter.js HEAD pin.
+// Groupcast (Listener + Sender + PerGroup, GroupcastServer.ts:83) and
+// AccessControl (Extension + Auxiliary) to parity/schema.json, the
+// matter.js HEAD pin.
 func TestGroupcastAndAuxiliarySurfaceMatchSchema(t *testing.T) {
 	t.Parallel()
 	f := newGCFixture(t, 1)
-	gc := surfaceFromSchema(t, 0x0065, "LN", "PGA")
+	gc := surfaceFromSchema(t, 0x0065, "LN", "SD", "PGA")
 	fm, _ := f.gc.MatterRead(cluster.AttrGlobalFeatureMap)
 	if !slices.Equal(f.gc.MatterAttributes(), gc.attrs) || !slices.Equal(f.gc.MatterAcceptedCommands(), gc.accepted) ||
 		!slices.Equal(f.gc.MatterGeneratedCommands(), gc.generated) || !slices.Equal(f.gc.MatterEvents(), gc.events) || fm != gc.featureMap {
@@ -845,4 +970,13 @@ func TestGroupcastAndAuxiliarySurfaceMatchSchema(t *testing.T) {
 	if _, ok := plain.MatterRead(0x0007); ok {
 		t.Error("AuxiliaryAcl readable without the Auxiliary feature")
 	}
+}
+
+// twentyOneEndpoints is a JoinGroup endpoint list one past the limit.
+func twentyOneEndpoints() []uint16 {
+	out := make([]uint16, 21)
+	for i := range out {
+		out[i] = uint16(i + 1)
+	}
+	return out
 }

@@ -83,3 +83,47 @@ func (l *Listener) membership(group net.IP, join bool) error {
 	}
 	return nil
 }
+
+// SendMulticast sends one datagram to an IPv6 multicast group on port,
+// once on every up, multicast-capable interface — the set [Listener.JoinGroup]
+// joins on — choosing each egress interface with the IPV6_PKTINFO control
+// message. It fails only when no interface took the datagram
+// ([ErrNoMulticastInterface]), which is the "no UDP interface for the
+// multicast address" of matter.js GroupSession.create
+// (packages/protocol/src/session/GroupSession.ts:143-153 at 0ceb202d).
+// matter.js sends on one interface — the configured, the observed or the
+// default one (packages/nodejs/src/net/NodeJsUdpSocket.ts:298-325); a
+// receiver reachable over two interfaces takes the second copy as a
+// replay. Returns [ErrPayloadTooLarge] past [MaxDatagramSize] and
+// [ErrListenerClosed] after Close.
+func (l *Listener) SendMulticast(group net.IP, port int, payload []byte) error {
+	if group.To16() == nil || group.To4() != nil || !group.IsMulticast() {
+		return fmt.Errorf("udp: %v is not an IPv6 multicast address", group)
+	}
+	if len(payload) > MaxDatagramSize {
+		return fmt.Errorf("%w: %d bytes", ErrPayloadTooLarge, len(payload))
+	}
+	if l.isClosed() {
+		return ErrListenerClosed
+	}
+	pc := ipv6.NewPacketConn(l.conn)
+	dst := &net.UDPAddr{IP: group, Port: port}
+	var (
+		done    int
+		lastErr error
+	)
+	for _, ifi := range multicastInterfaces() {
+		if _, err := pc.WriteTo(payload, &ipv6.ControlMessage{IfIndex: ifi.Index}, dst); err != nil {
+			lastErr = err
+			continue
+		}
+		done++
+	}
+	if done == 0 {
+		if lastErr == nil {
+			return fmt.Errorf("%w: %v", ErrNoMulticastInterface, group)
+		}
+		return fmt.Errorf("%w: %v: %w", ErrNoMulticastInterface, group, lastErr)
+	}
+	return nil
+}

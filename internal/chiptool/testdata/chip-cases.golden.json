@@ -741,7 +741,7 @@
     "GC/2.2": {
       "tests": 1,
       "steps": 40,
-      "stepsSkipped": 24
+      "stepsSkipped": 12
     },
     "GC/2.3": {
       "tests": 1,
@@ -756,7 +756,7 @@
     "GC/2.5": {
       "tests": 1,
       "steps": 16,
-      "stepsSkipped": 4
+      "stepsSkipped": 0
     },
     "GC/2.6": {
       "tests": 1,

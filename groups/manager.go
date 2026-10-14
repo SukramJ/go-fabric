@@ -12,6 +12,7 @@ import (
 	"net"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/SukramJ/go-fabric/secure/aesccm"
 	"github.com/SukramJ/go-fabric/store"
@@ -63,6 +64,9 @@ type epochKey struct {
 	privacy   []byte
 	sessionID uint16
 	ccm       *aesccm.CCM
+	// start is the epoch's EpochStartTime in microseconds, which
+	// selects the current key a sender uses (KeySets.currentKeyForId).
+	start uint64
 }
 
 // keySet is the operational form of one group key set — matter.js
@@ -80,6 +84,10 @@ type fabricGroups struct {
 	index      uint8
 	fabricID   uint64
 	compressed [8]byte
+	// nodeID is this node's operational node id on the fabric — the
+	// source node id and the nonce node id of the group messages it
+	// sends (matter.js GroupSession.nodeId, fabric.nodeId).
+	nodeID uint64
 
 	keySets map[uint16]*keySet
 	idMap   map[uint16]uint16
@@ -126,6 +134,22 @@ type Manager struct {
 	listenersMu      sync.Mutex
 	messageListeners map[uint64]func(GroupMessageEvent)
 	nextListener     uint64
+
+	// counter is the node-global group data message counter (counter.go),
+	// created on the first send; counterRandom is its random start.
+	counterMu     sync.Mutex
+	counter       *dataCounter
+	counterRandom func() (uint32, error)
+
+	// The send side (sender.go): the outbound group sessions, the
+	// socket they leave through, the exchange id counter and the clock
+	// that selects the current epoch key.
+	senderMu       sync.Mutex
+	senders        map[senderKey]*Sender
+	transport      MulticastTransport
+	exchangeID     uint16
+	exchangeSeeded bool
+	now            func() time.Time
 }
 
 // NewManager returns a manager over st. logger may be nil.
@@ -142,6 +166,10 @@ func NewManager(st Store, logger *slog.Logger) (*Manager, error) {
 		maxGroups: DefaultMaxGroupsPerFabric,
 		fabrics:   make(map[uint8]*fabricGroups),
 		reception: make(map[string]map[uint64]*mrp.Window),
+
+		counterRandom: randomCounterStart,
+		senders:       make(map[senderKey]*Sender),
+		now:           time.Now,
 	}, nil
 }
 
@@ -222,7 +250,7 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 		return nil, fmt.Errorf("groups: load fabric %d: %w", idx, err)
 	}
 	f := &fabricGroups{
-		index: idx, fabricID: rec.FabricID, compressed: rec.CompressedID,
+		index: idx, fabricID: rec.FabricID, compressed: rec.CompressedID, nodeID: rec.NodeID,
 		keySets: make(map[uint16]*keySet), idMap: make(map[uint16]uint16), table: make(map[uint16]*TableEntry),
 		props: make(map[uint16]GroupProperties),
 	}
@@ -273,7 +301,8 @@ func (m *Manager) loadFabric(ctx context.Context, idx uint8) (*fabricGroups, err
 // Mirrors matter.js FabricGroups.setFromGroupKeySet.
 func deriveKeySet(s store.GroupKeySet, compressed [8]byte) (*keySet, error) {
 	ks := &keySet{id: s.GroupKeySetID}
-	for _, ek := range [][]byte{s.EpochKey0, s.EpochKey1, s.EpochKey2} {
+	starts := [3]uint64{s.EpochStart0, s.EpochStart1, s.EpochStart2}
+	for slot, ek := range [][]byte{s.EpochKey0, s.EpochKey1, s.EpochKey2} {
 		if len(ek) == 0 {
 			continue
 		}
@@ -293,7 +322,7 @@ func deriveKeySet(s store.GroupKeySet, compressed [8]byte) (*keySet, error) {
 		if err != nil {
 			return nil, err
 		}
-		ks.epochs = append(ks.epochs, epochKey{key: op, privacy: priv, sessionID: sid, ccm: ccm})
+		ks.epochs = append(ks.epochs, epochKey{key: op, privacy: priv, sessionID: sid, ccm: ccm, start: starts[slot]})
 	}
 	if len(ks.epochs) == 0 {
 		return nil, fmt.Errorf("groups: key set %d has no epoch key", s.GroupKeySetID)
@@ -401,6 +430,7 @@ func (m *Manager) ForgetFabric(fabricIndex uint8) {
 	_, had := m.fabrics[fabricIndex]
 	delete(m.fabrics, fabricIndex)
 	m.mu.Unlock()
+	m.closeSenders(fabricIndex)
 	m.forgetUnreferenced()
 	if had {
 		m.notify()
@@ -553,6 +583,24 @@ func (m *Manager) AddEndpointForGroup(ctx context.Context, fabricIndex uint8, gr
 // A group whose last endpoint leaves is removed. Mirrors matter.js
 // GroupKeyManagementServer.removeEndpoint.
 func (m *Manager) RemoveEndpoint(ctx context.Context, fabricIndex uint8, endpoint, groupID uint16, all bool) (bool, error) {
+	return m.removeEndpoint(ctx, fabricIndex, endpoint, groupID, all, false)
+}
+
+// RemoveEndpointRetainingSender removes endpoint from groupID as
+// [Manager.RemoveEndpoint] does, except that a group losing its last
+// endpoint keeps its Groupcast properties and so stays a sender-only
+// member of the Groupcast Membership list — the Sender feature's
+// kKeepGroupIfEmpty. The Groupcast server uses it where matter.js
+// GroupcastServer marks a group retainedSenderOnly (JoinGroup emptying a
+// group's endpoints, GroupcastServer.ts:262-292; LeaveGroup removing the
+// last endpoint, :346-357), a mark the groupTable$Changed prune consumes
+// instead of deleting the group (:631-646). Here the prune runs inside the
+// removal, so the mark is this call.
+func (m *Manager) RemoveEndpointRetainingSender(ctx context.Context, fabricIndex uint8, endpoint, groupID uint16) (bool, error) {
+	return m.removeEndpoint(ctx, fabricIndex, endpoint, groupID, false, true)
+}
+
+func (m *Manager) removeEndpoint(ctx context.Context, fabricIndex uint8, endpoint, groupID uint16, all, retainSender bool) (bool, error) {
 	m.mu.Lock()
 	f, err := m.fabricLocked(ctx, fabricIndex)
 	if err != nil {
@@ -590,9 +638,9 @@ func (m *Manager) RemoveEndpoint(ctx context.Context, fabricIndex uint8, endpoin
 			// GroupcastServer #handleGroupTableChanged /
 			// #applyPendingAndDerive prune the groupProperties of a group
 			// that left the group table (CHIP kDeleteGroupIfEmpty) unless
-			// a Groupcast command kept it sender-only — which needs the
-			// Sender feature this module does not advertise.
-			if _, ok := f.props[id]; ok {
+			// a Groupcast command kept it sender-only (retainSender, the
+			// retainedSenderOnly mark).
+			if _, ok := f.props[id]; ok && !retainSender {
 				if err := m.st.RemoveGroupcastGroup(ctx, fabricIndex, id); err != nil {
 					m.mu.Unlock()
 					return existing, fmt.Errorf("groups: remove groupcast group %d: %w", id, err)

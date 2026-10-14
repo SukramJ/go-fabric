@@ -324,7 +324,8 @@ The item this section opened with — Groupcast (0x0065) on the root with the
 AccessControl Auxiliary ACL, which the 1.6.1 device library requires for the
 light and plug types (RootNode `GroupcastListenerCond`) — is built:
 [ADR 0010](../../docs/adr/0010-groupcast-and-auxiliary-acl.md), with Listener
-and PerGroup but without Sender (`BD-Matter-GroupcastNoSender`). What remains:
+PerGroup and, since wave 20 (report AN), Sender — FeatureMap 0x07, the
+group sender in `groups/`. What remains:
 
 - **Groupcast has not met a real controller.** The evidence is the in-process
   end-to-end test (`bridge/groupcast_e2e_test.go`) and the wire fixtures
@@ -440,6 +441,8 @@ Fixed-width integer encodes exceed the sanctioned SubscriptionID/DataVersion wor
 - **`controller/client`: 38 snapshot clusters have no generated definition** (AccessControl, OperationalCredentials, GroupKeyManagement, Groupcast, Thread/WiFi diagnostics, Switch, the media and camera clusters, the joint-fabric and TLS clusters among them; `script/clustergen/clusters.go` names the 97 that do). The client names them ("named clusters", brief AK D3), decodes their global attributes, names their features and judges their changes-omitted attributes from the schema's tables, and delivers their events raw. What stays approximate is `Cluster.Extra()`: matter.js subtracts the model's attributes and commands (`PeerBehavior.ts:443-455` at `0ceb202d`); the Go client has no per-cluster attribute table for a cluster without a definition, so every non-global listed id counts as extra. Closes when the generator covers them (ADR 0013's skip list) or the schema gains an attribute table. Report AK, 2026-10-14.
 
 - **`controller/client.Registry`, three gaps against `Peers.ts`/`CommissioningClient.ts` at `0ceb202d` (report AL, 2026-10-14):** (1) the record follows the peer's descriptor on `SessionAdded` and at commission, not on every descriptor save as `CommissioningClient.ts:711` (`peer.updated`) does — closes with a `peer.Observer.Updated`; (2) `ForDevice` stores no TTL because `discovery.Device` carries none, so a commissionable node expires after `DefaultTTL` instead of its record's TTL (`Peers.ts:959-966`) — closes when the scanner exposes the record TTL; (3) the decommission confirmation classes (`CommissioningClient.ts:405-417`) map `PeerMessageMissingError`, `PeerInitiatedCloseError` and `PeerLeftError`, but `FabricRemovedError` has no Go counterpart.
+
+- **Group sender (report AN, 2026-10-14):** (1) matter.js compares a key set's `epochStartTime` (Matter epoch, µs since 2000) as if it were Unix milliseconds (`Groups.ts` `currentKeyForId`, `0ceb202d`); `groups/sender.go` mirrors the comparison — a key whose start lies between 2000 and 2030 in Matter time reads as started; a CHIP controller writes current Matter-epoch values, which are "started" either way. (2) Group writes are not list-chunked (`ClientGroupInteraction.ts` chunks as unicast does). (3) Group messages leave from the node's ephemeral send socket, not the bridge's listener on 5540 (`BD-Matter-GroupSendFromEphemeralPort`); closes when `bridge` exposes its listener.
 
 ## Closed in 0.31–0.33 (duplicated Tier-2 bullets)
 

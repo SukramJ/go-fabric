@@ -12,6 +12,37 @@ pseudo-version of `main`.
 
 ### Added
 
+- Group sending (ADR 0020, stage 5, part 1; matter.js `SessionManager.groupSessionForAddress`,
+  `GroupSession.create` / `encode`, `MessageExchange.#send` on a group session and
+  `ClientGroupInteraction` at `0ceb202d`). `groups.Manager.Sender(ctx, fabricIndex, groupID)`
+  returns the outbound group session for the group's current epoch key (`ErrNoKey`,
+  `ErrKeyNotStarted`, `ErrInvalidGroupID`, `ErrNoInterface`, `ErrNoCounterStore`), cached by
+  fabric, group session id and operational key. `Sender.Send` frames a group message (P flag,
+  this node's node id as source, a new initiator exchange, no MRP), seals it under the
+  operational group key, privacy-obfuscates the header and sends it to the group's multicast
+  address on port 5540; `Sender.Invoke` and `Sender.Write` send an InvokeRequest /
+  WriteRequest with SuppressResponse and refuse an endpoint path or a timed request
+  (`ErrInvalidGroupOperation`, `groups.RequestOptions`). Every message is numbered by the
+  node-global group data counter, persisted in `matter_metadata` under `groupDataCounter`
+  (`groups.GroupDataCounterKey`) with a reserve of 1000 and rolling over to 0 with a
+  `matter.groups.counter_near_rollover` warning; the manager's store must implement
+  `groups.CounterStore` (`*store.Store` does). `groups.Manager.SetTransport` takes the
+  socket (`groups.MulticastTransport`); `node.Node` opens one (`[::]:0`) at `Start`, so
+  `Node.Groups().Sender(…)` sends without further wiring.
+- `transport/message.Header.MarshalPacket` (matter.js `MessageCodec.encodePacketHeader` with
+  its group-header constraint, `ErrGroupHeader`, and `encodePacket`'s refusal of message
+  extensions, `ErrEncodeExtensions`); `secure/channel.EncryptGroup`, `ObfuscateGroupHeader`,
+  `PrivacyNonce` and `Obfuscate` (`GroupSession.encode`, `MessagePrivacy.buildNonce` /
+  `obfuscate`); `transport/udp.Listener.SendMulticast`, which sends on every up,
+  multicast-capable interface.
+- The Groupcast Sender feature: `core.Groupcast` advertises Listener, Sender and PerGroup
+  (FeatureMap `0x07`, as matter.js `GroupcastServer`). JoinGroup with an empty endpoint list
+  joins a group sender-only; a JoinGroup replacing the endpoints with none and a LeaveGroup
+  removing the last listed endpoint keep the group as a sender-only member
+  (`groups.Manager.RemoveEndpointRetainingSender`); EnableSenderTesting puts the fabric under
+  test like EnableListenerTesting. Previously these answered ConstraintError or removed the
+  group (`BD-Matter-GroupcastNoSender`).
+
 - `controller/client.Hooks.Commissioned`: the registry commissioned the node (matter.js `lifecycle.commissioned`, `CommissioningClient.ts:325` at `0ceb202d`), after the record and settings are saved and before the node starts. Deleting a node through the registry closes every client subscription the registry still holds for its peer (`ClientNode.ts:288-302`).
 
 - `controller/client` (ADR 0020, stage 4, first half): the controller's

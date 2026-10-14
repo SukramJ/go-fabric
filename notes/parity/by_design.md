@@ -1465,18 +1465,27 @@ Pinned by `TestPeerInitiator_FullHandshakeAgainstResponder`.
 
 ---
 
-### BD-Matter-GroupReceiveOnly — group messages are received, never sent
+### BD-Matter-GroupSendOnEveryMulticastInterface — a group message leaves on every interface the listener joined
 
-matter.js sends group messages too: `GroupSession.create` opens an outbound
-group session, and a node-global group data message counter (seeded from the
-legacy per-key counters by `MessagingState.legacyGroupDataCounterMax`) numbers
-them. go-fabric only receives them (`groups.Manager.Decode`,
-`Bridge.dispatchGroupMessage`) and keeps no group data counter. Reason: a node
-sends group messages only as a controller or a binding client, and the
-controller role is a scope decision (`docs/matterjs-comparison.md`).
-Retires if a sending role is ever in scope.
+matter.js sends a group message through the one UDP interface
+`transports.interfaceFor(ChannelType.UDP, multicastAddress)` returns
+(`GroupSession.ts:143-153` at `0ceb202d`). `udp.Listener.SendMulticast`
+sends the datagram on every interface the listener holds multicast
+memberships on. Report AN.
 
----
+By design. The module joins multicast on every usable interface
+(`ServerGroupNetworking` reconciles the same set); a sender bound to one
+of them would reach only that link.
+
+### BD-Matter-GroupSendFromEphemeralPort — group messages leave from the node's own send socket
+
+matter.js originates group messages on the operational socket, port
+5540 (`GroupSession.ts:150-153` at `0ceb202d`). `node.Node` opens a
+`[::]:0` send socket at `Start` for `groups.Manager.Sender` because the
+bridge does not expose its listener; receivers do not key on the source
+port. Report AN.
+
+By design, until the bridge exposes its listener (findings register).
 
 ### BD-Matter-KeySetReadAllIndicesOrder — key set ids listed in id order
 
@@ -1487,30 +1496,6 @@ order, the order the store returns them. The list is a set on the wire — no
 controller reads meaning into the order — and keeping write order would mean
 persisting an order column for it. Pinned by
 `TestGroupKeyManagementParityMatterJS` (key set 0 leading, membership only).
-
----
-
-### BD-Matter-GroupcastNoSender — Groupcast advertises Listener and PerGroup, not Sender
-
-matter.js's default root installs `GroupcastServer.with("Listener", "Sender",
-"PerGroup")` (`packages/node/src/node/ServerNode.ts`). go-fabric's
-`core.Groupcast` advertises Listener and PerGroup (FeatureMap 0x05). The
-Sender feature obliges a node to keep memberships for groups it sends to —
-JoinGroup with an empty endpoint list, LeaveGroup keeping an emptied group as
-sender-only (`GroupcastServer.ts #leave`, `retainedSenderOnly`),
-EnableSenderTesting — and to originate group messages for them (matter.js
-`4ad47150`, group bindings that send). This node originates none
-(`BD-Matter-GroupReceiveOnly`), so it would advertise memberships that do
-nothing. Without Sender the server behaves as matter.js's Listener-only
-server: an empty endpoint list answers ConstraintError ("Empty endpoint list
-requires Sender feature"), a group losing its last endpoint is removed, and
-EnableSenderTesting (conformance SD) answers ConstraintError. RootNode needs
-the Sender condition only for switch / controller device types
-(`GroupcastSenderCond`, conformance O), which no bridge of this module
-advertises. Retires with `BD-Matter-GroupReceiveOnly`.
-[ADR 0010](../../docs/adr/0010-groupcast-and-auxiliary-acl.md). Pinned by
-`TestGroupcastAndAuxiliarySurfaceMatchSchema` and the "no endpoints" case of
-`TestGroupcastJoinGroupParityMatterJS`.
 
 ---
 
