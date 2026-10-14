@@ -221,6 +221,24 @@ func (b *Binding) MatterWrite(ctx context.Context, attrID uint32, value any) err
 	return nil
 }
 
+// RemoveFabric drops a removed fabric's entries and tells the
+// [Binding.OnChange] observers — matter.js limitNodeDataToAllowedFabrics
+// strips a departed fabric's fabric-scoped attribute entries from every
+// endpoint (packages/node/src/behavior/cluster/FabricScopedDataHandler.ts:
+// 109-122).
+func (b *Binding) RemoveFabric(fabricIndex uint8) {
+	b.mu.Lock()
+	before := b.bindings
+	after := slices.DeleteFunc(slices.Clone(before), func(t TargetStruct) bool { return t.FabricIndex == fabricIndex })
+	if len(after) == len(before) {
+		b.mu.Unlock()
+		return
+	}
+	b.bindings = after
+	b.mu.Unlock()
+	b.notify(before, after)
+}
+
 // bindingWriteList converts a written value into the server's entries.
 func bindingWriteList(value any, fabric uint8, request bool) ([]TargetStruct, error) {
 	switch v := value.(type) {

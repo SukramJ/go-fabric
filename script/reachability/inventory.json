@@ -1,10 +1,11 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4845,
+  "entry_points": 4858,
   "entry_packages": [
     ".",
     "bdx",
     "bdx/otaimage",
+    "binding",
     "bootid",
     "bridge",
     "bridge/bridgetest",
@@ -186,9 +187,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11081,
-    "reachable": 7773,
-    "whitelisted": 3303,
+    "total_exported": 11107,
+    "reachable": 7788,
+    "whitelisted": 3314,
     "unreachable": 5
   },
   "by_package": [
@@ -261,6 +262,83 @@
     }
   ],
   "whitelisted": [
+    {
+      "package": "binding",
+      "identifier": "Entry",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "binding/manager.go",
+      "line": 23
+    },
+    {
+      "package": "binding",
+      "identifier": "TestAttachDetachClose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 309
+    },
+    {
+      "package": "binding",
+      "identifier": "TestClientEstablishedOnSession",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 164
+    },
+    {
+      "package": "binding",
+      "identifier": "TestDormantThenWoken",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 101
+    },
+    {
+      "package": "binding",
+      "identifier": "TestDropReasons",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 20
+    },
+    {
+      "package": "binding",
+      "identifier": "TestGroupWaitsForKey",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 241
+    },
+    {
+      "package": "binding",
+      "identifier": "TestHandlerPanic",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 283
+    },
+    {
+      "package": "binding",
+      "identifier": "TestKindString",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 396
+    },
+    {
+      "package": "binding",
+      "identifier": "TestParkedAgainWithoutObserver",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 139
+    },
+    {
+      "package": "binding",
+      "identifier": "TestReplaceAttachedServer",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 377
+    },
+    {
+      "package": "binding",
+      "identifier": "TestUnregister",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "binding/manager_test.go",
+      "line": 208
+    },
     {
       "package": "bootid",
       "identifier": "TestEnableRotation_Idempotent",

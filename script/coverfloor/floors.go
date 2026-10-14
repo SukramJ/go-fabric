@@ -35,6 +35,7 @@ type packageFloor struct {
 var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric", min: 0, why: "module doc only, no statements to cover"},
 	{pkg: "github.com/SukramJ/go-fabric/bdx", min: 75},
+	{pkg: "github.com/SukramJ/go-fabric/binding", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/bdx/otaimage", min: 76},
 	{pkg: "github.com/SukramJ/go-fabric/bootid", min: 89},
 	{

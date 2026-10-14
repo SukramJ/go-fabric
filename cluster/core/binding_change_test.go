@@ -216,3 +216,26 @@ func TestBindingGeneratedValue(t *testing.T) {
 		t.Fatalf("group 0: %v", err)
 	}
 }
+
+// TestBindingRemoveFabric: a removed fabric's entries go and the observers
+// hear it (FabricScopedDataHandler.ts:109-122); another fabric's stay.
+func TestBindingRemoveFabric(t *testing.T) {
+	t.Parallel()
+	b := core.NewBinding()
+	if err := b.MatterWrite(fabricCtx(1), 0, []core.TargetStruct{{Node: 2, Endpoint: 1}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.MatterWrite(fabricCtx(2), 0, []core.TargetStruct{{Group: 3}}); err != nil {
+		t.Fatal(err)
+	}
+	r := &changeRecorder{}
+	b.OnChange(r.fn)
+	b.RemoveFabric(1)
+	b.RemoveFabric(7) // none: no call
+	if got := r.take(); !slices.EqualFunc(got, []bindingChange{{1, nil, []string{"1/2//1/"}}}, eqChange) {
+		t.Fatalf("changes %+v", got)
+	}
+	if got := b.Entries(); len(got) != 1 || got[0].FabricIndex != 2 {
+		t.Fatalf("entries %+v", got)
+	}
+}

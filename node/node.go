@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/binding"
 	"github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/diagevent"
@@ -59,8 +60,9 @@ type Node struct {
 	advertiser mdns.Advertiser
 	bootReason uint8
 	persisted  persisted
-	// groupTx is the socket group messages leave through (groupsend.go).
-	groupTx *udp.Listener
+	client     *clientStack
+	bindings   *binding.Manager
+	bindSync   bindingSync
 
 	// life bounds the goroutines New and Start begin (subscription
 	// engine, reapers, the operational-time keeper); Stop cancels it.
@@ -147,6 +149,8 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		n.agg = &Aggregator{n: n}
 		snapshotter = n.agg.snapshot
 	}
+	// The binding manager reads the topology the bridge serves.
+	snapshotter = n.observeTopology(snapshotter)
 
 	// --- the bridge (main.go:188-228) -----------------------------------
 	n.br, err = bridge.New(snapshotter, n.advertiser, bridge.Config{
@@ -238,6 +242,19 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 			n.logger.Warn("eventlog.persist_ceiling", slog.String("err", err.Error()))
 		}
 	}, 0)
+
+	// --- the client stack and the binding manager (brief AO) -------------
+	if cfg.Client.Enabled {
+		if n.client, err = n.newClientStack(); err != nil {
+			return nil, err
+		}
+	}
+	if n.bindings, err = n.newBindings(); err != nil {
+		if n.client != nil {
+			n.client.close(ctx)
+		}
+		return nil, err
+	}
 	ok = true
 	return n, nil
 }
@@ -325,6 +342,7 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 		n.br.WithdrawFabric(ctx, compressedID, nodeID)
 	}
 	n.br.EmitFabricRemovedContext(ctx, fabricIndex)
+	n.removeFabricBindings(fabricIndex)
 	n.window.reopenIfDecommissioned(ctx, n.st)
 }
 
@@ -464,6 +482,10 @@ func (n *Node) Start(ctx context.Context) error {
 	for _, fabric := range loaded {
 		n.br.AnnounceFabric(ctx, fabric.CompressedID, fabric.NodeID)
 	}
+	// The Binding servers register their entries once the node is online
+	// and its CASE identities are loaded (BindingManager.ts:65-78: the
+	// queue flushes on the node's online event).
+	n.startBindings()
 	// An uncommissioned node opens its own window (main.go:491-501;
 	// matter.js CommissioningServer enterCommissionableMode).
 	if len(loaded) == 0 {
@@ -495,6 +517,12 @@ func (n *Node) Stop(ctx context.Context) error {
 			n.logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
 		}
 		n.root.BasicInformation.EmitShutDown()
+	}
+	// Every live binding is removed before the client stack goes
+	// (BindingServer.ts:52, :160-163).
+	n.bindings.Close()
+	if n.client != nil {
+		n.client.close(ctx)
 	}
 	n.sec.pase.Stop()
 	n.window.stop()
