@@ -32,6 +32,7 @@ German, briefly. Six waves were planned against the phases:
 | 15 | concept v2 phase 7 stage 3 (ADR 0020): `controller/interaction` Write, Subscribe, the subscription registry with its liveness timer, sustained subscriptions, the inbound report handler, Read with events and filters; `controller/handshake.CASEServer` (the CASE responder); `controller/exchange.Manager.SetProtocolHandler`; the client encoders and decoders in `im/` | AI | `wave/2026-10-13-tranche-15` (#90); docs PR `docs/wave-15-followups` | see §15 |
 | 16 | ADR 0020 stage-2 close-out: `bridge/bridgetest.Commissioner` runs on `controller/` (surface kept); `interaction.Report.SubscriptionID` / `Session` | AJ | `wave/2026-10-13-tranche-16` (#93); docs PR `docs/wave-16-followups` | see §16 |
 | 17 | ADR 0020 stage 4, first half: `controller/client` (the client node image, cache and store, shape analysis, default subscription, connection state, physical properties); `peer.Peer.Observe`; `interaction.SubscribeRequest.RefreshRequest`; `spec.DecodeValue`; `schema.ClusterHasChangesOmittedAttribute` | AK | `wave/2026-10-14-tranche-17` (#95); docs PR `docs/wave-17-followups` | see §17 |
+| 18 | ADR 0020 stage 4, second half: `client.Registry` (`peerN` ids, restore, record and address book with the 15 min TTL / 1 min cull, `ForDevice`/`ForAddress`, commission/decommission with the fabric-operation guard, leave/shutDown/startUp, fabric-label reconciliation), `controller/client/sqlstore`, `exchange.Session.CreatedAt` | AL | `wave/2026-10-14-tranche-18` (#97); docs PR `docs/wave-18-followups` | see §18 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -1135,3 +1136,58 @@ ids, restore on start, the address book with its 15 min TTL and 1 min
 cull, the leave/shutdown/startUp reactions, `forAddress`, fabric-label
 reconciliation) and a SQLite `client.Store`; then the `device/` types as
 the client view.
+
+## 18. Wave 18 (2026-10-14, the owner away; everything local; a second Opus ran brief AM in parallel)
+
+ADR 0020 stage 4, second half — stage 4 closed. Brief AL (`wave18/registry`,
+head `1b5d45e`) on `planning/briefs-wave-18` (`f72901c`), the brief
+written by the owner after a Sonnet first read of `Peers.ts`,
+`CommissioningClient.ts` and `NetworkClient.ts`, every load-bearing line
+re-read at the pin. Tranche `wave/2026-10-14-tranche-18` = the branch
+(linear on `main`) plus the owner's commit.
+
+- **`client.Registry`** (`registry.go`, `record.go`, `addresses.go`,
+  `fabricops.go`, `opcreds.go`, `reactions.go`, `label.go`): `peerN` ids
+  past every stored one; restore from `Store.NodeIDs()` (a node that
+  fails to load is skipped — `BD-Matter-ClientRegistry-RestoreSkipsFailedNode`);
+  `AutoStart` starts commissioned, enabled nodes sequentially; the
+  record (CC's nonvolatile state, 22 fields) under reserved cluster
+  `0xFFFF_FFFE`; the address book with `DefaultTTL` 15 min and the
+  one-minute one-shot cull (`Peers.ts:651-712` literally);
+  `ForDevice`/`ForAddress`; `Commission`/`Decommission` under the
+  fabric-operation guard (RemoveFabric and NOCResponse hand-coded for
+  the named OperationalCredentials cluster); the three reactions and
+  the once-per-start label reconciliation as registry background work
+  (`BD-Matter-ClientRegistry-ReactionsInBackground`); `HooksFor(id)`
+  per-node hooks, `Hooks.Decommissioned` and (owner) `Hooks.Commissioned`.
+- **`controller/client/sqlstore`**: `client.Store` over `modernc.org/sqlite`
+  with its own `v1` migration list (tables `matter_client_values`,
+  `matter_client_versions`), floor 85 (measured 89.6 %).
+- **`exchange.Session.CreatedAt()`** for the startUp cut.
+- **Live proof** `TestLiveRegistry`: commission through the registry,
+  the label really renamed on the device after `Stop`+`Start`, restore
+  from the SQLite file with the subscription resuming, decommission
+  (RemoveFabric reaches the device, store and peer gone), the cull past
+  `DefaultTTL`. The startUp cut is proven scripted only: the device's
+  graceful stop already closes its session before it restarts.
+- **Owner:** `keepSubscriptions` mirror holds (a controller has no
+  server-side subscriptions; `Session.ts:318-322`); `deleteNode` closes
+  the peer's client subscriptions (`ClientNode.ts:288-302`); three
+  `by_design` entries; findings Tier 3: `Observer.Updated` missing,
+  scanner TTL, `FabricRemovedError`.
+
+Guards on the tranche (tool PATH exported, HEAD logged): `make ci`,
+`make race`, `make reachability-check` (unreached 5), `make chiptool-test`
+(313 pass, 0 fail, 1 skip) — green at `2755d67`; `make ci` failed only on
+an unconvert finding in the owner's own line, fixed in `ec655d0`, `make
+lint` + `make cover-check` rerun green. The Go build cache had grown to
+67 GB under two parallel agents (7.7 GB free); entries older than six
+hours were deleted. PR #97 (auto-merge).
+
+**Docs PR `docs/wave-18-followups`:** ADR 0020 (stage-4 row done),
+concept v2 B.1 (stage 4 closed, AM parallel), this section. Then delete
+`wave18/registry`, `planning/briefs-wave-18`, the tranche and docs
+branches and the `.claude/worktrees/wave18-registry` worktree. Next:
+stage 5 (binding client, Groupcast sender, controller device types)
+after a first read; wave 19 (brief AM, Wi-Fi diagnostics) lands first
+or second depending on its guards.
