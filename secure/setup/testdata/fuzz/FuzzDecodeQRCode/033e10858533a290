@@ -1,0 +1,2 @@
+go test fuzz v1
+string("MT:2710000100000000070")

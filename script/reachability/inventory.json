@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4985,
+  "entry_points": 4997,
   "entry_packages": [
     ".",
     "bdx",
@@ -189,9 +189,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11451,
-    "reachable": 8019,
-    "whitelisted": 3427,
+    "total_exported": 11472,
+    "reachable": 8028,
+    "whitelisted": 3439,
     "unreachable": 5
   },
   "by_package": [
@@ -21483,6 +21483,20 @@
     },
     {
       "package": "secure/setup",
+      "identifier": "FuzzDecodeManualCode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/fuzz_setup_test.go",
+      "line": 180
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "FuzzDecodeQRCode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/fuzz_setup_test.go",
+      "line": 154
+    },
+    {
+      "package": "secure/setup",
       "identifier": "FuzzIsValidSetupPIN",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/fuzz_setup_test.go",
@@ -21501,6 +21515,55 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/fuzz_setup_test.go",
       "line": 34
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeExtra",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 149
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeManualCode_MatterJSVectors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 236
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeManualCode_Rejects",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 288
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeManualCode_RoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 267
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeQRCode_MatterJSVectors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 35
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecodeQRCode_Rejects",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 78
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestDecode_EveryInvalidPasscode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 308
     },
     {
       "package": "secure/setup",
@@ -21616,10 +21679,31 @@
     },
     {
       "package": "secure/setup",
+      "identifier": "TestQRCode_RoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 98
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestQRCode_RoundTripWithTLVTail",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 120
+    },
+    {
+      "package": "secure/setup",
       "identifier": "TestQRCode_StartsWithMT",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
       "line": 132
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestQRCode_TooLong",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/decode_test.go",
+      "line": 204
     },
     {
       "package": "secure/setup",
