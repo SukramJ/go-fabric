@@ -35,6 +35,7 @@ German, briefly. Six waves were planned against the phases:
 | 18 | ADR 0020 stage 4, second half: `client.Registry` (`peerN` ids, restore, record and address book with the 15 min TTL / 1 min cull, `ForDevice`/`ForAddress`, commission/decommission with the fabric-operation guard, leave/shutDown/startUp, fabric-label reconciliation), `controller/client/sqlstore`, `exchange.Session.CreatedAt` | AL | `wave/2026-10-14-tranche-18` (#97); docs PR `docs/wave-18-followups` | see §18 |
 | 19 | concept v2 phase 10: WiFiNetworkDiagnostics server with `core.WiFiReporter`, SecondaryNetworkInterface, `node.Network.WiFi` + conditions, reference-bridge `--wifi`, DGWIFI family | AM | `wave/2026-10-14-tranche-19` (#99); docs PR `docs/wave-19-followups` | see §19 |
 | 20 | ADR 0020 stage 5, part 1: the group message sender (`groups.Manager.Sender`, `channel.EncryptGroup`, the group header constraint, `udp.Listener.SendMulticast`, the persisted group data counter), the Groupcast Sender feature (FeatureMap 0x07) | AN | `wave/2026-10-14-tranche-20` (#101); docs PR `docs/wave-20-followups` | see §20 |
+| 21 | ADR 0020 stage 5, part 2: `binding.Manager`, `core.Binding.OnChange` + fabric-scoped writes, the bridge decoding Binding writes, `node.Config.Client` (the node's client stack), the 11 controller device types, `TestLiveBinding` (TC-BIND-2.1) | AO | `wave/2026-10-14-tranche-21` (#103); docs PR `docs/wave-21-followups` | see §21 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -1284,3 +1285,58 @@ v2 B.1 (the stage-5 split), this section. Then delete `wave20/groupsend`,
 `.claude/worktrees/wave20-groupsend` worktree. Next: wave 21 (brief AO)
 lands on top; then the `device/` types as the client view, stage 6 or
 phase 8 (ADR 0021 first).
+
+## 21. Wave 21 (2026-10-14, the owner away; everything local; ran in parallel with wave 20)
+
+ADR 0020 stage 5, part 2 — stage 5 closed. Brief AO (`wave21/binding`,
+head `dac12af`) on `planning/briefs-wave-21` (`8d7ec13`). Tranche
+`wave/2026-10-14-tranche-21` = the wave-21 commits cherry-picked onto
+tranche 20 (`-X theirs` dropped wave 20's `groupTx` field from
+`node/node.go` — restored in the owner's commit; check `go build` after
+a stacked cherry-pick) and, after #101 merged, rebuilt on `main`.
+
+- **`binding/`:** `Manager` after `BindingManager.ts` (resolution order,
+  the four `ignoredEntryReason` strings, dormancy, background CASE,
+  group wait, server kind), `Config{Topology, Peers, Groups}`,
+  `Resolution{Kind, Entry, Peer, Interaction, Endpoint, Clients, Group}`,
+  `OnEstablished`/`OnRemoved`; floor 85 (92 %).
+- **`cluster/core.Binding`:** fabric-scoped writes (before, the fabric was
+  ignored), `OnChange`, `Entries()`, `MatterReadFiltered`, generated
+  `TargetStruct` accepted (and the decoder's `spec.List`, owner).
+- **bridge (owner):** Binding list writes decoded through the generated
+  definition; `stampFabricPlaceholder` sets each entry's FabricIndex to
+  1 before validation (the generated client encoders send 0, which the
+  1..254 constraint refused — AttributeWriteResponse.ts:461-467 assigns
+  the accessing fabric first). Before this, a Binding write over the wire
+  reached the server as nothing.
+- **node:** `Config.Client{Enabled, Listen, Names}`, `Peers()`,
+  `Bindings()`; Base's `Simple & Client` mounts the Binding server;
+  group entries through `groups.Manager.Sender` (owner wiring),
+  `HasUsableKey` (map and held key set, BM:488-489).
+- **device:** the 11 controller types, `WithClientClusters`,
+  `TestControllerDeviceTypesParity`.
+- **Proof:** `TestLiveBinding` — TC-BIND-2.1 steps 2–12 over the wire,
+  then a group entry resolving to the group sender after KeySetWrite and
+  GroupKeyMap.
+- **Owner:** two `by_design` entries, findings (Binding not persisted,
+  client resumption in memory, endpoint 0 as a target, worktree
+  `CHIP_ROOT`); `make race` flaked once in the agent's run on
+  `controller/commissioner` `TestConnectionErrorClasses` (passes
+  `-count=5`; watch it).
+
+Guards on the tranche (tool PATH exported, `CHIP_ROOT` absolute, HEAD
+logged): `make ci`, `make race`, `make reachability-check`,
+`make chipdm-check`, `make chiptool-test` (313 pass, 0 fail, 1 skip) — all
+green at `cd13fe2`; a narrowed DGETH family run confirmed the PICS slices
+unchanged. Wave 20's PR needed three CI rounds first (the Sender
+feature moved the PICS slice and uncovered TC-GC-2.2 step 12; a
+`TestObserve` race under `-race`; a forgotten inventory) — the lessons
+are in §20's follow-up and the briefs README. PR #103 (auto-merge).
+
+**Docs PR `docs/wave-21-followups`:** ADR 0020 (stage-5 row done),
+concept v2 B.1 (stage 5 closed, what stays open), this section. Then
+delete `wave21/binding`, `planning/briefs-wave-21`, the tranche and docs
+branches and the `.claude/worktrees/wave21-binding` worktree. Next: the
+owner's call between stage 6 (Joint Fabric, DCL — separable), phase 8
+(OTA provider + DLOG over BDX, ADR 0021 first), the `device/` types as
+the client view, and Binding persistence; `v1.0.0` after phases 7–9.
