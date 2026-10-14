@@ -104,6 +104,7 @@ func ClusterServers(ep *Endpoint) []contract.ClusterServer { //nolint:funlen // 
 	// first, ahead of the source's own clusters (see mountGroups).
 	inner = mountGroups(ep, ep.identifyServer(), inner)
 	inner = mountScenes(ep, inner)
+	inner = mountBinding(ep, inner)
 	if ep.Part {
 		return partClusterServers(ep, inner)
 	}

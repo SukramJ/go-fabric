@@ -245,3 +245,11 @@ read as reported.
    multicast address in a cached sender) is matter.js's own behaviour, no
    entry; D (no chunking) is a findings note. The two test assertions
    outside the brief's paths are accepted.
+6. **After the PR's CI (owner, tranche 20 `9925acd`):** the Sender feature
+   moved the generated PICS slice (`GC.S.F01=1`) and let TC-GC-2.2 step 12
+   run, which expects ConstraintError for 21 endpoints; matter.js does not
+   model JoinGroup.Endpoints' "desc" constraint, chip enforces
+   `kMaxCommandEndpoints` (20) before the key lookup — `validateJoin` now
+   does the same, with a parity row; PICS slice and golden regenerated.
+   A FeatureMap change on the reference daemon needs a families update
+   run before the PR (narrowed per family is enough).

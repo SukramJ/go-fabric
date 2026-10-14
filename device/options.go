@@ -63,6 +63,9 @@ type settings struct {
 	initial        map[uint32]map[uint32]any
 	elements       map[uint32]spec.Options
 	nilSrv         bool
+	// clients are the client clusters [WithClientClusters] declared, in
+	// call order.
+	clients []uint32
 }
 
 func newSettings(with []Option) *settings {
@@ -185,6 +188,19 @@ func WithElements(clusterID uint32, opts spec.Options) Option {
 		s.elements[clusterID] = e
 		s.optional[clusterID] = true
 	}
+}
+
+// WithClientClusters declares client clusters on the endpoint beyond the
+// ones its device type mandates — matter.js's
+// `MutableEndpoint.withClientClusters` (packages/node/src/endpoint/type/
+// MutableEndpoint.ts:123-129), which extends the type's clientClusters.
+// They join the Descriptor's ClientList and are what the binding manager
+// selects for a Binding entry (BindingManager.ts:563-577,
+// #selectClientClusters reads the type's clientClusters). A declared
+// bindable application client makes Base mandate Binding, which the
+// assembler then mounts where the type does not ([endpoint.Spec.ClientClusters]).
+func WithClientClusters(clusterIDs ...uint32) Option {
+	return func(s *settings) { s.clients = append(s.clients, clusterIDs...) }
 }
 
 // WithInitial sets initial attribute values of a cluster's default server

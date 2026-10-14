@@ -109,6 +109,10 @@ type Config struct {
 	// GeneralDiagnosticsServer.timeSnapshot does without a
 	// TimeSynchronizationBehavior (GeneralDiagnosticsServer.ts:168-182).
 	DisableTimeSynchronization bool
+	// Client is the node's client stack ([Client]): the socket, exchanges
+	// and peers its Binding entries reach other nodes through. The zero
+	// value runs without one.
+	Client Client
 	// Observers are the host's callbacks on fabric and commissioning
 	// events, each chained after the facade's own handler (observers.go);
 	// the zero value observes nothing.

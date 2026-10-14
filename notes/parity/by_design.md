@@ -1487,6 +1487,36 @@ port. Report AN.
 
 By design, until the bridge exposes its listener (findings register).
 
+### BD-Matter-NodeClientStack-SecondSocket — the node's client role runs on its own UDP socket
+
+matter.js's node initiates CASE to a bound peer on the same operational
+socket it answers on (`BindingManager.ts:585-627` at `0ceb202d`,
+`PeerSet.for(addr).connect()`). `node.Config.Client` opens a second
+`udp.Listener` with a `controller/exchange.Manager` and a `peer.Set`
+built from the node's own fabric identities (`node/security.go`): the
+device stack (`transport/mrp`, `secure/channel`) and the controller
+stack (`controller/exchange`) do not share a socket. A Matter initiator's
+source port is free; the responder answers the source. Report AO.
+
+By design. One stack per role; CASE resumption records of the client
+role live in memory (the store's row is the responder's — findings).
+
+### BD-Matter-BindingManager-Worker — resolutions and handlers run on one worker goroutine; dormancy is manager-wide
+
+matter.js's `BindingManager` runs each resolution as an async task and
+parks entries per endpoint until the endpoint's `established` observable
+has an observer (`BindingManager.ts:391-438` at `0ceb202d`); a
+`BindingResolution` carries a materialised endpoint with the client
+behaviours installed (`:338-340`). `binding.Manager` serializes
+resolutions and handler calls on one worker goroutine, is dormant until
+its first `OnEstablished` handler (manager-wide), and a `Resolution`
+names the target endpoint and the declared client cluster ids beside the
+peer's `*interaction.Interaction` — there is no client node image on
+the device side (ADR 0020 decision 6). Report AO.
+
+By design. The same order of effects per entry; a host sends through the
+interaction it is handed.
+
 ### BD-Matter-KeySetReadAllIndicesOrder — key set ids listed in id order
 
 matter.js `GroupKeyManagementServer.keySetReadAllIndices` lists key set 0

@@ -145,7 +145,7 @@ func groupLiveNode(t *testing.T, name string) (*node.Node, *onoff.Server) {
 // receiver's own group receive path (Decode, the auxiliary ACL Groupcast
 // grants, the group table's endpoint).
 func TestLiveGroupSend(t *testing.T) {
-	t.Parallel()
+	// Not parallel: the nodes and commissioner here starve the package's other live tests of their handshake budget.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	log := slog.New(slog.DiscardHandler)

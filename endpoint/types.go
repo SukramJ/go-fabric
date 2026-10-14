@@ -331,6 +331,9 @@ type endpointState struct {
 	configVersion uint32
 	// scenes is the ScenesManagement scene table, created on first use.
 	scenes *mattercore.ScenesState
+	// binding is the Binding server [mountBinding] mounts, created on first
+	// use.
+	binding *mattercore.Binding
 }
 
 // configurationVersion returns the version, 1 when never raised.

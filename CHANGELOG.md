@@ -12,6 +12,8 @@ pseudo-version of `main`.
 
 ### Added
 
+- The bridge decodes a Binding (0x001E) list write through the generated definition, stamping each entry's FabricIndex with a placeholder before validation (matter.js `AttributeWriteResponse.ts:461-467` at `0ceb202d` assigns the accessing fabric first); a Binding write over the wire reached the server as nothing before. `groups.Manager.HasUsableKey`: the group's key set is mapped and held.
+
 - Group sending (ADR 0020, stage 5, part 1; matter.js `SessionManager.groupSessionForAddress`,
   `GroupSession.create` / `encode`, `MessageExchange.#send` on a group session and
   `ClientGroupInteraction` at `0ceb202d`). `groups.Manager.Sender(ctx, fabricIndex, groupID)`
@@ -114,25 +116,107 @@ pseudo-version of `main`.
   the bridge's group-message routing and the root GroupKeyManagement
   share one state.
 
-- WiFiNetworkDiagnostics (0x0036, concept v2 §B.4): the generated
-  definition `cluster/spec/wifinetworkdiagnostics` and the server
-  `core.NewWiFiNetworkDiagnostics` over a host port, `core.WiFiReporter`,
-  read on every read as connectedhomeip reads its diagnostic provider —
-  null where the host cannot tell, the packet counters with `PKTCNT`, the
-  error counters and `ResetCounts` with `ERRCNT` (which resets the
-  reporter). The host raises the three events through
-  `OnDisconnectionDetected`, `OnAssociationFailureDetected` and
-  `OnConnectionStatusChanged`. The device layer gains the
-  SecondaryNetworkInterface device type (0x0019,
-  `device.NewSecondaryNetworkInterface`), and `device.RootNode` serves the
-  cluster as its `[WiFi]` requirement. `node.Network.WiFi` (a reporter,
-  the features, the optional attributes) mounts it on the root beside
-  EthernetNetworkDiagnostics and states the RootNode condition `WiFi`
-  (`endpoint.Config.RootDeviceConditions`); `Node.Root()` exposes it as
-  `WiFiNetworkDiagnostics`. NetworkCommissioning stays Ethernet-only.
-  The reference bridge's `--wifi` (TESTING ONLY) serves it from a
-  simulated link; the app pipe's `WiFiDiagnostics` command and CHIP's
-  Wi-Fi TestEventTrigger codes step its counters and raise its events.
+- `controller/client.Registry` (ADR 0020, stage 4, second half; brief AL):
+  the controller's set of client nodes — matter.js `Peers` with the
+  per-node half of `CommissioningClient`, at `0ceb202d`.
+  `NewRegistry(RegistryConfig)` restores every node its `Store` holds,
+  binding a commissioned one to its protocol peer from its record; local
+  ids are `peerN`, the counter past every stored one. `Start` (with
+  `AutoStart`, every commissioned, enabled node), `Stop`, `Close`,
+  `Erase`; `Nodes`, `Commissioned`, `Get`, `GetByAddress`, `Size`.
+  `ForDevice(ctx, discovery.Device)` finds or creates the node of a device
+  the host's scanner found; `ForAddress(addr, id)` the node of a peer
+  address. `Commission(ctx, node, CommissionOptions)` and
+  `Decommission(ctx, node)` run one fabric operation per node at a time
+  (`ErrFabricOperationInProgress`): commission records the peer address,
+  time and our fabric index on the peer, subscribes and starts the node;
+  decommission reads `CurrentFabricIndex` when needed, sends
+  `RemoveFabric`, takes a leave event or a lost session as confirmation
+  and deletes the node. A node's commissioning record (`client.Record`:
+  peer address, CATs, addresses with their lifespans, the discovery data,
+  the reported session parameters) is stored beside its settings;
+  `Node.Record`, `Node.PeerAddress`, `Node.IsCommissioned`. Discovered
+  addresses and commissionable nodes expire (`DefaultTTL` 15 min, culled
+  every `ExpirationInterval`); a commissioned node keeps its freshest
+  address. The registry reacts to the peer's BasicInformation events:
+  `Leave` of our fabric deletes the node (`Hooks.Decommissioned`, new),
+  `ShutDown` gives up the peer's sessions, `StartUp` those older than its
+  newest. Our fabric label is pushed to the peer once per start when it
+  drifted. `RegistryConfig.HooksFor` gives each node its own hooks.
+  A node a registry created before commissioning has no peer yet: its
+  `Read`, `Subscribe`, `Write` and `Invoke` return `ErrNotCommissioned`.
+
+- `controller/client/sqlstore` (ADR 0020, stage 4; brief AL §8): the first
+  durable `client.Store`, on SQLite (`modernc.org/sqlite`, no new
+  dependency). `sqlstore.New(db)` over the tables `matter_client_values`
+  (one TLV value per node, endpoint, cluster and attribute) and
+  `matter_client_versions` (one row per stored cluster, its DataVersion or
+  NULL); `Save` is one transaction and keeps `client.MemoryStore`'s
+  contract (a nil value deletes its key, a nil version clears the stored
+  one). The schema ships as `store/` ships the device's: `Schema()`,
+  `Apply(ctx, db)`, `Upgrade`, `Migrations()` (one step, `v1`) and
+  `SchemaFingerprint(ctx, db)`, its own list, so a device-side host's pin on
+  `len(store.Migrations())` does not move.
+
+- `binding` (ADR 0020, stage 5, brief AO): `binding.Manager`, matter.js's
+  `BindingManager` (`behaviors/binding/BindingManager.ts` at `0ceb202d`).
+  It listens to the node's Binding servers (`Attach`, `Detach`), resolves
+  each entry in matter.js's order into a `Resolution` — `KindClient` (the
+  bound node's `*peer.Peer` and an `*interaction.Interaction` with it, once
+  a CASE session exists), `KindGroup` (a `GroupTarget` from the
+  `GroupSender`, once the fabric holds a key for the group) or `KindServer`
+  (a self-binding, local) — and reports it through `OnEstablished` and
+  `OnRemoved`. Entries stay dormant until the first `OnEstablished`
+  handler; an unusable entry is dropped with matter.js's message as the
+  log's `reason`. `Topology`, `Peers` and `GroupSender` are the manager's
+  ports.
+
+- `node.Config.Client` (`Enabled`, `Listen`, `Names`): the node's client
+  stack — a second UDP socket, a controller exchange manager and a
+  `peer.Set` over the node's CASE identities. `Node.Peers()` returns the
+  peer set (nil without the stack), `Node.Bindings()` the binding
+  manager, which the node feeds every Binding server of the topology it
+  serves; without the client stack a node entry is dropped with the
+  reason "client stack disabled".
+
+- The eleven controller device types in `device/` — `OnOffLightSwitch`,
+  `DimmerSwitch`, `ColorDimmerSwitch`, `ControlBridge`, `OnOffSensor`,
+  `DoorLockController`, `WindowCoveringController`, `ThermostatController`,
+  `PumpController`, `ClosureController`, `VideoRemoteControl` — generated
+  with their client requirements (`Type.Clients`) and the Binding server
+  Base mandates. `device.WithClientClusters` declares further client
+  clusters (matter.js `MutableEndpoint.withClientClusters`).
+
+- `cluster/core.Binding`: `OnChange` (the entries each fabric gained and
+  lost after a committed write, by `TargetStruct.Key`, matter.js's
+  `entryKey`), `Entries`, `RemoveFabric`, `MatterReadFiltered`;
+  `TargetStruct.Key`, `HasNode`, `HasGroup`, `HasEndpoint`, `HasCluster`.
+  A write also accepts the generated `bindingdef.TargetStruct` list.
+
+- The endpoint assembler mounts a Binding server on an endpoint whose
+  declared client clusters make Base mandate it ("Simple & Client": a
+  bindable application client) when its source supplies none.
+
+### Changed
+
+- `cluster/core.Binding`'s write is fabric-scoped, as matter.js's: a write
+  on a session replaces the accessing fabric's entries only, each stamped
+  with that fabric's index, and a session without a fabric is answered
+  UNSUPPORTED_ACCESS; a write without a request (a local writer) replaces
+  the list as before. A value of the wrong type is CONSTRAINT_ERROR (was
+  FAILURE).
+
+- `controller/client.Store` gains `NodeIDs() ([]string, error)` — the ids
+  of the nodes the store holds, sorted (matter.js
+  `ClientNodeStores.knownIds`); `client.MemoryStore` implements it. The
+  interface is unreleased, so no deprecation window applies; a host
+  `Store` adds the method.
+
+- `controller/exchange.Session.CreatedAt()`: when the session was
+  established — matter.js `Session.createdAt`, the cutoff
+  `SessionManager.#handlePeerLoss` compares and the `asOf` a
+  `Manager.HandlePeerLoss` takes (the registry's `startUp` reaction keeps
+  the sessions created at or after the newest one).
 
 ### Fixed
 
