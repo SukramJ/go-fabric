@@ -68,6 +68,10 @@ type Config struct {
 	// Topology set the node builds the provider ([Node.OTAProvider]) and
 	// the host mounts it.
 	OTAProvider *OTAProviderConfig
+	// CommissionerControl mounts the CommissionerControl server on the
+	// Aggregator (ADR 0020 stage 6); nil mounts none. The reference daemon
+	// mounts none.
+	CommissionerControl *CommissionerControlConfig
 	// FixedLabels is the root FixedLabel list; nil serves an empty list.
 	FixedLabels []fixedlabeldef.LabelStruct
 	// Locales are the root LocalizationConfiguration's SupportedLocales,

@@ -683,6 +683,11 @@ const matterAccessControlClusterID uint32 = 0x001F
 // read.
 const matterGroupcastClusterID uint32 = 0x0065
 
+// matterCommissionerControlClusterID is CommissionerControl (0x0751): its
+// CommissioningRequestResult event carries access "S M"
+// (commissioner-control.element.ts:28 at 0ceb202d) — fabric-sensitive, Manage.
+const matterCommissionerControlClusterID uint32 = 0x0751
+
 // EventReadAuthorizer bundles the accessing subject + ACL checker used to gate
 // event reads and subscriptions, mirroring the (fabricIndex, subject, CATs)
 // tuple the attribute read path threads through [HandleReadRequest]. A zero
@@ -754,11 +759,15 @@ func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events
 
 // eventReadPrivilege returns the minimum privilege required to read events on
 // clusterID: Administer for AccessControl (§9.10.7.1 fabric-sensitive events)
-// and Groupcast (GroupcastTesting, access "S A"), View for every other
-// cluster (the Matter default event read privilege).
+// and Groupcast (GroupcastTesting, access "S A"), Manage for
+// CommissionerControl (CommissioningRequestResult, access "S M"), View for
+// every other cluster (the Matter default event read privilege).
 func eventReadPrivilege(clusterID uint32) uint8 {
-	if clusterID == matterAccessControlClusterID || clusterID == matterGroupcastClusterID {
+	switch clusterID {
+	case matterAccessControlClusterID, matterGroupcastClusterID:
 		return 5 // Administer
+	case matterCommissionerControlClusterID:
+		return 4 // Manage
 	}
 	return 1 // View
 }
@@ -767,7 +776,8 @@ func eventReadPrivilege(clusterID uint32) uint8 {
 // FabricIndex and must be filtered to the accessing fabric regardless of the
 // read's FabricFiltered flag (Matter §8.4.3.2 / §9.10.7.1).
 func isFabricSensitiveEventCluster(clusterID uint32) bool {
-	return clusterID == matterAccessControlClusterID || clusterID == matterGroupcastClusterID
+	return clusterID == matterAccessControlClusterID || clusterID == matterGroupcastClusterID ||
+		clusterID == matterCommissionerControlClusterID
 }
 
 // eventPayloadFabricIndex extracts the FabricIndex a fabric-sensitive event

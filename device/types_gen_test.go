@@ -23,6 +23,9 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.Actions(); s != nil && d.Server(0x0025) != s {
 			t.Error("Aggregator: optional Actions is not the device's server")
 		}
+		if s := d.CommissionerControl(); s != nil && d.Server(0x0751) != s {
+			t.Error("Aggregator: optional CommissionerControl is not the device's server")
+		}
 	} else if !refusesFixture("Aggregator") {
 		t.Errorf("Aggregator: %v", err)
 	}

@@ -150,4 +150,6 @@ var committed = []string{
 	"ContentAppObserver",
 	// cluster/core Messages (ADR 0022)
 	"Messages",
+	// cluster/core CommissionerControl (ADR 0020 stage 6, brief AS)
+	"CommissionerControl",
 }

@@ -1522,7 +1522,9 @@ sits on its own OtaProvider endpoint beside the Aggregator
 Report AQ.
 
 By design (ADR 0021). A bridge host owns its images and its consent
-flow; no DCL in this module.
+flow; the DCL enters as the opt-in helper `controller/dcl` (wave 25,
+`BD-Matter-DCL-OptIn`), which the provider's host port may call — the
+provider itself asks no ledger.
 
 ### BD-chip-DiagLogs-BDX — DiagnosticLogs serves BDX as chip does, with one EndLogCollection and the pinned image's manual case
 
@@ -2817,3 +2819,45 @@ with RESP/RPLY and absent without. Report AR.
 By design (ADR 0022). The list bound and the fabric scope come from the
 model; the lifecycle has no reference and is the host's.
 
+### BD-Matter-DCL-OptIn — the DCL is reached only through a host-built client; development certificates from GitHub stay off; one trust-store blob; the CRL cache expires on use
+
+matter.js's `DclCertificateService` (`packages/protocol/src/dcl/DclCertificateService.ts`
+at `0ceb202d`) is constructed by the controller with the production
+ledger, fetches GitHub's development certificates whenever test
+certificates are enabled unless explicitly disabled (`:995-1001`),
+stores PAAs and CD signers as per-certificate entries, and sweeps its
+CRL cache with an hourly timer after an hour of disuse (`:302-326`,
+`:1434-1747`). `controller/dcl` mirrors the GETs, the 5 s timeout
+(`DclClient.ts:39`), the daily refresh and the §6.2.6.1 checks, with four
+surface differences: a `CertificateStore` without a `Client` is offline
+and fetches nothing; the GitHub fallback is an option that defaults to
+off; the trust store persists as one JSON value under the host's
+`Store`; a CRL entry's hour is checked when it is used, with no timer.
+The reference daemon's `--dcl` defaults to `off`, as
+`eligibility/vendor_name.go:5-25` keeps vendor names embedded. Report AS.
+
+By design (ADR 0020 stage 6a). No request leaves a host that did not
+construct a client; the stored shape and the sweep are private to the
+store and change no answer.
+
+### BD-chip-CommissionerControl-RandomWindow — the reverse commissioning window is minted at random; the client check includes the fabric; approval may time out
+
+chip's CommissionerControl server (`src/app/clusters/commissioner-control-server/CommissionerControlCluster.cpp`
+at the harness pin) delegates the window's parameters, and the only
+delegate — `examples/fabric-sync/bridge/CommissionerControlDelegate.cpp:33-36`
+— uses the fixed passcode 20202021 and discriminator 3840 with 1000
+iterations; `CommissionNode` compares the client's node id and carries a
+TODO to include the fabric; an approval has no timeout. `core.CommissionerControl`
+mints passcode, discriminator and salt from `crypto/rand` per request,
+compares node id *and* accessing fabric index, and takes
+`ApprovalTimeout`/`ApprovalValidity` (0 = chip's wait-forever and
+never-expire); the TIMEOUT and FAILURE result codes for a timed-out or
+denied approval are this module's choice. The vid/pid of the request is
+not checked by the server, as chip checks it at discovery
+(`src/controller/SetUpCodePairer.cpp:690-707`): the port exposes
+`CommissioningApprovalRequest.Matches` for the host's commissioner.
+Report AS.
+
+By design (ADR 0020 stage 6b). A fixed passcode on a reverse window is
+an example's convenience, not a protocol rule; the fabric comparison is
+what chip's TODO asks for.
