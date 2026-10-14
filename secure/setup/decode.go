@@ -130,8 +130,8 @@ func DecodeQRCode(s string) (Payload, error) {
 // Mirrors matter.js packages/types/src/schema/PairingCodeSchema.ts:330-345
 // (QrPairingCodeSchema.decodeInternal) followed by the validation decode
 // runs by default (Schema.ts:18-25): version 0 and a valid passcode (:279-286),
-// the vendor/product identity (:289-293), and — when a TLV tail is present —
-// decodeTlvData's checks (:354-377).
+// the vendor/product identity (:289-293). A TLV tail is parsed with
+// [DecodeExtra] when it decodes and kept as raw bytes otherwise.
 func DecodeQRCodes(s string) ([]Payload, error) {
 	if !strings.HasPrefix(s, qrPrefix) {
 		return nil, invalid("The pairing code should start with MT:")
@@ -196,10 +196,13 @@ func decodeQRPart(part string) (Payload, error) {
 		return Payload{}, err
 	}
 	// PairingCodeSchema.ts:342: TlvData (if any) follows the fixed-length data.
+	// matter.js's decode keeps the tail as bytes and parses it only in a
+	// separate decodeTlvData call (:354); a tail DecodeExtra refuses is
+	// kept here as Raw alone, so every code matter.js decodes decodes.
 	if len(data) > 11 {
 		extra, err := DecodeExtra(data[11:])
 		if err != nil {
-			return Payload{}, err
+			extra = Extra{Raw: append([]byte(nil), data[11:]...)}
 		}
 		p.Extra = &extra
 	}

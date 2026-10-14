@@ -44,6 +44,9 @@ func TestDecodeQRCode_MatterJSVectors(t *testing.T) {
 	}
 	// :42-46 + :111-115 — a TLV tail 010203 (not a structure, so only the
 	// raw bytes round-trip; decodeTlvData is not run by decode in matter.js).
+	if p, err := DecodeQRCode("MT:YNJV7VSC00CMVH7E4810AK00"); err != nil || p.Extra == nil || !bytes.Equal(p.Extra.Raw, []byte{1, 2, 3}) {
+		t.Fatalf("decode with tail: %v %+v", err, p)
+	}
 	enc, err := QRCode(Payload{
 		VendorID: 9050, ProductID: 65279, DiscoveryCaps: DiscoveryBLE,
 		Discriminator: 2976, Passcode: 34567890, Extra: &Extra{Raw: mustHex(t, "010203")},
@@ -189,15 +192,17 @@ func TestDecodeExtra(t *testing.T) {
 			t.Errorf("%s: err %v, want %q", tc.hex, err, tc.want)
 		}
 	}
-	// A tail that fails decodeTlvData's checks fails the whole code.
+	// A tail decodeTlvData refuses is kept raw: matter.js's decode does not
+	// parse it (PairingCodeSchema.ts:342).
 	p := qrVector
 	p.Extra = &Extra{Raw: mustHex(t, "1524050118")}
 	code, err := QRCode(p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := DecodeQRCode(code); err == nil {
-		t.Fatal("code with a reserved TLV tag decoded")
+	got, err := DecodeQRCode(code)
+	if err != nil || got.Extra == nil || !bytes.Equal(got.Extra.Raw, p.Extra.Raw) || got.Extra.Vendor != nil {
+		t.Fatalf("raw tail: %v %+v", err, got.Extra)
 	}
 }
 

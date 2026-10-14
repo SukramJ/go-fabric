@@ -21557,28 +21557,28 @@
       "identifier": "TestDecodeExtra",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 149
+      "line": 152
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecodeManualCode_MatterJSVectors",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 236
+      "line": 241
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecodeManualCode_Rejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 288
+      "line": 293
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecodeManualCode_RoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 267
+      "line": 272
     },
     {
       "package": "secure/setup",
@@ -21592,14 +21592,14 @@
       "identifier": "TestDecodeQRCode_Rejects",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 78
+      "line": 81
     },
     {
       "package": "secure/setup",
       "identifier": "TestDecode_EveryInvalidPasscode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 308
+      "line": 313
     },
     {
       "package": "secure/setup",
@@ -21718,14 +21718,14 @@
       "identifier": "TestQRCode_RoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 98
+      "line": 101
     },
     {
       "package": "secure/setup",
       "identifier": "TestQRCode_RoundTripWithTLVTail",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 120
+      "line": 123
     },
     {
       "package": "secure/setup",
@@ -21739,7 +21739,7 @@
       "identifier": "TestQRCode_TooLong",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/decode_test.go",
-      "line": 204
+      "line": 209
     },
     {
       "package": "secure/setup",
