@@ -72,8 +72,10 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 	msg := bdx.Message{ProtocolID: proto.ProtocolID, Opcode: proto.Opcode, Payload: append([]byte(nil), payload...)}
 	if raw, ok := b.bdx.exchanges.Load(key); ok {
 		if ex, ok := raw.(*initiatedSecureExchange); ok {
+			k := ex.turn.deliver()
 			select {
 			case ex.in <- msg:
+				ex.turn.await(k, ex.done)
 			case <-ex.done:
 			default:
 				b.logger.Debug("matter.exchange.bdx.overflow",
@@ -95,7 +97,7 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 	}
 	ex := &initiatedSecureExchange{
 		b: b, sessionID: hdr.SessionID, addr: b.currentPeerAddr(hdr.SessionID, nil), exchangeID: proto.ExchangeID,
-		createdAt: time.Now(), responder: true, in: make(chan bdx.Message, 16), done: make(chan struct{}),
+		createdAt: time.Now(), responder: true, turn: newResponderTurn(), in: make(chan bdx.Message, 16), done: make(chan struct{}),
 	}
 	if _, loaded := b.bdx.exchanges.LoadOrStore(key, ex); loaded {
 		// A concurrent first message of the same exchange won the race;
@@ -106,7 +108,93 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 		defer func() { _ = ex.Close() }()
 		responder.HandleExchange(ctx, peer, msg, ex)
 	}()
+	// The *Init is message 0: the responder has answered it once it waits
+	// for the next.
+	ex.turn.await(0, ex.done)
 	return true
+}
+
+// responderTurnBound is the longest a session's next message waits for the
+// BDX responder to finish with the previous one ([responderTurn]).
+const responderTurnBound = 2 * time.Second
+
+// responderTurn keeps a session's messages in order across the responder's
+// goroutine. matter.js handles a BDX message on its event loop: the flow
+// resumes on it and runs to its next await before the session's next
+// message is looked at (ExchangeManager #receiveMessage, the flow's
+// `await this.messenger.read…`). So an OTA requestor's BlockAckEof
+// completes the transfer — WaitForApply — before its ApplyUpdateRequest,
+// sent right after on the same session, is handled
+// (OtaSoftwareUpdateProviderServer.ts:332-339, :418-424). Here the
+// responder runs on a goroutine of its own; the dispatch of a message to it
+// waits, bounded, until the responder has taken it and is waiting for the
+// next one or has finished.
+type responderTurn struct {
+	mu        sync.Mutex
+	delivered int64
+	taken     int64
+	// idleAt is how many messages the responder had taken when it last
+	// waited for one; -1 before it first waited.
+	idleAt  int64
+	changed chan struct{}
+}
+
+func newResponderTurn() *responderTurn {
+	return &responderTurn{idleAt: -1, changed: make(chan struct{})}
+}
+
+// waiting records that the responder waits for its next message, having
+// taken all it took.
+func (t *responderTurn) waiting() {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.idleAt = t.taken
+	close(t.changed)
+	t.changed = make(chan struct{})
+	t.mu.Unlock()
+}
+
+// took records that the responder took a message.
+func (t *responderTurn) took() {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	t.taken++
+	t.mu.Unlock()
+}
+
+// deliver numbers the next message handed to the responder; the first,
+// handed over with the exchange, is message 0.
+func (t *responderTurn) deliver() int64 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.delivered++
+	return t.delivered
+}
+
+// await waits until the responder took message k and waits again, the
+// exchange ended, or [responderTurnBound] passed.
+func (t *responderTurn) await(k int64, done <-chan struct{}) {
+	timer := time.NewTimer(responderTurnBound)
+	defer timer.Stop()
+	for {
+		t.mu.Lock()
+		reached, ch := t.idleAt >= k, t.changed
+		t.mu.Unlock()
+		if reached {
+			return
+		}
+		select {
+		case <-ch:
+		case <-done:
+			return
+		case <-timer.C:
+			return
+		}
+	}
 }
 
 // bdxPeer resolves the peer of a secure session: its node id and the

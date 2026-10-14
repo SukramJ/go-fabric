@@ -209,6 +209,10 @@ type initiatedSecureExchange struct {
 	// responder is set on an exchange the peer opened (bdx_responder.go):
 	// this node answers on it with the I flag clear.
 	responder bool
+	// turn tracks how far the responder consumed what was delivered to it
+	// (bdx_responder.go, responderTurn); nil on an exchange this node
+	// opened.
+	turn      *responderTurn
 	in        chan bdx.Message
 	done      chan struct{}
 	closeOnce sync.Once
@@ -445,8 +449,10 @@ func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opc
 
 // Receive implements [bdx.Exchange].
 func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, error) {
+	e.turn.waiting()
 	select {
 	case msg := <-e.in:
+		e.turn.took()
 		return msg, nil
 	case <-e.done:
 		return bdx.Message{}, ErrExchangeClosed
