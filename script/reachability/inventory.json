@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4971,
+  "entry_points": 4982,
   "entry_packages": [
     ".",
     "bdx",
@@ -45,6 +45,7 @@
     "cluster/spec/closurecontrol",
     "cluster/spec/closuredimension",
     "cluster/spec/colorcontrol",
+    "cluster/spec/commissionercontrol",
     "cluster/spec/commoditymetering",
     "cluster/spec/commodityprice",
     "cluster/spec/commoditytariff",
@@ -188,9 +189,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11376,
-    "reachable": 7962,
-    "whitelisted": 3409,
+    "total_exported": 11448,
+    "reachable": 8018,
+    "whitelisted": 3425,
     "unreachable": 5
   },
   "by_package": [
@@ -5620,6 +5621,69 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestCommissionerControlApproved",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 172
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlCASEOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 133
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlClose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 329
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlDenied",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 255
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlExpired",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 300
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlMatchesTheGeneratedDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_parity_matterjs_test.go",
+      "line": 22
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlRandFailure",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 349
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 284
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissioningApprovalRequestMatches",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 365
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestDescriptorMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
@@ -8172,6 +8236,55 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
       "line": 351
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "Status",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 70
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "StatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 112
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "SupportedDeviceCategoryBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 53
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "SupportedDeviceCategoryBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 63
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commissionercontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commissionercontrol/definition_gen_test.go",
+      "line": 19
     },
     {
       "package": "cluster/spec/commoditymetering",
