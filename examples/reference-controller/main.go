@@ -14,6 +14,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 	"os/signal"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -100,7 +102,11 @@ type env struct {
 	opts   *globalOptions
 	stdin  io.Reader
 	stdout io.Writer
-	log    *slog.Logger
+	// outMu serialises stdout: the OTA provider's offer (asked on the
+	// bridge's receive goroutine) and the serving command's own lines
+	// write concurrently.
+	outMu sync.Mutex
+	log   *slog.Logger
 	// attests is set by a command that commissions a device: only it
 	// opens the DCL trust store.
 	attests bool
@@ -217,9 +223,24 @@ func isTerminal(r io.Reader) bool {
 
 // printf writes to the command's output; a failed write to stdout is
 // not an error a command can do anything about.
-func (e *env) printf(format string, args ...any) { _, _ = fmt.Fprintf(e.stdout, format, args...) }
+func (e *env) printf(format string, args ...any) {
+	e.outMu.Lock()
+	defer e.outMu.Unlock()
+	_, _ = fmt.Fprintf(e.stdout, format, args...)
+}
 
-func (e *env) println(args ...any) { _, _ = fmt.Fprintln(e.stdout, args...) }
+func (e *env) println(args ...any) {
+	e.outMu.Lock()
+	defer e.outMu.Unlock()
+	_, _ = fmt.Fprintln(e.stdout, args...)
+}
+
+// writeJSON encodes v as one line on stdout under the same lock.
+func (e *env) writeJSON(v any) error {
+	e.outMu.Lock()
+	defer e.outMu.Unlock()
+	return json.NewEncoder(e.stdout).Encode(v)
+}
 
 // confirm asks a yes/no question on the console.
 func confirm(e *env, question string) bool {

@@ -309,9 +309,8 @@ func reportLines(r *interaction.Report) []any {
 
 // printJSONLines writes each value as one JSON line.
 func printJSONLines(e *env, lines []any) error {
-	enc := json.NewEncoder(e.stdout)
 	for _, l := range lines {
-		if err := enc.Encode(l); err != nil {
+		if err := e.writeJSON(l); err != nil {
 			return err
 		}
 	}
