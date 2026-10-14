@@ -107,6 +107,7 @@ type Registry struct {
 	ops    map[*Node]*fabricOp
 	leaves map[*Node]*leaveLatch
 	nextID int
+	timer  exchange.Timer
 	closed bool
 
 	// ctx ends the registry's background work on Close.
@@ -530,11 +531,6 @@ func (r *Registry) ForAddress(addr handshake.PeerAddress, id string) (*Node, err
 	r.add(n)
 	return n, nil
 }
-
-// manageExpiration and cancelExpiration manage the expiry timer (§3).
-func (r *Registry) manageExpiration() {}
-
-func (r *Registry) cancelExpiration() {}
 
 // hooksFor are a node's hooks: the host's, wrapped by the registry's
 // reactions (D6 of brief AL): the registry's work for an event runs

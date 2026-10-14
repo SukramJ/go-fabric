@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4821,
+  "entry_points": 4825,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,9 +184,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11007,
-    "reachable": 7706,
-    "whitelisted": 3295,
+    "total_exported": 11013,
+    "reachable": 7708,
+    "whitelisted": 3299,
     "unreachable": 6
   },
   "by_package": [
@@ -14085,10 +14085,38 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestCullCommissioned",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/addresses_internal_test.go",
+      "line": 87
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestCullUncommissioned",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/addresses_internal_test.go",
+      "line": 46
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestEveryGeneratedClusterIsKnown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cluster_internal_test.go",
       "line": 153
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestExpirationOf",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/addresses_internal_test.go",
+      "line": 27
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestForDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/addresses_internal_test.go",
+      "line": 154
     },
     {
       "package": "controller/client",
