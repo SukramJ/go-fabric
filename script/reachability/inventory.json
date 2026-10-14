@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4817,
+  "entry_points": 4821,
   "entry_packages": [
     ".",
     "bdx",
@@ -184,10 +184,10 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11000,
-    "reachable": 7701,
-    "whitelisted": 3291,
-    "unreachable": 8
+    "total_exported": 11007,
+    "reachable": 7706,
+    "whitelisted": 3295,
+    "unreachable": 6
   },
   "by_package": [
     {
@@ -206,7 +206,7 @@
       "package": "controller/client",
       "unreachable_funcs": 0,
       "unreachable_types": 0,
-      "unreachable_other": 3
+      "unreachable_other": 1
     },
     {
       "package": "secure/channel",
@@ -237,23 +237,9 @@
     },
     {
       "package": "controller/client",
-      "identifier": "ErrAlreadyCommissioned",
-      "file": "controller/client/registry.go",
-      "line": 69,
-      "kind": "var"
-    },
-    {
-      "package": "controller/client",
-      "identifier": "ErrFabricOperationInProgress",
-      "file": "controller/client/registry.go",
-      "line": 62,
-      "kind": "var"
-    },
-    {
-      "package": "controller/client",
-      "identifier": "ErrNotLocated",
-      "file": "controller/client/registry.go",
-      "line": 72,
+      "identifier": "ErrPeerShutdown",
+      "file": "controller/client/fabricops.go",
+      "line": 37,
       "kind": "var"
     },
     {
@@ -14036,10 +14022,31 @@
     },
     {
       "package": "controller/client",
+      "identifier": "HoldOperation",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 34
+    },
+    {
+      "package": "controller/client",
       "identifier": "ObserveRequests",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/export_test.go",
       "line": 13
+    },
+    {
+      "package": "controller/client",
+      "identifier": "SaveRecord",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 20
+    },
+    {
+      "package": "controller/client",
+      "identifier": "SaveSettingsAutoSubscribe",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 48
     },
     {
       "package": "controller/client",
@@ -14278,6 +14285,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/structure_internal_test.go",
       "line": 539
+    },
+    {
+      "package": "controller/client",
+      "identifier": "WaitRegistry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/export_test.go",
+      "line": 30
     },
     {
       "package": "controller/commissioner",

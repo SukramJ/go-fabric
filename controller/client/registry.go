@@ -47,6 +47,9 @@ type RegistryConfig struct {
 	// DefaultSubscription, NewlyCommissioned, NoInitialRead) are a
 	// commission's ([CommissionOptions]).
 	Node Config
+	// HooksFor, when set, returns the hooks of the node with local id in
+	// place of Node.Hooks, so a host tells its nodes' callbacks apart.
+	HooksFor func(id string) Hooks
 	// Logger receives the registry's diagnostics; nil discards them.
 	Logger *slog.Logger
 	// Clock paces the expiry of discovered addresses and nodes; nil is the
@@ -102,6 +105,7 @@ type Registry struct {
 	nodes  []*Node
 	bound  map[*Node]func()
 	ops    map[*Node]*fabricOp
+	leaves map[*Node]*leaveLatch
 	nextID int
 	closed bool
 
@@ -128,7 +132,7 @@ func NewRegistry(cfg RegistryConfig) (*Registry, error) {
 	case len(cfg.Fabrics) == 0 || slices.Contains(cfg.Fabrics, nil):
 		return nil, fmt.Errorf("%w: no Fabrics", ErrConfig)
 	}
-	r := &Registry{cfg: cfg, log: cfg.Logger, clock: cfg.Clock, store: cfg.Store, bound: map[*Node]func(){}, ops: map[*Node]*fabricOp{}, nextID: 1}
+	r := &Registry{cfg: cfg, log: cfg.Logger, clock: cfg.Clock, store: cfg.Store, bound: map[*Node]func(){}, ops: map[*Node]*fabricOp{}, leaves: map[*Node]*leaveLatch{}, nextID: 1}
 	if r.log == nil {
 		r.log = slog.New(slog.DiscardHandler)
 	}
@@ -220,7 +224,7 @@ func (r *Registry) restore(id string) (*Node, error) {
 func (r *Registry) build(id string, p *peer.Peer) (*Node, error) {
 	cfg := r.nodeConfig(id)
 	holder := &nodeHolder{}
-	cfg.Hooks = r.hooksFor(holder)
+	cfg.Hooks = r.hooksFor(id, holder)
 	n, err := newNode(cfg)
 	if err != nil {
 		return nil, err
@@ -247,6 +251,12 @@ func (h *nodeHolder) set(n *Node) {
 	h.mu.Lock()
 	h.n = n
 	h.mu.Unlock()
+}
+
+func (h *nodeHolder) get() *Node {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.n
 }
 
 // bindPeer couples the node with its protocol peer — #bindPeer
@@ -526,9 +536,22 @@ func (r *Registry) manageExpiration() {}
 
 func (r *Registry) cancelExpiration() {}
 
-// hooksFor are a node's hooks: the template's, wrapped by the registry's
-// reactions.
-func (r *Registry) hooksFor(_ *nodeHolder) Hooks { return r.cfg.Node.Hooks }
-
-// fabricOp is a commission or decommission in flight (§4).
-type fabricOp struct{}
+// hooksFor are a node's hooks: the host's, wrapped by the registry's
+// reactions (D6 of brief AL): the registry's work for an event runs
+// before the host's Event.
+func (r *Registry) hooksFor(id string, holder *nodeHolder) Hooks {
+	h := r.cfg.Node.Hooks
+	if r.cfg.HooksFor != nil {
+		h = r.cfg.HooksFor(id)
+	}
+	host := h.Event
+	h.Event = func(endpoint uint16, cluster, event uint32, e interaction.EventData, value any) {
+		if n := holder.get(); n != nil {
+			r.onEvent(n, endpoint, cluster, event, value)
+		}
+		if host != nil {
+			host(endpoint, cluster, event, e, value)
+		}
+	}
+	return h
+}

@@ -116,6 +116,12 @@ type Hooks struct {
 	// Seeded: the image holds BasicInformation and more than the root
 	// endpoint, once (ClientNodeLifecycle.ts:51-75).
 	Seeded func()
+	// Decommissioned: a [Registry] removed the node from its fabric, or the
+	// peer left it — matter.js lifecycle.decommissioned
+	// (node/NodeLifecycle.ts:105-110), emitted when the peer address is
+	// cleared (CommissioningClient.ts:637-646) and on a leave event
+	// (node/client/Peers.ts:827).
+	Decommissioned func()
 }
 
 // ConnectionState is a node's connection state — matter.js
