@@ -163,6 +163,15 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   product's provider serves the images its vendor signed behind its own
   `mattercore.OTAImageSource`.
 
+- `--dcl prod|testnet|off` (default `off`) looks the image `--ota-provider`
+  offers up in the CSA Distributed Compliance Ledger (`dcl.go`,
+  `controller/dcl`): is the version listed for the requestor's vendor and
+  product, and does the image match the ledger's checksum. The answer is
+  logged; the image is offered either way. What leaves the host when it is
+  on: one HTTPS request per offer, naming the requestor's vendor id,
+  product id and the offered software version. Off, nothing contacts the
+  ledger.
+
 Each applied command is logged as `apppipe.applied`. None of these flags
 belongs in a real deployment.
 

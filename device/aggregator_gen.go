@@ -8,6 +8,7 @@ package device
 import (
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	actionsdef "github.com/SukramJ/go-fabric/cluster/spec/actions"
+	commissionercontroldef "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -35,6 +36,7 @@ var AggregatorType = Type{
 		},
 		{
 			ID: 0x0751, Name: "CommissionerControl", Conformance: "FabricSynchronization",
+			Definition: commissionercontroldef.Definition,
 		},
 	},
 }
@@ -54,3 +56,8 @@ func NewAggregator(opts Options, with ...Option) (*Aggregator, error) {
 
 // Actions returns the Actions server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
 func (d *Aggregator) Actions() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0025) }
+
+// CommissionerControl returns the CommissionerControl server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+func (d *Aggregator) CommissionerControl() *spec.Server {
+	return serverAs[*spec.Server](d.Device, 0x0751)
+}

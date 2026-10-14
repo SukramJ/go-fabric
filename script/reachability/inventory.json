@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4942,
+  "entry_points": 4985,
   "entry_packages": [
     ".",
     "bdx",
@@ -45,6 +45,7 @@
     "cluster/spec/closurecontrol",
     "cluster/spec/closuredimension",
     "cluster/spec/colorcontrol",
+    "cluster/spec/commissionercontrol",
     "cluster/spec/commoditymetering",
     "cluster/spec/commodityprice",
     "cluster/spec/commoditytariff",
@@ -142,6 +143,7 @@
     "controller/client",
     "controller/client/sqlstore",
     "controller/commissioner",
+    "controller/dcl",
     "controller/discovery",
     "controller/exchange",
     "controller/handshake",
@@ -187,9 +189,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11310,
-    "reachable": 7925,
-    "whitelisted": 3380,
+    "total_exported": 11451,
+    "reachable": 8019,
+    "whitelisted": 3427,
     "unreachable": 5
   },
   "by_package": [
@@ -5619,6 +5621,69 @@
     },
     {
       "package": "cluster/core",
+      "identifier": "TestCommissionerControlApproved",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 172
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlCASEOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 133
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlClose",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 329
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlDenied",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 255
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlExpired",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 300
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlMatchesTheGeneratedDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_parity_matterjs_test.go",
+      "line": 22
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlRandFailure",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 349
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissionerControlTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 284
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestCommissioningApprovalRequestMatches",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/commissioner_control_test.go",
+      "line": 365
+    },
+    {
+      "package": "cluster/core",
       "identifier": "TestDescriptorMatchesTheGeneratedDefinition",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/spec_parity_matterjs_test.go",
@@ -8171,6 +8236,55 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/colorcontrol/definition_gen.go",
       "line": 351
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "Status",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 70
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "StatusDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 112
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "SupportedDeviceCategoryBitmap",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 53
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "SupportedDeviceCategoryBitmapDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/commissionercontrol/definition_gen.go",
+      "line": 63
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commissionercontrol/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/commissionercontrol",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/commissionercontrol/definition_gen_test.go",
+      "line": 19
     },
     {
       "package": "cluster/spec/commoditymetering",
@@ -14816,6 +14930,209 @@
       "line": 113
     },
     {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateStoreCDSigner",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_test.go",
+      "line": 204
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateStoreDailyRefresh",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_test.go",
+      "line": 73
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateStoreGitHub",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_test.go",
+      "line": 293
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateStoreRejectsBadRoots",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_test.go",
+      "line": 173
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateStoreRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_test.go",
+      "line": 31
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateStoreSelfHeal",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_test.go",
+      "line": 254
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCertificateStoreTestNet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_test.go",
+      "line": 112
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestClientFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/client_test.go",
+      "line": 194
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestClientModels",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/client_test.go",
+      "line": 92
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestClientRevocationPointsPaginated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/client_test.go",
+      "line": 155
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestClientRoots",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/client_test.go",
+      "line": 21
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestClientSchemaVersions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/client_test.go",
+      "line": 63
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCommissionRevokedDAC",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/commission_test.go",
+      "line": 207
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestCommissionWithDCLStore",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/commission_test.go",
+      "line": 163
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestEncodeURIComponent",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/client_test.go",
+      "line": 236
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestOTADownload",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/ota_test.go",
+      "line": 200
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestOTATestNet",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/ota_test.go",
+      "line": 114
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestOTAVersions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/ota_test.go",
+      "line": 43
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestParseCRLIndirect",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_test.go",
+      "line": 377
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestRevocationExpiredCRL",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_test.go",
+      "line": 361
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestRevocationLookupFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_test.go",
+      "line": 111
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestRevocationPAASignedCRL",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_test.go",
+      "line": 292
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestRevocationPAIDelegated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_test.go",
+      "line": 335
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestRevocationPAISignedCRL",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_test.go",
+      "line": 69
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestRevocationPartitioned",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_test.go",
+      "line": 266
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestRevocationRejectedPoints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_test.go",
+      "line": 144
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestSameName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/revocation_test.go",
+      "line": 430
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestStores",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/certstore_test.go",
+      "line": 355
+    },
+    {
+      "package": "controller/dcl",
+      "identifier": "TestVerifyImage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/ota_test.go",
+      "line": 150
+    },
+    {
       "package": "controller/discovery",
       "identifier": "TestDiffAddresses_RestartKeepsInterruptedRoundKnown",
       "reason": "auto-whitelist:pattern=test-file",
@@ -17232,6 +17549,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestDCLFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/dcl_test.go",
+      "line": 28
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestDelayedOffReportsItsCountdown",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
@@ -17320,6 +17644,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/kitchen_test.go",
       "line": 108
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestLedgerCheckedImages",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/dcl_test.go",
+      "line": 77
     },
     {
       "package": "examples/reference-bridge",

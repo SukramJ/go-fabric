@@ -133,4 +133,6 @@ var committed = []string{
 	"PowerSourceConfiguration",
 	"EcosystemInformation",
 	"Actions",
+	// cluster/core CommissionerControl (ADR 0020 stage 6, brief AS)
+	"CommissionerControl",
 }
