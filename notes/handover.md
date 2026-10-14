@@ -37,6 +37,7 @@ German, briefly. Six waves were planned against the phases:
 | 20 | ADR 0020 stage 5, part 1: the group message sender (`groups.Manager.Sender`, `channel.EncryptGroup`, the group header constraint, `udp.Listener.SendMulticast`, the persisted group data counter), the Groupcast Sender feature (FeatureMap 0x07) | AN | `wave/2026-10-14-tranche-20` (#101); docs PR `docs/wave-20-followups` | see §20 |
 | 21 | ADR 0020 stage 5, part 2: `binding.Manager`, `core.Binding.OnChange` + fabric-scoped writes, the bridge decoding Binding writes, `node.Config.Client` (the node's client stack), the 11 controller device types, `TestLiveBinding` (TC-BIND-2.1) | AO | `wave/2026-10-14-tranche-21` (#103); docs PR `docs/wave-21-followups` | see §21 |
 | 22 | ADR 0020 stage 4 close-out: `device.Lookup`, the validator input seam (`endpoint.DeviceTypeTree`), `client.Endpoint.Device()`/`Conformance()`, `core.Binding.Persist` + node persistence; owner: the doubled group-sender start/stop fixed | AP | `wave/2026-10-14-tranche-22` (#105); docs PR `docs/wave-22-followups` | see §22 |
+| 25 | ADR 0020 stage 6a+6b: `controller/dcl` (DCL client, certificate store as `attestation.PAAStore`/`Revocations`, OTA version lookup; opt-in), `core.CommissionerControl` after chip + `node.Config.CommissionerControl`, daemon `--dcl`, `TestLiveCommissionerControl`; Joint Fabric (6c) deferred past v1.0.0 | AS | `wave/2026-10-14-tranche-25` (#109); docs PR `docs/wave-25-followups` | see §25 |
 | 23 | concept v2 phase 8 (ADR 0021): the BDX sender roles, `bridge.AttachBDXResponder`/`OpenSessionExchange`, `core.OTAProvider` + `node.Config.OTAProvider` (OtaProvider endpoint), DiagnosticLogs over BDX after chip, reference-bridge `--ota-provider`, in-repo proofs | AQ | `wave/2026-10-14-tranche-23` (#107); docs PR `docs/wave-23-followups` | see §23 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
@@ -1447,3 +1448,50 @@ this section. Then delete `wave23/otaprovider`, `planning/briefs-wave-23`,
 the tranche and docs branches and the `.claude/worktrees/wave23-otaprovider`
 worktree. Next: phase 9 (media, ADR 0022) and/or ADR 0020 stage 6 —
 the owner's call; `v1.0.0` after phase 9.
+
+## 25. Wave 25 (2026-10-14, the owner away; everything local; ran in parallel with wave 24)
+
+ADR 0020 stage 6, split by the owner after Sonnet's `read-stage6.md`
+(matter.js at the pin: a full DCL client of ~4 200 lines, empty
+classes for CommissionerControl and the Joint Fabric behaviours): 6a
+DCL client + 6b CommissionerControl server = brief AS
+(`wave25/dcl`, head `2ff4ebc`) on `planning/briefs-wave-25`
+(`01aaa1c`, cut from `main` after #108); 6c Joint Fabric deferred past
+`v1.0.0`. Tranche `wave/2026-10-14-tranche-25` = the branch plus the
+owner's commit (`e96dbac`), fast-forward on `main`. Guards all green at
+`e96dbac`; no chip-tool run (the daemon's composition is unchanged).
+
+- **controller/dcl:** `Client` (the REST GETs of `DclClient.ts`,
+  pagination, 5 s timeout, prod and test-net URLs), `CertificateStore`
+  (PAAs and CD signers through a `Store` — memory, file, settings key —
+  refreshed daily; GitHub fallback off by default; CRLs on demand, hour
+  cache, §6.2.6.1 checks; no `Client` = offline), `OTAVersions`,
+  `VerifyImage`. Proof: the harness node commissioned against a store
+  fed by a fake ledger, PaaNotTrusted and CertificateRevoked shown.
+- **core.CommissionerControl:** generated definition (one clustergen
+  line), chip's `CommissionerControlCluster.cpp` and the fabric-sync
+  delegate: CASE-only, asynchronous `CommissioningApprover`, the event,
+  `CommissionNode` for the same client *and* fabric, the reverse window
+  minted at random, then the node's own commissioner commissions the
+  client. `node.Config.CommissionerControl` on the Aggregator; the
+  daemon does not mount it. `TestLiveCommissionerControl` (not
+  parallel): node B ends with two fabrics.
+- **Daemon:** `--dcl prod|testnet|off`, default off; only a lookup of
+  the `--ota-provider` image, logged.
+- **Owner:** `im/read.go` now gates `CommissioningRequestResult` at
+  Manage and fabric-sensitive (`commissioner-control.element.ts:28`,
+  "S M"); the agent found this and could not touch `im/`. Two `by_design`
+  entries (`BD-Matter-DCL-OptIn`, `BD-chip-CommissionerControl-RandomWindow`),
+  a findings note (expired CRL mirrored from
+  `DclCertificateService.ts:1849-1874`; the parts not ported; the
+  parsing copy in `controller/dcl/cert.go`; the seams without context).
+- **Lessons:** a stray `go run ./script/coverfloor` is the full
+  coverage run (two hours) — `make cover-check` is the guard; `pgrep -f`
+  in a wait loop matches the loop's own shell.
+
+Cleanup after the merge: `wave25/dcl`, `planning/briefs-wave-25`, the
+tranche and docs branches and the `.claude/worktrees/wave25-dcl`
+worktree. Next: wave 24 (brief AR, media) lands on top by merge, then
+the `v1.0.0` preparation (README §API stability for `device/`, `node/`,
+`controller/`) and phase 5 with the owner at the device.
+
