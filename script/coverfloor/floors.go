@@ -198,6 +198,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/activatedcarbonfiltermonitoring", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/closurecontrol", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/colorcontrol", min: 100},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/dishwashermode", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/doorlock", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/spec/fancontrol", min: 100},
