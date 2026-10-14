@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4846,
+  "entry_points": 4850,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11037,
-    "reachable": 7724,
-    "whitelisted": 3308,
+    "total_exported": 11044,
+    "reachable": 7727,
+    "whitelisted": 3312,
     "unreachable": 5
   },
   "by_package": [
@@ -17326,6 +17326,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/parity_matterjs_test.go",
       "line": 65
+    },
+    {
+      "package": "groups",
+      "identifier": "TestGroupDataCounterFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/counter_test.go",
+      "line": 165
+    },
+    {
+      "package": "groups",
+      "identifier": "TestGroupDataCounterFirstRun",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/counter_test.go",
+      "line": 46
+    },
+    {
+      "package": "groups",
+      "identifier": "TestGroupDataCounterRestartResumesPastTheMark",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/counter_test.go",
+      "line": 77
+    },
+    {
+      "package": "groups",
+      "identifier": "TestGroupDataCounterRollsOverAndWarnsOnce",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/counter_test.go",
+      "line": 115
     },
     {
       "package": "groups",

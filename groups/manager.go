@@ -126,6 +126,12 @@ type Manager struct {
 	listenersMu      sync.Mutex
 	messageListeners map[uint64]func(GroupMessageEvent)
 	nextListener     uint64
+
+	// counter is the node-global group data message counter (counter.go),
+	// created on the first send; counterRandom is its random start.
+	counterMu     sync.Mutex
+	counter       *dataCounter
+	counterRandom func() (uint32, error)
 }
 
 // NewManager returns a manager over st. logger may be nil.
@@ -142,6 +148,8 @@ func NewManager(st Store, logger *slog.Logger) (*Manager, error) {
 		maxGroups: DefaultMaxGroupsPerFabric,
 		fabrics:   make(map[uint8]*fabricGroups),
 		reception: make(map[string]map[uint64]*mrp.Window),
+
+		counterRandom: randomCounterStart,
 	}, nil
 }
 

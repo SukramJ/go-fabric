@@ -28,6 +28,12 @@ type memStore struct {
 	failPut error
 	// failList makes ListFabrics fail.
 	failList bool
+	// meta is the matter_metadata counter table; failMeta / failMetaSet
+	// make its reads / writes fail.
+	meta        map[string]uint64
+	metaWrites  int
+	failMeta    error
+	failMetaSet error
 }
 
 func newMemStore() *memStore {
@@ -204,4 +210,37 @@ func sealGroup(tb testing.TB, opKey []byte, sessionID, groupID uint16, source ui
 		}
 	}
 	return out
+}
+
+// GetMetadataCounter makes memStore a [CounterStore].
+func (s *memStore) GetMetadataCounter(_ context.Context, key string) (value uint64, ok bool, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.failMeta != nil {
+		return 0, false, s.failMeta
+	}
+	value, ok = s.meta[key]
+	return value, ok, nil
+}
+
+// SetMetadataCounter makes memStore a [CounterStore].
+func (s *memStore) SetMetadataCounter(_ context.Context, key string, value uint64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.failMetaSet != nil {
+		return s.failMetaSet
+	}
+	if s.meta == nil {
+		s.meta = map[string]uint64{}
+	}
+	s.meta[key] = value
+	s.metaWrites++
+	return nil
+}
+
+func (s *memStore) metaValue(key string) (uint64, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.meta[key]
+	return v, ok
 }
