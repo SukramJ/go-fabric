@@ -99,6 +99,9 @@ pseudo-version of `main`.
   EthernetNetworkDiagnostics and states the RootNode condition `WiFi`
   (`endpoint.Config.RootDeviceConditions`); `Node.Root()` exposes it as
   `WiFiNetworkDiagnostics`. NetworkCommissioning stays Ethernet-only.
+  The reference bridge's `--wifi` (TESTING ONLY) serves it from a
+  simulated link; the app pipe's `WiFiDiagnostics` command and CHIP's
+  Wi-Fi TestEventTrigger codes step its counters and raise its events.
 
 ### Fixed
 

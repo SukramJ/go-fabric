@@ -59,6 +59,14 @@ type pipeCommand struct {
 	DoorOpen   *uint8  `json:"DoorOpen"`
 	// SoilMoistureValue is SetSimulatedSoilMoisture's new reading (percent).
 	SoilMoistureValue *uint8 `json:"SoilMoistureValue"`
+	// Action and the event fields are WiFiDiagnostics' (wifi.go); the
+	// field names are the event fields' (wi-fi-network-diagnostics.element.ts
+	// :70-82).
+	Action                  string  `json:"Action"`
+	ReasonCode              *uint16 `json:"ReasonCode"`
+	AssociationFailureCause *uint8  `json:"AssociationFailureCause"`
+	Status                  *uint16 `json:"Status"`
+	ConnectionStatus        *uint8  `json:"ConnectionStatus"`
 }
 
 // serveAppPipe creates the FIFO (when absent) and applies every command
@@ -233,6 +241,10 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 	case "SetSpeakerLevel":
 		f.speaker.reportFromDevice(uint8(cmd.Value))
 		return nil
+	case "WiFiDiagnostics":
+		// The simulated Wi-Fi link of --wifi (wifi.go): CHIP's apps have no
+		// pipe command for it, only the TestEventTrigger codes.
+		return f.wifi.pipeCommand(cmd)
 	}
 	return fmt.Errorf("%q: %w", cmd.Name, errUnknownPipeCommand)
 }
@@ -381,6 +393,9 @@ func (f *fleet) testEventTrigger(_ context.Context, trigger uint64) error { //no
 		f.contact.testEventTrigger(trigger) || f.meter.testEventTrigger(trigger) ||
 		f.esa.testEventTrigger(trigger) || f.evse.testEventTrigger(trigger) || f.energyMarketTestEventTrigger(trigger) {
 		return nil
+	}
+	if handled, err := f.wifi.testEventTrigger(trigger); handled {
+		return err
 	}
 	switch trigger & smokeTriggerMask {
 	case triggerForceSmokeWarning:

@@ -87,7 +87,7 @@ type flags struct {
 	appPipe, enableKey, otaDir                 string
 	passcode, discriminator                    uint
 	iterations                                 int
-	advertise, osHostName, otaHarness          bool
+	advertise, osHostName, otaHarness, wifi    bool
 }
 
 func parseFlags() flags {
@@ -107,6 +107,7 @@ func parseFlags() flags {
 	flag.BoolVar(&f.osHostName, "mdns-os-hostname", false, "TESTING ONLY: advertise the OS host name as SRV target instead of the MAC-derived one, for a test host whose LAN interface has no IPv6")
 	flag.StringVar(&f.otaDir, "ota-dir", "", "directory OTA images are downloaded to (default: an \"ota\" directory beside --db)")
 	flag.BoolVar(&f.otaHarness, "ota-harness", false, "TESTING ONLY: apply a downloaded OTA image in place — report its version as running without a restart, as the CHIP SU cases read it; see ota.go")
+	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
 	flag.Parse()
 	return f
 }
@@ -207,7 +208,12 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 	if err != nil {
 		return fmt.Errorf("aggregator actions: %w", err)
 	}
-	n, err := assemble(ctx, devices, nodeConfig(f, passcode, discriminator, tcpConfig, db, advertiser, applier, actions, logger), applier)
+	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, db, advertiser, applier, actions, logger)
+	if f.wifi {
+		// The simulated Wi-Fi link (wifi.go), TESTING ONLY.
+		cfg.Network.WiFi = devices.wifi.nodeConfig()
+	}
+	n, err := assemble(ctx, devices, cfg, applier)
 	if err != nil {
 		return err
 	}
@@ -270,6 +276,9 @@ func assemble(ctx context.Context, devices *fleet, cfg node.Config, applier *ota
 			_ = n.Stop(context.WithoutCancel(ctx))
 		}
 	}()
+	// The simulated Wi-Fi link raises its events on the root's server
+	// (nil without --wifi).
+	devices.wifi.attach(n.Root().WiFiNetworkDiagnostics)
 	if applier != nil {
 		applier.basicInfo = n.Root().BasicInformation
 		applier.requestor = func() *mattercore.OTASoftwareUpdateRequestor { return n.Root().OTARequestor }

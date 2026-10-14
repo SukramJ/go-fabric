@@ -1016,6 +1016,8 @@ type fleet struct {
 	electricalMeter *demoElectricalMeter
 	// esa is the state-forecast ESA (fleet_esa.go).
 	esa *demoEsa
+	// wifi is the root's simulated Wi-Fi link (wifi.go), served with --wifi.
+	wifi *demoWiFi
 
 	// configChange raises the ConfigurationVersion of every bridged device
 	// (the app pipe's SimulateConfigurationVersionChange); wired by main.
@@ -1026,6 +1028,7 @@ func newFleet() *fleet {
 	vacuum := newDemoVacuum("Robot Vacuum")
 	light := newDemoLight("Desk Lamp")
 	return &fleet{
+		wifi:        newDemoWiFi(),
 		light:       light,
 		thermometer: newDemoThermometer(21.5),
 		valve:       newDemoValve("Garden Tap", 600),

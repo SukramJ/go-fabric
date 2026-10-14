@@ -139,6 +139,19 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   still running the old version; `--ota-dir` (default `ota` beside `--db`)
   is where downloads land.
 
+- `--wifi` (TESTING ONLY) serves WiFiNetworkDiagnostics on the root from a
+  simulated Wi-Fi link (`wifi.go`): fixed values (a locally administered
+  BSSID, WPA2, 802.11ax, channel 36, RSSI -52 dBm), the PKTCNT and ERRCNT
+  counters and CurrentMaxRate, and the RootNode condition `WiFi` stated.
+  The app pipe's `{"Name": "WiFiDiagnostics", "Action": …}` steps the
+  counters (`StepCounters`) and raises the three events
+  (`Disconnection`, `AssociationFailure`, `ConnectionStatus`); with
+  `--enable-key`, CHIP's Wi-Fi TestEventTrigger codes
+  (`0x0036000000000000` to `…02`) raise them as CHIP's all-clusters app
+  does. NetworkCommissioning stays Ethernet-only. A real Wi-Fi host reads
+  the values from the kernel (nl80211, or `iw`) behind its own
+  `mattercore.WiFiReporter` and hands it to `node.Network.WiFi`.
+
 Each applied command is logged as `apppipe.applied`. None of these flags
 belongs in a real deployment.
 

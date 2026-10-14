@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4814,
+  "entry_points": 4815,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11050,
+    "total_exported": 11051,
     "reachable": 7749,
-    "whitelisted": 3296,
+    "whitelisted": 3297,
     "unreachable": 5
   },
   "by_package": [
@@ -16870,7 +16870,7 @@
       "identifier": "TestAirQualitySensorMountsEveryConcentrationCluster",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 350
+      "line": 360
     },
     {
       "package": "examples/reference-bridge",
@@ -16898,7 +16898,7 @@
       "identifier": "TestBridgedDevicesServeTheNodesVendorName",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 308
+      "line": 318
     },
     {
       "package": "examples/reference-bridge",
@@ -16912,7 +16912,7 @@
       "identifier": "TestButtonPressWiringThroughTheDeviceLayer",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 379
+      "line": 389
     },
     {
       "package": "examples/reference-bridge",
@@ -17143,7 +17143,7 @@
       "identifier": "TestSmokeAlarmHasItsPowerSourcePart",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_test.go",
-      "line": 325
+      "line": 335
     },
     {
       "package": "examples/reference-bridge",
@@ -17249,6 +17249,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_energy_test.go",
       "line": 63
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestWiFiFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/wifi_test.go",
+      "line": 32
     },
     {
       "package": "groups",
