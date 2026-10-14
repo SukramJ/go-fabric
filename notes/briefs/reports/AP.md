@@ -220,3 +220,20 @@ All at HEAD cf1567c, logged before and after each run (unchanged).
 
 "The Binding attribute is held in memory only" (findings register; the
 owner closes it).
+
+## Owner's decisions (Fable, 2026-10-14, tranche 22)
+
+1. **The double `startGroupSender`/`stopGroupSender` on `main`** (question
+   1) was the owner's own cherry-pick repair in tranche 21; fixed in this
+   tranche's owner commit (one socket per Start again).
+2. A stored Binding list inherited by a later device with the same
+   stable key (question 2) is the labels' behaviour; accepted and named
+   in `BD-Matter-Binding-PersistedInSettings`.
+3. No node-level `Conformance()` now (question 3); a host iterates
+   `Endpoints()`.
+4. The differences 2–5 (the existing `types_gen.go` registry,
+   `Binding.Persist` instead of a constructor option, the `binding.<key>`
+   scheme, the 16 excluded types) are the files' truth; accepted.
+5. `by_design`: `BD-Matter-ClientView-RemoteConformance` and
+   `BD-Matter-Binding-PersistedInSettings` written; the findings line on
+   Binding persistence closed.
