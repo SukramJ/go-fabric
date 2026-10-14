@@ -83,61 +83,18 @@ pseudo-version of `main`.
   the bridge's group-message routing and the root GroupKeyManagement
   share one state.
 
-- `controller/client.Registry` (ADR 0020, stage 4, second half; brief AL):
-  the controller's set of client nodes — matter.js `Peers` with the
-  per-node half of `CommissioningClient`, at `0ceb202d`.
-  `NewRegistry(RegistryConfig)` restores every node its `Store` holds,
-  binding a commissioned one to its protocol peer from its record; local
-  ids are `peerN`, the counter past every stored one. `Start` (with
-  `AutoStart`, every commissioned, enabled node), `Stop`, `Close`,
-  `Erase`; `Nodes`, `Commissioned`, `Get`, `GetByAddress`, `Size`.
-  `ForDevice(ctx, discovery.Device)` finds or creates the node of a device
-  the host's scanner found; `ForAddress(addr, id)` the node of a peer
-  address. `Commission(ctx, node, CommissionOptions)` and
-  `Decommission(ctx, node)` run one fabric operation per node at a time
-  (`ErrFabricOperationInProgress`): commission records the peer address,
-  time and our fabric index on the peer, subscribes and starts the node;
-  decommission reads `CurrentFabricIndex` when needed, sends
-  `RemoveFabric`, takes a leave event or a lost session as confirmation
-  and deletes the node. A node's commissioning record (`client.Record`:
-  peer address, CATs, addresses with their lifespans, the discovery data,
-  the reported session parameters) is stored beside its settings;
-  `Node.Record`, `Node.PeerAddress`, `Node.IsCommissioned`. Discovered
-  addresses and commissionable nodes expire (`DefaultTTL` 15 min, culled
-  every `ExpirationInterval`); a commissioned node keeps its freshest
-  address. The registry reacts to the peer's BasicInformation events:
-  `Leave` of our fabric deletes the node (`Hooks.Decommissioned`, new),
-  `ShutDown` gives up the peer's sessions, `StartUp` those older than its
-  newest. Our fabric label is pushed to the peer once per start when it
-  drifted. `RegistryConfig.HooksFor` gives each node its own hooks.
-  A node a registry created before commissioning has no peer yet: its
-  `Read`, `Subscribe`, `Write` and `Invoke` return `ErrNotCommissioned`.
-
-- `controller/client/sqlstore` (ADR 0020, stage 4; brief AL §8): the first
-  durable `client.Store`, on SQLite (`modernc.org/sqlite`, no new
-  dependency). `sqlstore.New(db)` over the tables `matter_client_values`
-  (one TLV value per node, endpoint, cluster and attribute) and
-  `matter_client_versions` (one row per stored cluster, its DataVersion or
-  NULL); `Save` is one transaction and keeps `client.MemoryStore`'s
-  contract (a nil value deletes its key, a nil version clears the stored
-  one). The schema ships as `store/` ships the device's: `Schema()`,
-  `Apply(ctx, db)`, `Upgrade`, `Migrations()` (one step, `v1`) and
-  `SchemaFingerprint(ctx, db)`, its own list, so a device-side host's pin on
-  `len(store.Migrations())` does not move.
-
-### Changed
-
-- `controller/client.Store` gains `NodeIDs() ([]string, error)` — the ids
-  of the nodes the store holds, sorted (matter.js
-  `ClientNodeStores.knownIds`); `client.MemoryStore` implements it. The
-  interface is unreleased, so no deprecation window applies; a host
-  `Store` adds the method.
-
-- `controller/exchange.Session.CreatedAt()`: when the session was
-  established — matter.js `Session.createdAt`, the cutoff
-  `SessionManager.#handlePeerLoss` compares and the `asOf` a
-  `Manager.HandlePeerLoss` takes (the registry's `startUp` reaction keeps
-  the sessions created at or after the newest one).
+- WiFiNetworkDiagnostics (0x0036, concept v2 §B.4): the generated
+  definition `cluster/spec/wifinetworkdiagnostics` and the server
+  `core.NewWiFiNetworkDiagnostics` over a host port, `core.WiFiReporter`,
+  read on every read as connectedhomeip reads its diagnostic provider —
+  null where the host cannot tell, the packet counters with `PKTCNT`, the
+  error counters and `ResetCounts` with `ERRCNT` (which resets the
+  reporter). The host raises the three events through
+  `OnDisconnectionDetected`, `OnAssociationFailureDetected` and
+  `OnConnectionStatusChanged`. The device layer gains the
+  SecondaryNetworkInterface device type (0x0019,
+  `device.NewSecondaryNetworkInterface`), and `device.RootNode` serves the
+  cluster as its `[WiFi]` requirement.
 
 ### Fixed
 

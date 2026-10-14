@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4810,
+  "entry_points": 4813,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11042,
-    "reachable": 7744,
-    "whitelisted": 3293,
+    "total_exported": 11049,
+    "reachable": 7748,
+    "whitelisted": 3296,
     "unreachable": 5
   },
   "by_package": [
@@ -5874,6 +5874,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/user_label_test.go",
       "line": 32
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_WiFiNetworkDiagnostics",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/wifi_network_diagnostics_parity_matterjs_test.go",
+      "line": 125
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_WiFiNetworkDiagnosticsDefinition",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/wifi_network_diagnostics_parity_matterjs_test.go",
+      "line": 69
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestParityMatterJS_WiFiNetworkDiagnosticsEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/wifi_network_diagnostics_parity_matterjs_test.go",
+      "line": 251
     },
     {
       "package": "cluster/core",
