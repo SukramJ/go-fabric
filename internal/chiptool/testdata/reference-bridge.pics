@@ -182,6 +182,14 @@ SMOKECO.S.E06=1
 SMOKECO.S.E07=1
 SMOKECO.S.E08=1
 SMOKECO.S.E09=1
+# WiFiNetworkDiagnostics Disconnection, AssociationFailure and
+# ConnectionStatus: the simulated Wi-Fi link of --wifi raises them through
+# the app pipe (WiFiDiagnostics) and CHIP's Wi-Fi TestEventTrigger codes
+# (examples/reference-bridge/wifi.go; cluster/core
+# wifi_network_diagnostics.go lists all three).
+DGWIFI.S.E00=1
+DGWIFI.S.E01=1
+DGWIFI.S.E02=1
 # The robot vacuum takes the rvc-app's manual controls through the app pipe
 # (examples/reference-bridge/control.go: Reset, ChargerFound, Charged,
 # Docked, ErrorEvent), which TC-RVCOPSTATE-2.4 drives.
@@ -197,18 +205,19 @@ WNCV.S.M.Maintenance=0
 
 # --- Client roles -------------------------------------------------------------
 # The daemon is a server for every cluster it mounts and a client of none: it
-# never sends OnOff, ColorControl, WindowCovering, SoftwareDiagnostics or
-# EthernetNetworkDiagnostics commands. CHIP's ci-pics-values declares those
-# clients for its sample apps (DGSW.C=1 at :49, DGETH.C=1 at :1144 at the
-# harness pin), which would run the DUT-as-client cases
-# (Test_TC_*_Simulated; TC-DGSW-3.2 and TC-DGETH-3.2 wait for the DUT to send
-# ResetWatermarks / ResetCounts, PICS DGSW.C / DGETH.C) against a DUT that
-# issues no command.
+# never sends OnOff, ColorControl, WindowCovering, SoftwareDiagnostics,
+# EthernetNetworkDiagnostics or WiFiNetworkDiagnostics commands. CHIP's ci-pics-values declares those
+# clients for its sample apps (DGSW.C=1 at :49, DGETH.C=1 at :1144,
+# DGWIFI.C=1 at :1189 at the harness pin), which would run the DUT-as-client
+# cases (Test_TC_*_Simulated; TC-DGSW-3.2, TC-DGETH-3.2 and TC-DGWIFI-3.2 wait
+# for the DUT to send ResetWatermarks / ResetCounts, PICS DGSW.C / DGETH.C /
+# DGWIFI.C) against a DUT that issues no command.
 OO.C=0
 CC.C=0
 WNCV.C=0
 DGSW.C=0
 DGETH.C=0
+DGWIFI.C=0
 
 # --- Door lock writable attributes (cluster/lock) ---------------------------
 # The lock serves LockState, LockType, ActuatorEnabled, OperatingMode

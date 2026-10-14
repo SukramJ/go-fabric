@@ -134,6 +134,9 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 			Groups:             n.groups,
 			OnNodeLabelWritten: n.persisted.storeLabel,
 			Scenes:             n.persisted,
+			// The node's own conditions on the root: WiFi with a Wi-Fi
+			// reporter (Network.WiFi).
+			RootDeviceConditions: n.cfg.rootDeviceConditions(),
 		}, n.logger)
 		if err != nil {
 			return nil, fmt.Errorf("node: endpoint assembler: %w", err)

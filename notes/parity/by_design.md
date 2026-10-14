@@ -2639,6 +2639,25 @@ By design. An extension of the surface; the record's path is matter.js's.
 
 ---
 
+### BD-Matter-WiFiHost-NetworkCommissioningEthernet — a Wi-Fi host advertises NetworkCommissioning as Ethernet and states the WiFi condition
+
+matter.js's `NetworkCommissioningServer` is the empty generated class
+(`packages/node/src/behaviors/network-commissioning/NetworkCommissioningServer.ts:18`
+at `0ceb202d`); a Wi-Fi node there specialises it with the WI feature and
+supplies the scan/connect commands itself. `node/` keeps
+`NetworkCommissioning` Ethernet-only (concept v2 0.4, §B.4): a host with a
+`Network.WiFi` reporter gets `WiFiNetworkDiagnostics` on its root and the
+root states the Base conditions `Ethernet` and `WiFi`
+(`RootDeviceConditions`), which is what the RootNode requirements'
+`[WiFi]` and `[Ethernet]` conformance evaluates; the FeatureMap of
+NetworkCommissioning stays `ET`. Report AM.
+
+By design. A bridge host does not scan or join networks through Matter;
+the diagnostics tell the truth about the link, the commissioning cluster
+says what the host can do. Reverts when a Wi-Fi commissioning port exists.
+
+---
+
 ## Removed (built, tested, never wired)
 
 `cluster/doc.go` cites this table. It records code that existed and was

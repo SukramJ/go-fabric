@@ -218,6 +218,13 @@ func startFleetNode(t *testing.T) (*fleet, *node.Node) {
 // does, unstarted; the node is stopped when the test ends.
 func testNode(t *testing.T, f *fleet, path string) *node.Node {
 	t.Helper()
+	return testNodeWith(t, f, path, nil)
+}
+
+// testNodeWith is testNode with the node configuration amended by edit
+// (nil: none) before the node is built.
+func testNodeWith(t *testing.T, f *fleet, path string, edit func(*node.Config)) *node.Node {
+	t.Helper()
 	logger := slog.New(slog.DiscardHandler)
 	db, err := openDB(context.Background(), path)
 	if err != nil {
@@ -234,6 +241,9 @@ func testNode(t *testing.T, f *fleet, path string) *node.Node {
 	}
 	cfg := nodeConfig(flags{listen: "127.0.0.1:0", label: "fleet-test", salt: "go-fabric-ref-salt", iterations: 1000},
 		20202021, 3840, matterbridge.TCPConfig{}, db, nil, applier, actions, logger)
+	if edit != nil {
+		edit(&cfg)
+	}
 	n, err := assemble(context.Background(), f, cfg, applier)
 	if err != nil {
 		t.Fatalf("assemble: %v", err)

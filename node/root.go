@@ -70,6 +70,8 @@ type RootClusters struct {
 	Descriptor             *mattercore.Descriptor
 	// OTARequestor is nil unless [Config].OTA is set.
 	OTARequestor *mattercore.OTASoftwareUpdateRequestor
+	// WiFiNetworkDiagnostics is nil unless [Network].WiFi has a Reporter.
+	WiFiNetworkDiagnostics *mattercore.WiFiNetworkDiagnostics
 	// PowerSourceConfiguration lists the node's PowerSource endpoints;
 	// it starts empty, for the host to fill once the topology exists.
 	PowerSourceConfiguration *mattercore.PowerSourceConfiguration
@@ -229,7 +231,15 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	// controller reads its presence as "this node sleeps"
 	// (NodePhysicalProperties isIntermittentlyConnected).
 
-	optional, err := buildRootOptional(ctx, d.st, cfg.FixedLabels, cfg.Locales)
+	if wifi := cfg.Network.WiFi; wifi.Reporter != nil {
+		r.WiFiNetworkDiagnostics, err = mattercore.NewWiFiNetworkDiagnostics(mattercore.WiFiNetworkDiagnosticsConfig{
+			Reporter: wifi.Reporter, Features: wifi.Features, Attributes: wifi.Attributes,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("root wifi diagnostics: %w", err)
+		}
+	}
+	optional, err := buildRootOptional(ctx, d.st, cfg.FixedLabels, cfg.Locales, r.WiFiNetworkDiagnostics)
 	if err != nil {
 		return nil, fmt.Errorf("root labels and diagnostics: %w", err)
 	}
@@ -293,9 +303,11 @@ func attestationMaterial(cfg *Config) (*attestation.Chain, []byte, error) {
 // FixedLabel, UserLabel (persisted), LocalizationConfiguration (locales,
 // nil is en-US alone),
 // TimeFormatLocalization (24-hour, Gregorian), UnitLocalization,
-// SoftwareDiagnostics (the Go heap) and EthernetNetworkDiagnostics (every
-// value null).
-func buildRootOptional(ctx context.Context, st *store.Store, fixed []fixedlabeldef.LabelStruct, locales []string) ([]contract.ClusterServer, error) {
+// SoftwareDiagnostics (the Go heap), the host's WiFiNetworkDiagnostics when
+// it has one, and EthernetNetworkDiagnostics (every value null).
+func buildRootOptional(ctx context.Context, st *store.Store, fixed []fixedlabeldef.LabelStruct, locales []string,
+	wifi *mattercore.WiFiNetworkDiagnostics,
+) ([]contract.ClusterServer, error) {
 	fixedLabel, userLabel, err := buildLabels(ctx, st, rootUserLabelsKey, fixed)
 	if err != nil {
 		return nil, err
@@ -332,7 +344,11 @@ func buildRootOptional(ctx context.Context, st *store.Store, fixed []fixedlabeld
 	if err != nil {
 		return nil, err
 	}
-	return []contract.ClusterServer{fixedLabel, userLabel, localization, timeFormat, units, software, ethernet}, nil
+	servers := []contract.ClusterServer{fixedLabel, userLabel, localization, timeFormat, units, software}
+	if wifi != nil {
+		servers = append(servers, wifi)
+	}
+	return append(servers, ethernet), nil
 }
 
 // buildLabels constructs one endpoint's FixedLabel and UserLabel, the

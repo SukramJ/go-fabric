@@ -17,6 +17,7 @@ import (
 	eemdef "github.com/SukramJ/go-fabric/cluster/spec/electricalenergymeasurement"
 	epmdef "github.com/SukramJ/go-fabric/cluster/spec/electricalpowermeasurement"
 	mwocdef "github.com/SukramJ/go-fabric/cluster/spec/microwaveovencontrol"
+	ncdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
 	occdef "github.com/SukramJ/go-fabric/cluster/spec/occupancysensing"
 	psdef "github.com/SukramJ/go-fabric/cluster/spec/powersource"
 	ptdef "github.com/SukramJ/go-fabric/cluster/spec/powertopology"
@@ -45,9 +46,12 @@ var refusedDefaults = map[string]string{
 	"PowerSource":            "PowerSource needs a feature selection",
 	"Pump":                   "PumpConfigurationAndControl needs a feature selection",
 	"RoomAirConditioner":     "Thermostat needs a feature selection",
-	"SmokeCoAlarm":           "SmokeCoAlarm needs a feature selection",
-	"Thermostat":             "Thermostat needs a feature selection",
-	"WindowCovering":         "WindowCovering needs a feature selection",
+	// NetworkCommissioning's three interface features are O.a: one of
+	// them is the host's to name.
+	"SecondaryNetworkInterface": "NetworkCommissioning needs a feature selection",
+	"SmokeCoAlarm":              "SmokeCoAlarm needs a feature selection",
+	"Thermostat":                "Thermostat needs a feature selection",
+	"WindowCovering":            "WindowCovering needs a feature selection",
 	// A mandatory cluster whose generated server refuses its definition
 	// and that has no core default: the requestor needs the node's
 	// connector.
@@ -218,6 +222,9 @@ var fixtures = map[string]fixture{
 		part(t, d, "TemperatureControlledCabinet", []string{"Cooler"})
 	}},
 	"RoomAirConditioner": {with: opts(heating)},
+	// An Ethernet secondary interface; it states no condition, so none of
+	// the three diagnostics is required.
+	"SecondaryNetworkInterface": {with: opts(feat(0x0031, ncdef.FeatureEthernetNetworkInterface))},
 	"SmokeCoAlarm": {
 		with: opts(feat(0x005C, scadef.FeatureSmokeAlarm)),
 		parts: func(t *testing.T, d *Device) {

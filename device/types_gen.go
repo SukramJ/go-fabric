@@ -17,6 +17,7 @@ var committedTypes = []*Type{
 	&RootNodeType,
 	&SolarPowerType,
 	&BatteryStorageType,
+	&SecondaryNetworkInterfaceType,
 	&SpeakerType,
 	&ModeSelectType,
 	&FanType,
