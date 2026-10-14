@@ -22,7 +22,7 @@ func TestLookup(t *testing.T) {
 	}
 	for _, id := range []uint32{
 		0x0142,      // Camera: excluded (F.3 camera device types)
-		0x0023,      // CastingVideoPlayer: excluded (F.3 media device types)
+		0x0029,      // CastingVideoClient: excluded (camera / media by its mandatory client clusters)
 		0xFFF1_0001, // manufacturer-specific
 		0x0001_010A, // above 0xFFFF: not OnOffPlugInUnit
 		0xFFFF_FFFF, // the client view's unknown device type

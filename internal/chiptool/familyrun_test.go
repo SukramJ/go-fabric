@@ -51,9 +51,10 @@ func TestChipCertificationFamilies(t *testing.T) {
 	}
 	h := tool.harness
 	bin := requireBridgeBinary(t)
-	// wifi: the committed PICS slices describe a daemon with the simulated
-	// Wi-Fi link (startBridgeWith), so one without it cannot run them.
-	flags := requireBridgeFlags(t, bin, "db", "listen", "wifi")
+	// wifi, media: the committed PICS slices describe a daemon with the
+	// simulated Wi-Fi link and the media pair (startBridgeWith), so one
+	// without them cannot run them.
+	flags := requireBridgeFlags(t, bin, "db", "listen", "wifi", "media")
 	defaultListen = fmt.Sprintf(":%d", matterPort)
 	defer func() { defaultListen = ":0" }()
 

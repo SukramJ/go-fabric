@@ -201,6 +201,12 @@ const (
 	// dtSoilSensor is the reference daemon's soil moisture sensor
 	// (examples/reference-bridge/fleet_sensors.go): SoilMeasurement.
 	dtSoilSensor = 0x0045
+	// dtCastingVideoPlayer and dtContentApp are the media pair the daemon
+	// serves with --media (examples/reference-bridge/media.go, ADR 0022):
+	// chip's tv-app endpoints 1 and 3, which the media YAML cases target
+	// (config endpoint: 1, and 3 for ALOGIN-12.1 and APBSC-9.1).
+	dtCastingVideoPlayer = 0x0023
+	dtContentApp         = 0x0024
 )
 
 // endpointDeviceTypes are the device types the harness resolves to an
@@ -214,6 +220,7 @@ var endpointDeviceTypes = []uint32{
 	dtSmokeCOAlarm, dtPump, dtFlowSensor, dtLaundryWasher, dtRVC, dtThermostat, dtWindowCovering,
 	dtDoorLock, dtHumiditySensor, dtOccupancySensor, dtContactSensor, dtGenericSwitch, dtAirPurifier, dtClosure,
 	dtTempControlledCabinet, dtAirQualitySensor, dtWaterHeater, dtElectricalUtilityMeter, dtRefrigerator, dtDishwasher, dtMicrowaveOven, dtOven, dtEnergyEvse, dtDeviceEnergyManagement, dtClosurePanel, dtSoilSensor, dtElectricalEnergyTariff, dtElectricalMeter,
+	dtCastingVideoPlayer, dtContentApp,
 }
 
 // pseudoEndpoints are the keys that name an endpoint by its position: the
@@ -722,4 +729,44 @@ var chipFamilies = []family{
 	},
 	{name: "WHM", deviceType: dtWaterHeater},
 	{name: "WNCV", deviceType: dtWindowCovering},
+	// --- media (ADR 0022) ---------------------------------------------------
+	// The media families run against the daemon's --media pair
+	// (examples/reference-bridge/media.go), a simulation of chip's tv-app:
+	// the casting video player for every family but the content app's
+	// ApplicationBasic and AccountLogin, whose cases target the tv-app's
+	// content app (Test_TC_APBSC_9_1.yaml and Test_TC_ALOGIN_12_1.yaml,
+	// config endpoint: 3). The image's descriptor lists the cases whose
+	// every step is disabled as manual; the
+	// Python cases gate on PICS codes past the model at the pin
+	// (MEDIAPLAYBACK.S.A000b/A000c, CONTENTLAUNCHER.S.F05/F06/A0003,
+	// ALOGIN.S.F00) and are not applicable.
+	{name: "ALOGIN", deviceType: dtContentApp},
+	{name: "APBSC", deviceType: dtContentApp},
+	{
+		name: "APPLAUNCHER", deviceType: dtCastingVideoPlayer,
+		edits: map[string][]edit{
+			// The ApplicationBasic endpoint the StopApp / HideApp steps read
+			// is a config variable naming the tv-app's content app (3,
+			// Test_TC_APPLAUNCHER_3_8.yaml:18 and _3_9.yaml:18); here the
+			// content app is the daemon's ContentApp endpoint. Set in the
+			// config, as TC-G-2.4's endpoints are.
+			"3.8": {{"ApplicationBasic.Endpoint: 3\n", "ApplicationBasic.Endpoint: {ep:0x0024}\n", "PIXIT: the ApplicationBasic endpoint is the daemon's content app"}},
+			"3.9": {{"ApplicationBasic.Endpoint: 3\n", "ApplicationBasic.Endpoint: {ep:0x0024}\n", "PIXIT: the ApplicationBasic endpoint is the daemon's content app"}},
+		},
+	},
+	{name: "APPOBSERVER", deviceType: dtCastingVideoPlayer},
+	{name: "AUDIOOUTPUT", deviceType: dtCastingVideoPlayer},
+	{name: "CHANNEL", deviceType: dtCastingVideoPlayer},
+	{name: "CONTENTLAUNCHER", deviceType: dtCastingVideoPlayer},
+	{name: "KEYPADINPUT", deviceType: dtCastingVideoPlayer},
+	{name: "LOWPOWER", deviceType: dtCastingVideoPlayer},
+	{name: "MEDIAINPUT", deviceType: dtCastingVideoPlayer},
+	{
+		name: "MEDIAPLAYBACK", deviceType: dtCastingVideoPlayer,
+		exclude: map[string]gap{
+			"6.8": {classHarness, "TC-MEDIAPLAYBACK-6.8 step 1 (and the reads after DeactivateTextTrack) expects ActiveTextTrack to read a TrackStruct with an empty ID and a null TrackAttributes (Test_TC_MEDIAPLAYBACK_6_8.yaml:26-31), the tv-app's empty track under chip's revision 3; the model at the pin makes TrackAttributes mandatory and not nullable (matter.js media-playback.element.ts:206-208) and ActiveTextTrack itself nullable (:71-74), so the daemon reads null while no text track is active", false},
+		},
+	},
+	{name: "TGTNAV", deviceType: dtCastingVideoPlayer},
+	{name: "WAKEONLAN", deviceType: dtCastingVideoPlayer},
 }

@@ -212,7 +212,20 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | VALCC | 10 | 8 | 0 | 0 | 2 | 0 | 0 |
 | WHM | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
 | WNCV | 17 | 15 | 0 | 0 | 2 | 0 | 0 |
-| **all** | **612** | **353** | **0** | **1** | **112** | **141** | **5** |
+| ALOGIN | 3 | 1 | 0 | 0 | 1 | 1 | 0 |
+| APBSC | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| APPLAUNCHER | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
+| APPOBSERVER | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
+| AUDIOOUTPUT | 4 | 2 | 0 | 0 | 0 | 2 | 0 |
+| CHANNEL | 6 | 3 | 0 | 0 | 0 | 3 | 0 |
+| CONTENTLAUNCHER | 9 | 4 | 0 | 0 | 3 | 2 | 0 |
+| KEYPADINPUT | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
+| LOWPOWER | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
+| MEDIAINPUT | 8 | 4 | 0 | 0 | 0 | 4 | 0 |
+| MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
+| TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
+| WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| **all** | **669** | **384** | **0** | **1** | **118** | **161** | **5** |
 
 ### Cases not run
 
@@ -222,6 +235,11 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | ACT/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ACT/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | ACT/3.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| ALOGIN/12.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| ALOGIN/12.3 | (b) not supported | not applicable: the case's PICS `ALOGIN.S & ALOGIN.S.F00` is false for the reference DUT |
+| APPOBSERVER/13.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| AUDIOOUTPUT/7.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| AUDIOOUTPUT/7.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | BDX/1.3 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -271,6 +289,9 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CGEN/2.7 | (b) not supported | not applicable: the case's PICS `CGEN.S & CGEN.S.F00` is false for the reference DUT |
 | CGEN/2.8 | (b) not supported | not applicable: the case's PICS `CGEN.S & CGEN.S.F00` is false for the reference DUT |
 | CGEN/2.9 | (b) not supported | not applicable: the case's PICS `CGEN.S & CGEN.S.F00` is false for the reference DUT |
+| CHANNEL/5.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CHANNEL/5.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CHANNEL/5.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CLCTRL/3.1 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F06` is false for the reference DUT |
 | CLCTRL/4.2 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.F01` is false for the reference DUT |
 | CLCTRL/4.4 | (b) not supported | not applicable: the case's PICS `CLCTRL.S & CLCTRL.S.A0000` is false for the reference DUT |
@@ -304,6 +325,11 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CNET/4.5 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.6 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CNET/4.9 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
+| CONTENTLAUNCHER/10.10 | (b) not supported | not applicable: the case's PICS `CONTENTLAUNCHER.S & CONTENTLAUNCHER.S.A0003` is false for the reference DUT |
+| CONTENTLAUNCHER/10.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CONTENTLAUNCHER/10.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CONTENTLAUNCHER/10.8 | (b) not supported | not applicable: the case's PICS `CONTENTLAUNCHER.S & CONTENTLAUNCHER.S.F05` is false for the reference DUT |
+| CONTENTLAUNCHER/10.9 | (b) not supported | not applicable: the case's PICS `CONTENTLAUNCHER.S & CONTENTLAUNCHER.S.F06 & CONTENTLAUNCHER.S.C01.Rsp` is false for the reference DUT |
 | DA/1.10 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
 | DA/1.11 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONER` is false for the reference DUT |
 | DA/1.12 | (b) not supported | not applicable: the case's PICS `MCORE.ROLE.COMMISSIONEE & OPCREDS.S & OPCREDS.S.F00 & OPCREDS.S.C00.Rsp & OPCREDS.S.C01.Tx & OPCREDS.S.C02.Rsp & OPCREDS.S.C03.Tx` is false for the reference DUT |
@@ -400,8 +426,20 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | IDM/6.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/7.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | IDM/8.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| KEYPADINPUT/3.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| LOWPOWER/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | LVL/7.1 | (b) not supported | not applicable: the case's PICS `LVL.S & LVL.S.F02` is false for the reference DUT |
 | LVL/8.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAINPUT/3.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAINPUT/3.15 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAINPUT/3.16 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAINPUT/3.17 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAPLAYBACK/6.10 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAPLAYBACK/6.11 | (b) not supported | not applicable: the case's PICS `MEDIAPLAYBACK.S & MEDIAPLAYBACK.S.A000b` is false for the reference DUT |
+| MEDIAPLAYBACK/6.12 | (b) not supported | not applicable: the case's PICS `MEDIAPLAYBACK.S & MEDIAPLAYBACK.S.A000c` is false for the reference DUT |
+| MEDIAPLAYBACK/6.5 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAPLAYBACK/6.7 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| MEDIAPLAYBACK/6.8 | (c) harness | TC-MEDIAPLAYBACK-6.8 step 1 (and the reads after DeactivateTextTrack) expects ActiveTextTrack to read a TrackStruct with an empty ID and a null TrackAttributes (Test_TC_MEDIAPLAYBACK_6_8.yaml:26-31), the tv-app's empty track under chip's revision 3; the model at the pin makes TrackAttributes mandatory and not nullable (matter.js media-playback.element.ts:206-208) and ActiveTextTrack itself nullable (:71-74), so the daemon reads null while no text track is active |
 | MOD/2.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | MOD/2.3 | (b) not supported | not applicable: the case's PICS `MOD.S & S.S` is false for the reference DUT |
 | MOD/3.1 | (b) not supported | not applicable: the case's PICS `MOD.S.A0005` is false for the reference DUT |
@@ -458,6 +496,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | TCCM/2.1 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TCTL/2.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
 | TCTL/3.3 | (b) not supported | not applicable: the case's PICS `TCTL.S & TCTL.S.F01` is false for the reference DUT |
+| TGTNAV/8.2 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | TIMESYNC/2.10 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
 | TIMESYNC/2.11 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
 | TIMESYNC/2.12 | (b) not supported | not applicable: the case's PICS `TIMESYNC.S.F00` is false for the reference DUT |
@@ -500,7 +539,7 @@ whose family is not in that list is "not yet run", not "not supported".
 | --- | --- | --- |
 | PWRTL, ILL, PRS, DISHM | the module serves the cluster (`cluster/measurement` PowerTopology, Illuminance and Pressure; `cluster/modebase` DishwasherMode), but the reference daemon exposes no endpoint with it and the harness does not run the family | (c) not yet run |
 | EEM, EPM | the module serves both clusters (`cluster/measurement`) and the reference daemon's ElectricalMeter carries them, but the harness does not run the families | (c) not yet run |
-| APBSC, LOWPOWER, WAKEONLAN and the other media families | no media server in this module (concept v2 phase 9) | (b) not supported |
+| CONCON, MESSAGES | the module serves ContentControl (`cluster/media`) and Messages (`cluster/core`), but chip has no case of either family at the harness pin | (c) no case |
 | ICDB | the module is not an ICD | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
 | CNET Wi-Fi and Thread cases | NetworkCommissioning is Ethernet-only | (d) out of scope |
@@ -529,6 +568,21 @@ on the root from fixed values and counters the app pipe steps
 (`examples/reference-bridge/wifi.go`), while NetworkCommissioning stays
 Ethernet-only and `MCORE.COM.WIFI` stays 0 — a product on Wi-Fi supplies its
 own reporter (`node.Network.WiFi`).
+
+The media families (ADR 0022) run against the daemon's `--media` pair
+(TESTING ONLY, `examples/reference-bridge/media.go`): a CastingVideoPlayer
+and a ContentApp that simulate connectedhomeip's tv-app — its transport,
+channels, inputs, outputs, targets and the test suite's content app —
+behind the `cluster/media` servers, and which every daemon of the suite
+carries. The image lists the media cases whose every step is disabled as
+manual, recorded as class (c); TC-MEDIAPLAYBACK-6.8 expects an inactive
+text track to read as a track with an empty ID, which the model at the pin
+cannot carry (null is its inactive track), and is excluded as class (c);
+the Python media cases gate on PICS codes the model at the pin
+does not define (MediaPlayback's AvailableCommands and ContentInfo,
+ContentLauncher's ContentReplication and Presets features, AccountLogin's
+OAuth feature) and are not applicable. Nothing here plays media: a
+product's host implements the ports over its own player.
 
 ## What a product owner must supply
 

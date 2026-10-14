@@ -2781,6 +2781,44 @@ commissioning. The wire values are the same; only the widths differ from
 matter.js's. Retire after a commissioning run against Apple Home with the
 generated encoders.
 
+### BD-Matter-Media-HostPorts — the fourteen media servers are the generated definitions plus typed host ports and a state transaction
+
+matter.js's media behaviours at `0ceb202d` are the generated
+`extends XBehavior {}` stubs (fourteen; `low-power/LowPowerServer.ts:13-25`
+is the one with logic, `sleep()` emitting `enterLowPowerMode`): the
+application's subclass implements each command against `this.state`,
+and a command throwing rolls its transaction back. `cluster/media` wraps
+each definition in `spec.NewServer` behind one host port per cluster:
+a port command receives the attribute state as a pointer, the server
+commits the copy on success and drops it on failure; optional commands
+are optional Go interfaces (accepted only when implemented,
+`ProtocolService.ts:541-545`), a mandatory one the port lacks is
+`ErrNotImplemented` (`ValidatedElements.ts:357-371`); the two list
+defaults the model does carry (`channel.element.ts:31`,
+`content-launcher.element.ts:34`, both `[]`) are applied by the servers
+because `defaultValue` renders no list defaults. LowPower's `Sleep`
+calls the port where matter.js emits its event. Report AR.
+
+By design (ADR 0022). A host owns what plays; the server owns the wire
+shape and the transaction.
+
+### BD-chip-Messages-CoreHeld — Messages answers a ninth message with RESOURCE_EXHAUSTED, cancels per fabric and lets the host report presentation
+
+matter.js has no Messages logic (`MessagesServer.ts`, an empty class at
+`0ceb202d`); chip's `messages-server.cpp` at the harness pin checks the
+request (Responses without RESP → INVALID_COMMAND, `:359-363`) and the
+tv-app's `MessagesManager.cpp` replaces an existing id, completes a
+presented message on cancel and drops a queued one. `core.Messages`
+mirrors both and adds what neither says: a ninth message is
+RESOURCE_EXHAUSTED (the list's `max 8`, `messages.element.ts:32`), a
+cancel touches only the accessing fabric's messages (the list is `R F V`),
+the presentation lifecycle is the host's (`Presented`, `Complete` with
+a `MessageOutcome`), and MessageComplete's ResponseId/Reply are null
+with RESP/RPLY and absent without. Report AR.
+
+By design (ADR 0022). The list bound and the fabric scope come from the
+model; the lifecycle has no reference and is the host's.
+
 ### BD-Matter-DCL-OptIn — the DCL is reached only through a host-built client; development certificates from GitHub stay off; one trust-store blob; the CRL cache expires on use
 
 matter.js's `DclCertificateService` (`packages/protocol/src/dcl/DclCertificateService.ts`
