@@ -36,6 +36,7 @@ German, briefly. Six waves were planned against the phases:
 | 19 | concept v2 phase 10: WiFiNetworkDiagnostics server with `core.WiFiReporter`, SecondaryNetworkInterface, `node.Network.WiFi` + conditions, reference-bridge `--wifi`, DGWIFI family | AM | `wave/2026-10-14-tranche-19` (#99); docs PR `docs/wave-19-followups` | see §19 |
 | 20 | ADR 0020 stage 5, part 1: the group message sender (`groups.Manager.Sender`, `channel.EncryptGroup`, the group header constraint, `udp.Listener.SendMulticast`, the persisted group data counter), the Groupcast Sender feature (FeatureMap 0x07) | AN | `wave/2026-10-14-tranche-20` (#101); docs PR `docs/wave-20-followups` | see §20 |
 | 21 | ADR 0020 stage 5, part 2: `binding.Manager`, `core.Binding.OnChange` + fabric-scoped writes, the bridge decoding Binding writes, `node.Config.Client` (the node's client stack), the 11 controller device types, `TestLiveBinding` (TC-BIND-2.1) | AO | `wave/2026-10-14-tranche-21` (#103); docs PR `docs/wave-21-followups` | see §21 |
+| 22 | ADR 0020 stage 4 close-out: `device.Lookup`, the validator input seam (`endpoint.DeviceTypeTree`), `client.Endpoint.Device()`/`Conformance()`, `core.Binding.Persist` + node persistence; owner: the doubled group-sender start/stop fixed | AP | `wave/2026-10-14-tranche-22` (#105); docs PR `docs/wave-22-followups` | see §22 |
 
 Phase 1 (timed write per attribute, subscription quota, PASE session
 parameters) closed across waves 4 and 5. Phase 5 (ecosystem proof, v1.0)
@@ -1340,3 +1341,44 @@ branches and the `.claude/worktrees/wave21-binding` worktree. Next: the
 owner's call between stage 6 (Joint Fabric, DCL — separable), phase 8
 (OTA provider + DLOG over BDX, ADR 0021 first), the `device/` types as
 the client view, and Binding persistence; `v1.0.0` after phases 7–9.
+
+## 22. Wave 22 (2026-10-14, the owner away; everything local; ran in parallel with wave 23)
+
+ADR 0020 stage 4 close-out. Brief AP (`wave22/clientview`, head
+`95935a5`, rebased by the agent onto tranche 21 because it needs wave
+21's `binding/` and `node/client.go`) on `planning/briefs-wave-22`
+(`4422890`). Tranche `wave/2026-10-14-tranche-22` = the four section
+commits cherry-picked onto `main` after #103, plus the owner's commit.
+
+- **endpoint:** `DeviceTypeSubject`, `ClusterShape`, `DeviceTypeTree`
+  (`Validate()`, `Check(ep)`) after matter.js `DeviceTypeFacts.ts`;
+  `topologyFacts` gone; a cluster whose FeatureMap or element list is
+  unknown is not judged.
+- **device:** `Lookup` over the generator's existing `types_gen.go`
+  registry (16 excluded types named in its doc).
+- **controller/client:** `Endpoint.Device()`, `Conformance()` →
+  `ConformanceReport{Status unknown|incomplete|clean|violated,
+  Violations, ClientList differences, Unjudged}` over a snapshot of
+  the image; `TestLiveClientNode` asserts the plug's type and a clean
+  report.
+- **Binding persisted:** `core.Binding.Persist(BindingConfig{Load, Save})`
+  (saved before the write commits, a failed save refuses it;
+  `RemoveFabric` saves); the node keys each server `binding.<stable key>`
+  (`binding.@<number>` unkeyed) in the settings table and restores
+  before the topology is served; `TestLiveBinding` restarts the DUT on
+  its database — both entries re-established without a write;
+  `TestNodeBindingPersisted`.
+- **Owner:** `node.Start`/`Stop` called `startGroupSender`/`stopGroupSender`
+  twice since the tranche-21 cherry-pick repair (a UDP socket per Start
+  leaked) — fixed; two `by_design` entries; the findings line closed.
+
+Guards on the tranche (tool PATH exported, `CHIP_ROOT` absolute, HEAD
+logged): `make ci`, `make race`, `make reachability-check`,
+`make chipdm-check`, `make chiptool-test` (314 pass, 0 fail, 1 skip) — all green
+at `0ae1d82`; a DGETH family run confirmed the PICS slices unchanged. PR #105 (auto-merge).
+
+**Docs PR `docs/wave-22-followups`** (opened after the tranche merged):
+ADR 0020 (stage-4 row: closed), concept v2 B.1, this section. Then delete
+`wave22/clientview`, `planning/briefs-wave-22`, the tranche and docs
+branches and the `.claude/worktrees/wave22-clientview` worktree. Next:
+wave 23 (brief AQ, phase 8) lands on top.
