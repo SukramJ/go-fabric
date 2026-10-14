@@ -57,6 +57,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 86},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/media", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/modebase", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/modeselect", min: 86},
 	// Pinned at full coverage. A package that reaches 100 % has no
