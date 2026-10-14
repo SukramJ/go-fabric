@@ -16,19 +16,24 @@ package main
 // wave 5 (ADR 0019), SecondaryNetworkInterface, which concept v2 §B.4
 // takes in with the WiFiNetworkDiagnostics server (brief AM), and
 // OtaProvider, which ADR 0021 takes in with the OTA Software Update
-// Provider server (brief AQ). Sorted by name.
+// Provider server (brief AQ), and the three media device types
+// (BasicVideoPlayer, CastingVideoPlayer, ContentApp), which ADR 0022 takes
+// in with the media and content clusters (brief AR). Sorted by name.
 var committed = []string{
 	"Aggregator",
 	"AirPurifier",
 	"AirQualitySensor",
+	"BasicVideoPlayer",
 	"BatteryStorage",
 	"BridgedNode",
+	"CastingVideoPlayer",
 	"Closure",
 	"ClosureController",
 	"ClosurePanel",
 	"ColorDimmerSwitch",
 	"ColorTemperatureLight",
 	"ContactSensor",
+	"ContentApp",
 	"ControlBridge",
 	"CookSurface",
 	"Cooktop",
@@ -110,10 +115,7 @@ var excluded = map[string]string{
 	"Intercom":         "F.3 camera device types",
 	"Chime":            "F.3 camera device types",
 	"CameraController": "F.3 camera device types",
-	// Media device types: they mandate the F.2 media clusters.
-	"BasicVideoPlayer":   "F.3 media device types",
-	"CastingVideoPlayer": "F.3 media device types",
-	"ContentApp":         "F.3 media device types",
+	// The media device types left the group with ADR 0022.
 	// Infrastructure: F.2 Thread or Joint Fabric. OtaProvider left the
 	// group with ADR 0021.
 	"ThreadBorderRouter":           "F.3 infrastructure",

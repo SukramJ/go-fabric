@@ -159,11 +159,9 @@ func TypeByID(id uint16) (*Type, bool) {
 // manufacturer-specific or unknown one, and the snapshot device types
 // script/devicegen excludes (its excluded list: the camera family —
 // Camera, SnapshotCamera, AudioDoorbell, Intercom, Chime,
-// CameraController, VideoDoorbell, FloodlightCamera —, the media family —
-// BasicVideoPlayer, CastingVideoPlayer, ContentApp, CastingVideoClient —
-// and the infrastructure types ThreadBorderRouter,
-// NetworkInfrastructureManager, JointFabricAdministrator and
-// OtaProvider). It reads the generated registry (types_gen.go), so a
+// CameraController, VideoDoorbell, FloodlightCamera —, the media client
+// CastingVideoClient, and the infrastructure types ThreadBorderRouter,
+// NetworkInfrastructureManager and JointFabricAdministrator). It reads the generated registry (types_gen.go), so a
 // regeneration that commits a type makes Lookup find it.
 //
 // A client view resolves a remote endpoint's device type through it, as

@@ -97,6 +97,49 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("AirQualitySensor") {
 		t.Errorf("AirQualitySensor: %v", err)
 	}
+	if _, err := NewBasicVideoPlayer(Options{}); err == nil {
+		t.Error("BasicVideoPlayer: constructed without a StableKey")
+	}
+	if d, err := NewBasicVideoPlayer(testOptions("BasicVideoPlayer"), testWith(t, "BasicVideoPlayer")...); err == nil {
+		if d.Type() != &BasicVideoPlayerType {
+			t.Errorf("BasicVideoPlayer: type %v", d.Type().Name)
+		}
+		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+			t.Error("BasicVideoPlayer: mandatory OnOff not mounted")
+		}
+		if s := d.MediaPlayback(); d.Server(0x0506) == nil || s != nil && d.Server(0x0506) != s {
+			t.Error("BasicVideoPlayer: mandatory MediaPlayback not mounted")
+		}
+		if s := d.KeypadInput(); d.Server(0x0509) == nil || s != nil && d.Server(0x0509) != s {
+			t.Error("BasicVideoPlayer: mandatory KeypadInput not mounted")
+		}
+		if s := d.Messages(); s != nil && d.Server(0x0097) != s {
+			t.Error("BasicVideoPlayer: optional Messages is not the device's server")
+		}
+		if s := d.WakeOnLan(); s != nil && d.Server(0x0503) != s {
+			t.Error("BasicVideoPlayer: optional WakeOnLan is not the device's server")
+		}
+		if s := d.Channel(); s != nil && d.Server(0x0504) != s {
+			t.Error("BasicVideoPlayer: optional Channel is not the device's server")
+		}
+		if s := d.TargetNavigator(); s != nil && d.Server(0x0505) != s {
+			t.Error("BasicVideoPlayer: optional TargetNavigator is not the device's server")
+		}
+		if s := d.MediaInput(); s != nil && d.Server(0x0507) != s {
+			t.Error("BasicVideoPlayer: optional MediaInput is not the device's server")
+		}
+		if s := d.LowPower(); s != nil && d.Server(0x0508) != s {
+			t.Error("BasicVideoPlayer: optional LowPower is not the device's server")
+		}
+		if s := d.AudioOutput(); s != nil && d.Server(0x050B) != s {
+			t.Error("BasicVideoPlayer: optional AudioOutput is not the device's server")
+		}
+		if s := d.ContentControl(); s != nil && d.Server(0x050F) != s {
+			t.Error("BasicVideoPlayer: optional ContentControl is not the device's server")
+		}
+	} else if !refusesFixture("BasicVideoPlayer") {
+		t.Errorf("BasicVideoPlayer: %v", err)
+	}
 	if _, err := NewBatteryStorage(Options{}); err == nil {
 		t.Error("BatteryStorage: constructed without a StableKey")
 	}
@@ -128,6 +171,58 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("BridgedNode") {
 		t.Errorf("BridgedNode: %v", err)
+	}
+	if _, err := NewCastingVideoPlayer(Options{}); err == nil {
+		t.Error("CastingVideoPlayer: constructed without a StableKey")
+	}
+	if d, err := NewCastingVideoPlayer(testOptions("CastingVideoPlayer"), testWith(t, "CastingVideoPlayer")...); err == nil {
+		if d.Type() != &CastingVideoPlayerType {
+			t.Errorf("CastingVideoPlayer: type %v", d.Type().Name)
+		}
+		if s := d.OnOff(); d.Server(0x0006) == nil || s != nil && d.Server(0x0006) != s {
+			t.Error("CastingVideoPlayer: mandatory OnOff not mounted")
+		}
+		if s := d.MediaPlayback(); d.Server(0x0506) == nil || s != nil && d.Server(0x0506) != s {
+			t.Error("CastingVideoPlayer: mandatory MediaPlayback not mounted")
+		}
+		if s := d.KeypadInput(); d.Server(0x0509) == nil || s != nil && d.Server(0x0509) != s {
+			t.Error("CastingVideoPlayer: mandatory KeypadInput not mounted")
+		}
+		if s := d.ContentLauncher(); d.Server(0x050A) == nil || s != nil && d.Server(0x050A) != s {
+			t.Error("CastingVideoPlayer: mandatory ContentLauncher not mounted")
+		}
+		if s := d.Messages(); s != nil && d.Server(0x0097) != s {
+			t.Error("CastingVideoPlayer: optional Messages is not the device's server")
+		}
+		if s := d.WakeOnLan(); s != nil && d.Server(0x0503) != s {
+			t.Error("CastingVideoPlayer: optional WakeOnLan is not the device's server")
+		}
+		if s := d.Channel(); s != nil && d.Server(0x0504) != s {
+			t.Error("CastingVideoPlayer: optional Channel is not the device's server")
+		}
+		if s := d.TargetNavigator(); s != nil && d.Server(0x0505) != s {
+			t.Error("CastingVideoPlayer: optional TargetNavigator is not the device's server")
+		}
+		if s := d.MediaInput(); s != nil && d.Server(0x0507) != s {
+			t.Error("CastingVideoPlayer: optional MediaInput is not the device's server")
+		}
+		if s := d.LowPower(); s != nil && d.Server(0x0508) != s {
+			t.Error("CastingVideoPlayer: optional LowPower is not the device's server")
+		}
+		if s := d.AudioOutput(); s != nil && d.Server(0x050B) != s {
+			t.Error("CastingVideoPlayer: optional AudioOutput is not the device's server")
+		}
+		if s := d.ApplicationLauncher(); s != nil && d.Server(0x050C) != s {
+			t.Error("CastingVideoPlayer: optional ApplicationLauncher is not the device's server")
+		}
+		if s := d.AccountLogin(); s != nil && d.Server(0x050E) != s {
+			t.Error("CastingVideoPlayer: optional AccountLogin is not the device's server")
+		}
+		if s := d.ContentControl(); s != nil && d.Server(0x050F) != s {
+			t.Error("CastingVideoPlayer: optional ContentControl is not the device's server")
+		}
+	} else if !refusesFixture("CastingVideoPlayer") {
+		t.Errorf("CastingVideoPlayer: %v", err)
 	}
 	if _, err := NewClosure(Options{}); err == nil {
 		t.Error("Closure: constructed without a StableKey")
@@ -215,6 +310,40 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		}
 	} else if !refusesFixture("ContactSensor") {
 		t.Errorf("ContactSensor: %v", err)
+	}
+	if _, err := NewContentApp(Options{}); err == nil {
+		t.Error("ContentApp: constructed without a StableKey")
+	}
+	if d, err := NewContentApp(testOptions("ContentApp"), testWith(t, "ContentApp")...); err == nil {
+		if d.Type() != &ContentAppType {
+			t.Errorf("ContentApp: type %v", d.Type().Name)
+		}
+		if s := d.KeypadInput(); d.Server(0x0509) == nil || s != nil && d.Server(0x0509) != s {
+			t.Error("ContentApp: mandatory KeypadInput not mounted")
+		}
+		if s := d.ApplicationLauncher(); d.Server(0x050C) == nil || s != nil && d.Server(0x050C) != s {
+			t.Error("ContentApp: mandatory ApplicationLauncher not mounted")
+		}
+		if s := d.ApplicationBasic(); d.Server(0x050D) == nil || s != nil && d.Server(0x050D) != s {
+			t.Error("ContentApp: mandatory ApplicationBasic not mounted")
+		}
+		if s := d.Channel(); s != nil && d.Server(0x0504) != s {
+			t.Error("ContentApp: optional Channel is not the device's server")
+		}
+		if s := d.TargetNavigator(); s != nil && d.Server(0x0505) != s {
+			t.Error("ContentApp: optional TargetNavigator is not the device's server")
+		}
+		if s := d.MediaPlayback(); s != nil && d.Server(0x0506) != s {
+			t.Error("ContentApp: optional MediaPlayback is not the device's server")
+		}
+		if s := d.ContentLauncher(); s != nil && d.Server(0x050A) != s {
+			t.Error("ContentApp: optional ContentLauncher is not the device's server")
+		}
+		if s := d.AccountLogin(); s != nil && d.Server(0x050E) != s {
+			t.Error("ContentApp: optional AccountLogin is not the device's server")
+		}
+	} else if !refusesFixture("ContentApp") {
+		t.Errorf("ContentApp: %v", err)
 	}
 	if _, err := NewControlBridge(Options{}); err == nil {
 		t.Error("ControlBridge: constructed without a StableKey")

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5000,
+  "entry_points": 5001,
   "entry_packages": [
     ".",
     "bdx",
@@ -203,9 +203,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12069,
-    "reachable": 8559,
-    "whitelisted": 3505,
+    "total_exported": 12085,
+    "reachable": 8574,
+    "whitelisted": 3506,
     "unreachable": 5
   },
   "by_package": [
@@ -16832,6 +16832,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/registry_test.go",
       "line": 18
+    },
+    {
+      "package": "device",
+      "identifier": "TestMediaDeviceTypesMountTheMediaServers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/media_test.go",
+      "line": 131
     },
     {
       "package": "device",
