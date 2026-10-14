@@ -14,7 +14,9 @@ No chip-tool binary was run.
 | 644cef7 `feat(spec): a JSON codec over the generated definitions` | §3 (+ lint fixes of §1/§2 code: G115 notes, named results) |
 | 7e6dca5 `feat(examples): the reference controller CLI` | §4 |
 | fbf549c `fix(setup): keep a QR tail DecodeExtra refuses as raw bytes` | §1 fix-up (difference 1 below) |
-| (this commit) `notes: report AT` | — |
+| 1d112ed `notes: report AT` | — |
+| 5073b7f `feat(examples): group create falls back to the pre-1.5 path` | §5 (owner's answer to Q1) |
+| (this commit) `notes: report AT §5` | — |
 
 ## Per section — what was built, what proves it
 
@@ -95,6 +97,58 @@ All logged with HEAD before/after (`bin/guard-*.log` in the worktree):
   Could not connect to device", issue87_test.go:308) — rerun alone per the
   brief's rule, 3/3 **pass**; lint 0 issues in that run. The only change
   between the green `make ci` and this one is `secure/setup` (fbf549c).
+
+## §5 — the pre-1.5 group fallback (owner's answer to Q1)
+
+**What.** `group create` now reads each node's root Descriptor ServerList
+first. If Groupcast (0x0065) is listed, it runs JoinGroup as before. If not,
+`legacyJoin` provisions the node the way chip's
+`src/app/tests/suites/TestGroupMessaging.yaml` does at the harness pin
+(`IsLegacyGroupsRevision` steps):
+- KeySetWrite with the group's epoch key, TrustFirst (:84-102);
+- a GroupKeyMap entry group → key set, appended read-modify-write and
+  skipped if the group is already mapped (:122-132);
+- Groups AddGroup on each endpoint, checking that AddGroupResponse's status
+  is 0 (:134-168);
+- an ACL entry with AuthMode Group granting the group Operate on the member
+  endpoints. The YAML's own entry is "any group can manage" (:188-211); this
+  one is narrower, following the owner's instruction.
+
+The tool's own node is provisioned as before. The README has one sentence on
+the fallback.
+
+**One line differs from the owner's message.** The ACL subject is the bare
+group id, not `0xFFFFFFFFFFFF0000 | groupID`. That 64-bit value is chip's
+*internal* group node id, and chip converts it to the bare group id for the
+stored and wire form (`src/app/server/AclStorage.cpp:162-171`, `Convert`
+with `GroupIdFromNodeId`). `cluster/core` AccessControl, which mirrors
+matter.js, accepts only 0x0001–0xFFFF (`access_control.go:1122`
+`aclIsValidGroupSubject`), so the 64-bit form would be a CONSTRAINT_ERROR
+there. chip-tool's `groupsettings` (`examples/chip-tool/commands/group/
+Commands.h`) manages only chip-tool's own key sets and groups, not a device's,
+so the YAML is the source for the device-side steps.
+
+**Proof.** `TestReferenceController` now continues after `unpair`:
+1. It starts a second harness node and hides Groupcast from that node's root.
+2. It pairs the node as 0x4322 and runs `group create 258`, whose output says
+   `(Groups)`.
+3. `group send 258 OnOff/Toggle` from the tool's own node flips the second
+   node's plug.
+
+**How Groupcast is hidden.** The node facade always mounts Groupcast on the
+root (`node/root.go:209-268`), and `node.Config` has no option that leaves it
+out. The seam used is therefore the exported root Descriptor:
+`node.Node.Root().Descriptor.SetServerListProvider`, set to the ServerList
+minus 0x0065. The Groupcast server stays mounted but is no longer listed,
+and the listing is what the tool decides by. A real "no Groupcast" composition
+would need a `node.Config` option in `node/`, which is outside this brief's
+allowed paths. Should one be added?
+
+**Guards at 5073b7f** (HEAD logged in `bin/guard5-*.log`):
+- `make ci`: **green** (lint 0 issues; `examples/reference-controller` at
+  83.4 % against a floor of 70).
+- `make race`: **green**.
+- `make reachability-check`: **green** (unreached 5).
 
 ## Lines that differ from the cited files
 
@@ -187,7 +241,7 @@ chip-tool parser (ComplexArgument.h / CustomArgument.h):
 
 ## Left out
 
-The Groups-cluster (pre-1.5) group provisioning; a 21-digit manual encoder;
+A 21-digit manual encoder;
 persistent CASE resumption (in memory, per D2); commissioning-window
 opening on paired nodes; BLE/Wi-Fi; TUI/daemon; Joint Fabric;
 CommissionerControl client; media (all per brief).
@@ -197,6 +251,7 @@ CommissionerControl client; media (all per brief).
 1. Should `group create` fall back to GroupKeyMap + Groups.AddGroup + a
    Group-auth ACL entry when a node answers UNSUPPORTED_CLUSTER for Groupcast
    (devices before 1.5)? Not done: no in-repo proof possible today.
+   **Owner: yes — done as §5.**
 2. D2's record omitted the operational key and NOC; I kept them (decision
    above). Keep, or re-mint the NOC each run?
 3. `QRCode` still accepts what matter.js's `encode` refuses (difference 3) —
