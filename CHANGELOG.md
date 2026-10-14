@@ -12,6 +12,7 @@ pseudo-version of `main`.
 
 ### Added
 
+- `device.Lookup(id uint32)` resolves a Descriptor device type id to its generated `*device.Type` (false for the device types `script/devicegen` excludes and for ids it does not know). The device type validator takes its input through `endpoint.DeviceTypeSubject` / `endpoint.ClusterShape` / `endpoint.DeviceTypeTree` (matter.js `DeviceTypeFacts.ts` at `0ceb202d`): an assembled topology is adapted to it (`ValidateDeviceTypes` gives the verdicts it gave), and any other image of a node — a controller's client view — is judged by the same pass; a cluster whose FeatureMap or element list is not known is judged present but nothing inside it.
 - The bridge decodes a Binding (0x001E) list write through the generated definition, stamping each entry's FabricIndex with a placeholder before validation (matter.js `AttributeWriteResponse.ts:461-467` at `0ceb202d` assigns the accessing fabric first); a Binding write over the wire reached the server as nothing before. `groups.Manager.HasUsableKey`: the group's key set is mapped and held.
 
 - Group sending (ADR 0020, stage 5, part 1; matter.js `SessionManager.groupSessionForAddress`,

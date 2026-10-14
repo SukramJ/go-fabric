@@ -126,59 +126,51 @@ func ValidateDeviceTypes(t *Topology) []DeviceTypeViolation {
 	if t == nil {
 		return nil
 	}
-	facts := newTopologyFacts(t)
-	pass := newDTPass(facts, deviceTypeLookups())
-	var out []DeviceTypeViolation
-	for _, ep := range t.Endpoints {
-		if ep == nil {
-			continue
-		}
-		out = append(out, pass.check(ep.ID)...)
-	}
-	return out
+	return topologyTree(t).Validate()
 }
 
-// topologyFacts answers dtFacts for an assembled topology.
-type topologyFacts struct {
-	t         *Topology
-	byID      map[uint16]*Endpoint
-	children  map[uint16][]uint16
-	servers   map[uint16][]contract.ClusterServer
-	descripts map[uint16]*mattercore.Descriptor
-}
-
-func newTopologyFacts(t *Topology) *topologyFacts {
-	f := &topologyFacts{
-		t: t, byID: map[uint16]*Endpoint{}, children: map[uint16][]uint16{},
-		servers: map[uint16][]contract.ClusterServer{}, descripts: map[uint16]*mattercore.Descriptor{},
-	}
+// topologyTree adapts an assembled topology to the validator's input: one
+// [DeviceTypeSubject] per endpoint, in topology order, and the node's
+// conditions.
+func topologyTree(t *Topology) DeviceTypeTree {
+	byID := map[uint16]*Endpoint{}
 	for _, ep := range t.Endpoints {
 		if ep != nil {
-			f.byID[ep.ID] = ep
+			byID[ep.ID] = ep
 		}
 	}
+	subjects := make([]*assembledSubject, 0, len(t.Endpoints))
+	byNumber := map[uint16]*assembledSubject{}
 	for _, ep := range t.Endpoints {
 		if ep == nil {
 			continue
 		}
-		if parent, ok := f.parentOf(ep.ID); ok {
-			f.children[parent] = append(f.children[parent], ep.ID)
-		}
-		servers := ClusterServers(ep)
-		f.servers[ep.ID] = servers
-		for _, srv := range servers {
+		s := &assembledSubject{ep: ep, servers: ClusterServers(ep)}
+		for _, srv := range s.servers {
 			if d, ok := srv.(*mattercore.Descriptor); ok {
-				f.descripts[ep.ID] = d
+				s.descriptor = d
 			}
 		}
+		subjects = append(subjects, s)
+		if _, dup := byNumber[ep.ID]; !dup {
+			byNumber[ep.ID] = s
+		}
 	}
-	return f
+	for _, s := range subjects {
+		if parent, ok := assembledParentOf(byID, s.ep); ok {
+			byNumber[parent].parts = append(byNumber[parent].parts, s.ep.ID)
+		}
+	}
+	tree := DeviceTypeTree{Endpoints: make([]DeviceTypeSubject, 0, len(subjects)), NodeConditions: assembledNodeConditions}
+	for _, s := range subjects {
+		tree.Endpoints = append(tree.Endpoints, s)
+	}
+	return tree
 }
 
-// parentOf: a bridged endpoint's ParentEndpointID; the root for every other
-// endpoint but the root itself, which owns the tree.
-func (f *topologyFacts) parentOf(ep uint16) (uint16, bool) {
-	e := f.byID[ep]
+// assembledParentOf: a bridged endpoint's ParentEndpointID; the root for
+// every other endpoint but the root itself, which owns the tree.
+func assembledParentOf(byID map[uint16]*Endpoint, e *Endpoint) (uint16, bool) {
 	if e == nil || e.IsRoot() {
 		return 0, false
 	}
@@ -186,18 +178,34 @@ func (f *topologyFacts) parentOf(ep uint16) (uint16, bool) {
 	if e.HasParentEndpointID {
 		parent = e.ParentEndpointID
 	}
-	if _, ok := f.byID[parent]; !ok || parent == ep {
+	if _, ok := byID[parent]; !ok || parent == e.ID {
 		return 0, false
 	}
 	return parent, true
 }
 
-func (f *topologyFacts) partsOf(ep uint16) []uint16 { return f.children[ep] }
+// newTopologyFacts is the facts the validation pass reads of an assembled
+// topology.
+func newTopologyFacts(t *Topology) *subjectFacts { return newSubjectFacts(topologyTree(t)) }
 
-// deviceTypeIDs: the Descriptor's DeviceTypeList, as a controller reads it;
-// the endpoint's DeviceType when it serves no Descriptor.
-func (f *topologyFacts) deviceTypeIDs(ep uint16) []uint32 {
-	if d := f.descripts[ep]; d != nil {
+// assembledSubject is an assembled endpoint as the validator reads it — as
+// a controller reads it: the server clusters [ClusterServers] mounts, each
+// one's FeatureMap, AttributeList and AcceptedCommandList (synthesised as
+// the dispatcher synthesises them) and its event list, and the
+// Descriptor's DeviceTypeList and ClientList.
+type assembledSubject struct {
+	ep         *Endpoint
+	servers    []contract.ClusterServer
+	descriptor *mattercore.Descriptor
+	parts      []uint16
+}
+
+func (s *assembledSubject) EndpointNumber() uint16 { return s.ep.ID }
+
+// DeviceTypeIDs: the Descriptor's DeviceTypeList, as a controller reads
+// it; the endpoint's DeviceType when it serves no Descriptor.
+func (s *assembledSubject) DeviceTypeIDs() []uint32 {
+	if d := s.descriptor; d != nil {
 		if v, ok := d.MatterRead(0x0000); ok {
 			if list, ok := v.([]mattercore.DeviceTypeStruct); ok {
 				ids := make([]uint32, 0, len(list))
@@ -208,15 +216,15 @@ func (f *topologyFacts) deviceTypeIDs(ep uint16) []uint32 {
 			}
 		}
 	}
-	if e := f.byID[ep]; e != nil && e.DeviceType != 0 {
-		return []uint32{uint32(e.DeviceType)}
+	if s.ep.DeviceType != 0 {
+		return []uint32{uint32(s.ep.DeviceType)}
 	}
 	return nil
 }
 
-func (f *topologyFacts) serverClusters(ep uint16) []uint32 {
+func (s *assembledSubject) ServerClusterIDs() []uint32 {
 	var ids []uint32
-	for _, srv := range f.servers[ep] {
+	for _, srv := range s.servers {
 		if srv != nil && !slices.Contains(ids, srv.MatterClusterID()) {
 			ids = append(ids, srv.MatterClusterID())
 		}
@@ -224,9 +232,9 @@ func (f *topologyFacts) serverClusters(ep uint16) []uint32 {
 	return ids
 }
 
-// clientClusters: the Descriptor's ClientList.
-func (f *topologyFacts) clientClusters(ep uint16) []uint32 {
-	if d := f.descripts[ep]; d != nil {
+// ClientClusterIDs: the Descriptor's ClientList.
+func (s *assembledSubject) ClientClusterIDs() []uint32 {
+	if d := s.descriptor; d != nil {
 		if v, ok := d.MatterRead(0x0002); ok {
 			if list, ok := v.([]uint32); ok {
 				return list
@@ -236,8 +244,8 @@ func (f *topologyFacts) clientClusters(ep uint16) []uint32 {
 	return nil
 }
 
-func (f *topologyFacts) server(ep uint16, clusterID uint32) contract.ClusterServer {
-	for _, srv := range f.servers[ep] {
+func (s *assembledSubject) server(clusterID uint32) contract.ClusterServer {
+	for _, srv := range s.servers {
 		if srv != nil && srv.MatterClusterID() == clusterID {
 			return srv
 		}
@@ -245,56 +253,52 @@ func (f *topologyFacts) server(ep uint16, clusterID uint32) contract.ClusterServ
 	return nil
 }
 
-// features decodes the server's FeatureMap.
-func (f *topologyFacts) features(ep uint16, clusterID uint32) []string {
-	srv := f.server(ep, clusterID)
+// ServerClusterShape reads the server as a controller reads it; an
+// assembled server's shape is always known.
+func (s *assembledSubject) ServerClusterShape(clusterID uint32) (ClusterShape, bool) {
+	srv := s.server(clusterID)
 	if srv == nil {
-		return nil
+		return ClusterShape{}, false
 	}
-	v, ok := srv.MatterRead(cluster.AttrGlobalFeatureMap)
-	if !ok {
-		return nil
+	sh := ClusterShape{
+		FeaturesKnown: true, AttributesKnown: true, CommandsKnown: true, EventsKnown: true,
+		Attributes:       globalList(srv, cluster.AttrGlobalAttributeList),
+		AcceptedCommands: globalList(srv, cluster.AttrGlobalAcceptedCommandList),
 	}
-	var fm uint32
-	switch x := v.(type) {
-	case uint32:
-		fm = x
-	case uint16:
-		fm = uint32(x)
-	case uint8:
-		fm = uint32(x)
-	case uint64:
-		fm = uint32(x) //nolint:gosec // a FeatureMap is a map32; higher bits name no feature
-	case int:
-		if x < 0 {
-			return nil
-		}
-		fm = uint32(x) //nolint:gosec // bounded above by the map32 FeatureMap type
-	default:
-		return nil
+	sh.FeatureMap = featureMapOf(srv)
+	if lister, ok := srv.(contract.ClusterEventLister); ok {
+		sh.Events = lister.MatterEvents()
 	}
-	return schema.ClusterFeatureNames(clusterID, fm)
+	return sh, true
 }
 
-// supports reads the server's AttributeList, AcceptedCommandList or event
-// list, as a controller reads them.
-func (f *topologyFacts) supports(ep uint16, clusterID uint32, element schema.RequirementElement, id uint32) bool {
-	srv := f.server(ep, clusterID)
-	if srv == nil {
-		return false
+func (s *assembledSubject) StatedConditions() []string { return s.ep.DeviceConditions }
+
+func (s *assembledSubject) PartNumbers() []uint16 { return s.parts }
+
+// featureMapOf reads the server's FeatureMap; 0 when it answers none or a
+// value that is not one.
+func featureMapOf(srv contract.ClusterServer) uint32 {
+	v, ok := srv.MatterRead(cluster.AttrGlobalFeatureMap)
+	if !ok {
+		return 0
 	}
-	switch element {
-	case schema.RequirementAttribute:
-		return slices.Contains(globalList(srv, cluster.AttrGlobalAttributeList), id)
-	case schema.RequirementCommand:
-		return slices.Contains(globalList(srv, cluster.AttrGlobalAcceptedCommandList), id)
-	case schema.RequirementEvent:
-		if lister, ok := srv.(contract.ClusterEventLister); ok {
-			return slices.Contains(lister.MatterEvents(), id)
+	switch x := v.(type) {
+	case uint32:
+		return x
+	case uint16:
+		return uint32(x)
+	case uint8:
+		return uint32(x)
+	case uint64:
+		return uint32(x) //nolint:gosec // a FeatureMap is a map32; higher bits name no feature
+	case int:
+		if x < 0 {
+			return 0
 		}
-		return false
+		return uint32(x) //nolint:gosec // bounded above by the map32 FeatureMap type
 	default:
-		return false
+		return 0
 	}
 }
 
@@ -312,21 +316,12 @@ func globalList(srv contract.ClusterServer, attrID uint32) []uint32 {
 	return ids
 }
 
-func (f *topologyFacts) statedConditions(ep uint16) []string {
-	if e := f.byID[ep]; e != nil {
-		return e.DeviceConditions
-	}
-	return nil
-}
-
-// nodeConditions: CustomNetworkConfig, always — matter.js answers it for a
-// node that does not commission over BLE (ServerEndpointFacts
+// assembledNodeConditions: CustomNetworkConfig, always — matter.js answers
+// it for a node that does not commission over BLE (ServerEndpointFacts
 // nodeConditionsOf), and this module has no BLE.
-func (f *topologyFacts) nodeConditions(uint16) []string {
+func assembledNodeConditions(uint16) []string {
 	return []string{condCustomNetworkConfig}
 }
-
-func (f *topologyFacts) describe(ep uint16) string { return fmt.Sprintf("endpoint %d", ep) }
 
 // DeviceTypeValidationMode selects what [DeviceTypeValidator] does with a
 // violation: matter.js's `endpoint.validation` modes.

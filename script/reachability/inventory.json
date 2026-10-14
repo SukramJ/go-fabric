@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4889,
+  "entry_points": 4894,
   "entry_packages": [
     ".",
     "bdx",
@@ -187,9 +187,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11217,
-    "reachable": 7861,
-    "whitelisted": 3351,
+    "total_exported": 11226,
+    "reachable": 7865,
+    "whitelisted": 3356,
     "unreachable": 5
   },
   "by_package": [
@@ -15741,6 +15741,13 @@
     },
     {
       "package": "device",
+      "identifier": "TestEveryGeneratedFileIsRegistered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/registry_test.go",
+      "line": 45
+    },
+    {
+      "package": "device",
       "identifier": "TestEveryTypeConstructsAndConforms",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/conformance_test.go",
@@ -15773,6 +15780,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "device/types_gen_test.go",
       "line": 14
+    },
+    {
+      "package": "device",
+      "identifier": "TestLookup",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "device/registry_test.go",
+      "line": 18
     },
     {
       "package": "device",
@@ -16294,6 +16308,20 @@
     },
     {
       "package": "endpoint",
+      "identifier": "TestDeviceTypeSubjectSameVerdicts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_subject_test.go",
+      "line": 82
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestDeviceTypeSubjectUnknownShape",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_subject_test.go",
+      "line": 124
+    },
+    {
+      "package": "endpoint",
       "identifier": "TestDeviceTypeValidatorModes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/devicetype_validation_test.go",
@@ -16732,6 +16760,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/groups_mount_test.go",
       "line": 242
+    },
+    {
+      "package": "endpoint",
+      "identifier": "TestSubjectFactsTree",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "endpoint/devicetype_subject_test.go",
+      "line": 163
     },
     {
       "package": "endpoint",

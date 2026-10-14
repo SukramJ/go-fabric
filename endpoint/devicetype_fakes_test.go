@@ -107,6 +107,9 @@ func (f *fakeTree) supports(ep uint16, cluster uint32, element schema.Requiremen
 	return slices.Contains(f.eps[ep].elements[cluster][element], id)
 }
 
+// judgeable: a fake endpoint's shape is always known.
+func (f *fakeTree) judgeable(uint16, uint32, schema.RequirementElement) bool { return true }
+
 func (f *fakeTree) statedConditions(ep uint16) []string { return f.eps[ep].stated }
 func (f *fakeTree) nodeConditions(uint16) []string      { return f.node }
 func (f *fakeTree) describe(ep uint16) string           { return f.eps[ep].name }

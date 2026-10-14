@@ -16,8 +16,9 @@ import (
 // (packages/model/src/logic/device-types/DeviceTypeConformance.ts) with the
 // condition derivation of ConditionAssertions.ts and the endpoint facts of
 // ResolvedEndpoint.ts. Endpoints are identified by their id; dtFacts is
-// matter.js's DeviceTypeFacts, answered for an assembled Topology by
-// topologyFacts (devicetype_validation.go).
+// matter.js's DeviceTypeFacts, answered for every [DeviceTypeSubject] by
+// subjectFacts (devicetype_subject.go) — an assembled Topology's and a
+// client view's alike.
 //
 // What is judged, and how, is matter.js's docs/DEVICE_TYPE_VALIDATION.md:
 // mandatory and disallowed server and client clusters; the feature,
@@ -42,6 +43,11 @@ type dtFacts interface {
 	// supports reports whether ep's server cluster implements the
 	// attribute, command or event with that id.
 	supports(ep uint16, cluster uint32, element schema.RequirementElement, id uint32) bool
+	// judgeable reports whether a requirement of element nested in ep's
+	// server cluster can be judged: false while the cluster's FeatureMap,
+	// or the list the element is read from, is unknown — a client view
+	// still reading its peer (DeviceTypeSubject).
+	judgeable(ep uint16, cluster uint32, element schema.RequirementElement) bool
 	statedConditions(ep uint16) []string
 	nodeConditions(nodeEp uint16) []string
 	describe(ep uint16) string
@@ -654,6 +660,11 @@ func (c *dtContext) checkCluster(r *schema.DeviceTypeRequirement, side string) {
 		return
 	}
 	cluster := r.Referent.ID
+	// The features decide what the cluster's other elements require, so a
+	// cluster whose FeatureMap is not known yet is not judged inside.
+	if !c.p.facts.judgeable(c.facts.ep, cluster, schema.RequirementFeature) {
+		return
+	}
 	features := c.facts.featuresOf(cluster)
 	trueNames := map[string]bool{}
 	for n := range c.conditions {
@@ -665,7 +676,7 @@ func (c *dtContext) checkCluster(r *schema.DeviceTypeRequirement, side string) {
 	scope := reqScope{dt: c.scope, cluster: cluster, hasCluster: true}
 	for i := range r.Requirements {
 		nested := &r.Requirements[i]
-		if !nested.Referent.Resolved {
+		if !nested.Referent.Resolved || !c.p.facts.judgeable(c.facts.ep, cluster, nested.Element) {
 			continue
 		}
 		var held bool

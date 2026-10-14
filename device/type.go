@@ -153,6 +153,37 @@ func TypeByID(id uint16) (*Type, bool) {
 	return nil, false
 }
 
+// Lookup returns the generated device type of a device type id as the
+// Descriptor's DeviceTypeList carries it (a 32-bit devtype-id), or
+// (nil, false) for an id device/ does not generate: an id above 0xFFFF, a
+// manufacturer-specific or unknown one, and the snapshot device types
+// script/devicegen excludes (its excluded list: the camera family —
+// Camera, SnapshotCamera, AudioDoorbell, Intercom, Chime,
+// CameraController, VideoDoorbell, FloodlightCamera —, the media family —
+// BasicVideoPlayer, CastingVideoPlayer, ContentApp, CastingVideoClient —
+// and the infrastructure types ThreadBorderRouter,
+// NetworkInfrastructureManager, JointFabricAdministrator and
+// OtaProvider). It reads the generated registry (types_gen.go), so a
+// regeneration that commits a type makes Lookup find it.
+//
+// A client view resolves a remote endpoint's device type through it, as
+// matter.js's ClientStructure resolves it through the model
+// (packages/node/src/node/client/ClientStructure.ts:871,
+// this.#node.matter.deviceTypes(dt.deviceType)).
+func Lookup(id uint32) (*Type, bool) {
+	t, ok := typesByID[id]
+	return t, ok
+}
+
+// typesByID indexes the generated registry for [Lookup].
+var typesByID = func() map[uint32]*Type {
+	m := make(map[uint32]*Type, len(committedTypes))
+	for _, t := range committedTypes {
+		m[uint32(t.ID)] = t
+	}
+	return m
+}()
+
 // typeByName returns the generated device type named name, or nil.
 func typeByName(name string) *Type {
 	for _, t := range committedTypes {
