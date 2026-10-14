@@ -14019,14 +14019,14 @@
       "identifier": "TestCacheBuffered",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 195
+      "line": 196
     },
     {
       "package": "controller/client",
       "identifier": "TestCacheWriteThrough",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 161
+      "line": 162
     },
     {
       "package": "controller/client",
@@ -14068,14 +14068,14 @@
       "identifier": "TestMemoryStore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 257
+      "line": 258
     },
     {
       "package": "controller/client",
       "identifier": "TestMemoryStoreConcurrent",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 293
+      "line": 301
     },
     {
       "package": "controller/client",
@@ -14103,7 +14103,7 @@
       "identifier": "TestSettingsRoundTrip",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/cache_internal_test.go",
-      "line": 317
+      "line": 325
     },
     {
       "package": "controller/client",

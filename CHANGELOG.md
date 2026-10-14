@@ -81,6 +81,14 @@ pseudo-version of `main`.
   the bridge's group-message routing and the root GroupKeyManagement
   share one state.
 
+### Changed
+
+- `controller/client.Store` gains `NodeIDs() ([]string, error)` — the ids
+  of the nodes the store holds, sorted (matter.js
+  `ClientNodeStores.knownIds`); `client.MemoryStore` implements it. The
+  interface is unreleased, so no deprecation window applies; a host
+  `Store` adds the method.
+
 ### Fixed
 
 - The node facade's PASE and CASE responders advertise the TCP roles of
