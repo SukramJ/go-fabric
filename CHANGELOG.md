@@ -81,6 +81,18 @@ pseudo-version of `main`.
   the bridge's group-message routing and the root GroupKeyManagement
   share one state.
 
+- `controller/client/sqlstore` (ADR 0020, stage 4; brief AL §8): the first
+  durable `client.Store`, on SQLite (`modernc.org/sqlite`, no new
+  dependency). `sqlstore.New(db)` over the tables `matter_client_values`
+  (one TLV value per node, endpoint, cluster and attribute) and
+  `matter_client_versions` (one row per stored cluster, its DataVersion or
+  NULL); `Save` is one transaction and keeps `client.MemoryStore`'s
+  contract (a nil value deletes its key, a nil version clears the stored
+  one). The schema ships as `store/` ships the device's: `Schema()`,
+  `Apply(ctx, db)`, `Upgrade`, `Migrations()` (one step, `v1`) and
+  `SchemaFingerprint(ctx, db)`, its own list, so a device-side host's pin on
+  `len(store.Migrations())` does not move.
+
 ### Changed
 
 - `controller/client.Store` gains `NodeIDs() ([]string, error)` — the ids
