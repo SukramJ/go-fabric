@@ -14,7 +14,9 @@
 //
 //   - application clusters, grouped by the device surface they serve
 //     rather than one subpackage per cluster: closure/, cover/, light/,
-//     lock/, measurement/, thermo/, wire/. PowerSource lives in
+//     lock/, measurement/, media/, thermo/, wire/. media/ wraps the
+//     generated media and content definitions (ADR 0022) in typed host
+//     ports; Messages, fabric-scoped, is core-held. PowerSource lives in
 //     measurement/ with the other metering clusters, not in core/ — the
 //     core-package variant was a duplicate and was removed (see
 //     notes/parity/by_design.md, "Removed" table).

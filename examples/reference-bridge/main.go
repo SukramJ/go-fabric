@@ -89,7 +89,7 @@ type flags struct {
 	passcode, discriminator                    uint
 	iterations                                 int
 	advertise, osHostName, otaHarness, wifi    bool
-	otaProvider                                bool
+	otaProvider, media                         bool
 }
 
 func parseFlags() flags {
@@ -112,6 +112,7 @@ func parseFlags() flags {
 	flag.BoolVar(&f.otaProvider, "ota-provider", false, "TESTING ONLY: serve one embedded test OTA image (software version 2 of the test vendor/product) from an OtaProvider endpoint, consent granted unless the app pipe withholds it; see ota_provider.go")
 	flag.StringVar(&f.dcl, "dcl", "off", "prod, testnet or off: look the --ota-provider image up in the CSA Distributed Compliance Ledger (sends the requestor's vendor/product id and the offered version to the ledger); see dcl.go")
 	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
+	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
 	flag.Parse()
 	return f
 }
@@ -237,6 +238,12 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 				OTAImageSource: images, versions: &dcl.OTAVersions{Client: ledger, Logger: logger},
 				image: func(string) []byte { return images.image }, logger: logger,
 			}
+		}
+	}
+	if f.media {
+		// The video player and content app (media.go), TESTING ONLY.
+		if devices.media, err = newDemoMedia(logger); err != nil {
+			return err
 		}
 	}
 	n, err := assemble(ctx, devices, cfg, applier)

@@ -270,6 +270,12 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	if flags["wifi"] {
 		args = append(args, "--wifi")
 	}
+	// --media adds the video player and content app the media families run
+	// against (examples/reference-bridge/media.go, ADR 0022); every daemon
+	// carries it for the same reason it carries --wifi.
+	if flags["media"] {
+		args = append(args, "--media")
+	}
 	// On a host whose LAN interfaces have no IPv6, the MAC-derived SRV
 	// target carries only IPv4 address records, and the image's chip-tool
 	// resolves operational nodes over IPv6 only. The OS host name's
