@@ -13,6 +13,10 @@ package main
 // wave 5 (ADR 0019), and the eleven controller device types ADR 0020's
 // stage 5 takes in (brief AO): their client clusters are what the binding
 // manager selects for a Binding entry. Sorted by name.
+// wave 5 (ADR 0019), SecondaryNetworkInterface, which concept v2 §B.4
+// takes in with the WiFiNetworkDiagnostics server (brief AM), and
+// OtaProvider, which ADR 0021 takes in with the OTA Software Update
+// Provider server (brief AQ). Sorted by name.
 var committed = []string{
 	"Aggregator",
 	"AirPurifier",
@@ -62,6 +66,7 @@ var committed = []string{
 	"OnOffLightSwitch",
 	"OnOffPlugInUnit",
 	"OnOffSensor",
+	"OtaProvider",
 	"OtaRequestor",
 	"Oven",
 	"PowerSource",
@@ -109,11 +114,11 @@ var excluded = map[string]string{
 	"BasicVideoPlayer":   "F.3 media device types",
 	"CastingVideoPlayer": "F.3 media device types",
 	"ContentApp":         "F.3 media device types",
-	// Infrastructure: F.2 Thread, Joint Fabric or OTA provider.
+	// Infrastructure: F.2 Thread or Joint Fabric. OtaProvider left the
+	// group with ADR 0021.
 	"ThreadBorderRouter":           "F.3 infrastructure",
 	"NetworkInfrastructureManager": "F.3 infrastructure",
 	"JointFabricAdministrator":     "F.3 infrastructure",
-	"OtaProvider":                  "F.3 infrastructure",
 	// Camera / media by their mandatory requirements (owner's decision,
 	// 2026-10-11), read from parity/schema.json effective.requirements:
 	// VideoDoorbell and FloodlightCamera mandate a Camera component

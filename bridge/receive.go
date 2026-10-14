@@ -257,6 +257,11 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	if b.deliverInitiatedSecure(&hdr, proto, payload) {
 		return nil
 	}
+	// A message the peer sends as the initiator of a BDX exchange goes to
+	// the attached BDX responder (bdx_responder.go).
+	if b.deliverRespondedBDX(ctx, &hdr, proto, payload) {
+		return nil
+	}
 
 	switch proto.ProtocolID {
 	case im.InteractionModelProtocolID:

@@ -305,45 +305,6 @@ connectedhomeip's `Dnssd.cpp` would emit (`cmd/openccu-loom/daemon.go`).
 audit does not re-flag it (parity audit 2026-05-30 CHIP-mDNS F2). The wire
 diff that motivated it should be attached when next reproduced.
 
-### BD-Matter-OTAProvider-NotExposed — the OTA Software Update Provider cluster is not exposed
-
-The bridge does not expose the OTA Software Update **Provider** cluster
-(0x0029). The **Requestor** cluster server (0x002A) is a full port since #49
-([ADR 0019](../../docs/adr/0019-tcp-bdx-and-the-ota-requestor.md),
-`BD-Matter-OTARequestor-OnSpecInstance`), and the reference daemon mounts
-it on the root; the reference host's note that it was "intentionally NOT
-mounted" (`cmd/openccu-loom/daemon_matter.go` buildRootClusters) predates
-that and records the host's choice, not the module's.
-
-**Rationale (verified against the gold standard, 2026-07):**
-- matter.js **defines** the Provider cluster and an `OtaProvider` device
-  type (`../matter.js/packages/model/src/standard/elements/ota-provider.element.ts:13`
-  — id 0x14) but **composes it on no endpoint**: neither
-  `packages/node/src/endpoints/root.ts` nor
-  `packages/node/src/devices/aggregator.ts` lists cluster 0x0029, and
-  `packages/node/src/devices/` ships no OTA-provider device. There is no
-  gold-standard endpoint composition to mirror.
-  home-assistant-matter-bridge does not expose it either.
-- The Provider cluster is mandatory on the OtaProvider device type (0x14),
-  **not** on the RootNode (0x0016) or Aggregator (0x000E) device types loom
-  composes. Mounting 0x0029 on the RootNode makes Apple Home's HAP mapper
-  reject the node as schematically inconsistent (the reference host's
-  reason for leaving 0x002A unmounted as well; the reference daemon lists
-  the OtaRequestor device type on the root since #49, and whether Apple
-  Home accepts that is on `docs/open-items.md` §4, not yet proven against
-  a real controller).
-- A bridge has **no Matter-OTA consumer** for the Provider role: HomeMatic
-  devices update through the CCU, and the daemon updates via its Docker /
-  GoReleaser channel. A Provider that only ever answers `QueryImage` with
-  `NotAvailable` would serve no controller.
-
-Implementing an unreachable, never-invoked responder (plus its dead
-QueryImageResponse / ApplyUpdateResponse TLV encoders) would add code no
-wire path exercises — exactly the silent stub the matter-parity rule
-forbids. Re-open only if loom takes on the OtaProvider device-class role on
-a dedicated device-type-0x14 endpoint, which is out of scope. The cluster
-IDs / command shapes are recorded in the A1 plan for that future work.
-
 ### BD-Matter-ButtonPressCycleFromDiscreteFrames — Switch (0x003B) events from discrete CCU frames, not a position stream
 
 matter.js derives Switch (0x003B) events from a continuous currentPosition
@@ -1325,16 +1286,6 @@ The same reasoning covers the sibling MRP keys **SII and SAI** on both the opera
 
 ---
 
-### BD-chip-DiagLogs-NoBDX — DiagnosticLogs cluster does not initiate BDX transfers
-
-**chip reference:** `src/app/clusters/diagnostic-logs-server/DiagnosticLogsServer.cpp` — checks `TransferProtocol == BDX` and starts a BDX session.
-
-**Go path:** `cluster/core/diagnostic_logs.go:67-181` — `decodeRetrieveLogsIntent` extracts only the `intent` field; `RequestedProtocol` is not examined. When `BDX` is requested, the handler falls back to inline log delivery with `LogStatusExhausted`.
-
-**Rationale:** BDX (Bulk Data Exchange) is used by enterprise diagnostic tools and certification test suites. No production Matter controller (Apple Home, Google Home, chip-tool interop) requests BDX for bridge diagnostic logs. Implementing BDX upload requires a full BDX initiator session (separate exchange ID, block ack protocol, connection-oriented flow control) which is a non-trivial effort with no concrete deployment need in 0.1.0. The spec permits `LogStatusDenied` for devices that do not support BDX; returning `LogStatusExhausted` with inline content is a graceful fallback that satisfies chip-tool's `62 PASS` baseline. No Apple-reject risk.
-
----
-
 ### BD-chip-ICD-Attrs-0x3-0x5 — ICDManagement attributes 0x0003–0x0005 not implemented
 
 **chip reference:** `src/app/clusters/icd-management-server/ICDManagementServer.cpp` — implements `RegisteredClients` (0x0003), `ICDCounter` (0x0004), `ClientsSupportedPerFabric` (0x0005).
@@ -1552,6 +1503,43 @@ the same stable key inherits the stored list, as labels do. Report AP.
 By design. The settings table is the module's one durable seam for
 per-endpoint state; a write the store cannot hold is refused rather than
 held in memory alone.
+
+### BD-Matter-OTAProvider-HostPorts — the OTA provider decides images, consent and apply through host ports, not a software-update manager
+
+matter.js's `OtaSoftwareUpdateProviderServer` (`packages/node/src/behaviors/ota-software-update-provider/OtaSoftwareUpdateProviderServer.ts`
+at `0ceb202d`) is welded to a `SoftwareUpdateManager` that validates the
+requestor's BasicInformation, consults the DCL and queues consent
+(`:66-71` the four consent states, `:248-273`, `:504-509`).
+`core.OTAProvider` keeps the server's statuses, timers and responses
+(the 32-byte token, the 86 400 s DelayedActionTime cap, Busy with the
+2-minute retry, the 15-minute stale entry, `BdxSynchronous` with the
+5-minute idle timeout, Discontinue without consent) and asks three host
+ports — `OTAImageSource`, `OTAConsent`, `OTAApplyPolicy` — for what the
+manager decides; the apply policy may also answer AwaitNextAction or
+Discontinue, which matter.js never does once consent holds. The provider
+sits on its own OtaProvider endpoint beside the Aggregator
+(`endpoints/ota-provider.ts:57-64` defines the type, not its place).
+Report AQ.
+
+By design (ADR 0021). A bridge host owns its images and its consent
+flow; no DCL in this module.
+
+### BD-chip-DiagLogs-BDX — DiagnosticLogs serves BDX as chip does, with one EndLogCollection and the pinned image's manual case
+
+matter.js has no DiagnosticLogs server (`DiagnosticLogsServer.ts:9-14`
+at `0ceb202d`, an empty class); chip's `diagnostic-logs-server` at the
+harness pin is the reference: the BDX initiator and sender on the
+requesting session, Exhausted when the log fits the response, Denied on
+a provider failure, Busy during a transfer, InvalidCommand without a
+designator, ConstraintError above 32 characters, the oldest entry's
+timestamps on Success. `core.DiagnosticLogs` mirrors it line by line
+with two differences: `EndLogCollection` is called once at the end of
+the transfer where chip calls it twice (`BDXDiagnosticLogsProvider.cpp:194`,
+`:282`), and the one DLOG case stays manual because the automated
+`TC_DLOG_2_1.py` exists only after the pinned image. Report AQ.
+
+By design (ADR 0021). The second EndLogCollection is a chip quirk with
+no observable effect; the pin moves on its own schedule.
 
 ### BD-Matter-KeySetReadAllIndicesOrder — key set ids listed in id order
 

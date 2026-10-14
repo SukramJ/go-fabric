@@ -811,6 +811,19 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 	} else if !refusesFixture("OnOffSensor") {
 		t.Errorf("OnOffSensor: %v", err)
 	}
+	if _, err := NewOtaProvider(Options{}); err == nil {
+		t.Error("OtaProvider: constructed without a StableKey")
+	}
+	if d, err := NewOtaProvider(testOptions("OtaProvider"), testWith(t, "OtaProvider")...); err == nil {
+		if d.Type() != &OtaProviderType {
+			t.Errorf("OtaProvider: type %v", d.Type().Name)
+		}
+		if s := d.OtaSoftwareUpdateProvider(); d.Server(0x0029) == nil || s != nil && d.Server(0x0029) != s {
+			t.Error("OtaProvider: mandatory OtaSoftwareUpdateProvider not mounted")
+		}
+	} else if !refusesFixture("OtaProvider") {
+		t.Errorf("OtaProvider: %v", err)
+	}
 	if _, err := NewOtaRequestor(Options{}); err == nil {
 		t.Error("OtaRequestor: constructed without a StableKey")
 	}

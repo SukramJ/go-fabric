@@ -159,6 +159,12 @@
 //     every former subscription; the controllers then recover through
 //     their liveness timeout, as without a store. This narrow initiator
 //     is the only one in the module (docs/adr/0008).
+//   - AttachBDXResponder — fails closed. The responder (a *bdx.Responder)
+//     serves the BDX exchanges a peer opens on a secure session — an OTA
+//     requestor's ReceiveInit for the image a provider offered — on the
+//     session the *Init arrived on. Without one such an exchange is
+//     acknowledged and dropped as a protocol without a handler
+//     ([ErrUnknownProtocol]), and a requestor's download fails.
 //   - AttachDiagnosticEvents makes [Bridge.DiagnosticEvents] non-empty.
 //   - SetOnReassembled, SetOnFabricAdded and SetOnFabricRemoved are
 //     nil-safe observer hooks.
@@ -662,6 +668,10 @@ type Bridge struct {
 	// of former subscriptions after a restart (docs/adr/0008). See
 	// subscription_persistence.go and subscription_reestablish.go.
 	resumption resumptionState
+
+	// bdx routes the BDX exchanges peers open to the attached responder
+	// (bdx_responder.go).
+	bdx bdxRouting
 
 	// chunkStatusResponseTimeoutOverride pins the per-chunk
 	// StatusResponse wait bound ([Bridge.chunkStatusResponseTimeout])
