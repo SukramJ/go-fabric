@@ -3,6 +3,7 @@
 - **Status**: Accepted (2026-10-11; wave 5 of
   [`../concept-matter-1.6.1-and-device-layer.md`](../concept-matter-1.6.1-and-device-layer.md), phase 3)
 - **Date**: 2026-10-11
+- **Superseded in part** by [ADR 0021](./0021-ota-provider-and-diagnosticlogs-over-bdx.md) (2026-10-14): the OTA provider enters the scope and DiagnosticLogs serves BDX; the rest stands.
 - **Related**:
   [ADR 0008 — subscription resumption (the narrow CASE initiator)](./0008-subscription-resumption.md),
   [ADR 0011 — certifiability is a goal](./0011-certifiability-is-a-goal.md),

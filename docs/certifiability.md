@@ -512,8 +512,11 @@ The OTA Software Update Requestor is mounted since #49 (ADR 0019) and its
 automated SU cases run. The image lists
 the DLOG case, the BIND cases and the SU YAML cases as manual, so the
 status block records them as class (c); on substance BIND tests the binding
-client (`BIND.C`, a controller-side role, (d)), and the SU provider cases an
-OTA provider (b). BDX shipped with the OTA requestor in `v0.3.0` (ADR 0019),
+client (`BIND.C`, a controller-side role, (d) — proven in-repo since wave 21), and the SU provider cases an
+OTA provider (b — built in wave 23, ADR 0021; the cases stay manual YAML, the
+in-repo proof is the module's requestor downloading from the module's
+provider; the DLOG case stays manual at the pinned image although the
+server now transfers over BDX). BDX shipped with the OTA requestor in `v0.3.0` (ADR 0019),
 but that is the receiving side; DLOG needs the sending side. A
 RetrieveLogsRequest that asks for BDX with a `TransferFileDesignator` is
 still answered inline (`cluster/core/diagnostic_logs.go`,
