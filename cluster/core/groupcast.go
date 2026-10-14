@@ -41,6 +41,7 @@ const (
 
 	// Feature bits: Listener (LN) 0, Sender (SD) 1, PerGroup (PGA) 2.
 	groupcastFeatureListener uint32 = 1 << 0
+	groupcastFeatureSender   uint32 = 1 << 1
 	groupcastFeaturePerGroup uint32 = 1 << 2
 
 	// MaxMembershipCount / MaxMcastAddrCount: matter.js GroupcastServer
@@ -181,9 +182,10 @@ type GroupcastConfig struct {
 // Groupcast is the Groupcast cluster server of the root endpoint, the
 // counterpart of matter.js packages/node/src/behaviors/groupcast/
 // GroupcastServer.ts as ServerNode.RootEndpoint installs it — with the
-// Listener and PerGroup features but without Sender (see
-// notes/parity/by_design.md BD-Matter-GroupcastNoSender): this node
-// receives group messages and originates none.
+// Listener, Sender and PerGroup features (GroupcastServer.ts:81-83): the
+// node receives group messages for its member endpoints and keeps
+// sender-only memberships for the groups it sends to
+// ([groups.Manager.Sender]).
 //
 // It keeps no group state of its own. Membership is derived from the
 // shared [groups.Manager] (Groupcast properties, group table, GroupKeyMap),
@@ -310,8 +312,12 @@ func (g *Groupcast) SetEndpoint(endpoint uint16) {
 	g.mu.Unlock()
 }
 
-// featureMap is Listener | PerGroup.
-func (*Groupcast) featureMap() uint32 { return groupcastFeatureListener | groupcastFeaturePerGroup }
+// featureMap is Listener | Sender | PerGroup — matter.js
+// GroupcastBehavior.with("Listener", "Sender", "PerGroup")
+// (GroupcastServer.ts:81-83).
+func (*Groupcast) featureMap() uint32 {
+	return groupcastFeatureListener | groupcastFeatureSender | groupcastFeaturePerGroup
+}
 
 // MatterRead implements [contract.ClusterServer]. A read without an IM
 // request behind it is a local one and sees Membership whole.
@@ -537,8 +543,10 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 		return err
 	}
 
-	// The group table must take a new group and GroupKeyMap the binding;
-	// both refusals are known before anything changes.
+	// The group table must take a new group — when the join leaves it an
+	// endpoint: an empty target writes nothing there (sender-only,
+	// GroupcastServer.ts:268-277) — and GroupKeyMap the binding; both
+	// refusals are known before anything changes.
 	table, err := g.groups.GroupTable(ctx, fabric)
 	if err != nil {
 		return fmt.Errorf("matter: Groupcast.JoinGroup: %w", err)
@@ -549,7 +557,7 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 			name, inTable = e.GroupName, true
 		}
 	}
-	if !inTable && len(table) >= g.groups.MaxGroupsPerFabric() {
+	if !inTable && len(joinTarget(req, existing.Endpoints)) > 0 && len(table) >= g.groups.MaxGroupsPerFabric() {
 		return groupcastErr(im.StatusResourceExhausted, "Too many groups for fabric %d, maximum is %d", fabric, g.groups.MaxGroupsPerFabric())
 	}
 	if err := g.gkm.checkGroupKeyMapping(ctx, fabric, req.GroupID); err != nil {
@@ -571,8 +579,9 @@ func (g *Groupcast) joinGroup(ctx context.Context, fabric uint8, req JoinGroupRe
 // validateJoin applies the model constraints and the request checks of
 // JoinGroup in matter.js's order: GroupId and KeySetId "min 1", Key "16",
 // the MulticastAddrPolicyEnum values, then the GroupId range, Administer
-// for a key or UseAuxiliaryAcl, the endpoint ids, and — without the Sender
-// feature — a non-empty endpoint list.
+// for a key or UseAuxiliaryAcl and the endpoint ids. An empty endpoint
+// list is legal: with the Sender feature it joins the group sender-only
+// (GroupcastServer.ts:206-209 refuses it only without Sender).
 func (g *Groupcast) validateJoin(ctx context.Context, req JoinGroupRequest) error {
 	if req.GroupID < 1 || req.KeySetID < 1 || (req.Key != nil && len(req.Key) != groupcastKeyLength) {
 		return groupcastErr(im.StatusConstraintError, "JoinGroup: GroupId and KeySetId must be at least 1, Key 16 bytes")
@@ -593,10 +602,23 @@ func (g *Groupcast) validateJoin(ctx context.Context, req JoinGroupRequest) erro
 			return groupcastErr(im.StatusUnsupportedEndpoint, "Endpoint %d is invalid", ep)
 		}
 	}
-	if len(req.Endpoints) == 0 {
-		return groupcastErr(im.StatusConstraintError, "Empty endpoint list requires Sender feature")
-	}
 	return nil
+}
+
+// joinTarget is the endpoint set a JoinGroup leaves the group with: the
+// request's endpoints with ReplaceEndpoints, else the current ones merged
+// with them. Mirrors GroupcastServer.ts:268.
+func joinTarget(req JoinGroupRequest, current []uint16) []uint16 {
+	if req.ReplaceEndpoints != nil && *req.ReplaceEndpoints {
+		return req.Endpoints
+	}
+	target := slices.Clone(current)
+	for _, ep := range req.Endpoints {
+		if !slices.Contains(target, ep) {
+			target = append(target, ep)
+		}
+	}
+	return target
 }
 
 // checkJoinCapacity applies the membership limits — per fabric
@@ -631,7 +653,10 @@ func checkJoinCapacity(ms []groups.GroupcastMembership, fabric uint8, groupID ui
 // merged with the current ones, or replacing them with ReplaceEndpoints.
 // The new endpoints join before the dropped ones leave, so a replace never
 // empties the group on the way (which would prune its properties); the end
-// state is the one matter.js's remove-then-add produces.
+// state is the one matter.js's remove-then-add produces. A replace with an
+// empty list does empty it, and keeps it sender-only: matter.js marks it
+// retainedSenderOnly (GroupcastServer.ts:269, :290-292) so the
+// groupTable$Changed prune spares its properties.
 func (g *Groupcast) mirrorEndpoints(ctx context.Context, fabric uint8, req JoinGroupRequest, current []uint16, name string) error {
 	for _, ep := range req.Endpoints {
 		if err := g.groups.AddEndpointForGroup(ctx, fabric, req.GroupID, ep, name); err != nil {
@@ -641,11 +666,18 @@ func (g *Groupcast) mirrorEndpoints(ctx context.Context, fabric uint8, req JoinG
 	if req.ReplaceEndpoints == nil || !*req.ReplaceEndpoints {
 		return nil
 	}
+	keepsSenderOnly := len(req.Endpoints) == 0 && len(current) > 0
 	for _, ep := range current {
 		if slices.Contains(req.Endpoints, ep) {
 			continue
 		}
-		if _, err := g.groups.RemoveEndpoint(ctx, fabric, ep, req.GroupID, false); err != nil {
+		var err error
+		if keepsSenderOnly {
+			_, err = g.groups.RemoveEndpointRetainingSender(ctx, fabric, ep, req.GroupID)
+		} else {
+			_, err = g.groups.RemoveEndpoint(ctx, fabric, ep, req.GroupID, false)
+		}
+		if err != nil {
 			return g.groupStateErr("JoinGroup", err)
 		}
 	}
@@ -726,14 +758,20 @@ func (g *Groupcast) leaveGroup(ctx context.Context, fabric uint8, req LeaveGroup
 	return LeaveGroupResponse{GroupID: req.GroupID, Endpoints: removed}, nil
 }
 
-// leave withdraws the requested endpoints, or all of them, from one group;
-// a group left without an endpoint is removed with its binding and its
-// properties (no Sender feature to keep it sender-only). Mirrors matter.js
-// GroupcastServer #leave.
+// leave withdraws the requested endpoints, or all of them, from one group.
+// Without an endpoint list the group is removed with its binding and its
+// properties; a list that removes the last endpoint keeps the group as a
+// sender-only member (the Sender feature's kKeepGroupIfEmpty). Mirrors
+// matter.js GroupcastServer #leave (GroupcastServer.ts:328-369): :340-342
+// all endpoints and the entry; :344-351 the listed ones, the group kept
+// sender-only when none remains and one was removed; :354-358 its
+// properties written first, with the entry's policy, so a group the Groups
+// cluster created stays a member; :359-366 the removals.
 func (g *Groupcast) leave(ctx context.Context, fabric uint8, entry groups.GroupcastMembership, req LeaveGroupRequest) ([]uint16, error) {
 	var (
-		removed      []uint16
-		entryRemoved bool
+		removed         []uint16
+		entryRemoved    bool
+		keepsSenderOnly bool
 	)
 	if !req.HasEndpoints {
 		removed = slices.Clone(entry.Endpoints)
@@ -745,10 +783,22 @@ func (g *Groupcast) leave(ctx context.Context, fabric uint8, entry groups.Groupc
 			}
 		}
 		remaining := slices.DeleteFunc(slices.Clone(entry.Endpoints), func(ep uint16) bool { return slices.Contains(req.Endpoints, ep) })
-		entryRemoved = len(remaining) == 0
+		keepsSenderOnly = len(remaining) == 0 && len(removed) > 0
+	}
+	if keepsSenderOnly {
+		policy := entry.McastAddrPolicy
+		if err := g.groups.SetGroupProperties(ctx, fabric, entry.GroupID, &policy, nil); err != nil {
+			return nil, g.groupStateErr("LeaveGroup", err)
+		}
 	}
 	for _, ep := range removed {
-		if _, err := g.groups.RemoveEndpoint(ctx, fabric, ep, entry.GroupID, false); err != nil {
+		var err error
+		if keepsSenderOnly {
+			_, err = g.groups.RemoveEndpointRetainingSender(ctx, fabric, ep, entry.GroupID)
+		} else {
+			_, err = g.groups.RemoveEndpoint(ctx, fabric, ep, entry.GroupID, false)
+		}
+		if err != nil {
 			return nil, g.groupStateErr("LeaveGroup", err)
 		}
 	}
@@ -803,18 +853,15 @@ func (g *Groupcast) configureAuxiliaryACL(ctx context.Context, fabric uint8, req
 	return nil
 }
 
-// groupcastTesting mirrors matter.js GroupcastServer.groupcastTesting:
-// DisableTesting clears FabricUnderTest; EnableListenerTesting puts the
-// accessing fabric under test for DurationSeconds (60 by default, 452d6f5c)
-// and reports every received group message as a GroupcastTesting event
-// meanwhile. EnableSenderTesting is not a value this server's enum allows
-// (conformance SD) and answers ConstraintError, as matter.js's conformance
-// validation does.
+// groupcastTesting mirrors matter.js GroupcastServer.groupcastTesting
+// (GroupcastServer.ts:405-431): DisableTesting clears FabricUnderTest;
+// EnableListenerTesting and EnableSenderTesting alike put the accessing
+// fabric under test for DurationSeconds (60 by default, :79) and report
+// every received group message as a GroupcastTesting event meanwhile. The
+// sender side of the event (messages this node sends) is not reported.
 func (g *Groupcast) groupcastTesting(fabric uint8, req GroupcastTestingRequest) error {
 	switch req.TestOperation {
-	case groupcastTestingDisable, groupcastTestingEnableListener:
-	case groupcastTestingEnableSender:
-		return groupcastErr(im.StatusConstraintError, "EnableSenderTesting requires the Sender feature")
+	case groupcastTestingDisable, groupcastTestingEnableListener, groupcastTestingEnableSender:
 	default:
 		return groupcastErr(im.StatusConstraintError, "TestOperation %d is no GroupcastTestingEnum value", req.TestOperation)
 	}

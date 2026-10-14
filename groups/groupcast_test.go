@@ -178,6 +178,50 @@ func TestGroupLeavingTheTableLosesItsProperties(t *testing.T) {
 	}
 }
 
+// TestGroupRetainedSenderOnly pins the retainedSenderOnly mark of
+// GroupcastServer (GroupcastServer.ts:631-646): a removal that keeps the
+// group sender-only leaves its properties, so it stays a Membership entry
+// without endpoints, without an auxiliary ACL entry and without a
+// multicast membership to receive on; a later plain removal of a re-added
+// endpoint prunes it again.
+func TestGroupRetainedSenderOnly(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	m, _ := newTestManager(t)
+	if err := m.AddEndpointForGroup(ctx, 1, 0x0101, 3, "kitchen"); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SetGroupProperties(ctx, 1, 0x0101, ptr(PolicyPerGroup), ptr(true)); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := m.RemoveEndpointRetainingSender(ctx, 1, 3, 0x0101); err != nil || !ok {
+		t.Fatalf("RemoveEndpointRetainingSender = %v, %v", ok, err)
+	}
+	got, _ := m.GroupcastMemberships(ctx)
+	if len(got) != 1 || len(got[0].Endpoints) != 0 || got[0].McastAddrPolicy != PolicyPerGroup || !got[0].HasAuxiliaryACL {
+		t.Fatalf("sender-only membership = %+v", got)
+	}
+	if acl, _ := m.AuxiliaryACL(ctx, 1); len(acl) != 0 {
+		t.Errorf("auxiliary ACL of a sender-only group: %+v", acl)
+	}
+	if ms, _ := m.Memberships(ctx); len(ms) != 0 {
+		t.Errorf("multicast memberships of a sender-only group: %+v", ms)
+	}
+	if table, _ := m.GroupTable(ctx, 1); len(table) != 0 {
+		t.Errorf("group table: %+v", table)
+	}
+	// Re-added, then removed without the mark: deleted (kDeleteGroupIfEmpty).
+	if err := m.AddEndpointForGroup(ctx, 1, 0x0101, 4, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.RemoveEndpoint(ctx, 1, 4, 0x0101, false); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := m.GroupcastMemberships(ctx); len(got) != 0 {
+		t.Fatalf("after an external removal: %+v", got)
+	}
+}
+
 // TestAuxiliaryACLEntries pins GroupcastServer #emitAuxAcl: one Operate
 // Group entry per member with HasAuxiliaryAcl and listener endpoints, the
 // group id its subject and its endpoints the targets.

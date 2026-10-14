@@ -201,9 +201,10 @@ func TestGroupcastMalformedPayloadsOverTheWire(t *testing.T) {
 		"GroupcastTesting TestOperation not an integer": {0x05, func(enc *tlv.Encoder) {
 			enc.PutBool(tlv.ContextTag(0), true)
 		}, im.StatusInvalidCommand},
+		// The Sender feature makes EnableSenderTesting a legal value.
 		"GroupcastTesting EnableSenderTesting": {0x05, func(enc *tlv.Encoder) {
 			enc.PutUint(tlv.ContextTag(0), 2)
-		}, im.StatusConstraintError},
+		}, im.StatusSuccess},
 		"GroupcastTesting DurationSeconds overflow": {0x05, func(enc *tlv.Encoder) {
 			enc.PutUint(tlv.ContextTag(0), 1)
 			enc.PutUint(tlv.ContextTag(1), 0x1_0000)

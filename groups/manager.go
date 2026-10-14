@@ -583,6 +583,24 @@ func (m *Manager) AddEndpointForGroup(ctx context.Context, fabricIndex uint8, gr
 // A group whose last endpoint leaves is removed. Mirrors matter.js
 // GroupKeyManagementServer.removeEndpoint.
 func (m *Manager) RemoveEndpoint(ctx context.Context, fabricIndex uint8, endpoint, groupID uint16, all bool) (bool, error) {
+	return m.removeEndpoint(ctx, fabricIndex, endpoint, groupID, all, false)
+}
+
+// RemoveEndpointRetainingSender removes endpoint from groupID as
+// [Manager.RemoveEndpoint] does, except that a group losing its last
+// endpoint keeps its Groupcast properties and so stays a sender-only
+// member of the Groupcast Membership list — the Sender feature's
+// kKeepGroupIfEmpty. The Groupcast server uses it where matter.js
+// GroupcastServer marks a group retainedSenderOnly (JoinGroup emptying a
+// group's endpoints, GroupcastServer.ts:262-292; LeaveGroup removing the
+// last endpoint, :346-357), a mark the groupTable$Changed prune consumes
+// instead of deleting the group (:631-646). Here the prune runs inside the
+// removal, so the mark is this call.
+func (m *Manager) RemoveEndpointRetainingSender(ctx context.Context, fabricIndex uint8, endpoint, groupID uint16) (bool, error) {
+	return m.removeEndpoint(ctx, fabricIndex, endpoint, groupID, false, true)
+}
+
+func (m *Manager) removeEndpoint(ctx context.Context, fabricIndex uint8, endpoint, groupID uint16, all, retainSender bool) (bool, error) {
 	m.mu.Lock()
 	f, err := m.fabricLocked(ctx, fabricIndex)
 	if err != nil {
@@ -620,9 +638,9 @@ func (m *Manager) RemoveEndpoint(ctx context.Context, fabricIndex uint8, endpoin
 			// GroupcastServer #handleGroupTableChanged /
 			// #applyPendingAndDerive prune the groupProperties of a group
 			// that left the group table (CHIP kDeleteGroupIfEmpty) unless
-			// a Groupcast command kept it sender-only — which needs the
-			// Sender feature this module does not advertise.
-			if _, ok := f.props[id]; ok {
+			// a Groupcast command kept it sender-only (retainSender, the
+			// retainedSenderOnly mark).
+			if _, ok := f.props[id]; ok && !retainSender {
 				if err := m.st.RemoveGroupcastGroup(ctx, fabricIndex, id); err != nil {
 					m.mu.Unlock()
 					return existing, fmt.Errorf("groups: remove groupcast group %d: %w", id, err)

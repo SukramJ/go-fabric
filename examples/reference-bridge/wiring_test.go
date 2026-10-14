@@ -148,7 +148,7 @@ func partsList(t *testing.T, ep *endpoint.Endpoint) []uint16 {
 
 // TestRootMountsGroupcastWithTheAuxiliaryACL: the bridged lights and plugs
 // require the RootNode GroupcastListenerCond in Matter 1.6.1, so the root
-// mounts Groupcast — Listener and PerGroup — and AccessControl advertises
+// mounts Groupcast — Listener, Sender and PerGroup — and AccessControl advertises
 // the Auxiliary feature the Listener feature needs (matter.js
 // ServerNode.RootEndpoint: GroupcastServer + AccessControlServer.with(
 // "Extension", "Auxiliary")). The Descriptor's ServerList names it.
@@ -163,8 +163,8 @@ func TestRootMountsGroupcastWithTheAuxiliaryACL(t *testing.T) {
 			}
 		}
 	}
-	if fm, ok := features[mattercore.GroupcastClusterID]; !ok || fm != 0x5 {
-		t.Errorf("Groupcast FeatureMap = %#x (mounted %v), want Listener|PerGroup 0x5", fm, ok)
+	if fm, ok := features[mattercore.GroupcastClusterID]; !ok || fm != 0x7 {
+		t.Errorf("Groupcast FeatureMap = %#x (mounted %v), want Listener|Sender|PerGroup 0x7", fm, ok)
 	}
 	if fm := features[0x001F]; fm != 0x5 {
 		t.Errorf("AccessControl FeatureMap = %#x, want Extension|Auxiliary 0x5", fm)

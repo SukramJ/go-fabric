@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 4858,
+  "entry_points": 4859,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,9 +186,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 11059,
+    "total_exported": 11060,
     "reachable": 7734,
-    "whitelisted": 3320,
+    "whitelisted": 3321,
     "unreachable": 5
   },
   "by_package": [
@@ -343,7 +343,7 @@
       "identifier": "TestACLWriteWithAuxiliaryTypeOverTheWire",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/groupcast_wire_test.go",
-      "line": 228
+      "line": 229
     },
     {
       "package": "bridge",
@@ -17276,7 +17276,7 @@
       "identifier": "TestAuxiliaryACLEntries",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groupcast_test.go",
-      "line": 184
+      "line": 228
     },
     {
       "package": "groups",
@@ -17290,7 +17290,7 @@
       "identifier": "TestDecodeNoKeyNamesAnUnmappedAuthentication",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groupcast_test.go",
-      "line": 330
+      "line": 374
     },
     {
       "package": "groups",
@@ -17374,7 +17374,7 @@
       "identifier": "TestGroupMessageListeners",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groupcast_test.go",
-      "line": 308
+      "line": 352
     },
     {
       "package": "groups",
@@ -17385,10 +17385,17 @@
     },
     {
       "package": "groups",
+      "identifier": "TestGroupRetainedSenderOnly",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "groups/groupcast_test.go",
+      "line": 187
+    },
+    {
+      "package": "groups",
       "identifier": "TestGroupcastChangeSignal",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groupcast_test.go",
-      "line": 231
+      "line": 275
     },
     {
       "package": "groups",
@@ -17409,7 +17416,7 @@
       "identifier": "TestGroupcastStoreFailures",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "groups/groupcast_test.go",
-      "line": 284
+      "line": 328
     },
     {
       "package": "groups",
