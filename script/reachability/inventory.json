@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5001,
+  "entry_points": 5005,
   "entry_packages": [
     ".",
     "bdx",
@@ -203,9 +203,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12085,
+    "total_exported": 12089,
     "reachable": 8574,
-    "whitelisted": 3506,
+    "whitelisted": 3510,
     "unreachable": 5
   },
   "by_package": [
@@ -18225,6 +18225,34 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/conformance_test.go",
       "line": 312
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestMediaFlag",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/media_test.go",
+      "line": 75
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestMediaPlatformMovesTheAppStatus",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/media_test.go",
+      "line": 241
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestMediaPlaybackLikeTheTvApp",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/media_test.go",
+      "line": 115
+    },
+    {
+      "package": "examples/reference-bridge",
+      "identifier": "TestMediaPlayerClustersLikeTheTvApp",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/media_test.go",
+      "line": 167
     },
     {
       "package": "examples/reference-bridge",

@@ -1021,6 +1021,9 @@ type fleet struct {
 	// otaImages is the OTA provider's test image and consent
 	// (ota_provider.go), served with --ota-provider; nil without.
 	otaImages *testImages
+	// media is the video player and content app pair (media.go), served
+	// with --media; nil without.
+	media *demoMedia
 
 	// configChange raises the ConfigurationVersion of every bridged device
 	// (the app pipe's SimulateConfigurationVersionChange); wired by main.
@@ -1195,6 +1198,15 @@ func (f *fleet) endpoints() ([]node.Endpoint, error) { //nolint:funlen // the fl
 	add(device.NewElectricalEnergyTariff(bridged("tariff", f.energyTariff.name), serve(f.energyTariff.servers())...))
 	add(f.electricalMeter.device(bridged("electricalmeter", f.electricalMeter.name)))
 	add(f.esa.device(bridged("esa", f.esa.name)))
+	// The media pair (--media, TESTING ONLY) comes last, so every device
+	// above keeps its number with or without it.
+	if f.media != nil {
+		pair, err := f.media.devices()
+		if err != nil {
+			errs = append(errs, err)
+		}
+		out = append(out, pair...)
+	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, fmt.Errorf("fleet: %w", err)
 	}

@@ -51,6 +51,9 @@ func attachNodeProviders(br *matterbridge.Bridge, pscfg *mattercore.PowerSourceC
 	if actions != nil {
 		actions.setLampEndpoint(func() (uint16, bool) { return endpointByKey(br, lampKey) })
 	}
+	if f.media != nil {
+		f.media.setAppEndpoint(func() (uint16, bool) { return endpointByKey(br, mediaAppKey) })
+	}
 }
 
 // --- Actions on the Aggregator -------------------------------------------

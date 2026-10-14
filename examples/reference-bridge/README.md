@@ -163,6 +163,21 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   product's provider serves the images its vendor signed behind its own
   `mattercore.OTAImageSource`.
 
+- `--media` (TESTING ONLY) bridges two more devices after the fleet
+  (`media.go`, ADR 0022): a CastingVideoPlayer stating ContentAppPlatform
+  and PhysicalInputs (OnOff, MediaPlayback, KeypadInput, ContentLauncher,
+  ApplicationLauncher with the platform feature, MediaInput, AudioOutput,
+  Channel, TargetNavigator, LowPower, WakeOnLan) and a ContentApp
+  (ApplicationBasic, ApplicationLauncher, AccountLogin, KeypadInput),
+  each a simulation of connectedhomeip's tv-app — its transport, three of
+  its channels, two inputs, three outputs, two targets and the test suite's
+  content app (catalog vendor 123, `exampleid`, setup PIN `34567890`),
+  whose ApplicationBasic.Status the player's LaunchApp, HideApp and StopApp
+  move. The app pipe's `{"Name": "MediaPlaybackState", "Operation":
+  "Playing"|"Paused"|"NotPlaying"|"Buffering"}` moves the transport.
+  Nothing plays: a product's host implements the `cluster/media` ports
+  over its own player.
+
 Each applied command is logged as `apppipe.applied`. None of these flags
 belongs in a real deployment.
 

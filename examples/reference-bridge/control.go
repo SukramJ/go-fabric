@@ -245,6 +245,13 @@ func (f *fleet) applyPipeCommand(cmd pipeCommand) error {
 		// The simulated Wi-Fi link of --wifi (wifi.go): CHIP's apps have no
 		// pipe command for it, only the TestEventTrigger codes.
 		return f.wifi.pipeCommand(cmd)
+	case "MediaPlaybackState":
+		// The player's transport (--media, media.go); Operation names the
+		// PlaybackStateEnum value.
+		if f.media == nil {
+			return errors.New("MediaPlaybackState: the daemon runs without --media")
+		}
+		return f.media.setPlaybackState(cmd.Operation)
 	case "OtaProviderConsent":
 		// The test OTA provider of --ota-provider (ota_provider.go).
 		return f.otaImages.pipeCommand(cmd)
