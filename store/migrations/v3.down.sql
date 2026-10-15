@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: MIT
+-- SPDX-License-Identifier: Apache-2.0
 -- Copyright (C) 2026 SukramJ.
 --
 -- Reverts v3: rebuilds matter_group_key_map with the foreign key into

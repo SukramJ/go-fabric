@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
 // Package interaction is the controller's Interaction Model client (ADR

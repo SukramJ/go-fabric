@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: MIT
+-- SPDX-License-Identifier: Apache-2.0
 -- Copyright (C) 2026 SukramJ.
 --
 -- Migration v4 (go-fabric v0.3.0): the OTA requestor's DefaultOTAProviders

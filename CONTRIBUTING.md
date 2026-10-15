@@ -5,6 +5,18 @@ Matter protocol that a host application embeds. Everything below follows from
 that — the module has no binary, no configuration file and no operator
 surface, and its public API is the whole of its contract.
 
+## Licence and contributor agreement
+
+go-fabric is licensed under the Apache License 2.0 ([`LICENSE`](./LICENSE),
+[`NOTICE`](./NOTICE); [ADR 0023](./docs/adr/0023-apache-2-and-the-cla.md)).
+Every contribution needs the individual contributor licence agreement in
+[`CLA.md`](./CLA.md): write `I have read and agree to CLA.md` in the
+description of your first pull request — the template has the line — and
+every later one from the same account is covered. Pull requests without
+it are not merged. The agreement lets the project be licensed as a whole,
+including under other terms later; it takes nothing from your own rights
+to your work.
+
 ## Before you open a PR
 
 - Read [`CLAUDE.md`](./CLAUDE.md). matter.js HEAD is the gold standard for
@@ -81,11 +93,11 @@ explains the rest.
 - `go mod tidy -diff` prints nothing.
 - User-visible changes have an entry in [`CHANGELOG.md`](./CHANGELOG.md)
   under `[Unreleased]`.
-- Every new `.go` file opens with the MIT header — `TestLicenseHeaderOnEveryGoFile`
+- Every new `.go` file opens with the Apache-2.0 header — `TestLicenseHeaderOnEveryGoFile`
   fails naming the file otherwise:
 
   ```go
-  // SPDX-License-Identifier: MIT
+  // SPDX-License-Identifier: Apache-2.0
   // Copyright (C) 2026 SukramJ.
   ```
 
@@ -108,7 +120,7 @@ decision, not a convenience:
 - **No cgo.** The module builds with `CGO_ENABLED=0`; only the race-enabled
   test run turns it on.
 - **MIT / Apache-2.0 / BSD only.** GPL, LGPL, MPL and AGPL pull in copyleft
-  obligations the MIT licence of this module cannot carry — stop and discuss.
+  obligations the Apache-2.0 licence of this module cannot carry — stop and discuss.
 - A new dependency updates `THIRD-PARTY-NOTICES.md` and, when its licence
   requires the text to travel, adds it under `licenses/`.
 

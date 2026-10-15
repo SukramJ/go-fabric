@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Changed
+
+- **Licence: Apache License 2.0** from this version on ([ADR 0023](./docs/adr/0023-apache-2-and-the-cla.md)) — the licence of matter.js and connectedhomeip, with its patent grant (§3). Every `.go` file's SPDX header reads `Apache-2.0`; `NOTICE` names the copyright and the matter.js lineage. `v0.4.0` and every earlier release stay MIT as published. Contributions need the contributor licence agreement in `CLA.md`, agreed in the first pull request (`.github/PULL_REQUEST_TEMPLATE.md`).
+
 ## [0.4.0] — 2026-10-14
 
 The release with the controller role (ADR 0020, stages 1–6b: the

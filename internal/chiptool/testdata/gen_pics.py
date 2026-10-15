@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 SukramJ.
 #
 # Generates the reference daemon's per-endpoint PICS slices from the device

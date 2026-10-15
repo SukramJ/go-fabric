@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: MIT
+-- SPDX-License-Identifier: Apache-2.0
 -- Copyright (C) 2026 SukramJ.
 --
 -- Migration v1 (go-fabric v0.1.0): the matter_* DDL as v0.1.0 shipped it

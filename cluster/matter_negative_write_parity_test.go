@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
 // Package cluster_test — consolidated negative-write / negative-invoke

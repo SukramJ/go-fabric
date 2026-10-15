@@ -184,6 +184,11 @@ the changelog, it does not ship.
 
 ## Licence
 
-MIT — see [`LICENSE`](./LICENSE). Upstream notices and the dependency
+Apache License 2.0 — see [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE)
+([ADR 0023](./docs/adr/0023-apache-2-and-the-cla.md): the same licence as
+matter.js and connectedhomeip, with their patent grant; `v0.4.0` and earlier
+were released under MIT and stay so). Upstream notices and the dependency
 licences are recorded in
-[`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md).
+[`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md). Contributions need
+the contributor licence agreement in [`CLA.md`](./CLA.md), agreed once per
+account in the first pull request.

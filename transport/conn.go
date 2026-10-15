@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
 // Package transport names what the layers above the wire need from a

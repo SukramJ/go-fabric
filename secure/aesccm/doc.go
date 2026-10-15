@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
 // Package aesccm implements AES-CCM-128 with a 13-byte nonce and a

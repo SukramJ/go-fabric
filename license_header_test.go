@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
 package fabric_test
@@ -15,7 +15,7 @@ import (
 // what automated licence scanners read; the copyright line names the
 // rights holder, which the SPDX identifier alone does not.
 const (
-	spdxLine      = "// SPDX-License-Identifier: MIT"
+	spdxLine      = "// SPDX-License-Identifier: Apache-2.0"
 	copyrightLine = "// Copyright (C) 2026 SukramJ."
 )
 

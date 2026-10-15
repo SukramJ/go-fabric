@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: MIT
+-- SPDX-License-Identifier: Apache-2.0
 -- Copyright (C) 2026 SukramJ.
 --
 -- Migration v3 (go-fabric v0.2.0): matter_group_key_map loses its foreign

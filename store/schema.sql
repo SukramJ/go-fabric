@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: MIT
+-- SPDX-License-Identifier: Apache-2.0
 -- Copyright (C) 2026 SukramJ.
 --
 -- The DDL for the matter_* tables this package reads and writes. It is
