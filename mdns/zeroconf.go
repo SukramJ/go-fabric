@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -82,6 +83,9 @@ type Zeroconf struct {
 	// (MdnsAdvertisement.ts broadcast() vs expire()).
 	published map[string]string
 	closed    bool
+	// loopTrigger is the trigger channel of the running re-announce loop,
+	// nil when none runs: StartReannounceLoop starts at most one at a time.
+	loopTrigger chan struct{}
 	// afterSnapshot, when non-nil, runs between the snapshot of the
 	// active keys and the re-announce in [Zeroconf.republishAll]. It is
 	// the seam a test uses to land a Withdraw exactly in that gap —
@@ -599,12 +603,34 @@ func (z *Zeroconf) TriggerReannounce(ctx context.Context) {
 // one re-announce. Callers that do not use event-driven triggering may
 // ignore the channel — the periodic cadence still applies.
 //
-// Returns a (cancel func, trigger chan). Idempotent — calling twice
-// silently replaces the prior loop.
+// Returns a (cancel func, trigger chan); cancel is safe to call more
+// than once. One loop runs at a time: while one is running, a second call
+// starts none, logs at Info and returns a no-op cancel and the running
+// loop's trigger channel — so a host that starts the loop beside the node
+// facade, which starts it itself, gets one loop, not two. Once the
+// running loop is cancelled (or its ctx ends) a new call starts one.
 func (z *Zeroconf) StartReannounceLoop(ctx context.Context, interval time.Duration) (cancel func(), trigger chan<- struct{}) {
+	z.mu.Lock()
+	if running := z.loopTrigger; running != nil {
+		z.mu.Unlock()
+		slog.Default().Info("mdns.reannounce.loop_already_running",
+			slog.Duration("interval", interval),
+			slog.String("hint", "the running loop is kept; the node facade starts one itself"))
+		return func() {}, running
+	}
 	triggerCh := make(chan struct{}, 1)
+	z.loopTrigger = triggerCh
+	z.mu.Unlock()
 	stopCh := make(chan struct{})
+	release := func() {
+		z.mu.Lock()
+		if z.loopTrigger == triggerCh {
+			z.loopTrigger = nil
+		}
+		z.mu.Unlock()
+	}
 	go func() {
+		defer release()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
@@ -620,7 +646,10 @@ func (z *Zeroconf) StartReannounceLoop(ctx context.Context, interval time.Durati
 			}
 		}
 	}()
-	return func() { close(stopCh) }, triggerCh
+	return sync.OnceFunc(func() {
+		release()
+		close(stopCh)
+	}), triggerCh
 }
 
 // republishAll snapshots the current Service set and re-Publishes
