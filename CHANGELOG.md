@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `node.EndpointPersistence` (issue #117): the facade's per-endpoint stack state — scene tables (`endpoint.ScenesStore`, under `scenes.<key>`) and the commissioner-written bridged NodeLabel (`OnNodeLabelWritten`, `NodeLabel`, under `bridged_node_label.<key>`) — exported for a host with its own assembler (`node.Config.Topology`). `node.NewEndpointPersistence(st, logger)` builds it over a `*store.Store` before `node.New`, `Node.Persistence()` returns the one the facade uses, and `node.Config.EndpointPersistence` replaces it in the facade's own assembler and Aggregator. The keys are unchanged, so a host's database written under them reads back.
+
 ### Changed
 
 - **Licence: Apache License 2.0** from this version on ([ADR 0023](./docs/adr/0023-apache-2-and-the-cla.md)) — the licence of matter.js and connectedhomeip, with its patent grant (§3). Every `.go` file's SPDX header reads `Apache-2.0`; `NOTICE` names the copyright and the matter.js lineage. `v0.4.0` and every earlier release stay MIT as published. Contributions need the contributor licence agreement in `CLA.md`, agreed in the first pull request (`.github/PULL_REQUEST_TEMPLATE.md`).

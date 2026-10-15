@@ -61,6 +61,9 @@ type Node struct {
 	advertiser mdns.Advertiser
 	bootReason uint8
 	persisted  persisted
+	// endpoints is the endpoint-level persistence the facade's assembler
+	// and Aggregator use: Config.EndpointPersistence, else persisted.
+	endpoints EndpointPersistence
 	// groupTx is the socket group messages leave through (groupsend.go).
 	groupTx  *udp.Listener
 	client   *clientStack
@@ -126,6 +129,10 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	}
 	n.cfg.Store.Credentials = n.st
 	n.persisted = persisted{st: n.st, logger: n.logger}
+	n.endpoints = cfg.EndpointPersistence
+	if n.endpoints == nil {
+		n.endpoints = n.persisted
+	}
 	var err error
 	// The host's group manager when it supplies one (its assembler mounts
 	// the Groups servers over it), else the facade's own.
@@ -148,8 +155,8 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 			NodeLabel:          bi.NodeLabel,
 			VendorName:         bi.VendorName,
 			Groups:             n.groups,
-			OnNodeLabelWritten: n.persisted.storeLabel,
-			Scenes:             n.persisted,
+			OnNodeLabelWritten: n.endpoints.OnNodeLabelWritten,
+			Scenes:             n.endpoints,
 			// The node's own conditions on the root: WiFi with a Wi-Fi
 			// reporter (Network.WiFi).
 			RootDeviceConditions: n.cfg.rootDeviceConditions(),
@@ -638,6 +645,12 @@ func (n *Node) BootReason() uint8 { return n.bootReason }
 
 // Store returns the credential store the node runs on.
 func (n *Node) Store() *store.Store { return n.st }
+
+// Persistence is the endpoint-level persistence (scene tables, bridged
+// NodeLabels) the facade's assembler uses: [Config].EndpointPersistence
+// when set, else the facade's own over [Node.Store] — what a host with its
+// own assembler ([Config].Topology) hands that assembler (issue #117).
+func (n *Node) Persistence() EndpointPersistence { return n.endpoints }
 
 // Groups returns the group state the node runs on — [Config].Groups, or
 // the manager the facade built. A host that assembles its own topology

@@ -49,6 +49,38 @@ type persisted struct {
 	logger *slog.Logger
 }
 
+// EndpointPersistence is the endpoint-level stack state the facade keeps
+// for its own assembler, exported for a host that assembles its endpoints
+// itself ([Config].Topology, issue #117): a bridged endpoint's scene table
+// (endpoint.Config.Scenes, under "scenes.<key>") and the per-endpoint
+// NodeLabel a commissioner wrote (endpoint.Config.OnNodeLabelWritten,
+// under "bridged_node_label.<key>"), each keyed by the endpoint's stable
+// key's String(). A host restores a label by setting its endpoint.Spec's
+// NodeLabel from [EndpointPersistence.NodeLabel] before assembling, as
+// the facade's [Aggregator] does. matter.js keeps both as nonvolatile
+// endpoint state (the citations on the methods of the implementation
+// below and on endpoint.ScenesStore).
+type EndpointPersistence interface {
+	endpoint.ScenesStore
+	// OnNodeLabelWritten persists a commissioner-written NodeLabel of the
+	// bridged endpoint under key; it is endpoint.Config.OnNodeLabelWritten.
+	OnNodeLabelWritten(key endpoint.SourceKey, label string)
+	// NodeLabel is the label persisted for key, "" for none.
+	NodeLabel(ctx context.Context, key endpoint.SourceKey) string
+}
+
+// NewEndpointPersistence returns the facade's [EndpointPersistence] over
+// st's settings table — the same keys [Node.Persistence] uses, so a host
+// may build it before [New] (for the assembler its Topology runs) over a
+// store the node later opens. st must hold the store schema
+// (store.Apply); a nil logger is slog.Default().
+func NewEndpointPersistence(st *store.Store, logger *slog.Logger) EndpointPersistence {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return persisted{st: st, logger: logger}
+}
+
 // keyString is the settings-key suffix of a stable key, false for nil.
 func keyString(key endpoint.SourceKey) (string, bool) {
 	if key == nil {
@@ -100,8 +132,9 @@ func (p persisted) storeConfigVersions(topo *endpoint.Topology, v bridge.Configu
 	}
 }
 
-// storeLabel implements endpoint.Config.OnNodeLabelWritten.
-func (p persisted) storeLabel(key endpoint.SourceKey, label string) {
+// OnNodeLabelWritten implements [EndpointPersistence]: it is the
+// endpoint.Config.OnNodeLabelWritten hook.
+func (p persisted) OnNodeLabelWritten(key endpoint.SourceKey, label string) {
 	k, ok := keyString(key)
 	if !ok {
 		return
@@ -111,8 +144,9 @@ func (p persisted) storeLabel(key endpoint.SourceKey, label string) {
 	}
 }
 
-// label returns the label persisted for a bridged endpoint, "" for none.
-func (p persisted) label(ctx context.Context, key endpoint.SourceKey) string {
+// NodeLabel implements [EndpointPersistence]: the label persisted for a
+// bridged endpoint, "" for none.
+func (p persisted) NodeLabel(ctx context.Context, key endpoint.SourceKey) string {
 	k, ok := keyString(key)
 	if !ok {
 		return ""
@@ -143,7 +177,7 @@ func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformati
 	})
 }
 
-// LoadScenes implements endpoint.ScenesStore.
+// LoadScenes implements endpoint.ScenesStore ([EndpointPersistence]).
 func (p persisted) LoadScenes(key endpoint.SourceKey) []byte {
 	k, ok := keyString(key)
 	if !ok {
@@ -156,7 +190,7 @@ func (p persisted) LoadScenes(key endpoint.SourceKey) []byte {
 	return []byte(v)
 }
 
-// SaveScenes implements endpoint.ScenesStore.
+// SaveScenes implements endpoint.ScenesStore ([EndpointPersistence]).
 func (p persisted) SaveScenes(key endpoint.SourceKey, table []byte) {
 	k, ok := keyString(key)
 	if !ok {

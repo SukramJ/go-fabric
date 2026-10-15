@@ -102,8 +102,8 @@ func TestPersistedKeys(t *testing.T) {
 	ctx := context.Background()
 	p := persisted{st: testStore(t), logger: slog.New(slog.DiscardHandler)}
 	k := endpoint.StringKey("dev:1")
-	p.storeLabel(k, "Hall")
-	if got := p.label(ctx, k); got != "Hall" {
+	p.OnNodeLabelWritten(k, "Hall")
+	if got := p.NodeLabel(ctx, k); got != "Hall" {
 		t.Errorf("label %q", got)
 	}
 	p.SaveScenes(k, []byte("table"))
@@ -112,16 +112,16 @@ func TestPersistedKeys(t *testing.T) {
 	}
 	// A host's own key type is persisted under its String() (issue #87).
 	var other otherKey
-	p.storeLabel(other, "x")
+	p.OnNodeLabelWritten(other, "x")
 	p.SaveScenes(other, []byte("y"))
-	if p.label(ctx, other) != "x" || string(p.LoadScenes(other)) != "y" {
+	if p.NodeLabel(ctx, other) != "x" || string(p.LoadScenes(other)) != "y" {
 		t.Error("a non-StringKey was not persisted under its String()")
 	}
 	if v, ok, _ := p.st.GetSetting(ctx, endpointLabelKeyRoot+"other"); !ok || v != "x" {
 		t.Errorf("label key for a host key: %q (%v)", v, ok)
 	}
-	p.storeLabel(nil, "x")
-	if p.label(ctx, nil) != "" || p.LoadScenes(nil) != nil || p.configVersion(ctx, nil) != 0 {
+	p.OnNodeLabelWritten(nil, "x")
+	if p.NodeLabel(ctx, nil) != "" || p.LoadScenes(nil) != nil || p.configVersion(ctx, nil) != 0 {
 		t.Error("a nil key was persisted")
 	}
 	if p.LoadScenes(endpoint.StringKey("none")) != nil || p.configVersion(ctx, k) != 0 {

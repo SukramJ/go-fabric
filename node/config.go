@@ -100,6 +100,12 @@ type Config struct {
 	// endpoints' servers, the PartsList providers and every port stay the
 	// facade's. nil is the facade's [Aggregator] under one scope.
 	Topology bridge.Snapshotter
+	// EndpointPersistence, when set, replaces the facade's own scene and
+	// bridged-NodeLabel persistence ([NewEndpointPersistence] over the
+	// node's store) in the facade's assembler and [Aggregator], for a host
+	// that keeps that state itself; [Node.Persistence] returns it. nil is
+	// the facade's own.
+	EndpointPersistence EndpointPersistence
 	// AggregatorServers are mounted on the Aggregator endpoint after
 	// Identify, Descriptor, FixedLabel and UserLabel — an Actions server,
 	// say (the daemon's buildAggregatorClusters extra, wiring.go:330-345).

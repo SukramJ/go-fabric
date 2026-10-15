@@ -188,7 +188,7 @@ func (a *Aggregator) snapshot(ctx context.Context) (*endpoint.Topology, error) {
 	specs := make([]endpoint.Spec, 0, len(eps))
 	for _, ep := range eps {
 		spec := ep.Spec()
-		if label := a.n.persisted.label(ctx, spec.StableKey); label != "" {
+		if label := a.n.endpoints.NodeLabel(ctx, spec.StableKey); label != "" {
 			spec.NodeLabel = label
 		}
 		spec.ConfigurationVersion = max(spec.ConfigurationVersion, a.n.persisted.configVersion(ctx, spec.StableKey))
