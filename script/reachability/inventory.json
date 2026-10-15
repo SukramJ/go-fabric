@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5077,
+  "entry_points": 5078,
   "entry_packages": [
     ".",
     "bdx",
@@ -206,9 +206,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12274,
+    "total_exported": 12275,
     "reachable": 8695,
-    "whitelisted": 3574,
+    "whitelisted": 3575,
     "unreachable": 5
   },
   "by_package": [
@@ -21587,7 +21587,7 @@
       "identifier": "TestCountBootAndOperationalTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 40
+      "line": 41
     },
     {
       "package": "node",
@@ -21601,7 +21601,7 @@
       "identifier": "TestPersistedKeys",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 100
+      "line": 101
     },
     {
       "package": "node",
@@ -21615,7 +21615,7 @@
       "identifier": "TestRingLogs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 144
+      "line": 145
     },
     {
       "package": "node",
@@ -21623,6 +21623,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/wiring_internal_test.go",
       "line": 125
+    },
+    {
+      "package": "node",
+      "identifier": "TestUniqueIDRotationOnOffOn",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "node/persist_internal_test.go",
+      "line": 167
     },
     {
       "package": "schema",

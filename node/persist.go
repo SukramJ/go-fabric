@@ -47,6 +47,9 @@ const (
 type persisted struct {
 	st     *store.Store
 	logger *slog.Logger
+	// salt is the UniqueID rotation salt uniqueID consults; nil is
+	// bootid.Salt (a test pins its own).
+	salt func() [16]byte
 }
 
 // EndpointPersistence is the endpoint-level stack state the facade keeps
@@ -208,32 +211,29 @@ func (p persisted) SaveScenes(key endpoint.SourceKey, table []byte) {
 // (quality N), so the attribute keeps its F quality across a config edit
 // to the label the derivation reads. The key is the daemon's
 // (store.SettingUniqueID). A boot with bootid rotation enabled derives a
-// per-boot value and pins nothing; a stored value the daemon flagged as
-// written under rotation (store.SettingUniqueIDRotated) is stale to a
-// boot without it, which re-derives, pins and clears the flag.
+// per-boot value and neither reads nor writes the store, so the value a
+// boot without rotation pinned before is served again once rotation is
+// off. store.SettingUniqueIDRotated is not read (issue #122): nothing in
+// this module writes it, and with nothing pinned under rotation there is
+// no stale value for it to flag.
 func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, error) {
-	if bootid.Salt() != [16]byte{} {
+	salt := p.salt
+	if salt == nil {
+		salt = bootid.Salt
+	}
+	if salt() != [16]byte{} {
 		return derive(), nil
 	}
 	stored, found, err := p.st.GetSetting(ctx, store.SettingUniqueID)
 	if err != nil {
 		return "", err
 	}
-	rotated, _, err := p.st.GetSetting(ctx, store.SettingUniqueIDRotated)
-	if err != nil {
-		return "", err
-	}
-	if found && stored != "" && rotated != "1" {
+	if found && stored != "" {
 		return stored, nil
 	}
 	id := derive()
 	if err := p.st.SetSetting(ctx, store.SettingUniqueID, id); err != nil {
 		return "", err
-	}
-	if rotated == "1" {
-		if err := p.st.SetSetting(ctx, store.SettingUniqueIDRotated, ""); err != nil {
-			return "", err
-		}
 	}
 	return id, nil
 }

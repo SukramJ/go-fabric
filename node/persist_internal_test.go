@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -154,5 +155,67 @@ func TestRingLogs(t *testing.T) {
 	ring.Record(diagevent.Event{Kind: "k", Message: "m", Detail: map[string]string{"b": "2", "a": "1"}})
 	if b, _ := r.Logs(context.Background(), 0); !strings.Contains(string(b), "k m a=1 b=2") {
 		t.Errorf("ring %q", b)
+	}
+}
+
+// TestUniqueIDRotationOnOffOn (issue #122): over one store, a boot with
+// rotation on serves a salted per-boot value and writes nothing, and the
+// next boot with rotation off serves the value pinned before it, never a
+// salted one — matter.js creates uniqueId once and persists it
+// (BasicInformationServer.ts:89-91 at 0ceb202d); rotation is this
+// module's dev knob (bootid) beside that rule.
+func TestUniqueIDRotationOnOffOn(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := testStore(t)
+	var salt [16]byte
+	p := persisted{st: st, logger: slog.New(slog.DiscardHandler), salt: func() [16]byte { return salt }}
+	derive := func() string { return "id-" + strconv.Itoa(int(salt[0])) }
+	boot := func(rotation byte) string {
+		t.Helper()
+		salt = [16]byte{rotation}
+		id, err := p.uniqueID(ctx, derive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	stored := func() (string, bool) {
+		v, ok, err := st.GetSetting(ctx, store.SettingUniqueID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v, ok
+	}
+
+	// A fresh store booted with rotation on: a salted value, nothing pinned.
+	if got := boot(7); got != "id-7" {
+		t.Fatalf("rotated boot of a fresh store served %q", got)
+	}
+	if v, ok := stored(); ok {
+		t.Fatalf("rotation pinned %q", v)
+	}
+	// Off: derived without salt and pinned.
+	pinned := boot(0)
+	if pinned != "id-0" {
+		t.Fatalf("first boot without rotation served %q", pinned)
+	}
+	// On / off / on / off: every rotated boot serves its salted value and
+	// writes nothing; every boot without rotation serves the pin.
+	for i, rotation := range []byte{9, 0, 11, 0} {
+		got := boot(rotation)
+		want := pinned
+		if rotation != 0 {
+			want = "id-" + strconv.Itoa(int(rotation))
+		}
+		if got != want {
+			t.Errorf("boot %d (salt %d) served %q, want %q", i, rotation, got, want)
+		}
+		if v, ok := stored(); !ok || v != pinned {
+			t.Errorf("boot %d (salt %d): stored %q (%v), want the pin %q", i, rotation, v, ok, pinned)
+		}
+	}
+	if _, ok, _ := st.GetSetting(ctx, store.SettingUniqueIDRotated); ok { //nolint:staticcheck // the deprecated marker must stay unwritten
+		t.Error("the rotation marker was written")
 	}
 }

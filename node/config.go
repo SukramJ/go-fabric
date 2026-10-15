@@ -264,7 +264,11 @@ type BasicInformation struct {
 	// later boot serves the stored value — matter.js creates uniqueId
 	// once when the state has none and persists it
 	// (BasicInformationServer.ts:89-91), so a later edit to NodeLabel does
-	// not re-identify the node under a controller's cache.
+	// not re-identify the node under a controller's cache. A boot with
+	// bootid rotation enabled serves a per-boot value and pins nothing, so
+	// the next boot without rotation serves the value pinned before it.
+	// Leave the field empty unless the host owns the node's identity: a
+	// value here replaces the facade's pin, silently.
 	UniqueID              string
 	HardwareVersion       uint16
 	HardwareVersionString string
