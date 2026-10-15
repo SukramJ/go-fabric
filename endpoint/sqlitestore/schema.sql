@@ -40,10 +40,13 @@ CREATE INDEX IF NOT EXISTS matter_endpoints_scope ON matter_endpoints(scope);
 -- point: a controller caches its accessory list by endpoint number and is
 -- never told to re-read it, so a number freed by a removed device and
 -- reissued to an unrelated one makes the new device arrive under the
--- removed device's identity. The counter therefore only ever advances, and
--- RemoveEndpoint does not return a number to the pool. Mirrors matter.js
+-- removed device's identity. The counter therefore advances, and
+-- RemoveEndpoint does not return a number to the pool, until the top of
+-- the range (65534) is reached; only then does allocation wrap to the
+-- lowest number no row holds. Mirrors matter.js
 -- packages/node/src/storage/server/ServerEndpointStores.ts assignNumber,
--- which allocates from a persisted counter and never rewinds it.
+-- which allocates from a persisted counter, wraps after 0xFFFE and skips
+-- the numbers still held.
 --
 -- It starts at 2 because endpoint 0 is the RootNode and endpoint 1 the
 -- Aggregator; only bridged endpoints are stored here.

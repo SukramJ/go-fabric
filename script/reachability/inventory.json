@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5079,
+  "entry_points": 5091,
   "entry_packages": [
     ".",
     "bdx",
@@ -206,8 +206,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12275,
-    "reachable": 8695,
+    "total_exported": 12284,
+    "reachable": 8704,
     "whitelisted": 3575,
     "unreachable": 5
   },
@@ -18623,6 +18623,13 @@
     },
     {
       "package": "examples/reference-bridge",
+      "identifier": "TestNativeDimmerTakesTheHandOffPath",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/fleet_lighting_test.go",
+      "line": 22
+    },
+    {
+      "package": "examples/reference-bridge",
       "identifier": "TestNodeClustersOnRootAndAggregator",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-bridge/fleet_node_test.go",
@@ -21587,7 +21594,7 @@
       "identifier": "TestCountBootAndOperationalTime",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 41
+      "line": 40
     },
     {
       "package": "node",
@@ -21601,7 +21608,7 @@
       "identifier": "TestPersistedKeys",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 101
+      "line": 100
     },
     {
       "package": "node",
@@ -21615,7 +21622,7 @@
       "identifier": "TestRingLogs",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/persist_internal_test.go",
-      "line": 145
+      "line": 144
     },
     {
       "package": "node",
@@ -21623,13 +21630,6 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "node/wiring_internal_test.go",
       "line": 125
-    },
-    {
-      "package": "node",
-      "identifier": "TestUniqueIDRotationOnOffOn",
-      "reason": "auto-whitelist:pattern=test-file",
-      "file": "node/persist_internal_test.go",
-      "line": 167
     },
     {
       "package": "schema",
