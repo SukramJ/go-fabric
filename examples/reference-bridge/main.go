@@ -86,6 +86,7 @@ func main() {
 type flags struct {
 	dbPath, listen, tcp, label, salt, logLevel string
 	appPipe, enableKey, otaDir, dcl            string
+	attestationDir                             string
 	passcode, discriminator                    uint
 	iterations                                 int
 	advertise, osHostName, otaHarness, wifi    bool
@@ -110,6 +111,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.otaDir, "ota-dir", "", "directory OTA images are downloaded to (default: an \"ota\" directory beside --db)")
 	flag.BoolVar(&f.otaHarness, "ota-harness", false, "TESTING ONLY: apply a downloaded OTA image in place — report its version as running without a restart, as the CHIP SU cases read it; see ota.go")
 	flag.BoolVar(&f.otaProvider, "ota-provider", false, "TESTING ONLY: serve one embedded test OTA image (software version 2 of the test vendor/product) from an OtaProvider endpoint, consent granted unless the app pipe withholds it; see ota_provider.go")
+	flag.StringVar(&f.attestationDir, "attestation-dir", "", "directory with a vendor attestation chain — dac.pem, dac-key.pem, pai.pem, cd.der (PEM or DER each, the key PKCS#8 or SEC1) — served instead of the CSA test chain; see attestation.go")
 	flag.StringVar(&f.dcl, "dcl", "off", "prod, testnet or off: look the --ota-provider image up in the CSA Distributed Compliance Ledger (sends the requestor's vendor/product id and the offered version to the ledger); see dcl.go")
 	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
@@ -217,6 +219,9 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 		return fmt.Errorf("aggregator actions: %w", err)
 	}
 	cfg := nodeConfig(f, passcode, discriminator, tcpConfig, db, advertiser, applier, actions, logger)
+	if cfg.Attestation, err = loadAttestation(f.attestationDir); err != nil {
+		return err
+	}
 	if f.wifi {
 		// The simulated Wi-Fi link (wifi.go), TESTING ONLY.
 		cfg.Network.WiFi = devices.wifi.nodeConfig()

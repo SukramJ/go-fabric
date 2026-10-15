@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `attestation.LoadChainFiles(attestation.ChainFiles{DACPath, DACKeyPath, PAIPath, CDPath})` reads a vendor attestation chain from files — PEM or DER each, the key PKCS#8 or SEC1 — and returns the `attestation.Chain` and the Certification Declaration bytes a `node.Attestation` takes; `attestation.ErrNoChainConfigured` (every path empty) lets a host fall back to the CSA test chain without string matching, `attestation.ErrKeyMismatch` names a key that is not the DAC's. The reference daemon's `--attestation-dir` (dac.pem, dac-key.pem, pai.pem, cd.der) serves such a chain instead of the test chain; a chain that does not load stops the daemon rather than pairing as the test vendor (#118).
+
 ### Changed
 
 - **Licence: Apache License 2.0** from this version on ([ADR 0023](./docs/adr/0023-apache-2-and-the-cla.md)) — the licence of matter.js and connectedhomeip, with its patent grant (§3). Every `.go` file's SPDX header reads `Apache-2.0`; `NOTICE` names the copyright and the matter.js lineage. `v0.4.0` and every earlier release stay MIT as published. Contributions need the contributor licence agreement in `CLA.md`, agreed in the first pull request (`.github/PULL_REQUEST_TEMPLATE.md`).
