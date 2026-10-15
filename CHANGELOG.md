@@ -17,12 +17,12 @@ pseudo-version of `main`.
 
 ### Changed
 
-- The node facade no longer reads `store.SettingUniqueIDRotated` (issue #122): a boot with `bootid` rotation enabled serves a per-boot UniqueID and pins nothing, so the next boot without rotation serves the value pinned before it (matter.js `BasicInformationServer.ts:89-91`: created once, persisted). A stored UniqueID is now served whatever the marker says; a host whose own pinning wrote a salted value under the marker clears `store.SettingUniqueID` once to re-derive. `node.BasicInformation.UniqueID`'s comment says to leave the field empty unless the host owns the identity.
+- The node facade never writes `store.SettingUniqueIDRotated` and reads it only as a one-time migration (issue #122): a boot with `bootid` rotation enabled serves a per-boot UniqueID and pins nothing, so the next boot without rotation serves the value pinned before it (matter.js `BasicInformationServer.ts:89-91`: created once, persisted); a stored value a host's own pinning flagged `"1"` is re-derived, pinned and the flag cleared on the next boot without rotation, as before, with nothing for the host to clear. `node.BasicInformation.UniqueID`'s comment says to leave the field empty unless the host owns the identity.
 - **Licence: Apache License 2.0** from this version on ([ADR 0023](./docs/adr/0023-apache-2-and-the-cla.md)) — the licence of matter.js and connectedhomeip, with its patent grant (§3). Every `.go` file's SPDX header reads `Apache-2.0`; `NOTICE` names the copyright and the matter.js lineage. `v0.4.0` and every earlier release stay MIT as published. Contributions need the contributor licence agreement in `CLA.md`, agreed in the first pull request (`.github/PULL_REQUEST_TEMPLATE.md`).
 
 ### Deprecated
 
-- `store.SettingUniqueIDRotated`: nothing in the module reads or writes it; it is removed after the API window.
+- `store.SettingUniqueIDRotated`: read for the migration only; never written. It is removed after the API window.
 
 ## [0.4.0] — 2026-10-14
 

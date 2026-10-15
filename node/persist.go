@@ -213,9 +213,11 @@ func (p persisted) SaveScenes(key endpoint.SourceKey, table []byte) {
 // (store.SettingUniqueID). A boot with bootid rotation enabled derives a
 // per-boot value and neither reads nor writes the store, so the value a
 // boot without rotation pinned before is served again once rotation is
-// off. store.SettingUniqueIDRotated is not read (issue #122): nothing in
-// this module writes it, and with nothing pinned under rotation there is
-// no stale value for it to flag.
+// off. The facade never writes store.SettingUniqueIDRotated (issue #122);
+// it reads it once, as a migration until the deprecated key is removed: a
+// stored value a host's own pinning flagged "1" (written salted, under
+// rotation) is stale to a boot without rotation, which re-derives, pins
+// and clears the flag — the behaviour before #122 for that case.
 func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, error) {
 	salt := p.salt
 	if salt == nil {
@@ -228,12 +230,21 @@ func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, 
 	if err != nil {
 		return "", err
 	}
-	if found && stored != "" {
+	rotated, _, err := p.st.GetSetting(ctx, store.SettingUniqueIDRotated) //nolint:staticcheck // the one-time migration (issue #122)
+	if err != nil {
+		return "", err
+	}
+	if found && stored != "" && rotated != "1" {
 		return stored, nil
 	}
 	id := derive()
 	if err := p.st.SetSetting(ctx, store.SettingUniqueID, id); err != nil {
 		return "", err
+	}
+	if rotated == "1" {
+		if err := p.st.SetSetting(ctx, store.SettingUniqueIDRotated, ""); err != nil { //nolint:staticcheck // the migration clears the host's flag
+			return "", err
+		}
 	}
 	return id, nil
 }

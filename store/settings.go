@@ -40,10 +40,10 @@ const (
 	// stale — rather than pinning it as the bridge's permanent identity —
 	// and re-derive the deterministic one instead.
 	//
-	// Deprecated: nothing in this module reads or writes it any more — the
-	// node facade pins nothing under rotation, so there is no salted value
-	// to flag (issue #122). It is kept for the API window and removed
-	// after it.
+	// Deprecated: read for the migration only; never written. The node
+	// facade pins nothing under rotation, so it has no salted value to
+	// flag; it reads the key once to re-derive a value a host's own pinning
+	// flagged, and clears it (issue #122). Removed after the API window.
 	SettingUniqueIDRotated = "basic_information.unique_id_rotated"
 )
 

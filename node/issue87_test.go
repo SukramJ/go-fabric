@@ -118,9 +118,9 @@ func TestHostTopology(t *testing.T) {
 // TestUniqueIDPinned: the first boot of a store derives UniqueID and pins
 // it under store.SettingUniqueID; a later boot with another NodeLabel
 // serves the pinned value, as matter.js serves the uniqueId it created
-// once (BasicInformationServer.ts:89-91), whatever the deprecated rotation
-// marker says; a host's own pin is served verbatim; a pin over 32 bytes is
-// refused.
+// once (BasicInformationServer.ts:89-91); a value flagged by the old
+// rotation marker (store.SettingUniqueIDRotated) is migrated once; a
+// host's own pin is served verbatim; a pin over 32 bytes is refused.
 func TestUniqueIDPinned(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -156,22 +156,26 @@ func TestUniqueIDPinned(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The rotation marker a host's own pinning wrote is not read (issue
-	// #122): the stored value is served as pinned and the marker is left
-	// as it is.
+	// A value a host's own pinning flagged as written under rotation is
+	// stale to a boot without it: re-derived, pinned, flag cleared — the
+	// one-time migration until the deprecated key goes (issue #122).
 	st := store.New(db)
-	if err := st.SetSetting(ctx, store.SettingUniqueID, "host-written-earlier"); err != nil {
+	if err := st.SetSetting(ctx, store.SettingUniqueID, "rotated-per-boot"); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetSetting(ctx, store.SettingUniqueIDRotated, "1"); err != nil { //nolint:staticcheck // the deprecated marker, set to show it is ignored
+	if err := st.SetSetting(ctx, store.SettingUniqueIDRotated, "1"); err != nil { //nolint:staticcheck // the deprecated marker the migration reads
 		t.Fatal(err)
 	}
 	n3 := newNode(t, cfg)
-	if got := readUniqueID(n3); got != "host-written-earlier" {
-		t.Errorf("with a leftover marker UniqueID %q, want the stored value", got)
+	want := mattercore.DeriveUniqueID(pd.VendorID, pd.ProductID, "renamed node", bi.SerialNumber)
+	if got := readUniqueID(n3); got != want {
+		t.Errorf("after a flagged value UniqueID %q, want re-derived %q", got, want)
 	}
-	if flag, _, _ := st.GetSetting(ctx, store.SettingUniqueIDRotated); flag != "1" { //nolint:staticcheck // as above
-		t.Errorf("rotated marker rewritten to %q", flag)
+	if v, _, _ := st.GetSetting(ctx, store.SettingUniqueID); v != want {
+		t.Errorf("pinned %q, want %q", v, want)
+	}
+	if flag, _, _ := st.GetSetting(ctx, store.SettingUniqueIDRotated); flag != "" { //nolint:staticcheck // as above
+		t.Errorf("rotated flag %q still set", flag)
 	}
 	if err := n3.Stop(ctx); err != nil {
 		t.Fatal(err)
