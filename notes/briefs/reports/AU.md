@@ -10,7 +10,10 @@ stays **5**, ratchet untouched). No chip-tool binary was run.
 | d929216 `feat(node): export the endpoint-level persistence` | §1, Closes #117 |
 | 11cdf4d `feat(node,mdns): the facade owns the re-announce loop` | §2, Closes #119 |
 | 4e5ea9e `fix(node): drop the UniqueID rotation marker read` | §3, Closes #122 |
-| (this commit) `notes: report AU` | — |
+| 451e476 `notes: report AU` | — |
+| 5ebfe61 `fix(node): the UniqueID rotation marker read as a one-time migration` | §3 fix-up (owner Q1) |
+| 75fe8a5 `fix(mdns): Zeroconf runs one re-announce loop at a time` | §2 fix-up (owner Q2) |
+| (this commit) `notes: report AU — fix-ups` | — |
 
 ## Per section — what was built, what proves it
 
@@ -78,6 +81,29 @@ stays **5**, ratchet untouched). No chip-tool binary was run.
   marker segment rewritten: a stored value with marker "1" is now served
   as pinned and the marker left alone.
 
+## Owner's answers (2026-10-15) — fix-ups
+
+- **Q1 → 5ebfe61.** `persisted.uniqueID` reads `store.SettingUniqueIDRotated`
+  again as a one-time migration until the key is removed: "1" ⇒ re-derive,
+  pin, clear; no flag ⇒ serve the stored value; rotation on ⇒ nothing read
+  or written. The facade never writes the flag. Deprecated line: "read for
+  the migration only; never written". `salt` seam kept;
+  `TestUniqueIDRotationOnOffOn` gains the migration case (a rotated boot
+  leaves flagged value and flag alone, the next unrotated boot migrates);
+  `TestUniqueIDPinned`'s segment is back to the migration assertions.
+  CHANGELOG: no manual clearing needed.
+- **Q2 → 75fe8a5.** `Zeroconf.StartReannounceLoop` keeps the running
+  loop's trigger in `loopTrigger`; a second call while it runs logs
+  `mdns.reannounce.loop_already_running` at Info (`slog.Default()` — Zeroconf
+  has no logger) and returns a no-op cancel plus that trigger. cancel is
+  `sync.OnceFunc` (was `close(stopCh)`, which panicked on a second call) and
+  releases the slot synchronously; the goroutine releases it too when its
+  ctx ends. `TestZeroconfOneReannounceLoop` (no-op second cancel, trigger
+  shared, double cancel, new loop after cancel and after ctx end); the
+  existing loop tests pass unchanged. CHANGELOG line keeps the advice and
+  names the guard.
+- Q3: no change (owner records `TestReactionLeave`). Floor: untouched.
+
 ## Guards
 
 All at `4e5ea9e` (HEAD before = after for every run; summary
@@ -98,15 +124,29 @@ All at `4e5ea9e` (HEAD before = after for every run; summary
   including `node` and `mdns`.
 - `make reachability-check` — **green** (unreached 5).
 
+### Guards after the fix-ups
+
+At `75fe8a5` (HEAD before = after; `bin/guards-summary3.log`): `make ci`
+**green** (lint and cover-check included, no rerun needed), `make race`
+**green**, `make reachability-check` **green**. An earlier run at the
+pre-amend head failed `TestDeprecationMarkersMatchThePolicy` on a test
+comment line starting with "deprecated" (issue87_test.go:122); reworded
+in the amended §3 fix-up.
+
 ## Lines that differ from the cited files
 
 - `node/aggregator.go:191` read `a.n.persisted.label`; it now reads
   `a.n.endpoints.NodeLabel` (the override, if set). D1 names the
   assembler only; the Aggregator restore follows so a label the override
   stores is the label restored.
-- `node/persist.go` `uniqueID` (was :180-205): the marker read, the
-  `rotated != "1"` condition and the marker clear are gone; the salt comes
-  from `p.salt` (nil = `bootid.Salt`).
+- `node/persist.go` `uniqueID` (was :180-205): after the Q1 fix-up the
+  logic equals the pre-wave one except under rotation (still no store
+  access) and the salt source (`p.salt`, nil = `bootid.Salt`); the comment
+  now says the flag is read as a migration and never written.
+- `mdns/zeroconf.go` `StartReannounceLoop` (was :584-617, Q2 fix-up): the
+  single-loop guard, `sync.OnceFunc` cancel, `loopTrigger` field; the
+  "Idempotent — calling twice silently replaces the prior loop" doc line
+  (which did not match the code: it started a second loop) is replaced.
 - `node/node.go` Stop doc comment lists the re-announce loop in the
   shutdown order.
 
@@ -141,14 +181,14 @@ All at `4e5ea9e` (HEAD before = after for every run; summary
    worth a findings note or a `waitUntil` on `NodeIDs` (not this brief's
    path).
 
-1. **#122 behaviour change for existing databases:** a value a host wrote
+1. *(answered: migrate once — 5ebfe61)* **#122 behaviour change for existing databases:** a value a host wrote
    under rotation with the marker "1" (OpenCCU-Loom's copy,
    `daemon_matter.go:626-684`) is now served as the pinned UniqueID on the
    next non-rotated boot instead of being re-derived. The CHANGELOG tells
    such a host to clear `store.SettingUniqueID` once. Should the facade
    instead do a one-time migration (marker "1" ⇒ re-derive, pin, clear) for
    the window, i.e. keep the old reader until the constant goes?
-2. A host that already calls `Zeroconf.StartReannounceLoop` itself (Loom,
+2. *(answered: guarded in `mdns` — 75fe8a5)* A host that already calls `Zeroconf.StartReannounceLoop` itself (Loom,
    `daemon_matter.go:525`) runs two loops after upgrading unless it drops
    the call or sets `DisableReannounce` — stated in the CHANGELOG; no
    guard against it in the library.
