@@ -134,7 +134,7 @@ described as certified, but certifiability is a goal, tracked in
 > `endpoint/`, `im/`, `tlv/`, `secure/`, `transport/`, `mdns/`,
 > `commissioning/`, `store/` and the rest:** the gold standard is
 > [`matter.js`](https://github.com/matter-js/matter.js) HEAD.
-> Apache-2.0 — MIT-compatible — and the most production-tested
+> Apache-2.0 — the licence of this module too since ADR 0023 — and the most production-tested
 > open reference stack. It is **not** certified: its own README states
 > that matter.js is not certified by the Connectivity Standards
 > Alliance, and devices built on it show up in the ecosystems as
@@ -309,11 +309,11 @@ about which row a task is in, it is in the first.
 
 ## Conventions worth knowing before the linter tells you
 
-- Every new `.go` file opens with the MIT header, or
+- Every new `.go` file opens with the Apache-2.0 header, or
   `TestLicenseHeaderOnEveryGoFile` fails naming it:
 
   ```go
-  // SPDX-License-Identifier: MIT
+  // SPDX-License-Identifier: Apache-2.0
   // Copyright (C) 2026 SukramJ.
   ```
 - **No cgo.** The module builds with `CGO_ENABLED=0`; only the race-enabled

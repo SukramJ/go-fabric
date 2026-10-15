@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
 package main
@@ -24,7 +24,7 @@ var fixtureClusters = []string{
 // generated codecs: the fixture's bytes decode with the definition's
 // decoder for the element, and the decoded value encodes back to the same
 // bytes.
-const fixtureTest = `// SPDX-License-Identifier: MIT
+const fixtureTest = `// SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2026 SukramJ.
 
 package fixtures_test

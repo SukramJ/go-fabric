@@ -1,6 +1,7 @@
 # Third-Party Notices
 
-go-fabric is MIT-licensed (see [`LICENSE`](./LICENSE)). It is a semantic port
+go-fabric is licensed under the Apache License 2.0 (see [`LICENSE`](./LICENSE)
+and [`NOTICE`](./NOTICE); `v0.4.0` and earlier were MIT). It is a semantic port
 of `matter.js` for the Matter side and depends on a small set of Go modules.
 No third-party source is copied verbatim into this tree; the Go code is
 written from scratch and cites the upstream file + function it mirrors in a
