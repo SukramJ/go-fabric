@@ -17,6 +17,8 @@ pseudo-version of `main`.
 
 ### Changed
 
+- **`endpoint/sqlitestore` allocates as `endpoint.Store` promises** (#121): allocation lifts the counter past the highest persisted endpoint number (a row the counter never saw is no longer reissued), wraps to 2 after 65534 and skips the numbers rows still hold, and returns `ErrEndpointsExhausted` only when every number from 2 to 65534 is held — matter.js `ServerEndpointStores.ts` `assignNumber` / `#nextFreeNumber`. Before the top of the range is reached nothing changes: a removed source's number is still not reissued. No `SQLITE_BUSY` retry was added: a test with a second connection holding a write transaction shows `busy_timeout` waits it out in WAL and rollback-journal mode, as long as the host's DSN sets one.
+
 - **Licence: Apache License 2.0** from this version on ([ADR 0023](./docs/adr/0023-apache-2-and-the-cla.md)) — the licence of matter.js and connectedhomeip, with its patent grant (§3). Every `.go` file's SPDX header reads `Apache-2.0`; `NOTICE` names the copyright and the matter.js lineage. `v0.4.0` and every earlier release stay MIT as published. Contributions need the contributor licence agreement in `CLA.md`, agreed in the first pull request (`.github/PULL_REQUEST_TEMPLATE.md`).
 
 ## [0.4.0] — 2026-10-14
