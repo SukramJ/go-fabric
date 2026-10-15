@@ -10,6 +10,11 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- **`levelcontrol.NewNativeSource`** (#120): a `LevelSource` for a device that ramps by itself. The host implements `levelcontrol.NativeRamp` (`Level`, `Ramp(ctx, level, d, withOnOff)`, `Stop`) and hands over the endpoint's `levelcontrol.OnOff`; the source keeps Options and OnLevel (in memory, with an optional `NativeConfig.Persist` hook), applies the ExecuteIfOff gate, turns each of the eight commands into one target and one duration, and couples the "with On/Off" commands — on before a ramp up, off once a ramp to the minimum has arrived — in matter.js `LevelControlServer` order. The arithmetic is exported for hosts that keep their own source: `StepLevel`, `CropLevel`, `TransitionDuration`, `MoveTransition`, `LevelFromUnit`, `UnitFromLevel`.
+- **`cluster/light` attribute scalers** (#120): `HueDegreesToAttr` / `AttrToHueDegrees` (0..360° ↔ 0..254), `SaturationPercentToAttr` / `AttrToSaturationPercent` (0..100 % ↔ 0..254) and `CropMireds(mireds, physicalMin, physicalMax)` — matter.js `ColorControlServer`'s hue, saturation and colour-temperature arithmetic.
+
 ### Changed
 
 - **Licence: Apache License 2.0** from this version on ([ADR 0023](./docs/adr/0023-apache-2-and-the-cla.md)) — the licence of matter.js and connectedhomeip, with its patent grant (§3). Every `.go` file's SPDX header reads `Apache-2.0`; `NOTICE` names the copyright and the matter.js lineage. `v0.4.0` and every earlier release stay MIT as published. Contributions need the contributor licence agreement in `CLA.md`, agreed in the first pull request (`.github/PULL_REQUEST_TEMPLATE.md`).
