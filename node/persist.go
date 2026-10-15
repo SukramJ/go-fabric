@@ -47,6 +47,41 @@ const (
 type persisted struct {
 	st     *store.Store
 	logger *slog.Logger
+	// salt is the UniqueID rotation salt uniqueID consults; nil is
+	// bootid.Salt (a test pins its own).
+	salt func() [16]byte
+}
+
+// EndpointPersistence is the endpoint-level stack state the facade keeps
+// for its own assembler, exported for a host that assembles its endpoints
+// itself ([Config].Topology, issue #117): a bridged endpoint's scene table
+// (endpoint.Config.Scenes, under "scenes.<key>") and the per-endpoint
+// NodeLabel a commissioner wrote (endpoint.Config.OnNodeLabelWritten,
+// under "bridged_node_label.<key>"), each keyed by the endpoint's stable
+// key's String(). A host restores a label by setting its endpoint.Spec's
+// NodeLabel from [EndpointPersistence.NodeLabel] before assembling, as
+// the facade's [Aggregator] does. matter.js keeps both as nonvolatile
+// endpoint state (the citations on the methods of the implementation
+// below and on endpoint.ScenesStore).
+type EndpointPersistence interface {
+	endpoint.ScenesStore
+	// OnNodeLabelWritten persists a commissioner-written NodeLabel of the
+	// bridged endpoint under key; it is endpoint.Config.OnNodeLabelWritten.
+	OnNodeLabelWritten(key endpoint.SourceKey, label string)
+	// NodeLabel is the label persisted for key, "" for none.
+	NodeLabel(ctx context.Context, key endpoint.SourceKey) string
+}
+
+// NewEndpointPersistence returns the facade's [EndpointPersistence] over
+// st's settings table — the same keys [Node.Persistence] uses, so a host
+// may build it before [New] (for the assembler its Topology runs) over a
+// store the node later opens. st must hold the store schema
+// (store.Apply); a nil logger is slog.Default().
+func NewEndpointPersistence(st *store.Store, logger *slog.Logger) EndpointPersistence {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return persisted{st: st, logger: logger}
 }
 
 // keyString is the settings-key suffix of a stable key, false for nil.
@@ -100,8 +135,9 @@ func (p persisted) storeConfigVersions(topo *endpoint.Topology, v bridge.Configu
 	}
 }
 
-// storeLabel implements endpoint.Config.OnNodeLabelWritten.
-func (p persisted) storeLabel(key endpoint.SourceKey, label string) {
+// OnNodeLabelWritten implements [EndpointPersistence]: it is the
+// endpoint.Config.OnNodeLabelWritten hook.
+func (p persisted) OnNodeLabelWritten(key endpoint.SourceKey, label string) {
 	k, ok := keyString(key)
 	if !ok {
 		return
@@ -111,8 +147,9 @@ func (p persisted) storeLabel(key endpoint.SourceKey, label string) {
 	}
 }
 
-// label returns the label persisted for a bridged endpoint, "" for none.
-func (p persisted) label(ctx context.Context, key endpoint.SourceKey) string {
+// NodeLabel implements [EndpointPersistence]: the label persisted for a
+// bridged endpoint, "" for none.
+func (p persisted) NodeLabel(ctx context.Context, key endpoint.SourceKey) string {
 	k, ok := keyString(key)
 	if !ok {
 		return ""
@@ -143,7 +180,7 @@ func (p persisted) restoreRoot(ctx context.Context, b *mattercore.BasicInformati
 	})
 }
 
-// LoadScenes implements endpoint.ScenesStore.
+// LoadScenes implements endpoint.ScenesStore ([EndpointPersistence]).
 func (p persisted) LoadScenes(key endpoint.SourceKey) []byte {
 	k, ok := keyString(key)
 	if !ok {
@@ -156,7 +193,7 @@ func (p persisted) LoadScenes(key endpoint.SourceKey) []byte {
 	return []byte(v)
 }
 
-// SaveScenes implements endpoint.ScenesStore.
+// SaveScenes implements endpoint.ScenesStore ([EndpointPersistence]).
 func (p persisted) SaveScenes(key endpoint.SourceKey, table []byte) {
 	k, ok := keyString(key)
 	if !ok {
@@ -174,18 +211,26 @@ func (p persisted) SaveScenes(key endpoint.SourceKey, table []byte) {
 // (quality N), so the attribute keeps its F quality across a config edit
 // to the label the derivation reads. The key is the daemon's
 // (store.SettingUniqueID). A boot with bootid rotation enabled derives a
-// per-boot value and pins nothing; a stored value the daemon flagged as
-// written under rotation (store.SettingUniqueIDRotated) is stale to a
-// boot without it, which re-derives, pins and clears the flag.
+// per-boot value and neither reads nor writes the store, so the value a
+// boot without rotation pinned before is served again once rotation is
+// off. The facade never writes store.SettingUniqueIDRotated (issue #122);
+// it reads it once, as a migration until the deprecated key is removed: a
+// stored value a host's own pinning flagged "1" (written salted, under
+// rotation) is stale to a boot without rotation, which re-derives, pins
+// and clears the flag — the behaviour before #122 for that case.
 func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, error) {
-	if bootid.Salt() != [16]byte{} {
+	salt := p.salt
+	if salt == nil {
+		salt = bootid.Salt
+	}
+	if salt() != [16]byte{} {
 		return derive(), nil
 	}
 	stored, found, err := p.st.GetSetting(ctx, store.SettingUniqueID)
 	if err != nil {
 		return "", err
 	}
-	rotated, _, err := p.st.GetSetting(ctx, store.SettingUniqueIDRotated)
+	rotated, _, err := p.st.GetSetting(ctx, store.SettingUniqueIDRotated) //nolint:staticcheck // the one-time migration (issue #122)
 	if err != nil {
 		return "", err
 	}
@@ -197,7 +242,7 @@ func (p persisted) uniqueID(ctx context.Context, derive func() string) (string, 
 		return "", err
 	}
 	if rotated == "1" {
-		if err := p.st.SetSetting(ctx, store.SettingUniqueIDRotated, ""); err != nil {
+		if err := p.st.SetSetting(ctx, store.SettingUniqueIDRotated, ""); err != nil { //nolint:staticcheck // the migration clears the host's flag
 			return "", err
 		}
 	}

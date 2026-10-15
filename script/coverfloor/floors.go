@@ -53,7 +53,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/energy", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/fan", min: 98},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 81},
+	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 86},
@@ -105,7 +105,7 @@ var floors = []packageFloor{
 		min: 0,
 		why: "test scaffolding, exercised through the packages that import it, and go credits that coverage to them; only the device type conformance helper has a test of its own",
 	},
-	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 72},
+	{pkg: "github.com/SukramJ/go-fabric/endpoint/sqlitestore", min: 77},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/reference-bridge",
 		min: 0,
@@ -140,7 +140,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
 	{
 		pkg: "github.com/SukramJ/go-fabric/node",
-		min: 72,
+		min: 83,
 		why: "the end-to-end tests commission the node over UDP with bridgetest.Commissioner (PASE, AddNOC, CASE, re-establishment after a restart, RemoveFabric); the enhanced commissioning window, UpdateNOC's fabric hook, CASE resumption and the OTA applier have no test in the package",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},

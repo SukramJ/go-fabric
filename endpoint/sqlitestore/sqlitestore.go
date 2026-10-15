@@ -57,10 +57,9 @@ const (
 	endpointIDMax uint16 = 65534
 )
 
-// ErrEndpointsExhausted is returned when the allocation counter has walked
-// past the last usable endpoint number. It is a terminal condition for the
-// bridge, not a retryable one: numbers are never returned to the pool, so
-// nothing frees one.
+// ErrEndpointsExhausted is returned when every number from 2 to 65534 is
+// held by a row. Only removing a source frees one; allocation then wraps
+// to it (matter.js ServerEndpointStores.ts #nextFreeNumber, :169-183).
 var ErrEndpointsExhausted = errors.New("sqlitestore: no endpoint numbers left below 65535")
 
 // Schema returns the DDL for the tables this package reads and writes, as
@@ -247,9 +246,27 @@ func resolveID(ctx context.Context, tx txConn, rec endpoint.Record) (uint16, err
 	return allocate(ctx, tx)
 }
 
-// allocate draws the next number off the high-water mark and advances it.
+// allocate hands out the next free number and advances the counter past
+// it. Mirrors matter.js
+// packages/node/src/storage/server/ServerEndpointStores.ts at 0ceb202d:
+//
+//   - the counter is the persisted next number (:13, :37-43), lifted past
+//     the highest number a row holds — matter.js reserves every persisted
+//     number at load (:52-60) and lifts the counter past each it claims
+//     (:156-158), so a row above the counter is never reissued;
+//   - from the counter, the first number no row holds, wrapping to
+//     allocMin after endpointIDMax (#nextFreeNumber :169-181, which wraps
+//     to 1 after 0xFFFE and skips the numbers held; 1 is the Aggregator
+//     here);
+//   - [ErrEndpointsExhausted] only when a full pass finds none (:183).
+//
+// Until the top of the range is reached a removed row's number is not
+// reissued. Once a row holds the top number, the lift puts the counter
+// past it on every allocation, so the pass wraps and takes the lowest free
+// number from allocMin; matter.js keeps its in-memory counter after the
+// number it last assigned (:178) and walks on from there.
 func allocate(ctx context.Context, tx txConn) (uint16, error) {
-	var next int64
+	var next, highest int64
 	if err := tx.QueryRowContext(ctx,
 		`SELECT next_endpoint_id FROM matter_endpoint_allocation WHERE id = 1`).Scan(&next); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -260,18 +277,55 @@ func allocate(ctx context.Context, tx txConn) (uint16, error) {
 	if next < int64(allocMin) {
 		return 0, fmt.Errorf("sqlitestore: allocation counter %d is below the first bridged endpoint %d", next, allocMin)
 	}
-	if next > int64(endpointIDMax) {
-		return 0, ErrEndpointsExhausted
+	if err := tx.QueryRowContext(ctx,
+		`SELECT COALESCE(MAX(endpoint_id), 0) FROM matter_endpoints`).Scan(&highest); err != nil {
+		return 0, fmt.Errorf("sqlitestore: read highest endpoint: %w", err)
 	}
-	id, err := asUint16(next, "next_endpoint_id")
+	next = max(next, highest+1)
+
+	id, err := firstFree(ctx, tx, next, int64(endpointIDMax))
+	if err == nil && id == 0 {
+		// The pass wraps to allocMin and ends below where it started.
+		id, err = firstFree(ctx, tx, int64(allocMin), min(next-1, int64(endpointIDMax)))
+	}
 	if err != nil {
 		return 0, err
 	}
+	if id == 0 {
+		return 0, ErrEndpointsExhausted
+	}
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE matter_endpoint_allocation SET next_endpoint_id = ? WHERE id = 1`, next+1); err != nil {
+		`UPDATE matter_endpoint_allocation SET next_endpoint_id = ? WHERE id = 1`, id+1); err != nil {
 		return 0, fmt.Errorf("sqlitestore: advance allocation counter: %w", err)
 	}
-	return id, nil
+	return asUint16(id, "endpoint_id")
+}
+
+// firstFree returns the lowest number in [lo, hi] no row holds, or 0 when
+// every one is held (or the range is empty). It is lo itself when lo is
+// free, and otherwise the successor of the first held number at or above
+// lo whose successor is free — one indexed query rather than a walk, so a
+// nearly full range costs no more than an empty one.
+func firstFree(ctx context.Context, tx txConn, lo, hi int64) (int64, error) {
+	if lo > hi {
+		return 0, nil
+	}
+	var id sql.NullInt64
+	err := tx.QueryRowContext(ctx,
+		`SELECT MIN(n) FROM (
+		   SELECT ?1 AS n WHERE NOT EXISTS (SELECT 1 FROM matter_endpoints WHERE endpoint_id = ?1)
+		   UNION ALL
+		   SELECT e.endpoint_id + 1 FROM matter_endpoints e
+		    WHERE e.endpoint_id >= ?1 AND e.endpoint_id < ?2
+		      AND NOT EXISTS (SELECT 1 FROM matter_endpoints f WHERE f.endpoint_id = e.endpoint_id + 1)
+		 )`, lo, hi).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("sqlitestore: find a free endpoint number: %w", err)
+	}
+	if !id.Valid {
+		return 0, nil
+	}
+	return id.Int64, nil
 }
 
 // raiseCounter moves the high-water mark up to floor, never down.

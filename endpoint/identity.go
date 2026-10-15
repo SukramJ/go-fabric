@@ -82,11 +82,13 @@ var ErrNotFound = errors.New("endpoint: no persisted identity for this source")
 // caches and cannot be told to re-read: a controller keys its accessory
 // list on the number, and the Aggregator's Descriptor.PartsList set is
 // unchanged by a remove-then-add pair. An implementation must therefore
-// allocate monotonically and never reissue a number a removed source
-// once held. Mirrors matter.js
-// packages/node/src/storage/server/ServerEndpointStores.ts assignNumber,
-// which allocates from a persisted counter and never rewinds it when an
-// endpoint store is erased.
+// allocate from a persisted counter that never rewinds, so a number a
+// removed source once held is not reissued until the range wraps at
+// 0xFFFE; after the wrap a number still held is skipped. Mirrors matter.js
+// packages/node/src/storage/server/ServerEndpointStores.ts assignNumber
+// (:101-103, :156-158, :170-183): the next number is persisted and lifted
+// past every assigned one, wraps to the first part number after 0xFFFE
+// and skips the holders.
 type Store interface {
 	// GetEndpoint returns the record for key, or [ErrNotFound].
 	GetEndpoint(ctx context.Context, key SourceKey) (Record, error)

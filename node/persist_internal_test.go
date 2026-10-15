@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -102,8 +103,8 @@ func TestPersistedKeys(t *testing.T) {
 	ctx := context.Background()
 	p := persisted{st: testStore(t), logger: slog.New(slog.DiscardHandler)}
 	k := endpoint.StringKey("dev:1")
-	p.storeLabel(k, "Hall")
-	if got := p.label(ctx, k); got != "Hall" {
+	p.OnNodeLabelWritten(k, "Hall")
+	if got := p.NodeLabel(ctx, k); got != "Hall" {
 		t.Errorf("label %q", got)
 	}
 	p.SaveScenes(k, []byte("table"))
@@ -112,16 +113,16 @@ func TestPersistedKeys(t *testing.T) {
 	}
 	// A host's own key type is persisted under its String() (issue #87).
 	var other otherKey
-	p.storeLabel(other, "x")
+	p.OnNodeLabelWritten(other, "x")
 	p.SaveScenes(other, []byte("y"))
-	if p.label(ctx, other) != "x" || string(p.LoadScenes(other)) != "y" {
+	if p.NodeLabel(ctx, other) != "x" || string(p.LoadScenes(other)) != "y" {
 		t.Error("a non-StringKey was not persisted under its String()")
 	}
 	if v, ok, _ := p.st.GetSetting(ctx, endpointLabelKeyRoot+"other"); !ok || v != "x" {
 		t.Errorf("label key for a host key: %q (%v)", v, ok)
 	}
-	p.storeLabel(nil, "x")
-	if p.label(ctx, nil) != "" || p.LoadScenes(nil) != nil || p.configVersion(ctx, nil) != 0 {
+	p.OnNodeLabelWritten(nil, "x")
+	if p.NodeLabel(ctx, nil) != "" || p.LoadScenes(nil) != nil || p.configVersion(ctx, nil) != 0 {
 		t.Error("a nil key was persisted")
 	}
 	if p.LoadScenes(endpoint.StringKey("none")) != nil || p.configVersion(ctx, k) != 0 {
@@ -154,5 +155,91 @@ func TestRingLogs(t *testing.T) {
 	ring.Record(diagevent.Event{Kind: "k", Message: "m", Detail: map[string]string{"b": "2", "a": "1"}})
 	if b, _ := r.Logs(context.Background(), 0); !strings.Contains(string(b), "k m a=1 b=2") {
 		t.Errorf("ring %q", b)
+	}
+}
+
+// TestUniqueIDRotationOnOffOn (issue #122): over one store, a boot with
+// rotation on serves a salted per-boot value and writes nothing, and the
+// next boot with rotation off serves the value pinned before it, never a
+// salted one; a value flagged by the deprecated marker is migrated once — matter.js creates uniqueId once and persists it
+// (BasicInformationServer.ts:89-91 at 0ceb202d); rotation is this
+// module's dev knob (bootid) beside that rule.
+func TestUniqueIDRotationOnOffOn(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	st := testStore(t)
+	var salt [16]byte
+	p := persisted{st: st, logger: slog.New(slog.DiscardHandler), salt: func() [16]byte { return salt }}
+	derive := func() string { return "id-" + strconv.Itoa(int(salt[0])) }
+	boot := func(rotation byte) string {
+		t.Helper()
+		salt = [16]byte{rotation}
+		id, err := p.uniqueID(ctx, derive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	stored := func() (string, bool) {
+		v, ok, err := st.GetSetting(ctx, store.SettingUniqueID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v, ok
+	}
+
+	// A fresh store booted with rotation on: a salted value, nothing pinned.
+	if got := boot(7); got != "id-7" {
+		t.Fatalf("rotated boot of a fresh store served %q", got)
+	}
+	if v, ok := stored(); ok {
+		t.Fatalf("rotation pinned %q", v)
+	}
+	// Off: derived without salt and pinned.
+	pinned := boot(0)
+	if pinned != "id-0" {
+		t.Fatalf("first boot without rotation served %q", pinned)
+	}
+	// On / off / on / off: every rotated boot serves its salted value and
+	// writes nothing; every boot without rotation serves the pin.
+	for i, rotation := range []byte{9, 0, 11, 0} {
+		got := boot(rotation)
+		want := pinned
+		if rotation != 0 {
+			want = "id-" + strconv.Itoa(int(rotation))
+		}
+		if got != want {
+			t.Errorf("boot %d (salt %d) served %q, want %q", i, rotation, got, want)
+		}
+		if v, ok := stored(); !ok || v != pinned {
+			t.Errorf("boot %d (salt %d): stored %q (%v), want the pin %q", i, rotation, v, ok, pinned)
+		}
+	}
+	if _, ok, _ := st.GetSetting(ctx, store.SettingUniqueIDRotated); ok { //nolint:staticcheck // the deprecated marker must stay unwritten
+		t.Error("the rotation marker was written")
+	}
+
+	// The migration: a stored value a host's pinning flagged "1" is
+	// re-derived, pinned and the flag cleared by a boot without rotation;
+	// a rotated boot leaves both alone.
+	for _, k := range []struct{ key, v string }{{store.SettingUniqueID, "salted-by-host"}, {store.SettingUniqueIDRotated, "1"}} { //nolint:staticcheck // the deprecated marker the migration reads
+		if err := st.SetSetting(ctx, k.key, k.v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := boot(5); got != "id-5" {
+		t.Errorf("rotated boot over a flagged value served %q", got)
+	}
+	if v, _ := stored(); v != "salted-by-host" {
+		t.Errorf("rotated boot rewrote the stored value to %q", v)
+	}
+	if got := boot(0); got != "id-0" {
+		t.Errorf("migration served %q, want the re-derived id-0", got)
+	}
+	if v, _ := stored(); v != "id-0" {
+		t.Errorf("migration pinned %q", v)
+	}
+	if flag, _, _ := st.GetSetting(ctx, store.SettingUniqueIDRotated); flag != "" { //nolint:staticcheck // as above
+		t.Errorf("flag %q not cleared", flag)
 	}
 }

@@ -39,6 +39,11 @@ const (
 	// boot with the dev flag off recognise a leftover salted value as
 	// stale — rather than pinning it as the bridge's permanent identity —
 	// and re-derive the deterministic one instead.
+	//
+	// Deprecated: read for the migration only; never written. The node
+	// facade pins nothing under rotation, so it has no salted value to
+	// flag; it reads the key once to re-derive a value a host's own pinning
+	// flagged, and clears it (issue #122). Removed after the API window.
 	SettingUniqueIDRotated = "basic_information.unique_id_rotated"
 )
 
