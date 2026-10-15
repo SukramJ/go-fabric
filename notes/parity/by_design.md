@@ -2917,3 +2917,54 @@ By design (ADR 0020). A bare controller has no sender socket of its own;
 the narrower ACL is what the group needs; a device before Matter 1.5 has
 no Groupcast.
 
+### BD-Matter-Mdns-ReannounceLoop — the facade re-announces its DNS-SD records on a timer; matter.js only answers queries
+
+matter.js's `MdnsServer.ts:158-164` at `0ceb202d` re-sends a record in
+answer to a query once a quarter of its TTL has passed and never
+announces unsolicited after the start. This module's `mdns.Zeroconf`
+runs on a library that probes and announces once per Register
+(`mdns/zeroconf.go:46-60`), so a commissioner that missed the announce
+and does not query again never learns of the node; the facade therefore
+starts `Zeroconf.StartReannounceLoop` on `Start` every
+`node.Network.ReannounceInterval` (default 30 min, under half of
+mDNSResponder's 75-minute TTL), stops it on `Stop`, and exposes
+`Node.TriggerReannounce` for link changes; a second loop on one
+`Zeroconf` is refused. Report AU (#119).
+
+By design. The loop is this module's device for its mDNS library, not a
+Matter behaviour; the cadence is a cache-lifetime argument.
+
+### BD-Matter-LevelControl-NativeSource — the native-ramp source switches off when the level arrives and couples no colour temperature
+
+matter.js's `LevelControlServer` runs the ramp itself and, for a
+`*WithOnOff` command, moves OnOff on every step of its own transition
+(`LevelControlServer.ts`, `transition`/`setLevel` as cited in
+`cluster/levelcontrol/native.go`). `levelcontrol.NewNativeSource` hands
+the ramp to the device (`NativeRamp.Ramp(level, duration, withOnOff)`):
+it switches the light on before a ramp up from off in matter.js's order,
+and switches off only when the level actually reaches the minimum —
+immediately, on the device's change notification, or when the ramp is
+due to end; a later command cancels the pending switch-off. It reports
+RemainingTime 0 and couples no colour temperature (the engine's
+`Transitions.ColorTemperature` has no hand-off counterpart). The plain
+Stop is gated by ExecuteIfOff and StopWithOnOff is not
+(`LevelControlServer.ts:481-496`). Report AV (#120).
+
+By design. A device that ramps natively reports its level when it gets
+there; the server cannot step what it does not drive.
+
+### BD-Matter-SqliteStore-WrapOrder — after a wrap the store takes the lowest free number and starts at 2
+
+matter.js `ServerEndpointStores.ts:170-183` at `0ceb202d` continues from
+the number after the last assigned one after wrapping to 1, and skips
+the preset numbers an application reserves. `endpoint/sqlitestore`
+lifts its persisted counter past the highest stored number on every
+allocation, so once 0xFFFE is in use it walks from the first bridged
+number (2 — 1 is the Aggregator) and takes the lowest free one; there is
+no preset-number set because the bridge reserves nothing beyond the
+Aggregator. `ErrEndpointsExhausted` only after a full pass. Report AV
+(#121).
+
+By design. Matching matter.js's order after a wrap would need a second
+persisted cursor for a case that needs 65 533 allocations to occur.
+

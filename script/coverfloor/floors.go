@@ -140,7 +140,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
 	{
 		pkg: "github.com/SukramJ/go-fabric/node",
-		min: 72,
+		min: 83,
 		why: "the end-to-end tests commission the node over UDP with bridgetest.Commissioner (PASE, AddNOC, CASE, re-establishment after a restart, RemoveFabric); the enhanced commissioning window, UpdateNOC's fabric hook, CASE resumption and the OTA applier have no test in the package",
 	},
 	{pkg: "github.com/SukramJ/go-fabric/parity", min: 100},

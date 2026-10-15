@@ -161,3 +161,19 @@ the hand-off path; mounting the native dimmer (Decision 3).
   minimum (difference 2); no CT coupling and RemainingTime 0 on the hand-off
   path.
 - sqlitestore: post-wrap lowest-free order (difference 5); wrap to 2, not 1.
+
+## Owner's decisions (2026-10-15, tranche 27)
+
+- **Q1:** the native dimmer stays a package-level proof (its test), not
+  a fleet endpoint — mounting it moves the PICS and golden and needs a
+  harness update run; it joins the fleet in the next wave that runs
+  the harness.
+- **Q2:** `endpoint/identity.go` reworded in the owner commit ("until
+  the range wraps", with the matter.js lines).
+- **Q3:** keep D2 (lowest free number after the wrap) —
+  `BD-Matter-SqliteStore-WrapOrder`.
+- **Difference 1 (Stop gating):** matter.js is right and the brief and
+  the issue comment were wrong — the plain Stop is gated, StopWithOnOff
+  is not (`LevelControlServer.ts:481-496`); recorded in
+  `BD-Matter-LevelControl-NativeSource` with the delayed switch-off and
+  the missing colour-temperature coupling. Differences 2–5 accepted.

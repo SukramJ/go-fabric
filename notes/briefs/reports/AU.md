@@ -201,3 +201,14 @@ in the amended §3 fix-up.
   announces once per Register only.
 - `bootid` UniqueID rotation (a dev knob with no matter.js counterpart;
   under it nothing is pinned) — if not already catalogued.
+
+## Owner's decisions (2026-10-15, tranche 27)
+
+- **Q1 (#122):** migrate once — the marker stays read until the
+  constant is removed (done in the §3 fix-up).
+- **Q2 (#119):** `Zeroconf.StartReannounceLoop` refuses a second loop
+  (done in the §2 fix-up); the CHANGELOG advice stays.
+- **Q3:** `TestReactionLeave` is a findings note.
+- The `node` floor moves to 83 in the owner commit. `by_design`:
+  `BD-Matter-Mdns-ReannounceLoop`; `bootid` rotation is catalogued
+  already.
