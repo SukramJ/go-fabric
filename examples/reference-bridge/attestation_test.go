@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/pem"
 	"os"
@@ -48,7 +49,7 @@ func TestLoadAttestation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadAttestation: %v", err)
 	}
-	if att.Chain == nil || string(att.Chain.DAC) != string(chain.DAC) || string(att.CertificationDeclaration) != string(cd) {
+	if att.Chain == nil || !bytes.Equal(att.Chain.DAC, chain.DAC) || !bytes.Equal(att.CertificationDeclaration, cd) {
 		t.Fatal("the loaded chain is not the one written")
 	}
 	if err := os.Remove(filepath.Join(dir, "pai.pem")); err != nil {

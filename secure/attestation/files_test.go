@@ -4,6 +4,7 @@
 package attestation
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -77,7 +78,7 @@ func TestLoadChainFiles_Formats(t *testing.T) {
 			if err != nil {
 				t.Fatalf("LoadChainFiles: %v", err)
 			}
-			if string(got.DAC) != string(want.DAC) || string(got.PAI) != string(want.PAI) || string(cd) != string(wantCD) {
+			if !bytes.Equal(got.DAC, want.DAC) || !bytes.Equal(got.PAI, want.PAI) || !bytes.Equal(cd, wantCD) {
 				t.Error("certificates or CD differ from the files written")
 			}
 			if !got.DACKey.Equal(want.DACKey) {
