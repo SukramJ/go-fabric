@@ -307,6 +307,48 @@ Sonnet never writes a fact about matter.js or chip into the repo, and never
 touches the security-relevant paths named in the first row. When in doubt
 about which row a task is in, it is in the first.
 
+## Token use
+
+Set by the owner on 2026-10-14 ("Wichtig ist mir eine effiziente Nutzung
+der Token"). A wave costs on the order of half a million to a million
+tokens per implementing agent before the owner's review; the rules below
+are what keeps that from doubling.
+
+- **Read slices, not files.** `sed -n a,bp`, `grep -n` with a tight
+  pattern and `head`; a whole file only when the task is the file. Never
+  re-read what is already in context; cite the earlier read.
+- **Delegate first reads.** A source tree's inventory (matter.js, chip,
+  this repo) is a Sonnet read written to a `read-*.md` with `file:line`
+  for every fact; the owner spot-checks the load-bearing lines and
+  verifies every matter.js or chip fact before it enters a brief, an ADR
+  or `notes/parity/` — Sonnet's result is a map, never a citation.
+- **Logs by their summary.** Guards run in the background with a summary
+  log (HEAD before and after, one `exit` line per guard); read the
+  summary, and open a guard's log only on failure, with `grep` for
+  `FAIL`, `DATA RACE`, `_test.go:` and the error strings — never `cat`.
+  The same for CI: the job log is fetched once to a file and grepped.
+- **One turn, every independent call.** Reads, checks and background
+  starts that do not depend on each other go out together; a wait is a
+  `Monitor` or an `until` loop in the background, not polling by hand.
+- **Short artefacts.** A brief names decisions and sections, not
+  prose; a report follows the fixed shape (per §, guards with HEAD,
+  differences, decisions, left out, questions, `by_design` candidates);
+  a `by_design` entry is one paragraph with the citations and one
+  sentence of reasoning; status messages to the owner are short, outcome
+  first, in German.
+- **Skip what cannot have changed.** No chip-tool run when the daemon's
+  composition and FeatureMap did not move; no schema regeneration for a
+  comment change; no second guard run for a notes-only commit — say
+  what was skipped and why.
+- **Edit by script.** Several replacements in several files are one
+  scripted call with asserted anchors, not a chain of interactive
+  edits; a generated file is regenerated, never patched.
+- **Agents read what the brief names.** An implementing agent gets the
+  file list and the pinned sources in the brief, reads those, and reports
+  in the fixed shape; it does not survey the tree. One agent per brief;
+  two agents only on disjoint paths, and the chip-tool harness is one
+  agent's at a time.
+
 ## Conventions worth knowing before the linter tells you
 
 - Every new `.go` file opens with the Apache-2.0 header, or
