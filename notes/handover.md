@@ -38,6 +38,7 @@ German, briefly. Six waves were planned against the phases:
 | 21 | ADR 0020 stage 5, part 2: `binding.Manager`, `core.Binding.OnChange` + fabric-scoped writes, the bridge decoding Binding writes, `node.Config.Client` (the node's client stack), the 11 controller device types, `TestLiveBinding` (TC-BIND-2.1) | AO | `wave/2026-10-14-tranche-21` (#103); docs PR `docs/wave-21-followups` | see §21 |
 | 22 | ADR 0020 stage 4 close-out: `device.Lookup`, the validator input seam (`endpoint.DeviceTypeTree`), `client.Endpoint.Device()`/`Conformance()`, `core.Binding.Persist` + node persistence; owner: the doubled group-sender start/stop fixed | AP | `wave/2026-10-14-tranche-22` (#105); docs PR `docs/wave-22-followups` | see §22 |
 | 24 | concept v2 phase 9 (ADR 0022): 15 media definitions, `cluster/media` (14 servers over typed host ports, state transaction), `core.Messages`, three media device types, daemon `--media` (CastingVideoPlayer + ContentApp after chip's tv-app), 13 media families, PICS ep45/ep46, `app-media` CI group | AR | `wave/2026-10-14-tranche-24` (#111); docs PR `docs/wave-24-followups` | see §24 |
+| 28 | Issues #117–#122 from the loom integration of v0.4.0: `node.EndpointPersistence`, `attestation.LoadChainFiles` + `--attestation-dir`, the facade-owned re-announce loop, `levelcontrol.NewNativeSource` + `light` scalers, `sqlitestore` wrap/occupancy allocation, the UniqueID marker migration | AU, AV, owner (#118) | `wave/2026-10-15-tranche-27` (#123); docs PR `docs/wave-27-followups` | see §28 |
 | 27 | Licence: Apache-2.0 from the next release (ADR 0023), `NOTICE`, every SPDX header and generator template, `CLA.md` + PR template, README/CONTRIBUTING/CLAUDE.md; `v0.4.0` and earlier stay MIT | owner | `wave/2026-10-15-license-apache` (#115) | — |
 | 26 | `v0.4.0`: `examples/reference-controller` (pair/unpair/nodes/node/read/write/invoke/subscribe/events/group/bind/ota serve), `secure/setup` QR + manual-code decoders, the persisted controller fabric (`ca.SettingStore`, `FabricConfig.Store`), `spec.EncodeJSON`/`DecodeJSON`, `docs/manual-test-plan-0.4.0.md`, CHANGELOG `[0.4.0]`, tag `v0.4.0` | AT | `wave/2026-10-14-tranche-26` (#113); docs PR `docs/wave-26-followups` | see §26 |
 | 25 | ADR 0020 stage 6a+6b: `controller/dcl` (DCL client, certificate store as `attestation.PAAStore`/`Revocations`, OTA version lookup; opt-in), `core.CommissionerControl` after chip + `node.Config.CommissionerControl`, daemon `--dcl`, `TestLiveCommissionerControl`; Joint Fabric (6c) deferred past v1.0.0 | AS | `wave/2026-10-14-tranche-25` (#109); docs PR `docs/wave-25-followups` | see §25 |
@@ -1602,4 +1603,36 @@ Cleanup after the merge: `wave26/controller-cli`,
 `v0.4.0` on `main` and the GitHub release with the notes. Next: the
 owner's findings from the test plan; the `v1.0.0` freeze wave after
 them.
+
+## 28. Wave 27 (2026-10-15, the owner away; the first issues from loom's integration of `v0.4.0`)
+
+Six issues the owner filed from OpenCCU-Loom's integration (#117–#122),
+each assessed and commented first (plan or decision on the issue), then
+one tranche: brief AU (`wave27/node`: #117 persistence export, #119
+re-announce loop in the facade, #122 UniqueID marker) and brief AV
+(`wave27/clusters`: #120 native-ramp LevelSource + scalers, #121
+sqlitestore allocation) in parallel on disjoint paths, the owner's own
+#118 (`secure/attestation`, a security path) on a local branch — all
+three merged into `wave/2026-10-15-tranche-27` (owner's rule: one PR
+per wave, not per issue). Guards green on the merged tranche; no
+chip-tool (daemon composition unchanged; the native dimmer stays a
+package-level proof until a harness-running wave mounts it).
+
+- **Decisions worth remembering:** the marker of #122 is read once as a
+  migration until the Deprecated constant goes (loom's own pinning wrote
+  it); `Zeroconf.StartReannounceLoop` refuses a second loop; matter.js
+  gates the plain Stop and not StopWithOnOff (the brief had it the other
+  way round — the agent followed matter.js); SQLITE_BUSY is covered by
+  `busy_timeout`, so no retry; after a wrap the store takes the lowest
+  free number (`BD-Matter-SqliteStore-WrapOrder`).
+- **Flakes seen:** `TestSessionAndSubscriptionDiagnostics` (known),
+  `TestReactionLeave` under race (findings note), a bridge chunking test
+  once under load 18 (three guard runs at once — run guards one at a
+  time per machine).
+
+Cleanup after the merge: `wave27/node`, `wave27/clusters`,
+`wave/2026-10-15-attestation-files`, `planning/briefs-wave-27`, the
+tranche and docs branches, the two worktrees. Next: the owner's
+test-plan findings; `v0.5.0` when they are in (the licence change is
+announced for it).
 
