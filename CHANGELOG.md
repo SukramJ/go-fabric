@@ -13,6 +13,7 @@ pseudo-version of `main`.
 ### Added
 
 - `node.EndpointPersistence` (issue #117): the facade's per-endpoint stack state — scene tables (`endpoint.ScenesStore`, under `scenes.<key>`) and the commissioner-written bridged NodeLabel (`OnNodeLabelWritten`, `NodeLabel`, under `bridged_node_label.<key>`) — exported for a host with its own assembler (`node.Config.Topology`). `node.NewEndpointPersistence(st, logger)` builds it over a `*store.Store` before `node.New`, `Node.Persistence()` returns the one the facade uses, and `node.Config.EndpointPersistence` replaces it in the facade's own assembler and Aggregator. The keys are unchanged, so a host's database written under them reads back.
+- The node facade owns the DNS-SD re-announce loop (issue #119): `node.Network.ReannounceInterval` (0 is `node.DefaultReannounceInterval`, 30 min, under half the 75-minute mDNSResponder TTL) and `node.Network.DisableReannounce`; `Node.Start` starts the loop when the advertiser is an `mdns.Reannouncer` and `Node.Stop` ends it, and `Node.TriggerReannounce(ctx)` re-publishes on a link change. The `mdns` package gains the optional interfaces `mdns.Reannouncer` (implemented by `Zeroconf`) and `mdns.Enabled` (`Zeroconf` true, `Noop` false) with `mdns.IsEnabled(a)`; `mdns.Advertiser` is unchanged. A host that started `Zeroconf.StartReannounceLoop` itself drops that call (or sets `DisableReannounce`), or two loops run. The loop is this module's own: matter.js re-sends answers on a query, never unsolicited.
 
 ### Changed
 

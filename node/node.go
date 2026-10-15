@@ -59,8 +59,11 @@ type Node struct {
 	window     *commissioningHost
 	diagRing   *diagevent.Ring
 	advertiser mdns.Advertiser
-	bootReason uint8
-	persisted  persisted
+	// stopReannounce ends the re-announce loop Start began; nil when none
+	// runs (reannounce.go).
+	stopReannounce func()
+	bootReason     uint8
+	persisted      persisted
 	// endpoints is the endpoint-level persistence the facade's assembler
 	// and Aggregator use: Config.EndpointPersistence, else persisted.
 	endpoints EndpointPersistence
@@ -476,6 +479,7 @@ func (n *Node) Start(ctx context.Context) error {
 		n.agg.setStarted()
 	}
 	n.startGroupSender()
+	n.startReannounce()
 
 	n.root.DiagnosticLogs.AttachProvider(ringLogs{n.diagRing})
 	// BasicInformation StartUp, then GeneralDiagnostics BootReason, the
@@ -535,7 +539,8 @@ func (n *Node) Start(ctx context.Context) error {
 // the daemon's shutdown order (main.go:430-450): the OTA requestor, the
 // operational time stored once more, BasicInformation ShutDown (when the
 // node was started), the PASE providers, the CASE reaper, the
-// subscription engine, the bridge and the advertiser. Stop is idempotent
+// subscription engine, the re-announce loop, the bridge and the
+// advertiser. Stop is idempotent
 // (matter.js Node.stop, Node.ts:193) and safe without Start.
 func (n *Node) Stop(ctx context.Context) error {
 	n.mu.Lock()
@@ -570,6 +575,7 @@ func (n *Node) Stop(ctx context.Context) error {
 	if n.commissionerControl != nil {
 		n.commissionerControl.Close()
 	}
+	n.stopReannounceLoop()
 	err := n.br.Stop(ctx)
 	_ = n.advertiser.Close()
 	n.cancel()

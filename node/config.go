@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/SukramJ/go-fabric/bridge"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -160,7 +161,22 @@ type Network struct {
 	// assembler states it. EthernetNetworkDiagnostics stays mounted beside
 	// it.
 	WiFi WiFi
+	// ReannounceInterval is the cadence at which the node re-publishes its
+	// DNS-SD records when its Advertiser is an mdns.Reannouncer
+	// (mdns.Zeroconf is): the loop starts on [Node.Start] and stops on
+	// [Node.Stop]. 0 is [DefaultReannounceInterval]. The loop is this
+	// module's own device, not matter.js's (mdns.Reannouncer).
+	ReannounceInterval time.Duration
+	// DisableReannounce keeps the re-announce loop off; [Node.TriggerReannounce]
+	// still re-publishes on demand.
+	DisableReannounce bool
 }
+
+// DefaultReannounceInterval is the re-announce cadence a zero
+// [Network].ReannounceInterval selects: 30 minutes, under half the
+// 75-minute TTL Apple's mDNSResponder caches the records for, so a cache
+// sees the records again before they expire.
+const DefaultReannounceInterval = 30 * time.Minute
 
 // WiFi is a Wi-Fi node's WiFiNetworkDiagnostics configuration.
 type WiFi struct {
@@ -345,6 +361,9 @@ func (c *Config) Validate() error {
 	}
 	if c.SupportedFabrics > maxSupportedFabrics {
 		errs = append(errs, fmt.Errorf("SupportedFabrics %d exceeds %d", c.SupportedFabrics, maxSupportedFabrics))
+	}
+	if c.Network.ReannounceInterval < 0 {
+		errs = append(errs, fmt.Errorf("Network.ReannounceInterval %v is negative", c.Network.ReannounceInterval))
 	}
 	if c.OTA != nil && c.OTA.Dir == "" {
 		errs = append(errs, errors.New("OTA.Dir must be set"))
