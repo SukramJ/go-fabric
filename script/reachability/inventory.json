@@ -1413,14 +1413,14 @@
       "identifier": "TestChunkedReportFirstChunkUnacknowledgedIsPeerLoss",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 425
+      "line": 436
     },
     {
       "package": "bridge",
       "identifier": "TestChunkedReportLaterChunkUnacknowledged",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 483
+      "line": 494
     },
     {
       "package": "bridge",
@@ -3471,7 +3471,7 @@
       "identifier": "TestInitiatedPeerLoss_UnknownExchangeIsNoOp",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 129
+      "line": 140
     },
     {
       "package": "bridge",
@@ -4465,14 +4465,14 @@
       "identifier": "TestReportExhaustionPeerLoss_ClosesPeerSessionsAndSubscriptions",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 150
+      "line": 161
     },
     {
       "package": "bridge",
       "identifier": "TestReportPeerLoss_OnlyFirstMessageOfExchange",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/peer_loss_test.go",
-      "line": 252
+      "line": 263
     },
     {
       "package": "bridge",

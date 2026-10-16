@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Fixed
+
+- `bridge`: an exchange this node opened — the OTA requestor's BDX download, a provider query — ends when the reliable tracker gives up on a message it sent, so its pending `Receive` and every later `Send` fail with `ErrExchangeClosed` wrapping `mrp.ErrMaxRetransmissionsReached`. It used to keep waiting, and a download whose provider went away stayed in Downloading for the whole 5-minute BDX idle timeout before the requestor could query again; matter.js's `MessageExchange.send` throws once the retransmissions are exhausted (`MessageExchange.ts:604-624`). This was 5 of the 17 minutes chip's TC_SU_2_2 took (step 4 waits for the aborted step-3 download).
+
+### Changed
+
+- CI: the core certification families run as four parallel groups (`core-su`, `core-idm`, `core-ace`, `core-rest`) instead of one job, so a pull request's families finish in about the time of SU alone.
+
 ## [0.5.2] — 2026-10-16
 
 ### Added
