@@ -10,6 +10,17 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-10-16
+
+### Added
+
+- `levelcontrol.NativeMover` (#129): an optional interface of a `NativeRamp` that replaces the source's Move logic, the Go form of overriding matter.js `moveLogic` (`LevelControlServer.ts:378-403`). Move and MoveWithOnOff call `MoveLevel(ctx, req, withOnOff)` after the ExecuteIfOff gate instead of ramping to the bound; the On/Off coupling is then the host's. A device for which a jump to the bound is no reading of a continuous move — a speaker's volume — returns nil and keeps its level. A device without it keeps the immediate move to the bound.
+
+### Fixed
+
+- `levelcontrol.NativeSource` (#129): a "with On/Off" command to MinLevel with no transition time switches off before it returns, as matter.js does on its immediate path (`Transitions.ts:147`, `:238-241`; `LevelControlServer.ts:624-627`); it used to wait for the device to report the level, and without a change notifier waited for good. A host that switched off itself inside `Ramp` can drop that.
+- `bridge`: the single-active-PASE slot is released when Pake3 establishes the session, before the reply is sent. It used to be released after the send, so a commissioner that read the reply, closed the PASE session and opened the next one at once could have its PBKDFParamRequest — handled on another dispatch goroutine — answered `pase_busy` and dropped after the MRP ack, and waited out its whole timeout ("Could not connect to device"). This was the CI flake of `node` `TestSessionAndSubscriptionDiagnostics`; the node debug log the test now keeps on failure showed `matter.rx.sc.pase_busy` one millisecond after Pake3.
+
 ## [0.5.1] — 2026-10-16
 
 ### Fixed
@@ -3914,7 +3925,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/SukramJ/go-fabric/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/SukramJ/go-fabric/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/SukramJ/go-fabric/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/SukramJ/go-fabric/compare/v0.3.1...v0.4.0

@@ -10,6 +10,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -657,5 +658,109 @@ func TestNativeSourceSettlesBelowMinLevel(t *testing.T) {
 	}
 	if d.OnOff() {
 		t.Error("OnOff still true after the device reported 0 below MinLevel 1")
+	}
+}
+
+// moverDevice is a rampDevice that declines Move (a speaker's volume).
+type moverDevice struct {
+	*rampDevice
+	moves int
+}
+
+func (m *moverDevice) MoveLevel(context.Context, levelcontrol.MoveRequest, bool) error {
+	m.moves++
+	return nil
+}
+
+// TestNativeSourceMover (#129): a device implementing NativeMover takes
+// Move and MoveWithOnOff itself (matter.js moveLogic override,
+// LevelControlServer.ts:378-403) — no ramp, no stop, no coupling; one
+// without it ramps to the bound.
+func TestNativeSourceMover(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	d := &rampDevice{level: 100, known: true, on: true}
+	m := &moverDevice{rampDevice: d}
+	d.src = levelcontrol.NewNativeSource(m, d, levelcontrol.NativeConfig{Lighting: true})
+	srv := levelcontrol.NewServer(levelcontrol.Config{Source: d.src, Lighting: true})
+	for _, cmd := range []uint32{levelcontrol.CmdMove, levelcontrol.CmdMoveWithOnOff} {
+		if _, err := srv.MatterInvoke(ctx, cmd, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(10)}); err != nil {
+			t.Fatalf("Move %#x through a NativeMover: %v", cmd, err)
+		}
+	}
+	if m.moves != 2 {
+		t.Errorf("MoveLevel called %d times, want 2", m.moves)
+	}
+	wantLog(t, d)
+	if !d.OnOff() {
+		t.Error("MoveWithOnOff down switched off a device whose mover kept its level")
+	}
+
+	plain, pd := nativeServer(100, true, true, levelcontrol.NativeConfig{})
+	if _, err := plain.MatterInvoke(ctx, levelcontrol.CmdMove, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp}); err != nil {
+		t.Fatalf("Move without a NativeMover: %v", err)
+	}
+	wantLog(t, pd, "ramp 254 0s false")
+}
+
+// slowReportDevice takes a ramp but does not change its reported level
+// synchronously (a device that confirms after a round trip, with no
+// change notifier).
+type slowReportDevice struct{ *rampDevice }
+
+func (s *slowReportDevice) Ramp(_ context.Context, level uint8, dur time.Duration, withOnOff bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.log = append(s.log, fmt.Sprintf("ramp %d %v %t", level, dur, withOnOff))
+	return nil
+}
+
+// TestNativeSourceImmediateSwitchOff (#129): MoveToLevelWithOnOff to the
+// minimum with no transition switches off before the command returns,
+// without waiting for the device's report — matter.js sets the target in
+// state at once (Transitions.ts:147, :238-241) and couples off on that
+// commit (LevelControlServer.ts:624-627).
+func TestNativeSourceImmediateSwitchOff(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	d := &rampDevice{level: 100, known: true, on: true}
+	s := &slowReportDevice{rampDevice: d}
+	d.src = levelcontrol.NewNativeSource(s, d, levelcontrol.NativeConfig{Lighting: true})
+	srv := levelcontrol.NewServer(levelcontrol.Config{Source: d.src, Lighting: true})
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(0)}); err != nil {
+		t.Fatalf("MoveToLevelWithOnOff(1, 0): %v", err)
+	}
+	if d.OnOff() {
+		t.Error("OnOff still true after an immediate MoveToLevelWithOnOff to MinLevel returned")
+	}
+	if lvl, _ := d.Level(); lvl != 100 {
+		t.Fatalf("test device changed its level synchronously (%d)", lvl)
+	}
+}
+
+// failingOnOff refuses to switch off.
+type failingOnOff struct{ on bool }
+
+func (f *failingOnOff) OnOff() bool { return f.on }
+
+func (f *failingOnOff) SetOnOff(_ context.Context, on bool) error {
+	if !on {
+		return errors.New("refused")
+	}
+	f.on = on
+	return nil
+}
+
+// TestNativeSourceImmediateSwitchOffRefused: the immediate switch-off of
+// a "with On/Off" command to MinLevel is the command's result — a refusal
+// fails the command, as matter.js's preCommit failing aborts the
+// transaction (LevelControlServer.ts:624-627).
+func TestNativeSourceImmediateSwitchOffRefused(t *testing.T) {
+	t.Parallel()
+	d := &rampDevice{level: 100, known: true}
+	src := levelcontrol.NewNativeSource(d, &failingOnOff{on: true}, levelcontrol.NativeConfig{Lighting: true})
+	err := src.MoveToLevelWithOnOff(context.Background(), levelcontrol.MoveToLevelRequest{Level: 1})
+	if err == nil || !strings.Contains(err.Error(), "switch off") {
+		t.Fatalf("refused switch-off: %v, want the switch-off error", err)
 	}
 }

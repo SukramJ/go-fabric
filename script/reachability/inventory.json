@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5102,
+  "entry_points": 5106,
   "entry_packages": [
     ".",
     "bdx",
@@ -206,9 +206,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12298,
-    "reachable": 8714,
-    "whitelisted": 3579,
+    "total_exported": 12300,
+    "reachable": 8715,
+    "whitelisted": 3580,
     "unreachable": 5
   },
   "by_package": [
@@ -846,70 +846,77 @@
       "identifier": "TestBridge_PaseAbortedByPeerStatusReport",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 358
+      "line": 359
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_BelowCapKeepsWindowOpen",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 81
+      "line": 82
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_NoWindowIsNilSafe",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 122
+      "line": 123
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_ResetGivesFreshBudget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 100
+      "line": 101
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseFailures_RevokesWindowAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 65
+      "line": 66
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestBridge_PaseInFlightSlotReleasedBeforePake3Reply",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/securechannel_bruteforce_test.go",
+      "line": 407
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseInFlightSlotReleasedOnPake1Failure",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 243
+      "line": 244
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockedOutAtCap",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 140
+      "line": 141
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutBacksOffOnRepeatedCaps",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 304
+      "line": 305
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockoutExpiresOnItsOwn",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 271
+      "line": 272
     },
     {
       "package": "bridge",
       "identifier": "TestBridge_PaseLockout_SurvivesInternalRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/securechannel_bruteforce_test.go",
-      "line": 197
+      "line": 198
     },
     {
       "package": "bridge",
