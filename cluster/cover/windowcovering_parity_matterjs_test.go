@@ -321,15 +321,15 @@ func TestWindowCoveringServer_WriteModeAccepted(t *testing.T) {
 	t.Parallel()
 
 	srv := cover.NewWindowCoveringServer(cover.Config{})
-	if err := srv.MatterWrite(context.Background(), clusterwire.WindowCoveringAttrMode, uint8(3)); err != nil {
-		t.Fatalf("MatterWrite(Mode, 3): unexpected error: %v", err)
+	if err := srv.MatterWrite(context.Background(), clusterwire.WindowCoveringAttrMode, uint8(9)); err != nil {
+		t.Fatalf("MatterWrite(Mode, 9): unexpected error: %v", err)
 	}
 	v, ok := srv.MatterRead(clusterwire.WindowCoveringAttrMode)
 	if !ok {
 		t.Fatal("MatterRead(Mode): ok=false after write")
 	}
-	if got, _ := v.(uint8); got != 3 {
-		t.Errorf("Mode after write = %d, want 3", got)
+	if got, _ := v.(uint8); got != 9 {
+		t.Errorf("Mode after write = %d, want 9", got)
 	}
 }
 
@@ -530,5 +530,65 @@ func TestParityMatterJS_WindowCoveringAcceptedCommands(t *testing.T) {
 		if _, err := lift.MatterInvoke(context.Background(), cmd, fields); err != nil {
 			t.Errorf("listed command 0x%02X: %v", cmd, err)
 		}
+	}
+}
+
+// TestWindowCoveringMaintenanceMode: MaintenanceMode clears ConfigStatus
+// Operational and answers every movement command BUSY until it is cleared;
+// MotorDirectionReversed on a lift sets LiftMovementReversed; each
+// ConfigStatus move is reported. Mirrors matter.js
+// packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:162-200
+// and :289-292 (0ceb202d), the behaviour TC-WNCV-2.3 steps 1 and 3 check.
+func TestWindowCoveringMaintenanceMode(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv := cover.NewWindowCoveringServer(cover.Config{FeatureMap: 0x05})
+	var notes [][]uint32
+	srv.OnMatterAttributesChanged(func(ids []uint32) { notes = append(notes, ids) })
+	status := func() uint8 {
+		v, _ := srv.MatterRead(clusterwire.WindowCoveringAttrConfigStatus)
+		return v.(uint8)
+	}
+	if got := status(); got != 0x09 {
+		t.Fatalf("ConfigStatus = 0x%02X, want 0x09 (Operational, LiftPositionAware)", got)
+	}
+	write := func(mode uint8) {
+		t.Helper()
+		if err := srv.MatterWrite(ctx, clusterwire.WindowCoveringAttrMode, mode); err != nil {
+			t.Fatalf("MatterWrite(Mode, %d): %v", mode, err)
+		}
+	}
+	write(0x01)
+	if got := status(); got != 0x0D {
+		t.Errorf("reversed: ConfigStatus = 0x%02X, want 0x0D", got)
+	}
+	write(0x04)
+	if got := status(); got != 0x08 {
+		t.Errorf("maintenance: ConfigStatus = 0x%02X, want 0x08", got)
+	}
+	for _, cmd := range []uint32{clusterwire.WindowCoveringCmdDownOrClose, clusterwire.WindowCoveringCmdStopMotion} {
+		_, err := srv.MatterInvoke(ctx, cmd, nil)
+		var sc im.StatusCodeError
+		if !errors.As(err, &sc) || sc.MatterStatusCode() != im.StatusBusy {
+			t.Errorf("command 0x%02X in maintenance: %v, want BUSY", cmd, err)
+		}
+	}
+	write(0x00)
+	if got := status(); got != 0x09 {
+		t.Errorf("cleared: ConfigStatus = 0x%02X, want 0x09", got)
+	}
+	if _, err := srv.MatterInvoke(ctx, clusterwire.WindowCoveringCmdDownOrClose, nil); err != nil {
+		t.Errorf("DownOrClose after maintenance: %v", err)
+	}
+	configNotes := 0
+	for _, ids := range notes {
+		for _, id := range ids {
+			if id == clusterwire.WindowCoveringAttrConfigStatus {
+				configNotes++
+			}
+		}
+	}
+	if configNotes != 3 {
+		t.Errorf("ConfigStatus reported %d times, want 3", configNotes)
 	}
 }
