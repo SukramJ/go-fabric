@@ -53,7 +53,11 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/cluster/cover", min: 98},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/energy", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/fan", min: 98},
-	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 86},
+	// 85, not 86: NativeSource's owed switch-off is paid by whichever of
+	// the device's notification and the ramp's deadline timer gets there
+	// first (native.go settle/pay), so a run covers one branch or the
+	// other — CI measured 85.9 where a local run measured 86.1.
+	{pkg: "github.com/SukramJ/go-fabric/cluster/levelcontrol", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/light", min: 94},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/lock", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/cluster/measurement", min: 86},
@@ -114,6 +118,14 @@ var floors = []packageFloor{
 	// Brief AT §4: the floor the brief set; measured 74.0 with
 	// TestReferenceController and TestReferenceControllerOTA alone.
 	{pkg: "github.com/SukramJ/go-fabric/examples/reference-controller", min: 70},
+	// Brief AW: measured 59.3-60.2; the uncovered part is main and the
+	// paired-node path, which needs a device on the network.
+	{pkg: "github.com/SukramJ/go-fabric/examples/quickstart-controller", min: 55},
+	{
+		pkg: "github.com/SukramJ/go-fabric/examples/quickstart-device",
+		min: 20,
+		why: "brief AW: measured 24.4. The test drives newNode, the program's substance; main and run bind :5540 and the mDNS groups, which a unit test does not",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/im", min: 82},
 	// Measured 91.7-92.7 across six runs at varying GOMAXPROCS: this
 	// package has concurrent paths whose coverage depends on scheduling, so

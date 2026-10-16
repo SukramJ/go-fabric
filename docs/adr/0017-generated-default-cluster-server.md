@@ -1,7 +1,7 @@
 # ADR 0017 — A generated default cluster server, so that a cluster without matter.js logic costs no hand-written server
 
 - **Status**: Accepted — implemented in #40 (2026-10-10): `cluster/spec.Server`, `cluster/filter` on it, FixedLabel as the second proof; the schema tables stay as decided (phase 0 of
-  [`../concept-matter-1.6.1-and-device-layer.md`](../concept-matter-1.6.1-and-device-layer.md))
+  [`../concept-matter-1.6.1-and-device-layer.md`](../history/concept-matter-1.6.1-and-device-layer.md))
 - **Date**: 2026-10-08
 - **Related**:
   [ADR 0013 — generated cluster definitions](./0013-generated-cluster-definitions.md),

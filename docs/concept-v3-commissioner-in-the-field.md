@@ -1,7 +1,7 @@
 # Konzept v3: Der Commissioner im Feld
 
 Stand 2026-10-16, go-fabric `v0.5.0`. Fortsetzung von
-[Konzept v2](./concept-v2-scope-extension.md). Sprache ist Deutsch, weil es
+[Konzept v2](./history/concept-v2-scope-extension.md). Sprache ist Deutsch, weil es
 ein Planungsstand ist; die ADRs daraus sind Englisch.
 
 Konzept v2 hat den Commissioner gebaut und gegen eigene Nodes, den
@@ -28,7 +28,7 @@ Jede matter.js-Zeile gilt am Pin `0ceb202d`
 | 0.5 | Status-Tabelle im README | **Ja.** Klein. |
 
 Unverändert: `v1.0.0` folgt den Befunden aus dem Testplan
-(`docs/manual-test-plan-0.4.0.md`) und friert `device/`, `node/` und
+(`notes/manual-test-plan-0.4.0.md`) und friert `device/`, `node/` und
 `controller/` ein; Joint Fabric bleibt dahinter (ADR 0020, Stufe 6c).
 
 ---

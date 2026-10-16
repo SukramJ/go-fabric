@@ -4,7 +4,8 @@
 standard (see [`CLAUDE.md`](../CLAUDE.md)), but it is a *larger* project: a full
 Matter stack with both node roles, several radio transports, a generated
 cluster library, and a set of runtime and tooling packages. `go-fabric` is one
-slice of that — the device side of the wire, as an embeddable Go library.
+slice of that — the device side of the wire and, since ADR 0020, a full
+commissioner/controller, as an embeddable Go library.
 
 This page maps the two, so that "matter.js has X and we don't" is a decision on
 record rather than an open question. Everything here is measured against
@@ -94,7 +95,7 @@ since 2026-10-08 is every cluster a home-automation device type mandates or
 allows, 101 of the 135, through a generated default server
 ([ADR 0017](./adr/0017-generated-default-cluster-server.md)); the
 measured gap and the four tranches are in
-[`concept-matter-1.6.1-and-device-layer.md`](./concept-matter-1.6.1-and-device-layer.md) §A.2–A.3.
+[`concept-matter-1.6.1-and-device-layer.md`](./history/concept-matter-1.6.1-and-device-layer.md) §A.2–A.3.
 
 | Cluster family | matter.js | go-fabric | State | Interest | Assessment |
 | --- | --- | --- | --- | --- | --- |
@@ -111,7 +112,7 @@ measured gap and the four tranches are in
 | DiagnosticLogs | an empty generated class (`DiagnosticLogsServer.ts`) | full after chip's `diagnostic-logs-server` (ADR 0021, wave 23, #107): the BDX initiator and sender on the requesting session, chip's statuses and limits, the `LogCollector` host port; the reference daemon serves its diagnostic event ring | ✅ | — | `BD-chip-DiagLogs-BDX` (one `EndLogCollection`; the DLOG case stays manual at the pinned image). matter.js is not the reference here: it has no server. |
 | OTA Software Update **Requestor** | ✅ | full (`cluster/core/ota_software_update_requestor.go`): matter.js's `OtaSoftwareUpdateRequestorServer` rule for rule, DefaultOTAProviders persisted per fabric, BDX download, the host's `OtaApplier`; HTTPS downloads not ported | ✅ | — | Wave 5 ([ADR 0019](./adr/0019-tcp-bdx-and-the-ota-requestor.md)). Mounted on the reference daemon's root; SU/2.2, 2.4 and 4.1 pass, the daemon's `--ota-harness` applies in place (`BD-Daemon-OTA-HarnessAppliesInPlace`). `BD-Matter-OTARequestor-OnSpecInstance`. |
 | OTA Software Update **Provider** | ✅ | full (`cluster/core/ota_provider.go`): `OtaSoftwareUpdateProviderServer` rule for rule, on its own OtaProvider endpoint (`node.Config.OTAProvider`), the BDX sender roles in `bdx/`; the software-update manager's decisions are host ports | ✅ | — | Wave 23 ([ADR 0021](./adr/0021-ota-provider-and-diagnosticlogs-over-bdx.md)), `BD-Matter-OTAProvider-HostPorts`. Proven device-to-device: the module's requestor downloads from the module's provider. The reference daemon's `--ota-provider` is TESTING ONLY; chip's SU provider cases are manual. |
-| Network diagnostics (Ethernet / Wi-Fi / Thread / Software) | ✅ | GeneralDiagnostics only | ○ | **Low** | All optional. Useful telemetry, no controller depends on them. |
+| Network diagnostics (Ethernet / Wi-Fi / Thread / Software) | ✅ | General, Software, Ethernet and Wi-Fi diagnostics (Wi-Fi through a host reporter, `node.Network.WiFi`) | ◐ | **Low** | Thread diagnostics stay out with Thread. All optional; no controller depends on them. |
 | Home-automation remainder: energy (DeviceEnergyManagement + Mode, EnergyEvse + Mode, WaterHeaterManagement + Mode, EnergyPreference, MeterIdentification, Commodity*, ElectricalGridConditions, PowerSourceConfiguration), appliance extras (TemperatureControl, MicrowaveOven*, Oven*, Refrigerator*, Laundry*Controls, DishwasherAlarm, TemperatureAlarm, ServiceArea), the seven further concentration clusters, BooleanStateConfiguration, ClosureDimension, SoilMeasurement, ThermostatUserInterfaceConfiguration, labels, localization, Software / Ethernet / WiFi diagnostics, Actions, EcosystemInformation (46 clusters at the start, 38 left after #40 and #41 added FixedLabel, six ModeBase derivations and TemperatureControl) | ✅ (most of them generated only) | ◐ | **High** | In scope since 2026-10-08. 11 were mandated by a device type in scope, 35 allowed. Built in four tranches on the generated default server ([ADR 0017](./adr/0017-generated-default-cluster-server.md)); concept §A.3. |
 | Media / content (15: MediaPlayback, KeypadInput, ContentLauncher, ApplicationLauncher, ApplicationBasic, AccountLogin, AudioOutput, Channel, TargetNavigator, MediaInput, LowPower, WakeOnLan, ContentControl, ContentAppObserver, Messages) | ✅ (fourteen generated stubs; `LowPowerServer.ts` the one with logic) | ✅ | **Med** | In scope since wave 24 (#111, [ADR 0022](./adr/0022-media-and-content-clusters.md), concept v2 phase 9): fourteen through the standard server behind typed host ports in `cluster/media`, Messages core-held for its fabric-scoped list; the three media device types generated; the reference daemon's `--media` player and content app carry chip's 13 media families (MEDIAPLAYBACK/6.8 excluded, a model contradiction). No ecosystem shows a player yet (phase 5). |
 | Camera (7), TLS (2), Joint Fabric (2; CommissionerControl entered in wave 25, #109, ADR 0020 stage 6b), Thread / network infrastructure (4) (15 clusters) | ✅ | — | ○ | **No** | Out of scope by decision, each with its reason in the concept's Appendix F.2: streams need WebRTC and a media path in the host, Joint Fabric is deferred past `v1.0.0` (ADR 0020 stage 6c: no matter.js behaviour at the pin), Thread needs hardware. The OTA provider and the media family, excluded there too, entered in waves 23 and 24. The schema and `script/clustergen` cover the rest should a host appear. AmbientContextSensing and WaterTankLevelMonitoring, which no device type mandates, await a decision. |
@@ -143,8 +144,8 @@ measured gap and the four tranches are in
 
 ## Non-goals
 
-Three of the ○ rows above are decisions, not backlog. Restating them so they
-are not re-opened by accident:
+The ○ rows above that are decisions, not backlog, restated so they are not
+re-opened by accident (the first is kept for its history):
 
 1. **No controller / commissioner role** — *superseded by
    [ADR 0020](./adr/0020-commissioner-and-controller-role.md) (accepted
@@ -168,7 +169,7 @@ are not re-opened by accident:
 ## If you are looking for the next thing to build
 
 Since 2026-10-08 the order is set by
-[`concept-matter-1.6.1-and-device-layer.md`](./concept-matter-1.6.1-and-device-layer.md)
+[`concept-matter-1.6.1-and-device-layer.md`](./history/concept-matter-1.6.1-and-device-layer.md)
 §A.3: the generated default server and the composed bridged endpoint first
 (phase 0), the protocol remainder (phase 1), the cluster breadth (phase 2),
 TCP and BDX (phase 3), the device layer (phase 4), the real-controller
@@ -194,4 +195,4 @@ doing only when a specific consumer asks for it.
 
 The complete list of what is unfinished, across this document, the
 certifiability status and the findings register, is
-[`open-items.md`](./open-items.md).
+[`open-items.md`](https://github.com/SukramJ/go-fabric/blob/v0.5.4/docs/open-items.md).

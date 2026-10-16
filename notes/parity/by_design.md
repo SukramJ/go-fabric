@@ -3010,3 +3010,18 @@ policy". Issue #133.
 By design. A host extension with no matter.js behaviour to mirror; it
 only removes ways to commission, never adds one.
 
+### BD-Matter-AttestationPolicy-ZeroProceeds — the zero attestation policy lets commissioning proceed with a warning
+
+matter.js's `ControllerCommissioningFlow.#resolveAttestationFindings`
+(`ControllerCommissioningFlow.ts:1341-1368` at `0ceb202d`) logs each
+attestation finding as a warning and proceeds when the controller set no
+policy; only `false` or a deciding function rejects. `attestation.Policy`'s
+zero value is that undefined policy (`controller/attestation/policy.go`),
+so a host that sets nothing commissions a device whose chain does not
+verify. Hosts set `attestation.Reject()` for production; the security
+page and the controller guide say so. Raised in brief AW's report.
+
+By design. The zero value mirrors matter.js; a Go-only stricter default
+would change what a matter.js-shaped host expects, and the reference
+controller asks on a terminal and rejects otherwise.
+

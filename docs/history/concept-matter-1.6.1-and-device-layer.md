@@ -484,9 +484,9 @@ Die Quelle ist dieselbe; nur Packaging und Netzwerk unterscheiden sich.
 
 1. Dieses Konzept gegenlesen; Entscheidungen aus §0 bestätigen oder
    ändern. Insbesondere die TCP/BDX-ohne-OTA-Spannung.
-2. Erledigt am 2026-10-08: [ADR 0017](./adr/0017-generated-default-cluster-server.md)
+2. Erledigt am 2026-10-08: [ADR 0017](../adr/0017-generated-default-cluster-server.md)
    (generierter Standard-Server, Phase 0) und
-   [ADR 0018](./adr/0018-device-layer-and-node-facade.md) (Geräteschicht
+   [ADR 0018](../adr/0018-device-layer-and-node-facade.md) (Geräteschicht
    und Node-Fassade, Phase 4) liegen als „Proposed“ vor;
    `docs/matterjs-comparison.md` §2, §5 und §6, `docs/open-items.md`,
    `docs/feature-scope.md`, `README.md` und `CHANGELOG.md` verweisen auf
@@ -509,7 +509,7 @@ Entscheidung steht, und was es kosten würde, ihn später hereinzuholen.
 ### F.1 Rollen und Transport
 
 > Stand 2026-10-13: die ersten beiden Zeilen (Controller-/Commissioner-
-> Rolle, Minimal-Controller) sind durch [ADR 0020](./adr/0020-commissioner-and-controller-role.md)
+> Rolle, Minimal-Controller) sind durch [ADR 0020](../adr/0020-commissioner-and-controller-role.md)
 > (Konzept v2, Entscheidung 0.1) überholt; der Rest gilt.
 
 | Punkt | Warum draußen | Quelle | Weg herein |

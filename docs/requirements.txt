@@ -1,0 +1,6 @@
+# The documentation site's build (mkdocs.yml, .github/workflows/pages.yml).
+# Exact versions, each released at least two weeks before it was pinned;
+# bump deliberately and rebuild with `mkdocs build --strict`.
+mkdocs==1.6.1
+mkdocs-material==9.7.7
+pymdown-extensions==12.1

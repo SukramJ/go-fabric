@@ -351,6 +351,20 @@ are what keeps that from doubling.
   two agents only on disjoint paths, and the chip-tool harness is one
   agent's at a time.
 
+## Documentation
+
+`docs/` is the developer and architect documentation and is published as
+the GitHub Pages site (`mkdocs.yml`, `.github/workflows/pages.yml`;
+`mkdocs build --strict` runs on every pull request that touches it).
+Write it for someone who embeds or evaluates the module: what it does,
+how to wire it, what it guarantees — every behavioural claim checkable
+against the code. A link from a page to a file outside `docs/` is an
+absolute GitHub URL (the strict build rejects relative ones). Planning
+concepts move to `docs/history/` once executed (not published); owner
+test plans, briefs, audits and parity registers live under `notes/`.
+A change that alters behaviour a page describes updates the page in the
+same pull request.
+
 ## Conventions worth knowing before the linter tells you
 
 - Every new `.go` file opens with the Apache-2.0 header, or

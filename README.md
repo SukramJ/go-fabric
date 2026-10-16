@@ -44,19 +44,25 @@ supply that a library cannot is in
 
 ## Documentation
 
+The site (rendered from `docs/`) is at
+<https://sukramj.github.io/go-fabric/>; the API reference is
+[pkg.go.dev](https://pkg.go.dev/github.com/SukramJ/go-fabric).
+
 | | |
 | --- | --- |
-| [`docs/feature-scope.md`](./docs/feature-scope.md) | What this module does today, package by package — and the scope boundaries that are decisions rather than backlog. |
+| [`docs/index.md`](./docs/index.md) | Where to start, by role: embedding the device side, driving the controller, evaluating the architecture. |
+| [`docs/architecture.md`](./docs/architecture.md) | The two roles, the layers, the request path, the package map and the scope boundaries that are decisions rather than backlog. |
+| [`docs/getting-started/`](./docs/getting-started) | A minimal device host and a minimal controller, each a compiling example. |
+| [`docs/guides/`](./docs/guides) | Host ports, concurrency, persistence. |
+| [`docs/security.md`](./docs/security.md) | The security model of both roles. |
 | [`docs/matterjs-comparison.md`](./docs/matterjs-comparison.md) | Feature-by-feature against matter.js, with a verdict on whether each gap is worth closing here. |
+| [`docs/certifiability.md`](./docs/certifiability.md) | What the CSA certification families say about this module, family by family. |
 | [`docs/matter-parity-contract.md`](./docs/matter-parity-contract.md) | What parity means and which standing guards enforce it. Read before your first change. |
 | [`docs/matter-ecosystem-observations.md`](./docs/matter-ecosystem-observations.md) | What Apple Home, Google Home and Alexa were actually observed to do. |
-| [`docs/open-items.md`](./docs/open-items.md) | What is known to be unfinished, in one place, with a pointer to the detail. |
-| [`docs/concept-matter-1.6.1-and-device-layer.md`](./docs/concept-matter-1.6.1-and-device-layer.md) | The target "Matter 1.6.1 complete" for the home-automation scope: the measured gap, the phases, the planned `device/` layer, and what stays out (in German; its ADRs 0017 and 0018 are in English). |
 | [`docs/adr/`](./docs/adr) | Architecture decision records. |
+| [`docs/history/`](./docs/history) | Earlier planning concepts (German), kept for their reasoning. |
 | [`notes/parity/by_design.md`](./notes/parity/by_design.md) | The catalogue of intentional divergences from matter.js. |
 | [`notes/parity/matter_behaviour_findings.md`](./notes/parity/matter_behaviour_findings.md) | Known behaviour gaps that are *not* intentional, as scoped fix packages. |
-| [`notes/reference/matter-conformance.md`](./notes/reference/matter-conformance.md) | Which tests run, when, and what gates on them. |
-| [`notes/audits/matter-threat-model.md`](./notes/audits/matter-threat-model.md) | Threat model for the responder role. |
 
 ## Examples
 
@@ -82,9 +88,10 @@ through which the test-support packages reach package internals
 unimportable from outside. Nothing else is private by convention, so nothing
 else may be changed as if it were.
 
-Depend freely on `bdx/`, `bootid/`, `bridge/`, `cluster/…`, `commissioning/`,
-`contract/`, `device/`, `diagevent/`, `eligibility/`, `endpoint/` (including
-`endpoint/sqlitestore`), `groups/`, `im/`, `im/subscription`, `mdns/`, `node/`,
+Depend freely on `bdx/`, `binding/`, `bootid/`, `bridge/`, `cluster/…`,
+`commissioning/`, `contract/`, `controller/…`, `device/`, `diagevent/`,
+`eligibility/`, `endpoint/` (including `endpoint/sqlitestore`), `groups/`,
+`im/`, `im/subscription`, `mdns/`, `node/`,
 `parity/`, `schema/`, `secure/…`, `store/`, `tlv/` and `transport/…`. The
 device layer `device/` and the node facade `node/` are public API since
 `v0.3.0`; that release freezes nothing, and the `v1.0.0` freeze is still

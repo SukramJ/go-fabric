@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5110,
+  "entry_points": 5116,
   "entry_packages": [
     ".",
     "bdx",
@@ -171,6 +171,8 @@
     "endpoint",
     "endpoint/endpointtest",
     "endpoint/sqlitestore",
+    "examples/quickstart-controller",
+    "examples/quickstart-device",
     "examples/reference-bridge",
     "examples/reference-controller",
     "groups",
@@ -206,9 +208,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12302,
+    "total_exported": 12308,
     "reachable": 8717,
-    "whitelisted": 3580,
+    "whitelisted": 3586,
     "unreachable": 5
   },
   "by_package": [
@@ -18396,6 +18398,48 @@
       "reason": "auto-whitelist:pattern=mock-fake-stub-dummy",
       "file": "endpoint/endpointtest/endpointtest.go",
       "line": 66
+    },
+    {
+      "package": "examples/quickstart-controller",
+      "identifier": "TestMain",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/quickstart-controller/main_test.go",
+      "line": 26
+    },
+    {
+      "package": "examples/quickstart-controller",
+      "identifier": "TestQuickstartControllerPairErrors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/quickstart-controller/main_test.go",
+      "line": 62
+    },
+    {
+      "package": "examples/quickstart-controller",
+      "identifier": "TestQuickstartControllerStack",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/quickstart-controller/main_test.go",
+      "line": 36
+    },
+    {
+      "package": "examples/quickstart-device",
+      "identifier": "TestMain",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/quickstart-device/main_test.go",
+      "line": 111
+    },
+    {
+      "package": "examples/quickstart-device",
+      "identifier": "TestQuickstartDevice",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/quickstart-device/main_test.go",
+      "line": 37
+    },
+    {
+      "package": "examples/quickstart-device",
+      "identifier": "TestQuickstartDeviceRunStops",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/quickstart-device/main_test.go",
+      "line": 76
     },
     {
       "package": "examples/reference-bridge",

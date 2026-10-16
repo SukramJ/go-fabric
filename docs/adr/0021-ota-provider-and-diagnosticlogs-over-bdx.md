@@ -1,7 +1,7 @@
 # ADR 0021 — The OTA Software Update Provider and DiagnosticLogs over BDX enter the scope
 
 - **Status**: Accepted (2026-10-14; concept v2 phase 8,
-  [`../concept-v2-scope-extension.md`](../concept-v2-scope-extension.md) §B.2, decision 0.3)
+  [`../concept-v2-scope-extension.md`](../history/concept-v2-scope-extension.md) §B.2, decision 0.3)
 - **Date**: 2026-10-14
 - **Related**:
   [ADR 0019 — TCP, BDX and the OTA Software Update Requestor](./0019-tcp-bdx-and-the-ota-requestor.md)

@@ -5,7 +5,7 @@ package main
 
 // committed lists the device types whose generated files are committed
 // under device/: the device types in scope of
-// docs/concept-matter-1.6.1-and-device-layer.md Appendix F.3 — every
+// docs/history/concept-matter-1.6.1-and-device-layer.md Appendix F.3 — every
 // snapshot device type the appendix does not name, less the three whose
 // mandatory clusters are the excluded camera and media families (owner's
 // decision, 2026-10-11) — with OtaRequestor, which ADR 0018 ("Decisions
@@ -106,7 +106,7 @@ var committed = []string{
 const cameraMedia = "camera / media (Appendix F.3: their mandatory clusters are the excluded camera and media families)"
 
 // excluded names every other snapshot device type with its group in
-// docs/concept-matter-1.6.1-and-device-layer.md Appendix F.3.
+// docs/history/concept-matter-1.6.1-and-device-layer.md Appendix F.3.
 var excluded = map[string]string{
 	// Camera device types: they mandate the F.2 camera clusters.
 	"Camera":           "F.3 camera device types",

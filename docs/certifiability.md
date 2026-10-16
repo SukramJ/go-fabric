@@ -40,7 +40,7 @@ GOFABRIC_CHIP_FAMILIES=IDM,ACL make chiptool-families   # a selection
   | (a) defect | go-fabric misbehaves or lacks mandatory behaviour | fixed per matter.js, or an open finding carrying the TC id |
   | (b) not supported | optional per spec for the device types exposed, and declared so in PICS | the PICS line is the record |
   | (c) harness | the test case or the environment is at fault | the evidence is cited |
-  | (d) out of scope | Bluetooth, Thread, Wi-Fi commissioning, controller role | the scope decision is named |
+  | (d) out of scope | Bluetooth and Thread on the device side, Wi-Fi commissioning of the node itself | the scope decision is named (the controller role entered with ADR 0020; BLE commissioning in the controller with ADR 0024) |
 
   A case matter.js passes and this module fails is class (a) by definition.
 - **Out-of-band controls** are the ones CHIP's CI drives its sample apps
@@ -555,12 +555,10 @@ client (`BIND.C`, a controller-side role, (d) — proven in-repo since wave 21),
 OTA provider (b — built in wave 23, ADR 0021; the cases stay manual YAML, the
 in-repo proof is the module's requestor downloading from the module's
 provider; the DLOG case stays manual at the pinned image although the
-server now transfers over BDX). BDX shipped with the OTA requestor in `v0.3.0` (ADR 0019),
-but that is the receiving side; DLOG needs the sending side. A
+server now transfers over BDX). BDX shipped with the OTA requestor in `v0.3.0` (ADR 0019) as the
+receiving side; the sending side came with ADR 0021 in `v0.4.0`, and a
 RetrieveLogsRequest that asks for BDX with a `TransferFileDesignator` is
-still answered inline (`cluster/core/diagnostic_logs.go`,
-`BD-chip-DiagLogs-NoBDX`), so DiagnosticLogs over BDX is not served until
-concept v2 phase 8.
+now served over BDX as chip does (`BD-chip-DiagLogs-BDX`).
 
 DGWIFI runs against a Wi-Fi link the daemon simulates: the harness starts
 every daemon with `--wifi` (TESTING ONLY), which serves WiFiNetworkDiagnostics
