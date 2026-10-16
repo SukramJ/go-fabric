@@ -59,6 +59,19 @@ func (t *fakeTimer) Stop() bool {
 	return was
 }
 
+// live counts the timers neither fired nor stopped.
+func (c *fakeClock) live() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	n := 0
+	for _, t := range c.timers {
+		if !t.stopped && !t.fired {
+			n++
+		}
+	}
+	return n
+}
+
 // Advance moves the clock by d, firing every due timer in order.
 func (c *fakeClock) Advance(d time.Duration) {
 	c.mu.Lock()

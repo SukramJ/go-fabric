@@ -15665,7 +15665,7 @@
       "identifier": "TestAddressesToCandidates",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 301
+      "line": 321
     },
     {
       "package": "controller/commissioner",
@@ -15693,35 +15693,35 @@
       "identifier": "TestConnectionBudget",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 229
+      "line": 247
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionErrorClasses",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 268
+      "line": 287
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionHoldingResponder",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 179
+      "line": 196
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionPasscodeDropsDevice",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 206
+      "line": 224
     },
     {
       "package": "controller/commissioner",
       "identifier": "TestConnectionStaggerAndWinner",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/connection_test.go",
-      "line": 154
+      "line": 170
     },
     {
       "package": "controller/commissioner",
