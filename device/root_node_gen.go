@@ -13,6 +13,7 @@ import (
 	ethernetnetworkdiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
 	generalcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	generaldiagnosticsdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
+	groupcastdef "github.com/SukramJ/go-fabric/cluster/spec/groupcast"
 	icdmanagementdef "github.com/SukramJ/go-fabric/cluster/spec/icdmanagement"
 	localizationconfigurationdef "github.com/SukramJ/go-fabric/cluster/spec/localizationconfiguration"
 	networkcommissioningdef "github.com/SukramJ/go-fabric/cluster/spec/networkcommissioning"
@@ -119,6 +120,7 @@ var RootNodeType = Type{
 		},
 		{
 			ID: 0x0065, Name: "Groupcast", Conformance: "GroupcastListenerCond, GroupcastSenderCond, O",
+			Definition: groupcastdef.Definition,
 		},
 		{
 			ID: 0x0801, Name: "TlsCertificateManagement", Conformance: "TlsCertificatesCond, O",
@@ -211,3 +213,6 @@ func (d *RootNode) TimeSynchronization() *spec.Server {
 
 // IcdManagement returns the IcdManagement server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
 func (d *RootNode) IcdManagement() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0046) }
+
+// Groupcast returns the Groupcast server (optional: nil until WithOptional, WithFeatures or WithServer mounts it), or nil when the host supplied one of another type.
+func (d *RootNode) Groupcast() *spec.Server { return serverAs[*spec.Server](d.Device, 0x0065) }

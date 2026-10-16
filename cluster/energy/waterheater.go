@@ -141,19 +141,22 @@ func NewWaterHeaterManagement(cfg WaterHeaterConfig) (*WaterHeaterManagementServ
 	if cfg.Booster == nil {
 		return nil, ErrNoBooster
 	}
-	srv, err := spec.NewServer(whm.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &WaterHeaterManagementServer{booster: cfg.Booster}
+	handlers := map[uint32]spec.CommandHandler{
+		whm.CmdBoost:       s.boost,
+		whm.CmdCancelBoost: s.cancelBoost,
+	}
+	srv, err := spec.NewServer(whm.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s := &WaterHeaterManagementServer{Instance: srv.Instance, srv: srv, booster: cfg.Booster}
+	s.Instance, s.srv = srv.Instance, srv
 	values := s.stateValues(cfg.Initial)
 	values[whm.AttrHeaterTypes] = cfg.HeaterTypes
 	values[whm.AttrBoostState] = BoostStateInactive
 	if err := s.set(values); err != nil {
 		return nil, err
 	}
-	srv.Handle(whm.CmdBoost, s.boost)
-	srv.Handle(whm.CmdCancelBoost, s.cancelBoost)
 	return s, nil
 }
 

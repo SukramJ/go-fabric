@@ -68,22 +68,24 @@ func NewTargets(cfg TargetsConfig) (*TargetsServer, error) {
 	if cfg.Port == nil {
 		return nil, fmt.Errorf("%w: TargetNavigator", ErrNilPort)
 	}
-	srv, err := spec.NewServer(targetdef.Definition, spec.Options{Attributes: cfg.Attributes, Events: cfg.Events},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &TargetsServer{}
+	h := handlers{}
+	port := cfg.Port
+	handleState(h, &s.stateful, targetdef.CmdNavigateTarget, func(ctx context.Context, st *TargetState, req targetdef.NavigateTargetRequest) (any, error) {
+		return port.NavigateTarget(ctx, st, req)
+	})
+	srv, err := newServer(targetdef.Definition, spec.Options{Attributes: cfg.Attributes, Events: cfg.Events},
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("media: TargetNavigator: %w", err)
 	}
-	s := &TargetsServer{Server: srv}
+	s.Server = srv
 	if err := s.init(srv, cfg.Initial, TargetState.values, TargetState.clone); err != nil {
 		return nil, fmt.Errorf("media: TargetNavigator: %w", err)
 	}
 	if err := checkState(srv); err != nil {
 		return nil, err
 	}
-	port := cfg.Port
-	handleState(srv, &s.stateful, targetdef.CmdNavigateTarget, func(ctx context.Context, st *TargetState, req targetdef.NavigateTargetRequest) (any, error) {
-		return port.NavigateTarget(ctx, st, req)
-	})
 	return s, nil
 }
 

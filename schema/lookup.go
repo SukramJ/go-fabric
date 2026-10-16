@@ -17,8 +17,6 @@ func ClusterRevision(id uint32) (uint16, bool) {
 
 // ClusterName returns the canonical matter.js cluster name for the given id,
 // or ("", false) if the cluster is not present in the snapshot.
-//
-// loom:reachable:reason="introspection companion to the generated cluster tables; retained for diagnostics — no production caller yet"
 func ClusterName(id uint32) (string, bool) {
 	name, ok := ClusterNames[id]
 	return name, ok
@@ -41,8 +39,6 @@ func DeviceTypeRevision(id uint32) (uint16, bool) {
 
 // DeviceTypeName returns the canonical matter.js device-type name for the
 // given id, or ("", false) if the device type is not present in the snapshot.
-//
-// loom:reachable:reason="introspection companion to the generated device-type tables; retained for diagnostics — no production caller yet"
 func DeviceTypeName(id uint32) (string, bool) {
 	name, ok := DeviceTypeNames[id]
 	return name, ok
@@ -62,8 +58,6 @@ func DeviceTypeName(id uint32) (string, bool) {
 // Callers must distinguish the two return values: an unknown device type
 // (known=false) means the snapshot cannot answer the question, which is not
 // the same as a definite "no".
-//
-// loom:reachable:reason="conformance oracle for tests/contract/matter_devicetype_conformance_test.go; the bridge itself mounts clusters from the model layer"
 func DeviceTypeAllowsServerCluster(deviceType, clusterID uint32) (allowed, known bool) {
 	ids, ok := DeviceTypeServerClusters[deviceType]
 	if !ok {

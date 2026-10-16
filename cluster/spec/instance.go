@@ -63,6 +63,7 @@ type Instance struct {
 	features  uint32
 	attrs     []uint32
 	accepted  []uint32
+	required  []uint32
 	generated []uint32
 	events    []uint32
 }
@@ -288,6 +289,9 @@ func New(def *Cluster, opts Options) (*Instance, error) {
 			continue
 		}
 		inst.accepted = append(inst.accepted, c.ID)
+		if c.Conformance.Applicability(ctx) == ApplicabilityMandatory {
+			inst.required = append(inst.required, c.ID)
+		}
 		if resp := def.responseOf(c); resp != nil && !slices.Contains(inst.generated, resp.ID) {
 			inst.generated = append(inst.generated, resp.ID)
 		}

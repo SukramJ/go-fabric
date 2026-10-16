@@ -12,7 +12,6 @@ import (
 // distinction matters because the ecosystems disagree about which device
 // types they support, and a device type one of them refuses is not an
 // error the bridge can see — the entity simply never appears there.
-// loom:reachable:reason="returned by EcosystemForVendor and carried on CompatFinding, both consumed by the daemon's matterCompatibilityReporter on each GET /api/v1/matter/compatibility; a string alias without methods, invisible to the analyzer's type heuristic"
 type Ecosystem string
 
 // Ecosystem values.
@@ -60,7 +59,6 @@ func EcosystemForVendor(vendorID uint16) Ecosystem {
 
 // CompatFinding is one warning about how a commissioned ecosystem will
 // treat what the bridge exposes.
-// loom:reachable:reason="returned by Compat, which the daemon's matterCompatibilityReporter calls on each GET /api/v1/matter/compatibility; a data struct whose fields the REST layer copies out, invisible to the analyzer's method-based type heuristic"
 type CompatFinding struct {
 	Ecosystem Ecosystem
 	Code      string

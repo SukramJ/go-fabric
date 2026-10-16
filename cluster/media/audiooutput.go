@@ -70,24 +70,26 @@ func NewOutputs(cfg OutputsConfig) (*OutputsServer, error) {
 	}
 	renamer, canRename := cfg.Port.(OutputRenamer)
 	cmds := []command{{outputdef.CmdSelectOutput, true}, {outputdef.CmdRenameOutput, canRename}}
-	srv, err := spec.NewServer(outputdef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &OutputsServer{}
+	h := handlers{}
+	handleState(h, &s.stateful, outputdef.CmdSelectOutput, statusOnly(cfg.Port.SelectOutput))
+	if canRename {
+		handleState(h, &s.stateful, outputdef.CmdRenameOutput, statusOnly(renamer.RenameOutput))
+	}
+	srv, err := newServer(outputdef.Definition, spec.Options{Features: uint32(cfg.Features)},
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("media: AudioOutput: %w", err)
 	}
 	if err := checkImplemented(srv, cmds); err != nil {
 		return nil, err
 	}
-	s := &OutputsServer{Server: srv}
+	s.Server = srv
 	if err := s.init(srv, cfg.Initial, OutputState.values, OutputState.clone); err != nil {
 		return nil, fmt.Errorf("media: AudioOutput: %w", err)
 	}
 	if err := checkState(srv); err != nil {
 		return nil, err
-	}
-	handleState(srv, &s.stateful, outputdef.CmdSelectOutput, statusOnly(cfg.Port.SelectOutput))
-	if canRename {
-		handleState(srv, &s.stateful, outputdef.CmdRenameOutput, statusOnly(renamer.RenameOutput))
 	}
 	return s, nil
 }

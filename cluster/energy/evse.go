@@ -249,7 +249,16 @@ func NewEnergyEvse(cfg EvseConfig) (*EvseServer, error) {
 	if s.version == nil {
 		s.version = &s.own
 	}
-	srv, err := spec.NewServer(evse.Definition, opts, spec.ServerConfig{DataVersion: s.version, Sink: s})
+	handlers := map[uint32]spec.CommandHandler{
+		evse.CmdDisable:           s.disable,
+		evse.CmdEnableCharging:    s.enableCharging,
+		evse.CmdEnableDischarging: s.enableDischarging,
+		evse.CmdStartDiagnostics:  s.startDiagnostics,
+		evse.CmdSetTargets:        s.setTargets,
+		evse.CmdGetTargets:        s.getTargets,
+		evse.CmdClearTargets:      s.clearTargets,
+	}
+	srv, err := spec.NewServer(evse.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: s.version, Sink: s})
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
@@ -284,13 +293,6 @@ func NewEnergyEvse(cfg EvseConfig) (*EvseServer, error) {
 	if err := srv.SetAttributes(values); err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	srv.Handle(evse.CmdDisable, s.disable)
-	srv.Handle(evse.CmdEnableCharging, s.enableCharging)
-	srv.Handle(evse.CmdEnableDischarging, s.enableDischarging)
-	srv.Handle(evse.CmdStartDiagnostics, s.startDiagnostics)
-	srv.Handle(evse.CmdSetTargets, s.setTargets)
-	srv.Handle(evse.CmdGetTargets, s.getTargets)
-	srv.Handle(evse.CmdClearTargets, s.clearTargets)
 	return s, nil
 }
 

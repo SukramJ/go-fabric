@@ -212,9 +212,14 @@ func NewCommissionerControl(cfg CommissionerControlConfig) (*CommissionerControl
 		c.now = time.Now
 	}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
+	handlers := map[uint32]spec.CommandHandler{
+		commctrldef.CmdRequestCommissioningApproval: c.requestCommissioningApproval,
+		commctrldef.CmdCommissionNode:               c.commissionNode,
+	}
 	srv, err := spec.NewServer(commctrldef.Definition, spec.Options{
 		Commands: []uint32{commctrldef.CmdRequestCommissioningApproval, commctrldef.CmdCommissionNode},
 	}, spec.ServerConfig{
+		Handlers:    handlers,
 		DataVersion: &c.dv,
 		Initial:     map[uint32]any{commctrldef.AttrSupportedDeviceCategories: cfg.SupportedDeviceCategories},
 	})
@@ -222,8 +227,6 @@ func NewCommissionerControl(cfg CommissionerControlConfig) (*CommissionerControl
 		return nil, fmt.Errorf("core: CommissionerControl: %w", err)
 	}
 	c.Server = srv
-	srv.Handle(commctrldef.CmdRequestCommissioningApproval, c.requestCommissioningApproval)
-	srv.Handle(commctrldef.CmdCommissionNode, c.commissionNode)
 	return c, nil
 }
 

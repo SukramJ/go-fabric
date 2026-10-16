@@ -7,34 +7,25 @@ package dcl
 // Pai.fromAsn1 and Certificate.parseAsn1Certificate (packages/protocol/src/
 // certificate/kinds/AttestationCertificates.ts:23-50, Certificate.ts at
 // 0ceb202d) read of a trust-store, CRL signer or CD signer certificate,
-// on crypto/x509. The same reading as controller/attestation's
-// (cert.go there), which keeps it unexported.
+// on crypto/x509. The subject's ids, the P-256 key and the signature check
+// are controller/attestation's (MatterIDs, P256Key, VerifySignedBy).
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
-	"regexp"
-	"strconv"
 	"strings"
+
+	"github.com/SukramJ/go-fabric/controller/attestation"
 )
 
 // maxDERCertificateSize is MAX_DER_CERTIFICATE_SIZE (kinds/common.ts:13),
 // the limit Certificate.parseAsn1Certificate applies (Certificate.ts:
 // 617-622).
 const maxDERCertificateSize = 600
-
-var (
-	oidMatterVendorID  = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 2, 1}
-	oidMatterProductID = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37244, 2, 2}
-)
 
 // Kind is the kind of a trust-store entry — DclCertificateService.
 // CertificateKind (DclCertificateService.ts:2089).
@@ -70,7 +61,7 @@ func parseCert(der []byte, paa bool) (*trustCert, error) {
 		return nil, errors.New("Missing required extensions in certificate") //nolint:staticcheck // matter.js's message
 	}
 	t := &trustCert{x509: c}
-	if t.vendorID, t.productID, err = matterIDs(c); err != nil {
+	if t.vendorID, t.productID, err = attestation.MatterIDs(c); err != nil {
 		return nil, err
 	}
 	return t, nil
@@ -81,92 +72,6 @@ func parseCert(der []byte, paa bool) (*trustCert, error) {
 // required extensions.
 func parseTrustStoreCertificate(der []byte, kind Kind) (*trustCert, error) {
 	return parseCert(der, kind == KindPAA)
-}
-
-// matterIDs reads the vendor and product id of the subject DN: the OID
-// attributes as hex (parseInt(_, 16)), and the Mvid:/Mpid: commonName
-// fallback only when the DN carries neither (Certificate.ts:345-352,
-// :379-392, parseMatterFallbackVidPid :249-258).
-func matterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
-	for _, n := range c.Subject.Names {
-		s, ok := n.Value.(string)
-		switch {
-		case !ok:
-			continue
-		case n.Type.Equal(oidMatterVendorID):
-			vid = parseHexID(s)
-		case n.Type.Equal(oidMatterProductID):
-			pid = parseHexID(s)
-		}
-	}
-	if vid != nil || pid != nil {
-		return vid, pid, nil
-	}
-	cn := c.Subject.CommonName
-	if vid, err = fallbackID(cn, "Mvid:"); err != nil {
-		return nil, nil, err
-	}
-	if pid, err = fallbackID(cn, "Mpid:"); err != nil {
-		return nil, nil, err
-	}
-	return vid, pid, nil
-}
-
-func parseHexID(s string) *uint16 {
-	end := 0
-	for end < len(s) && strings.ContainsRune("0123456789abcdefABCDEF", rune(s[end])) {
-		end++
-	}
-	if end == 0 {
-		return nil
-	}
-	v, err := strconv.ParseUint(s[:end], 16, 16)
-	if err != nil {
-		return nil
-	}
-	id := uint16(v)
-	return &id
-}
-
-var fallbackPatterns = map[string]*regexp.Regexp{
-	"Mvid:": regexp.MustCompile(`Mvid:([0-9A-F]{4})`),
-	"Mpid:": regexp.MustCompile(`Mpid:([0-9A-F]{4})`),
-}
-
-func fallbackID(cn, prefix string) (*uint16, error) {
-	if m := fallbackPatterns[prefix].FindStringSubmatch(cn); m != nil {
-		v, _ := strconv.ParseUint(m[1], 16, 16)
-		id := uint16(v)
-		return &id, nil
-	}
-	if strings.Contains(cn, prefix) {
-		return nil, fmt.Errorf("commonName contains %s not followed by 4 uppercase hex digits", prefix)
-	}
-	return nil, nil
-}
-
-// p256Key is the certificate's key when it is EC P-256, matter.js's
-// "ECDSA-P256" (kinds/CertificateSignature.ts:55-57).
-func p256Key(c *x509.Certificate) (*ecdsa.PublicKey, error) {
-	k, ok := c.PublicKey.(*ecdsa.PublicKey)
-	if !ok || k.Curve != elliptic.P256() {
-		return nil, errors.New("public key is not EC P-256")
-	}
-	return k, nil
-}
-
-// verifySignedBy is Certificate.verifySignature with an ECDSA P-256 key
-// (kinds/CertificateSignature.ts:101-120): the ecdsa-with-SHA256
-// signature over the TBS DER verifies with key.
-func verifySignedBy(c *x509.Certificate, key *ecdsa.PublicKey) error {
-	if c.SignatureAlgorithm != x509.ECDSAWithSHA256 {
-		return fmt.Errorf("signature algorithm %v is not ecdsa-with-SHA256", c.SignatureAlgorithm)
-	}
-	digest := sha256.Sum256(c.RawTBSCertificate)
-	if !ecdsa.VerifyASN1(key, digest[:], c.Signature) {
-		return errors.New("signature does not verify")
-	}
-	return nil
 }
 
 // pemToDER is Pem.asDer for text (packages/general/src/crypto/Pem.ts:

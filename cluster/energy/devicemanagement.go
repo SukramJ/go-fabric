@@ -253,11 +253,22 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 	if cfg.Manager == nil {
 		return nil, ErrNoDemManager
 	}
-	srv, err := spec.NewServer(dem.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &DeviceEnergyManagementServer{manager: cfg.Manager, now: cfg.Now}
+	handlers := map[uint32]spec.CommandHandler{
+		dem.CmdPowerAdjustRequest:             s.powerAdjustRequest,
+		dem.CmdCancelPowerAdjustRequest:       s.cancelPowerAdjustRequest,
+		dem.CmdStartTimeAdjustRequest:         s.startTimeAdjustRequest,
+		dem.CmdPauseRequest:                   s.pauseRequest,
+		dem.CmdResumeRequest:                  s.resumeRequest,
+		dem.CmdModifyForecastRequest:          s.modifyForecastRequest,
+		dem.CmdRequestConstraintBasedForecast: s.requestConstraintBasedForecast,
+		dem.CmdCancelRequest:                  s.cancelRequest,
+	}
+	srv, err := spec.NewServer(dem.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s := &DeviceEnergyManagementServer{Instance: srv.Instance, srv: srv, manager: cfg.Manager, now: cfg.Now}
+	s.Instance, s.srv = srv.Instance, srv
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -280,14 +291,6 @@ func NewDeviceEnergyManagement(cfg DeviceEnergyConfig) (*DeviceEnergyManagementS
 	if err := srv.SetAttributes(values); err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	srv.Handle(dem.CmdPowerAdjustRequest, s.powerAdjustRequest)
-	srv.Handle(dem.CmdCancelPowerAdjustRequest, s.cancelPowerAdjustRequest)
-	srv.Handle(dem.CmdStartTimeAdjustRequest, s.startTimeAdjustRequest)
-	srv.Handle(dem.CmdPauseRequest, s.pauseRequest)
-	srv.Handle(dem.CmdResumeRequest, s.resumeRequest)
-	srv.Handle(dem.CmdModifyForecastRequest, s.modifyForecastRequest)
-	srv.Handle(dem.CmdRequestConstraintBasedForecast, s.requestConstraintBasedForecast)
-	srv.Handle(dem.CmdCancelRequest, s.cancelRequest)
 	return s, nil
 }
 

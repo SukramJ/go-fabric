@@ -70,27 +70,29 @@ func NewAppLauncher(cfg AppLauncherConfig) (*AppLauncherServer, error) {
 	if cfg.Port == nil {
 		return nil, fmt.Errorf("%w: ApplicationLauncher", ErrNilPort)
 	}
-	srv, err := spec.NewServer(launcherdef.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: cfg.Attributes},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &AppLauncherServer{}
+	h := handlers{}
+	port := cfg.Port
+	handleState(h, &s.stateful, launcherdef.CmdLaunchApp, func(ctx context.Context, st *AppLauncherState, req launcherdef.LaunchAppRequest) (any, error) {
+		return port.LaunchApp(ctx, st, req)
+	})
+	handleState(h, &s.stateful, launcherdef.CmdStopApp, func(ctx context.Context, st *AppLauncherState, req launcherdef.StopAppRequest) (any, error) {
+		return port.StopApp(ctx, st, req)
+	})
+	handleState(h, &s.stateful, launcherdef.CmdHideApp, func(ctx context.Context, st *AppLauncherState, req launcherdef.HideAppRequest) (any, error) {
+		return port.HideApp(ctx, st, req)
+	})
+	srv, err := newServer(launcherdef.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: cfg.Attributes},
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("media: ApplicationLauncher: %w", err)
 	}
-	s := &AppLauncherServer{Server: srv}
+	s.Server = srv
 	if err := s.init(srv, cfg.Initial, AppLauncherState.values, AppLauncherState.clone); err != nil {
 		return nil, fmt.Errorf("media: ApplicationLauncher: %w", err)
 	}
 	if err := checkState(srv); err != nil {
 		return nil, err
 	}
-	port := cfg.Port
-	handleState(srv, &s.stateful, launcherdef.CmdLaunchApp, func(ctx context.Context, st *AppLauncherState, req launcherdef.LaunchAppRequest) (any, error) {
-		return port.LaunchApp(ctx, st, req)
-	})
-	handleState(srv, &s.stateful, launcherdef.CmdStopApp, func(ctx context.Context, st *AppLauncherState, req launcherdef.StopAppRequest) (any, error) {
-		return port.StopApp(ctx, st, req)
-	})
-	handleState(srv, &s.stateful, launcherdef.CmdHideApp, func(ctx context.Context, st *AppLauncherState, req launcherdef.HideAppRequest) (any, error) {
-		return port.HideApp(ctx, st, req)
-	})
 	return s, nil
 }

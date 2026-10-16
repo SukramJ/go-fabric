@@ -70,17 +70,18 @@ func NewSoftwareDiagnostics(cfg SoftwareDiagnosticsConfig) (*spec.Server, error)
 		opts.Features = uint32(swdiagdef.FeatureWatermarks)
 	}
 	src := softwareDiagnosticsSource{heap: cfg.Heap, marks: cfg.Watermarks}
-	srv, err := spec.NewServer(swdiagdef.Definition, opts, spec.ServerConfig{DataVersion: cfg.DataVersion, Source: src})
-	if err != nil {
-		return nil, fmt.Errorf("core: SoftwareDiagnostics: %w", err)
-	}
+	sc := spec.ServerConfig{DataVersion: cfg.DataVersion, Source: src}
 	if cfg.Watermarks != nil {
-		srv.Handle(swdiagdef.CmdResetWatermarks, func(ctx context.Context, _ any) (any, error) {
+		sc.Handlers = map[uint32]spec.CommandHandler{swdiagdef.CmdResetWatermarks: func(ctx context.Context, _ any) (any, error) {
 			if err := cfg.Watermarks.ResetWatermarks(ctx); err != nil {
 				return nil, fmt.Errorf("core: SoftwareDiagnostics: ResetWatermarks: %w", err)
 			}
 			return nil, nil
-		})
+		}}
+	}
+	srv, err := spec.NewServer(swdiagdef.Definition, opts, sc)
+	if err != nil {
+		return nil, fmt.Errorf("core: SoftwareDiagnostics: %w", err)
 	}
 	return srv, nil
 }

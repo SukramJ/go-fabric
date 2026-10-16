@@ -313,21 +313,21 @@ func TestDecodeManualCode_Rejects(t *testing.T) {
 func TestDecode_EveryInvalidPasscode(t *testing.T) {
 	t.Parallel()
 	// PairingCodeSchema.ts:160-162 (INVALID_PASSCODES) — every one, through
-	// both decoders. ManualCode/QRCode refuse only 0, so the codes are built
-	// with the bit layout directly for the others.
+	// both decoders. ManualCode/QRCode refuse them as matter.js's encoder
+	// does, so the codes are built without the encoder's check.
 	for _, pc := range []uint32{11111111, 22222222, 33333333, 44444444, 55555555, 66666666, 77777777, 88888888, 99999999, 12345678, 87654321} {
 		if IsValidPasscode(pc) {
 			t.Errorf("IsValidPasscode(%d) = true", pc)
 		}
 		if pc <= 99999998 {
-			code, err := ManualCode(0, pc)
+			code, err := manualCode(0, pc, nil, false)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if _, err := DecodeManualCode(code); err == nil || !strings.Contains(err.Error(), "Invalid passcode") {
 				t.Errorf("manual %d: %v", pc, err)
 			}
-			q, err := QRCode(Payload{Passcode: pc})
+			q, err := qrCode(Payload{Passcode: pc}, false)
 			if err != nil {
 				t.Fatal(err)
 			}

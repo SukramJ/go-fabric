@@ -238,6 +238,11 @@ func (p *Peer) save() {
 	if h := p.set.ctx.Updated; h != nil {
 		h(p)
 	}
+	for _, o := range p.observing() {
+		if o.Updated != nil {
+			o.Updated()
+		}
+	}
 }
 
 // addSession takes a session of the peer: the operational address follows

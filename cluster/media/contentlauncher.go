@@ -70,21 +70,23 @@ func NewContentLauncher(cfg ContentLauncherConfig) (*ContentLauncherServer, erro
 	if cfg.Port == nil {
 		return nil, fmt.Errorf("%w: ContentLauncher", ErrNilPort)
 	}
-	srv, err := spec.NewServer(launchdef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &ContentLauncherServer{}
+	h := handlers{}
+	port := cfg.Port
+	handleState(h, &s.stateful, launchdef.CmdLaunchContent, func(ctx context.Context, st *ContentLauncherState, req launchdef.LaunchContentRequest) (any, error) {
+		return port.LaunchContent(ctx, st, req)
+	})
+	handleState(h, &s.stateful, launchdef.CmdLaunchUrl, func(ctx context.Context, st *ContentLauncherState, req launchdef.LaunchUrlRequest) (any, error) {
+		return port.LaunchURL(ctx, st, req)
+	})
+	srv, err := newServer(launchdef.Definition, spec.Options{Features: uint32(cfg.Features)},
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("media: ContentLauncher: %w", err)
 	}
-	s := &ContentLauncherServer{Server: srv}
+	s.Server = srv
 	if err := s.init(srv, cfg.Initial, ContentLauncherState.values, ContentLauncherState.clone); err != nil {
 		return nil, fmt.Errorf("media: ContentLauncher: %w", err)
 	}
-	port := cfg.Port
-	handleState(srv, &s.stateful, launchdef.CmdLaunchContent, func(ctx context.Context, st *ContentLauncherState, req launchdef.LaunchContentRequest) (any, error) {
-		return port.LaunchContent(ctx, st, req)
-	})
-	handleState(srv, &s.stateful, launchdef.CmdLaunchUrl, func(ctx context.Context, st *ContentLauncherState, req launchdef.LaunchUrlRequest) (any, error) {
-		return port.LaunchURL(ctx, st, req)
-	})
 	return s, nil
 }

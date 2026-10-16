@@ -22,6 +22,11 @@ type Observer struct {
 	// EstablishmentUnresponsive is called when a CASE establishment
 	// attempt retransmitted past the MRP budget.
 	EstablishmentUnresponsive func()
+	// Updated is called after the peer's descriptor was saved — matter.js
+	// Peer.updated, emitted by #save (Peer.ts:190-195, :575-579 at
+	// 0ceb202d), which CommissioningClient observes per node
+	// (CommissioningClient.ts:711).
+	Updated func()
 }
 
 // observerEntry is a registered observer; its address identifies it for

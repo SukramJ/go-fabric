@@ -16,23 +16,10 @@ import (
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
-// The AccessControl attributes whose list values are never chunked.
-// Mirrors matter.js packages/protocol/src/action/request/Write.ts:14-21 at
-// 0ceb202d (AccessControl 0x001F, Acl 0x0000, Extension 0x0001 —
-// model/src/standard/elements/access-control.element.ts:20, :31, :35), the
-// connectedhomeip #38263 exemption of :151-156.
-const (
-	accessControlCluster   uint32 = 0x001F
-	accessControlACL       uint32 = 0x0000
-	accessControlExtension uint32 = 0x0001
-)
-
 // ListChunked reports whether a list value of the attribute is chunked by
 // default: every attribute but AccessControl ACL and Extension
 // (Write.ts:18-21, isAclOrExtensionPath).
-func ListChunked(cluster, attribute uint32) bool {
-	return cluster != accessControlCluster || (attribute != accessControlACL && attribute != accessControlExtension)
-}
+func ListChunked(cluster, attribute uint32) bool { return im.ListChunkedByDefault(cluster, attribute) }
 
 // WriteRequest is one attribute to write — a Write.Attribute of matter.js
 // (Write.ts:204-218) with numeric ids.
@@ -53,43 +40,7 @@ func Raw(n spec.Node) spec.Encodable { return rawNode(n) }
 
 type rawNode spec.Node
 
-func (n rawNode) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { writeNode(enc, tag, spec.Node(n)) }
-
-// writeNode writes n at tag, integers at their minimal width.
-func writeNode(enc *tlv.Encoder, tag tlv.Tag, n spec.Node) {
-	el := n.El
-	switch {
-	case el.IsContainer:
-		switch el.Type {
-		case tlv.TypeArray:
-			enc.StartArray(tag)
-		case tlv.TypeList:
-			enc.StartList(tag)
-		default:
-			enc.StartStruct(tag)
-		}
-		for _, c := range n.Children {
-			writeNode(enc, c.El.Tag, c)
-		}
-		_ = enc.EndContainer()
-	case el.IsNull || el.Type == tlv.TypeNull:
-		enc.PutNull(tag)
-	case el.Type <= tlv.TypeSignedInt8:
-		enc.PutInt(tag, el.Int)
-	case el.Type <= tlv.TypeUnsignedInt8:
-		enc.PutUint(tag, el.Uint)
-	case el.Type == tlv.TypeBoolFalse || el.Type == tlv.TypeBoolTrue:
-		enc.PutBool(tag, el.Bool)
-	case el.Type == tlv.TypeFloat4:
-		enc.PutFloat32(tag, float32(el.Float))
-	case el.Type == tlv.TypeFloat8:
-		enc.PutFloat64(tag, el.Float)
-	case el.Type >= tlv.TypeUTF8Str1 && el.Type <= tlv.TypeUTF8Str8:
-		enc.PutUTF8(tag, el.String)
-	default:
-		enc.PutOctets(tag, el.Octets)
-	}
-}
+func (n rawNode) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) { spec.Node(n).EncodeTLV(enc, tag) }
 
 // WriteOptions configures [Interaction.Write] — matter.js Write.Options
 // (Write.ts:188-199).
@@ -292,22 +243,11 @@ func formulateWrite(writes []WriteRequest, opts WriteOptions) (im.WriteRequest, 
 	return req, nil
 }
 
-// listElements encodes v and reports whether it is a list (a TLV array),
-// with its elements — the value side of matter.js's
-// `Array.isArray(value) && tlv instanceof ArraySchema` (Write.ts:154-155).
+// listElements is [spec.ListElements] with the request's error.
 func listElements(v spec.Encodable) ([]spec.Node, bool, error) {
-	enc := tlv.NewEncoder()
-	v.EncodeTLV(enc, tlv.AnonymousTag())
-	b, err := enc.Bytes()
+	elements, isList, err := spec.ListElements(v)
 	if err != nil {
 		return nil, false, fmt.Errorf("%w: value: %w", ErrMalformedRequest, err)
 	}
-	n, err := spec.ReadElement(tlv.NewDecoder(b))
-	if err != nil {
-		return nil, false, fmt.Errorf("%w: value: %w", ErrMalformedRequest, err)
-	}
-	if n.El.Type != tlv.TypeArray {
-		return nil, false, nil
-	}
-	return n.Children, true, nil
+	return elements, isList, nil
 }

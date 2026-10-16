@@ -56,11 +56,17 @@ func (e *Encoder) PutNull(tag Tag) {
 }
 
 // PutUint16 writes an explicit 2-byte unsigned-int element regardless
-// of v's magnitude. Use this for spec-typed TLV fields (e.g. Matter
-// `TlvUInt16` slots) where the consumer's decoder is strict on the
-// element width — the magnitude-driven [Encoder.PutUint] would emit
-// the smallest type that fits (UInt1 for v ≤ 0xFF) and the receiver
-// would surface that as a parse error.
+// of v's magnitude.
+//
+// matter.js has no fixed-width integer encoding: every TlvUInt*/TlvInt*
+// schema picks its length from the value (TlvCodec.getUIntTlvLength /
+// getIntTlvLength, packages/types/src/tlv/TlvNumber.ts:247-297 at
+// 0ceb202d), and chip's TLVReader accepts any width of the right sign
+// (src/lib/core/TLVReader.cpp:240-255). A fixed width is a deliberate,
+// documented divergence for a controller that rejected a narrower one
+// (notes/parity/by_design.md L5-Apple-Width,
+// BD-Matter-FixedWidthStructs); every other value goes through the
+// smallest-fit [Encoder.PutUint] / [Encoder.PutInt].
 func (e *Encoder) PutUint16(tag Tag, v uint16) {
 	e.writeControlAndTag(TypeUnsignedInt2, tag)
 	e.buf = binary.LittleEndian.AppendUint16(e.buf, v)
@@ -116,16 +122,13 @@ func (e *Encoder) PutUint(tag Tag, v uint64) {
 // specified by widthBytes (1, 2, 4, or 8). Values are truncated to the
 // given width. Panics for any other widthBytes value.
 //
-// Mirrors matter.js TlvNumber.ts:TlvUInt8/16/32/64 schema types that each
-// emit a fixed declared width regardless of magnitude. Unlike
-// [Encoder.PutUint] and [Encoder.PutUint64] (both smallest-fit),
-// this helper lets callers express an exact schema-declared width — useful
-// when a spec field is nominally declared uint32 but the caller holds a
-// uint64 value whose upper bits are guaranteed zero. chip tolerates narrower
-// or equal widths on read (TLVReader.cpp:GetValue template specialization);
-// Apple Home also tolerates width mismatch for unsigned types. Wire example:
+// matter.js never encodes at a fixed width: its TlvUInt8/16/32/64 all
+// take the smallest length that fits the value
+// (packages/types/src/tlv/TlvNumber.ts:271-297 at 0ceb202d, through
+// TlvCodec.getUIntTlvLength). This helper exists for the documented
+// fixed-width divergences only (see [Encoder.PutUint16]); a spec field
+// has no width of its own on the wire. Wire example:
 // PutUintWidth(AnonymousTag(), 1, 4) emits 06 01000000 (TypeUnsignedInt4 + 4-byte LE).
-// Mirrors matter.js packages/types/src/tlv/TlvNumber.ts:TlvUInt32 et al.
 func (e *Encoder) PutUintWidth(tag Tag, v uint64, widthBytes int) {
 	switch widthBytes {
 	case 1:
@@ -153,26 +156,26 @@ func (e *Encoder) PutUintWidth(tag Tag, v uint64, widthBytes int) {
 }
 
 // PutInt16 writes an explicit 2-byte signed-int element regardless of
-// v's magnitude. Counterpart to [Encoder.PutUint16] for spec-typed
-// `int16` slots — Apple Home's HAP service mapper rejects an attribute
-// whose declared type is `int16` if the wire shape is `TypeSignedInt1`.
+// v's magnitude. matter.js encodes TlvInt16 at the smallest fitting
+// width (packages/types/src/tlv/TlvNumber.ts:253-257 at 0ceb202d); this
+// fixed form is for the documented divergences only (see
+// [Encoder.PutUint16]) — [Encoder.PutInt] is the matter.js encoding.
 func (e *Encoder) PutInt16(tag Tag, v int16) {
 	e.writeControlAndTag(TypeSignedInt2, tag)
 	e.buf = binary.LittleEndian.AppendUint16(e.buf, uint16(v)) //nolint:gosec // G115: bit-pattern preserved, two's-complement is the wire form; see #20
 }
 
 // PutInt32 writes an explicit 4-byte signed-int element regardless of
-// v's magnitude. Counterpart to [Encoder.PutUint32] for spec-typed
-// `int32` slots.
+// v's magnitude. matter.js encodes TlvInt32 at the smallest fitting
+// width (TlvNumber.ts:259-263 at 0ceb202d); see [Encoder.PutInt16].
 func (e *Encoder) PutInt32(tag Tag, v int32) {
 	e.writeControlAndTag(TypeSignedInt4, tag)
 	e.buf = binary.LittleEndian.AppendUint32(e.buf, uint32(v)) //nolint:gosec // G115: bit-pattern preserved, two's-complement is the wire form; see #20
 }
 
 // PutInt64 writes an explicit 8-byte signed-int element regardless of
-// v's magnitude. For spec-typed `int64` slots (e.g. EpochS /
-// SystemTimeUs / time-of-day fields) where the schema declares a
-// fixed 64-bit width.
+// v's magnitude. matter.js encodes TlvInt64 at the smallest fitting
+// width (TlvNumber.ts:265-269 at 0ceb202d); see [Encoder.PutInt16].
 func (e *Encoder) PutInt64(tag Tag, v int64) {
 	e.writeControlAndTag(TypeSignedInt8, tag)
 	e.buf = binary.LittleEndian.AppendUint64(e.buf, uint64(v)) //nolint:gosec // G115: bit-pattern preserved, two's-complement is the wire form; see #20
@@ -325,7 +328,10 @@ func (e *Encoder) PutUTF8Bounded(tag Tag, s string, maxBytes int) {
 		TypeUTF8Str1, TypeUTF8Str2, TypeUTF8Str4, TypeUTF8Str8)
 }
 
-// PutInt8Bounded writes a 1-byte signed-int element. Returns
+// PutInt8Bounded writes a signed-int element at the smallest fitting
+// width, as matter.js's nullable schema does (TlvNullable.ts wraps
+// the TlvNumber schema, whose length provider picks the width from the
+// value, TlvNumber.ts:247-297 at 0ceb202d). Returns
 // [ErrInt8NullableSentinel] when v equals the Matter §6.6.4.5 Table 26
 // nullable-int8 sentinel (−128 / 0x80). Callers on a nullable int8
 // attribute must encode null via [Encoder.PutNull] when the intended
@@ -338,12 +344,14 @@ func (e *Encoder) PutInt8Bounded(tag Tag, v int8) error {
 	if v == -128 {
 		return fmt.Errorf("%w: int8 sentinel −128 must be encoded as null, not as a value", ErrInt8NullableSentinel)
 	}
-	e.writeControlAndTag(TypeSignedInt1, tag)
-	e.buf = append(e.buf, byte(v)) //nolint:gosec // G115: range is int8, sentinel excluded above; see #20
+	e.PutInt(tag, int64(v))
 	return nil
 }
 
-// PutInt16Bounded writes a 2-byte signed-int element. Returns
+// PutInt16Bounded writes a signed-int element at the smallest fitting
+// width, as matter.js's nullable schema does (TlvNullable.ts wraps
+// the TlvNumber schema, whose length provider picks the width from the
+// value, TlvNumber.ts:247-297 at 0ceb202d). Returns
 // [ErrInt16NullableSentinel] when v equals the Matter §6.6.4.5 Table 26
 // nullable-int16 sentinel (−32768 / 0x8000). See [Encoder.PutInt8Bounded]
 // for the encoding rationale.
@@ -354,12 +362,14 @@ func (e *Encoder) PutInt16Bounded(tag Tag, v int16) error {
 	if v == -32768 {
 		return fmt.Errorf("%w: int16 sentinel −32768 must be encoded as null", ErrInt16NullableSentinel)
 	}
-	e.writeControlAndTag(TypeSignedInt2, tag)
-	e.buf = binary.LittleEndian.AppendUint16(e.buf, uint16(v)) //nolint:gosec // G115: bit-pattern preserved, two's-complement is the wire form; see #20
+	e.PutInt(tag, int64(v))
 	return nil
 }
 
-// PutInt32Bounded writes a 4-byte signed-int element. Returns
+// PutInt32Bounded writes a signed-int element at the smallest fitting
+// width, as matter.js's nullable schema does (TlvNullable.ts wraps
+// the TlvNumber schema, whose length provider picks the width from the
+// value, TlvNumber.ts:247-297 at 0ceb202d). Returns
 // [ErrInt32NullableSentinel] when v equals the Matter §6.6.4.5 Table 26
 // nullable-int32 sentinel (−2147483648 / 0x80000000). See
 // [Encoder.PutInt8Bounded] for the encoding rationale.
@@ -370,12 +380,14 @@ func (e *Encoder) PutInt32Bounded(tag Tag, v int32) error {
 	if v == -2147483648 {
 		return fmt.Errorf("%w: int32 sentinel −2147483648 must be encoded as null", ErrInt32NullableSentinel)
 	}
-	e.writeControlAndTag(TypeSignedInt4, tag)
-	e.buf = binary.LittleEndian.AppendUint32(e.buf, uint32(v)) //nolint:gosec // G115: bit-pattern preserved, two's-complement is the wire form; see #20
+	e.PutInt(tag, int64(v))
 	return nil
 }
 
-// PutUint8Bounded writes a 1-byte unsigned-int element. Returns
+// PutUint8Bounded writes a unsigned-int element at the smallest fitting
+// width, as matter.js's nullable schema does (TlvNullable.ts wraps
+// the TlvNumber schema, whose length provider picks the width from the
+// value, TlvNumber.ts:247-297 at 0ceb202d). Returns
 // [ErrUint8NullableSentinel] when v equals 0xFF, the Matter §6.6.4.5
 // Table 26 nullable-uint8 sentinel. Callers on a nullable uint8
 // attribute (e.g. NullableEnum8, occupancy percentage) must encode
@@ -390,12 +402,14 @@ func (e *Encoder) PutUint8Bounded(tag Tag, v uint8) error {
 	if v == 0xFF {
 		return fmt.Errorf("%w: uint8 sentinel 0xFF must be encoded as null, not as a value", ErrUint8NullableSentinel)
 	}
-	e.writeControlAndTag(TypeUnsignedInt1, tag)
-	e.buf = append(e.buf, v)
+	e.PutUint(tag, uint64(v))
 	return nil
 }
 
-// PutUint16Bounded writes a 2-byte unsigned-int element. Returns
+// PutUint16Bounded writes a unsigned-int element at the smallest fitting
+// width, as matter.js's nullable schema does (TlvNullable.ts wraps
+// the TlvNumber schema, whose length provider picks the width from the
+// value, TlvNumber.ts:247-297 at 0ceb202d). Returns
 // [ErrUint16NullableSentinel] when v equals 0xFFFF, the Matter
 // §6.6.4.5 Table 26 nullable-uint16 sentinel. See
 // [Encoder.PutUint8Bounded] for the encoding rationale.
@@ -406,12 +420,14 @@ func (e *Encoder) PutUint16Bounded(tag Tag, v uint16) error {
 	if v == 0xFFFF {
 		return fmt.Errorf("%w: uint16 sentinel 0xFFFF must be encoded as null", ErrUint16NullableSentinel)
 	}
-	e.writeControlAndTag(TypeUnsignedInt2, tag)
-	e.buf = binary.LittleEndian.AppendUint16(e.buf, v)
+	e.PutUint(tag, uint64(v))
 	return nil
 }
 
-// PutUint32Bounded writes a 4-byte unsigned-int element. Returns
+// PutUint32Bounded writes a unsigned-int element at the smallest fitting
+// width, as matter.js's nullable schema does (TlvNullable.ts wraps
+// the TlvNumber schema, whose length provider picks the width from the
+// value, TlvNumber.ts:247-297 at 0ceb202d). Returns
 // [ErrUint32NullableSentinel] when v equals 0xFFFFFFFF, the Matter
 // §6.6.4.5 Table 26 nullable-uint32 sentinel. See
 // [Encoder.PutUint8Bounded] for the encoding rationale.
@@ -422,12 +438,14 @@ func (e *Encoder) PutUint32Bounded(tag Tag, v uint32) error {
 	if v == 0xFFFFFFFF {
 		return fmt.Errorf("%w: uint32 sentinel 0xFFFFFFFF must be encoded as null", ErrUint32NullableSentinel)
 	}
-	e.writeControlAndTag(TypeUnsignedInt4, tag)
-	e.buf = binary.LittleEndian.AppendUint32(e.buf, v)
+	e.PutUint(tag, uint64(v))
 	return nil
 }
 
-// PutUint64Bounded writes an 8-byte unsigned-int element. Returns
+// PutUint64Bounded writes a unsigned-int element at the smallest fitting
+// width, as matter.js's nullable schema does (TlvNullable.ts wraps
+// the TlvNumber schema, whose length provider picks the width from the
+// value, TlvNumber.ts:247-297 at 0ceb202d). Returns
 // [ErrUint64NullableSentinel] when v equals 0xFFFFFFFFFFFFFFFF, the
 // Matter §6.6.4.5 Table 26 nullable-uint64 sentinel. See
 // [Encoder.PutUint8Bounded] for the encoding rationale.
@@ -438,8 +456,7 @@ func (e *Encoder) PutUint64Bounded(tag Tag, v uint64) error {
 	if v == 0xFFFFFFFFFFFFFFFF {
 		return fmt.Errorf("%w: uint64 sentinel 0xFFFFFFFFFFFFFFFF must be encoded as null", ErrUint64NullableSentinel)
 	}
-	e.writeControlAndTag(TypeUnsignedInt8, tag)
-	e.buf = binary.LittleEndian.AppendUint64(e.buf, v)
+	e.PutUint(tag, v)
 	return nil
 }
 

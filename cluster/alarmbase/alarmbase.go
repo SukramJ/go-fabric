@@ -261,14 +261,19 @@ func newServer(v variant, cfg Config) (*Server, error) {
 	if cfg.Features&FeatureReset != 0 {
 		initial[AttrLatch] = cfg.Latch
 	}
-	srv, err := spec.NewServer(v.def, opts, spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &Server{v: v, supported: cfg.Supported, latch: cfg.Latch, delegate: cfg.Delegate}
+	handlers := map[uint32]spec.CommandHandler{
+		CmdReset:               s.handleReset,
+		CmdModifyEnabledAlarms: s.handleModifyEnabledAlarms,
+	}
+	srv, err := spec.NewServer(v.def, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("alarmbase: %w", err)
 	}
 	if err := srv.SetAttributes(initial); err != nil {
 		return nil, fmt.Errorf("alarmbase: %w", err)
 	}
-	s := &Server{Instance: srv.Instance, v: v, srv: srv, supported: cfg.Supported, latch: cfg.Latch, delegate: cfg.Delegate}
+	s.Instance, s.srv = srv.Instance, srv
 	// The initial Mask, then the initial State, as chip's integration sets
 	// them (dishwasher-alarm-server/CodegenIntegration.cpp:158-167). No
 	// emitter is attached yet, so the State's Notify goes nowhere, as
@@ -279,8 +284,6 @@ func newServer(v variant, cfg Config) (*Server, error) {
 	if err := s.SetState(cfg.State); err != nil {
 		return nil, err
 	}
-	srv.Handle(CmdReset, s.handleReset)
-	srv.Handle(CmdModifyEnabledAlarms, s.handleModifyEnabledAlarms)
 	return s, nil
 }
 

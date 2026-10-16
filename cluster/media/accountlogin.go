@@ -47,20 +47,21 @@ func NewAccountLogin(cfg AccountLoginConfig) (*AccountLoginServer, error) {
 	if cfg.Port == nil {
 		return nil, fmt.Errorf("%w: AccountLogin", ErrNilPort)
 	}
-	srv, err := spec.NewServer(logindef.Definition, spec.Options{Events: cfg.Events}, spec.ServerConfig{DataVersion: cfg.DataVersion})
+	h := handlers{}
+	port := cfg.Port
+	handle(h, logindef.CmdGetSetupPin, func(ctx context.Context, req logindef.GetSetupPinRequest) (any, error) {
+		return port.GetSetupPIN(ctx, req)
+	})
+	handle(h, logindef.CmdLogin, func(ctx context.Context, req logindef.LoginRequest) (any, error) {
+		return nil, port.Login(ctx, req)
+	})
+	handle(h, logindef.CmdLogout, func(ctx context.Context, req logindef.LogoutRequest) (any, error) {
+		return nil, port.Logout(ctx, req)
+	})
+	srv, err := newServer(logindef.Definition, spec.Options{Events: cfg.Events}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("media: AccountLogin: %w", err)
 	}
-	port := cfg.Port
-	handle(srv, logindef.CmdGetSetupPin, func(ctx context.Context, req logindef.GetSetupPinRequest) (any, error) {
-		return port.GetSetupPIN(ctx, req)
-	})
-	handle(srv, logindef.CmdLogin, func(ctx context.Context, req logindef.LoginRequest) (any, error) {
-		return nil, port.Login(ctx, req)
-	})
-	handle(srv, logindef.CmdLogout, func(ctx context.Context, req logindef.LogoutRequest) (any, error) {
-		return nil, port.Logout(ctx, req)
-	})
 	return &AccountLoginServer{Server: srv}, nil
 }
 

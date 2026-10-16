@@ -160,11 +160,16 @@ func NewMicrowaveOvenControl(cfg MicrowaveConfig) (*MicrowaveServer, error) {
 		// with the feature (MicrowaveOvenControlCluster.cpp:153-154).
 		opts.Attributes = append(opts.Attributes, mwo.AttrSupportedWatts, mwo.AttrSelectedWattIndex)
 	}
-	srv, err := spec.NewServer(mwo.Definition, opts, spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &MicrowaveServer{oven: cfg.Oven}
+	handlers := map[uint32]spec.CommandHandler{
+		mwo.CmdSetCookingParameters: s.setCookingParameters,
+		mwo.CmdAddMoreTime:          s.addMoreTime,
+	}
+	srv, err := spec.NewServer(mwo.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("microwaveovencontrol: %w", err)
 	}
-	s := &MicrowaveServer{Instance: srv.Instance, srv: srv, oven: cfg.Oven}
+	s.Instance, s.srv = srv.Instance, srv
 	cookTime := cfg.CookTime
 	if cookTime == 0 {
 		// mCookTimeSec(kDefaultCookTimeSec) (MicrowaveOvenControlCluster.cpp:58).
@@ -199,8 +204,6 @@ func NewMicrowaveOvenControl(cfg MicrowaveConfig) (*MicrowaveServer, error) {
 			return nil, fmt.Errorf("%w: %w", ErrMicrowaveValue, err)
 		}
 	}
-	srv.Handle(mwo.CmdSetCookingParameters, s.setCookingParameters)
-	srv.Handle(mwo.CmdAddMoreTime, s.addMoreTime)
 	return s, nil
 }
 

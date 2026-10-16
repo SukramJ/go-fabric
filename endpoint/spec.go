@@ -21,7 +21,6 @@ import (
 // the state the topology was built with. nil means "always reachable",
 // which is what an endpoint with no live source (the root and the
 // aggregator) needs.
-// loom:reachable:reason="carried on Spec and Endpoint and called by materialize on every dispatch; a named func type reached only through a struct field is invisible to the analyzer"
 type AvailabilityProbe func() bool
 
 // Spec is one bridged endpoint as its owner describes it: the
@@ -34,7 +33,6 @@ type AvailabilityProbe func() bool
 // and persistence, the three-tier root/aggregator scaffolding, the
 // per-endpoint state that must survive a reassembly, the cluster
 // surface — depends on nothing but the fields below.
-// loom:reachable:reason="constructed by the host adapter and consumed by Assemble in this package; a struct that only ever travels as a slice element has no construction site the analyzer follows"
 type Spec struct {
 	// StableKey identifies the source across reassemblies and daemon
 	// restarts. It is the owner's persisted endpoint-identity key, so

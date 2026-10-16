@@ -336,7 +336,7 @@ func (s *CertificateStore) CDSigner(skid []byte) (*ecdsa.PublicKey, bool) {
 			s.log.Info("dcl.certificates.cd_signer_unparseable", slog.String("skid", id), slog.String("err", err.Error()))
 			return nil, false
 		}
-		k, err := p256Key(c.x509)
+		k, err := attestation.P256Key(c.x509)
 		return k, err == nil
 	}
 	if s.offline() {
@@ -371,7 +371,7 @@ func (s *CertificateStore) fetchCDSigner(ctx context.Context, id string) (*ecdsa
 	if err != nil {
 		return nil, err
 	}
-	return p256Key(c.x509)
+	return attestation.P256Key(c.x509)
 }
 
 // AddCertificate puts a PAA or CD signer into the trust store — matter.js
