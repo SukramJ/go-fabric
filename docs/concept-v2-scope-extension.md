@@ -3,7 +3,9 @@
 Stand 2026-10-12, go-fabric `v0.3.0` plus #55/#56. Fortsetzung von
 [`concept-matter-1.6.1-and-device-layer.md`](./concept-matter-1.6.1-and-device-layer.md)
 (Konzept v1). Sprache ist Deutsch, weil es ein Planungsstand ist; die ADRs
-daraus sind Englisch.
+daraus sind Englisch. Fortgesetzt in
+[Konzept v3](./concept-v3-commissioner-in-the-field.md) (2026-10-16: BLE im
+Commissioner, DCL-Schnappschuss, `crypto.Signer`, Fenster öffnen).
 
 Dieses Dokument hat vier Teile:
 

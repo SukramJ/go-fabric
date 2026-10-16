@@ -119,7 +119,9 @@ one-way test seams (`bridgeseam`, `channelseam`), the shared parity-test
 support (`paritytest`) and the chip-tool suite.
 
 Scope boundaries that are decisions, not backlog — do not "fix" them:
-no Bluetooth, no Thread. The controller/commissioner role was a third
+no Bluetooth on the device side (the commissioner speaks BLE since
+[ADR 0024](./docs/adr/0024-ble-commissioning-in-the-controller.md), concept v3),
+no Thread radio. The controller/commissioner role was a third
 until [ADR 0020](./docs/adr/0020-commissioner-and-controller-role.md)
 (accepted 2026-10-13, concept v2): it enters as `controller/` in stages;
 until a stage lands nothing outside that package changes for it.
