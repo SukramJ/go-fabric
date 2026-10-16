@@ -22,7 +22,10 @@ import (
 // matter.js LevelControlServer does on its own transitions.
 type NativeRamp interface {
 	// Level reports the device's current level; known=false is a level
-	// the device has not reported, which reads as null.
+	// the device has not reported, which reads as null. A level below the
+	// server's MinLevel (a dimmer whose 0 means off) is reported as it is:
+	// the source counts it as at the minimum for an owed switch-off, so a
+	// host need not crop it.
 	Level() (level uint8, known bool)
 	// Ramp drives the device to level over d; d == 0 is at once. withOnOff
 	// marks a "with On/Off" command: the source has already switched the
@@ -247,8 +250,17 @@ func (n *NativeSource) move(ctx context.Context, req MoveRequest, withOnOff bool
 	if req.Rate == nil {
 		return n.ramp(ctx, target, func(uint8) time.Duration { return 0 }, withOnOff)
 	}
-	if _, err := n.currentLevel(); err != nil {
-		return err
+	if _, known := n.dev.Level(); !known {
+		// A level the device has not reported cannot time a rated move,
+		// and matter.js does not read it for one: moveLogic hands
+		// transition ±Infinity (LevelControlServer.ts:388-403), couple
+		// crops `targetLevel ?? this.currentLevel` (:529-550), and with
+		// managed transitions off — the default, :786-791, and the
+		// hardware NativeRamp models (Transitions.ts:44-49) —
+		// Transitions.start sets the cropped target at once
+		// (Transitions.ts:120-148). Step keeps its Failure: stepLogic
+		// reads currentLevel (:478), which throws on null (:103-111).
+		return n.ramp(ctx, target, func(uint8) time.Duration { return 0 }, withOnOff)
 	}
 	rate := *req.Rate
 	return n.ramp(ctx, target, func(current uint8) time.Duration {
@@ -408,7 +420,11 @@ func (n *NativeSource) settleOff() {
 // (LevelControlServer.ts:627-633): once the level is at the minimum, the
 // switch-off p owes is paid — off, if the device is still on.
 func (n *NativeSource) settle(p *pendingOff) error {
-	if level, known := n.dev.Level(); !known || level != n.minLevel {
+	// At or below the minimum: matter.js decides the switch-off with
+	// cropValueRange(target, minLevel, maxLevel) <= minLevel
+	// (LevelControlServer.ts couple), and a dimmer whose only knob is its
+	// level reports 0 for "off", below a Lighting server's MinLevel of 1.
+	if level, known := n.dev.Level(); !known || level > n.minLevel {
 		return nil
 	}
 	n.mu.Lock()

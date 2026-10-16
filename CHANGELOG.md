@@ -10,6 +10,12 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-16
+
+### Fixed
+
+- `levelcontrol.NativeSource` (#127): a Move with a Rate on a device that has reported no level ramps to the MoveMode's bound at once and succeeds, as matter.js does (it never reads `currentLevel` for a Move, `LevelControlServer.ts:388-403`, and with managed transitions off sets the target immediately, `Transitions.ts:120-148`); it used to answer Failure. Step on an unknown level still answers Failure (`:478`, `:103-111`). An owed "with On/Off" switch-off is now settled when the reported level is at **or below** MinLevel (matter.js `couple`: `<= minLevel`), so a dimmer that reports 0 for "off" after a ramp to the Lighting minimum of 1 is switched off; `NativeRamp.Level` documents that a level below MinLevel is reported as it is.
+
 ## [0.5.0] — 2026-10-16
 
 The licence release: Apache License 2.0 from this version on (ADR 0023;
@@ -3908,7 +3914,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/SukramJ/go-fabric/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/SukramJ/go-fabric/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/SukramJ/go-fabric/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/SukramJ/go-fabric/compare/v0.3.0...v0.3.1
