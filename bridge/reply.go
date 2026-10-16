@@ -1043,10 +1043,10 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 			if t.Group != 0 {
 				enc.PutUint16(tlv.ContextTag(2), t.Group)
 			}
-			if t.Endpoint != 0 {
+			if t.HasEndpoint() {
 				enc.PutUint16(tlv.ContextTag(3), t.Endpoint)
 			}
-			if t.Cluster != 0 {
+			if t.HasCluster() {
 				enc.PutUint32(tlv.ContextTag(4), t.Cluster)
 			}
 			enc.PutUint(tlv.ContextTag(254), uint64(t.FabricIndex))
