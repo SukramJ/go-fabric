@@ -51,15 +51,25 @@ type bindingObserver struct {
 
 // TargetStruct mirrors the Binding cluster's TargetStruct (Matter
 // §9.6.5.1). All fields are optional except Endpoint XOR Group;
-// FabricIndex is fabric-scoped. A zero Node, Group or Endpoint is the
-// field's absence (endpoint 0 cannot be a target); Cluster is absent at 0
-// and at 0xFFFFFFFF, and the read encoder omits it at 0.
+// FabricIndex is fabric-scoped. A zero Node or Group is the field's
+// absence (neither is a valid id: node-id 0 and group-id 0 are
+// unspecified, binding.element.ts's Group "min 1"). Endpoint and Cluster
+// have a valid zero — the root endpoint, the Identify cluster — so their
+// presence is stated explicitly: EndpointPresent and ClusterPresent mark a
+// zero value as present, as matter.js's optional fields do
+// (binding.element.ts, BindingServer's entries keep `endpoint: 0`). A
+// non-zero Endpoint or Cluster is present either way, and Cluster
+// 0xFFFFFFFF stays absent.
 type TargetStruct struct {
 	Node        uint64 // 0 means "not present"
 	Group       uint16 // 0 means "not present"
-	Endpoint    uint16 // 0 means "not present"
-	Cluster     uint32 // 0 or 0xFFFFFFFF mean "not present"
+	Endpoint    uint16 // present when non-zero or EndpointPresent
+	Cluster     uint32 // present when non-zero or ClusterPresent; 0xFFFFFFFF never
 	FabricIndex uint8
+	// EndpointPresent marks Endpoint present when it is 0.
+	EndpointPresent bool
+	// ClusterPresent marks Cluster present when it is 0.
+	ClusterPresent bool
 }
 
 // bindingClusterAbsent is the Cluster sentinel the struct's documentation
@@ -73,10 +83,12 @@ func (t TargetStruct) HasNode() bool { return t.Node != 0 }
 func (t TargetStruct) HasGroup() bool { return t.Group != 0 }
 
 // HasEndpoint reports whether the entry names an endpoint.
-func (t TargetStruct) HasEndpoint() bool { return t.Endpoint != 0 }
+func (t TargetStruct) HasEndpoint() bool { return t.Endpoint != 0 || t.EndpointPresent }
 
 // HasCluster reports whether the entry names a cluster.
-func (t TargetStruct) HasCluster() bool { return t.Cluster != 0 && t.Cluster != bindingClusterAbsent }
+func (t TargetStruct) HasCluster() bool {
+	return (t.Cluster != 0 || t.ClusterPresent) && t.Cluster != bindingClusterAbsent
+}
 
 // Key is the entry's stable identity: fabric index, node, group, endpoint
 // and cluster joined by "/", an absent field empty. Mirrors matter.js
@@ -343,11 +355,13 @@ func bindingWriteList(value any, fabric uint8, request bool) ([]TargetStruct, er
 			if t.Group != nil {
 				e.Group = *t.Group
 			}
+			// The flag is set for a zero value only, where it is needed:
+			// a non-zero value is present by itself.
 			if t.Endpoint != nil {
-				e.Endpoint = *t.Endpoint
+				e.Endpoint, e.EndpointPresent = *t.Endpoint, *t.Endpoint == 0
 			}
 			if t.Cluster != nil {
-				e.Cluster = *t.Cluster
+				e.Cluster, e.ClusterPresent = *t.Cluster, *t.Cluster == 0
 			}
 			out = append(out, e)
 		}
