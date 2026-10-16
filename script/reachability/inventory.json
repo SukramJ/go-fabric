@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5121,
+  "entry_points": 5122,
   "entry_packages": [
     ".",
     "bdx",
@@ -208,9 +208,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12309,
+    "total_exported": 12310,
     "reachable": 8717,
-    "whitelisted": 3587,
+    "whitelisted": 3588,
     "unreachable": 5
   },
   "by_package": [
@@ -20750,6 +20750,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/certifiability_doc_test.go",
       "line": 49
+    },
+    {
+      "package": "internal/chiptool",
+      "identifier": "TestDeviceTypeEvents",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "internal/chiptool/pics_device_events_test.go",
+      "line": 64
     },
     {
       "package": "internal/chiptool",
