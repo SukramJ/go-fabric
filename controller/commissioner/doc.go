@@ -16,7 +16,9 @@
 // root certificate and the NOC (controller/ca), the operational CASE
 // connection through controller/peer, CommissioningComplete and the
 // fabric label — with matter.js's failsafe bookkeeping and error
-// classes. Out of scope by ADR 0020's stage split: BLE, Wi-Fi and Thread
-// network commissioning, time synchronisation, terms and conditions, the
-// default OTA provider and the DCL.
+// classes. Not ported yet: BLE commissioning and the Wi-Fi and Thread
+// network steps (ADR 0024, concept v3), time synchronisation, terms and
+// conditions and the default OTA provider. The ledger's trust anchors and
+// revocation reach the flow through Options.Attestation from
+// controller/dcl (ADR 0020 stage 6a), which this package does not import.
 package commissioner

@@ -10,6 +10,14 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- Developer and architect documentation, published as the GitHub Pages site <https://sukramj.github.io/go-fabric/> (`mkdocs.yml`, `.github/workflows/pages.yml`; `mkdocs build --strict` on every pull request that touches `docs/`): a start page, the architecture, the security model, two getting-started pages with compiling examples (`examples/quickstart-device`, `examples/quickstart-controller`) and guides on host ports, concurrency and persistence.
+
+### Removed
+
+- `docs/feature-scope.md` and `docs/open-items.md` (replaced by `docs/architecture.md`, the issue tracker, the findings register and `docs/certifiability.md`); concept v1 and v2 moved to `docs/history/`, the owner's test plan to `notes/`. `examples/reference-controller/reference-controller.db`, a local run's database with its CA and fabric keys, is no longer tracked (`*.db` is ignored).
+
 ## [0.5.4] — 2026-10-16
 
 ### Added
