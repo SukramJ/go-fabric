@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -83,9 +84,12 @@ type Node struct {
 
 	// life bounds the goroutines New and Start begin (subscription
 	// engine, reapers, the operational-time keeper); Stop cancels it.
-	life     context.Context //nolint:containedctx // the node's lifetime, cancelled by Stop
-	cancel   context.CancelFunc
-	keeperWG sync.WaitGroup
+	life context.Context //nolint:containedctx // the node's lifetime, cancelled by Stop
+	// reopenPending is set while a reopen after the last fabric waits for
+	// the node to become idle (reopenWhenIdle).
+	reopenPending atomic.Bool
+	cancel        context.CancelFunc
+	keeperWG      sync.WaitGroup
 
 	mu      sync.Mutex
 	started bool
@@ -379,7 +383,44 @@ func (n *Node) fabricRemoved(ctx context.Context, fabricIndex uint8) {
 	}
 	n.br.EmitFabricRemovedContext(ctx, fabricIndex)
 	n.removeFabricBindings(fabricIndex)
-	n.window.reopenIfDecommissioned(ctx, n.st)
+	n.reopenWhenIdle()
+}
+
+// reopenPollInterval is how often a pending reopen after the last fabric's
+// removal checks whether the node has become idle.
+const reopenPollInterval = 250 * time.Millisecond
+
+// reopenWhenIdle reopens the node's own commissioning window once the last
+// fabric is gone and the node is idle: no fail-safe armed and no session
+// left — the session that carried RemoveFabric closes after its response.
+// A fabric that exists by then (a commissioning completed under the
+// fail-safe) cancels it. Mirrors matter.js CommissioningServer
+// #resetWhenIdle (CommissioningServer.ts:174-199); the erase that follows
+// there is not mirrored (BD-Matter-LastFabricReopenWithoutErase). One
+// pending reopen at a time, bounded by the node's lifetime.
+func (n *Node) reopenWhenIdle() {
+	if !n.reopenPending.CompareAndSwap(false, true) {
+		return
+	}
+	n.keeperWG.Add(1)
+	go func() {
+		defer n.keeperWG.Done()
+		defer n.reopenPending.Store(false)
+		tick := time.NewTicker(reopenPollInterval)
+		defer tick.Stop()
+		for {
+			armed := n.root.GeneralCommissioning != nil && n.root.GeneralCommissioning.FailSafeArmed()
+			if !armed && n.sec.sessions.Active() == 0 {
+				n.window.reopenIfDecommissioned(n.life, n.st)
+				return
+			}
+			select {
+			case <-n.life.Done():
+				return
+			case <-tick.C:
+			}
+		}
+	}()
 }
 
 // fabricUpdated is OperationalCredentials' OnFabricUpdated
