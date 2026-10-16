@@ -128,12 +128,14 @@ func (n *Node) otaProviderEndpointID() (uint16, bool) {
 	return 0, false
 }
 
-// ensureOTAProviderACL lets every node of the node's first fabric invoke
-// the provider: an Operate entry for CASE, no subject, the provider's
-// endpoint and cluster — added once, when the fabric's ACL has none.
-// Mirrors OP:116-158 (#nodeOnline), which waits for a fabric when there is
-// none yet (:118-124); the facade calls it at Start and after each
-// CommissioningComplete.
+// ensureOTAProviderACL lets every node of every fabric invoke the
+// provider: an Operate entry for CASE, no subject, the provider's endpoint
+// and cluster — added once per fabric whose ACL has none. matter.js adds
+// it on the first fabric only (OP:116-158 #nodeOnline,
+// fabricAuthority.fabrics[0] at :118), so a requestor on a second fabric of
+// a multi-admin bridge could not query; this module grants it on each
+// (BD-Matter-OTAProvider-ACLEveryFabric). The facade calls it at Start and
+// after each CommissioningComplete.
 func (n *Node) ensureOTAProviderACL(ctx context.Context) {
 	if n.otaProvider == nil {
 		return
@@ -143,11 +145,18 @@ func (n *Node) ensureOTAProviderACL(ctx context.Context) {
 		return
 	}
 	fabrics, err := n.st.ListFabrics(ctx)
-	if err != nil || len(fabrics) == 0 {
+	if err != nil {
 		return
 	}
-	own := fabrics[0].FabricIndex // fabricAuthority.fabrics[0] (OP:118)
-	acl, err := n.st.ListACL(ctx, own)
+	for _, f := range fabrics {
+		n.ensureOTAProviderACLOn(ctx, f.FabricIndex, epID)
+	}
+}
+
+// ensureOTAProviderACLOn adds the provider's Operate/CASE entry to
+// fabricIndex's ACL unless it is there.
+func (n *Node) ensureOTAProviderACLOn(ctx context.Context, fabricIndex uint8, epID uint16) {
+	acl, err := n.st.ListACL(ctx, fabricIndex)
 	if err != nil {
 		n.logger.Warn("ota.provider.acl_list", slog.String("err", err.Error()))
 		return
@@ -162,16 +171,16 @@ func (n *Node) ensureOTAProviderACL(ctx context.Context) {
 	}
 	ep := epID
 	entry := store.ACLEntry{
-		FabricIndex: own, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeCASE,
+		FabricIndex: fabricIndex, Privilege: store.PrivilegeOperate, AuthMode: store.AuthModeCASE,
 		Targets: []store.ACLTarget{{Endpoint: &ep, Cluster: &cluster}},
 	}
-	if err := n.st.ReplaceACL(ctx, own, append(acl, entry)); err != nil {
+	if err := n.st.ReplaceACL(ctx, fabricIndex, append(acl, entry)); err != nil {
 		n.logger.Warn("ota.provider.acl_add", slog.String("err", err.Error()))
 		return
 	}
 	// The ACL changed: DataVersion and AccessControlEntryChanged, as
 	// matter.js's setStateOf(AccessControlServer) reports it.
 	n.root.AccessControl.NotifyAdminEntryInstalled(entry)
-	n.logger.Info("ota.provider.acl_added", slog.Int("fabric_index", int(own)), slog.Int("endpoint", int(epID)),
+	n.logger.Info("ota.provider.acl_added", slog.Int("fabric_index", int(fabricIndex)), slog.Int("endpoint", int(epID)),
 		slog.String("hint", "anyone in the fabric may access the OTA Software Update Provider cluster"))
 }
