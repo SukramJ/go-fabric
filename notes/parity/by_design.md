@@ -2942,9 +2942,10 @@ matter.js's `LevelControlServer` runs the ramp itself and, for a
 `cluster/levelcontrol/native.go`). `levelcontrol.NewNativeSource` hands
 the ramp to the device (`NativeRamp.Ramp(level, duration, withOnOff)`):
 it switches the light on before a ramp up from off in matter.js's order,
-and switches off only when the level actually reaches the minimum —
-immediately, on the device's change notification, or when the ramp is
-due to end; a later command cancels the pending switch-off. It reports
+and switches off when the level reaches the minimum — at once for a
+ramp without duration, on the device's change notification, and at the
+latest when the ramp is due to end, reported or not (v0.5.2, v0.5.3,
+#129, #131); a later command cancels the pending switch-off. It reports
 RemainingTime 0 and couples no colour temperature (the engine's
 `Transitions.ColorTemperature` has no hand-off counterpart). The plain
 Stop is gated by ExecuteIfOff and StopWithOnOff is not
@@ -2967,4 +2968,24 @@ Aggregator. `ErrEndpointsExhausted` only after a full pass. Report AV
 
 By design. Matching matter.js's order after a wrap would need a second
 persisted cursor for a case that needs 65 533 allocations to occur.
+
+### BD-Matter-LevelControl-NativeSwitcher — a device that writes On/Off and level together takes "with On/Off" commands as one call
+
+matter.js couples On/Off and the level transition in one transaction
+against local state (`LevelControlServer.ts:529-550`, `couple` →
+`#turnOnForLevel` → the transition; the switch-off on commit, `:624-627`),
+so a device sees one consistent change. A bridged device that takes
+"start at level X" and "stop" as one write each would see two writes —
+on at the old level, then the new level — and an audible or visible
+moment in between. `levelcontrol.NativeSwitcher` (optional on a
+`NativeRamp`) receives `SwitchOn(level, d)` when a "with On/Off" command
+turns the device on and `SwitchOff(d)` when one ends at the minimum,
+instead of the source's SetOnOff + Ramp sequence; the source then leaves
+the OnOff attribute to the host's OnOff, which reflects the device. A
+device without the interface keeps matter.js's order; `NativeMover`
+still takes Move. Issue #131.
+
+By design. No matter.js behaviour changes for a device that does not
+opt in; the interface only lets a bridged device express the one
+transaction matter.js runs locally.
 

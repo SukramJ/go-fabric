@@ -10,7 +10,15 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-10-16
+
+### Added
+
+- `levelcontrol.NativeSwitcher` (#131): an optional interface of a `NativeRamp` whose On/Off and level are written together. For a "with On/Off" command the source calls `SwitchOn(level, d)` instead of switching the endpoint on and then ramping, and `SwitchOff(d)` instead of ramping to the minimum and then switching off; the OnOff attribute is then the host's. A device without it keeps matter.js's order. No matter.js counterpart (`BD-Matter-LevelControl-NativeSwitcher`).
+
 ### Fixed
+
+- `levelcontrol.NativeSource` (#131): a "with On/Off" ramp to the minimum with a duration switches off when the duration has elapsed, whether or not the device reported its level — matter.js's transition ends at its target by construction (`LevelControlServer.ts:624-627`). It used to wait for a report at or below MinLevel and stayed on for a device that sent none.
 
 - `bridge`: an exchange this node opened — the OTA requestor's BDX download, a provider query — ends when the reliable tracker gives up on a message it sent, so its pending `Receive` and every later `Send` fail with `ErrExchangeClosed` wrapping `mrp.ErrMaxRetransmissionsReached`. It used to keep waiting, and a download whose provider went away stayed in Downloading for the whole 5-minute BDX idle timeout before the requestor could query again; matter.js's `MessageExchange.send` throws once the retransmissions are exhausted (`MessageExchange.ts:604-624`). This was 5 of the 17 minutes chip's TC_SU_2_2 took (step 4 waits for the aborted step-3 download).
 
@@ -3933,7 +3941,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/SukramJ/go-fabric/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/SukramJ/go-fabric/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/SukramJ/go-fabric/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/SukramJ/go-fabric/compare/v0.4.0...v0.5.0

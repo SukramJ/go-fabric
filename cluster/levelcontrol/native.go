@@ -52,6 +52,23 @@ type NativeMover interface {
 	MoveLevel(ctx context.Context, req MoveRequest, withOnOff bool) error
 }
 
+// NativeSwitcher is an optional interface of a [NativeRamp] whose On/Off
+// and level are written together — a player that takes "start at volume
+// X" and "stop" as one write each. For a "with On/Off" command the source
+// calls SwitchOn(level, d) instead of switching the endpoint on and then
+// ramping when the command turns the device on, and SwitchOff(d) instead
+// of ramping to the minimum and then switching off when it ends there.
+// The source then sets nothing on the OnOff attribute itself: the host's
+// OnOff reflects what the device did. matter.js has no counterpart — it
+// couples On/Off and the transition in one transaction against local
+// state (LevelControlServer.ts:529-550, #turnOnForLevel) — so the
+// interface is a bridged host's affordance; a device without it keeps
+// matter.js's order. A [NativeMover] still takes Move and MoveWithOnOff.
+type NativeSwitcher interface {
+	SwitchOn(ctx context.Context, level uint8, d time.Duration) error
+	SwitchOff(ctx context.Context, d time.Duration) error
+}
+
 // NativeConfig carries the construction parameters of [NewNativeSource].
 type NativeConfig struct {
 	// Lighting matches [Config.Lighting] of the server the source is
@@ -92,8 +109,8 @@ type NativeSource struct {
 // reaches the minimum or a later command replaces the ramp.
 type pendingOff struct {
 	ctx context.Context
-	// deadline checks once more when the ramp is due to end, for a device
-	// that does not notify.
+	// deadline pays the switch-off when the ramp is due to end, for a
+	// device that does not notify or report the level it reached.
 	deadline *time.Timer
 }
 
@@ -397,6 +414,25 @@ func (n *NativeSource) ramp(ctx context.Context, target uint8, duration func(cur
 	n.cancelOff()
 	coupleOnOff := withOnOff && n.onOff != nil
 	turnsOff := coupleOnOff && target <= n.minLevel
+	if sw, ok := n.dev.(NativeSwitcher); ok && coupleOnOff {
+		current, known := n.dev.Level()
+		d := duration(current)
+		if !known {
+			d = 0
+		}
+		switch {
+		case turnsOff && (n.onOff.OnOff() || !known || current != target):
+			if err := sw.SwitchOff(ctx, d); err != nil {
+				return fmt.Errorf("levelcontrol: switch off: %w", err)
+			}
+			return nil
+		case !turnsOff && !n.onOff.OnOff():
+			if err := sw.SwitchOn(ctx, target, d); err != nil {
+				return fmt.Errorf("levelcontrol: switch on at %d: %w", target, err)
+			}
+			return nil
+		}
+	}
 	if coupleOnOff && !turnsOff && !n.onOff.OnOff() {
 		if err := n.onOff.SetOnOff(ctx, true); err != nil {
 			return fmt.Errorf("levelcontrol: switch on: %w", err)
@@ -431,7 +467,10 @@ func (n *NativeSource) ramp(ctx context.Context, target uint8, duration func(cur
 	n.mu.Lock()
 	n.off = p
 	if d > 0 {
-		p.deadline = time.AfterFunc(d, n.settleOff)
+		// When the ramp is due to end the target is the level, reported or
+		// not: matter.js's transition steps to targetValue and couples off
+		// on that commit (Transitions.ts, LevelControlServer.ts:624-627).
+		p.deadline = time.AfterFunc(d, func() { _ = n.pay(p) })
 	}
 	n.mu.Unlock()
 	return n.settle(p)
@@ -460,6 +499,11 @@ func (n *NativeSource) settle(p *pendingOff) error {
 	if level, known := n.dev.Level(); !known || level > n.minLevel {
 		return nil
 	}
+	return n.pay(p)
+}
+
+// pay pays the switch-off p owes, once: off, if the device is still on.
+func (n *NativeSource) pay(p *pendingOff) error {
 	n.mu.Lock()
 	owed := n.off == p
 	if owed {
