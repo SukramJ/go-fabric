@@ -121,6 +121,17 @@ func TestInitiatedExchangePeerLoss_ForceClosesPeerSessions(t *testing.T) {
 	if _, ok := dev.br.existingPeerSession(resumeFabricIndex, resumeCtrlNode); ok {
 		t.Error("a session of the lost peer is still offered for reuse")
 	}
+	// The exchange itself ends with the exhaustion: a BDX transfer's
+	// pending Receive fails now, not after the 5-minute idle timeout
+	// (matter.js MessageExchange.send throws, MessageExchange.ts:604-624).
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := ex.Receive(ctx); !errors.Is(err, mrp.ErrMaxRetransmissionsReached) || !errors.Is(err, ErrExchangeClosed) {
+		t.Errorf("Receive after the exhaustion: %v, want ErrExchangeClosed wrapping ErrMaxRetransmissionsReached", err)
+	}
+	if err := ex.Send(context.Background(), im.InteractionModelProtocolID, im.OpcodeInvokeRequest, nil); !errors.Is(err, mrp.ErrMaxRetransmissionsReached) {
+		t.Errorf("Send after the exhaustion: %v, want ErrMaxRetransmissionsReached", err)
+	}
 }
 
 // TestInitiatedPeerLoss_UnknownExchangeIsNoOp pins that the initiated-

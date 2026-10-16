@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
@@ -216,9 +217,32 @@ type initiatedSecureExchange struct {
 	in        chan bdx.Message
 	done      chan struct{}
 	closeOnce sync.Once
+	// cause is why the exchange ended when it did not end by Close: the
+	// reliable tracker gave up on a message it sent (fail).
+	cause atomic.Pointer[error]
 }
 
 var _ bdx.Exchange = (*initiatedSecureExchange)(nil)
+
+// fail ends the exchange because a message it sent was never
+// acknowledged: a pending Receive and every later Send return err.
+// Mirrors matter.js MessageExchange.send (MessageExchange.ts:604-624),
+// whose await of the reliable send throws once the retransmissions are
+// exhausted — a BDX transfer whose peer went away fails within the MRP
+// backoff instead of waiting out the 5-minute transfer idle timeout
+// (BdxMessenger.ts:55).
+func (e *initiatedSecureExchange) fail(err error) {
+	e.cause.CompareAndSwap(nil, &err)
+	_ = e.Close()
+}
+
+// closedErr is what an operation on the ended exchange returns.
+func (e *initiatedSecureExchange) closedErr() error {
+	if c := e.cause.Load(); c != nil {
+		return fmt.Errorf("%w: %w", ErrExchangeClosed, *c)
+	}
+	return ErrExchangeClosed
+}
 
 func (b *Bridge) openInitiatedExchange(link peerLink) (*initiatedSecureExchange, error) {
 	b.mu.RLock()
@@ -267,6 +291,7 @@ func (b *Bridge) handleInitiatedPeerLoss(sessionID, exchangeID uint16) {
 		return
 	}
 	b.closeLostPeer(sessionID, exchangeID, ex.createdAt, "an exchange this node opened")
+	ex.fail(mrp.ErrMaxRetransmissionsReached)
 }
 
 // reportPeerLoss reports whether the exhausted message (sessionID,
@@ -389,7 +414,7 @@ func (e *initiatedSecureExchange) Reliable() bool {
 func (e *initiatedSecureExchange) Send(_ context.Context, protocolID uint16, opcode uint8, payload []byte) error {
 	select {
 	case <-e.done:
-		return ErrExchangeClosed
+		return e.closedErr()
 	default:
 	}
 	b := e.b
@@ -455,7 +480,7 @@ func (e *initiatedSecureExchange) Receive(ctx context.Context) (bdx.Message, err
 		e.turn.took()
 		return msg, nil
 	case <-e.done:
-		return bdx.Message{}, ErrExchangeClosed
+		return bdx.Message{}, e.closedErr()
 	case <-ctx.Done():
 		return bdx.Message{}, ctx.Err()
 	}

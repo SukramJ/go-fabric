@@ -764,3 +764,70 @@ func TestNativeSourceImmediateSwitchOffRefused(t *testing.T) {
 		t.Fatalf("refused switch-off: %v, want the switch-off error", err)
 	}
 }
+
+// switcherDevice writes On/Off and level together (#131).
+type switcherDevice struct {
+	*rampDevice
+	calls []string
+}
+
+func (s *switcherDevice) SwitchOn(_ context.Context, level uint8, d time.Duration) error {
+	s.calls = append(s.calls, fmt.Sprintf("on %d %v", level, d))
+	return nil
+}
+
+func (s *switcherDevice) SwitchOff(_ context.Context, d time.Duration) error {
+	s.calls = append(s.calls, fmt.Sprintf("off %v", d))
+	return nil
+}
+
+// TestNativeSourceSwitcher (#131): a NativeSwitcher takes a "with On/Off"
+// command that turns the device on as one SwitchOn and one that ends at
+// the minimum as one SwitchOff — neither SetOnOff nor Ramp.
+func TestNativeSourceSwitcher(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	d := &rampDevice{level: 1, known: true, on: false}
+	sw := &switcherDevice{rampDevice: d}
+	d.src = levelcontrol.NewNativeSource(sw, d, levelcontrol.NativeConfig{Lighting: true})
+	srv := levelcontrol.NewServer(levelcontrol.Config{Source: d.src, Lighting: true})
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 80, TransitionTime: u16(10)}); err != nil {
+		t.Fatalf("MoveToLevelWithOnOff from off: %v", err)
+	}
+	d.mu.Lock()
+	d.on = true
+	d.mu.Unlock()
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(5)}); err != nil {
+		t.Fatalf("MoveToLevelWithOnOff to the minimum: %v", err)
+	}
+	if want := []string{"on 80 1s", "off 500ms"}; !slices.Equal(sw.calls, want) {
+		t.Errorf("switcher saw %q, want %q", sw.calls, want)
+	}
+	wantLog(t, d)
+}
+
+// TestNativeSourceSettlesAtDeadline (#131): a "with On/Off" ramp to the
+// minimum with a duration switches off when the duration has elapsed even
+// if the device never reports a level — matter.js's transition ends at
+// its target by construction (LevelControlServer.ts:624-627).
+func TestNativeSourceSettlesAtDeadline(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	d := &rampDevice{level: 100, known: true, on: true}
+	s := &slowReportDevice{rampDevice: d}
+	d.src = levelcontrol.NewNativeSource(s, d, levelcontrol.NativeConfig{Lighting: true})
+	srv := levelcontrol.NewServer(levelcontrol.Config{Source: d.src, Lighting: true})
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(1)}); err != nil {
+		t.Fatalf("MoveToLevelWithOnOff(1, 0.1 s): %v", err)
+	}
+	if !d.OnOff() {
+		t.Fatal("switched off before the ramp's duration elapsed")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for d.OnOff() && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if d.OnOff() {
+		t.Error("OnOff still true after the ramp's duration on a device that never reported its level")
+	}
+}
