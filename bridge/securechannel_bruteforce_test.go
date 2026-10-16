@@ -387,15 +387,15 @@ func TestBridge_PaseAbortedByPeerStatusReport(t *testing.T) {
 // established handshake's last step does.
 type pake3ReplyHandler struct{}
 
-func (pake3ReplyHandler) ProcessPBKDFParamRequest([]byte) (uint8, []byte, error) {
+func (pake3ReplyHandler) ProcessPBKDFParamRequest([]byte) (opcode uint8, payload []byte, err error) {
 	return mrp.SCOpcodeStatusReport, mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), 0, nil), nil
 }
 
-func (pake3ReplyHandler) ProcessPake1([]byte) (uint8, []byte, error) {
+func (pake3ReplyHandler) ProcessPake1([]byte) (opcode uint8, payload []byte, err error) {
 	return mrp.SCOpcodeStatusReport, mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), 0, nil), nil
 }
 
-func (pake3ReplyHandler) ProcessPake3([]byte) (uint8, []byte, error) {
+func (pake3ReplyHandler) ProcessPake3([]byte) (opcode uint8, payload []byte, err error) {
 	return mrp.SCOpcodeStatusReport, mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), 0, nil), nil
 }
 
