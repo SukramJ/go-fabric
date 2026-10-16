@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5122,
+  "entry_points": 5123,
   "entry_packages": [
     ".",
     "bdx",
@@ -208,9 +208,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12313,
+    "total_exported": 12314,
     "reachable": 8718,
-    "whitelisted": 3590,
+    "whitelisted": 3591,
     "unreachable": 5
   },
   "by_package": [
@@ -6008,6 +6008,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/ota_software_update_requestor_test.go",
       "line": 538
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestOTARequestor_QueryRunningClearedOnPanic",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/ota_requestor_query_panic_test.go",
+      "line": 22
     },
     {
       "package": "cluster/core",
