@@ -140,3 +140,47 @@ func TestOrderedBacklogBound(t *testing.T) {
 		t.Errorf("backlog %d, want at most %d", n, maxOrderedBacklog)
 	}
 }
+
+// TestOrderedDispatchSharesTheConcurrencyBudget: datagrams of many
+// distinct streams — a flood of forged session ids — are bounded by
+// maxConcurrentDispatch in total, not one budget per stream; beyond it
+// they are dropped and no queue is left behind for them.
+func TestOrderedDispatchSharesTheConcurrencyBudget(t *testing.T) {
+	block := make(chan struct{})
+	var mu sync.Mutex
+	started := 0
+	o := &orderedDispatch{key: keyOf, queues: map[uint32]*orderedQueue{}, handler: func([]byte, *net.UDPAddr, func()) {
+		mu.Lock()
+		started++
+		mu.Unlock()
+		<-block
+	}}
+	l := &Listener{}
+	const flood = maxConcurrentDispatch + 500
+	for i := range flood {
+		key := uint32(i + 1)
+		o.enqueue(l, key, []byte{1}, nil)
+	}
+	o.mu.Lock()
+	pending, queues := o.pending, len(o.queues)
+	o.mu.Unlock()
+	if pending != maxConcurrentDispatch || queues > maxConcurrentDispatch {
+		t.Errorf("pending %d, queues %d; want %d pending and at most as many queues", pending, queues, maxConcurrentDispatch)
+	}
+	close(block)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		o.mu.Lock()
+		pending = o.pending
+		o.mu.Unlock()
+		if pending == 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if pending != 0 || started != maxConcurrentDispatch {
+		t.Errorf("after the release: pending %d, handled %d; want 0 and %d", pending, started, maxConcurrentDispatch)
+	}
+}

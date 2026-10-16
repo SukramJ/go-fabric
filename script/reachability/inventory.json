@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5116,
+  "entry_points": 5117,
   "entry_packages": [
     ".",
     "bdx",
@@ -208,9 +208,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12308,
+    "total_exported": 12309,
     "reachable": 8717,
-    "whitelisted": 3586,
+    "whitelisted": 3587,
     "unreachable": 5
   },
   "by_package": [
@@ -25321,6 +25321,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/ordered_test.go",
       "line": 128
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestOrderedDispatchSharesTheConcurrencyBudget",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/ordered_test.go",
+      "line": 148
     },
     {
       "package": "transport/udp",
