@@ -262,14 +262,19 @@ func (h *nodeHolder) get() *Node {
 
 // bindPeer couples the node with its protocol peer — #bindPeer
 // (CommissioningClient.ts:685-714): the node's peer and interaction are
-// set, and the record follows the peer's descriptor (#update, :711,
-// :721-741) whenever the peer takes a session.
+// set, and the record follows the peer's descriptor (#update, :721-741)
+// on every descriptor save (peer.updated, :711) and whenever the peer
+// takes a session.
 func (r *Registry) bindPeer(n *Node, p *peer.Peer) {
 	n.bind(p, r.cfg.Commissioner.Interaction(p))
-	stop := p.Observe(peer.Observer{SessionAdded: func(*exchange.Session) {
+	follow := func() {
 		d := p.Descriptor()
 		n.updateRecord(func(rec *Record) { rec.applyPeer(d) })
-	}})
+	}
+	stop := p.Observe(peer.Observer{
+		SessionAdded: func(*exchange.Session) { follow() },
+		Updated:      follow,
+	})
 	r.mu.Lock()
 	if old := r.bound[n]; old != nil {
 		old()

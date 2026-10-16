@@ -35,6 +35,14 @@ var (
 	// (errors.Is against exchange.ErrTransient), as matter.js's class
 	// extends TransientPeerCommunicationError.
 	ErrPeerShutdown error = peerShutdownError{}
+	// ErrFabricRemoved: this node is no longer a member of the session's
+	// fabric — matter.js FabricRemovedError
+	// (protocol/src/peer/PeerCommunicationError.ts:86-93 at 0ceb202d), the
+	// cause Fabric.delete force-closes the fabric's sessions with
+	// (protocol/src/fabric/Fabric.ts:461-465). A host that drops its fabric
+	// closes the peers' sessions with it (peer.Peer.Disconnect); a
+	// RemoveFabric that fails with it counts as delivered.
+	ErrFabricRemoved = errors.New("client: this node is no longer a member of the fabric")
 )
 
 type peerShutdownError struct{}
@@ -360,12 +368,11 @@ func (r *Registry) decommission(ctx context.Context, n *Node) (handshake.PeerAdd
 // (CommissioningClient.ts:406-408). PeerMessageMissingError and
 // PeerInitiatedCloseError are controller/exchange's
 // [*exchange.PeerMessageMissingError] and [*exchange.PeerInitiatedCloseError];
-// PeerLeftError is [ErrPeerLeft]; FabricRemovedError has no Go
-// counterpart — no Go layer raises it.
+// PeerLeftError is [ErrPeerLeft]; FabricRemovedError is [ErrFabricRemoved].
 func removalConfirmedBy(err error) bool {
 	var missing *exchange.PeerMessageMissingError
 	var closed *exchange.PeerInitiatedCloseError
-	return errors.As(err, &missing) || errors.As(err, &closed) || errors.Is(err, ErrPeerLeft)
+	return errors.As(err, &missing) || errors.As(err, &closed) || errors.Is(err, ErrPeerLeft) || errors.Is(err, ErrFabricRemoved)
 }
 
 // udpAddrs is a list of addresses as the commissioner takes them.

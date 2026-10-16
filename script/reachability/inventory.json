@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5126,
+  "entry_points": 5128,
   "entry_packages": [
     ".",
     "bdx",
@@ -208,9 +208,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12318,
-    "reachable": 8719,
-    "whitelisted": 3594,
+    "total_exported": 12321,
+    "reachable": 8720,
+    "whitelisted": 3596,
     "unreachable": 5
   },
   "by_package": [
@@ -15552,10 +15552,24 @@
     },
     {
       "package": "controller/client",
+      "identifier": "TestRegistryRecordFollowsDescriptorSave",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/registry_follow_internal_test.go",
+      "line": 21
+    },
+    {
+      "package": "controller/client",
       "identifier": "TestRegistryRestore",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/registry_internal_test.go",
       "line": 187
+    },
+    {
+      "package": "controller/client",
+      "identifier": "TestRemovalConfirmedByFabricRemoved",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/client/registry_follow_internal_test.go",
+      "line": 49
     },
     {
       "package": "controller/client",
