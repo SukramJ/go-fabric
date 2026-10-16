@@ -285,3 +285,10 @@ part; the RvcCleanMode part stays host-side — keep one sentence), 408,
 4. EEVSE/2.7 depends on the host time zone (local `now.Local()` in the
    daemon vs UTC in the case container). Pin `TZ=UTC` for the daemon in the
    harness, or leave it (CI runs UTC)?
+
+## Owner's decisions (2026-10-17)
+
+- Q1: the internal test is enough. Q2: TC-EEVSE-2.3 stays `classDefect`
+  in the harness table with `BD-chip-Harness-ModelOverCase` as its record.
+  Q3: maintenance mode stays always supported. Q4: done — the harness
+  daemon runs with `TZ=UTC`.

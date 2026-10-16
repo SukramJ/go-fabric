@@ -367,3 +367,14 @@ No chip-tool run (forbidden in this brief).
 3. Channel's old entry type names are kept as plain aliases, without a
    `Deprecated:` marker (the marker needs the CHANGELOG line): mark them
    with the release notes, or keep them?
+
+## Owner's decisions (2026-10-17)
+
+- The six owner-path items are done on `findings/owner` (Binding endpoint
+  0 encoding and persistence, provider ACL on every fabric, the reaper
+  test, the generic writer's widths, the wording, the diagnostics
+  deprecation).
+- Q1: kept; CI's chip-tool jobs confirm. Q2: keep `ServerConfig.Unimplemented`
+  for the device layer's default servers — matter.js lists only implemented
+  commands (`ProtocolService.ts:541-545`). Q3: no Deprecated marker on the
+  Channel aliases; they are generated names, kept.

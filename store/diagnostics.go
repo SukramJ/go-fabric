@@ -30,6 +30,10 @@ type DiagnosticsRecord struct {
 // LoadDiagnostics returns the singleton diagnostics row. Returns the
 // zero record if the table is empty (first boot before migration
 // seeded the row, or test fixtures that wipe the table).
+//
+// Deprecated: the node facade keeps RebootCount and the operational
+// hours in the settings table and never reads this row; nothing in the
+// module calls it. Kept, with its table, for the API window.
 func (s *Store) LoadDiagnostics(ctx context.Context) (DiagnosticsRecord, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT reboot_count, base_operational_hours, updated_at FROM matter_diagnostics WHERE id = 1`)
@@ -51,6 +55,8 @@ func (s *Store) LoadDiagnostics(ctx context.Context) (DiagnosticsRecord, error) 
 // SaveDiagnostics persists the current counter values into the
 // singleton row. Daemon's shutdown hook calls this with the live
 // rebootCount + (baseHours + uptime_seconds_at_shutdown / 3600).
+//
+// Deprecated: see [Store.LoadDiagnostics].
 func (s *Store) SaveDiagnostics(ctx context.Context, rec DiagnosticsRecord) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE matter_diagnostics
