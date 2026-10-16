@@ -114,6 +114,9 @@ var floors = []packageFloor{
 	// Brief AT §4: the floor the brief set; measured 74.0 with
 	// TestReferenceController and TestReferenceControllerOTA alone.
 	{pkg: "github.com/SukramJ/go-fabric/examples/reference-controller", min: 70},
+	// Brief AW: measured 59.3-60.2; the uncovered part is main and the
+	// paired-node path, which needs a device on the network.
+	{pkg: "github.com/SukramJ/go-fabric/examples/quickstart-controller", min: 55},
 	{
 		pkg: "github.com/SukramJ/go-fabric/examples/quickstart-device",
 		min: 20,
