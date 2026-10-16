@@ -114,6 +114,14 @@ var floors = []packageFloor{
 	// Brief AT §4: the floor the brief set; measured 74.0 with
 	// TestReferenceController and TestReferenceControllerOTA alone.
 	{pkg: "github.com/SukramJ/go-fabric/examples/reference-controller", min: 70},
+	// Brief AW: measured 59.3-60.2; the uncovered part is main and the
+	// paired-node path, which needs a device on the network.
+	{pkg: "github.com/SukramJ/go-fabric/examples/quickstart-controller", min: 55},
+	{
+		pkg: "github.com/SukramJ/go-fabric/examples/quickstart-device",
+		min: 20,
+		why: "brief AW: measured 24.4. The test drives newNode, the program's substance; main and run bind :5540 and the mDNS groups, which a unit test does not",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/im", min: 82},
 	// Measured 91.7-92.7 across six runs at varying GOMAXPROCS: this
 	// package has concurrent paths whose coverage depends on scheduling, so
