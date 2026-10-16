@@ -33,7 +33,9 @@
 //   - CurrentMode is always a supported mode (ModeUtils.assertMode);
 //   - ChangeToMode answers UnsupportedMode for a mode not in
 //     SupportedModes and Success for the current one
-//     (ModeUtils.assertModeChange), and otherwise asks the host's
+//     (ModeUtils.assertModeChange); RvcRunMode without DIRECTMODECH
+//     answers InvalidInMode for a change between two non-Idle modes
+//     (Server.runModeLocked); otherwise it asks the host's
 //     [ModeChanger] — matter.js's default sets CurrentMode at once; a
 //     device decides here, and may refuse with GenericFailure,
 //     InvalidInMode or a derivation's own status (Stuck, BatteryLow,
@@ -120,8 +122,12 @@ type Feature uint32
 
 // FeatureDirectModeChange is RvcRunMode / RvcCleanMode DIRECTMODECH,
 // constraint "20" (rvc-run-mode.element.ts:23,
-// rvc-clean-mode.element.ts:23): the device changes modes while the RVC
-// Run Mode is not Idle. The other derivations define no feature; DEPONOFF
+// rvc-clean-mode.element.ts:23) — connectedhomeip agrees, 0x100000
+// (zzz_generated/app-common/clusters/RvcRunMode/Enums.h:76,
+// RvcCleanMode/Enums.h:70 at the harness pin
+// 6170af8461b10b1766044122ac83332c6d00ab20): the device changes modes
+// while the RVC Run Mode is not Idle. Without it RvcRunMode refuses a
+// change between two non-Idle modes itself (see [Server.MatterInvoke]). The other derivations define no feature; DEPONOFF
 // is "X" everywhere.
 const FeatureDirectModeChange = Feature(rvcrunmode.FeatureDirectModeChange)
 
@@ -689,6 +695,12 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 			Status: uint8(StatusUnsupportedMode), StatusText: fmt.Sprintf("Unsupported mode: %d", req.NewMode),
 		}, nil
 	}
+	if s.runModeLocked(current, req.NewMode) {
+		return clusterwire.ChangeToModeResponse{
+			Status:     uint8(StatusInvalidInMode),
+			StatusText: "Change to a non-idle mode is only allowed from idle",
+		}, nil
+	}
 	status, text, err := s.changer.ChangeToMode(ctx, req.NewMode)
 	if err != nil {
 		return nil, fmt.Errorf("modebase: ChangeToMode %d: %w", req.NewMode, err)
@@ -700,6 +712,38 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 		s.setCurrent(req.NewMode)
 	}
 	return clusterwire.ChangeToModeResponse{Status: uint8(status), StatusText: truncate(text, LabelMaxBytes)}, nil
+}
+
+// runModeLocked is RvcRunMode's DIRECTMODECH rule, the one this server can
+// judge on its own: without the feature, a change between two modes that
+// both lack the Idle tag answers InvalidInMode ("If the implementation
+// does not support such a change, the ChangeToModeResponse command shall
+// have the StatusCode field set to the InvalidInMode value",
+// packages/model/src/standard/resources/rvc-run-mode.resource.ts:24-28);
+// a change to or from an Idle mode stays the host's. matter.js's
+// RvcRunModeServer.changeToMode does not check it
+// (packages/node/src/behaviors/rvc-run-mode/RvcRunModeServer.ts:71-77);
+// this mirrors connectedhomeip's RVC example, the device the CSA case
+// TC_RVCRUNM_2_2 (steps 6-7) is written against
+// (examples/rvc-app/rvc-common/src/rvc-device.cpp:53-57 at the harness pin
+// 6170af8461b10b1766044122ac83332c6d00ab20). RvcCleanMode's rule reads
+// RvcRunMode's CurrentMode, which this server cannot see: there the host's
+// [ModeChanger] answers InvalidInMode.
+func (s *Server) runModeLocked(current, newMode uint8) bool {
+	if s.k.def != rvcrunmode.Definition || s.inst.FeatureMap()&uint32(FeatureDirectModeChange) != 0 {
+		return false
+	}
+	return !s.modeHasTag(current, RvcRunTagIdle) && !s.modeHasTag(newMode, RvcRunTagIdle)
+}
+
+// modeHasTag reports whether the supported mode carries the standard tag.
+func (s *Server) modeHasTag(mode uint8, tag uint16) bool {
+	for _, m := range s.modes {
+		if m.Mode == mode {
+			return slices.ContainsFunc(m.Tags, func(t ModeTag) bool { return t.MfgCode == nil && t.Value == tag })
+		}
+	}
+	return false
 }
 
 // changeToModeRequest reads the fields the bridge hands over: cluster/wire's
@@ -739,7 +783,8 @@ func changeToModeRequest(fields any) (clusterwire.ChangeToModeRequest, bool) {
 // validHostStatus accepts what a device may answer: ModeChangeStatus as
 // the definition allows, incl. the manufacturer range — Success,
 // GenericFailure, InvalidInMode, a status the derivation defines, or one
-// in MfgCodes (128..191). UnsupportedMode is the server's own answer. This
+// in MfgCodes (128..191, mode-base.element.ts:79 "MfgCodes", constraint
+// "128 to 191"). UnsupportedMode is the server's own answer. This
 // is the module's own guard on the host port: matter.js's ModeBase server
 // checks no host status.
 func (s *Server) validHostStatus(st Status) bool {
