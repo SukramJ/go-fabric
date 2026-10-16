@@ -37,6 +37,21 @@ type NativeRamp interface {
 	Stop(ctx context.Context) error
 }
 
+// NativeMover is an optional interface of a [NativeRamp]: a device that
+// implements it replaces the source's Move logic, as an implementation
+// overrides matter.js's "default implementation of the Move commands",
+// moveLogic (LevelControlServer.ts:378-403). Move and MoveWithOnOff call
+// MoveLevel after the ExecuteIfOff gate (which matter.js applies in move
+// before moveLogic, :351-361) instead of ramping to the bound; the On/Off
+// coupling of MoveWithOnOff is then the host's, as an override of
+// moveLogic skips transition and its couple (:529-550). A device for
+// which a jump to the bound is no reading of a continuous move — a
+// speaker's volume — returns nil and keeps its level. Stop and
+// StopWithOnOff are unaffected.
+type NativeMover interface {
+	MoveLevel(ctx context.Context, req MoveRequest, withOnOff bool) error
+}
+
 // NativeConfig carries the construction parameters of [NewNativeSource].
 type NativeConfig struct {
 	// Lighting matches [Config.Lighting] of the server the source is
@@ -243,6 +258,10 @@ func (n *NativeSource) MoveWithOnOff(ctx context.Context, req MoveRequest) error
 // falls back to DefaultMoveRate (:309-311), which this cluster does not
 // serve. A zero Rate was refused by the server (:305-308).
 func (n *NativeSource) move(ctx context.Context, req MoveRequest, withOnOff bool) error {
+	if m, ok := n.dev.(NativeMover); ok {
+		n.cancelOff()
+		return m.MoveLevel(ctx, req, withOnOff)
+	}
 	target := LevelMax
 	if req.MoveMode == MoveModeDown {
 		target = n.minLevel
@@ -392,6 +411,20 @@ func (n *NativeSource) ramp(ctx context.Context, target uint8, duration func(cur
 		}
 	}
 	if !turnsOff {
+		return nil
+	}
+	if d == 0 {
+		// At once, the target is the level: matter.js writes it into state
+		// on the immediate path (Transitions.ts:147, transitionImmediately
+		// :238-241) and switches off in the same transaction's preCommit
+		// once currentLevel is the minimum (LevelControlServer.ts:624-627),
+		// so OnOff is false when the command returns. The device's later
+		// report still corrects the level; it is not waited for.
+		if n.onOff.OnOff() {
+			if err := n.onOff.SetOnOff(ctx, false); err != nil {
+				return fmt.Errorf("levelcontrol: switch off: %w", err)
+			}
+		}
 		return nil
 	}
 	p := &pendingOff{ctx: context.WithoutCancel(ctx)}
