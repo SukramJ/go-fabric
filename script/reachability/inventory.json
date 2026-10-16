@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5117,
+  "entry_points": 5118,
   "entry_packages": [
     ".",
     "bdx",
@@ -208,9 +208,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12309,
+    "total_exported": 12310,
     "reachable": 8717,
-    "whitelisted": 3587,
+    "whitelisted": 3588,
     "unreachable": 5
   },
   "by_package": [
@@ -25391,6 +25391,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/ordered_test.go",
       "line": 99
+    },
+    {
+      "package": "transport/udp",
+      "identifier": "TestWaitIdleWaitsForRunningHandlers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/udp/ordered_test.go",
+      "line": 191
     }
   ],
   "variant_disagreements": 0

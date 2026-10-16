@@ -184,3 +184,24 @@ func TestOrderedDispatchSharesTheConcurrencyBudget(t *testing.T) {
 		t.Errorf("after the release: pending %d, handled %d; want 0 and %d", pending, started, maxConcurrentDispatch)
 	}
 }
+
+// TestWaitIdleWaitsForRunningHandlers: WaitIdle returns only once every
+// dispatched handler — ordered and unordered — has returned, and gives
+// up with ctx.
+func TestWaitIdleWaitsForRunningHandlers(t *testing.T) {
+	block := make(chan struct{})
+	o := &orderedDispatch{key: keyOf, queues: map[uint32]*orderedQueue{}, handler: func([]byte, *net.UDPAddr, func()) { <-block }}
+	l := &Listener{}
+	o.enqueue(l, 7, []byte{7}, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err := l.WaitIdle(ctx); err == nil {
+		t.Fatal("WaitIdle returned while a handler was still running")
+	}
+	close(block)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+	if err := l.WaitIdle(ctx2); err != nil {
+		t.Fatalf("WaitIdle after the handler returned: %v", err)
+	}
+}
