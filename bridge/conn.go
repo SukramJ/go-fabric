@@ -344,8 +344,17 @@ type establishedSessionReporter interface {
 // PaseServer.ts:111-118): the connection is then held by the session
 // itself, before its first authenticated message. A replayed step (the handler's state rejects it)
 // leaves the original handshake running.
+//
+// Over UDP the established session is bound to the handshake's source
+// address the same way, so a session that has not carried an
+// authenticated message yet still has an address for its CloseSession on
+// fabric removal or NOC rotation; the session's first authenticated
+// message rebinds it as before (receive.go). Only a connection is held.
 func (b *Bridge) settleHandshake(src net.Addr, exchangeID uint16, h any, respOpcode uint8, respPayload []byte, err error) {
 	if !isConnRoute(src) {
+		if src != nil && err == nil && establishedBy(respOpcode, respPayload) {
+			b.bindEstablishedSession(src, h)
+		}
 		return
 	}
 	switch {
@@ -363,6 +372,19 @@ func (b *Bridge) settleHandshake(src net.Addr, exchangeID uint16, h any, respOpc
 		return // PBKDFParamResponse, Pake2, Sigma2: the handshake goes on
 	}
 	b.releaseHandshake(src, exchangeID)
+}
+
+// establishedBy reports whether a handshake reply establishes the session:
+// a Sigma2Resume, or a success StatusReport (after Sigma3 or Pake3).
+func establishedBy(respOpcode uint8, respPayload []byte) bool {
+	switch respOpcode {
+	case mrp.SCOpcodeSigma2Resume:
+		return true
+	case mrp.SCOpcodeStatusReport:
+		general, _, _, ok := decodeStatusReport(respPayload)
+		return ok && general == mrp.SCStatusGeneralSuccess
+	}
+	return false
 }
 
 // bindEstablishedSession binds the secure session handler h established
