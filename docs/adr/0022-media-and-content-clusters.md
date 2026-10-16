@@ -1,11 +1,11 @@
 # ADR 0022 — The media and content clusters and the three media device types enter the scope
 
 - **Status**: Accepted (2026-10-14; concept v2 phase 9,
-  [`../concept-v2-scope-extension.md`](../concept-v2-scope-extension.md) §B.3, decision 0.2)
+  [`../concept-v2-scope-extension.md`](../history/concept-v2-scope-extension.md) §B.3, decision 0.2)
 - **Date**: 2026-10-14
 - **Related**:
   [ADR 0013 — generated cluster definitions](./0013-generated-cluster-definitions.md),
-  [ADR 0017 — the standard server](./0017-standard-server.md) (the mechanism that carries a generated definition with no logic),
+  [ADR 0017 — the standard server](./0017-generated-default-cluster-server.md) (the mechanism that carries a generated definition with no logic),
   [ADR 0018 — device layer](./0018-device-layer-and-node-facade.md),
   [ADR 0011 — certifiability is a goal](./0011-certifiability-is-a-goal.md),
   concept v1 Appendix F.2 (the media family's exclusion, now lifted)

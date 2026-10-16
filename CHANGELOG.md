@@ -84,7 +84,7 @@ commissioner, the client interaction, the client node model, bindings and
 the group sender, the DCL client and CommissionerControl; Joint Fabric is
 deferred), the OTA provider and DiagnosticLogs over BDX (ADR 0021), the
 media and content clusters (ADR 0022), Wi-Fi diagnostics, and the
-reference controller CLI. It freezes no API: `docs/manual-test-plan-0.4.0.md`
+reference controller CLI. It freezes no API: `notes/manual-test-plan-0.4.0.md`
 is the plan the owner runs against OpenCCU-Loom, the ecosystems and real
 devices before the `v1.0.0` freeze. Everything below was `[Unreleased]`
 since 0.3.1.
@@ -2215,7 +2215,7 @@ left to keep.
   `docs/matterjs-comparison.md` counts 99 of 135 clusters served.
 - The target of the module is now stated: Matter 1.6.1 complete for the
   home-automation scope, measured against the snapshot and phased in
-  [`docs/concept-matter-1.6.1-and-device-layer.md`](./docs/concept-matter-1.6.1-and-device-layer.md)
+  [`docs/history/concept-matter-1.6.1-and-device-layer.md`](./docs/history/concept-matter-1.6.1-and-device-layer.md)
   (Appendix F lists every exclusion with its reason). Two planning ADRs
   record the decisions it rests on:
   [ADR 0017](./docs/adr/0017-generated-default-cluster-server.md), a
@@ -2268,7 +2268,7 @@ is not pursued, certifiability is). The full entries follow this summary.
 - **Deprecated, removable in v0.3.0:** `wire.Groups`, the two removed status
   codes, and the never-wired `PersistentSubscription*` store API.
 
-What is still open is tracked in [`docs/open-items.md`](./docs/open-items.md).
+What is still open is tracked in [`docs/open-items.md`](https://github.com/SukramJ/go-fabric/blob/v0.5.4/docs/open-items.md).
 
 ### Added
 

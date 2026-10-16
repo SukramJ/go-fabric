@@ -129,8 +129,9 @@ was made:
    packages/protocol/src packages/types/src`. A commit message carries the
    reason a file diff hides.
 2. Read each commit at its pin (`git -C ../matter.js show <commit>`) and give
-   it one verdict: (1) not applicable to a device-side responder or to a
-   feature the module does not have — say which; (2) already matches — cite
+   it one verdict: (1) not applicable to the roles this module plays
+   (device-side responder, commissioner/controller) or to a feature it does
+   not have — say which; (2) already matches — cite
    the Go code; (3) go-fabric differs — fix it through the workflow above
    (read, mirror, cite, unit or parity test, CHANGELOG), or, if it is large,
    record a finding in the open-gap register.

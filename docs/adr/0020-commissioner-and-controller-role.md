@@ -1,7 +1,7 @@
 # ADR 0020 — The commissioner and controller role enters the scope as `controller/`; the responder side stays as it is
 
 - **Status**: Accepted (owner, 2026-10-13; proposed the same day; concept v2
-  [`../concept-v2-scope-extension.md`](../concept-v2-scope-extension.md)
+  [`../concept-v2-scope-extension.md`](../history/concept-v2-scope-extension.md)
   decision 0.1, phase 7). The non-goal it supersedes is retired; phase 7
   starts with stage 1.
 - **Date**: 2026-10-13
@@ -11,7 +11,7 @@
   [ADR 0018 — device layer and node facade](./0018-device-layer-and-node-facade.md),
   [ADR 0019 — TCP, BDX and the OTA requestor](./0019-tcp-bdx-and-the-ota-requestor.md),
   [`../matterjs-comparison.md`](../matterjs-comparison.md) §1–§3 and §Non-goals,
-  concept v1 [`../concept-matter-1.6.1-and-device-layer.md`](../concept-matter-1.6.1-and-device-layer.md) §F.1,
+  concept v1 [`../concept-matter-1.6.1-and-device-layer.md`](../history/concept-matter-1.6.1-and-device-layer.md) §F.1,
   `notes/parity/by_design.md` `BD-Matter-GroupcastNoSender`,
   `BD-Matter-Commissioner-TestCA` (the test commissioner's fixed issuing instant)
 

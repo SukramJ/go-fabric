@@ -1,7 +1,7 @@
 # ADR 0018 — A device layer (`device/`) generated from the device-type model, and a node facade, as matter.js's `devices/`, `endpoints/` and `ServerNode`
 
 - **Status**: Accepted (2026-10-11; wave 6 of
-  [`../concept-matter-1.6.1-and-device-layer.md`](../concept-matter-1.6.1-and-device-layer.md), phase 4)
+  [`../concept-matter-1.6.1-and-device-layer.md`](../history/concept-matter-1.6.1-and-device-layer.md), phase 4)
 - **Date**: 2026-10-08, accepted 2026-10-11
 - **Related**:
   [ADR 0016 — device type validation](./0016-device-type-validation.md),
