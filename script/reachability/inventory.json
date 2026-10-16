@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5121,
+  "entry_points": 5122,
   "entry_packages": [
     ".",
     "bdx",
@@ -208,9 +208,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12310,
+    "total_exported": 12311,
     "reachable": 8717,
-    "whitelisted": 3588,
+    "whitelisted": 3589,
     "unreachable": 5
   },
   "by_package": [
@@ -1430,6 +1430,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "bridge/im_gate_test.go",
       "line": 16
+    },
+    {
+      "package": "bridge",
+      "identifier": "TestCloseFabricSessionsAfterUpdate_ClosesTheInvokingSessionToo",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "bridge/fabric_session_close_test.go",
+      "line": 170
     },
     {
       "package": "bridge",

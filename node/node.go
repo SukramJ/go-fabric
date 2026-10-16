@@ -398,7 +398,7 @@ func (n *Node) fabricUpdated(ctx context.Context, fabricIndex uint8) {
 		}
 		n.br.AnnounceFabric(ctx, newCompressed, newNode)
 	}
-	n.br.CloseFabricSessionsExcept(fabricIndex, mattercore.InvokeSessionIDFromContext(ctx))
+	n.br.CloseFabricSessionsAfterUpdate(ctx, fabricIndex)
 }
 
 // observedFabricInstalled is the facade's fabricInstalled, then the

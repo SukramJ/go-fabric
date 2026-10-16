@@ -1272,6 +1272,34 @@ func (b *Bridge) CloseFabricSessionsExcept(fabricIndex uint8, exceptSessionID ui
 	closer.CloseFabricExcept(fabricIndex, exceptSessionID)
 }
 
+// CloseFabricSessionsAfterUpdate is the session teardown of UpdateNOC:
+// every other session of fabricIndex is told with a CloseSession and
+// closed at once ([Bridge.CloseFabricSessionsExcept]), and the session
+// that carried UpdateNOC — named by ctx — is closed after its response,
+// without a CloseSession. Mirrors matter.js Fabric.replaced
+// (Fabric.ts:408-415): every session of the fabric runs
+// initiateForceClose, the invoking one included, which closes once its
+// exchange ends and, marked peer-lost, sends nothing
+// (NodeSession.ts:349-352). The controller reconnects with CASE under the
+// new NOC.
+func (b *Bridge) CloseFabricSessionsAfterUpdate(ctx context.Context, fabricIndex uint8) {
+	invoking := mattercore.InvokeSessionIDFromContext(ctx)
+	b.CloseFabricSessionsExcept(fabricIndex, invoking)
+	if invoking == 0 {
+		return
+	}
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
+	if reg == nil {
+		return
+	}
+	closeNow := func() { _ = reg.Close(invoking) }
+	if !im.DeferAfterResponse(ctx, closeNow) {
+		closeNow()
+	}
+}
+
 // closeFabricSessionsGracefully tells every live session of fabricIndex
 // but invoking with a CloseSession and, when the registry can, closes
 // them at once; without that capability they close with the rest of the

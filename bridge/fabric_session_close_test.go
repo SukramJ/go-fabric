@@ -161,3 +161,41 @@ func TestCloseFabricSessionsExcept_WithoutCapability(t *testing.T) {
 	}
 	b.notifyFabricSessionsClosing(0, 0) // fabric 0 (PASE) is never told
 }
+
+// TestCloseFabricSessionsAfterUpdate_ClosesTheInvokingSessionToo: after
+// UpdateNOC the invoking session closes as well — after its response
+// where the IM layer defers it, at once otherwise — without a
+// CloseSession, while the fabric's other sessions are told (matter.js
+// Fabric.ts:408-415 replaced → initiateForceClose, NodeSession.ts:349-352).
+func TestCloseFabricSessionsAfterUpdate_ClosesTheInvokingSessionToo(t *testing.T) {
+	t.Parallel()
+	dev := startResumeDevice(t, newMemSubscriptionStore(), nil)
+	peer, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = peer.Close() })
+	peerAddr, ok := peer.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		t.Fatalf("peer address %T", peer.LocalAddr())
+	}
+	const (
+		invoking = uint16(0x0E01)
+		sibling  = uint16(0x0E02)
+	)
+	for _, sid := range []uint16{invoking, sibling} {
+		if _, err := dev.sessions.OpenFromSigmaWithID(sid, resumeFabricIndex, resumeDeviceNode, resumeCtrlNode+uint64(sid), sid+0x100, nil, peerLossKeys(t)); err != nil {
+			t.Fatal(err)
+		}
+		dev.br.bindSessionRoute(sid, peerAddr)
+	}
+	dev.br.CloseFabricSessionsAfterUpdate(mattercore.WithInvokeSessionID(context.Background(), invoking), resumeFabricIndex)
+	if got := readCloseSessionTargets(t, peer); len(got) != 1 || got[0] != sibling+0x100 {
+		t.Fatalf("CloseSession sent on peer sessions %#x, want only the sibling's [%#x]", got, sibling+0x100)
+	}
+	for _, sid := range []uint16{invoking, sibling} {
+		if _, err := dev.sessions.Get(sid); !errors.Is(err, operational.ErrSessionNotFound) {
+			t.Errorf("session %#x after UpdateNOC: %v, want closed", sid, err)
+		}
+	}
+}
