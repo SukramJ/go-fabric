@@ -306,3 +306,34 @@ func TestInboundSystemModeTheSelectionCannotServe(t *testing.T) {
 		t.Error("OccupiedCoolingSetpoint served without COOL")
 	}
 }
+
+// TestSetpointRaiseLowerKeepsTheDeadband: Heat or Cool on an AUTO
+// thermostat moves the other setpoint along when the deadband would be
+// violated — one Sink call, cooling primary, heating companion — and
+// leaves it alone otherwise. Mirrors matter.js ThermostatServer.ts:229-269
+// (0ceb202d).
+func TestSetpointRaiseLowerKeepsTheDeadband(t *testing.T) {
+	t.Parallel()
+	sink := &recordingThermoSink{}
+	srv := newSinkHeatCool(sink)                                                  // heat 2000, cool 2600, deadband 200
+	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeHeat, 50)  // heat 2500: cool must reach 2700
+	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeCool, -60) // cool 2100: heat must reach 1900
+	invokeSetpointRaiseLower(t, srv, clusterwire.ThermostatSetpointModeCool, 10)  // cool 2200: deadband kept, heat stays
+	want := []sinkCall{
+		{
+			attrID: tdef.AttrOccupiedCoolingSetpoint, value: 2700,
+			companions: []thermo.SetpointChange{{AttrID: tdef.AttrOccupiedHeatingSetpoint, Value: 2500}},
+		},
+		{
+			attrID: tdef.AttrOccupiedCoolingSetpoint, value: 2100,
+			companions: []thermo.SetpointChange{{AttrID: tdef.AttrOccupiedHeatingSetpoint, Value: 1900}},
+		},
+		{attrID: tdef.AttrOccupiedCoolingSetpoint, value: 2200},
+	}
+	if got := sink.recorded(); !reflect.DeepEqual(got, want) {
+		t.Errorf("Sink calls = %+v, want %+v", got, want)
+	}
+	if h, c := readSetpoint(t, srv, tdef.AttrOccupiedHeatingSetpoint, "heat"), readSetpoint(t, srv, tdef.AttrOccupiedCoolingSetpoint, "cool"); h != 1900 || c != 2200 {
+		t.Errorf("setpoints heat %d cool %d, want 1900 / 2200", h, c)
+	}
+}
