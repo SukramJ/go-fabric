@@ -638,6 +638,29 @@ func (n *Node) RemoveFabric(ctx context.Context, fabricIndex uint8) error {
 // CommissioningWindow returns the commissioning window.
 func (n *Node) CommissioningWindow() *bridge.CommissioningWindow { return n.br.CommissioningWindow() }
 
+// SetCommissioningBlocked refuses every new commissioning while err is
+// non-nil — the node's own window (at Start and after the last fabric is
+// removed), [Node.OpenBasicWindow], the host's opener and both
+// AdministratorCommissioning commands of a paired controller, which
+// answer FAILURE — and revokes a window that is open; controllers already
+// paired keep working. nil lifts the block and, on a node without a
+// fabric, reopens its own window at once. A host that cannot serve the
+// attestation chain it was configured with calls it before [Node.Start].
+// See [bridge.CommissioningWindow.SetBlocked]; matter.js has no
+// counterpart (BD-Matter-CommissioningBlocked).
+func (n *Node) SetCommissioningBlocked(ctx context.Context, err error) {
+	n.br.CommissioningWindow().SetBlocked(ctx, err)
+	if err != nil {
+		return
+	}
+	n.mu.Lock()
+	started := n.started
+	n.mu.Unlock()
+	if started && n.window != nil && n.st != nil {
+		n.window.reopenIfDecommissioned(ctx, n.st)
+	}
+}
+
 // Fabrics returns the installed fabrics.
 func (n *Node) Fabrics(ctx context.Context) ([]store.FabricRecord, error) {
 	return n.st.ListFabrics(ctx)

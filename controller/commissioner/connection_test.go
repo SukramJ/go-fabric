@@ -91,6 +91,22 @@ func (h *connectionHarness) next(t *testing.T) *attemptCall {
 	}
 }
 
+// armed waits until connectPASE has armed its next-address timer beside
+// the budget's: the attempt it launched reaches the test through
+// establish before the goroutine arms the timer, so advancing the fake
+// clock at once could pass the delay before the timer exists and no
+// next attempt would ever launch.
+func (h *connectionHarness) armed(t *testing.T) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for h.clock.live() < 2 {
+		if time.Now().After(deadline) {
+			t.Fatal("connectPASE armed no next-address timer")
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 // none checks no attempt launches for a moment.
 func (h *connectionHarness) none(t *testing.T) {
 	t.Helper()
@@ -157,6 +173,7 @@ func TestConnectionStaggerAndWinner(t *testing.T) {
 	h.start(context.Background(), time.Minute, device("dev", 1, 2))
 	first := h.next(t)
 	h.none(t)
+	h.armed(t)
 	h.clock.Advance(DelayBeforeNextAddress - time.Second)
 	h.none(t)
 	h.clock.Advance(time.Second)
@@ -187,6 +204,7 @@ func TestConnectionHoldingResponder(t *testing.T) {
 	h.none(t)
 	first.result <- attemptResult{err: fmt.Errorf("%w: lost", exchange.ErrTransient)}
 	second := h.next(t)
+	h.armed(t)
 	h.clock.Advance(DelayBeforeNextAddress)
 	third := h.next(t)
 	won := h.session(t)
@@ -231,6 +249,7 @@ func TestConnectionBudget(t *testing.T) {
 	h := newConnectionHarness(t)
 	h.start(context.Background(), 15*time.Second, device("dev", 1, 2))
 	first := h.next(t)
+	h.armed(t)
 	h.clock.Advance(DelayBeforeNextAddress)
 	second := h.next(t)
 	h.clock.Advance(5 * time.Second)
@@ -279,6 +298,7 @@ func TestConnectionErrorClasses(t *testing.T) {
 	h = newConnectionHarness(t)
 	h.start(context.Background(), time.Minute, device("dev", 1, 2))
 	first := h.next(t)
+	h.armed(t)
 	h.clock.Advance(DelayBeforeNextAddress)
 	second := h.next(t)
 	fatal := errors.New("fatal")

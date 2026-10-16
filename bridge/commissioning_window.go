@@ -101,7 +101,9 @@ type PaseSessionCloser interface {
 // guaranteeing the bridge's long-lived PASE acceptor is reinstated
 // regardless of whether the window closed early or by timeout.
 type CommissioningWindow struct {
-	mu             sync.RWMutex
+	mu sync.RWMutex
+	// blocked, while non-nil, refuses every window ([SetBlocked]).
+	blocked        error
 	open           bool
 	expiresAt      time.Time
 	discriminator  uint16
@@ -320,6 +322,48 @@ const (
 // replaces one (matter.js DeviceCommissioner #open throws MatterFlowError).
 var ErrAdministratorWindowOpen = errors.New("bridge: an administrator's commissioning window is open")
 
+// ErrCommissioningBlocked is wrapped by every window open refused while
+// the host has blocked commissioning ([CommissioningWindow.SetBlocked]).
+// An AdministratorCommissioning command refused this way answers
+// FAILURE: none of the cluster's own statuses means "refused by policy"
+// (matter.js AdministratorCommissioningServer.ts: Busy only for a window
+// already open, :196; PakeParameterError and InvalidCommand for the
+// request, :74-80, :200-209).
+var ErrCommissioningBlocked = errors.New("bridge: commissioning is blocked by the host")
+
+// SetBlocked refuses every commissioning window while err is non-nil:
+// [CommissioningWindow.OpenOwnWindow] and [CommissioningWindow.OpenWindow]
+// return an error wrapping [ErrCommissioningBlocked] and err, so the
+// node's own window, a basic window, the host's opener and both
+// AdministratorCommissioning commands stay closed and no commissionable
+// record is advertised; a window open when the block is set is revoked.
+// nil lifts the block; nothing reopens by itself here (the node facade
+// reopens an uncommissioned node's own window). Paired controllers are
+// unaffected: the block concerns new commissioning only.
+//
+// matter.js has no counterpart; it is a host extension for a node that
+// cannot serve the attestation it promised (issue #133,
+// BD-Matter-CommissioningBlocked).
+func (w *CommissioningWindow) SetBlocked(ctx context.Context, err error) {
+	w.mu.Lock()
+	w.blocked = err
+	open := w.open
+	w.mu.Unlock()
+	if err != nil && open {
+		_ = w.RevokeWindow(ctx)
+	}
+}
+
+// blockedErr is the refusal while commissioning is blocked, nil otherwise.
+func (w *CommissioningWindow) blockedErr() error {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.blocked == nil {
+		return nil
+	}
+	return fmt.Errorf("%w: %w", ErrCommissioningBlocked, w.blocked)
+}
+
 // OpenOwnWindow opens the node's own commissioning window — the window an
 // uncommissioned node opens at start, or one the application opens — for
 // timeout, or, when timeout is 0, for 48 h while the node has no fabric and
@@ -342,6 +386,9 @@ var ErrAdministratorWindowOpen = errors.New("bridge: an administrator's commissi
 // packages/node/src/behavior/system/commissioning/CommissioningServer.ts
 // enterCommissionableMode.
 func (w *CommissioningWindow) OpenOwnWindow(ctx context.Context, timeout time.Duration) error {
+	if err := w.blockedErr(); err != nil {
+		return err
+	}
 	w.mu.RLock()
 	counter := w.fabricCounter
 	w.mu.RUnlock()
@@ -472,6 +519,9 @@ func (w *CommissioningWindow) CurrentWindow() wire.WindowStatusSnapshot {
 // §11.19.6. A FailSafe arm failure is logged but does not abort the
 // window: the window is already open and the controller expects Success.
 func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWindowParams) error {
+	if err := w.blockedErr(); err != nil {
+		return err
+	}
 	// Reject if a FailSafe from a prior commissioning session is still
 	// armed. Opening a window while another commissioner's FailSafe is
 	// active would overwrite its state; return BUSY instead.
