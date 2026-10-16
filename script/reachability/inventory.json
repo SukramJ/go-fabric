@@ -20756,7 +20756,7 @@
       "identifier": "TestDeviceTypeEvents",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "internal/chiptool/pics_device_events_test.go",
-      "line": 64
+      "line": 66
     },
     {
       "package": "internal/chiptool",

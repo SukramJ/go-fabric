@@ -32,11 +32,13 @@ func deviceTypeEvents() map[string]map[string][]uint32 {
 		if !ok {
 			continue
 		}
-		for _, r := range dt.Requirements {
+		for i := range dt.Requirements {
+			r := &dt.Requirements[i]
 			if r.Element != schema.RequirementServerCluster || !r.HasID {
 				continue
 			}
-			for _, n := range r.Requirements {
+			for j := range r.Requirements {
+				n := &r.Requirements[j]
 				if n.Element != schema.RequirementEvent || n.Conformance.Text != "M" || !n.Referent.Resolved || n.Referent.Provisional {
 					continue
 				}
