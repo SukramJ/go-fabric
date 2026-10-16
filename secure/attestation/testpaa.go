@@ -16,10 +16,8 @@
 // trust store — no `--bypass-attestation-verifier` flag required, no
 // vendor-supplied DAC needed.
 //
-// Operators that ship a real product replace the chain via
-// `north.matter.attestation.{dac,dac_key,pai,cd}_path`; the daemon
-// then loads the production bundle and ignores the embedded test
-// material.
+// A product replaces the chain with its own (attestation.LoadChainFiles,
+// node.Config.Attestation); the embedded test material is then unused.
 package attestation
 
 import (

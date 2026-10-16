@@ -3,8 +3,8 @@
 
 // Package bridge orchestrates the Matter bridge runtime: endpoint
 // topology assembly, IM dispatcher wiring, UDP listener, and mDNS
-// advertisement. The bridge is the single composition unit the
-// daemon's bootstrap turns on when matter.enabled is set in config.
+// advertisement. The bridge is the single composition unit a host
+// starts (node.Node starts it for a host that uses the facade).
 //
 // Layering: bridge depends on every other Matter sub-package
 // (endpoint, transport/udp, mdns, im) but on no daemon-internal
@@ -1787,7 +1787,7 @@ func (b *Bridge) LocalAddr() string {
 // effectiveUDPPort returns the port the UDP listener is actually bound
 // to, falling back to the configured (or default) port before Start.
 //
-// `north.matter.listen: ":0"` is a valid configuration — the OS then
+// `Config.Listen: ":0"` is a valid configuration — the OS then
 // assigns an ephemeral port, and advertising the 5540 default instead
 // points every commissioner's SRV lookup at a port nothing listens on.
 // Mirrors matter.js packages/node/src/behavior/system/network/
@@ -2029,7 +2029,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 		b.logger.Warn("matter.mdns.commissioning_not_advertised",
 			slog.String("instance", svc.InstanceName),
 			slog.Int("discriminator", int(params.Discriminator)),
-			slog.String("hint", "mdns_advertise=noop suppresses the commissionable record — commissioners cannot discover the bridge; set north.matter.mdns_advertise=zeroconf (or leave it unset) for pairing"))
+			slog.String("hint", "mdns_advertise=noop suppresses the commissionable record — commissioners cannot discover the bridge; set the host's mDNS advertiser (node.Config.Advertiser or Bridge.New's advertiser)=zeroconf (or leave it unset) for pairing"))
 		return nil
 	}
 	b.logger.Info("matter.mdns.commissioning_published",

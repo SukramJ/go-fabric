@@ -398,7 +398,7 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 		// as a silent "could not find cached attribute values for
 		// attribute" log breadcrumb. Gated on the same dump env var so
 		// the cost stays in diagnose mode.
-		if os.Getenv("OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE") != "" {
+		if dumpSubscribeEnabled() {
 			if vErr := tlv.Validate(body); vErr != nil {
 				b.logger.Warn("matter.tx.im.subscribe.chunk_strict_violation",
 					slog.Int("chunk", i),
@@ -411,7 +411,7 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 		// output. Apple's MTRDevice has been seen logging "last
 		// report: (null)" while MRP-acking every chunk, which points
 		// at an IM-decoder rejection of this exact byte stream. The
-		// disk dump is gated on the OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE
+		// disk dump is gated on the GOFABRIC_DUMP_SUBSCRIBE
 		// env var so production deployments do not fill /tmp; the log
 		// line is always emitted at debug level. Dump path is scoped
 		// per-subscription so a later Sub does not overwrite the first
@@ -422,7 +422,7 @@ func (b *Bridge) streamInitialReportChunks( //nolint:gocognit // per-chunk ack s
 			slog.Int("chunk_count", len(chunks)),
 			slog.Int("bytes", len(body)),
 			slog.Bool("final", i == len(chunks)-1))
-		if os.Getenv("OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE") != "" {
+		if dumpSubscribeEnabled() {
 			_ = os.WriteFile(fmt.Sprintf("/tmp/subscribe-init-sub%d-chunk%d.bin", subID, i), body, 0o600)
 		}
 
@@ -651,3 +651,11 @@ func eventPathAllowed(ctx context.Context, dispatcher im.Dispatcher, auth im.Eve
 
 // clusterRevisionAttributeID is the global ClusterRevision attribute.
 const clusterRevisionAttributeID = 0xFFFD
+
+// dumpSubscribeEnabled reports whether the subscribe disk dump is on:
+// GOFABRIC_DUMP_SUBSCRIBE, or the deprecated
+// OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE (read until the deprecation window
+// ends).
+func dumpSubscribeEnabled() bool {
+	return os.Getenv("GOFABRIC_DUMP_SUBSCRIBE") != "" || os.Getenv("OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE") != ""
+}

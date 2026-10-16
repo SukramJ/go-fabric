@@ -1296,8 +1296,6 @@ func (m *Manager) allocateIDLocked() (uint16, error) {
 // diagnostics. It deliberately carries no key material, no attestation
 // challenge and no session object — only what answers "is this
 // controller still talking to us, and when did it last".
-//
-// loom:reachable:reason="returned by Manager.Sessions, which the daemon's matterSessionLister calls on every GET /api/v1/matter/sessions; a data struct whose fields the REST layer copies out, which the analyzer's type heuristic (reachable only via its own methods) cannot see used"
 type SessionInfo struct {
 	// SessionID is the local 16-bit identifier carried in the message
 	// header of every encrypted exchange with this peer.
@@ -1332,8 +1330,6 @@ type SessionInfo struct {
 // [PlaceholderIDTTL], and is the only shape in which the 16-bit space
 // actually drains. Reporting it as a session would claim a controller is
 // connected; leaving it out entirely hides the drain.
-//
-// loom:reachable:reason="returned by Manager.Occupancy, which the daemon's matterSessionLister calls on every GET /api/v1/matter/sessions; a data struct whose fields the REST layer copies out, which the analyzer's type heuristic (reachable only via its own methods) cannot see used"
 type SessionTableOccupancy struct {
 	// Live counts sessions with key material installed.
 	Live int
