@@ -66,4 +66,20 @@ func TestNewServer_UnimplementedStub(t *testing.T) {
 	if got := srv.MatterGeneratedCommands(); !slices.Equal(got, []uint32{provdef.CmdQueryImageResponse}) {
 		t.Fatalf("GeneratedCommandList %v after Handle", got)
 	}
+	for _, id := range []uint32{provdef.CmdApplyUpdateRequest, provdef.CmdNotifyUpdateApplied} {
+		srv.Handle(id, noop)
+	}
+	if got := srv.MatterAcceptedCommands(); len(got) != 3 || !srv.Handles(provdef.CmdNotifyUpdateApplied) {
+		t.Fatalf("AcceptedCommandList %v with every handler", got)
+	}
+	// A server without stubs answers the instance's lists.
+	full, err := spec.NewServer(provdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: map[uint32]spec.CommandHandler{
+		provdef.CmdQueryImage: noop, provdef.CmdApplyUpdateRequest: noop, provdef.CmdNotifyUpdateApplied: noop,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(full.MatterGeneratedCommands(), full.Instance.MatterGeneratedCommands()) {
+		t.Fatal("GeneratedCommandList differs from the instance's")
+	}
 }
