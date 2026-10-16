@@ -25,6 +25,11 @@ type RequestOptions struct {
 	// ([ErrInvalidGroupOperation]; ClientGroupInteraction.ts:48-50,
 	// :74-76).
 	Timed bool
+	// DisableListChunking writes a list value as one AttributeDataIB; by
+	// default a group write lists a list value REPLACE-ALL with the empty
+	// list and one append per element, as a unicast write does (matter.js
+	// Write.ts chunkLists = true, :59, :149-171 at 0ceb202d).
+	DisableListChunking bool
 }
 
 // Invoke sends one command to the group. The path names the cluster and
@@ -62,9 +67,14 @@ func (s *Sender) Invoke(ctx context.Context, path im.ConcreteCommandPath, fields
 // Write writes one attribute on the group. The path names the cluster and
 // the attribute and no endpoint, or the write is refused, as is a timed
 // write ([ErrInvalidGroupOperation]). The WriteRequest carries
-// SuppressResponse: writing to a group yields no response. Mirrors
-// ClientGroupInteraction.write (ClientGroupInteraction.ts:44-68) and the
-// WriteRequest encoding of im.WriteRequest.MarshalTLV.
+// SuppressResponse: writing to a group yields no response. A list value is
+// list-chunked in the one message — REPLACE-ALL with the empty list, then
+// one append per element — unless the attribute is AccessControl's ACL or
+// Extension or opts.DisableListChunking is set: ClientGroupInteraction.write
+// hands the request to ClientInteraction.write
+// (ClientGroupInteraction.ts:44-68 at 0ceb202d), whose Write() builder
+// chunks a list as a unicast write does (Write.ts:149-171). The encoding is
+// im.WriteRequest.MarshalTLV's.
 func (s *Sender) Write(ctx context.Context, path im.ConcreteAttributePath, value spec.Encodable, opts RequestOptions) error {
 	if opts.Timed {
 		return fmt.Errorf("%w: timed requests are not supported for group address writes", ErrInvalidGroupOperation)
@@ -75,9 +85,28 @@ func (s *Sender) Write(ctx context.Context, path im.ConcreteAttributePath, value
 	if value == nil {
 		return fmt.Errorf("%w: a write needs a value", ErrInvalidGroupOperation)
 	}
+	writes := []im.AttributeWrite{{Path: path, Value: im.AttributeValue{Value: value}}}
+	if !opts.DisableListChunking && im.ListChunkedByDefault(path.Cluster, path.Attribute) {
+		elements, isList, err := spec.ListElements(value)
+		if err != nil {
+			return fmt.Errorf("groups: encode WriteRequest: %w", err)
+		}
+		if isList {
+			writes = []im.AttributeWrite{{Path: path, Value: im.AttributeValue{Value: spec.Node{El: tlv.Element{Type: tlv.TypeArray, IsContainer: true}}}}}
+			for _, e := range elements {
+				p := path
+				p.HasListIndex, p.ListAppend = true, true
+				writes = append(writes, im.AttributeWrite{Path: p, Value: im.AttributeValue{Value: e}})
+			}
+		}
+	}
 	enc := tlv.NewEncoder()
-	im.WriteRequest{SuppressResponse: true, Writes: []im.AttributeWrite{{Path: path}}}.MarshalTLV(enc,
-		func(e *tlv.Encoder, tag tlv.Tag, _ im.AttributeValue) { value.EncodeTLV(e, tag) })
+	im.WriteRequest{SuppressResponse: true, Writes: writes}.MarshalTLV(enc,
+		func(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
+			if value, ok := v.Value.(spec.Encodable); ok {
+				value.EncodeTLV(e, tag)
+			}
+		})
 	payload, err := enc.Bytes()
 	if err != nil {
 		return fmt.Errorf("groups: encode WriteRequest: %w", err)
