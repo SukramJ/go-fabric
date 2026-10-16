@@ -219,11 +219,20 @@ var (
 // unless the boot reason is SoftwareUpdateCompleted or the server is
 // Bridged (OnOffServer.ts:34-50).
 func New(cfg Config) (*Server, error) {
-	srv, err := spec.NewServer(onoffdef.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &Server{sink: cfg.Sink, clock: cfg.Clock, scenes: cfg.Scenes}
+	handlers := map[uint32]spec.CommandHandler{
+		CmdOff:                     s.command(func(ctx context.Context, st *state, _ any) error { return s.off(ctx, st) }),
+		CmdOn:                      s.command(func(ctx context.Context, st *state, _ any) error { return s.on(ctx, st) }),
+		CmdToggle:                  s.command(s.toggle),
+		CmdOffWithEffect:           s.command(s.offWithEffect),
+		CmdOnWithRecallGlobalScene: s.command(s.onWithRecallGlobalScene),
+		CmdOnWithTimedOff:          s.command(s.onWithTimedOff),
+	}
+	srv, err := spec.NewServer(onoffdef.Definition, spec.Options{Features: uint32(cfg.Features)}, spec.ServerConfig{DataVersion: cfg.DataVersion, Handlers: handlers})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
-	s := &Server{Instance: srv.Instance, srv: srv, sink: cfg.Sink, clock: cfg.Clock, lighting: srv.HasFeature("LT"), scenes: cfg.Scenes}
+	s.Instance, s.srv, s.lighting = srv.Instance, srv, srv.HasFeature("LT")
 	if s.clock == nil {
 		s.clock = wallClock{}
 	}
@@ -245,12 +254,6 @@ func New(cfg Config) (*Server, error) {
 	if s.lighting && !cfg.Bridged && (cfg.BootReason == nil || cfg.BootReason() != bootReasonSoftwareUpdateCompleted) {
 		s.applyStartUp()
 	}
-	srv.Handle(CmdOff, s.command(func(ctx context.Context, st *state, _ any) error { return s.off(ctx, st) }))
-	srv.Handle(CmdOn, s.command(func(ctx context.Context, st *state, _ any) error { return s.on(ctx, st) }))
-	srv.Handle(CmdToggle, s.command(s.toggle))
-	srv.Handle(CmdOffWithEffect, s.command(s.offWithEffect))
-	srv.Handle(CmdOnWithRecallGlobalScene, s.command(s.onWithRecallGlobalScene))
-	srv.Handle(CmdOnWithTimedOff, s.command(s.onWithTimedOff))
 	return s, nil
 }
 

@@ -246,17 +246,20 @@ func NewCommodityTariff(cfg CommodityTariffConfig) (*CommodityTariffServer, erro
 		delete(initial, ct.AttrDefaultRandomizationOffset)
 		delete(initial, ct.AttrDefaultRandomizationType)
 	}
+	s := &CommodityTariffServer{now: cfg.Now}
+	handlers := map[uint32]spec.CommandHandler{
+		ct.CmdGetTariffComponent: s.getTariffComponent,
+		ct.CmdGetDayEntry:        s.getDayEntry,
+	}
 	srv, err := spec.NewServer(ct.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{DataVersion: cfg.DataVersion, Initial: initial})
+		spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion, Initial: initial})
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s := &CommodityTariffServer{Instance: srv.Instance, srv: srv, now: cfg.Now}
+	s.Instance, s.srv = srv.Instance, srv
 	if s.now == nil {
 		s.now = time.Now
 	}
-	srv.Handle(ct.CmdGetTariffComponent, s.getTariffComponent)
-	srv.Handle(ct.CmdGetDayEntry, s.getDayEntry)
 	return s, nil
 }
 

@@ -99,31 +99,33 @@ func NewChannels(cfg ChannelsConfig) (*ChannelsServer, error) {
 		{channeldef.CmdRecordProgram, hasRecorder},
 		{channeldef.CmdCancelRecordProgram, hasRecorder},
 	}
-	srv, err := spec.NewServer(channeldef.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: cfg.Attributes},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &ChannelsServer{}
+	h := handlers{}
+	handleState(h, &s.stateful, channeldef.CmdChangeChannel, func(ctx context.Context, st *ChannelState, req channeldef.ChangeChannelRequest) (any, error) {
+		return port.ChangeChannel(ctx, st, req)
+	})
+	handleState(h, &s.stateful, channeldef.CmdChangeChannelByNumber, statusOnly(port.ChangeChannelByNumber))
+	handleState(h, &s.stateful, channeldef.CmdSkipChannel, statusOnly(port.SkipChannel))
+	if hasGuide {
+		handleState(h, &s.stateful, channeldef.CmdGetProgramGuide, func(ctx context.Context, st *ChannelState, req channeldef.GetProgramGuideRequest) (any, error) {
+			return guide.GetProgramGuide(ctx, st, req)
+		})
+	}
+	if hasRecorder {
+		handleState(h, &s.stateful, channeldef.CmdRecordProgram, statusOnly(recorder.RecordProgram))
+		handleState(h, &s.stateful, channeldef.CmdCancelRecordProgram, statusOnly(recorder.CancelRecordProgram))
+	}
+	srv, err := newServer(channeldef.Definition, spec.Options{Features: uint32(cfg.Features), Attributes: cfg.Attributes},
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("media: Channel: %w", err)
 	}
 	if err := checkImplemented(srv, cmds); err != nil {
 		return nil, err
 	}
-	s := &ChannelsServer{Server: srv}
+	s.Server = srv
 	if err := s.init(srv, cfg.Initial, ChannelState.values, ChannelState.clone); err != nil {
 		return nil, fmt.Errorf("media: Channel: %w", err)
-	}
-	handleState(srv, &s.stateful, channeldef.CmdChangeChannel, func(ctx context.Context, st *ChannelState, req channeldef.ChangeChannelRequest) (any, error) {
-		return port.ChangeChannel(ctx, st, req)
-	})
-	handleState(srv, &s.stateful, channeldef.CmdChangeChannelByNumber, statusOnly(port.ChangeChannelByNumber))
-	handleState(srv, &s.stateful, channeldef.CmdSkipChannel, statusOnly(port.SkipChannel))
-	if hasGuide {
-		handleState(srv, &s.stateful, channeldef.CmdGetProgramGuide, func(ctx context.Context, st *ChannelState, req channeldef.GetProgramGuideRequest) (any, error) {
-			return guide.GetProgramGuide(ctx, st, req)
-		})
-	}
-	if hasRecorder {
-		handleState(srv, &s.stateful, channeldef.CmdRecordProgram, statusOnly(recorder.RecordProgram))
-		handleState(srv, &s.stateful, channeldef.CmdCancelRecordProgram, statusOnly(recorder.CancelRecordProgram))
 	}
 	return s, nil
 }

@@ -42,14 +42,15 @@ func NewKeypad(cfg KeypadConfig) (*KeypadServer, error) {
 	if cfg.Port == nil {
 		return nil, fmt.Errorf("%w: KeypadInput", ErrNilPort)
 	}
-	srv, err := spec.NewServer(keypaddef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+	h := handlers{}
+	port := cfg.Port
+	handle(h, keypaddef.CmdSendKey, func(ctx context.Context, req keypaddef.SendKeyRequest) (any, error) {
+		return port.SendKey(ctx, req)
+	})
+	srv, err := newServer(keypaddef.Definition, spec.Options{Features: uint32(cfg.Features)},
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("media: KeypadInput: %w", err)
 	}
-	port := cfg.Port
-	handle(srv, keypaddef.CmdSendKey, func(ctx context.Context, req keypaddef.SendKeyRequest) (any, error) {
-		return port.SendKey(ctx, req)
-	})
 	return &KeypadServer{Server: srv}, nil
 }

@@ -264,37 +264,39 @@ func NewOTAProvider(cfg OTAProviderConfig) (*OTAProvider, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	srv, err := spec.NewServer(provdef.Definition, spec.Options{}, spec.ServerConfig{})
-	if err != nil {
-		return nil, fmt.Errorf("core: OtaSoftwareUpdateProvider: %w", err)
-	}
 	p := &OTAProvider{
-		Server: srv, cfg: cfg, logger: logger,
+		cfg: cfg, logger: logger,
 		storage:    &otaImageStorage{source: cfg.ImageSource},
 		inProgress: map[string]*otaInProgress{},
 		consents:   map[OTAPeer]uint32{},
 	}
-	srv.Handle(provdef.CmdQueryImage, func(ctx context.Context, fields any) (any, error) {
-		req, err := fieldsAs[provdef.QueryImageRequest](fields)
-		if err != nil {
-			return nil, err
-		}
-		return p.QueryImage(ctx, req)
-	})
-	srv.Handle(provdef.CmdApplyUpdateRequest, func(ctx context.Context, fields any) (any, error) {
-		req, err := fieldsAs[provdef.ApplyUpdateRequestRequest](fields)
-		if err != nil {
-			return nil, err
-		}
-		return p.ApplyUpdateRequest(ctx, req)
-	})
-	srv.Handle(provdef.CmdNotifyUpdateApplied, func(ctx context.Context, fields any) (any, error) {
-		req, err := fieldsAs[provdef.NotifyUpdateAppliedRequest](fields)
-		if err != nil {
-			return nil, err
-		}
-		return nil, p.NotifyUpdateApplied(ctx, req)
-	})
+	srv, err := spec.NewServer(provdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: map[uint32]spec.CommandHandler{
+		provdef.CmdQueryImage: func(ctx context.Context, fields any) (any, error) {
+			req, err := fieldsAs[provdef.QueryImageRequest](fields)
+			if err != nil {
+				return nil, err
+			}
+			return p.QueryImage(ctx, req)
+		},
+		provdef.CmdApplyUpdateRequest: func(ctx context.Context, fields any) (any, error) {
+			req, err := fieldsAs[provdef.ApplyUpdateRequestRequest](fields)
+			if err != nil {
+				return nil, err
+			}
+			return p.ApplyUpdateRequest(ctx, req)
+		},
+		provdef.CmdNotifyUpdateApplied: func(ctx context.Context, fields any) (any, error) {
+			req, err := fieldsAs[provdef.NotifyUpdateAppliedRequest](fields)
+			if err != nil {
+				return nil, err
+			}
+			return nil, p.NotifyUpdateApplied(ctx, req)
+		},
+	}})
+	if err != nil {
+		return nil, fmt.Errorf("core: OtaSoftwareUpdateProvider: %w", err)
+	}
+	p.Server = srv
 	return p, nil
 }
 

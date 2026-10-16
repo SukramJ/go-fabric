@@ -30,6 +30,9 @@ var (
 	ErrInvalidValue = errors.New("spec: value outside the attribute's type or constraint")
 	// ErrNotEmitted: an event the instance's EventList does not hold.
 	ErrNotEmitted = errors.New("spec: event not in EventList")
+	// ErrMissingHandler: a command the conformance makes mandatory for
+	// the feature selection has no handler in [ServerConfig.Handlers].
+	ErrMissingHandler = errors.New("spec: mandatory command has no handler")
 )
 
 // Source is the optional read port for attributes the device owns: a
@@ -68,6 +71,21 @@ type ServerConfig struct {
 	// Initial holds the values the server starts with, checked as
 	// [Server.Set] checks a value.
 	Initial map[uint32]any
+	// Handlers holds the command handlers, by request command id. Every
+	// command the conformance makes mandatory for the feature selection
+	// must have one, or construction fails with [ErrMissingHandler];
+	// an optional command's handler may also be registered later with
+	// [Server.Handle].
+	Handlers map[uint32]CommandHandler
+	// Unimplemented marks every accepted command Handlers leaves out as
+	// the generated behavior's unimplemented one (matter.js
+	// Behavior.unimplemented): construction does not fail on a mandatory
+	// one, and the command stays out of AcceptedCommandList (and its
+	// response out of GeneratedCommandList) until [Server.Handle]
+	// registers it — matter.js's non-strict validation
+	// (ValidatedElements.ts:106-108, :341-343, :361-368 at 0ceb202d). The
+	// device layer's generated default server is such a stub.
+	Unimplemented bool
 }
 
 // Server is a complete [contract.ClusterServer] for a cluster whose
@@ -100,7 +118,10 @@ type Server struct {
 	mu       sync.Mutex
 	values   map[uint32]any
 	handlers map[uint32]CommandHandler
-	emitter  contract.EventEmitter
+	// stubs are the accepted commands construction found unimplemented
+	// ([ServerConfig.Unimplemented]); one is listed once it has a handler.
+	stubs   []uint32
+	emitter contract.EventEmitter
 }
 
 // Compile-time assertions.
@@ -140,6 +161,26 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 		sink:     cfg.Sink,
 		values:   map[uint32]any{},
 		handlers: map[uint32]CommandHandler{},
+	}
+	// A command the conformance requires is fatal at construction when it
+	// has no implementation. Mirrors matter.js
+	// packages/node/src/behavior/cluster/ValidatedElements.ts:331-333,357-370
+	// at 0ceb202d (requireCommand, #validateRequiredCommands: "Implementation
+	// missing", fatal) — rather than advertising it in AcceptedCommandList
+	// and answering UNSUPPORTED_COMMAND at invoke.
+	for id, fn := range cfg.Handlers {
+		if fn != nil {
+			s.handlers[id] = fn
+		}
+	}
+	for _, id := range inst.accepted {
+		switch {
+		case s.handlers[id] != nil:
+		case cfg.Unimplemented:
+			s.stubs = append(s.stubs, id)
+		case slices.Contains(inst.required, id):
+			return nil, fmt.Errorf("%w: %s command %s (0x%02X)", ErrMissingHandler, def.Name, def.Command(id, Request).Name, id)
+		}
 	}
 	for _, id := range inst.attrs {
 		if v, ok := defaultValue(def.Attribute(id)); ok {
@@ -310,11 +351,68 @@ func (s *Server) store(values map[uint32]any) {
 }
 
 // Handle registers fn for the request command cmdID. A command the
-// instance does not accept is never dispatched, registered or not.
+// instance does not accept is never dispatched, registered or not. A
+// mandatory command's handler belongs in [ServerConfig.Handlers]:
+// construction refuses a server without it ([ErrMissingHandler]).
 func (s *Server) Handle(cmdID uint32, fn CommandHandler) {
 	s.mu.Lock()
 	s.handlers[cmdID] = fn
 	s.mu.Unlock()
+}
+
+// Handles reports whether an accepted command has a handler.
+func (s *Server) Handles(cmdID uint32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.Instance.Accepts(cmdID) && s.handlers[cmdID] != nil
+}
+
+// unimplementedLocked reports whether cmdID is a stub still without a
+// handler.
+func (s *Server) unimplementedLocked(cmdID uint32) bool {
+	return slices.Contains(s.stubs, cmdID) && s.handlers[cmdID] == nil
+}
+
+// Accepts reports whether the server accepts the request command: the
+// instance accepts it and it is not an unimplemented stub.
+func (s *Server) Accepts(cmdID uint32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.Instance.Accepts(cmdID) && !s.unimplementedLocked(cmdID)
+}
+
+// MatterAcceptedCommands implements [contract.ClusterCommandLister]: the
+// instance's accepted commands without the unimplemented stubs
+// (ServerBehaviorBacking.ts:127-147 at 0ceb202d lists the implemented
+// commands only).
+func (s *Server) MatterAcceptedCommands() []uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := s.Instance.MatterAcceptedCommands()
+	if len(s.stubs) == 0 {
+		return out
+	}
+	return slices.DeleteFunc(out, s.unimplementedLocked)
+}
+
+// MatterGeneratedCommands implements [contract.ClusterCommandLister]: the
+// responses of the listed accepted commands (ServerBehaviorBacking.ts:137-148).
+func (s *Server) MatterGeneratedCommands() []uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.stubs) == 0 {
+		return s.Instance.MatterGeneratedCommands()
+	}
+	out := []uint32{}
+	for _, id := range s.Instance.MatterAcceptedCommands() {
+		if s.unimplementedLocked(id) {
+			continue
+		}
+		if r := s.def.responseOf(s.def.Command(id, Request)); r != nil && !slices.Contains(out, r.ID) {
+			out = append(out, r.ID)
+		}
+	}
+	return out
 }
 
 // MatterInvoke implements [contract.ClusterServer]: an accepted command
@@ -324,7 +422,7 @@ func (s *Server) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (an
 	s.mu.Lock()
 	fn := s.handlers[cmdID]
 	s.mu.Unlock()
-	if !s.Accepts(cmdID) || fn == nil {
+	if !s.Instance.Accepts(cmdID) || fn == nil {
 		return nil, im.UnsupportedCommandf("%s: command 0x%02X is not supported", s.def.Name, cmdID)
 	}
 	return fn(ctx, fields)
