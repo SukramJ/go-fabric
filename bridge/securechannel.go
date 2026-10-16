@@ -713,6 +713,19 @@ func (b *Bridge) handlePase(
 		slog.String("src", srcString(src)),
 		slog.Int("exchange_id", int(proto.ExchangeID)))
 	respOpcode, respPayload, err := process(payload)
+	if stage == "pake3" && err == nil {
+		// The session is established: free the single-active-PASE slot
+		// before the reply goes out. A commissioner that reads the reply
+		// may close the session and open the next PASE at once (PASE, then
+		// a fresh one to commission); released only after the send, the
+		// slot was still held when that PBKDFParamRequest arrived on
+		// another dispatch goroutine, which answered it pase_busy — dropped
+		// after the MRP ack, so the commissioner waited out its whole
+		// timeout. matter.js clears #pairingMessenger when the pairing
+		// completes (PaseServer.ts:112-118), before its event loop handles
+		// the next exchange.
+		b.releasePaseInFlight(proto.ExchangeID)
+	}
 	b.settleHandshake(src, proto.ExchangeID, handler, respOpcode, respPayload, err)
 	if err != nil {
 		// Missing-handler is a routine pre-PASE-wiring condition

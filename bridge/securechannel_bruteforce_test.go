@@ -13,6 +13,7 @@ package bridge
 import (
 	"bytes"
 	"context"
+	"net"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -379,5 +380,62 @@ func TestBridge_PaseAbortedByPeerStatusReport(t *testing.T) {
 	}
 	if !b.claimPaseInFlight(exchange + 2) {
 		t.Fatal("the slot is still held after the commissioner aborted the handshake; its retry would be dropped as busy")
+	}
+}
+
+// pake3ReplyHandler answers every PASE stage with a StatusReport, as an
+// established handshake's last step does.
+type pake3ReplyHandler struct{}
+
+func (pake3ReplyHandler) ProcessPBKDFParamRequest([]byte) (uint8, []byte, error) {
+	return mrp.SCOpcodeStatusReport, mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), 0, nil), nil
+}
+
+func (pake3ReplyHandler) ProcessPake1([]byte) (uint8, []byte, error) {
+	return mrp.SCOpcodeStatusReport, mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), 0, nil), nil
+}
+
+func (pake3ReplyHandler) ProcessPake3([]byte) (uint8, []byte, error) {
+	return mrp.SCOpcodeStatusReport, mrp.EncodeStatusReport(mrp.SCStatusGeneralSuccess, uint32(mrp.SecureChannelProtocolID), 0, nil), nil
+}
+
+// TestBridge_PaseInFlightSlotReleasedBeforePake3Reply pins that the
+// single-active-PASE slot is free by the time the commissioner can read
+// the Pake3 reply: a commissioner that closes the PASE session and opens
+// the next one at once must not be answered pase_busy (the CI flake of
+// node TestSessionAndSubscriptionDiagnostics, 2026-10-14..16).
+func TestBridge_PaseInFlightSlotReleasedBeforePake3Reply(t *testing.T) {
+	t.Parallel()
+	b := newStartedBridge(t)
+	b.AttachPaseHandler(pake3ReplyHandler{})
+	peer, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = peer.Close() }()
+	src := peer.LocalAddr().(*net.UDPAddr)
+
+	const xid = uint16(21)
+	if err := b.dispatchSecureChannel(src, scHdr(), scProto(mrp.SCOpcodePBKDFParamRequest, xid, false, 0), nil); err != nil {
+		t.Fatalf("PBKDFParamRequest: %v", err)
+	}
+	buf := make([]byte, 1500)
+	_ = peer.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, _, err := peer.ReadFromUDP(buf); err != nil {
+		t.Fatalf("no PBKDFParamResponse: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- b.dispatchSecureChannel(src, scHdr(), scProto(mrp.SCOpcodePake3, xid, false, 0), nil)
+	}()
+	if _, _, err := peer.ReadFromUDP(buf); err != nil {
+		t.Fatalf("no Pake3 reply: %v", err)
+	}
+	// The reply is read: the slot must already be free.
+	if !b.claimPaseInFlight(xid + 1) {
+		t.Fatal("single-active-PASE slot still held when the Pake3 reply arrived; the next PASE would be refused as pase_busy")
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("Pake3: %v", err)
 	}
 }
