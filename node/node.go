@@ -504,7 +504,8 @@ func (n *Node) Start(ctx context.Context) error {
 	if err != nil {
 		n.logger.Warn("fabrics.list_failed", slog.String("err", err.Error()))
 	}
-	loaded := fabrics[:0]
+	stored := len(fabrics)
+	loaded := make([]store.FabricRecord, 0, stored)
 	for _, fabric := range fabrics {
 		if err := n.caseIDs.load(ctx, n.st, fabric.FabricIndex); err != nil {
 			n.logger.Warn("case.identity.boot_load_failed", slog.String("err", err.Error()))
@@ -526,11 +527,22 @@ func (n *Node) Start(ctx context.Context) error {
 	// queue flushes on the node's online event).
 	n.startBindings()
 	// An uncommissioned node opens its own window (main.go:491-501;
-	// matter.js CommissioningServer enterCommissionableMode).
-	if len(loaded) == 0 {
+	// matter.js CommissioningServer enterCommissionableMode, which asks
+	// whether the fabric table is empty — not whether its identities
+	// loaded). A node with stored fabrics none of which loaded is a broken
+	// commissioned node, not a new one: advertising it as commissionable
+	// would invite a stranger onto a bridge its owners still administer.
+	// A store that cannot list its fabrics fails closed the same way.
+	switch {
+	case err != nil:
+	case stored == 0:
 		if err := n.br.CommissioningWindow().OpenOwnWindow(ctx, 0); err != nil {
 			n.logger.Warn("commissioning.own_window", slog.String("err", err.Error()))
 		}
+	case len(loaded) == 0:
+		n.logger.Error("commissioning.no_fabric_loaded",
+			slog.Int("stored_fabrics", stored),
+			slog.String("hint", "every stored fabric failed to load its CASE identity; the node is not opened for commissioning"))
 	}
 	return nil
 }

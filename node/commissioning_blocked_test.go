@@ -17,6 +17,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/store"
 )
 
 var errChainNotLoaded = errors.New("vendor attestation chain did not load")
@@ -101,5 +102,32 @@ func TestCommissioningBlockedRefusesAdministrator(t *testing.T) {
 	n.SetCommissioningBlocked(ctx, nil)
 	if err := n.OpenBasicWindow(ctx, randomCredentials(t, time.Minute)); err != nil {
 		t.Errorf("OpenBasicWindow after the block is lifted: %v", err)
+	}
+}
+
+// TestStartDoesNotOpenWindowWhenStoredFabricsFailToLoad: a node whose
+// fabric table holds a fabric that cannot load its CASE identity is a
+// broken commissioned node, not a new one — Start advertises no
+// commissionable record (matter.js asks whether the fabric table is
+// empty, CommissioningServer enterCommissionableMode).
+func TestStartDoesNotOpenWindowWhenStoredFabricsFailToLoad(t *testing.T) {
+	ctx := context.Background()
+	db := openDB(t, filepath.Join(t.TempDir(), "node.db"))
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.New(db).AddFabric(ctx, store.FabricRecord{FabricID: 0x0133, NodeID: 0x0134, VendorID: 0xFFF1, Label: "broken", RootPublicKey: make([]byte, 65), CompressedID: [8]byte{1}}); err != nil {
+		t.Fatalf("AddFabric: %v", err)
+	}
+	adv := mdns.NewNoop()
+	cfg := minimalConfig(db)
+	cfg.Advertiser = adv
+	n := newNode(t, cfg)
+	if err := n.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if _, _, ok := commissionableRecord(adv); ok || n.CommissioningWindow().IsOpen() {
+		t.Fatal("a node whose stored fabric failed to load opened its commissioning window")
 	}
 }
