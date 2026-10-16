@@ -134,11 +134,10 @@ func TestObserverOnFabricRemoved(t *testing.T) {
 
 	var ref atomic.Pointer[node.Node]
 	type seen struct {
-		info       node.FabricInfo
-		fabrics    int
-		acl        int
-		record     bool
-		windowOpen bool
+		info    node.FabricInfo
+		fabrics int
+		acl     int
+		record  bool
 	}
 	removed := make(chan seen, 1)
 	cfg.Observers.OnFabricRemoved = func(info node.FabricInfo) error {
@@ -146,7 +145,7 @@ func TestObserverOnFabricRemoved(t *testing.T) {
 		ctx := context.Background()
 		fabrics, _ := n.Fabrics(ctx)
 		acl, _ := n.Store().ListACL(ctx, info.FabricIndex)
-		removed <- seen{info: info, fabrics: len(fabrics), acl: len(acl), record: hasOperationalRecord(adv), windowOpen: n.CommissioningWindow().IsOpen()}
+		removed <- seen{info: info, fabrics: len(fabrics), acl: len(acl), record: hasOperationalRecord(adv)}
 		return nil
 	}
 	n := newNode(t, cfg)
@@ -182,9 +181,9 @@ func TestObserverOnFabricRemoved(t *testing.T) {
 	if got.record {
 		t.Error("when OnFabricRemoved ran the operational record was still published")
 	}
-	if !got.windowOpen {
-		t.Error("when OnFabricRemoved ran the node's own window was not reopened")
-	}
+	// The own window reopens once the node is idle — after the observer,
+	// once the removing session has closed (reopenWhenIdle).
+	waitRecord(t, adv, "own window after the last fabric", func(_, mode uint64, ok bool) bool { return ok && mode == 1 })
 }
 
 // TestObserverOnWindowTransition: the node's own window opening at Start

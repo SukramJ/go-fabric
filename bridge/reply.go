@@ -732,22 +732,27 @@ func defaultAttributeValueWriter(enc *tlv.Encoder, tag tlv.Tag, v im.AttributeVa
 		_ = enc.PutRawElement(tag, x)
 	case bool:
 		enc.PutBool(tag, x)
+	// Integers at the smallest width that holds the value, as matter.js's
+	// TlvUInt/TlvInt encode (packages/types/src/tlv/TlvNumber.ts at
+	// 0ceb202d); a reader accepts any width (Matter Core §A.11.1). The
+	// hand-written encoders above keep their widths where a controller
+	// finding is recorded (by_design.md).
 	case uint8:
 		enc.PutUint(tag, uint64(x))
 	case uint16:
-		enc.PutUint16(tag, x)
+		enc.PutUint(tag, uint64(x))
 	case uint32:
-		enc.PutUint32(tag, x)
+		enc.PutUint(tag, uint64(x))
 	case uint64:
-		enc.PutUint64(tag, x)
+		enc.PutUint(tag, x)
 	case int8:
 		enc.PutInt(tag, int64(x))
 	case int16:
-		enc.PutInt16(tag, x)
+		enc.PutInt(tag, int64(x))
 	case int32:
-		enc.PutInt32(tag, x)
+		enc.PutInt(tag, int64(x))
 	case int64:
-		enc.PutInt64(tag, x)
+		enc.PutInt(tag, x)
 	case float32:
 		enc.PutFloat32(tag, x)
 	case float64:

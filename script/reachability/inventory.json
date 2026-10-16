@@ -22861,7 +22861,7 @@
       "identifier": "TestStartReaper_NeverMarkedSessionIsNotReaped",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/operational/manager_idle_reaper_test.go",
-      "line": 116
+      "line": 119
     },
     {
       "package": "secure/setup",

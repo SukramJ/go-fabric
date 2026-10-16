@@ -514,12 +514,13 @@ func TestPumpOverTheWire(t *testing.T) {
 	}); st != uint64(im.StatusConstraintError) {
 		t.Errorf("OperationMode Local status 0x%02X, want ConstraintError", st)
 	}
-	// Capacity unknown: null on the wire. MaxSpeed 0 as a uint16.
+	// Capacity unknown: null on the wire. MaxSpeed 0 at the smallest
+	// width, as matter.js's TlvUInt16 encodes it (TlvNumber.ts).
 	if data, _, _ := h.readAttribute(ep, matterpump.ClusterID, matterpump.AttrCapacity); !data.El.IsNull {
 		t.Errorf("Capacity = %+v, want null", data.El)
 	}
-	if data, _, _ := h.readAttribute(ep, matterpump.ClusterID, matterpump.AttrMaxSpeed); data.El.Type != tlv.TypeUnsignedInt2 {
-		t.Errorf("MaxSpeed TLV type 0x%02X, want a two-byte unsigned integer", data.El.Type)
+	if data, _, _ := h.readAttribute(ep, matterpump.ClusterID, matterpump.AttrMaxSpeed); data.El.Type != tlv.TypeUnsignedInt1 || data.El.Uint != 0 {
+		t.Errorf("MaxSpeed TLV type 0x%02X value %d, want a one-byte unsigned 0", data.El.Type, data.El.Uint)
 	}
 	// The host raises DryRunning; it reads back as an empty structure.
 	if err := srv.Emit(matterpump.EventDryRunning); err != nil {
