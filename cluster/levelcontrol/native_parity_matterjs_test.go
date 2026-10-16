@@ -535,24 +535,18 @@ func TestNativeSourceAttributesAndRefusals(t *testing.T) {
 	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevel, levelcontrol.MoveToLevelRequest{Level: 3}); !errors.Is(err, fail) {
 		t.Errorf("refused ramp: %v, want %v", err, fail)
 	}
-	// A null level cannot be stepped or moved at a rate (matter.js
-	// currentLevel getter, LevelControlServer.ts:103-111: Failure).
+	// A null level cannot be stepped (matter.js stepLogic reads the
+	// currentLevel getter, LevelControlServer.ts:478, which throws
+	// Failure, :103-111).
 	d.mu.Lock()
 	d.refuse, d.known = nil, false
 	d.mu.Unlock()
-	for _, c := range []struct {
-		cmd    uint32
-		fields any
-	}{
-		{levelcontrol.CmdStep, levelcontrol.StepRequest{StepSize: 1}},
-		{levelcontrol.CmdMove, levelcontrol.MoveRequest{Rate: u8(1)}},
-	} {
-		_, err := srv.MatterInvoke(ctx, c.cmd, c.fields)
-		wantStatus(t, err, im.StatusFailure)
-	}
+	_, err := srv.MatterInvoke(ctx, levelcontrol.CmdStep, levelcontrol.StepRequest{StepSize: 1})
+	wantStatus(t, err, im.StatusFailure)
 	if v, _ := srv.MatterRead(levelcontrol.AttrCurrentLevel); v != nil {
 		t.Errorf("CurrentLevel of an unknown level = %v, want null", v)
 	}
+	d.take()
 
 	// The device's notifier reaches the server.
 	fired := 0
@@ -601,5 +595,67 @@ func TestNativeSourceWithoutOnOff(t *testing.T) {
 	}
 	if want := []string{"ramp 0 0s false", "ramp 0 300ms true", "stop"}; !slices.Equal(dev.log, want) {
 		t.Errorf("device saw %q, want %q", dev.log, want)
+	}
+}
+
+// TestNativeSourceRatedMoveOnUnknownLevel (#127): a Move with a Rate on a
+// device that has reported no level ramps to the MoveMode's bound at once
+// and succeeds — matter.js never reads currentLevel for a Move
+// (LevelControlServer.ts:388-403, :529-550) and, with managed transitions
+// off, sets the cropped target immediately (Transitions.ts:120-148).
+func TestNativeSourceRatedMoveOnUnknownLevel(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, c := range []struct {
+		name string
+		cmd  uint32
+		req  levelcontrol.MoveRequest
+		want []string
+	}{
+		{"up", levelcontrol.CmdMove, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeUp, Rate: u8(10)}, []string{"ramp 254 0s false"}},
+		{"down with on/off", levelcontrol.CmdMoveWithOnOff, levelcontrol.MoveRequest{MoveMode: levelcontrol.MoveModeDown, Rate: u8(10)}, []string{"ramp 1 0s true", "off"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			srv, d := nativeServer(0, true, true, levelcontrol.NativeConfig{})
+			d.mu.Lock()
+			d.known = false
+			d.mu.Unlock()
+			if _, err := srv.MatterInvoke(ctx, c.cmd, c.req); err != nil {
+				t.Fatalf("rated Move on an unknown level: %v, want success", err)
+			}
+			wantLog(t, d, c.want...)
+		})
+	}
+}
+
+// TestNativeSourceSettlesBelowMinLevel (#127): a dimmer that reports 0
+// after a ramp to the Lighting minimum of 1 still has its owed switch-off
+// paid — matter.js decides it with `<= minLevel` (LevelControlServer.ts
+// couple).
+func TestNativeSourceSettlesBelowMinLevel(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	srv, d := nativeServer(100, true, true, levelcontrol.NativeConfig{})
+	if _, err := srv.MatterInvoke(ctx, levelcontrol.CmdMoveToLevelWithOnOff, levelcontrol.MoveToLevelRequest{Level: 1, TransitionTime: u16(5)}); err != nil {
+		t.Fatalf("MoveToLevelWithOnOff: %v", err)
+	}
+	if !d.OnOff() {
+		t.Fatal("switched off before the ramp arrived")
+	}
+	// The device lands on 0 — its "off" — instead of the 1 it was sent
+	// to, and notifies.
+	d.mu.Lock()
+	if d.arrival != nil {
+		d.arrival.Stop()
+	}
+	d.level = 0
+	cbs := slices.Clone(d.notify)
+	d.mu.Unlock()
+	for _, cb := range cbs {
+		cb()
+	}
+	if d.OnOff() {
+		t.Error("OnOff still true after the device reported 0 below MinLevel 1")
 	}
 }
