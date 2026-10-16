@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5116,
+  "entry_points": 5119,
   "entry_packages": [
     ".",
     "bdx",
@@ -208,9 +208,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12308,
+    "total_exported": 12311,
     "reachable": 8717,
-    "whitelisted": 3586,
+    "whitelisted": 3589,
     "unreachable": 5
   },
   "by_package": [
@@ -23784,6 +23784,13 @@
     },
     {
       "package": "tlv",
+      "identifier": "TestBoundedWriters_SmallestFit",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/utf8_test.go",
+      "line": 52
+    },
+    {
+      "package": "tlv",
       "identifier": "TestCodecParity_AnyEmptyArray",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/codec_parity_test.go",
@@ -24074,7 +24081,14 @@
       "identifier": "TestDecodeAppleSigma1Bytes",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 808
+      "line": 811
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestDecodeUTF8_ReplacesIllFormedLikeTextDecoder",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/utf8_test.go",
+      "line": 12
     },
     {
       "package": "tlv",
@@ -24110,6 +24124,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
       "line": 412
+    },
+    {
+      "package": "tlv",
+      "identifier": "TestDecoder_IllFormedUTF8StringElement",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "tlv/utf8_test.go",
+      "line": 36
     },
     {
       "package": "tlv",
@@ -24508,28 +24529,28 @@
       "identifier": "TestPutUint32Bounded_SentinelRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 735
+      "line": 736
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint32Bounded_ValidValues",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 746
+      "line": 747
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint64Bounded_SentinelRejected",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 770
+      "line": 772
     },
     {
       "package": "tlv",
       "identifier": "TestPutUint64Bounded_ValidValues",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/tlv_test.go",
-      "line": 781
+      "line": 783
     },
     {
       "package": "tlv",

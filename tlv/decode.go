@@ -219,7 +219,9 @@ func (d *Decoder) readValue(el *Element) error { //nolint:funlen // wire/dispatc
 		if i := bytes.IndexByte(body, 0x1F); i >= 0 {
 			body = body[:i]
 		}
-		el.String = string(body)
+		// Ill-formed UTF-8 reads as U+FFFD, as matter.js's TextDecoder
+		// does, rather than reaching a cluster server as invalid bytes.
+		el.String = decodeUTF8(body)
 	case TypeOctetStr1, TypeOctetStr2, TypeOctetStr4, TypeOctetStr8:
 		w := []int{1, 2, 4, 8}[int(el.Type)-int(TypeOctetStr1)]
 		body, err := d.readStringLike(w)

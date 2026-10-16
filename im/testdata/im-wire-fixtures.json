@@ -202,7 +202,7 @@
     },
     "bytesHex": "1524000124021e24ff0c18",
     "byDesignDivergence": true,
-    "byDesignNote": "Go uses PutUint32/PutUint16 (fixed-width); matter.js TlvUInt32/UInt16 magnitude-encodes. Spec requires fixed-width; chip-tool and Apple reject magnitude-encoded subId/maxInterval."
+    "byDesignNote": "Go keeps SubscriptionId at 4 bytes (by_design L5-Apple-Width: Apple MTRDevice rejected the narrowed form); matter.js TlvUInt32 magnitude-encodes. MaxInterval follows matter.js (smallest fit)."
   },
   {
     "label": "subscribe_resp_large_subid",
@@ -214,8 +214,7 @@
       "interactionModelRevision": 12
     },
     "bytesHex": "1526007856341224027824ff0c18",
-    "byDesignDivergence": true,
-    "byDesignNote": "Go uses PutUint32/PutUint16 (fixed-width); matter.js TlvUInt32/UInt16 magnitude-encodes."
+    "byDesignDivergence": false
   },
   {
     "label": "status_resp_success",

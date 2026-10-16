@@ -317,9 +317,9 @@ func TestEventReport_Marshal_DataIB(t *testing.T) {
 // inner EventDataIB; every tag we encounter MUST be in the spec set.
 // Specifically:
 //   - tag 7 carries the data — never 5 (DeltaEpoch).
-//   - EventNumber and EpochTimestamp use the 8-byte unsigned-int wire
-//     type (0x07) regardless of magnitude — chip-tool's strict-width
-//     IM-decoder otherwise rejects the IB.
+//   - EventNumber and EpochTimestamp go out at the smallest fitting
+//     width, as matter.js TlvEventData.ts:20,22 (TlvUInt64) does; chip
+//     reads both with TLVReader::Get(uint64_t&), which takes any width.
 func TestEventReport_Marshal_DataIB_MatterJsParity(t *testing.T) {
 	t.Parallel()
 	rep := EventReport{
@@ -390,7 +390,7 @@ func TestEventReport_Marshal_DataIB_MatterJsParity(t *testing.T) {
 
 	want := []field{
 		{Tag: tagEventDataPath, TlvType: tlv.TypeList},
-		{Tag: tagEventDataNumber, TlvType: tlv.TypeUnsignedInt8},
+		{Tag: tagEventDataNumber, TlvType: tlv.TypeUnsignedInt1},
 		{Tag: tagEventDataPriority, TlvType: tlv.TypeUnsignedInt1},
 		{Tag: tagEventDataEpochTimestamp, TlvType: tlv.TypeUnsignedInt8},
 		{Tag: tagEventDataData, TlvType: tlv.TypeUnsignedInt4},
