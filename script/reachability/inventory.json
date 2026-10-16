@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5123,
+  "entry_points": 5126,
   "entry_packages": [
     ".",
     "bdx",
@@ -208,9 +208,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12314,
-    "reachable": 8718,
-    "whitelisted": 3591,
+    "total_exported": 12318,
+    "reachable": 8719,
+    "whitelisted": 3594,
     "unreachable": 5
   },
   "by_package": [
@@ -22629,6 +22629,13 @@
     },
     {
       "package": "secure/setup",
+      "identifier": "TestManualCodeLong",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/encode_parity_matterjs_test.go",
+      "line": 59
+    },
+    {
+      "package": "secure/setup",
       "identifier": "TestManualCode_Deterministic",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
@@ -22646,14 +22653,14 @@
       "identifier": "TestManualCode_InvalidDiscriminator",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
-      "line": 412
+      "line": 411
     },
     {
       "package": "secure/setup",
       "identifier": "TestManualCode_InvalidPasscode",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
-      "line": 420
+      "line": 419
     },
     {
       "package": "secure/setup",
@@ -22678,17 +22685,24 @@
     },
     {
       "package": "secure/setup",
+      "identifier": "TestManualCode_RefusesTrivialPasscode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/encode_parity_matterjs_test.go",
+      "line": 45
+    },
+    {
+      "package": "secure/setup",
       "identifier": "TestManualCode_VerhoeffSelfCheck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
-      "line": 364
+      "line": 363
     },
     {
       "package": "secure/setup",
       "identifier": "TestQRCode_ChipToolCrossCheck",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
-      "line": 440
+      "line": 439
     },
     {
       "package": "secure/setup",
@@ -22738,6 +22752,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "secure/setup/setup_test.go",
       "line": 159
+    },
+    {
+      "package": "secure/setup",
+      "identifier": "TestQRCode_RefusesWhatMatterJSRefuses",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "secure/setup/encode_parity_matterjs_test.go",
+      "line": 16
     },
     {
       "package": "secure/setup",

@@ -249,7 +249,7 @@ func TestManualCode_Length(t *testing.T) {
 	t.Parallel()
 	cases := [][2]uint32{
 		{0xF00, 20202021},
-		{0x123, 12345678},
+		{0x123, 12345679},
 		{0xFFF, 99999998},
 		{0, 1},
 	}
@@ -283,7 +283,7 @@ func TestManualCode_Deterministic(t *testing.T) {
 	t.Parallel()
 	pairs := [][2]uint32{
 		{0xF00, 20202021},
-		{0xABC, 87654321},
+		{0xABC, 87654320},
 		{0, 1},
 	}
 	for _, tc := range pairs {
@@ -335,7 +335,6 @@ func TestManualCode_KnownVectors(t *testing.T) {
 		want string
 	}{
 		{0xF00, 20202021, "34970112332"},
-		{0x123, 12345678, "02491007533"},
 		{0xFFF, 99999998, "35759861036"},
 		{0, 1, "00000100007"},
 	}
@@ -364,7 +363,7 @@ func TestManualCode_KnownVectors(t *testing.T) {
 func TestManualCode_VerhoeffSelfCheck(t *testing.T) {
 	t.Parallel()
 	// Generate a valid 11-digit code, then mutate digit 5 (middle position).
-	mc, err := ManualCode(0xABC, 55555555)
+	mc, err := ManualCode(0xABC, 55555557)
 	if err != nil {
 		t.Fatalf("ManualCode: %v", err)
 	}
@@ -385,7 +384,7 @@ func TestManualCode_VerhoeffSelfCheck(t *testing.T) {
 	// prefix differs, so the ManualCode for *any* (disc,pass) that happens to
 	// produce the same 10 prefix + a different check digit would be unique.
 	// Simpler: verify at least that our own check digit is stable.
-	mc2, _ := ManualCode(0xABC, 55555555)
+	mc2, _ := ManualCode(0xABC, 55555557)
 	if mc2[10] != checkDigit {
 		t.Errorf("Verhoeff check digit is not stable: first=%c, second=%c", checkDigit, mc2[10])
 	}
@@ -398,7 +397,7 @@ func TestManualCode_VerhoeffSelfCheck(t *testing.T) {
 	if err3 != nil {
 		t.Fatalf("ManualCode variant: %v", err3)
 	}
-	// 55555555 and 55555556 differ; their check digits should differ
+	// 55555557 and 55555556 differ; their check digits should differ
 	// (Verhoeff is a single-error detector so any one-digit change changes c).
 	if mc3 == mc {
 		t.Error("two different passcodes produced identical 11-digit codes")
