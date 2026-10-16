@@ -8097,8 +8097,8 @@
       "package": "cluster/spec/channel",
       "identifier": "GetProgramGuideRequestExternalIdListEntry",
       "reason": "auto-whitelist:pattern=type-alias",
-      "file": "cluster/spec/channel/compat.go",
-      "line": 14
+      "file": "cluster/spec/channel/entry_aliases.go",
+      "line": 19
     },
     {
       "package": "cluster/spec/channel",
@@ -8153,8 +8153,8 @@
       "package": "cluster/spec/channel",
       "identifier": "ProgramStructExternalIdListEntry",
       "reason": "auto-whitelist:pattern=type-alias",
-      "file": "cluster/spec/channel/compat.go",
-      "line": 12
+      "file": "cluster/spec/channel/entry_aliases.go",
+      "line": 17
     },
     {
       "package": "cluster/spec/channel",

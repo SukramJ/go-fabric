@@ -27,7 +27,8 @@ func decodeUTF8(body []byte) string {
 			i++
 			continue
 		}
-		need, lower, upper := 0, byte(0x80), byte(0xBF)
+		var need int
+		lower, upper := byte(0x80), byte(0xBF)
 		switch {
 		case c >= 0xC2 && c <= 0xDF:
 			need = 1
@@ -49,7 +50,7 @@ func decodeUTF8(body []byte) string {
 			continue
 		}
 		j := i + 1
-		for k := 0; k < need; k++ {
+		for range need {
 			if j >= len(body) || body[j] < lower || body[j] > upper {
 				break
 			}
