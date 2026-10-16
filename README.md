@@ -1,13 +1,20 @@
 # go-fabric
 
-`go-fabric` is a pure-Go implementation of the device side of the Matter
-protocol, packaged as a library a host application embeds: TLV codec,
-Interaction Model, PASE and CASE session establishment, MRP over IPv6 UDP,
-DNS-SD advertisement, the cluster servers a bridge needs, and the endpoint
-assembler that turns a host's own device list into a Matter topology. The
-host keeps its device model; this module owns the wire format and hands back
-the port contracts (`contract/`) a device implements to appear as a bridged
-endpoint. It is a semantic port of [matter.js](https://github.com/matter-js/matter.js)
+`go-fabric` is a pure-Go implementation of the Matter protocol, packaged as
+a library a host application embeds. On the **device side** it brings the
+TLV codec, the Interaction Model, PASE and CASE session establishment, MRP
+over IPv6 UDP and TCP, DNS-SD advertisement, the cluster servers a bridge
+needs (including the media clusters, the OTA requestor and provider, and
+DiagnosticLogs over BDX), and the endpoint assembler that turns a host's own
+device list into a Matter topology. The host keeps its device model; this
+module owns the wire format and hands back the port contracts (`contract/`)
+a device implements to appear as a bridged endpoint. On the **controller
+side** (`controller/`, [ADR 0020](./docs/adr/0020-commissioner-and-controller-role.md))
+it is a full commissioner: discovery, attestation (with the CSA Distributed
+Compliance Ledger, opt-in), NOC issuance, the client interaction and a typed
+image of a remote node, bindings and the group sender —
+`examples/reference-controller` drives it from the command line. It is a
+semantic port of [matter.js](https://github.com/matter-js/matter.js)
 — cluster IDs, revisions, attribute IDs, constraints and wire shape are
 mirrored from matter.js HEAD rather than transcribed from the specification,
 and the extracted matter.js element model ships embedded so parity is a test,
