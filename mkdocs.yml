@@ -1,0 +1,122 @@
+# The documentation site, published to GitHub Pages by
+# .github/workflows/pages.yml. Build it locally with
+#   pip install -r docs/requirements.txt && mkdocs build --strict
+# strict turns every warning (a broken link, a missing nav target, a
+# snippet path that does not exist) into a failed build.
+site_name: go-fabric
+site_description: Matter as an embeddable Go library — the device side and the controller role, a semantic port of matter.js.
+site_url: https://sukramj.github.io/go-fabric/
+repo_url: https://github.com/SukramJ/go-fabric
+repo_name: SukramJ/go-fabric
+edit_uri: edit/main/docs/
+copyright: Apache License 2.0
+
+docs_dir: docs
+strict: true
+# A link to a missing heading fails the build as a missing page does.
+validation:
+  links:
+    anchors: warn
+
+# history/ holds the finished planning records; the active concept is a
+# German working paper. Neither is published.
+exclude_docs: |
+  history/
+  concept-v3-*.md
+  requirements.txt
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - content.action.edit
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+
+plugins:
+  - search
+
+# Links from a page to files outside docs/ (CLAUDE.md, notes/, the Go
+# packages) become GitHub links; a target that does not exist stays a
+# broken link and fails the strict build.
+hooks:
+  - script/mkdocs/repo_links.py
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+  # The getting-started pages include the quickstart programs from
+  # examples/ by reference (--8<--), so the page shows the code the test
+  # builds. Paths are relative to the repository root; a missing file
+  # fails the build.
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - The device side: getting-started/device.md
+      - The controller side: getting-started/controller.md
+  - Architecture: architecture.md
+  - Guides:
+      - Host ports: guides/ports.md
+      - Concurrency: guides/concurrency.md
+      - Persistence: guides/persistence.md
+      - Security: security.md
+  - Reference:
+      - Architecture decisions:
+          - adr/README.md
+          - "ADR 0001 — Matter wire-protocol design rules from chip-tool bring-up": adr/0001-matter-commissioning-bring-up.md
+          - "ADR 0002 — Extract a testable gate + per-opcode seam from `handleIMOpcode`": adr/0002-im-opcode-dispatch-seam.md
+          - "ADR 0003 — Sigma resumption extraction: already satisfied (finding corrected)": adr/0003-sigma-resume-extraction.md
+          - "ADR 0004 — Minimal in-memory Groups cluster: rejected (stub is a deliberate, matter.js-conformant divergence)": adr/0004-groups-cluster-stays-stub.md
+          - "ADR 0005 — Matter `Bridge`: defer the CommissioningSession/IMEngine facade split": adr/0005-bridge-decomposition.md
+          - "ADR 0006 — Extract cohesive sub-helpers from `handleSubscribeRequest`": adr/0006-subscribe-dispatch-seam.md
+          - "ADR 0007 — Hermetic per-DP-type Matter send/receive suite (chip-tool ↔ godevccu)": adr/0007-chiptool-send-receive-matrix.md
+          - "ADR 0008 — Server-side subscription persistence and re-establishment after restart": adr/0008-subscription-resumption.md
+          - "ADR 0009 — A real Groups server and group message delivery, as matter.js builds them": adr/0009-groups-and-group-messaging.md
+          - "ADR 0010 — Groupcast and the AccessControl Auxiliary ACL on the root, as matter.js installs them": adr/0010-groupcast-and-auxiliary-acl.md
+          - "ADR 0011 — Certifiability is a goal; certification is not pursued": adr/0011-certifiability-is-a-goal.md
+          - "ADR 0012 — A real ScenesManagement server on the bridged lights": adr/0012-scenesmanagement-server.md
+          - "ADR 0013 — Cluster definitions generated from the matter.js model": adr/0013-generated-cluster-definitions.md
+          - "ADR 0014 — Attribute transitions run in the module, optional per endpoint": adr/0014-transitions-optional-per-endpoint.md
+          - "ADR 0015 — The CHIP data model cross-check reads connectedhomeip at test time": adr/0015-chip-data-model-read-at-run-time.md
+          - "ADR 0016 — Assembled topologies are validated against their device types, as matter.js validates a server node": adr/0016-device-type-validation.md
+          - "ADR 0017 — A generated default cluster server, so that a cluster without matter.js logic costs no hand-written server": adr/0017-generated-default-cluster-server.md
+          - "ADR 0018 — A device layer (`device/`) generated from the device-type model, and a node facade, as matter.js's `devices/`, `endpoints/` and `ServerNode`": adr/0018-device-layer-and-node-facade.md
+          - "ADR 0019 — TCP, BDX and the OTA Software Update Requestor enter the scope; DiagnosticLogs stays without BDX": adr/0019-tcp-bdx-and-the-ota-requestor.md
+          - "ADR 0020 — The commissioner and controller role enters the scope as `controller/`; the responder side stays as it is": adr/0020-commissioner-and-controller-role.md
+          - "ADR 0021 — The OTA Software Update Provider and DiagnosticLogs over BDX enter the scope": adr/0021-ota-provider-and-diagnosticlogs-over-bdx.md
+          - "ADR 0022 — The media and content clusters and the three media device types enter the scope": adr/0022-media-and-content-clusters.md
+          - "ADR 0023 — Apache License 2.0 and a contributor licence agreement": adr/0023-apache-2-and-the-cla.md
+          - "ADR 0024 — BLE commissioning in the controller role": adr/0024-ble-commissioning-in-the-controller.md
+      - matter.js comparison: matterjs-comparison.md
+      - Parity contract: matter-parity-contract.md
+      - Certifiability: certifiability.md
+      - CHIP data-model cross-check: chip-datamodel-crosscheck.md
+      - Ecosystem observations: matter-ecosystem-observations.md
+  - Project:
+      - Contributing: https://github.com/SukramJ/go-fabric/blob/main/CONTRIBUTING.md
+      - Contributor licence agreement: https://github.com/SukramJ/go-fabric/blob/main/CLA.md
+      - Changelog: https://github.com/SukramJ/go-fabric/blob/main/CHANGELOG.md
+      - Licence: https://github.com/SukramJ/go-fabric/blob/main/LICENSE
