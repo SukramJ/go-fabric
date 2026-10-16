@@ -58,6 +58,13 @@ type Aggregator struct {
 	eps      []Endpoint
 	started  bool
 	complete bool
+
+	// reassembleMu serialises reassembly: each snapshot is taken after the
+	// previous topology was installed, so of two concurrent Add/Remove
+	// calls the later install always reflects both — without it an older
+	// snapshot could install last, dropping a just-added device and, on a
+	// model-complete set, releasing its endpoint number.
+	reassembleMu sync.Mutex
 }
 
 func keyOf(spec endpoint.Spec) (string, error) {
@@ -170,6 +177,8 @@ func (a *Aggregator) setStarted() {
 }
 
 func (a *Aggregator) reassemble(ctx context.Context) error {
+	a.reassembleMu.Lock()
+	defer a.reassembleMu.Unlock()
 	if err := a.n.br.Reassemble(ctx); err != nil {
 		return fmt.Errorf("node: reassemble: %w", err)
 	}

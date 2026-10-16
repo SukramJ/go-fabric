@@ -7,9 +7,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -624,6 +626,35 @@ func TestLocales(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("%s: no LocalizationConfiguration on the root", name)
+		}
+	}
+}
+
+// TestAggregatorConcurrentAdds: devices added from many goroutines at
+// once all end in the topology — reassembly is serialised, so an older
+// snapshot never installs after a newer one.
+func TestAggregatorConcurrentAdds(t *testing.T) {
+	ctx := context.Background()
+	n := newNode(t, minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db"))))
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	n.Aggregator().MarkComplete()
+	const count = 16
+	var wg sync.WaitGroup
+	for i := range count {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := n.Aggregator().Add(ctx, newPlug(t, fmt.Sprintf("plug:%02d", i))); err != nil {
+				t.Errorf("Add %d: %v", i, err)
+			}
+		}()
+	}
+	wg.Wait()
+	for i := range count {
+		if _, ok := endpointOf(t, n, fmt.Sprintf("plug:%02d", i)); !ok {
+			t.Errorf("plug:%02d missing from the topology after concurrent adds", i)
 		}
 	}
 }
