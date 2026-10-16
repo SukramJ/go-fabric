@@ -10,6 +10,7 @@ import (
 	"math"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -734,5 +735,32 @@ func TestNativeSourceImmediateSwitchOff(t *testing.T) {
 	}
 	if lvl, _ := d.Level(); lvl != 100 {
 		t.Fatalf("test device changed its level synchronously (%d)", lvl)
+	}
+}
+
+// failingOnOff refuses to switch off.
+type failingOnOff struct{ on bool }
+
+func (f *failingOnOff) OnOff() bool { return f.on }
+
+func (f *failingOnOff) SetOnOff(_ context.Context, on bool) error {
+	if !on {
+		return errors.New("refused")
+	}
+	f.on = on
+	return nil
+}
+
+// TestNativeSourceImmediateSwitchOffRefused: the immediate switch-off of
+// a "with On/Off" command to MinLevel is the command's result — a refusal
+// fails the command, as matter.js's preCommit failing aborts the
+// transaction (LevelControlServer.ts:624-627).
+func TestNativeSourceImmediateSwitchOffRefused(t *testing.T) {
+	t.Parallel()
+	d := &rampDevice{level: 100, known: true}
+	src := levelcontrol.NewNativeSource(d, &failingOnOff{on: true}, levelcontrol.NativeConfig{Lighting: true})
+	err := src.MoveToLevelWithOnOff(context.Background(), levelcontrol.MoveToLevelRequest{Level: 1})
+	if err == nil || !strings.Contains(err.Error(), "switch off") {
+		t.Fatalf("refused switch-off: %v, want the switch-off error", err)
 	}
 }
