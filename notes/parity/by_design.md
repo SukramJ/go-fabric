@@ -2989,3 +2989,24 @@ By design. No matter.js behaviour changes for a device that does not
 opt in; the interface only lets a bridged device express the one
 transaction matter.js runs locally.
 
+### BD-Matter-CommissioningBlocked — a host can refuse every new commissioning while paired controllers keep working
+
+matter.js opens a commissioning window whenever its rules allow one —
+the node's own window while uncommissioned, AdministratorCommissioning
+for an administrator (`AdministratorCommissioningServer.ts`: Busy only
+for a window already open, `:196`) — and has no policy refusal. A bridge
+host that was configured with a vendor attestation chain it cannot load
+must not let a new controller pair against the CSA test chain, yet must
+keep serving the controllers already paired.
+`bridge.CommissioningWindow.SetBlocked(ctx, err)` / `Node.SetCommissioningBlocked`
+refuse both window open paths (`OpenOwnWindow`, `OpenWindow`) with an
+error wrapping `bridge.ErrCommissioningBlocked` and the host's cause,
+revoke a window that is open (withdrawing the CM record), and lift with
+nil — the facade then reopens an uncommissioned node's own window. An
+AdministratorCommissioning command refused this way answers FAILURE
+(general status): none of the cluster's statuses means "refused by
+policy". Issue #133.
+
+By design. A host extension with no matter.js behaviour to mirror; it
+only removes ways to commission, never adds one.
+

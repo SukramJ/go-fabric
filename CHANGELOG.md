@@ -10,6 +10,12 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.5.4] — 2026-10-16
+
+### Added
+
+- `Node.SetCommissioningBlocked(ctx, err)` and `bridge.CommissioningWindow.SetBlocked(ctx, err)` (#133): while `err` is non-nil every new commissioning is refused — the node's own window (at `Start` and after the last fabric is removed), `Node.OpenBasicWindow`, the host's opener and both AdministratorCommissioning commands of a paired controller, which answer FAILURE — with an error wrapping `bridge.ErrCommissioningBlocked`; a window open when the block is set is revoked and its CM record withdrawn. Controllers already paired keep working. `nil` lifts the block and reopens an uncommissioned node's own window. For a host that cannot serve the attestation chain it was configured with; matter.js has no counterpart (`BD-Matter-CommissioningBlocked`).
+
 ## [0.5.3] — 2026-10-16
 
 ### Added
@@ -3941,7 +3947,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/SukramJ/go-fabric/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/SukramJ/go-fabric/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/SukramJ/go-fabric/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/SukramJ/go-fabric/compare/v0.5.0...v0.5.1
