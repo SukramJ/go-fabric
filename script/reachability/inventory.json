@@ -5370,7 +5370,7 @@
       "identifier": "AlarmSeverityEvent",
       "reason": "auto-whitelist:pattern=type-alias",
       "file": "cluster/alarm/smokecoalarm_server.go",
-      "line": 673
+      "line": 676
     },
     {
       "package": "cluster/alarm",
