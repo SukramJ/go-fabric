@@ -25,7 +25,7 @@
 #     (docs/adr/0011-certifiability-is-a-goal.md): the families run with PICS
 #     generated from the device, every excluded case carries its class and
 #     reason, and docs/certifiability.md is the status. An unlabelled pull
-#     request runs the core families; the nightly run, a manual dispatch and
+#     request runs the core groups (core-su, core-idm, core-ace, core-rest, in parallel); the nightly run, a manual dispatch and
 #     the `needs-chiptool` label run all of them, split into groups so no job
 #     exceeds the runner limit. A group an event does not run gets no job.
 #
@@ -125,7 +125,7 @@ jobs:
       # One place for the split (TestWorkflowRunsEveryFamily holds it to the
       # family table): the groups divide internal/chiptool's family table so
       # no job exceeds the runner's six hours. An unlabelled pull request runs
-      # the core group only; the nightly run, a manual dispatch and the
+      # the core-* groups only; the nightly run, a manual dispatch and the
       # `needs-chiptool` label run every group. A group that is not run does
       # not get a job at all, so it can neither look green nor hide a skip.
       - id: groups
@@ -143,7 +143,10 @@ jobs:
             exit 0
           fi
           groups=(
-            "core=IDM,DESC,BINFO,BRBINFO,ACE,ACL,CGEN,OPCREDS,GRPKEY,DT,RR,SM,TIMESYNC,DLOG,ICDM,SU,BDX,BIND,FLABEL,ULABEL,LCFG,LTIME,LUNIT,DGSW,DGETH,DGWIFI,ACT,PSCFG,ECOINFO"
+            "core-su=SU"
+            "core-idm=IDM"
+            "core-ace=ACE,ACL,OPCREDS,CGEN"
+            "core-rest=DESC,BINFO,BRBINFO,GRPKEY,DT,RR,SM,TIMESYNC,DLOG,ICDM,BDX,BIND,FLABEL,ULABEL,LCFG,LTIME,LUNIT,DGSW,DGETH,DGWIFI,ACT,PSCFG,ECOINFO"
             "commissioning=CADMIN,SC,DA,DD,CNET,DGGEN,G,GC"
             "app-lights=OO,LVL,CC,I,S,SWTCH,BOOL,BOOLCFG,OCC,TMP,RH,FLW,CDOCONC,CMOCONC,FLDCONC,NDOCONC,OZCONC,PMHCONC,RNCONC,TVOCCONC,AIRQUAL,PMICONC,PMKCONC,SOIL"
             "app-appliances=DRLK,FAN,LWM,MOD,OPSTATE,PCC,PS,RVCCLEANM,RVCOPSTATE,RVCRUNM,SMOKECO,TSTAT,VALCC,WNCV,HEPAFREMON,ACFREMON,CLCTRL,TCCM,TCTL,EPREF,EWATERHTR,WHM,MTRID,DISHALM,REFALM,OVENOPSTATE,OTCCM,MWOCTRL,MWOM,SEAR,CLDIM,TSUIC"
@@ -157,7 +160,7 @@ jobs:
           include="[]"
           for entry in "${groups[@]}"; do
             group="${entry%%=*}"; families="${entry#*=}"
-            if [ "$all" = true ] || [ "$group" = core ]; then
+            if [ "$all" = true ] || [[ "$group" == core-* ]]; then
               include=$(jq -c --arg g "$group" --arg f "$families" '. + [{group: $g, families: $f}]' <<<"$include")
             fi
           done
