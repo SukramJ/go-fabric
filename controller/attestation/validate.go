@@ -64,7 +64,7 @@ func Validate(ctx Context, data Data) (Result, error) {
 	}
 	// The DAC key must be EC P-256 (Dac constructor,
 	// kinds/AttestationCertificates.ts:66-72).
-	dacPublicKey, err := p256Key(dac.x509)
+	dacPublicKey, err := P256Key(dac.x509)
 	if err != nil {
 		return Result{}, &Error{Check: CertificateUnparseable, Message: "Device returned a DAC certificate that cannot be parsed: " + err.Error(), Err: err}
 	}
@@ -190,15 +190,15 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 	}
 	// The PAA key is read inside matter.js's try (DAV:272-279), so a key
 	// it cannot use fails the chain as the signature does.
-	paaKey, err := p256Key(paa.x509)
+	paaKey, err := P256Key(paa.x509)
 	if err == nil {
-		err = verifySignedBy(pai.x509, paaKey)
+		err = VerifySignedBy(pai.x509, paaKey)
 	}
 	if err != nil {
 		return nil, fail(CertificateChainInvalid, "PAI signature verification failed: "+err.Error())
 	}
 	// Reading the PAI key apart from the DAC check (DAV:281-286).
-	paiKey, err := p256Key(pai.x509)
+	paiKey, err := P256Key(pai.x509)
 	if err != nil {
 		return nil, &Error{Check: CertificateUnparseable, Message: "Device returned a PAI whose public key cannot be read: " + err.Error(), Err: err}
 	}
@@ -206,7 +206,7 @@ func checkChain(store PAAStore, dac, pai *attCert, findings *[]Finding) (*attCer
 	// key no stronger than its PAA's. Both are EC P-256 here — the one
 	// algorithm this validator admits — so the strengths are equal.
 	// The DAC's signature by the PAI (DAV:296-303).
-	if err := verifySignedBy(dac.x509, paiKey); err != nil {
+	if err := VerifySignedBy(dac.x509, paiKey); err != nil {
 		return nil, fail(CertificateChainInvalid, "DAC signature verification failed: "+err.Error())
 	}
 

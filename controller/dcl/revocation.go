@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"github.com/SukramJ/go-fabric/controller/attestation"
 )
 
 // The CRL revocation check of DclCertificateService.isRevoked
@@ -398,7 +399,7 @@ func verifyCRLSignature(signer *x509.Certificate, tbs, algorithm, value []byte) 
 	if _, err := asn1.Unmarshal(derEncode(alg.elements[0]), &oid); err != nil || !oid.Equal(oidECDSAWithSHA256) {
 		return fmt.Errorf("signature algorithm %s is neither ecdsa-with-SHA256 nor ML-DSA", strings.ToLower(hexUpper(alg.elements[0].bytes)))
 	}
-	key, err := p256Key(signer)
+	key, err := attestation.P256Key(signer)
 	if err != nil {
 		return errors.New("signature is ecdsa-with-SHA256 but the signer key is not ECDSA-P256")
 	}
@@ -554,8 +555,8 @@ func idText(id *uint16) string {
 
 // signsItself is #signsItself (:1716-1723).
 func signsItself(c *trustCert) bool {
-	key, err := p256Key(c.x509)
-	return err == nil && verifySignedBy(c.x509, key) == nil
+	key, err := attestation.P256Key(c.x509)
+	return err == nil && attestation.VerifySignedBy(c.x509, key) == nil
 }
 
 // trustedPAADER is #trustedPaaDer (:1725-1731): the stored PAA with that
@@ -582,9 +583,9 @@ func assertIssuedBy(subject, issuer *trustCert) error {
 	if !sameName(subject.x509.RawIssuer, issuer.x509.RawSubject) {
 		return rejected("CRL signer chain names do not match")
 	}
-	key, err := p256Key(issuer.x509)
+	key, err := attestation.P256Key(issuer.x509)
 	if err == nil {
-		err = verifySignedBy(subject.x509, key)
+		err = attestation.VerifySignedBy(subject.x509, key)
 	}
 	if err != nil {
 		return rejectedBy(err, "CRL signer chain signature does not verify")

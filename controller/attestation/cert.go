@@ -86,7 +86,7 @@ func parseAttCert(der []byte, authorityKeyID bool) (*attCert, error) {
 		return nil, err
 	}
 	a := &attCert{x509: c, notBefore: matterTime(c.NotBefore), notAfter: matterTime(c.NotAfter)}
-	if a.vendorID, a.productID, err = matterIDs(c); err != nil {
+	if a.vendorID, a.productID, err = MatterIDs(c); err != nil {
 		return nil, err
 	}
 	return a, nil
@@ -101,11 +101,11 @@ func matterTime(t time.Time) int64 {
 	return t.Unix() - matterEpochOffset
 }
 
-// matterIDs reads the vendor and product id of the subject DN —
+// MatterIDs reads the vendor and product id of the subject DN —
 // Certificate.ts:345-352 (the OID attributes, hex strings parsed with
 // parseInt(_, 16)) and :379-392 (the Mvid:/Mpid: commonName fallback,
 // only when the DN carries neither OID).
-func matterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
+func MatterIDs(c *x509.Certificate) (vid, pid *uint16, err error) {
 	for _, n := range c.Subject.Names {
 		s, ok := n.Value.(string)
 		switch {
@@ -171,9 +171,9 @@ func fallbackID(cn, prefix string) (*uint16, error) {
 	return nil, nil
 }
 
-// p256Key is the certificate's key when it is EC P-256 — matter.js's
+// P256Key is the certificate's key when it is EC P-256 — matter.js's
 // "ECDSA-P256" key algorithm (kinds/CertificateSignature.ts:55-57).
-func p256Key(c *x509.Certificate) (*ecdsa.PublicKey, error) {
+func P256Key(c *x509.Certificate) (*ecdsa.PublicKey, error) {
 	k, ok := c.PublicKey.(*ecdsa.PublicKey)
 	if !ok || k.Curve != elliptic.P256() {
 		return nil, errors.New("public key is not EC P-256")
@@ -181,10 +181,10 @@ func p256Key(c *x509.Certificate) (*ecdsa.PublicKey, error) {
 	return k, nil
 }
 
-// verifySignedBy is Certificate.verifySignature with an ECDSA P-256 signer
+// VerifySignedBy is Certificate.verifySignature with an ECDSA P-256 signer
 // (kinds/CertificateSignature.ts:101-120): the certificate's
 // ecdsa-with-SHA256 signature over its TBS DER verifies with key.
-func verifySignedBy(c *x509.Certificate, key *ecdsa.PublicKey) error {
+func VerifySignedBy(c *x509.Certificate, key *ecdsa.PublicKey) error {
 	if c.SignatureAlgorithm != x509.ECDSAWithSHA256 {
 		return fmt.Errorf("signature algorithm %v is not ecdsa-with-SHA256", c.SignatureAlgorithm)
 	}
