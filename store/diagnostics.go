@@ -9,9 +9,9 @@ import (
 	"time"
 )
 
-// DiagnosticsRecord is the persisted counter pair the daemon seeds
-// into the GeneralDiagnostics cluster on every boot. Mirrors
-// migration 011_matter_diagnostics.sql.
+// DiagnosticsRecord is the persisted counter pair a host seeds into the
+// GeneralDiagnostics cluster on every boot. Mirrors the
+// matter_diagnostics table (migration v1).
 type DiagnosticsRecord struct {
 	// RebootCount is the number of fresh daemon starts since first
 	// install. The daemon reads it, increments by 1, persists, and

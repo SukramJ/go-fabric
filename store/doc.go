@@ -36,6 +36,5 @@
 // (FOREIGN KEY ... ON DELETE CASCADE).
 //
 // The private key persists raw. File-system level protection is the
-// operator's responsibility for v1.1; an at-rest encryption ADR is
-// expected for v1.2.
+// operator's responsibility; the module does not encrypt at rest.
 package store

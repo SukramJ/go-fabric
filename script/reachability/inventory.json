@@ -257,7 +257,7 @@
       "package": "endpoint",
       "identifier": "ComposeNodeLabel",
       "file": "endpoint/spec.go",
-      "line": 135,
+      "line": 133,
       "kind": "func"
     },
     {

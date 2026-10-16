@@ -27,7 +27,7 @@ Entry points: 5129 across 204 test packages.
 | Package | Identifier | File | Line |
 |---|---|---|---|
 | cluster/measurement | CelsiusToInt16 | cluster/measurement/measurement.go | 1662 |
-| endpoint | ComposeNodeLabel | endpoint/spec.go | 135 |
+| endpoint | ComposeNodeLabel | endpoint/spec.go | 133 |
 
 ## Full by-package breakdown
 

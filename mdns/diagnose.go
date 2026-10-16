@@ -10,7 +10,6 @@ import (
 )
 
 // Severity ranks a finding by what it costs an operator.
-// loom:reachable:reason="the severity of every Finding that Diagnose returns; the REST layer copies it into the diagnostics payload on each GET /api/v1/matter/mdns. A string alias without methods, which the analyzer's type heuristic cannot see used"
 type Severity string
 
 // Severity values.
@@ -24,7 +23,6 @@ const (
 )
 
 // Finding is one diagnosed condition of the advertised records.
-// loom:reachable:reason="returned by Diagnose, which the daemon's matterMdnsReporter calls on each GET /api/v1/matter/mdns; a data struct whose fields the REST layer copies out, invisible to the analyzer's method-based type heuristic"
 type Finding struct {
 	Severity Severity
 	// Code is a stable machine-readable identifier; the message is
