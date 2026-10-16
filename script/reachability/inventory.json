@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5131,
+  "entry_points": 5141,
   "entry_packages": [
     ".",
     "bdx",
@@ -37,6 +37,7 @@
     "cluster/spec/activatedcarbonfiltermonitoring",
     "cluster/spec/administratorcommissioning",
     "cluster/spec/airquality",
+    "cluster/spec/ambientcontextsensing",
     "cluster/spec/applicationbasic",
     "cluster/spec/applicationlauncher",
     "cluster/spec/audiooutput",
@@ -48,6 +49,7 @@
     "cluster/spec/carbondioxideconcentrationmeasurement",
     "cluster/spec/carbonmonoxideconcentrationmeasurement",
     "cluster/spec/channel",
+    "cluster/spec/chime",
     "cluster/spec/closurecontrol",
     "cluster/spec/closuredimension",
     "cluster/spec/colorcontrol",
@@ -79,6 +81,7 @@
     "cluster/spec/formaldehydeconcentrationmeasurement",
     "cluster/spec/generalcommissioning",
     "cluster/spec/generaldiagnostics",
+    "cluster/spec/groupcast",
     "cluster/spec/groups",
     "cluster/spec/hepafiltermonitoring",
     "cluster/spec/icdmanagement",
@@ -145,7 +148,9 @@
     "cluster/spec/wakeonlan",
     "cluster/spec/waterheatermanagement",
     "cluster/spec/waterheatermode",
+    "cluster/spec/watertanklevelmonitoring",
     "cluster/spec/wifinetworkdiagnostics",
+    "cluster/spec/wifinetworkmanagement",
     "cluster/spec/windowcovering",
     "cluster/thermo",
     "cluster/transition",
@@ -208,9 +213,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12330,
-    "reachable": 8728,
-    "whitelisted": 3597,
+    "total_exported": 12511,
+    "reachable": 8869,
+    "whitelisted": 3637,
     "unreachable": 5
   },
   "by_package": [
@@ -7494,6 +7499,76 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "AmbientContextTypeStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen.go",
+      "line": 86
+    },
+    {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen.go",
+      "line": 53
+    },
+    {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "HoldTimeLimitsStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen.go",
+      "line": 227
+    },
+    {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "Namespace",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen.go",
+      "line": 131
+    },
+    {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "NamespaceDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen.go",
+      "line": 168
+    },
+    {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "ObjectCountConfigStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen.go",
+      "line": 258
+    },
+    {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "PredictedActivityStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen.go",
+      "line": 300
+    },
+    {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "SemtagDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen.go",
+      "line": 121
+    },
+    {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/ambientcontextsensing",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/ambientcontextsensing/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/applicationbasic",
       "identifier": "ApplicationStatusEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -7978,6 +8053,13 @@
     },
     {
       "package": "cluster/spec/channel",
+      "identifier": "AdditionalInfoStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/channel/definition_gen.go",
+      "line": 486
+    },
+    {
+      "package": "cluster/spec/channel",
       "identifier": "ChannelInfoStructDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/channel/definition_gen.go",
@@ -8010,6 +8092,13 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/channel/definition_gen.go",
       "line": 50
+    },
+    {
+      "package": "cluster/spec/channel",
+      "identifier": "GetProgramGuideRequestExternalIdListEntry",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/spec/channel/compat.go",
+      "line": 14
     },
     {
       "package": "cluster/spec/channel",
@@ -8062,6 +8151,13 @@
     },
     {
       "package": "cluster/spec/channel",
+      "identifier": "ProgramStructExternalIdListEntry",
+      "reason": "auto-whitelist:pattern=type-alias",
+      "file": "cluster/spec/channel/compat.go",
+      "line": 12
+    },
+    {
+      "package": "cluster/spec/channel",
       "identifier": "RecordingFlagBitmap",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/channel/definition_gen.go",
@@ -8086,14 +8182,14 @@
       "identifier": "StatusEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/channel/definition_gen.go",
-      "line": 464
+      "line": 494
     },
     {
       "package": "cluster/spec/channel",
       "identifier": "StatusEnumDef",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/channel/definition_gen.go",
-      "line": 476
+      "line": 506
     },
     {
       "package": "cluster/spec/channel",
@@ -8107,6 +8203,34 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/channel/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/chime",
+      "identifier": "ChimeSoundStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/chime/definition_gen.go",
+      "line": 75
+    },
+    {
+      "package": "cluster/spec/chime",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/chime/definition_gen.go",
+      "line": 48
+    },
+    {
+      "package": "cluster/spec/chime",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/chime/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/chime",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/chime/definition_gen_test.go",
       "line": 19
     },
     {
@@ -10921,6 +11045,76 @@
       "identifier": "TestDefinitionMatchesSnapshot",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/generaldiagnostics/definition_gen_test.go",
+      "line": 19
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/groupcast/definition_gen.go",
+      "line": 55
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "GroupcastTestResultEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/groupcast/definition_gen.go",
+      "line": 88
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "GroupcastTestResultEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/groupcast/definition_gen.go",
+      "line": 103
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "GroupcastTestingEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/groupcast/definition_gen.go",
+      "line": 67
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "GroupcastTestingEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/groupcast/definition_gen.go",
+      "line": 79
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "MembershipStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/groupcast/definition_gen.go",
+      "line": 149
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "MulticastAddrPolicyEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/groupcast/definition_gen.go",
+      "line": 161
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "MulticastAddrPolicyEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/groupcast/definition_gen.go",
+      "line": 172
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/groupcast/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/groupcast",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/groupcast/definition_gen_test.go",
       "line": 19
     },
     {
@@ -14928,6 +15122,76 @@
       "line": 19
     },
     {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "ChangeIndicationEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "ChangeIndicationEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen.go",
+      "line": 70
+    },
+    {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "DegradationDirectionEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen.go",
+      "line": 79
+    },
+    {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "DegradationDirectionEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen.go",
+      "line": 90
+    },
+    {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen.go",
+      "line": 46
+    },
+    {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "ProductIdentifierTypeEnum",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen.go",
+      "line": 98
+    },
+    {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "ProductIdentifierTypeEnumDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen.go",
+      "line": 112
+    },
+    {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "ReplacementProductStructDef",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen.go",
+      "line": 145
+    },
+    {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/watertanklevelmonitoring",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/watertanklevelmonitoring/definition_gen_test.go",
+      "line": 19
+    },
+    {
       "package": "cluster/spec/wifinetworkdiagnostics",
       "identifier": "AssociationFailureCauseEnum",
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
@@ -15003,6 +15267,27 @@
       "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
       "file": "cluster/spec/wifinetworkdiagnostics/definition_gen.go",
       "line": 156
+    },
+    {
+      "package": "cluster/spec/wifinetworkmanagement",
+      "identifier": "Feature",
+      "reason": "generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow",
+      "file": "cluster/spec/wifinetworkmanagement/definition_gen.go",
+      "line": 43
+    },
+    {
+      "package": "cluster/spec/wifinetworkmanagement",
+      "identifier": "TestCodecsRoundTrip",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/wifinetworkmanagement/definition_gen_test.go",
+      "line": 26
+    },
+    {
+      "package": "cluster/spec/wifinetworkmanagement",
+      "identifier": "TestDefinitionMatchesSnapshot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/wifinetworkmanagement/definition_gen_test.go",
+      "line": 19
     },
     {
       "package": "cluster/spec/windowcovering",

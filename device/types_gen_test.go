@@ -1189,6 +1189,9 @@ func TestGeneratedConstructorsAndAccessors(t *testing.T) {
 		if s := d.IcdManagement(); s != nil && d.Server(0x0046) != s {
 			t.Error("RootNode: optional IcdManagement is not the device's server")
 		}
+		if s := d.Groupcast(); s != nil && d.Server(0x0065) != s {
+			t.Error("RootNode: optional Groupcast is not the device's server")
+		}
 	} else if !refusesFixture("RootNode") {
 		t.Errorf("RootNode: %v", err)
 	}
