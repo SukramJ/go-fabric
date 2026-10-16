@@ -10,9 +10,16 @@
 # when it does not, so a slice overrides whatever CHIP's ci-pics-values says
 # for its all-clusters app.
 #
+# An event is also mandatory where a device type the endpoint lists requires
+# it (OperationCompletion on a LaundryWasher's OperationalState): CHIP's spec
+# parser carries no device-type event overrides, so the harness passes the
+# module's own table (device_events: JSON {deviceType: {cluster: [event]}},
+# internal/chiptool/pics_device_events_test.go deviceTypeEvents).
+#
 # Run inside the CHIP harness image against a commissioned DUT:
-#   python3 gen_pics.py --string-arg out_dir:/path
+#   python3 gen_pics.py --string-arg out_dir:/path --string-arg device_events:/path.json
 # Writes <out_dir>/ep<N>.txt for every endpoint.
+import json
 import math
 import os
 
@@ -41,9 +48,18 @@ class GenPICS(BasicCompositionTests):
         facts, _ = derive_base_pics_facts_from_device_wildcard(wildcard, self.xml_clusters)
         base = base_pics_facts_to_pics_codes(facts)
         ota = {Clusters.OtaSoftwareUpdateProvider.id, Clusters.OtaSoftwareUpdateRequestor.id}
+        device_events = {}
+        if self.user_params.get("device_events"):
+            with open(self.user_params.get("device_events")) as f:
+                device_events = json.load(f)
         for ep in sorted(self.endpoints_tlv):
             have = set(present.get(ep, []))
             codes = {}
+            descriptor = self.endpoints.get(ep, {}).get(Clusters.Descriptor, {})
+            required_events = {}
+            for dt in descriptor.get(Clusters.Descriptor.Attributes.DeviceTypeList, []) or []:
+                for cid_s, eids in device_events.get(str(dt.deviceType), {}).items():
+                    required_events.setdefault(int(cid_s), set()).update(eids)
             for cid, xc in sorted(self.xml_clusters.items()):
                 if xc.pics is None or cid in ota or cid not in Clusters.ClusterObjects.ALL_CLUSTERS:
                     continue
@@ -64,7 +80,9 @@ class GenPICS(BasicCompositionTests):
                         continue
                     bit = int(math.log2(mask))
                     codes[feature_pics_str(p, bit)] = feature_pics_str(p, bit) in have
-                mandatory = facts.mandatory_events_by_cluster.get(ep, {}).get(cid, set())
+                mandatory = set(facts.mandatory_events_by_cluster.get(ep, {}).get(cid, set()))
+                if server_pics_str(p) in have:
+                    mandatory |= required_events.get(cid, set())
                 for eid in xc.events:
                     codes[event_pics_str(p, eid)] = eid in mandatory
             for code in BASE_PICS_CODES_DERIVED:

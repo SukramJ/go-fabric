@@ -342,14 +342,7 @@ func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
 	case wire.WindowCoveringAttrType:
 		return s.wcType, true
 	case wire.WindowCoveringAttrConfigStatus:
-		st := configStatusOperational
-		if s.lift != nil {
-			st |= configStatusLiftPositionAware
-		}
-		if s.tilt != nil {
-			st |= configStatusTiltPositionAware
-		}
-		return st, true
+		return s.configStatusLocked(), true
 	case wire.WindowCoveringAttrOperationalStatus:
 		return s.operationalStatus, true
 	case wire.WindowCoveringAttrEndProductType:
@@ -388,14 +381,38 @@ func (s *WindowCoveringServer) MatterRead(attrID uint32) (any, bool) {
 //
 // matter.js WindowCoveringServer.ts:121-132 initialize() sets Operational
 // and, for a position-aware lift or tilt, LiftPositionAware /
-// TiltPositionAware; LiftMovementReversed is only ever derived from
-// Mode.MotorDirectionReversed (WindowCoveringServer.ts:189), which this
-// server never sets.
+// TiltPositionAware; Operational and LiftMovementReversed follow the Mode
+// attribute (#handleModeChanging, :185-190).
 const (
-	configStatusOperational       uint8 = 1 << 0 // constraint "0", element :110
-	configStatusLiftPositionAware uint8 = 1 << 3 // constraint "3", element :113
-	configStatusTiltPositionAware uint8 = 1 << 4 // constraint "4", element :114
+	configStatusOperational          uint8 = 1 << 0 // constraint "0", element :110
+	configStatusLiftMovementReversed uint8 = 1 << 2 // constraint "2", element :112
+	configStatusLiftPositionAware    uint8 = 1 << 3 // constraint "3", element :113
+	configStatusTiltPositionAware    uint8 = 1 << 4 // constraint "4", element :114
 )
+
+// configStatusLocked derives ConfigStatus from the served axes and Mode:
+// Operational unless MaintenanceMode is set, LiftMovementReversed with a
+// lift that has MotorDirectionReversed set. Mirrors matter.js
+// WindowCoveringServer.ts:121-132 (initialize) and :185-190
+// (#handleModeChanging: `operational = !maintenanceMode || (calibrationMode
+// && !supportsCalibration)` — a calibration request is refused here, so
+// only the first term remains). Caller holds s.mu.
+func (s *WindowCoveringServer) configStatusLocked() uint8 {
+	var st uint8
+	if s.wcMode&uint8(wcdef.ModeMaintenanceMode) == 0 {
+		st |= configStatusOperational
+	}
+	if s.lift != nil {
+		st |= configStatusLiftPositionAware
+		if s.wcMode&uint8(wcdef.ModeMotorDirectionReversed) != 0 {
+			st |= configStatusLiftMovementReversed
+		}
+	}
+	if s.tilt != nil {
+		st |= configStatusTiltPositionAware
+	}
+	return st
+}
 
 // windowCoveringConstraintErr is a typed [im.StatusCodeError] for
 // writes that violate the "max 10000" constraint on percent100ths attributes.
@@ -413,6 +430,15 @@ var _ im.StatusCodeError = windowCoveringConstraintErr{}
 // (matter.js AttributeWriteResponse + ValueValidator): a served read-only
 // attribute is UNSUPPORTED_WRITE, an unserved one UNSUPPORTED_ATTRIBUTE,
 // a Mode outside "max 15" — the four ModeBitmap bits — CONSTRAINT_ERROR.
+//
+// A Mode that passes is synced as matter.js #handleModeChanging does
+// (WindowCoveringServer.ts:162-200 at 0ceb202d): MaintenanceMode takes
+// priority over CalibrationMode, which is cleared beside it; a
+// CalibrationMode left set is CONSTRAINT_ERROR, as matter.js answers
+// without supportsCalibration (its default, :73, :620) — the server has no
+// calibration procedure; and ConfigStatus follows ([configStatusLocked]),
+// reported when it moved. In MaintenanceMode the movement commands answer
+// BUSY ([WindowCoveringServer.MatterInvoke]).
 func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, value any) error {
 	v, err := s.inst.ValidateWrite(attrID, value, nil)
 	if err != nil {
@@ -422,11 +448,30 @@ func (s *WindowCoveringServer) MatterWrite(_ context.Context, attrID uint32, val
 		return err
 	}
 	n, _ := v.(uint64) // a map8 ≤ 15 per ValidateWrite
+	mode := uint8(n)   //nolint:gosec // ≤ 15 per ValidateWrite
+	maintenance, calibration := uint8(wcdef.ModeMaintenanceMode), uint8(wcdef.ModeCalibrationMode)
+	if mode&maintenance != 0 {
+		mode &^= calibration
+	}
+	if mode&calibration != 0 {
+		return windowCoveringConstraintErr{"windowcovering: Mode CalibrationMode: calibration not supported"}
+	}
 	s.mu.Lock()
-	s.wcMode = uint8(n) //nolint:gosec // ≤ 15 per ValidateWrite
+	before := s.configStatusLocked()
+	s.wcMode = mode
+	moved := s.configStatusLocked() != before
 	s.mu.Unlock()
+	if moved {
+		s.changes.Notify(wire.WindowCoveringAttrConfigStatus)
+	}
 	return nil
 }
+
+// maintenanceErr answers a movement command in MaintenanceMode.
+type maintenanceErr struct{}
+
+func (maintenanceErr) Error() string                   { return "windowcovering: device is in maintenance mode" }
+func (maintenanceErr) MatterStatusCode() im.StatusCode { return im.StatusBusy }
 
 // MinWritePrivilege implements [contract.ClusterAttributeWritePrivilege]:
 // Mode is "RW VM".
@@ -498,6 +543,15 @@ func (s *WindowCoveringServer) MatterInvoke(ctx context.Context, cmdID uint32, f
 	c, err := s.parseCommand(cmdID, fields)
 	if err != nil {
 		return nil, err
+	}
+	// Every movement command, StopMotion included, answers BUSY in
+	// MaintenanceMode. Mirrors matter.js WindowCoveringServer.ts:289-292
+	// (#assertMotionLockStatus, called at :519, :543, :567, :577, :599).
+	s.mu.RLock()
+	inMaintenance := s.wcMode&uint8(wcdef.ModeMaintenanceMode) != 0
+	s.mu.RUnlock()
+	if inMaintenance {
+		return nil, maintenanceErr{}
 	}
 	if s.mover != nil {
 		return nil, s.invokeMover(ctx, cmdID, c)

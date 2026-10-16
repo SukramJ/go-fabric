@@ -194,7 +194,30 @@ func NewServer(def *Cluster, opts Options, cfg ServerConfig) (*Server, error) {
 		}
 		s.values[id] = v
 	}
+	// An "in" constraint names a sibling, so it is judged once every
+	// initial value is in place, not in id order — matter.js validates the
+	// whole state after the initializer has run. Mirrors matter.js
+	// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:60-63
+	// (invokeInitializer: finalizeState → datasource.validate).
+	for _, id := range inst.attrs {
+		if err := s.checkIn(id, s.values[id], s.peers); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
+		}
+	}
 	return s, nil
+}
+
+// checkIn holds v to attrID's "in" constraint, if it states one; a null or
+// absent value is not judged.
+func (s *Server) checkIn(attrID uint32, v any, peers Peers) error {
+	a := s.def.Attribute(attrID)
+	if a == nil || a.Constraint.In == "" || v == nil {
+		return nil
+	}
+	if !s.inPeer(a.Constraint.In, v, peers) {
+		return Errorf(im.StatusConstraintError, "%s: %s %v is not one of the values allowed by %q", s.def.Name, a.Name, v, a.Constraint.Text)
+	}
+	return nil
 }
 
 func (s *Server) tracker() *cluster.DataVersionTracker {
@@ -275,6 +298,21 @@ func (s *Server) SetAttributes(values map[uint32]any) error {
 			return err
 		}
 		checked[id] = v
+	}
+	// The siblings an "in" constraint reads are the state with this
+	// change applied, as matter.js validates an assigned property against
+	// the struct it is assigned in. Mirrors matter.js
+	// packages/node/src/behavior/state/managed/values/StructManager.ts:273-287.
+	pending := func(attrID uint32) (any, bool) {
+		if v, ok := checked[attrID]; ok {
+			return v, true
+		}
+		return s.peers(attrID)
+	}
+	for _, id := range slices.Sorted(maps.Keys(checked)) {
+		if err := s.checkIn(id, checked[id], pending); err != nil {
+			return fmt.Errorf("%w: %w", ErrInvalidValue, err)
+		}
 	}
 	s.store(checked)
 	return nil

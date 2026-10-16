@@ -197,11 +197,12 @@ RVCOPSTATE.S.M.CAN_MANUALLY_CONTROLLED=1
 
 # --- Window covering modes -------------------------------------------------
 # The blind has no calibration procedure (cluster/cover; matter.js
-# WindowCoveringServer supportsCalibration defaults to false) and the module
-# does not implement maintenance mode (open finding, by TC id in
-# notes/parity/matter_behaviour_findings.md).
+# WindowCoveringServer supportsCalibration defaults to false). Maintenance
+# mode is served as matter.js's (supportsMaintenanceMode defaults to true):
+# Mode bit 2 clears ConfigStatus Operational and movement answers BUSY
+# (TC-WNCV-2.3 step 3).
 WNCV.S.M.Calibration=0
-WNCV.S.M.Maintenance=0
+WNCV.S.M.Maintenance=1
 
 # --- Client roles -------------------------------------------------------------
 # The daemon is a server for every cluster it mounts and a client of none: it

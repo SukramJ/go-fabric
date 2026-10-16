@@ -492,9 +492,9 @@ func (c rvcRunChanger) ChangeToMode(_ context.Context, newMode uint8) (modebase.
 	case newMode == rvcCleaning && current == rvcIdle:
 		st := opstate.StateRunning
 		next = &st
-	case newMode == rvcMapping && current == rvcCleaning:
-		return modebase.StatusInvalidInMode, "can not switch operative modes while the device is operating", nil
 	}
+	// Cleaning ↔ Mapping never arrives: without DIRECTMODECH the RvcRunMode
+	// server answers InvalidInMode for it before asking.
 	v.mu.Lock()
 	v.runMode = newMode
 	v.paused = false

@@ -284,7 +284,10 @@ type SensitivitySetter interface {
 // holds is the one expressed. The specification leaves the order to the
 // manufacturer (resource :27-30); this default is the order connectedhomeip's
 // smoke-co-alarm example application passes to
-// SmokeCoAlarmServer::SetExpressedStateByPriority. Inoperative is not in
+// SmokeCoAlarmServer::SetExpressedStateByPriority — Inoperative first, then
+// these eight in this order (examples/smoke-co-alarm-app/silabs/src/
+// SmokeCoAlarmManager.cpp:32-36, telink/src/SmokeCoAlarmManager.cpp:31-35,
+// at the harness pin 6170af8461b10b1766044122ac83332c6d00ab20). Inoperative is not in
 // it: when the host reports [State.Inoperative] it is expressed ahead of
 // everything, because an alarm that cannot detect has nothing else to
 // say truthfully.

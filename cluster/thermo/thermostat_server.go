@@ -779,9 +779,11 @@ func abs16(x int16) int16 {
 }
 
 // handleSetpointRaiseLower implements the SetpointRaiseLower command per
-// matter.js ThermostatServer.ts:setpointRaiseLower (lines 186-233).
+// matter.js ThermostatServer.ts:setpointRaiseLower (lines 186-274).
 // mode=Heat without HEAT feature → InvalidCommand; mode=Cool without COOL
-// feature → InvalidCommand; otherwise apply amount*10 delta, clamped to limits.
+// feature → InvalidCommand; otherwise apply amount*10 delta, clamped to
+// limits; Heat or Cool on an AUTO thermostat moves the other setpoint to
+// keep the deadband, InvalidCommand when it cannot (:229-269).
 //
 // Mode values are SetpointRaiseLowerModeEnum
 // (thermostat-cluster.element.ts:510-514): Heat 0x0, Cool 0x1, Both 0x2 —
@@ -817,7 +819,9 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 	s.mu.RLock()
 	occupHeat, occupCool := s.occupHeat, s.occupCool
 	minHeat, maxHeat, minCool, maxCool := s.minHeat, s.maxHeat, s.minCool, s.maxCool
+	deadband := int(s.minSetpointDeadBand) * 10 // matter.js setpointDeadBand, 0.01 °C
 	s.mu.RUnlock()
+	auto := s.features&ThermostatFeatureAUTO != 0
 	prevHeat, prevCool := occupHeat, occupCool
 
 	// amount is in 0.1°C steps in the command; setpoints are in 0.01°C units.
@@ -876,8 +880,29 @@ func (s *ThermostatServer) handleSetpointRaiseLower(ctx context.Context, fields 
 		}
 	case wire.ThermostatSetpointModeHeat:
 		occupHeat = clampHeat(occupHeat + delta)
+		// On an AUTO thermostat the cooling setpoint follows to keep the
+		// deadband, or the command is refused. Mirrors matter.js
+		// ThermostatServer.ts:251-269 (0ceb202d). Under the AUTO limit
+		// invariants (maxCool - maxHeat ≥ deadband, setpoints.go violation)
+		// the companion always fits; the refusal is matter.js's guard.
+		if auto && int(occupCool)-int(occupHeat) < deadband {
+			companion := int(occupHeat) + deadband
+			if companion < int(minCool) || companion > int(maxCool) {
+				return thermoInvalidCommandErr{"thermostat: SetpointRaiseLower could not adjust the cooling setpoint to maintain the deadband"}
+			}
+			occupCool = int16(companion) //nolint:gosec // within [minCool, maxCool], checked above
+		}
 	case wire.ThermostatSetpointModeCool:
 		occupCool = clampCool(occupCool + delta)
+		// The heating setpoint follows the same way. Mirrors matter.js
+		// ThermostatServer.ts:229-249 (0ceb202d).
+		if auto && int(occupCool)-int(occupHeat) < deadband {
+			companion := int(occupCool) - deadband
+			if companion < int(minHeat) || companion > int(maxHeat) {
+				return thermoInvalidCommandErr{"thermostat: SetpointRaiseLower could not adjust the heating setpoint to maintain the deadband"}
+			}
+			occupHeat = int16(companion) //nolint:gosec // within [minHeat, maxHeat], checked above
+		}
 	default:
 		return thermoInvalidCommandErr{fmt.Sprintf("thermostat: SetpointRaiseLower unsupported mode %d", mode)}
 	}

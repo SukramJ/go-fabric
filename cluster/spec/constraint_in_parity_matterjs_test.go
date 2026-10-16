@@ -96,3 +96,65 @@ func TestConstraintInParityMatterJS(t *testing.T) {
 		t.Errorf("found %d \"in\" constraints over %d definitions, want one each", found, len(fixtures))
 	}
 }
+
+// TestConstraintInStartUpAndSetParityMatterJS: an "in" constraint holds
+// the initial state — judged after every initial value is applied, so the
+// id order of the two attributes does not matter — and a host Set, judged
+// against the state with the change applied. Mirrors matter.js
+// packages/node/src/behavior/internal/ServerBehaviorBacking.ts:60-63 (the
+// whole state validated after the initializer) and
+// packages/node/src/behavior/state/managed/values/StructManager.ts:273-287
+// (an assigned property validated against its siblings).
+func TestConstraintInStartUpAndSetParityMatterJS(t *testing.T) {
+	t.Parallel()
+	type startUp struct {
+		def          *spec.Cluster
+		opts         spec.Options
+		active, list uint32
+		set          any
+		member       any
+		outsider     any
+	}
+	cases := map[string]startUp{
+		"LocalizationConfiguration": {
+			def: lcfg.Definition, active: lcfg.AttrActiveLocale, list: lcfg.AttrSupportedLocales,
+			set: []string{"en-US", "de-DE"}, member: "de-DE", outsider: "fr-FR",
+		},
+		"TimeFormatLocalization": {
+			def: tfl.Definition, opts: spec.Options{Features: uint32(tfl.FeatureCalendarFormat)},
+			active: tfl.AttrActiveCalendarType, list: tfl.AttrSupportedCalendarTypes,
+			set:    []tfl.CalendarTypeEnum{tfl.CalendarTypeGregorian, tfl.CalendarTypeBuddhist},
+			member: tfl.CalendarTypeBuddhist, outsider: tfl.CalendarTypeChinese,
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if c.active >= c.list {
+				t.Fatalf("fixture: the active attribute 0x%X must precede its list 0x%X to test the order", c.active, c.list)
+			}
+			srv, err := spec.NewServer(c.def, c.opts, spec.ServerConfig{
+				Initial: map[uint32]any{c.active: c.member, c.list: c.set},
+			})
+			if err != nil {
+				t.Fatalf("NewServer with a member: %v", err)
+			}
+			_, err = spec.NewServer(c.def, c.opts, spec.ServerConfig{
+				Initial: map[uint32]any{c.active: c.outsider, c.list: c.set},
+			})
+			var se *spec.StatusError
+			if !errors.Is(err, spec.ErrInvalidValue) || !errors.As(err, &se) || se.Status != im.StatusConstraintError {
+				t.Fatalf("NewServer with an outsider: %v, want ErrInvalidValue / CONSTRAINT_ERROR", err)
+			}
+			if err := srv.Set(c.active, c.outsider); !errors.Is(err, spec.ErrInvalidValue) {
+				t.Errorf("Set of an outsider: %v, want ErrInvalidValue", err)
+			}
+			if v, _ := srv.Value(c.active); v == nil {
+				t.Errorf("refused Set cleared the value")
+			}
+			if err := srv.SetAttributes(map[uint32]any{c.active: c.outsider, c.list: []any{c.outsider}}); err != nil {
+				t.Errorf("SetAttributes of an outsider with a list holding it: %v", err)
+			}
+		})
+	}
+}

@@ -146,9 +146,18 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 	if err := os.WriteFile(filepath.Join(work, "gen_pics.py"), script, 0o644); err != nil { //nolint:gosec // read by the container
 		t.Fatal(err)
 	}
+	events, err := deviceTypeEventsJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventsPath := filepath.Join(work, "device_events.json")
+	if err := os.WriteFile(eventsPath, events, 0o644); err != nil { //nolint:gosec // read by the container
+		t.Fatal(err)
+	}
 	out := filepath.Join(work, "pics")
 	gctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	log, err := h.execIn(gctx, work, "python3", "gen_pics.py", "--paa-trust-store-path", chipPAATrustStore, "--string-arg", "out_dir:"+out)
+	log, err := h.execIn(gctx, work, "python3", "gen_pics.py", "--paa-trust-store-path", chipPAATrustStore,
+		"--string-arg", "out_dir:"+out, "--string-arg", "device_events:"+eventsPath)
 	cancel()
 	if _, pass := parsePython(log); err != nil || !pass {
 		t.Fatalf("generate the PICS slices: %v\n%s", err, saveCaseLog("PICS/generate", log))

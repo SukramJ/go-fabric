@@ -88,7 +88,8 @@ cases:
    helpers (`matter/testing/pics.py`): every server-side cluster, attribute,
    command, feature and event code of every spec cluster, 0 or 1, plus the
    derivable MCORE codes (commissionee, bridge, OTA roles, multi-endpoint
-   groups). Mandatory events follow from spec conformance.
+   groups). Mandatory events follow from spec conformance and from the
+   device types the endpoint lists (OperationCompletion on a LaundryWasher).
 2. `internal/chiptool/testdata/reference-bridge.pics` holds the declarations a
    device cannot report — transport (Ethernet only), onboarding (QR and
    11-digit manual code, no NFC, no UI), DNS-SD keys, the attestation material
