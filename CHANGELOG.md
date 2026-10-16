@@ -10,6 +10,16 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-16
+
+The licence release: Apache License 2.0 from this version on (ADR 0023;
+`v0.4.0` and earlier stay MIT), with a contributor licence agreement, and
+the six library changes OpenCCU-Loom's integration of `v0.4.0` asked for
+(#117–#122): exported endpoint persistence, a vendor attestation chain
+from files, the re-announce loop owned by the node facade, a native-ramp
+LevelSource with the attribute-range scalers, `sqlitestore` allocation as
+the contract promises, and the UniqueID rotation marker migrated once.
+
 ### Added
 
 - `node.EndpointPersistence` (issue #117): the facade's per-endpoint stack state — scene tables (`endpoint.ScenesStore`, under `scenes.<key>`) and the commissioner-written bridged NodeLabel (`OnNodeLabelWritten`, `NodeLabel`, under `bridged_node_label.<key>`) — exported for a host with its own assembler (`node.Config.Topology`). `node.NewEndpointPersistence(st, logger)` builds it over a `*store.Store` before `node.New`, `Node.Persistence()` returns the one the facade uses, and `node.Config.EndpointPersistence` replaces it in the facade's own assembler and Aggregator. The keys are unchanged, so a host's database written under them reads back.
@@ -3898,7 +3908,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/SukramJ/go-fabric/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/SukramJ/go-fabric/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/SukramJ/go-fabric/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/SukramJ/go-fabric/compare/v0.2.0...v0.3.0
