@@ -345,6 +345,17 @@ FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
 rules below that matter.js does not carry and that were taken from memory
 of connectedhomeip are marked unverified:
 
+- **Wi-Fi NetworkCommissioning: the fail-safe check is not bound to the
+  accessing fabric.** `core.WiFiNetworkCommissioning` gates its commands
+  on `GeneralCommissioning.FailSafeArmed()` (any fabric), chip on
+  `failSafeContext.IsFailSafeArmed(fabricIndex)`
+  (`NetworkCommissioningCluster.cpp:157` at the harness pin). Fix: carry
+  the accessing fabric into the invoke and expose `FailSafeArmedBy(fabric)`
+  on `GeneralCommissioning` (it already keeps `failSafeFabricIndex`,
+  `general_commissioning.go:50,533`). TESTING ONLY behind `--wifi-sim`
+  today; must land before milestone 7 makes the server real. (Phase 12,
+  report BA.)
+
 ---
 
 ## Tier 3 — LOW

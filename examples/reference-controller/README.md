@@ -43,12 +43,17 @@ its error on stderr.
 
 ## Commands
 
-- `pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L]`
+- `pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX]`
   Finds the device over DNS-SD by its discriminator (long from a QR code or
   `--discriminator`, short from a manual code), runs PASE, checks its
   attestation, installs the NOC, keeps the node in the registry and prints
   its node id and device view (each endpoint's device type and clusters).
-  `--label` writes `BasicInformation.NodeLabel`.
+  `--label` writes `BasicInformation.NodeLabel`. `--wifi-ssid` with
+  `--wifi-credentials`, or `--thread-dataset` (the operational dataset as
+  hex), add the network steps of the commissioning flow
+  (`AddOrUpdateWiFiNetwork` / `AddOrUpdateThreadNetwork`, `ConnectNetwork`),
+  which matter.js runs only on a BLE channel; here they also run over IP
+  when the credentials are given (`BD-Controller-NetworkStepsOverIP`).
 
   ```sh
   reference-controller pair --code 34970112332 --node-id 0x4321 --label kitchen

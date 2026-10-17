@@ -88,7 +88,7 @@ var commands map[string]command
 
 func init() {
 	commands = map[string]command{
-		"pair":      {"pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L]", cmdPair},
+		"pair":      {"pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX]", cmdPair},
 		"unpair":    {"unpair <node>", cmdUnpair},
 		"nodes":     {"nodes", cmdNodes},
 		"node":      {"node <node>", cmdNode},
