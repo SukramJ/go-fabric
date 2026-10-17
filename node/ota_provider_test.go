@@ -160,7 +160,7 @@ func TestOTAProviderACLOnEveryFabric(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := store.New(db)
-	var indexes []uint8
+	indexes := make([]uint8, 0, 2)
 	for i := range 2 {
 		idx, err := st.AddFabric(ctx, store.FabricRecord{FabricID: uint64(0x0A00 + i), NodeID: uint64(0x0B00 + i), VendorID: 0xFFF1, RootPublicKey: make([]byte, 65), CompressedID: [8]byte{byte(i + 1)}})
 		if err != nil {
