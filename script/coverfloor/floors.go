@@ -204,6 +204,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/store", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/tlv", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/transport", min: 0, why: "the Conn interface only, no statements to cover"},
+	{pkg: "github.com/SukramJ/go-fabric/transport/btp", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/transport/message", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/transport/mrp", min: 99},
 	{pkg: "github.com/SukramJ/go-fabric/transport/tcp", min: 89},
