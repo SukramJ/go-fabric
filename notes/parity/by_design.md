@@ -3127,3 +3127,42 @@ model's elements, `PeerBehavior.ts:443-455`). Report AX §11.
 By design. Out-of-scope clusters, and three whose definitions are
 hand-written servers.
 
+
+### BD-Controller-KeysBehindSigner — the controller's CA and operational keys may live behind `crypto.Signer`
+
+matter.js keeps the fabric's operational key pair in the fabric itself
+(`Fabric.ts:50-76` at `0ceb202d`, `#keyPair: Key`) and the CA's root key in
+`CertificateAuthority`'s state; there is no seam for a key the process
+cannot read. This module adds one: `ca.Config.RootSigner` / `ICACSigner`,
+`commissioner.FabricConfig.OperationalSigner`, `sigma.Identity.Signer`
+(a P-256 `crypto.Signer`); with a signer the stored record keeps the
+certificates, the public key and a `KeyRef`, no private scalar. Without
+one the record and its JSON are what they were. The wire shape is
+unchanged: ECDSA P-256 over SHA-256, `r ‖ s` in Sigma2 / Sigma3
+(`signTranscript` parses the signer's ASN.1 and range-checks the
+components). Concept v3 §A.3, report AZ §2 (phase 11, 2026-10-17).
+
+By design. Go's standard key seam, needed by an operator with an HSM, a
+TPM or a KMS; the device side (the node's NOC key) is a later item.
+
+### BD-Controller-DclSnapshotLayered — the embedded DCL snapshot is a trust layer, and the CD signers are named
+
+matter.js feeds an offline seed into its `DclCertificateService`
+(`DclCertificateService.ts:336-340`, `#consumeCertSeed` :1352-1410 at
+`0ceb202d`) and has no query for the ledger's CD-signer set. This module
+keeps the snapshot (`controller/dcl/snapshot`: 74 production PAAs and 5 CD
+signers from `on.dcl.csa-iot.org`, `SOURCE` manifest, refreshed only by
+`make update-dcl-snapshot` as a review step) a separate `attestation.PAAStore`
+beneath the online `dcl.CertificateStore` (`attestation.Trust`, `Layered`;
+`TrustMode` Development / Production / None), because consuming it into
+`controller/dcl` would import `attestation` from both sides. The CD-signer
+set is named by key id after chip's
+`src/credentials/attestation_verifier/DefaultDeviceAttestationVerifier.cpp:146-256`
+(harness pin `6170af84`; the five ids equal the ledger's child listing of
+the CSA root, checked 2026-10-17). Revocation is never answered from the
+snapshot (`TestSnapshotIsNoRevocationSource`; Matter PKI CP §1.4.5,
+§4.9.6). Concept v3 §A.2, report AZ §3,
+`notes/reference/dcl-data-terms-2026-10-17.md`.
+
+By design. Same trust decision as matter.js's seed, a different place in
+the graph; the named signer set is chip's own.
