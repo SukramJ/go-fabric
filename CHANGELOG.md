@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Documentation
+
+- `docs/roadmap.md`: the roadmap to complete Matter 1.6.1 wherever matter.js implements it — seven milestones, one minor version each, three-pillar definition of done; concept v3 becomes milestone 1.
+
 ## [0.6.0] — 2026-10-17
 
 The findings release: every open entry of the findings register worked through (the security and stability fixes first: a bound on per-session UDP dispatch, `Stop` waiting for handlers, no commissionable advertisement for a node whose fabrics fail to load), the developer and architect documentation published as <https://sukramj.github.io/go-fabric/>, and the cleanup of `docs/`.

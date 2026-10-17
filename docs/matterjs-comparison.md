@@ -168,6 +168,10 @@ re-opened by accident (the first is kept for its history):
 
 ## If you are looking for the next thing to build
 
+Since 2026-10-17 the order is the [roadmap](./roadmap.md): seven
+milestones, one minor version each, the next open one first. The
+paragraph below is the history of that order.
+
 Since 2026-10-08 the order is set by
 [`concept-matter-1.6.1-and-device-layer.md`](./history/concept-matter-1.6.1-and-device-layer.md)
 §A.3: the generated default server and the composed bridged endpoint first

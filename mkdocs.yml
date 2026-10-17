@@ -78,6 +78,7 @@ nav:
       - The device side: getting-started/device.md
       - The controller side: getting-started/controller.md
   - Architecture: architecture.md
+  - Roadmap: roadmap.md
   - Guides:
       - Host ports: guides/ports.md
       - Concurrency: guides/concurrency.md
