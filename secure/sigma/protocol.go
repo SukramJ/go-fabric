@@ -843,7 +843,7 @@ func (r *Responder) processSigma1Locked(sigma1Bytes []byte) (Sigma2, error) { //
 	// responderEph, initiatorEph). The initiator's Sigma3 signature
 	// later flips the eph order to (initiatorEph, responderEph) —
 	// asymmetry intentional, locks each party's signature to its role.
-	mySig, err := signTranscript(r.identity.PrivateKey, r.identity.NOC, r.identity.ICAC, r.ephPubBytes, initEphBytes)
+	mySig, err := signTranscript(r.identity.signingKey(), r.identity.NOC, r.identity.ICAC, r.ephPubBytes, initEphBytes)
 	if err != nil {
 		return Sigma2{}, err
 	}

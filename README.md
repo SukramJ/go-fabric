@@ -20,6 +20,20 @@ mirrored from matter.js HEAD rather than transcribed from the specification,
 and the extracted matter.js element model ships embedded so parity is a test,
 not a claim.
 
+## Status
+
+As of `v0.6.0` (2026-10-17); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
+
+| Area | State |
+| --- | --- |
+| Device side | 118 of 135 clusters served, 79 of 91 device types generated ([comparison](./docs/matterjs-comparison.md), [roadmap](./docs/roadmap.md)) |
+| Controller side | full commissioner, controller role stages 1–6b; Joint Fabric deferred ([comparison](./docs/matterjs-comparison.md)) |
+| BLE | controller: [milestone 1](./docs/roadmap.md#milestone-1-the-commissioner-in-the-field), in progress; device: [milestone 7](./docs/roadmap.md#milestone-7-ble-on-the-device-side) |
+| Thread | dataset provisioning only, by the commissioner ([milestone 1](./docs/roadmap.md#milestone-1-the-commissioner-in-the-field), phase 12); no Thread radio ([comparison](./docs/matterjs-comparison.md)) |
+| ICD | [milestone 5](./docs/roadmap.md#milestone-5-icd-and-the-controller-remainder) |
+| Certification | not pursued; certifiability is a goal ([certifiability](./docs/certifiability.md)) |
+| Verified ecosystems | Apple Home, Home Assistant; Google Home and Alexa pending ([roadmap](./docs/roadmap.md#baseline-2026-10-17-v060)) |
+
 ## Not certified
 
 This is an independent open-source implementation. It is **not certified by

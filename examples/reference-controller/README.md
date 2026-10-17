@@ -20,12 +20,15 @@ They go before or after the command.
 | Flag | Default | |
 | --- | --- | --- |
 | `--db <file>` | `reference-controller.db` | The SQLite database (see [The database](#the-database)). |
-| `--dcl prod\|testnet\|off` | `off` | Where `pair`'s attestation trusts come from: the CSA Distributed Compliance Ledger, its test net, or the embedded CSA test PAAs. |
+| `--trust development\|production\|none` | `development` | Which roots `pair`'s attestation check trusts: the embedded DCL snapshot (`controller/dcl/snapshot`) and the CSA test PAAs, the snapshot only, or none (no chain check). The snapshot's fetch time is in the `--log-level debug` log. |
+| `--trust-dir <path>` | unset | A DCL snapshot directory (`paa/`, `cd-signers/`, `SOURCE`, as `make update-dcl-snapshot` writes it) in place of the embedded one — a newer set without a rebuild. |
+| `--dcl prod\|testnet\|off` | `off` | The online CSA Distributed Compliance Ledger (or its test net) on top of the trust set: roots newer than the snapshot, CD signers fetched on demand, and the CRL revocation check, which only the online ledger answers. |
 | `--attestation accept\|reject\|ask` | `ask` on a terminal, `reject` otherwise | What an attestation finding does to a pairing. |
 | `--log-level debug\|info\|warn\|error` | `warn` | The log, as `slog` text on stderr. |
 | `--listen <addr>` | `[::]:0` | The controller's UDP socket. |
 | `--node-listen <addr>` | `[::]:0` | The UDP socket of the controller's own node (group sender, OTA provider). |
 | `--timeout <duration>` | `60s` | How long a command waits for the network (a bare number is seconds). |
+| `--ca-key file:<path>` | unset | The CA root key in a passphrase-encrypted key file instead of the database; the passphrase comes from `GOFABRIC_KEY_PASSPHRASE`. A missing file is created: with the root key the database holds (which then leaves the database), or a new key for a new database. Every later run needs the flag. |
 
 A `<node>` argument is the node id, decimal or `0x` hex, or the registry's
 local id (`peer1`). A path is `<endpoint>/<Cluster>/<element>`: the cluster
@@ -146,6 +149,27 @@ its error on stderr.
   reference-controller ota serve --image light-v2.ota --announce 0x4321 --once
   ```
 
+- `window open <node> [--timeout s] [--basic]` — opens a commissioning
+  window on a paired node so a second administrator (Apple Home, Google
+  Home, another controller) can add it. Enhanced (the default) draws a
+  random discriminator, passcode and 32-byte salt, sends
+  OpenCommissioningWindow with the PAKE verifier (1000 PBKDF iterations)
+  and prints the discriminator, passcode, manual code and QR code; the
+  node's vendor and product ids are read for the QR code. `--basic` sends
+  OpenBasicCommissioningWindow — the device's own code — and fails when
+  the node does not advertise the Basic (BC) feature. `--timeout` is the
+  window's lifetime in seconds (default 900); after `window open` it is the
+  window's, so the network `--timeout` goes before the command. Any window
+  already open is revoked first. Both follow matter.js's
+  `CommissioningClient` (`openEnhancedCommissioningWindow`,
+  `openBasicCommissioningWindow`).
+  `window revoke <node>` — RevokeCommissioning; a node without an open
+  window is reported, not an error.
+
+  ```sh
+  reference-controller window open 0x4321 --timeout 600
+  ```
+
 ## The controller's own node
 
 A group message is sealed and sent by a node of the fabric, and an OTA
@@ -162,7 +186,7 @@ One SQLite file holds:
 
 | Where | What |
 | --- | --- |
-| `matter_settings` `controller.ca` | The CA: root certificate, root key, certificate counter (JSON, matter.js `CertificateAuthority` field names). |
+| `matter_settings` `controller.ca` | The CA: root certificate, root key, certificate counter (JSON, matter.js `CertificateAuthority` field names). With `--ca-key` the root key is not here; `rootKeyRef` names the key file. |
 | `matter_settings` `controller.ca.fabric` | The fabric: fabric id, root node id, vendor id, IPK, fabric index, label, the controller's operational key and NOC (matter.js `Fabric.Config` names). |
 | `matter_settings` `controller.dcl.trust` | The DCL trust store, with `--dcl prod` or `testnet`. |
 | `matter_settings` `controller.self`, `controller.group.<id>` | The own node's passcode, discriminator, salt and node id; each group `group create` made (key set, epoch key, members). |
@@ -176,7 +200,9 @@ run makes a full CASE handshake.
 ## What leaves the host
 
 With `--dcl off` (the default) nothing but Matter traffic: DNS-SD on the local
-network and the Matter messages to the devices.
+network and the Matter messages to the devices. The DCL snapshot is embedded
+in the binary; using it asks nobody. Without `--dcl` no revocation is
+checked: the snapshot holds trust anchors, not CRLs.
 
 With `--dcl prod` or `--dcl testnet`, `pair` — and only `pair` — opens the
 ledger trust store (`controller/dcl`): it updates the store from the ledger

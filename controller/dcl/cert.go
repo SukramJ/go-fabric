@@ -101,6 +101,30 @@ func pemToDER(pem string) ([]byte, error) {
 	return der, nil
 }
 
+// PEMToDER is matter.js Pem.asDer for a certificate the ledger returns PEM
+// encoded (Certificate.PEMCert) — packages/general/src/crypto/Pem.ts:35-73.
+func PEMToDER(pem string) ([]byte, error) { return pemToDER(pem) }
+
+// ErrSKIDMismatch is a certificate whose own subject key identifier is not
+// the one its source states for it.
+var ErrSKIDMismatch = errors.New("dcl: subject key identifier mismatch")
+
+// CheckTrustStoreCertificate is #parseAndCheckSkid (DclCertificateService.ts:
+// 492-515) for a source outside the store, a snapshot: der parses as kind
+// (parseTrustStoreCertificate, :48-52) and carries statedSKID — hex, colons
+// allowed, any case — as its own subject key identifier, else
+// [ErrSKIDMismatch]. It returns the parsed certificate.
+func CheckTrustStoreCertificate(der []byte, kind Kind, statedSKID string) (*x509.Certificate, error) {
+	c, err := parseTrustStoreCertificate(der, kind)
+	if err != nil {
+		return nil, err
+	}
+	if derived, stated := hexUpper(c.x509.SubjectKeyId), normalizeKeyID(statedSKID); derived != stated {
+		return nil, fmt.Errorf("%w: entry=%s der-derived=%s", ErrSKIDMismatch, stated, derived)
+	}
+	return c.x509, nil
+}
+
 // normalizeKeyID is #normalizeSubjectKeyId (DclCertificateService.ts:
 // 368-373): uppercase hex without colons.
 func normalizeKeyID(s string) string { return strings.ToUpper(strings.ReplaceAll(s, ":", "")) }

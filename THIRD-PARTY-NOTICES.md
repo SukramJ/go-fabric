@@ -54,6 +54,22 @@ creating derivative works from them. The XML fixtures in
 `internal/chipdm/*_test.go` are written for those tests and reproduce no
 CSA document.
 
+### CSA Distributed Compliance Ledger — public root certificates
+
+`controller/dcl/snapshot/data/` holds the production Product Attestation
+Authority certificates and Certification Declaration signer certificates of
+the CSA Distributed Compliance Ledger (`https://on.dcl.csa-iot.org`), as DER
+files with a `SOURCE` file naming the ledger, the fetch time and the SHA-256
+of every file; they are embedded in every binary that imports
+`controller/dcl/snapshot`. They are public root certificates whose
+publication the Matter PKI Certificate Policy requires (§2.2, Table 5: PAA
+certificates — Public; §4.4.2: "published in a publicly available
+repository"),
+<https://csa-iot.org/wp-content/uploads/2024/02/pki-certificate-policy-2025.pdf>.
+connectedhomeip (Apache-2.0) commits the same certificates under
+`credentials/production/`. Revocation information is not redistributed: the
+CRL check stays online.
+
 ---
 
 ## Go module dependencies

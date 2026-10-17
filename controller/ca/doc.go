@@ -16,4 +16,14 @@
 // matter.js, which writes its storage only when it creates the root, the
 // CA saves after every certificate it issues, so serial numbers do not
 // repeat after a restart.
+//
+// [Config.RootSigner] and [Config.ICACSigner] take the keys out of the
+// store: any P-256 crypto.Signer — the passphrase-encrypted file of
+// package keyfile, or a host's PKCS#11 or KMS signer (keyfile's package
+// documentation says how to wire one). The record then holds the
+// certificates and a KeyRef, no private key; without a signer the store
+// keeps the key as matter.js does. commissioner.FabricConfig.OperationalSigner
+// is the same seam for the controller's operational key. matter.js has no
+// such seam (packages/protocol/src/fabric/Fabric.ts:50-76 at 0ceb202d
+// keeps #keyPair).
 package ca

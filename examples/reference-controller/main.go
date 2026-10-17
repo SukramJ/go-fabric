@@ -49,11 +49,14 @@ type globalOptions struct {
 	listen      string
 	nodeListen  string
 	timeout     durationFlag
+	caKey       string
+	trust       string
+	trustDir    string
 }
 
 // defaultOptions are the flags' defaults.
 func defaultOptions() *globalOptions {
-	return &globalOptions{db: "reference-controller.db", dcl: "off", logLevel: "warn", listen: "[::]:0", nodeListen: "[::]:0"}
+	return &globalOptions{db: "reference-controller.db", dcl: "off", logLevel: "warn", listen: "[::]:0", nodeListen: "[::]:0", trust: "development"}
 }
 
 // register defines the global flags on fs with o's current values as
@@ -61,12 +64,15 @@ func defaultOptions() *globalOptions {
 // for flags after the command — keeps what was parsed before it.
 func (o *globalOptions) register(fs *flag.FlagSet) {
 	fs.StringVar(&o.db, "db", o.db, "the SQLite database holding the CA, the fabric, the paired nodes and the DCL trust store")
-	fs.StringVar(&o.dcl, "dcl", o.dcl, "the Distributed Compliance Ledger attestation trusts: prod, testnet or off (the embedded test PAAs)")
+	fs.StringVar(&o.dcl, "dcl", o.dcl, "the online Distributed Compliance Ledger on top of the trust set: prod, testnet or off")
+	fs.StringVar(&o.trust, "trust", o.trust, "the attestation trust set: development (DCL snapshot and CSA test PAAs), production (DCL snapshot) or none (no chain check)")
+	fs.StringVar(&o.trustDir, "trust-dir", o.trustDir, "a DCL snapshot directory (paa/, cd-signers/, SOURCE) in place of the embedded one")
 	fs.StringVar(&o.attestation, "attestation", o.attestation, "on an attestation finding: accept, reject or ask (default ask on a terminal, reject otherwise)")
 	fs.StringVar(&o.logLevel, "log-level", o.logLevel, "log level: debug, info, warn or error")
 	fs.StringVar(&o.listen, "listen", o.listen, "the controller's UDP address")
 	fs.StringVar(&o.nodeListen, "node-listen", o.nodeListen, "the UDP address of the controller's own node (group sender, OTA provider)")
 	fs.Var(&o.timeout, "timeout", "how long a command waits for the network (default 60s)")
+	fs.StringVar(&o.caKey, "ca-key", o.caKey, "the CA root key outside the database: file:<path> (passphrase from "+passphraseEnv+")")
 }
 
 // command is one subcommand: its usage line and its function.
@@ -75,8 +81,9 @@ type command struct {
 	run   func(e *env, args []string) error
 }
 
-// commands is every subcommand. "group" and "ota" dispatch on their second
-// word. It is filled in init: the commands' usage errors refer to it.
+// commands is every subcommand. "group", "ota" and "window" dispatch on
+// their second word. It is filled in init: the commands' usage errors
+// refer to it.
 var commands map[string]command
 
 func init() {
@@ -93,6 +100,7 @@ func init() {
 		"group":     {"group create <id> --key <hex|random> --nodes <n,n…> --endpoints <e,e…> | group send <id> <Cluster>/<Command> [<json>]", cmdGroup},
 		"bind":      {"bind <node> <ep> --to <node>/<ep>[/<Cluster>] | --group <id>", cmdBind},
 		"ota":       {"ota serve --image <file> [--version N] [--vendor N] [--product N] [--announce <node>] [--once] [--yes]", cmdOTA},
+		"window":    {"window open <node> [--timeout s] [--basic] | window revoke <node>", cmdWindow},
 	}
 }
 

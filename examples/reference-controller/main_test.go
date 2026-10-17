@@ -144,6 +144,18 @@ type responder struct {
 	port        int
 	mu          sync.Mutex
 	operational map[uint64]int
+	// window, when set, is the commissionable record's D= value in place
+	// of the harness's own: an opened window advertises its discriminator.
+	window *uint16
+}
+
+func (r *responder) commissionableDiscriminator() uint16 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.window != nil {
+		return *r.window
+	}
+	return harnessDiscriminator
 }
 
 func (r *responder) commissionablePort() uint16 {
@@ -180,7 +192,7 @@ func (c *fakeConn) Send(b []byte) error {
 			answers = append(answers,
 				&dns.PTR{Hdr: dns.RR_Header{Name: "_matterc._udp.local.", Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: 4500}, Ptr: inst},
 				&dns.SRV{Hdr: hdr(inst, dns.TypeSRV), Target: host, Port: c.r.commissionablePort()}, //nolint:gosec // a test port
-				&dns.TXT{Hdr: hdr(inst, dns.TypeTXT), Txt: []string{"D=" + strconv.Itoa(int(harnessDiscriminator)), "CM=1", "VP=65521+32769", "SII=500", "SAI=300"}},
+				&dns.TXT{Hdr: hdr(inst, dns.TypeTXT), Txt: []string{"D=" + strconv.Itoa(int(c.r.commissionableDiscriminator())), "CM=1", "VP=65521+32769", "SII=500", "SAI=300"}},
 				a)
 			if name != "_matterc._udp.local." {
 				answers = append(answers, &dns.PTR{Hdr: dns.RR_Header{Name: qq.Name, Rrtype: dns.TypePTR, Class: dns.ClassINET, Ttl: 4500}, Ptr: inst})

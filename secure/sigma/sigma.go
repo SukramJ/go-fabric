@@ -4,6 +4,7 @@
 package sigma
 
 import (
+	"crypto"
 	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -12,6 +13,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/asn1"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -117,6 +119,10 @@ type Identity struct {
 	ICAC []byte
 	// PrivateKey is the P-256 private key matching the NOC public key.
 	PrivateKey *ecdsa.PrivateKey
+	// Signer, when set, signs the Sigma2 / Sigma3 transcript in place of
+	// PrivateKey: a P-256 crypto.Signer whose private key lives outside
+	// the process (a key file, an HSM, a KMS). PrivateKey may then be nil.
+	Signer crypto.Signer
 	// NodeID is the 64-bit operational node identifier.
 	NodeID uint64
 	// FabricID is the 64-bit fabric identifier.
@@ -815,17 +821,41 @@ func signedDataBytes(noc, icac, selfEph, peerEph []byte) []byte {
 	return enc.bytes()
 }
 
-// signTranscript signs the TLV `signed-data` derived from the
-// signer's NOC + ICAC + ephemeral keys. ECDSA-P256-SHA256; output is
-// the 64-byte concatenation of 32-byte BE r || 32-byte BE s expected
-// by chip-tool / matter.js for downstream parsing.
-func signTranscript(priv *ecdsa.PrivateKey, noc, icac, selfEph, peerEph []byte) ([]byte, error) {
-	digest := sha256.Sum256(signedDataBytes(noc, icac, selfEph, peerEph))
-	r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
-	if err != nil {
-		return nil, fmt.Errorf("sigma: ecdsa.Sign: %w", err)
+// signingKey is the key the identity signs with: Signer when set, else
+// PrivateKey; nil when it has neither.
+func (id *Identity) signingKey() crypto.Signer {
+	if id.Signer != nil {
+		return id.Signer
 	}
-	return packECDSASig(r, s), nil
+	if id.PrivateKey != nil {
+		return id.PrivateKey
+	}
+	return nil
+}
+
+// signTranscript signs the TLV `signed-data` derived from the
+// signer's NOC + ICAC + ephemeral keys. ECDSA-P256-SHA256 through
+// key.Sign (for an *ecdsa.PrivateKey that is ecdsa.SignASN1, which
+// ecdsa.Sign wraps); output is the 64-byte concatenation of 32-byte BE
+// r || 32-byte BE s expected by chip-tool / matter.js for downstream
+// parsing.
+func signTranscript(key crypto.Signer, noc, icac, selfEph, peerEph []byte) ([]byte, error) {
+	if key == nil {
+		return nil, errors.New("sigma: no operational signing key")
+	}
+	digest := sha256.Sum256(signedDataBytes(noc, icac, selfEph, peerEph))
+	der, err := key.Sign(rand.Reader, digest[:], crypto.SHA256)
+	if err != nil {
+		return nil, fmt.Errorf("sigma: sign: %w", err)
+	}
+	var sig struct{ R, S *big.Int }
+	if rest, err := asn1.Unmarshal(der, &sig); err != nil || len(rest) != 0 {
+		return nil, errors.New("sigma: sign: not an ASN.1 ECDSA signature")
+	}
+	if sig.R.Sign() <= 0 || sig.S.Sign() <= 0 || sig.R.BitLen() > 256 || sig.S.BitLen() > 256 {
+		return nil, errors.New("sigma: sign: signature component out of range")
+	}
+	return packECDSASig(sig.R, sig.S), nil
 }
 
 // verifyTranscript verifies a signature produced by [signTranscript].

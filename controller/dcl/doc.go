@@ -23,4 +23,13 @@
 //
 // Only net/http and the standard library are used; the REST shapes are
 // those of DclRestApiTypes.ts.
+//
+// Offline trust: package snapshot embeds the production PAAs and CD
+// signers of the ledger, fetched with this package's [Client] by
+// `make update-dcl-snapshot` — a review step like the schema refresh, run
+// by hand and committed after reading the diff, never automatic; its
+// SOURCE file names the ledger, the fetch time, the count per kind and
+// the SHA-256 of every file. attestation.Trust layers it under a
+// [CertificateStore]. Revocation stays online: the snapshot carries no
+// CRL, and the CRL check is the [CertificateStore]'s alone.
 package dcl

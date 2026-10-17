@@ -12,8 +12,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	// The pure-Go SQLite driver; no store package imports one.
 	_ "modernc.org/sqlite"
@@ -24,6 +26,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/client/sqlstore"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/controller/dcl"
+	"github.com/SukramJ/go-fabric/controller/dcl/snapshot"
 	"github.com/SukramJ/go-fabric/controller/discovery"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/interaction"
@@ -134,7 +137,11 @@ func openStack(e *env) (_ *stack, err error) {
 		return nil, err
 	}
 	cs := ca.SettingStore{Settings: s.settings, Key: caKey}
-	authority, err := ca.New(ca.Config{Store: cs})
+	rootSigner, err := openCAKey(e, cs)
+	if err != nil {
+		return nil, err
+	}
+	authority, err := ca.New(ca.Config{Store: cs, RootSigner: rootSigner})
 	if err != nil {
 		return nil, err
 	}
@@ -179,13 +186,22 @@ func openStack(e *env) (_ *stack, err error) {
 		return nil, err
 	}
 	s.subs = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: e.log})
-	var trust attestation.PAAStore = attestation.TestStore()
+	mode, err := attestation.ParseTrustMode(e.opts.trust)
+	if err != nil {
+		return nil, fmt.Errorf("--trust: %w", err)
+	}
+	snap, err := openSnapshot(e)
+	if err != nil {
+		return nil, err
+	}
 	if s.certs, err = openTrust(e, s.settings); err != nil {
 		return nil, err
 	}
+	var online attestation.PAAStore
 	if s.certs != nil {
-		trust = s.certs
+		online = s.certs
 	}
+	trust := attestation.Trust(mode, snap, online)
 	if s.com, err = commissioner.New(commissioner.Context{
 		Exchanges: s.mgr, Peers: s.set, Attestation: trust, Logger: e.log,
 		Subscriptions: s.subs, Fabrics: []*commissioner.Fabric{s.fabric}, Resumption: resumption,
@@ -239,8 +255,34 @@ func (s *stack) close() {
 	}
 }
 
-// openTrust is the DCL trust store --dcl names, nil for off (the embedded
-// test PAAs are used then). What it asks the ledger is in README.md.
+// openSnapshot is the DCL snapshot: --trust-dir's, else the embedded one.
+// Its fetch time goes to the debug log, so a stale set is noticed.
+func openSnapshot(e *env) (*snapshot.Snapshot, error) {
+	var snap *snapshot.Snapshot
+	var err error
+	where := "embedded"
+	if e.opts.trustDir != "" {
+		where = e.opts.trustDir
+		snap, err = snapshot.Load(os.DirFS(e.opts.trustDir))
+	} else {
+		snap, err = snapshot.Embedded()
+	}
+	if snap == nil {
+		return nil, fmt.Errorf("DCL snapshot %s: %w", where, err)
+	}
+	if err != nil {
+		// A malformed entry ends its kind's load; what came before is used.
+		e.log.Warn("controller.dcl_snapshot.malformed", "from", where, "err", err)
+	}
+	src := snap.Source()
+	paas, cds := snap.Len()
+	e.log.Debug("controller.dcl_snapshot", "from", where, "ledger", src.Ledger, "fetched", src.BuiltAt.Format(time.RFC3339),
+		"paas", paas, "cd_signers", cds, "skipped", snap.Skipped())
+	return snap, nil
+}
+
+// openTrust is the online DCL trust store --dcl names, nil for off (the
+// snapshot and, with --trust development, the test PAAs are used then). What it asks the ledger is in README.md.
 func openTrust(e *env, settings *store.Store) (*dcl.CertificateStore, error) {
 	var c *dcl.Client
 	testnet := false

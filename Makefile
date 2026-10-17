@@ -291,5 +291,11 @@ generate-matter-schema: ## regenerate parity/schema.json, schema/ and the genera
 	@# script/devicegen/devicetypes.go lists which.
 	$(GO) run ./script/devicegen
 
+.PHONY: update-dcl-snapshot
+update-dcl-snapshot: ## refetch controller/dcl/snapshot/data (PAAs, CD signers, SOURCE) from the production DCL — a review step, read the diff before committing
+	@# Never automatic: like the schema refresh this changes what the
+	@# controller trusts. The CRL check stays online (controller/dcl).
+	$(GO) run ./script/dclsnapshot -out controller/dcl/snapshot/data
+
 .PHONY: ci
 ci: build vet test lint cover-check ## everything the pipeline runs

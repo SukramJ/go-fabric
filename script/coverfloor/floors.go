@@ -83,10 +83,12 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 89},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ca", min: 88},
+	{pkg: "github.com/SukramJ/go-fabric/controller/ca/keyfile", min: 73},
 	{pkg: "github.com/SukramJ/go-fabric/controller/client", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/controller/client/sqlstore", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/controller/commissioner", min: 85},
 	{pkg: "github.com/SukramJ/go-fabric/controller/dcl", min: 85},
+	{pkg: "github.com/SukramJ/go-fabric/controller/dcl/snapshot", min: 83},
 	{pkg: "github.com/SukramJ/go-fabric/controller/discovery", min: 95},
 	{pkg: "github.com/SukramJ/go-fabric/groups", min: 93},
 	// The module's lowest measured package (76.7 when last raised).
@@ -162,6 +164,11 @@ var floors = []packageFloor{
 	// covering it would mean a test that runs the gate over the module the
 	// gate is part of.
 	{pkg: "github.com/SukramJ/go-fabric/script/coverfloor", min: 52},
+	{
+		pkg: "github.com/SukramJ/go-fabric/script/dclsnapshot",
+		min: 0,
+		why: "main only, asking the production ledger; snapshot.Fetch, which it calls, is covered against a fake ledger in controller/dcl/snapshot",
+	},
 	{
 		pkg: "github.com/SukramJ/go-fabric/script/reachability",
 		min: 0,

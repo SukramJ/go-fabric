@@ -5,6 +5,7 @@ package commissioner
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/handshake"
+	"github.com/SukramJ/go-fabric/secure/mattercert"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 )
 
@@ -46,6 +48,14 @@ type FabricConfig struct {
 	// the record. A stored record wins over the fields above; a non-zero
 	// FabricID or RootNodeID that differs from it is [ErrFabricMismatch].
 	Store ca.FabricStore
+	// OperationalSigner, when set, is our operational key: a P-256
+	// crypto.Signer whose private key the store never sees (a key file,
+	// an HSM, a KMS); CASE signs Sigma3 through it. The NOC is issued for
+	// its public key; the stored record holds the NOC, the public key and
+	// a KeyRef ([ca.KeyRefOf]), no private key, and a stored NOC for
+	// another key is replaced by a new one. matter.js has no such seam
+	// (Fabric.ts:50-76 keeps #keyPair).
+	OperationalSigner crypto.Signer
 }
 
 // ErrFabricMismatch is a stored fabric record that does not fit: its
@@ -71,6 +81,8 @@ type Fabric struct {
 	FabricIndex  uint8
 	// CA is the authority that issues the fabric's NOCs.
 	CA *ca.CA
+
+	keyRef string // set: Identity.Signer is FabricConfig.OperationalSigner
 }
 
 // NewFabric loads the fabric cfg.Store keeps, or mints our own key and NOC
@@ -112,13 +124,20 @@ func NewFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 	if len(ipk) != 16 {
 		return nil, fmt.Errorf("commissioner: IPK of %d bytes, want 16", len(ipk))
 	}
-	key, err := ecdsa.GenerateKey(elliptic.P256(), cfg.Rand)
-	if err != nil {
-		return nil, fmt.Errorf("commissioner: key: %w", err)
-	}
-	pub, err := key.PublicKey.Bytes()
-	if err != nil {
-		return nil, err
+	var key *ecdsa.PrivateKey
+	var pub []byte
+	var err error
+	if cfg.OperationalSigner != nil {
+		if pub, err = ca.P256PublicKey(cfg.OperationalSigner); err != nil {
+			return nil, fmt.Errorf("commissioner: operational signer: %w", err)
+		}
+	} else {
+		if key, err = ecdsa.GenerateKey(elliptic.P256(), cfg.Rand); err != nil {
+			return nil, fmt.Errorf("commissioner: key: %w", err)
+		}
+		if pub, err = key.PublicKey.Bytes(); err != nil {
+			return nil, err
+		}
 	}
 	noc, err := c.GenerateNOC(pub, cfg.FabricID, cfg.RootNodeID, cfg.CATs)
 	if err != nil {
@@ -158,6 +177,12 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error
 	}
 	cfg.FabricID, cfg.RootNodeID, cfg.VendorID = rec.FabricID, rec.RootNodeID, rec.RootVendorID
 	cfg.Label, cfg.FabricIndex = rec.Label, rec.FabricIndex
+	if cfg.OperationalSigner != nil {
+		return loadSignerFabric(c, cfg, rec)
+	}
+	if rec.KeyRef != "" && (rec.KeyPair == nil || len(rec.KeyPair.PrivateKey) == 0) {
+		return nil, fmt.Errorf("%w: the operational key %q is not configured (FabricConfig.OperationalSigner)", ErrFabricMismatch, rec.KeyRef)
+	}
 	if rec.KeyPair == nil || len(rec.NOC) == 0 {
 		// No identity kept: mint one under the stored ids and save it.
 		cfg.IPK = rec.IPK
@@ -179,11 +204,53 @@ func loadFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error
 	return buildFabric(c, cfg, rec.IPK, key, rec.NOC)
 }
 
-// fabricRecord is the record of f, its key and NOC included.
+// loadSignerFabric is loadFabric with an operational signer: the stored
+// NOC is kept when it is for the signer's key, otherwise a new NOC is
+// minted under the stored ids; a record that still holds a private key
+// or another NOC is saved again.
+func loadSignerFabric(c *ca.CA, cfg FabricConfig, rec ca.FabricRecord) (*Fabric, error) {
+	pub, err := ca.P256PublicKey(cfg.OperationalSigner)
+	if err != nil {
+		return nil, fmt.Errorf("commissioner: operational signer: %w", err)
+	}
+	store := cfg.Store
+	keep := false
+	if len(rec.NOC) > 0 {
+		if noc, err := mattercert.Decode(rec.NOC); err == nil && bytes.Equal(noc.PublicKey, pub) {
+			keep = true
+		}
+	}
+	var f *Fabric
+	if keep {
+		if f, err = buildFabric(c, cfg, rec.IPK, nil, rec.NOC); err != nil {
+			return nil, err
+		}
+	} else {
+		cfg.IPK = rec.IPK
+		cfg.Store = nil
+		if f, err = NewFabric(c, cfg); err != nil {
+			return nil, err
+		}
+	}
+	if fresh := fabricRecord(f, c); !keep || rec.KeyRef != fresh.KeyRef || (rec.KeyPair != nil && len(rec.KeyPair.PrivateKey) > 0) {
+		if err := store.SaveFabric(fresh); err != nil {
+			return nil, fmt.Errorf("commissioner: save fabric: %w", err)
+		}
+	}
+	return f, nil
+}
+
+// fabricRecord is the record of f, its key and NOC included — the public
+// key and the KeyRef only when a signer keeps the key.
 func fabricRecord(f *Fabric, c *ca.CA) ca.FabricRecord {
 	r := ca.FabricRecord{
 		FabricID: f.FabricID, RootNodeID: f.RootNodeID, RootVendorID: f.RootVendorID,
 		IPK: f.IPK, FabricIndex: f.FabricIndex, Label: f.Label, RootPublicKey: c.RootPublicKey(),
+	}
+	if id := f.Identity; id != nil && id.PrivateKey == nil && id.Signer != nil {
+		pub, _ := ca.P256PublicKey(id.Signer) // checked when the fabric was built
+		r.KeyPair, r.NOC, r.KeyRef = &ca.KeyPair{PublicKey: pub}, id.NOC, f.keyRef
+		return r
 	}
 	if id := f.Identity; id != nil && id.PrivateKey != nil {
 		pub, _ := id.PrivateKey.PublicKey.Bytes() // a P-256 key this package generated or parsed
@@ -195,7 +262,8 @@ func fabricRecord(f *Fabric, c *ca.CA) ca.FabricRecord {
 
 // buildFabric is the operational identity over a key and its NOC: the
 // compressed fabric id, the operational IPK (sigma.DeriveOperationalIPK),
-// the root public key and the CA's verifier.
+// the root public key and the CA's verifier. key is nil when
+// cfg.OperationalSigner keeps the key.
 func buildFabric(c *ca.CA, cfg FabricConfig, ipk []byte, key *ecdsa.PrivateKey, noc []byte) (*Fabric, error) {
 	root := c.RootPublicKey()
 	cfid, err := ca.CompressedFabricID(root, cfg.FabricID)
@@ -206,16 +274,25 @@ func buildFabric(c *ca.CA, cfg FabricConfig, ipk []byte, key *ecdsa.PrivateKey, 
 	if err != nil {
 		return nil, err
 	}
+	id := &sigma.Identity{
+		NOC: noc, ICAC: c.ICACCert(), PrivateKey: key,
+		NodeID: cfg.RootNodeID, FabricID: cfg.FabricID, CompressedFabricID: cfid,
+		IPK: opIPK, FabricIndex: cfg.FabricIndex,
+	}
+	var keyRef string
+	if key == nil {
+		if cfg.OperationalSigner == nil {
+			return nil, errors.New("commissioner: no operational key")
+		}
+		id.Signer, keyRef = cfg.OperationalSigner, ca.KeyRefOf(cfg.OperationalSigner)
+	}
 	return &Fabric{
 		Fabric: handshake.Fabric{
-			Identity: &sigma.Identity{
-				NOC: noc, ICAC: c.ICACCert(), PrivateKey: key,
-				NodeID: cfg.RootNodeID, FabricID: cfg.FabricID, CompressedFabricID: cfid,
-				IPK: opIPK, FabricIndex: cfg.FabricIndex,
-			},
+			Identity:      id,
 			RootPublicKey: root,
 			Verifier:      c.Verifier(),
 		},
+		keyRef:       keyRef,
 		FabricID:     cfg.FabricID,
 		RootNodeID:   cfg.RootNodeID,
 		RootVendorID: cfg.VendorID,
