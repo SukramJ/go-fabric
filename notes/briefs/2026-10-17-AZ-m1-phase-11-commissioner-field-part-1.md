@@ -65,9 +65,9 @@ never read the working tree). Mirror, cite (`// Mirrors matter.js … at
    `#keyPair: Key`) — list `BD-Controller-KeysBehindSigner` as a by_design
    candidate in the PR. Device side (`node`'s NOC key): only if it is no
    break; otherwise one paragraph in the report on what it would take.
-3. **A.2 DCL snapshot — mechanism now, data later.** The owner has not
-   yet cleared embedding ledger data; build everything but the committed
-   bytes. `controller/dcl/snapshot`: `Load(fs.FS) (*Snapshot, error)`
+3. **A.2 DCL snapshot — mechanism and data.** *(Amended 2026-10-17 after
+   the owner's decision, see `notes/reference/dcl-data-terms-2026-10-17.md`:
+   the data **is** committed.)* `controller/dcl/snapshot`: `Load(fs.FS) (*Snapshot, error)`
    reading `paa/*.der`, `cd-signers/*.der` and a `SOURCE` file (ledger
    URL, fetch time, count, SHA-256 per file — mirror the fields of
    `packages/protocol/src/dcl/SeedTypes.ts` `SeedSource` / `CertSeedEntry`),
@@ -79,12 +79,16 @@ never read the working tree). Mirror, cite (`// Mirrors matter.js … at
    only, online `dcl.CertificateStore` on top when `--dcl` is set), `None`
    (no chain check, explicit flag only). `make update-dcl-snapshot` fills
    `controller/dcl/snapshot/data/` from the ledger with the existing
-   `dcl.Client` — the directory is **git-ignored** in this phase, the
-   package embeds whatever is there (an empty data dir compiles and loads
-   as "no snapshot"); the reference controller also takes
-   `--trust-dir <path>`. Document in `controller/dcl/doc.go` and the
-   controller README that the embedded set is empty until the owner's
-   decision.
+   `dcl.Client`; run it once and **commit the DER files and `SOURCE`**
+   (a review step like the schema refresh, never automatic); the package
+   embeds them. `THIRD-PARTY-NOTICES.md` gets a paragraph: public root
+   certificates from the CSA Distributed Compliance Ledger, published by
+   requirement of the Matter PKI Certificate Policy §2.2 (PAA
+   certificates: Public), precedent connectedhomeip
+   `credentials/production/`; the `SOURCE` file names ledger URL, fetch
+   time, count and SHA-256 per file. The reference controller also takes
+   `--trust-dir <path>` for a newer local set. CRL / revocation stays
+   online (the relying-party duty, CP §1.4.5, §4.9.6).
 4. **A.5 README status table.** Directly after the opening paragraph: a
    compact "Status" table — device side, controller side, BLE (controller:
    milestone 1 in progress; device: milestone 7), Thread (dataset
