@@ -14,6 +14,9 @@ pseudo-version of `main`.
 
 - `examples/reference-controller`: `window open <node> [--timeout s] [--basic]` and `window revoke <node>` — an enhanced commissioning window with a random passcode, discriminator and salt (the manual and QR code printed), or a basic one, for adding a paired node to a second ecosystem; a stale window is revoked first, as matter.js's `CommissioningClient` does.
 
+- `controller/ca`: `Config.RootSigner` and `Config.ICACSigner`, `commissioner.FabricConfig.OperationalSigner` — the CA keys and the controller's operational key as a P-256 `crypto.Signer` (key file, HSM, KMS); the stored record then holds the certificates and a `KeyRef`, no private key. Without a signer the record and its JSON are unchanged. `sigma.Identity.Signer` signs the CASE transcript in place of `PrivateKey`.
+- `controller/ca/keyfile`: a passphrase-encrypted key file (PBKDF2-HMAC-SHA256 + AES-256-GCM, standard library only) as such a signer; the reference controller takes it as `--ca-key file:<path>` (passphrase from `GOFABRIC_KEY_PASSPHRASE`).
+
 ### Documentation
 
 - `docs/roadmap.md`: the roadmap to complete Matter 1.6.1 wherever matter.js implements it — seven milestones, one minor version each, three-pillar definition of done; concept v3 becomes milestone 1.

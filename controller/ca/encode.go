@@ -12,7 +12,7 @@ package ca
 // package.
 
 import (
-	"crypto/ecdsa"
+	"crypto"
 	"crypto/sha256"
 	"encoding/asn1"
 	"errors"
@@ -173,9 +173,10 @@ func encodeCert(f *certFields, sig []byte) ([]byte, error) {
 
 // signCert encodes f and signs it with key: the signature covers the
 // X.509 DER form of the TBS certificate (secure/mattercert TBSToDER, the
-// bytes matter.js Certificate.sign hashes), ECDSA P-256 over SHA-256,
+// bytes matter.js Certificate.sign hashes), ECDSA P-256 over SHA-256
+// through key.Sign (for an *ecdsa.PrivateKey that is ecdsa.SignASN1),
 // carried as the 64-byte r‖s.
-func signCert(f *certFields, key *ecdsa.PrivateKey, rand io.Reader) ([]byte, error) {
+func signCert(f *certFields, key crypto.Signer, rand io.Reader) ([]byte, error) {
 	unsigned, err := encodeCert(f, make([]byte, 64))
 	if err != nil {
 		return nil, err
@@ -189,7 +190,7 @@ func signCert(f *certFields, key *ecdsa.PrivateKey, rand io.Reader) ([]byte, err
 		return nil, fmt.Errorf("ca: TBS: %w", err)
 	}
 	digest := sha256.Sum256(der)
-	asn, err := ecdsa.SignASN1(rand, key, digest[:])
+	asn, err := key.Sign(rand, digest[:], crypto.SHA256)
 	if err != nil {
 		return nil, fmt.Errorf("ca: sign: %w", err)
 	}

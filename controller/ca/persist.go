@@ -37,6 +37,10 @@ type FabricRecord struct {
 	// certificate. Both nil makes the loader mint a new NOC from the CA.
 	KeyPair *KeyPair `json:"keyPair,omitempty"`
 	NOC     []byte   `json:"operationalCert,omitempty"`
+	// KeyRef names the operational key when it is a signer
+	// (commissioner.FabricConfig.OperationalSigner); KeyPair then holds
+	// the public key only. Not in matter.js's Fabric.Config.
+	KeyRef string `json:"keyRef,omitempty"`
 	// RootPublicKey is the RCAC public key the record was made under.
 	RootPublicKey []byte `json:"rootPublicKey,omitempty"`
 }
@@ -122,13 +126,19 @@ type storedJSON struct {
 	ICACKeyPair       *KeyPair `json:"icacKeyPair,omitempty"`
 	ICACKeyIdentifier []byte   `json:"icacKeyIdentifier,omitempty"`
 	ICACCertBytes     []byte   `json:"icacCertBytes,omitempty"`
+	// RootKeyRef and ICACKeyRef name keys kept by a signer
+	// (Stored.RootKeyRef, StoredICAC.KeyRef); not in matter.js's
+	// Configuration.
+	RootKeyRef string `json:"rootKeyRef,omitempty"`
+	ICACKeyRef string `json:"icacKeyRef,omitempty"`
 }
 
-// MarshalJSON gives [KeyPair] matter.js BinaryKeyPair's field names.
+// MarshalJSON gives [KeyPair] matter.js BinaryKeyPair's field names; a
+// key pair whose private key a signer keeps has no privateKey.
 func (k KeyPair) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		PublicKey  []byte `json:"publicKey"`
-		PrivateKey []byte `json:"privateKey"`
+		PrivateKey []byte `json:"privateKey,omitempty"`
 	}{k.PublicKey, k.PrivateKey})
 }
 
@@ -183,9 +193,10 @@ func (s SettingStore) Load() (Stored, bool, error) {
 		RootCertBytes:     j.RootCertBytes,
 		NextCertificateID: j.NextCertificateID,
 		RootKeyPair:       j.RootKeyPair,
+		RootKeyRef:        j.RootKeyRef,
 	}
 	if j.ICACCertID != nil && j.ICACKeyPair != nil {
-		st.ICAC = &StoredICAC{CertID: *j.ICACCertID, KeyPair: *j.ICACKeyPair, KeyIdentifier: j.ICACKeyIdentifier, CertBytes: j.ICACCertBytes}
+		st.ICAC = &StoredICAC{CertID: *j.ICACCertID, KeyPair: *j.ICACKeyPair, KeyIdentifier: j.ICACKeyIdentifier, CertBytes: j.ICACCertBytes, KeyRef: j.ICACKeyRef}
 	}
 	return st, true, nil
 }
@@ -198,11 +209,13 @@ func (s SettingStore) Save(st Stored) error {
 		RootCertBytes:     st.RootCertBytes,
 		NextCertificateID: st.NextCertificateID,
 		RootKeyPair:       st.RootKeyPair,
+		RootKeyRef:        st.RootKeyRef,
 	}
 	if st.ICAC != nil {
 		id := st.ICAC.CertID
 		kp := st.ICAC.KeyPair
 		j.ICACCertID, j.ICACKeyPair, j.ICACKeyIdentifier, j.ICACCertBytes = &id, &kp, st.ICAC.KeyIdentifier, st.ICAC.CertBytes
+		j.ICACKeyRef = st.ICAC.KeyRef
 	}
 	return s.save(s.key(), j)
 }

@@ -122,7 +122,7 @@ type InitiatorConfig struct {
 // NewPeerInitiator returns an Initiator for reaching PeerNodeID on the
 // fabric of cfg.Identity.
 func NewPeerInitiator(cfg InitiatorConfig) (*Initiator, error) {
-	if cfg.Identity == nil || cfg.Identity.PrivateKey == nil {
+	if cfg.Identity == nil || cfg.Identity.signingKey() == nil {
 		return nil, errors.New("sigma: initiator needs an operational identity")
 	}
 	if cfg.Verifier == nil {
@@ -342,7 +342,7 @@ func (i *Initiator) processSigma2(sigma2 Sigma2, sigma2Bytes []byte) ([]byte, er
 
 	// TBE3: initiator signed data carries (initNOC, initICAC, initEph,
 	// respEph) per Matter §4.14.2.3.
-	mySig, err := signTranscript(i.identity.PrivateKey, i.identity.NOC, i.identity.ICAC, i.ephPubBytes, sigma2.ResponderEphPubKey)
+	mySig, err := signTranscript(i.identity.signingKey(), i.identity.NOC, i.identity.ICAC, i.ephPubBytes, sigma2.ResponderEphPubKey)
 	if err != nil {
 		return fail(err)
 	}

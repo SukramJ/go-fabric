@@ -26,6 +26,7 @@ They go before or after the command.
 | `--listen <addr>` | `[::]:0` | The controller's UDP socket. |
 | `--node-listen <addr>` | `[::]:0` | The UDP socket of the controller's own node (group sender, OTA provider). |
 | `--timeout <duration>` | `60s` | How long a command waits for the network (a bare number is seconds). |
+| `--ca-key file:<path>` | unset | The CA root key in a passphrase-encrypted key file instead of the database; the passphrase comes from `GOFABRIC_KEY_PASSPHRASE`. A missing file is created: with the root key the database holds (which then leaves the database), or a new key for a new database. Every later run needs the flag. |
 
 A `<node>` argument is the node id, decimal or `0x` hex, or the registry's
 local id (`peer1`). A path is `<endpoint>/<Cluster>/<element>`: the cluster
@@ -183,7 +184,7 @@ One SQLite file holds:
 
 | Where | What |
 | --- | --- |
-| `matter_settings` `controller.ca` | The CA: root certificate, root key, certificate counter (JSON, matter.js `CertificateAuthority` field names). |
+| `matter_settings` `controller.ca` | The CA: root certificate, root key, certificate counter (JSON, matter.js `CertificateAuthority` field names). With `--ca-key` the root key is not here; `rootKeyRef` names the key file. |
 | `matter_settings` `controller.ca.fabric` | The fabric: fabric id, root node id, vendor id, IPK, fabric index, label, the controller's operational key and NOC (matter.js `Fabric.Config` names). |
 | `matter_settings` `controller.dcl.trust` | The DCL trust store, with `--dcl prod` or `testnet`. |
 | `matter_settings` `controller.self`, `controller.group.<id>` | The own node's passcode, discriminator, salt and node id; each group `group create` made (key set, epoch key, members). |

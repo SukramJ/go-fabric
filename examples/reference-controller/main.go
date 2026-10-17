@@ -49,6 +49,7 @@ type globalOptions struct {
 	listen      string
 	nodeListen  string
 	timeout     durationFlag
+	caKey       string
 }
 
 // defaultOptions are the flags' defaults.
@@ -67,6 +68,7 @@ func (o *globalOptions) register(fs *flag.FlagSet) {
 	fs.StringVar(&o.listen, "listen", o.listen, "the controller's UDP address")
 	fs.StringVar(&o.nodeListen, "node-listen", o.nodeListen, "the UDP address of the controller's own node (group sender, OTA provider)")
 	fs.Var(&o.timeout, "timeout", "how long a command waits for the network (default 60s)")
+	fs.StringVar(&o.caKey, "ca-key", o.caKey, "the CA root key outside the database: file:<path> (passphrase from "+passphraseEnv+")")
 }
 
 // command is one subcommand: its usage line and its function.

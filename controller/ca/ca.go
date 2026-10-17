@@ -4,6 +4,8 @@
 package ca
 
 import (
+	"bytes"
+	"crypto"
 	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -68,6 +70,10 @@ type Stored struct {
 	RootKeyPair *KeyPair
 	// ICAC is the intermediate CA, nil for a 2-tier PKI.
 	ICAC *StoredICAC
+	// RootKeyRef names the root key when it is a [Config.RootSigner]: the
+	// record then has no RootKeyPair, the key stays where the signer
+	// keeps it. "" for a key in RootKeyPair.
+	RootKeyRef string
 }
 
 // StoredICAC is the ICAC part of [Stored] (icacCertId, icacKeyPair,
@@ -77,6 +83,9 @@ type StoredICAC struct {
 	KeyPair       KeyPair
 	KeyIdentifier []byte
 	CertBytes     []byte
+	// KeyRef names the ICAC key when it is a [Config.ICACSigner]; KeyPair
+	// then holds the public key only.
+	KeyRef string
 }
 
 // Store keeps a CA's key material and certificate counter.
@@ -161,13 +170,53 @@ type Config struct {
 	// certificates reproducible — a test that needs that uses
 	// testing/cryptotest.SetGlobalRandom.
 	Rand io.Reader
+	// RootSigner, when set, is the root key: a P-256 crypto.Signer whose
+	// private key the store never sees (a key file, an HSM, a KMS). A new
+	// CA issues its RCAC for the signer's public key; a stored CA must
+	// have been made under it. The stored record then holds the
+	// certificates and RootKeyRef, no root private key; a record that
+	// still holds one is rewritten without it. matter.js has no such seam
+	// (its CertificateAuthority keeps the key pair in its storage).
+	RootSigner crypto.Signer
+	// ICACSigner is RootSigner for the ICAC key, with IntermediateCA.
+	ICACSigner crypto.Signer
+}
+
+// KeyReferencer is a signer that names its key for the stored record —
+// a path, a PKCS#11 URI, a KMS key name. A [Config.RootSigner] or
+// [Config.ICACSigner] that is none is recorded as [ExternalKeyRef].
+type KeyReferencer interface {
+	KeyRef() string
+}
+
+// ExternalKeyRef is the KeyRef recorded for a signer that is no
+// [KeyReferencer].
+const ExternalKeyRef = "external"
+
+// KeyRefOf is the KeyRef the record keeps for s.
+func KeyRefOf(s crypto.Signer) string {
+	if r, ok := s.(KeyReferencer); ok && r.KeyRef() != "" {
+		return r.KeyRef()
+	}
+	return ExternalKeyRef
+}
+
+// P256PublicKey is the 65-byte uncompressed public key of s, an error
+// when s is not a P-256 ECDSA key.
+func P256PublicKey(s crypto.Signer) ([]byte, error) {
+	pub, ok := s.Public().(*ecdsa.PublicKey)
+	if !ok || pub.Curve != elliptic.P256() {
+		return nil, errors.New("ca: signer is not a P-256 ECDSA key")
+	}
+	return pub.Bytes()
 }
 
 // signer is the RCAC or ICAC side that signs.
 type signer struct {
 	id     uint64 // rcacId or icacId
 	tag    uint8  // dnTagRCACID or dnTagICACID
-	key    *ecdsa.PrivateKey
+	key    crypto.Signer
+	keyRef string // set: key is a configured signer, not stored
 	keyID  []byte
 	cert   []byte
 	public []byte
@@ -181,7 +230,8 @@ type CA struct {
 
 	mu         sync.Mutex
 	rootCertID uint64
-	rootKey    *ecdsa.PrivateKey // nil: offline root with an ICAC
+	rootKey    crypto.Signer // nil: offline root with an ICAC
+	rootKeyRef string        // set: rootKey is Config.RootSigner
 	rootKeyID  []byte
 	rootCert   []byte
 	rootPub    []byte
@@ -203,6 +253,9 @@ func New(cfg Config) (*CA, error) {
 	if cfg.Rand == nil {
 		cfg.Rand = rand.Reader
 	}
+	if cfg.ICACSigner != nil && !cfg.IntermediateCA {
+		return nil, fmt.Errorf("%w: an ICACSigner needs IntermediateCA", ErrConfig)
+	}
 	c := &CA{cfg: cfg, rootCertID: RootCertID, nextID: FirstCertificateID}
 	if cfg.Store != nil {
 		st, ok, err := cfg.Store.Load()
@@ -216,16 +269,32 @@ func New(cfg Config) (*CA, error) {
 			if err := c.initVerifier(); err != nil {
 				return nil, err
 			}
+			if storedKeyBehindSigner(st, c) {
+				// A private key the configuration now keeps in a signer
+				// leaves the record.
+				if err := cfg.Store.Save(c.stored()); err != nil {
+					return nil, fmt.Errorf("ca: save: %w", err)
+				}
+			}
 			return c, nil
 		}
 	}
-	key, err := ecdsa.GenerateKey(elliptic.P256(), cfg.Rand)
-	if err != nil {
-		return nil, fmt.Errorf("ca: root key: %w", err)
+	if cfg.RootSigner != nil {
+		pub, err := P256PublicKey(cfg.RootSigner)
+		if err != nil {
+			return nil, err
+		}
+		c.rootKey, c.rootKeyRef, c.rootPub = cfg.RootSigner, KeyRefOf(cfg.RootSigner), pub
+	} else {
+		key, err := ecdsa.GenerateKey(elliptic.P256(), cfg.Rand)
+		if err != nil {
+			return nil, fmt.Errorf("ca: root key: %w", err)
+		}
+		c.rootKey = key
+		c.rootPub = publicKeyBytes(&key.PublicKey)
 	}
-	c.rootKey = key
-	c.rootPub = publicKeyBytes(&key.PublicKey)
 	c.rootKeyID = KeyIdentifier(c.rootPub)
+	var err error
 	if c.rootCert, err = c.generateRootCert(); err != nil {
 		return nil, err
 	}
@@ -261,16 +330,39 @@ func validStoredRoot(s Stored) bool {
 	return len(s.RootKeyIdentifier) > 0 && len(s.RootCertBytes) > 0
 }
 
-// validStoredICAC is #isValidStoredIcacCertificate (:348-355).
+// validStoredICAC is #isValidStoredIcacCertificate (:348-355); a key
+// kept by a signer (KeyRef) stands in for the private key.
 func validStoredICAC(s Stored) bool {
-	return s.ICAC != nil && len(s.ICAC.KeyPair.PrivateKey) > 0 &&
+	return s.ICAC != nil && (len(s.ICAC.KeyPair.PrivateKey) > 0 || s.ICAC.KeyRef != "") &&
 		len(s.ICAC.KeyIdentifier) > 0 && len(s.ICAC.CertBytes) > 0
+}
+
+// storedKeyBehindSigner reports whether s holds a private key that c now
+// takes from a configured signer.
+func storedKeyBehindSigner(s Stored, c *CA) bool {
+	if c.cfg.RootSigner != nil && s.RootKeyPair != nil && len(s.RootKeyPair.PrivateKey) > 0 {
+		return true
+	}
+	return c.cfg.ICACSigner != nil && s.ICAC != nil && len(s.ICAC.KeyPair.PrivateKey) > 0
+}
+
+// signerFor checks that a configured signer holds the key of a stored
+// certificate's public key pub.
+func signerFor(s crypto.Signer, pub []byte, what string) error {
+	sp, err := P256PublicKey(s)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(sp, pub) {
+		return fmt.Errorf("%w: the %s signer's key is not the stored %s certificate's", ErrConfig, what, what)
+	}
+	return nil
 }
 
 // load is #loadFromStorage (:357-389).
 func (c *CA) load(s Stored) error {
 	c.rootCertID = s.RootCertID
-	if s.RootKeyPair != nil {
+	if s.RootKeyPair != nil && c.cfg.RootSigner == nil {
 		k, err := privateKey(s.RootKeyPair.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("ca: stored root key: %w", err)
@@ -285,11 +377,40 @@ func (c *CA) load(s Stored) error {
 		return fmt.Errorf("ca: stored root certificate: %w", err)
 	}
 	c.rootPub = root.PublicKey
+	if c.cfg.RootSigner != nil {
+		if err := signerFor(c.cfg.RootSigner, c.rootPub, "root"); err != nil {
+			return err
+		}
+		c.rootKey, c.rootKeyRef = c.cfg.RootSigner, KeyRefOf(c.cfg.RootSigner)
+	} else if c.rootKey == nil {
+		// An offline root kept by a signer this run does not configure:
+		// the record keeps naming it.
+		c.rootKeyRef = s.RootKeyRef
+	}
 	hasICAC := validStoredICAC(s)
 	if c.cfg.IntermediateCA != hasICAC {
 		return fmt.Errorf("%w: stored credentials contain an ICAC: %v, but the configuration expects %v", ErrConfig, hasICAC, c.cfg.IntermediateCA)
 	}
 	if hasICAC {
+		if c.cfg.ICACSigner != nil {
+			icac, err := mattercert.Decode(s.ICAC.CertBytes)
+			if err != nil {
+				return fmt.Errorf("ca: stored ICAC certificate: %w", err)
+			}
+			if err := signerFor(c.cfg.ICACSigner, icac.PublicKey, "ICAC"); err != nil {
+				return err
+			}
+			c.icac = &signer{
+				id: s.ICAC.CertID, tag: dnTagICACID, key: c.cfg.ICACSigner, keyRef: KeyRefOf(c.cfg.ICACSigner),
+				keyID:  append([]byte(nil), s.ICAC.KeyIdentifier...),
+				cert:   append([]byte(nil), s.ICAC.CertBytes...),
+				public: append([]byte(nil), icac.PublicKey...),
+			}
+			return nil
+		}
+		if len(s.ICAC.KeyPair.PrivateKey) == 0 {
+			return fmt.Errorf("%w: the ICAC key %q is not configured (Config.ICACSigner)", ErrConfig, s.ICAC.KeyRef)
+		}
 		k, err := privateKey(s.ICAC.KeyPair.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("ca: stored ICAC key: %w", err)
@@ -303,6 +424,9 @@ func (c *CA) load(s Stored) error {
 		return nil
 	}
 	if c.rootKey == nil {
+		if s.RootKeyRef != "" {
+			return fmt.Errorf("%w: the root key %q is not configured (Config.RootSigner)", ErrConfig, s.RootKeyRef)
+		}
 		return fmt.Errorf("%w: a root key pair is required without an ICAC", ErrConfig)
 	}
 	return nil
@@ -316,15 +440,22 @@ func (c *CA) stored() Stored {
 		RootCertBytes:     append([]byte(nil), c.rootCert...),
 		NextCertificateID: c.nextID,
 	}
-	if c.rootKey != nil {
-		s.RootKeyPair = &KeyPair{PublicKey: append([]byte(nil), c.rootPub...), PrivateKey: privateKeyBytes(c.rootKey)}
+	switch k, ok := c.rootKey.(*ecdsa.PrivateKey); {
+	case c.rootKeyRef != "":
+		s.RootKeyRef = c.rootKeyRef
+	case ok:
+		s.RootKeyPair = &KeyPair{PublicKey: append([]byte(nil), c.rootPub...), PrivateKey: privateKeyBytes(k)}
 	}
 	if c.icac != nil {
 		s.ICAC = &StoredICAC{
 			CertID:        c.icac.id,
-			KeyPair:       KeyPair{PublicKey: append([]byte(nil), c.icac.public...), PrivateKey: privateKeyBytes(c.icac.key)},
+			KeyPair:       KeyPair{PublicKey: append([]byte(nil), c.icac.public...)},
 			KeyIdentifier: append([]byte(nil), c.icac.keyID...),
 			CertBytes:     append([]byte(nil), c.icac.cert...),
+			KeyRef:        c.icac.keyRef,
+		}
+		if k, ok := c.icac.key.(*ecdsa.PrivateKey); ok && c.icac.keyRef == "" {
+			s.ICAC.KeyPair.PrivateKey = privateKeyBytes(k)
 		}
 	}
 	return s
@@ -368,11 +499,22 @@ func (c *CA) generateRootCert() ([]byte, error) {
 func (c *CA) generateICAC() (*signer, error) {
 	id := c.nextID
 	c.nextID++
-	key, err := ecdsa.GenerateKey(elliptic.P256(), c.cfg.Rand)
-	if err != nil {
-		return nil, fmt.Errorf("ca: ICAC key: %w", err)
+	var key crypto.Signer
+	var keyRef string
+	var pub []byte
+	if c.cfg.ICACSigner != nil {
+		p, err := P256PublicKey(c.cfg.ICACSigner)
+		if err != nil {
+			return nil, err
+		}
+		key, keyRef, pub = c.cfg.ICACSigner, KeyRefOf(c.cfg.ICACSigner), p
+	} else {
+		k, err := ecdsa.GenerateKey(elliptic.P256(), c.cfg.Rand)
+		if err != nil {
+			return nil, fmt.Errorf("ca: ICAC key: %w", err)
+		}
+		key, pub = k, publicKeyBytes(&k.PublicKey)
 	}
-	pub := publicKeyBytes(&key.PublicKey)
 	keyID := KeyIdentifier(pub)
 	nb, na, err := c.validity()
 	if err != nil {
@@ -392,7 +534,7 @@ func (c *CA) generateICAC() (*signer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &signer{id: id, tag: dnTagICACID, key: key, keyID: keyID, cert: cert, public: pub}, nil
+	return &signer{id: id, tag: dnTagICACID, key: key, keyRef: keyRef, keyID: keyID, cert: cert, public: pub}, nil
 }
 
 // RootCert is the RCAC as Matter TLV — matter.js rootCert (:194-196).

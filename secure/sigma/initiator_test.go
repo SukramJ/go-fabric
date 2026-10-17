@@ -5,10 +5,12 @@ package sigma
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
+	"io"
 	"testing"
 )
 
@@ -389,5 +391,52 @@ func TestUnmarshalSigma2_RejectsMissingFields(t *testing.T) {
 	}
 	if _, err := UnmarshalSigma2Resume(enc.bytes()); !errors.Is(err, ErrSessionState) {
 		t.Fatalf("resume err = %v, want ErrSessionState", err)
+	}
+}
+
+// countingSigner is a crypto.Signer outside the identity's PrivateKey —
+// what a key file, HSM or KMS signer is to the handshake.
+type countingSigner struct {
+	key   *ecdsa.PrivateKey
+	signs int
+}
+
+func (s *countingSigner) Public() crypto.PublicKey { return &s.key.PublicKey }
+
+func (s *countingSigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	s.signs++
+	return s.key.Sign(r, digest, opts)
+}
+
+// TestPeerInitiator_SignsThroughSigner: an identity with a Signer and no
+// PrivateKey completes the handshake; Sigma3 is signed by the Signer once,
+// and the responder verifies it against the NOC.
+func TestPeerInitiator_SignsThroughSigner(t *testing.T) {
+	t.Parallel()
+	f := newPeerFixture(t)
+	signer := &countingSigner{key: f.device.PrivateKey}
+	f.device.Signer, f.device.PrivateKey = signer, nil
+	initiator := f.initiator(t, 0x1111, nil)
+	responder := f.responder(0x2222)
+	s1, err := initiator.GenerateSigma1()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sigma2, err := responder.ProcessSigma1(s1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s3, err := initiator.ProcessSigma2Bytes(sigma2.Marshal())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := responder.ProcessSigma3(s3); err != nil {
+		t.Fatalf("responder rejected the signer's Sigma3: %v", err)
+	}
+	if signer.signs != 1 {
+		t.Fatalf("signer used %d times, want 1", signer.signs)
+	}
+	if _, err := NewPeerInitiator(InitiatorConfig{Identity: &Identity{NOC: f.device.NOC}, Verifier: f.verifier, RootPublicKey: f.root}); err == nil {
+		t.Fatal("an identity without PrivateKey and Signer was accepted")
 	}
 }

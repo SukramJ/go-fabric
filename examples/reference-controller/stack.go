@@ -134,7 +134,11 @@ func openStack(e *env) (_ *stack, err error) {
 		return nil, err
 	}
 	cs := ca.SettingStore{Settings: s.settings, Key: caKey}
-	authority, err := ca.New(ca.Config{Store: cs})
+	rootSigner, err := openCAKey(e, cs)
+	if err != nil {
+		return nil, err
+	}
+	authority, err := ca.New(ca.Config{Store: cs, RootSigner: rootSigner})
 	if err != nil {
 		return nil, err
 	}
