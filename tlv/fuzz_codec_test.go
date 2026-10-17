@@ -150,6 +150,10 @@ func FuzzEncodeDecodeRoundTrip(f *testing.F) {
 		if idx := bytes.IndexByte([]byte(s), 0x1F); idx >= 0 {
 			wantStr = s[:idx]
 		}
+		// The decoder reads the body as matter.js's non-fatal TextDecoder
+		// does (decodeUTF8): an ill-formed sequence comes back as U+FFFD,
+		// so that is the round-trip expectation for an invalid input.
+		wantStr = decodeUTF8([]byte(wantStr))
 		if got[3].String != wantStr {
 			t.Fatalf("utf8 round-trip: got %q, want %q", got[3].String, wantStr)
 		}
