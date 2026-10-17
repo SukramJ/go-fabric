@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5173,
+  "entry_points": 5179,
   "entry_packages": [
     ".",
     "bdx",
@@ -166,6 +166,7 @@
     "controller/client/sqlstore",
     "controller/commissioner",
     "controller/dcl",
+    "controller/dcl/snapshot",
     "controller/discovery",
     "controller/exchange",
     "controller/handshake",
@@ -214,9 +215,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12539,
-    "reachable": 8880,
-    "whitelisted": 3654,
+    "total_exported": 12568,
+    "reachable": 8904,
+    "whitelisted": 3659,
     "unreachable": 5
   },
   "by_package": [
@@ -16411,6 +16412,34 @@
       "line": 150
     },
     {
+      "package": "controller/dcl/snapshot",
+      "identifier": "TestEmbedded",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/snapshot/snapshot_test.go",
+      "line": 76
+    },
+    {
+      "package": "controller/dcl/snapshot",
+      "identifier": "TestFetch",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/snapshot/fetch_test.go",
+      "line": 31
+    },
+    {
+      "package": "controller/dcl/snapshot",
+      "identifier": "TestLoad",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/snapshot/snapshot_test.go",
+      "line": 104
+    },
+    {
+      "package": "controller/dcl/snapshot",
+      "identifier": "TestSnapshotIsNoRevocationSource",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/dcl/snapshot/snapshot_test.go",
+      "line": 174
+    },
+    {
       "package": "controller/discovery",
       "identifier": "TestDiffAddresses_RestartKeepsInterruptedRoundKnown",
       "reason": "auto-whitelist:pattern=test-file",
@@ -19307,6 +19336,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/main_test.go",
       "line": 480
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestReferenceControllerTrust",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/trust_test.go",
+      "line": 19
     },
     {
       "package": "examples/reference-controller",

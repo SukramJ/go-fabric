@@ -17,6 +17,11 @@ pseudo-version of `main`.
 - `controller/ca`: `Config.RootSigner` and `Config.ICACSigner`, `commissioner.FabricConfig.OperationalSigner` — the CA keys and the controller's operational key as a P-256 `crypto.Signer` (key file, HSM, KMS); the stored record then holds the certificates and a `KeyRef`, no private key. Without a signer the record and its JSON are unchanged. `sigma.Identity.Signer` signs the CASE transcript in place of `PrivateKey`.
 - `controller/ca/keyfile`: a passphrase-encrypted key file (PBKDF2-HMAC-SHA256 + AES-256-GCM, standard library only) as such a signer; the reference controller takes it as `--ca-key file:<path>` (passphrase from `GOFABRIC_KEY_PASSPHRASE`).
 
+- `controller/dcl/snapshot`: the production PAAs and CD signers of the CSA Distributed Compliance Ledger, embedded with a `SOURCE` manifest (ledger, fetch time, count, SHA-256 per file) and loaded as an `attestation.PAAStore` (`Embedded`, `Load`, the rules of matter.js's seed consumption); `make update-dcl-snapshot` refreshes it as a reviewed step. Revocation stays online.
+- `controller/attestation`: `TrustMode` (`Development`, `Production`, `None`), `Trust` and `Layered` — the snapshot, the online `dcl.CertificateStore` and the CSA test PAAs as one trust store; the CRL check is the online store's alone.
+- `controller/dcl`: `CheckTrustStoreCertificate`, `PEMToDER`, `ErrSKIDMismatch`.
+- `examples/reference-controller`: `--trust development|production|none` (default `development`: snapshot and test PAAs) and `--trust-dir`; `--dcl` now adds the online ledger on top of the trust set instead of replacing the test PAAs. A production device pairs without `--dcl`.
+
 ### Documentation
 
 - `docs/roadmap.md`: the roadmap to complete Matter 1.6.1 wherever matter.js implements it — seven milestones, one minor version each, three-pillar definition of done; concept v3 becomes milestone 1.

@@ -50,11 +50,13 @@ type globalOptions struct {
 	nodeListen  string
 	timeout     durationFlag
 	caKey       string
+	trust       string
+	trustDir    string
 }
 
 // defaultOptions are the flags' defaults.
 func defaultOptions() *globalOptions {
-	return &globalOptions{db: "reference-controller.db", dcl: "off", logLevel: "warn", listen: "[::]:0", nodeListen: "[::]:0"}
+	return &globalOptions{db: "reference-controller.db", dcl: "off", logLevel: "warn", listen: "[::]:0", nodeListen: "[::]:0", trust: "development"}
 }
 
 // register defines the global flags on fs with o's current values as
@@ -62,7 +64,9 @@ func defaultOptions() *globalOptions {
 // for flags after the command — keeps what was parsed before it.
 func (o *globalOptions) register(fs *flag.FlagSet) {
 	fs.StringVar(&o.db, "db", o.db, "the SQLite database holding the CA, the fabric, the paired nodes and the DCL trust store")
-	fs.StringVar(&o.dcl, "dcl", o.dcl, "the Distributed Compliance Ledger attestation trusts: prod, testnet or off (the embedded test PAAs)")
+	fs.StringVar(&o.dcl, "dcl", o.dcl, "the online Distributed Compliance Ledger on top of the trust set: prod, testnet or off")
+	fs.StringVar(&o.trust, "trust", o.trust, "the attestation trust set: development (DCL snapshot and CSA test PAAs), production (DCL snapshot) or none (no chain check)")
+	fs.StringVar(&o.trustDir, "trust-dir", o.trustDir, "a DCL snapshot directory (paa/, cd-signers/, SOURCE) in place of the embedded one")
 	fs.StringVar(&o.attestation, "attestation", o.attestation, "on an attestation finding: accept, reject or ask (default ask on a terminal, reject otherwise)")
 	fs.StringVar(&o.logLevel, "log-level", o.logLevel, "log level: debug, info, warn or error")
 	fs.StringVar(&o.listen, "listen", o.listen, "the controller's UDP address")

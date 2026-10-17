@@ -20,7 +20,9 @@ They go before or after the command.
 | Flag | Default | |
 | --- | --- | --- |
 | `--db <file>` | `reference-controller.db` | The SQLite database (see [The database](#the-database)). |
-| `--dcl prod\|testnet\|off` | `off` | Where `pair`'s attestation trusts come from: the CSA Distributed Compliance Ledger, its test net, or the embedded CSA test PAAs. |
+| `--trust development\|production\|none` | `development` | Which roots `pair`'s attestation check trusts: the embedded DCL snapshot (`controller/dcl/snapshot`) and the CSA test PAAs, the snapshot only, or none (no chain check). The snapshot's fetch time is in the `--log-level debug` log. |
+| `--trust-dir <path>` | unset | A DCL snapshot directory (`paa/`, `cd-signers/`, `SOURCE`, as `make update-dcl-snapshot` writes it) in place of the embedded one — a newer set without a rebuild. |
+| `--dcl prod\|testnet\|off` | `off` | The online CSA Distributed Compliance Ledger (or its test net) on top of the trust set: roots newer than the snapshot, CD signers fetched on demand, and the CRL revocation check, which only the online ledger answers. |
 | `--attestation accept\|reject\|ask` | `ask` on a terminal, `reject` otherwise | What an attestation finding does to a pairing. |
 | `--log-level debug\|info\|warn\|error` | `warn` | The log, as `slog` text on stderr. |
 | `--listen <addr>` | `[::]:0` | The controller's UDP socket. |
@@ -198,7 +200,9 @@ run makes a full CASE handshake.
 ## What leaves the host
 
 With `--dcl off` (the default) nothing but Matter traffic: DNS-SD on the local
-network and the Matter messages to the devices.
+network and the Matter messages to the devices. The DCL snapshot is embedded
+in the binary; using it asks nobody. Without `--dcl` no revocation is
+checked: the snapshot holds trust anchors, not CRLs.
 
 With `--dcl prod` or `--dcl testnet`, `pair` — and only `pair` — opens the
 ledger trust store (`controller/dcl`): it updates the store from the ledger
