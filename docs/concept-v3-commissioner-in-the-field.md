@@ -12,6 +12,9 @@ Betreiber, der seine Schlüssel nicht in einer SQLite-Datei will, und ein
 Gerät, das nach dem eigenen Pairing auch an Apple Home oder Alexa gehen
 soll. Die vier Punkte unten schließen diese Lücken.
 
+Seit 2026-10-17 ist dieses Konzept das Detaildokument von **Meilenstein 1**
+der [Roadmap](./roadmap.md) (`v0.7.0`, Phasen 11–13).
+
 Jede matter.js-Zeile gilt am Pin `0ceb202d`
 (`git -C ../matter.js show 0ceb202d:<pfad>`).
 

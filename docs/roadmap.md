@@ -1,0 +1,266 @@
+# Roadmap
+
+Set by the owner on 2026-10-17, at `v0.6.0`, after the module's node had
+been paired and driven by Apple Home and by Home Assistant's Matter server
+(both on the reference bridge and OpenCCU-Loom). This page is the one place
+where the order of the remaining work is written down: what each milestone
+contains, roughly how it is phased, what it is worth and to whom, and when
+it counts as closed. The detail of a phase lives in its own document,
+written when the phase is next (see [How a phase is planned](#how-a-phase-is-planned)).
+
+## The goal
+
+**Complete Matter 1.6.1, wherever matter.js implements it.** matter.js is
+the gold standard ([`CLAUDE.md`](https://github.com/SukramJ/go-fabric/blob/main/CLAUDE.md));
+the measure of "complete" is therefore its HEAD, not the specification
+text: every cluster, device type, protocol feature and behaviour matter.js
+has, this module has — semantically, with the same defaults, the same
+constraints and the same wire shape — and nothing it lacks is invented here
+unless a connectedhomeip reference exists, as the parity contract already
+allows (DiagnosticLogs, FanControl coupling). A generated matter.js stub
+counts as an implementation: it is served here by the generated default
+server ([ADR 0017](./adr/0017-generated-default-cluster-server.md)), which
+is exactly as much as matter.js offers for it.
+
+**Beyond the standard: the embedding layer.** matter.js is the gold
+standard; this module is meant to be the diamond one — not a larger
+protocol surface, but a smaller distance between a host's device model and
+a paired, working Matter node. The consumers that set that bar:
+
+| Consumer | State | What it needs from this module |
+| --- | --- | --- |
+| [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom) | in production; today imports 20 packages of this module directly | a complete `node/` + `device/` + `contract/` surface so that a bridge needs nothing below it; depth in the clusters HomeMatic devices map to (Switch, Thermostat, DoorLock, WindowCovering) |
+| go-ha-matter-bridge (working name; planned separately) | not started; its concept is written when milestone 4 is due | the declarative device kit, the in-process test pair, the adapter module below |
+| the `go-*2mqtt` family (daikin, homeconnect, mtec, unifi, zendure) via a shared adapter module (working name `go-hamatter`: `go-hamqtt`'s Home-Assistant vocabulary → Matter device types; lives outside this module, so `contract/` stays stdlib-only) | not started | the same device kit; energy and appliance device types, which already exist |
+| `examples/reference-controller` and a host acting as commissioner | shipped, controller stages 1–6b | the field features (milestone 1), ICD peers and the rest of OTA push (milestone 5) |
+
+Priority follows from that table: a feature a consumer uses comes before
+one none uses, and both come before completeness for its own sake.
+
+## How to read this page
+
+- A **milestone** closes a topic area completely; it is not a sprint. One
+  minor version per milestone (`v0.7.0` is milestone 1), patch versions for
+  the waves inside it. The `v1.0.0` cut is the owner's call and is not
+  scheduled here; the `0.x` series continues until then, and the freeze of
+  `device/`, `node/` and `controller/` stays bound to that cut.
+- **Phases** continue the numbering of the concepts (concept v3 ends at
+  phase 13). A phase is one to three implementation waves, one pull request
+  per wave ([one PR per wave](https://github.com/SukramJ/go-fabric/blob/main/CLAUDE.md)).
+- **Definition of done** is the same three pillars for every milestone, and
+  a milestone is not closed while one is missing:
+    1. the chip certification families the milestone names run green in
+       the harness (`make chiptool-families`), or are classified in
+       [`certifiability.md`](./certifiability.md);
+    2. the matter.js test files the milestone names are ported as Go tests
+       and recorded in the test-porting register with its ratchet
+       (milestone 2 creates both);
+    3. the rows of [`matterjs-comparison.md`](./matterjs-comparison.md)
+       the milestone names move to ✅, or the gap moves to
+       [`by_design.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/by_design.md)
+       with its reasoning.
+- **Every milestone opens with a pin check.** matter.js HEAD moves while a
+  milestone runs (the checkout is 52 commits past the pin `0ceb202d`
+  today); the first wave of each milestone lifts the pin, classifies the
+  snapshot diff and regenerates, as concept v2 phase 6 did. A fact about
+  matter.js quoted in this page is at the pin named in the milestone.
+
+## Baseline (2026-10-17, `v0.6.0`)
+
+- 118 of the snapshot's 135 clusters served, 79 of its 91 device types
+  generated; the matter.js servers with hand-written logic number 25
+  (≥150 lines) and their depth here varies from a full port (ColorControl,
+  LevelControl, WindowCovering, OnOff, OTA) to none (Switch: the generated
+  definition and the wire type only, against `SwitchServer.ts` 486 lines
+  and a 3 527-line test).
+- Controller role stages 1–6b landed; Joint Fabric (6c) deferred by
+  decision ([ADR 0020](./adr/0020-commissioner-and-controller-role.md)).
+- Concept v3 phases 11–13 open: `crypto.Signer`, window-open from the
+  reference controller, the DCL snapshot and BLE commissioning
+  ([ADR 0024](./adr/0024-ble-commissioning-in-the-controller.md)) — none
+  of it in the tree yet.
+- Verified ecosystems: Apple Home, Home Assistant (owner, 2026-10-17);
+  Google Home and Alexa await the owner at the device
+  ([ecosystem observations](./matter-ecosystem-observations.md)).
+- matter.js's own tests, the proof for devices nobody has on the bench:
+  209 `*Test.ts` under `packages/node/test` (54 of them behaviour tests
+  in 36 cluster directories, 49 node-level), 114 under
+  `packages/protocol/test`, 68 certification cases under
+  `support/chip-testing/test/cert`. None of them is ported as such; the
+  module's parity tests were written from the servers, not from these
+  files.
+
+## Milestones
+
+| # | Milestone | Version | Phases | Value, in one line |
+| --- | --- | --- | --- | --- |
+| 1 | [The commissioner in the field](#milestone-1-the-commissioner-in-the-field) | `v0.7.0` | 11–13 | a boxed Wi-Fi or Thread product is commissioned by this module and handed on to Apple Home |
+| 2 | [The test foundation](#milestone-2-the-test-foundation) | `v0.8.0` | 14–16 | every later milestone is proved against matter.js's own tests; consumers test their bridge without hardware |
+| 3 | [Behaviour depth](#milestone-3-behaviour-depth) | `v0.9.0` | 17–19 | the 25 matter.js servers with logic are ported line for line — remotes, thermostats, locks behave as the ecosystems expect |
+| 4 | [The embedding layer](#milestone-4-the-embedding-layer) | `v0.10.0` | 20–22 | a bridge is `node/` + `device/` + `contract/`; a new consumer is a day's work, not a port |
+| 5 | [ICD and the controller remainder](#milestone-5-icd-and-the-controller-remainder) | `v0.11.0` | 23–25 | battery devices stay reachable; the controller pushes firmware and uses TCP |
+| 6 | [Completeness](#milestone-6-completeness) | `v0.12.0` | 26–27 | 135/135 clusters, 91/91 device types, every matter.js row of the comparison closed |
+| 7 | [BLE on the device side](#milestone-7-ble-on-the-device-side) | `v0.13.0` | 28 | a node of this module without a network is commissioned over BLE, as matter.js's `nodejs-ble` node is |
+
+Milestones 2 and 3 are the owner's order of 2026-10-17: the test
+foundation first, because milestones 3–7 are proved on it; the behaviour
+depth before the embedding layer, so that the API frozen in milestone 4 has
+seen what Switch, Thermostat and ICD need from it.
+
+### Milestone 1: The commissioner in the field
+
+**Detail:** [concept v3](./concept-v3-commissioner-in-the-field.md) (German) and
+[ADR 0024](./adr/0024-ble-commissioning-in-the-controller.md).
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| 11 | `crypto.Signer` behind the controller CA; window-open from the reference controller (multi-admin from our side); the embedded DCL snapshot with modes dev / prod / none; the status table in the README | in-repo tests; the hand-over to Apple Home in the manual test plan |
+| 12 | BTP (`transport/btp`), `controller/ble`, the network steps of the commissioning flow (Wi-Fi credentials, Thread operational dataset, `ConnectNetwork`), a simulated Wi-Fi driver in the reference daemon; **the decision where the Thread dataset comes from** (operator-supplied, or the Thread border-router client of milestone 5) | BTP vectors against `BtpSessionHandlerTest.ts` (1 526 lines) and `BtpCodecTest.ts`; network steps against the daemon |
+| 13 | the sub-module `ble/bluez`, `pair --ble`, the `btvirt` job with chip's all-clusters-app | BLE end to end, virtual; a real device in the test plan |
+
+**Value.** A commissioner that only reaches devices already on the network
+is a laboratory tool. After this milestone a host built on this module
+commissions a boxed product and hands it on. Consumers: the reference
+controller, a loom installation acting as commissioner.
+
+**Done when.** The comparison rows BLE/BTP and DCL move to ✅ for the
+controller role; `TC-DD` and `TC-SC` BLE cases are classified; the
+`btvirt` job passes.
+
+### Milestone 2: The test foundation
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| 14 | pin lift to matter.js HEAD (snapshot diff classified, generators, citations re-checked, `chipdm-check` green); the **test-porting register** `notes/parity/matterjs_tests.md`: every `*Test.ts` under `packages/node/test` and `packages/protocol/test` mapped to the Go test(s) that port it or to a classified exclusion (controller-only at this stage, JS-runtime-only, Joint Fabric), with a ratchet guard like `reachability-check` | the guard fails when a matter.js test file is unmapped |
+| 15 | the public test package (working name `fabrictest`, next to `bridgetest` and `endpointtest`): an in-process node, an in-process controller, the commissioned pair (`MockSite.addCommissionedPair`), a fake clock injected through one `Clock` port instead of the five ad-hoc fakes in the tree today (`MockTime`: `advance`, `resolve`, `yield`), the wire-path helpers (`interaction.read/write/invoke/subscribe` of `node-helpers.ts`) | the module's own suites run on it; the concurrency guide names it |
+| 16 | the protocol ports: `packages/protocol/test` (114 files — MRP, MessageExchange, MessageReceptionState, SessionManager, SecureSession, PASE/CASE pairing, MessageCodec, Certificates, DeviceAttestationValidator, Bdx, TcpChannel, Mdns*, FailsafeContext …) and the node-level suite `packages/node/test/node` (49 files — the Attribute/Command/Event response tests, the commissioning tests, ServerSubscription) as Go tests against this stack | register at 100 % for the two trees, behaviour tests excepted (milestone 3) |
+
+**Value.** The owner's premise: the bench will never hold every device, so
+the proof has to come from matter.js's tests — which encode the ecosystem
+fixes matter.js collected. The package of phase 15 is also the first piece
+of the embedding layer: a consumer (loom, the HA bridge, a 2mqtt daemon)
+tests its own device mapping against an in-process controller, with no
+chip-tool and no radio. Consumers: every one.
+
+**Done when.** The register exists, the guard holds, phases 15–16 are at
+100 %, and the per-package coverage floors did not drop.
+
+### Milestone 3: Behaviour depth
+
+The 25 matter.js servers with hand-written logic, each audited against its
+Go counterpart with the matter.js test file ported as the proof. Grouped
+by the surface they serve; the figures are matter.js lines of server / of
+test.
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| 17 | **the device surface loom and the HA bridge map to:** Switch — a real server (486 / 3 527: the multi-press and long-press state machine, `SwitchServer.ts`), Thermostat — presets, schedules, atomic writes (1 790 / 1 776 in six files), DoorLock (1 628 / 1 946), WindowCovering (654 / 145), OnOff (343 / 352), LevelControl (875 / 944), ColorControl (2 046 / 610), Identify (156 / 187), ServiceArea (300 / 234) | SWTCH, TSTAT, DRLK, WNCV, OO, LVL, CC, I families green; the nine test files ported |
+| 18 | **the system set:** Descriptor (303 / 685), GeneralDiagnostics (631 / 235), AccessControl (775 / 619), OperationalCredentials (632 / 360), GroupKeyManagement (618 / 209), Groups (232 / 100), Groupcast (938 / 2 243), Binding (214 / 2 455), BasicInformation (213 / 214), GeneralCommissioning (285), AdministratorCommissioning (267), ScenesManagement (1 109 / 99) | ACL, ACE, DESC, DGGEN, OPCREDS, GRPKEY, G, S, BIND, BINFO, CGEN, CADMIN green; the test files ported |
+| 19 | **OTA and the remaining behaviour tests:** OTA requestor and provider (1 436 + 697 / 2 819 + utils), and the behaviour tests of the generated servers (boolean-state, fan-control, measurement, occupancy-sensing, power-source, hepa-filter-monitoring, concentration-measurement, energy-evse-mode, rvc-operational-state, commodity-tariff, thermostat-user-interface-configuration, time-format-localization, unit-localization, window-covering) | SU green; the register at 100 % for `packages/node/test/behaviors` |
+
+**Value.** This is where the ecosystems judge a bridge: a HomeMatic remote
+that double-clicks, a thermostat whose presets Apple Home writes
+atomically, a KeyMatic that reports its lock state the way `DoorLockServer`
+does. Consumers: loom (switches, thermostats, locks, covers), the HA bridge
+(the same surface from the Home Assistant side).
+
+**Done when.** The behaviour-test register is at 100 %, the named
+families are green, and no ◐ remains in the comparison's cluster section
+for a cluster with a hand-written matter.js server.
+
+### Milestone 4: The embedding layer
+
+**Detail:** written when milestone 3 is closed, together with the concept
+of the go-ha-matter-bridge and the adapter module, because the three
+shape each other.
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| 20 | the `node/` facade complete: everything loom reaches below it today (`bridge`, `store`, `secure/*`, `mdns`, `im`) is reachable through `node/`, `device/` and `contract/`, or is documented as an advanced seam; the **declarative device kit** — a bridged device from a device type, its values and its command handlers in one declaration, with attribute change propagation, transitions and the device-type validator behind it; an `apidiff` guard from this milestone on, so that a break is announced before it ships | loom's import list shrinks to the facade; the reference bridge is rewritten on the kit |
+| 21 | observability and persistence as ports: `slog` attribute conventions, a metrics hook, the diagnostic event ring; the `Store` seam proved by a second implementation (in-memory, for tests and small daemons); hardening a daemon in the field needs (session and subscription limits documented, PASE attempt limit after §5.5, fuzz targets for the controller decoders) | the persistence and concurrency guides describe the ports; `make fuzz` covers the new targets |
+| 22 | packaging and the cookbook: container image and systemd unit for the reference apps, arm64, the "embed in a daemon" guide written against a `go-*2mqtt` project; the concept documents of the go-ha-matter-bridge and the adapter module | a 2mqtt daemon exposes one device type end to end on the kit |
+
+**Value.** The diamond-standard claim lives here: matter.js asks a host to
+learn behaviours, agents and transactions; this module should ask for a
+device type and a handful of callbacks. Consumers: every one; the HA bridge
+and the 2mqtt family cannot start before it.
+
+**Done when.** The comparison's "device model" and "runtime" sections have
+no ◐ left except the behaviour-layer idiom row; loom and one 2mqtt daemon
+build on the facade alone.
+
+### Milestone 5: ICD and the controller remainder
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| 23 | the ICD server (`IcdManagementServer.ts` 838 + `IcdMode.ts` 152: SIT / LIT, the check-in sender, `UserActiveModeTrigger`, the registration table), mounted where the device type asks for it; the check-in protocol (`protocol/src/icd`, 1 162) | ICDM and ICDB families; `IcdManagementServerTest` (1 415) and the eight `protocol/test/icd` files ported |
+| 24 | the controller side: `IcdClient` (1 140), the check-in receiver (`FabricIcd.processCheckIn`), peer wakefulness, the sustained subscription parking on a LIT peer and re-subscribing when it wakes (`SustainedSubscription.ts` 672 / test 1 712), `RebootResubscribeArmer` | the module's controller holds a subscription to the module's own LIT node across its idle cycles |
+| 25 | the controller remainder: the rest of OTA push from the controller (`ota serve --announce` sends `AnnounceOTAProvider` today; writing `DefaultOTAProviders` and the provider's per-node consent record do not exist), the TCP initiator in `controller/`, the Thread border-router client (`packages/thread-br-client`: discovery, dataset codec, MeshCoP / OTBR diagnostics) if phase 12 chose it as the dataset source | `ClientNodeTcpTest`, the `peer/` tests ported; the reference controller updates the reference daemon over the air |
+
+**Value.** The battery sensor, lock or button commissioned over BLE in
+milestone 1 is an ICD; without this milestone the controller loses it at
+its first idle period. Consumers: the controller role; the device side of
+loom and the HA bridge is mains-powered and gains the server only for
+completeness.
+
+**Done when.** The comparison's ICD and CASE-initiator rows are ✅; the
+ICDM / ICDB families are green or classified.
+
+### Milestone 6: Completeness
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| 26 | the 15 clusters matter.js serves as generated stubs, through the generated default server: Camera (7), TLS (2), Thread and network infrastructure (4), AmbientContextSensing, WaterTankLevelMonitoring; `WebRtcTransportRequestor` with its logic (224 / 605) as the one camera-side server matter.js hand-writes; the 12 device types (Camera, SnapshotCamera, FloodlightCamera, CameraController, VideoDoorbell, AudioDoorbell, Intercom, Chime, CastingVideoClient, ThreadBorderRouter, NetworkInfrastructureManager, …); Thread network diagnostics | `chipdm-check` green; every snapshot device type in a devicegen list |
+| 27 | the comparison swept: every remaining ◐ / ○ row is ✅ or a `by_design` entry; the findings register empty; the test-porting register at 100 % for `packages/node/test` (endpoint, validation, storage) | the three registers agree |
+
+Excluded by decision, restated so they are not re-opened by accident:
+**Joint Fabric** (two stub clusters and no behaviour at the pin; deferred
+past `v1.0.0`, ADR 0020 stage 6c), **ARL / managed aggregator** (no
+matter.js logic exists, `BD-Matter-ARL-NotMounted`), the **Thread radio**
+(hardware), **certification itself** ([ADR 0011](./adr/0011-certifiability-is-a-goal.md)).
+
+**Value.** The claim in the first sentence of this page becomes checkable:
+135/135, 91/91, no row of the comparison older than its milestone. No
+consumer asked for a camera, which is why this is milestone 6 and not 2.
+
+### Milestone 7: BLE on the device side
+
+| Phase | Content | Proof |
+| --- | --- | --- |
+| 28 | the peripheral role of BTP (shared with milestone 1's central), `ble/bluez` as GATT peripheral, the commissionable advertisement over BLE, `NetworkCommissioning` with the Wi-Fi feature on a Linux host (the `wpa_supplicant` driver behind a host port) | the reference daemon on a Pi without a cable is commissioned by the reference controller and by Apple Home over BLE |
+
+**Value.** matter.js's `nodejs-ble` node does it, so by the premise this
+module does too; the owner's decision of 2026-10-17 reopens ADR 0024's
+device-side exclusion as a late milestone. Consumers: a future Go device
+without a network at first boot — none of the current bridges.
+
+**Done when.** The comparison's BLE row is ✅ for both roles; the DD and
+SC BLE cases run.
+
+## Standing work, outside the milestones
+
+- **Pin lifts** open every milestone (above).
+- **The chip harness** keeps running on every wave that moves the
+  daemon's composition or a FeatureMap; a wave that does not is said so in
+  its report.
+- **The findings register** takes every gap an audit finds; closing one
+  removes it. Ecosystem findings go to the observations page.
+- **Google Home and Alexa** runs happen when the owner is at the device;
+  their findings enter the register and may re-order a milestone's phases,
+  not the milestones.
+- **Security paths** (`secure/`, `commissioning/`, ACL, the four
+  hand-written core servers) are reviewed by the strongest model whatever
+  the milestone, as `CLAUDE.md` assigns them.
+
+## How a phase is planned
+
+A phase gets its detail document when it is next, not before: German,
+under `docs/` while it is current (as concept v3), moved to
+`docs/history/` when its milestone closes. It names the matter.js files
+at the pin with line ranges, the Go packages it touches, the decisions it
+needs from the owner (asked as a wizard with a recommendation), the waves
+with one agent each, and the three pillars it has to show. An architecture
+decision or a deliberate divergence inside it becomes an ADR or a
+`by_design` entry in the same pull request. The adapter module and the
+go-ha-matter-bridge get their own concept documents in their own
+repositories, written in milestone 4.
