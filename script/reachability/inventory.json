@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5179,
+  "entry_points": 5284,
   "entry_packages": [
     ".",
     "bdx",
@@ -160,6 +160,8 @@
     "conformance",
     "contract",
     "controller/attestation",
+    "controller/ble",
+    "controller/ble/bletest",
     "controller/ca",
     "controller/ca/keyfile",
     "controller/client",
@@ -209,15 +211,16 @@
     "store",
     "tlv",
     "transport",
+    "transport/btp",
     "transport/message",
     "transport/mrp",
     "transport/tcp",
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12568,
-    "reachable": 8904,
-    "whitelisted": 3659,
+    "total_exported": 12763,
+    "reachable": 9003,
+    "whitelisted": 3755,
     "unreachable": 5
   },
   "by_package": [
@@ -6253,6 +6256,27 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/core/time_synchronization_snapshot_test.go",
       "line": 59
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningAttributes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_test.go",
+      "line": 74
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningCommands",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_test.go",
+      "line": 131
+    },
+    {
+      "package": "cluster/core",
+      "identifier": "TestWiFiNetworkCommissioningScan",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/core/network_commissioning_wifi_test.go",
+      "line": 254
     },
     {
       "package": "cluster/energy",
@@ -15628,6 +15652,174 @@
       "line": 19
     },
     {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerAnotherTimeoutDoesNotEndDiscovery",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 568
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerCancelEndsEveryDiscoveryForIdentifier",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 652
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerCancelEndsOnlyTheCanceled",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 625
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerCloseSettlesContinuousDiscovery",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 700
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerDiscoveriesAskingDifferently",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 593
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerDropsRotatedAddressByElapsedTime",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 310
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerFailsDiscoveriesWhenScanCannotStart",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 674
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerForgetsAfter15MinutesOfListening",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 412
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerForgetsOneShotRecordAfter15Minutes",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 398
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerHandsAdvertisementToEveryDiscovery",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 511
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerIgnoresNonMatterServiceData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 720
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerKeepsBothWithinStaleWindow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 283
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerKeepsEntriesWithOtherServiceData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 357
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerKeepsEntryNobodyListenedFor",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 322
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerKeepsRefreshedEntry",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 341
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerMergesRepeatAdvertisements",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 275
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerOffersStalePeripheralAgain",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 385
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerOneShotRecordDoesNotAgeWhileScanning",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 431
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerOneShotWaitsWhileOnlyUnreachableAdvertise",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 472
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerPurgesWithIgnoreExisting",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 491
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerReachability",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 454
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerReplacesAfterStaleWindow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 295
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerStopsOfferingStalePeripheral",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 372
+    },
+    {
+      "package": "controller/ble",
+      "identifier": "TestBleScannerTimeoutEndsOneDiscovery",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/ble/scanner_parity_matterjs_test.go",
+      "line": 539
+    },
+    {
       "package": "controller/ca/keyfile",
       "identifier": "TestCreateDefaultIterations",
       "reason": "auto-whitelist:pattern=test-file",
@@ -16021,10 +16213,31 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestBLERearmInterval",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 526
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestChannelDropFallback",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 476
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestCommissionLiveThroughMulticast",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/node_live_test.go",
       "line": 24
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestCommissionOverChannelClosesItOnFailure",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/channel_test.go",
+      "line": 44
     },
     {
       "package": "controller/commissioner",
@@ -16133,6 +16346,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestFlowRearmsBeforeNetworkStep",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 508
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestFlowRearmsBelowHalf",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/flow_test.go",
@@ -16144,6 +16364,55 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
       "line": 157
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestNetworkStepsRegistration",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 445
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestNetworkThreadConfiguresAndConnects",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 327
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestNetworkThreadFailures",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 351
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestNetworkWiFiConfiguresAndConnects",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 205
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestNetworkWiFiConnectFailsAndMissingIndex",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 268
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestNetworkWiFiScanRejectedThenAddFails",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 247
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestNetworkWiFiSkips",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 293
     },
     {
       "package": "controller/commissioner",
@@ -16203,10 +16472,24 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestResolveThreadNetworkName",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 391
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestUpdateFabricLabel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
       "line": 113
+    },
+    {
+      "package": "controller/commissioner",
+      "identifier": "TestValidateNetwork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/network_test.go",
+      "line": 416
     },
     {
       "package": "controller/dcl",
@@ -17019,6 +17302,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/exchange/securechannel_test.go",
       "line": 64
+    },
+    {
+      "package": "controller/exchange",
+      "identifier": "TestReliableManagerRunsNoMRP",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/exchange/reliable_test.go",
+      "line": 20
     },
     {
       "package": "controller/exchange",
@@ -19296,11 +19586,25 @@
       "line": 32
     },
     {
+      "package": "examples/reference-bridge",
+      "identifier": "TestWiFiSim",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-bridge/wifisim_test.go",
+      "line": 14
+    },
+    {
       "package": "examples/reference-controller",
       "identifier": "TestArguments",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/args_test.go",
       "line": 19
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestPairNetworkOptions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/pair_test.go",
+      "line": 14
     },
     {
       "package": "examples/reference-controller",
@@ -25188,6 +25492,377 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "tlv/strict_validate_test.go",
       "line": 96
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "FuzzDecodePacket",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/fuzz_codec_test.go",
+      "line": 16
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecAdvertisement",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 208
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecDecodeHandshakeRequest",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 18
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecDecodeHandshakeRequestMultipleVersions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 29
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecDecodePacket",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 52
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecEncodeHandshakeResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 84
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecEncodePacket",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 91
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecErrors",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 133
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecFlagConsistency",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 178
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecIsHandshakeResponse",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 66
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecRoundTripsMultipleVersions",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 41
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpCodecTruncated",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 187
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpConsts",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/codec_parity_matterjs_test.go",
+      "line": 249
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionAbortPaths",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 355
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionAckReceiveTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 238
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionClosesAtMinimumSegmentSize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 815
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionClosesOncePeerSentAnything",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 930
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionClosesWhenNobodyObservesStall",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 806
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionClosesWhenOnlyStandaloneAckUnanswered",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 916
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionDataWriteDisconnected",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 300
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionDisconnectOnAnotherHandshake",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 131
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionDisconnectOnManagementOpcode",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 136
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionEmptyMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 166
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionFailedWriteNeverReplays",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 826
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionHandshake",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 23
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionImmediateAckOnLowWindow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 483
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionKeepsOfferedSegmentSize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 1023
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionLateWriteFailureAfterStall",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 989
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionLengthMismatch",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 253
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionNoAckForMessageWhoseHandlerClosed",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 858
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionNoDuplicateAckWhenSendInterleavesStandaloneAck",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 563
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionNoPiggybackBeforeData",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 412
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionNoSharedVersion",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 60
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionNoStandaloneAckWhileDataWriteInFlight",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 619
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionNonDisconnectWriteError",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 516
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionNothingWrittenAfterCloseDuringStandaloneAck",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 877
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionOneSegmentMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 141
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionReceivedMoreThanFragmentSize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 161
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionRejectsSmallSegmentSize",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 555
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionReportsStall",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 786
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionReservesLastWindowSlot",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 447
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionResumesStalledMultiFragmentMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 740
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionRoundsOffSequenceNumbers",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 271
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionSendAckTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 209
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionSequenceNumbersWrap",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 715
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionStandaloneAckWriteDisconnected",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 325
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionStopsWritingSuspendedFragments",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 953
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionTwoSegmentMessage",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 174
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestBtpSessionWriteErrorWhenCloseFailsToo",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/session_parity_matterjs_test.go",
+      "line": 541
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestConnOverAsyncGATTPair",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/conn_test.go",
+      "line": 37
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestSessionIdleTimeoutClosesCentral",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/conn_test.go",
+      "line": 143
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestSessionNonProtocolErrorReturned",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/conn_test.go",
+      "line": 190
+    },
+    {
+      "package": "transport/btp",
+      "identifier": "TestSessionSuspendAndUnsupportedVersion",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "transport/btp/conn_test.go",
+      "line": 163
     },
     {
       "package": "transport/message",
