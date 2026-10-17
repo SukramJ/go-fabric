@@ -91,6 +91,10 @@ func (s *Session) SetAddr(addr *net.UDPAddr) {
 // IsSecure reports whether the session is encrypted (PASE or CASE).
 func (s *Session) IsSecure() bool { return s.secure != nil }
 
+// UsesMRP reports whether the session runs MRP: not over a reliable
+// carrier (matter.js Session.ts:355-356).
+func (s *Session) UsesMRP() bool { return !s.m.reliable }
+
 // NodeID is our node id on the session: the ephemeral initiator node id
 // on an unsecured session we opened, the operational node id on a CASE
 // session and 0 on a PASE session and on an unsecured session the peer

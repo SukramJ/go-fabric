@@ -149,6 +149,22 @@ func (d Device) clone() Device {
 	return d
 }
 
+// SupportedOverBLE reports whether a BLE scan can select by id: an
+// instance id and a device type are not in a BLE advertisement. Mirrors
+// matter.js 0ceb202d packages/protocol/src/common/BleScanner.ts:476-496
+// (#buildCommissionableQueryIdentifier, undefined for both).
+func (id Identifier) SupportedOverBLE() bool {
+	return id.kind != identifyInstance && id.kind != identifyDeviceType
+}
+
+// MatchesBLE reports whether id selects d, a device a BLE advertisement
+// describes (controller/ble): as [Identifier] does over DNS-SD, and
+// never for an identifier [Identifier.SupportedOverBLE] refuses. Mirrors
+// BleScanner.ts:497-541 (#getCommissionableDevices).
+func (id Identifier) MatchesBLE(d *Device) bool {
+	return id.SupportedOverBLE() && id.matches(d)
+}
+
 // matches reports whether d is selected by id. Mirrors matter.js 0ceb202d
 // CommissionableMdnsScanner.ts:533-561.
 func (id Identifier) matches(d *Device) bool {

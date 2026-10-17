@@ -14,8 +14,11 @@ package bridge
 // it is.
 
 import (
+	"context"
 	"net"
 	"time"
+
+	"github.com/SukramJ/go-fabric/transport"
 
 	"github.com/SukramJ/go-fabric/internal/bridgeseam"
 	"github.com/SukramJ/go-fabric/internal/channelseam"
@@ -76,6 +79,27 @@ func init() {
 		// the impossible case, not an expected one.
 		anchor := channelseam.AnchorPeerCounter
 		return anchor != nil && anchor(sess, counter)
+	}
+
+	bridgeseam.ReceiveOnConn = func(b any, c transport.Conn, msg []byte, release func()) bool {
+		br, ok := b.(*Bridge)
+		if !ok || br == nil || c == nil {
+			return false
+		}
+		// As handleTCPMessage: the dispatch context carries the release of
+		// the connection's turn.
+		ctx := context.WithValue(br.handlerContext(), sessionTurnKey{}, release)
+		_ = br.receive(ctx, msg, c)
+		return true
+	}
+
+	bridgeseam.ConnClosed = func(b any, c transport.Conn) bool {
+		br, ok := b.(*Bridge)
+		if !ok || br == nil || c == nil {
+			return false
+		}
+		br.evictConn(c)
+		return true
 	}
 
 	bridgeseam.AckPumpTick = func(b any, now time.Time) (int, bool) {

@@ -87,6 +87,18 @@ func maxResponseTime(p Intervals, peerActive bool) time.Duration {
 	return total
 }
 
+// ReliableMaxPeerResponseTime is how long an exchange waits for the
+// peer's next message on a reliable channel without MRP: 30 s, or the
+// expected processing time when longer, plus the 5 s buffer. Mirrors
+// matter.js MRP.ts:111-113 (the "ble" case; the "tcp" case at :90-92 is
+// the same).
+func ReliableMaxPeerResponseTime(expectedProcessingTime time.Duration) time.Duration {
+	return max(reliablePeerResponseTime, expectedProcessingTime) + peerResponseTimeBuffer
+}
+
+// reliablePeerResponseTime is the 30 s base of a reliable channel (MRP.ts:92, :113).
+const reliablePeerResponseTime = 30 * time.Second
+
 // MaxPeerResponseTime is how long an exchange waits for the peer's next
 // message over UDP with MRP: our own worst-case retransmission time
 // (local intervals, assumed active), the expected processing time and a

@@ -96,6 +96,10 @@ func (p *sessionProvider) MaximumPeerResponseTime(ept time.Duration, includeSend
 	if ept == 0 {
 		ept = exchange.DefaultExpectedProcessingTime
 	}
+	if !p.s.UsesMRP() {
+		// A reliable channel (BTP) waits the channel's time (MRP.ts:111-113).
+		return exchange.ReliableMaxPeerResponseTime(ept)
+	}
 	local := exchange.IntervalsOf(p.mgr.LocalParameters())
 	if !includeSending {
 		return exchange.MaxPeerResponseTime(nil, false, local, ept)

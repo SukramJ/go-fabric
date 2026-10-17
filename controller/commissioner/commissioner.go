@@ -78,10 +78,28 @@ type Context struct {
 	Resumption handshake.ResumptionStore
 }
 
+// Channel is a commissioning channel other than the controller's UDP
+// socket: a BLE connection's BTP session (controller/ble.Channel) —
+// matter.js's BLE paseChannel (ControllerCommissioner.ts:442-449). PASE
+// runs on its exchange manager, whose carrier is reliable, so no MRP runs
+// (exchange.Config.Reliable).
+type Channel interface {
+	// Exchanges is the manager whose sessions run over the channel.
+	Exchanges() *exchange.Manager
+	// PeerAddress is the address that manager names the peer by.
+	PeerAddress() *net.UDPAddr
+	// Closed is closed when the channel is gone.
+	Closed() <-chan struct{}
+	// ClosedCause is the error the PASE session over a lost channel ends
+	// with (matter.js BleChannelClosedError, packages/protocol/src/ble/Ble.ts:17-22).
+	ClosedCause() error
+	// Close closes the channel.
+	Close() error
+}
+
 // Options configures [Commissioner.Commission] — matter.js
 // LocatedNodeCommissioningOptions (ControllerCommissioner.ts:134-170)
-// with CommissioningOptions (:62-118), without the BLE, Wi-Fi, Thread and
-// OTA provider options.
+// with CommissioningOptions (:62-118), without the OTA provider option.
 type Options struct {
 	// Fabric is the fabric to commission into. Required.
 	Fabric *Fabric
@@ -90,8 +108,14 @@ type Options struct {
 	// NodeID is the node id to assign; 0 draws a random operational node
 	// id no peer of the fabric has (:569-582).
 	NodeID uint64
-	// Addresses are the device's addresses. Required.
+	// Addresses are the device's addresses. Required unless Channel is set.
 	Addresses []*net.UDPAddr
+	// Channel, when set, is the commissioning channel PASE runs over
+	// instead of Addresses: a BLE peripheral's (matter.js's BLE address,
+	// ControllerCommissioner.ts:442-449). The flow then configures the
+	// operational network (ControllerCommissioningFlow.ts:595-620), and
+	// Commission closes the channel with the PASE session.
+	Channel Channel
 	// DiscoveryData is the device as discovery found it, nil when
 	// unknown: its TXT parameters seed the PASE session (:454-463) and its
 	// instance id makes the addresses one device's (:547-566).
@@ -231,17 +255,27 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 	if opts.Timeout == 0 {
 		opts.Timeout = DefaultPASETimeout
 	}
-	res, err := c.establishFromCandidates(ctx, addressesToCandidates(opts.Addresses, opts.DiscoveryData), opts.Timeout, opts.Passcode, true)
-	if err != nil {
-		return Result{}, err
+	var session *exchange.Session
+	if opts.Channel != nil {
+		s, err := c.establishOverChannel(ctx, opts.Channel, opts.Timeout, opts.Passcode)
+		if err != nil {
+			_ = opts.Channel.Close()
+			return Result{}, err
+		}
+		session = s
+	} else {
+		res, err := c.establishFromCandidates(ctx, addressesToCandidates(opts.Addresses, opts.DiscoveryData), opts.Timeout, opts.Passcode, true)
+		if err != nil {
+			return Result{}, err
+		}
+		session = res.session
 	}
-	session := res.session
 	nodeID := opts.NodeID
 	if opts.ClaimNodeIDAfterPASE != nil {
 		id, ok := opts.ClaimNodeIDAfterPASE()
 		if !ok {
 			err := newError(ErrCommissioning, "Commissioning cancelled: another device was already successfully connected", nil)
-			c.closePASESession(session, err)
+			c.closePASE(session, opts.Channel, err)
 			return Result{}, err
 		}
 		nodeID = id
@@ -249,10 +283,10 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 	opts.NodeID = nodeID
 	result, err := c.commissionConnectedNode(ctx, session, opts)
 	if err != nil {
-		c.closePASESession(session, err)
+		c.closePASE(session, opts.Channel, err)
 		return Result{}, err
 	}
-	c.closePASESession(session, &CommissioningTransitionError{Message: "Commissioning over PASE completed"})
+	c.closePASE(session, opts.Channel, &CommissioningTransitionError{Message: "Commissioning over PASE completed"})
 	return result, nil
 }
 
@@ -262,6 +296,39 @@ func (c *Commissioner) Commission(ctx context.Context, opts Options) (Result, er
 // that ended commissioning (:313-319).
 func (c *Commissioner) closePASESession(s *exchange.Session, cause error) {
 	s.HandlePeerLoss(cause)
+}
+
+// closePASE closes the PASE session and the channel it ran over, as
+// closing a BLE session's MessageChannel closes its BLE channel
+// (matter.js packages/protocol/src/protocol/MessageChannel.ts:179-191).
+func (c *Commissioner) closePASE(s *exchange.Session, ch Channel, cause error) {
+	c.closePASESession(s, cause)
+	if ch != nil {
+		_ = ch.Close()
+	}
+}
+
+// establishOverChannel is PASE over a commissioning channel
+// (ControllerCommissioner.ts:442-492 for a BLE address): the unsecured
+// session on the channel's manager, PASE with the passcode within
+// timeout, peer loss suppressed; a lost channel force-closes the PASE
+// session so its exchanges end at once (Ble.ts:17-22, :44-55).
+func (c *Commissioner) establishOverChannel(ctx context.Context, ch Channel, timeout time.Duration, passcode uint32) (*exchange.Session, error) {
+	c.log.Info("matter.controller.commissioning.establish_pase", slog.String("address", ch.PeerAddress().String()), slog.String("channel", "ble"))
+	pctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	s, err := handshake.PASE(pctx, ch.Exchanges(), ch.PeerAddress(), passcode, handshake.PASEOptions{SuppressPeerLoss: true, Logger: c.log})
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		select {
+		case <-ch.Closed():
+			s.HandlePeerLoss(ch.ClosedCause())
+		case <-s.Closing():
+		}
+	}()
+	return s, nil
 }
 
 // EstablishPASE establishes a PASE session without running the flow.
@@ -426,7 +493,11 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 		return Result{}, err
 	}
 	c.log.Info("matter.controller.commissioning.start", slog.Uint64("node", address.NodeID), slog.Uint64("fabric", opts.Fabric.FabricID))
-	f := newFlow(c, interaction.New(c.ctx.Exchanges, pase, c.log), opts, address, pase.AttestationChallenge(),
+	mgr := c.ctx.Exchanges
+	if opts.Channel != nil {
+		mgr = opts.Channel.Exchanges()
+	}
+	f := newFlow(c, interaction.New(mgr, pase, c.log), opts, address, pase.AttestationChallenge(),
 		func(ctx context.Context, addr handshake.PeerAddress, concurrent bool) (*interaction.Interaction, error) {
 			return c.transitionToCase(ctx, pase, addr, concurrent, opts)
 		})
@@ -449,7 +520,7 @@ func (c *Commissioner) commissionConnectedNode(ctx context.Context, pase *exchan
 // after 15 s, and the CASE session is the interaction's from then on.
 func (c *Commissioner) transitionToCase(ctx context.Context, pase *exchange.Session, addr handshake.PeerAddress, concurrent bool, opts Options) (*interaction.Interaction, error) {
 	if !concurrent {
-		c.closePASESession(pase, &CommissioningTransitionError{Message: "Commissioning session closed because node has now joined fabric"})
+		c.closePASE(pase, opts.Channel, &CommissioningTransitionError{Message: "Commissioning session closed because node has now joined fabric"})
 	}
 	if opts.FinalizeCommissioning != nil {
 		return nil, opts.FinalizeCommissioning(ctx, addr, opts.DiscoveryData, pase.ReportedParameters())

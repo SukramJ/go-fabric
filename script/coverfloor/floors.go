@@ -82,6 +82,8 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/commissioning", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/conformance", min: 93},
 	{pkg: "github.com/SukramJ/go-fabric/controller/attestation", min: 89},
+	{pkg: "github.com/SukramJ/go-fabric/controller/ble", min: 90},
+	{pkg: "github.com/SukramJ/go-fabric/controller/ble/bletest", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ca", min: 88},
 	{pkg: "github.com/SukramJ/go-fabric/controller/ca/keyfile", min: 73},
 	{pkg: "github.com/SukramJ/go-fabric/controller/client", min: 85},
