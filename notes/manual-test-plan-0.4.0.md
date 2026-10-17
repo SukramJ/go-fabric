@@ -56,6 +56,7 @@ Befehlsreferenz steht in `examples/reference-controller/README.md`.
 | C8 | Controller-Prozess beenden, neu starten, `nodes` | Dieselbe Fabric, dieselbe Root-Node-Id (persistierte Fabric); alle Nodes antworten ohne Neukommissionierung. |
 | C9 | loom aus dem Referenz-Controller pairen (`pair --code <loom-QR>`), `nodes`, `node <id>` | Das Verdict von loom aus Sicht des eigenen Device-Type-Validators; jede `violated`-Zeile ist ein Befund für loom oder für `device/`. |
 | C10 | Gerät mit CommissionerControl (nur falls vorhanden, z. B. ein Fabric-Sync-Bridge-Beispiel von chip) | Entfällt sonst; der Nachweis ist `TestLiveCommissionerControl`. |
+| C11 | `window open <id>` an einem über den Referenz-Controller gepairten Gerät, dann das Gerät mit dem ausgegebenen QR- oder Manual-Code in Apple Home hinzufügen; danach `window revoke <id>` | Apple Home kommissioniert das Gerät als zweiten Admin; `read <id> 0/OperationalCredentials/Fabrics` zeigt zwei Fabrics; `revoke` ohne offenes Fenster meldet „no commissioning window open“. In-Repo-Nachweis: `TestReferenceControllerWindow`. |
 
 ## Teil N — Netz und Zeit
 

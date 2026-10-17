@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `examples/reference-controller`: `window open <node> [--timeout s] [--basic]` and `window revoke <node>` — an enhanced commissioning window with a random passcode, discriminator and salt (the manual and QR code printed), or a basic one, for adding a paired node to a second ecosystem; a stale window is revoked first, as matter.js's `CommissioningClient` does.
+
 ### Documentation
 
 - `docs/roadmap.md`: the roadmap to complete Matter 1.6.1 wherever matter.js implements it — seven milestones, one minor version each, three-pillar definition of done; concept v3 becomes milestone 1.

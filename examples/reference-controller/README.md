@@ -146,6 +146,27 @@ its error on stderr.
   reference-controller ota serve --image light-v2.ota --announce 0x4321 --once
   ```
 
+- `window open <node> [--timeout s] [--basic]` — opens a commissioning
+  window on a paired node so a second administrator (Apple Home, Google
+  Home, another controller) can add it. Enhanced (the default) draws a
+  random discriminator, passcode and 32-byte salt, sends
+  OpenCommissioningWindow with the PAKE verifier (1000 PBKDF iterations)
+  and prints the discriminator, passcode, manual code and QR code; the
+  node's vendor and product ids are read for the QR code. `--basic` sends
+  OpenBasicCommissioningWindow — the device's own code — and fails when
+  the node does not advertise the Basic (BC) feature. `--timeout` is the
+  window's lifetime in seconds (default 900); after `window open` it is the
+  window's, so the network `--timeout` goes before the command. Any window
+  already open is revoked first. Both follow matter.js's
+  `CommissioningClient` (`openEnhancedCommissioningWindow`,
+  `openBasicCommissioningWindow`).
+  `window revoke <node>` — RevokeCommissioning; a node without an open
+  window is reported, not an error.
+
+  ```sh
+  reference-controller window open 0x4321 --timeout 600
+  ```
+
 ## The controller's own node
 
 A group message is sealed and sent by a node of the fabric, and an OTA

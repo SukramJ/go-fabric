@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5159,
+  "entry_points": 5163,
   "entry_packages": [
     ".",
     "bdx",
@@ -213,9 +213,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12517,
+    "total_exported": 12521,
     "reachable": 8869,
-    "whitelisted": 3643,
+    "whitelisted": 3647,
     "unreachable": 5
   },
   "by_package": [
@@ -19239,17 +19239,45 @@
     },
     {
       "package": "examples/reference-controller",
+      "identifier": "TestPakePasscodeVerifier",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/window_test.go",
+      "line": 21
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestRandomWindowCredentials",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/window_test.go",
+      "line": 45
+    },
+    {
+      "package": "examples/reference-controller",
       "identifier": "TestReferenceController",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/main_test.go",
-      "line": 323
+      "line": 335
     },
     {
       "package": "examples/reference-controller",
       "identifier": "TestReferenceControllerOTA",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/main_test.go",
-      "line": 468
+      "line": 480
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestReferenceControllerWindow",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/window_test.go",
+      "line": 67
+    },
+    {
+      "package": "examples/reference-controller",
+      "identifier": "TestWindowTimeout",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/window_test.go",
+      "line": 142
     },
     {
       "package": "groups",

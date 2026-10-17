@@ -75,8 +75,9 @@ type command struct {
 	run   func(e *env, args []string) error
 }
 
-// commands is every subcommand. "group" and "ota" dispatch on their second
-// word. It is filled in init: the commands' usage errors refer to it.
+// commands is every subcommand. "group", "ota" and "window" dispatch on
+// their second word. It is filled in init: the commands' usage errors
+// refer to it.
 var commands map[string]command
 
 func init() {
@@ -93,6 +94,7 @@ func init() {
 		"group":     {"group create <id> --key <hex|random> --nodes <n,n…> --endpoints <e,e…> | group send <id> <Cluster>/<Command> [<json>]", cmdGroup},
 		"bind":      {"bind <node> <ep> --to <node>/<ep>[/<Cluster>] | --group <id>", cmdBind},
 		"ota":       {"ota serve --image <file> [--version N] [--vendor N] [--product N] [--announce <node>] [--once] [--yes]", cmdOTA},
+		"window":    {"window open <node> [--timeout s] [--basic] | window revoke <node>", cmdWindow},
 	}
 }
 
