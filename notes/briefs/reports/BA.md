@@ -1,8 +1,10 @@
 # Report BA — milestone 1, phase 12: BTP, the BLE central seam, the network steps
 
 Branch `m1/phase-12` from `docs/roadmap` (d74f5d6), rebased onto
-`origin/main` (b4ffec3: `docs/roadmap` is merged as #141 and gone from the
-remote; one conflict in `docs/matterjs-comparison.md`, both rows kept).
+`origin/main` — first b4ffec3 (`docs/roadmap` is merged as #141 and gone
+from the remote; one conflict in `docs/matterjs-comparison.md`, both rows
+kept), then ba7a0dd (AZ merged as #143; CHANGELOG and floors kept both
+sides, the reachability inventory regenerated in c55ff24).
 matter.js read at `0ceb202d` (`git show`), chip at `6170af84`. Every item
 commit carries its reachability inventory (unreached unchanged at 5) and a
 CHANGELOG entry. AZ's files are untouched (in `examples/reference-controller`
@@ -10,11 +12,12 @@ only `pair.go` changed, plus a new `pair_test.go`).
 
 | Commit | Item |
 | --- | --- |
-| 04b7ecc `feat(transport/btp)` | 1 |
-| 7d1902e `feat(controller/ble)` | 2 |
-| 8702e3b `feat(controller/commissioner): the Wi-Fi and Thread network steps` | 3 |
-| d926601 `feat(cluster/core): a simulated Wi-Fi NetworkCommissioning` | 4 |
-| 55baa5b `test(bridgetest): ServeConn's own coverage` | guard |
+| e7d4f84 `feat(transport/btp)` | 1 |
+| be4246d `feat(controller/ble)` | 2 |
+| ca24db9 `feat(controller/commissioner): the Wi-Fi and Thread network steps` | 3 |
+| 27574fe `feat(cluster/core): a simulated Wi-Fi NetworkCommissioning` | 4 |
+| f635dd2 `test(bridgetest): ServeConn's own coverage` | guard |
+| c55ff24 `chore(reachability): regenerate after the rebase onto #143` | guard |
 
 ## 1. `transport/btp`
 
@@ -169,13 +172,15 @@ NetworkCommissioningCluster.cpp:417-445) — the proof uses `secret12`.
 
 ## Guards
 
-All at HEAD 55baa5b (the report commit after it is notes-only).
+`make ci` and `make race` at HEAD c55ff24 (after the second rebase), the
+full `make fuzz` at 55baa5b (before it; no fuzz target moved since).
 
-- `make ci` — exit 0 (build, vet, test, lint, cover-check). A first run at
-  d926601 failed cover-check only: `bridge/bridgetest` 85.4 % < 92 %;
-  fixed by 55baa5b (92.8 %). New floors: `transport/btp` 93,
+- `make ci` — exit 0 at c55ff24 (and at 55baa5b). A first run at the item 4
+  commit failed cover-check only: `bridge/bridgetest` 85.4 % < 92 %; fixed
+  by the guard commit (92.8 %). New floors: `transport/btp` 93,
   `controller/ble` 90, `controller/ble/bletest` 90.
-- `make race` (CGO_ENABLED=1) — exit 0, whole module.
+- `make race` (CGO_ENABLED=1) — exit 0 at c55ff24 (and at 55baa5b), whole
+  module. `FuzzDecodePacket` at 100000x — exit 0 at c55ff24.
 - `make fuzz` — exit 2 at `./tlv FuzzEncodeDecodeRoundTrip` ("utf8
   round-trip: got \"\ufffd\", want \"\xca\"", fuzz_codec_test.go:154),
   reproducible, in a package this branch does not touch — a pre-existing
