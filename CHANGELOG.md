@@ -24,6 +24,7 @@ pseudo-version of `main`.
 
 ### Documentation
 
+- `README.md`: a status table after the opening paragraph — device and controller side, BLE, Thread, ICD, certification, verified ecosystems — each row linked to the roadmap, the comparison or the certifiability page.
 - `docs/roadmap.md`: the roadmap to complete Matter 1.6.1 wherever matter.js implements it — seven milestones, one minor version each, three-pillar definition of done; concept v3 becomes milestone 1.
 
 ## [0.6.0] — 2026-10-17
