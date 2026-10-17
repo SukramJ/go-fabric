@@ -116,6 +116,12 @@ type Options struct {
 	// operational network (ControllerCommissioningFlow.ts:595-620), and
 	// Commission closes the channel with the PASE session.
 	Channel Channel
+	// WiFiNetwork, when set, is the Wi-Fi network the device is to join
+	// (wifiNetwork, ControllerCommissioningFlow.ts:102-105).
+	WiFiNetwork *WiFiNetwork
+	// ThreadNetwork, when set, is the Thread network the device is to
+	// join (threadNetwork, :110-113).
+	ThreadNetwork *ThreadNetwork
 	// DiscoveryData is the device as discovery found it, nil when
 	// unknown: its TXT parameters seed the PASE session (:454-463) and its
 	// instance id makes the addresses one device's (:547-566).

@@ -63,12 +63,13 @@ Reports flow the other way through the subscription engine
 
 ```
 controller/discovery     DNS-SD browse for commissionable and operational nodes
-controller/exchange      unsecured and secure sessions, exchanges, MRP (initiator side)
+controller/ble           BLE scanner, the Central seam, the BTP commissioning channel (transport/btp)
+controller/exchange      unsecured and secure sessions, exchanges, MRP (initiator side; none over BTP)
 controller/handshake     PASE and CASE as initiator, CASE responder for reconnects
 controller/ca            the fabric's root CA, NOC issuance
 controller/attestation   DAC → PAI → PAA, Certification Declaration, revocation hook
 controller/dcl           CSA Distributed Compliance Ledger client (opt-in)
-controller/commissioner  the commissioning flow (ControllerCommissioningFlow)
+controller/commissioner  the commissioning flow (ControllerCommissioningFlow), incl. the Wi-Fi / Thread network steps
 controller/interaction   Read, Write, Invoke, Subscribe as a client
 controller/peer          peer sets, address monitoring, session resumption
 controller/client        a typed image of each remote node, the registry, sqlstore
