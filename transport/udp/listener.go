@@ -76,6 +76,9 @@ type Listener struct {
 	// sem bounds concurrent per-datagram dispatch goroutines; see
 	// [maxConcurrentDispatch].
 	sem chan struct{}
+	// inflight counts the dispatch goroutines still running a handler,
+	// ordered and unordered, for [Listener.WaitIdle].
+	inflight sync.WaitGroup
 
 	// recoveredPanics counts handler panics [Listener.safeDispatch]
 	// recovered. Exposed via [Listener.RecoveredPanics] so a diagnostic
@@ -201,7 +204,9 @@ func (l *Listener) Serve(ctx context.Context, handler Handler) error {
 		// burst) drop the datagram — UDP is unreliable and peers retransmit.
 		select {
 		case l.sem <- struct{}{}:
+			l.inflight.Add(1)
 			go func() {
+				defer l.inflight.Done()
 				defer func() { <-l.sem }()
 				l.safeDispatch(handler, datagram, src)
 			}()
@@ -239,6 +244,24 @@ func (l *Listener) safeDispatch(handler Handler, buf []byte, src *net.UDPAddr) {
 		}
 	}()
 	handler(buf, src)
+}
+
+// WaitIdle blocks until every handler a dispatch goroutine is running
+// has returned, or ctx ends (its error is returned then). A host calls it
+// after the serve loop stopped, so that no handler — and no host code a
+// handler calls — still runs once shutdown reports done.
+func (l *Listener) WaitIdle(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		l.inflight.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // RecoveredPanics reports how many handler panics this listener has

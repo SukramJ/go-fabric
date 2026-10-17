@@ -101,12 +101,37 @@ const MaxDiscriminator = 0x0FFF
 const base38Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-."
 
 // QRCode encodes p into the "MT:..." onboarding string per Matter
-// §5.7. Errors out when p fails Validate.
+// §5.7. Errors out when p fails Validate, and refuses what matter.js's
+// encoder refuses: a version other than 0 and an invalid passcode
+// (QrPairingCodeSchema.validate, PairingCodeSchema.ts:279-286 at
+// 0ceb202d, INVALID_PASSCODES :160-162). The vendor/product identity rules
+// bind a code being read only (validateDecoded, :288-293): [DecodeQRCode]
+// applies them, the encoder does not.
 func QRCode(p Payload) (string, error) {
+	return qrCode(p, true)
+}
+
+// qrCode is [QRCode]; check false skips matter.js's encoder validation
+// (Schema.encode's validate), for tests that need a code the encoder
+// refuses.
+func qrCode(p Payload, check bool) (string, error) {
 	if err := p.Validate(); err != nil {
 		return "", err
 	}
+	if !check {
+		return qrEncode(p)
+	}
+	if p.Version != 0 {
+		return "", fmt.Errorf("setup: unsupported onboarding payload version %d", p.Version)
+	}
+	if !IsValidSetupPIN(p.Passcode) {
+		return "", fmt.Errorf("setup: invalid passcode %d", p.Passcode)
+	}
+	return qrEncode(p)
+}
 
+// qrEncode packs a validated payload.
+func qrEncode(p Payload) (string, error) {
 	// Pack into a single 88-bit big.Int per §5.1.4.1, low-bit-first
 	// allocation order (matches connectedhomeip's reference implementation
 	// `QRCodeSetupPayloadGenerator::payloadBase38Representation`).
@@ -195,18 +220,39 @@ func base38Encode(b []byte) string {
 //	digits 7-10: passcode >> 14, 4 digits
 //	digit 11  :  Verhoeff check digit over digits 1..10
 //
-// versionFlag is 0 in v1.1 (vendor + product not embedded). When
-// vendor/product carry is needed, supply a 21-digit code via a
-// future ManualCodeLong helper.
+// versionFlag is 0 here (vendor + product not embedded); [ManualCodeLong]
+// writes the 21-digit form that carries them. A trivial passcode is
+// refused, as matter.js's encoder refuses it (ManualPairingCodeSchema.validate,
+// PairingCodeSchema.ts:429-430 at 0ceb202d).
 func ManualCode(discriminator uint16, passcode uint32) (string, error) {
+	return manualCode(discriminator, passcode, nil, true)
+}
+
+// ManualCodeLong returns the 21-digit manual pairing code, which carries
+// the vendor and product id after the 10 digits of the short form and
+// sets the VID_PID_PRESENT bit of the first digit. Mirrors matter.js
+// ManualPairingCodeSchema.encodeInternal (PairingCodeSchema.ts:440-454 at
+// 0ceb202d): the first digit is (discriminator >> 10) | 1 << 2, the vendor
+// and product id are five digits each, and the Verhoeff check digit
+// closes the code.
+func ManualCodeLong(discriminator uint16, passcode uint32, vendorID, productID uint16) (string, error) {
+	return manualCode(discriminator, passcode, &[2]uint16{vendorID, productID}, true)
+}
+
+// manualCode writes the short or (vendorProduct set) long form; validate
+// false skips the passcode validation, for tests.
+func manualCode(discriminator uint16, passcode uint32, vendorProduct *[2]uint16, validate bool) (string, error) {
 	if discriminator > MaxDiscriminator {
 		return "", fmt.Errorf("setup: Discriminator=0x%X exceeds 12-bit width", discriminator)
 	}
-	if passcode == 0 || passcode > 99999998 {
-		return "", fmt.Errorf("setup: Passcode=%d outside 1..99999998", passcode)
+	if passcode > 99999998 || (validate && !IsValidSetupPIN(passcode)) {
+		return "", fmt.Errorf("setup: invalid passcode %d", passcode)
 	}
 
 	upperDisc := uint32(discriminator>>10) & 0x3
+	if vendorProduct != nil {
+		upperDisc |= 1 << 2
+	}
 	midDisc := uint32(discriminator>>8) & 0x3 // discriminator bits 9..8
 
 	digit1 := upperDisc
@@ -220,6 +266,9 @@ func ManualCode(discriminator uint16, passcode uint32) (string, error) {
 	tenDigits := first + mid + last
 	if len(tenDigits) != 10 {
 		return "", fmt.Errorf("setup: assembled %d digits, want 10", len(tenDigits))
+	}
+	if vendorProduct != nil {
+		tenDigits += fmt.Sprintf("%05d%05d", vendorProduct[0], vendorProduct[1])
 	}
 
 	check, err := verhoeffCheck(tenDigits)

@@ -130,13 +130,16 @@ func NewCommodityPrice(cfg CommodityPriceConfig) (*CommodityPriceServer, error) 
 	if cfg.Features&cp.FeatureForecasting != 0 {
 		initial[cp.AttrPriceForecast] = []CommodityPrice{}
 	}
-	srv, err := spec.NewServer(cp.Definition, opts, spec.ServerConfig{DataVersion: cfg.DataVersion, Initial: initial})
+	s := &CommodityPriceServer{}
+	handlers := map[uint32]spec.CommandHandler{
+		cp.CmdGetDetailedPriceRequest:    s.getDetailedPrice,
+		cp.CmdGetDetailedForecastRequest: s.getDetailedForecast,
+	}
+	srv, err := spec.NewServer(cp.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion, Initial: initial})
 	if err != nil {
 		return nil, fmt.Errorf("energy: %w", err)
 	}
-	s := &CommodityPriceServer{Instance: srv.Instance, srv: srv}
-	srv.Handle(cp.CmdGetDetailedPriceRequest, s.getDetailedPrice)
-	srv.Handle(cp.CmdGetDetailedForecastRequest, s.getDetailedForecast)
+	s.Instance, s.srv = srv.Instance, srv
 	return s, nil
 }
 

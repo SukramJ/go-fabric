@@ -39,8 +39,10 @@ type Observers struct {
 	// of an AddNOC) deleted a fabric and the facade's cleanup ran: the
 	// fabric, its ACL and its keys are gone from the store, its CASE
 	// identity and operational record are withdrawn, its sessions are
-	// told and closed (the invoking one after the response), and the
-	// node's own window is reopened when it was the last fabric. Mirrors
+	// told and closed (the invoking one after the response). When it was
+	// the last fabric the node's own window reopens afterwards, once the
+	// node is idle — no fail-safe armed and no session left (matter.js
+	// #resetWhenIdle); OnWindowTransition reports that. Mirrors
 	// matter.js FabricManager `events.deleted` (FabricManager.ts:253).
 	OnFabricRemoved func(FabricInfo) error
 	// OnFabricUpdated runs after an UpdateNOC (or the fail-safe rollback

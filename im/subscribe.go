@@ -225,23 +225,22 @@ type SubscribeResponse struct {
 
 // MarshalTLV encodes sr.
 //
-// Per Matter Core Spec §8.5.5.5 SubscriptionId is `uint32` and
-// MaxInterval is `uint16` — both are spec-fixed widths, not magnitude-
-// driven. Strict commissioner IM-decoders (chip-tool's `ReadClient`,
-// Apple's MTRDevice) compute the post-establishment subscription
-// liveness timer as `MaxInterval + RoundTripTimeout`; when MaxInterval
-// is encoded as a magnitude-narrowed `uint8` (e.g. value 30 → 1 byte)
-// the strict decoder reads MaxInterval as 0 / unparsed and the
-// liveness timer collapses to the round-trip alone (~10 s).
-// Empirically this surfaced as `CHIP Error 0x32 Timeout` from
-// `ReadClient.cpp:745` exactly 10 s after SubscribeResponse — the
-// chip-tool reproducer of the Subscribe-pump hardstop documented in
-// Session 14 §19.4. Same shape as Session 13 Fix #38 for ReportData's
-// DataVersion / SubscriptionId.
+// SubscriptionId keeps the fixed 4-byte form Apple's MTRDevice needs
+// (by_design L5-Apple-Width). MaxInterval is encoded at the smallest
+// fitting width, as matter.js does (TlvSubscribeResponse.ts:18 at
+// 0ceb202d); chip reads it with TLVReader::Get(uint16_t&), which accepts
+// any unsigned width that fits (src/app/MessageDef/SubscribeResponseMessage.cpp:87-90,
+// src/lib/core/TLVReader.cpp:216-226 at 6170af84), so an earlier note
+// here that a narrowed MaxInterval collapses chip-tool's liveness timer
+// does not match chip's reader.
 func (sr SubscribeResponse) MarshalTLV(enc *tlv.Encoder) {
 	enc.StartStruct(tlv.AnonymousTag())
 	enc.PutUint32(tlv.ContextTag(tagSubRespSubscriptionID), sr.SubscriptionID)
-	enc.PutUint16(tlv.ContextTag(tagSubRespMaxInterval), sr.MaxInterval)
+	// MaxInterval at the smallest fitting width: matter.js
+	// packages/types/src/protocol/messages/TlvSubscribeResponse.ts:18 at
+	// 0ceb202d (TlvUInt16, length from the value). Only SubscriptionId
+	// keeps the fixed 4-byte form (by_design L5-Apple-Width).
+	enc.PutUint(tlv.ContextTag(tagSubRespMaxInterval), uint64(sr.MaxInterval))
 	enc.PutUint(tlv.ContextTag(tagInteractionModelRevision), uint64(MatterInteractionModelRevision))
 	_ = enc.EndContainer()
 }

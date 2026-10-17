@@ -341,6 +341,11 @@ type storedBinding struct {
 	Endpoint    uint16 `json:"endpoint,omitempty"`
 	Cluster     uint32 `json:"cluster,omitempty"`
 	FabricIndex uint8  `json:"fabricIndex"`
+	// EndpointPresent / ClusterPresent keep a target naming endpoint 0
+	// or cluster 0 (core.TargetStruct's presence flags); absent in a list
+	// stored before they existed, which then reads as before.
+	EndpointPresent bool `json:"endpointPresent,omitempty"`
+	ClusterPresent  bool `json:"clusterPresent,omitempty"`
 }
 
 // bindingConfig keeps the Binding list of the endpoint under key in the
@@ -363,14 +368,14 @@ func (p persisted) bindingConfig(ctx context.Context, key string) mattercore.Bin
 			}
 			out := make([]mattercore.TargetStruct, 0, len(stored))
 			for _, e := range stored {
-				out = append(out, mattercore.TargetStruct{Node: e.Node, Group: e.Group, Endpoint: e.Endpoint, Cluster: e.Cluster, FabricIndex: e.FabricIndex})
+				out = append(out, mattercore.TargetStruct{Node: e.Node, Group: e.Group, Endpoint: e.Endpoint, Cluster: e.Cluster, FabricIndex: e.FabricIndex, EndpointPresent: e.EndpointPresent, ClusterPresent: e.ClusterPresent})
 			}
 			return out, nil
 		},
 		Save: func(list []mattercore.TargetStruct) error {
 			stored := make([]storedBinding, 0, len(list))
 			for _, e := range list {
-				stored = append(stored, storedBinding{Node: e.Node, Group: e.Group, Endpoint: e.Endpoint, Cluster: e.Cluster, FabricIndex: e.FabricIndex})
+				stored = append(stored, storedBinding{Node: e.Node, Group: e.Group, Endpoint: e.Endpoint, Cluster: e.Cluster, FabricIndex: e.FabricIndex, EndpointPresent: e.HasEndpoint() && e.Endpoint == 0, ClusterPresent: e.HasCluster() && e.Cluster == 0})
 			}
 			b, err := json.Marshal(stored)
 			if err == nil {

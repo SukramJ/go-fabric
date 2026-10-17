@@ -85,11 +85,14 @@ func TestStartReaper_ActiveSessionSurvivesSweeps(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	m.StartReaper(ctx, 50*time.Millisecond, 10*time.Millisecond)
+	// The idle timeout is 25× the marking cadence: a scheduler stall on a
+	// loaded machine (a full `make ci` beside the harness) used to stretch
+	// one 10 ms sleep past a 50 ms timeout and evict the live session.
+	m.StartReaper(ctx, 250*time.Millisecond, 10*time.Millisecond)
 
 	// Keep the peer "alive" for well over the TTL: mark every 10 ms for
-	// 200 ms (4× the idle timeout) while the sweep runs concurrently.
-	stopMarking := time.Now().Add(200 * time.Millisecond)
+	// 750 ms (3× the idle timeout) while the sweep runs concurrently.
+	stopMarking := time.Now().Add(750 * time.Millisecond)
 	for time.Now().Before(stopMarking) {
 		entry.MarkActiveRx()
 		time.Sleep(10 * time.Millisecond)

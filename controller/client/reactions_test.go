@@ -130,13 +130,13 @@ func TestReactionLeave(t *testing.T) {
 	sr.pushEvents(t, 33, leaveEvent(12, 3))
 	waitUntil(t, "the deletion", func() bool { return sr.reg.Size() == 0 })
 	client.WaitRegistry(sr.reg)
+	// The store is waited on, not read once (report AU: one -race run read
+	// it before the erase was visible).
+	waitUntil(t, "the erased store", func() bool { ids, _ := sr.store.NodeIDs(); return len(ids) == 0 })
 	sr.hooks.mu.Lock()
 	defer sr.hooks.mu.Unlock()
 	if !slices.Equal(sr.hooks.decommissioned, []string{"peer1"}) || !sr.session.IsPeerLost() || sr.set.Get(scriptedAddr) != nil {
 		t.Fatalf("after the leave: decommissioned %v, session lost %v", sr.hooks.decommissioned, sr.session.IsPeerLost())
-	}
-	if ids, _ := sr.store.NodeIDs(); len(ids) != 0 {
-		t.Fatalf("stored %v", ids)
 	}
 }
 

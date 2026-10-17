@@ -239,14 +239,16 @@ func (rep EventReport) marshal(enc *tlv.Encoder, valueWriter EventDataWriter) {
 		dataPath := rep.Path
 		dataPath.IsUrgent = false
 		dataPath.MarshalTLV(enc, tlv.ContextTag(tagEventDataPath))
-		// EventNumber and EpochTimestamp must be encoded as exactly 8 bytes.
-		// chip-tool's strict IM decoder rejects narrower widths with
-		// CHIP Error 0x26 (Wrong TLV type). Use PutUintWidth(8) rather than
-		// PutUint64 so the fixed-width intent is visible at the callsite;
-		// PutUint64 now uses minimal-fit encoding (matter.js wire parity).
-		enc.PutUintWidth(tlv.ContextTag(tagEventDataNumber), rep.Number, 8)
+		// EventNumber and EpochTimestamp at the smallest fitting width.
+		// Mirrors matter.js packages/types/src/protocol/types/TlvEventData.ts:20,22
+		// at 0ceb202d (TlvEventNumber / TlvPosixMs, both TlvUInt64, whose
+		// length follows the value — TlvNumber.ts:295-299); chip reads the
+		// two through TLVReader::Get(uint64_t&), which takes any unsigned
+		// width (src/app/MessageDef/EventDataIB.cpp:169-177,
+		// src/lib/core/TLVReader.cpp:240-255 at 6170af84).
+		enc.PutUint64(tlv.ContextTag(tagEventDataNumber), rep.Number)
 		enc.PutUint(tlv.ContextTag(tagEventDataPriority), uint64(rep.Priority))
-		enc.PutUintWidth(tlv.ContextTag(tagEventDataEpochTimestamp), rep.Timestamp, 8)
+		enc.PutUint64(tlv.ContextTag(tagEventDataEpochTimestamp), rep.Timestamp)
 		// Tag 7 carries the cluster-specific event payload (TlvAny).
 		// Omit entirely when there is no payload — matter.js treats the
 		// field as optional and an explicit `null` at tag 7 is still

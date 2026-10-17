@@ -296,8 +296,9 @@ func RoundTripAttribute(tb testing.TB, def *spec.Cluster, attrID uint32, v spec.
 // ClusterRevision read as the selection and the definition say; every
 // listed attribute, command and event is defined and allowed, every
 // mandatory one listed, GeneratedCommandList the responses of the accepted
-// requests; the privileges are matter.js's; a write to a served read-only
-// attribute is UNSUPPORTED_WRITE.
+// requests, each with a handler where the server reports one; the
+// privileges are matter.js's; a write to a served read-only attribute is
+// UNSUPPORTED_WRITE.
 func CheckServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, features uint32) {
 	tb.Helper()
 	if srv.MatterClusterID() != def.ID {
@@ -337,6 +338,17 @@ func CheckServer(tb testing.TB, srv contract.ClusterServer, def *spec.Cluster, f
 			checkPresence(tb, def.Name, "command", c.Name, c.Conformance.Applicability(ctx), has)
 			if r := def.CommandByName(c.Response); has && r != nil && !slices.Contains(want, r.ID) {
 				want = append(want, r.ID)
+			}
+		}
+		// An accepted command has an implementation: matter.js lists the
+		// implemented commands only (ValidatedElements.ts:341-343,
+		// ServerBehaviorBacking.ts:130-147 at 0ceb202d). Checked where the
+		// server can say so ([spec.Server.Handles]).
+		if h, ok := srv.(interface{ Handles(cmdID uint32) bool }); ok {
+			for _, id := range accepted {
+				if !h.Handles(id) {
+					tb.Errorf("%s: accepted command 0x%02X has no handler", def.Name, id)
+				}
 			}
 		}
 		slices.Sort(want)

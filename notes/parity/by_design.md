@@ -3025,3 +3025,105 @@ By design. The zero value mirrors matter.js; a Go-only stricter default
 would change what a matter.js-shaped host expects, and the reference
 controller asks on a terminal and rejects otherwise.
 
+### BD-Matter-LastFabricReopenWithoutErase — after the last fabric goes the node reopens its window when idle, without a factory reset
+
+matter.js `CommissioningServer #resetWhenIdle` (`CommissioningServer.ts:174-199`
+at `0ceb202d`) waits until no fail-safe is armed and no session remains,
+cancels if a fabric exists by then, and erases the node
+(`ServerNode.erase()`), which restarts it commissionable. The facade waits
+the same way (`Node.reopenWhenIdle`) and then reopens its own window, but
+erases nothing: a bridge host's endpoint numbers, labels and settings are
+the host's model of its devices, and the fabric-scoped state (ACL, group
+keys, bindings, scenes of the fabric) already left with the fabric.
+Findings wave 2026-10-17.
+
+By design. A reset of the host's device model is the host's decision, not
+a side effect of a controller removing itself.
+
+### BD-Matter-OTAProvider-ACLEveryFabric — the OTA provider's ACL entry goes on every fabric
+
+matter.js adds the provider's Operate/CASE entry on the first fabric only
+(`OtaSoftwareUpdateProviderServer.ts:116-158`, `fabricAuthority.fabrics[0]`
+at `:118`), so a requestor on a second fabric of a multi-admin bridge cannot
+query. `Node.ensureOTAProviderACL` adds it on each fabric. Report AX §8.
+
+By design. Multi-admin is the norm for a bridge; the entry grants the same
+narrow access (Operate, the provider's cluster on its endpoint) per fabric.
+
+### BD-Matter-OTA-MirroredQuirks — consent reset, userConsentNeeded and TC-SU-2.7 follow matter.js
+
+Mirrored as matter.js has them at `0ceb202d`: the provider's
+`directConsentObtained` defaults to false on every state change
+(`OtaSoftwareUpdateProviderServer.ts:570-574`, `:598`); `userConsentNeeded`
+is set from `consentRequired` also after the provider obtained consent
+(`:399`); the requestor treats a failed provider connection as "no update"
+with reason Success (`OtaSoftwareUpdateRequestorServer.ts:630-641`) and a
+BDX failure's DownloadError carries no byte count (`:924-930`, `:993-1002`),
+where chip's TC_SU_2_7.py expects otherwise (manual at the pin). Report AX §8.
+
+By design. Each is a matter.js behaviour with an upstream question; the
+module changes when matter.js does.
+
+### BD-Matter-DCL-MirroredScope — an expired CRL still revokes; the unported DCL parts; context-less seams
+
+`DclCertificateService.ts:1849-1874` parses a CRL's `nextUpdate` and never
+reads it, so an expired CRL still revokes — mirrored, pinned by a test.
+Not ported: out-of-band revocation sets and seed data, the on-demand PAA
+fetch by subject key id, the compliance endpoint, the vendor-info service,
+OTA image storage, ML-DSA certificates. `attestation.PAAStore` and
+`Revocations` take no context (a change would break the API before the
+freeze); on-demand CRL fetches are bounded by the client timeout. Reports
+AS, AX §10.
+
+By design until a host needs one of them.
+
+### BD-Matter-GroupKeyEpochStartTimeUnits — the group sender compares the key's epoch start as matter.js does
+
+`KeySets.ts:83`, `:126-133` read `epochStartTime` (Matter epoch, µs since
+2000) through `Timestamp.fromMicroseconds` and compare it with Unix ms; a key
+whose start is in the past in either reading counts as started.
+`groups/sender.go:132-170` mirrors it. Report AX §6.
+
+By design. Controllers write current values, which read as started either
+way; a fix belongs upstream.
+
+### BD-chip-Harness-ModelOverCase — CountdownTime, TC-EEVSE-2.3 and two chipdm (ii) entries follow the model, not chip's case or XML
+
+CountdownTime is reported as matter.js reports it (QuietEvent), not by the
+specification's list, which matter.js does not implement either.
+TC-EEVSE-2.3 step 19 expects RESOURCE_EXHAUSTED for eleven
+ChargingTargets; matter.js validates the request against the model's
+"max 10" first (`CommandInvokeResponse.ts:485-487`,
+`energy-evse-cluster.element.ts:254`) and answers CONSTRAINT_ERROR, as the
+module does. GroupKeyMulticastPolicy stays as the snapshot gates it, and
+ColorControl's XY → HS conversion stays mirrored
+(`BD-Matter-ColorControl-XYToHS`). chip's 33/66 FanMode split
+(`FanControlCluster.cpp:84-166`) is not ported; matter.js's mapping is.
+Report AY §2, §5, §9, §12.
+
+By design. matter.js is the gold standard where a case and the model
+disagree; the harness classifies the cases accordingly.
+
+### BD-chip-RvcRunMode-InvalidInMode — RvcRunMode without DIRECTMODECH refuses a change between two running modes
+
+matter.js's RvcRunModeServer accepts any supported mode. chip's RVC example
+and TC_RVCRUNM_2_2 steps 6-7 expect InvalidInMode for a change between two
+non-Idle modes when DIRECTMODECH is not set; the server answers it itself.
+RvcCleanMode's companion rule needs RvcRunMode's state and stays with the
+host. Report AY §4.
+
+By design. A rule matter.js leaves to the application, taken from chip where
+the server can see everything it needs.
+
+### BD-Matter-ClientUndefinedClusters — 16 snapshot clusters have no generated definition for the client view
+
+The generator now covers five more (Groupcast, WaterTankLevelMonitoring,
+AmbientContextSensing, WiFiNetworkManagement, Chime); the hand-written
+AccessControl, OperationalCredentials, GroupKeyManagement and the camera,
+Joint Fabric, TLS and Thread clusters stay without one, so
+`client.Cluster.Extra()` stays approximate for them (matter.js subtracts the
+model's elements, `PeerBehavior.ts:443-455`). Report AX §11.
+
+By design. Out-of-scope clusters, and three whose definitions are
+hand-written servers.
+

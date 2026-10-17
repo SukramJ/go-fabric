@@ -24,7 +24,7 @@ type IdentityRecord struct {
 	ICAC []byte
 	// PrivateKey is the 32-byte raw P-256 scalar matching the NOC's
 	// public key. Persisted as-is; at-rest encryption is the
-	// operator's responsibility for v1.1.
+	// operator's responsibility.
 	PrivateKey []byte
 	// IPK is the 16-byte Identity Protection Key for this fabric
 	// (used in CASE Sigma).

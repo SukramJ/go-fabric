@@ -255,8 +255,6 @@ func (r *Responder) PeerSessionID() uint16 {
 // the current behaviour readable from an operator report instead of
 // only from the source. matter.js logs a resumed session for the same
 // reason (NodeSession.ts:437 `logNew(logger, "Resumed", …)`).
-//
-// loom:reachable:reason="returned by Responder.ResumeInfo, which the daemon's CASE session-established callback reads on every resume before it logs the record; a data struct whose fields the logging path copies out, which the analyzer's type heuristic (reachable only via its own methods) cannot see used"
 type ResumeInfo struct {
 	// Resumed reports whether the session came from Sigma2_Resume
 	// rather than Full Sigma.

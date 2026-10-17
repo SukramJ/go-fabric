@@ -174,28 +174,12 @@ func NewPlayback(cfg PlaybackConfig) (*PlaybackServer, error) {
 		{mpdef.CmdActivateTextTrack, hasText},
 		{mpdef.CmdDeactivateTextTrack, hasText},
 	}
-	srv, err := spec.NewServer(mpdef.Definition, spec.Options{
-		Features: uint32(cfg.Features),
-		Commands: optionalCommands(cmds),
-		Events:   cfg.Events,
-	}, spec.ServerConfig{DataVersion: cfg.DataVersion})
-	if err != nil {
-		return nil, fmt.Errorf("media: MediaPlayback: %w", err)
-	}
-	if err := checkImplemented(srv, cmds); err != nil {
-		return nil, err
-	}
-	s := &PlaybackServer{Server: srv}
-	if err := s.init(srv, cfg.Initial, PlaybackState.values, PlaybackState.clone); err != nil {
-		return nil, fmt.Errorf("media: MediaPlayback: %w", err)
-	}
-	if err := checkState(srv); err != nil {
-		return nil, err
-	}
+	s := &PlaybackServer{}
+	h := handlers{}
 	type transport = func(ctx context.Context, st *PlaybackState) (mpdef.PlaybackResponse, error)
 	// The payload-less transport commands.
 	plain := func(cmdID uint32, fn transport) {
-		handleState(srv, &s.stateful, cmdID, func(ctx context.Context, st *PlaybackState, _ struct{}) (any, error) { return fn(ctx, st) })
+		handleState(h, &s.stateful, cmdID, func(ctx context.Context, st *PlaybackState, _ struct{}) (any, error) { return fn(ctx, st) })
 	}
 	plain(mpdef.CmdPlay, p.Play)
 	plain(mpdef.CmdPause, p.Pause)
@@ -210,34 +194,52 @@ func NewPlayback(cfg PlaybackConfig) (*PlaybackServer, error) {
 		plain(mpdef.CmdNext, next.Next)
 	}
 	if hasSpeed {
-		handleState(srv, &s.stateful, mpdef.CmdRewind, func(ctx context.Context, st *PlaybackState, req mpdef.RewindRequest) (any, error) {
+		handleState(h, &s.stateful, mpdef.CmdRewind, func(ctx context.Context, st *PlaybackState, req mpdef.RewindRequest) (any, error) {
 			return speed.Rewind(ctx, st, req)
 		})
-		handleState(srv, &s.stateful, mpdef.CmdFastForward, func(ctx context.Context, st *PlaybackState, req mpdef.FastForwardRequest) (any, error) {
+		handleState(h, &s.stateful, mpdef.CmdFastForward, func(ctx context.Context, st *PlaybackState, req mpdef.FastForwardRequest) (any, error) {
 			return speed.FastForward(ctx, st, req)
 		})
 	}
 	if hasSkip {
-		handleState(srv, &s.stateful, mpdef.CmdSkipForward, func(ctx context.Context, st *PlaybackState, req mpdef.SkipForwardRequest) (any, error) {
+		handleState(h, &s.stateful, mpdef.CmdSkipForward, func(ctx context.Context, st *PlaybackState, req mpdef.SkipForwardRequest) (any, error) {
 			return skip.SkipForward(ctx, st, req)
 		})
-		handleState(srv, &s.stateful, mpdef.CmdSkipBackward, func(ctx context.Context, st *PlaybackState, req mpdef.SkipBackwardRequest) (any, error) {
+		handleState(h, &s.stateful, mpdef.CmdSkipBackward, func(ctx context.Context, st *PlaybackState, req mpdef.SkipBackwardRequest) (any, error) {
 			return skip.SkipBackward(ctx, st, req)
 		})
 	}
 	if hasSeek {
-		handleState(srv, &s.stateful, mpdef.CmdSeek, func(ctx context.Context, st *PlaybackState, req mpdef.SeekRequest) (any, error) {
+		handleState(h, &s.stateful, mpdef.CmdSeek, func(ctx context.Context, st *PlaybackState, req mpdef.SeekRequest) (any, error) {
 			return seek.Seek(ctx, st, req)
 		})
 	}
 	if hasAudio {
-		handleState(srv, &s.stateful, mpdef.CmdActivateAudioTrack, statusOnly(audio.ActivateAudioTrack))
+		handleState(h, &s.stateful, mpdef.CmdActivateAudioTrack, statusOnly(audio.ActivateAudioTrack))
 	}
 	if hasText {
-		handleState(srv, &s.stateful, mpdef.CmdActivateTextTrack, statusOnly(text.ActivateTextTrack))
-		handleState(srv, &s.stateful, mpdef.CmdDeactivateTextTrack, func(ctx context.Context, st *PlaybackState, _ mpdef.DeactivateTextTrackRequest) (any, error) {
+		handleState(h, &s.stateful, mpdef.CmdActivateTextTrack, statusOnly(text.ActivateTextTrack))
+		handleState(h, &s.stateful, mpdef.CmdDeactivateTextTrack, func(ctx context.Context, st *PlaybackState, _ mpdef.DeactivateTextTrackRequest) (any, error) {
 			return nil, text.DeactivateTextTrack(ctx, st)
 		})
+	}
+	srv, err := newServer(mpdef.Definition, spec.Options{
+		Features: uint32(cfg.Features),
+		Commands: optionalCommands(cmds),
+		Events:   cfg.Events,
+	}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+	if err != nil {
+		return nil, fmt.Errorf("media: MediaPlayback: %w", err)
+	}
+	if err := checkImplemented(srv, cmds); err != nil {
+		return nil, err
+	}
+	s.Server = srv
+	if err := s.init(srv, cfg.Initial, PlaybackState.values, PlaybackState.clone); err != nil {
+		return nil, fmt.Errorf("media: MediaPlayback: %w", err)
+	}
+	if err := checkState(srv); err != nil {
+		return nil, err
 	}
 	return s, nil
 }

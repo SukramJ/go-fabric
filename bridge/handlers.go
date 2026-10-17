@@ -966,8 +966,6 @@ type SessionRetransmitIntervalResolver interface {
 // directions, `activeTimestamp` (peer activity) only on receive —
 // invoked from MessageExchange.ts:429 (receive, duplicates included)
 // and :562/:814 (sends).
-//
-// loom:reachable:reason="optional-capability contract satisfied via type assertion on the wired session lookup; the type name never appears in production references, which the reachability analyzer's type heuristic cannot see"
 type SessionActivityMarker interface {
 	MarkActiveRx(sessionID uint16)
 	MarkActiveTx(sessionID uint16)

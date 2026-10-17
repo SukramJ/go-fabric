@@ -17,6 +17,9 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/SukramJ/go-fabric/im"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
@@ -260,9 +263,9 @@ func TestRemoveFabricFromHost(t *testing.T) {
 	if hasOperationalRecord(adv) {
 		t.Error("the operational record is still published")
 	}
-	if _, mode, ok := commissionableRecord(adv); !ok || mode != 1 {
-		t.Errorf("own window after the last fabric: record %v mode %d, want CM=1", ok, mode)
-	}
+	// The own window reopens once the node is idle (no fail-safe, no
+	// session left), as matter.js #resetWhenIdle waits.
+	waitRecord(t, adv, "own window after the last fabric", func(_, mode uint64, ok bool) bool { return ok && mode == 1 })
 	if !n.CommissioningWindow().IsOpen() {
 		t.Error("the node's own window did not reopen")
 	}
@@ -376,4 +379,29 @@ func TestHostGroups(t *testing.T) {
 	if own.Groups() == nil {
 		t.Fatal("no group manager without Config.Groups")
 	}
+}
+
+// TestLastFabricReopenWaitsForTheFailSafe: with a fail-safe armed when the
+// last fabric goes, the own window stays closed until the fail-safe ends —
+// matter.js #resetWhenIdle waits for it (CommissioningServer.ts:183-188),
+// since a commissioning under it may still add a fabric.
+func TestLastFabricReopenWaitsForTheFailSafe(t *testing.T) {
+	ctx := context.Background()
+	adv := mdns.NewNoop()
+	cfg := minimalConfig(openDB(t, filepath.Join(t.TempDir(), "node.db")))
+	cfg.Advertiser = adv
+	n, c, s := commissioned(t, cfg)
+	if _, err := s.Invoke(ctx, im.ConcreteCommandPath{Endpoint: 0, Cluster: gencommdef.ClusterID, Command: gencommdef.CmdArmFailSafe, HasEndpoint: true, HasCluster: true, HasCommand: true},
+		gencommdef.ArmFailSafeRequest{ExpiryLengthSeconds: 60}.EncodeTLV); err != nil {
+		t.Fatalf("ArmFailSafe: %v", err)
+	}
+	if err := n.RemoveFabric(ctx, c.FabricIndex()); err != nil {
+		t.Fatalf("RemoveFabric: %v", err)
+	}
+	time.Sleep(4 * 250 * time.Millisecond)
+	if n.CommissioningWindow().IsOpen() {
+		t.Fatal("the own window reopened while a fail-safe was armed")
+	}
+	n.Root().GeneralCommissioning.ExpireFailSafe(ctx)
+	waitRecord(t, adv, "own window after the fail-safe ended", func(_, mode uint64, ok bool) bool { return ok && mode == 1 })
 }

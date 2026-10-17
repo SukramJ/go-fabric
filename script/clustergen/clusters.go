@@ -5,7 +5,8 @@ package main
 
 // committed lists the clusters whose generated definitions are committed
 // under cluster/spec/: each is the definition a server in this module is
-// built on. A cluster joins when its server does; the migration list in
+// built on, or one the client role reads typed (the last group). A server's
+// cluster joins when its server does; the migration list in
 // docs/adr/0013-generated-cluster-definitions.md says which servers are
 // next.
 var committed = []string{
@@ -152,4 +153,15 @@ var committed = []string{
 	"Messages",
 	// cluster/core CommissionerControl (ADR 0020 stage 6, brief AS)
 	"CommissionerControl",
+	// controller/client: definitions without a server in this module, so
+	// the client role reads their attributes, commands and events typed
+	// (register line 441, brief AX §11). Left out: AccessControl,
+	// OperationalCredentials and GroupKeyManagement (hand-written core
+	// servers, ADR 0013's skip list), the camera clusters, Joint Fabric,
+	// TLS and Thread (out of scope, docs/matterjs-comparison.md).
+	"Groupcast",
+	"WaterTankLevelMonitoring",
+	"AmbientContextSensing",
+	"WiFiNetworkManagement",
+	"Chime",
 }

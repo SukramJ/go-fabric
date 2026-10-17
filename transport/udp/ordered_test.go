@@ -140,3 +140,68 @@ func TestOrderedBacklogBound(t *testing.T) {
 		t.Errorf("backlog %d, want at most %d", n, maxOrderedBacklog)
 	}
 }
+
+// TestOrderedDispatchSharesTheConcurrencyBudget: datagrams of many
+// distinct streams — a flood of forged session ids — are bounded by
+// maxConcurrentDispatch in total, not one budget per stream; beyond it
+// they are dropped and no queue is left behind for them.
+func TestOrderedDispatchSharesTheConcurrencyBudget(t *testing.T) {
+	block := make(chan struct{})
+	var mu sync.Mutex
+	started := 0
+	o := &orderedDispatch{key: keyOf, queues: map[uint32]*orderedQueue{}, handler: func([]byte, *net.UDPAddr, func()) {
+		mu.Lock()
+		started++
+		mu.Unlock()
+		<-block
+	}}
+	l := &Listener{}
+	const flood = maxConcurrentDispatch + 500
+	for i := range flood {
+		key := uint32(i + 1)
+		o.enqueue(l, key, []byte{1}, nil)
+	}
+	o.mu.Lock()
+	pending, queues := o.pending, len(o.queues)
+	o.mu.Unlock()
+	if pending != maxConcurrentDispatch || queues > maxConcurrentDispatch {
+		t.Errorf("pending %d, queues %d; want %d pending and at most as many queues", pending, queues, maxConcurrentDispatch)
+	}
+	close(block)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		o.mu.Lock()
+		pending = o.pending
+		o.mu.Unlock()
+		if pending == 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if pending != 0 || started != maxConcurrentDispatch {
+		t.Errorf("after the release: pending %d, handled %d; want 0 and %d", pending, started, maxConcurrentDispatch)
+	}
+}
+
+// TestWaitIdleWaitsForRunningHandlers: WaitIdle returns only once every
+// dispatched handler — ordered and unordered — has returned, and gives
+// up with ctx.
+func TestWaitIdleWaitsForRunningHandlers(t *testing.T) {
+	block := make(chan struct{})
+	o := &orderedDispatch{key: keyOf, queues: map[uint32]*orderedQueue{}, handler: func([]byte, *net.UDPAddr, func()) { <-block }}
+	l := &Listener{}
+	o.enqueue(l, 7, []byte{7}, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err := l.WaitIdle(ctx); err == nil {
+		t.Fatal("WaitIdle returned while a handler was still running")
+	}
+	close(block)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+	if err := l.WaitIdle(ctx2); err != nil {
+		t.Fatalf("WaitIdle after the handler returned: %v", err)
+	}
+}

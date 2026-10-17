@@ -707,7 +707,7 @@ func TestPutUint16Bounded_SentinelRejected(t *testing.T) {
 }
 
 // TestPutUint16Bounded_ValidValues confirms non-sentinel values round-trip
-// correctly and are encoded as TypeUnsignedInt2.
+// correctly at the smallest fitting width.
 func TestPutUint16Bounded_ValidValues(t *testing.T) {
 	t.Parallel()
 	for _, v := range []uint16{0, 1, 1000, 0xFFFE} {
@@ -716,8 +716,9 @@ func TestPutUint16Bounded_ValidValues(t *testing.T) {
 			t.Fatalf("v=%d: unexpected error: %v", v, err)
 		}
 		wire, _ := enc.Bytes()
-		if wire[0] != byte(TypeUnsignedInt2) {
-			t.Errorf("v=%d: control byte 0x%02X, want TypeUnsignedInt2 0x%02X", v, wire[0], TypeUnsignedInt2)
+		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-297 at 0ceb202d).
+		if wire[0]&0x1F > byte(TypeUnsignedInt2) {
+			t.Errorf("v=%d: control byte 0x%02X wider than TypeUnsignedInt2 0x%02X", v, wire[0], TypeUnsignedInt2)
 		}
 		dec := NewDecoder(wire)
 		el, err := dec.Next()
@@ -742,7 +743,7 @@ func TestPutUint32Bounded_SentinelRejected(t *testing.T) {
 }
 
 // TestPutUint32Bounded_ValidValues confirms non-sentinel values round-trip
-// correctly and are encoded as TypeUnsignedInt4.
+// correctly and encode at the smallest fitting width.
 func TestPutUint32Bounded_ValidValues(t *testing.T) {
 	t.Parallel()
 	for _, v := range []uint32{0, 1, 1000000, 0xFFFFFFFE} {
@@ -751,8 +752,9 @@ func TestPutUint32Bounded_ValidValues(t *testing.T) {
 			t.Fatalf("v=%d: unexpected error: %v", v, err)
 		}
 		wire, _ := enc.Bytes()
-		if wire[0] != byte(TypeUnsignedInt4) {
-			t.Errorf("v=%d: control byte 0x%02X, want TypeUnsignedInt4 0x%02X", v, wire[0], TypeUnsignedInt4)
+		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-297 at 0ceb202d).
+		if wire[0]&0x1F > byte(TypeUnsignedInt4) {
+			t.Errorf("v=%d: control byte 0x%02X wider than TypeUnsignedInt4 0x%02X", v, wire[0], TypeUnsignedInt4)
 		}
 		dec := NewDecoder(wire)
 		el, err := dec.Next()
@@ -777,7 +779,7 @@ func TestPutUint64Bounded_SentinelRejected(t *testing.T) {
 }
 
 // TestPutUint64Bounded_ValidValues confirms non-sentinel values round-trip
-// correctly and are encoded as TypeUnsignedInt8.
+// correctly and encode at the smallest fitting width.
 func TestPutUint64Bounded_ValidValues(t *testing.T) {
 	t.Parallel()
 	for _, v := range []uint64{0, 1, 1_000_000_000_000, 0xFFFFFFFFFFFFFFFE} {
@@ -786,8 +788,9 @@ func TestPutUint64Bounded_ValidValues(t *testing.T) {
 			t.Fatalf("v=%d: unexpected error: %v", v, err)
 		}
 		wire, _ := enc.Bytes()
-		if wire[0] != byte(TypeUnsignedInt8) {
-			t.Errorf("v=%d: control byte 0x%02X, want TypeUnsignedInt8 0x%02X", v, wire[0], TypeUnsignedInt8)
+		// Smallest fitting width, as matter.js encodes (TlvNumber.ts:271-297 at 0ceb202d).
+		if wire[0]&0x1F > byte(TypeUnsignedInt8) {
+			t.Errorf("v=%d: control byte 0x%02X wider than TypeUnsignedInt8 0x%02X", v, wire[0], TypeUnsignedInt8)
 		}
 		dec := NewDecoder(wire)
 		el, err := dec.Next()

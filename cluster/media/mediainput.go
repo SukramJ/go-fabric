@@ -77,30 +77,32 @@ func NewInputs(cfg InputsConfig) (*InputsServer, error) {
 		{inputdef.CmdHideInputStatus, true},
 		{inputdef.CmdRenameInput, canRename},
 	}
-	srv, err := spec.NewServer(inputdef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
+	s := &InputsServer{}
+	h := handlers{}
+	handleState(h, &s.stateful, inputdef.CmdSelectInput, statusOnly(port.SelectInput))
+	handleState(h, &s.stateful, inputdef.CmdShowInputStatus, func(ctx context.Context, st *InputState, _ inputdef.ShowInputStatusRequest) (any, error) {
+		return nil, port.ShowInputStatus(ctx, st)
+	})
+	handleState(h, &s.stateful, inputdef.CmdHideInputStatus, func(ctx context.Context, st *InputState, _ inputdef.HideInputStatusRequest) (any, error) {
+		return nil, port.HideInputStatus(ctx, st)
+	})
+	if canRename {
+		handleState(h, &s.stateful, inputdef.CmdRenameInput, statusOnly(renamer.RenameInput))
+	}
+	srv, err := newServer(inputdef.Definition, spec.Options{Features: uint32(cfg.Features)},
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("media: MediaInput: %w", err)
 	}
 	if err := checkImplemented(srv, cmds); err != nil {
 		return nil, err
 	}
-	s := &InputsServer{Server: srv}
+	s.Server = srv
 	if err := s.init(srv, cfg.Initial, InputState.values, InputState.clone); err != nil {
 		return nil, fmt.Errorf("media: MediaInput: %w", err)
 	}
 	if err := checkState(srv); err != nil {
 		return nil, err
-	}
-	handleState(srv, &s.stateful, inputdef.CmdSelectInput, statusOnly(port.SelectInput))
-	handleState(srv, &s.stateful, inputdef.CmdShowInputStatus, func(ctx context.Context, st *InputState, _ inputdef.ShowInputStatusRequest) (any, error) {
-		return nil, port.ShowInputStatus(ctx, st)
-	})
-	handleState(srv, &s.stateful, inputdef.CmdHideInputStatus, func(ctx context.Context, st *InputState, _ inputdef.HideInputStatusRequest) (any, error) {
-		return nil, port.HideInputStatus(ctx, st)
-	})
-	if canRename {
-		handleState(srv, &s.stateful, inputdef.CmdRenameInput, statusOnly(renamer.RenameInput))
 	}
 	return s, nil
 }

@@ -626,6 +626,11 @@ func (g *GeneralCommissioning) handleArmFailSafe(ctx context.Context, fields any
 	// acquires its own lock).
 	armedHook := g.onFailSafeArmed
 	armedFabric := g.failSafeFabricIndex
+	// Release the cluster lock now, as the comment above promises: the
+	// deferred unlock would otherwise hold it across the hook, and a hook
+	// that reads this cluster (or arms through the bridge) would deadlock.
+	g.mu.Unlock()
+	unlocked = true
 	if armedHook != nil && !extending {
 		// Mirrors matter.js OperationalCredentialsServer.ts:
 		// FailSafeContext is recreated on every ArmFailSafe, surfacing a

@@ -1190,3 +1190,33 @@ func TestSetRegulatoryConfig_HonoursLocationCapability(t *testing.T) {
 		}
 	}
 }
+
+// TestGencomm_ArmFailSafe_HookRunsUnlocked: the armed hook runs without
+// the cluster lock — a hook that reads the cluster (FailSafeArmed takes
+// the lock) returns instead of deadlocking.
+func TestGencomm_ArmFailSafe_HookRunsUnlocked(t *testing.T) {
+	t.Parallel()
+	var gc *core.GeneralCommissioning
+	done := make(chan bool, 1)
+	gc = newGencomm(t, core.GeneralCommissioningConfig{
+		LocationCapability: core.RegulatoryIndoor,
+		FailSafeMaxSeconds: 600,
+		OnFailSafeArmed:    func(context.Context, uint8) { done <- gc.FailSafeArmed() },
+	})
+	result := make(chan error, 1)
+	go func() {
+		_, err := gc.MatterInvoke(context.Background(), 0x00, core.ArmFailSafeRequest{ExpiryLengthSeconds: 60})
+		result <- err
+	}()
+	select {
+	case armed := <-done:
+		if !armed {
+			t.Error("the hook saw the fail-safe disarmed")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the armed hook deadlocked on the cluster lock")
+	}
+	if err := <-result; err != nil {
+		t.Fatalf("ArmFailSafe: %v", err)
+	}
+}

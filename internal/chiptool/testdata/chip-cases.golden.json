@@ -1962,8 +1962,8 @@
       "stepsSkipped": 2
     },
     "WNCV/2.3": {
-      "steps": 5,
-      "stepsSkipped": 13
+      "steps": 11,
+      "stepsSkipped": 7
     },
     "WNCV/2.4": {
       "steps": 2,

@@ -54,6 +54,13 @@ type orderedDispatch struct {
 
 	mu     sync.Mutex
 	queues map[uint32]*orderedQueue
+	// pending counts the datagrams of every stream that are queued or
+	// being handled. It shares [maxConcurrentDispatch] with the unordered
+	// pool: a stream key is read from the datagram before any session
+	// lookup, so a flood of forged session ids would otherwise open one
+	// queue, one drain goroutine and up to [maxOrderedBacklog] buffers per
+	// id without any overall bound.
+	pending int
 }
 
 // enqueue appends a datagram to its stream and starts the stream's drain
@@ -67,9 +74,16 @@ func (o *orderedDispatch) enqueue(l *Listener, key uint32, buf []byte, src *net.
 		q = &orderedQueue{}
 		o.queues[key] = q
 	}
-	if len(q.items) >= maxOrderedBacklog {
+	if len(q.items) >= maxOrderedBacklog || o.pending >= maxConcurrentDispatch {
+		if len(q.items) == 0 && !q.running {
+			delete(o.queues, key)
+		}
 		return
 	}
+	o.pending++
+	// Counted from the queue on, so WaitIdle also covers a datagram
+	// queued behind a running one.
+	l.inflight.Add(1)
 	q.items = append(q.items, orderedItem{buf: buf, src: src})
 	if !q.running {
 		q.running = true
@@ -97,6 +111,12 @@ func (o *orderedDispatch) drain(l *Listener, key uint32, q *orderedQueue) {
 		var once sync.Once
 		release := func() { once.Do(func() { close(turn) }) }
 		go func() {
+			defer l.inflight.Done()
+			defer func() {
+				o.mu.Lock()
+				o.pending--
+				o.mu.Unlock()
+			}()
 			defer release()
 			l.safeDispatch(func(buf []byte, src *net.UDPAddr) { o.handler(buf, src, release) }, it.buf, it.src)
 		}()

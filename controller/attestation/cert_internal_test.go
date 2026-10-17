@@ -77,13 +77,13 @@ func TestCertificateRules(t *testing.T) {
 	if err != nil || a.vendorID == nil || *a.vendorID != 0xFFF1 || a.productID == nil || *a.productID != 0x8001 || a.notAfter != 0 {
 		t.Fatalf("parsed %+v (%v)", a, err)
 	}
-	if _, err := p256Key(c); err != nil {
+	if _, err := P256Key(c); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p256Key(selfSigned(t, &x509.Certificate{}, elliptic.P384())); err == nil {
+	if _, err := P256Key(selfSigned(t, &x509.Certificate{}, elliptic.P384())); err == nil {
 		t.Fatal("a P-384 key was accepted")
 	}
-	if verifySignedBy(selfSigned(t, &x509.Certificate{SignatureAlgorithm: x509.ECDSAWithSHA384}, elliptic.P384()), &ecdsa.PublicKey{}) == nil {
+	if VerifySignedBy(selfSigned(t, &x509.Certificate{SignatureAlgorithm: x509.ECDSAWithSHA384}, elliptic.P384()), &ecdsa.PublicKey{}) == nil {
 		t.Fatal("ecdsa-with-SHA384 was accepted")
 	}
 	for name, tmpl := range map[string]*x509.Certificate{

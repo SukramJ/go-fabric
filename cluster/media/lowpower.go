@@ -41,13 +41,14 @@ func NewLowPower(cfg LowPowerConfig) (*LowPowerServer, error) {
 	if cfg.Port == nil {
 		return nil, fmt.Errorf("%w: LowPower", ErrNilPort)
 	}
-	srv, err := spec.NewServer(lowpowerdef.Definition, spec.Options{}, spec.ServerConfig{DataVersion: cfg.DataVersion})
+	h := handlers{}
+	port := cfg.Port
+	handle(h, lowpowerdef.CmdSleep, func(ctx context.Context, _ lowpowerdef.SleepRequest) (any, error) {
+		return nil, port.Sleep(ctx)
+	})
+	srv, err := newServer(lowpowerdef.Definition, spec.Options{}, spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
 	if err != nil {
 		return nil, fmt.Errorf("media: LowPower: %w", err)
 	}
-	port := cfg.Port
-	handle(srv, lowpowerdef.CmdSleep, func(ctx context.Context, _ lowpowerdef.SleepRequest) (any, error) {
-		return nil, port.Sleep(ctx)
-	})
 	return &LowPowerServer{Server: srv}, nil
 }

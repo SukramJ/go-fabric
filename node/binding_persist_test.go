@@ -46,6 +46,9 @@ func TestNodeBindingPersisted(t *testing.T) {
 		{Node: 2, Endpoint: 3, Cluster: 6, FabricIndex: 1},
 		{Group: 0x0101, FabricIndex: 1},
 		{Node: 4, Endpoint: 1, FabricIndex: 2},
+		// Endpoint 0 and cluster 0 (Identify) named explicitly survive
+		// the restart (core.TargetStruct's presence flags).
+		{Node: 5, Endpoint: 0, EndpointPresent: true, Cluster: 0, ClusterPresent: true, FabricIndex: 2},
 	}
 	if err := b.MatterWrite(ctx, bindingdef.AttrBinding, entries); err != nil {
 		t.Fatal(err)

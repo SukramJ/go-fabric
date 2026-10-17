@@ -190,8 +190,12 @@ chiptool-extract: ## copy chip-tool out of the pinned chip-cert-bins image into 
 	@echo "$(CHIP_CERT_BINS_IMAGE)" > $(CHIPTOOL_BIN_DIR)/chip-tool.source
 
 # Where `make chiptool-setup` puts the CHIP source: the path CLAUDE.md names
-# for the connectedhomeip checkout.
-CHIP_ROOT ?= ../connectedhomeip
+# for the connectedhomeip checkout, beside the main working tree — also when
+# make runs in a linked git worktree, whose ../ is not that tree's
+# (git rev-parse --git-common-dir names the main tree's .git). Outside git it
+# is ../connectedhomeip.
+GIT_COMMON_DIR := $(shell git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+CHIP_ROOT ?= $(if $(GIT_COMMON_DIR),$(abspath $(dir $(GIT_COMMON_DIR))../connectedhomeip),../connectedhomeip)
 
 .PHONY: chiptool-setup
 chiptool-setup: ## sparse connectedhomeip checkout at the harness image's CHIP commit (source to read, nothing to build)

@@ -311,25 +311,25 @@ var ProgramCategoryStructDef = &spec.Struct{Name: "ProgramCategoryStruct", Field
 
 // ProgramStruct is the ProgramStruct struct.
 type ProgramStruct struct {
-	Identifier           string                              // 0: string, M, max 255
-	Channel              ChannelInfoStruct                   // 1: ChannelInfoStruct, M
-	StartTime            uint32                              // 2: epoch-s, M
-	EndTime              uint32                              // 3: epoch-s, M
-	Title                string                              // 4: string, M, max 255
-	Subtitle             *string                             // 5: string, O, max 255
-	Description          *string                             // 6: string, O, max 8192
-	AudioLanguages       *[]string                           // 7: list[string], O, max 10[max 50]
-	Ratings              *[]string                           // 8: list[string], O, max 255
-	ThumbnailUrl         *string                             // 9: string, O, max 8192
-	PosterArtUrl         *string                             // 10: string, O, max 8192
-	DvbiUrl              *string                             // 11: string, O, max 8192
-	ReleaseDate          *string                             // 12: string, O, max 30
-	ParentalGuidanceText *string                             // 13: string, O, max 255
-	RecordingFlag        *RecordingFlagBitmap                // 14: RecordingFlagBitmap, RP
-	SeriesInfo           *spec.Nullable[SeriesInfoStruct]    // 15: SeriesInfoStruct, O, X
-	CategoryList         *[]ProgramCategoryStruct            // 16: list[ProgramCategoryStruct], O, max 255
-	CastList             *[]ProgramCastStruct                // 17: list[ProgramCastStruct], O, max 255
-	ExternalIdList       *[]ProgramStructExternalIdListEntry // 18: list[ContentLauncher.AdditionalInfoStruct], O, max 255
+	Identifier           string                           // 0: string, M, max 255
+	Channel              ChannelInfoStruct                // 1: ChannelInfoStruct, M
+	StartTime            uint32                           // 2: epoch-s, M
+	EndTime              uint32                           // 3: epoch-s, M
+	Title                string                           // 4: string, M, max 255
+	Subtitle             *string                          // 5: string, O, max 255
+	Description          *string                          // 6: string, O, max 8192
+	AudioLanguages       *[]string                        // 7: list[string], O, max 10[max 50]
+	Ratings              *[]string                        // 8: list[string], O, max 255
+	ThumbnailUrl         *string                          // 9: string, O, max 8192
+	PosterArtUrl         *string                          // 10: string, O, max 8192
+	DvbiUrl              *string                          // 11: string, O, max 8192
+	ReleaseDate          *string                          // 12: string, O, max 30
+	ParentalGuidanceText *string                          // 13: string, O, max 255
+	RecordingFlag        *RecordingFlagBitmap             // 14: RecordingFlagBitmap, RP
+	SeriesInfo           *spec.Nullable[SeriesInfoStruct] // 15: SeriesInfoStruct, O, X
+	CategoryList         *[]ProgramCategoryStruct         // 16: list[ProgramCategoryStruct], O, max 255
+	CastList             *[]ProgramCastStruct             // 17: list[ProgramCastStruct], O, max 255
+	ExternalIdList       *[]AdditionalInfoStruct          // 18: list[ContentLauncher.AdditionalInfoStruct], O, max 255
 }
 
 // EncodeTLV implements spec.Encodable.
@@ -353,7 +353,7 @@ func (v ProgramStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	spec.PutOptional(enc, tlv.ContextTag(15), v.SeriesInfo, spec.PutNullable(spec.PutStruct[SeriesInfoStruct]))
 	spec.PutOptional(enc, tlv.ContextTag(16), v.CategoryList, spec.PutList(spec.PutStruct[ProgramCategoryStruct]))
 	spec.PutOptional(enc, tlv.ContextTag(17), v.CastList, spec.PutList(spec.PutStruct[ProgramCastStruct]))
-	spec.PutOptional(enc, tlv.ContextTag(18), v.ExternalIdList, spec.PutList(spec.PutStruct[ProgramStructExternalIdListEntry]))
+	spec.PutOptional(enc, tlv.ContextTag(18), v.ExternalIdList, spec.PutList(spec.PutStruct[AdditionalInfoStruct]))
 	_ = enc.EndContainer()
 }
 
@@ -378,7 +378,7 @@ func (v *ProgramStruct) DecodeTLV(n spec.Node) error {
 		spec.Bind(15, "SeriesInfo", false, &v.SeriesInfo, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeStruct[SeriesInfoStruct]))),
 		spec.Bind(16, "CategoryList", false, &v.CategoryList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[ProgramCategoryStruct], 0, 255))),
 		spec.Bind(17, "CastList", false, &v.CastList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[ProgramCastStruct], 0, 255))),
-		spec.Bind(18, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[ProgramStructExternalIdListEntry], 0, 255))),
+		spec.Bind(18, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[AdditionalInfoStruct], 0, 255))),
 	)
 }
 
@@ -404,7 +404,7 @@ var ProgramStructDef = &spec.Struct{Name: "ProgramStruct", Fields: []spec.Field{
 	{ID: 15, Name: "SeriesInfo", Type: spec.Type{Name: "SeriesInfoStruct", Kind: spec.KindStruct, Struct: SeriesInfoStructDef}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
 	{ID: 16, Name: "CategoryList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ProgramCategoryStruct", Kind: spec.KindStruct, Struct: ProgramCategoryStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 	{ID: 17, Name: "CastList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ProgramCastStruct", Kind: spec.KindStruct, Struct: ProgramCastStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
-	{ID: 18, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: &spec.Struct{Name: "ProgramStructExternalIdListEntry", Fields: nil}}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+	{ID: 18, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 }}
 
 // RecordingFlagBitmap is the RecordingFlagBitmap map8.
@@ -458,6 +458,36 @@ var SeriesInfoStructDef = &spec.Struct{Name: "SeriesInfoStruct", Fields: []spec.
 	{ID: 1, Name: "Episode", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 256", Max: &spec.Bound{Int: 256}}},
 }}
 
+// AdditionalInfoStruct is the AdditionalInfoStruct struct.
+type AdditionalInfoStruct struct {
+	Name  string // 0: string, M, max 256
+	Value string // 1: string, M, max 8192
+}
+
+// EncodeTLV implements spec.Encodable.
+func (v AdditionalInfoStruct) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
+	enc.StartStruct(tag)
+	spec.PutString(enc, tlv.ContextTag(0), v.Name)
+	spec.PutString(enc, tlv.ContextTag(1), v.Value)
+	_ = enc.EndContainer()
+}
+
+// DecodeTLV decodes the structure n into v.
+func (v *AdditionalInfoStruct) DecodeTLV(n spec.Node) error {
+	return spec.DecodeFields(n, "AdditionalInfoStruct",
+		spec.Bind(0, "Name", true, &v.Name, spec.DecodeStringIn(0, 256)),
+		spec.Bind(1, "Value", true, &v.Value, spec.DecodeStringIn(0, 8192)),
+	)
+}
+
+// AdditionalInfoStructDef describes AdditionalInfoStruct.
+//
+// fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
+var AdditionalInfoStructDef = &spec.Struct{Name: "AdditionalInfoStruct", Fields: []spec.Field{
+	{ID: 0, Name: "Name", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 256", Max: &spec.Bound{Int: 256}}},
+	{ID: 1, Name: "Value", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 8192", Max: &spec.Bound{Int: 8192}}},
+}}
+
 // StatusEnum is the StatusEnum enum8.
 //
 // fabric:reachable:reason="generated: referenced from Definition and the generated test; a package-level initializer, which RTA does not follow"
@@ -478,62 +508,6 @@ var StatusEnumDef = &spec.Enum{Name: "StatusEnum", Bits: 8, Values: []spec.EnumV
 	{Value: 1, Name: "MultipleMatches", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 	{Value: 2, Name: "NoMatches", Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
 }}
-
-// ProgramStructExternalIdListEntry is the anonymous struct ProgramStructExternalIdListEntry.
-type ProgramStructExternalIdListEntry struct{}
-
-// EncodeTLV implements spec.Encodable.
-func (v ProgramStructExternalIdListEntry) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
-	enc.StartStruct(tag)
-	_ = enc.EndContainer()
-}
-
-// DecodeTLV decodes the structure n into v.
-func (v *ProgramStructExternalIdListEntry) DecodeTLV(n spec.Node) error {
-	return spec.DecodeFields(n, "ProgramStructExternalIdListEntry")
-}
-
-// GetProgramGuideRequestExternalIdListEntry is the anonymous struct GetProgramGuideRequestExternalIdListEntry.
-type GetProgramGuideRequestExternalIdListEntry struct{}
-
-// EncodeTLV implements spec.Encodable.
-func (v GetProgramGuideRequestExternalIdListEntry) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
-	enc.StartStruct(tag)
-	_ = enc.EndContainer()
-}
-
-// DecodeTLV decodes the structure n into v.
-func (v *GetProgramGuideRequestExternalIdListEntry) DecodeTLV(n spec.Node) error {
-	return spec.DecodeFields(n, "GetProgramGuideRequestExternalIdListEntry")
-}
-
-// RecordProgramRequestExternalIdListEntry is the anonymous struct RecordProgramRequestExternalIdListEntry.
-type RecordProgramRequestExternalIdListEntry struct{}
-
-// EncodeTLV implements spec.Encodable.
-func (v RecordProgramRequestExternalIdListEntry) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
-	enc.StartStruct(tag)
-	_ = enc.EndContainer()
-}
-
-// DecodeTLV decodes the structure n into v.
-func (v *RecordProgramRequestExternalIdListEntry) DecodeTLV(n spec.Node) error {
-	return spec.DecodeFields(n, "RecordProgramRequestExternalIdListEntry")
-}
-
-// CancelRecordProgramRequestExternalIdListEntry is the anonymous struct CancelRecordProgramRequestExternalIdListEntry.
-type CancelRecordProgramRequestExternalIdListEntry struct{}
-
-// EncodeTLV implements spec.Encodable.
-func (v CancelRecordProgramRequestExternalIdListEntry) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
-	enc.StartStruct(tag)
-	_ = enc.EndContainer()
-}
-
-// DecodeTLV decodes the structure n into v.
-func (v *CancelRecordProgramRequestExternalIdListEntry) DecodeTLV(n spec.Node) error {
-	return spec.DecodeFields(n, "CancelRecordProgramRequestExternalIdListEntry")
-}
 
 // ChangeChannelRequest is the ChangeChannel command payload.
 type ChangeChannelRequest struct {
@@ -624,13 +598,13 @@ func (v *SkipChannelRequest) DecodeTLV(n spec.Node) error {
 
 // GetProgramGuideRequest is the GetProgramGuide command payload.
 type GetProgramGuideRequest struct {
-	StartTime      uint32                                       // 0: epoch-s, M
-	EndTime        uint32                                       // 1: epoch-s, M
-	ChannelList    *[]ChannelInfoStruct                         // 2: list[ChannelInfoStruct], O, max 255
-	PageToken      *spec.Nullable[PageTokenStruct]              // 3: PageTokenStruct, O, X
-	RecordingFlag  *spec.Nullable[RecordingFlagBitmap]          // 5: RecordingFlagBitmap, O, X
-	ExternalIdList *[]GetProgramGuideRequestExternalIdListEntry // 6: list[ContentLauncher.AdditionalInfoStruct], O, max 255
-	Data           *[]byte                                      // 7: octstr, O, max 8092
+	StartTime      uint32                              // 0: epoch-s, M
+	EndTime        uint32                              // 1: epoch-s, M
+	ChannelList    *[]ChannelInfoStruct                // 2: list[ChannelInfoStruct], O, max 255
+	PageToken      *spec.Nullable[PageTokenStruct]     // 3: PageTokenStruct, O, X
+	RecordingFlag  *spec.Nullable[RecordingFlagBitmap] // 5: RecordingFlagBitmap, O, X
+	ExternalIdList *[]AdditionalInfoStruct             // 6: list[ContentLauncher.AdditionalInfoStruct], O, max 255
+	Data           *[]byte                             // 7: octstr, O, max 8092
 }
 
 // EncodeTLV implements spec.Encodable.
@@ -641,7 +615,7 @@ func (v GetProgramGuideRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	spec.PutOptional(enc, tlv.ContextTag(2), v.ChannelList, spec.PutList(spec.PutStruct[ChannelInfoStruct]))
 	spec.PutOptional(enc, tlv.ContextTag(3), v.PageToken, spec.PutNullable(spec.PutStruct[PageTokenStruct]))
 	spec.PutOptional(enc, tlv.ContextTag(5), v.RecordingFlag, spec.PutNullable(spec.PutUint[RecordingFlagBitmap]))
-	spec.PutOptional(enc, tlv.ContextTag(6), v.ExternalIdList, spec.PutList(spec.PutStruct[GetProgramGuideRequestExternalIdListEntry]))
+	spec.PutOptional(enc, tlv.ContextTag(6), v.ExternalIdList, spec.PutList(spec.PutStruct[AdditionalInfoStruct]))
 	spec.PutOptional(enc, tlv.ContextTag(7), v.Data, spec.PutBytes)
 	_ = enc.EndContainer()
 }
@@ -654,7 +628,7 @@ func (v *GetProgramGuideRequest) DecodeTLV(n spec.Node) error {
 		spec.Bind(2, "ChannelList", false, &v.ChannelList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[ChannelInfoStruct], 0, 255))),
 		spec.Bind(3, "PageToken", false, &v.PageToken, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeStruct[PageTokenStruct]))),
 		spec.Bind(5, "RecordingFlag", false, &v.RecordingFlag, spec.DecodeOptional(spec.DecodeNullable(spec.DecodeUint[RecordingFlagBitmap](8)))),
-		spec.Bind(6, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[GetProgramGuideRequestExternalIdListEntry], 0, 255))),
+		spec.Bind(6, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[AdditionalInfoStruct], 0, 255))),
 		spec.Bind(7, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeBytesIn(0, 8092))),
 	)
 }
@@ -688,10 +662,10 @@ func (ProgramGuideResponse) ResponseCommand() (clusterID, commandID uint32) {
 
 // RecordProgramRequest is the RecordProgram command payload.
 type RecordProgramRequest struct {
-	ProgramIdentifier  string                                     // 0: string, M, max 255
-	ShouldRecordSeries bool                                       // 1: bool, M
-	ExternalIdList     *[]RecordProgramRequestExternalIdListEntry // 2: list[ContentLauncher.AdditionalInfoStruct], O, max 255
-	Data               *[]byte                                    // 3: octstr, O, max 8092
+	ProgramIdentifier  string                  // 0: string, M, max 255
+	ShouldRecordSeries bool                    // 1: bool, M
+	ExternalIdList     *[]AdditionalInfoStruct // 2: list[ContentLauncher.AdditionalInfoStruct], O, max 255
+	Data               *[]byte                 // 3: octstr, O, max 8092
 }
 
 // EncodeTLV implements spec.Encodable.
@@ -699,7 +673,7 @@ func (v RecordProgramRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	enc.StartStruct(tag)
 	spec.PutString(enc, tlv.ContextTag(0), v.ProgramIdentifier)
 	spec.PutBool(enc, tlv.ContextTag(1), v.ShouldRecordSeries)
-	spec.PutOptional(enc, tlv.ContextTag(2), v.ExternalIdList, spec.PutList(spec.PutStruct[RecordProgramRequestExternalIdListEntry]))
+	spec.PutOptional(enc, tlv.ContextTag(2), v.ExternalIdList, spec.PutList(spec.PutStruct[AdditionalInfoStruct]))
 	spec.PutOptional(enc, tlv.ContextTag(3), v.Data, spec.PutBytes)
 	_ = enc.EndContainer()
 }
@@ -709,17 +683,17 @@ func (v *RecordProgramRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "RecordProgram",
 		spec.Bind(0, "ProgramIdentifier", true, &v.ProgramIdentifier, spec.DecodeStringIn(0, 255)),
 		spec.Bind(1, "ShouldRecordSeries", true, &v.ShouldRecordSeries, spec.DecodeBool),
-		spec.Bind(2, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[RecordProgramRequestExternalIdListEntry], 0, 255))),
+		spec.Bind(2, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[AdditionalInfoStruct], 0, 255))),
 		spec.Bind(3, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeBytesIn(0, 8092))),
 	)
 }
 
 // CancelRecordProgramRequest is the CancelRecordProgram command payload.
 type CancelRecordProgramRequest struct {
-	ProgramIdentifier  string                                           // 0: string, M, max 255
-	ShouldRecordSeries bool                                             // 1: bool, M
-	ExternalIdList     *[]CancelRecordProgramRequestExternalIdListEntry // 2: list[ContentLauncher.AdditionalInfoStruct], O, max 255
-	Data               *[]byte                                          // 3: octstr, O, max 8092
+	ProgramIdentifier  string                  // 0: string, M, max 255
+	ShouldRecordSeries bool                    // 1: bool, M
+	ExternalIdList     *[]AdditionalInfoStruct // 2: list[ContentLauncher.AdditionalInfoStruct], O, max 255
+	Data               *[]byte                 // 3: octstr, O, max 8092
 }
 
 // EncodeTLV implements spec.Encodable.
@@ -727,7 +701,7 @@ func (v CancelRecordProgramRequest) EncodeTLV(enc *tlv.Encoder, tag tlv.Tag) {
 	enc.StartStruct(tag)
 	spec.PutString(enc, tlv.ContextTag(0), v.ProgramIdentifier)
 	spec.PutBool(enc, tlv.ContextTag(1), v.ShouldRecordSeries)
-	spec.PutOptional(enc, tlv.ContextTag(2), v.ExternalIdList, spec.PutList(spec.PutStruct[CancelRecordProgramRequestExternalIdListEntry]))
+	spec.PutOptional(enc, tlv.ContextTag(2), v.ExternalIdList, spec.PutList(spec.PutStruct[AdditionalInfoStruct]))
 	spec.PutOptional(enc, tlv.ContextTag(3), v.Data, spec.PutBytes)
 	_ = enc.EndContainer()
 }
@@ -737,7 +711,7 @@ func (v *CancelRecordProgramRequest) DecodeTLV(n spec.Node) error {
 	return spec.DecodeFields(n, "CancelRecordProgram",
 		spec.Bind(0, "ProgramIdentifier", true, &v.ProgramIdentifier, spec.DecodeStringIn(0, 255)),
 		spec.Bind(1, "ShouldRecordSeries", true, &v.ShouldRecordSeries, spec.DecodeBool),
-		spec.Bind(2, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[CancelRecordProgramRequestExternalIdListEntry], 0, 255))),
+		spec.Bind(2, "ExternalIdList", false, &v.ExternalIdList, spec.DecodeOptional(spec.DecodeListIn(spec.DecodeStruct[AdditionalInfoStruct], 0, 255))),
 		spec.Bind(3, "Data", false, &v.Data, spec.DecodeOptional(spec.DecodeBytesIn(0, 8092))),
 	)
 }
@@ -868,7 +842,7 @@ var Definition = &spec.Cluster{
 				{ID: 2, Name: "ChannelList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ChannelInfoStruct", Kind: spec.KindStruct, Struct: ChannelInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 				{ID: 3, Name: "PageToken", Type: spec.Type{Name: "PageTokenStruct", Kind: spec.KindStruct, Struct: PageTokenStructDef}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
 				{ID: 5, Name: "RecordingFlag", Type: spec.Type{Name: "RecordingFlagBitmap", Kind: spec.KindBitmap, Bits: 8, Bitmap: RecordingFlagBitmapDef}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Quality: spec.Quality{Nullable: true}, Default: spec.NullDefault{}},
-				{ID: 6, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: &spec.Struct{Name: "GetProgramGuideRequestExternalIdListEntry", Fields: nil}}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+				{ID: 6, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 				{ID: 7, Name: "Data", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8092", Max: &spec.Bound{Int: 8092}}},
 			},
 			Decode: decodeGetProgramGuideRequest,
@@ -891,7 +865,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "ProgramIdentifier", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 				{ID: 1, Name: "ShouldRecordSeries", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: &spec.Struct{Name: "RecordProgramRequestExternalIdListEntry", Fields: nil}}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+				{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 				{ID: 3, Name: "Data", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8092", Max: &spec.Bound{Int: 8092}}},
 			},
 			Decode: decodeRecordProgramRequest,
@@ -904,7 +878,7 @@ var Definition = &spec.Cluster{
 			Fields: []spec.Field{
 				{ID: 0, Name: "ProgramIdentifier", Type: spec.Type{Name: "string", Kind: spec.KindString}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 				{ID: 1, Name: "ShouldRecordSeries", Type: spec.Type{Name: "bool", Kind: spec.KindBool}, Conformance: spec.Conformance{Text: "M", Op: spec.ConfMandatory}},
-				{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: &spec.Struct{Name: "CancelRecordProgramRequestExternalIdListEntry", Fields: nil}}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
+				{ID: 2, Name: "ExternalIdList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "entry", Type: spec.Type{Name: "ContentLauncher.AdditionalInfoStruct", Kind: spec.KindStruct, Struct: AdditionalInfoStructDef}}}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 255", Max: &spec.Bound{Int: 255}}},
 				{ID: 3, Name: "Data", Type: spec.Type{Name: "octstr", Kind: spec.KindBytes}, Conformance: spec.Conformance{Text: "O", Op: spec.ConfOptional}, Constraint: spec.Constraint{Text: "max 8092", Max: &spec.Bound{Int: 8092}}},
 			},
 			Decode: decodeCancelRecordProgramRequest,

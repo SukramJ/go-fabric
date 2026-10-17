@@ -271,7 +271,6 @@ extraction — give both to one agent. C2 and H7 are the same defect.
 
 **TLV / message codec**
 - Vendor-qualified protocol IDs collide with standard dispatch (VendorID parsed but never consulted). `bridge/receive.go:195` vs `MessageCodec.ts:377`. **FIXED (batch 2; proof `bridge/receive.go:245`: `HasVendorID && VendorID != 0` → ErrUnknownProtocol before the switch).**
-- Security-flags decoded with a 5-bit session-type mask, no reject of unknown types / Control flag; Control/Privacy echoed into replies. `transport/message/message.go:40`, `bridge/reply.go:148` vs `MessageCodec.ts:150` / `:195` / `:212`. **FIXED in effect (verified 2026-10-13):** `transport/message/message.go:45` 2-bit mask, `:281-286` rejects a session type ∉ {0,1} and the C bit, a unicast P frame is dropped (`bridge/privacy.go:69-71`), the raw byte stays for the nonce (`message.go:224-239`). `bridge/reply.go:183-184` still copies Privacy/Control from the request header — dead code, since neither can be set on an accepted unicast request; remove with the next touch of `reply.go`.
 - Control byte with EndOfContainer type does not consume its tag bytes → decoder desync on malformed TLV. `tlv/decode.go:56` vs `TlvCodec.ts:156`. **FIXED (verified 2026-10-13):** `tlv/decode.go:65` reads the tag before the `TypeEndContainer` return (`:70-81`); a non-anonymous tag on it is an error.
 
 **IM / events**
@@ -346,113 +345,57 @@ FlowMeasurement, `cluster/opstate` and `cluster/modebase`.
 rules below that matter.js does not carry and that were taken from memory
 of connectedhomeip are marked unverified:
 
-- **The default Binding server resolves no peer.** `core.Binding` (mounted by `device/` where Base mandates it) is the fabric-scoped list with its write rules; nothing acts on an entry (`BD-Matter-Binding-StoreOnly`). **matter.js:** `BindingServer` resolves entries into peers. Out of scope while the module has no client role; recorded so a future client cluster finds it.
-
-- **`Constraint.In` is checked on controller writes only.** Since #47 the
-  `cluster/spec` runtime refuses a written value outside the peer list an
-  `in` constraint names (CONSTRAINT_ERROR, matter.js `constraint.ts:153`);
-  a host-side `Set` or the `Initial` value is not checked. **matter.js:**
-  validates every state commit, including the initial one. Checking
-  `Initial` today would make `NewServer` refuse LocalizationConfiguration,
-  because ActiveLocale is checked before SupportedLocales is applied.
-  **Fix:** validate initial and host-set values after all initials are
-  applied, then add the two localization clusters' start-up cases to the
-  parity test.
-- **FanControl percent / speed formulas and the On / Smart mapping.**
-  `ceil(SpeedMax × p / 100)`, `floor(s × 100 / SpeedMax)`, On → High,
-  Smart → Auto-or-High (`cluster/fan/fancontrol_server.go`
-  `percentSettings`, `speedSettings`, `resolveFanMode`) are recalled from
-  `src/app/clusters/fan-control-server/fan-control-server.cpp`. Fix
-  package: read that file and the spec's §4.4.6.3.1 / §4.4.6.6.1, correct
-  the three functions if they differ, extend `TestPercentAndSpeedWrites`.
-- **SmokeCoAlarm default ExpressedState priority.**
-  `alarm.DefaultExpressedStatePriority` is recalled from
-  `examples/smoke-co-alarm-app` (`SetExpressedStateByPriority`). Hosts can
-  override it, so a wrong default is a wrong default, not a lock-in. Fix
-  package: compare with the example app, adjust the slice and
-  `TestExpressedStatePriority`.
-- **SmokeCoAlarm requires a PowerSource device type on the endpoint.**
-  `smoke-co-alarm-device.element.ts` lists `PowerSource` (0x0011) as a
-  mandatory *deviceType* requirement; matter.js's `SmokeCoAlarmDevice`
-  does not install it either. A host can mount the PowerSource cluster
-  through `Spec.PowerSource`, but `endpoint/materialize.go` never adds
-  0x0011 to the Descriptor's DeviceTypeList. Fix package: append
-  PowerSource (with its schema revision) to DeviceTypeList when
-  `ep.PowerSource` is set, and assert it in
-  `endpoint/application_device_types_test.go`.
-- **ModeBase DIRECTMODECH bit and product-specific statuses.**
-  `modebase.FeatureDirectModeChange` is bit 20, as matter.js's
-  `rvc-run-mode.element.ts` / `rvc-clean-mode.element.ts` give it
-  (constraint "20") and `parity/schema.json` pins it; connectedhomeip is
-  recalled — not read — to define it as 0x10000 (bit 16). Likewise the
-  ModeChangeStatus range a host may use for a product-specific failure is
-  taken to start at 0x80, from memory of the specification's range table
-  that matter.js does not carry. Fix package: read
-  `src/app/clusters/mode-base-server/` and the RVC Run Mode feature table;
-  if the bit differs, raise it against matter.js before changing the
-  constant here; narrow `modebase.Server.validHostStatus` if the range does.
-- **DIRECTMODECH is advertised, not enforced.** Without it a RvcRunMode /
-  RvcCleanMode change while the run mode is not Idle must answer
-  InvalidInMode (`rvc-run-mode.resource.ts`, `rvc-clean-mode.resource.ts`).
-  The server leaves that to the host's `ModeChanger`; matter.js does not
-  enforce it either. Fix package: a cross-cluster check would need the
-  RvcRunMode server to be visible to RvcCleanMode; decide with a host that
-  needs it.
-- **CountdownTime reportability.** The server reports CountdownTime as
-  matter.js does (QuietEvent: at once to or from null, otherwise at most
-  once a second). The specification's list — report on a change caused by
-  CurrentPhase / OperationalState, on 0 ↔ non-zero, on increases and on
-  changes not due to the passage of time; never for the plain countdown —
-  is not implemented here or in matter.js
-  (RvcOperationalStateServer's own comment says so).
-- **Not built:** HepaFilterMonitoring (0x0071) and
-  ActivatedCarbonFilterMonitoring (0x0072), optional on AirPurifier and
-  ExtractorHood; Pump's optional LevelControl / ScenesManagement /
-  measurement servers beyond FlowMeasurement; SmokeCoAlarm's optional
-  CarbonMonoxideConcentrationMeasurement (0x040C); the appliance types'
-  optional LaundryWasherControls (0x0053), LaundryDryerControls (0x004A),
-  DishwasherAlarm (0x005D), TemperatureControl (0x0056), DeadFront OnOff
-  and RVC ServiceArea (0x0150); the microwave-oven clusters and
-  OvenCavityOperationalState (0x0048), which no target device type
-  mandates.
-
 ---
 
 ## Tier 3 — LOW
 
-- **UpdateNOC keeps the invoking session open.** `operational.Manager.CloseFabricExcept` keeps the session that carried UpdateNOC; `Bridge.CloseFabricSessionsExcept` tells and closes the others. **matter.js:** `Fabric.replaced` (`Fabric.ts:408-415`) runs `initiateForceClose` on every session of the fabric, the invoking one included, which closes after its exchange without a CloseSession (`NodeSession.ts:349-352`). Fix package: let `node/node.go` `fabricUpdated` defer a close of the invoking session after the response, as `EmitFabricRemovedContext` does for RemoveFabric (report W).
-
-- **A session that never carried an authenticated message closes without a CloseSession.** The farewell on fabric removal and NOC rotation needs a peer address from the bridge's route table; a UDP session bound by a CASE handshake but not yet used has none and is closed silently. **matter.js:** the session is created on the handshake's channel and always has one (`CaseServer.ts:175-176`). Fix package: bind a UDP session to its peer address at establishment, as item 2 of brief W does on a TCP connection; this moves the UDP route rule (first authenticated message) that the fixture runs have proven, so it waits for a fixture run (report W, question 3). Confirmed from the controller side by report AG (wave 13): `controller/peer`'s node test sends one probe before `Stop` so the node's CloseSession reaches the peer.
-
-- **SetpointRaiseLower in Heat or Cool mode on an AUTO thermostat does not keep the deadband.** `cluster/thermo/thermostat_server.go:764-767` clamps the one setpoint to its limits and stores it. **matter.js:** in Heat mode moves the cooling setpoint up to `desiredHeatingSetpoint + setpointDeadBand` when the deadband would be violated, and answers INVALID_COMMAND when that setpoint cannot be clamped into its limits; Cool mode mirrors it (`ThermostatServer.ts:229-267`). Fix package: compute the companion as matter.js does and hand both to `applyRaiseLower` (one Sink call, cooling primary, heating companion); add the two refusals to the negative-write parity table (report Y, candidate).
-
-- **ArmFailSafe runs the armed hook with the cluster lock held.** `cluster/core/general_commissioning.go:637` calls `onFailSafeArmed` while `g.mu` is still held by the deferred unlock (`:494-504`), although the comment at `:622-624` says the hook runs without the mutex; only the disarm branch releases first (`:564-568`). No cycle with today's wiring (`node` wires `OperationalCredentials.ClearPendingState`, which takes its own lock and never calls back). Fix package: release `g.mu` before the hook as the disarm branch does (`unlocked = true`), and a test with a hook that reads the cluster (report AA, candidate).
-
-- **After the last fabric is removed the node reopens its window at once; matter.js waits, then erases.** `node/node.go:287-298` `fabricRemoved` → `node/commissioning.go:282-294` `reopenIfDecommissioned` reopens the node's own commissioning window as soon as the store lists no fabric and no window is open. **matter.js:** `CommissioningServer.ts:178-199` `#resetWhenIdle` waits for the fail-safe to end and for every session to close, cancels when a fabric exists by then (one a commissioning completed), and erases the node (`ServerNode.erase()`), which restarts it into commissioning mode. Fix package: a reset policy on the node facade — wait as matter.js does, clear the node's own state (`store`), then reopen; the daemon's observers (`OnFabricRemoved`) are unchanged (report AD, question 4).
-
-- **A mandatory command without a handler is advertised and answers UNSUPPORTED_COMMAND.** `spec.New` resolves AcceptedCommandList from conformance alone (`cluster/spec/instance.go:247-300`) and `spec.Server` answers an unhandled one at invoke (`cluster/spec/server.go:320-330`); `spectest.CheckServer` checks the advertised list, not that a handler exists. **matter.js:** a required command the implementation lacks is fatal at server initialisation (`ValidatedElements.ts:357-370`, "Implementation missing"); one that throws `Behavior.unimplemented` is fatal in strict mode and otherwise a warning that drops it from AcceptedCommandList (`:106-108`, `:444-446`; `0c4057e8`). Fix package: `spectest.CheckServer` verifies a handler per accepted command, and `spec.Server` refuses at construction (report AD, question 6).
-
-- **The OTA requestor's `queryRunning` is cleared without a `defer`.** `cluster/core/ota_requestor_query.go:123-142` sets and clears the flag around `queryForUpdate`; a panic inside leaves it set and every later timer skips. **matter.js:** `finally { this.internal.queryRunning = false }` (`OtaSoftwareUpdateRequestorServer.ts:571-581`). Fix package: `defer` (report AD, §5).
-
-Fixed-width integer encodes exceed the sanctioned SubscriptionID/DataVersion workaround family-wide, and the provenance comments misstate matter.js (`tlv/encode.go:119`); invalid UTF-8 preserved on decode (`tlv/decode.go:201`); maxPathsPerInvoke unenforced and Invoke SuppressResponse ignored (`im/invoke.go:307`); CSRRequest lacks the post-NOC ConstraintError guard; CaseAdminSubject CAT version 0 accepted (`cluster/core/operational_credentials.go:1831`); unfiltered NOCs read returns other fabrics' cert bytes; advertised port ignores the effective bind port (`bridge/bridge.go:1168`); ephemeral PASE provider leaks a reaper goroutine per close (`cmd/openccu-loom/matter_ephemeral_provider.go:164`); encrypted receive window permits rollover (`transport/mrp/window.go:88`); negative-write parity guards pin unmounted implementations (`cluster/matter_negative_write_parity_test.go:231`).
-
 ---
 
-- **`controller/client`: 38 snapshot clusters have no generated definition** (AccessControl, OperationalCredentials, GroupKeyManagement, Groupcast, Thread/WiFi diagnostics, Switch, the media and camera clusters, the joint-fabric and TLS clusters among them; `script/clustergen/clusters.go` names the 97 that do). The client names them ("named clusters", brief AK D3), decodes their global attributes, names their features and judges their changes-omitted attributes from the schema's tables, and delivers their events raw. What stays approximate is `Cluster.Extra()`: matter.js subtracts the model's attributes and commands (`PeerBehavior.ts:443-455` at `0ceb202d`); the Go client has no per-cluster attribute table for a cluster without a definition, so every non-global listed id counts as extra. Closes when the generator covers them (ADR 0013's skip list) or the schema gains an attribute table. Report AK, 2026-10-14.
+## Closed in the 2026-10-17 findings wave (v0.6.0)
 
-- **`controller/client.Registry`, three gaps against `Peers.ts`/`CommissioningClient.ts` at `0ceb202d` (report AL, 2026-10-14):** (1) the record follows the peer's descriptor on `SessionAdded` and at commission, not on every descriptor save as `CommissioningClient.ts:711` (`peer.updated`) does — closes with a `peer.Observer.Updated`; (2) `ForDevice` stores no TTL because `discovery.Device` carries none, so a commissionable node expires after `DefaultTTL` instead of its record's TTL (`Peers.ts:959-966`) — closes when the scanner exposes the record TTL; (3) the decommission confirmation classes (`CommissioningClient.ts:405-417`) map `PeerMessageMissingError`, `PeerInitiatedCloseError` and `PeerLeftError`, but `FabricRemovedError` has no Go counterpart.
+Every open entry was worked through (briefs AX and AY, the owner's
+security paths; reports AX.md and AY.md). Two stay open above: the
+SetRegulatoryConfig CountryCode and Groupcast against a real controller
+both need a real ecosystem run (phase 5).
 
-- **Group sender (report AN, 2026-10-14):** (1) matter.js compares a key set's `epochStartTime` (Matter epoch, µs since 2000) as if it were Unix milliseconds (`Groups.ts` `currentKeyForId`, `0ceb202d`); `groups/sender.go` mirrors the comparison — a key whose start lies between 2000 and 2030 in Matter time reads as started; a CHIP controller writes current Matter-epoch values, which are "started" either way. (2) Group writes are not list-chunked (`ClientGroupInteraction.ts` chunks as unicast does). (3) Group messages leave from the node's ephemeral send socket, not the bridge's listener on 5540 (`BD-Matter-GroupSendFromEphemeralPort`); closes when `bridge` exposes its listener.
-
-- **Binding manager (report AO, 2026-10-14):** (1) **closed in wave 22 (report AP):** the Binding list is persisted through the settings table (`BD-Matter-Binding-PersistedInSettings`). (2) The client role's CASE resumption records are in memory (`node.Config.Client`); the store's resumption row is the responder's. (3) `core.TargetStruct` keeps its sentinel encoding (0 = absent), so endpoint 0 cannot be a binding target. (4) `make chipdm-check` from a git worktree needs an absolute `CHIP_ROOT` (the default `../connectedhomeip` resolves relative to the worktree).
-
-- **OTA provider, mirrored matter.js behaviour worth an upstream look (report AQ, 2026-10-14):** (1) `directConsentObtained` is reset on every state change (`OtaSoftwareUpdateProviderServer.ts:572`, `:598` at `0ceb202d`), so consent granted before the download is lost at apply and the update Discontinues; (2) `userConsentNeeded` is still sent after the provider obtained consent (`:399`), so a requestor that cannot consent drops the update; (3) the provider's Operate/CASE ACL entry goes on the first fabric only (`:118`) — a requestor on a second fabric of a multi-fabric bridge cannot query. All three mirrored; closes when upstream changes or the owner decides a divergence.
-- **clustergen: a cross-cluster datatype is generated as an empty struct (report AR, 2026-10-14):** Channel's `ExternalIdList` entries are `list[ContentLauncher.AdditionalInfoStruct]` and come out as `ProgramStructExternalIdListEntry struct{}` / `GetProgramGuideRequestExternalIdListEntry struct{}` (`cluster/spec/channel/definition_gen.go:332`, `:407`, `:632`, `Fields: nil`), so a peer's Name/Value are dropped on decode and never encoded. No family reaches the field; a host that fills it loses it. Closes when `script/clustergen` resolves `Cluster.Type` references across definitions. Related: `defaultValue` renders no list or struct defaults — the two the model carries (`channel.element.ts:31`, `content-launcher.element.ts:34`) are applied by hand in `cluster/media` (`BD-Matter-Media-HostPorts`); a generator rendering them retires that hand-off.
-- **`setup.QRCode` is laxer than matter.js's encoder (report AT, 2026-10-14):** `PairingCodeSchema.ts:277-330` at `0ceb202d` refuses a version other than 0, the passcodes in `INVALID_PASSCODES` (`:160`) and a vendor/product pair that fails `assertValidPayloadIdentity` (`:217`); `secure/setup/setup.go`'s `QRCode` accepts versions 1–7 and the trivial passcodes, with only the 255-character limit added in wave 26. The decoders (`DecodeQRCode`, `DecodeManualCode`) carry the checks. Closes when the encoder is tightened; a host that encodes its own code today may produce one matter.js would not. Also: no 21-digit manual-code encoder (the decoder reads it) and no decode mode that skips validation.
-- **Flake under `-race`: `controller/client` `TestReactionLeave` (report AU, 2026-10-15):** `reactions_test.go:139` ("stored [peer1]") failed once in a full `make race` on a loaded machine and passed 5/5 alone; the assertion reads the registry's stored ids right after the leave reaction without waiting for the store. Closes with a wait on `NodeIDs` in the test.
-- **Timing flake: `secure/operational` `TestStartReaper_ActiveSessionSurvivesSweeps` (2026-10-16):** `manager_idle_reaper_test.go:98` ("Active() = 0 during live traffic") failed once in a full `make ci` on a loaded machine and passed 10/10 alone; the test's 0.24 s window between the simulated traffic and the reaper's sweep is too tight under load. Closes with a fake clock in the test.
-- **From brief AW's code reading (2026-10-16), to triage:** (1) UDP dispatch for secure sessions queues by the datagram's session id before any lookup, outside the 1024-goroutine cap, so forged session ids are not bounded by it (`transport/udp/ordered.go`, `bridge/session_order.go`) — a DoS surface, security path; (2) concurrent `Aggregator.Add`/`Remove` reassemble last-writer-wins, so a just-added device can be missed, and after `MarkComplete` possibly its endpoint number collected (not traced); (3) `Node.Stop` does not wait for running cluster handlers; (4) `Start` opens the own commissioning window when no fabric *loads*, so a paired node whose CASE identities all fail to load advertises as commissionable; (5) the `matter_diagnostics` table and its store API have no caller; (6) `endpoint/sqlitestore` has no `Migrations`/`SchemaFingerprint` unlike `store` and `controller/client/sqlstore`; (7) host-specific wording left in public docs and logs (`north.matter.mdns_advertise`, "matter.enabled", "v1.1/v1.2" in `store`, loom terms in `contract`). Each closes as a fix or a `by_design` entry.
-- **DCL client, mirrored matter.js behaviour and the parts left out (report AS, 2026-10-14):** (1) `DclCertificateService.ts:1849-1874` at `0ceb202d` parses a CRL's `nextUpdate` and never reads it, so an expired CRL still revokes — mirrored and pinned by a test; (2) not ported: revocation sets installed out of band and the seed data, the on-demand PAA fetch by subject key id, the compliance endpoint (and with it an update's specification version), the vendor-info service and OTA image storage, ML-DSA certificates; (3) `controller/dcl/cert.go` copies the certificate-parsing helpers rather than exporting them from `controller/attestation` — fold when a third consumer appears; (4) the `PAAStore`/`Revocations` seams take no context, so the store's on-demand CRL fetches run under the client timeout only. Closes per item as the owner ports it or decides a divergence.
+- **Fixed:** the ordered UDP dispatch shares the 1024 budget; `Node.Stop`
+  waits for dispatched handlers; Start opens the own window only on an
+  empty fabric table; Aggregator reassembly is serialised; ArmFailSafe's
+  hook runs unlocked; UpdateNOC closes the invoking session after its
+  response; the reopen after the last fabric waits for idleness; a UDP
+  handshake binds its session's address; Binding endpoint/cluster 0;
+  smallest-width integers (TLV writers, IM, the bridge's generic writer);
+  invalid UTF-8 decodes to U+FFFD; mandatory commands need a handler
+  (default servers list a command only once handled); the client
+  registry follows every descriptor save, `client.ErrFabricRemoved`;
+  group writes list-chunk; `queryRunning` deferred; `setup.QRCode` /
+  `ManualCode` refuse what matter.js refuses, `ManualCodeLong`; DCL folds
+  its certificate helpers into `controller/attestation`; clustergen
+  resolves cross-cluster structs and five more definitions are generated;
+  `endpoint/sqlitestore` migrations; host wording; chipdm-check from a
+  worktree; the three flakes; `in` constraints on initial values and host
+  Set; RvcRunMode InvalidInMode; SetpointRaiseLower keeps the deadband;
+  WindowCovering maintenance mode; PICS declare the events device types
+  require; the harness daemon runs in UTC; the OTA provider's ACL entry on
+  every fabric.
+- **Closed as already fixed or not reproducible:** the encrypted window's
+  rollover, CAT version 0, the NOCs read (NOCStruct carries no
+  fabric-sensitive field in matter.js or chip), CSRRequest after AddNOC,
+  the advertised port, maxPathsPerInvoke and SuppressResponse, the
+  negative-write guards, the scanner TTL (matter.js sets none either),
+  FanControl's formulas (verified), SmokeCoAlarm (PowerSource is a part
+  endpoint, as matter.js's validator expects), "Not built" (every listed
+  cluster is served), the Binding server "resolves no peer" (the binding
+  manager arrived in wave 21), semtag.Label (no TagList served), the
+  PASE provider leak (the host's file, not this module's), the reply
+  path's Control/Privacy echo (decode already rejects both).
+- **Now by design:** see `by_design.md` — the reopen without erase, the
+  OTA provider ACL on every fabric, the mirrored OTA consent quirks and
+  TC-SU-2.7, the DCL's expired CRL and unported parts, the group
+  epochStartTime units, CountdownTime reportability, TC-EEVSE-2.3,
+  GroupKeyMulticastPolicy and ColorControl's `hsvToXy`, RvcRunMode's
+  InvalidInMode, the unported chip FanMode split, the `matter_diagnostics`
+  API (Deprecated).
 
 ## Closed in 0.31–0.33 (duplicated Tier-2 bullets)
 
@@ -491,47 +434,6 @@ is excluded in `internal/chiptool/families_table_test.go` with class (a) and
 a pointer here; fixing one means removing that exclusion, re-running the
 family, and deleting the entry.
 
-- **Maintenance mode is not implemented — declared `WNCV.S.M.Maintenance=0`.**
-  `cluster/cover` stores Mode but does not act on its MaintenanceMode bit.
-  **matter.js:** `WindowCoveringServer` (`supportsMaintenanceMode`, default
-  true) refuses movement commands in maintenance mode and syncs
-  ConfigStatus.Operational. **Fix:** port the Mode / ConfigStatus sync and
-  the maintenance refusal, then declare the PICS code 1.
-
-- **TC-EEVSE-2.3 step 19 — eleven ChargingTargets in one day answer
-  CONSTRAINT_ERROR, the case expects RESOURCE_EXHAUSTED.** The generated
-  SetTargets decoder (`cluster/spec/energyevse`, `DecodeListIn(…, 0, 10)`
-  from the `max 10` constraint on ChargingTargetScheduleStruct.ChargingTargets)
-  refuses the request before `cluster/energy/evse.go`'s own per-day check
-  (`evseMaxTargetsPerDay`, which would answer RESOURCE_EXHAUSTED as
-  connectedhomeip's `EvseCluster.cpp` does) runs. **matter.js:** validates
-  the request TLV against the same model constraint before the behavior
-  sees it (`CommandInvokeResponse.ts` `requestTlv.validate(request)`;
-  `TlvArray.validate` throws `ValidationOutOfBoundsError`, a
-  `ValidationError` whose status is ConstraintError) — so matter.js answers
-  CONSTRAINT_ERROR here too, and the CSA case disagrees with both. **Fix:**
-  decide whether a command's list bound belongs to the decoder (status of
-  the schema) or to the server (status of the cluster's rule); the spec
-  text for SetTargets names RESOURCE_EXHAUSTED. Until then the case is
-  excluded as class (a) in the EEVSE family.
-
-- **TC-SU-2.7 would fail two asserts where the case and matter.js
-  disagree — not run: the case is manual at the harness pin.** Recorded
-  from the port (#49) so the first manual run is not read as a defect.
-  Step 3 kills the provider and expects Querying → Idle with ChangeReason
-  *Failure* (`TC_SU_2_7.py:257`); matter.js treats a failed provider
-  connection as "no update" and resets with the default reason, Success
-  (`OtaSoftwareUpdateRequestorServer.ts:633-640`), as the requestor here
-  does. Step 5 expects a DownloadError with `bytesDownloaded > 0`,
-  `progressPercent > 0`, `platformCode` null and at least 300 s until Idle
-  (`:364`, `:371-374`); matter.js builds the BDX failure's OtaDownloadError
-  without a byte count and with the BDX code or 0 as the platform code
-  (`:982`, `:915`, `:1209-1215`) and returns to Idle at once with reason
-  Failure (`:916`). Mirrored (`cluster/core/ota_requestor_query.go:449-451`,
-  `:536`). Open: follow matter.js (then exclude the case as class (a)
-  with this entry once it is automated) or follow the case; an upstream
-  matter.js issue is the candidate either way.
-
 The group-messaging cases are not findings: they are skipped on a host
 whose LAN interface has no IPv6, with the command that enables it, and run
 wherever it has. TC-SC-4.1 and TC-SC-4.3 were wrongly listed here as such an
@@ -548,41 +450,11 @@ certification cases judge a device by) is right and the snapshot is wrong
 None changes a shipped server's behaviour today; each entry leaves the
 table, and this list, when the snapshot is corrected.
 
-- **GroupKeySetStruct.GroupKeyMulticastPolicy is O, Matter 1.6.1 says D.**
-  matter.js's `GroupKeyManagementOverrides.ts` (written when the field was
-  "P, M") forces O for every revision; its own 1.6.1 scrape states D.
-  `bridge/fields_reader_groupkeys.go` reports field 8 in KeySetReadResponse
-  as matter.js's server does while the model defines the field (a D field
-  still is); CHIP's server omits it. No case of the GRPKEY family reads or
-  writes it, and TC_DeviceConformance does not judge struct fields, so no
-  certification family is affected. Upstream candidate (matter.js): gate
-  the override `until: "1.6.1"`.
-- **ColorControl XY → hue/saturation converts with the wrong function in
-  matter.js.** `ColorControlServer.ts:1493` (`switchColorMode`) calls
-  `hsvToXy(this.x, this.y)` where `xyToHsv` is meant; the module converts
-  correctly and records the departure as `BD-Matter-ColorControl-XYToHS`.
-  Not a data-model difference, listed here as an upstream candidate
-  (matter.js): call `xyToHsv`.
-- **semtag.Label is O, the specification says "MfgCode != null, O".**
-  matter.js `support/models/src/local/semtag.ts` relaxes it ("TODO we do not
-  support MfgCode != null"). go-fabric serves no Descriptor TagList, so
-  nothing depends on it; it matters once TagList is served (TC-DESC-2.2).
-
 ### Device type validation — open departures
 
 What `endpoint.ValidateDeviceTypes`
 ([ADR 0016](../../docs/adr/0016-device-type-validation.md)) finds in what
 the module builds itself (`endpoint/devicetype_module_test.go` pins each).
-
-- **PICS slices mark OperationCompletion absent where the device types
-  make it mandatory.** `internal/chiptool/testdata/pics/ep12.txt` and
-  `ep13.txt` carry `OPSTATE.S.E01=0` / `RVCOPSTATE.S.E01=0` although
-  LaundryWasher and RoboticVacuumCleaner require the event and the endpoints
-  list it: `gen_pics.py` derives event codes from the cluster's own
-  conformance (`mandatory_events_by_cluster`), not from the device type's
-  override, so cases gated on E01 are skipped. Every other device-type
-  element requirement of the reference daemon's endpoints agrees with its
-  slices. For the chip-tool harness owner.
 
 ## Verified sound (no action)
 

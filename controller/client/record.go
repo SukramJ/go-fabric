@@ -537,8 +537,10 @@ func (r Record) device() *discovery.Device {
 
 // applyDevice refreshes the record from a commissionable device the
 // scanner found — RemoteDescriptor.toLongForm (RemoteDescriptor.ts:167-245)
-// over the device: discovered now (:191-193); the TTL unknown — the Go
-// scanner carries no record TTL, so it is [DefaultTTL] at expiry; the
+// over the device: discovered now (:191-193); the TTL unknown, so it is
+// [DefaultTTL] at expiry (Peers.ts:959-966) — as in matter.js, whose
+// scanner states no TTL on a commissionable device or its addresses
+// (CommissionableMdnsScanner.ts:470-496, IpService.ts:316 at 0ceb202d); the
 // addresses only when there are any (:199-201), each discovered now; the
 // instance id (:203-205), the host (:210-212), the TXT keys (applyTXT),
 // the discriminator and commissioning mode (:236-242).

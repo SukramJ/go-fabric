@@ -11,6 +11,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/store"
+
 	"github.com/SukramJ/go-fabric/bdx"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
@@ -143,6 +145,48 @@ func TestOTAProviderNotConfigured(t *testing.T) {
 		}
 		if n.OTAProvider() != nil || providerEndpoint(t, n) != nil || len(n.Bridge().Topology().Endpoints) != 2 {
 			t.Fatalf("config %+v: provider %v, %d endpoints", p, n.OTAProvider(), len(n.Bridge().Topology().Endpoints))
+		}
+	}
+}
+
+// TestOTAProviderACLOnEveryFabric: the provider's Operate/CASE entry goes
+// on every fabric's ACL, so a requestor on a second fabric can query — a
+// divergence from matter.js, which grants it on the first fabric only
+// (BD-Matter-OTAProvider-ACLEveryFabric).
+func TestOTAProviderACLOnEveryFabric(t *testing.T) {
+	ctx := context.Background()
+	db := openDB(t, filepath.Join(t.TempDir(), "node.db"))
+	if err := store.Apply(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	st := store.New(db)
+	indexes := make([]uint8, 0, 2)
+	for i := range 2 {
+		idx, err := st.AddFabric(ctx, store.FabricRecord{FabricID: uint64(0x0A00 + i), NodeID: uint64(0x0B00 + i), VendorID: 0xFFF1, RootPublicKey: make([]byte, 65), CompressedID: [8]byte{byte(i + 1)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		indexes = append(indexes, idx)
+	}
+	cfg := minimalConfig(db)
+	cfg.OTAProvider = &node.OTAProviderConfig{ImageSource: &oneImage{img: mattercore.OTAImage{FileDesignator: bdx.FileDesignator("img.ota"), SoftwareVersion: 2, SoftwareVersionString: "2"}}}
+	n := newNode(t, cfg)
+	if err := n.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, idx := range indexes {
+		acl, err := st.ListACL(ctx, idx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, e := range acl {
+			if e.Privilege == store.PrivilegeOperate && len(e.Targets) == 1 && e.Targets[0].Cluster != nil && *e.Targets[0].Cluster == 0x0029 {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("fabric %d has no OTA provider ACL entry: %+v", idx, acl)
 		}
 	}
 }

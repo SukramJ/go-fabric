@@ -217,14 +217,16 @@ func TestChangeToModeFollowsModeUtils(t *testing.T) {
 		t.Errorf("notifications %v", notes)
 	}
 	// The device refuses with a derivation status and text; nothing moves.
+	// The target is Idle: a change between two non-Idle run modes is the
+	// server's own refusal without DIRECTMODECH (TestRvcRunModeDirectModeChange).
 	c.status, c.text = modebase.StatusStuck, strings.Repeat("ü", 40)
-	r := change(t, srv, 2)
+	r := change(t, srv, 0)
 	if r.Status != uint8(modebase.StatusStuck) || current(srv) != 1 || len(r.StatusText) > 64 || !strings.HasPrefix(r.StatusText, "ü") {
 		t.Errorf("refused change: %+v, current %d", r, current(srv))
 	}
 	for _, st := range []modebase.Status{modebase.StatusGenericFailure, modebase.StatusInvalidInMode, 0x80, 0xBF} {
 		c.status = st
-		if r := change(t, srv, 2); r.Status != uint8(st) {
+		if r := change(t, srv, 0); r.Status != uint8(st) {
 			t.Errorf("status 0x%02X answered %+v", uint8(st), r)
 		}
 	}
@@ -233,14 +235,14 @@ func TestChangeToModeFollowsModeUtils(t *testing.T) {
 	var sce im.StatusCodeError
 	for _, st := range []modebase.Status{modebase.StatusUnsupportedMode, modebase.StatusCleaningInProgress, 0x04, 0xC0, 0xFF} {
 		c.status = st
-		_, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, clusterwire.ChangeToModeRequest{NewMode: 2})
+		_, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, clusterwire.ChangeToModeRequest{NewMode: 0})
 		if !errors.As(err, &sce) || sce.MatterStatusCode() != im.StatusFailure || !strings.Contains(err.Error(), modebase.ErrInvalidHostStatus.Error()) {
 			t.Errorf("host status 0x%02X: %v", uint8(st), err)
 		}
 	}
 	// A device error fails the invoke.
 	c.status, c.err = modebase.StatusSuccess, errors.New("offline")
-	if _, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, clusterwire.ChangeToModeRequest{NewMode: 2}); err == nil || current(srv) != 1 {
+	if _, err := srv.MatterInvoke(context.Background(), modebase.CmdChangeToMode, clusterwire.ChangeToModeRequest{NewMode: 0}); err == nil || current(srv) != 1 {
 		t.Errorf("device error: %v", err)
 	}
 	// Malformed fields and other commands.
@@ -290,5 +292,39 @@ func TestSetCurrentModeAndWrites(t *testing.T) {
 	before := ext.Current()
 	if err := withExt.SetCurrentMode(1); err != nil || ext.Current() == before || withExt.MatterDataVersion() != ext.Current() {
 		t.Errorf("host tracker not used: %v", err)
+	}
+}
+
+// TestRvcRunModeDirectModeChange: without DIRECTMODECH a change between two
+// non-Idle run modes answers InvalidInMode before the host is asked; a
+// change to or from Idle reaches the host; with DIRECTMODECH every change
+// does. The rule of rvc-run-mode.resource.ts:24-28 as connectedhomeip's
+// RVC example applies it (rvc-device.cpp:53-57; TC_RVCRUNM_2_2 steps 6-7).
+func TestRvcRunModeDirectModeChange(t *testing.T) {
+	t.Parallel()
+	c := &changer{}
+	srv := newRun(t, c)
+	if r := change(t, srv, 1); r.Status != uint8(modebase.StatusSuccess) || current(srv) != 1 {
+		t.Fatalf("Idle → Cleaning: %+v, current %d", r, current(srv))
+	}
+	r := change(t, srv, 2)
+	if r.Status != uint8(modebase.StatusInvalidInMode) || current(srv) != 1 {
+		t.Errorf("Cleaning → Mapping without DIRECTMODECH: %+v, current %d, want InvalidInMode, 1", r, current(srv))
+	}
+	if len(c.asked) != 1 {
+		t.Errorf("host asked %v, want only the first change", c.asked)
+	}
+	if r := change(t, srv, 0); r.Status != uint8(modebase.StatusSuccess) || current(srv) != 0 {
+		t.Errorf("Cleaning → Idle: %+v, current %d", r, current(srv))
+	}
+
+	direct, err := modebase.NewRvcRunMode(modebase.Config{
+		Changer: c, SupportedModes: runModes, CurrentMode: 1, Features: modebase.FeatureDirectModeChange,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := change(t, direct, 2); r.Status != uint8(modebase.StatusSuccess) || current(direct) != 2 {
+		t.Errorf("Cleaning → Mapping with DIRECTMODECH: %+v, current %d", r, current(direct))
 	}
 }

@@ -368,6 +368,20 @@ func TestNegativeWriteParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
+			// Mirrors matter.js packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:172-175
+			// (0ceb202d): #handleModeChanging refuses CalibrationMode without
+			// supportsCalibration (default false, :620).
+			name: "WindowCovering/Mode CalibrationMode without calibration → ConstraintError",
+			build: func() interface {
+				MatterWrite(context.Context, uint32, any) error
+			} {
+				return newWindowCoveringServer()
+			},
+			attrID:     wire.WindowCoveringAttrMode, // 0x0017
+			value:      uint8(0x02),
+			wantStatus: im.StatusConstraintError,
+		},
+		{
 			// matter.js fan-control.element.ts:106 — FanModeEnum Auto has
 			// conformance "AUT"; matter.js rejects a member whose
 			// conformance fails with ConstraintError
@@ -671,6 +685,23 @@ func TestNegativeInvokeParity(t *testing.T) {
 			wantStatus: im.StatusConstraintError,
 		},
 		{
+			// Mirrors matter.js packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:289-292
+			// (0ceb202d): #assertMotionLockStatus answers Busy in MaintenanceMode.
+			name: "WindowCovering/DownOrClose in MaintenanceMode → Busy",
+			build: func() interface {
+				MatterInvoke(context.Context, uint32, any) (any, error)
+			} {
+				srv := newWindowCoveringServer()
+				if err := srv.MatterWrite(context.Background(), wire.WindowCoveringAttrMode, uint8(0x04)); err != nil {
+					panic(err)
+				}
+				return srv
+			},
+			cmdID:      wire.WindowCoveringCmdDownOrClose,
+			fields:     nil,
+			wantStatus: im.StatusBusy,
+		},
+		{
 			// Mirrors matter.js packages/node/src/behaviors/window-covering/WindowCoveringServer.ts:338
 			// (0ceb202d): a host's handleMovement that throws fails the command;
 			// cover.Mover is its Go form, an error → Failure.
@@ -767,7 +798,7 @@ func TestPositiveWriteControl(t *testing.T) {
 		}
 	})
 
-	t.Run("WindowCovering/Mode write == 15 accepted", func(t *testing.T) {
+	t.Run("WindowCovering/Mode write == 15 accepted, CalibrationMode cleared", func(t *testing.T) {
 		t.Parallel()
 		// Mode constraint max 15; write exactly 15 → must succeed.
 		srv := newWindowCoveringServer()
@@ -778,8 +809,10 @@ func TestPositiveWriteControl(t *testing.T) {
 		if !ok {
 			t.Fatal("Mode read after boundary write: ok=false")
 		}
-		if v.(uint8) != 15 {
-			t.Errorf("Mode = %d, want 15", v.(uint8))
+		// MaintenanceMode clears CalibrationMode beside it (matter.js
+		// WindowCoveringServer.ts:164-166): 15 is stored as 13.
+		if v.(uint8) != 13 {
+			t.Errorf("Mode = %d, want 13", v.(uint8))
 		}
 	})
 }

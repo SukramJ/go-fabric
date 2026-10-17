@@ -158,6 +158,27 @@ func (g *generator) lookupDatatype(name string) *datatype {
 	return nil
 }
 
+// crossClusterStruct finds a struct named "Cluster.Struct" in another
+// cluster of the snapshot, nil when the name is not such a reference.
+// Only structs resolve: an enum or bitmap of another cluster keeps its
+// integer type, which every committed definition already relies on.
+func (g *generator) crossClusterStruct(name string) *datatype {
+	owner, local, ok := strings.Cut(name, ".")
+	if !ok {
+		return nil
+	}
+	c := g.snap.cluster(owner)
+	if c == nil {
+		return nil
+	}
+	for _, d := range c.Datatypes {
+		if d.Name == local && d.Metatype == "object" {
+			return d
+		}
+	}
+	return nil
+}
+
 // declare registers a datatype for declaration, once.
 func (g *generator) declare(d *datatype) (*dataInfo, error) {
 	if di, ok := g.data[d.Name]; ok {
@@ -320,6 +341,20 @@ func (g *generator) resolve(v *value, anonName string) (typeInfo, error) {
 		t.goType = "[]" + elem.goType()
 		return t, nil
 	case "object":
+		if d := g.lookupDatatype(v.Type); d == nil && v.Type != "struct" {
+			// A struct another cluster declares ("ContentLauncher.AdditionalInfoStruct")
+			// is declared here under its own name, as matter.js's model
+			// resolves the reference into the other cluster's datatype
+			// (channel.element.ts ExternalIdList at 0ceb202d).
+			if xd := g.crossClusterStruct(v.Type); xd != nil {
+				di, err := g.declare(xd)
+				if err != nil {
+					return t, err
+				}
+				t.kind, t.goType, t.dt = kindStruct, di.goName, di
+				return t, nil
+			}
+		}
 		if d := g.lookupDatatype(v.Type); d != nil && v.Type != "struct" {
 			di, err := g.declare(d)
 			if err != nil {

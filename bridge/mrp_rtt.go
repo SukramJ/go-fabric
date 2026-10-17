@@ -48,7 +48,6 @@ func (w *mrpRTTWindow) record(d time.Duration) {
 //
 // Every field is published as a gauge; see [mqtt.LatencyStats] for why window
 // occupancy and the single most recent sample are not among them.
-// loom:reachable:reason="returned by Bridge.ControllerRTT and read field-by-field by the matter.controller_rtt_* diagnostics gauges; the analyzer sees the accessor, not the struct behind it"
 type MRPRTTStats struct {
 	// Total counts every measurement since start. Zero is the steady state of
 	// a bridge nobody has paired; a total that stops advancing says the

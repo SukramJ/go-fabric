@@ -125,7 +125,12 @@ func NewActions(cfg ActionsConfig) (*Actions, error) {
 		initial[actionsdef.AttrSetupUrl] = *cfg.SetupURL
 	}
 	a := &Actions{host: cfg.Host}
+	handlers := make(map[uint32]spec.CommandHandler, len(actionsCommands))
+	for _, cmd := range actionsCommands {
+		handlers[cmd] = func(ctx context.Context, fields any) (any, error) { return nil, a.invoke(ctx, cmd, fields) }
+	}
 	srv, err := spec.NewServer(actionsdef.Definition, opts, spec.ServerConfig{
+		Handlers:    handlers,
 		DataVersion: &a.dv,
 		Source:      actionsSource{cfg.Host},
 		Initial:     initial,
@@ -134,9 +139,6 @@ func NewActions(cfg ActionsConfig) (*Actions, error) {
 		return nil, fmt.Errorf("core: Actions: %w", err)
 	}
 	a.Server = srv
-	for _, cmd := range actionsCommands {
-		srv.Handle(cmd, func(ctx context.Context, fields any) (any, error) { return nil, a.invoke(ctx, cmd, fields) })
-	}
 	return a, nil
 }
 

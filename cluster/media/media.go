@@ -135,11 +135,26 @@ func emptyStruct(t reflect.Type) bool {
 	return t != nil && t.Kind() == reflect.Struct && t.NumField() == 0
 }
 
-// handle registers fn for cmdID on srv: the request is decoded into Req,
+// handlers collects a server's command handlers before construction:
+// [spec.NewServer] refuses a mandatory command without one.
+type handlers map[uint32]spec.CommandHandler
+
+// newServer is [spec.NewServer]; a mandatory command left without a
+// handler — the port does not implement it — is [ErrNotImplemented]
+// (ValidatedElements.ts:357-371 at 0ceb202d).
+func newServer(def *spec.Cluster, opts spec.Options, cfg spec.ServerConfig) (*spec.Server, error) {
+	srv, err := spec.NewServer(def, opts, cfg)
+	if errors.Is(err, spec.ErrMissingHandler) {
+		return nil, fmt.Errorf("%w: %w", ErrNotImplemented, err)
+	}
+	return srv, err
+}
+
+// handle registers fn for cmdID in h: the request is decoded into Req,
 // fn's error becomes the invoke's status (commandStatus) and its result
 // the response payload.
-func handle[Req any](srv *spec.Server, cmdID uint32, fn func(ctx context.Context, req Req) (any, error)) {
-	srv.Handle(cmdID, func(ctx context.Context, fields any) (any, error) {
+func handle[Req any](h handlers, cmdID uint32, fn func(ctx context.Context, req Req) (any, error)) {
+	h[cmdID] = func(ctx context.Context, fields any) (any, error) {
 		req, err := request[Req](fields)
 		if err != nil {
 			return nil, err
@@ -149,13 +164,13 @@ func handle[Req any](srv *spec.Server, cmdID uint32, fn func(ctx context.Context
 			return nil, commandStatus(err)
 		}
 		return resp, nil
-	})
+	}
 }
 
-// handleState registers fn for cmdID on srv as a command of the state s:
+// handleState registers fn for cmdID in h as a command of the state s:
 // fn changes a copy of the state, committed when it succeeds.
-func handleState[Req, S any](srv *spec.Server, s *stateful[S], cmdID uint32, fn func(ctx context.Context, st *S, req Req) (any, error)) {
-	handle(srv, cmdID, func(ctx context.Context, req Req) (any, error) {
+func handleState[Req, S any](h handlers, s *stateful[S], cmdID uint32, fn func(ctx context.Context, st *S, req Req) (any, error)) {
+	handle(h, cmdID, func(ctx context.Context, req Req) (any, error) {
 		return s.transact(func(st *S) (any, error) { return fn(ctx, st, req) })
 	})
 }

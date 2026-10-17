@@ -330,7 +330,10 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings) (contract.Cluste
 	if !ok {
 		factory = newSpecServer
 	}
-	srv, err := factory(def, opts, spec.ServerConfig{Initial: initial})
+	// The generated default is matter.js's generated behavior: its
+	// commands are unimplemented until the host registers handlers
+	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d).
+	srv, err := factory(def, opts, spec.ServerConfig{Initial: initial, Unimplemented: true})
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
 		return nil, fmt.Errorf("%w: %s %s: %w: supply its server with WithServer", ErrNoDefaultServer, t.Name, r.Name, err)

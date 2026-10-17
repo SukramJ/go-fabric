@@ -180,60 +180,62 @@ func NewContentControl(cfg ContentControlConfig) (*ContentControlServer, error) 
 		{ccdef.CmdSetBlockContentTimeWindow, hasWindows},
 		{ccdef.CmdRemoveBlockContentTimeWindow, hasWindows},
 	}
-	srv, err := spec.NewServer(ccdef.Definition, spec.Options{Features: uint32(cfg.Features)},
-		spec.ServerConfig{DataVersion: cfg.DataVersion})
-	if err != nil {
-		return nil, fmt.Errorf("media: ContentControl: %w", err)
-	}
-	if err := checkImplemented(srv, cmds); err != nil {
-		return nil, err
-	}
-	s := &ContentControlServer{Server: srv}
-	if err := s.init(srv, cfg.Initial, ContentControlState.values, ContentControlState.clone); err != nil {
-		return nil, fmt.Errorf("media: ContentControl: %w", err)
-	}
-	if err := checkState(srv); err != nil {
-		return nil, err
-	}
+	s := &ContentControlServer{}
+	h := handlers{}
 	type plain = func(ctx context.Context, st *ContentControlState) error
 	empty := func(cmdID uint32, fn plain) {
-		handleState(srv, &s.stateful, cmdID, func(ctx context.Context, st *ContentControlState, _ struct{}) (any, error) {
+		handleState(h, &s.stateful, cmdID, func(ctx context.Context, st *ContentControlState, _ struct{}) (any, error) {
 			return nil, fn(ctx, st)
 		})
 	}
 	empty(ccdef.CmdEnable, port.Enable)
 	empty(ccdef.CmdDisable, port.Disable)
 	if hasPIN {
-		handleState(srv, &s.stateful, ccdef.CmdUpdatePin, statusOnly(pin.UpdatePin))
-		handleState(srv, &s.stateful, ccdef.CmdResetPin, func(ctx context.Context, st *ContentControlState, _ struct{}) (any, error) {
+		handleState(h, &s.stateful, ccdef.CmdUpdatePin, statusOnly(pin.UpdatePin))
+		handleState(h, &s.stateful, ccdef.CmdResetPin, func(ctx context.Context, st *ContentControlState, _ struct{}) (any, error) {
 			return pin.ResetPin(ctx, st)
 		})
 	}
 	if hasScreen {
-		handleState(srv, &s.stateful, ccdef.CmdAddBonusTime, statusOnly(screen.AddBonusTime))
-		handleState(srv, &s.stateful, ccdef.CmdSetScreenDailyTime, statusOnly(screen.SetScreenDailyTime))
+		handleState(h, &s.stateful, ccdef.CmdAddBonusTime, statusOnly(screen.AddBonusTime))
+		handleState(h, &s.stateful, ccdef.CmdSetScreenDailyTime, statusOnly(screen.SetScreenDailyTime))
 	}
 	if hasUnrated {
 		empty(ccdef.CmdBlockUnratedContent, unrated.BlockUnratedContent)
 		empty(ccdef.CmdUnblockUnratedContent, unrated.UnblockUnratedContent)
 	}
 	if hasOnDemand {
-		handleState(srv, &s.stateful, ccdef.CmdSetOnDemandRatingThreshold, statusOnly(onDemand.SetOnDemandRatingThreshold))
+		handleState(h, &s.stateful, ccdef.CmdSetOnDemandRatingThreshold, statusOnly(onDemand.SetOnDemandRatingThreshold))
 	}
 	if hasScheduled {
-		handleState(srv, &s.stateful, ccdef.CmdSetScheduledContentRatingThreshold, statusOnly(scheduled.SetScheduledContentRatingThreshold))
+		handleState(h, &s.stateful, ccdef.CmdSetScheduledContentRatingThreshold, statusOnly(scheduled.SetScheduledContentRatingThreshold))
 	}
 	if hasChannels {
-		handleState(srv, &s.stateful, ccdef.CmdAddBlockChannels, statusOnly(channels.AddBlockChannels))
-		handleState(srv, &s.stateful, ccdef.CmdRemoveBlockChannels, statusOnly(channels.RemoveBlockChannels))
+		handleState(h, &s.stateful, ccdef.CmdAddBlockChannels, statusOnly(channels.AddBlockChannels))
+		handleState(h, &s.stateful, ccdef.CmdRemoveBlockChannels, statusOnly(channels.RemoveBlockChannels))
 	}
 	if hasApps {
-		handleState(srv, &s.stateful, ccdef.CmdAddBlockApplications, statusOnly(apps.AddBlockApplications))
-		handleState(srv, &s.stateful, ccdef.CmdRemoveBlockApplications, statusOnly(apps.RemoveBlockApplications))
+		handleState(h, &s.stateful, ccdef.CmdAddBlockApplications, statusOnly(apps.AddBlockApplications))
+		handleState(h, &s.stateful, ccdef.CmdRemoveBlockApplications, statusOnly(apps.RemoveBlockApplications))
 	}
 	if hasWindows {
-		handleState(srv, &s.stateful, ccdef.CmdSetBlockContentTimeWindow, statusOnly(windows.SetBlockContentTimeWindow))
-		handleState(srv, &s.stateful, ccdef.CmdRemoveBlockContentTimeWindow, statusOnly(windows.RemoveBlockContentTimeWindow))
+		handleState(h, &s.stateful, ccdef.CmdSetBlockContentTimeWindow, statusOnly(windows.SetBlockContentTimeWindow))
+		handleState(h, &s.stateful, ccdef.CmdRemoveBlockContentTimeWindow, statusOnly(windows.RemoveBlockContentTimeWindow))
+	}
+	srv, err := newServer(ccdef.Definition, spec.Options{Features: uint32(cfg.Features)},
+		spec.ServerConfig{Handlers: h, DataVersion: cfg.DataVersion})
+	if err != nil {
+		return nil, fmt.Errorf("media: ContentControl: %w", err)
+	}
+	if err := checkImplemented(srv, cmds); err != nil {
+		return nil, err
+	}
+	s.Server = srv
+	if err := s.init(srv, cfg.Initial, ContentControlState.values, ContentControlState.clone); err != nil {
+		return nil, fmt.Errorf("media: ContentControl: %w", err)
+	}
+	if err := checkState(srv); err != nil {
+		return nil, err
 	}
 	return s, nil
 }

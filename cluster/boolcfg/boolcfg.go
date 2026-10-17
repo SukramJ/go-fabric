@@ -220,7 +220,11 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("%w: AlarmsSupported 0x%02X / AlarmsEnabled 0x%02X", ErrInvalidConfig, cfg.AlarmsSupported, cfg.AlarmsEnabled)
 	}
 
-	srv, err := spec.NewServer(def.Definition, opts, spec.ServerConfig{DataVersion: cfg.DataVersion, Sink: sensitivitySink{s}})
+	handlers := map[uint32]spec.CommandHandler{
+		def.CmdEnableDisableAlarm: s.enableDisableAlarm,
+		def.CmdSuppressAlarm:      s.suppressAlarm,
+	}
+	srv, err := spec.NewServer(def.Definition, opts, spec.ServerConfig{Handlers: handlers, DataVersion: cfg.DataVersion, Sink: sensitivitySink{s}})
 	if err != nil {
 		return nil, fmt.Errorf("boolcfg: %w", err)
 	}
@@ -238,8 +242,6 @@ func New(cfg Config) (*Server, error) {
 	if err := srv.SetAttributes(initial); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
-	srv.Handle(def.CmdEnableDisableAlarm, s.enableDisableAlarm)
-	srv.Handle(def.CmdSuppressAlarm, s.suppressAlarm)
 	return s, nil
 }
 

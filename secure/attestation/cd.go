@@ -45,9 +45,8 @@ var (
 //	versionNumber       = 1
 //	certificationType   = 0  (TEST)
 //
-// Operators that ship a real product replace the CD via
-// `north.matter.attestation.cd_path`; the daemon then loads the
-// production blob and ignores the embedded test material.
+// A product replaces the CD with its own (attestation.LoadChainFiles,
+// node.Config.Attestation); the embedded test material is then unused.
 func BuildTestCertificationDeclaration(vid, pid uint16) ([]byte, error) {
 	inner, err := encodeCDInnerTLV(vid, pid)
 	if err != nil {

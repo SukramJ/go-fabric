@@ -10,6 +10,86 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+The findings wave (2026-10-17): every open entry of the findings register worked through — see the register's closing section and `by_design.md`.
+
+### Fixed
+
+- `transport/udp`: per-session (ordered) dispatch shares the 1024 concurrency budget with the unordered pool — a flood of datagrams with forged session ids no longer opens one queue and goroutine per id without bound.
+- `bridge`, `node`: `Stop` waits, bounded by its context, for the handlers the listener dispatched (`udp.Listener.WaitIdle`), so no cluster server or host port runs after it returns.
+- `node`: `Start` opens the own commissioning window only when the fabric table is empty; a node whose stored fabrics fail to load logs `commissioning.no_fabric_loaded` instead of advertising itself as commissionable.
+- `node`: `Aggregator.Add`/`Remove` from several goroutines no longer lose a device (reassembly is serialised).
+- `cluster/core`: ArmFailSafe runs the armed hook without the cluster lock.
+- `bridge`, `node`: UpdateNOC also closes the session that carried it, after its response and without a CloseSession (matter.js `Fabric.replaced`); `Bridge.CloseFabricSessionsAfterUpdate`.
+- `bridge`: a session a UDP handshake established is bound to the handshake's address, so its CloseSession reaches the peer before its first authenticated message.
+- `bridge`, `node`: a Binding target naming endpoint 0 or cluster 0 is encoded and persisted.
+- `bridge`: generic integer attribute values encode at the smallest width, as matter.js does.
+
+### Changed
+
+- `node`: after the last fabric is removed the own window reopens once the node is idle — no fail-safe armed, no session left (matter.js `#resetWhenIdle`); `OnFabricRemoved` runs before it, `OnWindowTransition` reports the reopen.
+- `node`: the OTA provider's Operate/CASE ACL entry goes on every fabric, not the first only.
+- `bridge`: the subscribe dump is enabled by `GOFABRIC_DUMP_SUBSCRIBE`; `OPENCCU_LOOM_MATTER_DUMP_SUBSCRIBE` still works and is deprecated.
+
+### Deprecated
+
+- `store.DiagnosticsRecord`, `store.LoadDiagnostics`, `store.SaveDiagnostics`: no caller in the module; kept with their table for the API window.
+
+### Changed and added in briefs AX and AY
+
+- Changed: `tlv` — the `Put*Bounded` writers encode at the smallest fitting
+  width, as matter.js; EventDataIB EventNumber/EpochTimestamp and
+  SubscribeResponse MaxInterval likewise (SubscriptionId and DataVersion
+  keep 4 bytes).
+- Changed: `tlv` — a UTF-8 string element with ill-formed bytes decodes with
+  U+FFFD per maximal subpart (matter.js `TextDecoder`) instead of keeping
+  the bytes.
+- Added: `spec.ServerConfig.Handlers`, `ServerConfig.Unimplemented`,
+  `spec.ErrMissingHandler`, `Server.Handles`.
+- Changed (breaking for a host that registers a mandatory command's handler
+  with `Handle` after `spec.NewServer`): construction refuses a mandatory
+  command without a handler; pass it in `ServerConfig.Handlers`.
+- Changed: a device-layer default server lists a command in
+  AcceptedCommandList only once the host registered its handler (before:
+  advertised, UNSUPPORTED_COMMAND).
+- Added: `peer.Observer.Updated`; the client registry's record follows
+  every descriptor save. Added: `client.ErrFabricRemoved`.
+- Changed: `setup.QRCode` refuses a version other than 0 and the trivial
+  passcodes; `setup.ManualCode` refuses the trivial passcodes. Added:
+  `setup.ManualCodeLong` (21 digits).
+- Added: `groups.RequestOptions.DisableListChunking`; a group write
+  list-chunks a list value. Added: `spec.ListElements`, `spec.Node.EncodeTLV`,
+  `im.ListChunkedByDefault`.
+- Added: `core.TargetStruct.EndpointPresent`, `ClusterPresent` — a Binding
+  target may name endpoint 0 or cluster 0.
+- Added: `attestation.MatterIDs`, `P256Key`, `VerifySignedBy`.
+- Added: `sqlitestore.Migrations`, `sqlitestore.Migration`,
+  `sqlitestore.SchemaFingerprint`.
+- Added: generated definitions for Groupcast, WaterTankLevelMonitoring,
+  AmbientContextSensing, WiFiNetworkManagement and Chime; Channel's
+  ExternalIdList entries are `AdditionalInfoStruct` (the old entry names
+  are aliases); `device.RootNode.Groupcast()`.
+- (with the owner's change) Deprecated: `store.DiagnosticsRecord`,
+  `store.LoadDiagnostics`, `store.SaveDiagnostics` — no caller; removal
+  permissible in v0.8.0.
+- **Changed** — `cluster/spec`: an `in` constraint (LocalizationConfiguration
+  ActiveLocale, TimeFormatLocalization ActiveCalendarType) now holds the
+  initial values and a host `Set`/`SetAttributes`, as matter.js validates
+  every state commit; `NewServer` refuses an initial value outside its
+  peer list with `ErrInvalidValue`.
+- **Changed** — `cluster/modebase`: RvcRunMode without DIRECTMODECH answers
+  InvalidInMode for a change between two non-Idle modes itself; the host's
+  ModeChanger is no longer asked.
+- **Fixed** — `cluster/thermo`: SetpointRaiseLower in Heat or Cool mode on
+  an AUTO thermostat moves the other setpoint to keep the deadband (one
+  Sink call, cooling primary).
+- **Added** — `cluster/cover`: WindowCovering maintenance mode — Mode bit 2
+  clears ConfigStatus Operational and movement commands answer BUSY;
+  ConfigStatus LiftMovementReversed follows Mode bit 0; a CalibrationMode
+  write is CONSTRAINT_ERROR (MaintenanceMode clears it beside itself).
+  `WNCV.S.M.Maintenance=1`.
+- **Changed** — harness: PICS slices declare events a device type makes
+  mandatory (OperationCompletion on the washer and the vacuum).
+
 ### Added
 
 - Developer and architect documentation, published as the GitHub Pages site <https://sukramj.github.io/go-fabric/> (`mkdocs.yml`, `.github/workflows/pages.yml`; `mkdocs build --strict` on every pull request that touches `docs/`): a start page, the architecture, the security model, two getting-started pages with compiling examples (`examples/quickstart-device`, `examples/quickstart-controller`) and guides on host ports, concurrency and persistence.

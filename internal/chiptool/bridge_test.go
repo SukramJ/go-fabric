@@ -290,6 +290,10 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	}
 
 	cmd := exec.Command(bin, args...) //nolint:gosec // bin is this module's own build output
+	// The case container runs in UTC; a daemon on a host in another zone
+	// reports local times its UTC-based checks reject (EEVSE/2.7 step 12b
+	// was off by the host's offset).
+	cmd.Env = append(os.Environ(), "TZ=UTC")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatalf("stdout pipe: %v", err)

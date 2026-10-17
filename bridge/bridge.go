@@ -3,8 +3,8 @@
 
 // Package bridge orchestrates the Matter bridge runtime: endpoint
 // topology assembly, IM dispatcher wiring, UDP listener, and mDNS
-// advertisement. The bridge is the single composition unit the
-// daemon's bootstrap turns on when matter.enabled is set in config.
+// advertisement. The bridge is the single composition unit a host
+// starts (node.Node starts it for a host that uses the facade).
 //
 // Layering: bridge depends on every other Matter sub-package
 // (endpoint, transport/udp, mdns, im) but on no daemon-internal
@@ -1272,6 +1272,34 @@ func (b *Bridge) CloseFabricSessionsExcept(fabricIndex uint8, exceptSessionID ui
 	closer.CloseFabricExcept(fabricIndex, exceptSessionID)
 }
 
+// CloseFabricSessionsAfterUpdate is the session teardown of UpdateNOC:
+// every other session of fabricIndex is told with a CloseSession and
+// closed at once ([Bridge.CloseFabricSessionsExcept]), and the session
+// that carried UpdateNOC — named by ctx — is closed after its response,
+// without a CloseSession. Mirrors matter.js Fabric.replaced
+// (Fabric.ts:408-415): every session of the fabric runs
+// initiateForceClose, the invoking one included, which closes once its
+// exchange ends and, marked peer-lost, sends nothing
+// (NodeSession.ts:349-352). The controller reconnects with CASE under the
+// new NOC.
+func (b *Bridge) CloseFabricSessionsAfterUpdate(ctx context.Context, fabricIndex uint8) {
+	invoking := mattercore.InvokeSessionIDFromContext(ctx)
+	b.CloseFabricSessionsExcept(fabricIndex, invoking)
+	if invoking == 0 {
+		return
+	}
+	b.mu.RLock()
+	reg := b.sessionRegistry
+	b.mu.RUnlock()
+	if reg == nil {
+		return
+	}
+	closeNow := func() { _ = reg.Close(invoking) }
+	if !im.DeferAfterResponse(ctx, closeNow) {
+		closeNow()
+	}
+}
+
 // closeFabricSessionsGracefully tells every live session of fabricIndex
 // but invoking with a CloseSession and, when the registry can, closes
 // them at once; without that capability they close with the rest of the
@@ -1609,20 +1637,7 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	if tcpListener != nil {
 		_ = tcpListener.Close()
 	}
-	if done != nil {
-		select {
-		case <-done:
-		case <-ctx.Done():
-			b.logger.Warn("matter.bridge.stop.serve_timeout", slog.String("err", ctx.Err().Error()))
-		}
-	}
-	if tcpDone != nil {
-		select {
-		case <-tcpDone:
-		case <-ctx.Done():
-			b.logger.Warn("matter.bridge.stop.tcp_serve_timeout", slog.String("err", ctx.Err().Error()))
-		}
-	}
+	b.waitServeStopped(ctx, listener, done, tcpDone)
 	if pumpDone != nil {
 		// Give the pump its own bounded budget. If `ctx` already
 		// expired waiting for the serve loop, the pump still gets a
@@ -1669,6 +1684,33 @@ func (b *Bridge) Stop(ctx context.Context) error {
 	quiesceServers(b.Topology(), nil)
 
 	return nil
+}
+
+// waitServeStopped waits, bounded by ctx, for the UDP and TCP serve loops
+// to end and then for the handlers the UDP listener dispatched, so no
+// cluster server or host port still runs once [Bridge.Stop] returns (the
+// handler context was cancelled before, so a handler that honours it
+// ends promptly).
+func (b *Bridge) waitServeStopped(ctx context.Context, listener *udp.Listener, done, tcpDone <-chan struct{}) {
+	if done != nil {
+		select {
+		case <-done:
+		case <-ctx.Done():
+			b.logger.Warn("matter.bridge.stop.serve_timeout", slog.String("err", ctx.Err().Error()))
+		}
+	}
+	if listener != nil {
+		if err := listener.WaitIdle(ctx); err != nil {
+			b.logger.Warn("matter.bridge.stop.handlers_timeout", slog.String("err", err.Error()))
+		}
+	}
+	if tcpDone != nil {
+		select {
+		case <-tcpDone:
+		case <-ctx.Done():
+			b.logger.Warn("matter.bridge.stop.tcp_serve_timeout", slog.String("err", ctx.Err().Error()))
+		}
+	}
 }
 
 // quiesceServers calls [contract.ClusterQuiescer.MatterQuiesce] on every
@@ -1745,7 +1787,7 @@ func (b *Bridge) LocalAddr() string {
 // effectiveUDPPort returns the port the UDP listener is actually bound
 // to, falling back to the configured (or default) port before Start.
 //
-// `north.matter.listen: ":0"` is a valid configuration — the OS then
+// `Config.Listen: ":0"` is a valid configuration — the OS then
 // assigns an ephemeral port, and advertising the 5540 default instead
 // points every commissioner's SRV lookup at a port nothing listens on.
 // Mirrors matter.js packages/node/src/behavior/system/network/
@@ -1987,7 +2029,7 @@ func (b *Bridge) AnnounceCommissioning(ctx context.Context, params Commissioning
 		b.logger.Warn("matter.mdns.commissioning_not_advertised",
 			slog.String("instance", svc.InstanceName),
 			slog.Int("discriminator", int(params.Discriminator)),
-			slog.String("hint", "mdns_advertise=noop suppresses the commissionable record — commissioners cannot discover the bridge; set north.matter.mdns_advertise=zeroconf (or leave it unset) for pairing"))
+			slog.String("hint", "mdns_advertise=noop suppresses the commissionable record — commissioners cannot discover the bridge; set the host's mDNS advertiser (node.Config.Advertiser or Bridge.New's advertiser)=zeroconf (or leave it unset) for pairing"))
 		return nil
 	}
 	b.logger.Info("matter.mdns.commissioning_published",

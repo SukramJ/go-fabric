@@ -130,15 +130,26 @@ func (r *OTASoftwareUpdateRequestor) performUpdateQuery(ctx context.Context) {
 	}
 	r.queryRunning = true
 	r.mu.Unlock()
-	r.queryForUpdate(ctx)
-	r.mu.Lock()
-	r.queryRunning = false
-	pending := r.pendingApply
-	r.pendingApply = nil
-	r.mu.Unlock()
-	if pending != nil {
+	if pending := r.runUpdateQuery(ctx); pending != nil {
 		r.applyPreparedUpdate(ctx, pending.version, pending.file)
 	}
+}
+
+// runUpdateQuery runs queryForUpdate and clears queryRunning however it
+// ends — a panic included, which would otherwise leave the flag set and
+// every later timer skipping. Mirrors `try { await this.#queryForUpdate() }
+// finally { this.internal.queryRunning = false }`
+// (OtaSoftwareUpdateRequestorServer.ts:576-581 at 0ceb202d). It returns
+// the update the query prepared, if any.
+func (r *OTASoftwareUpdateRequestor) runUpdateQuery(ctx context.Context) (pending *pendingApply) {
+	defer func() {
+		r.mu.Lock()
+		r.queryRunning = false
+		pending, r.pendingApply = r.pendingApply, nil
+		r.mu.Unlock()
+	}()
+	r.queryForUpdate(ctx)
+	return nil
 }
 
 // queryOutcome is QueryOutcome (:78-87).

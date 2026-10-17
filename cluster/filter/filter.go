@@ -197,11 +197,15 @@ func newServer(def *spec.Cluster, cfg Config) (*Server, error) {
 	if cfg.LastChangedTimeWriter != nil {
 		sc.Sink = lastChangedSink{cfg.LastChangedTimeWriter}
 	}
+	s := &Server{cfg: cfg}
+	if cfg.Optional&OptionalResetCondition != 0 {
+		sc.Handlers = map[uint32]spec.CommandHandler{hepa.CmdResetCondition: s.resetCondition}
+	}
 	srv, err := spec.NewServer(def, opts, sc)
 	if err != nil {
 		return nil, fmt.Errorf("filter: %w", err)
 	}
-	s := &Server{Instance: srv.Instance, srv: srv, cfg: cfg}
+	s.Instance, s.srv = srv.Instance, srv
 	if !s.EnumSupported(hepa.DegradationDirectionEnumDef, uint64(cfg.DegradationDirection)) {
 		return nil, fmt.Errorf("%w: DegradationDirection %d", ErrInvalidValue, cfg.DegradationDirection)
 	}
@@ -221,9 +225,6 @@ func newServer(def *spec.Cluster, cfg Config) (*Server, error) {
 	// makes.
 	if err := s.setState(cfg.Initial, fixed); err != nil {
 		return nil, err
-	}
-	if cfg.Optional&OptionalResetCondition != 0 {
-		srv.Handle(hepa.CmdResetCondition, s.resetCondition)
 	}
 	return s, nil
 }

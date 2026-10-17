@@ -394,6 +394,20 @@ func TestPercentAndSpeedWrites(t *testing.T) {
 	if s := d.last(); s.SpeedSetting.Value != 2 {
 		t.Errorf("percent 34 of SpeedMax 3 → speed %d, want 2 (ceiling)", s.SpeedSetting.Value)
 	}
+	// The rest of connectedhomeip's two rules at SpeedMax 3
+	// (FanControlCluster.cpp:197, :224 at the harness pin).
+	for _, c := range []struct{ percent, speed uint8 }{{33, 1}, {66, 2}, {67, 3}, {100, 3}} {
+		_ = three.MatterWrite(ctx, fan.AttrPercentSetting, uint64(c.percent))
+		if s := d.last(); s.SpeedSetting.Value != c.speed {
+			t.Errorf("percent %d of SpeedMax 3 → speed %d, want %d", c.percent, s.SpeedSetting.Value, c.speed)
+		}
+	}
+	for _, c := range []struct{ speed, percent uint8 }{{2, 66}, {3, 100}} {
+		_ = three.MatterWrite(ctx, fan.AttrSpeedSetting, uint64(c.speed))
+		if s := d.last(); s.PercentSetting.Value != c.percent {
+			t.Errorf("speed %d of SpeedMax 3 → percent %d, want %d", c.speed, s.PercentSetting.Value, c.percent)
+		}
+	}
 }
 
 func TestBitmapAndDirectionWrites(t *testing.T) {

@@ -124,6 +124,9 @@ func NewWiFiNetworkDiagnostics(cfg WiFiNetworkDiagnosticsConfig) (*WiFiNetworkDi
 	if cfg.Reporter == nil {
 		return nil, fmt.Errorf("core: WiFiNetworkDiagnostics: %w", ErrNilReporter)
 	}
+	// The handler is registered either way; without ERRCNT the instance
+	// does not accept the command and it is never dispatched.
+	reporter := cfg.Reporter
 	srv, err := spec.NewServer(wifidiagdef.Definition, spec.Options{
 		Features:   uint32(cfg.Features),
 		Attributes: cfg.Attributes,
@@ -131,17 +134,14 @@ func NewWiFiNetworkDiagnostics(cfg WiFiNetworkDiagnosticsConfig) (*WiFiNetworkDi
 	}, spec.ServerConfig{
 		DataVersion: cfg.DataVersion,
 		Source:      wifiSource{cfg.Reporter},
+		Handlers: map[uint32]spec.CommandHandler{wifidiagdef.CmdResetCounts: func(context.Context, any) (any, error) {
+			reporter.ResetCounts()
+			return nil, nil
+		}},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("core: WiFiNetworkDiagnostics: %w", err)
 	}
-	// The handler is registered either way; without ERRCNT the instance
-	// does not accept the command and it is never dispatched.
-	reporter := cfg.Reporter
-	srv.Handle(wifidiagdef.CmdResetCounts, func(context.Context, any) (any, error) {
-		reporter.ResetCounts()
-		return nil, nil
-	})
 	return &WiFiNetworkDiagnostics{Server: srv}, nil
 }
 
