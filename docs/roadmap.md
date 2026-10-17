@@ -32,7 +32,7 @@ a paired, working Matter node. The consumers that set that bar:
 | [OpenCCU-Loom](https://github.com/SukramJ/openccu-loom) | in production; today imports 20 packages of this module directly | a complete `node/` + `device/` + `contract/` surface so that a bridge needs nothing below it; depth in the clusters HomeMatic devices map to (Switch, Thermostat, DoorLock, WindowCovering) |
 | go-ha-matter-bridge (working name; planned separately) | not started; its concept is written when milestone 4 is due | the declarative device kit, the in-process test pair, the adapter module below |
 | the `go-*2mqtt` family (daikin, homeconnect, mtec, unifi, zendure) via a shared adapter module (working name `go-hamatter`: `go-hamqtt`'s Home-Assistant vocabulary → Matter device types; lives outside this module, so `contract/` stays stdlib-only) | not started | the same device kit; energy and appliance device types, which already exist |
-| `examples/reference-controller` and a host acting as commissioner | shipped, controller stages 1–6b | the field features (milestone 1), ICD peers and OTA push (milestone 5) |
+| `examples/reference-controller` and a host acting as commissioner | shipped, controller stages 1–6b | the field features (milestone 1), ICD peers and the rest of OTA push (milestone 5) |
 
 Priority follows from that table: a feature a consumer uses comes before
 one none uses, and both come before completeness for its own sake.
@@ -195,7 +195,7 @@ build on the facade alone.
 | --- | --- | --- |
 | 23 | the ICD server (`IcdManagementServer.ts` 838 + `IcdMode.ts` 152: SIT / LIT, the check-in sender, `UserActiveModeTrigger`, the registration table), mounted where the device type asks for it; the check-in protocol (`protocol/src/icd`, 1 162) | ICDM and ICDB families; `IcdManagementServerTest` (1 415) and the eight `protocol/test/icd` files ported |
 | 24 | the controller side: `IcdClient` (1 140), the check-in receiver (`FabricIcd.processCheckIn`), peer wakefulness, the sustained subscription parking on a LIT peer and re-subscribing when it wakes (`SustainedSubscription.ts` 672 / test 1 712), `RebootResubscribeArmer` | the module's controller holds a subscription to the module's own LIT node across its idle cycles |
-| 25 | the controller remainder: OTA push from the controller (`AnnounceOTAProvider`, writing `DefaultOTAProviders`), the TCP initiator in `controller/`, the Thread border-router client (`packages/thread-br-client`: discovery, dataset codec, MeshCoP / OTBR diagnostics) if phase 12 chose it as the dataset source | `ClientNodeTcpTest`, the `peer/` tests ported; the reference controller updates the reference daemon over the air |
+| 25 | the controller remainder: the rest of OTA push from the controller (`ota serve --announce` sends `AnnounceOTAProvider` today; writing `DefaultOTAProviders` and the provider's per-node consent record do not exist), the TCP initiator in `controller/`, the Thread border-router client (`packages/thread-br-client`: discovery, dataset codec, MeshCoP / OTBR diagnostics) if phase 12 chose it as the dataset source | `ClientNodeTcpTest`, the `peer/` tests ported; the reference controller updates the reference daemon over the air |
 
 **Value.** The battery sensor, lock or button commissioned over BLE in
 milestone 1 is an ICD; without this milestone the controller loses it at

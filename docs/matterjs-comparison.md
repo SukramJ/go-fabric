@@ -37,8 +37,8 @@ matter.js HEAD as checked out at `../matter.js`.
 | matter.js | go-fabric | State | Interest | Assessment |
 | --- | --- | --- | --- | --- |
 | `ServerNode` — device / responder (`packages/node`) | the whole module | ✅ | — | This is what go-fabric is. |
-| `ClientNode` + `DeviceCommissioner` — controller role (`packages/protocol/src/peer`, `protocol/DeviceCommissioner.ts`) | — | ○ | **No** | Being a controller means discovering, commissioning and driving *other* nodes: a second state machine, a second certificate role (as issuer), and a device cache. A bridge never needs it. Declared non-goal. |
-| Commissioner-control / joint-fabric (`commissioner-control`, `joint-fabric-*` behaviors) | — | ○ | **No** | Only meaningful for a controller or a fabric-bridging administrator. |
+| `ClientNode` + `DeviceCommissioner` — controller role (`packages/protocol/src/peer`, `protocol/DeviceCommissioner.ts`) | `controller/` (`discovery`, `handshake`, `commissioner`, `ca`, `attestation`, `interaction`, `client`, `peer`, `dcl`), `examples/reference-controller` | ✅ | — | [ADR 0020](./adr/0020-commissioner-and-controller-role.md) (accepted 2026-10-13) reversed the former non-goal: stages 1–6b landed in waves 14–25; the field features (BLE, keys behind `crypto.Signer`, the DCL snapshot) are [roadmap](./roadmap.md) milestone 1, the ICD client milestone 5. |
+| Commissioner-control / joint-fabric (`commissioner-control`, `joint-fabric-*` behaviors) | `core.CommissionerControl` after chip's server (`node.Config.CommissionerControl`, wave 25); Joint Fabric — | ◐ | **No** (Joint Fabric) | CommissionerControl is served (ADR 0020 stage 6b; matter.js has an empty class). Joint Fabric is deferred past `v1.0.0` (stage 6c): two generated stubs and no behaviour in matter.js at the pin. |
 
 ## 2. Transport and discovery
 
@@ -46,7 +46,7 @@ matter.js HEAD as checked out at `../matter.js`.
 | --- | --- | --- | --- | --- |
 | UDP/IPv6 + MRP (`protocol/src/transport`, `securechannel`) | `transport/udp`, `transport/mrp` | ✅ | — | The operational path, incl. retransmission, dedup and receive window. |
 | DNS-SD advertisement + `MdnsServer` (`protocol/src/mdns`) | `mdns/` | ✅ | — | Operational + commissionable records, subtype PTRs, rotating device id, re-announce loop. |
-| `CommissionableMdnsScanner` — *browsing* for other nodes | — | ○ | **No** | Controller-side discovery. |
+| `CommissionableMdnsScanner` — *browsing* for other nodes | `controller/discovery` (commissionable and operational browsing, TXT data) | ✅ | — | ADR 0020 stage 1. |
 | BLE / BTP (`protocol/src/ble`, `packages/nodejs-ble`) | — | ○ | **No** (planned for the commissioner, [ADR 0024](./adr/0024-ble-commissioning-in-the-controller.md), concept v3 phases 12–13) | Device side: declared non-goal. BLE commissioning pulls a platform radio stack (BlueZ/CoreBluetooth) into a library whose only other OS dependency is a UDP socket, and it exists to solve a problem a LAN-attached bridge does not have: getting network credentials onto a device that has none. |
 | TCP transport (`protocol/src/transport/tcp`) + BDX (`protocol/src/bdx`) | `transport/tcp`, `transport.Conn`, `mrp.UsesMRP`; `bdx/`, `bdx/otaimage` | ✅ | — | Wave 5 ([ADR 0019](./adr/0019-tcp-bdx-and-the-ota-requestor.md)): the length-framed listener and dialer, no MRP over a reliable connection, PASE / CASE over TCP, route-aware chunking to the peer's MaxTcpMessageSize, the sessions of a dropped connection closed. BDX as the initiating receiver in both driver modes, for the OTA requestor; the sender / responder roles are a provider's and are not exposed. Not ported: closing a connection when its last session goes, the 8192-byte BDX block over TCP (findings register, Tier 3), MESSAGE_TOO_LARGE before closing (a matter.js TODO too). `BD-Matter-TCP-GoMechanics`. |
 | Thread border-router client (`packages/thread-br-client`, `thread-network-*`) | — | ○ | **No** | The host is on Ethernet/Wi-Fi already; `NetworkCommissioning` advertises the Ethernet feature. |
@@ -58,14 +58,14 @@ matter.js HEAD as checked out at `../matter.js`.
 | --- | --- | --- | --- | --- |
 | PASE (Spake2+) responder | `secure/spake2`, `commissioning/pase.go` | ✅ | — | |
 | CASE (Sigma1/2/3) responder + Sigma2Resume | `secure/sigma`, `store/resumption.go` | ✅ | — | Resumption is persisted and survives a restart. |
-| CASE initiator (`CaseClient`) | `secure/sigma.NewPeerInitiator`, `bridge/case_initiator.go` | ◐ | — | Only for re-establishing former subscriptions, as matter.js's server node uses it ([ADR 0008](./adr/0008-subscription-resumption.md)); offers resumption with a stored record. Not a controller role. |
+| CASE initiator (`CaseClient`) | `secure/sigma.NewPeerInitiator`; device side `bridge/case_initiator.go` (subscription resumption, [ADR 0008](./adr/0008-subscription-resumption.md)); controller side `controller/handshake`, `controller/peer` | ✅ | — | Both uses matter.js has: the server node re-establishing its subscriptions and the controller's peer connections (ADR 0020 stage 1). |
 | Session parameters (Matter 1.3+ `TlvSessionParameters`, 1.5+ transports) | full structure on CASE and PASE (`secure/sessionparams`, tags 1–9; PBKDFParamResponse states the node's parameters as `PaseServer.ts:151`) | ✅ | — | Wave 5 (ADR 0019). The peer's TCP bits pass the Matter 1.5 gate (`SessionParameters.ts:49-56`); `operational.Entry` keeps them for the TCP sender. |
 | DAC / PAI / PAA validation, Certification Declaration | `secure/attestation` | ✅ | — | |
 | Matter-TLV certificate codec | `secure/mattercert` | ✅ | — | |
 | Fabric management, NOC install, multi-fabric | `cluster/core/operational_credentials.go`, `store/fabric.go` | ✅ | — | Multiple ecosystems on one bridge is the normal case and is exercised in CI. |
 | Access control (ACL, fabric-scoped, CAT subjects) | `cluster/core/access_control.go`, `store/acl.go` | ✅ | — | |
 | Access Restriction List (ARL, Managed Aggregator) | cluster id constant + integration point only | ○ | **Low** | `BD-Matter-ARL-NotMounted`. Needed only for the Managed Aggregator use case, which no consumer has asked for. The re-activation checklist is in `by_design.md`. |
-| DCL (Distributed Compliance Ledger) client (`protocol/src/dcl`) | — | ○ | **No** | A controller checks the DCL to validate a device it is commissioning. A device does not check itself. |
+| DCL (Distributed Compliance Ledger) client (`protocol/src/dcl`) | `controller/dcl` (`DclClient.ts` and the used parts of the certificate and OTA services; PAA store, revocations, OTA versions), opt-in | ✅ | — | ADR 0020 stage 6a (wave 25). The embedded offline snapshot (matter.js's `SeedSource`) is roadmap milestone 1, phase 11. |
 
 ## 4. Interaction Model
 
