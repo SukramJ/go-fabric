@@ -15,6 +15,7 @@ import (
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	ethdiagdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
+	gencommdef "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	tfldef "github.com/SukramJ/go-fabric/cluster/spec/timeformatlocalization"
 	userlabeldef "github.com/SukramJ/go-fabric/cluster/spec/userlabel"
 	"github.com/SukramJ/go-fabric/cluster/wire"
@@ -58,9 +59,14 @@ type RootClusters struct {
 	AccessControl              *mattercore.AccessControl
 	GeneralCommissioning       *mattercore.GeneralCommissioning
 	AdministratorCommissioning *wire.AdministratorCommissioning
-	NetworkCommissioning       *mattercore.NetworkCommissioning
-	GeneralDiagnostics         *mattercore.GeneralDiagnostics
-	DiagnosticLogs             *mattercore.DiagnosticLogs
+	// NetworkCommissioning is the Ethernet server; nil when
+	// [Network].WiFiCommissioning has a Driver.
+	NetworkCommissioning *mattercore.NetworkCommissioning
+	// WiFiNetworkCommissioning is the Wi-Fi server, nil unless
+	// [Network].WiFiCommissioning has a Driver (TESTING ONLY).
+	WiFiNetworkCommissioning *mattercore.WiFiNetworkCommissioning
+	GeneralDiagnostics       *mattercore.GeneralDiagnostics
+	DiagnosticLogs           *mattercore.DiagnosticLogs
 	// TimeSynchronization is nil when [Config].DisableTimeSynchronization
 	// is set.
 	TimeSynchronization    *mattercore.TimeSynchronization
@@ -187,7 +193,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	otaRequestor := r.OTARequestor
 	observer := d.onCommissioningComplete
-	generalCom.SetOnCommissioningComplete(func(ctx context.Context, fabricIndex uint8) {
+	commissioned := func(ctx context.Context, fabricIndex uint8) {
 		opCreds.ClearPendingState()
 		if otaRequestor != nil {
 			// A query 30 s after a commissioning (wiring.go:210-215).
@@ -196,7 +202,8 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		if observer != nil {
 			observer(ctx, fabricIndex)
 		}
-	})
+	}
+	generalCom.SetOnCommissioningComplete(commissioned)
 
 	r.AccessControl, err = mattercore.NewAccessControl(d.st) //nolint:contextcheck // the constructor takes no context; it reads the store once
 	if err != nil {
@@ -222,7 +229,35 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		r.GeneralDiagnostics.SetUTCClock(r.TimeSynchronization.UTC)
 	}
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
-	r.NetworkCommissioning = mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{})
+	var netComm contract.ClusterServer
+	if wc := cfg.Network.WiFiCommissioning; wc.Driver != nil {
+		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{
+			Driver: wc.Driver, IsFailSafeArmed: generalCom.FailSafeArmed,
+			SetBreadcrumb: func(v uint64) {
+				_ = generalCom.MatterWrite(context.WithoutCancel(ctx), gencommdef.AttrBreadcrumb, v)
+			},
+			MaxNetworks: wc.MaxNetworks, ScanMaxTimeSeconds: wc.ScanMaxTimeSeconds, ConnectMaxTimeSeconds: wc.ConnectMaxTimeSeconds,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("wi-fi network commissioning: %w", err)
+		}
+		wifiNC := r.WiFiNetworkCommissioning
+		// The network list is committed with the commissioning and reverted
+		// with the failsafe (NetworkCommissioningCluster.cpp:984-1014).
+		expired := opCreds.OnFailSafeExpiry
+		generalCom.SetOnFailSafeExpired(func(ctx context.Context, fi uint8) {
+			expired(ctx, fi)
+			wifiNC.OnFailSafeExpired()
+		})
+		generalCom.SetOnCommissioningComplete(func(ctx context.Context, fi uint8) {
+			wifiNC.OnCommissioningComplete()
+			commissioned(ctx, fi)
+		})
+		netComm = wifiNC
+	} else {
+		r.NetworkCommissioning = mattercore.NewNetworkCommissioning(mattercore.NetworkCommissioningConfig{})
+		netComm = r.NetworkCommissioning
+	}
 
 	// IcdManagement is NOT mounted: RootNode requires it under "Sit | Lit"
 	// (root-node.element.ts), which an always-on, mains-powered bridge is
@@ -255,7 +290,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 		r.AccessControl,
 		generalCom,
 		r.AdministratorCommissioning,
-		r.NetworkCommissioning,
+		netComm,
 		r.GeneralDiagnostics,
 		r.DiagnosticLogs,
 	}

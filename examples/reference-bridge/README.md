@@ -152,6 +152,16 @@ the same two mechanisms CHIP's own example apps take (`control.go`):
   the values from the kernel (nl80211, or `iw`) behind its own
   `mattercore.WiFiReporter` and hands it to `node.Network.WiFi`.
 
+- `--wifi-sim` (TESTING ONLY) gives the root's NetworkCommissioning the
+  Wi-Fi feature instead of Ethernet, over a simulated driver
+  (`wifisim.go`): a directed scan finds the network, ConnectNetwork
+  "connects" to any SSID after 200 ms, and the daemon stays on its
+  Ethernet address. It lets the commissioner's network steps run without a
+  radio: `reference-controller pair --passcode 20202021 --discriminator 3840
+  --wifi-ssid lab --wifi-credentials secret12`. The list rules and statuses
+  are connectedhomeip's (credentials of 0, 5, 8–63 bytes or 64 hex digits;
+  one network). Without the flag the composition is unchanged.
+
 - `--ota-provider` (TESTING ONLY) serves one embedded test OTA image
   (`ota_provider.go`) through the node's OTA Software Update Provider
   (ADR 0021): an OtaProvider endpoint beside the Aggregator, the image —

@@ -161,6 +161,13 @@ type Network struct {
 	// assembler states it. EthernetNetworkDiagnostics stays mounted beside
 	// it.
 	WiFi WiFi
+	// WiFiCommissioning mounts NetworkCommissioning with the Wi-Fi feature
+	// instead of Ethernet, its scan and connect done by Driver — what the
+	// commissioner's network steps configure. TESTING ONLY: the module's
+	// nodes are Ethernet-attached; the reference daemon's --wifi-sim is
+	// the one user. The zero value (no Driver) keeps the Ethernet-only
+	// server, and the composition is unchanged.
+	WiFiCommissioning WiFiCommissioning
 	// ReannounceInterval is the cadence at which the node re-publishes its
 	// DNS-SD records when its Advertiser is an mdns.Reannouncer
 	// (mdns.Zeroconf is): the loop starts on [Node.Start] and stops on
@@ -177,6 +184,17 @@ type Network struct {
 // 75-minute TTL Apple's mDNSResponder caches the records for, so a cache
 // sees the records again before they expire.
 const DefaultReannounceInterval = 30 * time.Minute
+
+// WiFiCommissioning is the Wi-Fi NetworkCommissioning configuration
+// (mattercore.WiFiNetworkCommissioningConfig).
+type WiFiCommissioning struct {
+	// Driver scans and connects; nil mounts the Ethernet-only server.
+	Driver contract.WiFiDriver
+	// MaxNetworks is the size of the network list; 0 is 1.
+	MaxNetworks uint8
+	// ScanMaxTimeSeconds and ConnectMaxTimeSeconds; 0 are 10 and 20.
+	ScanMaxTimeSeconds, ConnectMaxTimeSeconds uint8
+}
 
 // WiFi is a Wi-Fi node's WiFiNetworkDiagnostics configuration.
 type WiFi struct {

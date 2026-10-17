@@ -90,6 +90,7 @@ type flags struct {
 	passcode, discriminator                    uint
 	iterations                                 int
 	advertise, osHostName, otaHarness, wifi    bool
+	wifiSim                                    bool
 	otaProvider, media                         bool
 }
 
@@ -114,6 +115,7 @@ func parseFlags() flags {
 	flag.StringVar(&f.attestationDir, "attestation-dir", "", "directory with a vendor attestation chain — dac.pem, dac-key.pem, pai.pem, cd.der (PEM or DER each, the key PKCS#8 or SEC1) — served instead of the CSA test chain; see attestation.go")
 	flag.StringVar(&f.dcl, "dcl", "off", "prod, testnet or off: look the --ota-provider image up in the CSA Distributed Compliance Ledger (sends the requestor's vendor/product id and the offered version to the ledger); see dcl.go")
 	flag.BoolVar(&f.wifi, "wifi", false, "TESTING ONLY: serve WiFiNetworkDiagnostics on the root from a simulated Wi-Fi link (fixed values, counters the app pipe steps), stating the RootNode condition WiFi; see wifi.go")
+	flag.BoolVar(&f.wifiSim, "wifi-sim", false, "TESTING ONLY: NetworkCommissioning with the Wi-Fi feature instead of Ethernet, over a simulated driver that connects to any SSID after a short delay and stays on the Ethernet address; see wifisim.go")
 	flag.BoolVar(&f.media, "media", false, "TESTING ONLY: add a simulated video player (CastingVideoPlayer) and content app (ContentApp) after chip's tv-app, for the media certification families; see media.go")
 	flag.Parse()
 	return f
@@ -222,10 +224,7 @@ func run() error { //nolint:funlen // the composition root: one sequential pass,
 	if cfg.Attestation, err = loadAttestation(f.attestationDir); err != nil {
 		return err
 	}
-	if f.wifi {
-		// The simulated Wi-Fi link (wifi.go), TESTING ONLY.
-		cfg.Network.WiFi = devices.wifi.nodeConfig()
-	}
+	applyTestWiFi(&cfg, f, devices)
 	if f.otaProvider {
 		// The OTA provider with its test image (ota_provider.go), TESTING
 		// ONLY.
