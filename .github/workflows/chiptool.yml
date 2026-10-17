@@ -209,7 +209,7 @@ jobs:
       # (parity/schema.json matter.sourceCommit) and checked out next to
       # the module, where the test looks for it. The built tree is cached
       # per commit.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: matter.js pin
@@ -248,7 +248,7 @@ jobs:
 
       - name: upload logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chiptool-logs
           path: /tmp/chiptool.log
@@ -313,7 +313,7 @@ jobs:
         run: docker exec chip-control cat /tmp/app.log > /tmp/app.log 2>/dev/null || true
       - name: upload control-leg logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chiptool-control-logs
           path: |
@@ -373,7 +373,7 @@ jobs:
           fi
       - name: upload rewritten fixtures
         if: always() && github.event.inputs.update_fixtures == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chip-fixtures-${{ matrix.group }}
           path: |
@@ -383,7 +383,7 @@ jobs:
           if-no-files-found: error
       - name: upload case logs
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chip-families-${{ matrix.group }}
           path: |
