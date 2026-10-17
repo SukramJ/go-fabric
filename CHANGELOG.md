@@ -10,6 +10,18 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-10-17
+
+The findings release: every open entry of the findings register worked through (the security and stability fixes first: a bound on per-session UDP dispatch, `Stop` waiting for handlers, no commissionable advertisement for a node whose fabrics fail to load), the developer and architect documentation published as <https://sukramj.github.io/go-fabric/>, and the cleanup of `docs/`.
+
+**What a host must do.**
+- A host that builds a `spec.NewServer` and registers a mandatory command's handler afterwards with `Handle` now gets `spec.ErrMissingHandler` at construction: pass the handler in `ServerConfig.Handlers`. A device-layer default server lists a command in AcceptedCommandList only once its handler is registered.
+- Integer attribute values and several IM fields now encode at the smallest TLV width, as matter.js does; a controller reads any width.
+- After the last fabric is removed, the node's own window reopens once the node is idle (no fail-safe, no session) — after `OnFabricRemoved`, reported through `OnWindowTransition`.
+- WindowCovering refuses a write to `CalibrationMode` (CONSTRAINT_ERROR), as matter.js does.
+- The subscribe dump variable is `GOFABRIC_DUMP_SUBSCRIBE`; the old name still works and is deprecated.
+- The store schema is unchanged (`store.Migrations()` still ends at `v4`).
+
 The findings wave (2026-10-17): every open entry of the findings register worked through — see the register's closing section and `by_design.md`.
 
 ### Fixed
@@ -4035,7 +4047,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/SukramJ/go-fabric/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/SukramJ/go-fabric/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/SukramJ/go-fabric/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/SukramJ/go-fabric/compare/v0.5.1...v0.5.2
