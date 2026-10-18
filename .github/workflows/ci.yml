@@ -141,6 +141,24 @@ jobs:
       - name: reachability
         run: make reachability-check
 
+  testparity:
+    name: testparity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      # Holds the matter.js test-porting register (script/testparity) against
+      # the committed snapshot of matter.js's test files at the schema pin: no
+      # file without an entry, no entry without a file, every Go test an entry
+      # names exists, a ported or partial mapping was checked against the blob
+      # now pinned, the rendered page is current, and the planned count sits
+      # exactly on its ratchet. No matter.js clone: the snapshot is committed.
+      - name: testparity
+        run: make testparity-check
+
   chipdm:
     name: chip data model cross-check
     runs-on: ubuntu-latest

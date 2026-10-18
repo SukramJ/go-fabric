@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+### Added
+
+- `script/testparity`: the matter.js test-porting register. A committed snapshot of every `*Test.ts` under matter.js's `packages/node/test` and `packages/protocol/test` at the schema pin (324 files; path, lines, blob SHA-1, top-level `describe` names; `make testparity-snapshot`), a register that gives each one a status — `ported`, `partial` with the `it` cases not covered, `planned`, or `excluded` with a class (`controller-stage` until a milestone, `js-runtime-only`, `joint-fabric`, `device-ble-thread`, `test-infrastructure`) — and the Go tests it maps to, and the generated page `notes/parity/matterjs_tests.md` (`make testparity`). `make testparity-check` and the CI job `testparity` fail on a snapshot file without an entry or an entry without a file, a Go test reference that does not resolve, a `ported`/`partial` mapping whose matter.js file changed, a stale page, and a `planned` count off `testparityPlannedRatchet` (133 at the initial fill: 8 ported, 94 partial, 133 planned, 89 excluded). No library code changes.
+
 ## [0.7.0] — 2026-10-18
 
 Milestone 1 of [the roadmap](./docs/roadmap.md), the commissioner in the field: the controller commissions over Bluetooth LE (BTP in pure Go, the BlueZ sub-module `ble/bluez`, `pair --ble`) and runs the network steps (Wi-Fi credentials, Thread dataset), its keys sit behind `crypto.Signer`, the CSA ledger's production roots ship as an embedded snapshot with the trust modes development / production / none, and it opens a commissioning window for the next admin. The BLE path is proven end to end against a matter.js node over virtual controllers (`ble-virtual.yml`, manual dispatch) — a real device remains the field proof. The device side and the store schema are unchanged.
