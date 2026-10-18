@@ -21,7 +21,12 @@
 # The verdict separates the ENVIRONMENT (btvirt, BlueZ, the vhci module,
 # Node.js, the npm install or the bleno build, the HCI claim) from a DEFECT
 # (the build, the pairing, the read), as the chip-tool control leg does for
-# the harness:
+# the harness. The control leg runs after ours: a fresh peripheral, and
+# matter.js's own controller (script/ble-virtual/controller.mjs, noble) on
+# the central's controller, taken from BlueZ once our central is done. Ours
+# failing while matter.js <-> matter.js passes is a defect; both failing is
+# the virtual stack, so environment; ours passing is a pass either way (the
+# summary names a failed control leg).
 #
 #   exit 0  pass
 #   exit 1  defect      — go-fabric's side; logs in $BLE_LOG_DIR
@@ -39,6 +44,7 @@ NODE_ID=0x1234
 mkdir -p "$LOG_DIR"
 
 btvirt_pid=
+btmon_pid=
 peripheral_pid=
 notes=()
 # alive PID — sudo's pid is root's, so kill -0 from the runner's user
@@ -56,6 +62,7 @@ stop_peripheral() {
 }
 cleanup() {
 	stop_peripheral
+	if [ -n "$btmon_pid" ]; then sudo kill "$btmon_pid" 2>/dev/null || true; fi
 	if [ -n "$btvirt_pid" ]; then sudo kill "$btvirt_pid" 2>/dev/null || true; fi
 	sudo chown -R "$(id -u):$(id -g)" "$LOG_DIR" 2>/dev/null || true
 }
@@ -169,6 +176,11 @@ sudo hciconfig "$CENTRAL" up >>"$LOG_DIR/hciconfig.log" 2>&1 ||
 	verdict environment "$CENTRAL does not power on (see hciconfig.log)"
 hci_down "$PERIPHERAL" || verdict environment "$PERIPHERAL does not go down for the HCI user channel (see hciconfig.log)"
 hciconfig -a >>"$LOG_DIR/hciconfig.log" 2>&1
+# Every controller's HCI traffic, for reading a failure (btmon -r btmon.snoop).
+if command -v btmon >/dev/null; then
+	sudo btmon -w "$LOG_DIR/btmon.snoop" >/dev/null 2>&1 &
+	btmon_pid=$!
+fi
 echo "ble-virtual: central $CENTRAL (BlueZ), peripheral $PERIPHERAL (bleno)"
 
 (cd "$PKG" && npm ci --no-audit --no-fund) >"$LOG_DIR/npm.log" 2>&1 ||
@@ -190,18 +202,61 @@ start_peripheral ours "$PERIPHERAL" ||
 	verdict environment "the matter.js peripheral did not come up on $PERIPHERAL (bleno build or HCI claim; see peripheral-ours.log)"
 notes+=("manual code: \`$MANUAL\`")
 
+# --- our leg: BlueZ on the central, pair --ble, read --------------------------
+
 ctl() { sudo "$BIN" --db "$LOG_DIR/controller.db" --attestation accept --trust development --log-level info --timeout 120s "$@"; }
-ctl pair --ble --ble-adapter "$CENTRAL" --code "$MANUAL" --node-id "$NODE_ID" --wifi-ssid lab --wifi-credentials secret12 >"$LOG_DIR/pair.log" 2>&1 ||
-	verdict defect "pair --ble failed (see pair.log)"
-grep -q 'AddOrUpdateWiFiNetwork ssid=lab' "$LOG_DIR/peripheral-ours.log" ||
-	verdict defect "the peripheral never saw AddOrUpdateWiFiNetwork for ssid lab (see peripheral-ours.log)"
-ctl read "$NODE_ID" 0/BasicInformation/VendorID 0/NetworkCommissioning/FeatureMap >"$LOG_DIR/read.log" 2>&1 ||
-	verdict defect "the read over the operational session failed after pairing (see read.log)"
-grep -q 'VendorID' "$LOG_DIR/read.log" || verdict defect "the read returned no VendorID (see read.log)"
-# Bonus: an enhanced commissioning window over the same session.
-if ctl window open "$NODE_ID" --timeout 180 >"$LOG_DIR/window.log" 2>&1; then
-	notes+=("window open: ok")
+ours=
+our_leg() {
+	ctl pair --ble --ble-adapter "$CENTRAL" --code "$MANUAL" --node-id "$NODE_ID" --wifi-ssid lab --wifi-credentials secret12 >"$LOG_DIR/pair.log" 2>&1 ||
+		{ ours="pair --ble failed (see pair.log)" && return; }
+	grep -q 'AddOrUpdateWiFiNetwork ssid=lab' "$LOG_DIR/peripheral-ours.log" ||
+		{ ours="the peripheral never saw AddOrUpdateWiFiNetwork for ssid lab (see peripheral-ours.log)" && return; }
+	ctl read "$NODE_ID" 0/BasicInformation/VendorID 0/NetworkCommissioning/FeatureMap >"$LOG_DIR/read.log" 2>&1 ||
+		{ ours="the read over the operational session failed after pairing (see read.log)" && return; }
+	grep -q 'VendorID' "$LOG_DIR/read.log" || { ours="the read returned no VendorID (see read.log)" && return; }
+	# Bonus: an enhanced commissioning window over the same session.
+	if ctl window open "$NODE_ID" --timeout 180 >"$LOG_DIR/window.log" 2>&1; then
+		notes+=("window open: ok")
+	else
+		notes+=("window open: failed (see window.log; not part of the verdict)")
+	fi
+}
+our_leg
+stop_peripheral
+notes+=("our leg: ${ours:-pass}")
+
+# --- the control leg: matter.js's controller on the central ------------------
+
+# noble claims the central's controller over the HCI user channel as bleno
+# does the peripheral's, so BlueZ gives it up first; NOBLE_MULTI_ROLE
+# (packages/nodejs-ble/README.md) is for bleno and noble on one adapter and
+# not needed here.
+control=
+control_leg() {
+	start_peripheral control "$PERIPHERAL" ||
+		{ control="the peripheral did not come up a second time (see peripheral-control.log)" && return; }
+	hci_down "$CENTRAL" || { control="$CENTRAL does not go down for noble (see hciconfig.log)" && return; }
+	mkdir -p "$LOG_DIR/storage-control-controller"
+	sudo timeout -k 10 240 env HCI_CHANNEL_USER=1 BLE_HCI_ID="${CENTRAL#hci}" \
+		CONTROL_STORAGE="$LOG_DIR/storage-control-controller" CONTROL_CODE="$MANUAL" \
+		CONTROL_WIFI_SSID=lab CONTROL_WIFI_CREDENTIALS=secret12 \
+		"$NODE_BIN" "$PKG/controller.mjs" >"$LOG_DIR/control.log" 2>&1
+	grep -q '^ble-virtual-control: pass' "$LOG_DIR/control.log" ||
+		control="matter.js's controller did not commission the peripheral over BLE and read it (see control.log)"
+}
+control_leg
+stop_peripheral
+notes+=("control leg (matter.js <-> matter.js): ${control:-pass}")
+
+# --- the verdict -------------------------------------------------------------
+
+what="pair --ble over $CENTRAL commissioned the matter.js peripheral on $PERIPHERAL with Wi-Fi credentials; read over the operational session"
+if [ -z "$ours" ] && [ -z "$control" ]; then
+	verdict pass "$what; the control leg passed too"
+elif [ -z "$ours" ]; then
+	verdict pass "$what (the control leg failed: $control)"
+elif [ -z "$control" ]; then
+	verdict defect "$ours — matter.js's own controller commissioned the same peripheral over the same virtual stack"
 else
-	notes+=("window open: failed (see window.log; not part of the verdict)")
+	verdict environment "both legs failed — ours: $ours; control: $control — the virtual stack"
 fi
-verdict pass "pair --ble over $CENTRAL commissioned the matter.js peripheral on $PERIPHERAL with Wi-Fi credentials; read over the operational session"
