@@ -3920,15 +3920,13 @@
     },
     {
       "path": "packages/protocol/test/peer/PeerEstablishmentProgressTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/peer:TestParityUnresponsiveDetector",
-        "controller/peer:TestEstablishmentUnresponsive"
+        "controller/peer:TestEstablishmentUnresponsive",
+        "controller/peer:TestPeerEstablishmentProgressDetector"
       ],
-      "missing": [
-        "keeps an independent latch per detector instance"
-      ],
-      "reason": "The unresponsive-establishment latch is ported; the per-instance latch independence is not.",
+      "reason": "The unresponsive-establishment latch (fire once past MRP.MAX_TRANSMISSIONS, re-arm at 0, one latch per detector instance) and its firing from a never-acked CASE exchange are ported against controller/peer.",
       "snapshotSha": "c24a7e3957d9be9c8550459acf4ccf8828b94b3a"
     },
     {

@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 26 |
-| partial | 103 |
+| ported | 27 |
+| partial | 102 |
 | planned | 108 |
 | excluded | 87 |
 | total | 324 |
@@ -106,7 +106,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/ota](#protocoltestota) | 2 | 2 | 0 | 0 | 0 |
-| [protocol/test/peer](#protocoltestpeer) | 14 | 1 | 7 | 3 | 3 |
+| [protocol/test/peer](#protocoltestpeer) | 14 | 2 | 6 | 3 | 3 |
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 8 | 0 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 1 | 0 | 1 |
@@ -844,7 +844,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | PeerConnectionKickTest.ts | 441 | partial | `controller/peer:TestParityTimingDefaults`<br>`controller/peer:TestKickRestartsTheExchange`<br>`controller/peer:TestDiscoverKick` | The kick defaults and the restart on a kick are covered; overrides, the quiet observable and the restart conditions are not ported case by case. Missing: “has correct default for kickMinRetransmissions”; “allows overriding kick restart cooldowns”; “keeps the untouched members of a partially overridden group”; “keeps the untouched members of a group when merging onto a custom base”; “passes 'discover' origin to observer”; “passes 'connect' origin to observer”; “suppresses rapid-fire kicks within minimumEmitInterval”; “allows kick after minimumEmitInterval has elapsed”; “accepts the first kick unconditionally”; “suppresses a second 'discover' kick within 30 minutes”; “accepts a second 'discover' kick after 30 minutes”; “suppresses a second 'connect' kick within 10 minutes”; “accepts a second 'connect' kick after 10 minutes”; “uses independent thresholds for different origins”; “shares lastRestartAt across concurrent handlers”; “allows custom thresholds via PeerTimingParameters override”; “suppresses while the exchange has not retransmitted enough”; “suppresses when a restart would save too little time (e.g. idle/sleepy peer)”; “restarts once both retransmission count and restart saving clear their thresholds”; “firing localAbort causes AbortedError via Abort.attempt”; “addressAbort propagates to localAbort”; “localAbort on already-aborted signal is harmless”; “connect loop restarts after localAbort fires”; “Observable<[KickOrigin]> matches QuietObservable<[KickOrigin]>”; “use() returns disposable that unregisters observer”. |
 | PeerConnectionSocketOwnershipTest.ts | 142 | planned | until M5 phase 24 | Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25. |
 | PeerDescriptorTest.ts | 82 | excluded | `js-runtime-only` | matter.js's observable peer descriptor objects (interning, change notification). |
-| PeerEstablishmentProgressTest.ts | 148 | partial | `controller/peer:TestParityUnresponsiveDetector`<br>`controller/peer:TestEstablishmentUnresponsive` | The unresponsive-establishment latch is ported; the per-instance latch independence is not. Missing: “keeps an independent latch per detector instance”. |
+| PeerEstablishmentProgressTest.ts | 148 | ported | `controller/peer:TestParityUnresponsiveDetector`<br>`controller/peer:TestEstablishmentUnresponsive`<br>`controller/peer:TestPeerEstablishmentProgressDetector` | The unresponsive-establishment latch (fire once past MRP.MAX_TRANSMISSIONS, re-arm at 0, one latch per detector instance) and its firing from a never-acked CASE exchange are ported against controller/peer. |
 | PhysicalDevicePropertiesTest.ts | 308 | planned | — | Subscription interval bounds the controller derives from a peer's physical properties (Thread, ICD, Generic Switch). |
 | RebootResubscribeArmerTest.ts | 529 | excluded | `controller-stage` until M5 phase 24 | The controller re-subscribing a peer after an OTA reboot, which milestone 5 phase 24 builds. |
 | ThreadNetworkNameResolutionTest.ts | 51 | ported | `controller/commissioner:TestResolveThreadNetworkName`<br>`controller/commissioner:TestThreadNetworkNameResolution` | All seven resolveThreadNetworkName cases ported with the test's MeshCoP vectors: derive, empty name as absent, match, typed mismatch error, dataset without a name, neither, undecodable dataset falling back to the supplied name. |
