@@ -206,26 +206,8 @@ func (o *OTAVersions) CheckVersion(ctx context.Context, c *Client, vid, pid uint
 // (packages/protocol/src/dcl/DclClient.ts:229-257): the record must answer
 // that vid, pid, version and certification type in schema version 0 or 1.
 func (o *OTAVersions) specificationVersionOf(ctx context.Context, c *Client, vid, pid uint16, version uint32) uint32 {
-	const certificationType = "matter"
-	var resp struct {
-		ComplianceInfo *struct {
-			VID                  uint16 `json:"vid"`
-			PID                  uint16 `json:"pid"`
-			SoftwareVersion      uint32 `json:"softwareVersion"`
-			CertificationType    string `json:"certificationType"`
-			SpecificationVersion uint32 `json:"specificationVersion"`
-			SchemaVersion        int    `json:"schemaVersion"`
-		} `json:"complianceInfo"`
-	}
-	err := c.fetchJSON(ctx, fmt.Sprintf("/dcl/compliance/compliance-info/%d/%d/%d/%s", vid, pid, version, certificationType), &resp)
-	info := resp.ComplianceInfo
-	switch {
-	case err != nil:
-	case info == nil || info.VID != vid || info.PID != pid || info.SoftwareVersion != version || info.CertificationType != certificationType:
-		err = dclErrorf("Compliance info not found for VID: %d, PID: %d, Software Version: %d, Certification Type: %s", vid, pid, version, certificationType)
-	case info.SchemaVersion != 0 && info.SchemaVersion != 1:
-		err = dclErrorf("Unsupported DCL compliance info schema version %d for VID: %d, PID: %d, Software Version: %d", info.SchemaVersion, vid, pid, version)
-	default:
+	info, err := c.ComplianceInfo(ctx, vid, pid, version, "matter")
+	if err == nil {
 		return info.SpecificationVersion
 	}
 	o.log().Debug("dcl.ota.no_specification_version", slog.String("message",
