@@ -2004,8 +2004,16 @@
     },
     {
       "path": "packages/node/test/node/FailsafeCommissioningTest.ts",
-      "status": "planned",
-      "reason": "Re-announcing the commissionable service after a fail-safe expiry before AddNOC and before CommissioningComplete.",
+      "status": "partial",
+      "go": [
+        "node:TestFailsafeCommissioningParity"
+      ],
+      "missing": [
+        "re-announces after failsafe expiry with PASE session active (before addNOC)",
+        "re-announces after failsafe expiry with CASE session after addNOC (before CommissioningComplete)",
+        "recovers cleanly when initial ACL creation fails during addNOC"
+      ],
+      "reason": "On fabrictest the fail-safe expiry before AddNOC (PASE) and after it (flow stopped at the transition) rolls back and leaves the device commissionable (node:TestFailsafeCommissioningParity); the re-announcement itself is missing — the Go device keeps its commissionable record while PASE is up and publishes nothing when the PASE session closes, where matter.js starts an advertisement round (DeviceAdvertiser.ts:131-162); the ACL-failure case has no seam to fail the device's initial ACL.",
       "snapshotSha": "8e1751cc53222167bae7811a878aa7bb8f11fc4d"
     },
     {
@@ -2097,15 +2105,15 @@
         "controller/commissioner:TestNetworkWiFiScanRejectedThenAddFails",
         "controller/commissioner:TestNetworkThreadFailures",
         "controller/commissioner:TestFlowRearmsBeforeNetworkStep",
-        "controller/commissioner:TestBLERearmInterval"
+        "controller/commissioner:TestBLERearmInterval",
+        "controller/commissioner:TestScanNetworksRejectionParity_ThreadScanRejected"
       ],
       "missing": [
-        "continues Thread setup when the device rejects the scan with a status",
         "continues WiFi setup when the device answers the scan too late",
         "ends commissioning when the device does not acknowledge the scan",
         "commissions over a PASE session that suppresses peer loss"
       ],
-      "reason": "The rejected scan, the failure that names it and the fail-safe re-arming are covered; the Thread rejection, the late answer and the unacknowledged scan are not.",
+      "reason": "The rejected scan (Wi-Fi and Thread), the failure that names it and the fail-safe re-arming are covered on the commissioner's scripted device; the late answer and the unacknowledged scan need the scripted device to answer late or never, and the PASE session's peer-loss suppression is not observable outside controller/exchange.",
       "snapshotSha": "a044dded9f253d1868a6a0add6933dd5ab58f415"
     },
     {
