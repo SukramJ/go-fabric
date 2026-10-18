@@ -1857,8 +1857,37 @@
     },
     {
       "path": "packages/node/test/node/ClientEventNotificationTest.ts",
-      "status": "planned",
-      "reason": "Delivery of peer events to the controller's observers, timestamps and event numbers.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientEventNotificationEventsOfParity",
+        "controller/client:TestClientEventNotificationEventNumbersParity"
+      ],
+      "missing": [
+        "emits EventOccurrence for MS initialPress",
+        "emits EventOccurrence for MS, MSR and MSM events",
+        "distinguishes the four wire timestamp variants",
+        "delivers an event to every observer when one of them throws or rejects",
+        "warns once per node and kind of failure when a change observer fails for each event report",
+        "commissions a node while a change observer fails for each event",
+        "ignores events and event numbers of a replaced default subscription",
+        "finishes delivering an event only after its asynchronous observers settled",
+        "does not emit an event again when the default subscription changes while its observers run",
+        "stores the number of the events the commissioning read emitted when the read fails",
+        "returns a narrow read's events to the caller only",
+        "returns a narrow subscription's events to the caller only",
+        "resubscribes a sustained subscription above the last event it delivered",
+        "does not store the number of an event dropped because the node is being deleted",
+        "does not store the number of an event dropped because the node crashed",
+        "stores the number when another transaction holds the network state",
+        "does not emit a held event once its interaction stopped emitting events",
+        "emits every event of an interaction when observers fail for some of them",
+        "does not queue emit jobs for the events of an interaction that stopped emitting",
+        "does not emit an interaction's delayed event at the end of another one when the first ends",
+        "does not emit an interaction's delayed event at the end of another one when the first fails",
+        "includes all Switch events even when featureMap is 0",
+        "preserves detected supportedFeatures after all-feature composition"
+      ],
+      "reason": "A switch's InitialPress, ShortRelease and MultiPressComplete delivered to the client node's event hook with their payloads, in order, and the event number the node stores — after the hook received the event, once, above the commissioning read's events, never lowered, asked above by a replacement subscription and after a controller restart — run on fabrictest (controller/client:TestClientEventNotification*; the switch is bridged, the Go root serves no Switch). Missing: matter.js's ChangeNotificationService and its EventOccurrence (names, timestamp kind), the per-event emitter and its observers (several, failing, asynchronous, rejecting; the warning per node and kind; the emit job queue of concurrent interactions and their delayed events), the per-subscription event number and the subscription-local events of a narrow read or subscription (Node.Read and Node.Subscribe apply every event to the image), a replaced default subscription's callbacks, the network state held by another transaction, the crashed node, and an event of a node being deleted (no hook inside Registry.Decommission), and the PeerBehavior event composition (Go does not gate events by features: any event of the definition decodes).",
       "snapshotSha": "1575387a3d2a35e62b3fafe9eee015d83f320d2c"
     },
     {

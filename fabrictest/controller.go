@@ -220,43 +220,52 @@ func (c *Controller) Close() {
 // nodes after a restart. A site on loopback sockets gives the controller a
 // new port.
 func (c *Controller) Restart(ctx context.Context) error {
-	c.shutdown(ctx)
+	// The stack's close waits for timers of its own (a subscription's
+	// last exchange); with a fake clock it runs under Site.Run.
+	if err := c.site.Run(ctx, func(ctx context.Context) error {
+		c.shutdown(ctx)
+		return nil
+	}); err != nil {
+		return fmt.Errorf("fabrictest: restart controller %d: %w", c.index, err)
+	}
 	if err := c.start(); err != nil {
 		return fmt.Errorf("fabrictest: restart controller %d: %w", c.index, err)
 	}
 	return nil
 }
 
-// shutdown stops the controller's stack, leaving its stores.
+// shutdown stops the controller's stack, leaving its stores. The fields
+// are read under the lock and closed outside it, so the site's resolver
+// is not held up while the stack winds down.
 func (c *Controller) shutdown(ctx context.Context) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	{
-		if c.reg != nil {
-			_ = c.reg.Close(ctx)
-		}
-		if c.subs != nil {
-			_ = c.subs.Close(ctx)
-		}
-		if c.com != nil {
-			c.com.Close()
-		}
-		if c.set != nil {
-			c.set.Close(ctx)
-		}
-		if c.mgr != nil {
-			c.mgr.Close()
-		}
-		if c.stop != nil {
-			c.stop()
-			<-c.served
-		}
-		if c.listener != nil {
-			_ = c.listener.Close()
-		}
-		if c.names != nil {
-			_ = c.names.Close()
-		}
+	c.mu.RLock()
+	reg, subs, com, set, mgr := c.reg, c.subs, c.com, c.set, c.mgr
+	stop, served, listener, names := c.stop, c.served, c.listener, c.names
+	c.mu.RUnlock()
+	if reg != nil {
+		_ = reg.Close(ctx)
+	}
+	if subs != nil {
+		_ = subs.Close(ctx)
+	}
+	if com != nil {
+		com.Close()
+	}
+	if set != nil {
+		set.Close(ctx)
+	}
+	if mgr != nil {
+		mgr.Close()
+	}
+	if stop != nil {
+		stop()
+		<-served
+	}
+	if listener != nil {
+		_ = listener.Close()
+	}
+	if names != nil {
+		_ = names.Close()
 	}
 }
 

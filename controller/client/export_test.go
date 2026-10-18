@@ -76,3 +76,14 @@ func CacheFabricFiltered(n *Node) bool {
 // UpdateRecord edits the node's commissioning record and stores it — what
 // matter.js does with peer.set({ commissioning: … }).
 func UpdateRecord(n *Node, f func(r *Record)) { n.updateRecord(f) }
+
+// MaxEventNumber is the highest event number the node stored —
+// matter.js peer.stateOf(NetworkClient).maxEventNumber.
+func MaxEventNumber(n *Node) uint64 {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	return n.settings.maxEventNumber
+}
+
+// DeliverEvent hands e to the node as an event of a report.
+func DeliverEvent(n *Node, e interaction.EventData) { n.deliverEvent(&e) }
