@@ -3397,26 +3397,17 @@
         "cluster/core:TestParityFabricManager_AllocateIndexAfterAdd",
         "cluster/core:TestParityFabricManager_AllocateIndexMonotonicAfterRemove",
         "cluster/core:TestParityFabricManager_AllocateIndexSkipsAfterMultiRemove",
-        "cluster/core:TestParityFabricManager_AllocateTableFull"
+        "cluster/core:TestParityFabricManager_AllocateTableFull",
+        "cluster/core:TestFabricManagerReplacingFabrics",
+        "store:TestFabricManagerDetermineNextFabricIndex"
       ],
       "missing": [
-        "shares groups, access control and ICD state with the replacement before it reports it",
-        "keeps group changes made while replaced when the previous fabric is restored",
         "forwards the events of a replaced and restored fabric once and those of a replaced object never",
         "releases the ICD state only when the fabric in the table is deleted",
         "releases the ICD state when the fabrics are cleared",
-        "refuses a replacement from another root",
-        "refuses a replacement with another IPK",
-        "get next fabric index initially",
-        "get next fabric index after adding fabric",
-        "get next fabric index after adding fabric and removing it",
-        "get next fabric index after adding fabric and revoking it",
-        "get jumps over one fabric index after adding fabric and revoking it",
-        "it find first open slot for next index",
-        "it find first open slot for next index id including overflow",
-        "throws when table is full"
+        "refuses a replacement with another IPK"
       ],
-      "reason": "The FabricManager parity tests port adding, persistence, removal and index allocation; the remaining lookup and event cases are not.",
+      "reason": "Adding, persistence, removal, all eight index-allocation cases on the SQLite fabric table, and the UpdateNOC replacement keeping group and ACL state, keeping group changes across the fail-safe restore and refusing another root are ported; the event forwarding between replaced Fabric objects has no Go counterpart (a Go fabric is a store row), this module holds no ICD client registrations, and UpdateNOC carries no IPK, so a replacement with another IPK cannot be expressed.",
       "snapshotSha": "f3219676eb1a53723a29154f45b19c411c2c256a"
     },
     {
