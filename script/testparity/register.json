@@ -2262,8 +2262,25 @@
     },
     {
       "path": "packages/node/test/node/PeerBehaviorTest.ts",
-      "status": "planned",
-      "reason": "The schema the controller builds for a peer's clusters from AttributeList and revision.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestPeerBehaviorDiscoveredParity"
+      ],
+      "missing": [
+        "builds a cluster even when the peer reports an empty AttributeList",
+        "builds a cluster for an ID a custom model resolves but the specification does not allow",
+        "judges a revision-conformant element against the revision the peer sent",
+        "leaves a revision-conformant element to the peer on a write from a client node",
+        "distinguishes shapes that differ only in revision",
+        "shares a behavior with a peer that reports the standard revision",
+        "omits an attribute the peer reports whose conformance before a trailing deprecation excludes it",
+        "keeps the conformance of a reported attribute that the peer's features make mandatory",
+        "exposes an obsolete attribute the peer reports",
+        "omits a disallowed attribute the peer reports",
+        "tolerates a peer that does not report a revision",
+        "returns a peer behavior as it is"
+      ],
+      "reason": "The analysis of a discovered shape into a client.Cluster — readiness from a well-formed AttributeList, an ID that is no legal MEI, unknown attribute names, the revision the peer sent (known, beyond the model, unknown cluster), a listed or unlisted deprecated attribute — runs on the cluster's input (controller/client:TestPeerBehaviorDiscoveredParity). Missing: the behavior class itself and its identity (fingerprint cache, a known shape returned as it is; BD-Matter-ClientNode-NoGeneratedTypes); a custom matter model handed with the shape (CustomIllegalMei, RevGated, WithObsolete); the conformance of a peer cluster's attributes — mandatory attributes kept supported under an empty AttributeList, a listed attribute excluded by its conformance before a trailing D, a disallowed (X) one, the effective conformance string, a revision-gated element validated against the peer's revision or left to the peer on a client write (client.Cluster.Supports follows the AttributeList only); the revision of a cluster the peer reports none for (matter.js the model's, 1 for an unknown cluster; client.Cluster.Revision is 0 — a decision for the owner).",
       "snapshotSha": "aa253cbd1374b4704ffecad0539b2dd746afbb76"
     },
     {
