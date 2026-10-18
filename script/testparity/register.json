@@ -3413,19 +3413,16 @@
       "status": "partial",
       "go": [
         "cluster/core:TestParityMatterJS_CompressedFabricID_HKDF",
-        "secure/sigma:TestDeriveOperationalIPKMatchesMatterJSVector"
+        "secure/sigma:TestDeriveOperationalIPKMatchesMatterJSVector",
+        "secure/sigma:TestFabricGetDestinationID",
+        "cluster/core:TestFabricSetLabel",
+        "bridge:TestFabricRemoveFromSession"
       ],
       "missing": [
-        "generates the correct destination ID",
         "generates the correct destination ID 2",
-        "generates the correct destination ID 3",
-        "accepts an empty label",
-        "accepts a label of the maximum length",
-        "rejects a label that exceeds the maximum length",
-        "removes all sessions when removing fabric",
         "removes one sessions without doing anything"
       ],
-      "reason": "The compressed fabric ID and the operational IPK are covered against matter.js vectors; the destination-ID vectors, labels and session removal are not.",
+      "reason": "Destination IDs 1 and 3 against the matter.js vectors, the label length constraint through UpdateFabricLabel and the session teardown of a fabric removal are ported; destination ID 2 needs the root key of TestFabric, which matter.js's MockCrypto certificate authority generates and the test file does not state, and deleteSession has no Go counterpart, as a Go fabric holds no session set.",
       "snapshotSha": "91d24e93b23d859880613ae2dc8f8fc13083b9f5"
     },
     {
