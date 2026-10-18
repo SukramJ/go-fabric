@@ -35,11 +35,9 @@ type Verifier struct {
 	now  TimeSource
 }
 
-// TimeSource returns the current time for NotBefore/NotAfter checks.
-//
-// Deprecated: pass a [clock.Clock] (the module's time port, which
-// satisfies TimeSource) to [NewVerifier]; TimeSource may be removed in
-// v0.10.0.
+// TimeSource returns the current time for NotBefore/NotAfter checks: the
+// one method of the module's time port, [clock.Clock], that a verifier
+// needs, so a [clock.Clock] is passed to [NewVerifier] as it is.
 type TimeSource interface {
 	Now() time.Time
 }

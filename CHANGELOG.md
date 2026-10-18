@@ -36,7 +36,7 @@ All removable in `v0.10.0` at the earliest; the README's deprecation table lists
 - `cluster/core.OTAProviderConfig.Now` and `core.CommissionerControlConfig.Now` — use their `Clock`.
 - `cluster.Quieter.Now` and `cluster.Quieter.AfterFunc` — use `cluster.Quieter.Clock`.
 - `cluster/closure.DimensionConfig.Now`, `cluster/energy.CommodityTariffConfig.Now`, `energy.DeviceEnergyConfig.Now` and `energy.EvseConfig.Now` — use the `Clock` beside each.
-- `secure/mattercert.TimeSource` and `mattercert.SystemTime` — pass a `clock.Clock` (it satisfies `TimeSource`) or `clock.System`.
+- `secure/mattercert.SystemTime` — use `clock.System`. `mattercert.TimeSource` stays as the verifier's one-method parameter type; a `clock.Clock` satisfies it.
 - `controller/ca.Config.Now` — use `ca.Config.Clock`.
 
 ## [0.7.1] — 2026-10-18

@@ -165,7 +165,7 @@ port `clock` landed (`[Unreleased]` in the changelog), removable in
 | `cluster.Quieter.Now`, `cluster.Quieter.AfterFunc` | `cluster.Quieter.Clock` |
 | `cluster/closure.DimensionConfig.Now` | `closure.DimensionConfig.Clock` |
 | `cluster/energy.CommodityTariffConfig.Now`, `energy.DeviceEnergyConfig.Now`, `energy.EvseConfig.Now` | the `Clock` field beside each |
-| `secure/mattercert.TimeSource`, `mattercert.SystemTime` | a `clock.Clock` (it satisfies `TimeSource`), `clock.System` |
+| `secure/mattercert.SystemTime` | `clock.System` (the `TimeSource` parameter stays: a `clock.Clock` satisfies it) |
 | `controller/ca.Config.Now` | `ca.Config.Clock` |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
