@@ -39,7 +39,7 @@ func invokeFieldsNode(_ im.ConcreteCommandPath, dec *tlv.Decoder, el tlv.Element
 // invokeCaptured runs Interaction.Invoke against a scripted peer, answers a
 // TimedRequest with Success and the invoke with a Success status, and
 // returns the InvokeRequest as sent with its payload.
-func invokeCaptured(t *testing.T, path im.ConcreteCommandPath, fields spec.Encodable, opts interaction.InvokeOptions) (im.InvokeRequest, []byte) {
+func invokeCaptured(t *testing.T, path im.ConcreteCommandPath, fields spec.Encodable, opts interaction.InvokeOptions) (parsed im.InvokeRequest, payload []byte) {
 	t.Helper()
 	s := newScripted(t)
 	c := interaction.New(s.mgr, s.session, nil)
@@ -106,7 +106,7 @@ func TestInvokeRequestBuildBasic(t *testing.T) {
 		}
 		p := req.Invokes[0].Path
 		if p.Endpoint != 1 || p.Cluster != onoff.ClusterID || p.Command != onoff.CmdToggle {
-			t.Fatalf("path %+v", p) // InvokeTest.ts:27-29
+			t.Fatalf("path %+v", p) // InvokeTest.ts:27-30
 		}
 	})
 	t.Run("encodes command arguments into command fields", func(t *testing.T) {
@@ -148,7 +148,7 @@ func TestInvokeRequestBuildMultipleCommands(t *testing.T) {
 		}})
 		if len(req.Invokes) != 2 || req.Invokes[0].CommandRef != 1 || req.Invokes[1].CommandRef != 2 ||
 			!req.Invokes[0].HasCommandRef || !req.Invokes[1].HasCommandRef {
-			t.Fatalf("request %+v", req) // InvokeTest.ts:88-90
+			t.Fatalf("request %+v", req) // InvokeTest.ts:89-91
 		}
 	})
 }

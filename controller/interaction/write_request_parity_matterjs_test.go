@@ -32,13 +32,12 @@ import (
 // TimedRequest with Success and the write with an empty WriteResponse,
 // and returns the WriteRequest as sent, its payload and the TimedRequest's
 // timeout in milliseconds (0 without one).
-func writeCaptured(t *testing.T, writes []interaction.WriteRequest, opts interaction.WriteOptions) (im.WriteRequest, []byte, uint32) {
+func writeCaptured(t *testing.T, writes []interaction.WriteRequest, opts interaction.WriteOptions) (parsed im.WriteRequest, payload []byte, timedMs uint32) {
 	t.Helper()
 	s := newScripted(t)
 	c := interaction.New(s.mgr, s.session, nil)
 	done := writeAsync(c, writes, opts)
 	req := s.next(t)
-	var timedMs uint32
 	if req.proto.Opcode == im.OpcodeTimedRequest {
 		tr, err := im.UnmarshalTimedRequestTLV(tlv.NewDecoder(req.payload))
 		if err != nil {
@@ -91,7 +90,7 @@ func TestWriteRequestBuildBasic(t *testing.T) {
 			{Path: attrPath(1, 0x28, 5), Value: writeString("test")},
 		}, interaction.WriteOptions{})
 		if len(req.Writes) != 2 || req.Writes[0].Path.Attribute != 0 || req.Writes[1].Path.Attribute != 5 {
-			t.Fatalf("writes %+v", req.Writes) // WriteTest.ts:58-60
+			t.Fatalf("writes %+v", req.Writes) // WriteTest.ts:57-59
 		}
 	})
 	t.Run("encodes data with correct schema", func(t *testing.T) {
@@ -102,7 +101,7 @@ func TestWriteRequestBuildBasic(t *testing.T) {
 		}
 		n, ok := req.Writes[0].Value.Value.(spec.Node)
 		if s, err := spec.DecodeString(n); !ok || err != nil || s != "TestProduct" {
-			t.Fatalf("value %+v (%v)", req.Writes[0].Value, err) // WriteTest.ts:77-78
+			t.Fatalf("value %+v (%v)", req.Writes[0].Value, err) // WriteTest.ts:77-79
 		}
 	})
 }
@@ -112,27 +111,27 @@ func TestWriteRequestBuildTimed(t *testing.T) {
 	t.Run("creates timed write request", func(t *testing.T) {
 		t.Parallel()
 		if req, _, _ := writeCaptured(t, writeOnOff, interaction.WriteOptions{Timed: true}); !req.TimedRequest {
-			t.Fatal("timedRequest not set") // WriteTest.ts:97
+			t.Fatal("timedRequest not set") // WriteTest.ts:99
 		}
 	})
 	t.Run("creates timed write with timeout", func(t *testing.T) {
 		t.Parallel()
 		req, _, timedMs := writeCaptured(t, writeOnOff, interaction.WriteOptions{TimedTimeout: 5 * time.Second})
 		if !req.TimedRequest || timedMs != 5000 {
-			t.Fatalf("timedRequest %v, TimedRequest timeout %d ms, want 5000", req.TimedRequest, timedMs) // WriteTest.ts:114-115
+			t.Fatalf("timedRequest %v, TimedRequest timeout %d ms, want 5000", req.TimedRequest, timedMs) // WriteTest.ts:117-118
 		}
 	})
 	t.Run("enables timedRequest when timeout is set", func(t *testing.T) {
 		t.Parallel()
 		if req, _, _ := writeCaptured(t, writeOnOff, interaction.WriteOptions{TimedTimeout: 10 * time.Second}); !req.TimedRequest {
-			t.Fatal("timedRequest not set") // WriteTest.ts:132
+			t.Fatal("timedRequest not set") // WriteTest.ts:136
 		}
 	})
 	t.Run("defaults timedRequest to false when not specified", func(t *testing.T) {
 		t.Parallel()
 		req, _, timedMs := writeCaptured(t, writeOnOff, interaction.WriteOptions{})
 		if req.TimedRequest || timedMs != 0 {
-			t.Fatal("timed by default") // WriteTest.ts:148
+			t.Fatal("timed by default") // WriteTest.ts:153
 		}
 	})
 }
@@ -144,7 +143,7 @@ func TestWriteRequestBuildDataVersions(t *testing.T) {
 		t.Parallel()
 		req, _, _ := writeCaptured(t, []interaction.WriteRequest{{Path: attrPath(1, 6, 0), Value: writeUint8(1), DataVersion: version(12345)}}, interaction.WriteOptions{})
 		if len(req.Writes) != 1 || !req.Writes[0].HasDataVersion || req.Writes[0].DataVersion != 12345 {
-			t.Fatalf("writes %+v", req.Writes) // WriteTest.ts:167
+			t.Fatalf("writes %+v", req.Writes) // WriteTest.ts:173
 		}
 	})
 	t.Run("handles writes with different data versions", func(t *testing.T) {
@@ -154,7 +153,7 @@ func TestWriteRequestBuildDataVersions(t *testing.T) {
 			{Path: attrPath(1, 8, 0), Value: writeUint8(2), DataVersion: version(200)},
 		}, interaction.WriteOptions{})
 		if len(req.Writes) != 2 || req.Writes[0].DataVersion != 100 || req.Writes[1].DataVersion != 200 {
-			t.Fatalf("writes %+v", req.Writes) // WriteTest.ts:194-195
+			t.Fatalf("writes %+v", req.Writes) // WriteTest.ts:200-201
 		}
 	})
 	t.Run("keeps data version on a concrete reified write path", func(t *testing.T) {
@@ -163,7 +162,7 @@ func TestWriteRequestBuildDataVersions(t *testing.T) {
 		on := interaction.Raw(spec.Node{El: tlv.Element{Type: tlv.TypeBoolTrue, Bool: true}})
 		req, _, _ := writeCaptured(t, []interaction.WriteRequest{{Path: attrPath(1, 6, 0), Value: on, DataVersion: version(7)}}, interaction.WriteOptions{})
 		if len(req.Writes) != 1 || req.Writes[0].Path.Endpoint != 1 || req.Writes[0].DataVersion != 7 {
-			t.Fatalf("writes %+v", req.Writes) // WriteTest.ts:209-210
+			t.Fatalf("writes %+v", req.Writes) // WriteTest.ts:215-216
 		}
 	})
 	wildcard := im.ConcreteAttributePath{Cluster: 6, Attribute: 0, HasCluster: true, HasAttribute: true}
@@ -177,7 +176,7 @@ func TestWriteRequestBuildDataVersions(t *testing.T) {
 			c := interaction.New(s.mgr, s.session, nil)
 			_, err := c.Write(context.Background(), []interaction.WriteRequest{{Path: wildcard, Value: writeUint8(1), DataVersion: version(7)}}, interaction.WriteOptions{})
 			if !errors.Is(err, interaction.ErrMalformedRequest) || !strings.Contains(err.Error(), "must target a concrete endpoint") {
-				t.Fatalf("%v, want a malformed request", err) // WriteTest.ts:213-230
+				t.Fatalf("%v, want a malformed request", err) // WriteTest.ts:219-230
 			}
 		})
 	}
@@ -188,7 +187,7 @@ func TestWriteRequestBuildChunked(t *testing.T) {
 	t.Run("initializes moreChunkedMessages to false", func(t *testing.T) {
 		t.Parallel()
 		if req, _, _ := writeCaptured(t, writeOnOff, interaction.WriteOptions{}); req.MoreChunkedMessages {
-			t.Fatal("moreChunkedMessages set") // WriteTest.ts:248
+			t.Fatal("moreChunkedMessages set") // WriteTest.ts:255
 		}
 	})
 	t.Run("supports chunk lists option", func(t *testing.T) {
@@ -196,7 +195,7 @@ func TestWriteRequestBuildChunked(t *testing.T) {
 		// chunkLists true is the default (DisableListChunking false); a
 		// value that is no list stays one write.
 		if req, _, _ := writeCaptured(t, writeOnOff, interaction.WriteOptions{DisableListChunking: false}); len(req.Writes) != 1 {
-			t.Fatalf("writes %d, want 1", len(req.Writes)) // WriteTest.ts:265
+			t.Fatalf("writes %d, want 1", len(req.Writes)) // WriteTest.ts:273
 		}
 	})
 }
@@ -209,7 +208,7 @@ func TestWriteRequestBuildValidation(t *testing.T) {
 		c := interaction.New(s.mgr, s.session, nil)
 		_, err := c.Write(context.Background(), []interaction.WriteRequest{}, interaction.WriteOptions{})
 		if !errors.Is(err, interaction.ErrMalformedRequest) || !strings.Contains(err.Error(), "contains no attributes") {
-			t.Fatalf("%v, want a malformed request", err) // WriteTest.ts:274
+			t.Fatalf("%v, want a malformed request", err) // WriteTest.ts:279
 		}
 	})
 }
@@ -220,7 +219,7 @@ func TestWriteRequestBuildInteractionModelRevision(t *testing.T) {
 		t.Parallel()
 		_, wire, _ := writeCaptured(t, writeOnOff, interaction.WriteOptions{})
 		if !readFieldPresent(t, wire, 0xFF) {
-			t.Fatal("no InteractionModelRevision") // WriteTest.ts:299
+			t.Fatal("no InteractionModelRevision") // WriteTest.ts:306
 		}
 	})
 }

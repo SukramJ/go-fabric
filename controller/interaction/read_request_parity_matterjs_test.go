@@ -26,7 +26,7 @@ import (
 // readCaptured runs Interaction.ReadWith against a scripted peer, answers
 // with an empty final report that suppresses the response, and returns the
 // ReadRequest as sent with its payload.
-func readCaptured(t *testing.T, r interaction.ReadRequest) (im.ReadRequest, []byte) {
+func readCaptured(t *testing.T, r interaction.ReadRequest) (parsed im.ReadRequest, payload []byte) {
 	t.Helper()
 	s := newScripted(t)
 	c := interaction.New(s.mgr, s.session, nil)
@@ -123,7 +123,7 @@ func TestReadRequestBuildAttributes(t *testing.T) {
 			t.Fatalf("attributes %+v", req.AttributeRequests)
 		}
 		if p := req.AttributeRequests[0]; p.HasEndpoint || p.HasCluster || p.HasAttribute {
-			t.Fatalf("path %+v", p) // ReadTest.ts:88-91
+			t.Fatalf("path %+v", p) // ReadTest.ts:87-90
 		}
 	})
 }
@@ -134,20 +134,20 @@ func TestReadRequestBuildFabricFiltering(t *testing.T) {
 	t.Run("enables fabric filtering by default", func(t *testing.T) {
 		t.Parallel()
 		if req, _ := readCaptured(t, interaction.ReadRequest{Attributes: paths}); !req.FabricFiltered {
-			t.Fatal("not fabric-filtered") // ReadTest.ts:106
+			t.Fatal("not fabric-filtered") // ReadTest.ts:105
 		}
 	})
 	t.Run("disables fabric filtering when specified", func(t *testing.T) {
 		t.Parallel()
 		if req, _ := readCaptured(t, interaction.ReadRequest{Attributes: paths, NoFabricFilter: true}); req.FabricFiltered {
-			t.Fatal("fabric-filtered") // ReadTest.ts:120
+			t.Fatal("fabric-filtered") // ReadTest.ts:119
 		}
 	})
 	t.Run("enables fabric filtering explicitly", func(t *testing.T) {
 		t.Parallel()
 		// fabricFilter: true is NoFabricFilter false.
 		if req, _ := readCaptured(t, interaction.ReadRequest{Attributes: paths, NoFabricFilter: false}); !req.FabricFiltered {
-			t.Fatal("not fabric-filtered") // ReadTest.ts:134
+			t.Fatal("not fabric-filtered") // ReadTest.ts:133
 		}
 	})
 }
@@ -161,7 +161,7 @@ func TestReadRequestBuildDataVersionFilters(t *testing.T) {
 			DataVersionFilters: []im.DataVersionFilter{{Endpoint: 1, Cluster: 6, DataVersion: 12345}},
 		})
 		if len(req.DataVersionFilters) != 1 || req.DataVersionFilters[0].DataVersion != 12345 {
-			t.Fatalf("filters %+v", req.DataVersionFilters) // ReadTest.ts:155-156
+			t.Fatalf("filters %+v", req.DataVersionFilters) // ReadTest.ts:154-155
 		}
 	})
 	t.Run("includes multiple data version filters", func(t *testing.T) {
@@ -174,7 +174,7 @@ func TestReadRequestBuildDataVersionFilters(t *testing.T) {
 			},
 		})
 		if len(req.DataVersionFilters) != 2 || req.DataVersionFilters[0].DataVersion != 100 || req.DataVersionFilters[1].DataVersion != 200 {
-			t.Fatalf("filters %+v", req.DataVersionFilters) // ReadTest.ts:183-185
+			t.Fatalf("filters %+v", req.DataVersionFilters) // ReadTest.ts:182-184
 		}
 	})
 }
@@ -189,14 +189,14 @@ func TestReadRequestBuildEvents(t *testing.T) {
 			t.Fatalf("events %+v", req.EventRequests)
 		}
 		if p := req.EventRequests[0]; !p.HasEndpoint || p.Endpoint != 0 || p.Cluster != 0x28 || !p.HasEvent || p.Event != 0 {
-			t.Fatalf("path %+v", p) // ReadTest.ts:201-204
+			t.Fatalf("path %+v", p) // ReadTest.ts:200-203
 		}
 	})
 	t.Run("creates event wildcard read", func(t *testing.T) {
 		t.Parallel()
 		req, _ := readCaptured(t, interaction.ReadRequest{Events: []im.ConcreteEventPath{readEvents(0, 0x28)}})
 		if len(req.EventRequests) != 1 || req.EventRequests[0].HasEvent {
-			t.Fatalf("events %+v", req.EventRequests) // ReadTest.ts:217-218
+			t.Fatalf("events %+v", req.EventRequests) // ReadTest.ts:216-217
 		}
 	})
 	t.Run("includes event filters when provided", func(t *testing.T) {
@@ -206,7 +206,7 @@ func TestReadRequestBuildEvents(t *testing.T) {
 			EventFilters: []im.EventMinimumNumber{{EventMin: 1000}},
 		})
 		if len(req.EventFilters) != 1 || req.EventFilters[0].EventMin != 1000 {
-			t.Fatalf("filters %+v", req.EventFilters) // ReadTest.ts:237-238
+			t.Fatalf("filters %+v", req.EventFilters) // ReadTest.ts:235-236
 		}
 	})
 }
@@ -220,7 +220,7 @@ func TestReadRequestBuildCombined(t *testing.T) {
 			Events:     []im.ConcreteEventPath{readEvents(0, 0x28)},
 		})
 		if len(req.AttributeRequests) != 1 || len(req.EventRequests) != 1 {
-			t.Fatalf("request %+v", req) // ReadTest.ts:260-261
+			t.Fatalf("request %+v", req) // ReadTest.ts:257-258
 		}
 	})
 }
@@ -232,7 +232,7 @@ func TestReadRequestBuildValidation(t *testing.T) {
 		_, wire := readCaptured(t, interaction.ReadRequest{})
 		// AttributeRequests (0) and EventRequests (1) are left out.
 		if readFieldPresent(t, wire, 0) || readFieldPresent(t, wire, 1) {
-			t.Fatal("an empty request carries a path list") // ReadTest.ts:285-286
+			t.Fatal("an empty request carries a path list") // ReadTest.ts:282-283
 		}
 	})
 }
@@ -243,7 +243,7 @@ func TestReadRequestBuildInteractionModelRevision(t *testing.T) {
 		t.Parallel()
 		_, wire := readCaptured(t, interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{{Endpoint: 1, HasEndpoint: true}}})
 		if !readFieldPresent(t, wire, 0xFF) {
-			t.Fatal("no InteractionModelRevision") // ReadTest.ts:301
+			t.Fatal("no InteractionModelRevision") // ReadTest.ts:299
 		}
 	})
 }

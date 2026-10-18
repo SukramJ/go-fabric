@@ -112,14 +112,14 @@ func TestSubscribeRequestBuildIntervals(t *testing.T) {
 		t.Parallel()
 		req := subscribeCaptured(t, interaction.SubscribeRequest{Attributes: subscribeOnOff, MinIntervalFloor: interaction.Interval(time.Second)})
 		if req.MinIntervalFloor != 1 {
-			t.Fatalf("minIntervalFloor %d, want 1", req.MinIntervalFloor) // SubscribeTest.ts:124
+			t.Fatalf("minIntervalFloor %d, want 1", req.MinIntervalFloor) // SubscribeTest.ts:123
 		}
 	})
 	t.Run("sets maximum interval ceiling", func(t *testing.T) {
 		t.Parallel()
 		req := subscribeCaptured(t, interaction.SubscribeRequest{Attributes: subscribeOnOff, MaxIntervalCeiling: interaction.Interval(60 * time.Second)})
 		if req.MaxIntervalCeiling != 60 {
-			t.Fatalf("maxIntervalCeiling %d, want 60", req.MaxIntervalCeiling) // SubscribeTest.ts:138
+			t.Fatalf("maxIntervalCeiling %d, want 60", req.MaxIntervalCeiling) // SubscribeTest.ts:137
 		}
 	})
 	t.Run("sets both min and max intervals", func(t *testing.T) {
@@ -129,7 +129,7 @@ func TestSubscribeRequestBuildIntervals(t *testing.T) {
 			MinIntervalFloor: interaction.Interval(time.Second), MaxIntervalCeiling: interaction.Interval(60 * time.Second),
 		})
 		if req.MinIntervalFloor != 1 || req.MaxIntervalCeiling != 60 {
-			t.Fatalf("intervals %d/%d, want 1/60", req.MinIntervalFloor, req.MaxIntervalCeiling) // SubscribeTest.ts:153-154
+			t.Fatalf("intervals %d/%d, want 1/60", req.MinIntervalFloor, req.MaxIntervalCeiling) // SubscribeTest.ts:152-153
 		}
 	})
 	t.Run("allows undefined intervals for default behavior", func(t *testing.T) {
@@ -174,21 +174,21 @@ func TestSubscribeRequestBuildWildcards(t *testing.T) {
 		t.Parallel()
 		req := subscribeCaptured(t, interaction.SubscribeRequest{Attributes: subscribeOnOff})
 		if len(req.AttributeRequests) != 1 || req.AttributeRequests[0].HasAttribute {
-			t.Fatalf("attributes %+v", req.AttributeRequests) // SubscribeTest.ts:242
+			t.Fatalf("attributes %+v", req.AttributeRequests) // SubscribeTest.ts:240
 		}
 	})
 	t.Run("subscribes to all events in a cluster", func(t *testing.T) {
 		t.Parallel()
 		req := subscribeCaptured(t, interaction.SubscribeRequest{Events: []im.ConcreteEventPath{readEvents(0, 0x28)}})
 		if len(req.EventRequests) != 1 || req.EventRequests[0].HasEvent {
-			t.Fatalf("events %+v", req.EventRequests) // SubscribeTest.ts:255
+			t.Fatalf("events %+v", req.EventRequests) // SubscribeTest.ts:253
 		}
 	})
 	t.Run("subscribes to all clusters on an endpoint", func(t *testing.T) {
 		t.Parallel()
 		req := subscribeCaptured(t, interaction.SubscribeRequest{Attributes: []im.ConcreteAttributePath{{Endpoint: 1, HasEndpoint: true}}})
 		if len(req.AttributeRequests) != 1 || req.AttributeRequests[0].HasCluster || req.AttributeRequests[0].HasAttribute {
-			t.Fatalf("attributes %+v", req.AttributeRequests) // SubscribeTest.ts:267-268
+			t.Fatalf("attributes %+v", req.AttributeRequests) // SubscribeTest.ts:265-266
 		}
 	})
 }
@@ -198,13 +198,13 @@ func TestSubscribeRequestBuildFabricFiltering(t *testing.T) {
 	t.Run("enables fabric filtering by default", func(t *testing.T) {
 		t.Parallel()
 		if req := subscribeCaptured(t, interaction.SubscribeRequest{Attributes: subscribeOnOff}); !req.FabricFiltered {
-			t.Fatal("not fabric-filtered") // SubscribeTest.ts:283
+			t.Fatal("not fabric-filtered") // SubscribeTest.ts:281
 		}
 	})
 	t.Run("disables fabric filtering when specified", func(t *testing.T) {
 		t.Parallel()
 		if req := subscribeCaptured(t, interaction.SubscribeRequest{Attributes: subscribeOnOff, NoFabricFilter: true}); req.FabricFiltered {
-			t.Fatal("fabric-filtered") // SubscribeTest.ts:297
+			t.Fatal("fabric-filtered") // SubscribeTest.ts:295
 		}
 	})
 }
@@ -218,7 +218,7 @@ func TestSubscribeRequestBuildDataVersionFilters(t *testing.T) {
 			DataVersionFilters: []im.DataVersionFilter{{Endpoint: 1, Cluster: 6, DataVersion: 12345}},
 		})
 		if len(req.DataVersionFilters) != 1 || req.DataVersionFilters[0].DataVersion != 12345 {
-			t.Fatalf("filters %+v", req.DataVersionFilters) // SubscribeTest.ts:318-319
+			t.Fatalf("filters %+v", req.DataVersionFilters) // SubscribeTest.ts:316-317
 		}
 	})
 }
@@ -232,7 +232,7 @@ func TestSubscribeRequestBuildEventFilters(t *testing.T) {
 			EventFilters: []im.EventMinimumNumber{{EventMin: 1000}},
 		})
 		if len(req.EventFilters) != 1 || req.EventFilters[0].EventMin != 1000 {
-			t.Fatalf("filters %+v", req.EventFilters) // SubscribeTest.ts:338-339
+			t.Fatalf("filters %+v", req.EventFilters) // SubscribeTest.ts:337-338
 		}
 	})
 }
