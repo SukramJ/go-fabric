@@ -20212,14 +20212,14 @@
       "identifier": "TestDeniedEventPathStatusesExistence",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_dispatch_endpoints_test.go",
-      "line": 113
+      "line": 114
     },
     {
       "package": "im",
       "identifier": "TestDispatchEndpoints",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/invoke_dispatch_endpoints_test.go",
-      "line": 83
+      "line": 84
     },
     {
       "package": "im",
