@@ -386,6 +386,45 @@ func (c *Client) ModelVersion(ctx context.Context, vid, pid uint16, softwareVers
 	return m.mapped(), nil
 }
 
+// ComplianceInfo returns the compliance record of a software version for
+// a certification program — DclClient.fetchComplianceInfo
+// (DclClient.ts:229-257): GET
+// /dcl/compliance/compliance-info/{vid}/{pid}/{softwareVersion}/{certificationType},
+// which must answer that vid, pid, version and program, schema version 0
+// or 1.
+func (c *Client) ComplianceInfo(ctx context.Context, vid, pid uint16, softwareVersion uint32, certificationType string) (ComplianceInfo, error) {
+	var resp struct {
+		ComplianceInfo *ComplianceInfo `json:"complianceInfo"`
+	}
+	path := fmt.Sprintf("/dcl/compliance/compliance-info/%d/%d/%d/%s", vid, pid, softwareVersion, encodeURIComponent(certificationType))
+	if err := c.fetchJSON(ctx, path, &resp); err != nil {
+		return ComplianceInfo{}, err
+	}
+	info := resp.ComplianceInfo
+	if info == nil || info.VID != vid || info.PID != pid || info.SoftwareVersion != softwareVersion || info.CertificationType != certificationType {
+		return ComplianceInfo{}, dclErrorf("Compliance info not found for VID: %d, PID: %d, Software Version: %d, Certification Type: %s", vid, pid, softwareVersion, certificationType)
+	}
+	// Schema versions 0 and 1 are the ones Core §11.23.10.15 defines.
+	if info.SchemaVersion != 0 && info.SchemaVersion != 1 {
+		return ComplianceInfo{}, dclErrorf("Unsupported DCL compliance info schema version %d for VID: %d, PID: %d, Software Version: %d", info.SchemaVersion, vid, pid, softwareVersion)
+	}
+	return *info, nil
+}
+
+// Vendors lists every vendor record — DclClient.fetchAllVendors
+// (DclClient.ts:262-265): GET /dcl/vendorinfo/vendors, paginated under
+// vendorInfo, the records of schema version 0.
+func (c *Client) Vendors(ctx context.Context) ([]Vendor, error) {
+	raw, err := fetchPaginated[Vendor](ctx, c, "/dcl/vendorinfo/vendors", "vendorInfo")
+	if err != nil {
+		return nil, err
+	}
+	n := len(raw)
+	out := slices.DeleteFunc(raw, func(v Vendor) bool { return v.SchemaVersion != 0 })
+	c.warnDropped(n-len(out), "vendor")
+	return out, nil
+}
+
 // RevocationPoints lists every revocation distribution point — DclClient.
 // fetchRevocationDistributionPoints (DclClient.ts:271-280): GET
 // /dcl/pki/revocation-points, paginated under PkiRevocationDistributionPoint,

@@ -164,6 +164,57 @@ func (r rawSoftwareVersion) mapped() SoftwareVersion {
 	}
 }
 
+// Vendor is a vendor record — VendorDclSchema
+// (packages/types/src/dcl/vendor.ts:16-61); the optional preferred name
+// and landing page are "" when unset (DclClient.ts:315-321).
+type Vendor struct {
+	VendorID             uint16 `json:"vendorID"`
+	VendorName           string `json:"vendorName"`
+	CompanyLegalName     string `json:"companyLegalName"`
+	CompanyPreferredName string `json:"companyPreferredName"`
+	VendorLandingPageURL string `json:"vendorLandingPageURL"`
+	Creator              string `json:"creator"`
+	SchemaVersion        int    `json:"schemaVersion"`
+}
+
+// ComplianceInfo is a compliance record — DeviceSoftwareComplianceDclSchema
+// (packages/types/src/dcl/device-software-compliance.ts:63-208). The four
+// fields the specification deprecates are not read, as mapRawComplianceInfo
+// drops them (DclClient.ts:360-381); an unset optional field is "" or 0.
+type ComplianceInfo struct {
+	VID                                uint16                  `json:"vid"`
+	PID                                uint16                  `json:"pid"`
+	SoftwareVersion                    uint32                  `json:"softwareVersion"`
+	SoftwareVersionString              string                  `json:"softwareVersionString"`
+	CDVersionNumber                    uint32                  `json:"cDVersionNumber"`
+	CDCertificateID                    string                  `json:"cDCertificateId"`
+	CertificationType                  string                  `json:"certificationType"`
+	SpecificationVersion               uint32                  `json:"specificationVersion"`
+	SoftwareVersionCertificationStatus uint8                   `json:"softwareVersionCertificationStatus"`
+	Date                               string                  `json:"date"`
+	Owner                              string                  `json:"owner"`
+	History                            []ComplianceHistoryItem `json:"history"`
+	CertificationRoute                 string                  `json:"certificationRoute"`
+	Reason                             string                  `json:"reason"`
+	Transport                          string                  `json:"transport"`
+	FamilyID                           string                  `json:"familyId"`
+	SupportedClusters                  string                  `json:"supportedClusters"`
+	ProgramType                        string                  `json:"programType"`
+	ProgramTypeVersion                 string                  `json:"programTypeVersion"`
+	ParentChild                        string                  `json:"parentChild"`
+	SchemaVersion                      int                     `json:"schemaVersion"`
+}
+
+// ComplianceHistoryItem is one entry of a compliance record's history —
+// ComplianceHistoryItemDclSchema (device-software-compliance.ts:23-49).
+type ComplianceHistoryItem struct {
+	SoftwareVersionCertificationStatus uint8  `json:"softwareVersionCertificationStatus"`
+	Date                               string `json:"date"`
+	Reason                             string `json:"reason"`
+	CDVersionNumber                    uint32 `json:"cDVersionNumber"`
+	SchemaVersion                      int    `json:"schemaVersion"`
+}
+
 // RevocationTypeCRL is RevocationTypeEnum.Crl
 // (packages/types/src/dcl/device-attestation-revocation.ts:9-14).
 const RevocationTypeCRL = 1
