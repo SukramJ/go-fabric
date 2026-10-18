@@ -506,6 +506,12 @@ func (b *Bridge) evictConn(c transport.Conn) []uint16 {
 		slog.String("conn", route.String()),
 		slog.Int("sessions", len(sids)))
 	for _, sid := range sids {
+		// One line per evicted session, as matter.js
+		// packages/protocol/src/protocol/ExchangeManager.ts:655 logs
+		// "Evicting session due to TCP disconnect".
+		b.logger.Debug("matter.tcp.evict.session",
+			slog.String("conn", route.String()),
+			slog.Int("session_id", int(sid)))
 		b.evictSession(sid, route)
 	}
 	return sids

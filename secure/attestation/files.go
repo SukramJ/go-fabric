@@ -40,13 +40,34 @@ var ErrNoChainConfigured = errors.New("attestation: no vendor chain configured")
 // does not belong to the DAC's public key.
 var ErrKeyMismatch = errors.New("attestation: the DAC key does not match the DAC's public key")
 
+// ErrCertificateTooLarge is returned by [LoadChainFiles] when the DAC or
+// the PAI exceeds the 600 bytes a device can serve.
+var ErrCertificateTooLarge = errors.New("attestation: certificate too large to serve")
+
+// maxServableCertificateSize is the largest DAC or PAI a node serves in a
+// CertificateChainResponse without the segmented responses of PQC Phase 1
+// — matter.js MAX_DER_CERTIFICATE_SIZE (certificate/kinds/common.ts:13,
+// Matter §6.1.3).
+const maxServableCertificateSize = 600
+
+// checkServable refuses a DAC or PAI over 600 bytes, which a node cannot serve.
+func checkServable(name string, der []byte) error {
+	// Mirrors matter.js packages/protocol/src/certificate/DeviceCertification.ts:87-105 (#assertServable).
+	if len(der) > maxServableCertificateSize {
+		return fmt.Errorf("%w: %s of %d bytes exceeds the %d bytes a device can serve without segmented certificate chain responses",
+			ErrCertificateTooLarge, name, len(der), maxServableCertificateSize)
+	}
+	return nil
+}
+
 // LoadChainFiles reads a vendor attestation chain from f and returns the
 // [Chain] a node serves (DAC key, DAC, PAI in DER) and the Certification
 // Declaration bytes (the CMS structure, DER). Every file accepts PEM
 // (the first block of the expected kind) or DER. It fails on a missing
 // or unreadable file, a certificate that does not parse, a key that is
-// not a P-256 EC key, and a key that does not match the DAC
-// ([ErrKeyMismatch]). With every path empty it returns
+// not a P-256 EC key, a key that does not match the DAC
+// ([ErrKeyMismatch]) and a DAC or PAI larger than a device can serve
+// ([ErrCertificateTooLarge]). With every path empty it returns
 // [ErrNoChainConfigured].
 //
 // The chain itself is not validated against a PAA here: whether the
@@ -67,6 +88,12 @@ func LoadChainFiles(f ChainFiles) (chain *Chain, cd []byte, err error) {
 	}
 	pai, err := readDER(f.PAIPath, "CERTIFICATE", "PAI")
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := checkServable("DAC", dac); err != nil {
+		return nil, nil, err
+	}
+	if err := checkServable("PAI", pai); err != nil {
 		return nil, nil, err
 	}
 	if _, err := x509.ParseCertificate(pai); err != nil {

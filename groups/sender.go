@@ -148,11 +148,11 @@ func (s *Sender) NodeID() uint64 { return s.nodeID }
 func (f *fabricGroups) currentKey(groupID uint16, nowMs int64) (uint16, epochKey, error) {
 	ksID, ok := f.idMap[groupID]
 	if !ok {
-		return 0, epochKey{}, fmt.Errorf("%w: no group key set found for group %d", ErrNoKey, groupID)
+		return 0, epochKey{}, fmt.Errorf("%w: no group key set found for groupId %d", ErrNoKey, groupID)
 	}
 	ks, ok := f.keySets[ksID]
 	if !ok {
-		return 0, epochKey{}, fmt.Errorf("%w: group %d is mapped to group key set %d, which the fabric does not hold", ErrNoKey, groupID, ksID)
+		return 0, epochKey{}, fmt.Errorf("%w: groupId %d is mapped to group key set %d, which the fabric does not hold", ErrNoKey, groupID, ksID)
 	}
 	var (
 		current epochKey

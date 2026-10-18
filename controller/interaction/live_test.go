@@ -322,7 +322,13 @@ func TestLiveSustainedSurvivesRestart(t *testing.T) {
 	lv.wait(t, "the subscription active", 10*time.Second, sub.Active)
 	waitPersisted(t, lv, 1)
 	id := sub.ID()
-	if err := lv.pair.Device.Restart(context.Background()); err != nil {
+	// The restarted node re-establishes the subscription inside Start and
+	// waits there for the priming report's StatusResponse; under Site.Run
+	// the site's Fake moves while it waits, so a retransmission the answer
+	// needs fires instead of blocking Start for good.
+	restartCtx, cancelRestart := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelRestart()
+	if err := lv.run(restartCtx, lv.pair.Device.Restart); err != nil {
 		t.Fatal(err)
 	}
 	waitOnOff(t, lv, reports, false)

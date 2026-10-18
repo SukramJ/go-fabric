@@ -12,14 +12,17 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // defaultHostName is the SRV target host name when none is configured:
 // the hardware address of the first up, non-loopback, multicast interface
-// as 12 uppercase hex digits, followed by "0000" — matter.js
+// with addresses and a non-zero MAC, kept while that MAC stays present
+// ([hostNameChooser]), as 12 uppercase hex digits, followed by "0000" — matter.js
 // MdnsAdvertisement.ts:155 (`addrs.mac.replace(/:/g, "").toUpperCase() +
 // "0000"`), which satisfies the Matter host-name rule TC-SC-4.3 checks (12
 // or 16 uppercase hexadecimal characters derived from the MAC). Without a
@@ -38,20 +41,78 @@ func defaultHostName() string {
 			return strings.TrimSuffix(h, ".local")
 		}
 	}
-	if ifaces, err := net.Interfaces(); err == nil {
-		for _, ifi := range ifaces {
-			if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagLoopback != 0 || ifi.Flags&net.FlagMulticast == 0 || len(ifi.HardwareAddr) != 6 {
-				continue
-			}
-			if addrs, err := ifi.Addrs(); err != nil || len(addrs) == 0 {
-				continue
-			}
-			return strings.ToUpper(hex.EncodeToString(ifi.HardwareAddr)) + "0000"
-		}
+	ifaces, err := listHostNameIfaces()
+	if h := defaultHostNames.choose(ifaces, err == nil); h != "" {
+		return h
 	}
 	h, _ := os.Hostname()
 	sum := sha256.Sum256([]byte("go-fabric host " + h))
 	return strings.ToUpper(hex.EncodeToString(sum[:8]))
+}
+
+// hostNameIface is what the host-name choice reads of one interface.
+type hostNameIface struct {
+	flags net.Flags
+	mac   net.HardwareAddr
+	addrs int
+	// err is set when the interface's addresses cannot be read.
+	err error
+}
+
+// listHostNameIfaces reads the host's interfaces.
+func listHostNameIfaces() ([]hostNameIface, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]hostNameIface, 0, len(ifaces))
+	for _, ifi := range ifaces {
+		addrs, err := ifi.Addrs()
+		out = append(out, hostNameIface{flags: ifi.Flags, mac: ifi.HardwareAddr, addrs: len(addrs), err: err})
+	}
+	return out, nil
+}
+
+// hostNameChooser keeps the MAC-derived host name stable: the current name
+// while an interface still carries its MAC, otherwise the first candidate —
+// an up, multicast, non-loopback interface with addresses and a non-zero
+// 6-byte MAC. "" when there is none; when the interfaces cannot be listed
+// the current name stays. Mirrors matter.js
+// packages/protocol/src/mdns/MdnsServer.ts:328-351 (#chooseHostname): a
+// querier that hears the node on several interfaces must see one host, so
+// the name may not follow interface order.
+type hostNameChooser struct {
+	mu      sync.Mutex
+	current string
+}
+
+// defaultHostNames is the process's choice; one advertiser per process
+// stands for matter.js's one MdnsServer.
+var defaultHostNames hostNameChooser
+
+func (c *hostNameChooser) choose(ifaces []hostNameIface, listed bool) string {
+	if !listed {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		return c.current
+	}
+	var candidates []string
+	for _, ifi := range ifaces {
+		if ifi.err != nil || ifi.addrs == 0 || ifi.flags&net.FlagUp == 0 || ifi.flags&net.FlagLoopback != 0 ||
+			ifi.flags&net.FlagMulticast == 0 || len(ifi.mac) != 6 || slices.Equal(ifi.mac, make(net.HardwareAddr, 6)) {
+			continue
+		}
+		candidates = append(candidates, strings.ToUpper(hex.EncodeToString(ifi.mac))+"0000")
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.current == "" || !slices.Contains(candidates, c.current) {
+		c.current = ""
+		if len(candidates) > 0 {
+			c.current = candidates[0]
+		}
+	}
+	return c.current
 }
 
 // Errors.

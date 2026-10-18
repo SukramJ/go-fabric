@@ -546,17 +546,25 @@ func (c *Commissioner) transitionToCase(ctx context.Context, pase *exchange.Sess
 	s, err := p.Connect(ctx, peer.ConnectOptions{
 		ConnectionTimeout: opts.CASEConnectionTimeout,
 		Timing:            opts.CASEConnectionTiming,
-		HandleError: func(err error) (time.Duration, bool, error) {
-			var sr *exchange.StatusReportError
-			if errors.As(err, &sr) && sr.Report.ProtocolCode == mrp.SCStatusProtocolNoSharedTrustRoots {
-				c.log.Warn("matter.controller.commissioning.no_shared_trust_roots", slog.String("retry", noSharedTrustRootsRetry.String()))
-				return noSharedTrustRootsRetry, true, nil
-			}
-			return 0, false, nil
-		},
+		HandleError:       c.handleNoSharedTrustRoots,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return interaction.New(c.ctx.Exchanges, s, c.log), nil
+}
+
+// handleNoSharedTrustRoots is the CASE connection's error handler during
+// commissioning: a device that answers NoSharedTrustRoots may not know the
+// new fabric yet, so the attempt retries after 15 s instead of the peer's
+// default delay; any other error keeps that default. Mirrors matter.js
+// ControllerCommissioner.transitionToCase's handleError
+// (packages/protocol/src/peer/ControllerCommissioner.ts:701-708) at 862ad75f.
+func (c *Commissioner) handleNoSharedTrustRoots(err error) (time.Duration, bool, error) {
+	var sr *exchange.StatusReportError
+	if errors.As(err, &sr) && sr.Report.ProtocolCode == mrp.SCStatusProtocolNoSharedTrustRoots {
+		c.log.Warn("matter.controller.commissioning.no_shared_trust_roots", slog.String("retry", noSharedTrustRootsRetry.String()))
+		return noSharedTrustRootsRetry, true, nil
+	}
+	return 0, false, nil
 }

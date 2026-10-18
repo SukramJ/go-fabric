@@ -717,26 +717,54 @@ func (c *connection) attemptOnce(att *attempt, attemptNo int) error {
 // than the origin's cooldown. The thresholds are the set's timing.
 func (c *connection) onKickLocked(origin kickOrigin, att *attempt, restart context.CancelFunc) {
 	x := att.exchange.Load()
-	if x == nil || x.RetransmissionCount() < c.setTiming.KickMinRetransmissions {
+	if x == nil {
 		return
 	}
 	log := c.p.log.With(slog.String("address", att.addr.String()), slog.String("origin", origin.String()))
-	if x.RetransmissionRestartSaving() < c.setTiming.KickMinRestartSaving {
-		log.Debug("matter.controller.peer.kick_suppressed", slog.String("why", "restart would save too little time"))
+	if ok, why := kickGate(c.setTiming, x.RetransmissionCount(), x.RetransmissionRestartSaving()); !ok {
+		if why != "" {
+			log.Debug("matter.controller.peer.kick_suppressed", slog.String("why", why))
+		}
 		return
 	}
+	if c.restartAllowedLocked(origin) {
+		log.Info("matter.controller.peer.kick_restart")
+		restart()
+		return
+	}
+	log.Debug("matter.controller.peer.kick_suppressed", slog.Duration("since_last_restart", c.p.set.clock.Now().Sub(c.lastRestartAt)))
+}
+
+// kickGate reports whether a kick may restart an exchange that has
+// retransmitted retransmissions times and whose restart would save
+// saving; why is set when the saving is too small. Mirrors matter.js
+// packages/protocol/src/peer/PeerConnection.ts:568-575.
+func kickGate(timing Timing, retransmissions int, saving time.Duration) (ok bool, why string) {
+	if retransmissions < timing.KickMinRetransmissions {
+		return false, ""
+	}
+	if saving < timing.KickMinRestartSaving {
+		return false, "restart would save too little time"
+	}
+	return true, ""
+}
+
+// restartAllowedLocked is the per-origin restart cooldown of the kick
+// handler, shared by every attempt of the process: true, and the restart
+// recorded, when no restart happened yet or the last one is at least the
+// origin's cooldown old. Mirrors matter.js
+// packages/protocol/src/peer/PeerConnection.ts:577-584.
+func (c *connection) restartAllowedLocked(origin kickOrigin) bool {
 	threshold := c.setTiming.KickRestartCooldown.Connect
 	if origin == kickDiscover {
 		threshold = c.setTiming.KickRestartCooldown.AddressChange
 	}
 	now := c.p.set.clock.Now()
 	if c.lastRestartAt.IsZero() || now.Sub(c.lastRestartAt) >= threshold {
-		log.Info("matter.controller.peer.kick_restart")
 		c.lastRestartAt = now
-		restart()
-		return
+		return true
 	}
-	log.Debug("matter.controller.peer.kick_suppressed", slog.Duration("since_last_restart", now.Sub(c.lastRestartAt)))
+	return false
 }
 
 // handleConnectionError picks the pause after a failed attempt and sleeps
@@ -750,7 +778,7 @@ func (c *connection) onKickLocked(origin kickOrigin, att *attempt, restart conte
 func (c *connection) handleConnectionError(err error, att *attempt) {
 	p := c.p
 	delay, hasDelay, category := classifyError(err, c.timing, p.set.rand, c.deleteResumptionRecord)
-	if errors.Is(err, exchange.ErrNetwork) {
+	if flagsUnreachable(err) {
 		p.status.SetReachable(false)
 	}
 	log := p.log.With(slog.String("address", att.addr.String()))
@@ -781,6 +809,14 @@ func (c *connection) handleConnectionError(err error, att *attempt) {
 	}
 	c.sleep(att.ctx, delay, nil)
 }
+
+// flagsUnreachable is the rediscovery gate of handleConnectionError: a
+// failure of the socket to send (ENETUNREACH, EHOSTUNREACH), also as the
+// cause of another error, may mean the address no longer routes, so the
+// service is marked unreachable for DNS-SD to look again; a transient
+// peer error is left to the MRP path. Mirrors matter.js
+// packages/protocol/src/peer/PeerConnection.ts:698-702.
+func flagsUnreachable(err error) bool { return errors.Is(err, exchange.ErrNetwork) }
 
 // classifyError is the delay table of handleConnectionError
 // (PeerConnection.ts:674-696): the pause, whether there is one, and the

@@ -3,9 +3,15 @@
 
 package channel_test
 
+// A port of matter.js packages/protocol/test/codec/MessagePrivacyTest.ts at
+// 862ad75f: the privacy nonce, key derivation and header obfuscation
+// against the CHIP vectors.
+
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/SukramJ/go-fabric/secure/channel"
@@ -77,4 +83,28 @@ func TestPrivacyMask_ChipObfuscateVector(t *testing.T) {
 	if !bytes.Equal(back, cleartext) {
 		t.Fatalf("deobfuscate mismatch:\n got=%x\nwant=%x", back, cleartext)
 	}
+}
+
+// TestMessagePrivacyBuildNonce ports describe("buildNonce") against
+// channel.PrivacyNonce, the Go buildNonce.
+func TestMessagePrivacyBuildNonce(t *testing.T) {
+	t.Parallel()
+	t.Run("matches the CHIP test vector", func(t *testing.T) {
+		t.Parallel()
+		mic := mustHex(t, "c5a0063ad5d2518191400dd68c5c163b") // MessagePrivacyTest.ts:15
+		got, err := channel.PrivacyNonce(0x002a, mic)
+		if err != nil {
+			t.Fatalf("PrivacyNonce: %v", err)
+		}
+		if want := "002ad2518191400dd68c5c163b"; hex.EncodeToString(got) != want {
+			t.Fatalf("nonce = %x, want %s", got, want)
+		}
+	})
+	t.Run("rejects a MIC that is not 16 bytes", func(t *testing.T) {
+		t.Parallel()
+		_, err := channel.PrivacyNonce(0x002a, mustHex(t, "c5a0063ad5d2518191400d"))
+		if !errors.Is(err, channel.ErrPrivacyMICShort) || !strings.Contains(err.Error(), "requires a 16-byte MIC") {
+			t.Fatalf("err = %v, want ErrPrivacyMICShort naming the 16-byte MIC", err)
+		}
+	})
 }

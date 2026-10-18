@@ -25,6 +25,11 @@ import (
 // for GroupSession encode").
 var ErrNotGroupHeader = errors.New("channel: group encode needs a group-session header with a destination group id")
 
+// ErrSourceNodeMismatch is returned by [EncryptGroup] for a sender node id
+// the header's Source Node ID disagrees with: the nonce is the header's
+// (GroupSession.ts:268-269), so the two must name the same node.
+var ErrSourceNodeMismatch = errors.New("channel: group encode sender node id differs from the header's source node id")
+
 // privacyHeaderOffset is where the obfuscated header region starts: the
 // Message Flags byte, the Session ID and the Security Flags stay in the
 // clear (GroupSession.ts:278, :285 — `headerBytes.slice(4)` /
@@ -41,13 +46,21 @@ const privacyHeaderOffset = 4
 //     [message.Header.MarshalPacket], with its group constraint;
 //   - :260 securityFlags = headerBytes[3];
 //   - :261 nonce = Session.generateNonce(securityFlags, messageId,
-//     fabric.nodeId) — the 13-byte nonce of Matter §4.7.1.1 with
-//     sourceNodeID, the sender's node id on the fabric;
+//     fabric.nodeId) — the 13-byte nonce of Matter §4.7.1.1 with the
+//     source node id; at 862ad75f the header's (below);
 //   - :262-267 ciphertext = crypto.encrypt(operationalGroupKey, payload,
 //     nonce, headerBytes) — AES-CCM, the unobfuscated header bytes as AAD.
 //
 // The header is the one the caller built (sessionId already the group
 // session id, GroupSession.ts:252); EncryptGroup does not change it.
+//
+// The nonce is built from header.SourceNodeID, the id receivers read back
+// and rebuild the nonce from. sourceNodeID names the sender's node id and
+// must agree with the header ([ErrSourceNodeMismatch]); a nonce from any
+// other id would seal a message no receiver can open. Mirrors matter.js
+// packages/protocol/src/session/GroupSession.ts:260-269 at 862ad75f
+// ("Receivers derive the nonce from the header, so the header's source
+// node ID is the only one used").
 func EncryptGroup(operationalKey []byte, sourceNodeID uint64, header message.Header, payload []byte) (headerBytes, ciphertext []byte, err error) {
 	if header.SessionType != message.SessionGroup || header.DestSize != message.DestGroup {
 		return nil, nil, ErrNotGroupHeader
@@ -56,8 +69,11 @@ func EncryptGroup(operationalKey []byte, sourceNodeID uint64, header message.Hea
 	if err != nil {
 		return nil, nil, fmt.Errorf("channel: group encode: %w", err)
 	}
+	if sourceNodeID != header.SourceNodeID {
+		return nil, nil, fmt.Errorf("%w: %#x, header names %#x", ErrSourceNodeMismatch, sourceNodeID, header.SourceNodeID)
+	}
 	securityFlags := headerBytes[3]
-	nonce := buildNonce(securityFlags, header.MessageCounter, sourceNodeID)
+	nonce := buildNonce(securityFlags, header.MessageCounter, header.SourceNodeID)
 	ccm, err := aesccm.New(operationalKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("channel: group key: %w", err)

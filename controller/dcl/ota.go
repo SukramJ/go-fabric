@@ -172,7 +172,8 @@ func (o *OTAVersions) logLookupFailure(err error, vid, pid uint16, attrs []any) 
 
 // CheckVersion fetches the record of one software version and reports
 // whether it is applicable over current — #checkSpecificVersion
-// (:722-764) without the compliance record's specification version.
+// (:722-764). An applicable version carries the specification version of
+// its compliance record, else the version record's.
 func (o *OTAVersions) CheckVersion(ctx context.Context, c *Client, vid, pid uint16, version, current uint32) (SoftwareVersion, bool, error) {
 	v, err := c.ModelVersion(ctx, vid, pid, version)
 	if err != nil {
@@ -186,7 +187,32 @@ func (o *OTAVersions) CheckVersion(ctx context.Context, c *Client, vid, pid uint
 			slog.Bool("url", v.OTAURL != ""), slog.Uint64("min", uint64(v.MinApplicableSoftwareVersion)), slog.Uint64("max", uint64(v.MaxApplicableSoftwareVersion)))
 		return v, false, nil
 	}
+	// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:747-752:
+	// the compliance record's specification version, the version record's
+	// when it has none.
+	if spec := o.specificationVersionOf(ctx, c, vid, pid, version); spec != 0 {
+		v.SpecificationVersion = spec
+	}
 	return v, true, nil
+}
+
+// specificationVersionOf reads the specification version of a software
+// version from its compliance record of the "matter" certification; 0
+// when the record states none or the lookup fails, which does not fail
+// the check.
+//
+// Mirrors matter.js packages/protocol/src/dcl/DclOtaUpdateService.ts:771-781
+// (#specificationVersionOf) with DclClient.fetchComplianceInfo
+// (packages/protocol/src/dcl/DclClient.ts:229-257): the record must answer
+// that vid, pid, version and certification type in schema version 0 or 1.
+func (o *OTAVersions) specificationVersionOf(ctx context.Context, c *Client, vid, pid uint16, version uint32) uint32 {
+	info, err := c.ComplianceInfo(ctx, vid, pid, version, "matter")
+	if err == nil {
+		return info.SpecificationVersion
+	}
+	o.log().Debug("dcl.ota.no_specification_version", slog.String("message",
+		fmt.Sprintf("No specification version from compliance info for VID: %d, PID: %d, version %d: %s", vid, pid, version, err.Error())))
+	return 0
 }
 
 // IsApplicable is #isVersionApplicable (:786-819): a valid version with an

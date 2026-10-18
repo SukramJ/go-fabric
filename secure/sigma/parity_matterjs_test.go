@@ -10,6 +10,8 @@
 //   - sigma2_*         — CasePairingTest.ts:14-63 (Sigma2 key schedule + AES-CCM)
 //   - sigma3_*         — CasePairingTest.ts:75-129 (Sigma3 key schedule + AES-CCM)
 //   - session_keys_*   — CasePairingTest.ts:117-128 (final session-key derivation)
+//   - TestCasePairingSignature — CasePairingTest.ts:65-73 at 862ad75f
+//     ("generates the right signature"), inline
 //
 // If any assertion fails that is a REAL drift against matter.js — stop,
 // report, do not paper over.
@@ -17,6 +19,9 @@
 package sigma
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
@@ -248,4 +253,29 @@ func testSessionKeysDerivation(t *testing.T, v matterJSSigmaVector) {
 	if hex.EncodeToString(got) != hex.EncodeToString(want) {
 		t.Errorf("sessionKeys[0:16] mismatch\n got=%x\nwant=%x", got, want)
 	}
+}
+
+// TestCasePairingSignature ports "generates the right signature"
+// (CasePairingTest.ts:65-73): the fabric key's raw r||s signature over the
+// signed-data bytes verifies, through the unpacking verifyTranscript uses.
+func TestCasePairingSignature(t *testing.T) {
+	t.Parallel()
+	t.Run("generates the right signature", func(t *testing.T) {
+		t.Parallel()
+		fabricPubKey := mustHexSigma(t, "049bfa105c3d209ff226c31da689dafb297b73499ec1844bba89c60ce65938b722300dd0abbb201e9451c6ab284ec99b8d90c5dd892388c59fde30c299c64af8c4")
+		signatureData := mustHexSigma(t, "153001f1153001010124020137032414001826048012542826058015203b370624150124115d18240701240801300941049bfa105c3d209ff226c31da689dafb297b73499ec1844bba89c60ce65938b722300dd0abbb201e9451c6ab284ec99b8d90c5dd892388c59fde30c299c64af8c4370a3501280118240201360304020401183004142c3494bc756f4b58a73bde64a3141285a3efd5c9300514e766069362d7e35b79687161644d222bdde93a6818300b406772b5445ef466a669d9e5e5663238b817511e73ce992937ddd975690abda8b86b0a79f2fd49bae78c653fad9bd3d53463d4abd7f996964988a7644c4cc1d0321830020030034104473bd04e2a9c4e6a12b9008739c64a16d0113295822faf17e3d2ffcb77b0cae437701b0f0525ddcc6139da5a56dfda2af2b86a2836ef6b03f8f5c231dbaf950b3004410441838848a7e58ab46a1a71a539c474780002bf22adccbeaa43ee07f5176c61aaa3d718102333fc856595ea3a6a5bfd37d2890049acb82c49440e1f490cd970e018")
+		signature := mustHexSigma(t, "75e35c22a5da60805d65772b3d4decc8c6eabe30bd2925608524ea12b729efd00a12faeb5757cdfc65aaefddd01c57be9f14d37e2c0beca43434f8ebdd81d635")
+		pub, err := ecdsa.ParseUncompressedPublicKey(elliptic.P256(), fabricPubKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r, sv, err := unpackECDSASig(signature)
+		if err != nil {
+			t.Fatal(err)
+		}
+		digest := sha256.Sum256(signatureData)
+		if !ecdsa.Verify(pub, digest[:], r, sv) {
+			t.Fatal("the signature does not verify over the signed data")
+		}
+	})
 }

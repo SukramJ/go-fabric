@@ -109,7 +109,9 @@ var ErrMalformedRequest = errors.New("interaction: malformed request")
 //     AccessControl ACL or Extension (:149-171);
 //   - a timed write first sends a TimedRequest on the same exchange and
 //     waits for its Success (:369-371; the timeout defaults to 10 s, :159);
-//   - one WriteRequest, MoreChunkedMessages false (Write.ts:77);
+//   - one WriteRequest, MoreChunkedMessages false (Write.ts:77); one
+//     that does not fit a message, or a timed one whose WriteResponse
+//     might not, is an ErrRequestTooLarge before anything is sent;
 //   - with SuppressResponse the send expects an acknowledgement only; a
 //     message in its place is tolerated unless it is a StatusResponse
 //     with an error (IM:1138-1162, the "Matter-SDK bug" of :1156), and the
@@ -120,6 +122,35 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 	req, err := formulateWrite(writes, opts)
 	if err != nil {
 		return nil, err
+	}
+	enc := tlv.NewEncoder()
+	req.MarshalTLV(enc, func(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
+		if value, ok := v.Value.(spec.Encodable); ok {
+			value.EncodeTLV(e, tag)
+		}
+	})
+	payload, err := enc.Bytes()
+	if err != nil {
+		return nil, err
+	}
+	// A write that does not fit one message is refused before anything is
+	// sent. Mirrors matter.js
+	// packages/protocol/src/interaction/InteractionMessenger.ts:1343-1354
+	// (a timed or suppressed write) and :1388-1392 (a value too large for a
+	// message); matter.js chunks any other write, which this one-message
+	// write does not.
+	if len(payload) > exchange.MaxPayloadSize {
+		return nil, fmt.Errorf("%w: a write of %d bytes, at most %d", ErrRequestTooLarge, len(payload), exchange.MaxPayloadSize)
+	}
+	// A timed write cannot be chunked, so its WriteResponse — every status
+	// at its largest, Failure with a cluster status — must fit one message
+	// too. Mirrors matter.js
+	// packages/protocol/src/interaction/InteractionMessenger.ts:103-106,
+	// :1335-1354.
+	if req.TimedRequest {
+		if size := worstWriteResponseSize(req); size > exchange.MaxPayloadSize {
+			return nil, fmt.Errorf("%w: a timed write whose statuses take up to %d bytes, at most %d", ErrRequestTooLarge, size, exchange.MaxPayloadSize)
+		}
 	}
 	m, err := c.begin(ctx, ExchangeOptions{})
 	if err != nil {
@@ -134,16 +165,6 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 		if err := m.timed(ctx, timeout); err != nil {
 			return nil, err
 		}
-	}
-	enc := tlv.NewEncoder()
-	req.MarshalTLV(enc, func(e *tlv.Encoder, tag tlv.Tag, v im.AttributeValue) {
-		if value, ok := v.Value.(spec.Encodable); ok {
-			value.EncodeTLV(e, tag)
-		}
-	})
-	payload, err := enc.Bytes()
-	if err != nil {
-		return nil, err
 	}
 	c.log.Debug("matter.controller.interaction.write", slog.Int("attributes", len(req.Writes)), slog.Bool("timed", req.TimedRequest))
 	if req.SuppressResponse {
@@ -175,6 +196,22 @@ func (c *Interaction) Write(ctx context.Context, writes []WriteRequest, opts Wri
 		out = append(out, s)
 	}
 	return out, nil
+}
+
+// worstWriteResponseSize is the size of req's WriteResponse with every
+// status at its largest (maxStatusSizeOf, InteractionMessenger.ts:103-106).
+func worstWriteResponseSize(req im.WriteRequest) int {
+	worst := im.WriteResponse{Responses: make([]im.AttributeStatus, 0, len(req.Writes))}
+	for _, w := range req.Writes {
+		worst.Responses = append(worst.Responses, im.AttributeStatus{
+			Path:   w.Path,
+			Status: im.StatusIB{Status: im.StatusFailure, ClusterStatus: uint8(im.StatusFailure), HasClusterStatus: true},
+		})
+	}
+	enc := tlv.NewEncoder()
+	worst.MarshalTLV(enc)
+	b, _ := enc.Bytes()
+	return len(b)
 }
 
 // statusOf is throwIfErrorStatusMessage (InteractionMessenger.ts:201-214)

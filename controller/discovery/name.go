@@ -154,11 +154,22 @@ func isAvailableService(srv mdns.DNSSRV) bool {
 type Parameters map[string][]byte
 
 // Get returns the value of key decoded as UTF-8 (an invalid byte becomes
-// U+FFFD) and whether the key is present.
+// U+FFFD) and whether the key is present. The key matches regardless of
+// case, an exact match first. Mirrors matter.js
+// packages/general/src/net/dns-sd/DnssdParameters.ts:36-46 (get/raw fold
+// the key to lower case).
 func (p Parameters) Get(key string) (string, bool) {
 	v, ok := p[key]
 	if !ok {
-		return "", false
+		for k, kv := range p {
+			if strings.EqualFold(k, key) {
+				v, ok = kv, true
+				break
+			}
+		}
+		if !ok {
+			return "", false
+		}
 	}
 	return decodeUTF8(v), true
 }
@@ -306,6 +317,9 @@ func (n *Name) parameters() Parameters {
 	}
 	slices.SortStableFunc(txts, func(a, b *Record) int { return b.InstalledAt.Compare(a.InstalledAt) })
 	raw := make(Parameters)
+	// The first occurrence of a key wins regardless of its case. Mirrors
+	// matter.js packages/general/src/net/dns-sd/DnssdParameters.ts:27-34.
+	seen := make(map[string]struct{})
 	for _, r := range txts {
 		for _, entry := range r.TXT {
 			if len(entry) == 0 {
@@ -322,9 +336,11 @@ func (n *Name) parameters() Parameters {
 			} else {
 				key, value = string(entry[:eq]), entry[eq+1:]
 			}
-			if _, dup := raw[key]; dup {
+			folded := strings.ToLower(key)
+			if _, dup := seen[folded]; dup {
 				continue
 			}
+			seen[folded] = struct{}{}
 			raw[key] = value
 		}
 	}

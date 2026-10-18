@@ -20,8 +20,9 @@ type SubscriptionsConfig struct {
 	Logger *slog.Logger
 	// ReportStarted is called when a report the peer pushes starts
 	// arriving on one of its subscriptions, with the session it arrived
-	// over; a priming report does not call it — matter.js
-	// ClientSubscriptions.reportStarted (ClientSubscriptions.ts:152-158).
+	// over; a priming report does not call it, and a panic in it is
+	// logged and contained — matter.js ClientSubscriptions.reportStarted
+	// (ClientSubscriptions.ts:152-158).
 	ReportStarted func(s *exchange.Session)
 }
 

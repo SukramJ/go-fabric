@@ -229,6 +229,13 @@ func (c *Certificate) PublicKeyECDSA() (*ecdsa.PublicKey, error) {
 // buffer is retained on Certificate.Raw for downstream signature
 // verification — callers MUST NOT mutate it after Decode returns.
 func Decode(raw []byte) (*Certificate, error) {
+	// Mirrors matter.js packages/protocol/src/certificate/kinds/OperationalBase.ts:19-28
+	// (assertTlvSize, called first by Noc/Rcac/Icac/Vvsc.fromTlv): §6.1.3
+	// caps a Matter-TLV operational certificate at 400 bytes.
+	if len(raw) > MaxOperationalCertTLVBytes {
+		return nil, fmt.Errorf("%w: Matter-TLV operational certificate of %d bytes exceeds the %d byte limit",
+			ErrMalformed, len(raw), MaxOperationalCertTLVBytes)
+	}
 	cert := &Certificate{Raw: append([]byte(nil), raw...)}
 
 	d := tlv.NewDecoder(raw)

@@ -2343,20 +2343,46 @@
     },
     {
       "path": "packages/protocol/test/action/client/ClientInteractionInvokeTest.ts",
-      "status": "planned",
-      "reason": "The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1).",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestClientInteractionInvokeCommandRefWireHandling",
+        "controller/interaction:TestClientInteractionInvokeDelayReportData",
+        "controller/interaction:TestClientInteractionInvokeResponseWithoutInteractionModelRevision",
+        "controller/interaction:TestClientInteractionInvokeStatusOrigin"
+      ],
+      "missing": [
+        "synthesizes NO_COMMAND_RESPONSE for a request command that received no response",
+        "does not synthesize NO_COMMAND_RESPONSE for an unanswered wildcard command (no concrete path)",
+        "discards a stray CommandDataIB that matches no sent command instead of throwing",
+        "passes a stray CommandStatusIB up to the caller (spec submits all status entries)",
+        "splits a multi-command invoke for a maxPathsPerInvoke=1 peer into ref-less single invokes",
+        "refuses to split an invoke for a provider reporting no usable path limit",
+        "aborts an in-flight batch on close instead of awaiting its response",
+        "rejects commands queued behind an in-flight batch with the close reason",
+        "does not mutate the caller's request when inferring largeMessage",
+        "sends DelayReportData in its own message",
+        "refuses a request with DelayReportData before anything is sent"
+      ],
+      "reason": "14 cases ported on the scripted rig for the Go single-command Invoke (no commandRef on the wire, abort during and before the exchange with no retransmission after, a read's abort, suppressResponse, concurrent single invokes, no DelayReportData, a response without InteractionModelRevision, received vs local error statuses); missing are the multi-command/batched invoke cases (reconciliation, stray entries, splitting by maxPathsPerInvoke), ClientInteraction.close, largeMessage inference and DelayReportData sending, none of which the Go Invoke has (one concrete command per exchange, no Close, no forward features).",
       "snapshotSha": "501b3a3570c0c93de6ce67f0ea5dfb310b4b3e56"
     },
     {
       "path": "packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts",
       "status": "planned",
-      "reason": "The controller's subscribe under abort and close, including an open BDX exchange.",
+      "reason": "Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix. Milestone 5 phase 25 (the controller remainder) brings ClientInteraction.close, the in-flight set and the abandonment; findings register (owner review of PR #164).",
+      "until": "M5 phase 25",
       "snapshotSha": "8a0fabd64c26bf89368d2a5fb75bc39d9f23a1a3"
     },
     {
       "path": "packages/protocol/test/action/client/InputChunkTest.ts",
-      "status": "planned",
-      "reason": "The controller's parsing of report chunks: path order, tag-compressed paths, chunked-array tails.",
+      "status": "ported",
+      "go": [
+        "controller/interaction:TestInputChunkAttributes",
+        "controller/interaction:TestInputChunkEvents",
+        "controller/interaction:TestInputChunkOrderingAcrossAttributesAndEvents",
+        "controller/interaction:TestInputChunkRelaxedIntegerTypeChecks"
+      ],
+      "reason": "All 18 cases ported against the controller's report assembler (InputChunk): path order, tag-compressed paths, status entries, chunked-array leftovers, malformed entries, event order, timestamps and statuses, and a signed value for an unsigned attribute through the wire; the Go Report keeps one slice per kind, so cross-kind order is checked per slice.",
       "snapshotSha": "772ad2cf993296093f21c9d2ebc71b6ac3f5092b"
     },
     {
@@ -2370,13 +2396,21 @@
     {
       "path": "packages/protocol/test/action/client/ReadScopeTest.ts",
       "status": "planned",
-      "reason": "Which cached clusters a controller read covers (empty, full wildcard, endpoint/cluster scopes, fabric filter).",
+      "reason": "The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI; brief BI's second tranche ports it (owner review of PR #164).",
       "snapshotSha": "eef880b90358e4fc34c70657b7cdf3752b6489e2"
     },
     {
       "path": "packages/protocol/test/action/client/subscription/ClientSubscriptionsTest.ts",
-      "status": "planned",
-      "reason": "The controller's subscription timers across clock steps and the report-started observers.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestClientSubscriptionsResetTimer",
+        "controller/interaction:TestClientSubscriptionsReportStarted"
+      ],
+      "missing": [
+        "keeps a healthy subscription alive across a forward wall-clock step",
+        "times a subscription out on schedule across a backward wall-clock step"
+      ],
+      "reason": "The liveness expiry at the deadline instant and the three reportStarted cases (session announced, a panicking callback contained, nothing announced after close) are ported on the scripted rig; the two wall-clock-step cases need a wall clock apart from the monotonic one, which clocktest.Fake (one reading) does not have.",
       "snapshotSha": "33a8e50b002c5d12f06f719efdce5abac617ddf3"
     },
     {
@@ -2386,19 +2420,18 @@
         "controller/interaction:TestSustainedSubscription",
         "controller/interaction:TestSustainedCloseWhileRetrying",
         "controller/interaction:TestSustainedRefreshRequest",
-        "controller/interaction:TestSustainedRefreshAfterBootstrap"
+        "controller/interaction:TestSustainedRefreshAfterBootstrap",
+        "controller/interaction:TestSustainedSubscriptionClose",
+        "controller/interaction:TestSustainedSubscriptionNonICD",
+        "controller/interaction:TestSustainedSubscriptionEventNumbers",
+        "controller/interaction:TestSustainedSubscriptionMaxEventNumberChanged"
       ],
       "missing": [
-        "close() resolves done() even when peer never fires request.closed",
-        "never reports active when closed while the subscribe is in flight and then succeeds",
-        "reports not live when closed while the active observers run",
         "never reports active when an inactive observer closes the subscription while going live",
         "ends not live and rejects done when an inactive observer throws while going live",
         "still reports inactive when an active observer throws during the final not-live update",
         "treats a wakefulness with requiresAwait===false as non-ICD (timed retry, probe)",
         "parks on the next loss once its wakefulness flips to requiresAwait===true",
-        "reports maxInterval in seconds, using a seconds fallback before a subscription is established",
-        "forwards a caller-provided keepaliveReceived",
         "parks while asleep and subscribes only after a wake signal",
         "leaves a subscribed LIT peer's availability to the subscription",
         "fires checkInMissed for a parked LIT peer that never subscribes and misses its Check-In",
@@ -2425,50 +2458,64 @@
         "keeps its subscription when the peer's wakefulness is suspended",
         "stops observing the peer's mode once closed",
         "ignores a feed signal for a different peer",
-        "keeps the caller's event filters until it delivered an event",
-        "resubscribes for events above the highest one it delivered",
-        "counts a result only once its consumer resolved",
         "requests events above the bootstrap read's highest event",
-        "does not lower its number when a later result carries lower event numbers",
-        "counts events of reports with asynchronous chunks",
-        "keeps its number when a report without events follows",
-        "settles the delivery of a report only after maxEventNumberChanged settled",
-        "replaces the event filters a refreshRequest returns with its own once it delivered an event",
         "keeps a subscription whose priming report fails to process and counts its events",
         "keeps a subscription whose live report fails to process and counts its events",
         "warns only for the first failure of its own processing",
-        "logs it and delivers the report",
         "keeps the failure of the report",
         "passes a failure while ${failure} on and counts the events received before it"
       ],
-      "reason": "The non-ICD sustained subscription (returned at once, active once established, the timed retry, close during the backoff, the reachability check before a resubscribe, the refreshed request) is covered by controller/interaction; the observer, maxInterval and keepalive cases, the ICD await mode of milestone 5 phase 24 and the event-number cases are not.",
+      "reason": "The non-ICD loop (close, closing in flight and from the active callback, maxInterval, keepalive forwarding) and the event-number tracking with its maxEventNumberChanged hook are covered; missing are the separate inactive observable and throwing observers (Go has one ActiveChanged callback), the ICD await mode (no controller-side wakefulness before milestone 5 phase 24), events counted from the bootstrap read (a host hook in Go), and consumer or peer report failures (Updated returns nothing and a failed report is never delivered).",
       "snapshotSha": "5452d36b2dc08104d60de241f6ee35269f7fdcb5"
     },
     {
       "path": "packages/protocol/test/action/request/InvokeTest.ts",
-      "status": "planned",
-      "reason": "Building an invoke request: command fields, commandRef rules for several commands, timed and suppress options.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestInvokeRequestBuildBasic",
+        "controller/interaction:TestInvokeRequestBuildMultipleCommands",
+        "controller/interaction:TestInvokeRequestBuildOptions"
+      ],
+      "missing": [
+        "throws when commandRef missing for multiple commands",
+        "throws on duplicate commandRef",
+        "uses custom interaction model revision",
+        "throws when no commands provided",
+        "throws when called with no arguments"
+      ],
+      "reason": "The single-command request read off the wire of Interaction.Invoke (path, fields, the bare call, suppress default, timed flag and timeout, revision present, processing time as the response wait) and the commandRefs and suppress flag of im.MarshalInvokeRequestTLV are ported; missing are the client-side refusals of a multi-command batch and of an empty or absent command list (Interaction.Invoke takes exactly one path, no multi-command builder exists) and a custom revision (Go always stamps its own).",
       "snapshotSha": "026eb52ce02c51eb6b014ccf2406452db0e68bc5"
     },
     {
       "path": "packages/protocol/test/action/request/ReadAttributePathsTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "im:TestPathParity_InsertionOrderPreserved",
-        "im:TestPathParity_DedupeByFullKey"
+        "im:TestPathParity_DedupeByFullKey",
+        "im:TestReadAttributePathsWildcardDedupe"
       ],
-      "missing": [
-        "dedupes cluster-level wildcard paths (no attributeId)",
-        "dedupes endpoint-level wildcard paths (no clusterId or attributeId)",
-        "treats cluster wildcard and specific attribute as distinct"
-      ],
-      "reason": "Insertion order and dedupe by the full key are ported; the wildcard-path dedupe cases are not.",
+      "reason": "Insertion order and dedupe by the full key are ported; the wildcard-path dedupe cases run against im.DedupAttributePaths, the Go counterpart of Read.AttributePaths.",
       "snapshotSha": "33b289ded47eccab872ed9c616cb84b8c291914b"
     },
     {
       "path": "packages/protocol/test/action/request/ReadTest.ts",
-      "status": "planned",
-      "reason": "Building a read request: attribute and event paths, wildcards, fabric filtering by default, data version filters.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestReadRequestBuildAttributes",
+        "controller/interaction:TestReadRequestBuildFabricFiltering",
+        "controller/interaction:TestReadRequestBuildDataVersionFilters",
+        "controller/interaction:TestReadRequestBuildEvents",
+        "controller/interaction:TestReadRequestBuildCombined",
+        "controller/interaction:TestReadRequestBuildValidation",
+        "controller/interaction:TestReadRequestBuildInteractionModelRevision"
+      ],
+      "missing": [
+        "validates request has attributes using containsAttribute",
+        "validates request has events using containsEvent",
+        "throws when called with no arguments",
+        "uses custom interaction model revision when specified"
+      ],
+      "reason": "The ReadRequest read off the wire of Interaction.ReadWith (attribute and event paths with every wildcard, fabric filtering, data version and event filters, the empty request, the revision) is ported; missing are the TypeScript type guards Read.containsAttribute/containsEvent (no Go counterpart, a Go caller reads len()), the call without an argument (ReadWith always takes a ReadRequest value; the empty one is ported) and a custom revision (Go always stamps its own).",
       "snapshotSha": "8edabceb05dc561b8fbfacf6e48cf945c380225c"
     },
     {
@@ -2480,14 +2527,36 @@
     },
     {
       "path": "packages/protocol/test/action/request/SubscribeTest.ts",
-      "status": "planned",
-      "reason": "Building a subscribe request: keepSubscriptions default, intervals, event paths.",
+      "status": "ported",
+      "go": [
+        "controller/interaction:TestSubscribeRequestBuildBasic",
+        "controller/interaction:TestSubscribeRequestBuildKeepSubscriptions",
+        "controller/interaction:TestSubscribeRequestBuildIntervals",
+        "controller/interaction:TestSubscribeRequestBuildIntervalValidation",
+        "controller/interaction:TestSubscribeRequestBuildWildcards",
+        "controller/interaction:TestSubscribeRequestBuildFabricFiltering",
+        "controller/interaction:TestSubscribeRequestBuildDataVersionFilters",
+        "controller/interaction:TestSubscribeRequestBuildEventFilters"
+      ],
+      "reason": "Every case runs against the SubscribeRequest Interaction.Subscribe sends (paths and wildcards, keepSubscriptions, interval bounds with the ClientInteraction defaults for unset ones, fabric filtering, data version and event filters) or the out-of-range refusal it returns before sending.",
       "snapshotSha": "1ae482b1028184daed89da56401c1b4c4ff7cb93"
     },
     {
       "path": "packages/protocol/test/action/request/WriteTest.ts",
-      "status": "planned",
-      "reason": "Building a write request: timed writes, schema encoding, data versions.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestWriteRequestBuildBasic",
+        "controller/interaction:TestWriteRequestBuildTimed",
+        "controller/interaction:TestWriteRequestBuildDataVersions",
+        "controller/interaction:TestWriteRequestBuildChunked",
+        "controller/interaction:TestWriteRequestBuildValidation",
+        "controller/interaction:TestWriteRequestBuildInteractionModelRevision"
+      ],
+      "missing": [
+        "throws when undefined options",
+        "uses custom interaction model revision"
+      ],
+      "reason": "The WriteRequest read off the wire of Interaction.Write (paths, encoded values, timed flag and TimedRequest timeout, data versions, moreChunkedMessages, list chunking default, the revision) and its refusals before sending (a DataVersion on a wildcard endpoint, through the one numeric surface both the reified and the raw case map to; an empty write) are ported; missing are the call without an argument (Write always takes a writes slice; the empty one is ported) and a custom revision (Go always stamps its own).",
       "snapshotSha": "bb77eb48f28402b301c386e2ba33394002d8a4c6"
     },
     {
@@ -2520,14 +2589,25 @@
     },
     {
       "path": "packages/protocol/test/advertisement/AdvertisementTest.ts",
-      "status": "planned",
-      "reason": "Privacy masking of a commissionable advertisement and the extended-announcement signal.",
+      "status": "partial",
+      "go": [
+        "mdns:TestAdvertisementPrivacyMasking"
+      ],
+      "missing": [
+        "masks private details but does not signal extended announcement when forced via omitPrivateDetails",
+        "masks and signals extended announcement once the extended-announcement period begins",
+        "signals extended announcement in the extended-announcement period even with omitPrivateDetails set"
+      ],
+      "reason": "The unmasked commissionable record (VP and _V vendor subtype present) is ported through BuildCommissionableService; the masked cases are the documented divergence BD-Matter-mDNS-VPAlwaysAdvertised (stateless record builders, no omitPrivateDetails option, no 15-minute extended-announcement timer), and the extended-announcement signal is BLE-only, which the device side does not have by design.",
       "snapshotSha": "265213350c880e665ae510dae3cb087ded2b0991"
     },
     {
       "path": "packages/protocol/test/advertisement/ServiceDescriptionTest.ts",
-      "status": "planned",
-      "reason": "ICD operating mode and session intervals carried on an operational service description.",
+      "status": "ported",
+      "go": [
+        "mdns:TestServiceDescriptionOperational"
+      ],
+      "reason": "Both cases run through BuildOperationalService: ICD Lit and the 30 s / 3 s / 5 s session intervals reach the operational TXT keys, and ICD Sit (0) stays present.",
       "snapshotSha": "c6e1ff1f1e3c2bc4f881d400ca02a9faeb5e7eaa"
     },
     {
@@ -2542,34 +2622,26 @@
         "bdx:TestReceive_BlockSizeCappedToTransport",
         "bdx:TestServe_BlockSizeNegotiation",
         "bdx:TestServe_Refusals",
-        "bdx:TestServe_AbortedTransfers"
+        "bdx:TestServe_AbortedTransfers",
+        "bdx:TestBdxSuccessfulTransfers",
+        "bdx:TestBdxPerBlockDebugLogging",
+        "bdx:TestBdxErrorCases"
       ],
       "missing": [
-        "Using SendInit as Receiver-Driver (by Responder and custom transfer designator)",
-        "Using ReceiveInit as Receiver-Driver (by Responder)",
-        "Using ReceiveInit as Sender-Driver (no limits)",
-        "Send first 100 bytes as sender drive",
-        "Send first 100 bytes as Receiver-Driver",
-        "Send 100 bytes with startOffset 50 as sender drive",
-        "Send first 100 bytes with startOffset 50 as Receiver-Driver",
         "Block/BlockEof/BlockAck/BlockAckEof count blocks from zero (Sender-Driver)",
-        "a responder reports what it received and granted, and an observer cannot alter either",
         "BlockQuery carries an ascending block counter starting at 0 (Receiver-Driver)",
-        "No matching driver modes",
-        "Unknown FileDesignator",
-        "Request a file from peer that is larger than the data",
-        "Request a file from peer that is larger than the data using startOffset",
-        "Unexpected Blockcounter in request with SenderDriver",
-        "BlockQueryWithSkip skipping bytes but end errors because of too less data",
         "sessionId and sessionActiveTimestamp are accessible after transfer completes"
       ],
-      "reason": "The drive modes of SendInit and ReceiveInit and the block-size caps are covered by the bdx package; the size variants, the responder-chosen designator and the error transfers are not ported case by case.",
+      "reason": "Every successful transfer (all sizes, drive modes, designators and partial transfers), the responder's reported parameters and every error case run between Send / Receive and a Responder with the messages of both sides recorded; the two per-block logging cases assert the log context BdxMessenger.ts:140-200 attaches to each sent message, which the Go messenger does not log, and the getters case reads the initiator BdxClient's secure session, an object the Go initiator API (which takes an Exchange) does not have.",
       "snapshotSha": "83b5f6877874b26c71b8767638e147d2b5a56efb"
     },
     {
       "path": "packages/protocol/test/bdx/PersistedFileDesignatorTest.ts",
-      "status": "planned",
-      "reason": "A persisted BDX file designator: read back, second write, write after delete, refusal after delete.",
+      "status": "ported",
+      "go": [
+        "bdx:TestPersistedFileDesignator"
+      ],
+      "reason": "The four cases are ported against the Go form of the designator (bdx/doc.go): one path written through a FileSink per transfer and read back as a Blob, so a second write, a write after a delete and an open after a delete answer as matter.js's cache-clearing designator does.",
       "snapshotSha": "45b6333bf9e7d739689557211b15d93ac9ce9ba7"
     },
     {
@@ -2626,105 +2698,154 @@
     },
     {
       "path": "packages/protocol/test/certificate/CertificateAuthorityTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/ca:TestRootAndNOCRoundTrip",
         "controller/ca:TestICACChain",
         "controller/ca:TestStoreSaveAndLoad",
-        "controller/ca:TestRejects"
+        "controller/ca:TestRejects",
+        "controller/ca:TestCertificateAuthority2Tier",
+        "controller/ca:TestCertificateAuthority3Tier",
+        "controller/ca:TestCertificateAuthorityConfiguration",
+        "controller/ca:TestCertificateAuthorityCertificateIDs",
+        "controller/ca:TestCertificateAuthorityConfigurationExport",
+        "controller/ca:TestCertificateAuthoritySKI",
+        "controller/ca:TestCertificateAuthorityCATs"
       ],
-      "missing": [
-        "refuses a NOC whose node ID is outside the operational range",
-        "verifies a NOC whose node ID is in the operational range",
-        "persists ICAC to storage",
-        "auto-detects ICAC from storage when ica option not provided",
-        "loads ICAC from storage and sets intermediateCert=true (storage takes precedence)",
-        "throws ImplementationError when intermediateCert=true but no ICAC data in storage",
-        "throws ImplementationError when ICAC data exists but intermediateCert=false",
-        "increments certificate IDs correctly",
-        "allocates ICAC cert ID before NOC IDs",
-        "exports complete configuration with ICAC",
-        "can reconstruct CA from exported config",
-        "derives root SKI as 160-bit SHA-1 of the public key (RFC 5280 method-1)",
-        "derives ICAC SKI as 160-bit SHA-1 of the public key",
-        "derives NOC SKI as 160-bit SHA-1 of the public key",
-        "generates NOC with CASE Authenticated Tags"
-      ],
-      "reason": "The two- and three-tier CA, NOC issuing and persistence are covered by controller/ca; the node-ID range checks and the remaining ICAC cases are not.",
+      "reason": "Every it case is ported through ca.New/GenerateNOC with a ca.MemoryStore standing for both the StorageContext and the exported Configuration; the node-ID range check runs through the CA's Verifier, and generateIntermediateCert left undefined is the new Config.DetectIntermediateCA.",
       "snapshotSha": "419f52282aee51d6a30925790ebe251d76a790c3"
     },
     {
       "path": "packages/protocol/test/certificate/CertificatesTest.ts",
-      "status": "planned",
-      "reason": "Matter certificate TLV/ASN.1 recoding, encoding and verification against fixed vectors; secure/mattercert has its own vectors, not these cases.",
+      "status": "partial",
+      "go": [
+        "secure/mattercert:TestTBSToDER_MatchesMatterJSCommissionerFixtures",
+        "secure/mattercert:TestValidateRCAC_MatterJSCommissionerRoots",
+        "secure/mattercert:TestVerifier_MatterJSCommissionerChains",
+        "secure/mattercert:TestCertificatesGeneratesTheCorrectASN1Bytes",
+        "secure/mattercert:TestCertificatesVerifiesCertificates",
+        "secure/mattercert:TestCertificatesSpecialNocEncodingCases",
+        "secure/mattercert:TestCertificatesDecodeicacificate",
+        "secure/mattercert:TestCertificatesOperationalCertDecodeSizeLimits",
+        "controller/attestation:TestCertificatesFallbackVendorIDProductID",
+        "controller/attestation:TestCertificatesParseMatterFallbackVidPid",
+        "controller/attestation:TestCertificatesPaaFromAsn1",
+        "controller/commissioner:TestCertificatesGetPublicKeyFromCsr"
+      ],
+      "missing": [
+        "recode root certificate",
+        "recode intermediate certificate",
+        "recode operational certificate",
+        "encode root certificate",
+        "parse root certificate from ASN.1",
+        "parse intermediate certificate from ASN.1",
+        "parse operational certificate from ASN.1",
+        "parse and regenerate external RCAC certificate",
+        "parse and regenerate external ICAC certificate",
+        "parse and regenerate external NOC certificate",
+        "external certificates form a valid chain",
+        "rejects a certificate whose recognized extension has no value octet string",
+        "parses a certificate whose unrecognized extension holds bytes that are not DER",
+        "parses fallback VendorID from a DAC issuer commonName",
+        "re-encodes a fallback DAC without injecting Matter VID/PID OIDs",
+        "re-encodes a fallback PAI without injecting Matter VID/PID OIDs",
+        "verify root certificate",
+        "verify intermediate certificate via ROOT",
+        "verify operational certificate via ICAC and ROOT",
+        "verify operational certificate via ICAC and ROOT with fabricId in root matching",
+        "verify operational certificate via ICAC and ROOT with fabricId in ica matching",
+        "verify operational certificate via ICAC and ROOT with fabricId in all matching",
+        "verify operational certificate via ICAC and ROOT with fabricId in root not matching",
+        "validates TLV order preserve",
+        "generates a valid CSR",
+        "rejects a DER operational certificate larger than 600 bytes before parsing",
+        "rejects a DER attestation certificate larger than the PQC limit before parsing"
+      ],
+      "reason": "Ported on the CERTIFICATE_SETS: TLV to TBS DER of NOCs, chain verification without an ICAC, the ICAC fabric-id mismatch, the CAT limits, the ICAC decode, the 400-byte TLV cap, the Mvid/Mpid fallback, PAA parsing and CSR key extraction; missing: Go has no Matter-TLV certificate encoder and no X.509-to-TLV parser for operational certificates (recode, fromAsn1, external, extension and 600-byte cases), the Google set's standard X.520 DN attributes are not carried into the TBS DER (encode root, every ICAC verify), the NOC issuer is not chosen by authorityKeyIdentifier, the root's fabric id is not checked, the issuer DN's vendor id and the re-encoding of attestation certificates have no Go counterpart, the device CSR subject is CN=CSR not O=CSR, and without ML-DSA there is no 10240-byte attestation limit.",
       "snapshotSha": "eb21fd73fb5c20b830d82dc26bf526478f47996d"
     },
     {
       "path": "packages/protocol/test/certificate/CertificationDeclarationTest.ts",
-      "status": "planned",
-      "reason": "Parsing a Certification Declaration: round trip, signer key identifier, signature, provisional CD.",
+      "status": "partial",
+      "go": [
+        "controller/attestation:TestCertificationDeclarationParse"
+      ],
+      "missing": [
+        "round-trips a provisional CD correctly"
+      ],
+      "reason": "The generate-then-parse round trip, the signer subject key identifier, the signature over signedData, the TlvDc decode of signedData and the refusal of garbage are ported on secure/attestation.BuildTestCertificationDeclaration and parseDeclaration; the provisional round trip is missing because the Go generator has no provisional flag (matter.js CertificationDeclaration.ts:165-181 generate(…, provisional)).",
       "snapshotSha": "d500fb7a7c28446d3b6141f9b3a88f8907bce528"
     },
     {
       "path": "packages/protocol/test/certificate/DeviceAttestationValidatorTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/attestation:TestCertificateRules",
         "controller/attestation:TestParityChecks",
         "controller/attestation:TestHardFailures",
-        "controller/attestation:TestFindings"
+        "controller/attestation:TestFindings",
+        "controller/attestation:TestDeviceAttestationValidatorMalformedPeerCertificates",
+        "controller/attestation:TestDeviceAttestationValidatorMalformedElements",
+        "controller/attestation:TestDeviceAttestationValidatorPAATrustStore",
+        "controller/attestation:TestDeviceAttestationValidatorChain",
+        "controller/attestation:TestDeviceAttestationValidatorValidityPeriod",
+        "controller/attestation:TestDeviceAttestationValidatorVendorID",
+        "controller/attestation:TestDeviceAttestationValidatorNonce",
+        "controller/attestation:TestDeviceAttestationValidatorSignature",
+        "controller/attestation:TestDeviceAttestationValidatorCDSignature",
+        "controller/attestation:TestDeviceAttestationValidatorCDFields",
+        "controller/attestation:TestDeviceAttestationValidatorRevocation",
+        "controller/attestation:TestDeviceAttestationValidatorFindings",
+        "controller/attestation:TestDeviceAttestationValidatorCertificationType",
+        "controller/attestation:TestDeviceAttestationValidatorPAAFetchTime",
+        "controller/attestation:TestDeviceAttestationValidatorTestCertificatePAA"
       ],
-      "missing": [
-        "throws CertificateUnparseable when the device returns an empty PAI",
-        "throws CertificateUnparseable when the device returns an empty DAC",
-        "throws CertificateUnparseable when the DAC's public key is malformed",
-        "throws CertificateUnparseable when the PAI is signed but its public key is unreadable",
-        "throws CertificateUnparseable when the device returns a truncated PAI",
-        "throws AttestationElementsUnparseable when the elements are not valid TLV",
-        "throws CertificationDeclarationUnparseable when the CD field holds something else",
-        "throws PaaNotTrusted when PAA is not in trust store",
-        "throws CertificateChainInvalid for tampered PAI",
-        "throws CertificateChainInvalid for tampered DAC",
-        "throws CertificateChainInvalid when DAC is signed by wrong PAI",
-        "passes when DAC notBefore is within PAI and PAA validity window",
-        "validates that test chain has expected overlapping dates",
-        "throws VendorIdMismatch when DAC vendorId does not match PAI vendorId",
-        "passes when attestation nonce matches",
-        "throws AttestationNonceMismatch when nonce does not match",
-        "passes with valid signature",
-        "throws AttestationSignatureInvalid for tampered signature",
-        "throws AttestationSignatureInvalid when signed with wrong attestation challenge",
-        "throws AttestationSignatureInvalid when signed with wrong key",
-        "passes with valid CD signature when signer key is provided",
-        "skips CD signature verification when no CD signer is available",
-        "throws CertificationDeclarationSignatureInvalid for CD signed with wrong key",
-        "passes with matching vendorId and productId",
-        "throws CertificationDeclarationFieldMismatch when CD vendorId does not match BasicInformation",
-        "throws CertificationDeclarationFieldMismatch when productId not in CD product_id_array",
-        "throws CertificationDeclarationFieldMismatch when CD vendorId does not match DAC vendorId",
-        "throws CertificateRevoked when DAC serial is in revocation list",
-        "throws CertificateRevoked when PAI serial is in revocation list",
-        "passes when revocation data exists but does not contain DAC or PAI serials",
-        "passes when no revocation data is available",
-        "returns findings alongside dacPublicKey on successful validation",
-        "returns CdSignerVerificationSkipped warning when no CD signer is available",
-        "still throws DeviceAttestationError for hard failures",
-        "returns CertificationTypeProvisional warning for provisional CD (type=1)",
-        "returns CertificationTypeTest info for test CD (type=0)",
-        "returns PaaTrustStoreTimeMismatch info when PAA was fetched after DAC notBefore",
-        "does not report PaaTrustStoreTimeMismatch when PAA was fetched before DAC notBefore",
-        "emits TrustedAsTestCertificate when PAA is test-only and service disallows test certs",
-        "does NOT emit TrustedAsTestCertificate when service acceptsTestCertificates is true",
-        "does NOT emit TrustedAsTestCertificate when the PAA is a production cert",
-        "runs revocation against a test-only PAA: a revoked DAC still throws CertificateRevoked"
-      ],
-      "reason": "The commissioner's attestation checks cover a valid chain and the hard failures in their own table; the malformed-certificate cases are not ported one to one.",
+      "reason": "Every it case is ported through attestation.Validate with the check and the matter.js message regex, the DclCertificateService standing as a StaticStore and its signed CRLs as the Revocations interface; the PAI with an unreadable key is CertificateUnparseable as upstream but with the step-1 message, because crypto/x509 reads the key while parsing.",
       "snapshotSha": "cba8f1e8542818bc9e5ddae4a958ef5db3c0e8e3"
     },
     {
       "path": "packages/protocol/test/certificate/PqcAttestationCertificatesTest.ts",
-      "status": "planned",
-      "reason": "Post-quantum (ML-DSA) attestation certificates of the Annex H examples.",
+      "status": "partial",
+      "go": [
+        "controller/attestation:TestPqcAttestationCertificatesAnnexHExamples",
+        "controller/attestation:TestPqcAttestationCertificatesParsing",
+        "secure/attestation:TestPqcAttestationCertificatesDeviceCertification"
+      ],
+      "missing": [
+        "accepts a chain under an ML-DSA PAA and PAI",
+        "creates a ${layout.paa} PAA, a ${layout.pai} PAI and a DAC that verify",
+        "creates certificates OpenSSL accepts",
+        "does not seed an ML-DSA PAA but seeds the entries after it",
+        "does not store an ML-DSA PAA fetched from GitHub",
+        "does not store an ML-DSA PAA fetched from the DCL",
+        "does not validate a device chain of a ${layout.pai} PAI under a ${layout.paa} PAA",
+        "fetches an ML-DSA PAA from the DCL",
+        "parses ${name} as a ${kind} with a ${keyAlgorithm} key signed with ${signatureAlgorithm}",
+        "re-encodes ${name} byte for byte",
+        "refuses a chain it cannot serve without segmented responses",
+        "refuses a key that does not match the declared signature algorithm",
+        "refuses a signature object of another algorithm",
+        "refuses to add an ML-DSA PAA",
+        "rejects ${name}",
+        "rejects a ${layout.pai} PAI under a ${layout.paa} PAA",
+        "rejects a PAI the trusted ML-DSA PAA did not sign",
+        "rejects a tampered certificate",
+        "rejects an ML-DSA issuer key for an ECDSA signature",
+        "rejects an ML-DSA key in a DAC",
+        "rejects an ML-DSA public key that is not canonical RFC 9881",
+        "rejects an ML-DSA signature BIT STRING with unused bits",
+        "rejects an ML-DSA signature algorithm with parameters",
+        "rejects an ML-DSA signature of the wrong length",
+        "rejects an ML-DSA signature that is not a BIT STRING",
+        "rejects an issuer key of another algorithm",
+        "rejects differing inner and outer signature algorithms",
+        "returns a stored ML-DSA PAA without a recovery re-fetch",
+        "seeds an ML-DSA PAA",
+        "serves a stored ML-DSA PAA without trying to repair it",
+        "verifies a PAA's self-signature",
+        "verifies chain link ${index + 1} against its issuer's key"
+      ],
+      "reason": "Ported: the traditional-certificate refusals (unsupported key algorithm or curve, unsupported signature algorithm, non-OID algorithm and curve, EC key with unused bits, over 600 bytes, an ML-DSA certificate where only traditional ones parse) and the device-side refusal of an unservable ML-DSA-signed DAC; missing: PQC Phase 1 (matter.js forward feature pqc-phase-1) is not implemented in controller/attestation or controller/dcl, and with it off Go refuses ML-DSA certificates by the 600-byte limit instead of classifying them as MlDsaAttestationDisabledError (\"not supported\", logged at DEBUG), and LoadChainFiles takes no product description.",
       "snapshotSha": "1975ee1c9e9037e4bb081e4976244e5fd769b6e2"
     },
     {
@@ -2750,47 +2871,39 @@
         "transport/message:TestHeaderMessageExtensionRoundTrip",
         "transport/message:TestHeaderMessageExtensionLengthOverflow",
         "transport/message:TestProtocolHeaderSecuredExtensionRoundTrip",
-        "transport/message:TestProtocolHeaderSecuredExtensionLengthOverflow"
+        "transport/message:TestProtocolHeaderSecuredExtensionLengthOverflow",
+        "transport/message:TestMessageCodecDecode",
+        "transport/message:TestMessageCodecEncodePrivacy",
+        "transport/message:TestMessageCodecEncode",
+        "groups:TestMessageCodecPrivacyTruncated"
       ],
       "missing": [
-        "decodes a message",
-        "decodes a message 2",
-        "decodes the cleartext prefix of a privacy-enhanced group packet (CHIP vector)",
-        "rejects a privacy-enhanced packet truncated below the MIC length",
-        "decodes obfuscated header fields once deobfuscated",
-        "sets the privacy bit in the encoded packet header",
-        "encodePacket uses pre-serialized headerBytes when present",
-        "encodes a message",
-        "encodes a message 2",
-        "writes vendor id before protocol id and round-trips (§4.4.3.4)",
-        "throws when encoding a message with securityExtensions data",
-        "throws when encoding a message with securityExtensions flag",
-        "throws when encoding a message with messageExtension data",
-        "throws when encoding a message with messageExtension flag"
+        "encodePacket uses pre-serialized headerBytes when present"
       ],
-      "reason": "The message and secured extensions and their length checks are covered; the fixed decode/encode vectors and the privacy-enhanced group packet are not.",
+      "reason": "The decode/encode vectors, the privacy-enhanced prefix and region, the MIC-length rejection (groups.tryDecrypt) and the extension refusals are ported; encodePacket's pre-serialized headerBytes has no Go counterpart, because channel.ObfuscateGroupHeader returns the wire header and the group sender concatenates it with the ciphertext itself.",
       "snapshotSha": "43912cc926a9c67615726e8fa7066614602cea08"
     },
     {
       "path": "packages/protocol/test/codec/MessagePrivacyTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "secure/channel:TestPrivacyNonceLayout",
         "secure/channel:TestPrivacyMask_ShortMIC",
         "secure/channel:TestDerivePrivacyKey_ChipGroupVector",
         "secure/channel:TestPrivacyMask_ChipObfuscateVector",
-        "secure/channel:TestApplyPrivacyMask_RoundTrip"
+        "secure/channel:TestApplyPrivacyMask_RoundTrip",
+        "secure/channel:TestMessagePrivacyBuildNonce"
       ],
-      "missing": [
-        "matches the CHIP test vector"
-      ],
-      "reason": "Key derivation, obfuscation and its symmetry are covered against the CHIP vectors; the nonce is checked for its layout, not against the CHIP nonce vector.",
+      "reason": "The privacy nonce (channel.PrivacyNonce against the CHIP nonce vector) and its 16-byte MIC rejection, key derivation and obfuscation with its symmetry against the CHIP vectors.",
       "snapshotSha": "add8c5c3f49dc9829e051bda62c36b6d612a07d0"
     },
     {
       "path": "packages/protocol/test/common/BleListeningClockTest.ts",
-      "status": "planned",
-      "reason": "The commissioner's BLE listening clock that ages scanned peripherals by time spent scanning.",
+      "status": "ported",
+      "go": [
+        "controller/ble:TestBleListeningClock"
+      ],
+      "reason": "All five cases run against controller/ble's ListeningMeter, the Go port of BleListeningClock that a Central uses to report ListeningTime; the scanner tests' listening mock runs on it too.",
       "snapshotSha": "45e6558bf207fca3a76f0b5cb153973dc29eb301"
     },
     {
@@ -2819,81 +2932,32 @@
         "controller/ble:TestBleScannerCancelEndsOnlyTheCanceled",
         "controller/ble:TestBleScannerCancelEndsEveryDiscoveryForIdentifier",
         "controller/ble:TestBleScannerFailsDiscoveriesWhenScanCannotStart",
-        "controller/ble:TestBleScannerCloseSettlesContinuousDiscovery"
+        "controller/ble:TestBleScannerCloseSettlesContinuousDiscovery",
+        "controller/ble:TestBleScannerDeduplicationAndAging",
+        "controller/ble:TestBleScannerForgetCommissionedDevice",
+        "controller/ble:TestBleScannerReachabilityCases",
+        "controller/ble:TestBleScannerOverlapping",
+        "controller/ble:TestBleScannerDiscoveriesForOneIdentifier",
+        "controller/ble:TestBleScannerClose"
       ],
       "missing": [
-        "keeps offering a peripheral while the radio does not scan, though we asked it to",
-        "keeps offering a peripheral that has not advertised while nothing scans",
-        "does not hand a discovery a peripheral that stopped advertising while an earlier scan ran",
-        "still resolves a stale peripheral for a channel open",
-        "stops offering a peripheral that goes stale while a discovery runs",
-        "ages a peripheral of a client that reports no listening time from its report after the last scan",
-        "ends the scan of a discovery whose callback throws",
-        "keeps a peripheral of a client that reports no listening time while its scan is still starting",
-        "forgets an aged-out peripheral when another one advertises",
-        "keeps offering another device advertising identical service data",
-        "ignores addresses of another transport",
-        "stops offering a peripheral that was commissioned",
-        "offers a forgotten peripheral again once it advertises again",
-        "forgets the BLE record of a device commissioned over another transport",
-        "matches an identity that names only the vendor",
-        "keeps a record whose vendor or product differs from the identity",
-        "refuses to hand out a peripheral the transport can no longer reach",
-        "offers a peripheral again once the transport reaches it again",
-        "ends a one-shot discovery as soon as a reachable peripheral advertises",
-        "purges a stale cached peripheral when a discovery asks to ignore existing records",
-        "hands a running discovery a peripheral the transport reaches again",
-        "hands a discovery a peripheral that became unreachable before the discovery started",
-        "offers a peripheral once however often it advertises",
-        "keeps offering peripherals for a client that states no reachability",
-        "keeps the deadline of a continuous discovery across a wall-clock step",
-        "scans again for a later discovery after a scan could not start",
-        "stops the scan once a one-shot discovery found its device",
-        "hands a one-shot discovery an advertisement that arrived while its scan started",
-        "fails a discovery whose scan does not start in time and serves the next one",
-        "fails a discovery that still runs when restarting its scan fails as another ends",
-        "still stops the radio once the discoveries a failed start ended are gone",
-        "stops the radio after the only discovery's scan could not start",
-        "keeps a discovery's result when stopping its scan fails",
-        "closes even when the client's stop never settles",
-        "does not scan for a discovery started after the scanner closed",
-        "returns a one-shot discovery started after the scanner closed at once",
-        "ends a one-shot discovery that is canceled",
-        "starts the next scan only once the previous stop finished",
-        "leaves no scan running when it closes while one is starting",
-        "asks the client to scan again after its radio stopped on its own",
-        "keeps scanning for a discovery that still runs when another ends",
-        "hands an advertisement to discoveries by vendor, product and without identifier",
-        "settles a timeout-less continuous discovery with an internal cancel signal",
-        "releases waiters and rethrows when the client fails to stop scanning"
+        "keeps the deadline of a continuous discovery across a wall-clock step"
       ],
-      "reason": "controller/ble ports the aging, reachability, timeout and per-identifier cases by name; forgetCommissionedDevice, most overlapping-discovery cases and the close failures are not ported.",
+      "reason": "Every it case but one runs against controller/ble's Scanner, including forgetCommissionedDevice, the scan-transition timeout, the transition order of close and discoveries on a closed scanner; the wall-clock-step case is missing because clocktest.Fake has a single reading (Set steps it for timers and Now alike), while production deadlines ride time.Time's monotonic reading, so the step the case needs cannot be expressed.",
       "snapshotSha": "c6569e7209f3fd35eb643027a44d122c1c59bd13"
     },
     {
       "path": "packages/protocol/test/common/DiscoveryDataTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/discovery:TestParityDiscovery_TXTParameters",
-        "controller/discovery:TestParityDiscovery_TXTData"
+        "controller/discovery:TestParityDiscovery_TXTData",
+        "controller/discovery:TestDiscoveryDataCaseInsensitiveKeys",
+        "controller/discovery:TestDiscoveryDataSessionIntervals",
+        "controller/discovery:TestDiscoveryDataIdentity",
+        "controller/discovery:TestDiscoveryDataTransports"
       ],
-      "missing": [
-        "decodes the keys of DNS-SD parameters regardless of their case",
-        "accepts SII/SAI at the maximum of 3600000 ms and zero",
-        "accepts SAT at the maximum of 65535 ms",
-        "drops SII/SAI above 3600000 ms",
-        "drops SAT above 65535 ms and SAT of zero",
-        "drops empty values",
-        "drops non-numeric and non-integer values",
-        "drops values with leading zeros",
-        "accepts values at their maximum",
-        "keeps the VP vendor when only the product is invalid",
-        "drops VP with an invalid vendor",
-        "drops DT and PH outside 32 bits, non-integers, leading zeros and PH of zero",
-        "drops signed, hexadecimal, non-integer and leading-zero values",
-        "drops T outside 16 bits and ICD other than 0 or 1"
-      ],
-      "reason": "SII/SAI/SAT decoding of valid TXT values is covered; the case-insensitive keys and the range and malformed-value drops are not ported case by case.",
+      "reason": "Every it case runs against ParseTXTData: case-insensitive keys (on a hand-built and on a discovered Name's parameters) and the SII/SAI/SAT, VP/DT/PH and T/ICD accept and drop vectors.",
       "snapshotSha": "a33584fd792721ab0c81c706c643f1fe918cbd3f"
     },
     {
@@ -2912,24 +2976,26 @@
     },
     {
       "path": "packages/protocol/test/common/FailsafeContextTest.ts",
-      "status": "planned",
-      "reason": "The fail-safe context dropping its listener on close and refusing an admin subject that is a CAT of version 0 or neither node ID nor CAT.",
+      "status": "partial",
+      "go": [
+        "cluster/core:TestFailsafeContextBuildFabric"
+      ],
+      "missing": [
+        "detaches its closedByPeer listener on close"
+      ],
+      "reason": "The admin subject check of buildFabric (CAT version 0, CAT version 1, a subject that is neither node ID nor CAT) is ported through AddNOC; the closedByPeer listener has no Go counterpart, as the Go fail-safe is not attached to the arming session and does not expire when its PASE peer closes it.",
       "snapshotSha": "14ec78a082cf5f073b5cd8a2a1a6de1c0e06c191"
     },
     {
       "path": "packages/protocol/test/common/FailsafeTimerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "cluster/core:TestGenComm_ArmFailSafeForArmsThenExpires",
         "cluster/core:TestGencomm_ArmFailSafe_OnExpired_Hook",
-        "cluster/core:TestGencomm_ArmFailSafe_ReArm_ExtendsWindow"
+        "cluster/core:TestGencomm_ArmFailSafe_ReArm_ExtendsWindow",
+        "cluster/core:TestFailsafeTimerVerifyExpiryHandling"
       ],
-      "missing": [
-        "Expiry callback is called directly when failsafe expires after being rearmed (with 0)",
-        "Expiry callback is called when max cumulative failsafe expires",
-        "Expiry callback is not called when failsafe was completed"
-      ],
-      "reason": "Expiry and re-arming are covered; re-arming with 0, the cumulative limit and completion are not ported case by case.",
+      "reason": "The fail-safe expiry, re-arming (extended and with 0), the cumulative limit expiring it and completion suppressing the callback are ported through the General Commissioning server on a fake clock, the cumulative vector scaled to the server's 900 s floor.",
       "snapshotSha": "d0ae50e074347215ae3f3dac23c9b356b1ffacba"
     },
     {
@@ -2941,51 +3007,29 @@
     },
     {
       "path": "packages/protocol/test/dcl/DclCertificateServiceRevocationTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/dcl:TestRevocationPAISignedCRL",
         "controller/dcl:TestRevocationLookupFailures",
-        "controller/dcl:TestRevocationPartitioned"
+        "controller/dcl:TestRevocationPartitioned",
+        "controller/dcl:TestDclCertificateServiceRevocationOutsideTheDCL",
+        "controller/dcl:TestDclCertificateServiceRevocationOffline",
+        "controller/dcl:TestDclCertificateServiceRevocationParseRevocationSet"
       ],
-      "missing": [
-        "installs what the constructor was given",
-        "passes a serial the set does not name to the DCL, which here knows nothing",
-        "answers a serial the set does name without asking the DCL",
-        "keeps one authority's two issuers apart, each with its own serials",
-        "installs the same set twice without stacking it up",
-        "matches a serial whose top bit is set, which a certificate states with a leading zero",
-        "matches on the key identifier alone where an entry states an empty issuer name",
-        "installs nothing when an entry hands in a serial that is not hex",
-        "installs nothing when an entry states an issuer name that is not base64",
-        "matches on the key identifier alone where an entry names no issuer",
-        "matches an entry that names an issuer even where the caller states none",
-        "reads a serial stated with separators, and one stated as bytes",
-        "asks the DCL nothing, neither for certificates nor for a CRL",
-        "answers a CD signer it does not hold without asking the DCL",
-        "still updates nothing when asked to",
-        "reads the set as the revocation-set tool writes it",
-        "refuses text that is not JSON",
-        "refuses a set that is not a list of entries",
-        "refuses an entry that names no issuer key identifier",
-        "refuses an entry that is not an object at all",
-        "refuses an entry whose key identifier is not hex, which would match nothing",
-        "refuses a serial that is not hex, which would match nothing",
-        "refuses hex that does not divide into bytes",
-        "refuses an issuer name that is not base64",
-        "refuses an entry stating a type other than a revocation set",
-        "refuses a list where an entry should be",
-        "reads a set that revokes nothing",
-        "refuses an entry whose serial numbers are not a list",
-        "refuses an entry whose issuer name is not a string",
-        "refuses an entry whose serial numbers are not a list of strings"
-      ],
-      "reason": "Revocation lookups by issuer are covered; installed sets outside the DCL, serial encodings and stacking are not ported case by case.",
+      "reason": "Installed revocation sets (CertificateStore.InstallRevocations, InstalledRevocations, the canonical serial and the issuer-name matching), the offline store and ParseRevocationSet are ported case by case through the Go surface, and the constructor.s revocations option through CertificateOptions.Revocations.",
       "snapshotSha": "6b158ccb0336eef76953f5e6515049142720ed35"
     },
     {
       "path": "packages/protocol/test/dcl/DclCertificateServiceSeedTest.ts",
-      "status": "planned",
-      "reason": "Seeding the DCL certificate store from a bundled snapshot.",
+      "status": "partial",
+      "go": [
+        "controller/dcl/snapshot:TestDclCertificateServiceSeed"
+      ],
+      "missing": [
+        "kind=test maps to isProduction=false",
+        "includes test-kind entries when fetchTestCertificates is true"
+      ],
+      "reason": "The seed is ported through snapshot.LoadAt (production, builtAt, test and expired skips, SKID mismatch, aborted PAA stream beside an intact CD signer stream, duplicates, no SOURCE, offline lookups); the Go snapshot is the production set alone with no fetchTestCertificates option, so the two cases that seed test-kind entries have no Go counterpart.",
       "snapshotSha": "d93dfffb084280a4cae501052984f616e597cb72"
     },
     {
@@ -2995,153 +3039,72 @@
         "controller/dcl:TestCertificateStoreRoundTrip",
         "controller/dcl:TestCertificateStoreTestNet",
         "controller/dcl:TestCertificateStoreDailyRefresh",
-        "controller/dcl:TestCertificateStoreRejectsBadRoots"
+        "controller/dcl:TestCertificateStoreRejectsBadRoots",
+        "controller/dcl:TestDclCertificateServiceInitialization",
+        "controller/dcl:TestDclCertificateServicePeriodicUpdates",
+        "controller/dcl:TestDclCertificateServiceErrorHandling",
+        "controller/dcl:TestDclCertificateServiceCertificateRetrieval",
+        "controller/dcl:TestDclCertificateServiceCertificateDeletion",
+        "controller/dcl:TestDclCertificateServiceManualUpdate",
+        "controller/dcl:TestDclCertificateServiceGetOrFetchCertificate",
+        "controller/dcl:TestDclCertificateServiceBytesSubjectKeyIDs",
+        "controller/dcl:TestDclCertificateServiceCustomDclConfig",
+        "controller/dcl:TestDclCertificateServiceFetchGithubCertificatesOption",
+        "controller/dcl:TestDclCertificateServiceCustomGithubConfig",
+        "controller/dcl:TestDclCertificateServiceIsProductionFlag",
+        "controller/dcl:TestDclCertificateServiceAddCertificate",
+        "controller/dcl:TestDclCertificateServiceGetOrFetchCdSigner",
+        "controller/dcl:TestDclCertificateServiceRevocationSupport",
+        "controller/dcl:TestDclCertificateServiceTestCertificateVisibility",
+        "controller/dcl:TestDclCertificateServiceGitHubRateLimitLogging"
       ],
       "missing": [
-        "doesn't duplicate certificates on re-initialization",
-        "uses custom update interval when provided",
-        "stops updates after close()",
         "leaves no update timer running when closed during the startup fetch",
-        "stops the timer and closes storage when the in-flight fetch fails during close()",
-        "resolves concurrent close() calls only after cleanup is done",
-        "handles DCL fetch errors gracefully",
-        "continues processing after individual certificate fetch failure",
-        "stores the valid record from a subject whose records include a malformed PEM entry",
-        "skips a record whose certificate SKID differs from the record's stated SKID",
-        "handles GitHub fetch errors gracefully when test certs enabled",
-        "retrieves certificate by subject key ID",
-        "returns undefined for non-existent certificate",
-        "retrieves all certificates",
-        "retrieves certificate as PEM",
-        "throws error for non-existent certificate when getting PEM",
-        "force re-fetches a corrupted cached certificate and returns valid DER",
-        "returns the original bytes when a corrupted cache cannot be re-fetched",
-        "returns the cached bytes without a second parse warning when the re-fetched certificate is unusable",
-        "deletes certificate successfully",
-        "throws error when deleting non-existent certificate",
-        "updates index after deletion",
-        "triggers certificate update manually",
-        "force mode re-downloads and overwrites existing certificates",
-        "returns existing certificate from index",
-        "accepts subject key ID with colons",
-        "fetches certificate from DCL if not in index",
-        "returns undefined on DCL error",
-        "getCertificate accepts Bytes",
-        "getCertificateAsPem accepts Bytes",
-        "getOrFetchCertificate accepts Bytes",
-        "deleteCertificate accepts Bytes",
-        "uses custom production URL when dclConfig provided",
-        "uses custom test URL when testDclConfig provided",
-        "uses defaults when no config provided",
-        "fetches GitHub certs by default when test certs enabled",
-        "skips GitHub when fetchGithubCertificates is false",
-        "GitHub option has no effect when fetchTestCertificates is false",
-        "uses custom GitHub repo when githubConfig provided",
-        "uses defaults when githubConfig not provided",
-        "upgrades test certificate to production when found in production DCL",
-        "preserves isProduction flag when force-updating with test certificates",
-        "does not downgrade production cert when same cert loaded from GitHub",
-        "adds a CD signer and returns true",
-        "returns false if same SKID already exists",
-        "respects explicit isProduction flag",
-        "returns locally injected CD signer without DCL lookup",
-        "fetches CD signer from DCL on cache miss",
-        "returns undefined when DCL has no CD signer for the SKID",
-        "parseCrlRevokedSerials extracts serial numbers from CRL",
-        "parseCrlRevokedSerials returns empty set for CRL with no revoked entries",
-        "parseCrl returns serials and issuerDnDerHex",
-        "parseCrl returns tbsDer and signatureValue for signature verification",
-        "isRevoked returns false when DCL has no revocation data for issuer",
-        "isRevoked rejects instead of answering not revoked while and after the service closes",
-        "isRevoked fetches CRL on demand and checks serial",
-        "isRevoked accepts Bytes for authority key identifier and serial number",
-        "skips non-CRL revocation types",
-        "handles CRL fetch failure gracefully",
-        "hides cached test certificates from getCertificate when fetchTestCertificates is disabled",
-        "returns cached test certificates again when fetchTestCertificates is re-enabled",
-        "rejects DER/PEM lookups for hidden test certificates",
-        "does not affect production certificates",
-        "returns cached test certificate when override is true and fetchTestCertificates is disabled",
-        "filters cached test certificate when override is false even if fetchTestCertificates is enabled",
-        "getCertificateAsDer returns DER when override is true",
-        "getCertificateAsDer throws when explicit override is false even if fetchTestCertificates is on",
-        "getCertificateAsPem returns PEM when override is true",
-        "getOrFetchCertificate respects the considerTestCertificates override on local hits",
-        "getOrFetchCertificate filters a post-fetch test cert per the considerTestCertificates override",
-        "defaults acceptsTestCertificates to false when neither flag is set",
-        "defaults acceptsTestCertificates to fetchTestCertificates when only fetch is set",
-        "accepts (and makes visible) test certificates without fetching them",
-        "fetches but does not accept test certificates when acceptTestCertificates is false",
-        "logs the GitHub fetch failure at info when no test certificate is cached",
-        "logs the GitHub fetch failure at debug when a test certificate is already cached",
-        "logs the GitHub fetch failure at info when only a production certificate is cached",
-        "skips the remaining GitHub fetches for the run after a rate-limit response"
+        "fetches GitHub certs by default when test certs enabled"
       ],
-      "reason": "Fetching, the test-net option, persistence and the daily refresh are covered; the remaining service cases are not ported case by case.",
+      "reason": "Every other it case is ported through CertificateStore over a MockFetch-like RoundTripper with the CHIP test PAAs and CD signer; missing: OpenCertificateStore returns no handle before its startup update ends, so nothing can close it during that fetch; GitHub stays opt-in (by_design BD-Matter-DCL-OptIn).",
       "snapshotSha": "7620f1460f0f81a91bed90c3efc89cdd216b4303"
     },
     {
       "path": "packages/protocol/test/dcl/DclClientRevocationTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/dcl:TestClientRevocationPointsPaginated",
-        "controller/dcl:TestClientSchemaVersions"
+        "controller/dcl:TestClientSchemaVersions",
+        "controller/dcl:TestDclClientRevocationFetchRevocationDistributionPoints",
+        "controller/dcl:TestDclClientRevocationFetchRevocationDistributionPointsByIssuer"
       ],
-      "missing": [
-        "maps DCL field names correctly (issuerSubjectKeyID -> issuerSubjectKeyId, dataURL -> dataUrl)",
-        "returns empty array when no revocation points exist",
-        "maps optional fields correctly",
-        "fetches revocation points for a specific issuer",
-        "maps crlSignerDelegator and dataFileSize from by-issuer response",
-        "rejects a response with an unsupported schema version",
-        "returns empty array when issuer has no revocation points",
-        "encodes issuer subject key ID in URL path",
-        "uses test-net URL when production is false"
-      ],
-      "reason": "Paginated revocation points and the schema-version filter are covered; the field mapping and the empty and optional-field cases are not.",
+      "reason": "Every it case is ported through Client.RevocationPoints and Client.RevocationPointsByIssuer over a MockFetch-like fake transport (the matter.js vectors, URL-fragment routes and call log): the field mapping into the Go struct, the empty and optional-field cases (absent pid and delegator as 0 and \"\"), the by-issuer delegator and file size, both schema-version rules, the escaped key identifier and the test-net base URL.",
       "snapshotSha": "f7d82e10e5482d7dcb6d456568549969de334c5c"
     },
     {
       "path": "packages/protocol/test/dcl/DclClientTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/dcl:TestClientRoots",
         "controller/dcl:TestClientSchemaVersions",
         "controller/dcl:TestClientModels",
-        "controller/dcl:TestClientFailures"
+        "controller/dcl:TestClientFailures",
+        "controller/dcl:TestDclClientConstructor",
+        "controller/dcl:TestDclClientFetchRootCertificateList",
+        "controller/dcl:TestDclClientFetchRootCertificateBySubject",
+        "controller/dcl:TestDclClientFetchModelByVidPid",
+        "controller/dcl:TestDclClientFetchModelVersionByVidPidSoftwareVersion",
+        "controller/dcl:TestDclClientFetchComplianceInfo",
+        "controller/dcl:TestDclClientRecordsWithUnsetOptionalFields",
+        "controller/dcl:TestDclClientFetchAllVendors"
       ],
-      "missing": [
-        "defaults to production URL when no config provided",
-        "uses production config explicitly",
-        "uses test config",
-        "uses custom URL",
-        "throws on HTTP error",
-        "fetches certificate by subject reference",
-        "throws when subject mismatch",
-        "throws when subjectKeyId mismatch",
-        "fetches model info",
-        "throws on VID/PID mismatch",
-        "converts the file size and keeps set OTA fields",
-        "returns fields the DCL sends empty as undefined",
-        "ignores a file size that is not a decimal number",
-        "returns the compliance record",
-        "rejects a record with a different ${field}",
-        "rejects a record with an unsupported schema version",
-        "returns empty vendor fields as undefined and skips unsupported schema versions",
-        "returns empty certificate fields as undefined and skips unsupported schema versions",
-        "skips root certificates with an unsupported schema version",
-        "returns empty model fields as undefined and keeps revisions only with their URL",
-        "keeps Terms and Conditions details when their URL is set",
-        "returns empty compliance fields as undefined",
-        "handles pagination correctly"
-      ],
-      "reason": "Root and model fetches, schema versions and failures are covered; the URL configuration cases are not.",
+      "reason": "Every DclClient case is ported over a MockFetch-style RoundTripper: the ledger URL configuration, the subject, VID/PID and compliance record checks, schema-version filtering, the unset-field mapping (zero values for undefined) and vendor pagination, with the compliance and vendor fetches added to the client.",
       "snapshotSha": "962cd4b5fd085bbb257bd32d88de85d6a2836958"
     },
     {
       "path": "packages/protocol/test/dcl/DclConfigTest.ts",
-      "status": "planned",
-      "reason": "The DCL production/test URLs and the GitHub certificate source defaults.",
+      "status": "ported",
+      "go": [
+        "controller/dcl:TestDclConfig",
+        "controller/dcl:TestDclConfigDclGithubConfig"
+      ],
+      "reason": "The production and test-net ledger URLs (ProductionURL, TestNetURL, a custom Client.BaseURL) and the GitHub certificate source defaults (DefaultGitHubConfig, a custom GitHubConfig) are ported.",
       "snapshotSha": "3875760a2b9106df46a9810f637a864ea490a887"
     },
     {
@@ -3150,68 +3113,24 @@
       "go": [
         "controller/dcl:TestRevocationPAASignedCRL",
         "controller/dcl:TestRevocationPAIDelegated",
-        "controller/dcl:TestRevocationRejectedPoints"
+        "controller/dcl:TestRevocationRejectedPoints",
+        "controller/dcl:TestDclCrlAuthenticationSignerForms",
+        "controller/dcl:TestDclCrlAuthenticationVendorAndProduct",
+        "controller/dcl:TestDclCrlAuthenticationCRLChecks",
+        "controller/dcl:TestDclCrlAuthenticationAuthorityName",
+        "controller/dcl:TestDclCrlAuthenticationForeignEntry",
+        "controller/dcl:TestDclCrlAuthenticationPartitions",
+        "controller/dcl:TestDclCrlAuthenticationRetrying",
+        "controller/dcl:TestDclCrlAuthenticationMLDSAForwardFeaturesOff"
       ],
       "missing": [
-        "accepts an approved self-signed PAA without an authority key identifier",
-        "ignores a self-signed signer that is not an approved PAA",
-        "ignores a self-signed signer that differs from the approved PAA with its key",
-        "ignores a self-signed signer on an entry for a PAI",
-        "accepts a signer the entry's PAA delegated ${authorityKeyIdentifier ? \"with\" : \"without\"} an authority key identifier",
-        "ignores a PAA-delegated signer that names another issuer",
-        "accepts a PAA-delegated signer that shares its PAA's name",
-        "ignores a PAA-delegated signer with the PAA's name but another key's signature",
-        "ignores a PAI posing as a PAA-delegated signer",
-        "ignores a signer without the cRLSign key usage",
-        "ignores a delegated signer anchored at a CD signer rather than a PAA",
-        "ignores a PAA-delegated signer another PAA issued",
-        "accepts a PAI signing its own CRL",
-        "ignores a PAI that does not chain to an approved PAA",
-        "ignores a PAI signing the CRL of another issuer",
-        "accepts a signer a PAI delegated, given that PAI as delegator",
-        "ignores a PAI-delegated signer given without its delegator",
-        "ignores a delegator that is not a PAI",
-        "ignores a delegator that may not sign certificates",
-        "ignores a PAI-delegated signer the delegator did not issue",
-        "ignores a PAA signer of another vendor",
-        "ignores a PAI without a VendorID",
-        "accepts a PAA without a VendorID",
-        "accepts a PAI of the entry's vendor and product",
-        "accepts a PAI with product ID 0 on an entry the DCL states without product",
-        "ignores a PAI with a product ID on an entry for ${description}",
-        "ignores a CRL whose authority key identifier names another signer (step 7.1)",
-        "accepts a CRL whose issuer encodes the signer's name as another string type (RFC 5280 §7.1)",
-        "ignores a CRL whose issuer is not the signer (RFC 5280 §5.1.2.3)",
-        "ignores a CRL without a signature (step 8)",
-        "ignores a CRL whose signature BIT STRING states unused bits (step 8)",
-        "ignores a CRL whose outer signature algorithm differs from the signed one (step 8)",
-        "ignores a CRL whose signature algorithm is neither ecdsa-with-SHA256 nor ML-DSA (step 8)",
-        "ignores a CRL signed with a key other than the signer's (step 8)",
-        "ignores a CRL with an unsupported critical extension such as a delta CRL indicator",
-        "ignores a CRL whose entry carries an unsupported critical extension",
-        "files the revocations of an indirect CRL under the delegating PAI's name",
-        "finds revocations for an issuer name the certificate encodes as another string type",
-        "ignores a CRL whose certificateIssuer ${description} (RFC 5280 §5.3.3)",
-        "ignores entries whose certificateIssuer names another authority (step 10.1)",
-        "keeps entries whose certificateIssuer encodes the authority's name as another string type",
-        "keeps entries once certificateIssuer names the authority again (step 10.1)",
-        "ignores an entry for another issuer in the response (§11.23.11.7)",
-        "combines the revocations of every partition",
-        "ignores a partition whose Issuing Distribution Point ${description}",
-        "requires no Issuing Distribution Point from entries of different vendors",
-        "does not download a rejected CRL again",
-        "uses the partitions that did load, and loads the others again next time",
-        "does not download ${description} again",
-        "downloads again after HTTP ${status}",
-        "downloads again after a transient failure",
         "verifies a CRL signed with ML-DSA",
         "ignores an ML-DSA CRL signed with another key",
         "ignores an ML-DSA CRL whose algorithm identifier carries parameters",
         "accepts a CRL from an ML-DSA signer the approved PAA delegated",
-        "ignores an EC-signed CRL from an ML-DSA signer",
-        "ignores a CRL from an ML-DSA signer the approved PAA delegated"
+        "ignores an EC-signed CRL from an ML-DSA signer"
       ],
-      "reason": "A PAA-signed CRL is accepted and delegated and rejected signers are covered in their own table; the Core §6.2.6.1 signer forms are not ported case by case.",
+      "reason": "Every signer-form, vendor/product, CRL-check, authority-name, partition, retry and forward-features-off case is ported against CertificateStore.IsRevoked; the five cases of describe(\"ML-DSA\") run with the pqc-phase-1 forward feature on, which the port does not have (it admits no ML-DSA CRL signer or signature), so the accepting ones would fail and the refusing ones would pass vacuously.",
       "snapshotSha": "5ff3742c049554a6a36ec255019e878cc696f509"
     },
     {
@@ -3221,38 +3140,17 @@
         "controller/dcl:TestOTAVersions",
         "controller/dcl:TestOTATestNet",
         "controller/dcl:TestVerifyImage",
-        "controller/dcl:TestOTADownload"
+        "controller/dcl:TestOTADownload",
+        "controller/dcl:TestDclOtaUpdateServiceCheckForUpdate",
+        "controller/dcl:TestDclOtaUpdateServiceDownloadUpdate",
+        "controller/dcl:TestDclOtaUpdateServiceIntegration",
+        "controller/dcl:TestDclOtaUpdateServiceCustomDclConfig"
       ],
       "missing": [
-        "skips invalid versions and finds next valid one",
-        "skips versions without OTA URL",
-        "returns undefined when all newer versions are invalid",
-        "checks version applicability range",
-        "returns no update on DCL fetch failure",
-        "uses test DCL when production is false",
-        "checks for a specific target version when provided",
-        "takes the specification version from the compliance record",
-        "returns the update without specification version when the compliance record is missing",
-        "treats a zero specification version in the compliance record as unknown",
-        "ignores a compliance record with an unsupported schema version",
-        "returns undefined when target version is not applicable",
-        "rejects DCL versions with non-HTTPS OTA URLs",
-        "rejects DCL versions with file:// protocol URLs",
         "skips stored test-mode files when isProduction is true",
         "surfaces local-mode stored files regardless of isProduction",
         "surfaces stored prod-mode files when isProduction is false",
-        "downloads and validates OTA image successfully",
-        "throws error on download failure",
-        "throws error on vendor ID mismatch",
-        "throws error on product ID mismatch",
-        "throws error on software version mismatch",
-        "validates OTA image digest",
-        "errors when trying to download file:// protocol for local files",
         "reuses existing valid OTA file instead of re-downloading",
-        "throws error for unsupported protocols",
-        "throws error for invalid URLs",
-        "checks for update and downloads it",
-        "rejects an unsupported OTA checksum type with an OtaUpdateError",
         "lists all stored OTA images",
         "returns empty array when no updates are stored",
         "filters by mode using new mode parameter",
@@ -3285,9 +3183,6 @@
         "migrates test mode bare keys",
         "handles corrupt files during migration gracefully",
         "leaves already-migrated storage untouched",
-        "uses custom production config for prod queries",
-        "uses custom test config for test queries",
-        "uses defaults when no options provided",
         "asks the DCL nothing and finds only stored updates",
         "serves a stored image and downloads none it lacks",
         "keeps a stored image when a forced download is refused",
@@ -3298,19 +3193,21 @@
         "keeps a stored image that fails validation when forced",
         "reads no image from a URL"
       ],
-      "reason": "The version lookup, image verification and download are covered; the skip rules, applicability ranges and caching are not ported case by case.",
+      "reason": "The ledger lookup (skip rules, applicability ranges, targeted version, prod/test ledger, custom and default ledger URLs, the compliance record's specification version), the download and the image verification are ported; the rest exercises the service's own image store (stored-file surfacing, reuse, find, delete, force, file designators, stored specification version, version-keyed storage, migration, offline mode, createUpdateInfoFromFile), which Go leaves to the host's image catalogue (cluster/core.OTAImageSource), so it has no Go counterpart.",
       "snapshotSha": "117d4880582471fa355cb7c37aefe7f9ed22be18"
     },
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceSeedTest.ts",
       "status": "planned",
-      "reason": "Seeding the DCL vendor information from a bundled snapshot.",
+      "reason": "The subject, matter.js DclVendorInfoService seeding from a bundled vendor snapshot (DclVendorInfoService.ts, SeedTypes.ts), has no Go counterpart in controller/dcl; the service is a feature for the owner. With DclVendorInfoServiceTest, milestone 6 phase 27 (owner review of PR #164).",
+      "until": "M6 phase 27",
       "snapshotSha": "dbc5f6e9dd6e9b6563fee27833b3baeeb05dc4b6"
     },
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceTest.ts",
       "status": "planned",
-      "reason": "The DCL vendor information service: fetch, storage, field normalisation, built-in vendors.",
+      "reason": "The subject, matter.js DclVendorInfoService (packages/protocol/src/dcl/DclVendorInfoService.ts, 497 lines: vendor fetch, storage, field normalisation, built-in vendors, update timer, productInfoFor), has no Go counterpart in controller/dcl; the ledger read it builds on is Client.Vendors (DclClientTest), the service itself is a feature for the owner. Milestone 6 phase 27 (completeness) brings the vendor information service; findings register (owner review of PR #164).",
+      "until": "M6 phase 27",
       "snapshotSha": "7b6c7c4ac0261f9fc1b23913e81a8ff236a79692"
     },
     {
@@ -3318,7 +3215,8 @@
       "status": "partial",
       "go": [
         "im:TestEventLog_AppendMonotonic",
-        "im:TestEventLog_CrashRestart_NeverReusesNumber"
+        "im:TestEventLog_CrashRestart_NeverReusesNumber",
+        "im:TestNonvolatileEventStoreClear"
       ],
       "missing": [
         "persists an occurrence retrievable by number",
@@ -3328,10 +3226,9 @@
         "continues after the events an older version stored without a reservation",
         "numbers from 1 again without keepNumbering (characterization)",
         "discards persisted events and continues numbering across a restart with keepNumbering",
-        "continues numbering across a restart after events were persisted again",
         "is passed through by OccurrenceManager"
       ],
-      "reason": "Sequential numbers that survive a restart are covered; the Go event log keeps no events across a restart, so retrieval, reload and deletion are not.",
+      "reason": "Sequential numbers that survive a restart, also after a clear with keepNumbering (DropBuffered), are covered on the EventLog with its persisted ceiling; the rest is missing because the Go event log persists no events (im/eventlog.go:117-121), has no delete and no plain clear, and has no separate store under an OccurrenceManager.",
       "snapshotSha": "548cf597186ea667b0f5ed49c520ea864d37cfa4"
     },
     {
@@ -3346,35 +3243,51 @@
       "status": "partial",
       "go": [
         "im:TestEventLog_AppendMonotonic",
-        "im:TestEventLog_SetCounterPersistence_CeilingAheadOfHandedOutNumber"
+        "im:TestEventLog_SetCounterPersistence_CeilingAheadOfHandedOutNumber",
+        "im:TestVolatileEventStore",
+        "im:TestVolatileEventStoreNumbering",
+        "im:TestVolatileEventStoreClear"
       ],
       "missing": [
-        "loads empty on a fresh store",
-        "retrieves a stored occurrence by number",
         "forgets a deleted occurrence",
         "waits on close for the reservation being stored",
-        "hands out numbers synchronously again once the reservation is stored",
-        "stores queued reservations in order",
         "converts events a non-volatile store left behind",
         "keeps the numbering of converted events across a restart before the next event",
-        "ignores a stored reservation below 1",
         "refuses a block size that is not a non-negative integer",
         "covers at least the number it hands out with a block size of 0",
-        "throws for an unknown event number",
         "numbers from 1 again without keepNumbering (characterization)",
         "reserves again for the numbers it hands out after a plain clear",
-        "continues numbering with keepNumbering",
-        "continues numbering across a restart with keepNumbering",
-        "reserves numbers from the kept numbering on, not from 1",
         "is passed through by OccurrenceManager"
       ],
-      "reason": "Sequential numbering behind a stored reservation is covered; retrieval, deletion and the close cases are not.",
+      "reason": "Lookup by number, the reservation (persisted ceiling, synchronous and in order), a reservation below 1 and clear with keepNumbering (DropBuffered) across a restart are ported on EventLog; missing are delete, the asynchronous close, the conversion of a non-volatile predecessor, the block size checks (the epoch is a uint64 and 0 selects chip's 0x10000, where matter.js counts 0 as 1, BaseEventStore.ts:43-51), the plain clear and the OccurrenceManager pass-through, none of which the Go log has.",
       "snapshotSha": "0927c32fb87c053ba767901f30461770fefe656f"
     },
     {
       "path": "packages/protocol/test/fabric/FabricAuthorityTest.ts",
-      "status": "planned",
-      "reason": "The controller's fabric authority: admin vendor checks, persistence, NOC keypair rotation.",
+      "status": "partial",
+      "go": [
+        "controller/commissioner:TestFabricAuthorityCreateFabric",
+        "controller/commissioner:TestFabricAuthorityDefaultAdminVendorID",
+        "controller/commissioner:TestFabricAuthorityKeypairRotation",
+        "controller/commissioner:TestFabricAuthorityFabricCreation"
+      ],
+      "missing": [
+        "refuses the Matter Standard vendor ID as admin vendor ID",
+        "rotates NOC keypair when getting default fabric with rotateNoc=true",
+        "rotated fabric sends to a group at once with the keys of the previous fabric",
+        "rotated fabric keeps receiving Check-Ins of the ICD peers of the previous fabric",
+        "rotation occurs exactly once per runtime per fabric",
+        "rotatedFabricIndices Set correctly prevents duplicate rotations",
+        "new fabric is properly persisted after rotation",
+        "preserves fabricId from operational certificate during rotation",
+        "preserves nodeId from operational certificate during rotation",
+        "preserves caseAuthenticatedTags during rotation",
+        "handles fabric without caseAuthenticatedTags during rotation",
+        "rotation works with multiple fabrics",
+        "emits fabricAdded event when creating fabric",
+        "refuses a NOC for another fabric ID and takes over nothing"
+      ],
+      "reason": "createFabric/defaultFabric are commissioner.NewFabric over a ca.FabricStore: the reserved-vendor refusal, persistence before completion, a failing store, the created fabric and the no-rotation path are ported; the Go controller never rotates its NOC key (no rotateNoc, no FabricBuilder.updateOperationalCert, no group or ICD state on its fabric), has no fabricAdded event, and its zero VendorID means unset (DEFAULT_ADMIN_VENDOR_ID), so an explicit 0 cannot be expressed.",
       "snapshotSha": "4f8ba2cbb4d304486b6fba557d00c9b99f3499e4"
     },
     {
@@ -3389,26 +3302,17 @@
         "cluster/core:TestParityFabricManager_AllocateIndexAfterAdd",
         "cluster/core:TestParityFabricManager_AllocateIndexMonotonicAfterRemove",
         "cluster/core:TestParityFabricManager_AllocateIndexSkipsAfterMultiRemove",
-        "cluster/core:TestParityFabricManager_AllocateTableFull"
+        "cluster/core:TestParityFabricManager_AllocateTableFull",
+        "cluster/core:TestFabricManagerReplacingFabrics",
+        "store:TestFabricManagerDetermineNextFabricIndex"
       ],
       "missing": [
-        "shares groups, access control and ICD state with the replacement before it reports it",
-        "keeps group changes made while replaced when the previous fabric is restored",
         "forwards the events of a replaced and restored fabric once and those of a replaced object never",
         "releases the ICD state only when the fabric in the table is deleted",
         "releases the ICD state when the fabrics are cleared",
-        "refuses a replacement from another root",
-        "refuses a replacement with another IPK",
-        "get next fabric index initially",
-        "get next fabric index after adding fabric",
-        "get next fabric index after adding fabric and removing it",
-        "get next fabric index after adding fabric and revoking it",
-        "get jumps over one fabric index after adding fabric and revoking it",
-        "it find first open slot for next index",
-        "it find first open slot for next index id including overflow",
-        "throws when table is full"
+        "refuses a replacement with another IPK"
       ],
-      "reason": "The FabricManager parity tests port adding, persistence, removal and index allocation; the remaining lookup and event cases are not.",
+      "reason": "Adding, persistence, removal, all eight index-allocation cases on the SQLite fabric table, and the UpdateNOC replacement keeping group and ACL state, keeping group changes across the fail-safe restore and refusing another root are ported; the event forwarding between replaced Fabric objects has no Go counterpart (a Go fabric is a store row), this module holds no ICD client registrations, and UpdateNOC carries no IPK, so a replacement with another IPK cannot be expressed.",
       "snapshotSha": "f3219676eb1a53723a29154f45b19c411c2c256a"
     },
     {
@@ -3416,57 +3320,79 @@
       "status": "partial",
       "go": [
         "cluster/core:TestParityMatterJS_CompressedFabricID_HKDF",
-        "secure/sigma:TestDeriveOperationalIPKMatchesMatterJSVector"
+        "secure/sigma:TestDeriveOperationalIPKMatchesMatterJSVector",
+        "secure/sigma:TestFabricGetDestinationID",
+        "cluster/core:TestFabricSetLabel",
+        "bridge:TestFabricRemoveFromSession"
       ],
       "missing": [
-        "generates the correct destination ID",
         "generates the correct destination ID 2",
-        "generates the correct destination ID 3",
-        "accepts an empty label",
-        "accepts a label of the maximum length",
-        "rejects a label that exceeds the maximum length",
-        "removes all sessions when removing fabric",
         "removes one sessions without doing anything"
       ],
-      "reason": "The compressed fabric ID and the operational IPK are covered against matter.js vectors; the destination-ID vectors, labels and session removal are not.",
+      "reason": "Destination IDs 1 and 3 against the matter.js vectors, the label length constraint through UpdateFabricLabel and the session teardown of a fabric removal are ported; destination ID 2 needs the root key of TestFabric, which matter.js's MockCrypto certificate authority generates and the test file does not state, and deleteSession has no Go counterpart, as a Go fabric holds no session set.",
       "snapshotSha": "91d24e93b23d859880613ae2dc8f8fc13083b9f5"
     },
     {
       "path": "packages/protocol/test/groups/FabricGroupsManagerTest.ts",
-      "status": "planned",
-      "reason": "The group IPv6 multicast address of a fabric and group against a fixed vector.",
+      "status": "ported",
+      "go": [
+        "groups:TestFabricGroupsManagerGroupIPv6AddressCalculation"
+      ],
+      "reason": "The group IPv6 multicast address of fabric 0x456789ABCDEF1234 and group 0x1234 is ported against the matter.js vector through Manager.MulticastAddressFor.",
       "snapshotSha": "1c53515df212fbf503dec294be72a04eb31456dd"
     },
     {
       "path": "packages/protocol/test/groups/GroupsMulticastPolicyTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "groups:TestGroupcastPolicyMovesTheMulticastMembership"
+        "groups:TestGroupcastPolicyMovesTheMulticastMembership",
+        "groups:TestGroupsMulticastPolicy"
       ],
-      "missing": [
-        "derives a per-group IPv6 address by default (PerGroupId policy)",
-        "reverts to per-group derivation after policy removal",
-        "different groups can have different policies independently"
-      ],
-      "reason": "The IANA policy moving the membership is covered; the per-group default, reverting and independent policies are not ported case by case.",
+      "reason": "The per-group default, the shared IANA address under IanaAddr, reverting after removal and independent per-group policies are ported on one shared fabric through SetGroupProperties and RemoveGroupProperties.",
       "snapshotSha": "a8249e79ca6107f182b9f5f89c0da73af796cc63"
     },
     {
       "path": "packages/protocol/test/groups/GroupsTest.ts",
-      "status": "planned",
-      "reason": "The fabric's group state: multicast address, ID map replacement, subject resolution for a group message.",
+      "status": "ported",
+      "go": [
+        "groups:TestGroupsMulticastAddress",
+        "groups:TestGroupsIDMap",
+        "groups:TestGroupsSubjectForGroup",
+        "groups:TestGroupsCurrentKeyForID"
+      ],
+      "reason": "The per-group multicast address and its refusal of group id 0, the GroupKeyMap replacement (store change and Reload), the subject of a group message through Decode's HasValidMapping and Endpoints including the session-id collision peer, and the current key of a group with the matter.js error texts are ported.",
       "snapshotSha": "38bb4ef7a272061022e72e85bf211b9645c53e82"
     },
     {
       "path": "packages/protocol/test/groups/KeySetsTest.ts",
-      "status": "planned",
-      "reason": "The fabric's group key sets: lookup, replacement, current and all operational keys.",
+      "status": "partial",
+      "go": [
+        "groups:TestKeySetsForIDAdd",
+        "groups:TestKeySetsAllKeysForID",
+        "groups:TestKeySetsCurrentKeyForID",
+        "groups:TestKeySetsContainsOperationalKey"
+      ],
+      "missing": [
+        "returns the only key for the default key set",
+        "returns the second-newest key for the IPK key set (§4.14.2.6)"
+      ],
+      "reason": "Lookup and replacement, the keys of a key set, the current key of a non-IPK key set and the operational-key match are ported on the manager's key sets (forId and allKeysForId on key set 1, as the manager does not hold key set 0); the two key-set-0 current-key cases are missing because the Go IPK is the single key of the fabric identity, not an epoch-rotated key set 0, and Group Key Management refuses writing key set 0.",
       "snapshotSha": "63ab34a45d0cbe4b2da1181f1f6556c27356ec6c"
     },
     {
       "path": "packages/protocol/test/groups/MessagingStateTest.ts",
-      "status": "planned",
-      "reason": "Group messaging state: storage, reception state per source and key, the legacy data-counter migration.",
+      "status": "partial",
+      "go": [
+        "groups:TestMessagingStateReceptionStateFor"
+      ],
+      "missing": [
+        "allows setting storage once when constructed without it",
+        "rejects setting storage a second time",
+        "returns the max across legacy *-data entries, ignoring others",
+        "returns undefined when there are no legacy entries",
+        "clears only the legacy *-data entries"
+      ],
+      "reason": "The per-(source node, key) reception state is ported on Manager.receptionWindow; the storage setter has no Go counterpart (NewManager takes the store at construction) and the legacy per-key data counter migration has none either, as this module never persisted per-key group send counters (groups/counter.go newDataCounter).",
       "snapshotSha": "8ee0caea698f3cd0993ea8a0a23bb649e2c2f41c"
     },
     {
@@ -3534,12 +3460,13 @@
         "im:TestMessengerParity_ReadRequestWithManyDataVersionFilters",
         "im:TestMessengerParity_SubscribeRequestWithManyDataVersionFilters",
         "im:TestMessengerParity_SubscribeRequestRoundTrip",
-        "im:TestMessengerParity_ReadRequestFitsPayload"
+        "im:TestMessengerParity_ReadRequestFitsPayload",
+        "controller/interaction:TestInteractionClientMessengerRead",
+        "controller/interaction:TestInteractionClientMessengerSubscribe",
+        "controller/interaction:TestInteractionClientMessengerWrites"
       ],
       "missing": [
-        "reads attributes",
         "throws a received error when the peer answers a read with a StatusResponse ${status}",
-        "subscribes attributes",
         "does not block report iteration on final status ack and waits on close",
         "answers a report it has not answered yet with INVALID_SUBSCRIPTION",
         "answers the next report with INVALID_SUBSCRIPTION when asked to await it",
@@ -3552,49 +3479,27 @@
         "sends nothing when no report waits for a status and it is not asked to await one",
         "does not consider a report with SuppressResponse as waiting for a status",
         "does not consider a report waiting for a status once it was answered",
-        "sends a write that fits one message unchanged, with MoreChunkedMessages encoded as false",
         "chunks a write that does not fit one message and merges the statuses of all chunks",
         "chunks a write whose statuses would not fit one WriteResponse although the request does",
-        "refuses a timed write whose statuses would not fit one WriteResponse",
         "sends a whole list that does not fit one message as an empty REPLACE followed by ADDs",
         "sends a whole ACL that does not fit one message as a filled REPLACE followed by ADDs",
-        "refuses to chunk a write with ${Object.keys(flags)[0]}",
-        "refuses a whole list at a wildcard path that does not fit one message",
-        "refuses a single value that does not fit one message",
         "sends the ADDs of a versioned list write without DataVersion once its REPLACE succeeded",
         "keeps the DataVersion on the ADDs of a list write whose REPLACE failed",
         "keeps the DataVersion on the ADDs of a repeated list write whose second REPLACE failed",
-        "sends a timed versioned list write that fits one message unchanged",
         "stops sending chunks when the peer answers a chunk with an error status"
       ],
-      "reason": "Trimming data version filters to the payload is ported; the messenger's exchange handling (status responses, abandoned subscriptions, acks) is not.",
+      "reason": "Read, subscribe, the read refused by a StatusResponse (UnsupportedAccess and Success) and every write that fits one message or is refused are ported through Interaction against a scripted peer; missing are the 0x7777 StatusResponse variant (a Go status is a uint8, im/status.go:61), the report iterator split between iteration and close (Go has no iterator; Read returns after the final ack), the abandonSubscription group (no Go counterpart, InteractionMessenger.ts:1116-1137) and write chunking across messages (InteractionMessenger.ts:1269-1460), which the one-message Go write refuses instead.",
       "snapshotSha": "89392f25092ecabc32ce49513ea6c3f0bc0add26"
     },
     {
       "path": "packages/protocol/test/mdns/CommissionableMdnsScannerTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/discovery:TestParityDiscovery_CommissionableDevice",
-        "controller/discovery:TestNames_ExpiryRemovesRecordsAndTheName"
+        "controller/discovery:TestNames_ExpiryRemovesRecordsAndTheName",
+        "controller/discovery:TestCommissionableMdnsScanner"
       ],
-      "missing": [
-        "ignores a device whose discriminator or commissioning mode is out of range",
-        "ignores TTL=0 goodbye within protection window",
-        "removes a device whose goodbye follows a re-announcement, and finds it again when it returns",
-        "re-discovers device after TTL expiry eviction",
-        "concurrent discoveries time out with empty results when no device is present",
-        "two concurrent discoveries both resolve when device is found",
-        "finds devices by long discriminator",
-        "reports the host its SRV record names",
-        "reports the host of an SRV record that arrives after the device was cached",
-        "reports no host while two SRV records disagree about it, rather than the one it left",
-        "reports the host where the device answers on two ports of it",
-        "defers delivery until A/AAAA records arrive",
-        "PTR-follow solicits SRV/TXT when PTR arrives without additional records",
-        "discovers device when A/AAAA arrives before SRV in separate messages",
-        "re-solicits A/AAAA when cached entry's addresses expired before next discovery"
-      ],
-      "reason": "Discovering a commissionable device and TTL expiry are covered; the range filter, goodbye protection and concurrent discoveries are not ported case by case.",
+      "reason": "Every case is ported against the Scanner on the in-memory query connection and the fake clock: the D/CM range filter, the goodbye eviction delay and re-announcement, TTL eviction and re-discovery, concurrent searches (the matter.js timeouts as caller contexts cancelled on the fake clock), the reported host, deferred delivery, PTR-follow, staged addresses and the address re-solicit.",
       "snapshotSha": "40364c02024c3a8f779f299934da5775c9c63f09"
     },
     {
@@ -3602,54 +3507,32 @@
       "status": "partial",
       "go": [
         "mdns:TestParityMdnsServer_RespondsToANYQuery",
-        "mdns:TestParityMdnsServer_TruncatedQueryDelaysResponse",
-        "mdns:TestParityMdnsServer_RespondsToSRVQuery",
-        "mdns:TestParityMdnsServer_RespondsToAQuery",
-        "mdns:TestParityMdnsServer_SuppressKnownAnswer",
-        "mdns:TestParityMdnsServer_SuppressFullAnswer",
-        "mdns:TestParityMdnsServer_DuplicateQuestionSuppression",
-        "mdns:TestParityMdnsServer_DuplicateSuppressionWindowExpires",
-        "mdns:TestParityMdnsServer_UnicastAndSplitResponse",
         "mdns:TestParityMdnsServer_NoResponseForUnknownName",
         "mdns:TestParityMdnsServer_RespondsToHostARecordByHostname",
-        "mdns:TestParityMdnsServer_MixedQueryRespondsForKnownNames",
         "mdns:TestParityMdnsServer_RecordsGeneratorReplacement",
-        "mdns:TestParityMdnsServer_CaseInsensitiveNameMatch",
         "mdns:TestHostAnswer_KnownAnswerNeedsMoreThanHalfTTL",
-        "mdns:TestHostAnswer_UnicastOnlyAfterRecentMulticast"
+        "mdns:TestHostAnswer_UnicastOnlyAfterRecentMulticast",
+        "mdns:TestMdnsServerRespondsToStandardQueries",
+        "mdns:TestMdnsServerCacheFlushBit",
+        "mdns:TestMdnsServerAnswerSuppression",
+        "mdns:TestMdnsServerHandleDuplicateMessages",
+        "mdns:TestMdnsServerRespondsAsUnicast",
+        "mdns:TestMdnsServerUnknownNameQueryRejection",
+        "mdns:TestMdnsServerHostName"
       ],
       "missing": [
         "server responds to an PTR query",
-        "suppresses a record the querier knows even though we flag it cache-flush",
-        "drops the bit on an additional record whose set a known answer pruned",
-        "omits the bit from a unicast response",
-        "drops the bit when a known answer leaves the record set incomplete",
-        "keeps the bit when the whole record set is sent",
-        "suppress some answers in an ANY query",
-        "suppress full answer in an A query",
-        "server suppress response to same ANY query when 0ms delay",
         "server suppress response to same ANY query when up to 1s delay",
-        "server do not suppress response from same ANY query when > 1s delay",
-        "server also suppress response to different query with same records when 0ms delay",
-        "server do not suppress additional records to different query when 0ms delay",
-        "server responds to an ANY query as multicast when unicast is requested after a previous unicast query with less than 1/4 of TTL remaining",
-        "server responds to an ANY query as multicast even if requested as unicast and after a multicast query with more than 1/4 of ttl but never sent as multicast",
-        "server responds to an ANY query as multicast even if requested as unicast and after a multicast query with more than 1/4 of ttl when earlier sent as multicast",
         "include as many answers as possible and spill remaining additionalRecords into a follow-up packet",
         "lets zero-query continuation packets merge known-answers into a cached TC fragment",
         "merges known-answers from a TC continuation that carries unrelated queries",
-        "suppresses known-answer records supplied with a different case (RFC 6762 §16)",
         "sends nothing and logs at debug level for a broadcast after close",
         "logs at debug level when expiring announcements while the server closes",
-        "names one host on every interface",
-        "keeps the name while its MAC is present, even when another interface lists first",
-        "follows a rotated MAC",
-        "skips an interface whose details cannot be read",
         "chooses the name on a network that reports interface details asynchronously",
         "names each interface by its own MAC when the interfaces cannot be listed",
         "names each interface by its own MAC when none has a usable one"
       ],
-      "reason": "The mdns parity tests port the query types, answer and duplicate suppression, unicast, splitting and name matching; the cache-flush details, TC continuations, close and host-name cases are not.",
+      "reason": "The cache-flush, known-answer, duplicate, unicast and case cases are ported against the host-name answerer (the go-fabric code that answers queries; the service records are grandcat/zeroconf's) and the host-name choice against hostNameChooser; missing stay the PTR answer with SRV/TXT additionals and the packet split (grandcat/zeroconf builds those responses), the 1 s duplicate case (its matter.js assertion runs before the async handler, MdnsServerTest.ts:707-724, and at 1000 ms MdnsServer.ts's 999 ms window has expired, so the vector proves nothing), the TC-continuation merge (the answerer does not hold truncated queries; MdnsServer.ts:446-503 is a timer-backed cache beyond a small fix), the two Close cases (no go-fabric broadcast fails and logs on close; TriggerReannounce after Close is a silent no-op), the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03). The t.Skip anchors of mdns/parity_mdns_server_test.go were dropped from the go list (owner review of PR #164).",
       "snapshotSha": "9d109578a8f28b656872292d2e6b039badf1c2a7"
     },
     {
@@ -3667,82 +3550,57 @@
         "it allows announcements of multiple devices on different ports",
         "splits oversized announcements into multiple packets with all records in the answer section"
       ],
-      "reason": "The commissionable TXT record is covered; the operational and commissioner broadcasts, their expiry and the overflow case are not ported case by case.",
+      "reason": "The commissionable and operational TXT content BuildCommissionableService/BuildOperationalService own is covered; the rest stays missing: the crypto case checks matter.js's MockCrypto itself, the announcement and TTL-0 expiry packets (record order, _services._dns-sd PTRs, cache-flush bits, overflow splitting) are assembled by grandcat/zeroconf's RegisterProxy/Shutdown, not by go-fabric code a unit test can drive, the operational TXT also differs by design (SAT always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted), and the device side has no _matterd._udp commissioner advertisement, so the three commissioner cases have no Go subject.",
       "snapshotSha": "1457c02635be7e2e331f32fe7f36473952a60e54"
     },
     {
       "path": "packages/protocol/test/ota/OtaImageReaderTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "bdx:TestOtaImageParityMatterJS",
         "bdx/otaimage:TestDigestTypes",
         "bdx/otaimage:TestHeaderBounds",
-        "bdx/otaimage:TestRefusals"
+        "bdx/otaimage:TestRefusals",
+        "bdx/otaimage:TestOtaImageReaderHeader",
+        "bdx/otaimage:TestOtaImageReaderFile",
+        "bdx/otaimage:TestOtaImageReaderExtractPayload",
+        "bdx/otaimage:TestOtaImageReaderErrorHandling"
       ],
-      "missing": [
-        "reads OTA image header without optional fields",
-        "reads header with custom hash algorithm",
-        "computes full file checksum when enabled",
-        "validates full file checksum when expectedChecksum provided",
-        "throws error when full file checksum doesn't match",
-        "supports custom checksum types",
-        "validates payload digest during file reading",
-        "rejects an unsupported image digest type with an OtaImageError",
-        "handles different hash algorithms for payload validation",
-        "extracts payload to writable stream",
-        "validates digest while extracting payload",
-        "throws error for invalid/truncated file",
-        "throws error for size mismatch"
-      ],
-      "reason": "Header parsing and digest validation are covered; the optional fields, full-file checksum and streaming cases are not ported case by case.",
+      "reason": "Every it of header, file (whole-file checksum with its algorithm, or the payload digest with calculateFullChecksum false), extractPayload and error handling is ported through ReadHeader / ValidateFile / ExtractPayload.",
       "snapshotSha": "04a20f60d44a9fb6454a8737c29324b7a0c4c73e"
     },
     {
       "path": "packages/protocol/test/ota/OtaImageWriterTest.ts",
-      "status": "planned",
-      "reason": "Writing an OTA image (header fields, digest, total size) and reading it back.",
+      "status": "ported",
+      "go": [
+        "bdx/otaimage:TestOtaImageWriterCreate",
+        "bdx/otaimage:TestOtaImageWriterRoundTripWithOtaImageReader",
+        "bdx/otaimage:TestOtaImageWriterConfigurableHashAlgorithms"
+      ],
+      "reason": "Every it of create, the round-trip with the reader and the configurable hash algorithms is ported through CreateWithChecksum, ReadHeader and ValidateFile.",
       "snapshotSha": "e7ece676a33bda942b008ee5ae79666073fec1e4"
     },
     {
       "path": "packages/protocol/test/peer/CommissioningConnectionTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/commissioner:TestConnectionPasscodeDropsDevice",
         "controller/commissioner:TestConnectionStaggerAndWinner",
         "controller/commissioner:TestConnectionHoldingResponder",
         "controller/commissioner:TestConnectionBudget",
-        "controller/commissioner:TestConnectionErrorClasses"
+        "controller/commissioner:TestConnectionErrorClasses",
+        "controller/commissioner:TestCommissioningConnection",
+        "controller/commissioner:TestCommissioningConnectionStagger",
+        "controller/commissioner:TestCommissioningConnectionScripted"
       ],
-      "missing": [
-        "does not accept a late success on a device already dropped for invalid credentials",
-        "credential failure skips later entries with the same deviceIdentifier",
-        "keeps trying a device's other addresses after invalid PASE data on one",
-        "closes session if winner is found concurrently with another establishment completing",
-        "returns the won session without waiting for an abort-unresponsive loser to settle",
-        "closes session if timeout fires while establishment is pending",
-        "external abort cancels in-flight connection and rejects with abort reason",
-        "passes abort signal to establishSession and aborts early when timeout fires",
-        "first candidate fires immediately, subsequent candidates wait delayBeforeNextAddress each",
-        "cancels pending stagger when a winner is established",
-        "stagger slot is global across distinct devices (contract doc)",
-        "a fast failure starts the next attempt at once, and that attempt still wins",
-        "gives a third address an attempt within the default 30s timeout",
-        "holds the next address while an attempt has reached its responder",
-        "skips the queued addresses of a device dropped for invalid credentials",
-        "restarts the stagger from the last launch",
-        "lets an older failure leave the newer attempt's stagger running",
-        "keeps the newer attempt's delay when a held attempt fails while it is unanswered",
-        "launches the next address once a hold ends after the latest attempt failed",
-        "launches the next address when a held attempt fails with nothing else pending",
-        "default delayBeforeNextAddress is 10s"
-      ],
-      "reason": "The commissioner's connection tests cover the passcode drop, transient network errors, the last error and an external abort; the concurrent-winner session closes and the remaining cases are not ported case by case.",
+      "reason": "Every CommissioningConnection case ported on clocktest.Fake: the credential drop and its late-success close cause, invalid PASE data, the concurrent-winner and timeout session closes, the winner not waiting for an abort-unresponsive loser, external and budget aborts reaching the attempt's ctx, the per-address stagger (global across devices, cancelled by a winner, default 10 s, a third address within 30 s), the responder hold and the five scripted stagger/hold timelines.",
       "snapshotSha": "7733004c6b3613f0fff0ff0d45a9baa688ab3e17"
     },
     {
       "path": "packages/protocol/test/peer/NetworkProfileTest.ts",
       "status": "planned",
-      "reason": "The controller's network profiles and their additional MRP delay per medium, BDX margin and sub-profiles.",
+      "reason": "matter.js's NetworkProfiles (per-medium throttle semaphores, additive MRP margins, connect/probe sub-profiles) has no Go counterpart: controller/peer documents network profiles as out of scope by ADR 0020's stage split (the LAN is the one network, MRP margins are 0), and porting the class is a feature, not a fix. Milestone 5 phase 25 (the controller remainder) brings the network profiles; findings register, \"Network profiles\" (owner review of PR #164).",
+      "until": "M5 phase 25",
       "snapshotSha": "96b368b7b5483585ae5cced11100b36ba550ccd6"
     },
     {
@@ -3752,28 +3610,22 @@
         "controller/peer:TestMonitorSessionSuspect",
         "controller/peer:TestMonitorMigratesToAnAlternate",
         "controller/peer:TestMonitorStillDiscoveredAndCooldown",
-        "controller/peer:TestMonitorAllProbesFail"
+        "controller/peer:TestMonitorAllProbesFail",
+        "controller/peer:TestPeerAddressMonitorVerifyReachability",
+        "controller/peer:TestPeerAddressMonitorCoalescing",
+        "controller/peer:TestPeerAddressMonitorBackoff"
       ],
       "missing": [
-        "session-suspect alone: current fails → no alternate walk, session closed, false",
-        "address-change: current matches a channel-agnostic discovered address → skip, no probe",
-        "coalesces concurrent triggers into one run",
-        "session-suspect stays current-only even when an address-change joins the run",
-        "close() stops the timer and awaits the in-flight run",
-        "a caller's own aborted signal yields false without preventing the peer-owned run",
         "sleeping LIT ICD whose address left mDNS: adopts a discovered address on trust, no probe",
         "sleeping LIT ICD prefers a discovered address in the session's IP family",
         "sleeping LIT ICD still in mDNS: keeps its address untouched, no probe",
         "session-suspect on a sleeping LIT ICD never probes or closes the session",
-        "an address change does not reset the growing cooldown",
-        "session-suspect resets the backoff so the next address-change probes immediately",
         "keeps the probe cooldown across a forward wall-clock step",
         "ends the probe cooldown on schedule across a backward wall-clock step",
         "keeps the probe cooldown when the clock stepped back before the first probe",
-        "a timer-fired address check is tracked exactly once",
-        "a session-suspect run does not arm the address-change debounce"
+        "a timer-fired address check is tracked exactly once"
       ],
-      "reason": "The session-suspect check, migration to an alternate, the still-discovered no-op and the all-fail close are covered; coalescing, abort and the sleeping-LIT cases are not.",
+      "reason": "The session-suspect and address-change runs (current-only, channel-agnostic skip, migration, all-fail close), coalescing including a joining address-change, close awaiting the in-flight run, a joiner's own abort and the probe backoff (growth across address churn, the suspect reset, no debounce after a suspect run) are ported against a live session; the sleeping-LIT-ICD branch (PeerAddressMonitor.ts:143-172) is not in Go (no fabric ICD wakefulness model, ADR 0020 stage 4), the wall-clock steps need a second clock reading clocktest.Fake does not have, and the trackWork count has no Go counterpart (the peer tracks work in a WaitGroup with no observable count).",
       "snapshotSha": "6e69549d9e68858d4b087b95eb3c32703ae77a4d"
     },
     {
@@ -3788,15 +3640,13 @@
       "status": "partial",
       "go": [
         "controller/peer:TestParityTimingDefaults",
-        "controller/peer:TestConnectReuseSharedProcessAndTimeout"
+        "controller/peer:TestConnectReuseSharedProcessAndTimeout",
+        "controller/peer:TestPeerConnectTimeout"
       ],
       "missing": [
-        "falls back to defaultConnectionTimeout when abort is provided without connectionTimeout",
-        "uses caller's connectionTimeout when one is supplied alongside abort",
-        "remains unbounded when caller explicitly passes Forever",
         "normalizes non-positive timeouts to Instant"
       ],
-      "reason": "The default connection timeout is covered; the abort/timeout combinations and the normalisation are not.",
+      "reason": "The default timeout, the default and the caller's timeout under a cancellable context (matter.js's abort) and the unbounded Forever wait are ported through Peer.Connect; non-positive timeouts cannot be normalised to Instant because Go's ConnectOptions.ConnectionTimeout encodes 0 as unset (the default) and a negative value as Forever, so Instant has no encoding.",
       "snapshotSha": "9e03dac5a4c1594eb0490afab2d97cca5e6187cf"
     },
     {
@@ -3804,51 +3654,32 @@
       "status": "partial",
       "go": [
         "controller/peer:TestHandleErrorOverrideAndFatal",
-        "controller/peer:TestConnectionErrorDelays"
+        "controller/peer:TestConnectionErrorDelays",
+        "controller/peer:TestPeerConnectionErrorHandlerSelection",
+        "controller/peer:TestPeerConnectionErrorHandlerDelayContract",
+        "controller/peer:TestPeerConnectionErrorHandlerRediscoveryGate",
+        "controller/commissioner:TestPeerConnectionErrorHandlerNoSharedTrustRoots"
       ],
       "missing": [
-        "prefers per-connection handler over context handler",
-        "falls back to context handler when no per-connection handler",
-        "returns undefined when neither handler is set",
-        "signals abort when handler throws",
-        "keeps default delay when no handler is set",
-        "flags unreachable for NetworkUnreachableError (ENETUNREACH)",
-        "flags unreachable for AddressUnreachableError (EHOSTUNREACH)",
-        "flags unreachable when a network error is wrapped as a cause",
-        "does not flag unreachable for transient peer errors (handled by MRP retransmission path)",
-        "does not flag unreachable for generic errors",
-        "returns 15s for NoSharedTrustRoots",
-        "returns undefined for other ChannelStatusResponseErrors",
-        "returns undefined for non-ChannelStatusResponseError",
         "overrides default peer error delay in full flow",
         "does not override delay for unrelated errors in commissioning"
       ],
-      "reason": "The handler's delay override is covered; handler precedence and the rediscovery gate are not ported case by case.",
+      "reason": "Handler precedence (connection over set), the delay override contract and the network-error rediscovery gate are ported through the connection process and flagsUnreachable; the commissioning NoSharedTrustRoots handler, now the commissioner method handleNoSharedTrustRoots, is ported in controller/commissioner; its two full-flow cases are missing because the commissioner cannot be driven through controller/peer.s connection harness (an import cycle), the delay contract itself being TestPeerConnectionErrorHandlerDelayContract.",
       "snapshotSha": "0c50761bbbb22c729a1df590be8c1285b0661bc5"
     },
     {
       "path": "packages/protocol/test/peer/PeerConnectionFallbackRetirementTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/peer:TestFallbackRetiredAfterStabilization",
         "controller/peer:TestFallbackOnlyAndNotFirst",
-        "controller/peer:TestParityTimingDefaults"
+        "controller/peer:TestParityTimingDefaults",
+        "controller/peer:TestPeerConnectionFallbackRetirementAfterStabilization",
+        "controller/peer:TestPeerConnectionFallbackRetirementSuperseded",
+        "controller/peer:TestPeerConnectionFallbackRetirementKeepAlive",
+        "controller/peer:TestPeerConnectionFallbackRetirementStagger"
       ],
-      "missing": [
-        "does not retire a fallback that discovery re-advertises during the debounce",
-        "does not retire while no discovered alternative exists",
-        "is superseded with a discovered alternative that is not the fallback",
-        "is not superseded once promoted (fallback flag cleared)",
-        "is not superseded when no discovered address exists",
-        "is not superseded when the fallback is itself re-advertised (matched ignoring transport)",
-        "is not superseded when the fallback is re-advertised alongside other addresses",
-        "keeps the operational address alive when it is the last attempt (unforced)",
-        "deletes when a non-operational attempt still remains",
-        "force bypasses the keep-alive so a superseded fallback is actually dropped",
-        "staggers a second real address behind the first",
-        "starts immediately once retirement resets lastAttemptAt"
-      ],
-      "reason": "Retiring the fallback address after stabilization is covered; the supersession decisions and the keep-alive guard are not.",
+      "reason": "The stabilization debounce, retiring a superseded fallback and keeping a re-advertised or alternative-less one, the fallbackSuperseded decision, the deleteAddress keep-alive guard with its force bypass and the scheduler stagger are ported against controller/peer's connection process and its closures.",
       "snapshotSha": "56b81559e7a471d841107791d7c8835cd0147ec4"
     },
     {
@@ -3857,36 +3688,18 @@
       "go": [
         "controller/peer:TestParityTimingDefaults",
         "controller/peer:TestKickRestartsTheExchange",
-        "controller/peer:TestDiscoverKick"
+        "controller/peer:TestDiscoverKick",
+        "controller/peer:TestPeerConnectionKickTiming",
+        "controller/peer:TestPeerConnectionKickOrigin",
+        "controller/peer:TestPeerConnectionKickRateLimiting",
+        "controller/peer:TestPeerConnectionKickGate",
+        "controller/peer:TestPeerConnectionKickLocalAbort",
+        "controller/peer:TestPeerConnectionKickObserver"
       ],
       "missing": [
-        "has correct default for kickMinRetransmissions",
-        "allows overriding kick restart cooldowns",
-        "keeps the untouched members of a partially overridden group",
-        "keeps the untouched members of a group when merging onto a custom base",
-        "passes 'discover' origin to observer",
-        "passes 'connect' origin to observer",
-        "suppresses rapid-fire kicks within minimumEmitInterval",
-        "allows kick after minimumEmitInterval has elapsed",
-        "accepts the first kick unconditionally",
-        "suppresses a second 'discover' kick within 30 minutes",
-        "accepts a second 'discover' kick after 30 minutes",
-        "suppresses a second 'connect' kick within 10 minutes",
-        "accepts a second 'connect' kick after 10 minutes",
-        "uses independent thresholds for different origins",
-        "shares lastRestartAt across concurrent handlers",
-        "allows custom thresholds via PeerTimingParameters override",
-        "suppresses while the exchange has not retransmitted enough",
-        "suppresses when a restart would save too little time (e.g. idle/sleepy peer)",
-        "restarts once both retransmission count and restart saving clear their thresholds",
-        "firing localAbort causes AbortedError via Abort.attempt",
-        "addressAbort propagates to localAbort",
-        "localAbort on already-aborted signal is harmless",
-        "connect loop restarts after localAbort fires",
-        "Observable<[KickOrigin]> matches QuietObservable<[KickOrigin]>",
-        "use() returns disposable that unregisters observer"
+        "Observable<[KickOrigin]> matches QuietObservable<[KickOrigin]>"
       ],
-      "reason": "The kick defaults and the restart on a kick are covered; overrides, the quiet observable and the restart conditions are not ported case by case.",
+      "reason": "The kick timing defaults and overrides, the 3 s kick throttle with its origins, the shared per-origin restart cooldown, the retransmission gate, the per-try abort under the attempt and the per-try handler registration are ported against controller/peer's connection process (kickGate and restartAllowedLocked split out of the kick handler); the QuietObservable-to-Observable assignability is a TypeScript type contract with no Go counterpart.",
       "snapshotSha": "4f67a160bce7d60f1b3c61366ac4d836bdee7267"
     },
     {
@@ -3905,21 +3718,19 @@
     },
     {
       "path": "packages/protocol/test/peer/PeerEstablishmentProgressTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/peer:TestParityUnresponsiveDetector",
-        "controller/peer:TestEstablishmentUnresponsive"
+        "controller/peer:TestEstablishmentUnresponsive",
+        "controller/peer:TestPeerEstablishmentProgressDetector"
       ],
-      "missing": [
-        "keeps an independent latch per detector instance"
-      ],
-      "reason": "The unresponsive-establishment latch is ported; the per-instance latch independence is not.",
+      "reason": "The unresponsive-establishment latch (fire once past MRP.MAX_TRANSMISSIONS, re-arm at 0, one latch per detector instance) and its firing from a never-acked CASE exchange are ported against controller/peer.",
       "snapshotSha": "c24a7e3957d9be9c8550459acf4ccf8828b94b3a"
     },
     {
       "path": "packages/protocol/test/peer/PhysicalDevicePropertiesTest.ts",
       "status": "planned",
-      "reason": "Subscription interval bounds the controller derives from a peer's physical properties (Thread, ICD, Generic Switch).",
+      "reason": "The subject (PhysicalDeviceProperties: computeProperties, isLongIdleTimeOperating, intervalBounds) lives in controller/client, brief BI's path, which this tranche does not touch; the cases wait for BI; brief BI's second tranche ports it (owner review of PR #164).",
       "snapshotSha": "05a12bae66a0294e57cd4b483431f04ee23c4004"
     },
     {
@@ -3932,31 +3743,48 @@
     },
     {
       "path": "packages/protocol/test/peer/ThreadNetworkNameResolutionTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "controller/commissioner:TestResolveThreadNetworkName"
+        "controller/commissioner:TestResolveThreadNetworkName",
+        "controller/commissioner:TestThreadNetworkNameResolution"
       ],
-      "missing": [
-        "treats an empty-string name as absent and derives",
-        "returns the supplied name when it matches the dataset",
-        "declines with a typed error when the supplied name mismatches the dataset",
-        "keeps the supplied name when the dataset carries no network name",
-        "returns undefined when neither the params nor the dataset carry a name",
-        "falls back to the supplied name and does not throw when the dataset cannot be decoded"
-      ],
-      "reason": "Deriving the network name from the dataset is covered; the mismatch, empty and undecodable cases are not.",
+      "reason": "All seven resolveThreadNetworkName cases ported with the test's MeshCoP vectors: derive, empty name as absent, match, typed mismatch error, dataset without a name, neither, undecodable dataset falling back to the supplied name.",
       "snapshotSha": "de49fbbdf64bbf926d868b2e8f54f3b0bdd3407f"
     },
     {
       "path": "packages/protocol/test/protocol/DeviceAdvertiserTest.ts",
-      "status": "planned",
-      "reason": "The device advertiser: commissioning advertisement after a PASE close, the TCP T key, ICD fields of the operational advertisement.",
+      "status": "partial",
+      "go": [
+        "secure/operational:TestDeviceAdvertiserSessionDeletedHandler",
+        "bridge:TestTriggerSessionReannounce_RepublishesActiveRecords",
+        "bridge:TestDeviceAdvertiserTcpTKey",
+        "bridge:TestDeviceAdvertiserIcdAdvertisementProvider"
+      ],
+      "missing": [
+        "includes ICD operating mode and intervals in operational advertisement when a provider is registered",
+        "refreshOperationalAdvertisement does nothing when not in operational mode",
+        "clearing the provider reverts to no ICD fields on next advertisement",
+        "feeds the node's session intervals into a non-ICD operational advertisement",
+        "lets the ICD provider override the node's session intervals"
+      ],
+      "reason": "The session deleted handler (a PASE close fires the reannounce trigger, a deleted fabric's CASE teardown does not), the T key for both, none and server-only transports, the absent ICD key and a repeated AnnounceFabric as the refresh are ported; the bridge has no ICD advertisement provider (DeviceAdvertiser.ts:195-197) nor an operational-mode state gating the refresh (:206-209), and AnnounceFabric advertises the mdns default SII/SAI/SAT rather than the node's configured session intervals (:363-364).",
       "snapshotSha": "4c439c1a8d84ebe34ea7716e87ef4bc4be608c09"
     },
     {
       "path": "packages/protocol/test/protocol/ExchangeManagerTest.ts",
-      "status": "planned",
-      "reason": "The exchange manager: peer loss, inbound group and secure messages, unadopted unsecured sessions.",
+      "status": "partial",
+      "go": [
+        "controller/exchange:TestExchangeManagerPeerLoss",
+        "controller/exchange:TestExchangeManagerInboundSecureMessages",
+        "controller/exchange:TestExchangeManagerInboundUnsecuredSessions"
+      ],
+      "missing": [
+        "reports the session lost when the clock stepped back since the session was created",
+        "gives each message the address of its own datagram",
+        "sends as the current node ID through an exchange opened before the fabric's node ID changed",
+        "wakes a sleeping LIT peer on a message no exchange accepts"
+      ],
+      "reason": "Peer loss sparing the failing exchange and its suppression, a duplicate as peer activity and the release of unadopted inbound unsecured sessions are ported against the controller Manager; the clock-step case needs a monotonic reading clocktest.Fake cannot step apart from the wall clock, the controller has no group sessions and the device's group path hands no source address to a handler, the group Sender fixes the node id at creation (a gap in groups/, not in an owned package), and ICD wakefulness has no Go counterpart.",
       "snapshotSha": "3a60949d5180b83fc1cd1261cd60bfe5c20d8323"
     },
     {
@@ -3965,7 +3793,10 @@
       "go": [
         "secure/operational:TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle",
         "secure/operational:TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx",
-        "transport/mrp:TestBackoffDuration_TransmissionExponent"
+        "transport/mrp:TestBackoffDuration_TransmissionExponent",
+        "controller/exchange:TestMRPRetransmissionIntervalOf",
+        "controller/exchange:TestMRPMaxRetransmissionIntervalOf",
+        "controller/exchange:TestMRPMaxPeerResponseTimeOf"
       ],
       "missing": [
         "selects the bdx margin for bulk transfer",
@@ -3973,27 +3804,25 @@
         "has no margin to offer when the peer's medium is unknown",
         "uses the active interval for retransmissions while the peer is active",
         "uses the idle interval for retransmissions when the peer is no longer active",
-        "adds no margin when additionalDelay is omitted",
         "adds fixedBackoff as a flat pad after the backoff, not amplified by the exponent",
         "applies additionalDelay (amplified) and fixedBackoff (flat) independently",
-        "uses the idle interval for retransmissions when the peer is not active",
-        "uses the active interval for retransmissions when the peer is active",
         "includes additionalDelay (amplified) and fixedBackoff (flat) so the maximum upper-bounds real sends",
-        "uses the 30s base when expectedProcessingTime is small",
-        "honors expectedProcessingTime when larger than the 30s base",
-        "falls back to the default expectedProcessingTime when omitted",
-        "composes the active peer leg, the active return leg, processing time and buffer",
-        "uses the idle peer leg when the peer is inactive while the return leg stays active",
-        "drops the peer leg when peer session parameters are unknown",
         "adds our sender-side fixedBackoff to the local return leg only"
       ],
-      "reason": "The active/idle base interval is covered; the margins, fixed backoff and maximum-interval cases are not ported case by case.",
+      "reason": "The unpadded interval, the maximum interval per peer activity and the peer response time of the udp, tcp and ble channels are ported against controller/exchange; the network-profile margins (MRP.marginFor), additionalDelay and fixedBackoff do not exist in Go (the retransmission formula has no pad), so every case that passes them stays missing.",
       "snapshotSha": "bed8f378fbba434e2451dcd1446b4815d0730193"
     },
     {
       "path": "packages/protocol/test/protocol/MessageChannelTest.ts",
-      "status": "planned",
-      "reason": "A message channel reporting a changed address after a socket swap, and releasing its transport channel.",
+      "status": "partial",
+      "go": [
+        "controller/exchange:TestMessageChannelSocketSwap"
+      ],
+      "missing": [
+        "stops observing the transport channel address without closing the channel",
+        "closes the transport channel of an unreliable transport on close"
+      ],
+      "reason": "The socket swap is ported against Session.SetAddr (the Go MessageChannel is folded into the Session and has no address observable, so the change is held as the reported and used address); the release cases have no Go counterpart, because every session sends on the manager's one socket and owns no transport channel to release or close.",
       "snapshotSha": "3908edac6e19f14fef5b432ac167d0a7af5064cd"
     },
     {
@@ -4003,32 +3832,51 @@
         "transport/mrp:TestNewCounter_SeedsWithin28BitRange",
         "transport/mrp:TestCounterMonotonic",
         "transport/mrp:TestCounterWrap",
-        "transport/mrp:TestCounter_NextNoRollover_ExhaustsAtCeiling"
+        "transport/mrp:TestCounter_NextNoRollover_ExhaustsAtCeiling",
+        "groups:TestMessageCounterPersisted",
+        "groups:TestMessageCounterRollover"
       ],
       "missing": [
-        "persistent initialization of counter with no persisted value",
-        "persistent initialization of counter with persisted value",
-        "persisted counter increases by 1",
         "persisted counter constructor throws in negative value in storage",
-        "persisted counter constructor throws in too large value in storage",
-        "emits 0xFFFFFFFF before rolling over to 0",
-        "Message counter rolls over if allowed and calls callback on increase once",
-        "Message counter rolls over if allowed and calls callback already on init once",
-        "reserves a block ahead and does not write storage within the block",
-        "never rolls back across a restart when reserving",
         "seeds the initial value when nothing is persisted",
         "ignores the seed when a value is already persisted",
         "rejects an invalid reserve",
-        "re-reserves after a rollover so wrapped values are not re-issued",
         "rejects a non-numeric persisted value"
       ],
-      "reason": "Seeding, increment, rollover and its refusal are covered; the persisted counter cases are not.",
+      "reason": "The persisted counter is ported against the group data counter (groups.dataCounter, matter.js's only persisted counter as SessionManager configures it: reserve 1000, rollover warning at 100 000); a negative or non-numeric stored value is unrepresentable in the uint64 CounterStore, and the seed and reserve options do not exist because the Go counter has the one fixed configuration (no legacy per-key counters to seed from).",
       "snapshotSha": "17b1fb8728fd817d91291a442c5ab808c6f98465"
     },
     {
       "path": "packages/protocol/test/protocol/MessageExchangeTest.ts",
-      "status": "planned",
-      "reason": "The message exchange: peer-loss declaration, unacked messages, retransmission and close.",
+      "status": "partial",
+      "go": [
+        "controller/exchange:TestMessageExchangePeerLossDeclaration",
+        "controller/exchange:TestMessageExchangeHasUnackedMessage",
+        "controller/exchange:TestMessageExchangeLivenessKickOnDuplicate",
+        "controller/exchange:TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage",
+        "controller/exchange:TestMessageExchangeBDXRetransmissionIntervalCap",
+        "controller/exchange:TestMessageExchangeActivityTracking",
+        "controller/exchange:TestMessageExchangeCloseNotification",
+        "controller/exchange:TestMessageExchangeCrossProtocolStatusReport",
+        "controller/exchange:TestMessageExchangeAckWaitAbort"
+      ],
+      "missing": [
+        "retransmits a BDX message within the peer's response budget",
+        "leaves a non-BDX schedule uncapped",
+        "emits closing once when close is invoked again after the exchange completed its close",
+        "emits closed but not closing when destroyed",
+        "uses peerAdditionalMrpDelay and ignores the throttle profile margin",
+        "falls back to localAdditionalMrpDelay as a floor when no peer margin is given",
+        "applies no margin when neither local nor peer margin is set",
+        "applies the session's peer margin to peer-initiated exchanges",
+        "applies the session's peer margin to initiated exchanges without an explicit margin",
+        "prefers the explicit peer margin over the session's",
+        "selects the BDX margin for BDX exchanges, in either direction",
+        "selects the messaging margin for other protocols",
+        "passes localFixedMrpBackoff through as the fixed backoff pad, separate from additionalDelay",
+        "does not wake a sleeping LIT peer on an outbound message"
+      ],
+      "reason": "Peer loss, the unacked state, the BDX liveness kick and idle-cadence cap, timers that outlive their message, activity, the close/destroy end, cross-protocol StatusReports and the ack-wait abort are ported against the controller exchange; the network-profile margins (localAdditionalMrpDelay, peer margins, localFixedMrpBackoff, and the two cap cases that pad with a 20 s margin) do not exist in Go, the exchange has no closing notification (Done reports only the end), and ICD wakefulness is not in the controller exchange.",
       "snapshotSha": "cb0854d0c154eff327c28217659b4cdc6fb1bdbf"
     },
     {
@@ -4038,105 +3886,110 @@
         "transport/mrp:TestWindowAcceptsFreshAndRejectsDuplicate",
         "transport/mrp:TestWindowAcceptsAdvancing",
         "transport/mrp:TestWindowAcceptsBackInWindow",
-        "transport/mrp:TestWindowEncryptedRollover"
+        "transport/mrp:TestWindowEncryptedRollover",
+        "transport/mrp:TestMessageReceptionStateEncryptedWithoutRollover",
+        "transport/mrp:TestMessageReceptionStateEncryptedWithRollover",
+        "transport/mrp:TestMessageReceptionStateUnencryptedWithRollover"
       ],
       "missing": [
-        "correct difference gets calculated and state gets updated after being initialized",
-        "duplicate counter value (value -1) within window is detected",
-        "value tests within counter window",
-        "value tests on counter window edges",
-        "value tests on range edges",
-        "accepts a peer counter of 0xFFFFFFFF (maximum valid value)",
-        "rejects out-of-range counter values",
-        "forward jump of exactly the window size clears stale bitmap bits",
-        "value tests on edges and duplicate values with low max-number and rollovers",
-        "value tests on edges and duplicate values with high max-number and rollovers",
-        "value tests on edges and new values with low max-number and rollovers",
-        "value tests on edges and new values with high max-number and rollovers",
-        "treats the exact counter rollover (MAX -> 0) as new and detects replays",
-        "accepts an in-window sub-max counter delivered right after the first counter"
+        "rejects out-of-range counter values"
       ],
-      "reason": "The reception window's duplicate detection is covered; the edge and range vectors per session type are not ported case by case.",
+      "reason": "Every diff and bitmap vector of the three reception states is ported against Window.diff and the bitmap after Window.Accept; the out-of-range case (-1, 0x100000000) is unrepresentable because the Go counter is a uint32 decoded from four wire bytes.",
       "snapshotSha": "abc287f99c416157f5e5fc930912f76917904101"
     },
     {
       "path": "packages/protocol/test/protocol/ProtocolStatusCodeTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "transport/mrp:TestEncodeStatusReportMinimalPayload",
-        "transport/mrp:TestEncodeStatusReportWithPayload"
+        "transport/mrp:TestEncodeStatusReportWithPayload",
+        "controller/exchange:TestProtocolStatusCode"
       ],
-      "missing": [
-        "Encodes and decodes vendor specific without protocol data",
-        "Encodes and decodes vendor specific with protocol data"
-      ],
-      "reason": "A status report without protocol data is covered; the vendor-specific forms are not.",
+      "reason": "All three StatusReport vectors (standard, vendor-specific without and with protocol data) are ported as an encode/decode round-trip through StatusReport.Encode and DecodeStatusReport, the vendor id in the upper 16 bits of the Go ProtocolID.",
       "snapshotSha": "dd6c059350965b26d9728d18d9d5b6aa05cba848"
     },
     {
       "path": "packages/protocol/test/protocol/TcpSessionBindingTest.ts",
       "status": "partial",
       "go": [
-        "bridge:TestTCPConnectionDropEvictsBoundSessions"
+        "bridge:TestTCPConnectionDropEvictsBoundSessions",
+        "bridge:TestTcpSessionBindingConnectionDropEvictsSessions",
+        "bridge:TestTcpSessionBindingManagerReaction",
+        "bridge:TestTcpSessionBindingConnectionLifecycle",
+        "bridge:TestTcpSessionBindingChannelTypeDetection",
+        "transport/tcp:TestTcpTransportOnDisconnect"
       ],
       "missing": [
-        "finds sessions by channel identity",
-        "sessions on different connections are distinguishable",
-        "session force-close marks session as closing",
-        "exchange can be closed with error",
-        "names the originating environment on the lines the drop produces",
-        "names no origin when the manager is built without one",
-        "leaves a session on another connection alone",
         "gives the closed exchange a cause that claims nothing about the peer",
-        "fires disconnect listeners when connection drops",
         "disconnect listener can be removed",
         "onDisconnect is detected via typeof check",
-        "TCP connection is NOT closed by MessageChannel.close()",
-        "multiple sessions can share the same TCP connection",
-        "closing one session does not affect sessions on other connections",
-        "TCP channels have type TCP",
-        "UDP channels have type UDP",
         "finds a TCP session among mixed sessions",
         "returns undefined when no TCP session exists",
         "skips closing TCP sessions",
         "returns undefined when all TCP sessions are closing"
       ],
-      "reason": "A dropped TCP connection closing its sessions is covered on the device side; the remaining binding and logging cases are not.",
+      "reason": "The binding by connection identity, the eviction on a drop and its two log lines on the node's logger (or slog.Default), the survivor on another connection, the lifecycle and the TCP/UDP route type are ported on the bridge (the device-side ExchangeManager) and the listener's disconnect callback on transport/tcp; the device bridge's exchanges hold no awaitable with an error cause, the listener's onClose is a Serve argument with no handle to remove nor a duck-typed probe, and the TCP session selection is PeerExchangeProvider's controller-side logic with no device-side counterpart.",
       "snapshotSha": "088544374dc6f4f411f779db8aef663d0eae36f1"
     },
     {
       "path": "packages/protocol/test/protocol/interaction/AttributeDataDecoderTest.ts",
-      "status": "planned",
-      "reason": "Decoding attribute reports as chip-tool sends them: chunked arrays with indexed changes, unknown attributes.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestAttributeDataDecoderChunkedArrays",
+        "controller/interaction:TestAttributeDataDecoderChipToolCaptures",
+        "controller/interaction:TestAttributeDataDecoderUnknownValues",
+        "controller/interaction:TestAttributeDataDecoderDuplicates",
+        "controller/interaction:TestAttributeDataDecoderNormalize",
+        "controller/interaction:TestAttributeDataDecoderUnknownCluster"
+      ],
+      "missing": [
+        "preserves insertion order and deduplicates when same attribute appears twice with another attribute in between"
+      ],
+      "reason": "Chunked lists with indexed add, delete and modify, the chip-tool captures, unknown values, adjacent duplicates, grouping with tag compression and unknown-cluster globals are ported through the schema-blind controller assembler (values compared as TLV nodes, attribute names not asserted); the non-adjacent duplicate case is missing because it tests the deprecated normalizeAttributeData Map grouping (AttributeDataDecoder.ts:162-181), while the Go assembler mirrors InputChunk, which emits one value per adjacent group.",
       "snapshotSha": "69fcb84bb6880680db064ffacfe13056d1b2add0"
     },
     {
       "path": "packages/protocol/test/protocol/interaction/AttributeDataEncoderTest.ts",
       "status": "partial",
       "go": [
-        "im:TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath"
+        "im:TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath",
+        "im:TestAttributeDataEncoderFieldGuarantees",
+        "bridge:TestAttributeDataEncoderChunkArray"
       ],
       "missing": [
-        "tag compress with dataVersion handling",
-        "chunk array",
-        "rejects an EventReport carrying both data and status (§8.9.3.5)",
-        "rejects an AttributeReport carrying both data and status (§8.9.2.9)",
-        "rejects an EventReport carrying neither data nor status (§8.9.3.5)",
-        "rejects an AttributeReport carrying neither data nor status (§8.9.2.9)"
+        "tag compress with dataVersion handling"
       ],
-      "reason": "Stripping isUrgent from event data paths is covered; tag compression, array chunking and the report data/status guarantees are not ported case by case.",
+      "reason": "The isUrgent strip, the exactly-one-of data/status guarantee (by construction of the Go report types, asserted on the wire) and list chunking through bridge's splitter are ported; tag compression is missing because matter.js does not use compressAttributeDataReportTags on its wire (AttributeDataEncoder.ts:196-201) and the Go encoder has no counterpart.",
       "snapshotSha": "f703ff2baa3301401d8ad308d7130072e91c3dff"
     },
     {
       "path": "packages/protocol/test/protocol/interaction/EventDataDecoderTest.ts",
-      "status": "planned",
-      "reason": "Normalising and decoding event reports, including unknown events.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestEventDataDecoderNormalize",
+        "controller/interaction:TestEventDataDecoderDecode",
+        "controller/interaction:TestEventDataDecoderUnknownEvent"
+      ],
+      "missing": [
+        "normalize data with all paths given for multiple events",
+        "normalize and decode data with all paths given for multiple events"
+      ],
+      "reason": "Decoding known and unknown events with one event per path is ported through the controller assembler (data as TLV nodes, event names not asserted); the two multiple-events cases are missing because their expectation is the deprecated normalizeEventData grouping by path, while the Go report is InputChunk's flat event stream (InputChunk.ts:336-354).",
       "snapshotSha": "5fdb16df8de7ba78594571c7ba7822ade17ab003"
     },
     {
       "path": "packages/protocol/test/securechannel/SecureChannelMessengerTest.ts",
-      "status": "planned",
-      "reason": "Busy and CloseSession sent without the reliability flag, and decode errors of the secure channel messenger.",
+      "status": "partial",
+      "go": [
+        "controller/exchange:TestSecureChannelMessengerStatusReportsThatMustNotBeReliable"
+      ],
+      "missing": [
+        "sends Busy with the R flag clear",
+        "returns the decoded payload",
+        "reports a schema violation as UnexpectedDataError naming message and field",
+        "passes other decode errors through unchanged"
+      ],
+      "reason": "CloseSession leaving the controller's exchange manager without the R flag is ported; no Go path sends Busy (matter.js defines sendBusy but no protocol path calls it), and there is no generic schema-bound decode — each Go handshake decoder wraps every decode failure, a read error included, in its own ErrUnexpectedData.",
       "snapshotSha": "75e7b7b0399f0ad3b344d723b851b6785c15b0fd"
     },
     {
@@ -4149,14 +4002,35 @@
     },
     {
       "path": "packages/protocol/test/session/SecureSessionTest.ts",
-      "status": "planned",
-      "reason": "The secure session: one path per invoke for a peer that reports zero, encryption and the group privacy round trips.",
+      "status": "partial",
+      "go": [
+        "secure/channel:TestSecureSessionParameters",
+        "secure/channel:TestSecureSessionDecrypt",
+        "secure/channel:TestSecureSessionEncrypt",
+        "groups:TestSecureSessionGroupPrivacy",
+        "bridge:TestGroupMessageOutcomes"
+      ],
+      "missing": [
+        "conveys the initiating exchange to its subscriptions",
+        "sends a cached group session's messages as the node ID of the current fabric object"
+      ],
+      "reason": "The paths-per-invoke fallback, decrypt and encrypt against the pinned vectors and the group-session cases (header-derived nonce, both round trips with the unmapped-key report, the send address, the cached-session key, the privacy flag) are ported; Go sessions own no subscriptions and the peer-loss hook carries no exchange, and a cached groups.Sender keeps the node id it was created with across an UpdateNOC (register candidate).",
       "snapshotSha": "3efe98888bae9c4ca3424851cbd7b12045efb761"
     },
     {
       "path": "packages/protocol/test/session/SessionIntervalsTest.ts",
-      "status": "planned",
-      "reason": "Session interval defaults, overrides and their clamping for advertisement.",
+      "status": "partial",
+      "go": [
+        "controller/exchange:TestSessionIntervals",
+        "controller/exchange:TestSessionIntervalsForAdvertisement"
+      ],
+      "missing": [
+        "accepts an active threshold over 65535 milliseconds",
+        "keeps intervals within the DNS-SD limits",
+        "drops negative and fractional intervals and an active threshold of zero",
+        "drops intervals above the DNS-SD limits"
+      ],
+      "reason": "The defaults, the overrides and the over-one-hour intervals (exchange.IntervalsOf) and the forAdvertisement clamping (through mdns.BuildOperationalService) are ported; the Go factory reads the wire's uint16 SAT, which cannot carry 65536, and the advertisable filter's counterpart is the stored descriptor in controller/client (brief BI's path).",
       "snapshotSha": "255bf727cd890c56dc1a632e0ea6ed13aeed2ea0"
     },
     {
@@ -4166,32 +4040,28 @@
         "secure/operational:TestOpenFromPase_AllocatesDistinctIDs",
         "secure/operational:TestManager_AllocateID_WrapAround",
         "secure/operational:TestAllocateID_EvictsOldestPlaceholderWhenExhausted",
-        "secure/operational:TestPeerCapEviction_ForceClosesWithoutCloseSessionOrReannounce"
+        "secure/operational:TestPeerCapEviction_ForceClosesWithoutCloseSessionOrReannounce",
+        "secure/operational:TestSessionManagerGetNextAvailableSessionID",
+        "secure/operational:TestSessionManagerMaybeSessionFor",
+        "secure/operational:TestSessionManagerEvictsOnlyForSessionsThePeerEstablished",
+        "secure/operational:TestSessionManagerWallClockSteps",
+        "groups:TestSessionManagerGroupDataMessageCounter",
+        "controller/exchange:TestSessionManagerActiveThresholdValidation",
+        "controller/exchange:TestSessionManagerMaxPathsPerInvokeValidation",
+        "controller/exchange:TestSessionManagerSessionParameterSetter"
       ],
       "missing": [
-        "verify that existing session ids are skipped",
-        "never allocates 0 when the random seed is 0",
         "stays within the ID range after reusing the session with the highest ID",
         "returns session with most recent activeTimestamp, not timestamp",
-        "never evicts a session we initiated, even when it is the least recently used",
-        "leaves sessions we initiated alone; peer loss reclaims those",
         "conveys the initiating exchange when reporting peer loss",
         "names the originating environment on the lines an eviction produces",
-        "exposes one node-global counter shared across group sessions",
         "closes the counter it replaces when cleared",
         "seeds the global counter above legacy per-key counters and clears them (Q-02 migration)",
-        "does not roll the counter back when a group key set is removed (Q-02)",
-        "forgets group message reception state when its key set is removed so a reused key re-syncs",
-        "keeps reception state until the last key set sharing an operational key is removed",
-        "forgets the previous operational key when a key set is rewritten with a new epoch key",
         "rejects a local active threshold over 65535 milliseconds on construction",
         "rejects a local active threshold over 65535 milliseconds via the setter",
-        "accepts a local active threshold of exactly 65535 milliseconds",
         "rejects a local max paths per invoke of zero on construction",
         "rejects a local max paths per invoke of zero via the setter",
         "rejects a local max paths per invoke that is not a whole count",
-        "accepts a local max paths per invoke of one",
-        "ignores undefined values and retains current values",
         "keeps a peer heard from just now active across a forward step",
         "keeps a peer silent beyond the active threshold idle across a backward step",
         "prefers the session heard from last when the clock stepped back between them",
@@ -4199,10 +4069,9 @@
         "closes a session on peer loss after the clock stepped back",
         "closes a session on peer loss when the clock stepped forward before it was created",
         "closes a session on peer shutdown after the clock stepped back",
-        "reports session activity on the wall clock as it reads now",
-        "reports a peer never heard from with a last active time of 0"
+        "reports session activity on the wall clock as it reads now"
       ],
-      "reason": "Session-ID allocation, wrap, exhaustion and the per-peer cap are covered; the random-seed, lookup and resumption cases are not ported case by case.",
+      "reason": "Session-id allocation (skip, seed 0), the per-peer cap and the initiator sessions it spares, the group data counter and reception-state cases, the accepted local parameters and their merge are ported; missing are live-session reuse under a compressed id range (by design only placeholders are reused), the session pick (controller/peer.NewestSession, BH-3), subscriptions and log origins (no Go counterpart), the Lifetime and legacy-counter migration cases (JS runtime, no legacy store), the rejections of values a Go uint16 or zero-means-unset field cannot carry, and the wall-clock steps, which clocktest.Fake cannot separate from the monotonic reading Go's time.Time compares by.",
       "snapshotSha": "db7bfa3a82d2296b888015c59abf7695f84c43b5"
     },
     {
@@ -4210,37 +4079,30 @@
       "status": "partial",
       "go": [
         "secure/sessionparams:TestEffectiveTransportsGateOnMatter15",
-        "secure/sessionparams:TestMaxTCPMessageSizeOnlyWithTCP"
+        "secure/sessionparams:TestMaxTCPMessageSizeOnlyWithTCP",
+        "controller/exchange:TestSessionParameters",
+        "controller/exchange:TestSessionParametersMaxPathsPerInvoke",
+        "controller/exchange:TestSessionParametersTCPSpecVersionGate",
+        "controller/exchange:TestSessionParametersReported"
       ],
       "missing": [
-        "accepts idle/active intervals above one hour",
-        "honors a peer-reported limit above one",
-        "assumes one when the peer reports zero",
-        "assumes one when the peer reports no limit",
-        "honors the highest limit the wire can carry",
         "assumes one for a persisted limit the wire could not have carried",
-        "clears TCP support when the spec version is unknown",
-        "decodes a numeric supportedTransports bitmap before gating",
-        "keeps only the values the peer sent, without fallbacks",
-        "decodes supported transports sent as a bitmap",
-        "keeps supported transports given as an object",
-        "is undefined when the peer sent no parameters"
+        "keeps supported transports given as an object"
       ],
-      "reason": "The TCP spec-version gate is covered; the maxPathsPerInvoke assumptions and the interval cases are not.",
+      "reason": "The factory (exchange.PeerParameters: intervals over one hour, the maxPathsPerInvoke fallbacks, the TCP spec-version gate) and reported (the decoded sessionparams.Parameters) are ported; the untyped persisted values (NaN, 2.5, \"10\", null, …) and the object form of supportedTransports are JavaScript-only shapes a Go uint16 bitmap field cannot hold.",
       "snapshotSha": "4cc44d0f3f46b537da788fd5f7c61479a0266426"
     },
     {
       "path": "packages/protocol/test/session/secure/CasePairingTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "secure:TestParityMatterJS_CasePairing_Sigma2_KeyMaterial",
         "secure:TestParityMatterJS_CasePairing_Sigma3_KeySchedule",
-        "secure:TestParityMatterJS_CasePairing_HexPinned_IPK"
+        "secure:TestParityMatterJS_CasePairing_HexPinned_IPK",
+        "secure/sigma:TestParityMatterJS_Sigma_Vectors",
+        "secure/sigma:TestCasePairingSignature"
       ],
-      "missing": [
-        "generates the right signature"
-      ],
-      "reason": "The Sigma2 and Sigma3 key material against matter.js's pinned bytes is covered; the signature vector is not.",
+      "reason": "The Sigma2 and Sigma3 key material against matter.js's pinned bytes and the fabric signature over the pinned signed-data bytes (raw r||s, the unpacking verifyTranscript uses) are ported.",
       "snapshotSha": "771af26c9e5c0402a2c8a285339fac06ec35f0d4"
     },
     {
@@ -4251,34 +4113,47 @@
         "secure:TestParityMatterJS_PasePairing_PasscodeGeneratorExhaustion",
         "secure:TestParityMatterJS_PasePairing_IterationsValidation",
         "secure:TestParityMatterJS_PasePairing_LeadingZeroW0_PBKDF",
-        "secure:TestParityMatterJS_PasePairing_SuccessfulProcess_PBKDF"
+        "secure:TestParityMatterJS_PasePairing_SuccessfulProcess_PBKDF",
+        "secure/spake2:TestPasePairingSpake2Process",
+        "controller/handshake:TestPasePairingPBKDFIterationsFromTheResponder"
       ],
       "missing": [
         "does not throw when sending the error status report fails",
-        "does not attempt to send the error status report when a sent message is still unacked",
-        "calls onPbkdfParamResponse once the responder answers the PBKDFParamRequest",
-        "does not call onPbkdfParamResponse when the responder does not answer",
-        "do special successful pase process"
+        "does not attempt to send the error status report when a sent message is still unacked"
       ],
-      "reason": "Passcode generation, the PBKDF iteration bounds and the PBKDF vectors are covered; cancelPairing and the PBKDFParamResponse callback are not.",
+      "reason": "Passcode generation, the PBKDF iteration bounds, the PBKDF vectors, the full special PASE process (w0, L, context hash, Y and hBX with the fixed y) and the onPbkdfParamResponse callback are ported; PaseServer.cancelPairing's counterpart is the bridge's datagram PASE handler (bridge/securechannel.go), which has no messenger or unacked-message guard to drive.",
       "snapshotSha": "410e318e6523e044afa1711a0a250461c8225547"
     },
     {
       "path": "packages/protocol/test/thread/BasicTlvCodecTest.ts",
-      "status": "planned",
-      "reason": "The Thread basic TLV walk and encode, including the 0xFF extended length.",
+      "status": "ported",
+      "go": [
+        "controller/thread:TestBasicTlvCodecWalk",
+        "controller/thread:TestBasicTlvCodecEncode"
+      ],
+      "reason": "All 11 cases run against the new controller/thread WalkTLVs / EncodeTLVs (short and 0xFF extended length, truncation errors, the 0xFFFF limit); the TLV type range case pins that TLV.Type is a byte, the Go form of the 0..255 check.",
       "snapshotSha": "b913ee2b36fecdebf55e7e21655976367ce0035c"
     },
     {
       "path": "packages/protocol/test/thread/MeshCopTlvTypesTest.ts",
-      "status": "planned",
-      "reason": "The MeshCoP TLV type table.",
+      "status": "ported",
+      "go": [
+        "controller/thread:TestMeshCopTlvTypesType",
+        "controller/thread:TestMeshCopTlvTypesName"
+      ],
+      "reason": "All 6 cases run against controller/thread's TLVType constants, the 43-entry type table (no duplicates, the post-spec extensions) and TLVType.Name, the reverse lookup of MeshCopTlvTypeName.",
       "snapshotSha": "09349adbb983699d1b1a6d51bd83e999e4c5d756"
     },
     {
       "path": "packages/protocol/test/thread/OperationalDatasetTest.ts",
-      "status": "planned",
-      "reason": "Decoding and re-encoding a Thread operational dataset byte-identically.",
+      "status": "ported",
+      "go": [
+        "controller/thread:TestOperationalDatasetDecode",
+        "controller/thread:TestOperationalDatasetEncode",
+        "controller/thread:TestOperationalDatasetDecodeHex",
+        "controller/thread:TestOperationalDatasetRedact"
+      ],
+      "reason": "All 18 cases run against controller/thread's DecodeDataset / DecodeDatasetHex / Encode / Redact: the synthetic-1 fixture, unknown TLVs, the security policy, both CHANNEL forms, byte-identical replay of non-canonical encodings, canonical encoding of a mutated or in-memory dataset, hex with whitespace and redaction; the ArrayBuffer case decodes a sub-slice of a larger buffer, Go's one byte type.",
       "snapshotSha": "23a7743a0cdbbf0bc272afab04f65fa1ea695e03"
     },
     {
@@ -4288,31 +4163,21 @@
         "transport/tcp:TestEncodeFrameLittleEndianLength",
         "transport/tcp:TestAssemblerRoundTripAcrossChunks",
         "transport/tcp:TestAssemblerSeveralFramesInOneChunk",
-        "transport/tcp:TestListenerEchoRoundTrip"
+        "transport/tcp:TestListenerEchoRoundTrip",
+        "transport/tcp:TestTcpChannelSendAfterClose",
+        "transport/tcp:TestTcpChannelChannelProperties",
+        "transport/tcp:TestTcpChannelNetworkAddress",
+        "transport/tcp:TestTcpChannelName",
+        "transport/tcp:TestTcpChannelOversizedMessageHandling",
+        "transport/tcp:TestTcpChannelZeroLengthFrameHandling",
+        "transport/tcp:TestTcpChannelSendSideSizeCheck",
+        "transport/tcp:TestTcpChannelClose",
+        "transport/tcp:TestTcpChannelAsyncIteration"
       ],
       "missing": [
-        "rejects with a typed error rather than an untyped one",
-        "reports correct channel type properties",
-        "is recognized as ConnectedChannel",
-        "returns a ServerAddressTcp with correct values",
-        "returns tcp:// formatted name",
-        "wraps IPv6 addresses in brackets",
-        "rejects message at the size limit",
-        "accepts message just under the size limit",
-        "rejects way-oversized message",
-        "rejects and closes on a zero-length frame",
-        "closes without processing a valid message that follows a zero-length frame",
-        "rejects messages above the size limit",
-        "accepts messages exactly at the size limit",
-        "closes the underlying socket",
-        "fires close listeners",
-        "yields messages via for-await",
-        "terminates iterator on close",
-        "terminates iterator on remote disconnect",
-        "delivers queued messages then terminates on close",
         "callback listeners take priority over iterator queue"
       ],
-      "reason": "Framing and reassembly are covered by transport/tcp; send after close, the channel properties and the error cases are not ported case by case.",
+      "reason": "Framing, send after close, properties, name, both size limits, zero-length frames, close and the message stream (Handler then Closed for the async iterator) are ported on a net.Pipe pair; the listener-over-iterator priority has no Go counterpart, as tcp.Conn has a single delivery path (the Handler).",
       "snapshotSha": "cde3430d5b10f5b9dd9cf60d76d3e9146e07b97e"
     },
     {
@@ -4320,7 +4185,9 @@
       "status": "partial",
       "go": [
         "transport/tcp:TestDialerRoundTrip",
-        "transport/tcp:TestListenerEchoRoundTrip"
+        "transport/tcp:TestListenerEchoRoundTrip",
+        "transport/tcp:TestTcpTransportOnDisconnect",
+        "transport/tcp:TestTcpTransportClose"
       ],
       "missing": [
         "returns true for TCP",
@@ -4328,11 +4195,9 @@
         "returns false for BLE",
         "throws for non-IP address",
         "reuses existing connection for same address",
-        "creates different connections for different addresses",
-        "fires when a connection drops",
-        "closes server and all connections"
+        "creates different connections for different addresses"
       ],
-      "reason": "Dialing, accepting and receiving a framed message are covered; transport selection, connection reuse and the error cases are not.",
+      "reason": "Dialing, accepting, receiving, the disconnect notification and closing the listener with its connections are ported on loopback sockets; supports(ChannelType) and the non-IP rejection have no Go counterpart (Listener and Dialer are TCP-only types and Dial takes a host:port string, not a ServerAddress union), and the Dialer keeps no per-address connection pool to reuse (TcpTransport.ts:149-169).",
       "snapshotSha": "2bd01254e917beb77613a9be516573772dcf2cc7"
     }
   ]
