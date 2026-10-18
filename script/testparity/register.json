@@ -3732,7 +3732,7 @@
         "it allows announcements of multiple devices on different ports",
         "splits oversized announcements into multiple packets with all records in the answer section"
       ],
-      "reason": "The commissionable TXT record is covered; the operational and commissioner broadcasts, their expiry and the overflow case are not ported case by case.",
+      "reason": "The commissionable and operational TXT content BuildCommissionableService/BuildOperationalService own is covered; the rest stays missing: the crypto case checks matter.js's MockCrypto itself, the announcement and TTL-0 expiry packets (record order, _services._dns-sd PTRs, cache-flush bits, overflow splitting) are assembled by grandcat/zeroconf's RegisterProxy/Shutdown, not by go-fabric code a unit test can drive, the operational TXT also differs by design (SAT always emitted, notes/parity/by_design.md BD-mDNS-SAT-AlwaysEmitted), and the device side has no _matterd._udp commissioner advertisement, so the three commissioner cases have no Go subject.",
       "snapshotSha": "1457c02635be7e2e331f32fe7f36473952a60e54"
     },
     {
