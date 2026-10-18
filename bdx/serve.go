@@ -203,7 +203,7 @@ func negotiateSender(ctx context.Context, f *outboundFlow, modes []DriverMode, o
 	if tc.SenderDrive {
 		mode = SenderDrive
 	}
-	return Result{Length: f.dataLength, Mode: mode, BlockSize: uint16(f.blockSize)}, nil //nolint:gosec // capped above
+	return Result{Length: f.dataLength, Mode: mode, BlockSize: uint16(f.blockSize), StartOffset: startOffset}, nil //nolint:gosec // capped above
 }
 
 // serveReceiver is the receiver-and-responder branch

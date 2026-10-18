@@ -2553,28 +2553,17 @@
         "bdx:TestReceive_BlockSizeCappedToTransport",
         "bdx:TestServe_BlockSizeNegotiation",
         "bdx:TestServe_Refusals",
-        "bdx:TestServe_AbortedTransfers"
+        "bdx:TestServe_AbortedTransfers",
+        "bdx:TestBdxSuccessfulTransfers",
+        "bdx:TestBdxPerBlockDebugLogging",
+        "bdx:TestBdxErrorCases"
       ],
       "missing": [
-        "Using SendInit as Receiver-Driver (by Responder and custom transfer designator)",
-        "Using ReceiveInit as Receiver-Driver (by Responder)",
-        "Using ReceiveInit as Sender-Driver (no limits)",
-        "Send first 100 bytes as sender drive",
-        "Send first 100 bytes as Receiver-Driver",
-        "Send 100 bytes with startOffset 50 as sender drive",
-        "Send first 100 bytes with startOffset 50 as Receiver-Driver",
         "Block/BlockEof/BlockAck/BlockAckEof count blocks from zero (Sender-Driver)",
-        "a responder reports what it received and granted, and an observer cannot alter either",
         "BlockQuery carries an ascending block counter starting at 0 (Receiver-Driver)",
-        "No matching driver modes",
-        "Unknown FileDesignator",
-        "Request a file from peer that is larger than the data",
-        "Request a file from peer that is larger than the data using startOffset",
-        "Unexpected Blockcounter in request with SenderDriver",
-        "BlockQueryWithSkip skipping bytes but end errors because of too less data",
         "sessionId and sessionActiveTimestamp are accessible after transfer completes"
       ],
-      "reason": "The drive modes of SendInit and ReceiveInit and the block-size caps are covered by the bdx package; the size variants, the responder-chosen designator and the error transfers are not ported case by case.",
+      "reason": "Every successful transfer (all sizes, drive modes, designators and partial transfers), the responder's reported parameters and every error case run between Send / Receive and a Responder with the messages of both sides recorded; the two per-block logging cases assert the log context BdxMessenger.ts:140-200 attaches to each sent message, which the Go messenger does not log, and the getters case reads the initiator BdxClient's secure session, an object the Go initiator API (which takes an Exchange) does not have.",
       "snapshotSha": "83b5f6877874b26c71b8767638e147d2b5a56efb"
     },
     {

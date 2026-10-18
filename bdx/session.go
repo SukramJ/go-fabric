@@ -69,6 +69,11 @@ type Result struct {
 	// Mode and BlockSize are what the transfer settled on.
 	Mode      DriverMode
 	BlockSize uint16
+	// StartOffset is where in the file the transfer starts: the offset a
+	// served ReceiveInit asked for or this node's SendInit stated, else 0.
+	// Mirrors matter.js packages/protocol/src/bdx/bdx-session-initiator.ts:224-257
+	// (collectAcceptParameters' startOffset, default 0; :39-44, :102).
+	StartOffset uint64
 }
 
 // Receive runs one inbound transfer this node initiates: ReceiveInit,
