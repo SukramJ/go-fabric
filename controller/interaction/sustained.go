@@ -84,6 +84,11 @@ type sustainedState struct {
 	// maxEvent is the highest event number delivered, valid once hasEvent.
 	maxEvent uint64
 	hasEvent bool
+	// changed is the request's MaxEventNumberChanged; log and failureLogged
+	// carry #logLocalFailure's warn-once rule.
+	changed       func(uint64) error
+	log           *slog.Logger
+	failureLogged bool
 }
 
 // MaxEventNumber is the highest event number of the reports a sustained
@@ -105,17 +110,45 @@ func (s *Subscription) MaxEventNumber() (uint64, bool) {
 // returned. Mirrors matter.js SustainedSubscription.#deliver and
 // #raiseMaxEventNumber
 // (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:339-364)
-// at 862ad75f; the maxEventNumberChanged hook and the failure of a
-// consumer have no Go counterpart.
+// at 862ad75f, the maxEventNumberChanged hook included; the failure of a
+// consumer has no Go counterpart (Updated returns nothing).
 func (st *sustainedState) deliver(r *Report, consumer func(*Report)) {
 	consumer(r)
 	st.mu.Lock()
-	defer st.mu.Unlock()
+	raised := false
 	for i := range r.Events {
 		if n := r.Events[i].Number; !st.hasEvent || n > st.maxEvent {
-			st.maxEvent, st.hasEvent = n, true
+			st.maxEvent, st.hasEvent, raised = n, true, true
 		}
 	}
+	number := st.maxEvent
+	st.mu.Unlock()
+	if !raised || st.changed == nil {
+		return
+	}
+	if err := st.changed(number); err != nil {
+		st.logLocalFailure("handling the event number of a report", err)
+	}
+}
+
+// logLocalFailure logs a failure of the subscription's own processing: the
+// first as a warning, later ones at debug, since a peer can trigger one with
+// every report. Mirrors matter.js SustainedSubscription.#logLocalFailure
+// (packages/protocol/src/action/client/subscription/SustainedSubscription.ts:366-377)
+// at 862ad75f.
+func (st *sustainedState) logLocalFailure(what string, err error) {
+	if st.log == nil {
+		return
+	}
+	st.mu.Lock()
+	first := !st.failureLogged
+	st.failureLogged = true
+	st.mu.Unlock()
+	logf := st.log.Debug
+	if first {
+		logf = st.log.Warn
+	}
+	logf("matter.controller.interaction.sustain_local_failure", slog.String("what", what), slog.String("err", err.Error()))
 }
 
 // delivering is the consumer reached through deliver, nil without one
@@ -171,7 +204,7 @@ func (s *Subscription) Active() bool {
 // underlying one, with a connection that does not time out (:1093-1095).
 func (c *Interaction) sustain(peer exchange.PeerAddress, req SubscribeRequest, floor, ceiling time.Duration) *Subscription {
 	outer := c.subs.newSubscription(peer, req, c.log)
-	outer.sustained = &sustainedState{finished: make(chan struct{}), trusted: true}
+	outer.sustained = &sustainedState{finished: make(chan struct{}), trusted: true, changed: req.MaxEventNumberChanged, log: c.log}
 	c.subs.addActive(outer)
 	go c.runSustained(outer, floor, ceiling)
 	return outer

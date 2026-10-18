@@ -2422,7 +2422,8 @@
         "controller/interaction:TestSustainedRefreshAfterBootstrap",
         "controller/interaction:TestSustainedSubscriptionClose",
         "controller/interaction:TestSustainedSubscriptionNonICD",
-        "controller/interaction:TestSustainedSubscriptionEventNumbers"
+        "controller/interaction:TestSustainedSubscriptionEventNumbers",
+        "controller/interaction:TestSustainedSubscriptionMaxEventNumberChanged"
       ],
       "missing": [
         "never reports active when an inactive observer closes the subscription while going live",
@@ -2456,19 +2457,14 @@
         "keeps its subscription when the peer's wakefulness is suspended",
         "stops observing the peer's mode once closed",
         "ignores a feed signal for a different peer",
-        "resubscribes for events above the highest one it delivered",
         "requests events above the bootstrap read's highest event",
-        "does not lower its number when a later result carries lower event numbers",
-        "keeps its number when a report without events follows",
-        "settles the delivery of a report only after maxEventNumberChanged settled",
         "keeps a subscription whose priming report fails to process and counts its events",
         "keeps a subscription whose live report fails to process and counts its events",
         "warns only for the first failure of its own processing",
-        "logs it and delivers the report",
         "keeps the failure of the report",
         "passes a failure while ${failure} on and counts the events received before it"
       ],
-      "reason": "The non-ICD loop (close, closing in flight and from the active callback, maxInterval, keepalive forwarding) and the event-number tracking are covered; missing are the separate inactive observable and throwing observers (Go has one ActiveChanged callback), the ICD await mode (no controller-side wakefulness before milestone 5 phase 24), the maxEventNumberChanged hook (no SubscribeRequest field), events counted from the bootstrap read (a host hook in Go), and consumer or peer report failures (Updated returns nothing and a failed report is never delivered).",
+      "reason": "The non-ICD loop (close, closing in flight and from the active callback, maxInterval, keepalive forwarding) and the event-number tracking with its maxEventNumberChanged hook are covered; missing are the separate inactive observable and throwing observers (Go has one ActiveChanged callback), the ICD await mode (no controller-side wakefulness before milestone 5 phase 24), events counted from the bootstrap read (a host hook in Go), and consumer or peer report failures (Updated returns nothing and a failed report is never delivered).",
       "snapshotSha": "5452d36b2dc08104d60de241f6ee35269f7fdcb5"
     },
     {
