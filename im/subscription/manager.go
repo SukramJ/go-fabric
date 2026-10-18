@@ -284,7 +284,15 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 	// minimum exceeds the capped ceiling — equivalent to matter.js's lower-bound
 	// guarantee. The negotiated MaxIntervalCeiling stored on the Subscription is
 	// what the bridge advertises in SubscribeResponse, satisfying §10.6.3.2.
-	maxCeil := min(req.MaxIntervalCeiling, m.cfg.MaxIntervalCeilingSeconds)
+	// The cap never takes the ceiling below the subscriber's own floor:
+	// MaxInterval stays >= MinIntervalFloor even when the floor exceeds
+	// the publisher limit (Matter §8.5.3.2). Mirrors matter.js
+	// packages/node/src/node/server/ServerSubscription.ts:324-343 at
+	// 862ad75f (Duration.max(minIntervalFloor, …) around the
+	// MAX_INTERVAL_PUBLISHER_LIMIT cap) and chip ReadHandler.cpp, which
+	// accepts the requested MaxInterval; such a request was refused as
+	// inverted after the clamp.
+	maxCeil := max(min(req.MaxIntervalCeiling, m.cfg.MaxIntervalCeilingSeconds), req.MinIntervalFloor)
 	minFloor := max(req.MinIntervalFloor, m.cfg.MinIntervalFloorSeconds)
 	// Re-validate AFTER clamp: the configured ceiling may be below the
 	// floored minimum, producing a silent inversion that permanently

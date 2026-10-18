@@ -1157,23 +1157,34 @@ func TestTick_CriticalEventAndDirty_OnlyOneReporterCallPerFloor(t *testing.T) {
 
 // ---- MinIntervalFloor > MaxIntervalCeiling not re-validated post-clamp ----
 
-// TestSubscribe_PostClampInversion_ErrCadenceInvertedAfterClamp verifies that
-// a subscribe request whose cadence inverts after the manager's ceiling clamp
-// is rejected with ErrCadenceInvertedAfterClamp. Without this check a
-// min=10, max=30 request against a cfg.MaxIntervalCeiling=5 manager silently
-// accepted min=10, max=5, causing drainDirtyIfElapsed to never fire.
+// TestSubscribe_PostClampInversion_ErrCadenceInvertedAfterClamp verifies
+// both sides of the post-clamp check. The manager's ceiling cap never takes
+// the ceiling below the subscriber's floor: a min=10, max=30 request against
+// a cfg.MaxIntervalCeiling=5 manager is accepted with max=10, as matter.js
+// raises MaxInterval back to the floor after its publisher cap
+// (packages/node/src/node/server/ServerSubscription.ts:324-343 at 862ad75f).
+// The manager's own floor above the capped ceiling still inverts the
+// cadence and is refused with ErrCadenceInvertedAfterClamp.
 func TestSubscribe_PostClampInversion_ErrCadenceInvertedAfterClamp(t *testing.T) {
 	t.Parallel()
-	cfg := subscription.Config{MaxIntervalCeilingSeconds: 5}
-	m := newManager(cfg, nil)
-
+	m := newManager(subscription.Config{MaxIntervalCeilingSeconds: 5}, nil)
 	args := defaultArgs()
-	args.MinIntervalFloor = 10   // valid: 10 <= 30
-	args.MaxIntervalCeiling = 30 // but cfg caps max to 5 → post-clamp min=10 > max=5
+	args.MinIntervalFloor = 10
+	args.MaxIntervalCeiling = 30
+	sub, err := m.Subscribe(args)
+	if err != nil {
+		t.Fatalf("floor above the cap: %v", err)
+	}
+	if sub.MaxIntervalCeiling != 10 || sub.MinIntervalFloor != 10 {
+		t.Fatalf("negotiated min=%d max=%d, want 10 and 10", sub.MinIntervalFloor, sub.MaxIntervalCeiling)
+	}
 
-	_, err := m.Subscribe(args)
-	if !errors.Is(err, subscription.ErrCadenceInvertedAfterClamp) {
-		t.Fatalf("expected ErrCadenceInvertedAfterClamp, got %v", err)
+	m2 := newManager(subscription.Config{MaxIntervalCeilingSeconds: 5, MinIntervalFloorSeconds: 8}, nil)
+	args = defaultArgs()
+	args.MinIntervalFloor = 1
+	args.MaxIntervalCeiling = 30
+	if _, err := m2.Subscribe(args); !errors.Is(err, subscription.ErrCadenceInvertedAfterClamp) {
+		t.Fatalf("manager floor above the capped ceiling: %v, want ErrCadenceInvertedAfterClamp", err)
 	}
 }
 
