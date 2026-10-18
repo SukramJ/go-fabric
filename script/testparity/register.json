@@ -3847,15 +3847,13 @@
       "status": "partial",
       "go": [
         "controller/peer:TestParityTimingDefaults",
-        "controller/peer:TestConnectReuseSharedProcessAndTimeout"
+        "controller/peer:TestConnectReuseSharedProcessAndTimeout",
+        "controller/peer:TestPeerConnectTimeout"
       ],
       "missing": [
-        "falls back to defaultConnectionTimeout when abort is provided without connectionTimeout",
-        "uses caller's connectionTimeout when one is supplied alongside abort",
-        "remains unbounded when caller explicitly passes Forever",
         "normalizes non-positive timeouts to Instant"
       ],
-      "reason": "The default connection timeout is covered; the abort/timeout combinations and the normalisation are not.",
+      "reason": "The default timeout, the default and the caller's timeout under a cancellable context (matter.js's abort) and the unbounded Forever wait are ported through Peer.Connect; non-positive timeouts cannot be normalised to Instant because Go's ConnectOptions.ConnectionTimeout encodes 0 as unset (the default) and a negative value as Forever, so Instant has no encoding.",
       "snapshotSha": "9e03dac5a4c1594eb0490afab2d97cca5e6187cf"
     },
     {
