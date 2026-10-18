@@ -3946,8 +3946,19 @@
     },
     {
       "path": "packages/protocol/test/protocol/ExchangeManagerTest.ts",
-      "status": "planned",
-      "reason": "The exchange manager: peer loss, inbound group and secure messages, unadopted unsecured sessions.",
+      "status": "partial",
+      "go": [
+        "controller/exchange:TestExchangeManagerPeerLoss",
+        "controller/exchange:TestExchangeManagerInboundSecureMessages",
+        "controller/exchange:TestExchangeManagerInboundUnsecuredSessions"
+      ],
+      "missing": [
+        "reports the session lost when the clock stepped back since the session was created",
+        "gives each message the address of its own datagram",
+        "sends as the current node ID through an exchange opened before the fabric's node ID changed",
+        "wakes a sleeping LIT peer on a message no exchange accepts"
+      ],
+      "reason": "Peer loss sparing the failing exchange and its suppression, a duplicate as peer activity and the release of unadopted inbound unsecured sessions are ported against the controller Manager; the clock-step case needs a monotonic reading clocktest.Fake cannot step apart from the wall clock, the controller has no group sessions and the device's group path hands no source address to a handler, the group Sender fixes the node id at creation (a gap in groups/, not in an owned package), and ICD wakefulness has no Go counterpart.",
       "snapshotSha": "3a60949d5180b83fc1cd1261cd60bfe5c20d8323"
     },
     {

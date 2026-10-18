@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 10 |
-| partial | 99 |
-| planned | 128 |
+| partial | 100 |
+| planned | 127 |
 | excluded | 87 |
 | total | 324 |
 
@@ -107,7 +107,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/ota](#protocoltestota) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
-| [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 6 | 2 | 0 |
+| [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 7 | 1 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 0 | 1 | 1 |
 | [protocol/test/session](#protocoltestsession) | 4 | 0 | 4 | 0 | 0 |
@@ -854,7 +854,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | DeviceAdvertiserTest.ts | 391 | partial | `secure/operational:TestDeviceAdvertiserSessionDeletedHandler`<br>`bridge:TestTriggerSessionReannounce_RepublishesActiveRecords`<br>`bridge:TestDeviceAdvertiserTcpTKey`<br>`bridge:TestDeviceAdvertiserIcdAdvertisementProvider` | The session deleted handler (a PASE close fires the reannounce trigger, a deleted fabric's CASE teardown does not), the T key for both, none and server-only transports, the absent ICD key and a repeated AnnounceFabric as the refresh are ported; the bridge has no ICD advertisement provider (DeviceAdvertiser.ts:195-197) nor an operational-mode state gating the refresh (:206-209), and AnnounceFabric advertises the mdns default SII/SAI/SAT rather than the node's configured session intervals (:363-364). Missing: “includes ICD operating mode and intervals in operational advertisement when a provider is registered”; “refreshOperationalAdvertisement does nothing when not in operational mode”; “clearing the provider reverts to no ICD fields on next advertisement”; “feeds the node's session intervals into a non-ICD operational advertisement”; “lets the ICD provider override the node's session intervals”. |
-| ExchangeManagerTest.ts | 619 | planned | — | The exchange manager: peer loss, inbound group and secure messages, unadopted unsecured sessions. |
+| ExchangeManagerTest.ts | 619 | partial | `controller/exchange:TestExchangeManagerPeerLoss`<br>`controller/exchange:TestExchangeManagerInboundSecureMessages`<br>`controller/exchange:TestExchangeManagerInboundUnsecuredSessions` | Peer loss sparing the failing exchange and its suppression, a duplicate as peer activity and the release of unadopted inbound unsecured sessions are ported against the controller Manager; the clock-step case needs a monotonic reading clocktest.Fake cannot step apart from the wall clock, the controller has no group sessions and the device's group path hands no source address to a handler, the group Sender fixes the node id at creation (a gap in groups/, not in an owned package), and ICD wakefulness has no Go counterpart. Missing: “reports the session lost when the clock stepped back since the session was created”; “gives each message the address of its own datagram”; “sends as the current node ID through an exchange opened before the fabric's node ID changed”; “wakes a sleeping LIT peer on a message no exchange accepts”. |
 | MRPTest.ts | 340 | partial | `secure/operational:TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle`<br>`secure/operational:TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx`<br>`transport/mrp:TestBackoffDuration_TransmissionExponent`<br>`controller/exchange:TestMRPRetransmissionIntervalOf`<br>`controller/exchange:TestMRPMaxRetransmissionIntervalOf`<br>`controller/exchange:TestMRPMaxPeerResponseTimeOf` | The unpadded interval, the maximum interval per peer activity and the peer response time of the udp, tcp and ble channels are ported against controller/exchange; the network-profile margins (MRP.marginFor), additionalDelay and fixedBackoff do not exist in Go (the retransmission formula has no pad), so every case that passes them stays missing. Missing: “selects the bdx margin for bulk transfer”; “selects the messaging margin for other protocols”; “has no margin to offer when the peer's medium is unknown”; “uses the active interval for retransmissions while the peer is active”; “uses the idle interval for retransmissions when the peer is no longer active”; “adds fixedBackoff as a flat pad after the backoff, not amplified by the exponent”; “applies additionalDelay (amplified) and fixedBackoff (flat) independently”; “includes additionalDelay (amplified) and fixedBackoff (flat) so the maximum upper-bounds real sends”; “adds our sender-side fixedBackoff to the local return leg only”. |
 | MessageChannelTest.ts | 81 | planned | — | A message channel reporting a changed address after a socket swap, and releasing its transport channel. |
 | MessageCounterTest.ts | 216 | partial | `transport/mrp:TestNewCounter_SeedsWithin28BitRange`<br>`transport/mrp:TestCounterMonotonic`<br>`transport/mrp:TestCounterWrap`<br>`transport/mrp:TestCounter_NextNoRollover_ExhaustsAtCeiling`<br>`groups:TestMessageCounterPersisted`<br>`groups:TestMessageCounterRollover` | The persisted counter is ported against the group data counter (groups.dataCounter, matter.js's only persisted counter as SessionManager configures it: reserve 1000, rollover warning at 100 000); a negative or non-numeric stored value is unrepresentable in the uint64 CounterStore, and the seed and reserve options do not exist because the Go counter has the one fixed configuration (no legacy per-key counters to seed from). Missing: “persisted counter constructor throws in negative value in storage”; “seeds the initial value when nothing is persisted”; “ignores the seed when a value is already persisted”; “rejects an invalid reserve”; “rejects a non-numeric persisted value”. |
@@ -1197,7 +1197,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### protocol/test/protocol
 
-- `ExchangeManagerTest.ts` — The exchange manager: peer loss, inbound group and secure messages, unadopted unsecured sessions.
 - `MessageChannelTest.ts` — A message channel reporting a changed address after a socket swap, and releasing its transport channel.
 
 ### protocol/test/securechannel
