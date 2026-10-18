@@ -4034,16 +4034,13 @@
     },
     {
       "path": "packages/protocol/test/protocol/ProtocolStatusCodeTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "transport/mrp:TestEncodeStatusReportMinimalPayload",
-        "transport/mrp:TestEncodeStatusReportWithPayload"
+        "transport/mrp:TestEncodeStatusReportWithPayload",
+        "controller/exchange:TestProtocolStatusCode"
       ],
-      "missing": [
-        "Encodes and decodes vendor specific without protocol data",
-        "Encodes and decodes vendor specific with protocol data"
-      ],
-      "reason": "A status report without protocol data is covered; the vendor-specific forms are not.",
+      "reason": "All three StatusReport vectors (standard, vendor-specific without and with protocol data) are ported as an encode/decode round-trip through StatusReport.Encode and DecodeStatusReport, the vendor id in the upper 16 bits of the Go ProtocolID.",
       "snapshotSha": "dd6c059350965b26d9728d18d9d5b6aa05cba848"
     },
     {

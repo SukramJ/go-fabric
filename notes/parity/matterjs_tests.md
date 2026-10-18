@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 7 |
-| partial | 96 |
+| ported | 8 |
+| partial | 95 |
 | planned | 134 |
 | excluded | 87 |
 | total | 324 |
@@ -107,7 +107,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/ota](#protocoltestota) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
-| [protocol/test/protocol](#protocoltestprotocol) | 9 | 0 | 5 | 4 | 0 |
+| [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 4 | 4 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 1 | 2 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 0 | 1 | 1 |
 | [protocol/test/session](#protocoltestsession) | 4 | 0 | 2 | 2 | 0 |
@@ -860,7 +860,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | MessageCounterTest.ts | 216 | partial | `transport/mrp:TestNewCounter_SeedsWithin28BitRange`<br>`transport/mrp:TestCounterMonotonic`<br>`transport/mrp:TestCounterWrap`<br>`transport/mrp:TestCounter_NextNoRollover_ExhaustsAtCeiling`<br>`groups:TestMessageCounterPersisted`<br>`groups:TestMessageCounterRollover` | The persisted counter is ported against the group data counter (groups.dataCounter, matter.js's only persisted counter as SessionManager configures it: reserve 1000, rollover warning at 100 000); a negative or non-numeric stored value is unrepresentable in the uint64 CounterStore, and the seed and reserve options do not exist because the Go counter has the one fixed configuration (no legacy per-key counters to seed from). Missing: “persisted counter constructor throws in negative value in storage”; “seeds the initial value when nothing is persisted”; “ignores the seed when a value is already persisted”; “rejects an invalid reserve”; “rejects a non-numeric persisted value”. |
 | MessageExchangeTest.ts | 972 | planned | — | The message exchange: peer-loss declaration, unacked messages, retransmission and close. |
 | MessageReceptionStateTest.ts | 803 | partial | `transport/mrp:TestWindowAcceptsFreshAndRejectsDuplicate`<br>`transport/mrp:TestWindowAcceptsAdvancing`<br>`transport/mrp:TestWindowAcceptsBackInWindow`<br>`transport/mrp:TestWindowEncryptedRollover`<br>`transport/mrp:TestMessageReceptionStateEncryptedWithoutRollover`<br>`transport/mrp:TestMessageReceptionStateEncryptedWithRollover`<br>`transport/mrp:TestMessageReceptionStateUnencryptedWithRollover` | Every diff and bitmap vector of the three reception states is ported against Window.diff and the bitmap after Window.Accept; the out-of-range case (-1, 0x100000000) is unrepresentable because the Go counter is a uint32 decoded from four wire bytes. Missing: “rejects out-of-range counter values”. |
-| ProtocolStatusCodeTest.ts | 63 | partial | `transport/mrp:TestEncodeStatusReportMinimalPayload`<br>`transport/mrp:TestEncodeStatusReportWithPayload` | A status report without protocol data is covered; the vendor-specific forms are not. Missing: “Encodes and decodes vendor specific without protocol data”; “Encodes and decodes vendor specific with protocol data”. |
+| ProtocolStatusCodeTest.ts | 63 | ported | `transport/mrp:TestEncodeStatusReportMinimalPayload`<br>`transport/mrp:TestEncodeStatusReportWithPayload`<br>`controller/exchange:TestProtocolStatusCode` | All three StatusReport vectors (standard, vendor-specific without and with protocol data) are ported as an encode/decode round-trip through StatusReport.Encode and DecodeStatusReport, the vendor id in the upper 16 bits of the Go ProtocolID. |
 | TcpSessionBindingTest.ts | 542 | partial | `bridge:TestTCPConnectionDropEvictsBoundSessions` | A dropped TCP connection closing its sessions is covered on the device side; the remaining binding and logging cases are not. Missing: “finds sessions by channel identity”; “sessions on different connections are distinguishable”; “session force-close marks session as closing”; “exchange can be closed with error”; “names the originating environment on the lines the drop produces”; “names no origin when the manager is built without one”; “leaves a session on another connection alone”; “gives the closed exchange a cause that claims nothing about the peer”; “fires disconnect listeners when connection drops”; “disconnect listener can be removed”; “onDisconnect is detected via typeof check”; “TCP connection is NOT closed by MessageChannel.close()”; “multiple sessions can share the same TCP connection”; “closing one session does not affect sessions on other connections”; “TCP channels have type TCP”; “UDP channels have type UDP”; “finds a TCP session among mixed sessions”; “returns undefined when no TCP session exists”; “skips closing TCP sessions”; “returns undefined when all TCP sessions are closing”. |
 
 ## protocol/test/protocol/interaction
