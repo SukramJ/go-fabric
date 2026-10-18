@@ -158,8 +158,11 @@ cite-report: ## regenerate script/citecheck/drift.json and summary.md — the ma
 
 .PHONY: cite-check
 cite-check: ## regenerate the citation artefacts, then fail on a hard error or when they moved off the committed ones
-	@$(GO) run ./script/citecheck -matterjs $(MATTERJS_DIR); rc=$$?; \
-	if [ $$rc -eq 2 ]; then exit 2; fi; \
+	@# Built, not `go run`: go run turns every non-zero exit into 1, and exit 2
+	@# (no clone, no pin) must not read as "hard errors".
+	@bin=$$(mktemp -d)/citecheck; $(GO) build -o $$bin ./script/citecheck || exit 1; \
+	$$bin -matterjs $(MATTERJS_DIR); rc=$$?; rm -rf $$(dirname $$bin); \
+	if [ $$rc -eq 2 ]; then echo "cite-check: no matter.js clone with the pin at $(MATTERJS_DIR)"; exit 2; fi; \
 	git diff --quiet -- script/citecheck/drift.json script/citecheck/summary.md || { \
 		echo ""; \
 		echo "The committed citation artefacts are stale: regenerating them changed the files."; \
