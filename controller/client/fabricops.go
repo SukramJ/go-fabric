@@ -178,7 +178,12 @@ func (r *Registry) commission(ctx context.Context, n *Node, o CommissionOptions)
 	if opts.Addresses == nil {
 		opts.Addresses = udpAddrs(rec.Addresses)
 	}
-	if len(opts.Addresses) == 0 {
+	// A node found over BLE is located by its commissioning channel. In
+	// matter.js its addresses hold the peripheral as a NetworkAddress of
+	// type "ble" (CommissioningClient.ts:883-895), which passes the check
+	// above (:220-223); a Record's NetworkAddress is IP only, so the
+	// channel stands for it.
+	if len(opts.Addresses) == 0 && opts.Channel == nil {
 		return fmt.Errorf("%w: cannot commission %s", ErrNotLocated, n.ID())
 	}
 	if opts.DiscoveryData == nil {

@@ -276,6 +276,9 @@ func startBridgeWith(t *testing.T, bin string, flags map[string]bool, opts bridg
 	if flags["media"] {
 		args = append(args, "--media")
 	}
+	// A family row's variant composition (familyrun_test.go
+	// daemonVariants: --wifi-sim for CNETWIFI).
+	args = append(args, daemonVariants[daemonVariant]...)
 	// On a host whose LAN interfaces have no IPv6, the MAC-derived SRV
 	// target carries only IPv4 address records, and the image's chip-tool
 	// resolves operational nodes over IPv6 only. The OS host name's

@@ -151,7 +151,8 @@ func renderCertifiability(g docGolden) string {
 	}
 	rows := map[string]row{}
 	tot := map[string]int{}
-	for _, fam := range chipFamilies {
+	for i := range chipFamilies {
+		fam := &chipFamilies[i]
 		names := g.Families[fam.name]
 		counts := map[gapClass]int{}
 		passed, known := 0, 0
@@ -205,7 +206,8 @@ func renderCertifiability(g docGolden) string {
 	b.WriteString("### Cases not run\n\n")
 	b.WriteString("| Case | Class | Reason |\n| --- | --- | --- |\n")
 	var all, knownAll []string
-	for _, fam := range chipFamilies {
+	for i := range chipFamilies {
+		fam := &chipFamilies[i]
 		all = append(all, rows[fam.name].gaps...)
 		knownAll = append(knownAll, rows[fam.name].known...)
 	}

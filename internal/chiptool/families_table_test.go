@@ -100,6 +100,40 @@ type family struct {
 	// timeout raises the per-case budget (defaultCaseTimeout) for a case
 	// that waits longer by design.
 	timeout map[string]time.Duration
+	// cases names the descriptor family whose cases this row runs, when
+	// the row is a second run of that family (CNETWIFI runs CNET's); empty
+	// is the row's own name. The run's case ids carry the row's name.
+	cases string //nolint:unused // read by the chiptool-tagged runner (familyrun_test.go)
+	// variant runs every case against the daemon with that composition
+	// (daemonVariants: the flags it adds), with PICS generated from that
+	// daemon and a commissioned snapshot of its own. Empty is the
+	// certified default composition.
+	variant string //nolint:unused // read by the chiptool-tagged runner (familyrun_test.go)
+}
+
+// The Wi-Fi network of the CNETWIFI run: the defaults of the CNET cases'
+// PIXIT.CNET.WIFI_1ST_ACCESSPOINT_SSID and _CREDENTIALS (chip 6170af84
+// src/app/tests/suites/certification/Test_TC_CNET_4_5.yaml config,
+// hex:7A6967626565686F6D65 and hex:70617373776f7264313233).
+const (
+	wifiSimSSID       = "zigbeehome"
+	wifiSimPassphrase = "password123"
+	// variantWiFiSim is the daemon with --wifi-sim (daemonVariants).
+	variantWiFiSim = "wifi-sim"
+)
+
+// wifiCaseArgs are a Python CNET case's network and endpoint: the network
+// the TH commissioned the DUT onto (TC_CNET_4_1.py:37-40 usage), and the
+// root's NetworkCommissioning for the cases' endpoint matchers. chip's
+// runner keeps --wifi-ssid / --wifi-passphrase only with a ble-wifi or
+// nfc-wifi commissioning method (matter/testing/runner.py
+// populate_commissioning_args in the harness image), so the commissioned
+// DUT is named as one an in-test ble-wifi commissioning would reach, with
+// the onboarding values that method requires; nothing commissions before
+// the case.
+var wifiCaseArgs = []string{
+	"--in-test-commissioning-method", "ble-wifi", "--discriminator", "{discriminator}", "--passcode", "{passcode}",
+	"--wifi-ssid", wifiSimSSID, "--wifi-passphrase", wifiSimPassphrase, "--endpoint", "0",
 }
 
 // knownProblems is a case that fails only on recorded gaps (by_design.md
@@ -280,6 +314,49 @@ var chipFamilies = []family{
 			"4.26": {"--endpoint", "0"},
 			"4.27": {"--endpoint", "0"},
 			"4.29": {"--endpoint", "0"},
+		},
+	},
+	{
+		// CNET a second time, against the daemon with --wifi-sim
+		// (NetworkCommissioning with the Wi-Fi feature, CNET.S.F00=1, over
+		// the simulated driver, examples/reference-bridge/wifisim.go):
+		// brief BB item 4. The default run above keeps the certified
+		// composition (Ethernet). The commissioned snapshots carry the
+		// Wi-Fi network a TH commissioning over BLE-Wi-Fi would have
+		// configured (provisionWiFiNetwork), and the Python cases get it as
+		// --wifi-ssid / --wifi-passphrase.
+		name: "CNETWIFI", cases: "CNET", variant: variantWiFiSim,
+		exclude: map[string]gap{
+			// The harness starts each case's daemon from the commissioned
+			// snapshot, so the network the snapshot configured must
+			// survive a restart. chip's Linux driver keeps it in its KVS
+			// (CommitConfiguration, Init: src/platform/Linux/
+			// NetworkCommissioningWiFiDriver.cpp:77-118, :135-138 at the
+			// harness pin) and reports it connected from the link; the
+			// module's Wi-Fi server keeps its list in memory only.
+			"4.1":  {classDefect, "TC-CNET-4.1 reads Networks for the one connected network the DUT was commissioned onto; cluster/core's WiFiNetworkCommissioning does not persist its committed networks, so a restarted daemon reports none (chip persists it: NetworkCommissioningWiFiDriver.cpp:77-118, :135-138)", false},
+			"4.4":  {classDefect, "TC-CNET-4.4 scans for the connected network's SSID; after a restart the daemon has no network (WiFiNetworkCommissioning does not persist its committed networks, as for 4.1)", false},
+			"4.9":  {classDefect, "TC-CNET-4.9 removes and re-adds the connected network; after a restart the daemon has none (WiFiNetworkCommissioning does not persist its committed networks, as for 4.1)", false},
+			"4.11": {classHarness, "TC-CNET-4.11 moves the DUT between two real access points and switches the TH host's own Wi-Fi with them (PIXIT.CNET.WIFI_2ND_ACCESSPOINT_SSID/_CREDENTIALS, TC_CNET_4_11.py:1107-1112, and its host connect steps); the simulated driver has no second network and the harness host no Wi-Fi to switch", false},
+			"4.23": {classHarness, "TC-CNET-4.23 expects ConnectNetwork to an incorrect SSID or passphrase to fail; the TESTING-ONLY simulated driver connects to any SSID (examples/reference-bridge/wifisim.go ConnectNetwork), so only a real driver can answer it", false},
+			"4.25": {classNotSupported, "TC-CNET-4.25 verifies Wi-Fi per-device credentials (NetworkCommissioning PDC); the module serves no PDC, and the case skips itself on an endpoint without it", true},
+			"4.26": {classNotSupported, "TC-CNET-4.26 verifies QueryIdentity (per-device credentials); no PDC, the case skips itself", true},
+			"4.27": {classNotSupported, "TC-CNET-4.27 verifies Wi-Fi network client identities (per-device credentials); no PDC, the case skips itself", true},
+			"4.29": {classNotSupported, "TC-CNET-4.29 verifies ConnectNetwork with per-device credentials; no PDC, the case skips itself", true},
+		},
+		args: map[string][]string{
+			"1.4":  wifiCaseArgs,
+			"4.1":  wifiCaseArgs,
+			"4.3":  wifiCaseArgs,
+			"4.4":  wifiCaseArgs,
+			"4.9":  wifiCaseArgs,
+			"4.11": wifiCaseArgs,
+			"4.15": wifiCaseArgs,
+			"4.23": wifiCaseArgs,
+			"4.25": wifiCaseArgs,
+			"4.26": wifiCaseArgs,
+			"4.27": wifiCaseArgs,
+			"4.29": wifiCaseArgs,
 		},
 	},
 	{

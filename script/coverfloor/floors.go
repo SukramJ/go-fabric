@@ -119,9 +119,15 @@ var floors = []packageFloor{
 		min: 0,
 		why: "example daemon, exercised end to end by the chip-tool suite, which runs the built binary rather than its statements. It does have statement-level tests now — fleet_test.go drives a subscription through a mounted endpoint — but the floor stays at 0 because the daemon's value is the end-to-end run, and a number here would ratchet on the fake devices rather than on anything a consumer depends on",
 	},
+	{
+		pkg: "github.com/SukramJ/go-fabric/examples/reference-controller",
+		min: 0,
+		why: "brief BB item 2: only main, which hands os.Args to cli.Run; the command line and its tests are examples/reference-controller/cli",
+	},
 	// Brief AT §4: the floor the brief set; measured 74.0 with
-	// TestReferenceController and TestReferenceControllerOTA alone.
-	{pkg: "github.com/SukramJ/go-fabric/examples/reference-controller", min: 70},
+	// TestReferenceController and TestReferenceControllerOTA alone (then
+	// package main, moved to cli by brief BB item 2).
+	{pkg: "github.com/SukramJ/go-fabric/examples/reference-controller/cli", min: 70},
 	// Brief AW: measured 59.3-60.2; the uncovered part is main and the
 	// paired-node path, which needs a device on the network.
 	{pkg: "github.com/SukramJ/go-fabric/examples/quickstart-controller", min: 55},

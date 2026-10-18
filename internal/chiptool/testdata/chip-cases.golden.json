@@ -448,6 +448,20 @@
       "steps": 7,
       "stepsSkipped": 0
     },
+    "CNETWIFI/1.4": {
+      "tests": 1,
+      "steps": 6,
+      "stepsSkipped": 4
+    },
+    "CNETWIFI/4.15": {
+      "tests": 1,
+      "steps": 4,
+      "stepsSkipped": 0
+    },
+    "CNETWIFI/4.5": {
+      "steps": 4,
+      "stepsSkipped": 0
+    },
     "COMMTR/2.1": {
       "tests": 1,
       "steps": 5,
@@ -2256,6 +2270,31 @@
       "4.27",
       "4.29"
     ],
+    "CNETWIFI": [
+      "1.4",
+      "4.1",
+      "4.2",
+      "4.3",
+      "4.4",
+      "4.5",
+      "4.6",
+      "4.9",
+      "4.10",
+      "4.11",
+      "4.12",
+      "4.13",
+      "4.14",
+      "4.15",
+      "4.16",
+      "4.20",
+      "4.21",
+      "4.22",
+      "4.23",
+      "4.25",
+      "4.26",
+      "4.27",
+      "4.29"
+    ],
     "COMMTR": [
       "2.1",
       "3.1"
@@ -2958,6 +2997,13 @@
     "CNET/4.5": "CNET.S.F00",
     "CNET/4.6": "CNET.S.F01",
     "CNET/4.9": "CNET.S.F00",
+    "CNETWIFI/4.10": "CNET.S \u0026 CNET.S.F01",
+    "CNETWIFI/4.12": "CNET.S.F01",
+    "CNETWIFI/4.16": "CNET.S.F01",
+    "CNETWIFI/4.2": "CNET.S.F01",
+    "CNETWIFI/4.22": "CNET.S.F01",
+    "CNETWIFI/4.3": "CNET.S.F02",
+    "CNETWIFI/4.6": "CNET.S.F01",
     "CONTENTLAUNCHER/10.10": "CONTENTLAUNCHER.S \u0026 CONTENTLAUNCHER.S.A0003",
     "CONTENTLAUNCHER/10.8": "CONTENTLAUNCHER.S \u0026 CONTENTLAUNCHER.S.F05",
     "CONTENTLAUNCHER/10.9": "CONTENTLAUNCHER.S \u0026 CONTENTLAUNCHER.S.F06 \u0026 CONTENTLAUNCHER.S.C01.Rsp",
@@ -3064,6 +3110,10 @@
     "CNET/4.14": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "CNET/4.20": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "CNET/4.21": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CNETWIFI/4.13": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CNETWIFI/4.14": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CNETWIFI/4.20": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
+    "CNETWIFI/4.21": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "CONTENTLAUNCHER/10.4": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "CONTENTLAUNCHER/10.6": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",
     "DA/1.3": "a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate",

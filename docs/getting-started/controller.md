@@ -27,7 +27,7 @@ reference controller's `openStack` builds them in this order:
 The quickstart's `open` follows the same order, and its `close` tears the
 stack down in reverse.
 
-*Source: `examples/reference-controller/stack.go:63-240`, `examples/quickstart-controller/main.go`.*
+*Source: `examples/reference-controller/cli/stack.go:63-240`, `examples/quickstart-controller/main.go`.*
 
 ## The program
 
@@ -93,7 +93,19 @@ to the node and then deletes it. If the node refused the removal, or the
 removal was not confirmed, `Decommission` returns that error and keeps the
 node.
 
-*Source: `examples/reference-controller/pair.go:34-145`, `controller/client/fabricops.go:108-157`, `controller/client/fabricops.go:224-232`, `controller/commissioner/commissioner.go:85-123`, `controller/commissioner/doc.go:4-19`, `controller/client/registry.go:176-191`.*
+A Wi-Fi or Thread device out of the box is found over BLE instead
+([ADR 0024](../adr/0024-ble-commissioning-in-the-controller.md)):
+`ble.NewScanner(central).Find` matches its advertisement by the same
+discriminator, `ble.Dial` opens the BTP channel, and `Registry.Commission`
+with `Options.Channel` runs PASE over it, then the network steps with
+`Options.WiFiNetwork` or `ThreadNetwork`; operational discovery finds the
+device over DNS-SD for CASE. The central on Linux is
+`github.com/SukramJ/go-fabric/ble/bluez`, a module of its own so the main
+module never pulls its D-Bus dependency; the reference controller's BLE
+build is its `cmd/reference-controller` (`pair --ble`, rights and BlueZ
+version in the reference controller's README).
+
+*Source: `examples/reference-controller/cli/pair.go:37-189`, `examples/reference-controller/cli/pair.go:214-246`, `ble/bluez/doc.go:4-30`, `controller/client/fabricops.go:108-157`, `controller/client/fabricops.go:224-232`, `controller/commissioner/commissioner.go:85-123`, `controller/commissioner/doc.go:4-19`, `controller/client/registry.go:176-191`.*
 
 ## Attestation and the DCL
 
@@ -122,7 +134,7 @@ The policy decides what a finding does:
 The zero value proceeds because matter.js does the same for backward
 compatibility. Set the policy explicitly.
 
-*Source: `controller/attestation/doc.go:4-20`, `controller/attestation/store.go:87-93`, `controller/attestation/policy.go:17-61`, `controller/commissioner/commissioner.go:52-54`, `controller/dcl/doc.go:4-24`, `examples/reference-controller/stack.go:242-297`.*
+*Source: `controller/attestation/doc.go:4-20`, `controller/attestation/store.go:87-93`, `controller/attestation/policy.go:17-61`, `controller/commissioner/commissioner.go:52-54`, `controller/dcl/doc.go:4-24`, `examples/reference-controller/cli/stack.go:242-297`.*
 
 ## The registry and the device view
 
@@ -152,7 +164,7 @@ cluster's shape.
 The image is persisted with `controller/client/sqlstore`, so a later run
 starts from what the last one saw.
 
-*Source: `controller/client/doc.go:19-50`, `controller/client/registry.go:24-191`, `controller/client/registry.go:343-369`, `controller/client/endpoint.go:53-145`, `controller/client/cluster.go:204-345`, `examples/reference-controller/pair.go:163-180`.*
+*Source: `controller/client/doc.go:19-50`, `controller/client/registry.go:24-191`, `controller/client/registry.go:343-369`, `controller/client/endpoint.go:53-145`, `controller/client/cluster.go:204-345`, `examples/reference-controller/cli/pair.go:191-212`.*
 
 ## Read, write, invoke, subscribe
 
@@ -176,13 +188,12 @@ establishes CASE when no session is live.
   hands each report to a channel. `Sustain` re-establishes a subscription
   that was lost.
 
-*Source: `controller/client/interact.go:15-120`, `controller/interaction/write.go:39-52`, `controller/interaction/invoke.go:19-31`, `controller/interaction/subscribe.go:44-90`, `controller/interaction/handler.go:126-138`, `examples/reference-controller/interact.go:289-330`.*
+*Source: `controller/client/interact.go:15-120`, `controller/interaction/write.go:39-52`, `controller/interaction/invoke.go:19-31`, `controller/interaction/subscribe.go:44-90`, `controller/interaction/handler.go:126-138`, `examples/reference-controller/cli/interact.go:289-330`.*
 
 ## What is not here yet
 
-BLE commissioning (planned, [ADR 0024](../adr/0024-ble-commissioning-in-the-controller.md)),
-Wi-Fi and Thread network commissioning, and TCP on the controller side are
-outside the current stages. Group messages and OTA images need a node of
+BLE on macOS and Windows (ADR 0024 decision 6) and TCP on the controller
+side are outside the current stages. Group messages and OTA images need a node of
 the fabric. The reference controller starts its own node for `group` and
 `ota` and keeps it in the same database.
 

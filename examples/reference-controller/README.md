@@ -1,14 +1,19 @@
 # reference-controller
 
 The module's controller role as a command-line tool: it pairs Matter nodes
-over IP, reads, writes, invokes and subscribes, provisions groups and
-bindings, and serves an OTA image. It is an example (`package main`), not
-API — copy from it, do not build against it.
+over IP or BLE, reads, writes, invokes and subscribes, provisions groups and
+bindings, and serves an OTA image. It is an example (the command line is
+`package cli` beside this file), not API — copy from it, do not build
+against it.
 
 ```sh
 go build ./examples/reference-controller
 ./reference-controller --db home.db pair --code MT:-24J0AFN00KA0648G00
 ```
+
+This build has no BLE. The BLE build is
+[`ble/bluez/cmd/reference-controller`](../../ble/bluez/cmd/reference-controller/main.go),
+the same command line over BlueZ (§BLE below).
 
 Every command opens the database, does its work and exits; the next command
 is the same fabric, so every node paired before still trusts it.
@@ -43,7 +48,7 @@ its error on stderr.
 
 ## Commands
 
-- `pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX]`
+- `pair --code <MT:… | 11 or 21 digits> | --passcode N --discriminator N [--node-id N] [--label L] [--wifi-ssid S --wifi-credentials C | --thread-dataset HEX] [--ble [--ble-adapter hci0]]`
   Finds the device over DNS-SD by its discriminator (long from a QR code or
   `--discriminator`, short from a manual code), runs PASE, checks its
   attestation, installs the NOC, keeps the node in the registry and prints
@@ -57,6 +62,18 @@ its error on stderr.
 
   ```sh
   reference-controller pair --code 34970112332 --node-id 0x4321 --label kitchen
+  ```
+
+  `--ble` (the BLE build only) finds the device by its BLE advertisement
+  instead — by the same discriminator — and runs PASE over BTP on the
+  adapter `--ble-adapter` (default `hci0`). A device on BLE has no network
+  yet, so `--ble` needs `--wifi-ssid` with `--wifi-credentials`, or
+  `--thread-dataset`; the network steps put the device on that network,
+  and operational discovery then finds it over DNS-SD for CASE. In the plain
+  build `--ble` answers that the build has none.
+
+  ```sh
+  reference-controller pair --ble --code MT:-24J0AFN00KA0648G00 --wifi-ssid lab --wifi-credentials secret12
   ```
 
 - `unpair <node>` — RemoveFabric on the node, then its record is deleted.
@@ -174,6 +191,33 @@ its error on stderr.
   ```sh
   reference-controller window open 0x4321 --timeout 600
   ```
+
+## BLE
+
+```sh
+cd ble/bluez && go build -o reference-controller ./cmd/reference-controller
+```
+
+`ble/bluez` is a Go module of its own (ADR 0024 decision 3), so the main
+module never pulls its D-Bus dependency; its `cmd/reference-controller` is
+this command line with `cli.Options.Central` set to `bluez.NewCentral`. It
+speaks BlueZ over the D-Bus system bus, without cgo, on Linux only.
+
+- **Rights.** BlueZ answers callers its D-Bus policy admits: root and, on
+  most distributions, members of the `bluetooth` group
+  (`sudo usermod -aG bluetooth $USER`, then log in again); elsewhere a
+  polkit rule or a D-Bus policy file for `org.bluez`. Without the right
+  `pair --ble` fails with `org.freedesktop.DBus.Error.AccessDenied` in the
+  message; an adapter that is off fails with `org.bluez.Error.NotReady`
+  (`bluetoothctl power on`).
+- **BlueZ.** Not yet verified against a live BlueZ: the module's tests run
+  over an in-process bus, and the live path is the manually started
+  `ble-virtual` workflow (Ubuntu 24.04, `btvirt`), which needs a CHIP image
+  whose `chip-all-clusters-app` is built with BLE — the pinned one is not.
+  The ATT_MTU comes from the characteristic's `MTU` property; a BlueZ
+  without it runs BTP at the 20-byte minimum segment.
+- **Adapter.** `--ble-adapter` names the adapter as BlueZ does (`hci0`,
+  `hci1`, …; `bluetoothctl list`).
 
 ## The controller's own node
 
