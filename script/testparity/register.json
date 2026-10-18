@@ -2626,31 +2626,21 @@
     },
     {
       "path": "packages/protocol/test/certificate/CertificateAuthorityTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/ca:TestRootAndNOCRoundTrip",
         "controller/ca:TestICACChain",
         "controller/ca:TestStoreSaveAndLoad",
-        "controller/ca:TestRejects"
+        "controller/ca:TestRejects",
+        "controller/ca:TestCertificateAuthority2Tier",
+        "controller/ca:TestCertificateAuthority3Tier",
+        "controller/ca:TestCertificateAuthorityConfiguration",
+        "controller/ca:TestCertificateAuthorityCertificateIDs",
+        "controller/ca:TestCertificateAuthorityConfigurationExport",
+        "controller/ca:TestCertificateAuthoritySKI",
+        "controller/ca:TestCertificateAuthorityCATs"
       ],
-      "missing": [
-        "refuses a NOC whose node ID is outside the operational range",
-        "verifies a NOC whose node ID is in the operational range",
-        "persists ICAC to storage",
-        "auto-detects ICAC from storage when ica option not provided",
-        "loads ICAC from storage and sets intermediateCert=true (storage takes precedence)",
-        "throws ImplementationError when intermediateCert=true but no ICAC data in storage",
-        "throws ImplementationError when ICAC data exists but intermediateCert=false",
-        "increments certificate IDs correctly",
-        "allocates ICAC cert ID before NOC IDs",
-        "exports complete configuration with ICAC",
-        "can reconstruct CA from exported config",
-        "derives root SKI as 160-bit SHA-1 of the public key (RFC 5280 method-1)",
-        "derives ICAC SKI as 160-bit SHA-1 of the public key",
-        "derives NOC SKI as 160-bit SHA-1 of the public key",
-        "generates NOC with CASE Authenticated Tags"
-      ],
-      "reason": "The two- and three-tier CA, NOC issuing and persistence are covered by controller/ca; the node-ID range checks and the remaining ICAC cases are not.",
+      "reason": "Every it case is ported through ca.New/GenerateNOC with a ca.MemoryStore standing for both the StorageContext and the exported Configuration; the node-ID range check runs through the CA's Verifier, and generateIntermediateCert left undefined is the new Config.DetectIntermediateCA.",
       "snapshotSha": "419f52282aee51d6a30925790ebe251d76a790c3"
     },
     {
