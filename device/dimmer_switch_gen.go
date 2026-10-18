@@ -18,7 +18,7 @@ const (
 	DimmerSwitchRevision uint16 = 4
 )
 
-// DimmerSwitchType is the DimmerSwitch device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// DimmerSwitchType is the DimmerSwitch device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/dimmer-switch.ts.
 var DimmerSwitchType = Type{
 	ID: DimmerSwitchID, Name: "DimmerSwitch", Revision: DimmerSwitchRevision,

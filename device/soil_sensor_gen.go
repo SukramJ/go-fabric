@@ -19,7 +19,7 @@ const (
 	SoilSensorRevision uint16 = 1
 )
 
-// SoilSensorType is the SoilSensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// SoilSensorType is the SoilSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/soil-sensor.ts.
 var SoilSensorType = Type{
 	ID: SoilSensorID, Name: "SoilSensor", Revision: SoilSensorRevision,

@@ -28,7 +28,7 @@ const (
 	BasicVideoPlayerRevision uint16 = 2
 )
 
-// BasicVideoPlayerType is the BasicVideoPlayer device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// BasicVideoPlayerType is the BasicVideoPlayer device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/basic-video-player.ts.
 var BasicVideoPlayerType = Type{
 	ID: BasicVideoPlayerID, Name: "BasicVideoPlayer", Revision: BasicVideoPlayerRevision,

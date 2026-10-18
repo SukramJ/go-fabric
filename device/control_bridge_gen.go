@@ -18,7 +18,7 @@ const (
 	ControlBridgeRevision uint16 = 4
 )
 
-// ControlBridgeType is the ControlBridge device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// ControlBridgeType is the ControlBridge device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/control-bridge.ts.
 var ControlBridgeType = Type{
 	ID: ControlBridgeID, Name: "ControlBridge", Revision: ControlBridgeRevision,

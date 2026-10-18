@@ -19,7 +19,7 @@ const (
 	SpeakerRevision uint16 = 1
 )
 
-// SpeakerType is the Speaker device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// SpeakerType is the Speaker device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/speaker.ts.
 var SpeakerType = Type{
 	ID: SpeakerID, Name: "Speaker", Revision: SpeakerRevision,

@@ -101,7 +101,7 @@ var deviceTypeDefinitions = map[uint32]*DeviceTypeDefinition{
 		},
 	},
 	0x0013: {
-		ID: 0x0013, Name: "BridgedNode", Classification: "utility", Revision: 3, Composition: "tree",
+		ID: 0x0013, Name: "BridgedNode", Classification: "utility", Revision: 3, Composition: "full-family",
 		Conditions: []string{"FabricSynchronizedNode"},
 		Requirements: []DeviceTypeRequirement{
 			{

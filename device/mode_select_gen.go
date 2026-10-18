@@ -17,7 +17,7 @@ const (
 	ModeSelectRevision uint16 = 1
 )
 
-// ModeSelectType is the ModeSelect device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// ModeSelectType is the ModeSelect device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/mode-select.ts.
 var ModeSelectType = Type{
 	ID: ModeSelectID, Name: "ModeSelect", Revision: ModeSelectRevision,

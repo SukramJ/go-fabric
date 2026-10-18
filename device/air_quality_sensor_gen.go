@@ -30,7 +30,7 @@ const (
 	AirQualitySensorRevision uint16 = 1
 )
 
-// AirQualitySensorType is the AirQualitySensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// AirQualitySensorType is the AirQualitySensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/air-quality-sensor.ts.
 var AirQualitySensorType = Type{
 	ID: AirQualitySensorID, Name: "AirQualitySensor", Revision: AirQualitySensorRevision,

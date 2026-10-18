@@ -17,7 +17,7 @@ const (
 	ElectricalUtilityMeterRevision uint16 = 1
 )
 
-// ElectricalUtilityMeterType is the ElectricalUtilityMeter device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// ElectricalUtilityMeterType is the ElectricalUtilityMeter device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/electrical-utility-meter.ts.
 var ElectricalUtilityMeterType = Type{
 	ID: ElectricalUtilityMeterID, Name: "ElectricalUtilityMeter", Revision: ElectricalUtilityMeterRevision,

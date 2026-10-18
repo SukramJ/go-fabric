@@ -18,7 +18,7 @@ const (
 	ColorDimmerSwitchRevision uint16 = 4
 )
 
-// ColorDimmerSwitchType is the ColorDimmerSwitch device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// ColorDimmerSwitchType is the ColorDimmerSwitch device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/color-dimmer-switch.ts.
 var ColorDimmerSwitchType = Type{
 	ID: ColorDimmerSwitchID, Name: "ColorDimmerSwitch", Revision: ColorDimmerSwitchRevision,

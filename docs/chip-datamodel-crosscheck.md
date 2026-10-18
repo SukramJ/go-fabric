@@ -143,7 +143,7 @@ block below.
 
 | Side | Source |
 | --- | --- |
-| snapshot | `parity/schema.json`, matter.js `0ceb202d28edc82f1ce131afde06e18a87c58a11`, Matter 1.6.1, SHA-256 `b0ee58b4e5d7e9eeeb372b9db10444ce1f7a27dff3220f5ddcfa3ddad40cd70f` |
+| snapshot | `parity/schema.json`, matter.js `862ad75f4d3c7ab528b8a3954168146082cad8a6`, Matter 1.6.1, SHA-256 `3b18deb666e85dab9401a536f86946be841a99a5532f1fd52faa913fd87cb3b0` |
 | CHIP | connectedhomeip `6170af8461b10b1766044122ac83332c6d00ab20`, `data_model/1.6.1` (git tree `77969732bddf4bd12ba57eb1c6fa032eb2613425`) |
 | CHIP's source | specification `1.6.1-attempt-4` (`49f70c101b4211df3febb975a7f7f9d6e4c4bc94`), alchemy version: v1.7.10 |
 | read | at test time from a connectedhomeip checkout; nothing of it is committed (ADR 0015) |

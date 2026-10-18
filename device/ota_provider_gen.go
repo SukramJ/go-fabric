@@ -17,7 +17,7 @@ const (
 	OtaProviderRevision uint16 = 1
 )
 
-// OtaProviderType is the OtaProvider device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// OtaProviderType is the OtaProvider device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/endpoints/ota-provider.ts.
 var OtaProviderType = Type{
 	ID: OtaProviderID, Name: "OtaProvider", Revision: OtaProviderRevision,

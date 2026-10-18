@@ -19,7 +19,7 @@ const (
 	WaterFreezeDetectorRevision uint16 = 2
 )
 
-// WaterFreezeDetectorType is the WaterFreezeDetector device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// WaterFreezeDetectorType is the WaterFreezeDetector device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/water-freeze-detector.ts.
 var WaterFreezeDetectorType = Type{
 	ID: WaterFreezeDetectorID, Name: "WaterFreezeDetector", Revision: WaterFreezeDetectorRevision,

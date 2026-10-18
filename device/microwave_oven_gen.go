@@ -21,7 +21,7 @@ const (
 	MicrowaveOvenRevision uint16 = 2
 )
 
-// MicrowaveOvenType is the MicrowaveOven device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// MicrowaveOvenType is the MicrowaveOven device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/microwave-oven.ts.
 var MicrowaveOvenType = Type{
 	ID: MicrowaveOvenID, Name: "MicrowaveOven", Revision: MicrowaveOvenRevision,

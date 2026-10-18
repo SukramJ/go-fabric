@@ -17,7 +17,7 @@ const (
 	VideoRemoteControlRevision uint16 = 2
 )
 
-// VideoRemoteControlType is the VideoRemoteControl device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// VideoRemoteControlType is the VideoRemoteControl device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/video-remote-control.ts.
 var VideoRemoteControlType = Type{
 	ID: VideoRemoteControlID, Name: "VideoRemoteControl", Revision: VideoRemoteControlRevision,

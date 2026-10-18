@@ -18,7 +18,7 @@ const (
 	OnOffLightSwitchRevision uint16 = 4
 )
 
-// OnOffLightSwitchType is the OnOffLightSwitch device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// OnOffLightSwitchType is the OnOffLightSwitch device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/on-off-light-switch.ts.
 var OnOffLightSwitchType = Type{
 	ID: OnOffLightSwitchID, Name: "OnOffLightSwitch", Revision: OnOffLightSwitchRevision,

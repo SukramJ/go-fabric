@@ -18,7 +18,7 @@ const (
 	OnOffSensorRevision uint16 = 4
 )
 
-// OnOffSensorType is the OnOffSensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// OnOffSensorType is the OnOffSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/on-off-sensor.ts.
 var OnOffSensorType = Type{
 	ID: OnOffSensorID, Name: "OnOffSensor", Revision: OnOffSensorRevision,

@@ -31,7 +31,7 @@ const (
 	CastingVideoPlayerRevision uint16 = 2
 )
 
-// CastingVideoPlayerType is the CastingVideoPlayer device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// CastingVideoPlayerType is the CastingVideoPlayer device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/casting-video-player.ts.
 var CastingVideoPlayerType = Type{
 	ID: CastingVideoPlayerID, Name: "CastingVideoPlayer", Revision: CastingVideoPlayerRevision,
