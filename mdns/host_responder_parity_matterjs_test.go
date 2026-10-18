@@ -3,7 +3,12 @@
 
 package mdns
 
+// A port of matter.js packages/protocol/test/mdns/MdnsServerTest.ts at
+// 862ad75f: the host-name answerer's cache-flush, suppression, duplicate and
+// unicast decisions, and the MAC-derived host-name choice.
+
 import (
+	"errors"
 	"net"
 	"slices"
 	"strings"
@@ -365,4 +370,242 @@ func TestHostAddrsFor_Policy(t *testing.T) {
 			}
 		}
 	}
+}
+
+// The MdnsServerTest.ts cases below run against the host-name answerer, the
+// go-fabric code that answers queries itself (grandcat/zeroconf answers the
+// service records). The matter.js record set is a PTR, SRV, TXT and the
+// host's A; here it is the host's A/AAAA set, so the cases test the same
+// rule on the records the answerer holds. Where the matter.js case needs
+// additionals it uses a mixed query: matter.js adds additionals unless
+// every question is A/AAAA (MdnsServer.ts:130-135), and a host ANY answers
+// the whole set.
+
+// mixedQuery asks qtype of the host plus an unrelated SRV, so the rest of
+// the host's set comes back as additionals.
+func mixedQuery(qtype uint16, known ...dns.RR) *dns.Msg {
+	q := hostQuery(testHost, qtype, false, known...)
+	q.Question = append(q.Question, dns.Question{Name: "other.local.", Qtype: dns.TypeSRV, Qclass: dns.ClassINET})
+	return q
+}
+
+func noAnswer(t *testing.T, h *hostAnswerer, q *dns.Msg) {
+	t.Helper()
+	if r, ok := h.answer(q, 1, querier); ok {
+		t.Errorf("answered %v with %v, want nothing", q.Question, rrStrings(r.msg.Answer))
+	}
+}
+
+func TestMdnsServerRespondsToStandardQueries(t *testing.T) {
+	t.Parallel()
+	t.Run("server responds to an A query with A record only", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4")
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeA, false), 1)
+		if r.unicast || r.ifIndex != 1 || r.msg.Id != 0 || len(r.msg.Question) != 0 {
+			t.Errorf("reply unicast=%v ifIndex=%d id=%d questions=%d", r.unicast, r.ifIndex, r.msg.Id, len(r.msg.Question))
+		}
+		expectRRs(t, "answers", r.msg.Answer, aRecord("1.2.3.4", 120, true))
+		expectRRs(t, "additionals", r.msg.Extra)
+	})
+}
+
+func TestMdnsServerCacheFlushBit(t *testing.T) {
+	t.Parallel()
+	t.Run("suppresses a record the querier knows even though we flag it cache-flush", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4", "fe80::1")
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false, aRecord("1.2.3.4", 120, false)), 1)
+		expectRRs(t, "answers", r.msg.Answer, aRecord("fe80::1", 120, true))
+	})
+	t.Run("drops the bit on an additional record whose set a known answer pruned", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4", "5.6.7.8", "fe80::1")
+		r := mustAnswer(t, h, mixedQuery(dns.TypeAAAA, aRecord("1.2.3.4", 120, false)), 1)
+		expectRRs(t, "answers", r.msg.Answer, aRecord("fe80::1", 120, true))
+		expectRRs(t, "additionals", r.msg.Extra, aRecord("5.6.7.8", 120, false))
+	})
+	t.Run("omits the bit from a unicast response", func(t *testing.T) {
+		t.Parallel()
+		h, clock := newTestAnswerer("1.2.3.4", "fe80::1")
+		mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false), 1)
+		clock.Advance(time.Second)
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, true), 1)
+		if !r.unicast || len(r.msg.Answer) == 0 {
+			t.Fatalf("unicast=%v answers=%d, want a unicast answer", r.unicast, len(r.msg.Answer))
+		}
+		for _, rr := range r.msg.Answer {
+			if rr.Header().Class&classCacheFlush != 0 {
+				t.Errorf("unicast answer %v carries the cache-flush bit", rr)
+			}
+		}
+	})
+	t.Run("drops the bit when a known answer leaves the record set incomplete", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4", "5.6.7.8")
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeA, false, aRecord("1.2.3.4", 120, false)), 1)
+		expectRRs(t, "answers", r.msg.Answer, aRecord("5.6.7.8", 120, false))
+	})
+	t.Run("keeps the bit when the whole record set is sent", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4", "5.6.7.8")
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeA, false), 1)
+		expectRRs(t, "answers", r.msg.Answer, aRecord("1.2.3.4", 120, true), aRecord("5.6.7.8", 120, true))
+	})
+}
+
+func TestMdnsServerAnswerSuppression(t *testing.T) {
+	t.Parallel()
+	t.Run("suppress some answers in an ANY query", func(t *testing.T) {
+		t.Parallel()
+		// Two of three answers known, as the TXT and PTR of :519.
+		h, _ := newTestAnswerer("fe80::1", "fd00::1", "1.2.3.4")
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false, aRecord("fe80::1", 120, false), aRecord("fd00::1", 120, false)), 1)
+		expectRRs(t, "answers", r.msg.Answer, aRecord("1.2.3.4", 120, true))
+	})
+	t.Run("suppress full answer in an A query", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4")
+		noAnswer(t, h, hostQuery(testHost, dns.TypeA, false, aRecord("1.2.3.4", 120, false)))
+	})
+}
+
+func TestMdnsServerHandleDuplicateMessages(t *testing.T) {
+	t.Parallel()
+	t.Run("server suppress response to same ANY query when 0ms delay", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4")
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false), 1)
+		expectRRs(t, "first", r.msg.Answer, aRecord("1.2.3.4", 120, true))
+		noAnswer(t, h, hostQuery(testHost, dns.TypeANY, false))
+	})
+	t.Run("server do not suppress response from same ANY query when > 1s delay", func(t *testing.T) {
+		t.Parallel()
+		h, clock := newTestAnswerer("1.2.3.4")
+		mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false), 1)
+		clock.Advance(questionSuppressionWindow + 2*time.Millisecond)
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false), 1)
+		expectRRs(t, "second", r.msg.Answer, aRecord("1.2.3.4", 120, true))
+	})
+	t.Run("server also suppress response to different query with same records when 0ms delay", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4")
+		mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false), 1)
+		noAnswer(t, h, hostQuery(testHost, dns.TypeA, false))
+	})
+	t.Run("server do not suppress additional records to different query when 0ms delay", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4", "fe80::1")
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeA, false), 1)
+		expectRRs(t, "first answers", r.msg.Answer, aRecord("1.2.3.4", 120, true))
+		expectRRs(t, "first additionals", r.msg.Extra)
+		r = mustAnswer(t, h, mixedQuery(dns.TypeAAAA), 1)
+		expectRRs(t, "second answers", r.msg.Answer, aRecord("fe80::1", 120, true))
+		expectRRs(t, "second additionals", r.msg.Extra, aRecord("1.2.3.4", 120, true))
+	})
+}
+
+func TestMdnsServerRespondsAsUnicast(t *testing.T) {
+	t.Parallel()
+	anyQU := func() *dns.Msg { return hostQuery(testHost, dns.TypeANY, true) }
+	expect := func(t *testing.T, r hostReply, unicast bool) {
+		t.Helper()
+		if r.unicast != unicast {
+			t.Errorf("unicast=%v, want %v", r.unicast, unicast)
+		}
+		if r.unicast && (!r.dst.IP.Equal(querier.IP) || r.dst.Port != querier.Port) {
+			t.Errorf("unicast to %v, want %v", r.dst, querier)
+		}
+		if len(r.msg.Answer) != 1 || r.msg.Answer[0].Header().Rrtype != dns.TypeA {
+			t.Errorf("answers %v", rrStrings(r.msg.Answer))
+		}
+	}
+	t.Run("server responds to an ANY query as multicast when unicast is requested after a previous unicast query with less than 1/4 of TTL remaining", func(t *testing.T) {
+		t.Parallel()
+		h, clock := newTestAnswerer("1.2.3.4")
+		expect(t, mustAnswer(t, h, anyQU(), 1), false)
+		clock.Advance(29 * time.Second)
+		expect(t, mustAnswer(t, h, anyQU(), 1), true)
+	})
+	t.Run("server responds to an ANY query as multicast even if requested as unicast and after a multicast query with more than 1/4 of ttl but never sent as multicast", func(t *testing.T) {
+		t.Parallel()
+		h, clock := newTestAnswerer("1.2.3.4")
+		expect(t, mustAnswer(t, h, anyQU(), 1), false)
+		clock.Advance(31 * time.Second)
+		expect(t, mustAnswer(t, h, anyQU(), 1), false)
+	})
+	t.Run("server responds to an ANY query as multicast even if requested as unicast and after a multicast query with more than 1/4 of ttl when earlier sent as multicast", func(t *testing.T) {
+		t.Parallel()
+		h, clock := newTestAnswerer("1.2.3.4")
+		expect(t, mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false), 1), false)
+		clock.Advance(20 * time.Second)
+		expect(t, mustAnswer(t, h, anyQU(), 1), true)
+		clock.Advance(11 * time.Second)
+		expect(t, mustAnswer(t, h, anyQU(), 1), false)
+	})
+}
+
+func TestMdnsServerUnknownNameQueryRejection(t *testing.T) {
+	t.Parallel()
+	t.Run("suppresses known-answer records supplied with a different case (RFC 6762 §16)", func(t *testing.T) {
+		t.Parallel()
+		h, _ := newTestAnswerer("1.2.3.4", "fe80::1")
+		known := aRecord("1.2.3.4", 120, false)
+		known.Header().Name = strings.ToUpper(testHost)
+		r := mustAnswer(t, h, hostQuery(testHost, dns.TypeANY, false, known), 1)
+		expectRRs(t, "answers", r.msg.Answer, aRecord("fe80::1", 120, true))
+	})
+}
+
+// The Host name group (MdnsServerTest.ts:1670-1836) runs against the
+// host-name choice of [defaultHostName]: one name, the SRV target of every
+// service on every interface. Every matter.js MockNetwork interface is up
+// and multicast-capable; "lo" is excluded by its zero MAC, as there.
+func TestMdnsServerHostName(t *testing.T) {
+	t.Parallel()
+	up := net.FlagUp | net.FlagMulticast
+	iface := func(mac string, addrs int) hostNameIface {
+		hw, err := net.ParseMAC(mac)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return hostNameIface{flags: up, mac: hw, addrs: addrs}
+	}
+	// beforeEach, :1752-1757.
+	lo, eth0, docker0 := iface("00:00:00:00:00:00", 1), iface("aa:bb:cc:dd:ee:01", 1), iface("aa:bb:cc:dd:ee:02", 1)
+	standard := func() []hostNameIface { return []hostNameIface{lo, eth0, docker0} }
+
+	t.Run("names one host on every interface", func(t *testing.T) {
+		t.Parallel()
+		var c hostNameChooser
+		anpi0 := iface("aa:bb:cc:dd:ee:00", 0)
+		if got := c.choose(append([]hostNameIface{anpi0}, standard()...), true); got != "AABBCCDDEE010000" {
+			t.Errorf("host = %q, want AABBCCDDEE010000", got)
+		}
+	})
+	t.Run("keeps the name while its MAC is present, even when another interface lists first", func(t *testing.T) {
+		t.Parallel()
+		var c hostNameChooser
+		c.choose(standard(), true)
+		if got := c.choose([]hostNameIface{docker0, eth0}, true); got != "AABBCCDDEE010000" {
+			t.Errorf("host = %q, want AABBCCDDEE010000", got)
+		}
+	})
+	t.Run("follows a rotated MAC", func(t *testing.T) {
+		t.Parallel()
+		var c hostNameChooser
+		c.choose(standard(), true)
+		if got := c.choose([]hostNameIface{lo, iface("aa:bb:cc:dd:ee:03", 1), docker0}, true); got != "AABBCCDDEE030000" {
+			t.Errorf("host = %q, want AABBCCDDEE030000", got)
+		}
+	})
+	t.Run("skips an interface whose details cannot be read", func(t *testing.T) {
+		t.Parallel()
+		var c hostNameChooser
+		gone := iface("aa:bb:cc:dd:ee:09", 1)
+		gone.err = errors.New("interface gone is gone")
+		if got := c.choose(append([]hostNameIface{gone}, standard()...), true); got != "AABBCCDDEE010000" {
+			t.Errorf("host = %q, want AABBCCDDEE010000", got)
+		}
+	})
 }
