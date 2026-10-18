@@ -2861,28 +2861,16 @@
     },
     {
       "path": "packages/protocol/test/common/DiscoveryDataTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/discovery:TestParityDiscovery_TXTParameters",
-        "controller/discovery:TestParityDiscovery_TXTData"
+        "controller/discovery:TestParityDiscovery_TXTData",
+        "controller/discovery:TestDiscoveryDataCaseInsensitiveKeys",
+        "controller/discovery:TestDiscoveryDataSessionIntervals",
+        "controller/discovery:TestDiscoveryDataIdentity",
+        "controller/discovery:TestDiscoveryDataTransports"
       ],
-      "missing": [
-        "decodes the keys of DNS-SD parameters regardless of their case",
-        "accepts SII/SAI at the maximum of 3600000 ms and zero",
-        "accepts SAT at the maximum of 65535 ms",
-        "drops SII/SAI above 3600000 ms",
-        "drops SAT above 65535 ms and SAT of zero",
-        "drops empty values",
-        "drops non-numeric and non-integer values",
-        "drops values with leading zeros",
-        "accepts values at their maximum",
-        "keeps the VP vendor when only the product is invalid",
-        "drops VP with an invalid vendor",
-        "drops DT and PH outside 32 bits, non-integers, leading zeros and PH of zero",
-        "drops signed, hexadecimal, non-integer and leading-zero values",
-        "drops T outside 16 bits and ICD other than 0 or 1"
-      ],
-      "reason": "SII/SAI/SAT decoding of valid TXT values is covered; the case-insensitive keys and the range and malformed-value drops are not ported case by case.",
+      "reason": "Every it case runs against ParseTXTData: case-insensitive keys (on a hand-built and on a discovered Name's parameters) and the SII/SAI/SAT, VP/DT/PH and T/ICD accept and drop vectors.",
       "snapshotSha": "a33584fd792721ab0c81c706c643f1fe918cbd3f"
     },
     {
