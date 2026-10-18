@@ -71,7 +71,7 @@ var (
 	// trees phase 16 brings to 100 % are checked as "ported, or until a
 	// named phase"; an excluded controller-stage or device-ble-thread entry
 	// always carries one.
-	untilPattern = regexp.MustCompile(`^M[1-7]( phase [0-9]{1,2})?$`)
+	untilPattern = regexp.MustCompile(`^M[1-7]( phase \d{1,2})?$`)
 )
 
 func loadRegister(p string) (*Register, error) {
