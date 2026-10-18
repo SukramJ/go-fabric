@@ -5,22 +5,21 @@ package interaction_test
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"log/slog"
 	"net"
-	"path/filepath"
 	"testing"
 	"time"
 
 	_ "modernc.org/sqlite"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
 	gencomm "github.com/SukramJ/go-fabric/cluster/spec/generalcommissioning"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/controller/interaction"
+	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/transport/udp"
@@ -28,38 +27,21 @@ import (
 
 const testPasscode uint32 = 20202021
 
-// startNode starts an uncommissioned node on loopback, as the node tests
-// do (node/node_test.go:30-65), and returns its UDP address.
+// startNode starts an uncommissioned node on IPv4 loopback with the
+// system clock — a fabrictest device, as these tests drive a controller
+// manager of their own on a loopback socket — and returns its UDP address.
 func startNode(t *testing.T) *net.UDPAddr {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	n, err := node.New(node.Config{
-		Network:            node.Network{Listen: "127.0.0.1:0", PreferIPv4: true},
-		Commissioning:      node.Commissioning{Passcode: testPasscode, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
-		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001},
-		BasicInformation: node.BasicInformation{
+	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true, Clock: clock.System{}})
+	d := site.AddDevice(fabrictest.Topology{Configure: func(c *node.Config) {
+		c.Network = node.Network{Listen: "127.0.0.1:0", PreferIPv4: true}
+		c.Commissioning.Passcode = testPasscode
+		c.BasicInformation = node.BasicInformation{
 			VendorName: "go-fabric test", ProductName: "interaction test", NodeLabel: "interaction node", SerialNumber: "IA-1",
 			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
-		},
-		Store:  node.Store{DB: db},
-		Logger: slog.New(slog.DiscardHandler),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := n.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = n.Stop(context.Background()) })
-	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return addr
+		}
+	}})
+	return d.Addr()
 }
 
 // paseTo opens a PASE session to the node at addr on a loopback manager.

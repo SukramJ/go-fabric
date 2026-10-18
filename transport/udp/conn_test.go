@@ -4,6 +4,7 @@
 package udp
 
 import (
+	"net"
 	"testing"
 	"time"
 )
@@ -23,7 +24,7 @@ func TestConnAdapterSendsThroughListener(t *testing.T) {
 		t.Fatal(err)
 	}
 	buf := make([]byte, 8)
-	_ = b.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_ = b.conn.(*net.UDPConn).SetReadDeadline(time.Now().Add(5 * time.Second))
 	n, _, err := b.conn.ReadFromUDP(buf)
 	if err != nil || n != 1 || buf[0] != 0x42 {
 		t.Fatalf("read n=%d err=%v", n, err)

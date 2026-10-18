@@ -110,6 +110,9 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/device", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/endpoint", min: 86},
+	// Brief BG: measured 86.9; the uncovered part is the error paths of a
+	// host that fails to build or listen, which fail the test through tb.
+	{pkg: "github.com/SukramJ/go-fabric/fabrictest", min: 85},
 	{
 		pkg: "github.com/SukramJ/go-fabric/endpoint/endpointtest",
 		min: 0,
@@ -162,6 +165,11 @@ var floors = []packageFloor{
 	},
 	{pkg: "github.com/SukramJ/go-fabric/internal/clockvar", min: 100},
 	{pkg: "github.com/SukramJ/go-fabric/internal/paritytest", min: 97},
+	{
+		pkg: "github.com/SukramJ/go-fabric/internal/udpseam",
+		min: 0,
+		why: "declaration-only seam: an interface and a function variable transport/udp installs from its init, so the package holds no statement a test could execute",
+	},
 	{pkg: "github.com/SukramJ/go-fabric/mdns", min: 91},
 	{
 		pkg: "github.com/SukramJ/go-fabric/node",

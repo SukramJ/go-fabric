@@ -15,6 +15,13 @@
 // entry points that exist only to serve tests, so they live here instead and
 // reach the bridge through a module-internal seam.
 //
+// For a device built with node.New,
+// [github.com/SukramJ/go-fabric/fabrictest] runs the device and the
+// module's controller in process on an in-memory network and a fake
+// clock, commissioned with a Site's CommissionedPair. Commissioner stays
+// the controller for a bridge a host builds itself (bridge.New) and for a
+// test on loopback UDP and the wall clock.
+//
 // The scaffolding a test also needs to CONSTRUCT a bridge — the in-memory
 // endpoint store and the empty-fleet snapshotter — lives one level down in
 // [github.com/SukramJ/go-fabric/endpoint/endpointtest], because it refers to

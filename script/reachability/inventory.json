@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5322,
+  "entry_points": 5331,
   "entry_packages": [
     ".",
     "bdx",
@@ -186,6 +186,7 @@
     "examples/quickstart-device",
     "examples/reference-bridge",
     "examples/reference-controller/cli",
+    "fabrictest",
     "groups",
     "im",
     "im/subscription",
@@ -223,8 +224,8 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12787,
-    "reachable": 9016,
+    "total_exported": 12819,
+    "reachable": 9048,
     "whitelisted": 3766,
     "unreachable": 5
   },
@@ -26539,7 +26540,7 @@
       "identifier": "TestConnAdapterSendsThroughListener",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "transport/udp/conn_test.go",
-      "line": 13
+      "line": 14
     },
     {
       "package": "transport/udp",

@@ -5,11 +5,7 @@ package client_test
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	"log/slog"
-	"net"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
@@ -17,213 +13,66 @@ import (
 	"testing"
 	"time"
 
-	"github.com/miekg/dns"
-	_ "modernc.org/sqlite"
-
 	"github.com/SukramJ/go-fabric/cluster/onoff"
-	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/attestation"
-	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
-	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/controller/peer"
 	"github.com/SukramJ/go-fabric/endpoint"
-	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/node"
-	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
-// The live harness follows controller/interaction/live_test.go: a node.Node
-// with one bridged plug in process, commissioned by the module's own
-// commissioner, whose context carries the subscription registry and the
-// CASE responder.
-
-const (
-	liveFabricID     uint64 = 0x0000_0000_0000_0F0D
-	liveController   uint64 = 112233
-	liveNode         uint64 = 0x0000_0000_0000_4323
-	liveDiscriminate uint16 = 3840
-	testPasscode     uint32 = 20202021
-)
-
-// plug is a bridged OnOffPlugInUnit holding an onoff.Server.
-type plug struct{ srv *onoff.Server }
-
-func (p *plug) Spec() endpoint.Spec {
-	return endpoint.Spec{
-		StableKey: endpoint.StringKey("plug:1"), DeviceAddress: "plug:1", ChannelAddress: "plug:1:0",
-		DeviceType: onoff.DeviceTypeOnOffPlugInUnit, FriendlyName: "plug", Source: p,
-	}
-}
-
-func (p *plug) MatterDeviceType() uint16 { return onoff.DeviceTypeOnOffPlugInUnit }
-
-func (p *plug) MatterClusterServers() []contract.ClusterServer {
-	return []contract.ClusterServer{p.srv}
-}
-
-// fakeMDNS is an mDNS socket that sends nowhere and receives what the test
-// injects.
-type fakeMDNS struct{ out chan mdns.QueryResponse }
-
-func (f *fakeMDNS) Send([]byte) error                    { return nil }
-func (f *fakeMDNS) Responses() <-chan mdns.QueryResponse { return f.out }
-func (f *fakeMDNS) Close() error                         { return nil }
-
-type resolverFunc func(ctx context.Context, cfid [8]byte, nodeID uint64) ([]*net.UDPAddr, error)
-
-func (f resolverFunc) ResolveOperational(ctx context.Context, cfid [8]byte, nodeID uint64) ([]*net.UDPAddr, error) {
-	return f(ctx, cfid, nodeID)
-}
-
-func discardLog() *slog.Logger { return slog.New(slog.DiscardHandler) }
-
-// liveNodeAt builds a node with one plug on the database at path, the
-// controller's address as its operational resolver's answer.
-func liveNodeAt(t *testing.T, path string, controllerAddr func() *net.UDPAddr) (*node.Node, *onoff.Server) {
-	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	n, err := node.New(node.Config{
-		Network:            node.Network{Listen: "127.0.0.1:0", PreferIPv4: true},
-		Commissioning:      node.Commissioning{Passcode: testPasscode, Discriminator: liveDiscriminate, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
-		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001},
-		BasicInformation: node.BasicInformation{
-			VendorName: "go-fabric test", ProductName: "client live test", NodeLabel: "live node", SerialNumber: "CL-1",
-			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
-		},
-		Store:      node.Store{DB: db},
-		Advertiser: mdns.NewNoop(),
-		Logger:     discardLog(),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := n.Aggregator().Add(context.Background(), &plug{srv: srv}); err != nil {
-		t.Fatal(err)
-	}
-	n.Bridge().AttachOperationalResolver(resolverFunc(func(context.Context, [8]byte, uint64) ([]*net.UDPAddr, error) {
-		return []*net.UDPAddr{controllerAddr()}, nil
-	}))
-	if err := n.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = n.Stop(context.Background()) })
-	return n, srv
-}
-
-// live is a node commissioned by the module's own commissioner.
-type live struct {
-	node   *node.Node
+// pairLive is a node.Node with one bridged plug in process, commissioned
+// by the module's own commissioner, whose context carries the
+// subscription registry and the CASE responder — a fabrictest pair on the
+// in-memory network and the site's fake clock.
+type pairLive struct {
+	site   *fabrictest.Site
+	dev    *fabrictest.Device
 	srv    *onoff.Server
-	dbPath string
-	addr   *net.UDPAddr
 	reg    *interaction.Subscriptions
 	peer   *peer.Peer
 	c      *interaction.Interaction
 	plugEP uint16
 }
 
-func newLive(t *testing.T) *live {
+func newPairLive(t *testing.T) *pairLive {
 	t.Helper()
-	lv := &live{dbPath: filepath.Join(t.TempDir(), "node.db")}
-	l, err := udp.New(udp.Config{LocalAddr: "127.0.0.1:0", PreferIPv4: true})
+	site := fabrictest.NewSite(t, fabrictest.Options{})
+	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, TimeSource: site.Clock()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	lv.addr = l.LocalAddr()
-	lv.node, lv.srv = liveNodeAt(t, lv.dbPath, func() *net.UDPAddr { return lv.addr })
-	mgr, err := exchange.NewManager(l, exchange.Config{Logger: discardLog()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	serveCtx, stop := context.WithCancel(context.Background())
-	served := make(chan struct{})
-	go func() {
-		defer close(served)
-		_ = l.Serve(serveCtx, mgr.HandleDatagram)
-	}()
-	conn := &fakeMDNS{out: make(chan mdns.QueryResponse, 64)}
-	names := discovery.NewNames(conn, discardLog())
-	authority, err := ca.New(ca.Config{Store: &ca.MemoryStore{}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	fabric, err := commissioner.NewFabric(authority, commissioner.FabricConfig{FabricID: liveFabricID, RootNodeID: liveController, VendorID: 0xFFF1, Label: "live"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	resumption := &peer.MemoryResumptionStore{}
-	set, err := peer.NewSet(peer.Context{Exchanges: mgr, Names: names, Fabrics: fabric.Lookup, Resumption: resumption, Logger: discardLog()})
-	if err != nil {
-		t.Fatal(err)
-	}
-	lv.reg = interaction.NewSubscriptions(interaction.SubscriptionsConfig{Logger: discardLog()})
-	com, err := commissioner.New(commissioner.Context{
-		Exchanges: mgr, Peers: set, Attestation: attestation.TestStore(), Logger: discardLog(),
-		Subscriptions: lv.reg, Fabrics: []*commissioner.Fabric{fabric}, Resumption: resumption,
+	pair := site.CommissionedPair(fabrictest.PairOptions{
+		Device: fabrictest.Topology{
+			Bridged: []node.Endpoint{&plug{srv: srv}},
+			Configure: func(c *node.Config) {
+				c.Commissioning.Passcode = testPasscode
+				c.BasicInformation.ProductName, c.BasicInformation.NodeLabel, c.BasicInformation.SerialNumber = "client live test", "live node", "CL-1"
+			},
+		},
+		Controller: fabrictest.ControllerOptions{FabricID: liveFabricID, NodeID: liveController, Label: "live"},
+		Commission: fabrictest.CommissionOptions{NodeID: liveNode, Edit: func(o *commissioner.Options) { o.OnAttestationFailure = attestation.Accept() }},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		_ = lv.reg.Close(context.Background())
-		com.Close()
-		set.Close(context.Background())
-		mgr.Close()
-		stop()
-		<-served
-		_ = names.Close()
-	})
-	nodeAddr, err := net.ResolveUDPAddr("udp", lv.node.Bridge().LocalAddr())
-	if err != nil {
-		t.Fatal(err)
-	}
-	op := discovery.OperationalQName(fabric.Identity.CompressedFabricID, liveNode)
-	hdr := func(name string, typ uint16) dns.RR_Header {
-		return dns.RR_Header{Name: dns.Fqdn(name), Rrtype: typ, Class: dns.ClassINET | 0x8000, Ttl: 120}
-	}
-	msg := new(dns.Msg)
-	msg.Response = true
-	msg.Answer = []dns.RR{
-		&dns.SRV{Hdr: hdr(op, dns.TypeSRV), Target: "live-node.local.", Port: uint16(nodeAddr.Port)}, //nolint:gosec // a test port
-		&dns.TXT{Hdr: hdr(op, dns.TypeTXT), Txt: []string{"SII=500", "SAI=300"}},
-		&dns.A{Hdr: hdr("live-node.local", dns.TypeA), A: net.ParseIP("127.0.0.1").To4()},
-	}
-	b, err := msg.Pack()
-	if err != nil {
-		t.Fatal(err)
-	}
-	conn.out <- mdns.QueryResponse{Msg: b}
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	res, err := com.Commission(ctx, commissioner.Options{
-		Fabric: fabric, Passcode: testPasscode, NodeID: liveNode, Addresses: []*net.UDPAddr{nodeAddr}, OnAttestationFailure: attestation.Accept(),
-	})
-	if err != nil {
-		t.Fatalf("Commission: %v", err)
-	}
-	lv.peer = set.Get(res.Address)
-	lv.c = com.Interaction(lv.peer)
-	for _, ep := range lv.node.Bridge().Topology().Bridged() {
-		if ep.SourceKey != nil && ep.SourceKey.String() == "plug:1" {
-			lv.plugEP = ep.ID
-		}
-	}
-	if lv.plugEP == 0 {
+	lv := &pairLive{site: site, dev: pair.Device, srv: srv, reg: pair.Controller.Subscriptions(), peer: pair.Peer, c: pair.Interaction}
+	ep, ok := pair.Device.EndpointOf("plug:1")
+	if !ok {
 		t.Fatal("the plug has no endpoint")
 	}
+	lv.plugEP = ep
 	return lv
+}
+
+// eventually waits for cond, moving the site's clock (at most 60 s).
+func (lv *pairLive) eventually(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	if err := lv.site.Eventually(ctx, what, cond); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // liveHooks records what a live client node reports.
@@ -267,33 +116,27 @@ func (h *liveHooks) hooks() client.Hooks {
 	}
 }
 
-func (h *liveHooks) waitState(t *testing.T, want client.ConnectionState) {
+// waitState waits for the transition to want, moving the site's clock.
+func (h *liveHooks) waitState(t *testing.T, lv *pairLive, want client.ConnectionState) {
 	t.Helper()
-	deadline := time.After(60 * time.Second)
-	for {
-		select {
-		case s := <-h.state:
-			if s == want {
-				return
+	lv.eventually(t, fmt.Sprintf("the transition to %v", want), func() bool {
+		for {
+			select {
+			case s := <-h.state:
+				if s == want {
+					return true
+				}
+			default:
+				return false
 			}
-		case <-deadline:
-			t.Fatalf("no transition to %v", want)
 		}
-	}
+	})
 }
 
-// waitFor polls cond on every Changed, at most 60 s.
-func (h *liveHooks) waitFor(t *testing.T, what string, cond func() bool) {
+// waitFor waits for cond, moving the site's clock (at most 60 s).
+func (h *liveHooks) waitFor(t *testing.T, lv *pairLive, what string, cond func() bool) {
 	t.Helper()
-	deadline := time.After(60 * time.Second)
-	for !cond() {
-		select {
-		case <-h.changed:
-		case <-time.After(50 * time.Millisecond):
-		case <-deadline:
-			t.Fatalf("timed out waiting for %s", what)
-		}
-	}
+	lv.eventually(t, what, cond)
 }
 
 // tree describes the image: number, device type, owner and cluster count
@@ -323,7 +166,7 @@ func tree(n *client.Node) []string {
 // (:183-232).
 func TestLiveClientNode(t *testing.T) {
 	t.Parallel()
-	lv := newLive(t)
+	lv := newPairLive(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 	st := &client.MemoryStore{}
@@ -342,10 +185,10 @@ func TestLiveClientNode(t *testing.T) {
 		requests = append(requests, r)
 		mu.Unlock()
 	})
-	if err := n.Start(ctx); err != nil {
+	if err := lv.site.Run(ctx, n.Start); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	h.waitState(t, client.Connected)
+	h.waitState(t, lv, client.Connected)
 	if !n.Seeded() || !n.SubscriptionActive() {
 		t.Fatal("not seeded or not subscribed")
 	}
@@ -413,16 +256,15 @@ func TestLiveClientNode(t *testing.T) {
 
 	// A toggle on the node reaches the image.
 	lv.srv.Set(true)
-	h.waitFor(t, "OnOff true", func() bool { v, _ := c.Decoded(onoff.AttrOnOff); return v == true })
+	h.waitFor(t, lv, "OnOff true", func() bool { v, _ := c.Decoded(onoff.AttrOnOff); return v == true })
 
 	// The node restarts on its database: the subscription delivers again.
-	if err := lv.node.Stop(ctx); err != nil {
+	if err := lv.dev.Restart(ctx); err != nil {
 		t.Fatal(err)
 	}
-	lv.node, lv.srv = liveNodeAt(t, lv.dbPath, func() *net.UDPAddr { return lv.addr })
-	h.waitFor(t, "the subscription after the restart", n.SubscriptionActive)
+	h.waitFor(t, lv, "the subscription after the restart", n.SubscriptionActive)
 	lv.srv.Set(false)
-	h.waitFor(t, "OnOff false after the restart", func() bool {
+	h.waitFor(t, lv, "OnOff false after the restart", func() bool {
 		cl := n.Endpoint(lv.plugEP).Cluster(onoff.ClusterID)
 		v, _ := cl.Decoded(onoff.AttrOnOff)
 		return v == false
@@ -435,35 +277,27 @@ func TestLiveClientNode(t *testing.T) {
 	// The underlying subscription is lost: the replacement carries the
 	// refreshed versions and the event minimum.
 	lv.reg.CloseForPeer(lv.reg.Active()[0].Peer())
-	deadline := time.Now().Add(60 * time.Second)
-	for {
+	h.waitFor(t, lv, "a re-subscription", func() bool {
 		mu.Lock()
-		got := len(requests)
-		mu.Unlock()
-		if got > afterRestart {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("no re-subscription")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+		defer mu.Unlock()
+		return len(requests) > afterRestart
+	})
 	mu.Lock()
 	refreshed := requests[len(requests)-1]
 	mu.Unlock()
 	if len(refreshed.DataVersionFilters) == 0 || len(refreshed.EventFilters) != 1 || refreshed.EventFilters[0].EventMin == 0 {
 		t.Fatalf("the refreshed request: %d filters, events %+v", len(refreshed.DataVersionFilters), refreshed.EventFilters)
 	}
-	h.waitFor(t, "the re-established subscription", n.SubscriptionActive)
+	h.waitFor(t, lv, "the re-established subscription", n.SubscriptionActive)
 
 	// The plug leaves the node: erased from the image.
 	h.mu.Lock()
 	h.installed, h.deleted = nil, nil
 	h.mu.Unlock()
-	if err := lv.node.Aggregator().Remove(ctx, endpoint.StringKey("plug:1")); err != nil {
+	if err := lv.dev.Node().Aggregator().Remove(ctx, endpoint.StringKey("plug:1")); err != nil {
 		t.Fatal(err)
 	}
-	h.waitFor(t, "the plug's erasure", func() bool { return n.Endpoint(lv.plugEP) == nil })
+	h.waitFor(t, lv, "the plug's erasure", func() bool { return n.Endpoint(lv.plugEP) == nil })
 	h.mu.Lock()
 	installed, deleted := h.installed, h.deleted
 	h.mu.Unlock()
@@ -474,7 +308,7 @@ func TestLiveClientNode(t *testing.T) {
 	want := tree(n)
 
 	// A second node on the store loads the tree from the cache.
-	if err := n.Close(ctx); err != nil {
+	if err := lv.site.Run(ctx, n.Close); err != nil {
 		t.Fatal(err)
 	}
 	second, err := client.New(client.Config{ID: "peer1", Peer: lv.peer, Interaction: lv.c, Store: st, Logger: discardLog()})

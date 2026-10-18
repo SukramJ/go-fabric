@@ -21,6 +21,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/transport"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 // The bridge is threaded through as any because this package must not
@@ -85,3 +86,13 @@ var ReceiveOnConn func(b any, c transport.Conn, msg []byte, release func()) bool
 // ConnClosed evicts every session bound to c, as a dropped TCP connection
 // does. Reports false when b is not a bridge.
 var ConnClosed func(b any, c transport.Conn) bool
+
+// UseListener makes b's Start serve the listener open returns instead of
+// binding a UDP socket of its own: fabrictest's in-memory network hands a
+// node's bridge a transport/udp.Listener over a socket of that network, so
+// every datagram the bridge receives, answers or initiates (a CASE to a
+// controller, a report, an OTA query) takes the production UDP path. open
+// is called on every Start, so a stopped bridge starts again on a new
+// listener. Reports false when b is not a bridge, has started, or listens
+// on TCP (Config.TCP.Incoming), which the in-memory network does not carry.
+var UseListener func(b any, open func() (*udp.Listener, error)) bool

@@ -594,6 +594,11 @@ type Bridge struct {
 	// would block on the listener's bind latency.
 	startClaim atomic.Bool
 
+	// openUDP, when set (internal/bridgeseam UseListener), opens the
+	// UDP listener Start serves instead of binding a socket: fabrictest's
+	// in-memory network. Nil binds Config.Listen.
+	openUDP atomic.Pointer[func() (*udp.Listener, error)]
+
 	// sessionMissTracker counts decrypt-side session-id lookup misses
 	// per source-address so the receive path can surface a single
 	// operator-actionable warning (with the "iPhone reboot" remediation

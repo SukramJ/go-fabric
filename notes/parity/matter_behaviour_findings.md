@@ -398,6 +398,16 @@ Device side:
 
 Controller side:
 
+- **A concrete event path to an unknown endpoint, cluster or event is
+  answered with nothing.** `im/read.go:598-640` `BuildEventReports` only
+  queries the log, so a read or subscribe naming an event the node does not
+  serve returns no EventStatusIB; matter.js answers UnsupportedEndpoint /
+  UnsupportedCluster / UnsupportedEvent per path
+  (`packages/protocol/src/action/server/EventReadResponse.ts:210-218`), after
+  the View-privilege pass (`:204`, spec §8.4.3.2 order). Only the ACL pass
+  exists here (`im/read.go:888` `DeniedEventPathStatuses`, UnsupportedAccess).
+  Seen by brief BG's agent in a scratch test (report BG, left out). (Phase 16,
+  with the `packages/protocol/test` port.)
 - **DNS-SD TXT keys are case-sensitive.** `controller/discovery/name.go:154-162`
   `Parameters` is a plain map; matter.js #4741 lower-cases keys, first of
   case-differing duplicates wins (`DnssdParameters.ts:15-49`, RFC 6763 § 6.4).

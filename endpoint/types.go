@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
@@ -285,7 +286,7 @@ func (e *Endpoint) endpointState() *endpointState {
 	e.stateMu.Lock()
 	defer e.stateMu.Unlock()
 	if e.state == nil {
-		e.state = newEndpointState()
+		e.state = newEndpointState(nil) // not the registry's: the system clock
 	}
 	return e.state
 }
@@ -322,6 +323,9 @@ type endpointState struct {
 	mu       sync.Mutex
 	trackers map[uint32]*contract.DataVersionTracker
 	identify *mattercore.Identify
+	// clock is the Identify countdown's time source; nil is the system
+	// clock.
+	clock clock.Clock
 	// nodeLabel is a BridgedDeviceBasicInformation NodeLabel a controller
 	// wrote (or the host restored from its own storage, Spec.NodeLabel);
 	// nil reads the FriendlyName. It lives here because the cluster
@@ -394,8 +398,8 @@ func (s *endpointState) restoreLabel(l string) {
 	s.mu.Unlock()
 }
 
-func newEndpointState() *endpointState {
-	return &endpointState{trackers: make(map[uint32]*contract.DataVersionTracker)}
+func newEndpointState(clk clock.Clock) *endpointState {
+	return &endpointState{trackers: make(map[uint32]*contract.DataVersionTracker), clock: clk}
 }
 
 // tracker returns (lazily creating) the tracker for clusterID.
@@ -416,6 +420,7 @@ func (s *endpointState) identifyServer() *mattercore.Identify {
 	defer s.mu.Unlock()
 	if s.identify == nil {
 		s.identify = mattercore.NewIdentify()
+		s.identify.SetClock(s.clock)
 	}
 	return s.identify
 }
@@ -448,10 +453,12 @@ func (s *endpointState) close() {
 type endpointStateRegistry struct {
 	mu     sync.Mutex
 	states map[SourceKey]*endpointState
+	// clock is the assembler's (Config.Clock), handed to every state.
+	clock clock.Clock
 }
 
-func newEndpointStateRegistry() *endpointStateRegistry {
-	return &endpointStateRegistry{states: make(map[SourceKey]*endpointState)}
+func newEndpointStateRegistry(clk clock.Clock) *endpointStateRegistry {
+	return &endpointStateRegistry{states: make(map[SourceKey]*endpointState), clock: clk}
 }
 
 // stateFor returns the state for key, creating it on first use. The
@@ -461,7 +468,7 @@ func (r *endpointStateRegistry) stateFor(key SourceKey) *endpointState {
 	defer r.mu.Unlock()
 	s := r.states[key]
 	if s == nil {
-		s = newEndpointState()
+		s = newEndpointState(r.clock)
 		r.states[key] = s
 	}
 	return s

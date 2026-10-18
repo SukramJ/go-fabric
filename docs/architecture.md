@@ -107,7 +107,7 @@ mechanical and guarded by tests that fail on drift.
 | Persistence | `store`, `endpoint/sqlitestore`, `controller/client/sqlstore` |
 | Codec and model | `tlv`, `schema`, `parity` |
 | Time | `clock` (the time port every package reads), `clock/clocktest` (the test clock) |
-| Test support (public API) | `bridge/bridgetest`, `endpoint/endpointtest`, `clock/clocktest` |
+| Test support (public API) | `bridge/bridgetest`, `endpoint/endpointtest`, `clock/clocktest`, `fabrictest` (in-process devices and controllers on an in-memory network) |
 
 Everything outside `internal/` is public API under the
 [deprecation window](https://github.com/SukramJ/go-fabric/blob/main/README.md#api-stability).
