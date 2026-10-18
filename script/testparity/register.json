@@ -3416,16 +3416,12 @@
     },
     {
       "path": "packages/protocol/test/groups/GroupsMulticastPolicyTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "groups:TestGroupcastPolicyMovesTheMulticastMembership"
+        "groups:TestGroupcastPolicyMovesTheMulticastMembership",
+        "groups:TestGroupsMulticastPolicy"
       ],
-      "missing": [
-        "derives a per-group IPv6 address by default (PerGroupId policy)",
-        "reverts to per-group derivation after policy removal",
-        "different groups can have different policies independently"
-      ],
-      "reason": "The IANA policy moving the membership is covered; the per-group default, reverting and independent policies are not ported case by case.",
+      "reason": "The per-group default, the shared IANA address under IanaAddr, reverting after removal and independent per-group policies are ported on one shared fabric through SetGroupProperties and RemoveGroupProperties.",
       "snapshotSha": "a8249e79ca6107f182b9f5f89c0da73af796cc63"
     },
     {
