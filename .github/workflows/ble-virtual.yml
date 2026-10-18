@@ -58,6 +58,8 @@ jobs:
           # found in directory /lib/modules/…-azure"). Without them the script
           # ends "environment".
           sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)" || true
+          grep -E '^(# )?CONFIG_BT(_HCIVHCI)?[= ]' "/boot/config-$(uname -r)" || true
+          find "/lib/modules/$(uname -r)" \( -name 'hci_vhci.ko*' -o -name 'bluetooth.ko*' \) || true
           bluetoothctl --version
           command -v btvirt || dpkg -L bluez-test-tools | grep /bin/
           node --version
