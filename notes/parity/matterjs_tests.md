@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 22 |
+| ported | 24 |
 | partial | 106 |
-| planned | 109 |
+| planned | 107 |
 | excluded | 87 |
 | total | 324 |
 
@@ -88,7 +88,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/storage](#nodeteststorage) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/tsconfigs/nonstrict](#nodetesttsconfigsnonstrict) | 1 | 0 | 0 | 0 | 1 |
 | [protocol/test/action](#protocoltestaction) | 1 | 0 | 0 | 0 | 1 |
-| [protocol/test/action/client](#protocoltestactionclient) | 5 | 0 | 0 | 4 | 1 |
+| [protocol/test/action/client](#protocoltestactionclient) | 5 | 1 | 0 | 3 | 1 |
 | [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/action/request](#protocoltestactionrequest) | 6 | 0 | 1 | 4 | 1 |
 | [protocol/test/action/response](#protocoltestactionresponse) | 4 | 0 | 0 | 0 | 4 |
@@ -106,7 +106,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/ota](#protocoltestota) | 2 | 0 | 1 | 1 | 0 |
-| [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
+| [protocol/test/peer](#protocoltestpeer) | 14 | 1 | 8 | 2 | 3 |
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 0 | 5 | 4 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 1 | 2 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 0 | 1 | 1 |
@@ -674,7 +674,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | ClientInteractionSubscribeTest.ts | 352 | planned | — | The controller's subscribe under abort and close, including an open BDX exchange. |
 | InputChunkTest.ts | 672 | planned | — | The controller's parsing of report chunks: path order, tag-compressed paths, chunked-array tails. |
 | LargeMessageTransportTest.ts | 106 | excluded | `controller-stage` until M5 phase 25 | The transport requirement of a large-payload read, which needs the controller's TCP initiator of milestone 5 phase 25. |
-| ReadScopeTest.ts | 60 | planned | — | Which cached clusters a controller read covers (empty, full wildcard, endpoint/cluster scopes, fabric filter). |
+| ReadScopeTest.ts | 60 | ported | `controller/client:TestReadScopeParity` | Which clusters a read covers — empty, full wildcard, a cluster on every endpoint, an endpoint and cluster, a concrete attribute (out of scope), the fabric filter flag — on the client's newScope (controller/client:TestReadScopeParity; the Go subject lives in controller/client, ported in tranche BI-2). |
 
 ## protocol/test/action/client/subscription
 
@@ -845,7 +845,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | PeerConnectionSocketOwnershipTest.ts | 142 | planned | until M5 phase 24 | Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25. |
 | PeerDescriptorTest.ts | 82 | excluded | `js-runtime-only` | matter.js's observable peer descriptor objects (interning, change notification). |
 | PeerEstablishmentProgressTest.ts | 148 | partial | `controller/peer:TestParityUnresponsiveDetector`<br>`controller/peer:TestEstablishmentUnresponsive` | The unresponsive-establishment latch is ported; the per-instance latch independence is not. Missing: “keeps an independent latch per detector instance”. |
-| PhysicalDevicePropertiesTest.ts | 308 | planned | — | Subscription interval bounds the controller derives from a peer's physical properties (Thread, ICD, Generic Switch). |
+| PhysicalDevicePropertiesTest.ts | 308 | ported | `controller/client:TestPhysicalDevicePropertiesParity`<br>`controller/client:TestPhysicalDevicePropertiesMinIntervalFloorParity`<br>`controller/client:TestPhysicalDevicePropertiesMaxIntervalCeilingParity`<br>`controller/client:TestPhysicalDevicePropertiesICDCeilingParity` | The interval bounds of a peer's physical properties — the floor (Thread before 1.3, a Generic Switch, a requested floor, ICD), the ceiling with its one-sided jitter (Wi-Fi, Thread, sleepy, battery, mains and battery, a requested ceiling, the floor clamp, ICD) and the ICD idle-synced ceiling — run on the client's intervalBounds over a Properties value (controller/client:TestPhysicalDeviceProperties*; the Go subject lives in controller/client, ported in tranche BI-2). |
 | RebootResubscribeArmerTest.ts | 529 | excluded | `controller-stage` until M5 phase 24 | The controller re-subscribing a peer after an OTA reboot, which milestone 5 phase 24 builds. |
 | ThreadNetworkNameResolutionTest.ts | 51 | partial | `controller/commissioner:TestResolveThreadNetworkName` | Deriving the network name from the dataset is covered; the mismatch, empty and undecodable cases are not. Missing: “treats an empty-string name as absent and derives”; “returns the supplied name when it matches the dataset”; “declines with a typed error when the supplied name mismatches the dataset”; “keeps the supplied name when the dataset carries no network name”; “returns undefined when neither the params nor the dataset carry a name”; “falls back to the supplied name and does not throw when the dataset cannot be decoded”. |
 
@@ -1100,7 +1100,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `ClientInteractionInvokeTest.ts` — The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1).
 - `ClientInteractionSubscribeTest.ts` — The controller's subscribe under abort and close, including an open BDX exchange.
 - `InputChunkTest.ts` — The controller's parsing of report chunks: path order, tag-compressed paths, chunked-array tails.
-- `ReadScopeTest.ts` — Which cached clusters a controller read covers (empty, full wildcard, endpoint/cluster scopes, fabric filter).
 
 ### protocol/test/action/client/subscription
 
@@ -1168,7 +1167,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 - `NetworkProfileTest.ts` — The controller's network profiles and their additional MRP delay per medium, BDX margin and sub-profiles.
 - `PeerConnectionSocketOwnershipTest.ts` — Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25.
-- `PhysicalDevicePropertiesTest.ts` — Subscription interval bounds the controller derives from a peer's physical properties (Thread, ICD, Generic Switch).
 
 ### protocol/test/protocol
 
