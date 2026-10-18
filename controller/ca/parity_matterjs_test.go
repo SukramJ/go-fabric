@@ -8,6 +8,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/secure/mattercert"
 )
@@ -37,7 +38,7 @@ func TestParityConstants(t *testing.T) {
 // ICAC (:267-275) and the NOC (:308-316) as mattercert decodes them.
 func TestParityCertificateFields(t *testing.T) {
 	t.Parallel()
-	c, err := ca.New(ca.Config{Now: fixedNow, IntermediateCA: true})
+	c, err := ca.New(ca.Config{Clock: clocktest.New(issuedAt), IntermediateCA: true})
 	if err != nil {
 		t.Fatal(err)
 	}

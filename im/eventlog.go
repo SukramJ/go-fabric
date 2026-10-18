@@ -6,7 +6,8 @@ package im
 import (
 	"slices"
 	"sync"
-	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // EventRecord is one persisted event entry.
@@ -147,6 +148,10 @@ type EventLog struct {
 	persistCeiling uint64
 	persistEpoch   uint64
 	persistFn      func(ceiling uint64)
+
+	// clock stamps a record that carries no timestamp; nil is
+	// [clock.System]. See [EventLog.SetClock].
+	clock clock.Clock
 }
 
 // NewEventLog constructs an EventLog with [defaultBufferConfig].
@@ -178,7 +183,7 @@ func (l *EventLog) Append(rec EventRecord) uint64 {
 		l.persistFn(l.persistCeiling)
 	}
 	if rec.EpochMS == 0 {
-		rec.EpochMS = uint64(time.Now().UnixMilli()) //nolint:gosec // time.Now() is non-negative; see #20
+		rec.EpochMS = uint64(clock.Or(l.clock).Now().UnixMilli()) //nolint:gosec // the clock's time is non-negative; see #20
 	}
 	l.occurrences = append(l.occurrences, rec)
 	l.harvestLocked()
@@ -287,6 +292,14 @@ func (l *EventLog) SeedNumber(base uint64) {
 	if base > l.next {
 		l.next = base
 	}
+}
+
+// SetClock sets the clock that stamps a record appended without a
+// timestamp; nil is [clock.System].
+func (l *EventLog) SetClock(c clock.Clock) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.clock = c
 }
 
 // SetCounterPersistence wires the durable half of the EventNumber

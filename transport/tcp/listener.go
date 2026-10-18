@@ -12,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // MatterPort is the IANA-registered Matter port (5540). The TCP
@@ -51,6 +53,9 @@ type Config struct {
 	MaxPayloadSize int
 	// Logger receives the listener's log lines. nil means slog.Default.
 	Logger *slog.Logger
+	// Clock paces the idle timeout of a new connection; nil is
+	// [clock.System].
+	Clock clock.Clock
 }
 
 // Listener accepts inbound Matter TCP connections — the server role of
@@ -60,6 +65,7 @@ type Listener struct {
 	maxPayloadSize int
 	logger         *slog.Logger
 	idleTimeout    time.Duration
+	clock          clock.Clock
 
 	recoveredPanics atomic.Uint64
 
@@ -109,6 +115,7 @@ func Listen(cfg Config) (*Listener, error) {
 		maxPayloadSize: maxPayload,
 		logger:         logger,
 		idleTimeout:    NewConnectionIdleTimeout,
+		clock:          clock.Or(cfg.Clock),
 		conns:          make(map[*Conn]struct{}),
 	}, nil
 }
@@ -195,7 +202,7 @@ func (l *Listener) accept(nc net.Conn, handler Handler, onClose func(*Conn)) {
 	l.mu.Unlock()
 
 	// Detect and close zombie connections (TcpTransport.ts:89-104).
-	idle := time.AfterFunc(l.idleTimeout, func() {
+	idle := l.clock.AfterFunc(l.idleTimeout, func() {
 		if !c.received.Load() {
 			l.logger.Debug("matter.tcp.idle_close",
 				slog.String("conn", c.String()))

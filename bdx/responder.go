@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // Peer is the peer of a BDX exchange: its node on one of this node's
@@ -75,6 +77,7 @@ type Responder struct {
 	scopes   map[scopeKey]scopeEntry
 	sessions map[*ServerSession]struct{}
 	started  []*startedListener
+	clock    clock.Clock // a session's activity stamps; nil is clock.System
 }
 
 type scopeKey struct {
@@ -98,6 +101,20 @@ func NewResponder(logger *slog.Logger) *Responder {
 		logger = slog.Default()
 	}
 	return &Responder{logger: logger, scopes: map[scopeKey]scopeEntry{}, sessions: map[*ServerSession]struct{}{}}
+}
+
+// SetClock sets the clock that stamps each session's last activity; nil
+// is [clock.System].
+func (r *Responder) SetClock(c clock.Clock) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.clock = c
+}
+
+func (r *Responder) now() time.Time {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return clock.Or(r.clock).Now()
 }
 
 // ErrActiveSession is a scope disabled without force while a transfer of
@@ -252,7 +269,7 @@ func (r *Responder) HandleExchange(ctx context.Context, peer Peer, first Message
 	m := NewMessenger(ex, entry.cfg.MessageTimeout)
 	sessCtx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
-	s := &ServerSession{peer: peer, scope: scope, file: file, initType: t, init: init, cancel: cancel, lastActivity: time.Now()}
+	s := &ServerSession{peer: peer, scope: scope, file: file, initType: t, init: init, cancel: cancel, lastActivity: r.now(), clock: clock.Or(r.clock)}
 	opts := ServeOptions{
 		InitType: t, Init: init,
 		// PersistedFileDesignator with a ScopedStorage names the file
@@ -339,6 +356,7 @@ type ServerSession struct {
 	total        *uint64
 	result       *Result
 	lastActivity time.Time
+	clock        clock.Clock
 	isClosed     bool
 	onProgress   []func(uint64, *uint64)
 	onFinished   []func(uint64)
@@ -432,7 +450,7 @@ func (s *ServerSession) Close(cause error) {
 func (s *ServerSession) negotiated(res Result) {
 	s.mu.Lock()
 	s.result = &res
-	s.lastActivity = time.Now()
+	s.lastActivity = s.clock.Now()
 	s.mu.Unlock()
 }
 
@@ -440,7 +458,7 @@ func (s *ServerSession) progress(transferred uint64, total *uint64) {
 	s.mu.Lock()
 	s.transferred = transferred
 	s.total = total
-	s.lastActivity = time.Now()
+	s.lastActivity = s.clock.Now()
 	fns := slices.Clone(s.onProgress)
 	s.mu.Unlock()
 	for _, fn := range fns {

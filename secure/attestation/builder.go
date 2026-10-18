@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"math/big"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // Matter Attestation Certificate Subject DN attributes
@@ -104,6 +106,13 @@ type Chain struct {
 // The returned PAI key is discarded — only the certificate ships;
 // signing capability stays with the bridge via the DAC key.
 func BuildTestChain(vid, pid uint16) (*Chain, error) {
+	return BuildTestChainAt(vid, pid, clock.System{}.Now())
+}
+
+// BuildTestChainAt is [BuildTestChain] with the certificates' validity
+// anchored at now instead of the system clock's time — the seam a host
+// that injects a [clock.Clock] uses.
+func BuildTestChainAt(vid, pid uint16, now time.Time) (*Chain, error) {
 	paiKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("pai keygen: %w", err)
@@ -129,7 +138,7 @@ func BuildTestChain(vid, pid uint16) (*Chain, error) {
 		return nil, fmt.Errorf("parse PAA: %w", err)
 	}
 
-	now := time.Now().UTC().Truncate(time.Second)
+	now = now.UTC().Truncate(time.Second)
 	notBefore := now.Add(-time.Hour)
 	notAfter := now.Add(20 * 365 * 24 * time.Hour) // 20 years.
 

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/schema"
 )
@@ -79,6 +80,9 @@ type Config struct {
 	// finer-grained MinIntervalFloor enforcement; larger = lower
 	// goroutine overhead. Default 250 ms.
 	TickInterval time.Duration
+	// Clock is the engine's time source: the tick and every report
+	// timestamp. nil is [clock.System].
+	Clock clock.Clock
 }
 
 // Manager owns the active subscription set and runs the report
@@ -184,6 +188,7 @@ func NewManager(cfg Config, reporter Reporter, logger *slog.Logger) *Manager {
 	if cfg.TickInterval == 0 {
 		cfg.TickInterval = 250 * time.Millisecond
 	}
+	cfg.Clock = clock.Or(cfg.Clock)
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -316,7 +321,7 @@ func (m *Manager) Subscribe(req SubscribeArgs) (*Subscription, error) {
 		// ack when we are waiting for an ack`, eventually timing out
 		// the entire subscription (chip-tool-test-brief T7/T8). Stamping
 		// here closes the race; TouchLastReport remains a no-op refresh.
-		lastReport: time.Now(),
+		lastReport: m.cfg.Clock.Now(),
 		priming:    req.Priming,
 	}
 	m.byID[id] = sub
@@ -593,7 +598,7 @@ func (m *Manager) DeferReports(endpoints map[uint16]bool, delay time.Duration) {
 	if len(endpoints) == 0 {
 		return
 	}
-	now := time.Now()
+	now := m.cfg.Clock.Now()
 	for _, sub := range m.snapshot() {
 		if sub.selectsAnyEndpoint(endpoints) {
 			sub.DeferReports(now, delay)

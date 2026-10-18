@@ -6,10 +6,9 @@ package ble_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
-
-	"slices"
 
 	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/ble"

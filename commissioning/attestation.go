@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/tlv"
 )
 
@@ -51,8 +52,11 @@ type AttestationInput struct {
 	// Used to ECDSA-sign the (elements ‖ challenge) digest.
 	DACPrivateKey *ecdsa.PrivateKey
 	// Now is the timestamp embedded in the attestation. Zero falls
-	// back to time.Now.
+	// back to Clock.
 	Now time.Time
+	// Clock supplies the timestamp when Now is zero; nil is
+	// [clock.System].
+	Clock clock.Clock
 }
 
 // AttestationResult bundles the elements TLV blob and its signature.
@@ -78,7 +82,7 @@ func BuildAttestation(in AttestationInput) (*AttestationResult, error) {
 
 	now := in.Now
 	if now.IsZero() {
-		now = time.Now()
+		now = clock.Or(in.Clock).Now()
 	}
 
 	enc := tlv.NewEncoder()

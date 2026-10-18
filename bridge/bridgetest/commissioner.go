@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
@@ -227,7 +228,7 @@ func (c *Commissioner) start() error {
 	}()
 	c.conn = &queryConn{out: make(chan mdns.QueryResponse, 64), onQuery: c.feedOperational}
 	c.names = discovery.NewNames(c.conn, discard)
-	if c.ca, err = ca.New(ca.Config{Rand: c.rand, Now: func() time.Time { return certificateInstant }}); err != nil {
+	if c.ca, err = ca.New(ca.Config{Rand: c.rand, Clock: clocktest.New(certificateInstant)}); err != nil {
 		return fmt.Errorf("certificate authority: %w", err)
 	}
 	ipk := make([]byte, 16)

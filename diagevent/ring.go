@@ -21,6 +21,8 @@ package diagevent
 import (
 	"sync"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // Kind buckets an event so a reader can filter without parsing prose.
@@ -75,6 +77,18 @@ type Ring struct {
 	events []Event
 	next   int
 	full   bool
+	clock  clock.Clock // stamps an event recorded without At; nil is clock.System
+}
+
+// SetClock sets the clock that stamps an event recorded without At; nil
+// is [clock.System]. Safe on a nil receiver.
+func (r *Ring) SetClock(c clock.Clock) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.clock = c
 }
 
 // NewRing returns a ring holding at most capacity events.
@@ -104,7 +118,10 @@ func (r *Ring) Record(e Event) {
 		return
 	}
 	if e.At.IsZero() {
-		e.At = time.Now()
+		r.mu.RLock()
+		c := r.clock
+		r.mu.RUnlock()
+		e.At = clock.Or(c).Now()
 	}
 	if e.Severity == "" {
 		e.Severity = SeverityInfo

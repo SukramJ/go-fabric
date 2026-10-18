@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SukramJ/go-fabric/mdns"
 	fabricclock "github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/mdns"
 )
 
 // Cache defaults. Mirrors matter.js 0ceb202d

@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/dcl"
 )
@@ -123,7 +124,11 @@ func Embedded() (*Snapshot, error) {
 // or a file whose SHA-256 differs from the manifest stops that kind's load
 // with [ErrMalformed] — the snapshot returned beside the error holds the
 // entries loaded until then.
-func Load(fsys fs.FS) (*Snapshot, error) { return load(fsys, time.Now()) }
+func Load(fsys fs.FS) (*Snapshot, error) { return load(fsys, clock.System{}.Now()) }
+
+// LoadAt is [Load] judging expiry at now instead of the system clock's
+// time — the seam a host that injects a [clock.Clock] uses.
+func LoadAt(fsys fs.FS, now time.Time) (*Snapshot, error) { return load(fsys, now) }
 
 func load(fsys fs.FS, now time.Time) (*Snapshot, error) {
 	s := &Snapshot{paas: map[string]attestation.PAA{}, cdSigners: map[string]*ecdsa.PublicKey{}}

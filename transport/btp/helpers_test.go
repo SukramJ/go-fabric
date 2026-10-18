@@ -5,69 +5,18 @@ package btp
 
 import (
 	"encoding/hex"
-	"sort"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 )
 
-// fakeClock is a manual Clock: timers fire, in order, inside Advance —
-// matter.js's MockTime for these tests.
-type fakeClock struct {
-	mu     sync.Mutex
-	now    time.Duration
-	timers []*fakeTimer
-}
+// fakeClock is the test clock, a [clocktest.Fake]: timers fire, in order,
+// inside Advance — matter.js's MockTime for these tests.
+type fakeClock = clocktest.Fake
 
-type fakeTimer struct {
-	c       *fakeClock
-	at      time.Duration
-	f       func()
-	stopped bool
-	fired   bool
-}
-
-func (c *fakeClock) AfterFunc(d time.Duration, f func()) Timer {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	t := &fakeTimer{c: c, at: c.now + d, f: f}
-	c.timers = append(c.timers, t)
-	return t
-}
-
-func (t *fakeTimer) Stop() bool {
-	t.c.mu.Lock()
-	defer t.c.mu.Unlock()
-	was := !t.stopped && !t.fired
-	t.stopped = true
-	return was
-}
-
-// Advance moves the clock by d, firing every due timer in order.
-func (c *fakeClock) Advance(d time.Duration) {
-	c.mu.Lock()
-	target := c.now + d
-	for {
-		sort.SliceStable(c.timers, func(i, j int) bool { return c.timers[i].at < c.timers[j].at })
-		var next *fakeTimer
-		for _, t := range c.timers {
-			if !t.stopped && !t.fired && t.at <= target {
-				next = t
-				break
-			}
-		}
-		if next == nil {
-			break
-		}
-		next.fired = true
-		c.now = next.at
-		c.mu.Unlock()
-		next.f()
-		c.mu.Lock()
-	}
-	c.now = target
-	c.mu.Unlock()
-}
+func newFakeClock() *fakeClock { return clocktest.New(time.Unix(0, 0)) }
 
 func unhex(t *testing.T, s string) []byte {
 	t.Helper()

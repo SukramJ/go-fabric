@@ -42,7 +42,7 @@ func FuzzDecodePacket(f *testing.F) {
 			Write:      func([]byte) error { return nil },
 			Disconnect: func() error { return nil },
 			Message:    func([]byte) error { return nil },
-		}, Options{Clock: &fakeClock{}})
+		}, Options{TimeSource: newFakeClock()})
 		if err != nil {
 			t.Fatal(err)
 		}

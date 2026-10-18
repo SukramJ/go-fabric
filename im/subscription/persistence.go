@@ -111,7 +111,7 @@ func (m *Manager) Restore(p PeerSubscription, sessionID uint16) (*Subscription, 
 		sendIntervalOverride: p.SendInterval,
 		// As in Subscribe: the priming report is the first report, so the
 		// engine must not fire a keep-alive into it.
-		lastReport: time.Now(),
+		lastReport: m.cfg.Clock.Now(),
 	}
 	m.byID[sub.ID] = sub
 	m.perFabric[sub.FabricIndex]++

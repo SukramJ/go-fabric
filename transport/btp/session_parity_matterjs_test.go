@@ -44,7 +44,7 @@ func TestBtpSessionHandshake(t *testing.T) {
 					return nil
 				},
 				Message: noMessage(t),
-			}, Options{Clock: &fakeClock{}})
+			}, Options{TimeSource: newFakeClock()})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -63,7 +63,7 @@ func TestBtpSessionNoSharedVersion(t *testing.T) {
 		Write:      func([]byte) error { t.Error("Should not be called"); return nil },
 		Disconnect: func() error { disconnected = true; return nil },
 		Message:    noMessage(t),
-	}, Options{Clock: &fakeClock{}})
+	}, Options{TimeSource: newFakeClock()})
 	wantProtocolError(t, err, "No supported BTP version found in 5")
 	if !disconnected {
 		t.Fatal("not disconnected")
@@ -84,7 +84,7 @@ type mmh struct {
 
 func newMMH(t *testing.T) *mmh {
 	t.Helper()
-	f := &mmh{clock: &fakeClock{}}
+	f := &mmh{clock: newFakeClock()}
 	f.disconnect = noDisconnect(t)
 	f.message = noMessage(t)
 	var hs []byte
@@ -93,7 +93,7 @@ func newMMH(t *testing.T) *mmh {
 		Write:      func(b []byte) error { return f.write(b) },
 		Disconnect: func() error { return f.disconnect() },
 		Message:    func(b []byte) error { return f.message(b) },
-	}, Options{Clock: f.clock})
+	}, Options{TimeSource: f.clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +393,7 @@ func TestBtpSessionAbortPaths(t *testing.T) {
 				Write:      func([]byte) error { return nil },
 				Disconnect: func() error { disconnected = true; return nil },
 				Message:    noMessage(t),
-			}, Options{Clock: &fakeClock{}})
+			}, Options{TimeSource: newFakeClock()})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -421,7 +421,7 @@ func TestBtpSessionNoPiggybackBeforeData(t *testing.T) {
 		},
 		Disconnect: func() error { return nil },
 		Message:    noMessage(t),
-	}, Options{Clock: &fakeClock{}})
+	}, Options{TimeSource: newFakeClock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +448,7 @@ func TestBtpSessionReservesLastWindowSlot(t *testing.T) {
 	rec := &recorder{}
 	c, err := NewCentral(unhex(t, "656c04f40004"), Callbacks{
 		Write: func(b []byte) error { rec.add(b); return nil }, Disconnect: func() error { return nil }, Message: noMessage(t),
-	}, MaximumBTPMTU, Options{Clock: &fakeClock{}})
+	}, MaximumBTPMTU, Options{TimeSource: newFakeClock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -491,7 +491,7 @@ func TestBtpSessionImmediateAckOnLowWindow(t *testing.T) {
 			return nil
 		},
 		Disconnect: func() error { return nil }, Message: noMessage(t),
-	}, Options{Clock: &fakeClock{}})
+	}, Options{TimeSource: newFakeClock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,7 +519,7 @@ func TestBtpSessionNonDisconnectWriteError(t *testing.T) {
 		Write:      func([]byte) error { writes++; return errors.New("boom") },
 		Disconnect: func() error { disconnects++; return nil },
 		Message:    noMessage(t),
-	}, MaximumBTPMTU, Options{Clock: &fakeClock{}})
+	}, MaximumBTPMTU, Options{TimeSource: newFakeClock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -543,7 +543,7 @@ func TestBtpSessionWriteErrorWhenCloseFailsToo(t *testing.T) {
 		Write:      func([]byte) error { return errors.New("boom") },
 		Disconnect: func() error { return errors.New("disconnect failed") },
 		Message:    noMessage(t),
-	}, MaximumBTPMTU, Options{Clock: &fakeClock{}})
+	}, MaximumBTPMTU, Options{TimeSource: newFakeClock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -577,7 +577,7 @@ func TestBtpSessionNoDuplicateAckWhenSendInterleavesStandaloneAck(t *testing.T) 
 			return nil
 		},
 		Disconnect: func() error { return nil }, Message: noMessage(t),
-	}, Options{Clock: &fakeClock{}})
+	}, Options{TimeSource: newFakeClock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -618,7 +618,7 @@ func TestBtpSessionNoDuplicateAckWhenSendInterleavesStandaloneAck(t *testing.T) 
 
 func TestBtpSessionNoStandaloneAckWhileDataWriteInFlight(t *testing.T) {
 	rec := &recorder{}
-	clock := &fakeClock{}
+	clock := newFakeClock()
 	var hang atomic.Bool
 	release := make(chan struct{})
 	ready := false
@@ -635,7 +635,7 @@ func TestBtpSessionNoStandaloneAckWhileDataWriteInFlight(t *testing.T) {
 		},
 		Disconnect: func() error { return nil },
 		Message:    func([]byte) error { return nil },
-	}, Options{Clock: clock})
+	}, Options{TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -680,7 +680,7 @@ type pair struct {
 	pClosed, cClosed    bool
 }
 
-func newPair(t *testing.T, maxData int, req HandshakeRequest, clock Clock) *pair {
+func newPair(t *testing.T, maxData int, req HandshakeRequest, clock *fakeClock) *pair {
 	t.Helper()
 	p := &pair{}
 	var resp []byte
@@ -696,7 +696,7 @@ func newPair(t *testing.T, maxData int, req HandshakeRequest, clock Clock) *pair
 		},
 		Disconnect: func() error { p.pClosed = true; return nil },
 		Message:    func(m []byte) error { p.received = append(p.received, m); return nil },
-	}, Options{Clock: clock})
+	}, Options{TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -705,7 +705,7 @@ func newPair(t *testing.T, maxData int, req HandshakeRequest, clock Clock) *pair
 		Write:      func(b []byte) error { return p.peripheral.HandleIncoming(b) },
 		Disconnect: func() error { p.cClosed = true; return nil },
 		Message:    noMessage(t),
-	}, MaximumBTPMTU, Options{Clock: clock})
+	}, MaximumBTPMTU, Options{TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -713,7 +713,7 @@ func newPair(t *testing.T, maxData int, req HandshakeRequest, clock Clock) *pair
 }
 
 func TestBtpSessionSequenceNumbersWrap(t *testing.T) {
-	p := newPair(t, 244, HandshakeRequest{Versions: []int{4}, ATTMTU: 247, ClientWindowSize: 8}, &fakeClock{})
+	p := newPair(t, 244, HandshakeRequest{Versions: []int{4}, ATTMTU: 247, ClientWindowSize: 8}, newFakeClock())
 	msgs := make([][]byte, 0, 270)
 	for i := range 270 {
 		m := []byte{0xaa, byte(i >> 8), byte(i)}
@@ -738,7 +738,7 @@ func TestBtpSessionSequenceNumbersWrap(t *testing.T) {
 }
 
 func TestBtpSessionResumesStalledMultiFragmentMessage(t *testing.T) {
-	p := newPair(t, 23, HandshakeRequest{Versions: []int{4}, ATTMTU: 23, ClientWindowSize: 4}, &fakeClock{})
+	p := newPair(t, 23, HandshakeRequest{Versions: []int{4}, ATTMTU: 23, ClientWindowSize: 4}, newFakeClock())
 	msg := bytes.Repeat(unhex(t, "aabbccdd"), 50)
 	if err := p.central.Send(msg); err != nil {
 		t.Fatal(err)
@@ -761,12 +761,12 @@ type stallFixture struct {
 
 func centralFor(t *testing.T, attMTU uint16, requested int) *stallFixture {
 	t.Helper()
-	f := &stallFixture{clock: &fakeClock{}, rec: &recorder{}}
+	f := &stallFixture{clock: newFakeClock(), rec: &recorder{}}
 	s, err := NewCentral(EncodeHandshakeResponse(HandshakeResponse{Version: 4, ATTMTU: attMTU, WindowSize: 8}), Callbacks{
 		Write:      func(b []byte) error { f.rec.add(b); return nil },
 		Disconnect: func() error { f.disconnected.Store(true); return nil },
 		Message:    noMessage(t),
-	}, requested, Options{Clock: f.clock})
+	}, requested, Options{TimeSource: f.clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -824,7 +824,7 @@ func TestBtpSessionClosesAtMinimumSegmentSize(t *testing.T) {
 }
 
 func TestBtpSessionFailedWriteNeverReplays(t *testing.T) {
-	clock := &fakeClock{}
+	clock := newFakeClock()
 	writes := 0
 	c, err := NewCentral(EncodeHandshakeResponse(HandshakeResponse{Version: 4, ATTMTU: 244, WindowSize: 8}), Callbacks{
 		Write: func([]byte) error {
@@ -836,7 +836,7 @@ func TestBtpSessionFailedWriteNeverReplays(t *testing.T) {
 		},
 		Disconnect: func() error { return nil },
 		Message:    noMessage(t),
-	}, MaximumBTPMTU, Options{Clock: clock})
+	}, MaximumBTPMTU, Options{TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -864,7 +864,7 @@ func TestBtpSessionNoAckForMessageWhoseHandlerClosed(t *testing.T) {
 		Write:      func(b []byte) error { rec.add(b); return nil },
 		Disconnect: func() error { return nil },
 		Message:    func([]byte) error { return c.Close() },
-	}, MaximumBTPMTU, Options{Clock: &fakeClock{}})
+	}, MaximumBTPMTU, Options{TimeSource: newFakeClock()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -875,7 +875,7 @@ func TestBtpSessionNoAckForMessageWhoseHandlerClosed(t *testing.T) {
 }
 
 func TestBtpSessionNothingWrittenAfterCloseDuringStandaloneAck(t *testing.T) {
-	clock := &fakeClock{}
+	clock := newFakeClock()
 	rec := &recorder{}
 	writing := make(chan struct{})
 	written := make(chan struct{})
@@ -889,7 +889,7 @@ func TestBtpSessionNothingWrittenAfterCloseDuringStandaloneAck(t *testing.T) {
 		},
 		Disconnect: func() error { return nil },
 		Message:    func([]byte) error { return nil },
-	}, MaximumBTPMTU, Options{Clock: clock})
+	}, MaximumBTPMTU, Options{TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -928,13 +928,13 @@ func TestBtpSessionClosesWhenOnlyStandaloneAckUnanswered(t *testing.T) {
 }
 
 func TestBtpSessionClosesOncePeerSentAnything(t *testing.T) {
-	clock := &fakeClock{}
+	clock := newFakeClock()
 	disconnected := false
 	c, err := NewCentral(EncodeHandshakeResponse(HandshakeResponse{Version: 4, ATTMTU: 244, WindowSize: 8}), Callbacks{
 		Write:      func([]byte) error { return nil },
 		Disconnect: func() error { disconnected = true; return nil },
 		Message:    func([]byte) error { return nil },
-	}, MaximumBTPMTU, Options{Clock: clock})
+	}, MaximumBTPMTU, Options{TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -951,7 +951,7 @@ func TestBtpSessionClosesOncePeerSentAnything(t *testing.T) {
 }
 
 func TestBtpSessionStopsWritingSuspendedFragments(t *testing.T) {
-	clock := &fakeClock{}
+	clock := newFakeClock()
 	rec := &recorder{}
 	release := make(chan struct{})
 	c, err := NewCentral(EncodeHandshakeResponse(HandshakeResponse{Version: 4, ATTMTU: 244, WindowSize: 8}), Callbacks{
@@ -963,7 +963,7 @@ func TestBtpSessionStopsWritingSuspendedFragments(t *testing.T) {
 		},
 		Disconnect: func() error { return nil },
 		Message:    func([]byte) error { return nil },
-	}, MaximumBTPMTU, Options{Clock: clock})
+	}, MaximumBTPMTU, Options{TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -987,7 +987,7 @@ func TestBtpSessionStopsWritingSuspendedFragments(t *testing.T) {
 }
 
 func TestBtpSessionLateWriteFailureAfterStall(t *testing.T) {
-	clock := &fakeClock{}
+	clock := newFakeClock()
 	rec := &recorder{}
 	fail := make(chan error)
 	c, err := NewCentral(EncodeHandshakeResponse(HandshakeResponse{Version: 4, ATTMTU: 244, WindowSize: 8}), Callbacks{
@@ -999,7 +999,7 @@ func TestBtpSessionLateWriteFailureAfterStall(t *testing.T) {
 		},
 		Disconnect: func() error { return nil },
 		Message:    func([]byte) error { return nil },
-	}, MaximumBTPMTU, Options{Clock: clock})
+	}, MaximumBTPMTU, Options{TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}

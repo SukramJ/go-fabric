@@ -12,6 +12,8 @@ import (
 	"math/big"
 	"slices"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // Verifier validates a NOC chain against a fabric root.
@@ -34,15 +36,21 @@ type Verifier struct {
 }
 
 // TimeSource returns the current time for NotBefore/NotAfter checks.
+//
+// Deprecated: pass a [clock.Clock] (the module's time port, which
+// satisfies TimeSource) to [NewVerifier]; TimeSource may be removed in
+// v0.10.0.
 type TimeSource interface {
 	Now() time.Time
 }
 
 // SystemTime delegates to time.Now.
+//
+// Deprecated: use [clock.System]; SystemTime may be removed in v0.10.0.
 type SystemTime struct{}
 
 // Now implements [TimeSource].
-func (SystemTime) Now() time.Time { return time.Now() }
+func (SystemTime) Now() time.Time { return clock.System{}.Now() }
 
 // FixedTime returns a [TimeSource] that always reports t — for tests.
 type FixedTime struct{ T time.Time }
