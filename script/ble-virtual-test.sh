@@ -218,7 +218,7 @@ our_leg() {
 		{ ours="pair --ble failed (see pair.log)" && return; }
 	grep -q 'AddOrUpdateWiFiNetwork ssid=lab' "$LOG_DIR/peripheral-ours.log" ||
 		{ ours="the peripheral never saw AddOrUpdateWiFiNetwork for ssid lab (see peripheral-ours.log)" && return; }
-	ctl read "$NODE_ID" 0/BasicInformation/VendorID 0/NetworkCommissioning/FeatureMap >"$LOG_DIR/read.log" 2>&1 ||
+	ctl read "$NODE_ID" 0/BasicInformation/VendorID 0/NetworkCommissioning/0xFFFC >"$LOG_DIR/read.log" 2>&1 ||
 		{ ours="the read over the operational session failed after pairing (see read.log)" && return; }
 	grep -q 'VendorID' "$LOG_DIR/read.log" || { ours="the read returned no VendorID (see read.log)" && return; }
 	# Bonus: an enhanced commissioning window over the same session.
