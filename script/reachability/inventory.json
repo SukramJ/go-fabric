@@ -16118,35 +16118,35 @@
       "identifier": "TestClientBridgeStructureChangesParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/client_bridge_structure_parity_matterjs_internal_test.go",
-      "line": 284
+      "line": 285
     },
     {
       "package": "controller/client",
       "identifier": "TestClientBridgeStructureNestedAggregatorParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/client_bridge_structure_parity_matterjs_internal_test.go",
-      "line": 432
+      "line": 433
     },
     {
       "package": "controller/client",
       "identifier": "TestClientBridgeStructureRootOmitsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/client_bridge_structure_parity_matterjs_internal_test.go",
-      "line": 256
+      "line": 257
     },
     {
       "package": "controller/client",
       "identifier": "TestClientBridgeStructureSeveralEndpointsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/client_bridge_structure_parity_matterjs_internal_test.go",
-      "line": 549
+      "line": 550
     },
     {
       "package": "controller/client",
       "identifier": "TestClientBridgeStructureTwoInteractionsParity",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/client/client_bridge_structure_parity_matterjs_internal_test.go",
-      "line": 201
+      "line": 202
     },
     {
       "package": "controller/client",
