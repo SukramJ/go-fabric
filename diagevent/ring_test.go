@@ -4,9 +4,12 @@
 package diagevent
 
 import (
+	"slices"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 )
 
 func at(sec int) time.Time { return time.Date(2026, 8, 15, 12, 0, sec, 0, time.UTC) }
@@ -112,4 +115,26 @@ func TestSnapshotIsACopy(t *testing.T) {
 	if again := r.Snapshot(); again[0].Message != "original" {
 		t.Errorf("mutating a snapshot changed the ring: %q", again[0].Message)
 	}
+}
+
+// TestSetClockStampsUnstampedEvents: an event recorded without At takes
+// the ring's clock; one with At keeps it; nil restores the system clock
+// and a nil ring ignores the call.
+func TestSetClockStampsUnstampedEvents(t *testing.T) {
+	t.Parallel()
+	r := NewRing(4)
+	r.SetClock(clocktest.New(at(7)))
+	r.Record(Event{})
+	r.Record(Event{At: at(1)})
+	got := r.Snapshot()
+	if len(got) != 2 || !slices.ContainsFunc(got, func(e Event) bool { return e.At.Equal(at(7)) }) || !slices.ContainsFunc(got, func(e Event) bool { return e.At.Equal(at(1)) }) {
+		t.Fatalf("stamps %v", got)
+	}
+	r.SetClock(nil)
+	r.Record(Event{})
+	if !slices.ContainsFunc(r.Snapshot(), func(e Event) bool { return e.At.After(at(59)) }) {
+		t.Fatal("SetClock(nil) did not restore the system clock")
+	}
+	var nilRing *Ring
+	nilRing.SetClock(clocktest.New(at(0)))
 }
