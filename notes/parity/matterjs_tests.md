@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 20 |
-| partial | 105 |
-| planned | 112 |
+| ported | 22 |
+| partial | 106 |
+| planned | 109 |
 | excluded | 87 |
 | total | 324 |
 
@@ -82,7 +82,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/endpoints](#nodetestendpoints) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/loader](#nodetestloader) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/node](#nodetestnode) | 50 | 14 | 21 | 5 | 10 |
-| [node/test/node/client](#nodetestnodeclient) | 11 | 0 | 0 | 5 | 6 |
+| [node/test/node/client](#nodetestnodeclient) | 11 | 2 | 1 | 2 | 6 |
 | [node/test/node/integration](#nodetestnodeintegration) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/node/remote](#nodetestnoderemote) | 1 | 0 | 0 | 0 | 1 |
 | [node/test/storage](#nodeteststorage) | 2 | 0 | 0 | 0 | 2 |
@@ -625,10 +625,10 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | CacheFabricFilterTest.ts | 333 | excluded | `js-runtime-only` | The fabric-filter record of matter.js's client-side attribute cache. |
 | ClientNodeInteractionIcdTest.ts | 329 | excluded | `controller-stage` until M5 phase 24 | Holding controller interactions for an idle LIT peer until it checks in. |
 | ClientNodePhysicalPropertiesIcdTest.ts | 79 | excluded | `controller-stage` until M5 phase 24 | The controller's view of a peer's LIT operating mode. |
-| ClientNodeSemanticTagTest.ts | 49 | planned | — | A semantic tag a peer reports without a label read by the controller as carrying none. |
-| PeersAutoStartTest.ts | 75 | planned | — | Auto-start of commissioned peers when the controller goes online, and its opt-out. |
+| ClientNodeSemanticTagTest.ts | 49 | ported | `controller/client:TestClientNodeSemanticTagParity` | A tag a peer reports without a label decodes with no Label (absent, not null) next to a labeled one, and the tag list change is announced (controller/client:TestClientNodeSemanticTagParity on Node.apply; the Go device's Descriptor serves no TagList, so the tag list is reported to the image as a device sends it). |
+| PeersAutoStartTest.ts | 75 | ported | `controller/client:TestPeersAutoStartParity` | The commissioned node started again when the registry starts with AutoStart (matter.js's default; opt-in in Go) and not started without it, the expired uncommissioned node culled either way (controller/client:TestPeersAutoStartParity on fabrictest). |
 | PeersCommissionedTest.ts | 50 | planned | — | The controller's list of commissioned peers excluding discoveries and groups. |
-| PeersForDescriptorTest.ts | 99 | planned | — | Finding or creating the controller's node for a discovered device descriptor. |
+| PeersForDescriptorTest.ts | 99 | partial | `controller/client:TestPeersForDescriptorParity`<br>`controller/client:TestForDevice` | Two concurrent sightings of one device find one node (fix: Registry.ForDevice finds or creates under the registry's operation mutex, Peers.ts:371-389) and a node is matched by its current device identifier (controller/client:TestPeersForDescriptorParity); a sighting waits out a decommission (TestForDevice). Missing: the lookups while the matched node is being deleted (matter.js's construction Inactive and destroying signals; a Go node is deleted through Registry.Decommission with no hook inside it — a closing node is skipped by find). Missing: “creates a new node for a device whose node is being deleted”; “creates a new node for a device whose node has begun deletion”. |
 | PeersInstrumentBasicInformationTest.ts | 88 | excluded | `js-runtime-only` | Registration of matter.js's BasicInformation event handlers once per node. |
 | PeersInstrumentBridgedConfigurationVersionTest.ts | 46 | excluded | `js-runtime-only` | Registration of matter.js's ConfigurationVersion handler once per bridged endpoint. |
 | PeersLoadFailureTest.ts | 146 | planned | — | Keeping a fabric's other peers usable when one cannot load from storage. |
@@ -1092,10 +1092,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/node/client
 
-- `ClientNodeSemanticTagTest.ts` — A semantic tag a peer reports without a label read by the controller as carrying none.
-- `PeersAutoStartTest.ts` — Auto-start of commissioned peers when the controller goes online, and its opt-out.
 - `PeersCommissionedTest.ts` — The controller's list of commissioned peers excluding discoveries and groups.
-- `PeersForDescriptorTest.ts` — Finding or creating the controller's node for a discovered device descriptor.
 - `PeersLoadFailureTest.ts` — Keeping a fabric's other peers usable when one cannot load from storage.
 
 ### protocol/test/action/client

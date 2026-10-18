@@ -2543,14 +2543,20 @@
     },
     {
       "path": "packages/node/test/node/client/ClientNodeSemanticTagTest.ts",
-      "status": "planned",
-      "reason": "A semantic tag a peer reports without a label read by the controller as carrying none.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestClientNodeSemanticTagParity"
+      ],
+      "reason": "A tag a peer reports without a label decodes with no Label (absent, not null) next to a labeled one, and the tag list change is announced (controller/client:TestClientNodeSemanticTagParity on Node.apply; the Go device's Descriptor serves no TagList, so the tag list is reported to the image as a device sends it).",
       "snapshotSha": "274e8bf105db0fc95581f36c1673420b856bcd7a"
     },
     {
       "path": "packages/node/test/node/client/PeersAutoStartTest.ts",
-      "status": "planned",
-      "reason": "Auto-start of commissioned peers when the controller goes online, and its opt-out.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestPeersAutoStartParity"
+      ],
+      "reason": "The commissioned node started again when the registry starts with AutoStart (matter.js's default; opt-in in Go) and not started without it, the expired uncommissioned node culled either way (controller/client:TestPeersAutoStartParity on fabrictest).",
       "snapshotSha": "94fe8d98d4d868596d1a29f85590869bc76170fe"
     },
     {
@@ -2561,8 +2567,16 @@
     },
     {
       "path": "packages/node/test/node/client/PeersForDescriptorTest.ts",
-      "status": "planned",
-      "reason": "Finding or creating the controller's node for a discovered device descriptor.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestPeersForDescriptorParity",
+        "controller/client:TestForDevice"
+      ],
+      "missing": [
+        "creates a new node for a device whose node is being deleted",
+        "creates a new node for a device whose node has begun deletion"
+      ],
+      "reason": "Two concurrent sightings of one device find one node (fix: Registry.ForDevice finds or creates under the registry's operation mutex, Peers.ts:371-389) and a node is matched by its current device identifier (controller/client:TestPeersForDescriptorParity); a sighting waits out a decommission (TestForDevice). Missing: the lookups while the matched node is being deleted (matter.js's construction Inactive and destroying signals; a Go node is deleted through Registry.Decommission with no hook inside it — a closing node is skipped by find).",
       "snapshotSha": "01d584ca2af6df2232d3833c70518cc5a7610889"
     },
     {

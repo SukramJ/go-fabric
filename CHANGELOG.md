@@ -43,6 +43,7 @@ Milestone 2, phase 16, brief BI: the port of matter.js `packages/node/test/node`
 - A bridged endpoint added at run time (a reassembly) reports all its attributes to the subscriptions that cover it, as matter.js announces every attribute of an added cluster changed (`ProtocolService.ts:280-287`); only the Descriptor PartsList that names it was reported, so a controller's client node never learned the endpoint's clusters.
 - `controller/client`: a client node signals a ConfigurationVersion change of the peer's BasicInformation or of a bridged endpoint's BridgedDeviceBasicInformation through the new `Hooks.ConfigurationVersionChanged`, as matter.js emits `lifecycle.configurationVersionChanged` (`Peers.ts:757`, `:803-814`); a host only saw an ordinary attribute change.
 - `controller/client`: a client node is seeded once every endpoint its root's PartsList names is installed — a node of its root only included, logged once as offering no function beyond node management when its DeviceTypeList names Root Node alone — as matter.js `Peers.ts:760-797`; it was seeded only with more than one endpoint, so a root-only node never was, and a bridge was seeded before all its endpoints arrived.
+- `controller/client`: two concurrent `Registry.ForDevice` calls for one device return one node; they could both miss and create two (matter.js finds or creates in one turn, `Peers.ts:371-389`).
 
 ## [0.7.2] — 2026-10-18
 

@@ -152,15 +152,9 @@ func (r *Registry) cull(ctx context.Context) error {
 // the device over; Commission commissions the node.
 func (r *Registry) ForDevice(ctx context.Context, d discovery.Device) (*Node, error) {
 	for {
-		n := r.find(d.InstanceID)
-		if n == nil {
-			break
-		}
-		op := r.operationOf(n)
-		if op == nil || op.kind != opDecommission {
-			now := r.clock.Now()
-			n.updateRecord(func(rec *Record) { rec.applyDevice(&d, now) })
-			return n, nil
+		n, op, err := r.findOrCreate(d)
+		if op == nil {
+			return n, err
 		}
 		select {
 		case <-op.done:
@@ -168,21 +162,40 @@ func (r *Registry) ForDevice(ctx context.Context, d discovery.Device) (*Node, er
 			return nil, ctx.Err()
 		}
 	}
+}
+
+// findOrCreate is one search of ForDevice under the registry's operation
+// mutex, so two sightings of one device find or create one node: matter.js
+// runs factory.find and factory.create in one turn of its event loop
+// (Peers.ts:371-389 at 862ad75f), a second forDescriptor finding the node
+// the first created. A match under decommission is returned as the
+// operation to wait for.
+func (r *Registry) findOrCreate(d discovery.Device) (*Node, *fabricOp, error) {
+	r.op.Lock()
+	defer r.op.Unlock()
+	if n := r.find(d.InstanceID); n != nil {
+		if op := r.operationOf(n); op != nil && op.kind == opDecommission {
+			return nil, op, nil
+		}
+		now := r.clock.Now()
+		n.updateRecord(func(rec *Record) { rec.applyDevice(&d, now) })
+		return n, nil, nil
+	}
 	r.mu.Lock()
 	if r.closed {
 		r.mu.Unlock()
-		return nil, ErrClosed
+		return nil, nil, ErrClosed
 	}
 	id := r.allocateIDLocked()
 	r.mu.Unlock()
 	n, err := r.build(id, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	now := r.clock.Now()
 	n.updateRecord(func(rec *Record) { rec.applyDevice(&d, now) })
 	r.add(n)
-	return n, nil
+	return n, nil, nil
 }
 
 // find is Factory.find with RemoteDescriptor.is: the first node (not
