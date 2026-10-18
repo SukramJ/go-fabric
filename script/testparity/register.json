@@ -4260,16 +4260,15 @@
         "secure:TestParityMatterJS_PasePairing_PasscodeGeneratorExhaustion",
         "secure:TestParityMatterJS_PasePairing_IterationsValidation",
         "secure:TestParityMatterJS_PasePairing_LeadingZeroW0_PBKDF",
-        "secure:TestParityMatterJS_PasePairing_SuccessfulProcess_PBKDF"
+        "secure:TestParityMatterJS_PasePairing_SuccessfulProcess_PBKDF",
+        "secure/spake2:TestPasePairingSpake2Process",
+        "controller/handshake:TestPasePairingPBKDFIterationsFromTheResponder"
       ],
       "missing": [
         "does not throw when sending the error status report fails",
-        "does not attempt to send the error status report when a sent message is still unacked",
-        "calls onPbkdfParamResponse once the responder answers the PBKDFParamRequest",
-        "does not call onPbkdfParamResponse when the responder does not answer",
-        "do special successful pase process"
+        "does not attempt to send the error status report when a sent message is still unacked"
       ],
-      "reason": "Passcode generation, the PBKDF iteration bounds and the PBKDF vectors are covered; cancelPairing and the PBKDFParamResponse callback are not.",
+      "reason": "Passcode generation, the PBKDF iteration bounds, the PBKDF vectors, the full special PASE process (w0, L, context hash, Y and hBX with the fixed y) and the onPbkdfParamResponse callback are ported; PaseServer.cancelPairing's counterpart is the bridge's datagram PASE handler (bridge/securechannel.go), which has no messenger or unacked-message guard to drive.",
       "snapshotSha": "410e318e6523e044afa1711a0a250461c8225547"
     },
     {
