@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 21 |
+| ported | 24 |
 | partial | 103 |
-| planned | 113 |
+| planned | 110 |
 | excluded | 87 |
 | total | 324 |
 
@@ -112,7 +112,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 1 | 0 | 1 |
 | [protocol/test/session](#protocoltestsession) | 4 | 0 | 4 | 0 | 0 |
 | [protocol/test/session/secure](#protocoltestsessionsecure) | 2 | 1 | 1 | 0 | 0 |
-| [protocol/test/thread](#protocoltestthread) | 3 | 0 | 0 | 3 | 0 |
+| [protocol/test/thread](#protocoltestthread) | 3 | 3 | 0 | 0 | 0 |
 | [protocol/test/transport/tcp](#protocoltesttransporttcp) | 2 | 0 | 2 | 0 | 0 |
 
 ## node/test/behavior
@@ -898,9 +898,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| BasicTlvCodecTest.ts | 97 | planned | — | The Thread basic TLV walk and encode, including the 0xFF extended length. |
-| MeshCopTlvTypesTest.ts | 53 | planned | — | The MeshCoP TLV type table. |
-| OperationalDatasetTest.ts | 200 | planned | — | Decoding and re-encoding a Thread operational dataset byte-identically. |
+| BasicTlvCodecTest.ts | 97 | ported | `controller/thread:TestBasicTlvCodecWalk`<br>`controller/thread:TestBasicTlvCodecEncode` | All 11 cases run against the new controller/thread WalkTLVs / EncodeTLVs (short and 0xFF extended length, truncation errors, the 0xFFFF limit); the TLV type range case pins that TLV.Type is a byte, the Go form of the 0..255 check. |
+| MeshCopTlvTypesTest.ts | 53 | ported | `controller/thread:TestMeshCopTlvTypesType`<br>`controller/thread:TestMeshCopTlvTypesName` | All 6 cases run against controller/thread's TLVType constants, the 43-entry type table (no duplicates, the post-spec extensions) and TLVType.Name, the reverse lookup of MeshCopTlvTypeName. |
+| OperationalDatasetTest.ts | 200 | ported | `controller/thread:TestOperationalDatasetDecode`<br>`controller/thread:TestOperationalDatasetEncode`<br>`controller/thread:TestOperationalDatasetDecodeHex`<br>`controller/thread:TestOperationalDatasetRedact` | All 18 cases run against controller/thread's DecodeDataset / DecodeDatasetHex / Encode / Redact: the synthetic-1 fixture, unknown TLVs, the security policy, both CHANNEL forms, byte-identical replay of non-canonical encodings, canonical encoding of a mutated or in-memory dataset, hex with whitespace and redaction; the ArrayBuffer case decodes a sub-slice of a larger buffer, Go's one byte type. |
 
 ## protocol/test/transport/tcp
 
@@ -1167,9 +1167,3 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `NetworkProfileTest.ts` — The controller's network profiles and their additional MRP delay per medium, BDX margin and sub-profiles.
 - `PeerConnectionSocketOwnershipTest.ts` — Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25.
 - `PhysicalDevicePropertiesTest.ts` — Subscription interval bounds the controller derives from a peer's physical properties (Thread, ICD, Generic Switch).
-
-### protocol/test/thread
-
-- `BasicTlvCodecTest.ts` — The Thread basic TLV walk and encode, including the 0xFF extended length.
-- `MeshCopTlvTypesTest.ts` — The MeshCoP TLV type table.
-- `OperationalDatasetTest.ts` — Decoding and re-encoding a Thread operational dataset byte-identically.
