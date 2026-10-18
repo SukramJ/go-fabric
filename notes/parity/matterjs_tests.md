@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 8 |
-| partial | 95 |
-| planned | 134 |
+| partial | 96 |
+| planned | 133 |
 | excluded | 87 |
 | total | 324 |
 
@@ -110,7 +110,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 4 | 4 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 1 | 2 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 0 | 1 | 1 |
-| [protocol/test/session](#protocoltestsession) | 4 | 0 | 2 | 2 | 0 |
+| [protocol/test/session](#protocoltestsession) | 4 | 0 | 3 | 1 | 0 |
 | [protocol/test/session/secure](#protocoltestsessionsecure) | 2 | 0 | 2 | 0 | 0 |
 | [protocol/test/thread](#protocoltestthread) | 3 | 0 | 0 | 3 | 0 |
 | [protocol/test/transport/tcp](#protocoltesttransporttcp) | 2 | 0 | 2 | 0 | 0 |
@@ -882,7 +882,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| SecureSessionTest.ts | 495 | planned | — | The secure session: one path per invoke for a peer that reports zero, encryption and the group privacy round trips. |
+| SecureSessionTest.ts | 495 | partial | `secure/channel:TestSecureSessionParameters`<br>`secure/channel:TestSecureSessionDecrypt`<br>`secure/channel:TestSecureSessionEncrypt`<br>`groups:TestSecureSessionGroupPrivacy`<br>`bridge:TestGroupMessageOutcomes` | The paths-per-invoke fallback, decrypt and encrypt against the pinned vectors and the group-session cases (header-derived nonce, both round trips with the unmapped-key report, the send address, the cached-session key, the privacy flag) are ported; Go sessions own no subscriptions and the peer-loss hook carries no exchange, and a cached groups.Sender keeps the node id it was created with across an UpdateNOC (register candidate). Missing: “conveys the initiating exchange to its subscriptions”; “sends a cached group session's messages as the node ID of the current fabric object”. |
 | SessionIntervalsTest.ts | 99 | planned | — | Session interval defaults, overrides and their clamping for advertisement. |
 | SessionManagerTest.ts | 924 | partial | `secure/operational:TestOpenFromPase_AllocatesDistinctIDs`<br>`secure/operational:TestManager_AllocateID_WrapAround`<br>`secure/operational:TestAllocateID_EvictsOldestPlaceholderWhenExhausted`<br>`secure/operational:TestPeerCapEviction_ForceClosesWithoutCloseSessionOrReannounce` | Session-ID allocation, wrap, exhaustion and the per-peer cap are covered; the random-seed, lookup and resumption cases are not ported case by case. Missing: “verify that existing session ids are skipped”; “never allocates 0 when the random seed is 0”; “stays within the ID range after reusing the session with the highest ID”; “returns session with most recent activeTimestamp, not timestamp”; “never evicts a session we initiated, even when it is the least recently used”; “leaves sessions we initiated alone; peer loss reclaims those”; “conveys the initiating exchange when reporting peer loss”; “names the originating environment on the lines an eviction produces”; “exposes one node-global counter shared across group sessions”; “closes the counter it replaces when cleared”; “seeds the global counter above legacy per-key counters and clears them (Q-02 migration)”; “does not roll the counter back when a group key set is removed (Q-02)”; “forgets group message reception state when its key set is removed so a reused key re-syncs”; “keeps reception state until the last key set sharing an operational key is removed”; “forgets the previous operational key when a key set is rewritten with a new epoch key”; “rejects a local active threshold over 65535 milliseconds on construction”; “rejects a local active threshold over 65535 milliseconds via the setter”; “accepts a local active threshold of exactly 65535 milliseconds”; “rejects a local max paths per invoke of zero on construction”; “rejects a local max paths per invoke of zero via the setter”; “rejects a local max paths per invoke that is not a whole count”; “accepts a local max paths per invoke of one”; “ignores undefined values and retains current values”; “keeps a peer heard from just now active across a forward step”; “keeps a peer silent beyond the active threshold idle across a backward step”; “prefers the session heard from last when the clock stepped back between them”; “evicts the least recently used session when the clock stepped back since its last traffic”; “closes a session on peer loss after the clock stepped back”; “closes a session on peer loss when the clock stepped forward before it was created”; “closes a session on peer shutdown after the clock stepped back”; “reports session activity on the wall clock as it reads now”; “reports a peer never heard from with a last active time of 0”. |
 | SessionParametersTest.ts | 112 | partial | `secure/sessionparams:TestEffectiveTransportsGateOnMatter15`<br>`secure/sessionparams:TestMaxTCPMessageSizeOnlyWithTCP` | The TCP spec-version gate is covered; the maxPathsPerInvoke assumptions and the interval cases are not. Missing: “accepts idle/active intervals above one hour”; “honors a peer-reported limit above one”; “assumes one when the peer reports zero”; “assumes one when the peer reports no limit”; “honors the highest limit the wire can carry”; “assumes one for a persisted limit the wire could not have carried”; “clears TCP support when the spec version is unknown”; “decodes a numeric supportedTransports bitmap before gating”; “keeps only the values the peer sent, without fallbacks”; “decodes supported transports sent as a bitmap”; “keeps supported transports given as an object”; “is undefined when the peer sent no parameters”. |
@@ -1213,7 +1213,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### protocol/test/session
 
-- `SecureSessionTest.ts` — The secure session: one path per invoke for a peer that reports zero, encryption and the group privacy round trips.
 - `SessionIntervalsTest.ts` — Session interval defaults, overrides and their clamping for advertisement.
 
 ### protocol/test/thread

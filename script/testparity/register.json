@@ -4110,8 +4110,19 @@
     },
     {
       "path": "packages/protocol/test/session/SecureSessionTest.ts",
-      "status": "planned",
-      "reason": "The secure session: one path per invoke for a peer that reports zero, encryption and the group privacy round trips.",
+      "status": "partial",
+      "go": [
+        "secure/channel:TestSecureSessionParameters",
+        "secure/channel:TestSecureSessionDecrypt",
+        "secure/channel:TestSecureSessionEncrypt",
+        "groups:TestSecureSessionGroupPrivacy",
+        "bridge:TestGroupMessageOutcomes"
+      ],
+      "missing": [
+        "conveys the initiating exchange to its subscriptions",
+        "sends a cached group session's messages as the node ID of the current fabric object"
+      ],
+      "reason": "The paths-per-invoke fallback, decrypt and encrypt against the pinned vectors and the group-session cases (header-derived nonce, both round trips with the unmapped-key report, the send address, the cached-session key, the privacy flag) are ported; Go sessions own no subscriptions and the peer-loss hook carries no exchange, and a cached groups.Sender keeps the node id it was created with across an UpdateNOC (register candidate).",
       "snapshotSha": "3efe98888bae9c4ca3424851cbd7b12045efb761"
     },
     {
