@@ -136,6 +136,20 @@ reachability-check: reachability ## regenerate, then fail if the committed snaps
 	}
 	$(GO) test -count=1 -run 'Reachab' ./script/reachability/
 
+.PHONY: testparity
+testparity: ## render notes/parity/matterjs_tests.md from the matter.js test register (no matter.js clone needed)
+	$(GO) run ./script/testparity -render
+
+.PHONY: testparity-snapshot
+testparity-snapshot: ## refresh script/testparity/matterjs_tests.json from $(MATTERJS_DIR) at the schema pin (exit 2 without the clone)
+	@# A pin lift's step: the diff names the matter.js test files added, removed
+	@# and changed; testparity-check then lists every mapping to re-check.
+	MATTERJS_DIR=$(MATTERJS_DIR) $(GO) run ./script/testparity -snapshot
+
+.PHONY: testparity-check
+testparity-check: ## fail if the test register and the snapshot disagree, a Go test it names is gone, the page is stale or planned is off its ratchet
+	$(GO) test -count=1 -run 'Testparity' ./script/testparity/
+
 # --- the real-commissioner guard ----------------------------------------
 #
 # CHIP_TEST_IMAGE (below) is the SINGLE SOURCE for the commissioner, the CSA

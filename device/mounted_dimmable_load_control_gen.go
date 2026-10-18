@@ -22,7 +22,7 @@ const (
 	MountedDimmableLoadControlRevision uint16 = 3
 )
 
-// MountedDimmableLoadControlType is the MountedDimmableLoadControl device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// MountedDimmableLoadControlType is the MountedDimmableLoadControl device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/mounted-dimmable-load-control.ts.
 var MountedDimmableLoadControlType = Type{
 	ID: MountedDimmableLoadControlID, Name: "MountedDimmableLoadControl", Revision: MountedDimmableLoadControlRevision,

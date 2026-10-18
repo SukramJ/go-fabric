@@ -24,7 +24,7 @@ const (
 	ContentAppRevision uint16 = 2
 )
 
-// ContentAppType is the ContentApp device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// ContentAppType is the ContentApp device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/content-app.ts.
 var ContentAppType = Type{
 	ID: ContentAppID, Name: "ContentApp", Revision: ContentAppRevision,

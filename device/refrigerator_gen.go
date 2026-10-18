@@ -20,7 +20,7 @@ const (
 	RefrigeratorRevision uint16 = 3
 )
 
-// RefrigeratorType is the Refrigerator device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// RefrigeratorType is the Refrigerator device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/refrigerator.ts.
 var RefrigeratorType = Type{
 	ID: RefrigeratorID, Name: "Refrigerator", Revision: RefrigeratorRevision,

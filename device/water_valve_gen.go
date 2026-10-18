@@ -19,7 +19,7 @@ const (
 	WaterValveRevision uint16 = 1
 )
 
-// WaterValveType is the WaterValve device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// WaterValveType is the WaterValve device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/water-valve.ts.
 var WaterValveType = Type{
 	ID: WaterValveID, Name: "WaterValve", Revision: WaterValveRevision,

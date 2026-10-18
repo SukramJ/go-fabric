@@ -18,7 +18,7 @@ const (
 	WindowCoveringControllerRevision uint16 = 5
 )
 
-// WindowCoveringControllerType is the WindowCoveringController device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// WindowCoveringControllerType is the WindowCoveringController device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/window-covering-controller.ts.
 var WindowCoveringControllerType = Type{
 	ID: WindowCoveringControllerID, Name: "WindowCoveringController", Revision: WindowCoveringControllerRevision,

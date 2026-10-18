@@ -17,7 +17,7 @@ const (
 	ClosureControllerRevision uint16 = 2
 )
 
-// ClosureControllerType is the ClosureController device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// ClosureControllerType is the ClosureController device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/closure-controller.ts.
 var ClosureControllerType = Type{
 	ID: ClosureControllerID, Name: "ClosureController", Revision: ClosureControllerRevision,

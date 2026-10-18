@@ -23,7 +23,7 @@ const (
 	ColorTemperatureLightRevision uint16 = 5
 )
 
-// ColorTemperatureLightType is the ColorTemperatureLight device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// ColorTemperatureLightType is the ColorTemperatureLight device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/color-temperature-light.ts.
 var ColorTemperatureLightType = Type{
 	ID: ColorTemperatureLightID, Name: "ColorTemperatureLight", Revision: ColorTemperatureLightRevision,

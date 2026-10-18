@@ -19,7 +19,7 @@ const (
 	SecondaryNetworkInterfaceRevision uint16 = 1
 )
 
-// SecondaryNetworkInterfaceType is the SecondaryNetworkInterface device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// SecondaryNetworkInterfaceType is the SecondaryNetworkInterface device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/endpoints/secondary-network-interface.ts.
 var SecondaryNetworkInterfaceType = Type{
 	ID: SecondaryNetworkInterfaceID, Name: "SecondaryNetworkInterface", Revision: SecondaryNetworkInterfaceRevision,

@@ -17,7 +17,7 @@ const (
 	DoorLockControllerRevision uint16 = 4
 )
 
-// DoorLockControllerType is the DoorLockController device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// DoorLockControllerType is the DoorLockController device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/door-lock-controller.ts.
 var DoorLockControllerType = Type{
 	ID: DoorLockControllerID, Name: "DoorLockController", Revision: DoorLockControllerRevision,

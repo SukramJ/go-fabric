@@ -18,7 +18,7 @@ const (
 	FlowSensorRevision uint16 = 3
 )
 
-// FlowSensorType is the FlowSensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// FlowSensorType is the FlowSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/flow-sensor.ts.
 var FlowSensorType = Type{
 	ID: FlowSensorID, Name: "FlowSensor", Revision: FlowSensorRevision,

@@ -17,7 +17,7 @@ const (
 	OtaRequestorRevision uint16 = 1
 )
 
-// OtaRequestorType is the OtaRequestor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// OtaRequestorType is the OtaRequestor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/endpoints/ota-requestor.ts.
 var OtaRequestorType = Type{
 	ID: OtaRequestorID, Name: "OtaRequestor", Revision: OtaRequestorRevision,

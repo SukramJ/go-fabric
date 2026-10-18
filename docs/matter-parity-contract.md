@@ -110,6 +110,7 @@ them with every change:
 | **matter.js pin freshness** | `.github/workflows/matterjs-pin.yml` + `schema/staleness_test.go` | the embedded extract does not silently fall behind matter.js HEAD |
 | **Divergence catalogue** | [`notes/parity/by_design.md`](../notes/parity/by_design.md) | every intentional deviation, with rationale and what pins it |
 | **Open-gap register** | [`notes/parity/matter_behaviour_findings.md`](../notes/parity/matter_behaviour_findings.md) | known behaviour gaps that are *not* by design, as scoped fix packages |
+| **Test-porting register** | [`script/testparity/`](https://github.com/SukramJ/go-fabric/tree/main/script/testparity) (`register.json` against the committed snapshot `matterjs_tests.json`), rendered to [`notes/parity/matterjs_tests.md`](https://github.com/SukramJ/go-fabric/blob/main/notes/parity/matterjs_tests.md); `make testparity-check` and the CI job `testparity` | every `*Test.ts` under matter.js's `packages/node/test` and `packages/protocol/test` at the pin is `ported`, `partial` (naming the `it` cases not covered), `planned` or `excluded` with one of five classes; every Go test an entry names exists; a `ported`, `partial` or `excluded` verdict fails once its matter.js file changes; the number of `planned` files sits exactly on `testparityPlannedRatchet` |
 
 When a parity sweep is genuinely warranted, prefer extending these guards over
 producing a throw-away report: a guard catches the *next* regression, a report
@@ -138,6 +139,11 @@ was made:
 3. Commit the table as `notes/parity/sweeps/<yyyy-mm>-<old>-<new>.md`
    (commit, subject, verdict, Go reference / fix commit / finding), and
    re-run every certification family that covers a verdict-3 change.
+4. Refresh the test snapshot (`make testparity-snapshot`, against the same
+   clone): `make testparity-check` then names every test file upstream added
+   or removed and every `ported`, `partial` or `excluded` entry whose file
+   changed. Re-check those mappings and exclusions, update their `snapshotSha`, and move
+   `testparityPlannedRatchet` with the `planned` count in the same commit.
 
 ## 5. Where the host's own parity obligation begins
 

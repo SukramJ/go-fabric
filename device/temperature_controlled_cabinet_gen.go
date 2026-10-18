@@ -22,7 +22,7 @@ const (
 	TemperatureControlledCabinetRevision uint16 = 6
 )
 
-// TemperatureControlledCabinetType is the TemperatureControlledCabinet device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// TemperatureControlledCabinetType is the TemperatureControlledCabinet device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/temperature-controlled-cabinet.ts.
 var TemperatureControlledCabinetType = Type{
 	ID: TemperatureControlledCabinetID, Name: "TemperatureControlledCabinet", Revision: TemperatureControlledCabinetRevision,

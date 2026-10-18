@@ -20,7 +20,7 @@ const (
 	ExtractorHoodRevision uint16 = 1
 )
 
-// ExtractorHoodType is the ExtractorHood device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// ExtractorHoodType is the ExtractorHood device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/extractor-hood.ts.
 var ExtractorHoodType = Type{
 	ID: ExtractorHoodID, Name: "ExtractorHood", Revision: ExtractorHoodRevision,

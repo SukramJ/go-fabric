@@ -19,7 +19,7 @@ const (
 	ContactSensorRevision uint16 = 2
 )
 
-// ContactSensorType is the ContactSensor device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// ContactSensorType is the ContactSensor device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/contact-sensor.ts.
 var ContactSensorType = Type{
 	ID: ContactSensorID, Name: "ContactSensor", Revision: ContactSensorRevision,

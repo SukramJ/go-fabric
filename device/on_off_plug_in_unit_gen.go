@@ -22,7 +22,7 @@ const (
 	OnOffPlugInUnitRevision uint16 = 5
 )
 
-// OnOffPlugInUnitType is the OnOffPlugInUnit device type, from the matter.js model at 0ceb202 (Matter 1.6.1):
+// OnOffPlugInUnitType is the OnOffPlugInUnit device type, from the matter.js model at 862ad75 (Matter 1.6.1):
 // what matter.js generates into packages/node/src/devices/on-off-plug-in-unit.ts.
 var OnOffPlugInUnitType = Type{
 	ID: OnOffPlugInUnitID, Name: "OnOffPlugInUnit", Revision: OnOffPlugInUnitRevision,

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5287,
+  "entry_points": 5295,
   "entry_packages": [
     ".",
     "bdx",
@@ -198,6 +198,7 @@
     "script/coverfloor",
     "script/devicegen",
     "script/reachability",
+    "script/testparity",
     "secure",
     "secure/aesccm",
     "secure/attestation",
