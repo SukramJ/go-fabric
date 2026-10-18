@@ -26,7 +26,8 @@ type FabricConfig struct {
 	// RootNodeID is our node id on the fabric, the CaseAdminSubject AddNOC
 	// grants Administer to; required, an operational node id.
 	RootNodeID uint64
-	// VendorID is the AdminVendorId of AddNOC (the fabric's root vendor).
+	// VendorID is the AdminVendorId of AddNOC (the fabric's root vendor);
+	// 0 is the test vendor 0xFFF1, and one above 0xFFF4 is refused.
 	VendorID uint16
 	// IPK is the 16-byte identity protection key (the epoch key AddNOC
 	// carries); nil draws one from Rand.
@@ -107,6 +108,15 @@ func NewFabric(c *ca.CA, cfg FabricConfig) (*Fabric, error) {
 	}
 	if !isOperationalNodeID(cfg.RootNodeID) {
 		return nil, fmt.Errorf("commissioner: root node id 0x%016X is not an operational node id", cfg.RootNodeID)
+	}
+	// Mirrors matter.js packages/protocol/src/fabric/FabricAuthority.ts:47, :139-147
+	// (createFabric): an unset admin vendor id is DEFAULT_ADMIN_VENDOR_ID,
+	// a reserved one is refused before anything is minted.
+	switch {
+	case cfg.VendorID == 0:
+		cfg.VendorID = defaultAdminVendorID
+	case cfg.VendorID > maxOperationalVendorID:
+		return nil, fmt.Errorf("commissioner: Admin vendor ID %#x is reserved (0x0000 or above 0xFFF4); devices refuse it in AddNOC", cfg.VendorID)
 	}
 	if cfg.Rand == nil {
 		cfg.Rand = rand.Reader
@@ -317,6 +327,17 @@ func (f *Fabric) Lookup(a handshake.PeerAddress) (handshake.Fabric, bool) {
 	}
 	return f.Fabric, true
 }
+
+// Admin vendor ids of a new fabric.
+const (
+	// defaultAdminVendorID is matter.js DEFAULT_ADMIN_VENDOR_ID
+	// (FabricAuthority.ts:47), the test vendor.
+	defaultAdminVendorID uint16 = 0xFFF1
+	// maxOperationalVendorID is the upper bound of matter.js's VendorId
+	// constructor (packages/types/src/datatype/VendorId.ts:22). Its
+	// isOperational applies the bound (VendorId.ts:44).
+	maxOperationalVendorID uint16 = 0xFFF4
+)
 
 // Operational node id range — matter.js packages/types/src/datatype/
 // NodeId.ts:27-28 (OPERATIONAL_NODE_MIN, OPERATIONAL_NODE_MAX) at 0ceb202d.

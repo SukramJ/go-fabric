@@ -41,6 +41,11 @@ type SendOptions struct {
 	// MaxTransferSize refuses a Length above it; zero is
 	// [DefaultMaxTransferSize] (bdx-session-initiator.ts:137-143).
 	MaxTransferSize uint64
+	// StartOffset, when set, is stated in the SendInit as the offset in
+	// the file Data begins at (matter.js senderStartOffset); Data must
+	// already start there. Mirrors matter.js
+	// packages/protocol/src/bdx/bdx-session-initiator.ts:128-135 and :167-178.
+	StartOffset *uint64
 	// Progress, when set, is told the bytes transferred and the transfer's
 	// size (flow/Flow.ts:121-147, progressInfo).
 	Progress func(transferred uint64, total *uint64)
@@ -130,8 +135,13 @@ func startSend(ctx context.Context, f *outboundFlow, modes []DriverMode, opts Se
 			ReceiverDrive: slices.Contains(modes, ReceiverDrive),
 		},
 		MaxBlockSize:   uint16(maxBlockSize), //nolint:gosec // bounded above
+		StartOffset:    opts.StartOffset,
 		MaxLength:      maxLength,
 		FileDesignator: opts.TransferFileDesignator,
+	}
+	var startOffset uint64
+	if opts.StartOffset != nil {
+		startOffset = *opts.StartOffset
 	}
 	accept, err := f.m.SendSendInit(ctx, init)
 	if err != nil {
@@ -154,7 +164,7 @@ func startSend(ctx context.Context, f *outboundFlow, modes []DriverMode, opts Se
 		f: f,
 		// :258: the sender drives exactly when the accept says senderDrive.
 		isDriver: accept.TransferControl.SenderDrive,
-		res:      Result{Length: f.dataLength, Mode: mode, BlockSize: uint16(f.blockSize)}, //nolint:gosec // bounded by the accept's uint16
+		res:      Result{Length: f.dataLength, Mode: mode, BlockSize: uint16(f.blockSize), StartOffset: startOffset}, //nolint:gosec // bounded by the accept's uint16
 	}, nil
 }
 

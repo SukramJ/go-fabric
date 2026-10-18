@@ -11,11 +11,13 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -99,10 +101,17 @@ type revocationCache struct {
 	mu       sync.Mutex
 	values   map[string]*cachedLookup
 	inflight map[string]*inflightLookup
+	// installed is #installedRevocations (DclCertificateService.ts:311-312):
+	// revocation information supplied out of band, by normalized AKID, for
+	// the life of the store and never persisted.
+	installed map[string][]revocationEntry
 }
 
 func newRevocationCache(s *CertificateStore) *revocationCache {
-	return &revocationCache{s: s, values: map[string]*cachedLookup{}, inflight: map[string]*inflightLookup{}}
+	return &revocationCache{
+		s: s, values: map[string]*cachedLookup{}, inflight: map[string]*inflightLookup{},
+		installed: map[string][]revocationEntry{},
+	}
 }
 
 func (c *revocationCache) get(ctx context.Context, akid string) (revocationLookup, error) {
@@ -174,7 +183,19 @@ func matchRevocation(entries []revocationEntry, serial, issuerDN string) bool {
 // offline store, or a lookup that failed, reports not revoked; a lookup
 // that was incomplete is not kept.
 func (s *CertificateStore) IsRevoked(akid, serial []byte, issuerDN string) (bool, error) {
+	// A closing store must not answer "not revoked" for a lookup it never
+	// ran. Mirrors matter.js
+	// packages/protocol/src/dcl/DclCertificateService.ts:706-710.
+	if s.isClosed() {
+		return false, ErrStoreClosed
+	}
 	id := hexUpper(akid)
+	// An installed set answers first, offline too; it can only add
+	// revocations. Mirrors matter.js
+	// packages/protocol/src/dcl/DclCertificateService.ts:713-724.
+	if s.revocations.installedMatch(id, canonicalSerial(hexUpper(serial)), issuerDN) {
+		return true, nil
+	}
 	if s.offline() {
 		return false, nil
 	}
@@ -591,4 +612,254 @@ func assertIssuedBy(subject, issuer *trustCert) error {
 		return rejectedBy(err, "CRL signer chain signature does not verify")
 	}
 	return nil
+}
+
+// Revocation information installed from outside the DCL.
+// Mirrors matter.js packages/protocol/src/dcl/DclCertificateService.ts:640-687
+// (installRevocations, installedRevocations) and :1767-1800
+// (parseRevocationSet).
+
+// RevocationSetEntry is DclCertificateService.RevocationSetEntry
+// (DclCertificateService.ts:2092-2104): one authority's revoked serial
+// numbers, as a revocation set states them.
+type RevocationSetEntry struct {
+	// IssuerSubjectKeyID is the key identifier of the certificate that
+	// issued the revoked ones, hex with or without colons.
+	IssuerSubjectKeyID string
+	// IssuerName is base64 of the issuer's Name DER; "" matches on the key
+	// identifier alone.
+	IssuerName string
+	// RevokedSerialNumbers are hex, with or without colons.
+	RevokedSerialNumbers []string
+}
+
+// InstalledRevocation is DclCertificateService.InstalledRevocation
+// (:2128-2132), as [CertificateStore.InstalledRevocations] reports it.
+type InstalledRevocation struct {
+	// Serials are the revoked serials as canonical uppercase hex, sorted.
+	Serials []string
+	// IssuerDN is uppercase hex of the issuer Name DER; "" when the entry
+	// named none.
+	IssuerDN string
+}
+
+// ErrInvalidRevocationSet wraps every refusal of [ParseRevocationSet] and
+// [CertificateStore.InstallRevocations] (matter.js ImplementationError).
+var ErrInvalidRevocationSet = errors.New("dcl: invalid revocation set")
+
+// ErrStoreClosed is IsRevoked's answer on a store that is closing or
+// closed — matter.js's ClosedError (DclCertificateService.ts:706-710).
+var ErrStoreClosed = errors.New("dcl: certificate store closed")
+
+func revocationSetErrorf(format string, args ...any) error {
+	return fmt.Errorf("%w: %s", ErrInvalidRevocationSet, fmt.Sprintf(format, args...))
+}
+
+// canonicalSerial is canonicalSerial (:276-288): uppercase hex without
+// separators or leading zero bytes, so a certificate's DER INTEGER content
+// (00E1…) and a set's number (E1…) agree.
+func canonicalSerial(serial string) string {
+	h := strings.ToUpper(strings.ReplaceAll(serial, ":", ""))
+	for strings.HasPrefix(h, "00") {
+		h = h[2:]
+	}
+	if h == "" {
+		return "00"
+	}
+	return h
+}
+
+// statedHex is statedHex (:60-82): a string field without colons, refused
+// unless it is a non-empty, even number of hex digits.
+func statedHex(value any, field string, index int) (string, error) {
+	str, ok := value.(string)
+	if !ok {
+		return "", revocationSetErrorf("Revocation set entry %d states %s as something other than a string", index, field)
+	}
+	stated := strings.ReplaceAll(str, ":", "")
+	if _, ok := decodeHex(stated); stated == "" || !ok {
+		return "", revocationSetErrorf("Revocation set entry %d states %s as %q, which is not an even number of hex digits", index, field, stated)
+	}
+	return stated, nil
+}
+
+// statedIssuerName is statedIssuerName and issuerDnOf (:93-127): the Name
+// DER an entry states as base64, nil when it states none or an empty one.
+func statedIssuerName(value any, present bool, index int) ([]byte, error) {
+	if !present || value == "" {
+		return nil, nil
+	}
+	str, ok := value.(string)
+	if !ok {
+		return nil, revocationSetErrorf("Revocation set entry %d states issuer_name as something other than a string", index)
+	}
+	der, err := forgivingBase64(str)
+	if err != nil {
+		return nil, revocationSetErrorf("Revocation set entry %d states an issuer_name that is not base64: %v", index, err)
+	}
+	return der, nil
+}
+
+// forgivingBase64 is atob, which Bytes.fromBase64 (packages/general/src/
+// util/Bytes.ts:115-123) decodes with: ASCII whitespace dropped, padding
+// optional.
+func forgivingBase64(s string) ([]byte, error) {
+	s = strings.Map(func(r rune) rune {
+		if strings.ContainsRune(" \t\n\f\r", r) {
+			return -1
+		}
+		return r
+	}, s)
+	if len(s)%4 == 0 {
+		s = strings.TrimSuffix(strings.TrimSuffix(s, "="), "=")
+	}
+	return base64.RawStdEncoding.DecodeString(s)
+}
+
+// InstallRevocations is installRevocations (:640-673): revocation
+// information that did not come from the DCL, trusted as it stands (no
+// signer chain, no CRL signature), held in memory for the life of the
+// store and never persisted. A listed serial is revoked; every other one
+// still goes to the DCL. Nothing is installed unless every entry reads;
+// installing a set twice changes nothing. An entry that names no issuer
+// matches on its key identifier alone.
+func (s *CertificateStore) InstallRevocations(entries []RevocationSetEntry) error {
+	type read struct {
+		akid, issuerDN string
+		serials        []string
+	}
+	reads := make([]read, 0, len(entries))
+	for i := range entries {
+		e := &entries[i]
+		akid, err := statedHex(e.IssuerSubjectKeyID, "issuerSubjectKeyId", i)
+		if err != nil {
+			return err
+		}
+		name, err := statedIssuerName(e.IssuerName, true, i)
+		if err != nil {
+			return err
+		}
+		r := read{akid: strings.ToUpper(akid), serials: make([]string, len(e.RevokedSerialNumbers))}
+		if name != nil {
+			r.issuerDN = hexUpper(name)
+		}
+		for j, serial := range e.RevokedSerialNumbers {
+			h, err := statedHex(serial, fmt.Sprintf("revokedSerialNumbers[%d]", j), i)
+			if err != nil {
+				return err
+			}
+			r.serials[j] = canonicalSerial(h)
+		}
+		reads = append(reads, r)
+	}
+	c := s.revocations
+	c.mu.Lock()
+	for _, r := range reads {
+		installed := c.installed[r.akid]
+		k := slices.IndexFunc(installed, func(e revocationEntry) bool { return e.issuerDN == r.issuerDN })
+		if k < 0 {
+			installed = append(installed, revocationEntry{serials: map[string]struct{}{}, issuerDN: r.issuerDN})
+			k = len(installed) - 1
+			c.installed[r.akid] = installed
+		}
+		for _, serial := range r.serials {
+			installed[k].serials[serial] = struct{}{}
+		}
+	}
+	authorities := len(c.installed)
+	c.mu.Unlock()
+	if len(reads) > 0 {
+		s.log.Info("dcl.revocation.installed", slog.Int("entries", len(reads)), slog.Int("authorities", authorities),
+			slog.String("message", "Installed revocation information from outside the DCL"))
+	}
+	return nil
+}
+
+// InstalledRevocations is installedRevocations (:675-687): a copy of the
+// installed revocation information by the key identifier it was stated
+// for; the store's own can only be added to, through InstallRevocations.
+func (s *CertificateStore) InstalledRevocations() map[string][]InstalledRevocation {
+	c := s.revocations
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make(map[string][]InstalledRevocation, len(c.installed))
+	for akid, entries := range c.installed {
+		list := make([]InstalledRevocation, len(entries))
+		for i, e := range entries {
+			serials := make([]string, 0, len(e.serials))
+			for serial := range e.serials {
+				serials = append(serials, serial)
+			}
+			slices.Sort(serials)
+			list[i] = InstalledRevocation{Serials: serials, IssuerDN: e.issuerDN}
+		}
+		out[akid] = list
+	}
+	return out
+}
+
+func (c *revocationCache) installedMatch(akid, serial, issuerDN string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return matchRevocation(c.installed[akid], serial, issuerDN)
+}
+
+// ParseRevocationSet is parseRevocationSet (:1767-1800): the per-issuer
+// list of revoked serial numbers connectedhomeip's
+// generate_revocation_set.py writes — that tool's format, not a DCL wire
+// format. Fields beyond the ones InstallRevocations needs are ignored.
+func ParseRevocationSet(data []byte) ([]RevocationSetEntry, error) {
+	var parsed any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return nil, revocationSetErrorf("Revocation set is not JSON: %v", err)
+	}
+	list, ok := parsed.([]any)
+	if !ok {
+		return nil, revocationSetErrorf("Revocation set must be an array of entries")
+	}
+	out := make([]RevocationSetEntry, 0, len(list))
+	for i, item := range list {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			return nil, revocationSetErrorf("Revocation set entry %d is not an object", i)
+		}
+		// statedType (:113-122).
+		if t, ok := entry["type"]; ok && t != "revocation_set" {
+			return nil, revocationSetErrorf("Revocation set entry %d states type %q rather than %q", i, jsString(t), "revocation_set")
+		}
+		akid, err := statedHex(entry["issuer_subject_key_id"], "issuer_subject_key_id", i)
+		if err != nil {
+			return nil, err
+		}
+		name, present := entry["issuer_name"]
+		if _, err := statedIssuerName(name, present, i); err != nil {
+			return nil, err
+		}
+		issuerName, _ := name.(string)
+		// statedSerials (:84-91).
+		stated, ok := entry["revoked_serial_numbers"].([]any)
+		if !ok {
+			return nil, revocationSetErrorf("Revocation set entry %d states revoked_serial_numbers as something other than a list", i)
+		}
+		serials := make([]string, len(stated))
+		for j, v := range stated {
+			if serials[j], err = statedHex(v, fmt.Sprintf("revoked_serial_numbers[%d]", j), i); err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, RevocationSetEntry{IssuerSubjectKeyID: akid, IssuerName: issuerName, RevokedSerialNumbers: serials})
+	}
+	return out, nil
+}
+
+// jsString is String(value) for a decoded JSON value.
+func jsString(v any) string {
+	if v == nil {
+		return "null"
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	b, _ := json.Marshal(v)
+	return string(b)
 }

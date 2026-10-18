@@ -80,8 +80,13 @@ func (f *fabricGroups) multicastAddress(groupID uint16) net.IP {
 
 // MulticastAddressFor returns the multicast address groupID of the fabric is
 // received on, following its policy. Mirrors matter.js
-// FabricGroups.multicastAddressFor.
+// FabricGroups.multicastAddressFor. Group id 0 is [ErrInvalidGroupID].
 func (m *Manager) MulticastAddressFor(ctx context.Context, fabricIndex uint8, groupID uint16) (net.IP, error) {
+	// Mirrors matter.js packages/protocol/src/groups/Groups.ts:98-99
+	// (GroupId.assertGroupId refuses the unspecified group id 0).
+	if groupID == 0 {
+		return nil, ErrInvalidGroupID
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	f, err := m.fabricLocked(ctx, fabricIndex)

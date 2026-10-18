@@ -106,6 +106,7 @@ var floors = []packageFloor{
 	{pkg: "github.com/SukramJ/go-fabric/controller/interaction", min: 91},
 	{pkg: "github.com/SukramJ/go-fabric/controller/handshake", min: 86},
 	{pkg: "github.com/SukramJ/go-fabric/controller/peer", min: 93},
+	{pkg: "github.com/SukramJ/go-fabric/controller/thread", min: 97},
 	{pkg: "github.com/SukramJ/go-fabric/diagevent", min: 96},
 	{pkg: "github.com/SukramJ/go-fabric/eligibility", min: 90},
 	{pkg: "github.com/SukramJ/go-fabric/device", min: 97},

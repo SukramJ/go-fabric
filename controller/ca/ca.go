@@ -170,6 +170,11 @@ type Config struct {
 	// IntermediateCA issues an ICAC that signs the NOCs (3-tier PKI). A
 	// stored CA must match it.
 	IntermediateCA bool
+	// DetectIntermediateCA lets a stored CA decide IntermediateCA: a
+	// stored ICAC is loaded and required, a stored CA without one stays
+	// 2-tier. A new CA follows IntermediateCA. It is matter.js's
+	// generateIntermediateCert left undefined (CertificateAuthority.ts:157-159).
+	DetectIntermediateCA bool
 	// Rand is the randomness of keys and signatures; nil is crypto/rand.
 	// Since Go 1.26 crypto/ecdsa ignores a caller's reader for key
 	// generation and signing (a secure source is always used; see
@@ -263,31 +268,39 @@ func New(cfg Config) (*CA, error) {
 	if cfg.Rand == nil {
 		cfg.Rand = rand.Reader
 	}
+	var st Stored
+	haveStored := false
+	if cfg.Store != nil {
+		s, ok, err := cfg.Store.Load()
+		if err != nil {
+			return nil, fmt.Errorf("ca: load: %w", err)
+		}
+		st, haveStored = s, ok && validStoredRoot(s)
+	}
+	if haveStored && cfg.DetectIntermediateCA {
+		// Mirrors matter.js packages/protocol/src/certificate/CertificateAuthority.ts:157-159
+		// (requireIcac = generateIntermediateCert ?? #isValidStoredIcacCertificate).
+		cfg.IntermediateCA = validStoredICAC(st)
+	}
 	if cfg.ICACSigner != nil && !cfg.IntermediateCA {
 		return nil, fmt.Errorf("%w: an ICACSigner needs IntermediateCA", ErrConfig)
 	}
 	c := &CA{cfg: cfg, rootCertID: RootCertID, nextID: FirstCertificateID}
-	if cfg.Store != nil {
-		st, ok, err := cfg.Store.Load()
-		if err != nil {
-			return nil, fmt.Errorf("ca: load: %w", err)
+	if haveStored {
+		if err := c.load(st); err != nil {
+			return nil, err
 		}
-		if ok && validStoredRoot(st) {
-			if err := c.load(st); err != nil {
-				return nil, err
-			}
-			if err := c.initVerifier(); err != nil {
-				return nil, err
-			}
-			if storedKeyBehindSigner(st, c) {
-				// A private key the configuration now keeps in a signer
-				// leaves the record.
-				if err := cfg.Store.Save(c.stored()); err != nil {
-					return nil, fmt.Errorf("ca: save: %w", err)
-				}
-			}
-			return c, nil
+		if err := c.initVerifier(); err != nil {
+			return nil, err
 		}
+		if storedKeyBehindSigner(st, c) {
+			// A private key the configuration now keeps in a signer
+			// leaves the record.
+			if err := cfg.Store.Save(c.stored()); err != nil {
+				return nil, fmt.Errorf("ca: save: %w", err)
+			}
+		}
+		return c, nil
 	}
 	if cfg.RootSigner != nil {
 		pub, err := P256PublicKey(cfg.RootSigner)
@@ -399,7 +412,7 @@ func (c *CA) load(s Stored) error {
 	}
 	hasICAC := validStoredICAC(s)
 	if c.cfg.IntermediateCA != hasICAC {
-		return fmt.Errorf("%w: stored credentials contain an ICAC: %v, but the configuration expects %v", ErrConfig, hasICAC, c.cfg.IntermediateCA)
+		return fmt.Errorf("%w: stored credentials contain ICAC certificate: %v, but configuration expected it to be %v", ErrConfig, hasICAC, c.cfg.IntermediateCA)
 	}
 	if hasICAC {
 		if c.cfg.ICACSigner != nil {

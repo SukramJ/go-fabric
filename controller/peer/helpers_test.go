@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -55,11 +56,16 @@ type fakeUDP struct {
 	mu  sync.Mutex
 	out []datagram
 	ch  chan datagram
+	// fail, when set, is the error of every Send, which then sends nothing.
+	fail atomic.Pointer[error]
 }
 
 func newFakeUDP() *fakeUDP { return &fakeUDP{ch: make(chan datagram, 4096)} }
 
 func (c *fakeUDP) Send(dst *net.UDPAddr, payload []byte) error {
+	if err := c.fail.Load(); err != nil {
+		return *err
+	}
 	d := datagram{to: dst, bytes: append([]byte(nil), payload...)}
 	c.mu.Lock()
 	c.out = append(c.out, d)

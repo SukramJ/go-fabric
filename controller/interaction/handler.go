@@ -6,6 +6,7 @@ package interaction
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -107,9 +108,7 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 		sub.mu.Unlock()
 		r.ResetTimer()
 	}()
-	if r.reportStarted != nil {
-		r.reportStarted(session)
-	}
+	r.announceReport(session)
 	if len(initial.Reports) == 0 && len(initial.EventReports) == 0 {
 		if sub.request.KeepaliveReceived != nil {
 			sub.request.KeepaliveReceived()
@@ -137,6 +136,23 @@ func (r *Subscriptions) handleReport(ctx context.Context, m *messenger, first *e
 		}
 		return nil
 	})
+}
+
+// announceReport runs ReportStarted; a panic in it is logged and
+// contained, so a broken observer does not abort the report being read.
+// Mirrors matter.js
+// packages/protocol/src/action/client/subscription/ClientSubscriptions.ts:156-158
+// (the Observable's error handler logs the observer's error).
+func (r *Subscriptions) announceReport(session *exchange.Session) {
+	if r.reportStarted == nil {
+		return
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			r.log.Warn("matter.controller.interaction.report_started_panic", slog.String("panic", fmt.Sprint(p)))
+		}
+	}()
+	r.reportStarted(session)
 }
 
 // beginReading tracks an in-flight report read; it fails once the

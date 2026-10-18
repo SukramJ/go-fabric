@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -62,6 +63,10 @@ type CertificateOptions struct {
 	Clock exchange.Clock
 	// Logger receives the store's log; nil discards it.
 	Logger *slog.Logger
+	// Revocations is revocation information from outside the DCL,
+	// installed before the first update as InstallRevocations does —
+	// matter.js's revocations option (DclCertificateService.ts:328-330).
+	Revocations []RevocationSetEntry
 }
 
 // CertificateMetadata is a stored certificate's record — matter.js
@@ -147,6 +152,11 @@ func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*Certif
 		s.github = newGitHubClient(opts.GitHub, opts.Client.httpClient())
 	}
 	s.revocations = newRevocationCache(s)
+	if opts.Revocations != nil {
+		if err := s.InstallRevocations(opts.Revocations); err != nil {
+			return nil, err
+		}
+	}
 	s.log.Info("dcl.certificates.init",
 		slog.Bool("offline", s.offline()), slog.Bool("test", opts.FetchTestCertificates),
 		slog.Bool("github", s.github != nil), slog.Bool("accept_test", s.AcceptsTestCertificates()))
@@ -248,33 +258,182 @@ func (s *CertificateStore) lookup(skid string) (storedCertificate, bool) {
 // PAA implements attestation.PAAStore: the certificate whose key
 // identifier is skid, test certificates considered — the validator's
 // getCertificate and getCertificateAsDer with considerTestCertificates
-// (DeviceAttestationValidator.ts:235, :269). A stored certificate that no
-// longer parses is re-fetched once (getCertificateAsDer :442-473); if that
-// fails the stored bytes are returned for the validator to reject.
+// (DeviceAttestationValidator.ts:235, :269), the self-heal of
+// [CertificateStore.CertificateDER] included.
 func (s *CertificateStore) PAA(skid []byte) (attestation.PAA, bool) {
 	id := hexUpper(skid)
-	e, ok := s.lookup(id)
-	if !ok || !s.isRelevant(e.CertificateMetadata, true) {
+	der, err := s.CertificateDER(context.Background(), id, GetCertificateOptions{ConsiderTestCertificates: &considerAll})
+	if err != nil {
 		return attestation.PAA{}, false
 	}
-	der := e.DER
-	if _, err := parseTrustStoreCertificate(der, e.kind()); err != nil {
-		s.log.Info("dcl.certificates.cached_unparseable", slog.String("skid", id), slog.String("err", err.Error()),
-			slog.String("message", "Cached certificate failed to parse; attempting one re-fetch from DCL to recover"))
-		if refetched, ok := s.tryRefetchRootCertificate(context.Background(), id, e.IsProduction); ok {
-			if _, err := parseTrustStoreCertificate(refetched, e.kind()); err == nil {
-				der = refetched
-			} else {
-				s.log.Warn("dcl.certificates.refetched_unparseable", slog.String("skid", id), slog.String("err", err.Error()))
-			}
-		}
-	}
+	e, _ := s.lookup(id)
 	return attestation.PAA{DER: der, Production: e.IsProduction, FetchedAt: e.FetchedAt}, true
 }
 
+// considerAll is the validator's considerTestCertificates: true.
+var considerAll = true
+
+// ErrCertificateNotFound is matter.js's MatterDclError "Certificate not
+// found" (DclCertificateService.ts:604-610 at 862ad75f): no certificate
+// with that key identifier, or one the trust policy filters out.
+var ErrCertificateNotFound = errors.New("dcl: certificate not found")
+
+// GetCertificateOptions is DclCertificateService.GetCertificateOptions
+// (DclCertificateService.ts:2026-2032 at 862ad75f).
+type GetCertificateOptions struct {
+	// ConsiderTestCertificates also returns test PAAs; nil is
+	// [CertificateStore.AcceptsTestCertificates].
+	ConsiderTestCertificates *bool
+}
+
+// considers is #isRelevant's considerTestCertificates — mirrors matter.js
+// packages/protocol/src/dcl/DclCertificateService.ts:387-394.
+func (s *CertificateStore) considers(o GetCertificateOptions) bool {
+	if o.ConsiderTestCertificates != nil {
+		return *o.ConsiderTestCertificates
+	}
+	return s.AcceptsTestCertificates()
+}
+
+// Certificate is a stored certificate's metadata by subject key
+// identifier — hex, colons allowed, any case — unless the trust policy
+// filters it out. Mirrors matter.js packages/protocol/src/dcl/
+// DclCertificateService.ts:400-407 (getCertificate) with :375-380
+// (#normalizeSubjectKeyId).
+func (s *CertificateStore) Certificate(skid string, o GetCertificateOptions) (CertificateMetadata, bool) {
+	e, ok := s.lookup(normalizeKeyID(skid))
+	if !ok || !s.isRelevant(e.CertificateMetadata, s.considers(o)) {
+		return CertificateMetadata{}, false
+	}
+	return e.CertificateMetadata, true
+}
+
+// storedDER is #getCertificateDer — mirrors matter.js packages/protocol/
+// src/dcl/DclCertificateService.ts:604-617.
+func (s *CertificateStore) storedDER(id string, o GetCertificateOptions) (storedCertificate, error) {
+	e, ok := s.lookup(id)
+	if !ok || !s.isRelevant(e.CertificateMetadata, s.considers(o)) {
+		return storedCertificate{}, fmt.Errorf("%w: %s", ErrCertificateNotFound, id)
+	}
+	if len(e.DER) == 0 {
+		return storedCertificate{}, fmt.Errorf("dcl: certificate data of %s not found in storage", id)
+	}
+	return e, nil
+}
+
+// CertificatePEM is the certificate as PEM text, [ErrCertificateNotFound]
+// when the store holds none the trust policy lets through. Mirrors
+// matter.js packages/protocol/src/dcl/DclCertificateService.ts:433-436
+// (getCertificateAsPem).
+func (s *CertificateStore) CertificatePEM(skid string, o GetCertificateOptions) (string, error) {
+	e, err := s.storedDER(normalizeKeyID(skid), o)
+	if err != nil {
+		return "", err
+	}
+	return pemEncode(e.DER), nil
+}
+
+// CertificateDER is the certificate's DER, [ErrCertificateNotFound] as
+// [CertificateStore.CertificatePEM]. A stored certificate that no longer
+// parses is re-fetched once from the ledger; if that fails the stored
+// bytes are returned for the caller's validation to reject. Mirrors
+// matter.js packages/protocol/src/dcl/DclCertificateService.ts:449-480
+// (getCertificateAsDer).
+func (s *CertificateStore) CertificateDER(ctx context.Context, skid string, o GetCertificateOptions) ([]byte, error) {
+	id := normalizeKeyID(skid)
+	e, err := s.storedDER(id, o)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := parseTrustStoreCertificate(e.DER, e.kind()); err != nil {
+		s.log.Info("dcl.certificates.cached_unparseable", slog.String("skid", id), slog.String("err", err.Error()),
+			slog.String("message", "Cached certificate failed to parse; attempting one re-fetch from DCL to recover"))
+		refetched, ok := s.tryRefetchRootCertificate(ctx, id, e.IsProduction, s.considers(o))
+		if !ok {
+			return e.DER, nil
+		}
+		if _, err := parseTrustStoreCertificate(refetched, e.kind()); err != nil {
+			s.log.Warn("dcl.certificates.refetched_unparseable", slog.String("skid", id), slog.String("err", err.Error()),
+				slog.String("message", "Re-fetched certificate also failed to parse"))
+			return e.DER, nil
+		}
+		return refetched, nil
+	}
+	return e.DER, nil
+}
+
+// GetOrFetchCertificateOptions is getOrFetchCertificate's options
+// (DclCertificateService.ts:749 at 862ad75f).
+type GetOrFetchCertificateOptions struct {
+	GetCertificateOptions
+	// IsProduction asks the production ledger, false the test ledger; nil
+	// is the production one.
+	IsProduction *bool
+}
+
+// GetOrFetchCertificate is a certificate's metadata, fetched from the
+// ledger's roots and stored when the store lacks it and is not offline;
+// false when neither has it, the trust policy filters it out or the ledger
+// fails. Mirrors matter.js packages/protocol/src/dcl/
+// DclCertificateService.ts:747-792 (getOrFetchCertificate).
+func (s *CertificateStore) GetOrFetchCertificate(ctx context.Context, skid string, o GetOrFetchCertificateOptions) (CertificateMetadata, bool) {
+	id := normalizeKeyID(skid)
+	if m, ok := s.Certificate(id, o.GetCertificateOptions); ok {
+		return m, true
+	}
+	if s.offline() {
+		return CertificateMetadata{}, false
+	}
+	if !s.fetchMu.TryLock() {
+		// An update is running: its outcome is the answer (:764-768 at
+		// 862ad75f).
+		s.awaitUpdate()
+		return s.Certificate(id, o.GetCertificateOptions)
+	}
+	defer s.fetchMu.Unlock()
+	isProduction := o.IsProduction == nil || *o.IsProduction
+	stored, err := s.fetchAndStoreRootCertificateBySkid(ctx, id, isProduction, false)
+	if err != nil {
+		s.log.Debug("dcl.certificates.fetch_failed", slog.String("skid", id), slog.String("err", err.Error()))
+		return CertificateMetadata{}, false
+	}
+	if !stored {
+		s.log.Debug("dcl.certificates.not_in_dcl", slog.String("skid", id), slog.Bool("production", isProduction))
+		return CertificateMetadata{}, false
+	}
+	return s.Certificate(id, o.GetCertificateOptions)
+}
+
+// DeleteCertificate removes a certificate from the store; one it does not
+// hold is no error. Mirrors matter.js packages/protocol/src/dcl/
+// DclCertificateService.ts:797-812 (deleteCertificate).
+func (s *CertificateStore) DeleteCertificate(ctx context.Context, skid string) {
+	id := normalizeKeyID(skid)
+	s.mu.Lock()
+	delete(s.index, id)
+	s.mu.Unlock()
+	s.saveIndex(ctx)
+	s.log.Debug("dcl.certificates.deleted", slog.String("skid", id))
+}
+
+// pemEncode is Pem.encode for a certificate: base64 in lines of 64, no
+// trailing newline. Mirrors matter.js packages/general/src/crypto/
+// Pem.ts:18-33.
+func pemEncode(der []byte) string {
+	b := base64.StdEncoding.EncodeToString(der)
+	var lines []string
+	for len(b) > 64 {
+		lines = append(lines, b[:64])
+		b = b[64:]
+	}
+	lines = append(lines, b)
+	return "-----BEGIN CERTIFICATE-----\n" + strings.Join(lines, "\n") + "\n-----END CERTIFICATE-----"
+}
+
 // tryRefetchRootCertificate is #tryRefetchRootCertificate (:523-555):
-// best effort, never an error.
-func (s *CertificateStore) tryRefetchRootCertificate(ctx context.Context, id string, isProduction bool) ([]byte, bool) {
+// best effort, never an error; the re-fetched entry is filtered as the
+// lookup was (:556-559 at 862ad75f).
+func (s *CertificateStore) tryRefetchRootCertificate(ctx context.Context, id string, isProduction, considerTest bool) ([]byte, bool) {
 	if s.offline() {
 		return nil, false
 	}
@@ -289,7 +448,7 @@ func (s *CertificateStore) tryRefetchRootCertificate(ctx context.Context, id str
 		return nil, false
 	}
 	e, ok := s.lookup(id)
-	if !ok || !s.isRelevant(e.CertificateMetadata, true) || len(e.DER) == 0 {
+	if !ok || !s.isRelevant(e.CertificateMetadata, considerTest) || len(e.DER) == 0 {
 		return nil, false
 	}
 	return e.DER, true

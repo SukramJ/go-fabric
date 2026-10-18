@@ -43,3 +43,24 @@ func (h Header) MarshalPacket() ([]byte, error) {
 	}
 	return h.Marshal(), nil
 }
+
+// ErrEncodeSecuredExtensions is returned for a protocol header that carries
+// Secured Extensions: matter.js encodes none (MessageCodec.ts:430-432,
+// encodePayload: "Security extensions not supported when encoding a
+// payload").
+var ErrEncodeSecuredExtensions = errors.New("message: security extensions not supported when encoding a payload")
+
+// MarshalPayload encodes the protocol header of an outbound message,
+// refusing what matter.js refuses to encode — the payload-side twin of
+// [Header.MarshalPacket]. Mirrors matter.js
+// packages/protocol/src/codec/MessageCodec.ts:429-437 (encodePayload): a
+// header with Secured Extensions is not encoded
+// ([ErrEncodeSecuredExtensions]); otherwise the bytes are
+// [ProtocolHeader.Marshal]'s. [ProtocolHeader.Marshal] stays the unchecked
+// encoder the decode round-trip tests use.
+func (h ProtocolHeader) MarshalPayload() ([]byte, error) {
+	if h.HasSecuredExt || len(h.SecuredExtension) > 0 {
+		return nil, ErrEncodeSecuredExtensions
+	}
+	return h.Marshal(), nil
+}

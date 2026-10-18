@@ -55,7 +55,7 @@
   },
   {
     "file": "bdx/session.go",
-    "line": 139,
+    "line": 144,
     "citation": "bdx-session-initiator.ts:155-178",
     "resolved": "packages/protocol/src/bdx/bdx-session-initiator.ts",
     "identifier": "buildInitMessage",
@@ -145,7 +145,16 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1296,
+    "line": 1112,
+    "citation": "packages/node/src/node/integration/ProtocolService.ts:280-287",
+    "resolved": "packages/node/src/node/integration/ProtocolService.ts",
+    "identifier": "addCluster",
+    "nearest": 252,
+    "occurrences": 3
+  },
+  {
+    "file": "bridge/bridge.go",
+    "line": 1333,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",
     "identifier": "initiateForceClose",
@@ -154,7 +163,7 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1611,
+    "line": 1648,
     "citation": "Session.ts:248",
     "resolved": "packages/protocol/src/session/Session.ts",
     "identifier": "initiateClose",
@@ -622,7 +631,7 @@
   },
   {
     "file": "cluster/core/general_commissioning.go",
-    "line": 951,
+    "line": 958,
     "citation": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts:67-82",
     "resolved": "packages/node/src/behaviors/general-commissioning/GeneralCommissioningServer.ts",
     "identifier": "CommissioningComplete",
@@ -1173,7 +1182,7 @@
   },
   {
     "file": "controller/ca/ca.go",
-    "line": 591,
+    "line": 604,
     "citation": "kinds/definitions/operational.ts:109-110",
     "resolved": "packages/protocol/src/certificate/kinds/definitions/operational.ts",
     "at": "0ceb202d",
@@ -1327,7 +1336,7 @@
   },
   {
     "file": "controller/client/network.go",
-    "line": 185,
+    "line": 187,
     "citation": "NetworkClient.ts:215-238",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "#recomputeConnectionState",
@@ -1354,7 +1363,7 @@
   },
   {
     "file": "controller/client/node.go",
-    "line": 254,
+    "line": 306,
     "citation": "NetworkClient.ts:60-102",
     "resolved": "packages/node/src/behavior/system/network/NetworkClient.ts",
     "identifier": "ClientNode",
@@ -1435,7 +1444,7 @@
   },
   {
     "file": "controller/client/structure.go",
-    "line": 181,
+    "line": 209,
     "citation": "ClientStructure.ts:1674-1692",
     "resolved": "packages/node/src/node/client/ClientStructure.ts",
     "identifier": "AttributeList",
@@ -1444,7 +1453,7 @@
   },
   {
     "file": "controller/client/structure.go",
-    "line": 195,
+    "line": 223,
     "citation": "ClientStructure.ts:1601-1605",
     "resolved": "packages/node/src/node/client/ClientStructure.ts",
     "identifier": "AttributeUpdates",
@@ -1489,7 +1498,7 @@
   },
   {
     "file": "controller/exchange/exchange.go",
-    "line": 52,
+    "line": 53,
     "citation": "MessageExchange.ts:1272-1273",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "suppressPeerLoss",
@@ -1552,7 +1561,7 @@
   },
   {
     "file": "controller/interaction/handler.go",
-    "line": 49,
+    "line": 50,
     "citation": "InteractionMessenger.ts:938-972",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "readDataReports",
@@ -1606,7 +1615,7 @@
   },
   {
     "file": "controller/interaction/invoke.go",
-    "line": 66,
+    "line": 71,
     "citation": "InteractionMessenger.ts:1082-1105",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "StatusResponse",
@@ -1668,15 +1677,6 @@
     "occurrences": 1
   },
   {
-    "file": "controller/interaction/report.go",
-    "line": 449,
-    "citation": "InteractionMessenger.ts:914-931",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "DataReport",
-    "nearest": 974,
-    "occurrences": 12
-  },
-  {
     "file": "controller/interaction/report_internal_test.go",
     "line": 159,
     "citation": "InteractionMessenger.ts:998-1050",
@@ -1723,7 +1723,7 @@
   },
   {
     "file": "controller/interaction/subscribe.go",
-    "line": 112,
+    "line": 118,
     "citation": "InteractionMessenger.ts:938-972",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "SubscribeResponse",
@@ -1732,7 +1732,7 @@
   },
   {
     "file": "controller/interaction/subscribe.go",
-    "line": 224,
+    "line": 230,
     "citation": "InteractionMessenger.ts:1052-1055",
     "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
     "identifier": "#encodeReadingRequest",
@@ -1795,7 +1795,7 @@
   },
   {
     "file": "controller/peer/connection.go",
-    "line": 786,
+    "line": 822,
     "citation": "PeerConnection.ts:674-696",
     "resolved": "packages/protocol/src/peer/PeerConnection.ts",
     "identifier": "handleConnectionError",

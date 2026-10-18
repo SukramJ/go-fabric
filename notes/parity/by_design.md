@@ -3232,6 +3232,9 @@ through opaque. Report BA §3.
 
 By design until a consumer reads more of it (the Thread border-router
 client is roadmap milestone 5).
+Since phase 16 (brief BH) `controller/thread` decodes the whole dataset;
+the commissioner still reads the name only (`controller/commissioner/network.go:86`,
+see the findings entry on `threadNetworkNameOf`).
 
 ### BD-Controller-BluezWithoutNobleRetries — `ble/bluez` ports the sequence, not noble's recovery
 
@@ -3296,3 +3299,144 @@ Report BC (phase 13b, 2026-10-18).
 
 By design. The same selection as matter.js, placed where BlueZ lets it
 run; the kernel filter would never see a Matter advertisement.
+
+### BD-Matter-SessionParams-ZeroIsUnset — a zero session parameter means "not stated"
+
+`secure/sessionparams/sessionparams.go:44-48`: a zero field is omitted on
+the wire and read as the spec default. matter.js checks a stated value at
+run time — a zero, fractional or untyped maxPathsPerInvoke takes the
+fallback (`session/SessionParameters.ts:65-80`), a local one is refused
+(`session/SessionManager.ts:368-374`). Those inputs cannot reach the Go
+type, so the cases that feed them are `missing` with this entry as the
+reason. Report BH (phase 16, 2026-10-18).
+
+By design. Go's zero value is the absence matter.js spells `undefined`;
+the one real gap (an oversized wire value masked) is in the findings
+register.
+
+### BD-Matter-MonotonicClockTests — session and peer-loss time runs on the monotonic clock
+
+matter.js stamps a session's creation and a peer-loss `asOf` on
+`Time.nowUs`, "not a wall-clock time" (`session/Session.ts:58-59`,
+`session/SessionManager.ts:627-628`, `:696`), and its tests step the wall
+clock apart from it to prove that. Go's `time.Time` comparisons use the
+monotonic reading, and `clocktest.Fake` has one reading, so a wall-clock
+step is not expressible; the step cases of SessionManagerTest,
+ExchangeManagerTest and BleScannerTest are `missing` with this entry as
+the reason. Report BH (phase 16, 2026-10-18).
+
+By design. The guarantee matter.js tests for is the one Go's clock gives;
+a second reading in `clocktest` would test the fake, not the module.
+
+### BD-Matter-EventNumberEpoch — the event-number epoch is chip's 0x10000
+
+`im/eventlog.go:318-324`: an epoch of 0 selects chip's
+`CHIP_DEVICE_CONFIG_EVENT_ID_COUNTER_EPOCH` and the ceiling is persisted
+inclusive. matter.js reserves in blocks of 1 000 by default, counts a block
+size of 0 as 1 (`events/BaseEventStore.ts:43-51`) and stores the exclusive
+next number (`:153-162`). Neither reuses a number across a restart; the
+gap a restart leaves differs. Report BH (phase 16, 2026-10-18).
+
+By design. The chip-tool families judge the numbering a device shows after
+a restart against chip's epoch; the register keeps the block-size cases
+as `missing` under this entry.
+
+### BD-Matter-AttestationDERAsReceived — attestation certificates are kept as received
+
+DAC, PAI and PAA are parsed with `crypto/x509` from the DER as received
+and never re-encoded; matter.js decodes them into its own structure, reads
+the issuer DN for the Mvid/Mpid fallback (`certificate/kinds/Certificate.ts:379-392`)
+and re-encodes. The recode and round-trip cases of CertificatesTest are
+`missing` under this entry. Report BH (phase 16, 2026-10-18).
+
+By design. A re-encoded attestation certificate has no consumer here; the
+vendor-id read happens on the parsed name. The operational-certificate
+side is different: there the TBS is rebuilt, and the X.520 gap is in the
+findings register.
+
+### BD-Matter-NoLegacyGroupCounters — no legacy group counter layout to migrate
+
+matter.js reads a legacy group data counter on first start
+(`groups/MessagingState.ts:41-60`) and migrates it; `groups/counter.go`
+starts from its own layout, which this module has always written. Report
+BH (phase 16, 2026-10-18).
+
+By design. There is no earlier go-fabric layout; the migration cases are
+`missing` under this entry.
+
+### BD-Matter-BDXInitiatorOverExchange — the BDX initiator runs on a caller's Exchange
+
+`bdx.Send` and `bdx.Receive` take the `Exchange` the caller opened
+(`bdx/doc.go`); matter.js's `bdx-session-initiator.ts` opens the session
+itself. The initiator cases that assert session ownership are `missing`
+under this entry. Report BH (phase 16, 2026-10-18).
+
+By design. The session stays with the caller, as every other controller
+interaction in this module; the transfer itself is the same state machine.
+
+### BD-Matter-ThreadDelayTimerUint32 — DELAY_TIMER is a uint32
+
+`controller/thread` decodes the MeshCoP DELAY_TIMER as a uint32;
+matter.js's `(value[0] << 24) | …` makes it a signed int32
+(`thread/OperationalDataset.ts:167-171`), so a value above 2^31 reads
+negative there. The wire bytes are identical both ways. Report BH (phase
+16, 2026-10-18).
+
+By design. A JavaScript shift artefact, not a protocol rule.
+
+### BD-Matter-Controller-ConnectionTimeoutNoInstant — a connection timeout has no `Instant`
+
+`peer.ConnectOptions.ConnectionTimeout`: 0 is the default, a negative
+value is forever. matter.js maps `Infinity` to no timeout and anything at
+or below 0 to `Instant` (`peer/Peer.ts:466-475`); the one case that
+asserts an instant timeout is `missing`. Report BH (phase 16, 2026-10-18).
+
+By design. Go's zero value is the unset marker; an instant timeout is a
+cancelled context.
+
+### BD-Matter-Controller-SingleCommandBuilders — numeric, single-command request builders
+
+`controller/interaction` builds a Read, Write or Invoke from numeric
+paths, one command per invoke. matter.js's request builders
+(`action/request/Read.ts`, `Write.ts`, `Invoke.ts`) also accept element
+names and a zero-argument form, and batch commands. The name and
+zero-argument cases are `missing` under this entry; batching is in the
+findings register. Report BH (phase 16, 2026-10-18).
+
+By design. The host resolves names through `cluster/spec`; the wire
+request is the same.
+
+### BD-Matter-Controller-CallbacksNotObservables — one callback where matter.js has an observable
+
+`SubscriptionsConfig.ReportStarted` and `SubscribeRequest.ActiveChanged`
+are single callbacks, and a report reaches `Updated` as one value per kind
+(`controller/interaction/report.go`, the assembler of
+`action/client/InputChunk.ts:174-245`); matter.js hands out observables
+(`action/client/subscription/ClientSubscriptions.ts`, `reportStarted`) and
+a chunk stream. Extends `BD-Matter-Controller-MergedReports`. Report BH
+(phase 16, 2026-10-18).
+
+By design. Go idiom; a second observer wraps the callback.
+
+### BD-Matter-DclOta-HostStore — the DCL OTA image store is the host's
+
+matter.js `dcl/DclOtaUpdateService.ts` keeps its own image store on blob
+storage "ota" (file names, find and delete, forced download, migration);
+`dcl.OTAVersions` answers the ledger questions only, and the catalogue
+stays with the host behind `cluster/core.OTAImageSource`, as
+`BD-Matter-OTAProvider-HostPorts` decided. The 45 store cases of
+DclOtaUpdateServiceTest are `missing` under this entry. Report BH (phase
+16, 2026-10-18).
+
+By design. One image store per host, not one per library.
+
+### BD-Matter-DCL-ProductionSeed — the certificate snapshot seeds production entries only
+
+The embedded DCL snapshot is a reviewed production PAA set layered by
+`attestation.Trust`; matter.js's `dcl/DclCertificateService.ts` seeds test
+certificates into the online store as well and fetches them on demand.
+The seed-kind cases are `missing` under this entry. Report BH (phase 16,
+2026-10-18).
+
+By design. Test roots enter through `attestation.Trust`'s own option
+(`BD-Matter-DCL-OptIn`), never through the snapshot a release ships.

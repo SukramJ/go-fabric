@@ -92,7 +92,7 @@ func (s *Site) AddDevice(topo Topology) *Device {
 		s.tb.Fatal("fabrictest: Topology.Bridged with a Snapshotter: the node has no Aggregator to add them to")
 	}
 	d := &Device{site: s, index: s.index(), topo: topo}
-	path := filepath.Join(s.tb.TempDir(), "device"+strconv.Itoa(d.index)+".db")
+	path := filepath.Join(s.dir, "device"+strconv.Itoa(d.index)+".db")
 	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		s.tb.Fatalf("fabrictest: device store: %v", err)

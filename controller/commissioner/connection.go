@@ -45,9 +45,13 @@ type establishFunc func(ctx context.Context, addr *net.UDPAddr, c *candidate, on
 
 // connectionConfig is CommissioningConnection.Options.
 type connectionConfig struct {
-	devices   []*candidate
-	timeout   time.Duration
-	delay     time.Duration
+	devices []*candidate
+	timeout time.Duration
+	// delay is delayBeforeNextAddress: nil is DelayBeforeNextAddress, and
+	// zero launches every address at once. Mirrors matter.js
+	// packages/protocol/src/peer/CommissioningConnection.ts:64 at 862ad75f
+	// (options.delayBeforeNextAddress ?? DELAY_BEFORE_NEXT_ADDRESS).
+	delay     *time.Duration
 	establish establishFunc
 	clock     exchange.Clock
 	log       *slog.Logger
@@ -80,6 +84,7 @@ type deviceAbort struct {
 // connection is one run of CommissioningConnection.
 type connection struct {
 	cfg      connectionConfig
+	delay    time.Duration
 	abortCtx context.Context
 	abort    context.CancelCauseFunc
 	changed  chan struct{}
@@ -122,15 +127,16 @@ type connection struct {
 //     the budget, a PairRetransmissionLimitReachedError, else that error
 //     around the last retryable one.
 func connectPASE(ctx context.Context, cfg connectionConfig) (connectionResult, error) {
-	if cfg.delay == 0 {
-		cfg.delay = DelayBeforeNextAddress
+	delay := DelayBeforeNextAddress
+	if cfg.delay != nil {
+		delay = *cfg.delay
 	}
 	abortCtx, abort := context.WithCancelCause(ctx)
 	defer abort(nil)
 	budget := cfg.clock.AfterFunc(cfg.timeout, func() { abort(errBudget) })
 	defer budget.Stop()
 	c := &connection{
-		cfg: cfg, abortCtx: abortCtx, abort: abort,
+		cfg: cfg, delay: delay, abortCtx: abortCtx, abort: abort,
 		changed: make(chan struct{}, 1),
 		devices: make(map[string]*deviceAbort),
 	}
@@ -228,7 +234,7 @@ func (c *connection) schedule() {
 		next := c.queue[0]
 		c.queue = c.queue[1:]
 		if c.latest != nil && !c.latest.settled {
-			if remaining := c.cfg.delay - c.cfg.clock.Now().Sub(c.latest.startedAt); remaining > 0 {
+			if remaining := c.delay - c.cfg.clock.Now().Sub(c.latest.startedAt); remaining > 0 {
 				c.queue = append([]queued{next}, c.queue...)
 				c.timer = c.cfg.clock.AfterFunc(remaining, func() {
 					c.mu.Lock()

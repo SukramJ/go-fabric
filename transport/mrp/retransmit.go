@@ -56,7 +56,15 @@ func BackoffDuration(base time.Duration, transmission int, rand01 func() float64
 	exp := max(transmission-1, 0)
 	factor := math.Pow(MRPBackoffThreshold, float64(exp))
 	jitter := 1 + rand01()*MRPBackoffJitterFactor
-	return time.Duration(float64(base) * MRPBackoffMargin * factor * jitter)
+	// matter.js computes the backoff in JavaScript numbers, which grow
+	// without wrapping (MRP.ts:183-190); a Go Duration saturates instead
+	// of overflowing to a negative wait from transmission 52 on, which made
+	// an unbounded attempt retransmit in a tight loop.
+	d := float64(base) * MRPBackoffMargin * factor * jitter
+	if d >= math.MaxInt64 {
+		return time.Duration(math.MaxInt64)
+	}
+	return time.Duration(d)
 }
 
 // ErrMaxRetransmissionsReached reports a reliable message whose retry

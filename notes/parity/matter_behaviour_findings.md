@@ -408,10 +408,6 @@ Controller side:
   exists here (`im/read.go:888` `DeniedEventPathStatuses`, UnsupportedAccess).
   Seen by brief BG's agent in a scratch test (report BG, left out). (Phase 16,
   with the `packages/protocol/test` port.)
-- **DNS-SD TXT keys are case-sensitive.** `controller/discovery/name.go:154-162`
-  `Parameters` is a plain map; matter.js #4741 lower-cases keys, first of
-  case-differing duplicates wins (`DnssdParameters.ts:15-49`, RFC 6763 § 6.4).
-  (Phase 16, DiscoveryDataTest port.)
 - **Known answers are sent with their original TTL.**
   `controller/discovery/solicitor.go:368-375`; matter.js #4756 sends the
   remaining TTL rounded up and omits a record past half its TTL
@@ -429,6 +425,110 @@ Controller side:
 - **A status the peer sent is not told from a local one.**
   `controller/interaction/interaction.go:56` `StatusError`; matter.js #4750
   `ResultStatus.received` (`ResultStatus.ts:1-35`). Low. (Milestone 5.)
+
+Found by the phase-16 port of `packages/protocol/test` (brief BH, PR #164,
+2026-10-18). Each closes with the fix named, or with the milestone in
+brackets; the feature-sized ones carry an `until` in the test register.
+
+Device side:
+
+- **Standard X.520 DN attributes are dropped from operational certificates.**
+  `secure/mattercert/decode.go:34-39` and `tbs_der.go:121` `buildDN` carry
+  the Matter DN tags 17-22 only; a subject or issuer that also carries
+  commonName, organizationName or countryName (TLV tags 1-16 and 129-143,
+  matter.js `certificate/kinds/definitions/operational.ts:69-110`, order
+  preserving) rebuilds a different TBS and fails ECDSA verification — the
+  Google set of `packages/protocol/test/certificate/TestCertificates.ts`
+  (RCAC self-signature, ICAC, NOC). Interop-relevant: such a controller's
+  chain is refused in CASE. **Fix before `v0.8.0`**, in `secure/mattercert`
+  (Fable). (Brief BH, CertificatesTest port: 27 cases missing.)
+- **An empty ICAC is dropped from the CASE signed data.**
+  `secure/sigma/sigma.go:811-822` `signedDataBytes` omits tag 2 when the
+  ICAC is empty; matter.js re-encodes the field as received
+  (`session/case/CaseServer.ts:294-299`, `TlvSignedData.encode` with
+  `responderIcac`), so a peer that sends an empty ICAC (`300200`) signs a
+  TBS this side does not rebuild. (With the X.520 fix.)
+- **IPK rotation through KeySetWrite does not reach CASE.**
+  `cluster/core/group_key_management.go:705` writes key set 0 into the
+  groups store like any other set, `store/identity.go` holds one IPK and
+  `groups/manager.go:271` skips key set 0, so CASE keeps the first IPK;
+  matter.js selects the epoch key per Core § 4.14.2.6.1
+  (`groups/KeySets.ts:113-120`). (Brief BH, KeySetsTest port; milestone 3.)
+- **The group sender keeps its node id after UpdateNOC.**
+  `groups/sender.go:208,225` captures the fabric's node id when the sender
+  is created; matter.js reads it per message from the current fabric
+  (`session/GroupSession.ts:184-189`, `:204-206`). (Brief BH, two agents.)
+- **A PASE session closed by the peer does not expire the fail-safe.**
+  `ExpireFailSafe` is reached from RevokeCommissioning only
+  (`bridge/commissioning_window.go:724-727`); matter.js expires the
+  fail-safe when the PASE session that armed it is closed by the peer
+  before CommissioningComplete (`common/FailsafeContext.ts:77-86`).
+  Crosses `secure/channel` and `bridge`. (Milestone 3.)
+- **The operational advertisement carries the module's SII/SAI defaults,
+  not the node's session parameters.** `mdns/service.go:293-302`; matter.js
+  reads the session manager's parameters, or an ICD provider's
+  (`protocol/DeviceAdvertiser.ts:363-364`). (Milestone 5 phase 23, with the
+  ICD server.)
+- **Session parameters: a local MaxPathsPerInvoke of 0 is not refused and
+  an oversized wire value is masked.** `secure/sessionparams/sessionparams.go:182`
+  keeps the low 16 bits; matter.js refuses the local value
+  (`session/SessionManager.ts:368-374`) and takes the fallback for anything
+  a uint16 cannot carry (`session/SessionParameters.ts:65-80`). Low.
+- **The device CSR subject is CN=CSR.**
+  `cluster/core/operational_credentials.go:1481-1483` uses commonName,
+  `commissioning/csr.go:84` an empty subject; matter.js uses
+  organizationName "CSR" (`certificate/kinds/Certificate.ts:264-267`). A
+  NOCSR wire difference every controller so far accepted. Low.
+
+Controller side:
+
+- **A NOC's issuer is not chosen by authorityKeyIdentifier.**
+  `secure/mattercert/verify.go:265` `VerifyAndExtractPubKey` verifies
+  against the ICAC whenever one is given, so a root-signed NOC presented
+  with an ICAC is refused; matter.js picks root or ICA by the AKID
+  (`certificate/kinds/Noc.ts:170-186`). The root's fabric id is not checked
+  against the NOC's either (`Noc.ts:119-125`). (With the X.520 fix.)
+- **Network profiles.** One network, MRP margins 0
+  (`controller/peer/doc.go:15-17`, `controller/exchange/mrp.go:62-65`);
+  matter.js `peer/NetworkProfile.ts:78-245` with the margins of
+  `protocol/MRP.ts:162-190`. Register `until M5 phase 25`
+  (NetworkProfileTest; 32 cases with BH-1's MRP cases). (Milestone 5 phase 25.)
+- **`ClientInteraction.close`, in-flight tracking, abandoned subscriptions,
+  multi-command invoke and write chunking.** `controller/interaction` has
+  no Close, no in-flight set, no abandonment and one command per invoke
+  (`action/client/ClientInteraction.ts:264-297`, `:520-640`); `Write`
+  refuses an oversized write with `ErrRequestTooLarge` where matter.js
+  chunks (`interaction/InteractionMessenger.ts:1269-1460`). `AckWaitAbort`
+  exists to build the abandonment on. Register `until M5 phase 25`
+  (ClientInteractionSubscribeTest). (Milestone 5 phase 25.)
+- **No `_matterd._udp` commissioner advertisement**
+  (`packages/protocol/test/mdns/MdnsTest.ts:546-713`). (Milestone 5 phase 25.)
+- **`ForgetCommissioned` is not wired into the commissioner.**
+  `controller/commissioner/commissioner.go:516-517` says matter.js has no
+  such call; its BLE scanner has one, run after `executeCommissioning`
+  (`peer/ControllerCommissioner.ts:325-340`, `:721-723`). `ble.Scanner.ForgetCommissioned`
+  exists since brief BH. (Milestone 5 phase 25.)
+- **`threadNetworkNameOf` does not reject an undecodable dataset.**
+  `controller/commissioner/network.go:86` walks the TLVs itself; matter.js
+  decodes the whole dataset and falls back to the supplied name when the
+  decode fails (`peer/ControllerCommissioningFlow.ts:264-288`,
+  `resolveThreadNetworkName`). Ten lines onto `controller/thread`. (Milestone 5 phase 25.)
+- **A whitespace-only `issuer_name` in an installed revocation set matches
+  every issuer.** `controller/dcl/revocation.go:688-701` decodes it to no
+  issuer and `:166-173` then matches any; matter.js keeps the empty hex
+  string, which matches nothing (`dcl/DclCertificateService.ts:97-109`,
+  `:125-127`). Revokes more, never less. Low.
+- **The close cause of a PASE session that lost the race.**
+  `controller/commissioner/connection.go:252` `launch`; matter.js closes it
+  with the composed signal's reason (`peer/CommissioningConnection.ts:140-151`).
+  Low, no deterministic test.
+- **DCL vendor information service** (`dcl/DclVendorInfoService.ts`, 497
+  lines; 41 cases): register `until M6 phase 27`. (Milestone 6.)
+- **PQC Phase 1 and controller NOC rotation.** An ML-DSA certificate is
+  refused by the 600-byte limit (`secure/attestation/files.go`; matter.js
+  allows 10 240 bytes for a PQC chain, `certificate/kinds/common.ts:19`) and
+  never classified; the controller never rotates its NOC key
+  (`fabric/FabricAuthority.ts:88-99`, `:181-186`). (Milestone 6.)
 
 ## Application cluster servers — open items
 

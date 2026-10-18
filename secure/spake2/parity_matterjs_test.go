@@ -10,6 +10,8 @@
 // Test-vector provenance:
 //   - ietf_draft01_*   — Spake2pTest.ts:14-61 (IETF draft-bar-cfrg-spake2plus-01)
 //   - pase_*           — PasePairingTest.ts:56-159
+//   - TestPasePairingSpake2Process — PasePairingTest.ts:263-315 at 862ad75f
+//     ("do special successful pase process"), inline
 //
 // If any assertion fails that is a REAL drift against matter.js — stop,
 // report, do not paper over.
@@ -18,6 +20,7 @@ package spake2
 
 import (
 	"crypto/ecdsa"
+	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
@@ -366,4 +369,50 @@ type badDigit struct{ c rune }
 
 func (e *badDigit) Error() string {
 	return "not a digit: " + string(e.c)
+}
+
+// TestPasePairingSpake2Process ports "do special successful pase process"
+// (PasePairingTest.ts:263-315) through the Verifier: w0 and L from the
+// PBKDF, the context hash of the request and response payloads, the fixed
+// random y, then Y and the verifier hBX (Go's Pake2 cB) for the peer's X.
+// Not parallel: it injects y through randomScalarFn.
+func TestPasePairingSpake2Process(t *testing.T) {
+	t.Run("do special successful pase process", func(t *testing.T) {
+		salt := mustHex(t, "2bb41e9d75f30c2e6b2f059410c56965717cc2bf14ed6c73a169435326a89652")
+		vc, err := NewVerifierContext(20202021, salt, 1000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := hex.EncodeToString(scalarTo32Bytes(vc.W0)); got != "501f85a83d1da77983ff6f0c1f742d6d98f6d0ab0ba740a38032200099c8981f" {
+			t.Fatalf("w0 = %s", got)
+		}
+		l, err := vc.L.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := hex.EncodeToString(l); got != "0463e7f225296bcd9b100e605d636a3d2c84524665cbd9b8b75e737d04bca1241486b37bdba74284de76f2db9df271d2c5bda21b8e26bc0943dcbf0542665c3aa8" {
+			t.Fatalf("L = %s", got)
+		}
+		request := mustHex(t, "15300120913cc0622eca85f8d4c132c89663c5d7afa780667be930e5c11bec865479c6172502e68b240300280418")
+		response := mustHex(t, "15300120913cc0622eca85f8d4c132c89663c5d7afa780667be930e5c11bec865479c6173002205682c0732b37c045ebeb416904c187a58b5341088e0172123becfb855f94a72c2503844235042501e8033002202bb41e9d75f30c2e6b2f059410c56965717cc2bf14ed6c73a169435326a896521818")
+		h := sha256.New()
+		h.Write([]byte(MatterContext)) // SPAKE_CONTEXT
+		h.Write(request)
+		h.Write(response)
+		y := mustBigInt(t, "fee695b4972a4f620951010c87390d3fe1313efce399fbc2c9c7cdc04d22b4c6")
+		prev := randomScalarFn
+		randomScalarFn = func() (*big.Int, error) { return new(big.Int).Set(y), nil }
+		t.Cleanup(func() { randomScalarFn = prev })
+
+		out, err := NewVerifier(vc, nil, nil, h.Sum(nil)).ProcessPake1(mustHex(t, "04db4f7c7f4dbf478440753d578825da01ae177c89dad6637f9c91ef86880e8d67571b2fdc0e0564985cd6b2cbbee82ab5655b0fbae7254ff4b13f88a30076612c"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := hex.EncodeToString(out.Y); got != "04cd3a2937c598cfd46e197e786e4194e65164ed1a0bf23f224947b4f4c140f72b4742792b86ae6c427ae9d4a6d345cd6e1f9ae0f950d5399d38c8031d7975ca82" {
+			t.Fatalf("Y = %s", got)
+		}
+		if got := hex.EncodeToString(out.CB); got != "52b9b5cb79dafd150b8729102ede22795d0f522ad884d29452818d8c54ca7508" {
+			t.Fatalf("hBX = %s", got)
+		}
+	})
 }

@@ -4,6 +4,7 @@
 package exchange
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -101,6 +102,13 @@ type SendOptions struct {
 	InitialRetransmissionTime time.Duration
 	// SuppressPeerLoss waives the peer-loss report for this send.
 	SuppressPeerLoss bool
+	// AckWaitAbort, once closed, ends only the waits for the
+	// acknowledgement and for retransmissions: the message is still
+	// transmitted once, even when it closed before, and Send then returns
+	// nil; the message stays unacknowledged for [Exchange.Close]. ctx —
+	// matter.js's abort — still stops the transmission. Mirrors matter.js
+	// ExchangeSendOptions.ackWaitAbort (MessageExchange.ts:125-130).
+	AckWaitAbort <-chan struct{}
 }
 
 // ReceiveOptions configures [Exchange.Next] — matter.js
@@ -166,7 +174,10 @@ type Exchange struct {
 	ackTimer        Timer
 	retransTimer    Timer
 	retransInterval time.Duration
+	retransArmed    bool     // the retransmission timer runs (no transmission in flight)
+	ackWaitEnded    *pending // the pending message whose ack wait AckWaitAbort ended
 	retransCount    int
+	lastTransmitAt  time.Time // the last transmission of a non-ack message
 	sendOpts        SendOptions
 	used            bool
 	closing         bool
@@ -336,9 +347,15 @@ func (x *Exchange) Send(ctx context.Context, opcode uint8, payload []byte, opts 
 	x.sendOpts = opts
 	x.retransCount = 0
 	p, err := x.transmitLocked(opcode, payload, nil)
+	if err == nil && p != nil && isClosed(opts.AckWaitAbort) {
+		// The ack wait was ended before the transmission completed
+		// (MessageExchange.ts:794-797).
+		x.endAckWaitLocked(p)
+		p = nil
+	}
 	x.mu.Unlock()
 	if err == nil && p != nil {
-		err = x.awaitAck(ctx, p, opts.ExpectAckOnly)
+		err = x.awaitAck(ctx, p, opts.ExpectAckOnly, opts.AckWaitAbort)
 	}
 	if err != nil && x.reportsPeerLoss(opts.SuppressPeerLoss) && (errors.Is(err, ErrTransient) || errors.Is(err, ErrNetwork)) {
 		x.m.exchangePeerLost(x, err)
@@ -420,6 +437,9 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 	if err := x.m.conn.Send(x.dest(), datagram); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrNetwork, err)
 	}
+	if !isAck {
+		x.lastTransmitAt = x.m.clock.Now() // MessageExchange.ts:799-801
+	}
 	if p != nil {
 		x.retransCount = 0
 		x.armRetransLocked(p, x.backoffLocked(0), x.expectedProcessingTimeLocked())
@@ -435,8 +455,15 @@ func (x *Exchange) expectedProcessingTimeLocked() time.Duration {
 }
 
 // awaitAck waits for the pending message's outcome.
-func (x *Exchange) awaitAck(ctx context.Context, p *pending, expectAckOnly bool) error {
+func (x *Exchange) awaitAck(ctx context.Context, p *pending, expectAckOnly bool, ackWait <-chan struct{}) error {
 	select {
+	case <-ackWait:
+		// MessageExchange.ts:812-825: the wait ends, the retransmissions
+		// stop, the send resolves.
+		x.mu.Lock()
+		x.endAckWaitLocked(p)
+		x.mu.Unlock()
+		return nil
 	case r := <-p.done:
 		if r.err != nil {
 			return r.err
@@ -453,10 +480,44 @@ func (x *Exchange) awaitAck(ctx context.Context, p *pending, expectAckOnly bool)
 	}
 }
 
+// endAckWaitLocked ends the ack wait of p: it stays pending for Close but
+// is never transmitted again. Mirrors matter.js MessageExchange.ts:987-997
+// (#endAckWait, #retransmits).
+func (x *Exchange) endAckWaitLocked(p *pending) {
+	x.ackWaitEnded = p
+	x.stopRetransTimerLocked()
+}
+
+// retransmitsLocked reports whether p is still retransmitted: pending and
+// its ack wait not ended (MessageExchange.ts:995-997).
+func (x *Exchange) retransmitsLocked(p *pending) bool {
+	return x.sentToAck == p && x.ackWaitEnded != p
+}
+
+// isClosed reports whether c is closed; a nil channel never is.
+func isClosed(c <-chan struct{}) bool {
+	select {
+	case <-c:
+		return true
+	default:
+		return false
+	}
+}
+
+// bdxProtocolID is the Bulk Data Exchange protocol id (Core Spec §11.21).
+const bdxProtocolID uint16 = 0x0002
+
+// bdxMaxRetransmissionInterval is the retransmission interval that still
+// fits every attempt inside the 30 s a BDX peer waits for the next BDX
+// message, less 100 ms for the final attempt to arrive. Mirrors matter.js
+// MessageExchange.ts:63-77 (BDX_MAX_RETRANSMISSION_INTERVAL).
+const bdxMaxRetransmissionInterval = 30*time.Second/(MaxTransmissions-1) - 100*time.Millisecond
+
 // backoffLocked is the scheduled wait after transmission n: the MRP
 // interval for the peer's state, plus InitialRetransmissionTime, capped
-// at max(MaxRetransmissionTime, peer idle interval) — matter.js
-// MessageExchange.ts:1203-1220 (#backOffFor) without the BDX cap.
+// at max(MaxRetransmissionTime, peer idle interval), and on a BDX exchange
+// at [bdxMaxRetransmissionInterval] even below the idle interval — matter.js
+// MessageExchange.ts:1234-1251 (#backOffFor).
 func (x *Exchange) backoffLocked(n int) time.Duration {
 	iv, active := x.session.timing()
 	d := RetransmissionInterval(n, iv, active, x.m.rand())
@@ -464,15 +525,20 @@ func (x *Exchange) backoffLocked(n int) time.Duration {
 	if x.sendOpts.MaxRetransmissionTime > 0 {
 		d = min(d, max(x.sendOpts.MaxRetransmissionTime, iv.Idle))
 	}
+	if x.protocol == bdxProtocolID {
+		d = min(d, bdxMaxRetransmissionInterval)
+	}
 	return d
 }
 
 func (x *Exchange) armRetransLocked(p *pending, d, expectedProcessingTime time.Duration) {
 	x.retransInterval = d
+	x.retransArmed = true
 	x.retransTimer = x.m.clock.AfterFunc(d, func() { x.retransmit(p, expectedProcessingTime) })
 }
 
 func (x *Exchange) stopRetransTimerLocked() {
+	x.retransArmed = false
 	if x.retransTimer != nil {
 		x.retransTimer.Stop()
 	}
@@ -490,13 +556,14 @@ func (x *Exchange) stopAckTimerLocked() {
 // last backoff for the peer's own retransmissions, then fails the send.
 // Mirrors matter.js MessageExchange.ts:879-978 (#retransmitMessage,
 // #initializeResubmission). expectedProcessingTime 0 is the final wait's
-// expiry.
-func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) {
+// expiry. It reports whether it transmitted (MessageExchange.ts:893-897).
+func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) bool {
 	x.mu.Lock()
-	if x.sentToAck != p {
+	if !x.retransmitsLocked(p) {
 		x.mu.Unlock()
-		return
+		return false
 	}
+	x.retransArmed = false
 	x.retransCount++
 	limit := x.sendOpts.MaxRetransmissions
 	if limit == 0 {
@@ -510,7 +577,7 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 				x.retransCount--
 				x.armRetransLocked(p, final, 0)
 				x.mu.Unlock()
-				return
+				return false
 			}
 		}
 		x.receivedToAck = nil
@@ -520,9 +587,10 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 		if closeNow {
 			x.finalClose(nil)
 		}
-		return
+		return false
 	}
 	x.notifySentLocked()
+	x.lastTransmitAt = x.m.clock.Now()
 	backoff := x.backoffLocked(x.retransCount)
 	count := x.retransCount
 	onSend := x.onSend
@@ -535,10 +603,42 @@ func (x *Exchange) retransmit(p *pending, expectedProcessingTime time.Duration) 
 	}
 	x.m.log.Debug("matter.controller.retransmit", slog.Int("exchange", int(x.id)), slog.Int("retransmission", count), slog.Duration("backoff", backoff))
 	x.mu.Lock()
-	if x.sentToAck == p {
+	if x.retransmitsLocked(p) {
 		x.armRetransLocked(p, backoff, expectedProcessingTime)
 	}
 	x.mu.Unlock()
+	return true
+}
+
+// kickLocked decides whether a duplicate of the message our pending one
+// answers proves the peer awake and our reply lost, so the pending message
+// is retransmitted now instead of on its schedule; it returns the message
+// to retransmit with its timer stopped, or nil. Only on BDX, never on the
+// last transmission slot, never faster than the peer's active interval and
+// only when the scheduled attempt lies beyond the peer's active threshold.
+// Mirrors matter.js MessageExchange.ts:564-617
+// (#kickRetransmissionForLiveness) without a network-profile delay.
+func (x *Exchange) kickLocked(dup *Message) *pending {
+	if x.protocol != bdxProtocolID || x.closed || (x.initiator && x.closing) {
+		return nil
+	}
+	p := x.sentToAck
+	if p == nil || !x.retransArmed || !p.hasAck || dup.Counter != p.ackCounter {
+		return nil
+	}
+	if limit := x.sendOpts.MaxRetransmissions; limit >= 0 && x.retransCount+1 >= cmp.Or(limit, MaxTransmissions) {
+		return nil
+	}
+	iv, _ := x.session.timing()
+	elapsed := x.m.clock.Now().Sub(x.lastTransmitAt)
+	if !x.lastTransmitAt.IsZero() && elapsed < iv.Active {
+		return nil
+	}
+	if remaining := max(0, x.retransInterval-elapsed); remaining <= iv.ActiveThreshold {
+		return nil
+	}
+	x.stopRetransTimerLocked()
+	return p
 }
 
 // onMessageReceived takes a message routed to the exchange. Mirrors
@@ -566,10 +666,7 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		x.mu.Lock()
 	}
 	if duplicate {
-		if msg.RequiresAck {
-			_, _ = x.transmitLocked(mrp.StandaloneAckOpcode, nil, &msg.Counter)
-		}
-		x.mu.Unlock()
+		x.onDuplicateLocked(msg)
 		return
 	}
 	if p := x.sentToAck; p != nil && p.hasAck && msg.Counter == p.ackCounter {
@@ -620,6 +717,24 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 	select {
 	case x.signal <- struct{}{}:
 	default:
+	}
+	x.mu.Unlock()
+}
+
+// onDuplicateLocked takes a duplicate with x.mu held and releases it: a
+// retransmission of our pending message acknowledges the duplicate, so it
+// stands in for the standalone ack (MessageExchange.ts:485-495).
+func (x *Exchange) onDuplicateLocked(msg *Message) {
+	if msg.RequiresAck {
+		if p := x.kickLocked(msg); p != nil {
+			ept := x.expectedProcessingTimeLocked()
+			x.mu.Unlock()
+			if x.retransmit(p, ept) {
+				return
+			}
+			x.mu.Lock()
+		}
+		_, _ = x.transmitLocked(mrp.StandaloneAckOpcode, nil, &msg.Counter)
 	}
 	x.mu.Unlock()
 }

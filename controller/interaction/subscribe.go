@@ -91,6 +91,12 @@ type SubscribeRequest struct {
 	// filters; the interval bounds stay Subscribe's and the subscription
 	// keeps its callbacks.
 	RefreshRequest func(SubscribeRequest) SubscribeRequest
+	// MaxEventNumberChanged, for a sustained subscription, is called with
+	// the new highest event number once a report raised it, after Updated
+	// returned and before the report counts as delivered; an error is
+	// logged and the subscription continues. matter.js
+	// maxEventNumberChanged (SustainedSubscription.ts:354-364).
+	MaxEventNumberChanged func(number uint64) error
 }
 
 // Interval returns d as a subscription interval bound.

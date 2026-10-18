@@ -57,6 +57,10 @@ type Options struct {
 type Site struct {
 	tb   testing.TB
 	opts Options
+	// dir holds the devices' stores. It is created before Close is
+	// registered, so the test's cleanup removes it only after Close has
+	// stopped every node (cleanups run last-registered first).
+	dir  string
 	clk  clock.Clock
 	fake *clocktest.Fake
 	net  *Network
@@ -89,6 +93,7 @@ func NewSite(tb testing.TB, opts Options) *Site {
 	if !opts.Loopback {
 		s.net = newNetwork(s.clk, opts.Net)
 	}
+	s.dir = tb.TempDir()
 	tb.Cleanup(s.Close)
 	return s
 }

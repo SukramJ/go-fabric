@@ -4,16 +4,20 @@
 package ble
 
 // A port of matter.js packages/protocol/test/common/BleScannerTest.ts at
-// 0ceb202d: the parser vectors (SERVICE_DATA_A/B, :12-13) and the cases
-// of the record store and of the discoveries this scanner implements —
-// deduplication and aging, reachability, discoveries for one identifier,
-// a scan that cannot start, close. Each case names its matter.js title.
-// MockTime is fakeClock; "settleDiscovery" is waiting for the waiter.
+// 862ad75f: the parser vectors (SERVICE_DATA_A/B, :12-13) and the cases
+// of the record store and of the discoveries — deduplication and aging,
+// forgetCommissionedDevice, reachability, overlapping discoveries,
+// discoveries for one identifier, close. Each case names its matter.js
+// title. MockTime is fakeClock; "settleDiscovery" is waiting for the
+// waiter; a callback that throws is one that panics.
 
 import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"runtime"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -37,14 +41,20 @@ type fakeClock = clocktest.Fake
 
 func newFakeClock() *fakeClock { return clocktest.New(time.Unix(1_000_000, 0)) }
 
-// mockClient is MockOneShotBleScannerClient: no listening time.
+// mockClient is MockOneShotBleScannerClient (BleScannerTest.ts:16-108):
+// it records each scan call, can hold a start or a stop in flight, and
+// reports no listening time; with a meter it is MockBleScannerClient's
+// radio.
 type mockClient struct {
 	mu        sync.Mutex
 	cb        func(Peripheral, []byte)
 	scanning  bool
-	starts    int
+	calls     []string
 	startErr  error
 	stopErr   error
+	startGate chan struct{}
+	stopGate  chan struct{}
+	meter     *ListeningMeter
 	connectFn func(Peripheral) (Connection, error)
 }
 
@@ -56,19 +66,32 @@ func (m *mockClient) SetDiscoveryCallback(f func(Peripheral, []byte)) {
 
 func (m *mockClient) StartScanning(context.Context) error {
 	m.mu.Lock()
+	m.calls = append(m.calls, "start")
+	gate := m.startGate
+	m.mu.Unlock()
+	if gate != nil {
+		<-gate
+	}
+	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.starts++
 	if m.startErr != nil {
 		return m.startErr
 	}
-	m.scanning = true
+	m.listenLocked(true)
 	return nil
 }
 
 func (m *mockClient) StopScanning(context.Context) error {
 	m.mu.Lock()
+	m.calls = append(m.calls, "stop")
+	gate := m.stopGate
+	m.mu.Unlock()
+	if gate != nil {
+		<-gate
+	}
+	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.scanning = false
+	m.listenLocked(false)
 	return m.stopErr
 }
 
@@ -77,6 +100,76 @@ func (m *mockClient) Connect(_ context.Context, p Peripheral) (Connection, error
 		return m.connectFn(p)
 	}
 	return nil, errors.New("no connection")
+}
+
+// listenLocked is startListening / stopListening: the radio's own state.
+func (m *mockClient) listenLocked(on bool) {
+	m.scanning = on
+	if m.meter == nil {
+		return
+	}
+	if on {
+		m.meter.Start()
+	} else {
+		m.meter.Stop()
+	}
+}
+
+// stopListening is the radio stopping on its own (BleScannerTest.ts:89-93).
+func (m *mockClient) stopListening() {
+	m.mu.Lock()
+	m.listenLocked(false)
+	m.mu.Unlock()
+}
+
+func (m *mockClient) setStartErr(err error) {
+	m.mu.Lock()
+	m.startErr = err
+	m.mu.Unlock()
+}
+
+func (m *mockClient) setStopErr(err error) {
+	m.mu.Lock()
+	m.stopErr = err
+	m.mu.Unlock()
+}
+
+// holdStart / releaseStart and holdStop / releaseStop leave the next
+// call in flight (BleScannerTest.ts:51-75).
+func (m *mockClient) holdStart() {
+	m.mu.Lock()
+	m.startGate = make(chan struct{})
+	m.mu.Unlock()
+}
+
+func (m *mockClient) releaseStart() {
+	m.mu.Lock()
+	if m.startGate != nil {
+		close(m.startGate)
+		m.startGate = nil
+	}
+	m.mu.Unlock()
+}
+
+func (m *mockClient) holdStop() {
+	m.mu.Lock()
+	m.stopGate = make(chan struct{})
+	m.mu.Unlock()
+}
+
+func (m *mockClient) releaseStop() {
+	m.mu.Lock()
+	if m.stopGate != nil {
+		close(m.stopGate)
+		m.stopGate = nil
+	}
+	m.mu.Unlock()
+}
+
+func (m *mockClient) scanCalls() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.calls)
 }
 
 func (m *mockClient) isScanning() bool {
@@ -93,45 +186,12 @@ func (m *mockClient) discover(address string, data []byte) {
 }
 
 // listeningClient is MockBleScannerClient: it reports the time its radio
-// scanned (BleListeningClock).
+// scanned (BleListeningClock, here [ListeningMeter]).
 type listeningClient struct {
 	mockClient
-	clock   *fakeClock
-	total   time.Duration
-	started time.Time
 }
 
-func (l *listeningClient) StartScanning(ctx context.Context) error {
-	if err := l.mockClient.StartScanning(ctx); err != nil {
-		return err
-	}
-	l.mu.Lock()
-	if l.started.IsZero() {
-		l.started = l.clock.Now()
-	}
-	l.mu.Unlock()
-	return nil
-}
-
-func (l *listeningClient) StopScanning(ctx context.Context) error {
-	l.mu.Lock()
-	if !l.started.IsZero() {
-		l.total += l.clock.Now().Sub(l.started)
-		l.started = time.Time{}
-	}
-	l.mu.Unlock()
-	return l.mockClient.StopScanning(ctx)
-}
-
-func (l *listeningClient) ListeningTime() time.Duration {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	t := l.total
-	if !l.started.IsZero() {
-		t += l.clock.Now().Sub(l.started)
-	}
-	return t
-}
+func (l *listeningClient) ListeningTime() time.Duration { return l.meter.Total() }
 
 // proxyClient is MockProxyingBleScannerClient.
 type proxyClient struct {
@@ -151,7 +211,9 @@ func (p *proxyClient) setReachable(address string, ok bool) {
 	p.mu.Unlock()
 }
 
-func newListening(clock *fakeClock) *listeningClient { return &listeningClient{clock: clock} }
+func newListening(clock *fakeClock) *listeningClient {
+	return &listeningClient{mockClient{meter: NewListeningMeter(clock)}}
+}
 
 func (s *Scanner) waiterCount() int {
 	s.mu.Lock()
@@ -162,12 +224,48 @@ func (s *Scanner) waiterCount() int {
 // settle waits until n discoveries wait for an advertisement.
 func settle(t *testing.T, s *Scanner, n int) {
 	t.Helper()
+	eventually(t, s, func() bool { return s.waiterCount() >= n }, "discoveries waiting")
+}
+
+// yield lets the scanner's goroutines run: the fake clock's Yield.
+func yield(s *Scanner) {
+	if f, ok := s.clock.(*clocktest.Fake); ok {
+		f.Yield()
+		return
+	}
+	runtime.Gosched()
+}
+
+// eventually yields until cond holds, failing after 5 s of real time.
+func eventually(t *testing.T, s *Scanner, cond func() bool, what string) {
+	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
-	for s.waiterCount() < n {
+	for !cond() {
 		if time.Now().After(deadline) {
-			t.Fatalf("%d of %d discoveries waiting", s.waiterCount(), n)
+			t.Fatalf("timed out waiting for %s", what)
 		}
-		time.Sleep(time.Millisecond)
+		yield(s)
+	}
+}
+
+// armed waits until the fake clock has at least n timers armed, so an
+// Advance reaches a timer a goroutine is about to arm.
+func armed(t *testing.T, s *Scanner, clock *fakeClock, n int) {
+	t.Helper()
+	eventually(t, s, func() bool { return clock.Pending() >= n }, "armed timers")
+}
+
+// recv receives from ch, failing after 5 s of real time: a discovery
+// that should settle without virtual time passing.
+func recv[T any](t *testing.T, ch <-chan T) T {
+	t.Helper()
+	select {
+	case v := <-ch:
+		return v
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out")
+		var zero T
+		return zero
 	}
 }
 
@@ -388,7 +486,7 @@ func TestBleScannerOneShotRecordDoesNotAgeWhileScanning(t *testing.T) {
 // --- reachability ---
 
 func newProxy(clock *fakeClock) *proxyClient {
-	return &proxyClient{listeningClient: listeningClient{clock: clock}, unreachable: map[string]bool{}}
+	return &proxyClient{listeningClient: listeningClient{mockClient{meter: NewListeningMeter(clock)}}, unreachable: map[string]bool{}}
 }
 
 func TestBleScannerReachability(t *testing.T) {
@@ -614,7 +712,7 @@ func TestBleScannerCancelEndsEveryDiscoveryForIdentifier(t *testing.T) {
 func TestBleScannerFailsDiscoveriesWhenScanCannotStart(t *testing.T) {
 	clock := newFakeClock()
 	c := newListening(clock)
-	c.startErr = errors.New("start failed")
+	c.setStartErr(errors.New("start failed"))
 	s := NewScanner(c, ScannerOptions{Clock: clock})
 	for _, id := range []discovery.Identifier{discovery.ByLongDiscriminator(1737), discovery.ByLongDiscriminator(1000)} {
 		if _, err := s.Find(context.Background(), id, 10*time.Second, false); err == nil || err.Error() != "start failed" {
@@ -622,9 +720,7 @@ func TestBleScannerFailsDiscoveriesWhenScanCannotStart(t *testing.T) {
 		}
 	}
 	// A later discovery scans again once the radio starts.
-	c.mu.Lock()
-	c.startErr = nil
-	c.mu.Unlock()
+	c.setStartErr(nil)
 	res := make(chan []Device, 1)
 	go func() {
 		d, _ := s.Find(context.Background(), discovery.ByLongDiscriminator(1737), 10*time.Second, false)
@@ -640,7 +736,7 @@ func TestBleScannerFailsDiscoveriesWhenScanCannotStart(t *testing.T) {
 func TestBleScannerCloseSettlesContinuousDiscovery(t *testing.T) {
 	clock := newFakeClock()
 	c := newListening(clock)
-	c.stopErr = errors.New("stop failed")
+	c.setStopErr(errors.New("stop failed"))
 	s := NewScanner(c, ScannerOptions{Clock: clock})
 	res := make(chan []Device, 1)
 	go func() {
@@ -652,8 +748,10 @@ func TestBleScannerCloseSettlesContinuousDiscovery(t *testing.T) {
 		t.Fatal("the stop failure was not reported")
 	}
 	want(t, <-res)
-	if _, err := s.Find(context.Background(), discovery.ByLongDiscriminator(1737), time.Second, false); !errors.Is(err, ErrScannerClosed) {
-		t.Fatalf("Find after Close: %v", err)
+	// A discovery after close returns at once, without an error
+	// (BleScannerTest.ts:981-999).
+	if d, err := s.Find(context.Background(), discovery.ByLongDiscriminator(1737), time.Second, false); err != nil || len(d) != 0 {
+		t.Fatalf("Find after Close: %v, %v", d, err)
 	}
 }
 
@@ -666,4 +764,699 @@ func TestBleScannerIgnoresNonMatterServiceData(t *testing.T) {
 	if cd := d.Commissionable(); cd.InstanceID != addrA || cd.D != 1737 || cd.CM != 1 || cd.VP == nil || *cd.VP != "4476+32769" {
 		t.Fatalf("Commissionable %+v", cd)
 	}
+}
+
+// --- the cases ported at 862ad75f, one test per describe group ---
+
+// collector gathers the addresses a continuous discovery's callback
+// receives.
+type collector struct {
+	mu    sync.Mutex
+	addrs []string
+}
+
+func (c *collector) add(d Device) {
+	c.mu.Lock()
+	c.addrs = append(c.addrs, d.Peripheral.Address)
+	c.mu.Unlock()
+}
+
+func (c *collector) get() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.addrs)
+}
+
+type findResult struct {
+	devices []Device
+	err     error
+}
+
+func goFind(ctx context.Context, s *Scanner, id discovery.Identifier, timeout time.Duration, ignoreExisting bool) <-chan findResult {
+	ch := make(chan findResult, 1)
+	go func() {
+		d, err := s.Find(ctx, id, timeout, ignoreExisting)
+		ch <- findResult{d, err}
+	}()
+	return ch
+}
+
+func goFindContinuously(ctx context.Context, s *Scanner, id discovery.Identifier, cb func(Device), timeout time.Duration) <-chan findResult {
+	if cb == nil {
+		cb = func(Device) {}
+	}
+	ch := make(chan findResult, 1)
+	go func() {
+		d, err := s.FindContinuously(ctx, id, cb, timeout)
+		ch <- findResult{d, err}
+	}()
+	return ch
+}
+
+func wantCalls(t *testing.T, c *mockClient, calls ...string) {
+	t.Helper()
+	if got := c.scanCalls(); !slices.Equal(got, calls) {
+		t.Fatalf("scan calls %v, want %v", got, calls)
+	}
+}
+
+func wantAddrs(t *testing.T, got []string, addrs ...string) {
+	t.Helper()
+	if !slices.Equal(got, addrs) {
+		t.Fatalf("candidates %v, want %v", got, addrs)
+	}
+}
+
+var bg = context.Background()
+
+// TestBleScannerDeduplicationAndAging covers the rest of
+// "service-data-based deduplication and aging" (BleScannerTest.ts:147-485).
+func TestBleScannerDeduplicationAndAging(t *testing.T) {
+	sd6 := discovery.ByShortDiscriminator(6)
+	t.Run("keeps offering a peripheral while the radio does not scan, though we asked it to", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newListening(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		stop := startScan(t, s)
+		c.discover(addrA, serviceDataA)
+		c.stopListening() // the adapter powers off under the scan
+		clock.Advance(3600 * time.Second)
+		want(t, s.Discovered(sd6), addrA)
+		stop()
+	})
+	t.Run("keeps offering a peripheral that has not advertised while nothing scans", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newListening(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		stop := startScan(t, s)
+		c.discover(addrA, serviceDataA)
+		stop()
+		clock.Advance(3600 * time.Second)
+		want(t, s.Discovered(sd6), addrA)
+	})
+	t.Run("does not hand a discovery a peripheral that stopped advertising while an earlier scan ran", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newListening(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		stop := startScan(t, s)
+		c.discover(addrA, serviceDataA)
+		clock.Advance(61 * time.Second)
+		stop()
+		var got collector
+		res := goFindContinuously(bg, s, sd6, got.add, 0)
+		settle(t, s, 1)
+		wantAddrs(t, got.get())
+		_ = s.Close(bg)
+		recv(t, res)
+	})
+	t.Run("still resolves a stale peripheral for a channel open", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newListening(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		stop := startScan(t, s)
+		c.discover(addrA, serviceDataA)
+		clock.Advance(61 * time.Second)
+		want(t, s.Discovered(sd6))
+		if _, err := s.Device(addrA); err != nil {
+			t.Fatal(err)
+		}
+		stop()
+	})
+	t.Run("stops offering a peripheral that goes stale while a discovery runs", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newListening(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		var got collector
+		res := goFindContinuously(bg, s, sd6, got.add, 0)
+		settle(t, s, 1)
+		c.discover(addrA, serviceDataA)
+		settle(t, s, 1)
+		wantAddrs(t, got.get(), addrA)
+		clock.Advance(61 * time.Second)
+		want(t, s.Discovered(sd6))
+		_ = s.Close(bg)
+		recv(t, res)
+	})
+	t.Run("ages a peripheral of a client that reports no listening time from its report after the last scan", func(t *testing.T) {
+		clock := newFakeClock()
+		c := &mockClient{}
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		startScan(t, s)()
+		clock.Advance(10 * time.Minute)
+		c.discover(addrA, serviceDataA)
+		clock.Advance(15 * time.Minute)
+		want(t, s.Discovered(sd6), addrA)
+		clock.Advance(time.Second)
+		want(t, s.Discovered(sd6))
+	})
+	t.Run("ends the scan of a discovery whose callback throws", func(t *testing.T) {
+		clock := newFakeClock()
+		c := &mockClient{}
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		c.discover(addrA, serviceDataA)
+		recovered := make(chan any, 1)
+		go func() {
+			defer func() { recovered <- recover() }()
+			_, _ = s.FindContinuously(bg, sd6, func(Device) { panic("callback failed") }, 0)
+		}()
+		if r := recv(t, recovered); r != "callback failed" {
+			t.Fatalf("recovered %v", r)
+		}
+		wantCalls(t, c, "start", "stop")
+		if c.isScanning() {
+			t.Fatal("still scanning")
+		}
+		c.discover(addrB, serviceDataB)
+		clock.Advance(16 * time.Minute)
+		want(t, s.Discovered(discovery.ByShortDiscriminator(3)))
+	})
+	t.Run("keeps a peripheral of a client that reports no listening time while its scan is still starting", func(t *testing.T) {
+		clock := newFakeClock()
+		c := &mockClient{}
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		c.discover(addrA, serviceDataA)
+		clock.Advance(15 * time.Minute)
+		c.holdStart()
+		res := goFindContinuously(bg, s, discovery.ByProduct(1), nil, 0)
+		eventually(t, s, func() bool { return len(c.scanCalls()) == 1 }, "the start")
+		clock.Advance(5 * time.Second)
+		want(t, s.Discovered(sd6), addrA)
+		c.releaseStart()
+		settle(t, s, 1)
+		s.Cancel(discovery.ByProduct(1))
+		recv(t, res)
+	})
+	t.Run("forgets an aged-out peripheral when another one advertises", func(t *testing.T) {
+		clock := newFakeClock()
+		c := &mockClient{}
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		c.discover(addrA, serviceDataA)
+		clock.Advance(16 * time.Minute)
+		c.discover(addrB, serviceDataB)
+		if _, err := s.Device(addrA); !errors.Is(err, ErrNoDevice) {
+			t.Fatalf("Device(A): %v", err)
+		}
+		if _, err := s.Device(addrB); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+// TestBleScannerForgetCommissionedDevice covers "forgetCommissionedDevice"
+// (BleScannerTest.ts:487-580). matter.js passes ServerAddress values and
+// skips those of another transport; ForgetCommissioned takes the BLE
+// peripheral addresses alone, so a UDP address is no entry.
+func TestBleScannerForgetCommissionedDevice(t *testing.T) {
+	d1737, d1000 := discovery.ByLongDiscriminator(1737), discovery.ByLongDiscriminator(1000)
+	noDevice := func(t *testing.T, s *Scanner, addr string) {
+		t.Helper()
+		if _, err := s.Device(addr); !errors.Is(err, ErrNoDevice) || !strings.Contains(err.Error(), "no device found") {
+			t.Fatalf("Device(%s): %v", addr, err)
+		}
+	}
+	t.Run("keeps offering another device advertising identical service data", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newListening(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		c.discover(addrA, serviceDataA)
+		clock.Advance(10 * time.Second)
+		c.discover(addrB, serviceDataA)
+		s.ForgetCommissioned([]string{addrB}, nil)
+		want(t, s.Discovered(d1737), addrA)
+	})
+	t.Run("ignores addresses of another transport", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		s.ForgetCommissioned(nil, nil) // { type: "udp", ip: "fe80::1", port: 5540 }
+		want(t, s.Discovered(d1737), addrA)
+	})
+	t.Run("stops offering a peripheral that was commissioned", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		c.discover(addrB, serviceDataB)
+		s.ForgetCommissioned([]string{addrA}, nil)
+		want(t, s.Discovered(d1737))
+		noDevice(t, s, addrA)
+		want(t, s.Discovered(d1000), addrB)
+	})
+	t.Run("offers a forgotten peripheral again once it advertises again", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		s.ForgetCommissioned([]string{addrA}, nil)
+		c.discover(addrA, serviceDataA)
+		want(t, s.Discovered(d1737), addrA)
+	})
+	t.Run("forgets the BLE record of a device commissioned over another transport", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		c.discover(addrB, serviceDataB)
+		s.ForgetCommissioned(nil, &CommissionedIdentity{D: 1737, VP: "4476+32769"})
+		noDevice(t, s, addrA)
+		want(t, s.Discovered(d1000), addrB)
+	})
+	t.Run("matches an identity that names only the vendor", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		s.ForgetCommissioned(nil, &CommissionedIdentity{D: 1737, VP: "4476"})
+		noDevice(t, s, addrA)
+	})
+	t.Run("keeps a record whose vendor or product differs from the identity", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		for _, vp := range []string{"4477+32769", "4476+32770", "4477"} {
+			s.ForgetCommissioned(nil, &CommissionedIdentity{D: 1737, VP: vp})
+		}
+		if _, err := s.Device(addrA); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+// TestBleScannerReachabilityCases covers the rest of "reachability"
+// (BleScannerTest.ts:582-771).
+func TestBleScannerReachabilityCases(t *testing.T) {
+	d1737 := discovery.ByLongDiscriminator(1737)
+	t.Run("refuses to hand out a peripheral the transport can no longer reach", func(t *testing.T) {
+		c := newProxy(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		c.setReachable(addrA, false)
+		if _, err := s.Device(addrA); !errors.Is(err, ErrNoDevice) || !strings.Contains(err.Error(), "is currently not reachable") {
+			t.Fatalf("Device: %v", err)
+		}
+	})
+	t.Run("offers a peripheral again once the transport reaches it again", func(t *testing.T) {
+		c := newProxy(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		c.setReachable(addrA, false)
+		want(t, s.Discovered(d1737))
+		c.setReachable(addrA, true)
+		want(t, s.Discovered(d1737), addrA)
+		if _, err := s.Device(addrA); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("ends a one-shot discovery as soon as a reachable peripheral advertises", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newProxy(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		res := goFind(bg, s, d1737, 10*time.Second, false)
+		settle(t, s, 1)
+		c.discover(addrA, serviceDataA)
+		want(t, recv(t, res).devices, addrA)
+	})
+	t.Run("purges a stale cached peripheral when a discovery asks to ignore existing records", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newListening(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		stop := startScan(t, s)
+		c.discover(addrA, serviceDataA)
+		clock.Advance(61 * time.Second)
+		stop()
+		res := goFind(bg, s, d1737, 10*time.Second, true)
+		settle(t, s, 1)
+		armed(t, s, clock, 1)
+		clock.Advance(11 * time.Second)
+		want(t, recv(t, res).devices)
+		if _, err := s.Device(addrA); err == nil {
+			t.Fatal("the stale record is still stored")
+		}
+	})
+	t.Run("hands a running discovery a peripheral the transport reaches again", func(t *testing.T) {
+		c := newProxy(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		var got collector
+		res := goFindContinuously(bg, s, d1737, got.add, 0)
+		settle(t, s, 1)
+		c.setReachable(addrA, false)
+		c.discover(addrA, serviceDataA)
+		yield(s)
+		wantAddrs(t, got.get())
+		c.setReachable(addrA, true)
+		c.discover(addrA, serviceDataA)
+		settle(t, s, 1)
+		wantAddrs(t, got.get(), addrA)
+		_ = s.Close(bg)
+		recv(t, res)
+	})
+	t.Run("hands a discovery a peripheral that became unreachable before the discovery started", func(t *testing.T) {
+		c := newProxy(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		c.setReachable(addrA, false)
+		var got collector
+		res := goFindContinuously(bg, s, d1737, got.add, 0)
+		settle(t, s, 1)
+		wantAddrs(t, got.get())
+		c.setReachable(addrA, true)
+		c.discover(addrA, serviceDataA)
+		settle(t, s, 1)
+		wantAddrs(t, got.get(), addrA)
+		_ = s.Close(bg)
+		recv(t, res)
+	})
+	t.Run("offers a peripheral once however often it advertises", func(t *testing.T) {
+		c := newProxy(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		var got collector
+		res := goFindContinuously(bg, s, d1737, got.add, 0)
+		settle(t, s, 1)
+		c.discover(addrA, serviceDataA)
+		settle(t, s, 1)
+		c.discover(addrA, serviceDataA)
+		settle(t, s, 1)
+		wantAddrs(t, got.get(), addrA)
+		_ = s.Close(bg)
+		recv(t, res)
+	})
+	t.Run("keeps offering peripherals for a client that states no reachability", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.discover(addrA, serviceDataA)
+		want(t, s.Discovered(d1737), addrA)
+	})
+}
+
+// TestBleScannerOverlapping covers the rest of "overlapping discoveries"
+// (BleScannerTest.ts:798-1177).
+func TestBleScannerOverlapping(t *testing.T) {
+	d1737, sd6, sd7 := discovery.ByLongDiscriminator(1737), discovery.ByShortDiscriminator(6), discovery.ByShortDiscriminator(7)
+	t.Run("scans again for a later discovery after a scan could not start", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.setStartErr(errors.New("start failed"))
+		if _, err := s.Find(bg, d1737, 10*time.Second, false); err == nil || err.Error() != "start failed" {
+			t.Fatalf("Find: %v", err)
+		}
+		c.setStartErr(nil)
+		res := goFind(bg, s, d1737, 10*time.Second, false)
+		settle(t, s, 1)
+		if !c.isScanning() {
+			t.Fatal("not scanning")
+		}
+		c.discover(addrA, serviceDataA)
+		want(t, recv(t, res).devices, addrA)
+		// The failed start left the radio in an unknown state, so it is stopped at once.
+		wantCalls(t, &c.mockClient, "start", "stop", "start", "stop")
+		if c.isScanning() {
+			t.Fatal("still scanning")
+		}
+	})
+	t.Run("stops the scan once a one-shot discovery found its device", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		res := goFind(bg, s, d1737, 10*time.Second, false)
+		settle(t, s, 1)
+		c.discover(addrA, serviceDataA)
+		want(t, recv(t, res).devices, addrA)
+		if c.isScanning() {
+			t.Fatal("still scanning")
+		}
+	})
+	t.Run("hands a one-shot discovery an advertisement that arrived while its scan started", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.holdStart()
+		res := goFind(bg, s, d1737, 10*time.Second, false)
+		eventually(t, s, func() bool { return len(c.scanCalls()) == 1 }, "the start")
+		c.discover(addrA, serviceDataA)
+		c.releaseStart()
+		// No virtual time passes, so the discovery does not wait out its timeout.
+		want(t, recv(t, res).devices, addrA)
+	})
+	t.Run("fails a discovery whose scan does not start in time and serves the next one", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newListening(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		c.holdStart()
+		stuck := goFind(bg, s, d1737, 60*time.Second, false)
+		eventually(t, s, func() bool { return len(c.scanCalls()) == 1 }, "the start")
+		armed(t, s, clock, 1)
+		clock.Advance(11 * time.Second)
+		if r := recv(t, stuck); !errors.Is(r.err, ErrScanTransitionTimeout) {
+			t.Fatalf("stuck discovery: %v", r.err)
+		}
+		c.releaseStart()
+		res := goFind(bg, s, d1737, 10*time.Second, false)
+		settle(t, s, 1)
+		c.discover(addrA, serviceDataA)
+		want(t, recv(t, res).devices, addrA)
+	})
+	t.Run("fails a discovery that still runs when restarting its scan fails as another ends", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		ctx, end := context.WithCancel(bg)
+		defer end()
+		ended := goFindContinuously(ctx, s, sd6, nil, 0)
+		remaining := goFindContinuously(bg, s, sd7, nil, 0)
+		settle(t, s, 2)
+		c.setStartErr(errors.New("restart failed"))
+		end()
+		// The restart is the remaining discovery's concern, so the ending one ends normally.
+		if r := recv(t, ended); r.err != nil || len(r.devices) != 0 {
+			t.Fatalf("ended: %v, %v", r.devices, r.err)
+		}
+		if r := recv(t, remaining); r.err == nil || r.err.Error() != "restart failed" {
+			t.Fatalf("remaining: %v", r.err)
+		}
+	})
+	t.Run("still stops the radio once the discoveries a failed start ended are gone", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		running := goFindContinuously(bg, s, sd6, nil, 0)
+		settle(t, s, 1)
+		c.setStartErr(errors.New("start failed"))
+		if _, err := s.Find(bg, discovery.ByLongDiscriminator(1000), 10*time.Second, false); err == nil || err.Error() != "start failed" {
+			t.Fatalf("Find: %v", err)
+		}
+		if r := recv(t, running); r.err == nil || r.err.Error() != "start failed" {
+			t.Fatalf("running: %v", r.err)
+		}
+		if calls := c.scanCalls(); calls[len(calls)-1] != "stop" {
+			t.Fatalf("scan calls %v end without a stop", calls)
+		}
+		if c.isScanning() {
+			t.Fatal("still scanning")
+		}
+	})
+	t.Run("stops the radio after the only discovery's scan could not start", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.setStartErr(errors.New("start failed"))
+		if _, err := s.Find(bg, d1737, 10*time.Second, false); err == nil || err.Error() != "start failed" {
+			t.Fatalf("Find: %v", err)
+		}
+		wantCalls(t, &c.mockClient, "start", "stop")
+	})
+	t.Run("keeps a discovery's result when stopping its scan fails", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		res := goFind(bg, s, d1737, 10*time.Second, false)
+		settle(t, s, 1)
+		c.setStopErr(errors.New("stop failed"))
+		c.discover(addrA, serviceDataA)
+		r := recv(t, res)
+		if r.err != nil {
+			t.Fatal(r.err)
+		}
+		want(t, r.devices, addrA)
+	})
+	t.Run("closes even when the client's stop never settles", func(t *testing.T) {
+		clock := newFakeClock()
+		c := newListening(clock)
+		s := NewScanner(c, ScannerOptions{Clock: clock})
+		res := goFindContinuously(bg, s, sd6, nil, 0)
+		settle(t, s, 1)
+		c.holdStop()
+		defer c.releaseStop()
+		closed := make(chan error, 1)
+		go func() { closed <- s.Close(bg) }()
+		eventually(t, s, func() bool { return len(c.scanCalls()) == 2 }, "the stop")
+		armed(t, s, clock, 1)
+		clock.Advance(11 * time.Second)
+		if err := recv(t, closed); !errors.Is(err, ErrScanTransitionTimeout) {
+			t.Fatalf("Close: %v", err)
+		}
+		recv(t, res)
+	})
+	t.Run("does not scan for a discovery started after the scanner closed", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		_ = s.Close(bg)
+		if r := recv(t, goFindContinuously(bg, s, sd6, nil, 0)); r.err != nil {
+			t.Fatal(r.err)
+		}
+		if slices.Contains(c.scanCalls(), "start") {
+			t.Fatalf("scan calls %v", c.scanCalls())
+		}
+	})
+	t.Run("returns a one-shot discovery started after the scanner closed at once", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		_ = s.Close(bg)
+		// No virtual time passes, so the discovery does not wait out its timeout.
+		r := recv(t, goFind(bg, s, d1737, 60*time.Second, false))
+		if r.err != nil || len(r.devices) != 0 {
+			t.Fatalf("Find: %v, %v", r.devices, r.err)
+		}
+		if slices.Contains(c.scanCalls(), "start") {
+			t.Fatalf("scan calls %v", c.scanCalls())
+		}
+	})
+	t.Run("ends a one-shot discovery that is canceled", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		res := goFind(bg, s, d1737, 60*time.Second, false)
+		settle(t, s, 1)
+		s.Cancel(d1737)
+		if r := recv(t, res); r.err != nil || len(r.devices) != 0 {
+			t.Fatalf("Find: %v, %v", r.devices, r.err)
+		}
+		if c.isScanning() {
+			t.Fatal("still scanning")
+		}
+	})
+	t.Run("starts the next scan only once the previous stop finished", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		first := goFindContinuously(bg, s, sd6, nil, 0)
+		settle(t, s, 1)
+		c.holdStop()
+		s.Cancel(sd6)
+		eventually(t, s, func() bool { return len(c.scanCalls()) == 2 }, "the stop")
+		second := goFindContinuously(bg, s, sd7, nil, 0)
+		yield(s)
+		// The stop is still in flight, so the radio is not asked to start again yet.
+		wantCalls(t, &c.mockClient, "start", "stop")
+		c.releaseStop()
+		recv(t, first)
+		settle(t, s, 1)
+		wantCalls(t, &c.mockClient, "start", "stop", "start")
+		if !c.isScanning() {
+			t.Fatal("not scanning")
+		}
+		_ = s.Close(bg)
+		recv(t, second)
+	})
+	t.Run("leaves no scan running when it closes while one is starting", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		c.holdStart()
+		res := goFindContinuously(bg, s, sd6, nil, 0)
+		eventually(t, s, func() bool { return len(c.scanCalls()) == 1 }, "the start")
+		closed := make(chan error, 1)
+		go func() { closed <- s.Close(bg) }()
+		yield(s)
+		c.releaseStart()
+		recv(t, closed)
+		recv(t, res)
+		wantCalls(t, &c.mockClient, "start", "stop")
+		if c.isScanning() {
+			t.Fatal("still scanning")
+		}
+	})
+	t.Run("asks the client to scan again after its radio stopped on its own", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		first := goFindContinuously(bg, s, sd6, nil, 0)
+		settle(t, s, 1)
+		c.stopListening() // the adapter power-cycles
+		second := goFindContinuously(bg, s, sd7, nil, 0)
+		settle(t, s, 2)
+		if !c.isScanning() {
+			t.Fatal("the client was not asked to scan again")
+		}
+		_ = s.Close(bg)
+		recv(t, first)
+		recv(t, second)
+	})
+	t.Run("keeps scanning for a discovery that still runs when another ends", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		var got collector
+		running := goFindContinuously(bg, s, sd6, got.add, 0)
+		ending := goFindContinuously(bg, s, sd7, nil, 0)
+		settle(t, s, 2)
+		if !c.isScanning() {
+			t.Fatal("not scanning")
+		}
+		s.Cancel(sd7)
+		recv(t, ending)
+		if !c.isScanning() {
+			t.Fatal("the scan stopped with a discovery still running")
+		}
+		c.discover(addrA, serviceDataA)
+		settle(t, s, 1)
+		wantAddrs(t, got.get(), addrA)
+		s.Cancel(sd6)
+		recv(t, running)
+		if c.isScanning() {
+			t.Fatal("still scanning")
+		}
+	})
+}
+
+// TestBleScannerDiscoveriesForOneIdentifier covers the rest of
+// "discoveries for one identifier" (BleScannerTest.ts:1179-1309).
+func TestBleScannerDiscoveriesForOneIdentifier(t *testing.T) {
+	t.Run("hands an advertisement to discoveries by vendor, product and without identifier", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		ids := []discovery.Identifier{
+			discovery.ByVendorProduct(4476, 32769),
+			discovery.ByProduct(32769),
+			discovery.ByVendor(4476),
+			discovery.AnyCommissionable(),
+		}
+		results := make([]<-chan findResult, len(ids))
+		for i, id := range ids {
+			results[i] = goFind(bg, s, id, 10*time.Second, false)
+		}
+		settle(t, s, len(ids))
+		c.discover(addrA, serviceDataA)
+		for _, res := range results {
+			want(t, recv(t, res).devices, addrA)
+		}
+	})
+}
+
+// TestBleScannerClose covers the rest of "close" (BleScannerTest.ts:1311-1341).
+func TestBleScannerClose(t *testing.T) {
+	d1737 := discovery.ByLongDiscriminator(1737)
+	t.Run("settles a timeout-less continuous discovery with an internal cancel signal", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		res := goFindContinuously(bg, s, d1737, nil, 0)
+		settle(t, s, 1)
+		select {
+		case <-res:
+			t.Fatal("settled before close")
+		default:
+		}
+		if err := s.Close(bg); err != nil {
+			t.Fatal(err)
+		}
+		recv(t, res)
+	})
+	t.Run("releases waiters and rethrows when the client fails to stop scanning", func(t *testing.T) {
+		c := newListening(newFakeClock())
+		c.setStopErr(errors.New("stop failed"))
+		s := NewScanner(c, ScannerOptions{Clock: newFakeClock()})
+		res := goFindContinuously(bg, s, d1737, nil, 0)
+		settle(t, s, 1)
+		// Close owns the stop, so it alone reports the failure and the discovery simply ends.
+		if err := s.Close(bg); err == nil || !strings.Contains(err.Error(), "stop failed") {
+			t.Fatalf("Close: %v", err)
+		}
+		if r := recv(t, res); r.err != nil || len(r.devices) != 0 {
+			t.Fatalf("discovery: %v, %v", r.devices, r.err)
+		}
+	})
 }

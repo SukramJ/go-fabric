@@ -39,7 +39,10 @@ import (
 // other than by the brief's rules, and five derived moves the review found
 // wrong were left in place (and on the list) rather than applied. The goal
 // is 0 by the end of milestone 2; each owner correction lowers it.
-const citecheckDriftRatchet = 266
+//
+// 265 after brief BH-1: the report assembler's InteractionMessenger.ts
+// citation moved to the lines that name what it mirrors.
+const citecheckDriftRatchet = 265
 
 func readDrift(t *testing.T) []driftEntry {
 	t.Helper()
