@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-10-18
+
 Milestone 2, phase 15a ([concept v4](./docs/concept-v4-test-foundation.md) §A.4): every time source of the module behind one port. No interval, timeout or ordering changed — with the default clock every timer runs exactly as before; what moved is where the time comes from.
 
 **What a host must do.** Nothing, unless it implements `controller/exchange.Clock` or `exchange.Timer` itself (see Changed). A host that wants to drive the device side's timers in its tests sets `node.Config.Clock` (or `bridge.Config.Clock`) to a `clocktest.Fake`.
@@ -4141,7 +4143,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/SukramJ/go-fabric/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/SukramJ/go-fabric/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/SukramJ/go-fabric/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/SukramJ/go-fabric/compare/v0.5.4...v0.6.0
