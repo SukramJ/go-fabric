@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 21 |
-| partial | 98 |
-| planned | 118 |
+| partial | 99 |
+| planned | 117 |
 | excluded | 87 |
 | total | 324 |
 
@@ -101,7 +101,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/dcl](#protocoltestdcl) | 10 | 0 | 6 | 4 | 0 |
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 2 | 1 | 0 |
-| [protocol/test/groups](#protocoltestgroups) | 5 | 3 | 0 | 2 | 0 |
+| [protocol/test/groups](#protocoltestgroups) | 5 | 3 | 1 | 1 | 0 |
 | [protocol/test/icd](#protocoltesticd) | 8 | 0 | 0 | 6 | 2 |
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
@@ -793,7 +793,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | FabricGroupsManagerTest.ts | 42 | ported | `groups:TestFabricGroupsManagerGroupIPv6AddressCalculation` | The group IPv6 multicast address of fabric 0x456789ABCDEF1234 and group 0x1234 is ported against the matter.js vector through Manager.MulticastAddressFor. |
 | GroupsMulticastPolicyTest.ts | 74 | ported | `groups:TestGroupcastPolicyMovesTheMulticastMembership`<br>`groups:TestGroupsMulticastPolicy` | The per-group default, the shared IANA address under IanaAddr, reverting after removal and independent per-group policies are ported on one shared fabric through SetGroupProperties and RemoveGroupProperties. |
 | GroupsTest.ts | 148 | ported | `groups:TestGroupsMulticastAddress`<br>`groups:TestGroupsIDMap`<br>`groups:TestGroupsSubjectForGroup`<br>`groups:TestGroupsCurrentKeyForID` | The per-group multicast address and its refusal of group id 0, the GroupKeyMap replacement (store change and Reload), the subject of a group message through Decode's HasValidMapping and Endpoints including the session-id collision peer, and the current key of a group with the matter.js error texts are ported. |
-| KeySetsTest.ts | 174 | planned | — | The fabric's group key sets: lookup, replacement, current and all operational keys. |
+| KeySetsTest.ts | 174 | partial | `groups:TestKeySetsForIDAdd`<br>`groups:TestKeySetsAllKeysForID`<br>`groups:TestKeySetsCurrentKeyForID`<br>`groups:TestKeySetsContainsOperationalKey` | Lookup and replacement, the keys of a key set, the current key of a non-IPK key set and the operational-key match are ported on the manager's key sets (forId and allKeysForId on key set 1, as the manager does not hold key set 0); the two key-set-0 current-key cases are missing because the Go IPK is the single key of the fabric identity, not an epoch-rotated key set 0, and Group Key Management refuses writing key set 0. Missing: “returns the only key for the default key set”; “returns the second-newest key for the IPK key set (§4.14.2.6)”. |
 | MessagingStateTest.ts | 76 | planned | — | Group messaging state: storage, reception state per source and key, the legacy data-counter migration. |
 
 ## protocol/test/icd
@@ -1161,7 +1161,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### protocol/test/groups
 
-- `KeySetsTest.ts` — The fabric's group key sets: lookup, replacement, current and all operational keys.
 - `MessagingStateTest.ts` — Group messaging state: storage, reception state per source and key, the legacy data-counter migration.
 
 ### protocol/test/icd

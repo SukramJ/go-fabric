@@ -3412,8 +3412,18 @@
     },
     {
       "path": "packages/protocol/test/groups/KeySetsTest.ts",
-      "status": "planned",
-      "reason": "The fabric's group key sets: lookup, replacement, current and all operational keys.",
+      "status": "partial",
+      "go": [
+        "groups:TestKeySetsForIDAdd",
+        "groups:TestKeySetsAllKeysForID",
+        "groups:TestKeySetsCurrentKeyForID",
+        "groups:TestKeySetsContainsOperationalKey"
+      ],
+      "missing": [
+        "returns the only key for the default key set",
+        "returns the second-newest key for the IPK key set (§4.14.2.6)"
+      ],
+      "reason": "Lookup and replacement, the keys of a key set, the current key of a non-IPK key set and the operational-key match are ported on the manager's key sets (forId and allKeysForId on key set 1, as the manager does not hold key set 0); the two key-set-0 current-key cases are missing because the Go IPK is the single key of the fabric identity, not an epoch-rotated key set 0, and Group Key Management refuses writing key set 0.",
       "snapshotSha": "63ab34a45d0cbe4b2da1181f1f6556c27356ec6c"
     },
     {
