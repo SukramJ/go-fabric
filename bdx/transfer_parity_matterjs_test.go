@@ -15,12 +15,14 @@ package bdx_test
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
 	"math/rand/v2"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -42,7 +44,7 @@ func bdxRandom(n int) []byte {
 
 // bdxRecord renders one message a side sent, every field matter.js's
 // deep.equals compares.
-func bdxRecord(protocolID uint16, opcode uint8, payload []byte) (string, any) {
+func bdxRecord(protocolID uint16, opcode uint8, payload []byte) (text string, msg any) {
 	if protocolID != bdx.ProtocolID {
 		sr, err := bdx.DecodeStatusReport(payload)
 		if err != nil {
@@ -88,14 +90,14 @@ func bdxOpt(v *uint64) string {
 	if v == nil {
 		return "-"
 	}
-	return fmt.Sprint(*v)
+	return strconv.FormatUint(*v, 10)
 }
 
 func bdxMeta(b []byte) string {
 	if len(b) == 0 {
 		return "-"
 	}
-	return fmt.Sprintf("%x", b)
+	return hex.EncodeToString(b)
 }
 
 // The renderings of the messages the matter.js cases compare; "-" is
@@ -112,7 +114,9 @@ func wantReceiveAccept(drive string) string {
 	return fmt.Sprintf("ReceiveAccept v=0 drive=%s async=false max=966 len=- meta=-", drive)
 }
 
-func wantBlock(t bdx.MessageType, cnt, n int) string { return fmt.Sprintf("%s cnt=%d len=%d", t, cnt, n) }
+func wantBlock(t bdx.MessageType, cnt, n int) string {
+	return fmt.Sprintf("%s cnt=%d len=%d", t, cnt, n)
+}
 
 func wantCounter(t bdx.MessageType, cnt int) string { return fmt.Sprintf("%s cnt=%d", t, cnt) }
 
@@ -340,6 +344,7 @@ var (
 
 // rewriteInit decodes an *Init payload, applies fn and encodes it again.
 func rewriteInit(t *testing.T, kind bdx.MessageType, fn func(*bdx.Init)) func(uint8, []byte) (uint8, []byte) {
+	t.Helper()
 	return func(opcode uint8, payload []byte) (uint8, []byte) {
 		if bdx.MessageType(opcode) != kind {
 			return opcode, payload
