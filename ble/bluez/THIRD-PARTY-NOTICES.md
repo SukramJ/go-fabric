@@ -21,6 +21,16 @@ module cache, and the copyright line is quoted verbatim from it.
 | `github.com/godbus/dbus/v5` | BSD-2-Clause | the system-bus client this module speaks BlueZ through (ADR 0024 decision 3) |
 | `golang.org/x/sys` | BSD-3-Clause | required by `godbus/dbus/v5`; already linked by the main module and listed in its notices |
 
+The package `bluez` links only those two beside the main module.
+`cmd/reference-controller` is the reference controller with BLE and links,
+besides, what `examples/reference-controller` links in the main module — the
+SQLite driver `modernc.org/sqlite` and its dependencies (`modernc.org/libc`,
+`modernc.org/mathutil`, `modernc.org/memory`, `github.com/dustin/go-humanize`,
+`github.com/google/uuid`, `github.com/mattn/go-isatty`,
+`github.com/ncruces/go-strftime`, `github.com/remyoudompheng/bigfft`), all
+MIT or BSD-3-Clause and recorded with their copyright lines in the main
+module's notices.
+
 ### Verbatim copyright notices
 
 ```

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5284,
+  "entry_points": 5286,
   "entry_packages": [
     ".",
     "bdx",
@@ -183,7 +183,7 @@
     "examples/quickstart-controller",
     "examples/quickstart-device",
     "examples/reference-bridge",
-    "examples/reference-controller",
+    "examples/reference-controller/cli",
     "groups",
     "im",
     "im/subscription",
@@ -218,9 +218,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12763,
-    "reachable": 9003,
-    "whitelisted": 3755,
+    "total_exported": 12767,
+    "reachable": 9005,
+    "whitelisted": 3757,
     "unreachable": 5
   },
   "by_package": [
@@ -19593,73 +19593,87 @@
       "line": 14
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
       "identifier": "TestArguments",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/args_test.go",
+      "file": "examples/reference-controller/cli/args_test.go",
       "line": 19
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
+      "identifier": "TestPairBLEWithoutBLEOrNetwork",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/cli/pair_ble_test.go",
+      "line": 41
+    },
+    {
+      "package": "examples/reference-controller/cli",
       "identifier": "TestPairNetworkOptions",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/pair_test.go",
+      "file": "examples/reference-controller/cli/pair_test.go",
       "line": 14
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
+      "identifier": "TestPairOverBLE",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/cli/pair_ble_test.go",
+      "line": 68
+    },
+    {
+      "package": "examples/reference-controller/cli",
       "identifier": "TestPakePasscodeVerifier",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/window_test.go",
+      "file": "examples/reference-controller/cli/window_test.go",
       "line": 21
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
       "identifier": "TestRandomWindowCredentials",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/window_test.go",
+      "file": "examples/reference-controller/cli/window_test.go",
       "line": 45
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
       "identifier": "TestReferenceController",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/main_test.go",
+      "file": "examples/reference-controller/cli/main_test.go",
       "line": 335
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
       "identifier": "TestReferenceControllerCAKey",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/cakey_test.go",
+      "file": "examples/reference-controller/cli/cakey_test.go",
       "line": 36
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
       "identifier": "TestReferenceControllerOTA",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/main_test.go",
+      "file": "examples/reference-controller/cli/main_test.go",
       "line": 480
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
       "identifier": "TestReferenceControllerTrust",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/trust_test.go",
+      "file": "examples/reference-controller/cli/trust_test.go",
       "line": 19
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
       "identifier": "TestReferenceControllerWindow",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/window_test.go",
+      "file": "examples/reference-controller/cli/window_test.go",
       "line": 67
     },
     {
-      "package": "examples/reference-controller",
+      "package": "examples/reference-controller/cli",
       "identifier": "TestWindowTimeout",
       "reason": "auto-whitelist:pattern=test-file",
-      "file": "examples/reference-controller/window_test.go",
+      "file": "examples/reference-controller/cli/window_test.go",
       "line": 142
     },
     {
