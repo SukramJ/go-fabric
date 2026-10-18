@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -47,14 +48,42 @@ func parseCode(code string) (pairing, error) {
 	return pairing{passcode: m.Passcode, id: discovery.ByShortDiscriminator(m.ShortDiscriminator), what: fmt.Sprintf("short discriminator %d", m.ShortDiscriminator)}, nil
 }
 
+// networkOptions are the operational network the device is to join
+// (commissioner.Options.WiFiNetwork, ThreadNetwork): the flow's network
+// steps configure it (ControllerCommissioningFlow.ts:1527-1958) when the
+// device advertises Wi-Fi or Thread.
+func networkOptions(ssid, credentials, dataset string) (*commissioner.WiFiNetwork, *commissioner.ThreadNetwork, error) {
+	var wifi *commissioner.WiFiNetwork
+	var thread *commissioner.ThreadNetwork
+	if ssid != "" {
+		wifi = &commissioner.WiFiNetwork{SSID: ssid, Credentials: credentials}
+	} else if credentials != "" {
+		return nil, nil, errors.New("--wifi-credentials needs --wifi-ssid")
+	}
+	if dataset != "" {
+		b, err := hex.DecodeString(dataset)
+		if err != nil || len(b) == 0 {
+			return nil, nil, fmt.Errorf("--thread-dataset is not a hex operational dataset: %w", err)
+		}
+		thread = &commissioner.ThreadNetwork{OperationalDataset: b}
+	}
+	return wifi, thread, nil
+}
+
 // cmdPair: discovery over DNS-SD, PASE, attestation, NOC, the registry's
 // record — the flow of node/binding_live_test.go:392-410 (ForDevice and
 // Commission) after the scanner found the device by its discriminator.
+// --wifi-ssid / --wifi-credentials and --thread-dataset give the
+// operational network the flow configures on a Wi-Fi or Thread device.
 func cmdPair(e *env, args []string) error {
 	var code, label string
 	var passcode, discriminator uint
 	var nodeIDArg string
+	var wifiSSID, wifiCredentials, threadDataset string
 	pos, err := parseArgs(e, "pair", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&wifiSSID, "wifi-ssid", "", "the SSID of the Wi-Fi network the device is to join")
+		fs.StringVar(&wifiCredentials, "wifi-credentials", "", "the Wi-Fi network's passphrase (with --wifi-ssid)")
+		fs.StringVar(&threadDataset, "thread-dataset", "", "the Thread operational dataset the device is to join, as hex")
 		fs.StringVar(&code, "code", "", "the QR code (MT:…) or the manual code (11 or 21 digits)")
 		fs.UintVar(&passcode, "passcode", 0, "the setup passcode (with --discriminator, instead of --code)")
 		fs.UintVar(&discriminator, "discriminator", 0, "the 12-bit long discriminator")
@@ -84,6 +113,10 @@ func cmdPair(e *env, args []string) error {
 	default:
 		return fmt.Errorf("usage: %s", commands["pair"].usage)
 	}
+	wifi, thread, err := networkOptions(wifiSSID, wifiCredentials, threadDataset)
+	if err != nil {
+		return err
+	}
 	var nodeID uint64
 	if nodeIDArg != "" {
 		if nodeID, err = parseNodeID(nodeIDArg); err != nil {
@@ -104,7 +137,10 @@ func cmdPair(e *env, args []string) error {
 		}
 		noSubscribe := false
 		if err := s.reg.Commission(ctx, n, client.CommissionOptions{
-			Options:       commissioner.Options{Passcode: pr.passcode, NodeID: nodeID, OnAttestationFailure: s.policy},
+			Options: commissioner.Options{
+				Passcode: pr.passcode, NodeID: nodeID, OnAttestationFailure: s.policy,
+				WiFiNetwork: wifi, ThreadNetwork: thread,
+			},
 			AutoSubscribe: &noSubscribe,
 		}); err != nil {
 			return fmt.Errorf("pairing: %w", err)

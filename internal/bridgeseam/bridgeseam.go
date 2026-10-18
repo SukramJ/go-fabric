@@ -19,6 +19,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/SukramJ/go-fabric/transport"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
 
@@ -72,3 +73,15 @@ var AnchorPeerCounter func(b any, sessionID uint16, peerNodeID uint64, counter u
 //
 // The second result is false when b is not a bridge.
 var AckPumpTick func(b any, now time.Time) (int, bool)
+
+// ReceiveOnConn hands one complete Matter message that arrived on c — a
+// connection of a transport the bridge does not listen on itself, such as
+// the BTP peripheral of controller/ble/bletest — to the bridge's
+// transport-neutral receive path, exactly as the TCP listener's handler
+// does: replies go back on c, and release hands c's turn to its next
+// message. Reports false when b is not a bridge.
+var ReceiveOnConn func(b any, c transport.Conn, msg []byte, release func()) bool
+
+// ConnClosed evicts every session bound to c, as a dropped TCP connection
+// does. Reports false when b is not a bridge.
+var ConnClosed func(b any, c transport.Conn) bool

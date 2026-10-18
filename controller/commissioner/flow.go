@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"math/big"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/SukramJ/go-fabric/cluster/spec"
@@ -68,9 +69,8 @@ const (
 	stepStop
 )
 
-// step is one CommissioningStep (:184-199). No step of the IP channel sets
-// reArmFailsafe (only the BLE network steps do, :603-620), so the field
-// and the re-arm before a step (:385-392) are left out.
+// step is one CommissioningStep (:184-199). Its reArmFailsafe flag, set
+// only on the network steps (:603-620), is the flow's reArmBefore set.
 type step struct {
 	number, sub int
 	name        string
@@ -83,12 +83,21 @@ type networkFeature struct {
 	featureMap uint32
 }
 
-// collectedData is CollectedCommissioningData (:202-221), the part the IP
-// channel steps use.
+// networkStatus is one NetworkCommissioning instance's Networks.
+type networkStatus struct {
+	endpoint uint16
+	networks []netcomm.NetworkInfoStruct
+}
+
+// collectedData is CollectedCommissioningData (:202-221) without the OTA
+// requestor list, which only the OTA provider step this port leaves out
+// reads.
 type collectedData struct {
 	basicCommissioningInfo       *gencomm.BasicCommissioningInfo
 	productName                  string
 	networkFeatures              []networkFeature // nil until collected
+	networkStatus                []networkStatus  // nil until collected
+	successfullyConnected        bool
 	rootPartsList                []uint16
 	rootServerList               []uint32
 	vendorID, productID          uint16
@@ -99,7 +108,7 @@ type collectedData struct {
 // transitionFunc is the flow's transitionToCase callback (:316-319).
 type transitionFunc func(ctx context.Context, addr handshake.PeerAddress, concurrent bool) (*interaction.Interaction, error)
 
-// flow is ControllerCommissioningFlow (:312-2141) for an IP channel.
+// flow is ControllerCommissioningFlow (:312-2141).
 type flow struct {
 	c          *Commissioner
 	log        *slog.Logger
@@ -111,6 +120,17 @@ type flow struct {
 	transition transitionFunc
 	steps      []step
 	results    map[[2]int]stepResult
+	// reArmBefore are the steps with reArmFailsafe (:196-198).
+	reArmBefore map[[2]int]bool
+	// ble is the commissioning channel's type: BLE (Options.Channel) or IP
+	// (interaction.channelType, :596).
+	ble bool
+
+	// mu guards what the BLE re-arm timer shares with the steps: the
+	// failsafe end, the cumulative expiry, the breadcrumb, the
+	// interaction and the timer itself.
+	mu       sync.Mutex
+	armTimer *armInterval
 
 	commissioningExpiry time.Time // zero: undefined
 	failSafeEnd         time.Time // zero: undefined
@@ -125,6 +145,8 @@ func newFlow(c *Commissioner, ia *interaction.Interaction, opts Options, address
 		c: c, log: c.log, ia: ia, opts: opts, fabric: opts.Fabric, address: address,
 		challenge: append([]byte(nil), challenge...), transition: transition,
 		results:         map[[2]int]stepResult{},
+		reArmBefore:     map[[2]int]bool{},
+		ble:             opts.Channel != nil,
 		defaultFailSafe: DefaultFailSafeTime,
 		lastBreadcrumb:  1, // :327
 	}
@@ -132,10 +154,14 @@ func newFlow(c *Commissioner, ia *interaction.Interaction, opts Options, address
 	return f
 }
 
-// initializeSteps is #initializeCommissioningSteps (:536-656) on an IP
-// channel: the NetworkCommissioning steps run only on BLE (:595-625) and
-// the OTA provider step only with its option, which this port does not
-// offer (:648-655).
+// initializeSteps is #initializeCommissioningSteps (:536-656): the
+// NetworkCommissioning steps on a BLE channel (:595-620) — validation,
+// then Wi-Fi and Thread when their credentials are given, each re-arming
+// the failsafe first — and, unlike matter.js, also on an IP channel when
+// Wi-Fi or Thread credentials are given (a by_design candidate: the
+// steps are testable without a radio, and a device that advertises
+// neither feature skips them). The OTA provider step only comes with its
+// option, which this port does not offer (:648-655).
 func (f *flow) initializeSteps() {
 	f.steps = []step{
 		{0, 1, "GetInitialData", f.getInitialData},
@@ -145,11 +171,25 @@ func (f *flow) initializeSteps() {
 		{10, 1, "OperationalCredentials.DeviceAttestation", f.deviceAttestation},
 		{11, 1, "OperationalCredentials.Certificates", f.certificates},
 		{15, 1, "AccessControl", f.configureAccessControlLists},
+	}
+	if f.ble || f.opts.WiFiNetwork != nil || f.opts.ThreadNetwork != nil {
+		f.steps = append(f.steps, step{16, 1, "NetworkCommissioning.Validate", f.validateNetwork})
+		if f.opts.WiFiNetwork != nil {
+			f.steps = append(f.steps, step{16, 2, "NetworkCommissioning.Wifi", f.configureNetworkWifi})
+			f.reArmBefore[[2]int{16, 2}] = true
+		}
+		if f.opts.ThreadNetwork != nil {
+			f.steps = append(f.steps, step{16, 3, "NetworkCommissioning.Thread", f.configureNetworkThread})
+			f.reArmBefore[[2]int{16, 3}] = true
+		}
+	} else {
+		f.log.Info("matter.controller.commissioning.skipping_network_commissioning", slog.String("reason", "the device is already on IP network (udp)"))
+	}
+	f.steps = append(f.steps, []step{
 		{18, 1, "Reconnect", f.reconnectWithDevice},
 		{20, 1, "GeneralCommissioning.Complete", f.completeCommissioning},
 		{98, 1, "OperationalCredentials.UpdateFabricLabel", f.updateFabricLabel},
-	}
-	f.log.Info("matter.controller.commissioning.skipping_network_commissioning", slog.String("reason", "the device is already on IP network (udp)"))
+	}...)
 }
 
 // sortSteps is #sortSteps (:658-663).
@@ -174,12 +214,27 @@ func (f *flow) now() time.Time { return f.c.ctx.Clock.Now() }
 // error is returned as is (:463-465). No retries: a TODO upstream (:443-451).
 func (f *flow) execute(ctx context.Context) error {
 	f.sortSteps()
+	// The BLE re-arm timer ends with the flow (close, :2138-2140).
+	defer f.stopArmInterval()
+	rearmedAfterPrevious := false
 	for _, s := range f.steps {
 		f.log.Info("matter.controller.commissioning.step", slog.String("step", fmt.Sprintf("%d.%d", s.number, s.sub)), slog.String("name", s.name))
-		res, err := s.run(ctx)
+		// A step with reArmFailsafe re-arms first, unless the previous
+		// step's bookkeeping just did or the BLE re-arm timer runs
+		// (:385-393).
+		var err error
+		if f.reArmBefore[[2]int{s.number, s.sub}] && !rearmedAfterPrevious && !f.armIntervalRunning() {
+			f.log.Debug("matter.controller.commissioning.rearm_before_step", slog.String("name", s.name))
+			_, err = f.armFailsafe(ctx, 0)
+		}
+		rearmedAfterPrevious = false
+		var res stepResult
+		if err == nil {
+			res, err = s.run(ctx)
+		}
 		if err == nil {
 			f.results[[2]int{s.number, s.sub}] = res
-			err = f.afterStep(ctx, s)
+			rearmedAfterPrevious, err = f.afterStep(ctx, s)
 			if err == nil {
 				if res == stepStop {
 					break
@@ -207,32 +262,76 @@ func (f *flow) execute(ctx context.Context) error {
 	return nil
 }
 
-// afterStep is the failsafe bookkeeping after a successful step (:397-424).
-func (f *flow) afterStep(ctx context.Context, s step) error {
-	if f.failSafeEnd.IsZero() {
-		return nil
+// afterStep is the failsafe bookkeeping after a successful step
+// (:397-424); it reports whether it re-armed.
+func (f *flow) afterStep(ctx context.Context, s step) (bool, error) {
+	end, expiry := f.failsafeTimes()
+	if end.IsZero() {
+		return false, nil
 	}
-	if !f.commissioningExpiry.IsZero() && f.now().After(f.commissioningExpiry) {
+	if !expiry.IsZero() && f.now().After(expiry) {
 		f.log.Error("matter.controller.commissioning.too_long", slog.String("name", s.name))
 		msg := "Commissioning time exceeds the maximum timeframe"
 		if i := f.data.basicCommissioningInfo; i != nil && i.MaxCumulativeFailsafeSeconds != 0 {
 			msg += fmt.Sprintf(" of %ds", i.MaxCumulativeFailsafeSeconds)
 		}
-		return newError(ErrCommissioningTimeout, msg, nil)
+		return false, newError(ErrCommissioningTimeout, msg, nil)
 	}
-	if left := f.failSafeEnd.Sub(f.now()); left < f.defaultFailSafe/2 {
+	if left := end.Sub(f.now()); left < f.defaultFailSafe/2 {
 		f.log.Info("matter.controller.commissioning.rearm_failsafe", slog.String("after", s.name), slog.Duration("left", left))
 		if _, err := f.armFailsafe(ctx, 0); err != nil {
-			return err
+			return false, err
 		}
+		return true, nil
 	}
-	return nil
+	return false, nil
+}
+
+// failsafeTimes are the failsafe's end and the cumulative expiry.
+func (f *flow) failsafeTimes() (end, expiry time.Time) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.failSafeEnd, f.commissioningExpiry
+}
+
+func (f *flow) setFailSafeEnd(t time.Time) {
+	f.mu.Lock()
+	f.failSafeEnd = t
+	f.mu.Unlock()
+}
+
+// breadcrumb is lastBreadcrumb.
+func (f *flow) breadcrumb() uint64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lastBreadcrumb
+}
+
+// nextBreadcrumb is `this.lastBreadcrumb++`: the current value, then
+// incremented.
+func (f *flow) nextBreadcrumb() uint64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b := f.lastBreadcrumb
+	f.lastBreadcrumb++
+	return b
+}
+
+// interaction is the current interaction (PASE, then CASE).
+func (f *flow) interaction() *interaction.Interaction {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.ia
 }
 
 // invoke is #invokeCommand (:506-530) on the root endpoint.
 func (f *flow) invoke(ctx context.Context, cluster, command uint32, fields spec.Encodable, extended bool) (interaction.Result, error) {
-	return f.ia.Invoke(ctx, im.ConcreteCommandPath{Endpoint: rootEndpoint, Cluster: cluster, Command: command}, fields,
-		interaction.InvokeOptions{ExtendedFailSafeTimeout: extended})
+	return f.invokeWith(ctx, cluster, command, fields, interaction.InvokeOptions{ExtendedFailSafeTimeout: extended})
+}
+
+// invokeWith is #invokeCommand with the request options (:506-530).
+func (f *flow) invokeWith(ctx context.Context, cluster, command uint32, fields spec.Encodable, opts interaction.InvokeOptions) (interaction.Result, error) {
+	return f.interaction().Invoke(ctx, im.ConcreteCommandPath{Endpoint: rootEndpoint, Cluster: cluster, Command: command}, fields, opts)
 }
 
 // response decodes the fields of a command's response into v.
@@ -249,7 +348,7 @@ func response(res interaction.Result, what string, decode func(spec.Node) error)
 // readValues is #readConcreteAttributeValues (:474-503): one read of root
 // endpoint attributes, the values in request order, absent ones not ok.
 func (f *flow) readValues(ctx context.Context, paths ...im.ConcreteAttributePath) ([]spec.Node, []bool, error) {
-	report, err := f.ia.Read(ctx, paths...)
+	report, err := f.interaction().Read(ctx, paths...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -383,16 +482,26 @@ func (f *flow) getInitialData(ctx context.Context) (stepResult, error) {
 		return 0, err
 	}
 	d.networkFeatures = []networkFeature{}
+	d.networkStatus = []networkStatus{}
 	for i := range report.Attributes {
 		a := &report.Attributes[i]
-		if a.Path.Cluster != netcomm.ClusterID || a.Path.Attribute != spec.AttrFeatureMap {
+		if a.Path.Cluster != netcomm.ClusterID {
 			continue
 		}
-		fm, err := spec.DecodeUint[uint32](32)(a.Value)
-		if err != nil {
-			return 0, fmt.Errorf("%w: NetworkCommissioning FeatureMap: %w", errUnexpectedResponse, err)
+		switch a.Path.Attribute {
+		case spec.AttrFeatureMap:
+			fm, err := spec.DecodeUint[uint32](32)(a.Value)
+			if err != nil {
+				return 0, fmt.Errorf("%w: NetworkCommissioning FeatureMap: %w", errUnexpectedResponse, err)
+			}
+			d.networkFeatures = append(d.networkFeatures, networkFeature{endpoint: a.Path.Endpoint, featureMap: fm})
+		case netcomm.AttrNetworks:
+			nets, err := decodeNetworks(a.Value)
+			if err != nil {
+				return 0, fmt.Errorf("%w: NetworkCommissioning Networks: %w", errUnexpectedResponse, err)
+			}
+			d.networkStatus = append(d.networkStatus, networkStatus{endpoint: a.Path.Endpoint, networks: nets})
 		}
-		d.networkFeatures = append(d.networkFeatures, networkFeature{endpoint: a.Path.Endpoint, featureMap: fm})
 	}
 	return stepSuccess, nil
 }
@@ -419,7 +528,9 @@ func (f *flow) armFailsafe(ctx context.Context, d time.Duration) (stepResult, er
 		f.data.basicCommissioningInfo = &info
 		f.defaultFailSafe = time.Duration(info.FailSafeExpiryLengthSeconds) * time.Second
 		started := f.now()
+		f.mu.Lock()
 		f.commissioningExpiry = started.Add(time.Duration(info.MaxCumulativeFailsafeSeconds) * time.Second)
+		f.mu.Unlock()
 	}
 	maxExpiry := f.defaultFailSafe
 	if i := f.data.basicCommissioningInfo; i != nil {
@@ -431,7 +542,7 @@ func (f *flow) armFailsafe(ctx context.Context, d time.Duration) (stepResult, er
 	}
 	length = min(length, maxExpiry)
 	res, err := f.invoke(ctx, gencomm.ClusterID, gencomm.CmdArmFailSafe, gencomm.ArmFailSafeRequest{
-		Breadcrumb: f.lastBreadcrumb, ExpiryLengthSeconds: uint16(length / time.Second), //nolint:gosec // bounded by MaxCumulativeFailsafeSeconds, a uint16
+		Breadcrumb: f.breadcrumb(), ExpiryLengthSeconds: uint16(length / time.Second), //nolint:gosec // bounded by MaxCumulativeFailsafeSeconds, a uint16
 	}, false)
 	if err != nil {
 		return 0, err
@@ -443,27 +554,31 @@ func (f *flow) armFailsafe(ctx context.Context, d time.Duration) (stepResult, er
 	if err := f.ensureGeneralCommissioningSuccess("armFailSafe", resp.ErrorCode, resp.DebugText); err != nil {
 		return 0, err
 	}
-	f.failSafeEnd = f.now().Add(length)
+	f.setFailSafeEnd(f.now().Add(length))
 	return stepSuccess, nil
 }
 
 // failSafeTimeLeft is :888-893.
 func (f *flow) failSafeTimeLeft() time.Duration {
-	if f.failSafeEnd.IsZero() {
+	end, _ := f.failsafeTimes()
+	if end.IsZero() {
 		return 0
 	}
-	return max(f.failSafeEnd.Sub(f.now()), 0)
+	return max(end.Sub(f.now()), 0)
 }
 
-// ensureFailsafeTimerFor is :895-951 without the BLE re-arm timer: the
-// failsafe must outlive the wait for a response of maxProcessingTime —
-// the interaction's maximum peer response time with the peer's sending
-// time, at most maxProcessingTime plus FailSafeMaxSendTime — plus
-// FailSafeProcessingMargin; with less left it re-arms for that, at least
-// the default failsafe time.
+// ensureFailsafeTimerFor is :895-951: the failsafe must outlive the wait
+// for a response of maxProcessingTime — the interaction's maximum peer
+// response time with the peer's sending time, at most maxProcessingTime
+// plus FailSafeMaxSendTime — plus FailSafeProcessingMargin; on BLE the
+// re-arm timer restarts (:905-938); with less left it re-arms for that,
+// at least the default failsafe time.
 func (f *flow) ensureFailsafeTimerFor(ctx context.Context, maxProcessingTime time.Duration) error {
-	responseWait := min(f.ia.MaximumPeerResponseTime(maxProcessingTime, true), maxProcessingTime+FailSafeMaxSendTime)
+	responseWait := min(f.interaction().MaximumPeerResponseTime(maxProcessingTime, true), maxProcessingTime+FailSafeMaxSendTime)
 	minFailsafe := responseWait + FailSafeProcessingMargin
+	if f.ble {
+		f.startArmInterval(ctx)
+	}
 	if left := f.failSafeTimeLeft(); left < minFailsafe {
 		f.log.Debug("matter.controller.commissioning.failsafe_short", slog.Duration("left", left), slog.Duration("rearm_for", minFailsafe))
 		_, err := f.armFailsafe(ctx, max(minFailsafe, f.defaultFailSafe))
@@ -476,14 +591,14 @@ func (f *flow) ensureFailsafeTimerFor(ctx context.Context, maxProcessingTime tim
 // resetFailsafeTimer is :1077-1093: ArmFailSafe with 0 when a failsafe is
 // armed, the response not checked, a failure only logged.
 func (f *flow) resetFailsafeTimer(ctx context.Context) {
-	if f.failSafeEnd.IsZero() {
+	if end, _ := f.failsafeTimes(); end.IsZero() {
 		return
 	}
-	if _, err := f.invoke(ctx, gencomm.ClusterID, gencomm.CmdArmFailSafe, gencomm.ArmFailSafeRequest{Breadcrumb: f.lastBreadcrumb, ExpiryLengthSeconds: 0}, false); err != nil {
+	if _, err := f.invoke(ctx, gencomm.ClusterID, gencomm.CmdArmFailSafe, gencomm.ArmFailSafeRequest{Breadcrumb: f.breadcrumb(), ExpiryLengthSeconds: 0}, false); err != nil {
 		f.log.Error("matter.controller.commissioning.reset_failsafe_failed", slog.String("err", err.Error()))
 		return
 	}
-	f.failSafeEnd = time.Time{}
+	f.setFailSafeEnd(time.Time{})
 }
 
 // configureRegulatoryInformation is step 8.1 (:1102-1188): only when a
@@ -520,8 +635,7 @@ func (f *flow) configureRegulatoryInformation(ctx context.Context) (stepResult, 
 		f.log.Debug("matter.controller.commissioning.fixed_regulatory_location", slog.Int("location", int(location)))
 	}
 	country := f.opts.RegulatoryCountryCode
-	breadcrumb := f.lastBreadcrumb
-	f.lastBreadcrumb++
+	breadcrumb := f.nextBreadcrumb()
 	res, err := f.invoke(ctx, gencomm.ClusterID, gencomm.CmdSetRegulatoryConfig, gencomm.SetRegulatoryConfigRequest{
 		Breadcrumb: breadcrumb, NewRegulatoryConfig: location, CountryCode: country,
 	}, true)
@@ -536,7 +650,7 @@ func (f *flow) configureRegulatoryInformation(ctx context.Context) (stepResult, 
 		f.log.Debug("matter.controller.commissioning.country_code_fallback", slog.String("country", country))
 		country = "XX"
 		res, err = f.invoke(ctx, gencomm.ClusterID, gencomm.CmdSetRegulatoryConfig, gencomm.SetRegulatoryConfigRequest{
-			Breadcrumb: f.lastBreadcrumb, NewRegulatoryConfig: location, CountryCode: country,
+			Breadcrumb: f.breadcrumb(), NewRegulatoryConfig: location, CountryCode: country,
 		}, true)
 		if err != nil {
 			return 0, err
@@ -777,8 +891,12 @@ func (f *flow) reconnectWithDevice(ctx context.Context) (stepResult, error) {
 		if err := f.ensureFailsafeTimerFor(ctx, CASEReconnectTimeout); err != nil {
 			f.log.Info("matter.controller.commissioning.rearm_before_reconnect_failed", slog.String("err", err.Error()))
 		}
+	} else {
+		f.stopArmInterval()
 	}
 	next, err := f.transition(ctx, f.address, concurrent)
+	// The re-arm timer ends with the transition (:2031-2033).
+	f.stopArmInterval()
 	if err != nil {
 		return 0, newError(ErrOperativeConnectionFailed, "Operative reconnection with device failed", err)
 	}
@@ -786,7 +904,9 @@ func (f *flow) reconnectWithDevice(ctx context.Context) (stepResult, error) {
 		f.log.Debug("matter.controller.commissioning.finalized_externally")
 		return stepStop, nil
 	}
+	f.mu.Lock()
 	f.ia = next
+	f.mu.Unlock()
 	f.log.Debug("matter.controller.commissioning.reconnected")
 	return stepSuccess, nil
 }
@@ -805,7 +925,7 @@ func (f *flow) completeCommissioning(ctx context.Context) (stepResult, error) {
 	if err := f.ensureGeneralCommissioningSuccess("commissioningComplete", resp.ErrorCode, resp.DebugText); err != nil {
 		return 0, err
 	}
-	f.failSafeEnd = time.Time{}
+	f.setFailSafeEnd(time.Time{})
 	return stepSuccess, nil
 }
 

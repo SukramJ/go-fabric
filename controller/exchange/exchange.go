@@ -367,7 +367,13 @@ func (x *Exchange) reportsPeerLoss(suppressed bool) bool {
 // pending entry of a reliable message.
 func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) (*pending, error) {
 	isAck := ackFor != nil
-	requiresAck := !x.sendOpts.SuppressAck && !isAck
+	// Without MRP nothing asks for an acknowledgement and no standalone
+	// ack is sent (MessageExchange.ts:660, :666-668).
+	usesMRP := x.session.UsesMRP()
+	if isAck && !usesMRP {
+		return nil, nil
+	}
+	requiresAck := !x.sendOpts.SuppressAck && !isAck && usesMRP
 	protocol := x.protocol
 	if isAck || opcode == mrp.SCOpcodeStatusReport {
 		protocol = mrp.SecureChannelProtocolID
@@ -387,7 +393,7 @@ func (x *Exchange) transmitLocked(opcode uint8, payload []byte, ackFor *uint32) 
 	switch {
 	case isAck:
 		proto.HasAck, proto.AckCounter = true, *ackFor
-	case x.receivedToAck != nil:
+	case x.receivedToAck != nil && usesMRP:
 		proto.HasAck, proto.AckCounter = true, x.receivedToAck.Counter
 		x.stopAckTimerLocked()
 		x.receivedToAck = nil
@@ -655,7 +661,11 @@ func (x *Exchange) Next(ctx context.Context, opts ReceiveOptions) (*Message, err
 		if ept == 0 {
 			ept = DefaultExpectedProcessingTime
 		}
-		timeout = MaxPeerResponseTime(nil, false, IntervalsOf(x.m.local), ept)
+		if x.session.UsesMRP() {
+			timeout = MaxPeerResponseTime(nil, false, IntervalsOf(x.m.local), ept)
+		} else {
+			timeout = ReliableMaxPeerResponseTime(ept)
+		}
 	}
 	var expired chan struct{}
 	if timeout > 0 {

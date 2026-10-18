@@ -3166,3 +3166,69 @@ snapshot (`TestSnapshotIsNoRevocationSource`; Matter PKI CP §1.4.5,
 
 By design. Same trust decision as matter.js's seed, a different place in
 the graph; the named signer set is chip's own.
+
+### BD-Controller-NetworkStepsOverIP — the network steps also run over IP when credentials are given
+
+matter.js registers the NetworkCommissioning steps of the commissioning
+flow only on a BLE channel (`ControllerCommissioningFlow.ts:595-620` at
+`0ceb202d`: "Care about Network commissioning only when we are on BLE,
+because else we are already on IP network"). This module runs the same
+steps (:1527-1998; Wi-Fi :1677, Thread :1874) over any channel when, and
+only when, the operator passes credentials (`commissioner.Options`,
+`pair --wifi-ssid/--wifi-credentials`, `--thread-dataset`); without them
+the IP flow is matter.js's. Report BA §3 (phase 12, 2026-10-17).
+
+By design. The steps are provable against the reference daemon's simulated
+Wi-Fi interface without a radio, and a device reached over Ethernet that
+should also join Wi-Fi can be provisioned.
+
+### BD-chip-WiFiNetworkCommissioningServer — the device-side Wi-Fi NetworkCommissioning server follows chip, TESTING ONLY
+
+matter.js's `NetworkCommissioningServer.ts` is an 18-line generated stub at
+`0ceb202d`; the command semantics the flow expects of a Wi-Fi device
+(`ScanNetworks`, `AddOrUpdateWiFiNetwork` with the credential length rule,
+`RemoveNetwork`, `ConnectNetwork`, `ReorderNetwork`, `Networks`,
+`LastNetworkingStatus`, `LastNetworkID`, `LastConnectErrorValue`) are
+taken from chip's
+`src/app/clusters/network-commissioning/NetworkCommissioningCluster.cpp`
+(harness pin `6170af84`), as the parity contract allows where matter.js has
+no behaviour. `core.WiFiNetworkCommissioning` sits behind
+`contract.WiFiDriver` and `node.Network.WiFiCommissioning`; the reference
+daemon mounts it only with `--wifi-sim`, so the FeatureMap and the
+composition the harness certifies do not move. Report BA §4.
+
+By design. A real Wi-Fi driver is roadmap milestone 7.
+
+### BD-Controller-BleReliableExchange — one reliable exchange manager per BLE channel
+
+matter.js marks a BLE channel reliable (`Ble.ts:38` `isReliable = true`)
+and a session then does not use MRP (`Session.ts:355-356` `usesMrp`). This
+module expresses the same as `exchange.Config.Reliable` on an exchange
+manager created per BTP channel with a synthetic peer address, since the
+UDP/TCP managers key their peers by network address. Report BA §2.
+
+By design. The idiom differs, the rule (no retransmission, no MRP
+parameters over BTP) is matter.js's.
+
+### BD-Go-BtpRejections — BTP refusals that exist only on the Go side
+
+`transport/btp` refuses a message longer than 0xFFFF (the BTP length
+field), a segment with no room for payload after the header, and a
+truncated packet (`ErrTruncated`) with named errors; matter.js's
+`BtpCodec.ts` / `BtpSessionHandler.ts` reach the same outcomes as thrown
+exceptions without these distinctions. Timers and window sizes are
+`BleConsts.ts`'s verbatim (15 s / 15 s / 5 s / 60 s, window 255, thresholds
+1 and 2, segment 20–244). Report BA §1.
+
+By design. Go's error surface; the wire behaviour is identical.
+
+### BD-Controller-ThreadDatasetNameOnly — only the network name is read from a Thread operational dataset
+
+The commissioning flow needs the Thread network name from the operational
+dataset for `ConnectNetwork` and its log (matter.js
+`thread/OperationalDataset.ts`, 327 lines, decodes the whole MeshCoP TLV
+set). This module decodes the name TLV only; the rest of the dataset passes
+through opaque. Report BA §3.
+
+By design until a consumer reads more of it (the Thread border-router
+client is roadmap milestone 5).

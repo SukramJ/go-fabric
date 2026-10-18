@@ -72,6 +72,13 @@ type Config struct {
 	// MessageExchangeContext.peerLost (ExchangeManager.ts:556-579), fired
 	// from MessageExchange.ts:613-621 and :822-832. Nil ignores it.
 	PeerLost func(s *Session, cause error)
+	// Reliable marks the manager's carrier as reliable (BTP): its sessions
+	// do not use MRP — no acknowledgement requested, none sent, no
+	// retransmission — and a wait for the peer is the reliable channel's.
+	// Mirrors matter.js packages/protocol/src/session/Session.ts:355-356
+	// (`usesMrp = supportsMRP && !channel?.isReliable`) for a manager whose
+	// one channel is a BleChannel (packages/protocol/src/ble/Ble.ts:38).
+	Reliable bool
 }
 
 // Manager is the controller's exchange manager: one socket, the session
@@ -84,6 +91,7 @@ type Manager struct {
 	log      *slog.Logger
 	local    sessionparams.Parameters
 	peerLost func(s *Session, cause error)
+	reliable bool
 
 	// counter is the global unencrypted message counter every unsecured
 	// session sends with (SessionManager.ts:265, :439).
@@ -120,6 +128,7 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 		log:      cfg.Logger,
 		local:    DefaultLocalParameters(),
 		peerLost: cfg.PeerLost,
+		reliable: cfg.Reliable,
 		counter:  counter,
 		sessions: make(map[uint16]*Session),
 		// unsecured is keyed by our ephemeral initiator node id
@@ -150,6 +159,9 @@ func NewManager(conn Conn, cfg Config) (*Manager, error) {
 
 // LocalParameters is our session parameters.
 func (m *Manager) LocalParameters() sessionparams.Parameters { return m.local }
+
+// Reliable reports whether the manager's carrier is reliable ([Config].Reliable).
+func (m *Manager) Reliable() bool { return m.reliable }
 
 // ProtocolHandler handles an exchange the peer opened: x is the new
 // exchange, first its first message, already taken by x — acknowledged as
@@ -549,6 +561,11 @@ func (m *Manager) HandleDatagram(buf []byte, src *net.UDPAddr) {
 		HasAck:      proto.HasAck,
 		AckCounter:  proto.AckCounter,
 		Payload:     body[pl:],
+	}
+	// A message asking for an acknowledgement on a session without MRP is
+	// treated as not asking (MessageExchange.ts:449-453).
+	if msg.RequiresAck && !s.UsesMRP() {
+		msg.RequiresAck = false
 	}
 	m.route(s, msg, duplicate)
 }
