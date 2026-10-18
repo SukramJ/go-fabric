@@ -3956,7 +3956,10 @@
       "go": [
         "secure/operational:TestEntry_RetransmitBaseInterval_FreshDefaultsToIdle",
         "secure/operational:TestEntry_RetransmitBaseInterval_ActiveAfterMarkActiveRx",
-        "transport/mrp:TestBackoffDuration_TransmissionExponent"
+        "transport/mrp:TestBackoffDuration_TransmissionExponent",
+        "controller/exchange:TestMRPRetransmissionIntervalOf",
+        "controller/exchange:TestMRPMaxRetransmissionIntervalOf",
+        "controller/exchange:TestMRPMaxPeerResponseTimeOf"
       ],
       "missing": [
         "selects the bdx margin for bulk transfer",
@@ -3964,21 +3967,12 @@
         "has no margin to offer when the peer's medium is unknown",
         "uses the active interval for retransmissions while the peer is active",
         "uses the idle interval for retransmissions when the peer is no longer active",
-        "adds no margin when additionalDelay is omitted",
         "adds fixedBackoff as a flat pad after the backoff, not amplified by the exponent",
         "applies additionalDelay (amplified) and fixedBackoff (flat) independently",
-        "uses the idle interval for retransmissions when the peer is not active",
-        "uses the active interval for retransmissions when the peer is active",
         "includes additionalDelay (amplified) and fixedBackoff (flat) so the maximum upper-bounds real sends",
-        "uses the 30s base when expectedProcessingTime is small",
-        "honors expectedProcessingTime when larger than the 30s base",
-        "falls back to the default expectedProcessingTime when omitted",
-        "composes the active peer leg, the active return leg, processing time and buffer",
-        "uses the idle peer leg when the peer is inactive while the return leg stays active",
-        "drops the peer leg when peer session parameters are unknown",
         "adds our sender-side fixedBackoff to the local return leg only"
       ],
-      "reason": "The active/idle base interval is covered; the margins, fixed backoff and maximum-interval cases are not ported case by case.",
+      "reason": "The unpadded interval, the maximum interval per peer activity and the peer response time of the udp, tcp and ble channels are ported against controller/exchange; the network-profile margins (MRP.marginFor), additionalDelay and fixedBackoff do not exist in Go (the retransmission formula has no pad), so every case that passes them stays missing.",
       "snapshotSha": "bed8f378fbba434e2451dcd1446b4815d0730193"
     },
     {
