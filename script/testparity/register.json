@@ -4136,8 +4136,18 @@
     },
     {
       "path": "packages/protocol/test/session/SessionIntervalsTest.ts",
-      "status": "planned",
-      "reason": "Session interval defaults, overrides and their clamping for advertisement.",
+      "status": "partial",
+      "go": [
+        "controller/exchange:TestSessionIntervals",
+        "controller/exchange:TestSessionIntervalsForAdvertisement"
+      ],
+      "missing": [
+        "accepts an active threshold over 65535 milliseconds",
+        "keeps intervals within the DNS-SD limits",
+        "drops negative and fractional intervals and an active threshold of zero",
+        "drops intervals above the DNS-SD limits"
+      ],
+      "reason": "The defaults, the overrides and the over-one-hour intervals (exchange.IntervalsOf) and the forAdvertisement clamping (through mdns.BuildOperationalService) are ported; the Go factory reads the wire's uint16 SAT, which cannot carry 65536, and the advertisable filter's counterpart is the stored descriptor in controller/client (brief BI's path).",
       "snapshotSha": "255bf727cd890c56dc1a632e0ea6ed13aeed2ea0"
     },
     {
