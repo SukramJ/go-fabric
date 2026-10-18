@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5356,
+  "entry_points": 5361,
   "entry_packages": [
     ".",
     "bdx",
@@ -224,9 +224,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12830,
+    "total_exported": 12835,
     "reachable": 9053,
-    "whitelisted": 3772,
+    "whitelisted": 3777,
     "unreachable": 5
   },
   "by_package": [
@@ -7238,10 +7238,24 @@
     },
     {
       "package": "cluster/spec",
+      "identifier": "TestBoundQualified",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/dotted_bound_internal_test.go",
+      "line": 58
+    },
+    {
+      "package": "cluster/spec",
       "identifier": "TestDefaultValue",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/checks_internal_test.go",
       "line": 71
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "TestDottedReference",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/dotted_bound_internal_test.go",
+      "line": 10
     },
     {
       "package": "cluster/spec",
@@ -7256,6 +7270,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "cluster/spec/checks_internal_test.go",
       "line": 19
+    },
+    {
+      "package": "cluster/spec",
+      "identifier": "TestStructField",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "cluster/spec/dotted_bound_internal_test.go",
+      "line": 28
     },
     {
       "package": "cluster/spec",
@@ -20185,6 +20206,20 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/read_limits_test.go",
       "line": 81
+    },
+    {
+      "package": "im",
+      "identifier": "TestDeniedEventPathStatusesExistence",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_dispatch_endpoints_test.go",
+      "line": 113
+    },
+    {
+      "package": "im",
+      "identifier": "TestDispatchEndpoints",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "im/invoke_dispatch_endpoints_test.go",
+      "line": 83
     },
     {
       "package": "im",

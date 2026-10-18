@@ -187,12 +187,12 @@ func TestServerNodeParity(t *testing.T) {
 		// The node opens its own window again once the last fabric left
 		// (node.reopenIfDecommissioned), so a controller commissions it
 		// anew.
-		var again *fabrictest.Pair
-		if err := site.Eventually(ctx, "a recommissioning", func() bool {
-			c, err := p.Controller.Commission(ctx, p.Device, fabrictest.CommissionOptions{})
-			again = c
-			return err == nil
-		}); err != nil {
+		window := p.Device.Node().CommissioningWindow()
+		if err := site.Eventually(ctx, "the node's window open again", window.IsOpen); err != nil {
+			t.Fatal(err)
+		}
+		again, err := p.Controller.Commission(ctx, p.Device, fabrictest.CommissionOptions{})
+		if err != nil {
 			t.Fatal(err)
 		}
 		if _, err := fabrictest.Read(ctx, again, attrPath(0, basicinfo.ClusterID, basicinfo.AttrNodeLabel)); err != nil {

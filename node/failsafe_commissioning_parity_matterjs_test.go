@@ -114,6 +114,8 @@ func TestFailsafeCommissioningParity(t *testing.T) {
 			t.Fatalf("%d fabrics before AddNOC", n)
 		}
 		spy.arm()
+		// The PASE auto-arm is 60 s (PaseSessionAutoArmSeconds).
+		site.Fake().Advance(61 * time.Second)
 		if err := site.Eventually(ctx, "the fail-safe expired", func() bool { return !armed(u) }); err != nil {
 			t.Fatal(err)
 		}
