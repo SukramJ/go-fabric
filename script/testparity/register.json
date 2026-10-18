@@ -2791,8 +2791,11 @@
     },
     {
       "path": "packages/protocol/test/common/BleListeningClockTest.ts",
-      "status": "planned",
-      "reason": "The commissioner's BLE listening clock that ages scanned peripherals by time spent scanning.",
+      "status": "ported",
+      "go": [
+        "controller/ble:TestBleListeningClock"
+      ],
+      "reason": "All five cases run against controller/ble's ListeningMeter, the Go port of BleListeningClock that a Central uses to report ListeningTime; the scanner tests' listening mock runs on it too.",
       "snapshotSha": "45e6558bf207fca3a76f0b5cb153973dc29eb301"
     },
     {

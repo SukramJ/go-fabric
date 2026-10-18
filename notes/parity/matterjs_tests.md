@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 24 |
+| ported | 25 |
 | partial | 103 |
-| planned | 110 |
+| planned | 109 |
 | excluded | 87 |
 | total | 324 |
 
@@ -97,7 +97,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [protocol/test/ble](#protocoltestble) | 2 | 1 | 0 | 0 | 1 |
 | [protocol/test/certificate](#protocoltestcertificate) | 5 | 2 | 2 | 1 | 0 |
 | [protocol/test/codec](#protocoltestcodec) | 3 | 2 | 1 | 0 | 0 |
-| [protocol/test/common](#protocoltestcommon) | 8 | 2 | 2 | 1 | 3 |
+| [protocol/test/common](#protocoltestcommon) | 8 | 3 | 2 | 0 | 3 |
 | [protocol/test/dcl](#protocoltestdcl) | 10 | 0 | 6 | 4 | 0 |
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 3 | 0 | 0 |
@@ -746,7 +746,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| BleListeningClockTest.ts | 56 | planned | ‚Äî | The commissioner's BLE listening clock that ages scanned peripherals by time spent scanning. |
+| BleListeningClockTest.ts | 56 | ported | `controller/ble:TestBleListeningClock` | All five cases run against controller/ble's ListeningMeter, the Go port of BleListeningClock that a Central uses to report ListeningTime; the scanner tests' listening mock runs on it too. |
 | BleScannerTest.ts | 1342 | partial | `controller/ble:TestBleScannerMergesRepeatAdvertisements`<br>`controller/ble:TestBleScannerKeepsBothWithinStaleWindow`<br>`controller/ble:TestBleScannerReplacesAfterStaleWindow`<br>`controller/ble:TestBleScannerDropsRotatedAddressByElapsedTime`<br>`controller/ble:TestBleScannerKeepsEntryNobodyListenedFor`<br>`controller/ble:TestBleScannerKeepsRefreshedEntry`<br>`controller/ble:TestBleScannerKeepsEntriesWithOtherServiceData`<br>`controller/ble:TestBleScannerStopsOfferingStalePeripheral`<br>`controller/ble:TestBleScannerOffersStalePeripheralAgain`<br>`controller/ble:TestBleScannerForgetsOneShotRecordAfter15Minutes`<br>`controller/ble:TestBleScannerForgetsAfter15MinutesOfListening`<br>`controller/ble:TestBleScannerOneShotRecordDoesNotAgeWhileScanning`<br>`controller/ble:TestBleScannerReachability`<br>`controller/ble:TestBleScannerOneShotWaitsWhileOnlyUnreachableAdvertise`<br>`controller/ble:TestBleScannerPurgesWithIgnoreExisting`<br>`controller/ble:TestBleScannerHandsAdvertisementToEveryDiscovery`<br>`controller/ble:TestBleScannerTimeoutEndsOneDiscovery`<br>`controller/ble:TestBleScannerAnotherTimeoutDoesNotEndDiscovery`<br>`controller/ble:TestBleScannerDiscoveriesAskingDifferently`<br>`controller/ble:TestBleScannerCancelEndsOnlyTheCanceled`<br>`controller/ble:TestBleScannerCancelEndsEveryDiscoveryForIdentifier`<br>`controller/ble:TestBleScannerFailsDiscoveriesWhenScanCannotStart`<br>`controller/ble:TestBleScannerCloseSettlesContinuousDiscovery`<br>`controller/ble:TestBleScannerDeduplicationAndAging`<br>`controller/ble:TestBleScannerForgetCommissionedDevice`<br>`controller/ble:TestBleScannerReachabilityCases`<br>`controller/ble:TestBleScannerOverlapping`<br>`controller/ble:TestBleScannerDiscoveriesForOneIdentifier`<br>`controller/ble:TestBleScannerClose` | Every it case but one runs against controller/ble's Scanner, including forgetCommissionedDevice, the scan-transition timeout, the transition order of close and discoveries on a closed scanner; the wall-clock-step case is missing because clocktest.Fake has a single reading (Set steps it for timers and Now alike), while production deadlines ride time.Time's monotonic reading, so the step the case needs cannot be expressed. Missing: ‚Äúkeeps the deadline of a continuous discovery across a wall-clock step‚Äù. |
 | DiscoveryDataTest.ts | 128 | ported | `controller/discovery:TestParityDiscovery_TXTParameters`<br>`controller/discovery:TestParityDiscovery_TXTData`<br>`controller/discovery:TestDiscoveryDataCaseInsensitiveKeys`<br>`controller/discovery:TestDiscoveryDataSessionIntervals`<br>`controller/discovery:TestDiscoveryDataIdentity`<br>`controller/discovery:TestDiscoveryDataTransports` | Every it case runs against ParseTXTData: case-insensitive keys (on a hand-built and on a discovered Name's parameters) and the SII/SAI/SAT, VP/DT/PH and T/ICD accept and drop vectors. |
 | ExpandedPathTest.ts | 134 | excluded | `js-runtime-only` | Log rendering of attribute and event paths. |
@@ -1141,10 +1141,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 ### protocol/test/certificate
 
 - `PqcAttestationCertificatesTest.ts` ‚Äî Post-quantum (ML-DSA) attestation certificates of the Annex H examples.
-
-### protocol/test/common
-
-- `BleListeningClockTest.ts` ‚Äî The commissioner's BLE listening clock that ages scanned peripherals by time spent scanning.
 
 ### protocol/test/dcl
 
