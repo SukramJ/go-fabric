@@ -29,7 +29,7 @@ var (
 	ErrNetwork = errors.New("exchange: network error")
 
 	// ErrRetransmissionLimit is matter.js RetransmissionLimitReachedError
-	// (errors.ts:17, deprecated there and thrown by no exchange at
+	// (packages/protocol/src/protocol/errors.ts:17, deprecated there and thrown by no exchange at
 	// 0ceb202d). It is kept so the handshakes' "do not report an error to
 	// a peer we cannot reach" rule names the same three classes matter.js
 	// names (PaseClient.ts:101, CaseClient.ts:89).

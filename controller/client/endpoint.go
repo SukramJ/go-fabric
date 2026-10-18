@@ -19,7 +19,7 @@ const UnknownDeviceType uint32 = math.MaxUint32
 
 // rootNodeDeviceType is the RootNode device type the image's endpoint 0
 // starts with (ClientNode.ts:401-404 over Node.CommonRootEndpoint,
-// endpoints/root.ts:314-319).
+// packages/node/src/endpoints/root.ts:314-319).
 const rootNodeDeviceType uint32 = 0x0016
 
 // Endpoint is one endpoint of the image — an endpoint of a matter.js

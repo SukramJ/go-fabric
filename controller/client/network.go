@@ -263,7 +263,7 @@ func (n *Node) deliverEvent(e *interaction.EventData) {
 }
 
 // noteUnknown logs an unknown cluster, or an unknown event of a cluster,
-// once (ClientEventEmitter.ts:156-175).
+// once (ClientEventEmitter.ts:138-156).
 func (n *Node) noteUnknown(cluster, event uint32, isEvent bool) {
 	key := [2]uint64{uint64(cluster), 1 << 32}
 	if isEvent {

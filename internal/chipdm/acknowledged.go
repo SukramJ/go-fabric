@@ -65,7 +65,7 @@ const (
 	respMax       = "matter.js resolves the RESP_MAX constant the specification defines; CHIP keeps the name"
 	elements      = "matter.js packages/model/src/standard/elements/"
 	enumRange     = "The specification reserves the manufacturer range of this enum; matter.js models it as a range " +
-		"member so a value in it validates (ValueValidator.ts:172-178), chip's XML lists only the named values"
+		"member so a value in it validates (packages/node/src/behavior/state/validation/ValueValidator.ts:172-178), chip's XML lists only the named values"
 	wncvTable = "matter.js states the lift / tilt feature each covering type needs; the specification's enum table " +
 		"has no conformance column, so CHIP marks every value M"
 )

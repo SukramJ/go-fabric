@@ -145,7 +145,7 @@ func (n *Node) apply(sc scope, r *interaction.Report) {
 
 // Properties are the node's physical properties, computed from the image
 // after each change and frozen while the node is stopped — matter.js
-// ClientNodePhysicalProperties (node/client/ClientNodePhysicalProperties.ts:19-134).
+// ClientNodePhysicalProperties (node/client/ClientNodePhysicalProperties.ts:18-133).
 func (n *Node) Properties() Properties {
 	n.mu.Lock()
 	defer n.mu.Unlock()

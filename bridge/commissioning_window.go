@@ -542,7 +542,7 @@ func (w *CommissioningWindow) OpenWindow(ctx context.Context, params wire.OpenWi
 		// Uncommissioned devices (no fabric installed yet) MAY use an
 		// extended 48-h window per Matter §11.19.8.1, which matches
 		// chip CommissioningWindowManager.cpp::MaxCommissioningTimeout()
-		// and matter.js AdministratorCommissioningServer.ts:283-290.
+		// and matter.js AdministratorCommissioningServer.ts:196-198 (the cap; :260 its default).
 		// Commissioned bridges use the standard 900-s cap.
 		maxTimeout = commissioningWindowMaxSecUncommissioned
 	}

@@ -34,7 +34,7 @@ const (
 
 // ignoredEntryReason is why an entry resolves to no client of the source
 // endpoint, phrased for the developer reading the log — matter.js
-// ignoredEntryReason (BindingManager.ts:721-737), its four messages
+// ignoredEntryReason (BindingManager.ts:707-720), its four messages
 // verbatim. unbindable are the clients the entry matches that are left
 // out as not bindable; cluster names come from the schema, as matter.js's
 // from its model.

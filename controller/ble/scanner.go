@@ -96,7 +96,7 @@ type ScannerOptions struct {
 }
 
 // Scanner finds commissionable devices by their BLE advertisements —
-// matter.js BleScanner (BleScanner.ts:124-674) at 0ceb202d. One radio
+// matter.js BleScanner (packages/protocol/src/common/BleScanner.ts:124-674) at 0ceb202d. One radio
 // serves every discovery: the scan starts with the first and stops with
 // the last. It is safe for concurrent use.
 type Scanner struct {

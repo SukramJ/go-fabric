@@ -129,7 +129,7 @@ func DecodeQRCode(s string) (Payload, error) {
 //
 // Mirrors matter.js packages/types/src/schema/PairingCodeSchema.ts:330-345
 // (QrPairingCodeSchema.decodeInternal) followed by the validation decode
-// runs by default (Schema.ts:18-25): version 0 and a valid passcode (:279-286),
+// runs by default (packages/types/src/schema/Schema.ts:18-25): version 0 and a valid passcode (:279-286),
 // the vendor/product identity (:289-293). A TLV tail is parsed with
 // [DecodeExtra] when it decodes and kept as raw bytes otherwise.
 func DecodeQRCodes(s string) ([]Payload, error) {
@@ -375,7 +375,7 @@ func skipRest(dec *tlv.Decoder) error {
 //
 // Mirrors matter.js packages/types/src/schema/PairingCodeSchema.ts:461-493
 // (ManualPairingCodeSchema.decodeInternal) followed by the default
-// validation (Schema.ts:18-25): the passcode (:429-431) and the
+// validation (packages/types/src/schema/Schema.ts:18-25): the passcode (:429-431) and the
 // vendor/product identity (:457-459).
 func DecodeManualCode(s string) (ManualPayload, error) {
 	// :462 — "we SHALL be robust against other characters".

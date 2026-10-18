@@ -14,7 +14,7 @@ import (
 // (packages/node/src/devices/<name>.ts at 0ceb202d): the type's identity,
 // its `server.mandatory` / `server.optional` blocks and its
 // `client.mandatory` / `client.optional` blocks, transcribed in order —
-// on-off-light-switch.ts:75-95 is the shape of all eleven.
+// packages/node/src/devices/on-off-light-switch.ts:75-95 is the shape of all eleven.
 type controllerParity struct {
 	ty                              *Type
 	id, revision                    uint16
