@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/measurement"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
@@ -101,6 +102,7 @@ func New(t *Type, opts Options, with ...Option) (*Device, error) {
 		return nil, fmt.Errorf("%w: %s needs a StableKey", ErrConfiguration, t.Name)
 	}
 	s := newSettings(with)
+	s.clock = opts.Clock
 	if s.nilSrv {
 		return nil, fmt.Errorf("%w: %s: WithServer(nil)", ErrConfiguration, t.Name)
 	}
@@ -333,7 +335,7 @@ func defaultServer(t *Type, r *ClusterRequirement, s *settings) (contract.Cluste
 	// The generated default is matter.js's generated behavior: its
 	// commands are unimplemented until the host registers handlers
 	// (ValidatedElements.ts:341-343, :361-368 at 0ceb202d).
-	srv, err := factory(def, opts, spec.ServerConfig{Initial: initial, Unimplemented: true})
+	srv, err := factory(def, opts, spec.ServerConfig{Initial: initial, Unimplemented: true}, s.clock)
 	switch {
 	case errors.Is(err, spec.ErrFabricScoped):
 		return nil, fmt.Errorf("%w: %s %s: %w: supply its server with WithServer", ErrNoDefaultServer, t.Name, r.Name, err)
@@ -357,7 +359,7 @@ func clusterMandatedFeatures(def *spec.Cluster) uint32 {
 
 // serverFactory builds a cluster's default server from its definition,
 // the feature and element selection and the initial values.
-type serverFactory func(def *spec.Cluster, opts spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error)
+type serverFactory func(def *spec.Cluster, opts spec.Options, cfg spec.ServerConfig, clk clock.Clock) (contract.ClusterServer, error)
 
 // defaultFactories is the device layer's default table: the clusters whose
 // default server is one of the module's self-held servers rather than the
@@ -386,7 +388,7 @@ var defaultFactories = map[uint32]serverFactory{
 // base.ts:15-19, 39 BindingServer as the default implementation). It keeps
 // its own list and data version, so the configuration states nothing it
 // can take.
-func newBindingServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error) {
+func newBindingServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig, _ clock.Clock) (contract.ClusterServer, error) {
 	if err := selfHeldConfig("Binding", cfg); err != nil {
 		return nil, err
 	}
@@ -400,7 +402,7 @@ func newBindingServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig) (c
 // EcosystemInformationServer.ts:14, no server logic; both attributes are
 // lists). A host whose bridged device belongs to an ecosystem supplies its
 // own server over its directory with [WithServer].
-func newEcosystemInformationServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error) {
+func newEcosystemInformationServer(_ *spec.Cluster, _ spec.Options, cfg spec.ServerConfig, _ clock.Clock) (contract.ClusterServer, error) {
 	if err := selfHeldConfig("EcosystemInformation", cfg); err != nil {
 		return nil, err
 	}
@@ -429,17 +431,19 @@ func (emptyEcosystem) EcosystemLocations(context.Context) []ecodef.EcosystemLoca
 // newOnOffServer is the module's OnOff server ([onoff.New]). A device of
 // this layer sits under the Aggregator, so StartUpOnOff is not applied
 // (OnOffServer.ts:37, `!this.endpoint.ownerOfType(AggregatorEndpoint)`).
-func newOnOffServer(_ *spec.Cluster, opts spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error) {
+// Its countdown runs on the device's clock ([Options].Clock).
+func newOnOffServer(_ *spec.Cluster, opts spec.Options, cfg spec.ServerConfig, clk clock.Clock) (contract.ClusterServer, error) {
 	return onoff.New(onoff.Config{
 		Features:    onoff.Feature(opts.Features),
 		DataVersion: cfg.DataVersion,
 		Initial:     cfg.Initial,
 		Bridged:     true,
+		TimeSource:  clk,
 	})
 }
 
 // newSpecServer is the generated server, [spec.NewServer].
-func newSpecServer(def *spec.Cluster, opts spec.Options, cfg spec.ServerConfig) (contract.ClusterServer, error) {
+func newSpecServer(def *spec.Cluster, opts spec.Options, cfg spec.ServerConfig, _ clock.Clock) (contract.ClusterServer, error) {
 	srv, err := spec.NewServer(def, opts, cfg)
 	if err != nil {
 		return nil, err

@@ -6,6 +6,7 @@ package device
 import (
 	"maps"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -40,6 +41,13 @@ type Options struct {
 	// NodeLabel is a NodeLabel a controller wrote in an earlier run and
 	// the host persisted ([endpoint.Spec.NodeLabel]).
 	NodeLabel string
+	// Clock is the time source of the servers the device builds itself —
+	// the OnOff server's OnTime / OffWaitTime countdown
+	// (onoff.Config.TimeSource); nil is [clock.System]. A host on a node
+	// passes the node's clock (node.Config.Clock), so a test that steps a
+	// clocktest.Fake steps the device's timers with the node's. A server
+	// the host supplies (WithServer) keeps its own.
+	Clock clock.Clock
 }
 
 // Option configures one device at construction, as matter.js's
@@ -66,6 +74,8 @@ type settings struct {
 	// clients are the client clusters [WithClientClusters] declared, in
 	// call order.
 	clients []uint32
+	// clock is [Options].Clock, for the servers the device builds.
+	clock clock.Clock
 }
 
 func newSettings(with []Option) *settings {

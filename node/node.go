@@ -176,6 +176,9 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 			// The node's own conditions on the root: WiFi with a Wi-Fi
 			// reporter (Network.WiFi).
 			RootDeviceConditions: n.cfg.rootDeviceConditions(),
+			// The bridged endpoints' Identify servers count down on the
+			// node's clock.
+			Clock: n.cfg.Clock,
 		}, n.logger)
 		if err != nil {
 			return nil, fmt.Errorf("node: endpoint assembler: %w", err)
@@ -252,7 +255,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	if n.commissionerControl != nil {
 		aggExtra = append(slices.Clone(aggExtra), n.commissionerControl)
 	}
-	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, aggExtra)
+	aggregatorServers, err := buildAggregatorClusters(ctx, n.st, aggExtra, n.cfg.Clock)
 	if err != nil {
 		return nil, fmt.Errorf("node: %w", err)
 	}

@@ -423,8 +423,9 @@ func buildLabels(ctx context.Context, st *store.Store, key string, fixed []fixed
 
 // buildAggregatorClusters constructs endpoint 1, the Aggregator: Identify,
 // Descriptor, FixedLabel ("role" "aggregator"), UserLabel and the host's
-// extra servers (wiring.go:332-345).
-func buildAggregatorClusters(ctx context.Context, st *store.Store, extra []contract.ClusterServer) ([]contract.ClusterServer, error) {
+// extra servers (wiring.go:332-345). Identify counts down on clk, the
+// node's clock.
+func buildAggregatorClusters(ctx context.Context, st *store.Store, extra []contract.ClusterServer, clk clock.Clock) ([]contract.ClusterServer, error) {
 	descriptor, err := mattercore.NewDescriptor(
 		[]mattercore.DeviceTypeStruct{{DeviceType: deviceTypeAggregator, Revision: deviceTypeRevision(deviceTypeAggregator)}},
 		nil, nil, nil,
@@ -438,7 +439,9 @@ func buildAggregatorClusters(ctx context.Context, st *store.Store, extra []contr
 	if err != nil {
 		return nil, fmt.Errorf("aggregator labels: %w", err)
 	}
-	servers := append([]contract.ClusterServer{mattercore.NewIdentify(), descriptor, fixedLabel, userLabel}, extra...)
+	identify := mattercore.NewIdentify()
+	identify.SetClock(clk)
+	servers := append([]contract.ClusterServer{identify, descriptor, fixedLabel, userLabel}, extra...)
 	descriptor.SetServerListProvider(clusterIDsOf(servers))
 	return servers, nil
 }

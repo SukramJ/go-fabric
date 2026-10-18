@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/groups"
 )
 
@@ -60,6 +61,11 @@ type Config struct {
 	// facts no topology shows, such as LanguageLocale, TimeLocale or
 	// UnitLocale. nil states none.
 	RootDeviceConditions []string
+	// Clock is the time source of the stateful servers the assembler
+	// builds per bridged endpoint — the Identify server's IdentifyTime
+	// countdown (cluster/core.Identify.SetClock); nil is [clock.System].
+	// A node passes its own (node.Config.Clock).
+	Clock clock.Clock
 }
 
 // ScenesStore keeps an endpoint's scene table across restarts — matter.js
@@ -117,7 +123,7 @@ func New(s Store, cfg Config, logger *slog.Logger) (*Assembler, error) {
 		store:  s,
 		cfg:    cfg,
 		logger: logger,
-		states: newEndpointStateRegistry(),
+		states: newEndpointStateRegistry(cfg.Clock),
 	}
 	return a, nil
 }
