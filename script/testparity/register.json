@@ -2381,8 +2381,16 @@
     },
     {
       "path": "packages/protocol/test/action/client/subscription/ClientSubscriptionsTest.ts",
-      "status": "planned",
-      "reason": "The controller's subscription timers across clock steps and the report-started observers.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestClientSubscriptionsResetTimer",
+        "controller/interaction:TestClientSubscriptionsReportStarted"
+      ],
+      "missing": [
+        "keeps a healthy subscription alive across a forward wall-clock step",
+        "times a subscription out on schedule across a backward wall-clock step"
+      ],
+      "reason": "The liveness expiry at the deadline instant and the three reportStarted cases (session announced, a panicking callback contained, nothing announced after close) are ported on the scripted rig; the two wall-clock-step cases need a wall clock apart from the monotonic one, which clocktest.Fake (one reading) does not have.",
       "snapshotSha": "33a8e50b002c5d12f06f719efdce5abac617ddf3"
     },
     {
