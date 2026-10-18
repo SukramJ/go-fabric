@@ -10,6 +10,16 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-18
+
+Milestone 1 of [the roadmap](./docs/roadmap.md), the commissioner in the field: the controller commissions over Bluetooth LE (BTP in pure Go, the BlueZ sub-module `ble/bluez`, `pair --ble`) and runs the network steps (Wi-Fi credentials, Thread dataset), its keys sit behind `crypto.Signer`, the CSA ledger's production roots ship as an embedded snapshot with the trust modes development / production / none, and it opens a commissioning window for the next admin. The BLE path is proven end to end against a matter.js node over virtual controllers (`ble-virtual.yml`, manual dispatch) — a real device remains the field proof. The device side and the store schema are unchanged.
+
+**What a host must do.**
+- Nothing for the device side: no API, wire or store change (`store.Migrations()` still ends at `v4`).
+- A controller host that wants hardware-held keys passes a `crypto.Signer` (`ca.Config.RootSigner`, `ca.Config.ICACSigner`, `commissioner.FabricConfig.OperationalSigner`); the file-based default is unchanged.
+- A controller host that verified attestation against the online ledger only now gets the embedded snapshot first (`attestation.Layered`); `--trust production` on the reference controller turns the test PAAs off.
+- `ble/bluez` is a Go module of its own: `go get github.com/SukramJ/go-fabric/ble/bluez@v0.7.0`.
+
 ### Added
 
 - `examples/reference-controller`: `window open <node> [--timeout s] [--basic]` and `window revoke <node>` — an enhanced commissioning window with a random passcode, discriminator and salt (the manual and QR code printed), or a basic one, for adding a paired node to a second ecosystem; a stale window is revoked first, as matter.js's `CommissioningClient` does.
@@ -4080,7 +4090,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/SukramJ/go-fabric/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/SukramJ/go-fabric/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/SukramJ/go-fabric/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/SukramJ/go-fabric/compare/v0.5.2...v0.5.3

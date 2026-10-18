@@ -22,13 +22,13 @@ not a claim.
 
 ## Status
 
-As of `v0.6.0` (2026-10-17); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
+As of `v0.7.0` (2026-10-18); the numbers are [the roadmap's baseline](./docs/roadmap.md#baseline-2026-10-17-v060).
 
 | Area | State |
 | --- | --- |
 | Device side | 118 of 135 clusters served, 79 of 91 device types generated ([comparison](./docs/matterjs-comparison.md), [roadmap](./docs/roadmap.md)) |
-| Controller side | full commissioner, controller role stages 1–6b; Joint Fabric deferred ([comparison](./docs/matterjs-comparison.md)) |
-| BLE | controller: [milestone 1](./docs/roadmap.md#milestone-1-the-commissioner-in-the-field), in progress; device: [milestone 7](./docs/roadmap.md#milestone-7-ble-on-the-device-side) |
+| Controller side | full commissioner (BLE, Wi-Fi and Thread network steps, keys behind `crypto.Signer`, the embedded DCL snapshot), controller role stages 1–6b; Joint Fabric deferred ([comparison](./docs/matterjs-comparison.md)) |
+| BLE | controller: done with [milestone 1](./docs/roadmap.md#milestone-1-the-commissioner-in-the-field) — `ble/bluez` on Linux, `pair --ble`, proven against a matter.js node over virtual controllers; device: [milestone 7](./docs/roadmap.md#milestone-7-ble-on-the-device-side) |
 | Thread | dataset provisioning only, by the commissioner ([milestone 1](./docs/roadmap.md#milestone-1-the-commissioner-in-the-field), phase 12); no Thread radio ([comparison](./docs/matterjs-comparison.md)) |
 | ICD | [milestone 5](./docs/roadmap.md#milestone-5-icd-and-the-controller-remainder) |
 | Certification | not pursued; certifiability is a goal ([certifiability](./docs/certifiability.md)) |
