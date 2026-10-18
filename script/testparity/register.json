@@ -3947,19 +3947,12 @@
     },
     {
       "path": "packages/protocol/test/peer/ThreadNetworkNameResolutionTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "controller/commissioner:TestResolveThreadNetworkName"
+        "controller/commissioner:TestResolveThreadNetworkName",
+        "controller/commissioner:TestThreadNetworkNameResolution"
       ],
-      "missing": [
-        "treats an empty-string name as absent and derives",
-        "returns the supplied name when it matches the dataset",
-        "declines with a typed error when the supplied name mismatches the dataset",
-        "keeps the supplied name when the dataset carries no network name",
-        "returns undefined when neither the params nor the dataset carry a name",
-        "falls back to the supplied name and does not throw when the dataset cannot be decoded"
-      ],
-      "reason": "Deriving the network name from the dataset is covered; the mismatch, empty and undecodable cases are not.",
+      "reason": "All seven resolveThreadNetworkName cases ported with the test's MeshCoP vectors: derive, empty name as absent, match, typed mismatch error, dataset without a name, neither, undecodable dataset falling back to the supplied name.",
       "snapshotSha": "de49fbbdf64bbf926d868b2e8f54f3b0bdd3407f"
     },
     {

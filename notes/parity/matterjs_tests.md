@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 25 |
-| partial | 104 |
+| ported | 26 |
+| partial | 103 |
 | planned | 108 |
 | excluded | 87 |
 | total | 324 |
@@ -106,7 +106,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/ota](#protocoltestota) | 2 | 2 | 0 | 0 | 0 |
-| [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
+| [protocol/test/peer](#protocoltestpeer) | 14 | 1 | 7 | 3 | 3 |
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 8 | 0 | 0 |
 | [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 1 | 0 | 1 |
@@ -847,7 +847,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | PeerEstablishmentProgressTest.ts | 148 | partial | `controller/peer:TestParityUnresponsiveDetector`<br>`controller/peer:TestEstablishmentUnresponsive` | The unresponsive-establishment latch is ported; the per-instance latch independence is not. Missing: “keeps an independent latch per detector instance”. |
 | PhysicalDevicePropertiesTest.ts | 308 | planned | — | Subscription interval bounds the controller derives from a peer's physical properties (Thread, ICD, Generic Switch). |
 | RebootResubscribeArmerTest.ts | 529 | excluded | `controller-stage` until M5 phase 24 | The controller re-subscribing a peer after an OTA reboot, which milestone 5 phase 24 builds. |
-| ThreadNetworkNameResolutionTest.ts | 51 | partial | `controller/commissioner:TestResolveThreadNetworkName` | Deriving the network name from the dataset is covered; the mismatch, empty and undecodable cases are not. Missing: “treats an empty-string name as absent and derives”; “returns the supplied name when it matches the dataset”; “declines with a typed error when the supplied name mismatches the dataset”; “keeps the supplied name when the dataset carries no network name”; “returns undefined when neither the params nor the dataset carry a name”; “falls back to the supplied name and does not throw when the dataset cannot be decoded”. |
+| ThreadNetworkNameResolutionTest.ts | 51 | ported | `controller/commissioner:TestResolveThreadNetworkName`<br>`controller/commissioner:TestThreadNetworkNameResolution` | All seven resolveThreadNetworkName cases ported with the test's MeshCoP vectors: derive, empty name as absent, match, typed mismatch error, dataset without a name, neither, undecodable dataset falling back to the supplied name. |
 
 ## protocol/test/protocol
 
