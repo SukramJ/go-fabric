@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 19 |
+| ported | 20 |
 | partial | 103 |
-| planned | 115 |
+| planned | 114 |
 | excluded | 87 |
 | total | 324 |
 
@@ -81,7 +81,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/endpoint/validation](#nodetestendpointvalidation) | 9 | 0 | 4 | 3 | 2 |
 | [node/test/endpoints](#nodetestendpoints) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/loader](#nodetestloader) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/node](#nodetestnode) | 50 | 13 | 19 | 8 | 10 |
+| [node/test/node](#nodetestnode) | 50 | 14 | 19 | 7 | 10 |
 | [node/test/node/client](#nodetestnodeclient) | 11 | 0 | 0 | 5 | 6 |
 | [node/test/node/integration](#nodetestnodeintegration) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/node/remote](#nodetestnoderemote) | 1 | 0 | 0 | 0 | 1 |
@@ -603,7 +603,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | MockServerNodeTest.ts | 31 | excluded | `test-infrastructure` | matter.js's MockServerNode test helper. |
 | MockSiteTest.ts | 16 | excluded | `test-infrastructure` | matter.js's MockSite test helper. |
 | NodeLifecycleSeededTest.ts | 423 | partial | `controller/client:TestNodeLifecycleSeededParity`<br>`controller/client:TestNodeLifecycleSeededPairParity` | When the client node is seeded — BasicInformation present and every endpoint the root's reported PartsList names installed, a root-only node included, more than the root without a PartsList — and the root-only warning (once, not for a node-scoped device type, not without a reported DeviceTypeList) run on Node.apply with Descriptor reports (controller/client:TestNodeLifecycleSeededParity) and on fabrictest for the commissioned pair and the restored peer (TestNodeLifecycleSeededPairParity); fix: the seeding rule of Peers.ts #evaluateSeeded (:760-797) at 862ad75f — the Go node seeded only with more than one endpoint. matter.js also reads an unreported mandatory list as empty; the Go image holds no value. Missing: nodes built by hand (endpoints.require, behaviors.require — the Go image is built from reports and its store only) and the ClientNodeLifecycle/NodeLifecycle class split (no lifecycle class hierarchy in Go). Missing: “seeds a node built by hand once an endpoint beyond the root is added”; “seeds a node built by hand on BasicInformation install when endpoints are already present”; “uses ClientNodeLifecycle for a client node and plain NodeLifecycle for a server node”. |
-| NodePhysicalPropertiesTest.ts | 265 | planned | — | Subscription intervals the controller chooses from a peer's power source and network. |
+| NodePhysicalPropertiesTest.ts | 265 | ported | `controller/client:TestNodePhysicalPropertiesParity`<br>`controller/client:TestNodePhysicalPropertiesPairParity` | The physical properties and the interval bounds of a node built as matter.js's MockServerNode compositions (the cluster on the root, on a utility endpoint, behind an Aggregator; default, request, ICD, battery, mains and battery, Wi-Fi, sleepy and active Thread intervals; the network medium inferred from the root's diagnostics; the device types collected) run on Node.apply of the image (controller/client:TestNodePhysicalPropertiesParity), the device's own specification version on fabrictest (TestNodePhysicalPropertiesPairParity). |
 | PeerBehaviorTest.ts | 359 | planned | — | The schema the controller builds for a peer's clusters from AttributeList and revision. |
 | PeerDescriptorTest.ts | 438 | planned | — | The controller's persisted peer descriptor: session parameters, intervals, migrated older records. |
 | PluginsTest.ts | 77 | excluded | `js-runtime-only` | matter.js's plugin loading. |
@@ -1087,7 +1087,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `ClientBridgeStructureTest.ts` — How the controller builds the structure of a bridge peer across interactions (parts below composed devices, owner lists, endpoints the root omits).
 - `ClientEventNotificationTest.ts` — Delivery of peer events to the controller's observers, timestamps and event numbers.
 - `ClientInvokeTest.ts` — The controller's invoke batching, its bypasses and network propagation.
-- `NodePhysicalPropertiesTest.ts` — Subscription intervals the controller chooses from a peer's power source and network.
 - `PeerBehaviorTest.ts` — The schema the controller builds for a peer's clusters from AttributeList and revision.
 - `PeerDescriptorTest.ts` — The controller's persisted peer descriptor: session parameters, intervals, migrated older records.
 - `ReportedSessionParametersTest.ts` — The session parameters the peer sent in PASE, CASE and resumed CASE, held by the controller.

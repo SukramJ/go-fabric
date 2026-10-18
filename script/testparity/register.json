@@ -2252,8 +2252,12 @@
     },
     {
       "path": "packages/node/test/node/NodePhysicalPropertiesTest.ts",
-      "status": "planned",
-      "reason": "Subscription intervals the controller chooses from a peer's power source and network.",
+      "status": "ported",
+      "go": [
+        "controller/client:TestNodePhysicalPropertiesParity",
+        "controller/client:TestNodePhysicalPropertiesPairParity"
+      ],
+      "reason": "The physical properties and the interval bounds of a node built as matter.js's MockServerNode compositions (the cluster on the root, on a utility endpoint, behind an Aggregator; default, request, ICD, battery, mains and battery, Wi-Fi, sleepy and active Thread intervals; the network medium inferred from the root's diagnostics; the device types collected) run on Node.apply of the image (controller/client:TestNodePhysicalPropertiesParity), the device's own specification version on fabrictest (TestNodePhysicalPropertiesPairParity).",
       "snapshotSha": "f7921db5589915e15ee22c65d9ee93ed62c6496a"
     },
     {
