@@ -23,6 +23,8 @@ Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5,
 - `bdx/otaimage`: `FileOptions.ChecksumType` and `FileOptions.SkipFullChecksum` for `ValidateFile`; `CreateWithChecksum` with `CreateOptions.FullFileChecksumType` (matter.js `OtaImageWriter.create`'s checksum result).
 - `bdx`: `SendOptions.StartOffset` (stated in the SendInit) and `Result.StartOffset`.
 - `secure/attestation.ErrCertificateTooLarge`.
+- `controller/interaction.InvokeOptions.SuppressResponse`: the request carries SuppressResponse and the invoke waits only for the acknowledgement (matter.js `Invoke.Definition.suppressResponse`).
+- `controller/interaction.Subscription.MaxEventNumber` and `SubscribeRequest.MaxEventNumberChanged`: the highest event number a sustained subscription delivered, and the hook called when a report raised it (matter.js `SustainedSubscription.maxEventNumber`, `maxEventNumberChanged`).
 
 ### Fixed
 
@@ -42,6 +44,9 @@ Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5,
 - `controller/commissioner`: `NewFabric` gives an unset admin vendor id the test vendor 0xFFF1 and refuses one above 0xFFF4 instead of sending it in AddNOC (matter.js `FabricAuthority.ts:47,139-147`).
 - `bdx/otaimage`: `ValidateFile` with an expected checksum and no computed one reports a mismatch (matter.js `OtaImageReader.ts:89-93`).
 - `controller/ble`: a scan start or stop that does not settle within 10 s fails with `ErrScanTransitionTimeout`; scan transitions run in the order queued, so `Close`'s stop is the last; a discovery on a closed scanner returns the stored devices without scanning (matter.js `BleScanner.ts:110-114,160-225,654-673`).
+- `transport/mrp`: `BackoffDuration` saturates instead of overflowing to a negative wait from transmission 52 on, which made an unbounded controller attempt retransmit in a tight loop after about 100 minutes (matter.js computes in JavaScript numbers, `MRP.ts:183-190`).
+- `controller/interaction`: a sustained subscription resubscribes for the events above the highest one it delivered, replacing the request's and its RefreshRequest's event filters (matter.js `SustainedSubscription.ts:105-126,339-384`); a timeout alone marks an invoke timed (`Invoke.ts:114`); a panic in the `ReportStarted` callback is logged and contained instead of crashing the inbound report handler (`ClientSubscriptions.ts:156-158`).
+- `mdns`: the MAC-derived default host name stays while its interface still carries the MAC, skips a zero MAC and is kept when the interfaces cannot be listed, instead of following the first interface on every Publish (matter.js `MdnsServer.ts:328-351`).
 - `secure/mattercert`: the X.509 TBSCertificate rebuilt for signature verification now emits the extensions in their TLV arrival order and writes an explicit `pathLenConstraint` of 0 when the certificate carries one. Both mirror matter.js (`Certificate.ts` `extensionsToAsn1`, `X509.ts` `BasicConstraints`) and chip (`CHIPCertToX509.cpp`). Before, the order was fixed to tag order and a zero path-len was dropped, so every Amazon (Alexa) and SmartThings root failed `AddTrustedRootCertificate` with `RCAC self-signature invalid: mattercert: signature invalid`, and their ICACs would have failed `AddNOC`. The matter.js fixtures of both commissioners (`TestCertificates.ts`) are now parity cases: TBS bytes, root self-signature and the root → ICAC → NOC chain.
 
 ### Deprecated
