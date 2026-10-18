@@ -3877,27 +3877,17 @@
     },
     {
       "path": "packages/protocol/test/peer/PeerConnectionFallbackRetirementTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/peer:TestFallbackRetiredAfterStabilization",
         "controller/peer:TestFallbackOnlyAndNotFirst",
-        "controller/peer:TestParityTimingDefaults"
+        "controller/peer:TestParityTimingDefaults",
+        "controller/peer:TestPeerConnectionFallbackRetirementAfterStabilization",
+        "controller/peer:TestPeerConnectionFallbackRetirementSuperseded",
+        "controller/peer:TestPeerConnectionFallbackRetirementKeepAlive",
+        "controller/peer:TestPeerConnectionFallbackRetirementStagger"
       ],
-      "missing": [
-        "does not retire a fallback that discovery re-advertises during the debounce",
-        "does not retire while no discovered alternative exists",
-        "is superseded with a discovered alternative that is not the fallback",
-        "is not superseded once promoted (fallback flag cleared)",
-        "is not superseded when no discovered address exists",
-        "is not superseded when the fallback is itself re-advertised (matched ignoring transport)",
-        "is not superseded when the fallback is re-advertised alongside other addresses",
-        "keeps the operational address alive when it is the last attempt (unforced)",
-        "deletes when a non-operational attempt still remains",
-        "force bypasses the keep-alive so a superseded fallback is actually dropped",
-        "staggers a second real address behind the first",
-        "starts immediately once retirement resets lastAttemptAt"
-      ],
-      "reason": "Retiring the fallback address after stabilization is covered; the supersession decisions and the keep-alive guard are not.",
+      "reason": "The stabilization debounce, retiring a superseded fallback and keeping a re-advertised or alternative-less one, the fallbackSuperseded decision, the deleteAddress keep-alive guard with its force bypass and the scheduler stagger are ported against controller/peer's connection process and its closures.",
       "snapshotSha": "56b81559e7a471d841107791d7c8835cd0147ec4"
     },
     {
