@@ -2490,8 +2490,23 @@
     },
     {
       "path": "packages/protocol/test/action/request/ReadTest.ts",
-      "status": "planned",
-      "reason": "Building a read request: attribute and event paths, wildcards, fabric filtering by default, data version filters.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestReadRequestBuildAttributes",
+        "controller/interaction:TestReadRequestBuildFabricFiltering",
+        "controller/interaction:TestReadRequestBuildDataVersionFilters",
+        "controller/interaction:TestReadRequestBuildEvents",
+        "controller/interaction:TestReadRequestBuildCombined",
+        "controller/interaction:TestReadRequestBuildValidation",
+        "controller/interaction:TestReadRequestBuildInteractionModelRevision"
+      ],
+      "missing": [
+        "validates request has attributes using containsAttribute",
+        "validates request has events using containsEvent",
+        "throws when called with no arguments",
+        "uses custom interaction model revision when specified"
+      ],
+      "reason": "The ReadRequest read off the wire of Interaction.ReadWith (attribute and event paths with every wildcard, fabric filtering, data version and event filters, the empty request, the revision) is ported; missing are the TypeScript type guards Read.containsAttribute/containsEvent (no Go counterpart, a Go caller reads len()), the call without an argument (ReadWith always takes a ReadRequest value; the empty one is ported) and a custom revision (Go always stamps its own).",
       "snapshotSha": "8edabceb05dc561b8fbfacf6e48cf945c380225c"
     },
     {
