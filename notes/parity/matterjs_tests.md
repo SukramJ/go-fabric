@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 54 |
-| partial | 111 |
-| planned | 72 |
+| partial | 112 |
+| planned | 71 |
 | excluded | 87 |
 | total | 324 |
 
@@ -81,7 +81,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/endpoint/validation](#nodetestendpointvalidation) | 9 | 0 | 4 | 3 | 2 |
 | [node/test/endpoints](#nodetestendpoints) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/loader](#nodetestloader) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/node](#nodetestnode) | 50 | 14 | 21 | 5 | 10 |
+| [node/test/node](#nodetestnode) | 50 | 14 | 22 | 4 | 10 |
 | [node/test/node/client](#nodetestnodeclient) | 11 | 2 | 1 | 2 | 6 |
 | [node/test/node/integration](#nodetestnodeintegration) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/node/remote](#nodetestnoderemote) | 1 | 0 | 0 | 0 | 1 |
@@ -574,7 +574,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | CaseConnectionTimeoutTest.ts | 111 | ported | `controller/client:TestCaseConnectionTimeoutParity` | The CASE connection budget after AddNOC (Sigma1 to the device dropped on fabrictest's network): commissioning through the registry fails before 60 s with a peer.UnreachableError naming the budget and the peer is deleted; a non-finite budget is refused (controller/client:TestCaseConnectionTimeoutParity). |
 | ClientAddressProbeTest.ts | 129 | partial | `controller/peer:TestMonitorScheduledByAServiceChange`<br>`controller/peer:TestProbeReadsTheReports` | The controller's probe on a vanished address is covered; keeping the session when the probe confirms reachability is not asserted as such. Missing: “keeps session when probe confirms current address is reachable”. |
 | ClientAttestationTest.ts | 680 | partial | `controller/commissioner:TestRejectedAttestation`<br>`controller/commissioner:TestAcceptedFailedAttestation`<br>`controller/dcl:TestCommissionWithDCLStore`<br>`controller/dcl:TestCommissionRevokedDAC`<br>`controller/client:TestClientAttestationNoTrustStoreParity`<br>`controller/client:TestClientAttestationTrustStoreParity`<br>`controller/client:TestClientAttestationCallbackContractParity` | Accepting and rejecting a failed attestation and commissioning against the DCL trust store keep their commissioner and dcl tests; the matter.js cases run through the client registry on fabrictest (controller/client:TestClientAttestation*): without a trust store (DclServiceUnavailable), with the device's PAA trusted, trusted as a test root only, or another PAA trusted, under every form of onAttestationFailure and the callback contract (the reason as the CommissioningError's message with the cause kept, an error returned verbatim, one invocation). The trust store is an attestation.StaticStore with the case's roots and the CSA test CD signer (fabrictest.ControllerOptions.Attestation, NoAttestationStore). Missing: the corrupt cached PAA (self-healed by a DCL re-fetch, or surfaced as a ValidationError finding when the re-fetch is blocked) and the revocation cases (a CRL served by the DCL revoking the PAI, one revoking other serials, the on-demand revocation-point fetch): they need the DclCertificateService over a mocked DCL, which the dcl package tests cover with their fake ledger (TestCertificateStoreSelfHeal, the revocation tests) but not through a commissioning on fabrictest. Missing: “self-heals a corrupt cached PAA by re-fetching from DCL”; “surfaces an unrecoverable corrupt cached PAA as a judgeable finding”; “rejects an unrecoverable corrupt cached PAA when policy rejects, surfacing the cause”; “rejects when PAI serial is in revocation list”; “passes when revocation list has different serial numbers”; “dynamically fetches revocation data from DCL during commissioning”. |
-| ClientBridgeStructureTest.ts | 1310 | planned | — | How the controller builds the structure of a bridge peer across interactions (parts below composed devices, owner lists, endpoints the root omits). |
+| ClientBridgeStructureTest.ts | 1310 | partial | `controller/client:TestClientBridgeStructureBridgeParity`<br>`controller/client:TestClientBridgeStructureTwoInteractionsParity`<br>`controller/client:TestClientBridgeStructureRootOmitsParity`<br>`controller/client:TestClientBridgeStructureChangesParity`<br>`controller/client:TestClientBridgeStructureNestedAggregatorParity`<br>`controller/client:TestClientBridgeStructureSeveralEndpointsParity` | How the client builds a bridge peer's tree: a composed device's parts below it on a real bridge (fabrictest), and on Descriptor reports applied to the image (Node.apply) — the claims kept across two interactions, the root omitting an endpoint, lists that change, an aggregator below an aggregator, bridged devices of several endpoints, the claimant ranking and the several-parents warning (controller/client:TestClientBridgeStructure*; fix: the claimant naming the fewest other claimants, then the shorter list, then the lower number owns a part whatever the arrival order, an endpoint the root no longer names is not waited for and not warned about, ClientStructure.ts:1436-1599). Missing: a sensor added to a composed device at run time and deleted again (device.Device has no part removal), and the real nested-aggregator device (the Go node serves one Aggregator at endpoint 1; the fed case covers the client's placement). Missing: “puts a sensor the bridge adds to a composed device below that device”; “keeps each aggregator's own devices below it”; “reports the nested aggregator as an aggregator”. |
 | ClientCacheBufferTest.ts | 166 | excluded | `js-runtime-only` | matter.js's write buffer for the client-side attribute cache in storage. |
 | ClientChunkedListTest.ts | 114 | ported | `controller/client:TestClientChunkedListParity` | A 50-channel ChannelList chunked across reports, reassembled through the default subscription and through a read (controller/client:TestClientChunkedListParity, a Channel server on the bridged light). |
 | ClientChunkedWriteTest.ts | 164 | partial | `controller/interaction:TestWriteChunksLists` | Chunking a large list write is covered; the data-version and response-size cases are not. Missing: “writes a whole list larger than one message as an empty REPLACE and ADDs across chunks”; “writes a list with a matching data version that fits one message”; “writes a list with a matching data version across chunks”; “rejects every entry of a list write with a stale data version”; “writes small values whose statuses do not fit one WriteResponse although the request does”. |
@@ -1084,7 +1084,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### node/test/node
 
-- `ClientBridgeStructureTest.ts` — How the controller builds the structure of a bridge peer across interactions (parts below composed devices, owner lists, endpoints the root omits).
 - `ClientEventNotificationTest.ts` — Delivery of peer events to the controller's observers, timestamps and event numbers.
 - `ClientInvokeTest.ts` — The controller's invoke batching, its bypasses and network propagation.
 - `ReportedSessionParametersTest.ts` — The session parameters the peer sent in PASE, CASE and resumed CASE, held by the controller.

@@ -29,14 +29,23 @@ import (
 // parityCtx bounds one port on the wall clock.
 func parityCtx(t *testing.T) context.Context {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	t.Cleanup(cancel)
 	return ctx
 }
 
-// quietSite is a site whose hosts log nowhere.
+// siteSlots bounds the sites the parity ports run at once. A fake site
+// clock moves only while the whole test process is quiet (fabrictest
+// Site.Run), so many busy sites in parallel starve each other's clocks —
+// under the race detector past the ports' wall-clock budget.
+var siteSlots = make(chan struct{}, 4)
+
+// quietSite is a site whose hosts log nowhere; it holds one of the
+// siteSlots until the test ends.
 func quietSite(t *testing.T) *fabrictest.Site {
 	t.Helper()
+	siteSlots <- struct{}{}
+	t.Cleanup(func() { <-siteSlots })
 	return fabrictest.NewSite(t, fabrictest.Options{Logger: slog.New(slog.DiscardHandler)})
 }
 

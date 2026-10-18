@@ -1776,8 +1776,21 @@
     },
     {
       "path": "packages/node/test/node/ClientBridgeStructureTest.ts",
-      "status": "planned",
-      "reason": "How the controller builds the structure of a bridge peer across interactions (parts below composed devices, owner lists, endpoints the root omits).",
+      "status": "partial",
+      "go": [
+        "controller/client:TestClientBridgeStructureBridgeParity",
+        "controller/client:TestClientBridgeStructureTwoInteractionsParity",
+        "controller/client:TestClientBridgeStructureRootOmitsParity",
+        "controller/client:TestClientBridgeStructureChangesParity",
+        "controller/client:TestClientBridgeStructureNestedAggregatorParity",
+        "controller/client:TestClientBridgeStructureSeveralEndpointsParity"
+      ],
+      "missing": [
+        "puts a sensor the bridge adds to a composed device below that device",
+        "keeps each aggregator's own devices below it",
+        "reports the nested aggregator as an aggregator"
+      ],
+      "reason": "How the client builds a bridge peer's tree: a composed device's parts below it on a real bridge (fabrictest), and on Descriptor reports applied to the image (Node.apply) — the claims kept across two interactions, the root omitting an endpoint, lists that change, an aggregator below an aggregator, bridged devices of several endpoints, the claimant ranking and the several-parents warning (controller/client:TestClientBridgeStructure*; fix: the claimant naming the fewest other claimants, then the shorter list, then the lower number owns a part whatever the arrival order, an endpoint the root no longer names is not waited for and not warned about, ClientStructure.ts:1436-1599). Missing: a sensor added to a composed device at run time and deleted again (device.Device has no part removal), and the real nested-aggregator device (the Go node serves one Aggregator at endpoint 1; the fed case covers the client's placement).",
       "snapshotSha": "383dcabbcfeadb8c3ff816583d859c91d6267cb7"
     },
     {

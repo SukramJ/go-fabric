@@ -77,6 +77,7 @@ Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5,
 - `controller/client`: a client node signals a ConfigurationVersion change of the peer's BasicInformation or of a bridged endpoint's BridgedDeviceBasicInformation through the new `Hooks.ConfigurationVersionChanged`, as matter.js emits `lifecycle.configurationVersionChanged` (`Peers.ts:757`, `:803-814`); a host only saw an ordinary attribute change.
 - `controller/client`: a client node is seeded once every endpoint its root's PartsList names is installed — a node of its root only included, logged once as offering no function beyond node management when its DeviceTypeList names Root Node alone — as matter.js `Peers.ts:760-797`; it was seeded only with more than one endpoint, so a root-only node never was, and a bridge was seeded before all its endpoints arrived.
 - `controller/client`: two concurrent `Registry.ForDevice` calls for one device return one node; they could both miss and create two (matter.js finds or creates in one turn, `Peers.ts:371-389`).
+- `controller/client`: of several claimants of a bridge peer's endpoint, the one naming the fewest other claimants, then the one with the shorter PartsList, then the lower endpoint number becomes its parent, whatever order the reports arrived in; an endpoint the root no longer names is neither waited for before a full-family owner is decided nor warned about (matter.js `ClientStructure.ts:1436-1599`). The first claimant to arrive won, and such a part could keep a bridge's devices from being placed.
 
 ### Deprecated
 
