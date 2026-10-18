@@ -295,9 +295,13 @@ func decodeGroup(entries []*im.AttributeReport) (spec.Node, error) {
 	if entries[0].Path.HasListIndex {
 		return spec.Node{}, fmt.Errorf("%w: the first chunk of a list needs no list index", errMalformedEntry)
 	}
+	if best, ok := bestDuplicate(entries); ok {
+		return nodeOf(best), nil
+	}
 	var list spec.Node
 	for _, e := range entries {
 		n := nodeOf(e)
+		idx := int(e.Path.ListIndex)
 		switch {
 		case !e.Path.HasListIndex:
 			// No list index replaces the whole list.
@@ -307,16 +311,48 @@ func decodeGroup(entries []*im.AttributeReport) (spec.Node, error) {
 			list = n
 		case e.Path.ListAppend:
 			list.Children = append(list.Children, n)
-		case int(e.Path.ListIndex) >= len(list.Children):
-			return spec.Node{}, fmt.Errorf("%w: list index %d past the list", errMalformedEntry, e.Path.ListIndex)
 		case n.El.Type == tlv.TypeNull || n.El.IsNull:
-			// A null element removes the entry at the index.
-			list.Children = append(list.Children[:e.Path.ListIndex], list.Children[e.Path.ListIndex+1:]...)
+			// A null element removes the entry at the index; past the end
+			// it removes nothing. Mirrors matter.js
+			// packages/types/src/tlv/TlvArray.ts:146-147 (splice).
+			if idx < len(list.Children) {
+				list.Children = append(list.Children[:idx], list.Children[idx+1:]...)
+			}
+		case idx < len(list.Children):
+			list.Children[idx] = n
+		case idx == len(list.Children):
+			// Setting the index at the list's length grows the list by one.
+			// Mirrors matter.js packages/types/src/tlv/TlvArray.ts:149-150
+			// (currentValue[listIndex] = …); an index past the length would
+			// leave a hole, which a node list has no form for.
+			list.Children = append(list.Children, n)
 		default:
-			list.Children[e.Path.ListIndex] = n
+			return spec.Node{}, fmt.Errorf("%w: list index %d past the list", errMalformedEntry, e.Path.ListIndex)
 		}
 	}
 	return list, nil
+}
+
+// bestDuplicate picks, among several entries of one path none of which
+// is a list action or an array, the one with the highest data version —
+// the first of them on a tie. Mirrors matter.js
+// packages/protocol/src/interaction/AttributeDataDecoder.ts:337-343
+// (decodeAttributeValueWithSchema for an attribute that is no list); the
+// schema-blind assembler takes "no list" from the values' TLV type.
+func bestDuplicate(entries []*im.AttributeReport) (*im.AttributeReport, bool) {
+	var best *im.AttributeReport
+	for _, e := range entries {
+		if e.Path.HasListIndex {
+			return nil, false
+		}
+		if n, _ := e.Value.Value.(spec.Node); n.El.Type == tlv.TypeArray {
+			return nil, false
+		}
+		if best == nil || e.DataVersion > best.DataVersion {
+			best = e
+		}
+	}
+	return best, true
 }
 
 // emitEvents is InputChunk.ts:336-354 with decodeEventValue (:356-413)

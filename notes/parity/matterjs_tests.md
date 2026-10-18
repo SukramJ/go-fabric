@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 9 |
-| partial | 95 |
-| planned | 133 |
+| partial | 96 |
+| planned | 132 |
 | excluded | 87 |
 | total | 324 |
 
@@ -108,7 +108,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/ota](#protocoltestota) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 4 | 4 | 0 |
-| [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 1 | 2 | 0 |
+| [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 2 | 1 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 0 | 1 | 1 |
 | [protocol/test/session](#protocoltestsession) | 4 | 0 | 3 | 1 | 0 |
 | [protocol/test/session/secure](#protocoltestsessionsecure) | 2 | 0 | 2 | 0 | 0 |
@@ -867,7 +867,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| AttributeDataDecoderTest.ts | 1234 | planned | — | Decoding attribute reports as chip-tool sends them: chunked arrays with indexed changes, unknown attributes. |
+| AttributeDataDecoderTest.ts | 1234 | partial | `controller/interaction:TestAttributeDataDecoderChunkedArrays`<br>`controller/interaction:TestAttributeDataDecoderChipToolCaptures`<br>`controller/interaction:TestAttributeDataDecoderUnknownValues`<br>`controller/interaction:TestAttributeDataDecoderDuplicates`<br>`controller/interaction:TestAttributeDataDecoderNormalize`<br>`controller/interaction:TestAttributeDataDecoderUnknownCluster` | Chunked lists with indexed add, delete and modify, the chip-tool captures, unknown values, adjacent duplicates, grouping with tag compression and unknown-cluster globals are ported through the schema-blind controller assembler (values compared as TLV nodes, attribute names not asserted); the non-adjacent duplicate case is missing because it tests the deprecated normalizeAttributeData Map grouping (AttributeDataDecoder.ts:162-181), while the Go assembler mirrors InputChunk, which emits one value per adjacent group. Missing: “preserves insertion order and deduplicates when same attribute appears twice with another attribute in between”. |
 | AttributeDataEncoderTest.ts | 362 | partial | `im:TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath`<br>`im:TestAttributeDataEncoderFieldGuarantees`<br>`bridge:TestAttributeDataEncoderChunkArray` | The isUrgent strip, the exactly-one-of data/status guarantee (by construction of the Go report types, asserted on the wire) and list chunking through bridge's splitter are ported; tag compression is missing because matter.js does not use compressAttributeDataReportTags on its wire (AttributeDataEncoder.ts:196-201) and the Go encoder has no counterpart. Missing: “tag compress with dataVersion handling”. |
 | EventDataDecoderTest.ts | 362 | planned | — | Normalising and decoding event reports, including unknown events. |
 
@@ -1204,7 +1204,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 ### protocol/test/protocol/interaction
 
-- `AttributeDataDecoderTest.ts` — Decoding attribute reports as chip-tool sends them: chunked arrays with indexed changes, unknown attributes.
 - `EventDataDecoderTest.ts` — Normalising and decoding event reports, including unknown events.
 
 ### protocol/test/securechannel

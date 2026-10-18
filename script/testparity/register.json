@@ -4068,8 +4068,19 @@
     },
     {
       "path": "packages/protocol/test/protocol/interaction/AttributeDataDecoderTest.ts",
-      "status": "planned",
-      "reason": "Decoding attribute reports as chip-tool sends them: chunked arrays with indexed changes, unknown attributes.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestAttributeDataDecoderChunkedArrays",
+        "controller/interaction:TestAttributeDataDecoderChipToolCaptures",
+        "controller/interaction:TestAttributeDataDecoderUnknownValues",
+        "controller/interaction:TestAttributeDataDecoderDuplicates",
+        "controller/interaction:TestAttributeDataDecoderNormalize",
+        "controller/interaction:TestAttributeDataDecoderUnknownCluster"
+      ],
+      "missing": [
+        "preserves insertion order and deduplicates when same attribute appears twice with another attribute in between"
+      ],
+      "reason": "Chunked lists with indexed add, delete and modify, the chip-tool captures, unknown values, adjacent duplicates, grouping with tag compression and unknown-cluster globals are ported through the schema-blind controller assembler (values compared as TLV nodes, attribute names not asserted); the non-adjacent duplicate case is missing because it tests the deprecated normalizeAttributeData Map grouping (AttributeDataDecoder.ts:162-181), while the Go assembler mirrors InputChunk, which emits one value per adjacent group.",
       "snapshotSha": "69fcb84bb6880680db064ffacfe13056d1b2add0"
     },
     {
