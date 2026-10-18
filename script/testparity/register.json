@@ -2124,8 +2124,28 @@
     },
     {
       "path": "packages/node/test/node/DecommissionTest.ts",
-      "status": "planned",
-      "reason": "The controller decommissioning a peer: RemoveFabric, lost responses, leave events.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestDecommissionUnstructuredParity",
+        "controller/client:TestDecommissionParity"
+      ],
+      "missing": [
+        "removes the node when removeFabric is delivered but the response is lost",
+        "removes the node when a matching leave event arrives even if removeFabric rejects",
+        "does not treat a leave for a different fabric as confirmation",
+        "keeps the node and throws when removeFabric returns a non-Ok status, even if a leave arrives",
+        "probe resolves false on a destroyed node instead of throwing",
+        "rejects a decommission of a node that is being deleted",
+        "waits for a running decommission before handing out a node (removed)",
+        "rejects a decommission of a crashed node with its lifecycle error",
+        "rejects a commission of a crashed node with its lifecycle error",
+        "rejects a commission attempt registered for a crashed node",
+        "does not cull the node while its decommission deletes it",
+        "reports the node gone as soon as its deletion begins",
+        "rejects acting on a node whose deletion has begun instead of restarting it",
+        "ignores an event that arrives for a node while it is deleted"
+      ],
+      "reason": "The decommission of a peer without a structure read or subscription (fabric index recorded, read, or read unfiltered), RemoveFabric never acknowledged (every datagram to the device dropped: the node kept, a second attempt accepted), one fabric operation at a time against a held commission or decommission (client.HoldOperation for peers.runCommissioning), ForDevice waiting for a held decommission, a node deleted by its decommission or by a leave the device reports (client.ErrClosed for DestroyedDependencyError) and nothing left in the store run on fabrictest (controller/client:TestDecommission*). Missing: the cases that patch the peer's removeFabric client to throw PeerMessageMissingError or a non-Ok status or to emit a leave inside the call (no seam on the wire for a delivered request whose answer is lost, nor for a leave timed inside the call); the probe of a destroyed node (no node-level probe); a node being deleted or a delete wrapper (deletion is the registry's Decommission, no public delete in flight); the crashed construction status, runCommissioning, isGone and act on a node whose deletion began (no construction lifecycle in Go); an event fed into the structure while the node is deleted (Node.apply is package-internal; covered by the closing node dropping events).",
       "snapshotSha": "1e1c5744fb3ee77eefc2ec262e9a685ee429585d"
     },
     {
