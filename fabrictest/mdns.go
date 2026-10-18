@@ -96,8 +96,9 @@ func (s *Site) answer(questions []dns.Question) []dns.RR {
 		if adv == nil || ip == nil {
 			continue
 		}
-		for _, svc := range adv.Active() {
-			rrs, names := serviceRecords(svc, host, ip)
+		services := adv.Active()
+		for i := range services {
+			rrs, names := serviceRecords(&services[i], host, ip)
 			for _, name := range names {
 				if asked[name] {
 					out = append(out, rrs...)
@@ -111,7 +112,7 @@ func (s *Site) answer(questions []dns.Question) []dns.RR {
 
 // serviceRecords are svc's records on host at ip, and the lower-case names
 // a question may ask them by.
-func serviceRecords(svc mdns.Service, host string, ip net.IP) ([]dns.RR, []string) {
+func serviceRecords(svc *mdns.Service, host string, ip net.IP) (rrs []dns.RR, names []string) {
 	domain := svc.Domain
 	if domain == "" {
 		domain = "local"
@@ -125,8 +126,9 @@ func serviceRecords(svc mdns.Service, host string, ip net.IP) ([]dns.RR, []strin
 		}
 		return dns.RR_Header{Name: name, Rrtype: typ, Class: class, Ttl: ttl}
 	}
-	rrs := []dns.RR{&dns.PTR{Hdr: hdr(typeName, dns.TypePTR, ttlService, false), Ptr: instance}}
-	names := []string{strings.ToLower(typeName), strings.ToLower(instance), strings.ToLower(host)}
+	rrs = []dns.RR{&dns.PTR{Hdr: hdr(typeName, dns.TypePTR, ttlService, false), Ptr: instance}}
+	names = make([]string, 0, 3+len(svc.Subtypes))
+	names = append(names, strings.ToLower(typeName), strings.ToLower(instance), strings.ToLower(host))
 	for _, sub := range svc.Subtypes {
 		subName := sub + "._sub." + typeName
 		rrs = append(rrs, &dns.PTR{Hdr: hdr(subName, dns.TypePTR, ttlService, false), Ptr: instance})

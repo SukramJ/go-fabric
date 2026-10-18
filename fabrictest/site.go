@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net"
 	"runtime/metrics"
 	"sync"
 	"testing"
@@ -289,15 +288,6 @@ func (s *Site) Eventually(ctx context.Context, what string, cond func() bool) er
 		if at, ok := s.fake.Next(); ok {
 			s.fake.Advance(max(at.Sub(s.fake.Now()), 0))
 		}
-	}
-	return nil
-}
-
-// address is host index's address on the in-memory network; nil on
-// loopback, where the kernel picks the port when the host listens.
-func (s *Site) address(index int) *net.UDPAddr {
-	if s.net != nil {
-		return hostAddr(index)
 	}
 	return nil
 }

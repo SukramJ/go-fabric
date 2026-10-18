@@ -130,7 +130,7 @@ func (d *Device) Start(ctx context.Context) error {
 		return errors.New("fabrictest: the device is running")
 	}
 	cfg := d.config()
-	n, err := node.New(cfg)
+	n, err := node.New(cfg) //nolint:contextcheck // node.New takes no context; the node's own work runs on its own
 	if err != nil {
 		return fmt.Errorf("node: %w", err)
 	}
@@ -286,9 +286,9 @@ func (d *Device) EndpointOf(key string) (uint16, bool) {
 }
 
 // Act runs fn with the running node for local access to its servers —
-// matter.js Node.act, which MockServerNode's tests use to change a
-// behavior's state in place (mock-server-node.ts): an attribute fn sets on
-// a server is reported to subscribers as a host's change is. Act does not
+// the local access matter.js's MockServerNode gives a test
+// (mock-server-node.ts): an attribute fn sets on a server is reported to
+// subscribers as a host's change is. Act does not
 // overlap Start, Stop or Restart, and returns fn's error.
 func (d *Device) Act(fn func(n *node.Node) error) error {
 	d.actMu.Lock()

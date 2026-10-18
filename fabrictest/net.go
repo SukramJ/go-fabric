@@ -21,9 +21,7 @@ import (
 // The in-memory network: datagrams between the hosts of a site over
 // channels, addressed like UDP. Each host the site adds — a device or a
 // controller — is given one IPv6 link-local address, fe80::<index>, and
-// its socket listens on port [udp.MatterPort] of it, as matter.js's
-// NetworkSimulator hands every simulated host an address of its own
-// (packages/general/src/net/mock/NetworkSimulator.ts addHost). Both ends
+// its socket listens on port [udp.MatterPort] of it. Both ends
 // run the production transport/udp.Listener over that socket
 // (internal/udpseam), so the bridge and the controller's exchange manager
 // see datagrams exactly as a kernel socket delivers them: a lost one is
@@ -148,7 +146,7 @@ func (n *Network) listen(addr *net.UDPAddr) (*udp.Listener, error) {
 }
 
 // send carries one datagram from src to dst.
-func (n *Network) send(src *net.UDPAddr, dst *net.UDPAddr, payload []byte) {
+func (n *Network) send(src, dst *net.UDPAddr, payload []byte) {
 	n.sent.Add(1)
 	d := Datagram{From: cloneAddr(src), To: cloneAddr(dst), Payload: append([]byte(nil), payload...)}
 	n.mu.Lock()
