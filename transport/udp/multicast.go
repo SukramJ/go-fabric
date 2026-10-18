@@ -56,7 +56,11 @@ func (l *Listener) membership(group net.IP, join bool) error {
 	if l.isClosed() {
 		return ErrListenerClosed
 	}
-	pc := ipv6.NewPacketConn(l.conn)
+	uc, ok := l.conn.(*net.UDPConn)
+	if !ok {
+		return fmt.Errorf("%w: %v: not a kernel socket", ErrNoMulticastInterface, group)
+	}
+	pc := ipv6.NewPacketConn(uc)
 	addr := &net.UDPAddr{IP: group}
 	var (
 		done    int
@@ -106,7 +110,11 @@ func (l *Listener) SendMulticast(group net.IP, port int, payload []byte) error {
 	if l.isClosed() {
 		return ErrListenerClosed
 	}
-	pc := ipv6.NewPacketConn(l.conn)
+	uc, ok := l.conn.(*net.UDPConn)
+	if !ok {
+		return fmt.Errorf("%w: %v: not a kernel socket", ErrNoMulticastInterface, group)
+	}
+	pc := ipv6.NewPacketConn(uc)
 	dst := &net.UDPAddr{IP: group, Port: port}
 	var (
 		done    int

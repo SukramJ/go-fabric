@@ -42,6 +42,10 @@ const maxPortAssignmentRetries = 10
 // interface's port; when that port is taken for TCP and the port was
 // auto-assigned, both sockets are closed and the pair is tried again.
 func (b *Bridge) openTransports() (udpListener *udp.Listener, tcpListener *tcp.Listener, err error) {
+	if open := b.openUDP.Load(); open != nil && !b.cfg.TCP.Incoming {
+		udpListener, err = (*open)()
+		return udpListener, nil, err
+	}
 	udpCfg := udp.Config{LocalAddr: b.cfg.Listen, PreferIPv4: b.cfg.PreferIPv4}
 	if !b.cfg.TCP.Incoming {
 		udpListener, err = udp.New(udpCfg)

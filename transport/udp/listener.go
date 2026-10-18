@@ -12,6 +12,8 @@ import (
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+
+	"github.com/SukramJ/go-fabric/internal/udpseam"
 )
 
 // MatterPort is the IANA-registered Matter operational port (5540).
@@ -71,7 +73,9 @@ type Config struct {
 // [Listener.Serve] in a goroutine to receive, [Listener.Send] to
 // transmit, [Listener.Close] to tear down. The zero value is unusable.
 type Listener struct {
-	conn *net.UDPConn
+	// conn is the socket: a *net.UDPConn from [New], or the in-memory
+	// socket of fabrictest's network through internal/udpseam.
+	conn udpseam.PacketConn
 
 	// sem bounds concurrent per-datagram dispatch goroutines; see
 	// [maxConcurrentDispatch].
@@ -128,13 +132,26 @@ func New(cfg Config) (*Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("udp: listen %s: %w", addr, err)
 	}
-	return &Listener{conn: conn, sem: make(chan struct{}, maxConcurrentDispatch)}, nil
+	return newListener(conn), nil
+}
+
+// newListener returns a Listener ready to Serve on conn.
+func newListener(conn udpseam.PacketConn) *Listener {
+	return &Listener{conn: conn, sem: make(chan struct{}, maxConcurrentDispatch)}
+}
+
+// The in-memory network of fabrictest builds its listeners through this
+// hook (internal/udpseam), so the bridge and the controller run the
+// production listener over it.
+func init() {
+	udpseam.NewListener = func(conn udpseam.PacketConn) any { return newListener(conn) }
 }
 
 // LocalAddr returns the effective bound address — useful for tests
 // that bind on `[::]:0` and need to learn the OS-assigned port. The
 // type-assert is total because [net.ListenUDP] always returns a
-// [*net.UDPConn] whose LocalAddr is a [*net.UDPAddr].
+// [*net.UDPConn] whose LocalAddr is a [*net.UDPAddr] (and the in-memory
+// socket of internal/udpseam names itself by one too).
 func (l *Listener) LocalAddr() *net.UDPAddr {
 	addr, _ := l.conn.LocalAddr().(*net.UDPAddr)
 	return addr

@@ -23,6 +23,7 @@ import (
 	"github.com/SukramJ/go-fabric/internal/bridgeseam"
 	"github.com/SukramJ/go-fabric/internal/channelseam"
 	"github.com/SukramJ/go-fabric/transport/message"
+	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
 func init() {
@@ -90,6 +91,15 @@ func init() {
 		// the connection's turn.
 		ctx := context.WithValue(br.handlerContext(), sessionTurnKey{}, release)
 		_ = br.receive(ctx, msg, c)
+		return true
+	}
+
+	bridgeseam.UseListener = func(b any, open func() (*udp.Listener, error)) bool {
+		br, ok := b.(*Bridge)
+		if !ok || br == nil || open == nil || br.cfg.TCP.Incoming || br.startClaim.Load() {
+			return false
+		}
+		br.openUDP.Store(&open)
 		return true
 	}
 
