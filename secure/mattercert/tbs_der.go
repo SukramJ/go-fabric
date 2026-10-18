@@ -345,101 +345,164 @@ type extension struct {
 }
 
 // buildExtensions encodes the Matter cert extensions as the X.509
-// extension list (Matter §6.5.1.4 → RFC 5280 §4.2). The order matches
-// matter.js's `extensionsToAst` iteration order: basic-constraints,
-// key-usage, extended-key-usage, subject-key-id, authority-key-id,
-// future-extensions.
+// extension list (Matter §6.5.1.4 → RFC 5280 §4.2) in the order they
+// arrived in the TLV (ext.Order). This mirrors matter.js's
+// `extensionsToAsn1` (packages/protocol/src/certificate/kinds/Certificate.ts:208),
+// which walks Object.entries(extensions) in insertion order — the wire
+// order TlvObject.decodeTlvInternalValue assigned the fields in. The
+// order is part of the signed bytes: Amazon's and SmartThings' roots
+// carry basic-constraints, subject-key-id, key-usage, authority-key-id,
+// and emitting them in tag order fails their self-signature.
+//
+// An ext without Order (built by hand, not decoded) is emitted in tag
+// order: basic-constraints, key-usage, extended-key-usage,
+// subject-key-id, authority-key-id, future-extensions.
 func buildExtensions(ext *CertificateExtensions) ([]asn1.RawValue, error) {
-	var out []asn1.RawValue
-	if ext.HasBasicConstraints {
-		bc := struct {
-			IsCA       bool `asn1:"optional"`
-			MaxPathLen int  `asn1:"optional"`
-		}{
-			IsCA: ext.BasicConstraintsIsCA,
-		}
-		if ext.BasicConstraintsHasPathLen {
-			bc.MaxPathLen = int(ext.BasicConstraintsPathLen)
-		}
-		// Encoder note: Go's asn1 omits MaxPathLen=0 with the
-		// `optional` tag — fine for non-CA certs. CA certs that
-		// genuinely want a 0 path-len would need a richer struct, but
-		// no real-world chip-issued cert uses path-len=0 anyway.
-		val, err := asn1.Marshal(bc)
-		if err != nil {
-			return nil, fmt.Errorf("basic-constraints: %w", err)
-		}
-		raw, err := marshalExt(oidExtBasicConstraints, true, val)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, raw)
+	order := ext.Order
+	if len(order) == 0 {
+		order = canonicalExtensionOrder(ext)
 	}
-	if ext.HasKeyUsage {
-		// KeyUsage is a BIT STRING; Matter's uint16 maps directly to
-		// RFC 5280 §4.2.1.3 bit positions (digitalSignature=0, …).
-		ku := encodeKeyUsageBits(ext.KeyUsage)
-		val, err := asn1.Marshal(ku)
-		if err != nil {
-			return nil, fmt.Errorf("key-usage: %w", err)
+	out := make([]asn1.RawValue, 0, len(order))
+	futureIdx := 0
+	for _, tag := range order {
+		var (
+			raw asn1.RawValue
+			err error
+		)
+		switch tag {
+		case extTagBasicConstraints:
+			raw, err = buildBasicConstraints(ext)
+		case extTagKeyUsage:
+			raw, err = buildKeyUsage(ext)
+		case extTagExtendedKeyUsage:
+			raw, err = buildExtendedKeyUsage(ext)
+		case extTagSubjectKeyID:
+			raw, err = buildSubjectKeyID(ext)
+		case extTagAuthorityKeyID:
+			raw, err = buildAuthorityKeyID(ext)
+		case extTagFutureExtension:
+			if futureIdx >= len(ext.FutureExtensions) {
+				return nil, fmt.Errorf("%w: future-extension order entry without value", ErrMalformed)
+			}
+			raw, err = buildFutureExtension(ext.FutureExtensions[futureIdx])
+			futureIdx++
+		default:
+			return nil, fmt.Errorf("%w: unknown extension tag %d in order", ErrMalformed, tag)
 		}
-		raw, err := marshalExt(oidExtKeyUsage, true, val)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, raw)
-	}
-	if ext.HasExtendedKeyUsage {
-		oids, err := mapEKU(ext.ExtendedKeyUsage)
-		if err != nil {
-			return nil, err
-		}
-		val, err := asn1.Marshal(oids)
-		if err != nil {
-			return nil, fmt.Errorf("extended-key-usage: %w", err)
-		}
-		raw, err := marshalExt(oidExtExtendedKeyUsage, true, val)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, raw)
-	}
-	if ext.HasSubjectKeyID {
-		val, err := asn1.Marshal(ext.SubjectKeyID)
-		if err != nil {
-			return nil, fmt.Errorf("subject-key-id: %w", err)
-		}
-		raw, err := marshalExt(oidExtSubjectKeyID, false, val)
 		if err != nil {
 			return nil, err
-		}
-		out = append(out, raw)
-	}
-	if ext.HasAuthorityKeyID {
-		// AuthorityKeyIdentifier ::= SEQUENCE { keyIdentifier [0] OCTET STRING OPTIONAL, … }.
-		aki := struct {
-			KeyIdentifier []byte `asn1:"tag:0,optional"`
-		}{KeyIdentifier: ext.AuthorityKeyID}
-		val, err := asn1.Marshal(aki)
-		if err != nil {
-			return nil, fmt.Errorf("authority-key-id: %w", err)
-		}
-		raw, err := marshalExt(oidExtAuthorityKeyID, false, val)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, raw)
-	}
-	for _, fe := range ext.FutureExtensions {
-		// Future extensions ride as raw DER per matter.js's
-		// `RawBytes(Bytes.concat(...future))` — we re-emit verbatim.
-		var raw asn1.RawValue
-		if _, err := asn1.Unmarshal(fe, &raw); err != nil {
-			return nil, fmt.Errorf("future-extension: unmarshal: %w", err)
 		}
 		out = append(out, raw)
 	}
 	return out, nil
+}
+
+// canonicalExtensionOrder lists the present extensions in tag order,
+// for an ext constructed without Order.
+func canonicalExtensionOrder(ext *CertificateExtensions) []uint8 {
+	var order []uint8
+	if ext.HasBasicConstraints {
+		order = append(order, extTagBasicConstraints)
+	}
+	if ext.HasKeyUsage {
+		order = append(order, extTagKeyUsage)
+	}
+	if ext.HasExtendedKeyUsage {
+		order = append(order, extTagExtendedKeyUsage)
+	}
+	if ext.HasSubjectKeyID {
+		order = append(order, extTagSubjectKeyID)
+	}
+	if ext.HasAuthorityKeyID {
+		order = append(order, extTagAuthorityKeyID)
+	}
+	for range ext.FutureExtensions {
+		order = append(order, extTagFutureExtension)
+	}
+	return order
+}
+
+func buildBasicConstraints(ext *CertificateExtensions) (asn1.RawValue, error) {
+	// BasicConstraints ::= SEQUENCE { cA BOOLEAN DEFAULT FALSE,
+	// pathLenConstraint INTEGER OPTIONAL }. cA is omitted when false
+	// (RFC 5280 appendix B; matter.js X509.ts:156 deletes isCa === false).
+	// pathLenConstraint is written whenever the TLV carried it — also
+	// when it is 0: matter.js passes the number through DerCodec
+	// (DerCodec.ts:224 encodes every number as INTEGER) and chip's
+	// DecodeConvertBasicConstraintsExtension (CHIPCertToX509.cpp:243-249)
+	// writes the INTEGER on tag presence, not on value. The Amazon and
+	// SmartThings ICACs carry path-len 0 and their signatures cover the
+	// `02 01 00`; an `optional` int that drops the zero fails them.
+	var (
+		val []byte
+		err error
+	)
+	if ext.BasicConstraintsHasPathLen {
+		val, err = asn1.Marshal(struct {
+			IsCA       bool `asn1:"optional"`
+			MaxPathLen int
+		}{IsCA: ext.BasicConstraintsIsCA, MaxPathLen: int(ext.BasicConstraintsPathLen)})
+	} else {
+		val, err = asn1.Marshal(struct {
+			IsCA bool `asn1:"optional"`
+		}{IsCA: ext.BasicConstraintsIsCA})
+	}
+	if err != nil {
+		return asn1.RawValue{}, fmt.Errorf("basic-constraints: %w", err)
+	}
+	return marshalExt(oidExtBasicConstraints, true, val)
+}
+
+func buildKeyUsage(ext *CertificateExtensions) (asn1.RawValue, error) {
+	// KeyUsage is a BIT STRING; Matter's uint16 maps directly to
+	// RFC 5280 §4.2.1.3 bit positions (digitalSignature=0, …).
+	val, err := asn1.Marshal(encodeKeyUsageBits(ext.KeyUsage))
+	if err != nil {
+		return asn1.RawValue{}, fmt.Errorf("key-usage: %w", err)
+	}
+	return marshalExt(oidExtKeyUsage, true, val)
+}
+
+func buildExtendedKeyUsage(ext *CertificateExtensions) (asn1.RawValue, error) {
+	oids, err := mapEKU(ext.ExtendedKeyUsage)
+	if err != nil {
+		return asn1.RawValue{}, err
+	}
+	val, err := asn1.Marshal(oids)
+	if err != nil {
+		return asn1.RawValue{}, fmt.Errorf("extended-key-usage: %w", err)
+	}
+	return marshalExt(oidExtExtendedKeyUsage, true, val)
+}
+
+func buildSubjectKeyID(ext *CertificateExtensions) (asn1.RawValue, error) {
+	val, err := asn1.Marshal(ext.SubjectKeyID)
+	if err != nil {
+		return asn1.RawValue{}, fmt.Errorf("subject-key-id: %w", err)
+	}
+	return marshalExt(oidExtSubjectKeyID, false, val)
+}
+
+func buildAuthorityKeyID(ext *CertificateExtensions) (asn1.RawValue, error) {
+	// AuthorityKeyIdentifier ::= SEQUENCE { keyIdentifier [0] OCTET STRING OPTIONAL, … }.
+	aki := struct {
+		KeyIdentifier []byte `asn1:"tag:0,optional"`
+	}{KeyIdentifier: ext.AuthorityKeyID}
+	val, err := asn1.Marshal(aki)
+	if err != nil {
+		return asn1.RawValue{}, fmt.Errorf("authority-key-id: %w", err)
+	}
+	return marshalExt(oidExtAuthorityKeyID, false, val)
+}
+
+// buildFutureExtension re-emits one future extension verbatim: it rides
+// as raw DER, per matter.js's `RawBytes(Bytes.concat(...future))`.
+func buildFutureExtension(fe []byte) (asn1.RawValue, error) {
+	var raw asn1.RawValue
+	if _, err := asn1.Unmarshal(fe, &raw); err != nil {
+		return asn1.RawValue{}, fmt.Errorf("future-extension: unmarshal: %w", err)
+	}
+	return raw, nil
 }
 
 // marshalExt wraps val into an [asn1.RawValue] holding the X.509
