@@ -210,10 +210,15 @@ speaks BlueZ over the D-Bus system bus, without cgo, on Linux only.
   `pair --ble` fails with `org.freedesktop.DBus.Error.AccessDenied` in the
   message; an adapter that is off fails with `org.bluez.Error.NotReady`
   (`bluetoothctl power on`).
-- **BlueZ.** Not yet verified against a live BlueZ: the module's tests run
-  over an in-process bus, and the live path is the manually started
-  `ble-virtual` workflow (Ubuntu 24.04, `btvirt`), which needs a CHIP image
-  whose `chip-all-clusters-app` is built with BLE — the pinned one is not.
+- **BlueZ.** Verified against BlueZ 5.72 over virtual controllers only:
+  the module's tests run over an in-process bus, and the live path is the
+  manually started `ble-virtual` workflow (`make ble-virtual-test`; Ubuntu 24.04 on arm64,
+  two LE-only `btvirt` controllers): this build pairs a matter.js node
+  with `@matter/nodejs-ble` (`script/ble-virtual/peripheral.mjs`, bleno,
+  a Wi-Fi NetworkCommissioning server) with `pair --ble`, reads it over
+  CASE and opens a window, and matter.js's own controller pairs the same
+  peripheral as the control leg. It is a virtual counterpart, not a field
+  test: a real device stays the proof.
   The ATT_MTU comes from the characteristic's `MTU` property; a BlueZ
   without it runs BTP at the 20-byte minimum segment.
 - **Adapter.** `--ble-adapter` names the adapter as BlueZ does (`hci0`,

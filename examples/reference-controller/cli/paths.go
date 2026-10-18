@@ -149,6 +149,10 @@ func (p path) attributePath() (im.ConcreteAttributePath, *spec.Attribute, error)
 		}
 		return ap, nil, nil
 	}
+	if a := globalAttributeByName(p.element); a != nil {
+		ap.Attribute, ap.HasAttribute = a.ID, true
+		return ap, a, nil
+	}
 	if p.def == nil {
 		return ap, nil, fmt.Errorf("attribute %q: no definition of the cluster; give its id", p.element)
 	}
@@ -242,7 +246,42 @@ func attributeName(def *spec.Cluster, id uint32) (string, *spec.Attribute) {
 			return a.Name, a
 		}
 	}
+	if a := globalAttributeByID(id); a != nil {
+		return a.Name, a
+	}
 	return fmt.Sprintf("0x%04X", id), nil
+}
+
+// globalAttributes are the attributes every cluster carries, which the
+// generated definitions leave out — matter.js's Global.Attributes
+// (packages/types/src/cluster/Global.ts:17-23: clusterRevision, featureMap,
+// attributeList, eventList, acceptedCommandList, generatedCommandList), so
+// `read <node> 0/OnOff/FeatureMap` resolves like any attribute name.
+var globalAttributes = []spec.Attribute{
+	{ID: spec.AttrClusterRevision, Name: "ClusterRevision", Type: spec.Type{Name: "uint16", Kind: spec.KindUint, Bits: 16}},
+	{ID: spec.AttrFeatureMap, Name: "FeatureMap", Type: spec.Type{Name: "map32", Kind: spec.KindUint, Bits: 32}},
+	{ID: spec.AttrAttributeList, Name: "AttributeList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "AttributeId", Type: spec.Type{Name: "attrib-id", Kind: spec.KindUint, Bits: 32}}}},
+	{ID: spec.AttrEventList, Name: "EventList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "EventId", Type: spec.Type{Name: "event-id", Kind: spec.KindUint, Bits: 32}}}},
+	{ID: spec.AttrAcceptedCommandList, Name: "AcceptedCommandList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "CommandId", Type: spec.Type{Name: "command-id", Kind: spec.KindUint, Bits: 32}}}},
+	{ID: spec.AttrGeneratedCommandList, Name: "GeneratedCommandList", Type: spec.Type{Name: "list", Kind: spec.KindList, Entry: &spec.Field{Name: "CommandId", Type: spec.Type{Name: "command-id", Kind: spec.KindUint, Bits: 32}}}},
+}
+
+func globalAttributeByName(name string) *spec.Attribute {
+	for i := range globalAttributes {
+		if strings.EqualFold(globalAttributes[i].Name, name) {
+			return &globalAttributes[i]
+		}
+	}
+	return nil
+}
+
+func globalAttributeByID(id uint32) *spec.Attribute {
+	for i := range globalAttributes {
+		if globalAttributes[i].ID == id {
+			return &globalAttributes[i]
+		}
+	}
+	return nil
 }
 
 func eventName(def *spec.Cluster, id uint32) (string, *spec.Event) {

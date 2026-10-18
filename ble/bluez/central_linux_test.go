@@ -101,8 +101,10 @@ func TestScanFilterAndDiscovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	filter, _ := b.lastArgs(ifaceAdapter + ".SetDiscoveryFilter")[0].(map[string]dbus.Variant)
-	if uuids, _ := filter["UUIDs"].Value().([]string); len(uuids) != 1 || uuids[0] != btp.ServiceUUID ||
-		filter["Transport"].Value() != "le" || filter["DuplicateData"].Value() != true || len(filter) != 3 {
+	// No UUIDs: the kernel's service discovery would drop a Matter
+	// advertisement, which has no UUID field (ChipDeviceScanner.cpp:227-236).
+	if _, has := filter["UUIDs"]; has ||
+		filter["Transport"].Value() != "le" || filter["DuplicateData"].Value() != true || len(filter) != 2 {
 		t.Fatalf("discovery filter %v", filter)
 	}
 	if got := b.called(); !slices.Equal(got[len(got)-2:], []string{"/org/bluez/hci0 org.bluez.Adapter1.SetDiscoveryFilter", "/org/bluez/hci0 org.bluez.Adapter1.StartDiscovery"}) {

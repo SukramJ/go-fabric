@@ -3274,3 +3274,25 @@ commissioning leaves. Report BB §4.
 
 By design. The harness image has no CHIPoBLE; the DUT state, not the
 transport, is what the cases judge.
+
+### BD-Controller-BluezScanWithoutUuidFilter — `ble/bluez` scans LE without a `UUIDs` discovery filter
+
+matter.js scans with noble's `startScanningAsync([MatterBle.SERVICE_UUID_SHORT],
+true)` (`packages/nodejs-ble/src/NobleBleClient.ts:84` at `0ceb202d`).
+noble's hci-socket binding keeps that list in user space
+(`@stoprocent/noble` 2.8.0, `lib/hci-socket/bindings.js:105`) and matches
+it against the advertisement's service UUIDs **and the UUIDs of its service
+data** (`:273-286`), so a Matter advertisement — Flags and Service Data 16
+only — passes. BlueZ's `SetDiscoveryFilter` with `UUIDs` instead becomes the
+kernel's service discovery (MGMT Start Service Discovery), which passes only
+advertisements carrying the UUID in a UUID16/32/128 field; the `ble-virtual`
+run 39100460695 shows hci0 receiving the peripheral's ADV_IND and reporting
+no device. connectedhomeip's Linux scanner sets `Transport "le"` alone for
+this reason (`src/platform/Linux/bluez/ChipDeviceScanner.cpp:227-236` at
+`6170af84`). `ble/bluez` therefore filters on `Transport "le"` and
+`DuplicateData` and selects the device by the Matter service data in the
+discovery callback, which is what noble's user-space match amounts to.
+Report BC (phase 13b, 2026-10-18).
+
+By design. The same selection as matter.js, placed where BlueZ lets it
+run; the kernel filter would never see a Matter advertisement.

@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5286,
+  "entry_points": 5287,
   "entry_packages": [
     ".",
     "bdx",
@@ -218,9 +218,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12767,
+    "total_exported": 12768,
     "reachable": 9005,
-    "whitelisted": 3757,
+    "whitelisted": 3758,
     "unreachable": 5
   },
   "by_package": [
@@ -19598,6 +19598,13 @@
       "reason": "auto-whitelist:pattern=test-file",
       "file": "examples/reference-controller/cli/args_test.go",
       "line": 19
+    },
+    {
+      "package": "examples/reference-controller/cli",
+      "identifier": "TestGlobalAttributeNames",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "examples/reference-controller/cli/globals_test.go",
+      "line": 14
     },
     {
       "package": "examples/reference-controller/cli",

@@ -39,7 +39,7 @@ The sequence is matter.js's (`packages/nodejs-ble/src/NobleBleClient.ts`,
 
 | Step | BlueZ |
 | --- | --- |
-| scan for the Matter service, every advertisement | `org.bluez.Adapter1.SetDiscoveryFilter` (`UUIDs: [0000fff6-…]`, `Transport: "le"`, `DuplicateData: true`), `StartDiscovery`, `StopDiscovery` |
+| scan for the Matter service, every advertisement | `org.bluez.Adapter1.SetDiscoveryFilter` (`Transport: "le"`, `DuplicateData: true`; no `UUIDs`, which BlueZ turns into the kernel's service discovery that drops a Matter advertisement without a UUID field), `StartDiscovery`, `StopDiscovery`; the Matter service data selects |
 | advertisements | `InterfacesAdded` and `PropertiesChanged` of `org.bluez.Device1`, `ServiceData[0000fff6-…]` (8 bytes) |
 | connect | `org.bluez.Device1.Connect`, then `ServicesResolved` (bounded by 2 min and 1 min, as matter.js bounds noble) |
 | GATT | the `org.bluez.GattService1` with the Matter UUID; its `GattCharacteristic1` C1 (`WriteValue`, type `request`), C2 (`StartNotify`, values as `PropertiesChanged` of `Value`), C3 (`ReadValue`, optional) |

@@ -31,3 +31,6 @@ examples/reference-bridge/reference-bridge
 *.db-journal
 *.db-wal
 *.db-shm
+
+# The ble-virtual job installs the matter.js packages here (npm ci).
+/script/ble-virtual/node_modules/

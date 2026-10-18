@@ -183,14 +183,22 @@ func (c *central) SetDiscoveryCallback(f func(ble.Peripheral, []byte)) {
 	}
 }
 
-// StartScanning implements ble.Central: a discovery filter for the Matter
-// service UUID over LE with every advertisement reported, then the
-// discovery (org.bluez.Adapter.rst, Methods, "void SetDiscoveryFilter(dict
-// filter)" with UUIDs, Transport "le" and DuplicateData, and "void
-// StartDiscovery()") — noble's startScanningAsync([SERVICE_UUID_SHORT],
-// allowDuplicates true) (NobleBleClient.ts:84). Asked again while the
-// discovery runs, it asks BlueZ again, so a discovery the adapter ended
-// resumes; BlueZ's InProgress answer is the discovery already running.
+// StartScanning implements ble.Central: a discovery filter for LE with
+// every advertisement reported, then the discovery (org.bluez.Adapter.rst,
+// Methods, "void SetDiscoveryFilter(dict filter)" with Transport "le" and
+// DuplicateData, and "void StartDiscovery()") — noble's
+// startScanningAsync([SERVICE_UUID_SHORT], allowDuplicates true)
+// (NobleBleClient.ts:84), with the service filter in serviceData. No UUIDs
+// entry: BlueZ turns it into the kernel's service discovery, which passes
+// only advertisements carrying the UUID in a UUID16/32/128 field, and a
+// Matter advertisement carries Flags and Service Data only —
+// connectedhomeip's Linux scanner sets Transport alone for that reason
+// (src/platform/Linux/bluez/ChipDeviceScanner.cpp:227-236 at 6170af84);
+// the ble-virtual job's run 39100460695 showed BlueZ issuing MGMT Start
+// Service Discovery and reporting no device for the ADV_IND it received.
+// Asked again while the discovery runs, it asks BlueZ again, so a
+// discovery the adapter ended resumes; BlueZ's InProgress answer is the
+// discovery already running.
 func (c *central) StartScanning(ctx context.Context) error {
 	c.mu.Lock()
 	closed := c.closed
@@ -199,7 +207,6 @@ func (c *central) StartScanning(ctx context.Context) error {
 		return nil // NobleBleClient.startScanning when closing (:148)
 	}
 	filter := map[string]dbus.Variant{
-		"UUIDs":         dbus.MakeVariant([]string{btp.ServiceUUID}),
 		"Transport":     dbus.MakeVariant("le"),
 		"DuplicateData": dbus.MakeVariant(true),
 	}

@@ -1,9 +1,10 @@
-# BLE end to end over virtual HCI controllers (ADR 0024 decision 5): two
-# btvirt controllers on the runner's BlueZ, connectedhomeip's
-# chip-all-clusters-app from the pinned CHIP image (CHIP_TEST_IMAGE in the
-# Makefile) advertising on one, the reference controller's BLE build
-# (ble/bluez/cmd/reference-controller) pairing it over the other with
-# `pair --ble`, then a read over CASE.
+# BLE end to end over virtual HCI controllers (ADR 0024 decision 5, as
+# amended 2026-10-18): two btvirt controllers on the runner; BlueZ keeps the
+# first for the reference controller's BLE build
+# (ble/bluez/cmd/reference-controller), a matter.js node with
+# @matter/nodejs-ble (script/ble-virtual/peripheral.mjs, bleno over the HCI
+# user channel) advertises on the second; `pair --ble` commissions it with
+# Wi-Fi credentials, then a read runs over the operational session.
 #
 # Manual only (owner decision 2026-10-18): btvirt needs root and the
 # kernel's vhci module, and a GitHub-hosted runner is the one place both
@@ -11,7 +12,7 @@
 # `make ble-virtual-test` locally.
 #
 # The summary separates the ENVIRONMENT (btvirt, BlueZ, the vhci module,
-# the image, an app built without BLE) from a DEFECT (the build, the
+# Node.js, the bleno build, the HCI claim) from a DEFECT (the build, the
 # pairing, the read), as the chip-tool control leg does for the harness.
 # Both fail the job: an environment verdict proves nothing about go-fabric,
 # and a green run must mean the pairing happened.
@@ -29,8 +30,12 @@ env:
 
 jobs:
   ble-virtual:
-    name: BLE over btvirt (all-clusters app, pair --ble)
-    runs-on: ubuntu-24.04
+    name: BLE over btvirt (matter.js peripheral, pair --ble)
+    # The arm64 image: the x86-64 ubuntu-24.04 runner's 6.17 Azure kernel is
+    # built with "# CONFIG_BT is not set" (no Bluetooth stack, no hci_vhci;
+    # run 39099608818), the arm64 one with CONFIG_BT=m and
+    # CONFIG_BT_HCIVHCI=m (probe run 39099728809, 2026-10-18).
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,14 +46,26 @@ jobs:
           cache-dependency-path: |
             go.sum
             ble/bluez/go.sum
-      - name: install BlueZ, its test tools and avahi
+      # @matter/nodejs-ble's engines: >=20.19 <21 or >=22.13.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: script/ble-virtual/package-lock.json
+      - name: install BlueZ, its test tools and the node-gyp toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends bluez bluez-tests avahi-daemon
-          # As the chip-tool jobs: avahi only on the real interfaces.
-          sudo sed -i 's/^#\?deny-interfaces=.*$/deny-interfaces=docker0/' /etc/avahi/avahi-daemon.conf
-          sudo systemctl restart avahi-daemon
+          # make and g++: packages/nodejs-ble/README.md (node-gyp builds bleno and noble).
+          sudo apt-get install -y --no-install-recommends bluez bluez-test-tools make g++
+          # The Azure kernel's Bluetooth modules may sit in its extra modules.
+          # Without hci_vhci the script ends "environment".
+          grep -E '^(# )?CONFIG_BT(_HCIVHCI)?[= ]' "/boot/config-$(uname -r)" || true
+          if ! find "/lib/modules/$(uname -r)" -name 'hci_vhci.ko*' | grep -q .; then
+            sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)" || true
+          fi
           bluetoothctl --version
+          command -v btvirt || dpkg -L bluez-test-tools | grep /bin/
+          node --version
       - name: pair over btvirt
         env:
           BLE_LOG_DIR: ${{ runner.temp }}/ble-virtual

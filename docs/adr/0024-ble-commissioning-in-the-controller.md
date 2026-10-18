@@ -55,7 +55,11 @@ BSD-2-Clause); CoreBluetooth and WinRT need cgo or COM.
    virtual counterpart is a **matter.js node with `@matter/nodejs-ble`**
    (bleno on the second `btvirt` controller), the gold standard itself;
    connectedhomeip's app returns to the job when an image built with BLE
-   is pinned. The job stays manually dispatched.*
+   is pinned. The job stays manually dispatched, on the `ubuntu-24.04-arm`
+   runner: the x86-64 `ubuntu-24.04` image's Azure kernel is built without
+   Bluetooth (`# CONFIG_BT is not set`, run 39099608818), the arm64 one
+   with `CONFIG_BT=m` and `CONFIG_BT_HCIVHCI=m` (probe run 39099728809).
+   First green run 39101585016 (report BC).*
 6. macOS and Windows stay out while they need cgo.
 
 ## Consequences
