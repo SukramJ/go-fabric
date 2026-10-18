@@ -50,10 +50,9 @@ var ErrCertificateTooLarge = errors.New("attestation: certificate too large to s
 // Matter §6.1.3).
 const maxServableCertificateSize = 600
 
-// checkServable mirrors matter.js
-// packages/protocol/src/certificate/DeviceCertification.ts:87-105
-// (#assertServable): a DAC or PAI over 600 bytes cannot be served.
+// checkServable refuses a DAC or PAI over 600 bytes, which a node cannot serve.
 func checkServable(name string, der []byte) error {
+	// Mirrors matter.js packages/protocol/src/certificate/DeviceCertification.ts:87-105 (#assertServable).
 	if len(der) > maxServableCertificateSize {
 		return fmt.Errorf("%w: %s of %d bytes exceeds the %d bytes a device can serve without segmented certificate chain responses",
 			ErrCertificateTooLarge, name, len(der), maxServableCertificateSize)
