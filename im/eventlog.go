@@ -197,10 +197,20 @@ func (l *EventLog) Append(rec EventRecord) uint64 {
 // process restart does. Mirrors matter.js
 // packages/node/src/behavior/system/events/EventsBehavior.ts, which clears
 // a volatile event store when the node goes offline (#4594).
+//
+// With a counter persistence wired, the current numbering is persisted as
+// the ceiling first, so a restart continues right after the last number
+// handed out rather than past the rest of the reserved epoch. Mirrors
+// matter.js packages/protocol/src/events/BaseEventStore.ts:62-67, :141-147
+// (clear with keepNumbering: reserveCurrentNumbering before the events go).
 func (l *EventLog) DropBuffered() {
 	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.persistFn != nil {
+		l.persistCeiling = l.next
+		l.persistFn(l.next)
+	}
 	l.occurrences = nil
-	l.mu.Unlock()
 }
 
 // harvestLocked drops the least valuable records once the buffer has grown

@@ -3307,7 +3307,8 @@
       "status": "partial",
       "go": [
         "im:TestEventLog_AppendMonotonic",
-        "im:TestEventLog_CrashRestart_NeverReusesNumber"
+        "im:TestEventLog_CrashRestart_NeverReusesNumber",
+        "im:TestNonvolatileEventStoreClear"
       ],
       "missing": [
         "persists an occurrence retrievable by number",
@@ -3317,10 +3318,9 @@
         "continues after the events an older version stored without a reservation",
         "numbers from 1 again without keepNumbering (characterization)",
         "discards persisted events and continues numbering across a restart with keepNumbering",
-        "continues numbering across a restart after events were persisted again",
         "is passed through by OccurrenceManager"
       ],
-      "reason": "Sequential numbers that survive a restart are covered; the Go event log keeps no events across a restart, so retrieval, reload and deletion are not.",
+      "reason": "Sequential numbers that survive a restart, also after a clear with keepNumbering (DropBuffered), are covered on the EventLog with its persisted ceiling; the rest is missing because the Go event log persists no events (im/eventlog.go:117-121), has no delete and no plain clear, and has no separate store under an OccurrenceManager.",
       "snapshotSha": "548cf597186ea667b0f5ed49c520ea864d37cfa4"
     },
     {
@@ -3335,29 +3335,23 @@
       "status": "partial",
       "go": [
         "im:TestEventLog_AppendMonotonic",
-        "im:TestEventLog_SetCounterPersistence_CeilingAheadOfHandedOutNumber"
+        "im:TestEventLog_SetCounterPersistence_CeilingAheadOfHandedOutNumber",
+        "im:TestVolatileEventStore",
+        "im:TestVolatileEventStoreNumbering",
+        "im:TestVolatileEventStoreClear"
       ],
       "missing": [
-        "loads empty on a fresh store",
-        "retrieves a stored occurrence by number",
         "forgets a deleted occurrence",
         "waits on close for the reservation being stored",
-        "hands out numbers synchronously again once the reservation is stored",
-        "stores queued reservations in order",
         "converts events a non-volatile store left behind",
         "keeps the numbering of converted events across a restart before the next event",
-        "ignores a stored reservation below 1",
         "refuses a block size that is not a non-negative integer",
         "covers at least the number it hands out with a block size of 0",
-        "throws for an unknown event number",
         "numbers from 1 again without keepNumbering (characterization)",
         "reserves again for the numbers it hands out after a plain clear",
-        "continues numbering with keepNumbering",
-        "continues numbering across a restart with keepNumbering",
-        "reserves numbers from the kept numbering on, not from 1",
         "is passed through by OccurrenceManager"
       ],
-      "reason": "Sequential numbering behind a stored reservation is covered; retrieval, deletion and the close cases are not.",
+      "reason": "Lookup by number, the reservation (persisted ceiling, synchronous and in order), a reservation below 1 and clear with keepNumbering (DropBuffered) across a restart are ported on EventLog; missing are delete, the asynchronous close, the conversion of a non-volatile predecessor, the block size checks (the epoch is a uint64 and 0 selects chip's 0x10000, where matter.js counts 0 as 1, BaseEventStore.ts:43-51), the plain clear and the OccurrenceManager pass-through, none of which the Go log has.",
       "snapshotSha": "0927c32fb87c053ba767901f30461770fefe656f"
     },
     {
