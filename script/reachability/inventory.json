@@ -286,7 +286,7 @@
       "package": "secure/mattercert",
       "identifier": "ErrExpired",
       "file": "secure/mattercert/verify.go",
-      "line": 70,
+      "line": 68,
       "kind": "var"
     },
     {
