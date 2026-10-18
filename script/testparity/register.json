@@ -3121,23 +3121,14 @@
     },
     {
       "path": "packages/protocol/test/dcl/DclClientRevocationTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/dcl:TestClientRevocationPointsPaginated",
-        "controller/dcl:TestClientSchemaVersions"
+        "controller/dcl:TestClientSchemaVersions",
+        "controller/dcl:TestDclClientRevocationFetchRevocationDistributionPoints",
+        "controller/dcl:TestDclClientRevocationFetchRevocationDistributionPointsByIssuer"
       ],
-      "missing": [
-        "maps DCL field names correctly (issuerSubjectKeyID -> issuerSubjectKeyId, dataURL -> dataUrl)",
-        "returns empty array when no revocation points exist",
-        "maps optional fields correctly",
-        "fetches revocation points for a specific issuer",
-        "maps crlSignerDelegator and dataFileSize from by-issuer response",
-        "rejects a response with an unsupported schema version",
-        "returns empty array when issuer has no revocation points",
-        "encodes issuer subject key ID in URL path",
-        "uses test-net URL when production is false"
-      ],
-      "reason": "Paginated revocation points and the schema-version filter are covered; the field mapping and the empty and optional-field cases are not.",
+      "reason": "Every it case is ported through Client.RevocationPoints and Client.RevocationPointsByIssuer over a MockFetch-like fake transport (the matter.js vectors, URL-fragment routes and call log): the field mapping into the Go struct, the empty and optional-field cases (absent pid and delegator as 0 and \"\"), the by-issuer delegator and file size, both schema-version rules, the escaped key identifier and the test-net base URL.",
       "snapshotSha": "f7d82e10e5482d7dcb6d456568549969de334c5c"
     },
     {
