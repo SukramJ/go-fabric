@@ -3369,13 +3369,13 @@
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceSeedTest.ts",
       "status": "planned",
-      "reason": "Seeding the DCL vendor information from a bundled snapshot.",
+      "reason": "The subject, matter.js DclVendorInfoService seeding from a bundled vendor snapshot (DclVendorInfoService.ts, SeedTypes.ts), has no Go counterpart in controller/dcl; the service is a feature for the owner.",
       "snapshotSha": "dbc5f6e9dd6e9b6563fee27833b3baeeb05dc4b6"
     },
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceTest.ts",
       "status": "planned",
-      "reason": "The DCL vendor information service: fetch, storage, field normalisation, built-in vendors.",
+      "reason": "The subject, matter.js DclVendorInfoService (packages/protocol/src/dcl/DclVendorInfoService.ts, 497 lines: vendor fetch, storage, field normalisation, built-in vendors, update timer, productInfoFor), has no Go counterpart in controller/dcl; the ledger read it builds on is Client.Vendors (DclClientTest), the service itself is a feature for the owner.",
       "snapshotSha": "7b6c7c4ac0261f9fc1b23913e81a8ff236a79692"
     },
     {
