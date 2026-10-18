@@ -72,3 +72,7 @@ func CacheFabricFiltered(n *Node) bool {
 	defer n.mu.RUnlock()
 	return n.s.subscribedFabricFiltered
 }
+
+// UpdateRecord edits the node's commissioning record and stores it — what
+// matter.js does with peer.set({ commissioning: … }).
+func UpdateRecord(n *Node, f func(r *Record)) { n.updateRecord(f) }

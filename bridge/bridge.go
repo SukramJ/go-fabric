@@ -1106,6 +1106,17 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 		}
 	}
 
+	// An endpoint the new topology adds announces every attribute of its
+	// clusters as changed, so a subscription that covers it reports the
+	// endpoint's data, not only the PartsList that names it. Mirrors
+	// matter.js packages/node/src/node/integration/ProtocolService.ts:280-287
+	// (addCluster: "Cluster added, emit all attributes as changed", the
+	// readable attributes without changes-omitted ones — OnAttributeChanged
+	// drops those).
+	if prevTopology != nil {
+		b.announceAddedEndpoints(ctx, prevTopology, topology, dispatcher)
+	}
+
 	// Topology.Bridged() is the authoritative bridged set: the assembler
 	// always seeds root (EP 0) AND aggregator (EP 1), so any arithmetic
 	// on len(Endpoints) drifts the moment a structural tier is added or
@@ -1121,6 +1132,32 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 		hook(count)
 	}
 	return nil
+}
+
+// announceAddedEndpoints marks every attribute of each endpoint in next
+// but not in prev changed on the subscription manager — see the call in
+// reassembleLocked.
+func (b *Bridge) announceAddedEndpoints(ctx context.Context, prev, next *endpoint.Topology, dispatcher im.Dispatcher) {
+	m := b.subscriptionManagerLocked()
+	if m == nil || dispatcher == nil {
+		return
+	}
+	known := make(map[uint16]bool, len(prev.Endpoints))
+	for _, ep := range prev.Endpoints {
+		if ep != nil {
+			known[ep.ID] = true
+		}
+	}
+	for _, ep := range next.Endpoints {
+		if ep == nil || known[ep.ID] {
+			continue
+		}
+		for _, rr := range dispatcher.Read(ctx, im.ConcreteAttributePath{Endpoint: ep.ID, HasEndpoint: true}) {
+			if rr.Status == im.StatusSuccess {
+				m.OnAttributeChanged(rr.Path)
+			}
+		}
+	}
 }
 
 // SetOnReassembled wires the post-Reassemble hook. The bridge calls

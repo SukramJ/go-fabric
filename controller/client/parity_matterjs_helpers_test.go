@@ -6,6 +6,7 @@ package client_test
 import (
 	"context"
 	"log/slog"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -116,6 +117,26 @@ func (cp *clientPair) run(t *testing.T, fn func(ctx context.Context) error) {
 	}
 }
 
+// advanceStep is the step of [clientPair.advance].
+const advanceStep = 2 * time.Second
+
+// advance moves the site's fake clock by d in steps of advanceStep, the
+// site settling after each, so the work a step's timers start runs before
+// the next — MockTime.advance stepping the timers in order. (Moving
+// deadline by deadline under Site.Run is too slow for minutes of fake
+// time; a single jump fires an exchange's timeouts before its answers.)
+func (cp *clientPair) advance(t *testing.T, d time.Duration) {
+	t.Helper()
+	for d > 0 {
+		step := min(d, advanceStep)
+		cp.site.Fake().Advance(step)
+		d -= step
+		if err := cp.site.Settle(parityCtx(t)); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 // rootPath is a path to every attribute of endpoint 0.
 func rootPath() im.ConcreteAttributePath {
 	return im.ConcreteAttributePath{Endpoint: 0, HasEndpoint: true}
@@ -144,3 +165,11 @@ func clustersOf(r *interaction.Report, into map[uint32]uint32) {
 
 // boolPtr is a *bool.
 func boolPtr(v bool) *bool { return &v }
+
+// newLight is an OnOffLight on the site's clock.
+func newLight(site *fabrictest.Site, key string) (*device.OnOffLight, error) {
+	return device.NewOnOffLight(device.Options{StableKey: endpoint.StringKey(key), Name: key, Clock: site.Clock()})
+}
+
+// mustAddr parses an IP address.
+func mustAddr(s string) netip.Addr { return netip.MustParseAddr(s) }
