@@ -145,15 +145,6 @@
   },
   {
     "file": "bridge/bridge.go",
-    "line": 1112,
-    "citation": "packages/node/src/node/integration/ProtocolService.ts:280-287",
-    "resolved": "packages/node/src/node/integration/ProtocolService.ts",
-    "identifier": "addCluster",
-    "nearest": 252,
-    "occurrences": 3
-  },
-  {
-    "file": "bridge/bridge.go",
     "line": 1333,
     "citation": "Fabric.ts:408-415",
     "resolved": "packages/protocol/src/fabric/Fabric.ts",

@@ -1109,7 +1109,7 @@ func (b *Bridge) reassembleLocked(ctx context.Context) error { //nolint:gocognit
 	// An endpoint the new topology adds announces every attribute of its
 	// clusters as changed, so a subscription that covers it reports the
 	// endpoint's data, not only the PartsList that names it. Mirrors
-	// matter.js packages/node/src/node/integration/ProtocolService.ts:280-287
+	// matter.js packages/node/src/node/integration/ProtocolService.ts:252-287
 	// (addCluster: "Cluster added, emit all attributes as changed", the
 	// readable attributes without changes-omitted ones — OnAttributeChanged
 	// drops those).
