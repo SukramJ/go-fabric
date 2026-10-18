@@ -136,16 +136,76 @@ die Zahl der `planned` nach der Befüllung; Phase 16 bringt ihn für
 `protocol/test` und `node/test/node` auf 0, Meilenstein 3 für
 `node/test/behaviors`.
 
-### A.4 Phase 15: das öffentliche Testpaket `fabrictest`
+### A.4 Phase 15: der `Clock`-Port und das öffentliche Testpaket `fabrictest`
 
-Umriss, Detail bei Fälligkeit: ein In-Process-Knoten und ein In-Process-
-Controller (aus `bridgetest` und `controller/…` zusammengesetzt), das
-kommissionierte Paar (`MockSite.addCommissionedPair`,
-`packages/node/src/testing/mock-site.ts:156`), ein `Clock`-Port mit einer
-Fake-Uhr (`MockTime`: `advance`, `resolve`, `yield`) statt der fünf Ad-hoc-
-Fakes im Baum, die Wire-Helfer (`interaction.read/write/invoke/subscribe`,
-`node-helpers.ts:317-465`). Öffentliche API, also Deprecation-Fenster nach
-README § API stability; die Suiten des Moduls laufen darauf.
+**Entscheidungen des Owners (2026-10-18, Phase 15):** (0.5) der eine Zeit-Port
+lebt im neuen Top-level-Paket `clock`; (0.6) **alle** rohen Zeitstellen der
+Knotenseite werden in Phase 15 umgestellt, Cluster-Timer eingeschlossen; (0.7)
+das kommissionierte Paar spricht über einen In-Memory-Transport, UDP-Loopback
+bleibt Option; (0.8) ein neues Paket `fabrictest` über `bridgetest` und dem
+Controller, `bridge/bridgetest` und `endpoint/endpointtest` bleiben stabil.
+
+**Befund** (`notes/reference/read-test-helpers-for-fabrictest.md`): sechs
+Clock-Formen (`exchange.Clock` Now+AfterFunc, `controller/exchange/clock.go:11`;
+`btp.Clock`, `onoff.Clock`, `core.OtaClock` nur AfterFunc; `mattercert.TimeSource`;
+nackte `Now func() time.Time`-Felder in sieben Cluster-Configs, `mdns`, `groups`,
+`controller/ca`), 20 benannte Test-Fakes, 22 `clock.AfterFunc`-Stellen im
+Controller hinter dem Seam, aber **kein Seam auf der Knotenseite**: 66 rohe
+`time.Now`/Timer/Ticker-Stellen in `bridge/` (Ack-Pump `ackpump.go:304`,
+PASE/CASE-Provider, Fenster, Health), `im/subscription/engine.go:39`, `node/`,
+`secure/operational/manager.go:1159`, `mdns/`, dazu 14 in `cluster/`.
+`bridgetest.Commissioner` läuft auf der Systemuhr über Loopback-UDP
+(`bridge/bridgetest/commissioner.go:219`). loom importiert neun Symbole aus
+`bridgetest`/`endpointtest`; die 2mqtt-Projekte nutzen go-fabric noch nicht.
+
+**Bauweise, Welle 15a (Brief BF): das Paket `clock`.**
+
+- `clock.Clock` = `Now() time.Time`, `AfterFunc(d, f) Timer`, `NewTimer(d) Timer`
+  (mit `C()`), `NewTicker(d) Ticker` (`C()`, `Stop()`, `Reset(d)`); `clock.System`.
+  Stdlib-only. `exchange.Clock` wird Alias; `btp.Clock`, `onoff.Clock`,
+  `core.OtaClock`, `mattercert.TimeSource` und jedes `Config.Now`-Feld bleiben
+  (öffentliche API, Deprecation-Fenster nach README § API stability), bekommen
+  daneben `Config.Clock clock.Clock`; gesetzt gewinnt `Clock`, sonst der alte
+  Weg, sonst `clock.System`.
+- `clock/clocktest.Fake` nach matter.js `MockTime`
+  (`packages/testing/src/mocks/time.ts`: `enable` :342, `reset` :350, `now`
+  :456, `resolve` :537, `advance` :638, `yield` :669): `Advance(d)` feuert
+  fällige Timer und Ticker in Zeitreihenfolge, jeden Callback in eigener
+  Goroutine, und kehrt zurück, wenn alle zurückgekehrt sind; `Yield()` lässt
+  angestoßene Goroutinen laufen; `Pending()`; `Set(t)`. Die 20 Fakes im Baum
+  werden durch `clocktest.Fake` ersetzt (eine Welle, per Skript wo gleichförmig).
+- Jede der 66 + 14 Stellen liest die Uhr des Besitzers: `bridge.Config.Clock`,
+  `node.Config.Clock` (reicht an Bridge, Store-Persist, Reopen-Poll, OTA
+  durch), `subscription.Config.Clock`, `operational`-Manager, `mdns`-Configs,
+  die Cluster-Configs. Ticker-Schleifen (`ackpump.go:304`, `engine.go:39`,
+  `persist.go:310`, `node.go:409`, `manager.go:1159`, `zeroconf.go:634`) laufen
+  auf `Clock.NewTicker`; `time.Sleep`/`time.After` auf `NewTimer`.
+- Guard: ein Test in `clock` prüft per `go/ast`, dass außerhalb von `clock/`,
+  `examples/` und `_test.go` kein `time.Now`, `time.AfterFunc`, `time.NewTimer`,
+  `time.NewTicker`, `time.Sleep`, `time.After`, `time.Tick` mehr steht (eine
+  Ausnahmeliste mit Begründung, Ziel leer); `make race` ist Pflicht.
+
+**Bauweise, Welle 15b (Brief BG): das Paket `fabrictest`.**
+
+- `fabrictest.Site` nach `MockSite` (`packages/node/src/testing/mock-site.ts:31-212`:
+  `addController` :112, `addDevice` :134, `addUncommissionedPair` :144,
+  `addCommissionedPair` :156, `close` :182): `NewSite(t, Options)` mit einer
+  `clocktest.Fake`, einem In-Memory-Netz (Datagramme zwischen Knoten über
+  Kanäle, bedient durch `bridgetest.ServeConn` auf der Knotenseite und einen
+  Conn-Channel des Controllers; Verlust/Verzögerung einstellbar für MRP-Tests)
+  und `Options.Loopback` für echtes UDP.
+- `Site.AddDevice(topology)` = In-Process-Knoten (aus `node`, Fake-Store),
+  `Site.AddController()` = In-Process-Controller (aus `controller/…`),
+  `Site.CommissionedPair()` = beide, kommissioniert, mit CASE-Session.
+- Wire-Helfer nach `node-helpers.ts` `interaction` (`:317-465`): `Read`,
+  `Write`, `Invoke`, `Subscribe`, `Connect`; dazu `Node.Act` für den lokalen
+  Serverzugriff wie `MockServerNode` (`mock-server-node.ts:102-348`).
+- Die vier `startNode`-Kopien unter `controller/` und die zwei handgebauten
+  Controller-Verdrahtungen (`controller/client/live_test.go`,
+  `controller/interaction/live_test.go`) wandern auf `fabrictest`; `bridgetest`
+  und `endpointtest` bleiben unverändert, Duplikate werden Deprecated.
+- Öffentliche API: `docs/guides/` bekommt eine Seite „Testing against an
+  in-process controller"; die Concurrency-Doku nennt das Paket.
 
 ### A.5 Phase 16: die Protokoll-Ports
 
@@ -163,8 +223,9 @@ mit Klasse und Frist.
 | 14a | BD (Opus) | Pin-Lift abschließen auf `m2/phase-14-pin`: BridgedNode full-family im Assembler + Paritätstest; `chipdm`-Acknowledgements nachgeführt; `cite-check` gebaut, Drift korrigiert, Ratchet gesetzt; CI-Job | `endpoint/`, `script/citecheck/`, Go-Kommentare überall, `Makefile` (Ziel `cite-check`), `ci.yml` (Job `cite-check`) | — |
 | 14b | BE (Opus, parallel) | Schnappschuss, Register, Generator, Guard, Erstbefüllung, CI-Job | `script/testparity/`, `notes/parity/matterjs_tests.md`, `Makefile` (Ziele `testparity*`), `ci.yml` (Job `testparity`) | — |
 | 14c | ich | Fix-Delta klassifiziert: `notes/parity/pin-lifts.md`, Register-Einträge | `notes/parity/` | `v0.7.1` nach 14a–c |
-| 15 | BF | `fabrictest` | `fabrictest/`, Suiten | `v0.7.2` |
-| 16 | BG, BH | Ports protocol/test, node/test/node | `*_test.go` | `v0.8.0` |
+| 15a | BF | `clock` + `clocktest.Fake`, alle Zeitstellen umgestellt, die 20 Fakes ersetzt, der Guard | `clock/`, `bridge/`, `im/`, `node/`, `secure/`, `mdns/`, `cluster/`, `controller/exchange` (Alias) | — |
+| 15b | BG | `fabrictest` (Site, In-Memory-Netz, Paar, Wire-Helfer), Migration der Controller-Testhelfer, Guide | `fabrictest/`, `controller/*_test.go`, `docs/guides/` | `v0.7.2` |
+| 16 | BH, BI | Ports protocol/test, node/test/node | `*_test.go` | `v0.8.0` |
 
 `Makefile` und `ci.yml` berühren 14a und 14b beide; den Merge-Konflikt löse
 ich (Fable-Zeile). Beide Briefs lesen die Sonnet-Reads, nicht den Baum.
