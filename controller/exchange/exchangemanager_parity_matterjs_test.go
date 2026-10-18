@@ -41,6 +41,7 @@ func emFailingPeer(t *testing.T, suppress bool) (*Manager, *Session, *lossRecord
 func TestExchangeManagerPeerLoss(t *testing.T) {
 	t.Parallel()
 	t.Run("conveys the failing exchange so its own subscription does not wait on itself", func(t *testing.T) {
+		t.Parallel()
 		m, s, rec, clock := emFailingPeer(t, false)
 		x, _ := m.Initiate(s, mrp.SecureChannelProtocolID, Options{})
 		if err := x.Send(context.Background(), 0, nil, SendOptions{}); !errors.Is(err, ErrNetwork) {
@@ -70,6 +71,7 @@ func TestExchangeManagerPeerLoss(t *testing.T) {
 		{"leaves a session alone that suppresses peer loss", true, Options{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			m, s, rec, _ := emFailingPeer(t, tc.sessionSuppress)
 			x, _ := m.Initiate(s, mrp.SecureChannelProtocolID, tc.exchangeOpts)
 			if err := x.Send(context.Background(), 0, nil, SendOptions{}); !errors.Is(err, ErrNetwork) {
@@ -90,6 +92,7 @@ func TestExchangeManagerPeerLoss(t *testing.T) {
 func TestExchangeManagerInboundSecureMessages(t *testing.T) {
 	t.Parallel()
 	t.Run("counts a duplicate message as peer activity", func(t *testing.T) {
+		t.Parallel()
 		m, _, clock := newTestManager(t, Config{})
 		s, peer := newSecurePair(t, m, 0x0410, false)
 		// An unsolicited standalone ack (ExchangeManagerTest.ts:460-470).
@@ -122,6 +125,7 @@ func emUnsecuredCount(m *Manager) int {
 func TestExchangeManagerInboundUnsecuredSessions(t *testing.T) {
 	t.Parallel()
 	t.Run("discards the session when the handler does not adopt it", func(t *testing.T) {
+		t.Parallel()
 		// The controller hands an unsecured session's Sigma1 to the Secure
 		// Channel handler; it answers nothing and closes the exchange, as
 		// silentHandler does (ExchangeManagerTest.ts:555-564).
@@ -143,6 +147,7 @@ func TestExchangeManagerInboundUnsecuredSessions(t *testing.T) {
 		}
 	})
 	t.Run("discards the session when no handler is registered", func(t *testing.T) {
+		t.Parallel()
 		m, _, _ := newTestManager(t, Config{})
 		m.HandleDatagram(emUnsecured(1, 1, 0x50, true), peerAddr) // IcdCheckInMessage
 		if n := emUnsecuredCount(m); n != 0 {

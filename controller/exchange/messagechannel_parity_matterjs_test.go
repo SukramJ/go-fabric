@@ -20,6 +20,7 @@ func TestMessageChannelSocketSwap(t *testing.T) {
 	t.Parallel()
 	one := &net.UDPAddr{IP: net.ParseIP("::1"), Port: 5540}
 	t.Run("emits networkAddressChanged when the socket swaps to a different address", func(t *testing.T) {
+		t.Parallel()
 		m, conn, _ := newTestManager(t, Config{})
 		s, err := m.NewUnsecuredSession(one, nil)
 		if err != nil {
@@ -38,6 +39,7 @@ func TestMessageChannelSocketSwap(t *testing.T) {
 		}
 	})
 	t.Run("does not emit when the socket swaps to the same address", func(t *testing.T) {
+		t.Parallel()
 		m, _, _ := newTestManager(t, Config{})
 		s, err := m.NewUnsecuredSession(one, nil)
 		if err != nil {

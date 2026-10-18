@@ -14,6 +14,7 @@ package exchange
 // to onMessageReceived the same way. Time is the manager's clocktest.Fake.
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net"
@@ -159,6 +160,7 @@ func TestMessageExchangePeerLossDeclaration(t *testing.T) {
 	t.Parallel()
 	boom := errors.New("simulated network failure")
 	t.Run("send()/declares peer lost when exchange has received no messages", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		e.conn.fail = boom
@@ -170,6 +172,7 @@ func TestMessageExchangePeerLossDeclaration(t *testing.T) {
 		}
 	})
 	t.Run("send()/does not declare peer lost when exchange already received at least one message", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		x.onMessageReceived(inbound(x, 1, mrp.SecureChannelProtocolID, 1), false)
@@ -182,6 +185,7 @@ func TestMessageExchangePeerLossDeclaration(t *testing.T) {
 		}
 	})
 	t.Run("nextMessage()/declares peer lost when exchange has received no messages", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		if err := e.nextNow(x); err == nil {
@@ -192,6 +196,7 @@ func TestMessageExchangePeerLossDeclaration(t *testing.T) {
 		}
 	})
 	t.Run("nextMessage()/does not declare peer lost when exchange already received at least one message", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		x.onMessageReceived(inbound(x, 1, mrp.SecureChannelProtocolID, 1), false)
@@ -206,6 +211,7 @@ func TestMessageExchangePeerLossDeclaration(t *testing.T) {
 		}
 	})
 	t.Run("on a session that suppresses peer loss/does not declare peer lost when a send fails", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, true, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		e.conn.fail = boom
@@ -217,6 +223,7 @@ func TestMessageExchangePeerLossDeclaration(t *testing.T) {
 		}
 	})
 	t.Run("on a session that suppresses peer loss/does not declare peer lost when no response arrives", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, true, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		if err := e.nextNow(x); err == nil {
@@ -231,12 +238,14 @@ func TestMessageExchangePeerLossDeclaration(t *testing.T) {
 func TestMessageExchangeHasUnackedMessage(t *testing.T) {
 	t.Parallel()
 	t.Run("is false before any send", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		if e.exchange(t, mrp.SecureChannelProtocolID).HasUnackedMessage() {
 			t.Error("unacked before any send")
 		}
 	})
 	t.Run("is true while a sent message awaits ack and clears once acked", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		done := sendAsync(x, 1, nil, SendOptions{})
@@ -310,11 +319,13 @@ func sendThenDuplicate(t *testing.T, o kickOptions) (retransmissions, standalone
 func TestMessageExchangeLivenessKickOnDuplicate(t *testing.T) {
 	t.Parallel()
 	t.Run("retransmits a BDX message when the peer re-asks for what it answers", func(t *testing.T) {
+		t.Parallel()
 		if r, _ := sendThenDuplicate(t, kickOptions{protocol: bdxProtocolID, gap: 7100 * time.Millisecond}); r != 1 {
 			t.Errorf("retransmissions = %d, want 1", r)
 		}
 	})
 	t.Run("lets the retransmission carry the ack instead of sending a standalone one", func(t *testing.T) {
+		t.Parallel()
 		if _, a := sendThenDuplicate(t, kickOptions{protocol: bdxProtocolID, gap: 7100 * time.Millisecond}); a != 0 {
 			t.Errorf("standalone acks = %d, want 0", a)
 		}
@@ -330,6 +341,7 @@ func TestMessageExchangeLivenessKickOnDuplicate(t *testing.T) {
 		{"does not retransmit for a duplicate of an unrelated message", kickOptions{protocol: bdxProtocolID, gap: 7100 * time.Millisecond, unrelated: true}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if r, a := sendThenDuplicate(t, tc.o); r != 0 || a != 1 {
 				t.Errorf("retransmissions = %d, standalone acks = %d, want 0 and 1", r, a)
 			}
@@ -340,6 +352,7 @@ func TestMessageExchangeLivenessKickOnDuplicate(t *testing.T) {
 func TestMessageExchangeRetransmissionTimersDoNotOutliveTheirMessage(t *testing.T) {
 	t.Parallel()
 	t.Run("stops retransmitting when the ack arrives while a transmission is in flight", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, &sessionparams.Parameters{SessionIdleInterval: 1000, SessionActiveInterval: 1000, SessionActiveThreshold: 4000})
 		release, inFlight := make(chan struct{}), make(chan struct{})
 		e.conn.hook = func(n int) {
@@ -400,11 +413,13 @@ func TestMessageExchangeBDXRetransmissionIntervalCap(t *testing.T) {
 	// SLEEPY, MessageExchangeTest.ts:501.
 	sleepy := &sessionparams.Parameters{SessionIdleInterval: 20000, SessionActiveInterval: 300}
 	t.Run("caps a slow peer's idle cadence too, since a peer mid-transfer is not idle", func(t *testing.T) {
+		t.Parallel()
 		if r := retransmissionsWithin(t, bdxProtocolID, 8*time.Second, sleepy); r != 1 {
 			t.Errorf("retransmissions = %d, want 1", r)
 		}
 	})
 	t.Run("leaves a non-BDX slow peer on its idle cadence", func(t *testing.T) {
+		t.Parallel()
 		if r := retransmissionsWithin(t, mrp.SecureChannelProtocolID, 8*time.Second, sleepy); r != 0 {
 			t.Errorf("retransmissions = %d, want 0", r)
 		}
@@ -414,6 +429,7 @@ func TestMessageExchangeBDXRetransmissionIntervalCap(t *testing.T) {
 func TestMessageExchangeActivityTracking(t *testing.T) {
 	t.Parallel()
 	t.Run("updates lastActive on receive", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		before := x.lastActivity()
@@ -424,6 +440,7 @@ func TestMessageExchangeActivityTracking(t *testing.T) {
 		}
 	})
 	t.Run("updates lastActive on send", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		before := x.lastActivity()
@@ -440,6 +457,7 @@ func TestMessageExchangeActivityTracking(t *testing.T) {
 func TestMessageExchangeCloseNotification(t *testing.T) {
 	t.Parallel()
 	t.Run("emits closed once when destroyed after the exchange completed its close", func(t *testing.T) {
+		t.Parallel()
 		// Go reports the end through Done (destroy is Abort); a second close
 		// must neither reopen nor close it again.
 		e := mxNew(t, false, nil)
@@ -467,6 +485,7 @@ func TestMessageExchangeCloseNotification(t *testing.T) {
 func TestMessageExchangeCrossProtocolStatusReport(t *testing.T) {
 	t.Parallel()
 	t.Run("accepts SecureChannel StatusReport on a non-SecureChannel exchange and delivers it to the consumer", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, bdxProtocolID)
 		report := []byte{0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x1f, 0x00} // MessageExchangeTest.ts:619
@@ -477,11 +496,12 @@ func TestMessageExchangeCrossProtocolStatusReport(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got.ProtocolID != mrp.SecureChannelProtocolID || got.Opcode != mrp.SCOpcodeStatusReport || string(got.Payload) != string(report) {
+		if got.ProtocolID != mrp.SecureChannelProtocolID || got.Opcode != mrp.SCOpcodeStatusReport || !bytes.Equal(got.Payload, report) {
 			t.Errorf("delivered %+v", got)
 		}
 	})
 	t.Run("still rejects non-StatusReport SecureChannel messages on a non-SecureChannel exchange", func(t *testing.T) {
+		t.Parallel()
 		// matter.js throws MatterFlowError; the Go receive path drops it.
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, bdxProtocolID)
@@ -503,6 +523,7 @@ func TestMessageExchangeCrossProtocolStatusReport(t *testing.T) {
 		{"keeps the exchange's protocol id on non-StatusReport outgoing messages", 0x10, []byte{0}, bdxProtocolID},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			e := mxNew(t, false, nil)
 			x := e.exchange(t, bdxProtocolID)
 			if err := x.Send(context.Background(), tc.opcode, tc.payload, SendOptions{SuppressAck: true, DisableMRP: true}); err != nil {
@@ -523,6 +544,7 @@ func TestMessageExchangeAckWaitAbort(t *testing.T) {
 	t.Parallel()
 	fired := func() chan struct{} { c := make(chan struct{}); close(c); return c }
 	t.Run("transmits once despite an abort that already fired and does not wait for the ack", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		if err := x.Send(context.Background(), 1, nil, SendOptions{AckWaitAbort: fired()}); err != nil {
@@ -533,6 +555,7 @@ func TestMessageExchangeAckWaitAbort(t *testing.T) {
 		}
 	})
 	t.Run("transmits despite an abort that fires while the message counter is allocated", func(t *testing.T) {
+		t.Parallel()
 		// Go allocates the counter while framing; the abort fires during the
 		// transmission, the same point before the ack wait.
 		e := mxNew(t, false, nil)
@@ -547,6 +570,7 @@ func TestMessageExchangeAckWaitAbort(t *testing.T) {
 		}
 	})
 	t.Run("ends the wait for the ack without retransmitting and resolves", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)
 		abort := make(chan struct{})
@@ -563,6 +587,7 @@ func TestMessageExchangeAckWaitAbort(t *testing.T) {
 		}
 	})
 	t.Run("does not retransmit after the ack wait ended during a retransmission in flight", func(t *testing.T) {
+		t.Parallel()
 		e := mxNew(t, false, nil)
 		retransmitted, released := make(chan struct{}), make(chan struct{})
 		e.conn.hook = func(n int) {
@@ -603,6 +628,7 @@ func TestMessageExchangeAckWaitAbort(t *testing.T) {
 		}
 	})
 	t.Run("does not transmit when an abort that already fired may stop the transmission", func(t *testing.T) {
+		t.Parallel()
 		// matter.js's abort is the Go ctx.
 		e := mxNew(t, false, nil)
 		x := e.exchange(t, mrp.SecureChannelProtocolID)

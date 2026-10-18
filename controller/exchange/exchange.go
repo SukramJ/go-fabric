@@ -666,21 +666,7 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 		x.mu.Lock()
 	}
 	if duplicate {
-		// A retransmission of our pending message acknowledges the
-		// duplicate, so it stands in for the standalone ack
-		// (MessageExchange.ts:485-495).
-		if msg.RequiresAck {
-			if p := x.kickLocked(msg); p != nil {
-				ept := x.expectedProcessingTimeLocked()
-				x.mu.Unlock()
-				if x.retransmit(p, ept) {
-					return
-				}
-				x.mu.Lock()
-			}
-			_, _ = x.transmitLocked(mrp.StandaloneAckOpcode, nil, &msg.Counter)
-		}
-		x.mu.Unlock()
+		x.onDuplicateLocked(msg)
 		return
 	}
 	if p := x.sentToAck; p != nil && p.hasAck && msg.Counter == p.ackCounter {
@@ -731,6 +717,24 @@ func (x *Exchange) onMessageReceived(msg *Message, duplicate bool) {
 	select {
 	case x.signal <- struct{}{}:
 	default:
+	}
+	x.mu.Unlock()
+}
+
+// onDuplicateLocked takes a duplicate with x.mu held and releases it: a
+// retransmission of our pending message acknowledges the duplicate, so it
+// stands in for the standalone ack (MessageExchange.ts:485-495).
+func (x *Exchange) onDuplicateLocked(msg *Message) {
+	if msg.RequiresAck {
+		if p := x.kickLocked(msg); p != nil {
+			ept := x.expectedProcessingTimeLocked()
+			x.mu.Unlock()
+			if x.retransmit(p, ept) {
+				return
+			}
+			x.mu.Lock()
+		}
+		_, _ = x.transmitLocked(mrp.StandaloneAckOpcode, nil, &msg.Counter)
 	}
 	x.mu.Unlock()
 }

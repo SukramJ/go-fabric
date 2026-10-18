@@ -87,6 +87,7 @@ func TestMRPMaxPeerResponseTimeOf(t *testing.T) {
 				{"falls back to the default expectedProcessingTime when omitted", DefaultExpectedProcessingTime, 35 * time.Second},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
+					t.Parallel()
 					if got := ReliableMaxPeerResponseTime(tc.expected); got != tc.wantTotal {
 						t.Errorf("timeout = %v, want %v", got, tc.wantTotal)
 					}
@@ -110,6 +111,7 @@ func TestMRPMaxPeerResponseTimeOf(t *testing.T) {
 			{"drops the peer leg when peer session parameters are unknown", nil, true, 11229 * time.Millisecond},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
 				if got := MaxPeerResponseTime(tc.peer, tc.active, mrpDefaults, DefaultExpectedProcessingTime); got != tc.want {
 					t.Errorf("timeout = %v, want %v", got, tc.want)
 				}

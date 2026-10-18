@@ -40,25 +40,25 @@ const (
 // mcDecoded is DECODED (MessageCodecTest.ts:25-50) in Go form.
 func mcDecoded() (Header, ProtocolHeader) {
 	return Header{
-			SessionID: 0, SessionType: SessionUnsecured,
-			HasSourceNodeID: true, SourceNodeID: 5936706156730294398,
-			MessageCounter: 401755914,
-		}, ProtocolHeader{
-			ProtocolID: 0, Initiator: true, ExchangeID: 25811,
-			Opcode: 0x20, NeedsAck: true,
-		}
+		SessionID: 0, SessionType: SessionUnsecured,
+		HasSourceNodeID: true, SourceNodeID: 5936706156730294398,
+		MessageCounter: 401755914,
+	}, ProtocolHeader{
+		ProtocolID: 0, Initiator: true, ExchangeID: 25811,
+		Opcode: 0x20, NeedsAck: true,
+	}
 }
 
 // mcDecoded2 is DECODED_2 (MessageCodecTest.ts:56-81) in Go form.
 func mcDecoded2() (Header, ProtocolHeader) {
 	return Header{
-			SessionID: 0, SessionType: SessionUnsecured,
-			DestSize: DestNodeID, DestNodeID: 5936706156730294398,
-			MessageCounter: 2031257377,
-		}, ProtocolHeader{
-			ProtocolID: 0, Initiator: false, ExchangeID: 25811,
-			Opcode: 0x21, NeedsAck: true, HasAck: true, AckCounter: 401755914,
-		}
+		SessionID: 0, SessionType: SessionUnsecured,
+		DestSize: DestNodeID, DestNodeID: 5936706156730294398,
+		MessageCounter: 2031257377,
+	}, ProtocolHeader{
+		ProtocolID: 0, Initiator: false, ExchangeID: 25811,
+		Opcode: 0x21, NeedsAck: true, HasAck: true, AckCounter: 401755914,
+	}
 }
 
 func mcDecode(t *testing.T, wire []byte) (Header, ProtocolHeader, []byte) {

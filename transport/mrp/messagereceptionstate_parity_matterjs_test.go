@@ -59,12 +59,15 @@ func mrsDup(t *testing.T, w *Window, cs ...uint32) {
 
 // mrsShared are the cases the three states share verbatim.
 func mrsShared(t *testing.T, newWindow func() *Window, firstBitmap uint32) {
+	t.Helper()
 	t.Run("state gets initialized by first counter value", func(t *testing.T) {
+		t.Parallel()
 		w := newWindow()
 		mrsAccept(t, w, 0x1234)
 		mrsUpdate(t, w, 0x1235, firstBitmap, false, 1)
 	})
 	t.Run("correct difference gets calculated and state gets updated after being initialized", func(t *testing.T) {
+		t.Parallel()
 		w := newWindow()
 		mrsAccept(t, w, 0x1234)
 		mrsDiff(t, w, 0x1235, false, 1)
@@ -73,11 +76,13 @@ func mrsShared(t *testing.T, newWindow func() *Window, firstBitmap uint32) {
 		}
 	})
 	t.Run("duplicate counter value (same value) within window is detected", func(t *testing.T) {
+		t.Parallel()
 		w := newWindow()
 		mrsAccept(t, w, 0x1234)
 		mrsDup(t, w, 0x1234)
 	})
 	t.Run("value tests within counter window", func(t *testing.T) {
+		t.Parallel()
 		w := newWindow() // MessageReceptionStateTest.ts:245-264
 		mrsAccept(t, w, 1, 96)
 		mrsUpdate(t, w, 100, 0b1000, false, 4)
@@ -93,6 +98,7 @@ func mrsShared(t *testing.T, newWindow func() *Window, firstBitmap uint32) {
 		mrsAccept(t, w, 102)
 	})
 	t.Run("forward jump of exactly the window size clears stale bitmap bits", func(t *testing.T) {
+		t.Parallel()
 		w := newWindow() // MessageReceptionStateTest.ts:304-315
 		mrsAccept(t, w, 1, 100)
 		mrsUpdate(t, w, 94, 0b100000, false, -6)
@@ -103,12 +109,15 @@ func mrsShared(t *testing.T, newWindow func() *Window, firstBitmap uint32) {
 
 // mrsEncryptedShared are the cases both encrypted states share.
 func mrsEncryptedShared(t *testing.T, newWindow func() *Window) {
+	t.Helper()
 	t.Run("duplicate counter value (value -1) within window is detected", func(t *testing.T) {
+		t.Parallel()
 		w := newWindow()
 		mrsAccept(t, w, 0x1234, 0x1235)
 		mrsDiff(t, w, 0x1234, true, -1)
 	})
 	t.Run("value tests on counter window edges", func(t *testing.T) {
+		t.Parallel()
 		w := newWindow() // MessageReceptionStateTest.ts:266-281
 		mrsAccept(t, w, 1, 103)
 		mrsUpdate(t, w, 100, 0b100, false, -3)
@@ -128,6 +137,7 @@ func TestMessageReceptionStateEncryptedWithoutRollover(t *testing.T) {
 	mrsEncryptedShared(t, NewWindowNoRollover)
 
 	t.Run("value tests on range edges", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindowNoRollover() // MessageReceptionStateTest.ts:283-291
 		mrsAccept(t, w, 103)
 		mrsDup(t, w, 0)
@@ -136,6 +146,7 @@ func TestMessageReceptionStateEncryptedWithoutRollover(t *testing.T) {
 		mrsAccept(t, w, mrsMax-32)
 	})
 	t.Run("accepts a peer counter of 0xFFFFFFFF (maximum valid value)", func(t *testing.T) {
+		t.Parallel()
 		mrsAccept(t, NewWindowNoRollover(), 0xffffffff)
 	})
 }
@@ -146,6 +157,7 @@ func TestMessageReceptionStateEncryptedWithRollover(t *testing.T) {
 	mrsEncryptedShared(t, NewWindowEncryptedRollover)
 
 	t.Run("value tests on edges and duplicate values with low max-number and rollovers", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindowEncryptedRollover() // MessageReceptionStateTest.ts:476-498
 		mrsAccept(t, w, 1, 103)
 		mrsUpdate(t, w, 71, 0b10000000000000000000000000000000, false, -32)
@@ -155,6 +167,7 @@ func TestMessageReceptionStateEncryptedWithRollover(t *testing.T) {
 		mrsDiff(t, w, uint32(103+mrs2pow31), true, -mrs2pow31)
 	})
 	t.Run("value tests on edges and duplicate values with high max-number and rollovers", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindowEncryptedRollover() // MessageReceptionStateTest.ts:500-515
 		highBase := int64(1) << 30
 		mrsAccept(t, w, uint32(highBase))
@@ -163,12 +176,14 @@ func TestMessageReceptionStateEncryptedWithRollover(t *testing.T) {
 		mrsDiff(t, w, uint32(highBase2-mrs2pow31), true, -mrs2pow31)
 	})
 	t.Run("value tests on edges and new values with low max-number and rollovers", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindowEncryptedRollover() // MessageReceptionStateTest.ts:517-536
 		mrsAccept(t, w, 1, 102)
 		mrsUpdate(t, w, 103, 0b1, false, 1)
 		mrsUpdate(t, w, uint32(103+mrs2pow31-1), 0b0, false, mrs2pow31-1)
 	})
 	t.Run("value tests on edges and new values with high max-number and rollovers", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindowEncryptedRollover() // MessageReceptionStateTest.ts:538-553
 		mrsAccept(t, w, uint32(103+mrs2pow31-1))
 		highBase := mrs2pow31 + 100_000
@@ -183,11 +198,13 @@ func TestMessageReceptionStateUnencryptedWithRollover(t *testing.T) {
 	mrsShared(t, NewWindow, 0b1)
 
 	t.Run("duplicate counter value (value -1) within window is detected", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindow()
 		mrsAccept(t, w, 1, 0x1234, 0x1235)
 		mrsDiff(t, w, 0x1234, true, -1)
 	})
 	t.Run("value tests on counter window edges", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindow() // MessageReceptionStateTest.ts:707-717
 		mrsAccept(t, w, 1, 103)
 		mrsUpdate(t, w, 100, 0b100, false, -3)
@@ -196,6 +213,7 @@ func TestMessageReceptionStateUnencryptedWithRollover(t *testing.T) {
 		mrsUpdate(t, w, 71, 0b10000000000000000000000001000110, false, -32)
 	})
 	t.Run("value tests on edges and duplicate values with low max-number and rollovers", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindow() // MessageReceptionStateTest.ts:719-729
 		mrsAccept(t, w, 1, 103)
 		mrsUpdate(t, w, 70, 0b0, false, int64(mrsMax)-32)
@@ -204,6 +222,7 @@ func TestMessageReceptionStateUnencryptedWithRollover(t *testing.T) {
 		mrsUpdate(t, w, 73, 0b10000000000000000000000000000000, false, -32)
 	})
 	t.Run("value tests on edges and duplicate values with high max-number and rollovers", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindow() // MessageReceptionStateTest.ts:731-761
 		mrsAccept(t, w, 1<<30, 10)
 		mrsUpdate(t, w, mrsMax-10, 0b100000000000000000000, false, -21)
@@ -211,6 +230,7 @@ func TestMessageReceptionStateUnencryptedWithRollover(t *testing.T) {
 		mrsUpdate(t, w, mrsMax-22, 0b0, false, int64(mrsMax)-32)
 	})
 	t.Run("treats the exact counter rollover (MAX -> 0) as new and detects replays", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindow() // MessageReceptionStateTest.ts:763-779
 		mrsAccept(t, w, mrsMax-1, mrsMax)
 		mrsDiff(t, w, 0, false, 1)
@@ -218,6 +238,7 @@ func TestMessageReceptionStateUnencryptedWithRollover(t *testing.T) {
 		mrsDiff(t, w, 1, false, 1)
 	})
 	t.Run("accepts an in-window sub-max counter delivered right after the first counter", func(t *testing.T) {
+		t.Parallel()
 		w := NewWindow() // MessageReceptionStateTest.ts:791-800 (matter.js issue #4095)
 		const af = uint32(0x0e8288af)
 		mrsAccept(t, w, af, af-1)
