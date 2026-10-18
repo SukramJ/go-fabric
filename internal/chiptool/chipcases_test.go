@@ -8,6 +8,7 @@ package chiptool
 import (
 	"bufio"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -485,10 +486,14 @@ func commissionedSnapshot(ctx context.Context, t *testing.T, h *harness, bin str
 	t.Helper()
 	snapshotMu.Lock()
 	defer snapshotMu.Unlock()
-	if s, ok := snapshots[kind]; ok {
+	key := kind
+	if daemonVariant != "" {
+		key += "-" + daemonVariant
+	}
+	if s, ok := snapshots[key]; ok {
 		return s
 	}
-	dir := filepath.Join(h.shared, "snapshot-"+kind)
+	dir := filepath.Join(h.shared, "snapshot-"+key)
 	if err := os.MkdirAll(dir, 0o777); err != nil { //nolint:gosec // the container's root writes here
 		t.Fatal(err)
 	}
@@ -518,6 +523,9 @@ func commissionedSnapshot(ctx context.Context, t *testing.T, h *harness, bin str
 			t.Fatalf("chip-tool commissioning for the YAML snapshot stopped at %s: %v", handshakeStage(out), err)
 		}
 	}
+	if daemonVariant == variantWiFiSim {
+		provisionWiFiNetwork(ctx, t, h, br, dir, kind)
+	}
 	// Stop the daemon so its database is quiescent before it is copied.
 	br.stop()
 	br.wg.Wait()
@@ -531,10 +539,72 @@ func commissionedSnapshot(ctx context.Context, t *testing.T, h *harness, bin str
 	for _, e := range entries {
 		s.files = append(s.files, e.Name())
 	}
-	snapshots[kind] = s
-	t.Logf("commissioned %s snapshot: %v", kind, s.files)
+	snapshots[key] = s
+	t.Logf("commissioned %s snapshot: %v", key, s.files)
 	return s
 }
+
+// provisionWiFiNetwork gives the commissioned --wifi-sim daemon the Wi-Fi
+// network the CNET cases expect: a TH commissioning over BLE-Wi-Fi
+// configures and connects it during commissioning (the cases' usage,
+// TC_CNET_4_1.py:37-40), the snapshot's controller commissioned over IP,
+// where chip configures no network (src/controller/AutoCommissioner.cpp:
+// 780-797 at 6170af84: network setup only over BLE, NFC, Wi-Fi PAF or a
+// proxy). So the same steps follow on CASE: ArmFailSafe,
+// AddOrUpdateWiFiNetwork, ConnectNetwork, CommissioningComplete.
+func provisionWiFiNetwork(ctx context.Context, t *testing.T, h *harness, br *bridgeProcess, dir, kind string) {
+	t.Helper()
+	switch kind {
+	case "py":
+		script, err := os.ReadFile(filepath.Join("testdata", "provision_wifi.py"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "provision_wifi.py"), script, 0o644); err != nil { //nolint:gosec // read by the container
+			t.Fatal(err)
+		}
+		cctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+		out, err := h.execIn(cctx, dir, "python3", "provision_wifi.py", "--paa-trust-store-path", chipPAATrustStore,
+			"--in-test-commissioning-method", "ble-wifi",
+			"--discriminator", strconv.Itoa(dutDiscriminator), "--passcode", strconv.Itoa(dutPasscode),
+			"--wifi-ssid", wifiSimSSID, "--wifi-passphrase", wifiSimPassphrase)
+		cancel()
+		_ = os.Remove(filepath.Join(dir, "provision_wifi.py"))
+		if _, pass := parsePython(out); err != nil || !pass {
+			br.dump(t)
+			t.Fatalf("provision the Wi-Fi network on the py snapshot: %v; full output: %s\n%s", err, saveCaseLog("CNETWIFI/provision-py", out), verdictLines(out))
+		}
+	case "yaml":
+		ctl := &controller{bin: h.chipTool, storageDir: filepath.Join(dir, "kvs"), nodeID: chipTestNodeID}
+		node := fmt.Sprintf("0x%X", ctl.nodeID)
+		ssid := "hex:" + hex.EncodeToString([]byte(wifiSimSSID))
+		steps := []struct {
+			args []string
+			ok   *regexp.Regexp
+		}{
+			{[]string{"generalcommissioning", "arm-fail-safe", "60", "1", node, "0"}, reCommissioningOK},
+			{[]string{"networkcommissioning", "add-or-update-wi-fi-network", ssid, "hex:" + hex.EncodeToString([]byte(wifiSimPassphrase)), node, "0", "--Breadcrumb", "2"}, reNetworkingOK},
+			{[]string{"networkcommissioning", "connect-network", ssid, node, "0", "--Breadcrumb", "3"}, reNetworkingOK},
+			{[]string{"generalcommissioning", "commissioning-complete", node, "0"}, reCommissioningOK},
+		}
+		for _, s := range steps {
+			out, err := ctl.run(ctx, t, s.args...)
+			if err != nil || !s.ok.MatchString(out) {
+				br.dump(t)
+				t.Fatalf("provision the Wi-Fi network on the yaml snapshot: chip-tool %s: %v\n%s", strings.Join(s.args, " "), err, tail(out, 40))
+			}
+		}
+	}
+	t.Logf("provisioned Wi-Fi network %q on the %s snapshot", wifiSimSSID, kind)
+}
+
+// reCommissioningOK and reNetworkingOK are chip-tool's decoded success
+// responses: GeneralCommissioning's errorCode 0 (OK) and
+// NetworkCommissioning's networkingStatus 0 (Success).
+var (
+	reCommissioningOK = regexp.MustCompile(`(?i)errorCode: 0\b`)
+	reNetworkingOK    = regexp.MustCompile(`(?i)networkingStatus: 0\b`)
+)
 
 // restoreSnapshot copies a snapshot into a case's work directory. Files the
 // container wrote as root are readable to us; the copies are ours.

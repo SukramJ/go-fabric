@@ -82,11 +82,73 @@ func TestChipCertificationFamilies(t *testing.T) {
 				continue
 			}
 			t.Run(fam.name, func(t *testing.T) {
-				runFamily(ctx, t, h, fam, cases[fam.name], pics, bin, flags)
+				p := pics
+				if fam.variant != "" {
+					p = variantPICS(ctx, t, h, bin, flags, fam.variant)
+					defer useVariant(fam.variant, p)()
+				}
+				runFamily(ctx, t, h, fam, cases[fam.descriptorFamily()], p, bin, flags)
 			})
 		}
 	}
 	writeGolden(t, h)
+}
+
+// --- daemon variants ----------------------------------------------------------
+
+// descriptorFamily is the family of the image's descriptor the row runs.
+func (f family) descriptorFamily() string {
+	if f.cases != "" {
+		return f.cases
+	}
+	return f.name
+}
+
+// daemonVariants are the compositions a family row may run against besides
+// the certified default (family.variant): the daemon flags each adds.
+var daemonVariants = map[string][]string{
+	variantWiFiSim: {"--wifi-sim"},
+}
+
+// daemonVariant is the variant every daemon of the running family is
+// started with ("" the default); the families run one after another.
+var daemonVariant string
+
+var (
+	variantMu   sync.Mutex
+	variantSets = map[string]*picsSet{}
+)
+
+// variantPICS is the PICS of a variant's daemon, generated once.
+func variantPICS(ctx context.Context, t *testing.T, h *harness, bin string, flags map[string]bool, variant string) *picsSet {
+	t.Helper()
+	extra, ok := daemonVariants[variant]
+	if !ok {
+		t.Fatalf("unknown daemon variant %q", variant)
+	}
+	for _, f := range extra {
+		if !flags[strings.TrimPrefix(f, "--")] {
+			t.Fatalf("the daemon binary has no %s, which the %s run needs", f, variant)
+		}
+	}
+	variantMu.Lock()
+	defer variantMu.Unlock()
+	if p, ok := variantSets[variant]; ok {
+		return p
+	}
+	restore := useVariant(variant, activePICS)
+	defer restore()
+	p := devicePICS(ctx, t, h, bin, flags)
+	variantSets[variant] = p
+	return p
+}
+
+// useVariant makes the variant's daemon and PICS the running ones, and
+// returns the restore.
+func useVariant(variant string, p *picsSet) (restore func()) {
+	prevVariant, prevPICS := daemonVariant, activePICS
+	daemonVariant, activePICS = variant, p
+	return func() { daemonVariant, activePICS = prevVariant, prevPICS }
 }
 
 // --- PICS ----------------------------------------------------------------------
@@ -192,7 +254,14 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 	if err != nil {
 		t.Fatal(err)
 	}
-	committed := filepath.Join("testdata", "pics")
+	// A variant's slices are committed only where they differ from the
+	// default composition's (testdata/pics-<variant>/), and held to those,
+	// else to the default's.
+	defaultSlices := filepath.Join("testdata", "pics")
+	committed := defaultSlices
+	if daemonVariant != "" {
+		committed = filepath.Join("testdata", "pics-"+daemonVariant)
+	}
 	if *updateChipCases {
 		_ = os.RemoveAll(committed)
 		if err := os.MkdirAll(committed, 0o755); err != nil { //nolint:gosec // a committed fixture directory
@@ -210,11 +279,24 @@ func devicePICS(ctx context.Context, t *testing.T, h *harness, bin string, flags
 		if err != nil {
 			t.Fatal(err)
 		}
-		if *updateChipCases {
-			if err := os.WriteFile(filepath.Join(committed, e.Name()), data, 0o644); err != nil { //nolint:gosec // a committed fixture
-				t.Fatal(err)
+		fixture := filepath.Join(committed, e.Name())
+		if daemonVariant != "" {
+			if _, err := os.Stat(fixture); err != nil && !*updateChipCases {
+				fixture = filepath.Join(defaultSlices, e.Name())
 			}
-		} else if want, err := os.ReadFile(filepath.Join(committed, e.Name())); err != nil || !bytes.Equal(want, data) { //nolint:gosec // a committed fixture
+		}
+		if *updateChipCases {
+			same := false
+			if daemonVariant != "" {
+				def, err := os.ReadFile(filepath.Join(defaultSlices, e.Name())) //nolint:gosec // a committed fixture
+				same = err == nil && bytes.Equal(def, data)
+			}
+			if !same {
+				if err := os.WriteFile(fixture, data, 0o644); err != nil { //nolint:gosec // a committed fixture
+					t.Fatal(err)
+				}
+			}
+		} else if want, err := os.ReadFile(fixture); err != nil || !bytes.Equal(want, data) { //nolint:gosec // a committed fixture
 			drift = append(drift, e.Name())
 		}
 		slice, err := readPICS(filepath.Join(out, e.Name()))
@@ -325,6 +407,8 @@ func runFamily(ctx context.Context, t *testing.T, h *harness, fam family, cases 
 	}
 	for i := range cases {
 		c := cases[i]
+		// A second run of a descriptor family records under its own name.
+		c.ID = fam.name + "/" + c.Name
 		if caseFilter != nil && !slices.Contains(caseFilter, c.ID) {
 			continue
 		}

@@ -120,6 +120,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CADMIN | 21 | 9 | 0 | 0 | 3 | 9 | 0 |
 | CGEN | 10 | 3 | 0 | 0 | 7 | 0 | 0 |
 | CNET | 23 | 2 | 0 | 0 | 12 | 4 | 5 |
+| CNETWIFI | 23 | 3 | 0 | 3 | 11 | 6 | 0 |
 | DA | 13 | 4 | 0 | 0 | 5 | 4 | 0 |
 | DD | 30 | 2 | 0 | 0 | 1 | 27 | 0 |
 | DESC | 3 | 2 | 0 | 0 | 0 | 1 | 0 |
@@ -226,7 +227,7 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | MEDIAPLAYBACK | 11 | 5 | 0 | 0 | 2 | 4 | 0 |
 | TGTNAV | 2 | 1 | 0 | 0 | 0 | 1 | 0 |
 | WAKEONLAN | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **all** | **669** | **384** | **0** | **1** | **118** | **161** | **5** |
+| **all** | **692** | **387** | **0** | **4** | **129** | **167** | **5** |
 
 ### Cases not run
 
@@ -326,6 +327,26 @@ Harness image: `ghcr.io/matter-js/chip@sha256:d6f1de89d714309beb621543d451a98996
 | CNET/4.5 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
 | CNET/4.6 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
 | CNET/4.9 | (b) not supported | not applicable: the case's PICS `CNET.S.F00` is false for the reference DUT |
+| CNETWIFI/4.1 | (a) defect | TC-CNET-4.1 reads Networks for the one connected network the DUT was commissioned onto; cluster/core's WiFiNetworkCommissioning does not persist its committed networks, so a restarted daemon reports none (chip persists it: NetworkCommissioningWiFiDriver.cpp:77-118, :135-138) |
+| CNETWIFI/4.10 | (b) not supported | not applicable: the case's PICS `CNET.S & CNET.S.F01` is false for the reference DUT |
+| CNETWIFI/4.11 | (c) harness | TC-CNET-4.11 moves the DUT between two real access points and switches the TH host's own Wi-Fi with them (PIXIT.CNET.WIFI_2ND_ACCESSPOINT_SSID/_CREDENTIALS, TC_CNET_4_11.py:1107-1112, and its host connect steps); the simulated driver has no second network and the harness host no Wi-Fi to switch |
+| CNETWIFI/4.12 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
+| CNETWIFI/4.13 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CNETWIFI/4.14 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CNETWIFI/4.16 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
+| CNETWIFI/4.2 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
+| CNETWIFI/4.20 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CNETWIFI/4.21 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
+| CNETWIFI/4.22 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
+| CNETWIFI/4.23 | (c) harness | TC-CNET-4.23 expects ConnectNetwork to an incorrect SSID or passphrase to fail; the TESTING-ONLY simulated driver connects to any SSID (examples/reference-bridge/wifisim.go ConnectNetwork), so only a real driver can answer it |
+| CNETWIFI/4.25 | (b) not supported | TC-CNET-4.25 verifies Wi-Fi per-device credentials (NetworkCommissioning PDC); the module serves no PDC, and the case skips itself on an endpoint without it (runs, and skips itself) |
+| CNETWIFI/4.26 | (b) not supported | TC-CNET-4.26 verifies QueryIdentity (per-device credentials); no PDC, the case skips itself (runs, and skips itself) |
+| CNETWIFI/4.27 | (b) not supported | TC-CNET-4.27 verifies Wi-Fi network client identities (per-device credentials); no PDC, the case skips itself (runs, and skips itself) |
+| CNETWIFI/4.29 | (b) not supported | TC-CNET-4.29 verifies ConnectNetwork with per-device credentials; no PDC, the case skips itself (runs, and skips itself) |
+| CNETWIFI/4.3 | (b) not supported | not applicable: the case's PICS `CNET.S.F02` is false for the reference DUT |
+| CNETWIFI/4.4 | (a) defect | TC-CNET-4.4 scans for the connected network's SSID; after a restart the daemon has no network (WiFiNetworkCommissioning does not persist its committed networks, as for 4.1) |
+| CNETWIFI/4.6 | (b) not supported | not applicable: the case's PICS `CNET.S.F01` is false for the reference DUT |
+| CNETWIFI/4.9 | (a) defect | TC-CNET-4.9 removes and re-adds the connected network; after a restart the daemon has none (WiFiNetworkCommissioning does not persist its committed networks, as for 4.1) |
 | CONTENTLAUNCHER/10.10 | (b) not supported | not applicable: the case's PICS `CONTENTLAUNCHER.S & CONTENTLAUNCHER.S.A0003` is false for the reference DUT |
 | CONTENTLAUNCHER/10.4 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
 | CONTENTLAUNCHER/10.6 | (c) harness | a manual case: the CHIP test plan has a test-lab operator perform it, there is nothing to automate |
@@ -543,7 +564,17 @@ whose family is not in that list is "not yet run", not "not supported".
 | CONCON, MESSAGES | the module serves ContentControl (`cluster/media`) and Messages (`cluster/core`), but chip has no case of either family at the harness pin | (c) no case |
 | ICDB | the module is not an ICD | (b) not supported |
 | SC_TC, the BLE and Thread cases of DD and SC | Bluetooth, Thread | (d) out of scope |
-| CNET Wi-Fi and Thread cases | NetworkCommissioning is Ethernet-only | (d) out of scope |
+| CNET Thread cases | the device side has no Thread radio | (d) out of scope |
+
+CNET runs twice. The `CNET` row is the certified default composition, whose
+NetworkCommissioning is Ethernet-only; its Wi-Fi cases are not applicable or
+excluded there. The `CNETWIFI` row runs the same cases against the reference
+daemon with `--wifi-sim`: NetworkCommissioning with the Wi-Fi feature
+(`CNET.S.F00=1`) over a simulated driver (TESTING ONLY), with PICS generated
+from that daemon (`internal/chiptool/testdata/pics-wifi-sim/`). Its
+commissioned snapshots carry the Wi-Fi network a test harness commissioning
+over BLE-Wi-Fi would have configured. Cases that need a real driver, a second
+access point or per-device credentials stay classified in the table above.
 
 Some families run but have nothing the daemon can be tested on. The root's
 IcdManagement is not mounted (`node/root.go` buildRoot says why), so the
