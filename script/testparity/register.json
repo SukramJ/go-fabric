@@ -2730,13 +2730,13 @@
         "controller/attestation:TestCertificatesFallbackVendorIDProductID",
         "controller/attestation:TestCertificatesParseMatterFallbackVidPid",
         "controller/attestation:TestCertificatesPaaFromAsn1",
-        "controller/commissioner:TestCertificatesGetPublicKeyFromCsr"
+        "controller/commissioner:TestCertificatesGetPublicKeyFromCsr",
+        "secure/mattercert:TestBuildDNStandardAttributes"
       ],
       "missing": [
         "recode root certificate",
         "recode intermediate certificate",
         "recode operational certificate",
-        "encode root certificate",
         "parse root certificate from ASN.1",
         "parse intermediate certificate from ASN.1",
         "parse operational certificate from ASN.1",
@@ -2749,11 +2749,7 @@
         "parses fallback VendorID from a DAC issuer commonName",
         "re-encodes a fallback DAC without injecting Matter VID/PID OIDs",
         "re-encodes a fallback PAI without injecting Matter VID/PID OIDs",
-        "verify root certificate",
-        "verify intermediate certificate via ROOT",
-        "verify operational certificate via ICAC and ROOT",
         "verify operational certificate via ICAC and ROOT with fabricId in root matching",
-        "verify operational certificate via ICAC and ROOT with fabricId in ica matching",
         "verify operational certificate via ICAC and ROOT with fabricId in all matching",
         "verify operational certificate via ICAC and ROOT with fabricId in root not matching",
         "validates TLV order preserve",
@@ -2761,7 +2757,7 @@
         "rejects a DER operational certificate larger than 600 bytes before parsing",
         "rejects a DER attestation certificate larger than the PQC limit before parsing"
       ],
-      "reason": "Ported on the CERTIFICATE_SETS: TLV to TBS DER of NOCs, chain verification without an ICAC, the ICAC fabric-id mismatch, the CAT limits, the ICAC decode, the 400-byte TLV cap, the Mvid/Mpid fallback, PAA parsing and CSR key extraction; missing: Go has no Matter-TLV certificate encoder and no X.509-to-TLV parser for operational certificates (recode, fromAsn1, external, extension and 600-byte cases), the Google set's standard X.520 DN attributes are not carried into the TBS DER (encode root, every ICAC verify), the NOC issuer is not chosen by authorityKeyIdentifier, the root's fabric id is not checked, the issuer DN's vendor id and the re-encoding of attestation certificates have no Go counterpart, the device CSR subject is CN=CSR not O=CSR, and without ML-DSA there is no 10240-byte attestation limit.",
+      "reason": "Ported on the CERTIFICATE_SETS: TLV to TBS DER of NOCs, chain verification without an ICAC, the ICAC fabric-id mismatch, the CAT limits, the ICAC decode, the 400-byte TLV cap, the Mvid/Mpid fallback, PAA parsing and CSR key extraction; missing: Go has no Matter-TLV certificate encoder and no X.509-to-TLV parser for operational certificates (recode, fromAsn1, external, extension and 600-byte cases) (the Google set's X.520 DN attributes and the NOC issuer by authorityKeyIdentifier verify since the owner review of PR #164).",
       "snapshotSha": "eb21fd73fb5c20b830d82dc26bf526478f47996d"
     },
     {

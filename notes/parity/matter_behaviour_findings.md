@@ -432,22 +432,12 @@ brackets; the feature-sized ones carry an `until` in the test register.
 
 Device side:
 
-- **Standard X.520 DN attributes are dropped from operational certificates.**
-  `secure/mattercert/decode.go:34-39` and `tbs_der.go:121` `buildDN` carry
-  the Matter DN tags 17-22 only; a subject or issuer that also carries
-  commonName, organizationName or countryName (TLV tags 1-16 and 129-143,
-  matter.js `certificate/kinds/definitions/operational.ts:69-110`, order
-  preserving) rebuilds a different TBS and fails ECDSA verification — the
-  Google set of `packages/protocol/test/certificate/TestCertificates.ts`
-  (RCAC self-signature, ICAC, NOC). Interop-relevant: such a controller's
-  chain is refused in CASE. **Fix before `v0.8.0`**, in `secure/mattercert`
-  (Fable). (Brief BH, CertificatesTest port: 27 cases missing.)
 - **An empty ICAC is dropped from the CASE signed data.**
   `secure/sigma/sigma.go:811-822` `signedDataBytes` omits tag 2 when the
   ICAC is empty; matter.js re-encodes the field as received
   (`session/case/CaseServer.ts:294-299`, `TlvSignedData.encode` with
   `responderIcac`), so a peer that sends an empty ICAC (`300200`) signs a
-  TBS this side does not rebuild. (With the X.520 fix.)
+  TBS this side does not rebuild. (Milestone 3.)
 - **IPK rotation through KeySetWrite does not reach CASE.**
   `cluster/core/group_key_management.go:705` writes key set 0 into the
   groups store like any other set, `store/identity.go` holds one IPK and
@@ -482,12 +472,6 @@ Device side:
 
 Controller side:
 
-- **A NOC's issuer is not chosen by authorityKeyIdentifier.**
-  `secure/mattercert/verify.go:265` `VerifyAndExtractPubKey` verifies
-  against the ICAC whenever one is given, so a root-signed NOC presented
-  with an ICAC is refused; matter.js picks root or ICA by the AKID
-  (`certificate/kinds/Noc.ts:170-186`). The root's fabric id is not checked
-  against the NOC's either (`Noc.ts:119-125`). (With the X.520 fix.)
 - **Network profiles.** One network, MRP margins 0
   (`controller/peer/doc.go:15-17`, `controller/exchange/mrp.go:62-65`);
   matter.js `peer/NetworkProfile.ts:78-245` with the margins of

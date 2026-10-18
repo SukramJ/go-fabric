@@ -37,6 +37,15 @@ const (
 	dnTagMatterRCACID         uint8 = 20 // matter-rcac-id (uint64)
 	dnTagMatterFabricID       uint8 = 21 // matter-fabric-id (uint64)
 	dnTagMatterCASEAuth       uint8 = 22 // matter-noc-cat (uint32, multiple)
+	// The standard X.520 attributes (Core § 6.5.6.1): tags 1-16 carry them
+	// as UTF8String — domainComponent (16) as IA5String — and tags 129-143
+	// carry the attributes 1-15 as PrintableString. Mirrors matter.js
+	// packages/protocol/src/certificate/kinds/definitions/operational.ts:69-110
+	// at 862ad75f (TlvGenericMatterSubjectOrIssuerTaggedList).
+	dnTagStandardFirst  uint8 = 1
+	dnTagStandardLast   uint8 = 16
+	dnTagPrintableFirst uint8 = 129
+	dnTagPrintableLast  uint8 = 143
 )
 
 // SignatureAlgorithm values (Matter §6.5.1.2). Only ECDSA-with-SHA256
@@ -161,6 +170,11 @@ type DistinguishedName struct {
 	// CASEAuthTags collects the (multi-valued) CASE Authenticated
 	// Tags from a NOC subject.
 	CASEAuthTags []uint32
+	// Attributes are the standard X.520 attributes (commonName,
+	// organizationName, countryName, …) in their TLV arrival order; a
+	// real controller's root carries them (Google's: C, O, CN), and the
+	// TBS DER must carry them back or the signature does not verify.
+	Attributes []DNAttribute
 	// HasNodeID / HasFabricID / HasRCACID / HasICACID convey
 	// presence; the spec uses zero-as-sentinel which conflicts with
 	// real fabric IDs that may legitimately be 0.
@@ -176,6 +190,16 @@ type DistinguishedName struct {
 	// reordered DN produces a different SHA-256 over the TBS and
 	// fails ECDSA.Verify even though every value is correct.
 	Order []uint8
+}
+
+// DNAttribute is one standard X.520 attribute of a [DistinguishedName] as
+// the TLV carried it: Tag is the context tag (1-16 a UTF8String, 129-143 a
+// PrintableString), Value the string. Mirrors matter.js
+// packages/protocol/src/certificate/kinds/definitions/operational.ts:69-110
+// at 862ad75f.
+type DNAttribute struct {
+	Tag   uint8
+	Value string
 }
 
 // IsRoot reports whether the cert's Subject identifies a Root CA.
@@ -363,6 +387,20 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 			dn.CASEAuthTags = append(dn.CASEAuthTags, uint32(el.Uint&0xFFFFFFFF))
 			dn.Order = append(dn.Order, tag)
 		default:
+			if isStandardDNTag(tag) {
+				// A standard X.520 attribute, kept with its place in the
+				// order for the TBS DER. Mirrors matter.js
+				// packages/protocol/src/certificate/kinds/definitions/operational.ts:69-110
+				// at 862ad75f (TlvString fields of a
+				// TlvTaggedListPreservingOrder); they used to be skipped, so
+				// a chain whose DNs carry them failed to verify.
+				if el.Type < tlv.TypeUTF8Str1 || el.Type > tlv.TypeUTF8Str8 {
+					return dn, fmt.Errorf("%w: dn attribute %d is not a UTF-8 string", ErrMalformed, tag)
+				}
+				dn.Attributes = append(dn.Attributes, DNAttribute{Tag: tag, Value: el.String})
+				dn.Order = append(dn.Order, tag)
+				continue
+			}
 			// Skip — DN attributes the bridge does not consume.
 			if el.IsContainer {
 				if err := skipContainer(d); err != nil {
@@ -372,6 +410,12 @@ func decodeDN(d *tlv.Decoder) (DistinguishedName, error) {
 		}
 	}
 	return dn, nil
+}
+
+// isStandardDNTag reports whether tag is a standard X.520 DN attribute
+// tag (1-16, or 129-143 for the PrintableString forms).
+func isStandardDNTag(tag uint8) bool {
+	return (tag >= dnTagStandardFirst && tag <= dnTagStandardLast) || (tag >= dnTagPrintableFirst && tag <= dnTagPrintableLast)
 }
 
 // skipContainer consumes elements (recursively if nested) until the

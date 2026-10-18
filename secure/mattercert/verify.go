@@ -307,10 +307,20 @@ func (v *Verifier) VerifyAndExtractPubKey(noc, icac []byte) (*ecdsa.PublicKey, e
 		if err != nil {
 			return nil, fmt.Errorf("icac: %w", err)
 		}
-		issuerKey = icacPub
-		// Chain link check: NOC.Issuer.MatterICACID == ICAC.Subject.MatterICACID.
-		if nocCert.Issuer.MatterICACID != icacCert.Subject.MatterICACID || !icacCert.Subject.HasICACID {
-			return nil, fmt.Errorf("%w: NOC issuer ICAC-ID does not match ICAC subject", ErrChainBroken)
+		// The NOC's issuer is the certificate whose subjectKeyIdentifier
+		// its authorityKeyIdentifier names: the ICAC, or the root when a
+		// root-signed NOC is presented together with an ICAC. Mirrors
+		// matter.js packages/protocol/src/certificate/kinds/Noc.ts:170-186
+		// at 862ad75f; the ICAC used to be taken as the issuer whenever one
+		// was given, which refused such a NOC.
+		if nocCert.Extensions.HasAuthorityKeyID && !bytesEqual(nocCert.Extensions.AuthorityKeyID, icacCert.Extensions.SubjectKeyID) {
+			issuerKey = v.root
+		} else {
+			issuerKey = icacPub
+			// Chain link check: NOC.Issuer.MatterICACID == ICAC.Subject.MatterICACID.
+			if nocCert.Issuer.MatterICACID != icacCert.Subject.MatterICACID || !icacCert.Subject.HasICACID {
+				return nil, fmt.Errorf("%w: NOC issuer ICAC-ID does not match ICAC subject", ErrChainBroken)
+			}
 		}
 	} else {
 		// NOC is signed directly by the root.

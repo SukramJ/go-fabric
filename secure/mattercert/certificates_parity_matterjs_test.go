@@ -62,36 +62,6 @@ func certificatesSetByName(t *testing.T, name string) certificatesSet {
 	return certificatesSet{}
 }
 
-// certificatesGaps are the set/it pairs secure/mattercert does not meet
-// yet; each stays in the register's missing list (a wire-shape change, not
-// a fix of this wave).
-var certificatesGaps = map[string]string{
-	"Google Certificates/encode root certificate":                                                        certificatesGapStandardDN,
-	"Google Certificates/verify root certificate":                                                        certificatesGapStandardDN,
-	"Google Certificates/verify intermediate certificate via ROOT":                                       certificatesGapStandardDN,
-	"Google Certificates/verify operational certificate via ICAC and ROOT":                               certificatesGapStandardDN,
-	"Google Certificates/verify operational certificate via ICAC and ROOT with fabricId in ica matching": certificatesGapStandardDN,
-	"ROOT, ICAC, NOC signed with ROOT certificates/verify operational certificate via ICAC and ROOT":     certificatesGapIssuerByAKI,
-}
-
-const (
-	// operational.ts:69-110 and Certificate.ts:899-1058 carry the standard
-	// X.520 DN attributes (TLV tags 1-16, 129-143); Decode and buildDN
-	// carry only the Matter ones (17-22), so the TBS DER loses
-	// countryName/orgName/commonName and the signature does not verify.
-	certificatesGapStandardDN = "standard X.520 DN attributes are not carried into the TBS DER"
-	// Noc.ts:170-186 picks the NOC's issuer by authorityKeyIdentifier;
-	// VerifyAndExtractPubKey always takes the ICAC when one is presented.
-	certificatesGapIssuerByAKI = "the NOC issuer is not chosen by authorityKeyIdentifier"
-)
-
-func certificatesSkipGap(t *testing.T, set certificatesSet, it string) {
-	t.Helper()
-	if reason, ok := certificatesGaps[set.name+"/"+it]; ok {
-		t.Skip("register gap: " + reason)
-	}
-}
-
 // TestCertificatesGeneratesTheCorrectASN1Bytes is the describe "generates
 // the correct ASN1 bytes" (CertificatesTest.ts:81): Rcac/Icac/Noc.fromTlv
 // then asUnsignedDer is TBSToDER over the decoded TLV.
@@ -107,7 +77,6 @@ func TestCertificatesGeneratesTheCorrectASN1Bytes(t *testing.T) {
 					continue
 				}
 				t.Run(c.it, func(t *testing.T) {
-					certificatesSkipGap(t, set, c.it)
 					got, err := TBSToDER(certificatesDecode(t, c.tlv))
 					if err != nil {
 						t.Fatalf("TBSToDER: %v", err)
@@ -134,7 +103,6 @@ func TestCertificatesVerifiesCertificates(t *testing.T) {
 	for _, set := range certificatesSets {
 		t.Run("verify certificates for "+set.name, func(t *testing.T) {
 			t.Run("verify root certificate", func(t *testing.T) {
-				certificatesSkipGap(t, set, "verify root certificate")
 				if err := ValidateRCAC(certificatesDecode(t, set.rootTLV)); err != nil {
 					t.Fatalf("ValidateRCAC: %v", err)
 				}
@@ -157,7 +125,6 @@ func TestCertificatesVerifiesCertificates(t *testing.T) {
 				return
 			}
 			t.Run("verify intermediate certificate via ROOT", func(t *testing.T) {
-				certificatesSkipGap(t, set, "verify intermediate certificate via ROOT")
 				icac := certificatesDecode(t, set.icacTLV)
 				if !icac.IsICA() {
 					t.Fatal("ICAC does not decode as an ICAC")
@@ -167,7 +134,6 @@ func TestCertificatesVerifiesCertificates(t *testing.T) {
 				}
 			})
 			t.Run("verify operational certificate via ICAC and ROOT", func(t *testing.T) {
-				certificatesSkipGap(t, set, "verify operational certificate via ICAC and ROOT")
 				if _, err := v.VerifyAndExtractPubKey(certificatesHex(t, set.nocTLV), certificatesHex(t, set.icacTLV)); err != nil {
 					t.Fatalf("VerifyAndExtractPubKey: %v", err)
 				}
@@ -188,7 +154,6 @@ func TestCertificatesVerifiesCertificates(t *testing.T) {
 				}
 			}
 			t.Run("verify operational certificate via ICAC and ROOT with fabricId in ica matching", func(t *testing.T) {
-				certificatesSkipGap(t, set, "verify operational certificate via ICAC and ROOT with fabricId in ica matching")
 				icac, noc := certificatesDecode(t, set.icacTLV), certificatesDecode(t, set.nocTLV)
 				icac.Subject.HasFabricID, icac.Subject.MatterFabricID = true, noc.Subject.MatterFabricID
 				if err := checkICACShape(icac, noc); err != nil {
