@@ -3783,38 +3783,18 @@
     },
     {
       "path": "packages/protocol/test/peer/CommissioningConnectionTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/commissioner:TestConnectionPasscodeDropsDevice",
         "controller/commissioner:TestConnectionStaggerAndWinner",
         "controller/commissioner:TestConnectionHoldingResponder",
         "controller/commissioner:TestConnectionBudget",
-        "controller/commissioner:TestConnectionErrorClasses"
+        "controller/commissioner:TestConnectionErrorClasses",
+        "controller/commissioner:TestCommissioningConnection",
+        "controller/commissioner:TestCommissioningConnectionStagger",
+        "controller/commissioner:TestCommissioningConnectionScripted"
       ],
-      "missing": [
-        "does not accept a late success on a device already dropped for invalid credentials",
-        "credential failure skips later entries with the same deviceIdentifier",
-        "keeps trying a device's other addresses after invalid PASE data on one",
-        "closes session if winner is found concurrently with another establishment completing",
-        "returns the won session without waiting for an abort-unresponsive loser to settle",
-        "closes session if timeout fires while establishment is pending",
-        "external abort cancels in-flight connection and rejects with abort reason",
-        "passes abort signal to establishSession and aborts early when timeout fires",
-        "first candidate fires immediately, subsequent candidates wait delayBeforeNextAddress each",
-        "cancels pending stagger when a winner is established",
-        "stagger slot is global across distinct devices (contract doc)",
-        "a fast failure starts the next attempt at once, and that attempt still wins",
-        "gives a third address an attempt within the default 30s timeout",
-        "holds the next address while an attempt has reached its responder",
-        "skips the queued addresses of a device dropped for invalid credentials",
-        "restarts the stagger from the last launch",
-        "lets an older failure leave the newer attempt's stagger running",
-        "keeps the newer attempt's delay when a held attempt fails while it is unanswered",
-        "launches the next address once a hold ends after the latest attempt failed",
-        "launches the next address when a held attempt fails with nothing else pending",
-        "default delayBeforeNextAddress is 10s"
-      ],
-      "reason": "The commissioner's connection tests cover the passcode drop, transient network errors, the last error and an external abort; the concurrent-winner session closes and the remaining cases are not ported case by case.",
+      "reason": "Every CommissioningConnection case ported on clocktest.Fake: the credential drop and its late-success close cause, invalid PASE data, the concurrent-winner and timeout session closes, the winner not waiting for an abort-unresponsive loser, external and budget aborts reaching the attempt's ctx, the per-address stagger (global across devices, cancelled by a winner, default 10 s, a third address within 30 s), the responder hold and the five scripted stagger/hold timelines.",
       "snapshotSha": "7733004c6b3613f0fff0ff0d45a9baa688ab3e17"
     },
     {
