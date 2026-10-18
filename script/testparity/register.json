@@ -3988,8 +3988,15 @@
     },
     {
       "path": "packages/protocol/test/protocol/MessageChannelTest.ts",
-      "status": "planned",
-      "reason": "A message channel reporting a changed address after a socket swap, and releasing its transport channel.",
+      "status": "partial",
+      "go": [
+        "controller/exchange:TestMessageChannelSocketSwap"
+      ],
+      "missing": [
+        "stops observing the transport channel address without closing the channel",
+        "closes the transport channel of an unreliable transport on close"
+      ],
+      "reason": "The socket swap is ported against Session.SetAddr (the Go MessageChannel is folded into the Session and has no address observable, so the change is held as the reported and used address); the release cases have no Go counterpart, because every session sends on the manager's one socket and owns no transport channel to release or close.",
       "snapshotSha": "3908edac6e19f14fef5b432ac167d0a7af5064cd"
     },
     {
