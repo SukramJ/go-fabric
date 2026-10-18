@@ -2764,18 +2764,16 @@
     },
     {
       "path": "packages/protocol/test/codec/MessagePrivacyTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "secure/channel:TestPrivacyNonceLayout",
         "secure/channel:TestPrivacyMask_ShortMIC",
         "secure/channel:TestDerivePrivacyKey_ChipGroupVector",
         "secure/channel:TestPrivacyMask_ChipObfuscateVector",
-        "secure/channel:TestApplyPrivacyMask_RoundTrip"
+        "secure/channel:TestApplyPrivacyMask_RoundTrip",
+        "secure/channel:TestMessagePrivacyBuildNonce"
       ],
-      "missing": [
-        "matches the CHIP test vector"
-      ],
-      "reason": "Key derivation, obfuscation and its symmetry are covered against the CHIP vectors; the nonce is checked for its layout, not against the CHIP nonce vector.",
+      "reason": "The privacy nonce (channel.PrivacyNonce against the CHIP nonce vector) and its 16-byte MIC rejection, key derivation and obfuscation with its symmetry against the CHIP vectors.",
       "snapshotSha": "add8c5c3f49dc9829e051bda62c36b6d612a07d0"
     },
     {

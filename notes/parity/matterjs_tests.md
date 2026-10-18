@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 
 | status | files |
 | --- | ---: |
-| ported | 8 |
-| partial | 96 |
+| ported | 9 |
+| partial | 95 |
 | planned | 133 |
 | excluded | 87 |
 | total | 324 |
@@ -96,7 +96,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | [protocol/test/bdx](#protocoltestbdx) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/ble](#protocoltestble) | 2 | 1 | 0 | 0 | 1 |
 | [protocol/test/certificate](#protocoltestcertificate) | 5 | 0 | 2 | 3 | 0 |
-| [protocol/test/codec](#protocoltestcodec) | 3 | 1 | 2 | 0 | 0 |
+| [protocol/test/codec](#protocoltestcodec) | 3 | 2 | 1 | 0 | 0 |
 | [protocol/test/common](#protocoltestcommon) | 8 | 0 | 3 | 2 | 3 |
 | [protocol/test/dcl](#protocoltestdcl) | 10 | 0 | 6 | 4 | 0 |
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
@@ -740,7 +740,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` ‚
 | --- | ---: | --- | --- | --- |
 | BtpCodecTest.ts | 358 | ported | `transport/btp:TestBtpCodecDecodeHandshakeRequest`<br>`transport/btp:TestBtpCodecDecodeHandshakeRequestMultipleVersions`<br>`transport/btp:TestBtpCodecRoundTripsMultipleVersions`<br>`transport/btp:TestBtpCodecDecodePacket`<br>`transport/btp:TestBtpCodecIsHandshakeResponse`<br>`transport/btp:TestBtpCodecEncodeHandshakeResponse`<br>`transport/btp:TestBtpCodecEncodePacket`<br>`transport/btp:TestBtpCodecErrors` | transport/btp/codec_parity_matterjs_test.go ports every vector and refusal of the file with matter.js's messages. |
 | MessageCodecTest.ts | 295 | partial | `transport/message:TestHeaderMessageExtensionRoundTrip`<br>`transport/message:TestHeaderMessageExtensionLengthOverflow`<br>`transport/message:TestProtocolHeaderSecuredExtensionRoundTrip`<br>`transport/message:TestProtocolHeaderSecuredExtensionLengthOverflow`<br>`transport/message:TestMessageCodecDecode`<br>`transport/message:TestMessageCodecEncodePrivacy`<br>`transport/message:TestMessageCodecEncode`<br>`groups:TestMessageCodecPrivacyTruncated` | The decode/encode vectors, the privacy-enhanced prefix and region, the MIC-length rejection (groups.tryDecrypt) and the extension refusals are ported; encodePacket's pre-serialized headerBytes has no Go counterpart, because channel.ObfuscateGroupHeader returns the wire header and the group sender concatenates it with the ciphertext itself. Missing: ‚ÄúencodePacket uses pre-serialized headerBytes when present‚Äù. |
-| MessagePrivacyTest.ts | 51 | partial | `secure/channel:TestPrivacyNonceLayout`<br>`secure/channel:TestPrivacyMask_ShortMIC`<br>`secure/channel:TestDerivePrivacyKey_ChipGroupVector`<br>`secure/channel:TestPrivacyMask_ChipObfuscateVector`<br>`secure/channel:TestApplyPrivacyMask_RoundTrip` | Key derivation, obfuscation and its symmetry are covered against the CHIP vectors; the nonce is checked for its layout, not against the CHIP nonce vector. Missing: ‚Äúmatches the CHIP test vector‚Äù. |
+| MessagePrivacyTest.ts | 51 | ported | `secure/channel:TestPrivacyNonceLayout`<br>`secure/channel:TestPrivacyMask_ShortMIC`<br>`secure/channel:TestDerivePrivacyKey_ChipGroupVector`<br>`secure/channel:TestPrivacyMask_ChipObfuscateVector`<br>`secure/channel:TestApplyPrivacyMask_RoundTrip`<br>`secure/channel:TestMessagePrivacyBuildNonce` | The privacy nonce (channel.PrivacyNonce against the CHIP nonce vector) and its 16-byte MIC rejection, key derivation and obfuscation with its symmetry against the CHIP vectors. |
 
 ## protocol/test/common
 
