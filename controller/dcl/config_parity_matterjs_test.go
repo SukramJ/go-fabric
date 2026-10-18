@@ -17,6 +17,7 @@ import "testing"
 func TestDclConfig(t *testing.T) {
 	t.Parallel()
 	t.Run("production has correct default URL", func(t *testing.T) {
+		t.Parallel()
 		if ProductionURL != "https://on.dcl.csa-iot.org" {
 			t.Fatal(ProductionURL)
 		}
@@ -25,11 +26,13 @@ func TestDclConfig(t *testing.T) {
 		}
 	})
 	t.Run("test has correct default URL", func(t *testing.T) {
+		t.Parallel()
 		if TestNetURL != "https://on.test-net.dcl.csa-iot.org" {
 			t.Fatal(TestNetURL)
 		}
 	})
 	t.Run("custom config satisfies interface", func(t *testing.T) {
+		t.Parallel()
 		if got := NewClient("https://custom.dcl.local").baseURL(); got != "https://custom.dcl.local" {
 			t.Fatal(got)
 		}
@@ -49,12 +52,14 @@ func TestDclConfigDclGithubConfig(t *testing.T) {
 		{"defaults has correct cdSignerCertPath", d.CDSignerCertPath, "credentials/development/cd-certs"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if tc.got != tc.want {
 				t.Fatalf("got %q, want %q", tc.got, tc.want)
 			}
 		})
 	}
 	t.Run("custom config satisfies interface", func(t *testing.T) {
+		t.Parallel()
 		custom := GitHubConfig{Owner: "my-org", Repo: "my-repo", Branch: "main", CertPath: "certs/paa", CDSignerCertPath: "certs/cd-signers"}
 		if custom.Owner != "my-org" || custom.Repo != "my-repo" || custom.Branch != "main" ||
 			custom.CertPath != "certs/paa" || custom.CDSignerCertPath != "certs/cd-signers" {
