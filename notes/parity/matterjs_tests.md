@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 30 |
-| partial | 104 |
-| planned | 103 |
+| partial | 105 |
+| planned | 102 |
 | excluded | 87 |
 | total | 324 |
 
@@ -90,7 +90,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/action](#protocoltestaction) | 1 | 0 | 0 | 0 | 1 |
 | [protocol/test/action/client](#protocoltestactionclient) | 5 | 1 | 0 | 3 | 1 |
 | [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 2 | 0 | 0 |
-| [protocol/test/action/request](#protocoltestactionrequest) | 6 | 2 | 2 | 1 | 1 |
+| [protocol/test/action/request](#protocoltestactionrequest) | 6 | 2 | 3 | 0 | 1 |
 | [protocol/test/action/response](#protocoltestactionresponse) | 4 | 0 | 0 | 0 | 4 |
 | [protocol/test/advertisement](#protocoltestadvertisement) | 2 | 1 | 1 | 0 | 0 |
 | [protocol/test/bdx](#protocoltestbdx) | 2 | 1 | 1 | 0 | 0 |
@@ -692,7 +692,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | ReadTest.ts | 311 | partial | `controller/interaction:TestReadRequestBuildAttributes`<br>`controller/interaction:TestReadRequestBuildFabricFiltering`<br>`controller/interaction:TestReadRequestBuildDataVersionFilters`<br>`controller/interaction:TestReadRequestBuildEvents`<br>`controller/interaction:TestReadRequestBuildCombined`<br>`controller/interaction:TestReadRequestBuildValidation`<br>`controller/interaction:TestReadRequestBuildInteractionModelRevision` | The ReadRequest read off the wire of Interaction.ReadWith (attribute and event paths with every wildcard, fabric filtering, data version and event filters, the empty request, the revision) is ported; missing are the TypeScript type guards Read.containsAttribute/containsEvent (no Go counterpart, a Go caller reads len()), the call without an argument (ReadWith always takes a ReadRequest value; the empty one is ported) and a custom revision (Go always stamps its own). Missing: “validates request has attributes using containsAttribute”; “validates request has events using containsEvent”; “throws when called with no arguments”; “uses custom interaction model revision when specified”. |
 | SpecifierTest.ts | 163 | excluded | `js-runtime-only` | Resolution of TypeScript cluster, attribute and command specifiers by name or object. |
 | SubscribeTest.ts | 341 | ported | `controller/interaction:TestSubscribeRequestBuildBasic`<br>`controller/interaction:TestSubscribeRequestBuildKeepSubscriptions`<br>`controller/interaction:TestSubscribeRequestBuildIntervals`<br>`controller/interaction:TestSubscribeRequestBuildIntervalValidation`<br>`controller/interaction:TestSubscribeRequestBuildWildcards`<br>`controller/interaction:TestSubscribeRequestBuildFabricFiltering`<br>`controller/interaction:TestSubscribeRequestBuildDataVersionFilters`<br>`controller/interaction:TestSubscribeRequestBuildEventFilters` | Every case runs against the SubscribeRequest Interaction.Subscribe sends (paths and wildcards, keepSubscriptions, interval bounds with the ClientInteraction defaults for unset ones, fabric filtering, data version and event filters) or the out-of-range refusal it returns before sending. |
-| WriteTest.ts | 327 | planned | — | Building a write request: timed writes, schema encoding, data versions. |
+| WriteTest.ts | 327 | partial | `controller/interaction:TestWriteRequestBuildBasic`<br>`controller/interaction:TestWriteRequestBuildTimed`<br>`controller/interaction:TestWriteRequestBuildDataVersions`<br>`controller/interaction:TestWriteRequestBuildChunked`<br>`controller/interaction:TestWriteRequestBuildValidation`<br>`controller/interaction:TestWriteRequestBuildInteractionModelRevision` | The WriteRequest read off the wire of Interaction.Write (paths, encoded values, timed flag and TimedRequest timeout, data versions, moreChunkedMessages, list chunking default, the revision) and its refusals before sending (a DataVersion on a wildcard endpoint, through the one numeric surface both the reified and the raw case map to; an empty write) are ported; missing are the call without an argument (Write always takes a writes slice; the empty one is ported) and a custom revision (Go always stamps its own). Missing: “throws when undefined options”; “uses custom interaction model revision”. |
 
 ## protocol/test/action/response
 
@@ -1125,10 +1125,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `ClientInteractionInvokeTest.ts` — The controller's invoke response reconciliation and commandRef handling (NO_COMMAND_RESPONSE synthesis, stray responses, splitting for maxPathsPerInvoke=1).
 - `ClientInteractionSubscribeTest.ts` — Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix.
 - `ReadScopeTest.ts` — The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI.
-
-### protocol/test/action/request
-
-- `WriteTest.ts` — Building a write request: timed writes, schema encoding, data versions.
 
 ### protocol/test/dcl
 

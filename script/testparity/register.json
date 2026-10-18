@@ -2534,8 +2534,20 @@
     },
     {
       "path": "packages/protocol/test/action/request/WriteTest.ts",
-      "status": "planned",
-      "reason": "Building a write request: timed writes, schema encoding, data versions.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestWriteRequestBuildBasic",
+        "controller/interaction:TestWriteRequestBuildTimed",
+        "controller/interaction:TestWriteRequestBuildDataVersions",
+        "controller/interaction:TestWriteRequestBuildChunked",
+        "controller/interaction:TestWriteRequestBuildValidation",
+        "controller/interaction:TestWriteRequestBuildInteractionModelRevision"
+      ],
+      "missing": [
+        "throws when undefined options",
+        "uses custom interaction model revision"
+      ],
+      "reason": "The WriteRequest read off the wire of Interaction.Write (paths, encoded values, timed flag and TimedRequest timeout, data versions, moreChunkedMessages, list chunking default, the revision) and its refusals before sending (a DataVersion on a wildcard endpoint, through the one numeric surface both the reified and the raw case map to; an empty write) are ported; missing are the call without an argument (Write always takes a writes slice; the empty one is ported) and a custom revision (Go always stamps its own).",
       "snapshotSha": "bb77eb48f28402b301c386e2ba33394002d8a4c6"
     },
     {
