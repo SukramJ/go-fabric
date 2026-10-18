@@ -1,6 +1,6 @@
 {
   "root_set": "test-seeded: Test*/Benchmark*/Fuzz*/Example* functions of every test package (this module is a library and has no production main to seed from)",
-  "entry_points": 5334,
+  "entry_points": 5352,
   "entry_packages": [
     ".",
     "bdx",
@@ -224,9 +224,9 @@
     "transport/udp"
   ],
   "summary": {
-    "total_exported": 12822,
-    "reachable": 9048,
-    "whitelisted": 3769,
+    "total_exported": 12828,
+    "reachable": 9053,
+    "whitelisted": 3770,
     "unreachable": 5
   },
   "by_package": [
@@ -16499,6 +16499,13 @@
     },
     {
       "package": "controller/commissioner",
+      "identifier": "TestScanNetworksRejectionParity_ThreadScanRejected",
+      "reason": "auto-whitelist:pattern=test-file",
+      "file": "controller/commissioner/scan_networks_rejection_parity_matterjs_test.go",
+      "line": 24
+    },
+    {
+      "package": "controller/commissioner",
       "identifier": "TestUpdateFabricLabel",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "controller/commissioner/steps_test.go",
@@ -18490,49 +18497,49 @@
       "identifier": "TestHandleInvokeRequest_AdministerPrivilegeNotBlockedByGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 328
+      "line": 336
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleInvokeRequest_EnforcesElevatedInvokePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 280
+      "line": 288
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_AdministerPrivilegeNotBlockedByGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 306
+      "line": 314
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_EnforcesElevatedWritePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 254
+      "line": 262
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_OperateAttributeNotBlockedByPrivilegeGate",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 355
+      "line": 363
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_RejectsWildcardAttributePath",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 385
+      "line": 393
     },
     {
       "package": "endpoint",
       "identifier": "TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 436
+      "line": 444
     },
     {
       "package": "endpoint",
@@ -18945,7 +18952,7 @@
       "identifier": "TestTopologyDispatcher_MinInvokePrivilege",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "endpoint/dispatcher_write_invoke_privilege_test.go",
-      "line": 187
+      "line": 193
     },
     {
       "package": "endpoint",
@@ -21231,7 +21238,7 @@
     },
     {
       "package": "im",
-      "identifier": "TestWriteParity_DataVersion_WildcardEndpoint_RejectsWithInvalidAction",
+      "identifier": "TestWriteParity_DataVersion_WildcardEndpoint_Ignored",
       "reason": "auto-whitelist:pattern=test-file",
       "file": "im/write_parity_test.go",
       "line": 299
