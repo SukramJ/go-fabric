@@ -220,8 +220,10 @@ func (b *Bridge) SubscriptionEventReporter() subscription.EventReporter {
 // so all three enforce identical event authorization.
 func (b *Bridge) eventReadAuthorizer(dispatcher im.Dispatcher, fabricIndex uint8, pase bool, subjectNodeID uint64, subjectCATs []uint32) im.EventReadAuthorizer {
 	checker, _ := dispatcher.(im.ACLChecker)
+	paths, _ := dispatcher.(im.EventPathChecker)
 	return im.EventReadAuthorizer{
 		Checker:       checker,
+		Paths:         paths,
 		FabricIndex:   fabricIndex,
 		PASE:          pase,
 		SubjectNodeID: subjectNodeID,

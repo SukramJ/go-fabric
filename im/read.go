@@ -704,6 +704,17 @@ type EventReadAuthorizer struct {
 	PASE          bool
 	SubjectNodeID uint64
 	SubjectCATs   []uint32
+	// Paths answers whether a concrete event path exists; nil takes every
+	// path to exist.
+	Paths EventPathChecker
+}
+
+// EventPathChecker is an optional interface a [Dispatcher] implements to
+// answer the existence of a concrete event path: UNSUPPORTED_ENDPOINT,
+// UNSUPPORTED_CLUSTER, UNSUPPORTED_EVENT, or Success — matter.js
+// EventReadResponse.ts #addConcrete's existence checks, in their order.
+type EventPathChecker interface {
+	EventPathStatus(path ConcreteEventPath) StatusCode
 }
 
 // Allows reports whether the accessing subject may read the events of
@@ -711,10 +722,15 @@ type EventReadAuthorizer struct {
 // AccessControl and Groupcast — checked against the ACL. A PASE session, a
 // zero fabric or a missing checker allows, as AuthorizeEventReports does.
 func (a EventReadAuthorizer) Allows(ctx context.Context, endpoint uint16, cluster uint32) bool {
+	return a.allowsAt(ctx, endpoint, cluster, eventReadPrivilege(cluster))
+}
+
+// allowsAt is Allows at privilege.
+func (a EventReadAuthorizer) allowsAt(ctx context.Context, endpoint uint16, cluster uint32, privilege uint8) bool {
 	if a.FabricIndex == 0 || a.PASE || IsPASEFromContext(ctx) || a.Checker == nil {
 		return true
 	}
-	return a.Checker.CheckACL(ctx, a.FabricIndex, a.SubjectNodeID, a.SubjectCATs, endpoint, cluster, eventReadPrivilege(cluster)).IsSuccess()
+	return a.Checker.CheckACL(ctx, a.FabricIndex, a.SubjectNodeID, a.SubjectCATs, endpoint, cluster, privilege).IsSuccess()
 }
 
 // AuthorizeEventReports filters events down to those the accessing subject may
@@ -764,7 +780,7 @@ func AuthorizeEventReports(ctx context.Context, auth EventReadAuthorizer, events
 // every other cluster (the Matter default event read privilege).
 func eventReadPrivilege(clusterID uint32) uint8 {
 	switch clusterID {
-	case matterAccessControlClusterID, matterGroupcastClusterID:
+	case matterAccessControlClusterID, matterGroupcastClusterID, matterAccountLoginClusterID:
 		return 5 // Administer
 	case matterCommissionerControlClusterID:
 		return 4 // Manage
@@ -775,10 +791,29 @@ func eventReadPrivilege(clusterID uint32) uint8 {
 // isFabricSensitiveEventCluster reports whether clusterID's events carry a
 // FabricIndex and must be filtered to the accessing fabric regardless of the
 // read's FabricFiltered flag (Matter §8.4.3.2 / §9.10.7.1).
+//
+// The clusters are those whose events matter.js marks "S": AccessControl,
+// Groupcast, CommissionerControl, Messages (MessageQueued, MessagePresented,
+// MessageComplete "S V", packages/model/src/standard/elements/messages.element.ts:39-56
+// at 862ad75f) and AccountLogin (LoggedOut "S A",
+// account-login.element.ts:21-24). Messages and AccountLogin were missing:
+// their records went to every fabric.
 func isFabricSensitiveEventCluster(clusterID uint32) bool {
-	return clusterID == matterAccessControlClusterID || clusterID == matterGroupcastClusterID ||
-		clusterID == matterCommissionerControlClusterID
+	switch clusterID {
+	case matterAccessControlClusterID, matterGroupcastClusterID, matterCommissionerControlClusterID,
+		matterMessagesClusterID, matterAccountLoginClusterID:
+		return true
+	}
+	return false
 }
+
+// matterMessagesClusterID is Messages (0x0097), matterAccountLoginClusterID
+// AccountLogin (0x050E): fabric-sensitive events, see
+// [isFabricSensitiveEventCluster].
+const (
+	matterMessagesClusterID     uint32 = 0x0097
+	matterAccountLoginClusterID uint32 = 0x050E
+)
 
 // eventPayloadFabricIndex extracts the FabricIndex a fabric-sensitive event
 // payload carries (e.g. AccessControl.AccessControlEntryChanged sets it per
@@ -892,14 +927,32 @@ func DedupAttributePaths(paths []ConcreteAttributePath) []ConcreteAttributePath 
 // EventReadResponse.ts #addConcrete returns #asStatus(path, denied) where
 // the wildcard expansion just leaves the cluster out. TC-ACL-2.9 reads
 // AccessControlEntryChanged without Administer and expects the status.
+//
+// A concrete path that does not exist answers its existence status —
+// UNSUPPORTED_ENDPOINT, UNSUPPORTED_CLUSTER or UNSUPPORTED_EVENT — to a
+// subject that passes the View pass, which comes first; the event's own
+// read privilege is checked for an event that exists. Mirrors matter.js
+// packages/protocol/src/action/server/EventReadResponse.ts:189-224 at
+// 862ad75f (#addConcrete, core spec §8.4.3.2); such a path used to be
+// answered with nothing.
 func DeniedEventPathStatuses(ctx context.Context, auth EventReadAuthorizer, paths []ConcreteEventPath) []EventReport {
+	const privilegeView uint8 = 1
 	var out []EventReport
 	for _, p := range paths {
 		if !p.HasEndpoint || !p.HasCluster || !p.HasEvent {
 			continue
 		}
-		if !auth.Allows(ctx, p.Endpoint, p.Cluster) {
-			out = append(out, EventReport{Path: p, IsStatus: true, Status: StatusIB{Status: StatusUnsupportedAccess}})
+		status := StatusSuccess
+		switch {
+		case !auth.allowsAt(ctx, p.Endpoint, p.Cluster, privilegeView):
+			status = StatusUnsupportedAccess
+		case auth.Paths != nil && !auth.Paths.EventPathStatus(p).IsSuccess():
+			status = auth.Paths.EventPathStatus(p)
+		case !auth.Allows(ctx, p.Endpoint, p.Cluster):
+			status = StatusUnsupportedAccess
+		}
+		if !status.IsSuccess() {
+			out = append(out, EventReport{Path: p, IsStatus: true, Status: StatusIB{Status: status}})
 		}
 	}
 	return out

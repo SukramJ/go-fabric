@@ -1992,8 +1992,11 @@
     },
     {
       "path": "packages/node/test/node/EventReadResponseTest.ts",
-      "status": "planned",
-      "reason": "Event reads: fabric-sensitive filtering, version filters, wildcards and non-existent paths.",
+      "status": "ported",
+      "go": [
+        "node:TestEventReadResponseParity"
+      ],
+      "reason": "Every case runs over the wire on fabrictest (node:TestEventReadResponseParity), event numbers and the commissioning history asserted as the Go node's own; fixes: the existence statuses of a concrete event path, Messages and AccountLogin events fabric-sensitive.",
       "snapshotSha": "42640add744cb2de9ca005d35a43500d8c723c05"
     },
     {

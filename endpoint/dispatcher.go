@@ -412,6 +412,30 @@ func (d *TopologyDispatcher) CommandPathStatus(path im.ConcreteCommandPath) im.S
 	return im.StatusUnsupportedCluster
 }
 
+// EventPathStatus implements [im.EventPathChecker]: UNSUPPORTED_ENDPOINT for
+// an endpoint the topology lacks, UNSUPPORTED_CLUSTER for a cluster the
+// endpoint does not serve, UNSUPPORTED_EVENT for an event its server does
+// not list (a server without an event lister answers for itself), Success
+// otherwise — the existence checks of matter.js
+// packages/protocol/src/action/server/EventReadResponse.ts:213-221 at
+// 862ad75f (#addConcrete), in their order.
+func (d *TopologyDispatcher) EventPathStatus(path im.ConcreteEventPath) im.StatusCode {
+	ep := d.topology.FindByID(path.Endpoint)
+	if ep == nil {
+		return im.StatusUnsupportedEndpoint
+	}
+	for _, srv := range ClusterServers(ep) {
+		if srv == nil || srv.MatterClusterID() != path.Cluster {
+			continue
+		}
+		if lister, ok := srv.(contract.ClusterEventLister); ok && !slices.Contains(lister.MatterEvents(), path.Event) {
+			return im.StatusUnsupportedEvent
+		}
+		return im.StatusSuccess
+	}
+	return im.StatusUnsupportedCluster
+}
+
 // InvokeAuthorized implements [im.AuthorizingInvoker]: a command whose
 // endpoint is a wildcard runs on every endpoint that hosts the cluster and
 // accepts the command, in ascending endpoint order, each location gated by

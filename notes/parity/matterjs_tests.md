@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 8 |
+| ported | 9 |
 | partial | 96 |
-| planned | 133 |
+| planned | 132 |
 | excluded | 87 |
 | total | 324 |
 
@@ -81,7 +81,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/endpoint/validation](#nodetestendpointvalidation) | 9 | 0 | 4 | 3 | 2 |
 | [node/test/endpoints](#nodetestendpoints) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/loader](#nodetestloader) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/node](#nodetestnode) | 50 | 2 | 12 | 26 | 10 |
+| [node/test/node](#nodetestnode) | 50 | 3 | 12 | 25 | 10 |
 | [node/test/node/client](#nodetestnodeclient) | 11 | 0 | 0 | 5 | 6 |
 | [node/test/node/integration](#nodetestnodeintegration) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/node/remote](#nodetestnoderemote) | 1 | 0 | 0 | 0 | 1 |
@@ -596,7 +596,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | DecommissionTest.ts | 698 | planned | — | The controller decommissioning a peer: RemoveFabric, lost responses, leave events. |
 | DelayReportDataTest.ts | 533 | partial | `im/subscription:TestDeferReports`<br>`node:TestDelayReportDataParity` | Every forward-feature case runs over the wire on fabrictest (node:TestDelayReportDataParity), matter.js's 50 ms send delay read as the engine's 250 ms tick (L10-D11) and the jitter as its window; fix: a command that cannot be dispatched defers nothing. Missing: the case with forward features off — the module acts on DelayReportData always (BD-Matter-DelayReportData). Missing: “ignores DelayReportData”. |
 | DotQualifiedConstraintTest.ts | 265 | planned | — | Constraints that name a sibling by a dot-qualified reference (OccupancySensing.HoldTime and others). |
-| EventReadResponseTest.ts | 496 | planned | — | Event reads: fabric-sensitive filtering, version filters, wildcards and non-existent paths. |
+| EventReadResponseTest.ts | 496 | ported | `node:TestEventReadResponseParity` | Every case runs over the wire on fabrictest (node:TestEventReadResponseParity), event numbers and the commissioning history asserted as the Go node's own; fixes: the existence statuses of a concrete event path, Messages and AccountLogin events fabric-sensitive. |
 | FailsafeCommissioningTest.ts | 347 | planned | — | Re-announcing the commissionable service after a fail-safe expiry before AddNOC and before CommissioningComplete. |
 | InteractionModelRevisionAbsentTest.ts | 134 | ported | `im:TestRequestsWithoutInteractionModelRevision` | Read, write, invoke, subscribe and timed request without InteractionModelRevision are each a subtest. |
 | LifetimeReleaseTest.ts | 75 | excluded | `js-runtime-only` | Release of matter.js runtime lifetimes so the runtime goes inactive. |
@@ -1098,7 +1098,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `CommissioningPaseLifetimeTest.ts` — The PASE session closed when the commissioning flow cannot be created.
 - `DecommissionTest.ts` — The controller decommissioning a peer: RemoveFabric, lost responses, leave events.
 - `DotQualifiedConstraintTest.ts` — Constraints that name a sibling by a dot-qualified reference (OccupancySensing.HoldTime and others).
-- `EventReadResponseTest.ts` — Event reads: fabric-sensitive filtering, version filters, wildcards and non-existent paths.
 - `FailsafeCommissioningTest.ts` — Re-announcing the commissionable service after a fail-safe expiry before AddNOC and before CommissioningComplete.
 - `NodeLifecycleSeededTest.ts` — When the controller considers a peer's structure seeded, and its warnings for root-only nodes.
 - `NodePhysicalPropertiesTest.ts` — Subscription intervals the controller chooses from a peer's power source and network.
