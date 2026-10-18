@@ -228,6 +228,7 @@ func (c *Controller) Restart(ctx context.Context) error {
 	}); err != nil {
 		return fmt.Errorf("fabrictest: restart controller %d: %w", c.index, err)
 	}
+	//nolint:contextcheck // the new stack's services run under contexts of their own, as at AddController
 	if err := c.start(); err != nil {
 		return fmt.Errorf("fabrictest: restart controller %d: %w", c.index, err)
 	}

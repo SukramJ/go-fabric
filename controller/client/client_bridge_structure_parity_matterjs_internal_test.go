@@ -170,7 +170,8 @@ func (h *warnRecorder) severalParents() []string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	var out []string
-	for _, r := range h.recs {
+	for i := range h.recs {
+		r := &h.recs[i]
 		if r.Message != "matter.controller.client.several_parents" {
 			continue
 		}
@@ -202,7 +203,7 @@ func TestClientBridgeStructureTwoInteractionsParity(t *testing.T) {
 	t.Parallel()
 	all := append([]uint16{bsAggregator, bsComposed}, bsSensors...)
 	sensors := func(version uint32) []*report {
-		out := []*report{}
+		out := make([]*report, 0, len(bsSensors))
 		for _, s := range bsSensors {
 			out = append(out, bsDescriptor(s, one(dtTemperature, 2), nil, version))
 		}
@@ -284,7 +285,7 @@ func TestClientBridgeStructureRootOmitsParity(t *testing.T) {
 func TestClientBridgeStructureChangesParity(t *testing.T) {
 	t.Parallel()
 	sensors := func(version uint32, numbers ...uint16) []*report {
-		out := []*report{}
+		out := make([]*report, 0, len(numbers))
 		for _, s := range numbers {
 			out = append(out, bsDescriptor(s, one(dtTemperature, 2), nil, version))
 		}
@@ -385,7 +386,7 @@ func nestedBridgeReports(version uint32) []struct {
 		ep uint16
 		r  *report
 	}
-	var out []item
+	out := make([]item, 0, 3+len(zigbeeLights)+len(daliLights)+len(zwaveLights))
 	out = append(out, item{zigbeeAggregator, bsDescriptor(zigbeeAggregator, one(dtAggregator, 2), append(append(slices.Clone(zigbeeLights), daliAggregator), daliLights...), version)})
 	for _, l := range zigbeeLights {
 		out = append(out, item{l, bsDescriptor(l, bridgedLight, nil, version)})

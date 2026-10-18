@@ -177,8 +177,8 @@ func clustersOf(r *interaction.Report, into map[uint32]uint32) {
 	if r == nil {
 		return
 	}
-	for _, a := range r.Attributes {
-		into[a.Path.Cluster] = a.DataVersion
+	for i := range r.Attributes {
+		into[r.Attributes[i].Path.Cluster] = r.Attributes[i].DataVersion
 	}
 }
 

@@ -20,7 +20,7 @@ import (
 
 // discovered is a PeerBehavior.DiscoveredClusterShape as the peer reports
 // it: the revision (0: none), FeatureMap and AttributeList.
-func discovered(id uint32, revision uint64, features uint64, attributes ...uint64) *Cluster {
+func discovered(id uint32, revision, features uint64, attributes ...uint64) *Cluster {
 	values := map[uint32]spec.Node{
 		spec.AttrFeatureMap:           uintNode(features),
 		spec.AttrAttributeList:        listNode(attributes...),

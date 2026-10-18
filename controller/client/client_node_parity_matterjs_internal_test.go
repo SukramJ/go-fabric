@@ -371,8 +371,9 @@ func TestClientNodeSchrodingersClusterParity(t *testing.T) {
 
 // attributeListIDs is the cluster's AttributeList as list values.
 func (c *Cluster) attributeListIDs() []uint64 {
-	var out []uint64
-	for _, id := range c.AttributeList() {
+	list := c.AttributeList()
+	out := make([]uint64, 0, len(list))
+	for _, id := range list {
 		out = append(out, uint64(id))
 	}
 	return out

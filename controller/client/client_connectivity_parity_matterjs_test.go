@@ -68,6 +68,7 @@ func (cp *clientPair) onOffIs(t *testing.T, n *client.Node, want bool) {
 // subscription is lost, offline passes, the device starts again and a new
 // subscription carries the light's changes.
 func resubscribes(t *testing.T, offline time.Duration) {
+	t.Helper()
 	cp := newClientPair(t, clientPairOptions{})
 	initial := cp.subscriptionID()
 	if !cp.node.SubscriptionActive() || initial == interaction.NoSubscription {

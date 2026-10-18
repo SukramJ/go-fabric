@@ -290,6 +290,7 @@ func TestClientAttestationCallbackContractParity(t *testing.T) {
 	})
 	fromCallback := func(store attestation.PAAStore) func(t *testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			t.Parallel()
 			r := runAttestation(t, store, attestation.Policy{Decide: func([]attestation.Finding) (bool, string, error) {
 				return false, "", &attestation.Error{Check: attestation.AttestationSignatureInvalid, Message: "from callback"}

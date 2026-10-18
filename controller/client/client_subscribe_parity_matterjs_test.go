@@ -168,8 +168,9 @@ func has(m map[uint32]uint32, cluster uint32) bool {
 // filteredClusters is ClientSubscribeTest.ts:351-356 filteredClusters: the
 // clusters a read of endpoint 0 with the fabric filter would filter.
 func filteredClusters(n *client.Node, fabricFiltered bool) []uint32 {
-	var out []uint32
-	for _, f := range client.KnownVersions(n, interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{rootPath()}, NoFabricFilter: !fabricFiltered}) {
+	filters := client.KnownVersions(n, interaction.ReadRequest{Attributes: []im.ConcreteAttributePath{rootPath()}, NoFabricFilter: !fabricFiltered})
+	out := make([]uint32, 0, len(filters))
+	for _, f := range filters {
 		out = append(out, f.Cluster)
 	}
 	slices.Sort(out)

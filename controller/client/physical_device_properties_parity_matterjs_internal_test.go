@@ -36,7 +36,7 @@ func threadPre13() Properties {
 }
 
 // bounds is subscriptionIntervalBoundsFor({ properties, request }).
-func bounds(p Properties, reqFloor, reqCeiling *time.Duration) (time.Duration, time.Duration) {
+func bounds(p Properties, reqFloor, reqCeiling *time.Duration) (floor, ceiling time.Duration) {
 	return intervalBounds(p, reqFloor, reqCeiling, rand.Float64, slog.New(slog.DiscardHandler))
 }
 
