@@ -2369,7 +2369,8 @@
     {
       "path": "packages/protocol/test/action/client/ClientInteractionSubscribeTest.ts",
       "status": "planned",
-      "reason": "Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix.",
+      "reason": "Every case drives ClientInteraction.close (ClientInteraction.ts:264-297) over its in-flight interaction set, the abandoned-subscribe termination (:1096, :1260-1300) or initBdx (:1185-1215); the Go Interaction has no Close, no in-flight tracking, no abandonment and no client BDX, and adding them spans subscribe.go/read.go/write.go (another agent's files) and is no small fix. Milestone 5 phase 25 (the controller remainder) brings ClientInteraction.close, the in-flight set and the abandonment; findings register (owner review of PR #164).",
+      "until": "M5 phase 25",
       "snapshotSha": "8a0fabd64c26bf89368d2a5fb75bc39d9f23a1a3"
     },
     {
@@ -2395,7 +2396,7 @@
     {
       "path": "packages/protocol/test/action/client/ReadScopeTest.ts",
       "status": "planned",
-      "reason": "The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI.",
+      "reason": "The Go ReadScope (newScope/scopeTester) lives only in controller/client/scope.go, brief BI's path, which BH-3 may not touch; the six cases wait for BI; brief BI's second tranche ports it (owner review of PR #164).",
       "snapshotSha": "eef880b90358e4fc34c70657b7cdf3752b6489e2"
     },
     {
@@ -3198,13 +3199,15 @@
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceSeedTest.ts",
       "status": "planned",
-      "reason": "The subject, matter.js DclVendorInfoService seeding from a bundled vendor snapshot (DclVendorInfoService.ts, SeedTypes.ts), has no Go counterpart in controller/dcl; the service is a feature for the owner.",
+      "reason": "The subject, matter.js DclVendorInfoService seeding from a bundled vendor snapshot (DclVendorInfoService.ts, SeedTypes.ts), has no Go counterpart in controller/dcl; the service is a feature for the owner. With DclVendorInfoServiceTest, milestone 6 phase 27 (owner review of PR #164).",
+      "until": "M6 phase 27",
       "snapshotSha": "dbc5f6e9dd6e9b6563fee27833b3baeeb05dc4b6"
     },
     {
       "path": "packages/protocol/test/dcl/DclVendorInfoServiceTest.ts",
       "status": "planned",
-      "reason": "The subject, matter.js DclVendorInfoService (packages/protocol/src/dcl/DclVendorInfoService.ts, 497 lines: vendor fetch, storage, field normalisation, built-in vendors, update timer, productInfoFor), has no Go counterpart in controller/dcl; the ledger read it builds on is Client.Vendors (DclClientTest), the service itself is a feature for the owner.",
+      "reason": "The subject, matter.js DclVendorInfoService (packages/protocol/src/dcl/DclVendorInfoService.ts, 497 lines: vendor fetch, storage, field normalisation, built-in vendors, update timer, productInfoFor), has no Go counterpart in controller/dcl; the ledger read it builds on is Client.Vendors (DclClientTest), the service itself is a feature for the owner. Milestone 6 phase 27 (completeness) brings the vendor information service; findings register (owner review of PR #164).",
+      "until": "M6 phase 27",
       "snapshotSha": "7b6c7c4ac0261f9fc1b23913e81a8ff236a79692"
     },
     {
@@ -3504,19 +3507,9 @@
       "status": "partial",
       "go": [
         "mdns:TestParityMdnsServer_RespondsToANYQuery",
-        "mdns:TestParityMdnsServer_TruncatedQueryDelaysResponse",
-        "mdns:TestParityMdnsServer_RespondsToSRVQuery",
-        "mdns:TestParityMdnsServer_RespondsToAQuery",
-        "mdns:TestParityMdnsServer_SuppressKnownAnswer",
-        "mdns:TestParityMdnsServer_SuppressFullAnswer",
-        "mdns:TestParityMdnsServer_DuplicateQuestionSuppression",
-        "mdns:TestParityMdnsServer_DuplicateSuppressionWindowExpires",
-        "mdns:TestParityMdnsServer_UnicastAndSplitResponse",
         "mdns:TestParityMdnsServer_NoResponseForUnknownName",
         "mdns:TestParityMdnsServer_RespondsToHostARecordByHostname",
-        "mdns:TestParityMdnsServer_MixedQueryRespondsForKnownNames",
         "mdns:TestParityMdnsServer_RecordsGeneratorReplacement",
-        "mdns:TestParityMdnsServer_CaseInsensitiveNameMatch",
         "mdns:TestHostAnswer_KnownAnswerNeedsMoreThanHalfTTL",
         "mdns:TestHostAnswer_UnicastOnlyAfterRecentMulticast",
         "mdns:TestMdnsServerRespondsToStandardQueries",
@@ -3539,7 +3532,7 @@
         "names each interface by its own MAC when the interfaces cannot be listed",
         "names each interface by its own MAC when none has a usable one"
       ],
-      "reason": "The cache-flush, known-answer, duplicate, unicast and case cases are ported against the host-name answerer (the go-fabric code that answers queries; the service records are grandcat/zeroconf's) and the host-name choice against hostNameChooser; missing stay the PTR answer with SRV/TXT additionals and the packet split (grandcat/zeroconf builds those responses), the 1 s duplicate case (its matter.js assertion runs before the async handler, MdnsServerTest.ts:707-724, and at 1000 ms MdnsServer.ts's 999 ms window has expired, so the vector proves nothing), the TC-continuation merge (the answerer does not hold truncated queries; MdnsServer.ts:446-503 is a timer-backed cache beyond a small fix), the two Close cases (no go-fabric broadcast fails and logs on close; TriggerReannounce after Close is a silent no-op), the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03).",
+      "reason": "The cache-flush, known-answer, duplicate, unicast and case cases are ported against the host-name answerer (the go-fabric code that answers queries; the service records are grandcat/zeroconf's) and the host-name choice against hostNameChooser; missing stay the PTR answer with SRV/TXT additionals and the packet split (grandcat/zeroconf builds those responses), the 1 s duplicate case (its matter.js assertion runs before the async handler, MdnsServerTest.ts:707-724, and at 1000 ms MdnsServer.ts's 999 ms window has expired, so the vector proves nothing), the TC-continuation merge (the answerer does not hold truncated queries; MdnsServer.ts:446-503 is a timer-backed cache beyond a small fix), the two Close cases (no go-fabric broadcast fails and logs on close; TriggerReannounce after Close is a silent no-op), the asynchronous-network case (JS promise mechanics) and the two per-interface-MAC fallbacks (go-fabric publishes one host name for all interfaces and hashes the OS host name when no MAC is usable, by_design L7-D03). The t.Skip anchors of mdns/parity_mdns_server_test.go were dropped from the go list (owner review of PR #164).",
       "snapshotSha": "9d109578a8f28b656872292d2e6b039badf1c2a7"
     },
     {
@@ -3606,7 +3599,8 @@
     {
       "path": "packages/protocol/test/peer/NetworkProfileTest.ts",
       "status": "planned",
-      "reason": "matter.js's NetworkProfiles (per-medium throttle semaphores, additive MRP margins, connect/probe sub-profiles) has no Go counterpart: controller/peer documents network profiles as out of scope by ADR 0020's stage split (the LAN is the one network, MRP margins are 0), and porting the class is a feature, not a fix.",
+      "reason": "matter.js's NetworkProfiles (per-medium throttle semaphores, additive MRP margins, connect/probe sub-profiles) has no Go counterpart: controller/peer documents network profiles as out of scope by ADR 0020's stage split (the LAN is the one network, MRP margins are 0), and porting the class is a feature, not a fix. Milestone 5 phase 25 (the controller remainder) brings the network profiles; findings register, \"Network profiles\" (owner review of PR #164).",
+      "until": "M5 phase 25",
       "snapshotSha": "96b368b7b5483585ae5cced11100b36ba550ccd6"
     },
     {
@@ -3736,7 +3730,7 @@
     {
       "path": "packages/protocol/test/peer/PhysicalDevicePropertiesTest.ts",
       "status": "planned",
-      "reason": "The subject (PhysicalDeviceProperties: computeProperties, isLongIdleTimeOperating, intervalBounds) lives in controller/client, brief BI's path, which this tranche does not touch; the cases wait for BI.",
+      "reason": "The subject (PhysicalDeviceProperties: computeProperties, isLongIdleTimeOperating, intervalBounds) lives in controller/client, brief BI's path, which this tranche does not touch; the cases wait for BI; brief BI's second tranche ports it (owner review of PR #164).",
       "snapshotSha": "05a12bae66a0294e57cd4b483431f04ee23c4004"
     },
     {

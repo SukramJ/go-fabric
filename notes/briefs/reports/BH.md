@@ -696,3 +696,34 @@ Register for `packages/protocol/test` after the wave: 32 `ported`, 51
 above); `testparityPlannedRatchet` 134 → 99 overall (the node trees are
 untouched). The brief's target of 7 `planned` in this tree is missed by
 the six files named in BH-3 and BH-4, each waiting on an owner decision.
+
+## Decisions (owner review, 2026-10-18)
+
+1. Every fix stays in the wave, the large ones included (`controller/thread`,
+   the DCL API, `controller/exchange`): each mirrors one matter.js passage
+   proved by its ported cases, and the device-side ones are small. Checked
+   at the pin: every citation of the production diff.
+2. The six `planned` files without `until`: PhysicalDevicePropertiesTest and
+   ReadScopeTest go to brief BI's second tranche (controller/client);
+   NetworkProfileTest and ClientInteractionSubscribeTest carry
+   `until M5 phase 25`; the two DclVendorInfoService files `until M6 phase 27`.
+3. Register candidates with behaviour behind them are findings entries
+   (`notes/parity/matter_behaviour_findings.md`, "Found by the phase-16 port
+   of `packages/protocol/test`"); the X.520 DN gap is fixed before `v0.8.0`.
+   The eleven `t.Skip` anchors of `mdns/parity_mdns_server_test.go` left the
+   MdnsServerTest `go` list.
+4. by_design: twelve entries written (SessionParams-ZeroIsUnset,
+   MonotonicClockTests, EventNumberEpoch, AttestationDERAsReceived,
+   NoLegacyGroupCounters, BDXInitiatorOverExchange, ThreadDelayTimerUint32,
+   Controller-ConnectionTimeoutNoInstant, Controller-SingleCommandBuilders,
+   Controller-CallbacksNotObservables, DclOta-HostStore, DCL-ProductionSeed).
+   Not by design, so findings: the single IPK, one network, the ML-DSA
+   refusal reason, the missing `_matterd._udp` advertisement, no TLV
+   re-encoding of operational certificates. The PAI-key message and the
+   scaled fail-safe vector stay test notes.
+5. Questions: wall-clock steps are `BD-Matter-MonotonicClockTests`; PQC
+   Phase 1 and NOC rotation are milestone 6; the whitespace-only issuer
+   name stays a low finding; the compressed-fabric-id vector of the
+   existing test is another matter.js vector of the same function and
+   keeps covering the case.
+
