@@ -171,6 +171,12 @@ func TestInvokeRequestBuildOptions(t *testing.T) {
 			t.Fatal("suppressResponse lost") // InvokeTest.ts:146
 		}
 	})
+	t.Run("marks request as timed when timeout provided", func(t *testing.T) {
+		t.Parallel()
+		if req, _ := invokeCaptured(t, invokeToggle, nil, interaction.InvokeOptions{TimedTimeout: time.Second}); !req.TimedRequest {
+			t.Fatal("timedRequest not set") // InvokeTest.ts:150-152
+		}
+	})
 	t.Run("marks request as timed when timed flag set", func(t *testing.T) {
 		t.Parallel()
 		if req, _ := invokeCaptured(t, invokeToggle, nil, interaction.InvokeOptions{Timed: true}); !req.TimedRequest {

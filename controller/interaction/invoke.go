@@ -80,7 +80,11 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 		return Result{}, err
 	}
 	defer m.x.Close()
-	if opts.Timed {
+	// A timeout alone marks the invoke timed, as a write's does. Mirrors
+	// matter.js packages/protocol/src/action/request/Invoke.ts:114
+	// (timedRequest = !!options.timed || !!timeout).
+	timed := opts.Timed || opts.TimedTimeout > 0
+	if timed {
 		timeout := opts.TimedTimeout
 		if timeout == 0 {
 			timeout = DefaultTimedRequestTimeout
@@ -95,7 +99,7 @@ func (c *Interaction) Invoke(ctx context.Context, path im.ConcreteCommandPath, f
 	}
 	path.HasEndpoint, path.HasCluster, path.HasCommand = true, true, true
 	enc := tlv.NewEncoder()
-	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{SuppressResponse: opts.SuppressResponse, TimedRequest: opts.Timed, Invokes: []im.CommandInvocation{{Path: path}}},
+	im.MarshalInvokeRequestTLV(enc, im.InvokeRequest{SuppressResponse: opts.SuppressResponse, TimedRequest: timed, Invokes: []im.CommandInvocation{{Path: path}}},
 		func(e *tlv.Encoder, tag tlv.Tag, _ any) {
 			if fields == nil {
 				e.StartStruct(tag)
