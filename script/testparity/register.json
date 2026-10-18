@@ -2460,8 +2460,21 @@
     },
     {
       "path": "packages/protocol/test/action/request/InvokeTest.ts",
-      "status": "planned",
-      "reason": "Building an invoke request: command fields, commandRef rules for several commands, timed and suppress options.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestInvokeRequestBuildBasic",
+        "controller/interaction:TestInvokeRequestBuildMultipleCommands",
+        "controller/interaction:TestInvokeRequestBuildOptions"
+      ],
+      "missing": [
+        "throws when commandRef missing for multiple commands",
+        "throws on duplicate commandRef",
+        "marks request as timed when timeout provided",
+        "uses custom interaction model revision",
+        "throws when no commands provided",
+        "throws when called with no arguments"
+      ],
+      "reason": "The single-command request read off the wire of Interaction.Invoke (path, fields, the bare call, suppress default, timed flag, revision present, processing time as the response wait) and the commandRefs and suppress flag of im.MarshalInvokeRequestTLV are ported; missing are the client-side refusals of a multi-command batch and of an empty or absent command list (Interaction.Invoke takes exactly one path, no multi-command builder exists), a timeout alone marking the invoke timed (Interaction.Invoke keys only on Timed, invoke.go:78/:93, Invoke.ts:114), and a custom revision (Go always stamps its own).",
       "snapshotSha": "026eb52ce02c51eb6b014ccf2406452db0e68bc5"
     },
     {
