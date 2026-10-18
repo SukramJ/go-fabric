@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 9 |
-| partial | 96 |
-| planned | 132 |
+| ported | 11 |
+| partial | 95 |
+| planned | 131 |
 | excluded | 87 |
 | total | 324 |
 
@@ -81,7 +81,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [node/test/endpoint/validation](#nodetestendpointvalidation) | 9 | 0 | 4 | 3 | 2 |
 | [node/test/endpoints](#nodetestendpoints) | 3 | 0 | 2 | 1 | 0 |
 | [node/test/loader](#nodetestloader) | 1 | 0 | 0 | 0 | 1 |
-| [node/test/node](#nodetestnode) | 50 | 3 | 12 | 25 | 10 |
+| [node/test/node](#nodetestnode) | 50 | 5 | 11 | 24 | 10 |
 | [node/test/node/client](#nodetestnodeclient) | 11 | 0 | 0 | 5 | 6 |
 | [node/test/node/integration](#nodetestnodeintegration) | 2 | 0 | 0 | 0 | 2 |
 | [node/test/node/remote](#nodetestnoderemote) | 1 | 0 | 0 | 0 | 1 |
@@ -570,7 +570,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | AttributeReadResponseTest.ts | 309 | partial | `endpoint:TestRead_ConcreteHit`<br>`endpoint:TestRead_WildcardEndpointFansOut`<br>`im:TestRead_DataVersionFilterMatching_SkipsCluster`<br>`endpoint:TestRead_UnknownEndpoint`<br>`endpoint:TestRead_AttributeNotImplemented`<br>`node:TestAttributeReadResponseParity` | Every other case runs over the wire on fabrictest (node:TestAttributeReadResponseParity), the root composition differences asserted as such; the WildcardPathFlags case is missing: the Go IM codec does not decode AttributePathIB WildcardPathFlags (tag 7), a wire-shape change outside this wave. Missing: “reads attributeList global Attribute full wildcard excluding attributerList via WildcardPath Filter”. |
 | AttributeSubscriptionResponseTest.ts | 218 | ported | `node:TestAttributeSubscriptionResponseParity` | Which attributes a subscription's data report carries after a change, over the wire on fabrictest: the writable BasicInformation attributes stand in for the fixed ones matter.js marks dirty, a probe attribute proves the absent data, five LevelControl attributes the five-attribute case. |
 | AttributeWriteResponseTest.ts | 409 | partial | `endpoint:TestWrite_Success`<br>`endpoint:TestHandleWriteRequest_WildcardEndpointAuthorizesEveryResolvedEndpoint`<br>`endpoint:TestHandleWriteRequest_EnforcesElevatedWritePrivilege`<br>`endpoint:TestWrite_ConcreteReadOnlyAttributeRejected`<br>`endpoint:TestWrite_WildcardSkipsReadOnlyAttribute`<br>`endpoint:TestWrite_ConstraintMaps`<br>`node:TestAttributeWriteResponseParity`<br>`im:TestWriteParity_DataVersion_WildcardEndpoint_Ignored` | Every other case runs over the wire on fabrictest (node:TestAttributeWriteResponseParity; three fixes: the View pass before existence, the DataVersion ignored on a wildcard path, NodeLabel CONSTRAINT_ERROR). Missing: the invalid wildcard combination — matter.js answers the whole interaction with a StatusResponse of InvalidAction (AttributeWriteResponse.ts:279-285), the Go server an AttributeStatus per path, a response-shape change; the two held-write cases — AttributeWriteResponse's isHeldByOtherWrite lock across write interactions (:355), which the Go server does not have. Missing: “writes with invalid wildcard combination”; “${group ? "group" : "wildcard"} write skips an attribute that another write interaction holds”. |
-| BitmapWriteValidationTest.ts | 82 | partial | `cluster/cover:TestWindowCoveringServer_WriteModeConstraint` | The reserved-bit write is ported; the defined bit and the motor direction bit on a covering without lift are not. Missing: “accepts a defined bit”; “accepts the motor direction bit on a covering with no lift”. |
+| BitmapWriteValidationTest.ts | 82 | ported | `cluster/cover:TestWindowCoveringServer_WriteModeConstraint`<br>`node:TestBitmapWriteValidationParity` | The three Mode writes run over the wire on fabrictest (node:TestBitmapWriteValidationParity) besides the server-level reserved-bit test. |
 | CaseConnectionTimeoutTest.ts | 111 | planned | — | The controller's CASE connection budget failing commissioning and deleting the peer, and refusing a non-finite budget. |
 | ClientAddressProbeTest.ts | 129 | partial | `controller/peer:TestMonitorScheduledByAServiceChange`<br>`controller/peer:TestProbeReadsTheReports` | The controller's probe on a vanished address is covered; keeping the session when the probe confirms reachability is not asserted as such. Missing: “keeps session when probe confirms current address is reachable”. |
 | ClientAttestationTest.ts | 680 | partial | `controller/commissioner:TestRejectedAttestation`<br>`controller/commissioner:TestAcceptedFailedAttestation`<br>`controller/dcl:TestCommissionWithDCLStore`<br>`controller/dcl:TestCommissionRevokedDAC` | Accepting and rejecting a failed attestation and commissioning against the DCL trust store are covered; the findings callbacks and corrupt-cache cases are not. Missing: “commissions with default policy (undefined)”; “custom callback receives DclServiceUnavailable warning and other findings”; “custom callback receives findings and rejects”; “callback receives CertificationTypeTest and other expected findings”; “rejects with onAttestationFailure=false despite valid chain”; “self-heals a corrupt cached PAA by re-fetching from DCL”; “surfaces an unrecoverable corrupt cached PAA as a judgeable finding”; “rejects an unrecoverable corrupt cached PAA when policy rejects, surfacing the cause”; “emits TrustedAsTestCertificate finding, callback rejects”; “emits TrustedAsTestCertificate finding, callback accepts → commissioning proceeds”; “PaaNotTrusted error finding, callback rejects”; “PaaNotTrusted error finding, callback accepts → commissioning proceeds”; “rejects when PAI serial is in revocation list”; “passes when revocation list has different serial numbers”; “dynamically fetches revocation data from DCL during commissioning”; “string return on success-path findings wraps the synthesized error as cause”; “string return on hard-error finding wraps the original DeviceAttestationError as cause”; “callback throw propagates verbatim (no wrapping)”; “callback throwing DeviceAttestationError on success-path findings propagates without re-invocation”; “callback throwing DeviceAttestationError on hard-error finding propagates without re-invocation”. |
@@ -595,7 +595,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | CommissioningPaseLifetimeTest.ts | 65 | planned | — | The PASE session closed when the commissioning flow cannot be created. |
 | DecommissionTest.ts | 698 | planned | — | The controller decommissioning a peer: RemoveFabric, lost responses, leave events. |
 | DelayReportDataTest.ts | 533 | partial | `im/subscription:TestDeferReports`<br>`node:TestDelayReportDataParity` | Every forward-feature case runs over the wire on fabrictest (node:TestDelayReportDataParity), matter.js's 50 ms send delay read as the engine's 250 ms tick (L10-D11) and the jitter as its window; fix: a command that cannot be dispatched defers nothing. Missing: the case with forward features off — the module acts on DelayReportData always (BD-Matter-DelayReportData). Missing: “ignores DelayReportData”. |
-| DotQualifiedConstraintTest.ts | 265 | planned | — | Constraints that name a sibling by a dot-qualified reference (OccupancySensing.HoldTime and others). |
+| DotQualifiedConstraintTest.ts | 265 | ported | `node:TestDotQualifiedConstraintParity` | Writes over the wire on fabrictest, local sets and server construction against the generated servers (node:TestDotQualifiedConstraintParity); fix: dot-qualified bounds resolved and initial values re-checked with their siblings in place. |
 | EventReadResponseTest.ts | 496 | ported | `node:TestEventReadResponseParity` | Every case runs over the wire on fabrictest (node:TestEventReadResponseParity), event numbers and the commissioning history asserted as the Go node's own; fixes: the existence statuses of a concrete event path, Messages and AccountLogin events fabric-sensitive. |
 | FailsafeCommissioningTest.ts | 347 | planned | — | Re-announcing the commissionable service after a fail-safe expiry before AddNOC and before CommissioningComplete. |
 | InteractionModelRevisionAbsentTest.ts | 134 | ported | `im:TestRequestsWithoutInteractionModelRevision` | Read, write, invoke, subscribe and timed request without InteractionModelRevision are each a subtest. |
@@ -1097,7 +1097,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `ClientSubscribeTest.ts` — The controller's subscribe: data version filter injection, sustained subscriptions, fabric filters.
 - `CommissioningPaseLifetimeTest.ts` — The PASE session closed when the commissioning flow cannot be created.
 - `DecommissionTest.ts` — The controller decommissioning a peer: RemoveFabric, lost responses, leave events.
-- `DotQualifiedConstraintTest.ts` — Constraints that name a sibling by a dot-qualified reference (OccupancySensing.HoldTime and others).
 - `FailsafeCommissioningTest.ts` — Re-announcing the commissionable service after a fail-safe expiry before AddNOC and before CommissioningComplete.
 - `NodeLifecycleSeededTest.ts` — When the controller considers a peer's structure seeded, and its warnings for root-only nodes.
 - `NodePhysicalPropertiesTest.ts` — Subscription intervals the controller chooses from a peer's power source and network.

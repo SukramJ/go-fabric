@@ -1721,15 +1721,12 @@
     },
     {
       "path": "packages/node/test/node/BitmapWriteValidationTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
-        "cluster/cover:TestWindowCoveringServer_WriteModeConstraint"
+        "cluster/cover:TestWindowCoveringServer_WriteModeConstraint",
+        "node:TestBitmapWriteValidationParity"
       ],
-      "missing": [
-        "accepts a defined bit",
-        "accepts the motor direction bit on a covering with no lift"
-      ],
-      "reason": "The reserved-bit write is ported; the defined bit and the motor direction bit on a covering without lift are not.",
+      "reason": "The three Mode writes run over the wire on fabrictest (node:TestBitmapWriteValidationParity) besides the server-level reserved-bit test.",
       "snapshotSha": "42e420d20f6b0762235a48ee1846f6ceb82e60b5"
     },
     {
@@ -1986,8 +1983,11 @@
     },
     {
       "path": "packages/node/test/node/DotQualifiedConstraintTest.ts",
-      "status": "planned",
-      "reason": "Constraints that name a sibling by a dot-qualified reference (OccupancySensing.HoldTime and others).",
+      "status": "ported",
+      "go": [
+        "node:TestDotQualifiedConstraintParity"
+      ],
+      "reason": "Writes over the wire on fabrictest, local sets and server construction against the generated servers (node:TestDotQualifiedConstraintParity); fix: dot-qualified bounds resolved and initial values re-checked with their siblings in place.",
       "snapshotSha": "d89b3df6751ca920a8963e8b054bf198282f02dc"
     },
     {
