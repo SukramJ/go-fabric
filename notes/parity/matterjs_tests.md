@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 18 |
+| ported | 19 |
 | partial | 99 |
-| planned | 120 |
+| planned | 119 |
 | excluded | 87 |
 | total | 324 |
 
@@ -93,7 +93,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/action/request](#protocoltestactionrequest) | 6 | 0 | 1 | 4 | 1 |
 | [protocol/test/action/response](#protocoltestactionresponse) | 4 | 0 | 0 | 0 | 4 |
 | [protocol/test/advertisement](#protocoltestadvertisement) | 2 | 1 | 1 | 0 | 0 |
-| [protocol/test/bdx](#protocoltestbdx) | 2 | 0 | 1 | 1 | 0 |
+| [protocol/test/bdx](#protocoltestbdx) | 2 | 1 | 1 | 0 | 0 |
 | [protocol/test/ble](#protocoltestble) | 2 | 1 | 0 | 0 | 1 |
 | [protocol/test/certificate](#protocoltestcertificate) | 5 | 1 | 1 | 3 | 0 |
 | [protocol/test/codec](#protocoltestcodec) | 3 | 2 | 1 | 0 | 0 |
@@ -715,7 +715,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | BdxTest.ts | 1726 | partial | `bdx:TestServe_ReceiveInit_SenderDrive`<br>`bdx:TestServe_ReceiveInit_FollowingReceivingFlow`<br>`bdx:TestServe_SendInit_DrivingReceivingFlow`<br>`bdx:TestReceive_ReceiverDrive_DrivingReceivingFlow`<br>`bdx:TestReceive_SenderDrive_FollowingSendingFlow`<br>`bdx:TestReceive_BlockSizeCappedToTransport`<br>`bdx:TestServe_BlockSizeNegotiation`<br>`bdx:TestServe_Refusals`<br>`bdx:TestServe_AbortedTransfers` | The drive modes of SendInit and ReceiveInit and the block-size caps are covered by the bdx package; the size variants, the responder-chosen designator and the error transfers are not ported case by case. Missing: “Using SendInit as Receiver-Driver (by Responder and custom transfer designator)”; “Using ReceiveInit as Receiver-Driver (by Responder)”; “Using ReceiveInit as Sender-Driver (no limits)”; “Send first 100 bytes as sender drive”; “Send first 100 bytes as Receiver-Driver”; “Send 100 bytes with startOffset 50 as sender drive”; “Send first 100 bytes with startOffset 50 as Receiver-Driver”; “Block/BlockEof/BlockAck/BlockAckEof count blocks from zero (Sender-Driver)”; “a responder reports what it received and granted, and an observer cannot alter either”; “BlockQuery carries an ascending block counter starting at 0 (Receiver-Driver)”; “No matching driver modes”; “Unknown FileDesignator”; “Request a file from peer that is larger than the data”; “Request a file from peer that is larger than the data using startOffset”; “Unexpected Blockcounter in request with SenderDriver”; “BlockQueryWithSkip skipping bytes but end errors because of too less data”; “sessionId and sessionActiveTimestamp are accessible after transfer completes”. |
-| PersistedFileDesignatorTest.ts | 72 | planned | — | A persisted BDX file designator: read back, second write, write after delete, refusal after delete. |
+| PersistedFileDesignatorTest.ts | 72 | ported | `bdx:TestPersistedFileDesignator` | The four cases are ported against the Go form of the designator (bdx/doc.go): one path written through a FileSink per transfer and read back as a Blob, so a second write, a write after a delete and an open after a delete answer as matter.js's cache-clearing designator does. |
 
 ## protocol/test/ble
 
@@ -1137,10 +1137,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `ReadTest.ts` — Building a read request: attribute and event paths, wildcards, fabric filtering by default, data version filters.
 - `SubscribeTest.ts` — Building a subscribe request: keepSubscriptions default, intervals, event paths.
 - `WriteTest.ts` — Building a write request: timed writes, schema encoding, data versions.
-
-### protocol/test/bdx
-
-- `PersistedFileDesignatorTest.ts` — A persisted BDX file designator: read back, second write, write after delete, refusal after delete.
 
 ### protocol/test/certificate
 

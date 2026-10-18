@@ -2579,8 +2579,11 @@
     },
     {
       "path": "packages/protocol/test/bdx/PersistedFileDesignatorTest.ts",
-      "status": "planned",
-      "reason": "A persisted BDX file designator: read back, second write, write after delete, refusal after delete.",
+      "status": "ported",
+      "go": [
+        "bdx:TestPersistedFileDesignator"
+      ],
+      "reason": "The four cases are ported against the Go form of the designator (bdx/doc.go): one path written through a FileSink per transfer and read back as a Blob, so a second write, a write after a delete and an open after a delete answer as matter.js's cache-clearing designator does.",
       "snapshotSha": "45b6333bf9e7d739689557211b15d93ac9ce9ba7"
     },
     {
