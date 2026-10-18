@@ -337,6 +337,89 @@ group sender in `groups/`. What remains:
   does. Fix package: an `internal/chiptool` leg (`groupcast join-group`, a
   multicast `onoff toggle`, `groupcast leave-group`).
 
+## matter.js pin 862ad75f — open items (pin lift 2026-10-18)
+
+What the lift from `0ceb202d` to `862ad75f` showed (`pin-lifts.md`, first
+section): upstream fixes this module lacks. Each closes with the wave that
+ports the matter.js test named, or earlier when a consumer needs it.
+
+Device side:
+
+- **Keep-alive reports suppress the response.** An empty max-interval
+  DataReport goes out with `SuppressResponse = true`
+  (`bridge/subscribe.go:447-453`); matter.js now sends it with
+  `suppressResponse: false` so the peer's INVALID_SUBSCRIPTION (Core § 8.5)
+  is read on every transport (`ServerSubscription.ts:913-914` at `862ad75f`,
+  #4766; ServerSubscriptionTest "keep-alive status"). Fix: send
+  `SuppressResponse = false`, wait for the status, end the subscription on
+  INVALID_SUBSCRIPTION as `closeSubscriptionByExchange` already does for data
+  reports. (Phase 16, ServerSubscriptionTest port.)
+- **A subscription that ends while the node runs stays persisted.**
+  `im/subscription/manager.go:128-149` keeps the former matter.js line: closed
+  on session close = not terminated = re-established after a restart.
+  matter.js #4742 drops the stored subscription whenever it ends while the
+  node runs; only `closeForShutdown` leaves it for re-establishment
+  (`Subscription.ts:21-40`, `ServerSubscription.ts:766-812`,
+  SubscriptionsServerTest "drops the stored subscription when the peer closes
+  its session while the node keeps running"). Fix: terminate on every close
+  except the one `Stop` performs. (Phase 16.)
+- **No BUSY for a write that races a chunked write.** A chunked write holds
+  its attribute (`bridge/exchange_routing.go:62` `writeTxs`); another
+  exchange writing the same attribute is not answered BUSY as matter.js does
+  (`InteractionServer.ts:507,526` at `862ad75f`, #4768; InteractionProtocolTest
+  "answers BUSY to another exchange's write of an attribute while a chunked
+  write holds it"). (Phase 16.)
+- **Utility component on the composing endpoint is not a candidate.**
+  `endpoint/devicetype_conformance.go:842-850` `candidatesOf` iterates the
+  composition scope; matter.js #4745 prepends the composing endpoint when it
+  lists the utility component itself (`DeviceTypeConformance.ts:596-614`,
+  Core § 9.2.1; Heat Pump and Solar Power examples). A composed product that
+  carries its Power Source on the composing endpoint is refused here.
+  (Device type validation; before milestone 4's device kit.)
+- **A Root-asserted condition can refuse.** Conditions true for the node
+  endpoint only because a device type asserts them at `Root`
+  (`devicetype_conformance.go:503-526`) produce violations that
+  `devicetype_validation.go:333-339` refuses like any other; matter.js #4746
+  marks them `assertedAtRoot`, never refuses, logs at debug
+  (`DeviceTypeConformance.ts:65-76`, `ConditionAssertions.ts:63-68`).
+  (With the previous item.)
+- **KeypadLockout is reset on every start.**
+  `cluster/thermo/thermostatuserinterfaceconfiguration.go:31-32`; matter.js
+  #4775 assigns NoLockout only when the state is undefined
+  (`ThermostatUserInterfaceConfigurationServer.ts:30-32`; "keeps a written
+  KeypadLockout across a restart"). (Milestone 3, thermostat servers.)
+- **OTA provider applies the requestor's `NewVersion` unchecked against the
+  token.** `cluster/core/ota_provider.go:558-563` checks consent on the raw
+  value; matter.js #4736 rewrites `NewVersion 0` under a known token to the
+  token's `versionToApply` and refuses (Cancelled) a version that differs
+  from the token's (`OtaSoftwareUpdateProviderServer.ts:419-458`; OtaTest
+  "applies the version of a known update token when the requestor asks for
+  version 0"). (Milestone 3, OTA.)
+
+Controller side:
+
+- **DNS-SD TXT keys are case-sensitive.** `controller/discovery/name.go:154-162`
+  `Parameters` is a plain map; matter.js #4741 lower-cases keys, first of
+  case-differing duplicates wins (`DnssdParameters.ts:15-49`, RFC 6763 § 6.4).
+  (Phase 16, DiscoveryDataTest port.)
+- **Known answers are sent with their original TTL.**
+  `controller/discovery/solicitor.go:368-375`; matter.js #4756 sends the
+  remaining TTL rounded up and omits a record past half its TTL
+  (`DnssdSolicitor.ts:280-291`, RFC 6762 § 7.1). (Phase 16.)
+- **A root-only peer never seeds.** `controller/client/config.go:116-118` and
+  `node.go` `evaluateSeeded` require more than the root endpoint; matter.js
+  #4770 requires BasicInformation and every endpoint of the root's PartsList
+  (`ClientNodeLifecycle.ts:52-56`; NodeLifecycleSeededTest). (Phase 16.)
+- **Discovery has one error and no abort.** matter.js #4747 distinguishes
+  `DeviceNotDiscoveredError`, `DiscoveryIncompleteError`,
+  `NoDiscoveryTransportError` and lets the caller abort every attempt
+  (`DiscoveryError.ts:9-31`); `controller/discovery` and the commissioner
+  report one error and stop on context cancellation only. (Milestone 5,
+  controller remainder.)
+- **A status the peer sent is not told from a local one.**
+  `controller/interaction/interaction.go:56` `StatusError`; matter.js #4750
+  `ResultStatus.received` (`ResultStatus.ts:1-35`). Low. (Milestone 5.)
+
 ## Application cluster servers — open items
 
 Raised with `cluster/alarm`, `cluster/fan`, `cluster/pump`,
