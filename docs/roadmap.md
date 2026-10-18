@@ -127,6 +127,13 @@ controller, a loom installation acting as commissioner.
 controller role; `TC-DD` and `TC-SC` BLE cases are classified; the
 `btvirt` job passes.
 
+**Status 2026-10-18.** Done, released as `v0.7.0`: phases 11–13 landed
+(pull requests 143, 144, 147, 149); the `ble-virtual` job is green against a
+matter.js node (ADR 0024 §5 as amended); the BLE and Thread cases of DD and
+SC are classified out of scope for the device side
+([certifiability](./certifiability.md)). The field proof with a boxed
+product is the owner's manual test plan.
+
 ### Milestone 2: The test foundation
 
 | Phase | Content | Proof |

@@ -3,7 +3,7 @@ module github.com/SukramJ/go-fabric/ble/bluez
 go 1.27.2
 
 require (
-	github.com/SukramJ/go-fabric v0.6.0
+	github.com/SukramJ/go-fabric v0.7.0
 	github.com/godbus/dbus/v5 v5.2.4
 )
 
