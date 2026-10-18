@@ -160,7 +160,14 @@ sudo systemctl start bluetooth 2>"$LOG_DIR/bluetoothd.log"
 systemctl is-active --quiet bluetooth || verdict environment "bluetoothd does not run"
 
 before=$(ls /sys/class/bluetooth 2>/dev/null | grep -E '^hci[0-9]+$' | sort)
-sudo btvirt -l2 >"$LOG_DIR/btvirt.log" 2>&1 &
+# -L: LE-only controllers with the LE 4.x command set. The default type
+# (BREDRLE52) offers LE Extended Create Connection, which the kernel and
+# noble then use, and BlueZ 5.72's emulator completes it only towards an
+# extended advertising set (emulator/btdev.c cmd_ext_create_conn_complete,
+# :5534-5560); bleno advertises with the legacy commands, so the connection
+# never came (run 39100460695). BTDEV_TYPE_LE gets the 5.0 commands not at
+# all (set_le_commands, :6759-6763).
+sudo btvirt -L -l2 >"$LOG_DIR/btvirt.log" 2>&1 &
 btvirt_pid=$!
 controllers=
 for _ in $(seq 1 50); do
@@ -169,7 +176,7 @@ for _ in $(seq 1 50); do
 	[ "$(echo "$controllers" | grep -c hci)" -ge 2 ] && break
 	sleep 0.2
 done
-[ "$(echo "$controllers" | grep -c hci)" -ge 2 ] || verdict environment "btvirt -l2 did not create two controllers (see btvirt.log)"
+[ "$(echo "$controllers" | grep -c hci)" -ge 2 ] || verdict environment "btvirt -L -l2 did not create two controllers (see btvirt.log)"
 CENTRAL=$(echo "$controllers" | sed -n 1p)
 PERIPHERAL=$(echo "$controllers" | sed -n 2p)
 sudo hciconfig "$CENTRAL" up >>"$LOG_DIR/hciconfig.log" 2>&1 ||
