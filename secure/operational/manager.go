@@ -1108,8 +1108,12 @@ const MaxSessionsPerPeer = 5
 // one that prompted the check. Mirrors matter.js
 // packages/protocol/src/session/SessionManager.ts:647-680
 // #evictExcessSessionsFor and #leastRecentlyUsedSession.
+//
+// Only a session the peer established runs the check: one we initiated
+// evicts nothing, since the peer loss our own traffic reports sweeps
+// those. Mirrors matter.js packages/protocol/src/session/SessionManager.ts:272-277.
 func (m *Manager) evictExcessPeerSessionsLocked(added *Entry) []*Entry {
-	if added.isPase {
+	if added.isPase || added.isInitiator {
 		return nil
 	}
 	fabricIndex, peerNodeID := added.FabricIndex(), added.Session.PeerNodeID()
