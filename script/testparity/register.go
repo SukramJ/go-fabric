@@ -65,6 +65,13 @@ type Entry struct {
 var (
 	shaPattern   = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	goRefPattern = regexp.MustCompile(`^[a-z0-9_]+(?:/[a-z0-9_]+)*:Test[A-Za-z0-9_]*$`)
+	// untilPattern is the shape of an until: a roadmap milestone, with or
+	// without its phase. A planned entry carries one when its subject is
+	// work of a later phase (the device ICD role of milestone 5), so the
+	// trees phase 16 brings to 100 % are checked as "ported, or until a
+	// named phase"; an excluded controller-stage or device-ble-thread entry
+	// always carries one.
+	untilPattern = regexp.MustCompile(`^M[1-7]( phase [0-9]{1,2})?$`)
 )
 
 func loadRegister(p string) (*Register, error) {
@@ -132,8 +139,8 @@ func (e *Entry) validate() error {
 			fail("class/until on a %s entry", e.Status)
 		}
 	case StatusPlanned:
-		if len(e.Go) > 0 || len(e.Missing) > 0 || e.Class != "" || e.Until != "" {
-			fail("planned carries only path, status, reason and snapshotSha")
+		if len(e.Go) > 0 || len(e.Missing) > 0 || e.Class != "" {
+			fail("planned carries only path, status, reason, snapshotSha and until")
 		}
 	case StatusExcluded:
 		if len(e.Go) > 0 || len(e.Missing) > 0 {
@@ -150,6 +157,9 @@ func (e *Entry) validate() error {
 		}
 	default:
 		fail("unknown status %q", e.Status)
+	}
+	if e.Until != "" && !untilPattern.MatchString(e.Until) {
+		fail("until %q is not a roadmap milestone or phase (M5, M5 phase 23)", e.Until)
 	}
 	return errors.Join(errs...)
 }

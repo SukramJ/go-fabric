@@ -3473,37 +3473,43 @@
       "path": "packages/protocol/test/icd/CheckInMessageTest.ts",
       "status": "planned",
       "reason": "The ICD Check-In message nonce, encoding and decoding against the specification vectors, built with the ICD server in milestone 5 phase 23.",
-      "snapshotSha": "55acba9967c1a110bfcd11496c11392d47f9d1af"
+      "snapshotSha": "55acba9967c1a110bfcd11496c11392d47f9d1af",
+      "until": "M5 phase 23"
     },
     {
       "path": "packages/protocol/test/icd/FabricIcdTest.ts",
       "status": "planned",
       "reason": "The fabric's ICD registrations (device role) and Check-In processing (controller role), milestone 5 phases 23 and 24.",
-      "snapshotSha": "887aa640d481599b87d43448937cc99621716dd6"
+      "snapshotSha": "887aa640d481599b87d43448937cc99621716dd6",
+      "until": "M5 phase 23"
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInBackOffTest.ts",
       "status": "planned",
       "reason": "The device's doubling Check-In back-off, milestone 5 phase 23.",
-      "snapshotSha": "af97184883104629241b16e0f8e6227afee16864"
+      "snapshotSha": "af97184883104629241b16e0f8e6227afee16864",
+      "until": "M5 phase 23"
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInSenderTest.ts",
       "status": "planned",
       "reason": "The device's Check-In sender, milestone 5 phase 23.",
-      "snapshotSha": "60e32d5ff88c138ffd0fb328ed559c73aefce106"
+      "snapshotSha": "60e32d5ff88c138ffd0fb328ed559c73aefce106",
+      "until": "M5 phase 23"
     },
     {
       "path": "packages/protocol/test/icd/IcdCheckInSuppressionTest.ts",
       "status": "planned",
       "reason": "Suppressing a Check-In when a subscription covers the monitored subject, milestone 5 phase 23.",
-      "snapshotSha": "5000cacfe58dfc1755ab88ba7a4e85fb68697df7"
+      "snapshotSha": "5000cacfe58dfc1755ab88ba7a4e85fb68697df7",
+      "until": "M5 phase 23"
     },
     {
       "path": "packages/protocol/test/icd/IcdCounterTest.ts",
       "status": "planned",
       "reason": "The device's ICD counter (boot bump, wrap at 2^32), milestone 5 phase 23.",
-      "snapshotSha": "2bb80a11d7cdce1a0fc21e256b5f2ded6c168250"
+      "snapshotSha": "2bb80a11d7cdce1a0fc21e256b5f2ded6c168250",
+      "until": "M5 phase 23"
     },
     {
       "path": "packages/protocol/test/icd/IcdPeerScheduleTest.ts",
@@ -3887,7 +3893,8 @@
       "path": "packages/protocol/test/peer/PeerConnectionSocketOwnershipTest.ts",
       "status": "planned",
       "reason": "Ownership of the channel a pairing opens: the UDP (and, for the commissioner, BLE) rule applies now, the TCP describe with the TCP initiator of milestone 5 phase 25.",
-      "snapshotSha": "9a8ee919d14a3f7f88f32b7a6c220c691f43a27d"
+      "snapshotSha": "9a8ee919d14a3f7f88f32b7a6c220c691f43a27d",
+      "until": "M5 phase 24"
     },
     {
       "path": "packages/protocol/test/peer/PeerDescriptorTest.ts",
