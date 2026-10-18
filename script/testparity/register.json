@@ -3006,7 +3006,7 @@
     },
     {
       "path": "packages/protocol/test/dcl/DclCertificateServiceRevocationTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "controller/dcl:TestRevocationPAISignedCRL",
         "controller/dcl:TestRevocationLookupFailures",
@@ -3015,10 +3015,7 @@
         "controller/dcl:TestDclCertificateServiceRevocationOffline",
         "controller/dcl:TestDclCertificateServiceRevocationParseRevocationSet"
       ],
-      "missing": [
-        "installs what the constructor was given"
-      ],
-      "reason": "Installed revocation sets (CertificateStore.InstallRevocations, InstalledRevocations, the canonical serial and the issuer-name matching), the offline store and ParseRevocationSet are ported case by case through the Go surface; the constructor's revocations option is missing because CertificateOptions (certstore.go) has no Revocations field yet, so the cases that pass it install the set right after OpenCertificateStore.",
+      "reason": "Installed revocation sets (CertificateStore.InstallRevocations, InstalledRevocations, the canonical serial and the issuer-name matching), the offline store and ParseRevocationSet are ported case by case through the Go surface, and the constructor.s revocations option through CertificateOptions.Revocations.",
       "snapshotSha": "6b158ccb0336eef76953f5e6515049142720ed35"
     },
     {
@@ -3062,10 +3059,9 @@
       ],
       "missing": [
         "leaves no update timer running when closed during the startup fetch",
-        "fetches GitHub certs by default when test certs enabled",
-        "isRevoked rejects instead of answering not revoked while and after the service closes"
+        "fetches GitHub certs by default when test certs enabled"
       ],
-      "reason": "Every other it case is ported through CertificateStore over a MockFetch-like RoundTripper with the CHIP test PAAs and CD signer; missing: OpenCertificateStore returns no handle before its startup update ends, so nothing can close it during that fetch; GitHub stays opt-in (by_design BD-Matter-DCL-OptIn); IsRevoked (revocation.go, not this tranche's file) has no closed check and answers not revoked after Close.",
+      "reason": "Every other it case is ported through CertificateStore over a MockFetch-like RoundTripper with the CHIP test PAAs and CD signer; missing: OpenCertificateStore returns no handle before its startup update ends, so nothing can close it during that fetch; GitHub stays opt-in (by_design BD-Matter-DCL-OptIn).",
       "snapshotSha": "7620f1460f0f81a91bed90c3efc89cdd216b4303"
     },
     {

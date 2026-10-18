@@ -122,6 +122,18 @@ func TestDclCertificateServiceRevocationOutsideTheDCL(t *testing.T) {
 		}
 	})
 
+	t.Run("installs what the constructor was given", func(t *testing.T) {
+		f := newFakeDCL(t)
+		f.json("/dcl/pki/root-certificates", 200, map[string]any{"approvedRootCertificates": map[string]any{"schemaVersion": 0, "certs": []any{}}})
+		s := dclRevOpen(t, CertificateOptions{
+			Client: f.client(), UpdateInterval: -1,
+			Revocations: []RevocationSetEntry{{IssuerSubjectKeyID: dclRevPAIAKID, RevokedSerialNumbers: []string{dclRevRevokedSerial}}},
+		}) // DclCertificateServiceRevocationTest.ts:77-86
+		if !dclRevIsRevoked(t, s, dclRevPAIAKID, revoked(t), "") {
+			t.Fatal("constructor-given serial not revoked")
+		}
+	})
+
 	t.Run("passes a serial the set does not name to the DCL, which here knows nothing", func(t *testing.T) {
 		s, f := dclRevService(t, []RevocationSetEntry{{IssuerSubjectKeyID: dclRevPAIAKID, RevokedSerialNumbers: []string{dclRevRevokedSerial}}})
 		if dclRevIsRevoked(t, s, dclRevPAIAKID, other(t), "") {

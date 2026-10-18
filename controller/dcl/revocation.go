@@ -183,6 +183,12 @@ func matchRevocation(entries []revocationEntry, serial, issuerDN string) bool {
 // offline store, or a lookup that failed, reports not revoked; a lookup
 // that was incomplete is not kept.
 func (s *CertificateStore) IsRevoked(akid, serial []byte, issuerDN string) (bool, error) {
+	// A closing store must not answer "not revoked" for a lookup it never
+	// ran. Mirrors matter.js
+	// packages/protocol/src/dcl/DclCertificateService.ts:706-710.
+	if s.isClosed() {
+		return false, ErrStoreClosed
+	}
 	id := hexUpper(akid)
 	// An installed set answers first, offline too; it can only add
 	// revocations. Mirrors matter.js
@@ -640,6 +646,10 @@ type InstalledRevocation struct {
 // ErrInvalidRevocationSet wraps every refusal of [ParseRevocationSet] and
 // [CertificateStore.InstallRevocations] (matter.js ImplementationError).
 var ErrInvalidRevocationSet = errors.New("dcl: invalid revocation set")
+
+// ErrStoreClosed is IsRevoked's answer on a store that is closing or
+// closed — matter.js's ClosedError (DclCertificateService.ts:706-710).
+var ErrStoreClosed = errors.New("dcl: certificate store closed")
 
 func revocationSetErrorf(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidRevocationSet, fmt.Sprintf(format, args...))

@@ -63,6 +63,10 @@ type CertificateOptions struct {
 	Clock exchange.Clock
 	// Logger receives the store's log; nil discards it.
 	Logger *slog.Logger
+	// Revocations is revocation information from outside the DCL,
+	// installed before the first update as InstallRevocations does —
+	// matter.js's revocations option (DclCertificateService.ts:328-330).
+	Revocations []RevocationSetEntry
 }
 
 // CertificateMetadata is a stored certificate's record — matter.js
@@ -148,6 +152,11 @@ func OpenCertificateStore(ctx context.Context, opts CertificateOptions) (*Certif
 		s.github = newGitHubClient(opts.GitHub, opts.Client.httpClient())
 	}
 	s.revocations = newRevocationCache(s)
+	if opts.Revocations != nil {
+		if err := s.InstallRevocations(opts.Revocations); err != nil {
+			return nil, err
+		}
+	}
 	s.log.Info("dcl.certificates.init",
 		slog.Bool("offline", s.offline()), slog.Bool("test", opts.FetchTestCertificates),
 		slog.Bool("github", s.github != nil), slog.Bool("accept_test", s.AcceptsTestCertificates()))

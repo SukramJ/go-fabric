@@ -1164,6 +1164,32 @@ func dclCertSvcPoints(skid, dataURL string, revocationType int) map[string]any {
 // parseCrlRevokedSerials and parseCrl are parseCRL's serials and result.
 func TestDclCertificateServiceRevocationSupport(t *testing.T) {
 	t.Parallel()
+	t.Run("isRevoked rejects instead of answering not revoked while and after the service closes", func(t *testing.T) {
+		t.Parallel()
+		f := &dclCertSvcFetch{}
+		f.addMocks("")
+		s := dclCertSvcOpen(t, f, CertificateOptions{Clock: newManualClock(), UpdateInterval: time.Minute})
+		g := f.gate()
+		updating := make(chan bool)
+		go func() { updating <- s.Update(context.Background(), true) }()
+		<-g.started
+		closing := make(chan struct{})
+		go func() { s.Close(); close(closing) }()
+		for !s.isClosed() {
+			runtime.Gosched()
+		}
+		// DclCertificateServiceTest.ts:1737-1757: while the close waits for
+		// the running update, and after it.
+		if _, err := s.IsRevoked([]byte{0xAA, 0xBB, 0xCC, 0xDD}, []byte{0x01, 0xAB}, ""); !errors.Is(err, ErrStoreClosed) {
+			t.Fatalf("IsRevoked while closing: %v, want ErrStoreClosed", err)
+		}
+		g.settle(nil)
+		<-closing
+		<-updating
+		if _, err := s.IsRevoked([]byte{0xAA, 0xBB, 0xCC, 0xDD}, []byte{0x01, 0xAB}, ""); !errors.Is(err, ErrStoreClosed) {
+			t.Fatalf("IsRevoked after close: %v, want ErrStoreClosed", err)
+		}
+	})
 	t.Run("parseCrlRevokedSerials extracts serial numbers from CRL", func(t *testing.T) {
 		t.Parallel()
 		r, err := parseCRL(dclCertSvcTestCRL(t, "01AB", "02CD", "FF00FF"), nil)
