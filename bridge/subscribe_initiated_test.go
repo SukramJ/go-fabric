@@ -81,7 +81,7 @@ func TestSendInitiatedReport_FreshExchange(t *testing.T) {
 		}
 		return nil, false
 	})
-	b.outboundReliable = newOutboundReliableTracker(nil)
+	b.outboundReliable = newOutboundReliableTracker(nil, nil)
 
 	const peerExchangeID uint16 = 7
 	target := subTarget{
@@ -212,7 +212,7 @@ func TestSendInitiatedReport_MonotonicallyIncreasing(t *testing.T) {
 		}
 		return nil, false
 	})
-	b.outboundReliable = newOutboundReliableTracker(nil)
+	b.outboundReliable = newOutboundReliableTracker(nil, nil)
 
 	target := subTarget{
 		src:           peerAddr,

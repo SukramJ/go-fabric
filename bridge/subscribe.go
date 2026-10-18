@@ -63,7 +63,7 @@ func (b *Bridge) chunkStatusResponseTimeout(sessionID uint16) time.Duration {
 	if b.chunkStatusResponseTimeoutOverride > 0 {
 		return b.chunkStatusResponseTimeoutOverride
 	}
-	base := b.outboundBaseInterval(sessionID, time.Now())
+	base := b.outboundBaseInterval(sessionID, b.clk().Now())
 	if base <= 0 {
 		base = mrp.SessionIdleIntervalDefault
 	}
@@ -822,7 +822,7 @@ func (b *Bridge) sendInitiatedReport(target subTarget, report im.ReportData) (co
 	freshTarget.peerInitiator = false
 	// The exchange context's creation time bounds a peer-loss sweep this
 	// report may trigger (matter.js ExchangeManager.ts:549, :576 asOf).
-	createdAt := time.Now()
+	createdAt := b.clk().Now()
 	key := mrp.ExchangeKey{SessionID: target.sessionID, ExchangeID: freshExchangeID, Initiator: true}
 	// The first message's counter belongs to the report's exchange from
 	// the moment it is sent, not from when the whole report is out: a
@@ -956,7 +956,7 @@ func (b *Bridge) sendUnsolicitedIM(target subTarget, opcode uint8, payload []byt
 	// not lost (bridge/reply.go sendReplyReliable).
 	track := tracker != nil && respProto.NeedsAck
 	if track {
-		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, time.Now())
+		tracker.Track(counter, target.sessionID, target.exchangeID, datagram, dest, b.clk().Now())
 	}
 	if err := sendVia(listener, dest, datagram); err != nil {
 		if track {

@@ -27,7 +27,7 @@ func TestMRPRTTMeasuresFirstTryOnly(t *testing.T) {
 
 	t.Run("a first-try ACK is measured", func(t *testing.T) {
 		t.Parallel()
-		tr := newOutboundReliableTracker(nil)
+		tr := newOutboundReliableTracker(nil, nil)
 		tr.Track(1, 7, 9, []byte{0x01}, dest, now)
 
 		if !tr.Ack(7, 1) {
@@ -42,7 +42,7 @@ func TestMRPRTTMeasuresFirstTryOnly(t *testing.T) {
 
 	t.Run("an ACK after a retransmit is not measured", func(t *testing.T) {
 		t.Parallel()
-		tr := newOutboundReliableTracker(nil)
+		tr := newOutboundReliableTracker(nil, nil)
 		tr.Track(2, 7, 9, []byte{0x02}, dest, now)
 		// Drive the retransmit the way the scheduler does, so `retries` is
 		// incremented by production code rather than by the test reaching in.
@@ -68,7 +68,7 @@ func TestMRPRTTMeasuresFirstTryOnly(t *testing.T) {
 func TestMRPRTTStatsEmptyWithoutPairing(t *testing.T) {
 	t.Parallel()
 
-	tr := newOutboundReliableTracker(nil)
+	tr := newOutboundReliableTracker(nil, nil)
 	if got := tr.RTTStats(); got.Total != 0 || got.MedianMs != 0 {
 		t.Errorf("RTTStats() = %+v on an untouched tracker, want the zero value", got)
 	}

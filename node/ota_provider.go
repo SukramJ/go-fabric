@@ -66,6 +66,7 @@ func (n *Node) buildOTAProvider() error {
 		return nil
 	}
 	n.bdx = bdx.NewResponder(n.logger)
+	n.bdx.SetClock(n.cfg.Clock) // the transfers' activity on the provider's clock
 	p, err := mattercore.NewOTAProvider(mattercore.OTAProviderConfig{
 		ImageSource: cfg.ImageSource, Consent: cfg.Consent, ApplyPolicy: cfg.ApplyPolicy,
 		BDX: n.bdx, BDXMaxBlockSize: cfg.BDXMaxBlockSize, OnStatusChange: cfg.OnStatusChange,
@@ -75,6 +76,7 @@ func (n *Node) buildOTAProvider() error {
 			return nodeID, ok
 		},
 		Logger: n.logger,
+		Clock:  n.cfg.Clock,
 	})
 	if err != nil {
 		return fmt.Errorf("node: ota provider: %w", err)

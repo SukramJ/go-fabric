@@ -182,7 +182,7 @@ func (b *Bridge) reconcileGroupMemberships() {
 		b.logger.Debug("matter.groups.joined", slog.String("address", key))
 	}
 	if failed && b.groupJoinRetry == nil {
-		b.groupJoinRetry = time.AfterFunc(groupJoinRetryInterval, func() {
+		b.groupJoinRetry = b.clk().AfterFunc(groupJoinRetryInterval, func() {
 			b.groupNetMu.Lock()
 			b.groupJoinRetry = nil
 			b.groupNetMu.Unlock()

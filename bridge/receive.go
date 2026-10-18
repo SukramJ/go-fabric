@@ -198,7 +198,7 @@ func (b *Bridge) dispatch(ctx context.Context, buf []byte, src net.Addr) error {
 	// requiresAck → sendStandaloneAckForMessage without delay).
 	if duplicate {
 		b.expediteDuplicateAck(hdr.SessionID, proto.ExchangeID, !proto.Initiator)
-		b.RunAckPumpOnce(time.Now())
+		b.RunAckPumpOnce(b.clk().Now())
 		b.logger.Debug("matter.rx.duplicate_acked",
 			slog.String("src", srcString(src)),
 			slog.Int("session_id", int(hdr.SessionID)),
@@ -349,7 +349,7 @@ func (b *Bridge) decryptIfNeeded(hdr *message.Header, body []byte) (plaintext []
 		// RemoveFabric; there is no further wire action that can clear
 		// Apple's local cache. matter.js and chip behave identically on
 		// the wire (silent drop); only the diagnostic differs.
-		if b.sessionMissTracker.record(hdr.SessionID, time.Now()) {
+		if b.sessionMissTracker.record(hdr.SessionID, b.clk().Now()) {
 			b.logger.Info("matter.rx.session_miss.burst",
 				slog.Int("session_id", int(hdr.SessionID)),
 				slog.String("hint", "controller is retransmitting on a session-id the bridge no longer holds — typical fingerprint of Apple iPhone stale-session cache after RemoveFabric; remediation is to reboot the iPhone"))
@@ -538,7 +538,7 @@ func (b *Bridge) checkTimedGate(timedFlag bool, sessionID, exchangeID uint16) (i
 		return im.StatusTimedRequestMismatch, true
 	}
 	deadline, isTime := raw.(time.Time)
-	if !isTime || time.Now().After(deadline) {
+	if !isTime || b.clk().Now().After(deadline) {
 		return im.StatusTimeout, true
 	}
 	return 0, false

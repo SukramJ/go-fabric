@@ -19,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/bdx"
 	"github.com/SukramJ/go-fabric/binding"
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/diagevent"
 	"github.com/SukramJ/go-fabric/endpoint"
@@ -121,6 +122,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		cfg.Advertiser = mdns.NewNoop()
 	}
 	ctx := context.Background()
+	cfg.Clock = clock.Or(cfg.Clock)
 	n := &Node{cfg: cfg, logger: cfg.Logger, advertiser: cfg.Advertiser, bootReason: mattercore.BootReasonPowerOnReboot}
 	n.life, n.cancel = context.WithCancel(ctx)
 	ok := false
@@ -129,6 +131,12 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 			n.cancel()
 		}
 	}()
+
+	// An advertiser that paces its own timers (mdns.Zeroconf) runs them on
+	// the node's clock.
+	if a, ok := n.advertiser.(interface{ SetClock(clock.Clock) }); ok {
+		a.SetClock(n.cfg.Clock)
+	}
 
 	// --- persistence (main.go:146-165, persist.go openDB) ---------------
 	if err := n.openStores(ctx); err != nil {
@@ -148,6 +156,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		if n.groups, err = groups.NewManager(n.st, n.logger); err != nil {
 			return nil, fmt.Errorf("node: group state: %w", err)
 		}
+		n.groups.SetClock(n.cfg.Clock)
 	}
 
 	// --- the topology assembler and the Aggregator (main.go:167-186) ----
@@ -186,6 +195,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 		ProductID:     pd.ProductID,
 		NodeLabel:     bi.NodeLabel,
 		Discriminator: cfg.Commissioning.Discriminator,
+		Clock:         n.cfg.Clock,
 	}, n.logger)
 	if err != nil {
 		return nil, fmt.Errorf("node: bridge: %w", err)
@@ -205,6 +215,7 @@ func New(cfg Config) (*Node, error) { //nolint:funlen // the composition root: o
 	// A bounded trace of the moments that explain a failed pairing
 	// (main.go:247-251).
 	n.diagRing = diagevent.NewRing(256)
+	n.diagRing.SetClock(n.cfg.Clock)
 	n.br.AttachDiagnosticEvents(n.diagRing)
 
 	// --- root + Aggregator endpoints (main.go:253-321) ------------------
@@ -406,7 +417,7 @@ func (n *Node) reopenWhenIdle() {
 	go func() {
 		defer n.keeperWG.Done()
 		defer n.reopenPending.Store(false)
-		tick := time.NewTicker(reopenPollInterval)
+		tick := n.cfg.Clock.NewTicker(reopenPollInterval)
 		defer tick.Stop()
 		for {
 			armed := n.root.GeneralCommissioning != nil && n.root.GeneralCommissioning.FailSafeArmed()
@@ -417,7 +428,7 @@ func (n *Node) reopenWhenIdle() {
 			select {
 			case <-n.life.Done():
 				return
-			case <-tick.C:
+			case <-tick.C():
 			}
 		}
 	}()
@@ -530,7 +541,7 @@ func (n *Node) Start(ctx context.Context) error {
 	n.keeperWG.Add(1)
 	go func() {
 		defer n.keeperWG.Done()
-		keepOperationalTime(n.life, n.st, n.root.GeneralDiagnostics, operationalTimeInterval, n.logger)
+		keepOperationalTime(n.life, n.cfg.Clock, n.st, n.root.GeneralDiagnostics, operationalTimeInterval, n.logger)
 	}()
 
 	if err := attachPartsListProviders(n.br); err != nil {

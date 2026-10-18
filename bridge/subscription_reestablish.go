@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/im/subscription"
@@ -282,7 +281,7 @@ func (b *Bridge) establishFormerSubscription(ctx context.Context, rec subscripti
 		_ = m.Release(sub.ID)
 		return err
 	}
-	sub.TouchLastReport(time.Now())
+	sub.TouchLastReport(b.clk().Now())
 	b.logger.Info("matter.subscription.reestablished_one",
 		slog.Int("subscription_id", int(sub.ID)),
 		slog.Int("session_id", int(link.sessionID)),
@@ -323,7 +322,7 @@ func (b *Bridge) sendPrimingReport(target subTarget, report im.ReportData) error
 			return fmt.Errorf("%w: %w", errPeerGone, err)
 		}
 		timeout := b.chunkStatusResponseTimeout(target.sessionID)
-		timer := time.NewTimer(timeout)
+		timer := b.clk().NewTimer(timeout)
 		select {
 		case status := <-waitCh:
 			timer.Stop()
@@ -331,7 +330,7 @@ func (b *Bridge) sendPrimingReport(target subTarget, report im.ReportData) error
 			if !status.IsSuccess() {
 				return &chunkStatusError{status: status}
 			}
-		case <-timer.C:
+		case <-timer.C():
 			b.disarmStatusResponseWait(target.sessionID, target.exchangeID, true)
 			return fmt.Errorf("%w: chunk %d unanswered after %s", errPeerGone, i, timeout)
 		}

@@ -52,7 +52,7 @@ func (b *Bridge) AttachAckTracker(t *mrp.AckTracker) {
 	b.mu.Lock()
 	b.ackTracker = t
 	if b.outboundReliable == nil {
-		b.outboundReliable = newOutboundReliableTracker(b.outboundBaseInterval)
+		b.outboundReliable = newOutboundReliableTracker(b.outboundBaseInterval, b.clk())
 	}
 	b.mu.Unlock()
 }
@@ -140,7 +140,7 @@ func (b *Bridge) owedInboundAck(src net.Addr, hdr *message.Header, proto message
 	// src/messaging/ExchangeContext.cpp:384, matter.js
 	// packages/protocol/src/protocol/ExchangeManager.ts:324), leaving
 	// the peer to retransmit until its cap fires.
-	tracker.Owe(hdr.MessageCounter, hdr.SessionID, proto.ExchangeID, !proto.Initiator, time.Now())
+	tracker.Owe(hdr.MessageCounter, hdr.SessionID, proto.ExchangeID, !proto.Initiator, b.clk().Now())
 }
 
 // refreshAckCounter rewrites requestHdr.MessageCounter to the latest
@@ -301,13 +301,13 @@ func (b *Bridge) runAckPump(ctx context.Context) {
 	if tracker == nil {
 		return
 	}
-	ticker := time.NewTicker(ackPumpInterval)
+	ticker := b.clk().NewTicker(ackPumpInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case now := <-ticker.C:
+		case now := <-ticker.C():
 			b.ackPumpTick(tracker, outbound, now)
 		}
 	}

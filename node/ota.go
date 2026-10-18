@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx/otaimage"
+	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
 )
@@ -45,6 +46,7 @@ type otaApplier struct {
 	harness             bool
 	requestor           func() *mattercore.OTASoftwareUpdateRequestor
 	logger              *slog.Logger
+	clock               clock.Clock
 }
 
 var _ mattercore.OtaApplier = (*otaApplier)(nil)
@@ -90,7 +92,7 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 	// would only ever see the Idle that follows. TC-SU-2.2 step 5 waits
 	// for Applying on its UpdateState subscription (TC_SU_2_2.py:1232-1262
 	// at the harness pin) and timed out on exactly that (run 38154468426).
-	if err := sleepCtx(ctx, otaHarnessApplyHold); err != nil {
+	if err := sleepCtx(ctx, a.clock, otaHarnessApplyHold); err != nil {
 		return err
 	}
 	if err := a.basicInfo.SetSoftwareVersion(newSoftwareVersion, header.SoftwareVersionString); err != nil {
@@ -110,11 +112,11 @@ func (a *otaApplier) ApplyUpdate(ctx context.Context, newSoftwareVersion uint32,
 const otaHarnessApplyHold = 2 * time.Second
 
 // sleepCtx waits d or until ctx ends.
-func sleepCtx(ctx context.Context, d time.Duration) error {
-	t := time.NewTimer(d)
+func sleepCtx(ctx context.Context, clk clock.Clock, d time.Duration) error {
+	t := clock.Or(clk).NewTimer(d)
 	defer t.Stop()
 	select {
-	case <-t.C:
+	case <-t.C():
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
@@ -156,12 +158,15 @@ func (a *otaApplier) restartedWhenIdle(ctx context.Context) {
 	if r == nil {
 		return
 	}
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
+	clk := clock.Or(a.clock)
+	deadline := clk.Now().Add(10 * time.Second)
+	for clk.Now().Before(deadline) {
 		if v, _ := r.MatterRead(otadef.AttrUpdateState); v == uint8(otadef.UpdateStateIdle) {
 			break
 		}
-		time.Sleep(10 * time.Millisecond)
+		if !clock.Sleep(clk, 10*time.Millisecond, ctx.Done()) {
+			break
+		}
 	}
 	r.Restarted(ctx)
 }
@@ -178,7 +183,7 @@ func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, b
 	if applier == nil {
 		applier = &otaApplier{
 			vendorID: cfg.ProductDescription.VendorID, productID: cfg.ProductDescription.ProductID, basicInfo: basicInfo,
-			dir: ota.Dir, harness: ota.Harness, logger: cfg.Logger,
+			dir: ota.Dir, harness: ota.Harness, logger: cfg.Logger, clock: cfg.Clock,
 			requestor: func() *mattercore.OTASoftwareUpdateRequestor { return requestor },
 		}
 	}
@@ -190,6 +195,7 @@ func buildOtaRequestor(cfg *Config, connector mattercore.OtaProviderConnector, b
 		DownloadDir:     ota.Dir,
 		CanConsent:      ota.Harness,
 		Logger:          cfg.Logger,
+		TimeSource:      cfg.Clock,
 	}
 	if ota.Harness {
 		// The matter.js cert requestor's wait after an announcement

@@ -12,6 +12,7 @@ import (
 	"slices"
 
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	ethdiagdef "github.com/SukramJ/go-fabric/cluster/spec/ethernetnetworkdiagnostics"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
@@ -132,6 +133,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	// RebootCount and the operational time carry over from the previous
 	// boots (wiring.go:118-128).
 	r.GeneralDiagnostics = mattercore.NewGeneralDiagnostics(d.bootReason)
+	r.GeneralDiagnostics.SetClock(d.cfg.Clock)
 	reboots, err := countBoot(ctx, d.st)
 	if err != nil {
 		return nil, fmt.Errorf("general diagnostics: %w", err)
@@ -146,6 +148,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.GeneralCommissioning, err = mattercore.NewGeneralCommissioning(mattercore.GeneralCommissioningConfig{
 		LocationCapability:           cfg.Commissioning.LocationCapability,
 		SupportsConcurrentConnection: true,
+		Clock:                        cfg.Clock,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("general commissioning: %w", err)
@@ -215,6 +218,7 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	}
 	r.Groupcast, err = mattercore.NewGroupcast(mattercore.GroupcastConfig{ //nolint:contextcheck // the constructor takes no context
 		Groups: d.groups, GroupKeyManagement: r.GroupKeyManagement, AccessControl: r.AccessControl,
+		Clock: cfg.Clock,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("groupcast: %w", err)
@@ -226,9 +230,11 @@ func buildRoot(ctx context.Context, d rootDeps) (*RootClusters, error) { //nolin
 	r.AdministratorCommissioning = wire.NewAdministratorCommissioning()
 	if !cfg.DisableTimeSynchronization {
 		r.TimeSynchronization = mattercore.NewTimeSynchronization()
+		r.TimeSynchronization.SetClock(cfg.Clock)
 		r.GeneralDiagnostics.SetUTCClock(r.TimeSynchronization.UTC)
 	}
 	r.DiagnosticLogs = mattercore.NewDiagnosticLogs()
+	r.DiagnosticLogs.SetClock(cfg.Clock)
 	var netComm contract.ClusterServer
 	if wc := cfg.Network.WiFiCommissioning; wc.Driver != nil {
 		r.WiFiNetworkCommissioning, err = mattercore.NewWiFiNetworkCommissioning(mattercore.WiFiNetworkCommissioningConfig{
@@ -319,7 +325,7 @@ func attestationMaterial(cfg *Config) (*attestation.Chain, []byte, error) {
 	chain := cfg.Attestation.Chain
 	if chain == nil {
 		var err error
-		if chain, err = attestation.BuildTestChain(pd.VendorID, pd.ProductID); err != nil {
+		if chain, err = attestation.BuildTestChainAt(pd.VendorID, pd.ProductID, clock.Or(cfg.Clock).Now()); err != nil {
 			return nil, nil, fmt.Errorf("attestation chain: %w", err)
 		}
 	}

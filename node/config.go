@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	fixedlabeldef "github.com/SukramJ/go-fabric/cluster/spec/fixedlabel"
 	wifidiagdef "github.com/SukramJ/go-fabric/cluster/spec/wifinetworkdiagnostics"
@@ -136,6 +137,15 @@ type Config struct {
 	Observers Observers
 	// Logger is the node's logger; nil is slog.Default().
 	Logger *slog.Logger
+	// Clock is the node's time source; nil is [clock.System]. The node
+	// hands it to the bridge (every device-side interval: the ack pump,
+	// MRP, subscriptions' timers, the commissioning window, PASE lockout),
+	// the session table, the subscription engine, the PASE and CASE
+	// providers, the operational resolver, an advertiser that takes a
+	// clock ([mdns.Zeroconf]), the group sender, the root's cluster
+	// servers, OTA, the store's persist loop and the reopen poll. A test
+	// passes a [github.com/SukramJ/go-fabric/clock/clocktest.Fake].
+	Clock clock.Clock
 }
 
 // Network is matter.js `network` for the keys the daemon uses

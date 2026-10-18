@@ -115,8 +115,17 @@ type Zeroconf struct {
 }
 
 // SetClock sets the clock the subtype re-announcement and the re-announce
-// loop run on; nil is [clock.System].
-func (z *Zeroconf) SetClock(c clock.Clock) { z.clock.Store(c) }
+// loop run on, and the attached [SubtypeResponder]'s; nil is
+// [clock.System].
+func (z *Zeroconf) SetClock(c clock.Clock) {
+	z.clock.Store(c)
+	z.mu.RLock()
+	r := z.responder
+	z.mu.RUnlock()
+	if r != nil {
+		r.SetClock(c)
+	}
+}
 
 // NewZeroconf returns a multicast advertiser backed by zeroconf. The
 // caller is responsible for calling [Zeroconf.Close] (typically
@@ -146,6 +155,9 @@ func (z *Zeroconf) AttachSubtypeResponder(r *SubtypeResponder) {
 	z.mu.Lock()
 	z.responder = r
 	z.mu.Unlock()
+	if r != nil {
+		r.SetClock(z.clock.Load())
+	}
 }
 
 // hostIface is the testable shape of one network interface: its name,

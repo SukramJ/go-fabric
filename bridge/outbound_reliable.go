@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
 
@@ -64,6 +65,8 @@ type outboundReliableTracker struct {
 	// resolver does not know, falls back to the spec idle default.
 	// Set once at construction; read without the mutex.
 	baseIntervalFor func(sessionID uint16, now time.Time) time.Duration
+	// clock stamps sentWall for the round-trip diagnostic.
+	clock clock.Clock
 }
 
 // outboundEntry captures one in-flight reliable datagram and the
@@ -81,19 +84,21 @@ type outboundEntry struct {
 	dest       net.Addr
 	retries    int
 	nextSendAt time.Time
-	// sentWall is the wall-clock reading when the datagram first left, used
-	// only to report the peer's round-trip in diagnostics. It is deliberately
-	// NOT the injected `now` the retransmit schedule runs on: that clock is a
-	// test seam and may be a fixed instant, which would make every reported
-	// round-trip zero. Nothing in the MRP state machine reads this field.
+	// sentWall is the tracker's clock reading when the datagram first
+	// left, used only to report the peer's round-trip in diagnostics. It is
+	// deliberately NOT the injected `now` the retransmit schedule runs on:
+	// that is a test seam and may be a fixed instant, which would make
+	// every reported round-trip zero. Nothing in the MRP state machine
+	// reads this field.
 	sentWall time.Time
 }
 
 // newOutboundReliableTracker returns a fresh, empty tracker.
 // baseIntervalFor may be nil — every send then uses the spec idle
 // default as its base interval.
-func newOutboundReliableTracker(baseIntervalFor func(sessionID uint16, now time.Time) time.Duration) *outboundReliableTracker {
+func newOutboundReliableTracker(baseIntervalFor func(sessionID uint16, now time.Time) time.Duration, clk clock.Clock) *outboundReliableTracker {
 	return &outboundReliableTracker{
+		clock:           clock.Or(clk),
 		pending:         make(map[outboundKey]*outboundEntry),
 		waiters:         make(map[outboundKey]chan error),
 		baseIntervalFor: baseIntervalFor,
@@ -135,7 +140,7 @@ func (t *outboundReliableTracker) Track(counter uint32, sessionID, exchangeID ui
 		datagram:   cp,
 		dest:       dest,
 		nextSendAt: now.Add(delay),
-		sentWall:   time.Now(),
+		sentWall:   t.clock.Now(),
 	}
 }
 
@@ -219,7 +224,7 @@ func (t *outboundReliableTracker) Ack(sessionID uint16, acked uint32) bool {
 	// reason MRP itself never adapts its interval from a retransmitted
 	// exchange.
 	if entry != nil && entry.retries == 0 && !entry.sentWall.IsZero() {
-		t.rtt.record(time.Since(entry.sentWall))
+		t.rtt.record(clock.Since(t.clock, entry.sentWall))
 	}
 	ch, has := t.waiters[key]
 	if has {

@@ -88,7 +88,7 @@ func TestCountBootAndOperationalTime(t *testing.T) {
 	kctx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	go func() {
-		keepOperationalTime(kctx, st, g, time.Millisecond, slog.New(slog.DiscardHandler))
+		keepOperationalTime(kctx, nil, st, g, time.Millisecond, slog.New(slog.DiscardHandler))
 		close(done)
 	}()
 	time.Sleep(20 * time.Millisecond)

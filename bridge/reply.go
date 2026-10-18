@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"time"
 
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	matterlock "github.com/SukramJ/go-fabric/cluster/lock"
@@ -218,7 +217,7 @@ func (b *Bridge) sendReplyOpts(
 		// for an untracked message is lost — the message then goes out
 		// again as a spurious retransmission.
 		if needsAck {
-			tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, time.Now())
+			tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, b.clk().Now())
 		}
 		if err := sendVia(listener, src, datagram); err != nil {
 			if needsAck {
@@ -271,7 +270,7 @@ func (b *Bridge) sendReplyOpts(
 	}
 	// Tracked before it is sent, for the reason above.
 	if needsAck {
-		tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, time.Now())
+		tracker.Track(counter, requestHdr.SessionID, requestProto.ExchangeID, datagram, src, b.clk().Now())
 	}
 	if err := sendVia(listener, src, datagram); err != nil {
 		if needsAck {

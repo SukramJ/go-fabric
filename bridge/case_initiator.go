@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
-	"time"
 
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/transport/message"
@@ -406,7 +405,7 @@ func (b *Bridge) sendInitiatedUnsecured(addr *net.UDPAddr, exchangeID uint16, ep
 	// Tracked before it is sent, so an ack handled before Send returns is
 	// not lost (bridge/reply.go sendReplyReliable).
 	if tracker != nil {
-		tracker.Track(hdr.MessageCounter, 0, exchangeID, datagram, addr, time.Now())
+		tracker.Track(hdr.MessageCounter, 0, exchangeID, datagram, addr, b.clk().Now())
 	}
 	if err := listener.Send(addr, datagram); err != nil {
 		if tracker != nil {

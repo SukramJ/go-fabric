@@ -14,6 +14,7 @@ import (
 
 	"github.com/SukramJ/go-fabric/bootid"
 	"github.com/SukramJ/go-fabric/bridge"
+	"github.com/SukramJ/go-fabric/clock"
 	mattercore "github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/store"
@@ -306,14 +307,14 @@ func storeOperationalTime(ctx context.Context, st *store.Store, g *mattercore.Ge
 
 // keepOperationalTime persists the operational time every interval until
 // ctx ends (wiring.go:1019-1036); Stop stores it once more.
-func keepOperationalTime(ctx context.Context, st *store.Store, g *mattercore.GeneralDiagnostics, interval time.Duration, logger *slog.Logger) {
-	tick := time.NewTicker(interval)
+func keepOperationalTime(ctx context.Context, clk clock.Clock, st *store.Store, g *mattercore.GeneralDiagnostics, interval time.Duration, logger *slog.Logger) {
+	tick := clock.Or(clk).NewTicker(interval)
 	defer tick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-tick.C:
+		case <-tick.C():
 			if err := storeOperationalTime(ctx, st, g); err != nil {
 				logger.Warn("gendiag.operational_hours.persist", slog.String("err", err.Error()))
 			}

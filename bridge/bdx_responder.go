@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/transport/message"
 	"github.com/SukramJ/go-fabric/transport/mrp"
 )
@@ -97,7 +98,7 @@ func (b *Bridge) deliverRespondedBDX(ctx context.Context, hdr *message.Header, p
 	}
 	ex := &initiatedSecureExchange{
 		b: b, sessionID: hdr.SessionID, addr: b.currentPeerAddr(hdr.SessionID, nil), exchangeID: proto.ExchangeID,
-		createdAt: time.Now(), responder: true, turn: newResponderTurn(), in: make(chan bdx.Message, 16), done: make(chan struct{}),
+		createdAt: b.clk().Now(), responder: true, turn: newResponderTurn(b.clk()), in: make(chan bdx.Message, 16), done: make(chan struct{}),
 	}
 	if _, loaded := b.bdx.exchanges.LoadOrStore(key, ex); loaded {
 		// A concurrent first message of the same exchange won the race;
@@ -137,10 +138,12 @@ type responderTurn struct {
 	// waited for one; -1 before it first waited.
 	idleAt  int64
 	changed chan struct{}
+	// clock bounds await.
+	clock clock.Clock
 }
 
-func newResponderTurn() *responderTurn {
-	return &responderTurn{idleAt: -1, changed: make(chan struct{})}
+func newResponderTurn(clk clock.Clock) *responderTurn {
+	return &responderTurn{idleAt: -1, changed: make(chan struct{}), clock: clock.Or(clk)}
 }
 
 // waiting records that the responder waits for its next message, having
@@ -178,7 +181,7 @@ func (t *responderTurn) deliver() int64 {
 // await waits until the responder took message k and waits again, the
 // exchange ended, or [responderTurnBound] passed.
 func (t *responderTurn) await(k int64, done <-chan struct{}) {
-	timer := time.NewTimer(responderTurnBound)
+	timer := t.clock.NewTimer(responderTurnBound)
 	defer timer.Stop()
 	for {
 		t.mu.Lock()
@@ -191,7 +194,7 @@ func (t *responderTurn) await(k int64, done <-chan struct{}) {
 		case <-ch:
 		case <-done:
 			return
-		case <-timer.C:
+		case <-timer.C():
 			return
 		}
 	}
