@@ -48,6 +48,14 @@ BSD-2-Clause); CoreBluetooth and WinRT need cgo or COM.
    with a simulated Wi-Fi driver (TESTING ONLY); end to end over virtual
    HCI controllers (`btvirt`) with connectedhomeip's all-clusters app in a
    manually started CI job; a real device in the manual test plan.
+   *Amended 2026-10-18 (owner decision, phase 13 report BB §3): the
+   pinned CHIP image's apps carry no CHIPoBLE — `--ble-controller` exists
+   only under `CHIP_DEVICE_CONFIG_ENABLE_CHIPOBLE`
+   (`examples/platform/linux/Options.cpp:170-172` at `6170af84`) — so the
+   virtual counterpart is a **matter.js node with `@matter/nodejs-ble`**
+   (bleno on the second `btvirt` controller), the gold standard itself;
+   connectedhomeip's app returns to the job when an image built with BLE
+   is pinned. The job stays manually dispatched.*
 6. macOS and Windows stay out while they need cgo.
 
 ## Consequences
