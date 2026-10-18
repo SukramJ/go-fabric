@@ -2750,25 +2750,16 @@
         "transport/message:TestHeaderMessageExtensionRoundTrip",
         "transport/message:TestHeaderMessageExtensionLengthOverflow",
         "transport/message:TestProtocolHeaderSecuredExtensionRoundTrip",
-        "transport/message:TestProtocolHeaderSecuredExtensionLengthOverflow"
+        "transport/message:TestProtocolHeaderSecuredExtensionLengthOverflow",
+        "transport/message:TestMessageCodecDecode",
+        "transport/message:TestMessageCodecEncodePrivacy",
+        "transport/message:TestMessageCodecEncode",
+        "groups:TestMessageCodecPrivacyTruncated"
       ],
       "missing": [
-        "decodes a message",
-        "decodes a message 2",
-        "decodes the cleartext prefix of a privacy-enhanced group packet (CHIP vector)",
-        "rejects a privacy-enhanced packet truncated below the MIC length",
-        "decodes obfuscated header fields once deobfuscated",
-        "sets the privacy bit in the encoded packet header",
-        "encodePacket uses pre-serialized headerBytes when present",
-        "encodes a message",
-        "encodes a message 2",
-        "writes vendor id before protocol id and round-trips (§4.4.3.4)",
-        "throws when encoding a message with securityExtensions data",
-        "throws when encoding a message with securityExtensions flag",
-        "throws when encoding a message with messageExtension data",
-        "throws when encoding a message with messageExtension flag"
+        "encodePacket uses pre-serialized headerBytes when present"
       ],
-      "reason": "The message and secured extensions and their length checks are covered; the fixed decode/encode vectors and the privacy-enhanced group packet are not.",
+      "reason": "The decode/encode vectors, the privacy-enhanced prefix and region, the MIC-length rejection (groups.tryDecrypt) and the extension refusals are ported; encodePacket's pre-serialized headerBytes has no Go counterpart, because channel.ObfuscateGroupHeader returns the wire header and the group sender concatenates it with the ciphertext itself.",
       "snapshotSha": "43912cc926a9c67615726e8fa7066614602cea08"
     },
     {
