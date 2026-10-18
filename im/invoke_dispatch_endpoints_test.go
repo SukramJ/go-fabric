@@ -59,8 +59,9 @@ func (d *gateDispatcher) CommandTargets(p ConcreteCommandPath, authorize Command
 }
 
 func (d *gateDispatcher) InvokeAuthorized(ctx context.Context, p ConcreteCommandPath, fields any, authorize CommandAuthorizer) []InvokeResult {
-	var out []InvokeResult
-	for _, ep := range d.targets(p, authorize) {
+	targets := d.targets(p, authorize)
+	out := make([]InvokeResult, 0, len(targets))
+	for _, ep := range targets {
 		at := p
 		at.Endpoint, at.HasEndpoint = ep, true
 		out = append(out, d.Invoke(ctx, at, fields))
