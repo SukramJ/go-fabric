@@ -168,6 +168,7 @@ port `clock` landed (`[Unreleased]` in the changelog), removable in
 | `cluster/energy.CommodityTariffConfig.Now`, `energy.DeviceEnergyConfig.Now`, `energy.EvseConfig.Now` | the `Clock` field beside each |
 | `secure/mattercert.SystemTime` | `clock.System` (the `TimeSource` parameter stays: a `clock.Clock` satisfies it) |
 | `controller/ca.Config.Now` | `ca.Config.Clock` |
+| `controller/ble.ErrScannerClosed` (marked by brief BH) | none: a discovery on a closed scanner returns the stored devices without an error |
 
 A patch release (`v0.x.y`) never removes or renames a public identifier and
 never changes a signature. Deprecations may be *marked* in a patch release;

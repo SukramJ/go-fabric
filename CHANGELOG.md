@@ -17,6 +17,12 @@ Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5,
 - `transport/message.ProtocolHeader.MarshalPayload` and `message.ErrEncodeSecuredExtensions`: the checked protocol-header encoder, which refuses Secured Extensions as matter.js `MessageCodec.encodePayload` does (`ProtocolHeader.Marshal` is unchanged).
 - `controller/exchange.SendOptions.AckWaitAbort`: ends only the wait for the acknowledgement — the message is sent once, `Send` returns, and it is never retransmitted again (matter.js `MessageExchange` `abortAckWait`).
 - `secure/channel.ErrSourceNodeMismatch`: `EncryptGroup` refuses a sender node id that disagrees with the header's Source Node ID.
+- `controller/thread`: the Thread operational dataset and MeshCoP TLV codec of the commissioner, a port of matter.js `packages/protocol/src/thread` — `WalkTLVs`/`EncodeTLVs`, the MeshCoP `TLVType` table, `SecurityPolicy`, `DecodeDataset`/`DecodeDatasetHex`/`Encode` (byte-identical replay of a decoded dataset) and `Redact`.
+- `controller/ble.ListeningMeter`, the scan-time meter of a Central's `ListeningTime` (matter.js `BleListeningClock`); `Scanner.ForgetCommissioned` and `CommissionedIdentity` (matter.js `BleScanner.forgetCommissionedDevice`); `ble.ErrScanTransitionTimeout`.
+- `controller/ca.Config.DetectIntermediateCA`: a stored CA's ICAC presence decides the tier, as matter.js does when `generateIntermediateCert` is left undefined.
+- `bdx/otaimage`: `FileOptions.ChecksumType` and `FileOptions.SkipFullChecksum` for `ValidateFile`; `CreateWithChecksum` with `CreateOptions.FullFileChecksumType` (matter.js `OtaImageWriter.create`'s checksum result).
+- `bdx`: `SendOptions.StartOffset` (stated in the SendInit) and `Result.StartOffset`.
+- `secure/attestation.ErrCertificateTooLarge`.
 
 ### Fixed
 
@@ -27,7 +33,20 @@ Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5,
 - `im`: `EventLog.DropBuffered` persists the current numbering as the ceiling before it drops the events, so a restart continues right after the last event number instead of past the rest of the reserved epoch (matter.js `BaseEventStore.ts:62-67,141-147`).
 - `controller/exchange`: a BDX exchange caps its retransmission interval at 7.4 s (matter.js `MessageExchange.ts:63-77,1234-1251`); a duplicate of the message a pending BDX reply answers retransmits that reply at once instead of a standalone acknowledgement (`MessageExchange.ts:485-495,564-617`).
 - `controller/interaction`: the report assembler grows a list by a chunk at the list's length index, ignores a null chunk past the end, and resolves repeated non-list values of one path to the highest data version instead of dropping the attribute (matter.js `TlvArray.ts:146-150`, `AttributeDataDecoder.ts:337-343`); a StatusResponse Success in place of a data report is a `*StatusError` like any other status (`InteractionMessenger.ts:985-1000`); a write that does not fit one message, or a timed write whose WriteResponse might not, is refused with `ErrRequestTooLarge` before anything is sent, where an oversized message went out (`InteractionMessenger.ts:103-106,1335-1354,1388-1392`).
+- `controller/discovery`: TXT parameter keys match regardless of case, the first occurrence of a key winning, so a node announcing `sii`/`Sat` is no longer read with MRP defaults (matter.js `DnssdParameters.ts:27-46`).
+- `cluster/core`: a fail-safe re-arm can no longer carry the fail-safe past the cumulative limit; the limit expires it (matter.js `FailsafeTimer.ts:33-35`).
+- `controller/ca`: the ICAC-mismatch configuration error carries matter.js's message (`CertificateAuthority.ts:367-372`).
+- `groups`: `Manager.MulticastAddressFor` refuses group id 0 with `ErrInvalidGroupID` (matter.js `Groups.ts:98-99`).
+- `secure/mattercert`: `Decode` refuses a Matter-TLV operational certificate over 400 bytes before parsing (matter.js `OperationalBase.ts:19-28`).
+- `secure/attestation`: `LoadChainFiles` refuses a DAC or PAI over 600 bytes, which a device cannot serve without the segmented CertificateChainResponse (matter.js `DeviceCertification.ts:87-105`).
+- `controller/commissioner`: `NewFabric` gives an unset admin vendor id the test vendor 0xFFF1 and refuses one above 0xFFF4 instead of sending it in AddNOC (matter.js `FabricAuthority.ts:47,139-147`).
+- `bdx/otaimage`: `ValidateFile` with an expected checksum and no computed one reports a mismatch (matter.js `OtaImageReader.ts:89-93`).
+- `controller/ble`: a scan start or stop that does not settle within 10 s fails with `ErrScanTransitionTimeout`; scan transitions run in the order queued, so `Close`'s stop is the last; a discovery on a closed scanner returns the stored devices without scanning (matter.js `BleScanner.ts:110-114,160-225,654-673`).
 - `secure/mattercert`: the X.509 TBSCertificate rebuilt for signature verification now emits the extensions in their TLV arrival order and writes an explicit `pathLenConstraint` of 0 when the certificate carries one. Both mirror matter.js (`Certificate.ts` `extensionsToAsn1`, `X509.ts` `BasicConstraints`) and chip (`CHIPCertToX509.cpp`). Before, the order was fixed to tag order and a zero path-len was dropped, so every Amazon (Alexa) and SmartThings root failed `AddTrustedRootCertificate` with `RCAC self-signature invalid: mattercert: signature invalid`, and their ICACs would have failed `AddNOC`. The matter.js fixtures of both commissioners (`TestCertificates.ts`) are now parity cases: TBS bytes, root self-signature and the root → ICAC → NOC chain.
+
+### Deprecated
+
+- `controller/ble.ErrScannerClosed`: no call returns it any more (a discovery on a closed scanner returns the stored devices).
 
 ## [0.7.2] — 2026-10-18
 
