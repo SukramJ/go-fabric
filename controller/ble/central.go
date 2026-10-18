@@ -18,7 +18,7 @@ type Peripheral struct {
 
 // Central is what a platform BLE stack offers the commissioner: the scan
 // of Matter advertisements — matter.js BleScannerClient
-// (BleScanner.ts:41-64) — and the GATT connection to one peripheral.
+// (common/BleScanner.ts:41-64) — and the GATT connection to one peripheral.
 // Implementations: the BlueZ module (phase 13) and ble/bletest.
 type Central interface {
 	// SetDiscoveryCallback installs the receiver of every advertisement
@@ -26,7 +26,7 @@ type Central interface {
 	// Matter service UUID (btp.ServiceUUID).
 	SetDiscoveryCallback(func(p Peripheral, serviceData []byte))
 	// StartScanning starts the scan. It is asked again while a scan runs,
-	// so a radio that stopped on its own resumes (BleScanner.ts:186-189).
+	// so a radio that stopped on its own resumes (common/BleScanner.ts:186-189).
 	StartScanning(ctx context.Context) error
 	// StopScanning stops the scan.
 	StopScanning(ctx context.Context) error
@@ -36,7 +36,7 @@ type Central interface {
 }
 
 // Reachability is a [Central] that can lose access to a peripheral it
-// reported, such as one routing through proxies (BleScanner.ts:46-52).
+// reported, such as one routing through proxies (common/BleScanner.ts:46-52).
 // A Central without it keeps every discovered peripheral available.
 type Reachability interface {
 	IsPeripheralReachable(address string) bool
@@ -44,7 +44,7 @@ type Reachability interface {
 
 // ListeningClock is a [Central] that reports how long it listened: its
 // radio scanned and it reported every advertisement it received
-// (BleScanner.ts:54-63). A record states that its device went silent
+// (common/BleScanner.ts:54-63). A record states that its device went silent
 // only when its age is measured in this time.
 type ListeningClock interface {
 	// ListeningTime is the total time listened so far.

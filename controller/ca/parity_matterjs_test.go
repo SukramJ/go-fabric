@@ -54,7 +54,7 @@ func TestParityCertificateFields(t *testing.T) {
 	}{
 		{"RCAC", c.RootCert(), true, mattercert.KeyUsageKeyCertSign | mattercert.KeyUsageCRLSign, nil},
 		{"ICAC", c.ICACCert(), true, mattercert.KeyUsageKeyCertSign | mattercert.KeyUsageCRLSign, nil},
-		{"NOC", noc, false, 0x0001 /* digitalSignature, base.ts:11 */, []uint8{2, 1}},
+		{"NOC", noc, false, 0x0001 /* digitalSignature, definitions/base.ts:11 */, []uint8{2, 1}},
 	}
 	for _, r := range rows {
 		cert := decode(t, r.raw)

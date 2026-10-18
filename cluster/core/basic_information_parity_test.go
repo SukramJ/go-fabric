@@ -505,7 +505,7 @@ func TestParityMatterJS_BasicInfoServer_AsyncObserverMechanism_Unsupported(t *te
 // until the session is torn down.
 //
 // Source-Origin: derived from matter.js packages/model/src/standard/
-// elements/basic-information.element.ts:51 (SerialNumber, type string,
+// elements/basic-information.element.ts:75 (SerialNumber, type string,
 // conformance "O", constraint "max 32") + chip
 // src/app/clusters/basic-information/basic-information.cpp attribute
 // non-empty guard. go-fabric mirrors the non-empty contract: when

@@ -185,7 +185,7 @@ var timedInvoke = interaction.InvokeOptions{Timed: true}
 // revokeWindow sends RevokeCommissioning; open is false when the node
 // answered WindowNotOpen — the error #revokeStaleCommissioningWindow
 // swallows: Status Failure with cluster status WindowNotOpen
-// (CommissioningClient.ts:538-549; PairedNode.ts:1390-1400).
+// (CommissioningClient.ts:576-587; PairedNode.ts:1390-1400).
 func revokeWindow(ctx context.Context, n *client.Node) (open bool, err error) {
 	_, err = n.Invoke(ctx, adminCommissioningPath(admincommdef.CmdRevokeCommissioning), nil, timedInvoke)
 	var se *interaction.StatusError

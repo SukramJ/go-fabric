@@ -34,8 +34,8 @@ var (
 	// key set starts in the future, so there is no current key to send
 	// with. Mirrors matter.js GroupKeyNotStartedError
 	// (packages/protocol/src/groups/errors.ts:21-26), thrown by
-	// KeySets.currentKeyForId (KeySets.ts:126-132). Like [ErrNoKey] — its
-	// sibling GroupKeySetMissingError (errors.ts:18-19) for a group
+	// KeySets.currentKeyForId (KeySets.ts:108-114). Like [ErrNoKey] — its
+	// sibling GroupKeySetMissingError (groups/errors.ts:18-19) for a group
 	// GroupKeyMap does not map, or maps to a key set the fabric does not
 	// hold — it is a NoUsableGroupKeyError: provisioning that is
 	// incomplete or not yet in effect.

@@ -46,7 +46,7 @@ var (
 	ErrExchangeClosed = errors.New("exchange: exchange closed")
 
 	// ErrSessionClosed is returned by a call on a closed session
-	// (matter.js SessionClosedError, errors.ts:35).
+	// (matter.js SessionClosedError, protocol/errors.ts:35).
 	ErrSessionClosed = errors.New("exchange: session closed")
 
 	// ErrUnexpectedMessage is a reply the exchange did not expect — an

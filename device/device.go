@@ -645,7 +645,7 @@ func (d *Device) clientClusters() []uint32 {
 
 // OnChanged calls fn with the ids of the attributes of the device's
 // clusterID server that changed — matter.js's
-// `events.<cluster>.<attribute>$Changed` (Endpoint.ts:456), delivered
+// `events.<cluster>.<attribute>$Changed` (endpoint/Endpoint.ts:456), delivered
 // through the server's [contract.AttributeChangeNotifier], or through its
 // [contract.ChangeNotifier] with every attribute it reports. It returns
 // the unsubscribe function; a cluster the device does not mount, or whose

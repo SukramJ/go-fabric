@@ -171,7 +171,7 @@ func TestParityStatusReport(t *testing.T) {
 	}
 	pu := &PeerUnresponsiveError{Waited: time.Second}
 	pm := &PeerMessageMissingError{Timeout: time.Second}
-	// RetransmissionLimitReachedError (errors.ts:17) is a
+	// RetransmissionLimitReachedError (protocol/errors.ts:17) is a
 	// NoResponseTimeoutError, not a transient peer error.
 	if errors.Is(ErrRetransmissionLimit, ErrTransient) {
 		t.Fatal("ErrRetransmissionLimit is transient")

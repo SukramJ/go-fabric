@@ -304,7 +304,7 @@ func buildFabric(c *ca.CA, cfg FabricConfig, ipk []byte, key *ecdsa.PrivateKey, 
 }
 
 // AddressOf is the peer address of nodeID on the fabric — matter.js
-// Fabric.addressOf (Fabric.ts:482-484).
+// Fabric.addressOf (Fabric.ts:505-507).
 func (f *Fabric) AddressOf(nodeID uint64) handshake.PeerAddress {
 	return handshake.PeerAddress{FabricIndex: f.FabricIndex, NodeID: nodeID}
 }

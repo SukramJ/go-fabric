@@ -93,7 +93,7 @@ func (n *Node) OTAProvider() *mattercore.OTAProvider { return n.otaProvider }
 // placeOTAProvider turns the provider's assembled endpoint from a bridged
 // one into a child of the root, the Aggregator's sibling: matter.js adds
 // an OtaProviderEndpoint to the server node, not to the aggregator
-// (ServerNode parts; the endpoint file ota-provider.ts:57-64). Assembled as
+// (ServerNode parts; the endpoint file src/endpoints/ota-provider.ts:57-64). Assembled as
 // a component, it serves its device type alone on its Descriptor and no
 // BridgedDeviceBasicInformation.
 func placeOTAProvider(topo *endpoint.Topology) {

@@ -2021,7 +2021,7 @@ func (o *OperationalCredentials) handleUpdateNOC(ctx context.Context, fields any
 	// instance. The old <compressedID>-<oldNodeID> record must be
 	// withdrawn explicitly — a republish alone leaves it answering
 	// until TTL. Mirrors matter.js Fabric.ts:548 (nodeId lifted from
-	// the new NOC) + DeviceAdvertiser.ts:65-76 (close the fabric's
+	// the new NOC) + DeviceAdvertiser.ts:96-107 (close the fabric's
 	// advertisement when nodeId changed, then re-advertise).
 	if noc.Subject.MatterNodeID != fab.NodeID {
 		if err := o.store.UpdateFabricNodeID(ctx, idx, noc.Subject.MatterNodeID); err != nil {
