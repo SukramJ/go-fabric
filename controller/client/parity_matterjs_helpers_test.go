@@ -129,15 +129,18 @@ func (cp *clientPair) run(t *testing.T, fn func(ctx context.Context) error) {
 // advanceStep is the step of [clientPair.advance].
 const advanceStep = 2 * time.Second
 
-// advance moves the site's fake clock by d in steps of advanceStep, the
+// advance moves the site's fake clock by d in steps of advanceStep (or a
+// sixtieth of d when that is longer), the
 // site settling after each, so the work a step's timers start runs before
 // the next — MockTime.advance stepping the timers in order. (Moving
 // deadline by deadline under Site.Run is too slow for minutes of fake
 // time; a single jump fires an exchange's timeouts before its answers.)
 func (cp *clientPair) advance(t *testing.T, d time.Duration) {
 	t.Helper()
+	// A long advance takes at most about sixty steps.
+	unit := max(advanceStep, d/60)
 	for d > 0 {
-		step := min(d, advanceStep)
+		step := min(d, unit)
 		cp.site.Fake().Advance(step)
 		d -= step
 		if err := cp.site.Settle(parityCtx(t)); err != nil {
