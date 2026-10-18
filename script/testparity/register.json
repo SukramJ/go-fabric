@@ -2285,8 +2285,30 @@
     },
     {
       "path": "packages/node/test/node/PeerDescriptorTest.ts",
-      "status": "planned",
-      "reason": "The controller's persisted peer descriptor: session parameters, intervals, migrated older records.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestPeerDescriptorRecordParity",
+        "controller/client:TestPeerDescriptorParity",
+        "controller/peer:TestAddKnownPeerMergeAndCoalescedSave"
+      ],
+      "missing": [
+        "bounds paths per invoke by the negotiated session rather than the reported attribute",
+        "selects TCP for the first connect after a restart from the stored session parameters",
+        "moves a set of DNS-SD intervals to the advertised intervals",
+        "keeps a full set as the reported session parameters",
+        "keeps advertised intervals already stored under the new key",
+        "keeps reported session parameters already stored under the new key",
+        "persist with the next write of the behavior",
+        "do not return after the migrated value is cleared",
+        "drops DNS-SD intervals beyond what DNS-SD can advertise",
+        "keeps a peer marked TCP-unsupported across a restart until a session reports TCP support",
+        "keeps advertised session intervals while the service holds no TXT record",
+        "drops an advertised session interval the device no longer advertises",
+        "take the spec default for a value the session left out",
+        "fall back to BasicInformation before any session reported",
+        "stay as reported when TCP is marked unsupported"
+      ],
+      "reason": "What the commissioning record keeps of the peer's descriptor (session intervals above the DNS-SD maximum, a vendor-specific device type, the reported parameters without fallbacks; controller/client:TestPeerDescriptorRecordParity) and what the controller restores into the protocol peer after a restart (later-session intervals winning over the advertised ones, the stored parameters before the first session, only what the device sent; TestPeerDescriptorParity on fabrictest, the record set through client.UpdateRecord where matter.js assigns the descriptor) are ported; a known peer's reported parameters and discovery data kept over a later descriptor is controller/peer:TestAddKnownPeerMergeAndCoalescedSave. Missing: paths per invoke bounded by the session against BasicInformation and the BasicInformation fallback before any session (the Go peer takes no BasicInformation input; the descriptor is not assignable); TCP (markTcpUnsupported, the transport selection, the descriptor flag — no TCP client); the migration of the legacy sessionParameters storage key (Go never stored it); the advertised intervals kept or dropped by DNS-SD changes as the record sees them (covered at the peer level by TestServiceChangeUpdatesDiscoveryData, but not the empty-TXT, T=4 and no-TXT steps nor through fabrictest, whose devices' TXT the test cannot change).",
       "snapshotSha": "5ee3894c828d2d9058e8634f79050b767cd07446"
     },
     {
