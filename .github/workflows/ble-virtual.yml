@@ -31,7 +31,11 @@ env:
 jobs:
   ble-virtual:
     name: BLE over btvirt (matter.js peripheral, pair --ble)
-    runs-on: ubuntu-24.04
+    # The arm64 image: the x86-64 ubuntu-24.04 runner's 6.17 Azure kernel is
+    # built with "# CONFIG_BT is not set" (no Bluetooth stack, no hci_vhci;
+    # run 39099608818), the arm64 one with CONFIG_BT=m and
+    # CONFIG_BT_HCIVHCI=m (probe run 39099728809, 2026-10-18).
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,13 +57,12 @@ jobs:
           sudo apt-get update
           # make and g++: packages/nodejs-ble/README.md (node-gyp builds bleno and noble).
           sudo apt-get install -y --no-install-recommends bluez bluez-test-tools make g++
-          # The runner's Azure kernel ships hci_vhci (and the Bluetooth stack)
-          # in its extra modules only (run 39099404692: "Module hci_vhci not
-          # found in directory /lib/modules/…-azure"). Without them the script
-          # ends "environment".
-          sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)" || true
+          # The Azure kernel's Bluetooth modules may sit in its extra modules.
+          # Without hci_vhci the script ends "environment".
           grep -E '^(# )?CONFIG_BT(_HCIVHCI)?[= ]' "/boot/config-$(uname -r)" || true
-          find "/lib/modules/$(uname -r)" \( -name 'hci_vhci.ko*' -o -name 'bluetooth.ko*' \) || true
+          if ! find "/lib/modules/$(uname -r)" -name 'hci_vhci.ko*' | grep -q .; then
+            sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)" || true
+          fi
           bluetoothctl --version
           command -v btvirt || dpkg -L bluez-test-tools | grep /bin/
           node --version
