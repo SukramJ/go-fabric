@@ -11,8 +11,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | status | files |
 | --- | ---: |
 | ported | 9 |
-| partial | 97 |
-| planned | 131 |
+| partial | 98 |
+| planned | 130 |
 | excluded | 87 |
 | total | 324 |
 
@@ -108,7 +108,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/ota](#protocoltestota) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/peer](#protocoltestpeer) | 14 | 0 | 8 | 3 | 3 |
 | [protocol/test/protocol](#protocoltestprotocol) | 9 | 1 | 4 | 4 | 0 |
-| [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 2 | 1 | 0 |
+| [protocol/test/protocol/interaction](#protocoltestprotocolinteraction) | 3 | 0 | 3 | 0 | 0 |
 | [protocol/test/securechannel](#protocoltestsecurechannel) | 2 | 0 | 0 | 1 | 1 |
 | [protocol/test/session](#protocoltestsession) | 4 | 0 | 4 | 0 | 0 |
 | [protocol/test/session/secure](#protocoltestsessionsecure) | 2 | 0 | 2 | 0 | 0 |
@@ -869,7 +869,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | --- | ---: | --- | --- | --- |
 | AttributeDataDecoderTest.ts | 1234 | partial | `controller/interaction:TestAttributeDataDecoderChunkedArrays`<br>`controller/interaction:TestAttributeDataDecoderChipToolCaptures`<br>`controller/interaction:TestAttributeDataDecoderUnknownValues`<br>`controller/interaction:TestAttributeDataDecoderDuplicates`<br>`controller/interaction:TestAttributeDataDecoderNormalize`<br>`controller/interaction:TestAttributeDataDecoderUnknownCluster` | Chunked lists with indexed add, delete and modify, the chip-tool captures, unknown values, adjacent duplicates, grouping with tag compression and unknown-cluster globals are ported through the schema-blind controller assembler (values compared as TLV nodes, attribute names not asserted); the non-adjacent duplicate case is missing because it tests the deprecated normalizeAttributeData Map grouping (AttributeDataDecoder.ts:162-181), while the Go assembler mirrors InputChunk, which emits one value per adjacent group. Missing: “preserves insertion order and deduplicates when same attribute appears twice with another attribute in between”. |
 | AttributeDataEncoderTest.ts | 362 | partial | `im:TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath`<br>`im:TestAttributeDataEncoderFieldGuarantees`<br>`bridge:TestAttributeDataEncoderChunkArray` | The isUrgent strip, the exactly-one-of data/status guarantee (by construction of the Go report types, asserted on the wire) and list chunking through bridge's splitter are ported; tag compression is missing because matter.js does not use compressAttributeDataReportTags on its wire (AttributeDataEncoder.ts:196-201) and the Go encoder has no counterpart. Missing: “tag compress with dataVersion handling”. |
-| EventDataDecoderTest.ts | 362 | planned | — | Normalising and decoding event reports, including unknown events. |
+| EventDataDecoderTest.ts | 362 | partial | `controller/interaction:TestEventDataDecoderNormalize`<br>`controller/interaction:TestEventDataDecoderDecode`<br>`controller/interaction:TestEventDataDecoderUnknownEvent` | Decoding known and unknown events with one event per path is ported through the controller assembler (data as TLV nodes, event names not asserted); the two multiple-events cases are missing because their expectation is the deprecated normalizeEventData grouping by path, while the Go report is InputChunk's flat event stream (InputChunk.ts:336-354). Missing: “normalize data with all paths given for multiple events”; “normalize and decode data with all paths given for multiple events”. |
 
 ## protocol/test/securechannel
 
@@ -1201,10 +1201,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `ExchangeManagerTest.ts` — The exchange manager: peer loss, inbound group and secure messages, unadopted unsecured sessions.
 - `MessageChannelTest.ts` — A message channel reporting a changed address after a socket swap, and releasing its transport channel.
 - `MessageExchangeTest.ts` — The message exchange: peer-loss declaration, unacked messages, retransmission and close.
-
-### protocol/test/protocol/interaction
-
-- `EventDataDecoderTest.ts` — Normalising and decoding event reports, including unknown events.
 
 ### protocol/test/securechannel
 

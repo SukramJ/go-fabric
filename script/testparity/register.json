@@ -4099,8 +4099,17 @@
     },
     {
       "path": "packages/protocol/test/protocol/interaction/EventDataDecoderTest.ts",
-      "status": "planned",
-      "reason": "Normalising and decoding event reports, including unknown events.",
+      "status": "partial",
+      "go": [
+        "controller/interaction:TestEventDataDecoderNormalize",
+        "controller/interaction:TestEventDataDecoderDecode",
+        "controller/interaction:TestEventDataDecoderUnknownEvent"
+      ],
+      "missing": [
+        "normalize data with all paths given for multiple events",
+        "normalize and decode data with all paths given for multiple events"
+      ],
+      "reason": "Decoding known and unknown events with one event per path is ported through the controller assembler (data as TLV nodes, event names not asserted); the two multiple-events cases are missing because their expectation is the deprecated normalizeEventData grouping by path, while the Go report is InputChunk's flat event stream (InputChunk.ts:336-354).",
       "snapshotSha": "5fdb16df8de7ba78594571c7ba7822ade17ab003"
     },
     {
