@@ -6,6 +6,7 @@ package client_test
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"net"
 	"net/netip"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	basicinfo "github.com/SukramJ/go-fabric/cluster/spec/basicinformation"
+	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/controller/attestation"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/client"
@@ -29,8 +31,10 @@ import (
 	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/controller/interaction"
 	"github.com/SukramJ/go-fabric/controller/peer"
+	"github.com/SukramJ/go-fabric/endpoint"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
+	"github.com/SukramJ/go-fabric/node"
 	"github.com/SukramJ/go-fabric/transport/udp"
 )
 
@@ -409,4 +413,100 @@ func ids(nodes []*client.Node) []string {
 		out = append(out, n.ID())
 	}
 	return out
+}
+
+// The registry's live harness: a node.Node with one bridged plug in
+// process on a loopback socket and the system clock, and the controller
+// parts the harness wires around it. (TestLiveClientNode runs on a
+// fabrictest pair instead, live_test.go.)
+
+const (
+	liveFabricID     uint64 = 0x0000_0000_0000_0F0D
+	liveController   uint64 = 112233
+	liveNode         uint64 = 0x0000_0000_0000_4323
+	liveDiscriminate uint16 = 3840
+	testPasscode     uint32 = 20202021
+)
+
+// plug is a bridged OnOffPlugInUnit holding an onoff.Server.
+type plug struct{ srv *onoff.Server }
+
+func (p *plug) Spec() endpoint.Spec {
+	return endpoint.Spec{
+		StableKey: endpoint.StringKey("plug:1"), DeviceAddress: "plug:1", ChannelAddress: "plug:1:0",
+		DeviceType: onoff.DeviceTypeOnOffPlugInUnit, FriendlyName: "plug", Source: p,
+	}
+}
+
+func (p *plug) MatterDeviceType() uint16 { return onoff.DeviceTypeOnOffPlugInUnit }
+
+func (p *plug) MatterClusterServers() []contract.ClusterServer {
+	return []contract.ClusterServer{p.srv}
+}
+
+// fakeMDNS is an mDNS socket that sends nowhere and receives what the test
+// injects.
+type fakeMDNS struct{ out chan mdns.QueryResponse }
+
+func (f *fakeMDNS) Send([]byte) error                    { return nil }
+func (f *fakeMDNS) Responses() <-chan mdns.QueryResponse { return f.out }
+func (f *fakeMDNS) Close() error                         { return nil }
+
+type resolverFunc func(ctx context.Context, cfid [8]byte, nodeID uint64) ([]*net.UDPAddr, error)
+
+func (f resolverFunc) ResolveOperational(ctx context.Context, cfid [8]byte, nodeID uint64) ([]*net.UDPAddr, error) {
+	return f(ctx, cfid, nodeID)
+}
+
+func discardLog() *slog.Logger { return slog.New(slog.DiscardHandler) }
+
+// liveNodeAt builds a node with one plug on the database at path, the
+// controller's address as its operational resolver's answer.
+func liveNodeAt(t *testing.T, path string, controllerAddr func() *net.UDPAddr) (*node.Node, *onoff.Server) {
+	t.Helper()
+	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	n, err := node.New(node.Config{
+		Network:            node.Network{Listen: "127.0.0.1:0", PreferIPv4: true},
+		Commissioning:      node.Commissioning{Passcode: testPasscode, Discriminator: liveDiscriminate, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
+		ProductDescription: node.ProductDescription{VendorID: 0xFFF1, ProductID: 0x8001},
+		BasicInformation: node.BasicInformation{
+			VendorName: "go-fabric test", ProductName: "client live test", NodeLabel: "live node", SerialNumber: "CL-1",
+			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
+		},
+		Store:      node.Store{DB: db},
+		Advertiser: mdns.NewNoop(),
+		Logger:     discardLog(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Aggregator().Add(context.Background(), &plug{srv: srv}); err != nil {
+		t.Fatal(err)
+	}
+	n.Bridge().AttachOperationalResolver(resolverFunc(func(context.Context, [8]byte, uint64) ([]*net.UDPAddr, error) {
+		return []*net.UDPAddr{controllerAddr()}, nil
+	}))
+	if err := n.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = n.Stop(context.Background()) })
+	return n, srv
+}
+
+// live is the registry harness's node: one plug, on a loopback socket.
+type live struct {
+	node   *node.Node
+	srv    *onoff.Server
+	dbPath string
+	addr   *net.UDPAddr
+	reg    *interaction.Subscriptions
+	plugEP uint16
 }

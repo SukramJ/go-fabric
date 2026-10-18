@@ -5,16 +5,13 @@ package peer_test
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"net"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/miekg/dns"
-	_ "modernc.org/sqlite"
 
 	"github.com/SukramJ/go-fabric/bridge/bridgetest"
 	"github.com/SukramJ/go-fabric/clock"
@@ -22,6 +19,7 @@ import (
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/controller/handshake"
 	"github.com/SukramJ/go-fabric/controller/peer"
+	"github.com/SukramJ/go-fabric/fabrictest"
 	"github.com/SukramJ/go-fabric/im"
 	"github.com/SukramJ/go-fabric/mdns"
 	"github.com/SukramJ/go-fabric/node"
@@ -86,42 +84,25 @@ func eventually(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-// startNode starts an uncommissioned node on loopback, as
-// controller/handshake's tests do, advertising with adv (nil: nothing) and
-// listening on listen.
+// startNode starts an uncommissioned node with the system clock on a
+// socket listening on listen — a fabrictest device on loopback, as these
+// tests drive a peer set of their own on a socket — advertising with adv
+// (nil: nothing).
 func startNode(t *testing.T, adv mdns.Advertiser, listen string) (*node.Node, *net.UDPAddr) {
 	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "node.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	n, err := node.New(node.Config{
-		Network:       node.Network{Listen: listen, PreferIPv4: listen == "127.0.0.1:0"},
-		Advertiser:    adv,
-		Commissioning: node.Commissioning{Passcode: nodePasscode, Discriminator: 3840, PBKDFIterations: 1000, Salt: []byte("SPAKE2P Key Salt")},
-		ProductDescription: node.ProductDescription{
-			VendorID: 0xFFF1, ProductID: 0x8001,
-		},
-		BasicInformation: node.BasicInformation{
+	site := fabrictest.NewSite(t, fabrictest.Options{Loopback: true, Clock: clock.System{}})
+	d := site.AddDevice(fabrictest.Topology{Configure: func(c *node.Config) {
+		c.Network = node.Network{Listen: listen, PreferIPv4: listen == "127.0.0.1:0"}
+		if adv != nil {
+			c.Advertiser = adv
+		}
+		c.Commissioning.Passcode = nodePasscode
+		c.BasicInformation = node.BasicInformation{
 			VendorName: "go-fabric test", ProductName: "peer test", NodeLabel: "peer node", SerialNumber: "PEER-1",
 			HardwareVersion: 1, HardwareVersionString: "1", SoftwareVersion: 1, SoftwareVersionString: "1",
-		},
-		Store:  node.Store{DB: db},
-		Logger: slog.New(slog.DiscardHandler),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := n.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = n.Stop(context.Background()) })
-	addr, err := net.ResolveUDPAddr("udp", n.Bridge().LocalAddr())
-	if err != nil {
-		t.Fatal(err)
-	}
-	return n, addr
+		}
+	}})
+	return d.Node(), d.Addr()
 }
 
 // commissioned starts a node, commissions it with the test commissioner
