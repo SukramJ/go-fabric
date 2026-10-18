@@ -10,6 +10,10 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-10-18
+
+Milestone 2, phase 14 ([the roadmap](./docs/roadmap.md), [concept v4](./docs/concept-v4-test-foundation.md)): the matter.js pin lifted from `0ceb202d` to `862ad75f` (57 upstream commits; the one model change is BridgedNode composing its full family, the 41 upstream fixes classified in `notes/parity/pin-lifts.md` — 12 register entries), two new standing guards (the test-porting register and the citation check), and the PartsList change that follows from the model. No API change; the store schema is unchanged.
+
 ### Added
 
 - `script/testparity`: the matter.js test-porting register. A committed snapshot of every `*Test.ts` under matter.js's `packages/node/test` and `packages/protocol/test` at the schema pin (324 files; path, lines, blob SHA-1, top-level `describe` names; `make testparity-snapshot`), a register that gives each one a status — `ported`, `partial` with the `it` cases not covered, `planned`, or `excluded` with a class (`controller-stage` until a milestone, `js-runtime-only`, `joint-fabric`, `device-ble-thread`, `test-infrastructure`) — and the Go tests it maps to, and the generated page `notes/parity/matterjs_tests.md` (`make testparity`). `make testparity-check` and the CI job `testparity` fail on a snapshot file without an entry or an entry without a file, a Go test reference that does not resolve, a `ported`, `partial` or `excluded` verdict whose matter.js file changed, a stale page, and a `planned` count off `testparityPlannedRatchet` (134 at the initial fill: 7 ported, 96 partial, 134 planned, 87 excluded). No library code changes.
@@ -18,6 +22,7 @@ pseudo-version of `main`.
 
 ### Changed
 
+- `parity/schema.json`: the matter.js pin is `862ad75f` (2026-10-17). Regenerated `schema/`, `cluster/spec/*/definition_gen.go` and `device/*_gen.go` move only their provenance line, except BridgedNode (`composition: "full-family"`, matter.js #4735). `docs/chip-datamodel-crosscheck.md` is regenerated against the new snapshot; the CHIP data model cross-check stays green with no new acknowledgement.
 - `endpoint`: a bridged node's Descriptor PartsList now lists every descendant, not only its direct parts — BridgedNode composes its full family since the matter.js pin `862ad75f` (matter.js #4735, Device Library 1.6.1 § 2.5.6). A bridged endpoint whose `Spec.Parts` have parts of their own reports the nested ones too; a part's own PartsList still lists its direct children, and the root's and the aggregator's lists are unchanged. The composition is read from the schema at run time.
 
 ## [0.7.0] — 2026-10-18
@@ -4100,7 +4105,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/SukramJ/go-fabric/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/SukramJ/go-fabric/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/SukramJ/go-fabric/compare/v0.5.4...v0.6.0
 [0.5.4]: https://github.com/SukramJ/go-fabric/compare/v0.5.3...v0.5.4
