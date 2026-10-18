@@ -208,6 +208,7 @@ func (c *Conn) serve(handler Handler) {
 				c.logger.Warn("matter.tcp.frame",
 					slog.String("conn", c.String()),
 					slog.String("err", ferr.Error()))
+				c.awaitDelivery(prev)
 				c.close(ferr)
 				return
 			}
@@ -217,10 +218,26 @@ func (c *Conn) serve(handler Handler) {
 				c.logger.Debug("matter.tcp.read",
 					slog.String("conn", c.String()),
 					slog.String("err", err.Error()))
+				c.awaitDelivery(prev)
 				c.close(err)
 			}
 			return
 		}
+	}
+}
+
+// awaitDelivery holds a close the peer caused (end of stream, read
+// error, framing violation) until every message completed before it
+// has reached the handler, so the close is observed after them. A
+// local Close cuts the wait. Mirrors matter.js
+// packages/protocol/src/transport/tcp/TcpChannel.ts:85-98 (the close
+// follows the last chunk's #handleData) and :281-296 (a completed
+// message is delivered within #extractMessages, before the bad
+// header's close); the iterator drains its queue first (:183-185).
+func (c *Conn) awaitDelivery(last <-chan struct{}) {
+	select {
+	case <-last:
+	case <-c.closed:
 	}
 }
 
