@@ -10,8 +10,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 28 |
-| partial | 102 |
+| ported | 29 |
+| partial | 101 |
 | planned | 107 |
 | excluded | 87 |
 | total | 324 |
@@ -90,7 +90,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/action](#protocoltestaction) | 1 | 0 | 0 | 0 | 1 |
 | [protocol/test/action/client](#protocoltestactionclient) | 5 | 1 | 0 | 3 | 1 |
 | [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 1 | 1 | 0 |
-| [protocol/test/action/request](#protocoltestactionrequest) | 6 | 0 | 1 | 4 | 1 |
+| [protocol/test/action/request](#protocoltestactionrequest) | 6 | 1 | 0 | 4 | 1 |
 | [protocol/test/action/response](#protocoltestactionresponse) | 4 | 0 | 0 | 0 | 4 |
 | [protocol/test/advertisement](#protocoltestadvertisement) | 2 | 1 | 1 | 0 | 0 |
 | [protocol/test/bdx](#protocoltestbdx) | 2 | 1 | 1 | 0 | 0 |
@@ -688,7 +688,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | InvokeTest.ts | 182 | planned | — | Building an invoke request: command fields, commandRef rules for several commands, timed and suppress options. |
-| ReadAttributePathsTest.ts | 62 | partial | `im:TestPathParity_InsertionOrderPreserved`<br>`im:TestPathParity_DedupeByFullKey` | Insertion order and dedupe by the full key are ported; the wildcard-path dedupe cases are not. Missing: “dedupes cluster-level wildcard paths (no attributeId)”; “dedupes endpoint-level wildcard paths (no clusterId or attributeId)”; “treats cluster wildcard and specific attribute as distinct”. |
+| ReadAttributePathsTest.ts | 62 | ported | `im:TestPathParity_InsertionOrderPreserved`<br>`im:TestPathParity_DedupeByFullKey`<br>`im:TestReadAttributePathsWildcardDedupe` | Insertion order and dedupe by the full key are ported; the wildcard-path dedupe cases run against im.DedupAttributePaths, the Go counterpart of Read.AttributePaths. |
 | ReadTest.ts | 311 | planned | — | Building a read request: attribute and event paths, wildcards, fabric filtering by default, data version filters. |
 | SpecifierTest.ts | 163 | excluded | `js-runtime-only` | Resolution of TypeScript cluster, attribute and command specifiers by name or object. |
 | SubscribeTest.ts | 341 | planned | — | Building a subscribe request: keepSubscriptions default, intervals, event paths. |

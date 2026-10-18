@@ -2458,17 +2458,13 @@
     },
     {
       "path": "packages/protocol/test/action/request/ReadAttributePathsTest.ts",
-      "status": "partial",
+      "status": "ported",
       "go": [
         "im:TestPathParity_InsertionOrderPreserved",
-        "im:TestPathParity_DedupeByFullKey"
+        "im:TestPathParity_DedupeByFullKey",
+        "im:TestReadAttributePathsWildcardDedupe"
       ],
-      "missing": [
-        "dedupes cluster-level wildcard paths (no attributeId)",
-        "dedupes endpoint-level wildcard paths (no clusterId or attributeId)",
-        "treats cluster wildcard and specific attribute as distinct"
-      ],
-      "reason": "Insertion order and dedupe by the full key are ported; the wildcard-path dedupe cases are not.",
+      "reason": "Insertion order and dedupe by the full key are ported; the wildcard-path dedupe cases run against im.DedupAttributePaths, the Go counterpart of Read.AttributePaths.",
       "snapshotSha": "33b289ded47eccab872ed9c616cb84b8c291914b"
     },
     {
