@@ -336,7 +336,7 @@ func decodeGroup(entries []*im.AttributeReport) (spec.Node, error) {
 // bestDuplicate picks, among several entries of one path none of which
 // is a list action or an array, the one with the highest data version —
 // the first of them on a tie. Mirrors matter.js
-// packages/protocol/src/interaction/AttributeDataDecoder.ts:337-343
+// packages/protocol/src/interaction/AttributeDataDecoder.ts:310-344
 // (decodeAttributeValueWithSchema for an attribute that is no list); the
 // schema-blind assembler takes "no list" from the values' TLV type.
 func bestDuplicate(entries []*im.AttributeReport) (*im.AttributeReport, bool) {

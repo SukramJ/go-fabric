@@ -1489,7 +1489,7 @@
   },
   {
     "file": "controller/exchange/exchange.go",
-    "line": 52,
+    "line": 53,
     "citation": "MessageExchange.ts:1272-1273",
     "resolved": "packages/protocol/src/protocol/MessageExchange.ts",
     "identifier": "suppressPeerLoss",
@@ -1666,15 +1666,6 @@
     "identifier": "reportStarted",
     "nearest": 112,
     "occurrences": 1
-  },
-  {
-    "file": "controller/interaction/report.go",
-    "line": 449,
-    "citation": "InteractionMessenger.ts:914-931",
-    "resolved": "packages/protocol/src/interaction/InteractionMessenger.ts",
-    "identifier": "DataReport",
-    "nearest": 974,
-    "occurrences": 12
   },
   {
     "file": "controller/interaction/report_internal_test.go",

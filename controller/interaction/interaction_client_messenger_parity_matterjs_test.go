@@ -108,7 +108,7 @@ func TestInteractionClientMessengerRead(t *testing.T) {
 
 // TestInteractionClientMessengerSubscribe ports "subscribes attributes"
 // (InteractionClientMessengerTest.ts:199-237): the request, the priming
-// report answered with Success, the SubscribeResponse finalising it.
+// report answered with Success, the subscribe response finalising it.
 func TestInteractionClientMessengerSubscribe(t *testing.T) {
 	t.Parallel()
 	t.Run("subscribes attributes", func(t *testing.T) {
