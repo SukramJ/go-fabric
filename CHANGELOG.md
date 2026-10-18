@@ -10,6 +10,8 @@ pseudo-version of `main`.
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-10-18
+
 Milestone 2, phase 16 ([concept v4](./docs/concept-v4-test-foundation.md) §A.5, brief BH): the port of matter.js `packages/protocol/test` at `862ad75f` — one `*_parity_matterjs_test.go` per matter.js file, the register `script/testparity/register.json` naming every Go test and every `it` still missing. The ports found the gaps below; each fix cites the matter.js lines it mirrors.
 
 ### Added
@@ -4189,7 +4191,8 @@ consumer of an older pseudo-version should read.
   earlier than it was. Both fields are gone; the commit holding the file is
   its provenance.
 
-[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/SukramJ/go-fabric/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/SukramJ/go-fabric/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/SukramJ/go-fabric/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/SukramJ/go-fabric/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/SukramJ/go-fabric/compare/v0.6.0...v0.7.0
