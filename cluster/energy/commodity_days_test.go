@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/energy"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	ct "github.com/SukramJ/go-fabric/cluster/spec/commoditytariff"
@@ -54,7 +55,7 @@ func TestCommodityTariffDays(t *testing.T) { //nolint:funlen // one sequence
 	if read(t, srv, ct.AttrNextDayEntry) != nil || read(t, srv, ct.AttrNextDayEntryDate) != nil {
 		t.Error("a next day entry after the walk ran out")
 	}
-	clock.advance(2 * time.Hour) // 02:00: entry 21, 01:00 to 10:00
+	clock.Advance(2 * time.Hour) // 02:00: entry 21, 01:00 to 10:00
 	if err := srv.SyncTime(); err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +67,7 @@ func TestCommodityTariffDays(t *testing.T) { //nolint:funlen // one sequence
 	if read(t, srv, ct.AttrNextDayEntryDate) != today+10+(60+480)*60 {
 		t.Errorf("NextDayEntryDate %v", read(t, srv, ct.AttrNextDayEntryDate))
 	}
-	clock.advance(21*time.Hour + 30*time.Minute) // 23:30: entry 20, across midnight
+	clock.Advance(21*time.Hour + 30*time.Minute) // 23:30: entry 20, across midnight
 	if err := srv.SyncTime(); err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +125,7 @@ func TestCommodityTariffDays(t *testing.T) { //nolint:funlen // one sequence
 	if err := srv4.UpdateTariff(tariff); err != nil {
 		t.Fatal(err)
 	}
-	clock4.advance(48 * time.Hour)
+	clock4.Advance(48 * time.Hour)
 	if err := srv4.SyncTime(); err == nil {
 		t.Error("SyncTime found a day two days after the only calendar period")
 	}
@@ -137,7 +138,7 @@ func TestCommodityTariffNoRandomization(t *testing.T) {
 	t.Parallel()
 	srv, err := energy.NewCommodityTariff(energy.CommodityTariffConfig{
 		Features: allTariffFeatures &^ energy.TariffFeatureRandomization,
-		Now:      func() time.Time { return time.Unix(1748736000, 0) },
+		Clock:    clocktest.New(time.Unix(1748736000, 0)),
 	})
 	if err != nil {
 		t.Fatal(err)

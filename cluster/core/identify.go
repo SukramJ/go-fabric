@@ -11,11 +11,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	identifydef "github.com/SukramJ/go-fabric/cluster/spec/identify"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 )
 
 // Identify implements the Matter Identify cluster (0x0003) per Matter
@@ -50,6 +52,9 @@ import (
 // reply. Returning UnsupportedCommand here would surface as a HAP
 // build warning that some firmware revisions escalate to Code=24.
 type Identify struct {
+	// clock paces the IdentifyTime countdown (see [Identify.SetClock]).
+	clock clockvar.Var
+
 	// identifyTime is tracked atomically because reads (subscribe
 	// reports), writes (clients setting it directly per spec §1.2.5.1),
 	// and command dispatch (Identify) all touch the same field from
@@ -112,6 +117,10 @@ var identifyInst = mustInstance(identifydef.Definition, spec.Options{Commands: [
 func NewIdentify() *Identify {
 	return &Identify{done: make(chan struct{})}
 }
+
+// SetClock sets the clock the IdentifyTime countdown ticks on; nil is
+// [clock.System]. A countdown already running keeps its clock.
+func (i *Identify) SetClock(c clock.Clock) { i.clock.Store(c) }
 
 // Close releases the cluster: a running countdown terminates at once and
 // no later write / command starts a new one. Idempotent and safe for
@@ -253,13 +262,13 @@ func (i *Identify) maybeStartCountdown() {
 	i.timerMu.Unlock()
 
 	go func() {
-		ticker := time.NewTicker(time.Second)
+		ticker := i.clock.Load().NewTicker(time.Second)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-done:
 				return
-			case <-ticker.C:
+			case <-ticker.C():
 				v := i.identifyTime.Load()
 				if v == 0 {
 					i.timerMu.Lock()

@@ -61,6 +61,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	sa "github.com/SukramJ/go-fabric/cluster/spec/servicearea"
@@ -167,6 +168,8 @@ type Config struct {
 
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
+	// Clock paces the EstimatedEndTime quieter; nil is [clock.System].
+	Clock clock.Clock
 }
 
 // Errors.
@@ -246,7 +249,7 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("servicearea: %w", err)
 	}
 	s := &Server{Instance: inst, ext: cfg.DataVersion, selector: cfg.Selector, skipper: cfg.Skipper}
-	s.quiet = &cluster.Quieter{Report: func() { s.changed(sa.AttrEstimatedEndTime) }}
+	s.quiet = &cluster.Quieter{Report: func() { s.changed(sa.AttrEstimatedEndTime) }, Clock: cfg.Clock}
 	if len(cfg.SupportedMaps) > 0 && !s.Serves(sa.AttrSupportedMaps) {
 		return nil, fmt.Errorf("%w: SupportedMaps without MAPS", ErrConfig)
 	}

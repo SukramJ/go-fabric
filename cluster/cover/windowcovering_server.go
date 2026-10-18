@@ -34,6 +34,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	wcdef "github.com/SukramJ/go-fabric/cluster/spec/windowcovering"
@@ -156,6 +157,9 @@ type Config struct {
 	// Mover is the optional host port; nil keeps the server
 	// self-contained.
 	Mover Mover
+	// Clock paces a travelling movement's steps (MoveStep); nil is
+	// [clock.System].
+	Clock clock.Clock
 }
 
 // moveSteps is the number of steps a travelling movement takes
@@ -191,6 +195,8 @@ type WindowCoveringServer struct {
 	operationalStatus uint8
 
 	moveStep time.Duration
+	// clock paces a travelling movement's steps.
+	clock clock.Clock
 	// changes reports what a travelling movement changes between
 	// requests (contract.AttributeChangeNotifier).
 	changes cluster.AttributeChanges
@@ -211,7 +217,7 @@ type axis struct {
 
 // movement is one travelling axis movement.
 type movement struct {
-	timer     *time.Timer
+	timer     clock.Timer
 	increment int
 	target    uint16
 	counter   int
@@ -294,6 +300,7 @@ func New(cfg Config) (*WindowCoveringServer, error) {
 		wcType:         cfg.Type,
 		endProductType: cfg.EndProductType,
 		moveStep:       cfg.MoveStep,
+		clock:          clock.Or(cfg.Clock),
 		mover:          cfg.Mover,
 	}
 	if features&uint32(wcdef.FeatureLift) != 0 {
@@ -747,7 +754,7 @@ func (s *WindowCoveringServer) moveToLocked(a *axis, target uint16) {
 		inc = int(math.Ceil(diff / moveSteps))
 	}
 	m := &movement{increment: inc, target: target}
-	m.timer = time.AfterFunc(s.moveStep, func() { s.tick(a, m) })
+	m.timer = s.clock.AfterFunc(s.moveStep, func() { s.tick(a, m) })
 	a.move = m
 }
 

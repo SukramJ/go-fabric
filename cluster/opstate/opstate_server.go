@@ -67,6 +67,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	opdef "github.com/SukramJ/go-fabric/cluster/spec/operationalstate"
@@ -282,6 +283,8 @@ type Config struct {
 	DeviceType uint16
 	// DataVersion is an optional host-owned tracker.
 	DataVersion *cluster.DataVersionTracker
+	// Clock paces the CountdownTime quieter; nil is [clock.System].
+	Clock clock.Clock
 }
 
 // Configuration and setter errors. A setter error leaves the state as it
@@ -520,7 +523,7 @@ func newServer(v variant, cfg Config) (*Server, error) {
 		states: slices.Clone(cfg.States), countOn: cfg.CountdownTime,
 		state: cfg.State, phases: slices.Clone(cfg.Phases), currentPhase: syncedPhase(cfg.Phases, cfg.CurrentPhase),
 	}
-	s.quiet = &cluster.Quieter{Report: func() { s.changed(AttrCountdownTime) }}
+	s.quiet = &cluster.Quieter{Report: func() { s.changed(AttrCountdownTime) }, Clock: cfg.Clock}
 	return s, nil
 }
 

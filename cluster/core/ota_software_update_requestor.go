@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	otadef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdaterequestor"
@@ -123,9 +124,15 @@ type OTARequestorConfig struct {
 	// AnnouncedUpdateQueryDelay, when set, replaces the random 1-600 s wait
 	// after an announcement other than a simple one (:1323).
 	AnnouncedUpdateQueryDelay *time.Duration
-	// Clock and Rand replace the wall clock and the random source (tests).
+	// TimeSource is the requestor's clock. Set, it wins over Clock;
+	// neither set is [clock.System].
+	TimeSource clock.Clock
+	// Clock replaces the wall clock.
+	//
+	// Deprecated: set TimeSource; Clock may be removed in v0.10.0.
 	Clock OtaClock
-	Rand  func(n int) int
+	// Rand replaces the random source (tests).
+	Rand func(n int) int
 	// Logger receives the requestor's log lines; nil is slog.Default.
 	Logger *slog.Logger
 }
@@ -191,17 +198,21 @@ type OtaRequestorStore interface {
 }
 
 // OtaClock is the requestor's time source.
+//
+// Deprecated: set [OTARequestorConfig.TimeSource] to a [clock.Clock], the
+// module's time port; OtaClock may be removed in v0.10.0.
 type OtaClock interface {
 	Now() time.Time
 	// AfterFunc runs f after d; stop prevents a run that has not begun.
 	AfterFunc(d time.Duration, f func()) (stop func() bool)
 }
 
-type wallClock struct{}
+// otaPortClock is a [clock.Clock] as the requestor's [OtaClock].
+type otaPortClock struct{ c clock.Clock }
 
-func (wallClock) Now() time.Time { return time.Now() }
-func (wallClock) AfterFunc(d time.Duration, f func()) func() bool {
-	return time.AfterFunc(d, f).Stop
+func (p otaPortClock) Now() time.Time { return p.c.Now() }
+func (p otaPortClock) AfterFunc(d time.Duration, f func()) func() bool {
+	return p.c.AfterFunc(d, f).Stop
 }
 
 // activeProvider is an ActiveProviderLocation (:65-69).
@@ -330,8 +341,11 @@ func NewOTASoftwareUpdateRequestor(cfg OTARequestorConfig) (*OTASoftwareUpdateRe
 	if cfg.UpdatePossible != nil {
 		r.updatePossible = *cfg.UpdatePossible
 	}
-	if r.clock == nil {
-		r.clock = wallClock{}
+	switch {
+	case cfg.TimeSource != nil:
+		r.clock = otaPortClock{cfg.TimeSource}
+	case r.clock == nil:
+		r.clock = otaPortClock{clock.System{}}
 	}
 	if r.rnd == nil {
 		r.rnd = rand.IntN

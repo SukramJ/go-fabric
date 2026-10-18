@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/secure/sigma"
 	"github.com/SukramJ/go-fabric/store"
@@ -30,6 +32,10 @@ import (
 // session closes. ID 0 is reserved by Matter for unsecured traffic.
 type Manager struct {
 	store ResumptionStore
+
+	// clock is the session table's time source (see [Manager.SetClock]);
+	// unset is clock.System.
+	clock clockvar.Var
 
 	mu             sync.RWMutex
 	sessions       map[uint16]*Entry
@@ -117,7 +123,7 @@ func (m *Manager) notifyGracefulClose(entries []*Entry, deadline time.Time) {
 		if e == nil || e.Session == nil {
 			continue
 		}
-		if !deadline.IsZero() && time.Now().After(deadline) {
+		if !deadline.IsZero() && m.clk().Now().After(deadline) {
 			return
 		}
 		hook(e.SessionID, e.Session)
@@ -322,6 +328,9 @@ type Entry struct {
 	// peer-loss sweep spares sessions created at or after the exchange
 	// that reported the loss (matter.js SessionManager.ts:688-690).
 	createdAt time.Time
+	// clock is the manager's clock when the entry opened; nil (an entry
+	// built outside a manager) is clock.System.
+	clock clock.Clock
 	// mu guards the mutable fields above for concurrent Rx/Tx updates.
 	mu sync.Mutex
 }
@@ -330,7 +339,7 @@ type Entry struct {
 // successful inbound message decryption.
 func (e *Entry) MarkActiveRx() {
 	e.mu.Lock()
-	now := time.Now()
+	now := clock.Or(e.clock).Now()
 	e.lastActivity = now
 	e.lastPeerActivity = now
 	e.mu.Unlock()
@@ -405,7 +414,7 @@ func (e *Entry) RetransmitBaseInterval(now time.Time) time.Duration {
 // successful outbound message encryption.
 func (e *Entry) MarkActiveTx() {
 	e.mu.Lock()
-	e.lastActivity = time.Now()
+	e.lastActivity = clock.Or(e.clock).Now()
 	e.mu.Unlock()
 }
 
@@ -476,6 +485,14 @@ var (
 	ErrSessionNotFound = errors.New("operational: session not found")
 )
 
+// SetClock sets the clock the manager stamps sessions with and paces the
+// idle reaper on; nil is [clock.System]. Call it before the first session
+// opens: an entry keeps the clock it was opened under.
+func (m *Manager) SetClock(c clock.Clock) { m.clock.Store(c) }
+
+// clk is the manager's clock.
+func (m *Manager) clk() clock.Clock { return m.clock.Load() }
+
 // NewManager returns a manager backed by s.
 func NewManager(s ResumptionStore) *Manager {
 	return &Manager{
@@ -544,7 +561,8 @@ func (m *Manager) OpenFromSigma(fabricIndex uint8, localNodeID, peerNodeID uint6
 		// As openFromSigma: the Sigma key schedule's third block
 		// (matter.js NodeSession.ts:82).
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
-		createdAt:            time.Now(),
+		createdAt:            m.clk().Now(),
+		clock:                m.clk(),
 	}
 	m.sessions[id] = entry
 	excess := m.evictExcessPeerSessionsLocked(entry)
@@ -582,7 +600,7 @@ func (m *Manager) AllocateID() (uint16, error) {
 	// same id out twice; OpenFromSigmaWithID overwrites it. The stamp
 	// is what lets the reaper tell an in-flight handshake from one
 	// that was abandoned — see [PlaceholderIDTTL].
-	m.sessions[id] = &Entry{SessionID: id, allocatedAt: time.Now()}
+	m.sessions[id] = &Entry{SessionID: id, allocatedAt: m.clk().Now(), clock: m.clk()}
 	return id, nil
 }
 
@@ -653,7 +671,8 @@ func (m *Manager) openFromSigma(id uint16, fabricIndex uint8, localNodeID, peerN
 		Session:              sess,
 		AttestationChallenge: append([]byte(nil), keys.AttestationChallenge[:]...),
 		isInitiator:          initiator,
-		createdAt:            time.Now(),
+		createdAt:            m.clk().Now(),
+		clock:                m.clk(),
 	}
 	m.mu.Lock()
 	// The pre-allocated id is in m.sessions as a placeholder Entry
@@ -720,7 +739,8 @@ func (m *Manager) OpenFromPase(localNodeID, peerNodeID uint64, peerSessionID uin
 		Session:              sess,
 		AttestationChallenge: append([]byte(nil), derived[32:48]...),
 		isPase:               true,
-		createdAt:            time.Now(),
+		createdAt:            m.clk().Now(),
+		clock:                m.clk(),
 	}
 	m.sessions[id] = entry
 	m.mu.Unlock()
@@ -763,7 +783,8 @@ func (m *Manager) OpenFromPaseWithID(id uint16, localNodeID, peerNodeID uint64, 
 		Session:              sess,
 		AttestationChallenge: append([]byte(nil), derived[32:48]...),
 		isPase:               true,
-		createdAt:            time.Now(),
+		createdAt:            m.clk().Now(),
+		clock:                m.clk(),
 	}
 	m.mu.Lock()
 	displaced := m.installEntryLocked(id, entry)
@@ -1156,13 +1177,13 @@ func (m *Manager) Active() int {
 // SessionInactiveBaseInterval defined in Matter §4.13.2.6.1.
 func (m *Manager) StartReaper(ctx context.Context, idleTimeout, poll time.Duration) {
 	go func() {
-		ticker := time.NewTicker(poll)
+		ticker := m.clk().NewTicker(poll)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-ticker.C:
+			case <-ticker.C():
 				m.reapIdle(idleTimeout)
 			}
 		}
@@ -1173,7 +1194,7 @@ func (m *Manager) StartReaper(ctx context.Context, idleTimeout, poll time.Durati
 // is older than idleTimeout. Only entries with an established channel
 // and a non-zero last-activity time are considered.
 func (m *Manager) reapIdle(idleTimeout time.Duration) {
-	now := time.Now()
+	now := m.clk().Now()
 	cutoff := now.Add(-idleTimeout)
 	placeholderCutoff := now.Add(-PlaceholderIDTTL)
 	m.mu.Lock()

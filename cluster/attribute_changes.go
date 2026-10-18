@@ -7,6 +7,8 @@ import (
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/SukramJ/go-fabric/clock"
 )
 
 // AttributeChanges is the listener set behind
@@ -88,15 +90,23 @@ type Quieter struct {
 	// Report is called, outside the throttle's lock, when a report goes
 	// out.
 	Report func()
-	// Now and AfterFunc default to time.Now and time.AfterFunc.
-	Now       func() time.Time
+	// Clock is the throttle's time source. Set, it wins over Now and
+	// AfterFunc; none set is [clock.System].
+	Clock clock.Clock
+	// Now is the throttle's clock reading.
+	//
+	// Deprecated: set Clock; Now may be removed in v0.10.0.
+	Now func() time.Time
+	// AfterFunc arms the deferred report.
+	//
+	// Deprecated: set Clock; AfterFunc may be removed in v0.10.0.
 	AfterFunc func(d time.Duration, f func()) *time.Timer
 
 	mu       sync.Mutex
 	lastEmit time.Time
 	pending  bool
-	timer    *time.Timer
-	gen      uint64 // identifies the armed timer; a stale one is ignored
+	timer    func() bool // stops the armed deferred report
+	gen      uint64      // identifies the armed timer; a stale one is ignored
 }
 
 // Changed reports one change of the attribute from wasNull to isNull (the
@@ -114,13 +124,9 @@ func (q *Quieter) Changed(wasNull, isNull bool) {
 	}
 	q.pending = true
 	if q.timer == nil {
-		after := q.AfterFunc
-		if after == nil {
-			after = time.AfterFunc
-		}
 		q.gen++
 		gen := q.gen
-		q.timer = after(q.lastEmit.Add(QuietMinimumInterval).Sub(now), func() { q.flush(gen) })
+		q.timer = q.afterFunc(q.lastEmit.Add(QuietMinimumInterval).Sub(now), func() { q.flush(gen) })
 	}
 	q.mu.Unlock()
 }
@@ -162,14 +168,28 @@ func (q *Quieter) emitLocked(now time.Time) {
 	q.lastEmit = now
 	q.pending = false
 	if q.timer != nil {
-		q.timer.Stop()
+		q.timer()
 		q.timer = nil
 	}
 }
 
 func (q *Quieter) now() time.Time {
-	if q.Now != nil {
+	switch {
+	case q.Clock != nil:
+		return q.Clock.Now()
+	case q.Now != nil:
 		return q.Now()
 	}
-	return time.Now()
+	return clock.System{}.Now()
+}
+
+// afterFunc arms f after d on the throttle's clock and returns its stop.
+func (q *Quieter) afterFunc(d time.Duration, f func()) func() bool {
+	switch {
+	case q.Clock != nil:
+		return q.Clock.AfterFunc(d, f).Stop
+	case q.AfterFunc != nil:
+		return q.AfterFunc(d, f).Stop
+	}
+	return clock.System{}.AfterFunc(d, f).Stop
 }

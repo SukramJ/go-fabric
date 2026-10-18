@@ -146,10 +146,10 @@ func TestHostChangeDuringSinkLosesToTheCommand(t *testing.T) {
 // does not block the tick, and the tick queue still runs after it.
 func TestSinkEchoInTheTimedOffTick(t *testing.T) {
 	t.Parallel()
-	clock := &fakeClock{}
+	clock := newFakeClock()
 	var calls []bool
 	var srv *onoff.Server
-	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, Clock: clock, Sink: funcSink(func(_ context.Context, on bool) error {
+	srv, err := onoff.New(onoff.Config{Features: onoff.FeatureLT, TimeSource: clock, Sink: funcSink(func(_ context.Context, on bool) error {
 		calls = append(calls, on)
 		srv.Set(on)
 		return nil

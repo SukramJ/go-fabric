@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/im"
@@ -190,8 +191,14 @@ type OTAProviderConfig struct {
 	// matter.js SoftwareUpdateManager.onOtaStatusChange (OP:608-612) — with
 	// the version the update brings; nil observes nothing.
 	OnStatusChange func(peer OTAPeer, status OTAUpdateStatus, version uint32)
-	// Now and Rand stand in for the clock and crypto/rand in tests.
-	Now  func() time.Time
+	// Clock is the provider's clock. Set, it wins over Now; neither set
+	// is [clock.System].
+	Clock clock.Clock
+	// Now stands in for the clock in tests.
+	//
+	// Deprecated: set Clock; Now may be removed in v0.10.0.
+	Now func() time.Time
+	// Rand stands in for crypto/rand in tests.
 	Rand io.Reader
 	// Logger is the provider's logger; nil is slog.Default().
 	Logger *slog.Logger
@@ -254,8 +261,11 @@ func NewOTAProvider(cfg OTAProviderConfig) (*OTAProvider, error) {
 	if cfg.BDX != nil && cfg.NodeID == nil {
 		return nil, ErrNoNodeID
 	}
-	if cfg.Now == nil {
-		cfg.Now = time.Now
+	switch {
+	case cfg.Clock != nil:
+		cfg.Now = cfg.Clock.Now
+	case cfg.Now == nil:
+		cfg.Now = clock.System{}.Now
 	}
 	if cfg.Rand == nil {
 		cfg.Rand = rand.Reader
@@ -462,7 +472,7 @@ func (p *OTAProvider) inProgressAnswer(peer OTAPeer, sessionID uint16) (provdef.
 		// OP:194-196: no transfer runs, the entry is stale.
 		p.removeInProgress(peer)
 		return provdef.QueryImageResponse{}, false
-	case running.Peer().SessionID != sessionID && running.LastActivity().Before(time.Now()):
+	case running.Peer().SessionID != sessionID && running.LastActivity().Before(p.cfg.Now()):
 		// OP:197-225: another session, last active before this query's —
 		// matter.js compares the two secure sessions' activeTimestamp; the
 		// query's session is active now, so the transfer's last block

@@ -17,6 +17,9 @@ import (
 	"github.com/miekg/dns"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
+
+	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 )
 
 // subtypePTRTTL matches grandcat/zeroconf's default record TTL (3200 s)
@@ -50,6 +53,8 @@ const subtypePTRTTL = 3200
 // A/AAAA additionals it sends with them.
 type SubtypeResponder struct {
 	logger *slog.Logger
+	// clock paces the read-error backoff; the host answerer shares it.
+	clock clockvar.Var
 
 	// host answers A/AAAA/ANY questions for the advertised host name;
 	// hostSend is the transport its replies go out on (the responder's
@@ -74,6 +79,13 @@ type SubtypeResponder struct {
 	// → primary instance FQDN
 	// (`f9732c2a304348b3._matterc._udp.local.`).
 	mappings map[string]string
+}
+
+// SetClock sets the clock the responder's backoff and its host-name
+// answerer's suppression windows run on; nil is [clock.System].
+func (r *SubtypeResponder) SetClock(c clock.Clock) {
+	r.clock.Store(c)
+	r.host.clock.Store(c)
 }
 
 // NewSubtypeResponder binds the responder to the mDNS multicast
@@ -423,7 +435,7 @@ func (r *SubtypeResponder) survivesReadError(ctx context.Context, family string,
 	select {
 	case <-ctx.Done():
 		return false
-	case <-time.After(readErrorBackoff):
+	case <-clock.After(r.clock.Load(), readErrorBackoff):
 	}
 	return true
 }

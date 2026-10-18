@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
@@ -93,14 +94,18 @@ type Scenes interface {
 // Clock is the timer seam. AfterFunc runs f once after d; stop prevents
 // a run that has not begun. The default is time.AfterFunc; tests pass a
 // clock they advance by hand.
+//
+// Deprecated: set [Config.TimeSource] to a [clock.Clock], the module's
+// time port; Clock may be removed in v0.10.0.
 type Clock interface {
 	AfterFunc(d time.Duration, f func()) (stop func() bool)
 }
 
-type wallClock struct{}
+// portClock is a [clock.Clock] as the server's timer seam.
+type portClock struct{ c clock.Clock }
 
-func (wallClock) AfterFunc(d time.Duration, f func()) func() bool {
-	return time.AfterFunc(d, f).Stop
+func (p portClock) AfterFunc(d time.Duration, f func()) func() bool {
+	return p.c.AfterFunc(d, f).Stop
 }
 
 // Config carries the construction parameters.
@@ -122,7 +127,13 @@ type Config struct {
 	// BootReason; StartUpOnOff is not applied after a software update
 	// (OnOffServer.ts:36, :326-331). nil applies it.
 	BootReason func() uint8
-	// Clock is the timer seam; nil is the wall clock.
+	// TimeSource paces the OnTime / OffWaitTime countdown and the scene
+	// transitions. Set, it wins over Clock; neither set is
+	// [clock.System].
+	TimeSource clock.Clock
+	// Clock is the old timer seam.
+	//
+	// Deprecated: set TimeSource; Clock may be removed in v0.10.0.
 	Clock Clock
 	// Bridged marks a server on an endpoint under the Aggregator: matter.js
 	// does not apply StartUpOnOff there
@@ -233,8 +244,11 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 	s.Instance, s.srv, s.lighting = srv.Instance, srv, srv.HasFeature("LT")
-	if s.clock == nil {
-		s.clock = wallClock{}
+	switch {
+	case cfg.TimeSource != nil:
+		s.clock = portClock{cfg.TimeSource}
+	case s.clock == nil:
+		s.clock = portClock{clock.System{}}
 	}
 	initial := map[uint32]any{AttrOnOff: false}
 	if s.lighting {

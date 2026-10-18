@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/cluster/spec"
 	gendiagdef "github.com/SukramJ/go-fabric/cluster/spec/generaldiagnostics"
@@ -78,6 +79,7 @@ const (
 type GeneralDiagnostics struct {
 	mu sync.RWMutex
 
+	clock      clock.Clock
 	startTime  time.Time
 	bootReason uint8
 
@@ -210,13 +212,24 @@ var gendiagInst = mustInstance(gendiagdef.Definition, spec.Options{
 // [BootReasonSoftwareUpdate] after an OTA).
 func NewGeneralDiagnostics(bootReason uint8) *GeneralDiagnostics {
 	g := &GeneralDiagnostics{
-		startTime:  time.Now(),
+		clock:      clock.System{},
 		bootReason: bootReason,
 	}
+	g.startTime = g.clock.Now()
 	// Seed DataVersion at a non-zero sentinel so DataVersionFilter=0 does not
 	// produce false-positive cache hits.
 	g.dataVersion.Bump()
 	return g
+}
+
+// SetClock sets the clock the server counts its uptime on and restarts
+// the count from that clock's now; nil is [clock.System]. Call it right
+// after [NewGeneralDiagnostics], before the persisted counters are set.
+func (g *GeneralDiagnostics) SetClock(c clock.Clock) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.clock = clock.Or(c)
+	g.startTime = g.clock.Now()
 }
 
 // UpTimeSeconds returns the seconds elapsed since the cluster was
@@ -225,7 +238,7 @@ func NewGeneralDiagnostics(bootReason uint8) *GeneralDiagnostics {
 func (g *GeneralDiagnostics) UpTimeSeconds() uint64 {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return uint64(time.Since(g.startTime).Seconds())
+	return uint64(clock.Since(g.clock, g.startTime).Seconds())
 }
 
 // SetPersistedCounters seeds RebootCount and the
@@ -281,7 +294,7 @@ func (g *GeneralDiagnostics) SetPersistedOperationalTime(d time.Duration) {
 func (g *GeneralDiagnostics) TotalOperationalTime() time.Duration {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	return g.baseOperationalTime + time.Since(g.startTime)
+	return g.baseOperationalTime + clock.Since(g.clock, g.startTime)
 }
 
 // BootReasonEvent is the payload for the BootReason event (0x03,
@@ -364,7 +377,7 @@ func (g *GeneralDiagnostics) MatterRead(attrID uint32) (any, bool) {
 		// Hours.of(base + uptime): the floor of the whole operational
 		// time, so the part-hours of earlier runs add up (matter.js
 		// GeneralDiagnosticsServer.ts totalOperationalHours getter).
-		total := g.baseOperationalTime + time.Since(g.startTime)
+		total := g.baseOperationalTime + clock.Since(g.clock, g.startTime)
 		return uint32(total / time.Hour), true //nolint:gosec // 2^32 hours is ~490,000 years
 	// BootReason / ActiveHardwareFaults / ActiveRadioFaults /
 	// ActiveNetworkFaults are OPTIONAL on GeneralDiagnostics. matter.js's
@@ -414,7 +427,7 @@ func (g *GeneralDiagnostics) MatterWrite(_ context.Context, attrID uint32, value
 func (g *GeneralDiagnostics) MatterInvoke(ctx context.Context, cmdID uint32, fields any) (any, error) {
 	switch cmdID {
 	case gendiagCmdTimeSnapshot:
-		systemMs := uint64(time.Since(g.startTime).Milliseconds()) //nolint:gosec // G115: wall-clock millis are non-negative for any valid host time; see #20
+		systemMs := uint64(clock.Since(g.clock, g.startTime).Milliseconds()) //nolint:gosec // G115: wall-clock millis are non-negative for any valid host time; see #20
 		// PosixTimeMs only when the node's TimeSynchronization cluster holds
 		// a UTC time: matter.js GeneralDiagnosticsServer.ts timeSnapshot
 		// (agent.has(TimeSynchronizationBehavior) && utcTime !== null), and
@@ -453,7 +466,8 @@ type DeviceLoadStruct = gendiagdef.DeviceLoadStruct
 // value already reported, so a backward wall-clock step (an NTP correction)
 // cannot lower it, and never negative.
 func (g *GeneralDiagnostics) upTime() time.Duration {
-	return g.upTimeFrom(time.Since(g.startTime), time.Now().Round(0).Sub(g.startTime.Round(0)))
+	now := g.clock.Now()
+	return g.upTimeFrom(now.Sub(g.startTime), now.Round(0).Sub(g.startTime.Round(0)))
 }
 
 // upTimeFrom folds the elapsed monotonic and wall-clock times into UpTime

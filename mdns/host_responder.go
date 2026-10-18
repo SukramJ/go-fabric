@@ -16,6 +16,8 @@ import (
 	"github.com/miekg/dns"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
+
+	"github.com/SukramJ/go-fabric/internal/clockvar"
 )
 
 // The bare-host-name questions (`<MAC>0000.local. AAAA`) are answered here,
@@ -82,7 +84,8 @@ type hostAnswerer struct {
 	// recentlyAnswered is matter.js #recentlyAnsweredQueries: per question
 	// signature and interface, the records known to the link.
 	recentlyAnswered map[string]recentAnswer
-	now              func() time.Time
+	// clock is the time the suppression windows are judged at.
+	clock clockvar.Var
 }
 
 type recentAnswer struct {
@@ -103,7 +106,6 @@ func newHostAnswerer() *hostAnswerer {
 	return &hostAnswerer{
 		lastMulticast:    map[string]time.Time{},
 		recentlyAnswered: map[string]recentAnswer{},
-		now:              time.Now,
 	}
 }
 
@@ -195,7 +197,7 @@ func (h *hostAnswerer) answer(query *dns.Msg, ifIndex int, src *net.UDPAddr) (re
 		additional = slices.DeleteFunc(additional, func(rr dns.RR) bool { return knownTo(query.Answer, rr) })
 	}
 
-	now := h.now()
+	now := h.clock.Load().Now()
 	sinceMulticast := func(rr dns.RR) time.Duration {
 		last, seen := h.lastMulticast[recordKey(rr, ifIndex)]
 		if !seen {

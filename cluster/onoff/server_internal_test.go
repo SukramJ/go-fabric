@@ -7,17 +7,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 )
 
-// manualClock keeps the last callback for the test to run by hand, after
-// its timer has been stopped — the race a wall-clock timer has when the
-// callback is already due as the timer stops.
-type manualClock struct{ f func() }
+// raceClock is the test clock, a [clocktest.Fake], that also keeps the
+// last callback armed so the test can run it by hand after its timer has
+// been stopped — the race a wall-clock timer has when the callback is
+// already due as the timer stops, which the Fake (a stopped timer never
+// fires) cannot produce on its own.
+type raceClock struct {
+	*clocktest.Fake
+	f func()
+}
 
-func (c *manualClock) AfterFunc(_ time.Duration, f func()) func() bool {
+func newRaceClock() *raceClock { return &raceClock{Fake: clocktest.New(time.Unix(0, 0))} }
+
+func (c *raceClock) AfterFunc(d time.Duration, f func()) clock.Timer {
 	c.f = f
-	return func() bool { return true }
+	return c.Fake.AfterFunc(d, f)
 }
 
 // TestTickHoldsAt0xFFFF reaches the hold branches of both ticks
@@ -26,7 +35,7 @@ func (c *manualClock) AfterFunc(_ time.Duration, f func()) func() bool {
 // hold value stops its timer and changes nothing.
 func TestTickHoldsAt0xFFFF(t *testing.T) {
 	t.Parallel()
-	s, err := New(Config{Features: FeatureLT, Clock: &manualClock{}, Initial: map[uint32]any{
+	s, err := New(Config{Features: FeatureLT, TimeSource: clocktest.New(time.Unix(0, 0)), Initial: map[uint32]any{
 		AttrOnOff: true, AttrOnTime: uint16(hold), AttrOffWaitTime: uint16(hold),
 	}})
 	if err != nil {
@@ -51,8 +60,8 @@ func TestTickHoldsAt0xFFFF(t *testing.T) {
 // changes nothing.
 func TestStaleTickDoesNothing(t *testing.T) {
 	t.Parallel()
-	clock := &manualClock{}
-	s, err := New(Config{Features: FeatureLT, Clock: clock})
+	clock := newRaceClock()
+	s, err := New(Config{Features: FeatureLT, TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,8 +85,8 @@ func timedOffReq(onTime uint16) any {
 // :291-297) changes nothing when it runs.
 func TestDelayedSceneApplyStaleRun(t *testing.T) {
 	t.Parallel()
-	clock := &manualClock{}
-	s, err := New(Config{Features: FeatureLT, Clock: clock})
+	clock := newRaceClock()
+	s, err := New(Config{Features: FeatureLT, TimeSource: clock})
 	if err != nil {
 		t.Fatal(err)
 	}

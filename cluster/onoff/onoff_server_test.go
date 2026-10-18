@@ -6,89 +6,21 @@ package onoff_test
 import (
 	"context"
 	"errors"
-	"sort"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/im"
 )
 
-// fakeClock runs AfterFunc callbacks only when the test advances it, on
-// the test's goroutine, in due order.
-type fakeClock struct {
-	mu      sync.Mutex
-	now     time.Duration
-	pending []*fakeTimer
-}
+// fakeClock is the test clock, a [clocktest.Fake]: callbacks run only
+// when the test advances it, in due order.
+type fakeClock = clocktest.Fake
 
-type fakeTimer struct {
-	due  time.Duration
-	f    func()
-	done bool
-}
-
-func (c *fakeClock) AfterFunc(d time.Duration, f func()) func() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	t := &fakeTimer{due: c.now + d, f: f}
-	c.pending = append(c.pending, t)
-	return func() bool {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		was := !t.done
-		t.done = true
-		return was
-	}
-}
-
-// Advance moves the clock by d, running every callback that falls due.
-func (c *fakeClock) Advance(d time.Duration) {
-	c.mu.Lock()
-	end := c.now + d
-	c.mu.Unlock()
-	for {
-		c.mu.Lock()
-		sort.SliceStable(c.pending, func(i, j int) bool { return c.pending[i].due < c.pending[j].due })
-		var next *fakeTimer
-		for len(c.pending) > 0 {
-			t := c.pending[0]
-			if t.done {
-				c.pending = c.pending[1:]
-				continue
-			}
-			if t.due <= end {
-				next = t
-				c.pending = c.pending[1:]
-				t.done = true
-				c.now = t.due
-			}
-			break
-		}
-		if next == nil {
-			c.now = end
-			c.mu.Unlock()
-			return
-		}
-		c.mu.Unlock()
-		next.f()
-	}
-}
-
-// Pending counts the callbacks not yet run or stopped.
-func (c *fakeClock) Pending() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	n := 0
-	for _, t := range c.pending {
-		if !t.done {
-			n++
-		}
-	}
-	return n
-}
+func newFakeClock() *fakeClock { return clocktest.New(time.Unix(0, 0)) }
 
 // recSink records the sink calls and refuses while refuse is set.
 type recSink struct {
@@ -116,8 +48,8 @@ type fixture struct {
 
 func newFixture(t *testing.T, features onoff.Feature, initial map[uint32]any) *fixture {
 	t.Helper()
-	f := &fixture{t: t, clock: &fakeClock{}, sink: &recSink{}}
-	srv, err := onoff.New(onoff.Config{Features: features, Sink: f.sink, Initial: initial, Clock: f.clock})
+	f := &fixture{t: t, clock: newFakeClock(), sink: &recSink{}}
+	srv, err := onoff.New(onoff.Config{Features: features, Sink: f.sink, Initial: initial, TimeSource: f.clock})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -226,7 +158,7 @@ func TestStartUpOnOff(t *testing.T) {
 			if c.feat&onoff.FeatureLT != 0 {
 				initial[onoff.AttrStartUpOnOff] = c.startUp
 			}
-			cfg := onoff.Config{Features: c.feat, Initial: initial, Clock: &fakeClock{}, Bridged: c.bridged}
+			cfg := onoff.Config{Features: c.feat, Initial: initial, TimeSource: newFakeClock(), Bridged: c.bridged}
 			if c.boot != nil {
 				b := *c.boot
 				cfg.BootReason = func() uint8 { return b }

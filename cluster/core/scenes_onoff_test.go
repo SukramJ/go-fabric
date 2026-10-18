@@ -8,17 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/cluster/core"
 	"github.com/SukramJ/go-fabric/cluster/onoff"
 	onoffdef "github.com/SukramJ/go-fabric/cluster/spec/onoff"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
 )
-
-// manualClock holds every timer; the test runs none.
-type manualClock struct{}
-
-func (manualClock) AfterFunc(time.Duration, func()) func() bool { return func() bool { return true } }
 
 // TestScenesManagementGlobalSceneWithOnOff runs the global-scene paths of
 // matter.js's OnOffServer against this package's ScenesManagement as its
@@ -41,7 +37,7 @@ func TestScenesManagementGlobalSceneWithOnOff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	light, err = onoff.New(onoff.Config{Features: onoff.FeatureLT, Scenes: sm, Clock: manualClock{}})
+	light, err = onoff.New(onoff.Config{Features: onoff.FeatureLT, Scenes: sm, TimeSource: clocktest.New(time.Unix(0, 0))})
 	if err != nil {
 		t.Fatal(err)
 	}

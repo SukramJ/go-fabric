@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 )
 
 // The host-name answerer, case by case against matter.js
@@ -20,11 +22,8 @@ import (
 
 const testHost = "AABBCCDDEEFF0000.local."
 
-// fakeClock is a settable clock (matter.js MockTime).
-type fakeClock struct{ t time.Time }
-
-func (c *fakeClock) now() time.Time          { return c.t }
-func (c *fakeClock) advance(d time.Duration) { c.t = c.t.Add(d) }
+// fakeClock is the test clock, a [clocktest.Fake] (matter.js MockTime).
+type fakeClock = clocktest.Fake
 
 // newTestAnswerer answers for testHost with addrs on interface 1 and none
 // elsewhere — interface 2 stands for an interface the policy excludes.
@@ -32,8 +31,8 @@ func newTestAnswerer(addrs ...string) (*hostAnswerer, *fakeClock) {
 	h := newHostAnswerer()
 	// More than two minutes past the zero time, as MdnsServerTest's
 	// beforeEach advances MockTime past the 120 s TTL.
-	clock := &fakeClock{t: time.Unix(1_000_000, 0)}
-	h.now = clock.now
+	clock := clocktest.New(time.Unix(1_000_000, 0))
+	h.clock.Store(clock)
 	ips := make([]net.IP, 0, len(addrs))
 	for _, a := range addrs {
 		ips = append(ips, net.ParseIP(a))
@@ -214,7 +213,7 @@ func TestHostAnswer_UnicastOnlyAfterRecentMulticast(t *testing.T) {
 	if r.unicast {
 		t.Fatal("QU question for never-multicast records was answered by unicast")
 	}
-	clock.advance(29 * time.Second) // within a quarter of 120 s
+	clock.Advance(29 * time.Second) // within a quarter of 120 s
 	r = mustAnswer(t, h, hostQuery(testHost, dns.TypeA, true), 1)
 	if !r.unicast || !r.dst.IP.Equal(querier.IP) || r.dst.Port != querier.Port {
 		t.Fatalf("QU question after a recent multicast: unicast=%v dst=%v, want unicast to %v", r.unicast, r.dst, querier)
@@ -223,11 +222,11 @@ func TestHostAnswer_UnicastOnlyAfterRecentMulticast(t *testing.T) {
 
 	h, clock = newTestAnswerer("1.2.3.4")
 	mustAnswer(t, h, hostQuery(testHost, dns.TypeA, false), 1)
-	clock.advance(20 * time.Second)
+	clock.Advance(20 * time.Second)
 	if r = mustAnswer(t, h, hostQuery(testHost, dns.TypeA, true), 1); !r.unicast {
 		t.Error("QU 20 s after a multicast: want unicast")
 	}
-	clock.advance(11 * time.Second) // 31 s since the multicast: more than a quarter
+	clock.Advance(11 * time.Second) // 31 s since the multicast: more than a quarter
 	if r = mustAnswer(t, h, hostQuery(testHost, dns.TypeA, true), 1); r.unicast {
 		t.Error("QU 31 s after the last multicast: want multicast")
 	}
@@ -242,11 +241,11 @@ func TestHostAnswer_DuplicateQuestionSuppression(t *testing.T) {
 	if _, ok := h.answer(hostQuery(testHost, dns.TypeA, false), 1, querier); ok {
 		t.Error("answered the same question again at once")
 	}
-	clock.advance(500 * time.Millisecond)
+	clock.Advance(500 * time.Millisecond)
 	if _, ok := h.answer(hostQuery(testHost, dns.TypeA, false), 1, querier); ok {
 		t.Error("answered the same question again within the window")
 	}
-	clock.advance(questionSuppressionWindow + 2*time.Millisecond)
+	clock.Advance(questionSuppressionWindow + 2*time.Millisecond)
 	if _, ok := h.answer(hostQuery(testHost, dns.TypeA, false), 1, querier); !ok {
 		t.Error("did not answer after the suppression window")
 	}

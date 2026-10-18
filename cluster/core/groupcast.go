@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock"
 	"github.com/SukramJ/go-fabric/cluster"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/groups"
@@ -183,6 +184,9 @@ type GroupcastConfig struct {
 	// TestingTimer schedules the end of a GroupcastTesting period and
 	// returns its cancellation; nil uses time.AfterFunc. A seam for tests.
 	TestingTimer func(d time.Duration, fire func()) (stop func())
+	// Clock arms the membership timers when TestingTimer is unset; nil
+	// is [clock.System].
+	Clock clock.Clock
 }
 
 // Groupcast is the Groupcast cluster server of the root endpoint, the
@@ -251,8 +255,9 @@ func NewGroupcast(cfg GroupcastConfig) (*Groupcast, error) {
 	}
 	g := &Groupcast{groups: cfg.Groups, gkm: cfg.GroupKeyManagement, acl: cfg.AccessControl, timer: cfg.TestingTimer}
 	if g.timer == nil {
+		clk := clock.Or(cfg.Clock)
 		g.timer = func(d time.Duration, fire func()) func() {
-			t := time.AfterFunc(d, fire)
+			t := clk.AfterFunc(d, fire)
 			return func() { t.Stop() }
 		}
 	}

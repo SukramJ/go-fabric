@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/bdx"
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	provdef "github.com/SukramJ/go-fabric/cluster/spec/otasoftwareupdateprovider"
 	"github.com/SukramJ/go-fabric/im"
 )
@@ -42,24 +43,6 @@ func (s *otaTestSource) Open(_ context.Context, file string) (bdx.Blob, error) {
 	return bytes.NewReader(s.bytes), nil
 }
 
-// otaClock is a settable clock.
-type otaClock struct {
-	mu  sync.Mutex
-	now time.Time
-}
-
-func (c *otaClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *otaClock) advance(d time.Duration) {
-	c.mu.Lock()
-	c.now = c.now.Add(d)
-	c.mu.Unlock()
-}
-
 type otaStatusLog struct {
 	mu  sync.Mutex
 	got []OTAUpdateStatus
@@ -81,7 +64,7 @@ type otaFixture struct {
 	p      *OTAProvider
 	src    *otaTestSource
 	bdx    *bdx.Responder
-	clock  *otaClock
+	clock  *clocktest.Fake
 	status *otaStatusLog
 }
 
@@ -93,17 +76,18 @@ func newOTAFixture(t *testing.T, mutate func(*OTAProviderConfig)) *otaFixture {
 			bytes: bytes.Repeat([]byte{0x42}, 3000),
 		},
 		bdx:    bdx.NewResponder(nil),
-		clock:  &otaClock{now: time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)},
+		clock:  clocktest.New(time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)),
 		status: &otaStatusLog{},
 	}
 	cfg := OTAProviderConfig{
 		ImageSource: f.src, BDX: f.bdx,
 		NodeID: func(fabric uint8) (uint64, bool) { return otaTestOwnNode, fabric == otaTestFabric },
-		Now:    f.clock.Now, OnStatusChange: f.status.add,
+		Clock:  f.clock, OnStatusChange: f.status.add,
 	}
 	if mutate != nil {
 		mutate(&cfg)
 	}
+	f.bdx.SetClock(f.clock) // the transfers' activity on the provider's clock, as a node wires it
 	p, err := NewOTAProvider(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -270,7 +254,7 @@ func TestOTAProvider_BusyWhileDownloading(t *testing.T) {
 	}
 	// A stale entry (older than 15 minutes, OtaProgress.ts:15) does not
 	// block: the query proceeds although the transfer still runs.
-	f.clock.advance(16 * time.Minute)
+	f.clock.Advance(16 * time.Minute)
 	if r := f.query(t, 7, bdxQuery()); r.Status != provdef.StatusUpdateAvailable {
 		t.Fatalf("after 16 minutes: %+v", r)
 	}
@@ -287,7 +271,7 @@ func TestOTAProvider_RebootDetected(t *testing.T) {
 	f := newOTAFixture(t, nil)
 	r := f.query(t, 7, bdxQuery())
 	_, done := f.startDownload(t, 7, *r.ImageUri)
-	f.clock.advance(time.Second)
+	f.clock.Advance(time.Second)
 	r2 := f.query(t, 8, bdxQuery())
 	if r2.Status != provdef.StatusUpdateAvailable {
 		t.Fatalf("response %+v", r2)

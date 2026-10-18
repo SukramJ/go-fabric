@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	commctrldef "github.com/SukramJ/go-fabric/cluster/spec/commissionercontrol"
 	"github.com/SukramJ/go-fabric/contract"
 	"github.com/SukramJ/go-fabric/im"
@@ -299,11 +300,10 @@ func TestCommissionerControlTimeout(t *testing.T) {
 // ApprovalValidity is FAILURE and dropped.
 func TestCommissionerControlExpired(t *testing.T) {
 	t.Parallel()
-	var mu sync.Mutex
-	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	clk := clocktest.New(time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC))
 	h := newCCHarness(t, func(c *CommissionerControlConfig) {
 		c.ApprovalValidity = time.Minute
-		c.Now = func() time.Time { mu.Lock(); defer mu.Unlock(); return now }
+		c.Clock = clk
 	})
 	ctx := caseCtx(clientNode)
 	if err := h.request(ctx, goodRequest); err != nil {
@@ -312,9 +312,7 @@ func TestCommissionerControlExpired(t *testing.T) {
 	<-h.approved
 	h.decisions <- true
 	h.events.next(t)
-	mu.Lock()
-	now = now.Add(2 * time.Minute)
-	mu.Unlock()
+	clk.Advance(2 * time.Minute)
 	if _, err := h.commission(ctx, goodRequest, 30); statusOf(err) != im.StatusFailure {
 		t.Fatalf("expired: %v", err)
 	}
