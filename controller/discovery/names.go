@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/SukramJ/go-fabric/mdns"
+	fabricclock "github.com/SukramJ/go-fabric/clock"
 )
 
 // Cache defaults. Mirrors matter.js 0ceb202d
@@ -157,7 +158,7 @@ func newNames(conn mdns.QueryConn, logger *slog.Logger, cfg namesConfig) *Names 
 		expiring:       make(map[*Record]struct{}),
 	}
 	if n.clock == nil {
-		n.clock = wallClock{}
+		n.clock = fabricclock.System{}
 	}
 	if n.random == nil {
 		n.random = rand.Uint32 //nolint:gosec // retry jitter, not a secret

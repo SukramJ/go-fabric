@@ -3,29 +3,19 @@
 
 package exchange
 
-import "time"
+import "github.com/SukramJ/go-fabric/clock"
 
-// Clock is the time source of a [Manager]: the current time and one-shot
-// timers. The default is the system clock; a test supplies its own to step
-// the retransmission and acknowledgement timers deterministically.
-type Clock interface {
-	// Now is the current time.
-	Now() time.Time
-	// AfterFunc calls f in its own goroutine once d has elapsed.
-	AfterFunc(d time.Duration, f func()) Timer
-}
+// Clock is the time source of a [Manager]: the current time and timers.
+// The default is the system clock; a test supplies its own
+// ([github.com/SukramJ/go-fabric/clock/clocktest.Fake]) to step the
+// retransmission and acknowledgement timers deterministically.
+//
+// Clock is the module's one time port, [clock.Clock]; the alias keeps
+// every existing reference to exchange.Clock compiling.
+type Clock = clock.Clock
 
-// Timer is a timer [Clock.AfterFunc] started.
-type Timer interface {
-	// Stop prevents the timer from firing. It reports whether it did.
-	Stop() bool
-}
+// Timer is a timer [Clock.AfterFunc] started; it is [clock.Timer].
+type Timer = clock.Timer
 
-// SystemClock is the [Clock] of the time package.
-type SystemClock struct{}
-
-// Now is time.Now.
-func (SystemClock) Now() time.Time { return time.Now() }
-
-// AfterFunc is time.AfterFunc.
-func (SystemClock) AfterFunc(d time.Duration, f func()) Timer { return time.AfterFunc(d, f) }
+// SystemClock is the [Clock] of the time package; it is [clock.System].
+type SystemClock = clock.System

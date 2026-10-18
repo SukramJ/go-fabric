@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"slices"
+
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/ble"
 	"github.com/SukramJ/go-fabric/controller/ble/bletest"
 	"github.com/SukramJ/go-fabric/controller/exchange"
@@ -119,15 +122,23 @@ func (c *silentCentral) Connect(context.Context, ble.Peripheral) (ble.Connection
 }
 
 func TestDialHandshakeTimeoutAndDisconnect(t *testing.T) {
-	clock := &stepClock{f: make(chan func(), 1)}
+	clock := clocktest.New(time.Unix(0, 0))
 	c := &silentCentral{conn: &silent{gone: make(chan struct{})}}
 	errc := make(chan error, 1)
 	go func() {
 		_, err := ble.Dial(context.Background(), c, ble.Peripheral{Address: "x"}, ble.DialOptions{Clock: clock})
 		errc <- err
 	}()
-	clock.waitArmed(t)
-	clock.fire()
+	// The handshake arms its response timeout; nothing answers, so it
+	// expires once the clock passes btp.ConnRspTimeout.
+	deadline := time.Now().Add(5 * time.Second)
+	for !slices.Contains(clock.Armed(), btp.ConnRspTimeout) {
+		if time.Now().After(deadline) {
+			t.Fatalf("no %v handshake timeout armed (armed %v)", btp.ConnRspTimeout, clock.Armed())
+		}
+		time.Sleep(time.Millisecond)
+	}
+	clock.Advance(btp.ConnRspTimeout)
 	if err := <-errc; !errors.Is(err, ble.ErrHandshakeTimeout) {
 		t.Fatalf("Dial = %v", err)
 	}
@@ -159,26 +170,3 @@ func TestChannelClosesWhenPeripheralDrops(t *testing.T) {
 		t.Fatal("the channel did not close")
 	}
 }
-
-// stepClock is an exchange.Clock whose single timer fires on demand.
-type stepClock struct {
-	f chan func()
-}
-
-func (c *stepClock) Now() time.Time { return time.Unix(0, 0) }
-
-func (c *stepClock) AfterFunc(_ time.Duration, f func()) exchange.Timer {
-	if c.f == nil {
-		panic("stepClock not armed")
-	}
-	c.f <- f
-	return stepTimer{}
-}
-
-func (c *stepClock) waitArmed(t *testing.T) { t.Helper() }
-
-func (c *stepClock) fire() { (<-c.f)() }
-
-type stepTimer struct{}
-
-func (stepTimer) Stop() bool { return true }

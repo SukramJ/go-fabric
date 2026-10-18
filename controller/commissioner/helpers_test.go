@@ -8,97 +8,24 @@ import (
 	"crypto/rand"
 	"log/slog"
 	"net"
-	"sort"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/exchange"
 	"github.com/SukramJ/go-fabric/secure/channel"
 	"github.com/SukramJ/go-fabric/transport/message"
 )
 
-// fakeClock is a manual exchange.Clock: timers fire, in order, inside
-// Advance.
-type fakeClock struct {
-	mu     sync.Mutex
-	now    time.Time
-	timers []*fakeTimer
-}
+// fakeClock is the test clock, a [clocktest.Fake]: timers fire, in order,
+// inside Advance.
+type fakeClock struct{ *clocktest.Fake }
 
-type fakeTimer struct {
-	c       *fakeClock
-	at      time.Time
-	d       time.Duration
-	f       func()
-	stopped bool
-	fired   bool
-}
-
-func newFakeClock() *fakeClock { return &fakeClock{now: time.Unix(4_000_000, 0)} }
-
-func (c *fakeClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *fakeClock) AfterFunc(d time.Duration, f func()) exchange.Timer {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	t := &fakeTimer{c: c, at: c.now.Add(d), d: d, f: f}
-	c.timers = append(c.timers, t)
-	return t
-}
-
-func (t *fakeTimer) Stop() bool {
-	t.c.mu.Lock()
-	defer t.c.mu.Unlock()
-	was := !t.stopped && !t.fired
-	t.stopped = true
-	return was
-}
+func newFakeClock() *fakeClock { return &fakeClock{clocktest.New(time.Unix(4_000_000, 0))} }
 
 // live counts the timers neither fired nor stopped.
-func (c *fakeClock) live() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	n := 0
-	for _, t := range c.timers {
-		if !t.stopped && !t.fired {
-			n++
-		}
-	}
-	return n
-}
-
-// Advance moves the clock by d, firing every due timer in order.
-func (c *fakeClock) Advance(d time.Duration) {
-	c.mu.Lock()
-	target := c.now.Add(d)
-	for {
-		sort.SliceStable(c.timers, func(i, j int) bool { return c.timers[i].at.Before(c.timers[j].at) })
-		var next *fakeTimer
-		for _, t := range c.timers {
-			if !t.stopped && !t.fired && !t.at.After(target) {
-				next = t
-				break
-			}
-		}
-		if next == nil {
-			break
-		}
-		next.fired = true
-		if next.at.After(c.now) {
-			c.now = next.at
-		}
-		c.mu.Unlock()
-		next.f()
-		c.mu.Lock()
-	}
-	c.now = target
-	c.mu.Unlock()
-}
+func (c *fakeClock) live() int { return c.Pending() }
 
 // eventually polls cond until it holds or ten seconds pass.
 func eventually(t *testing.T, what string, cond func() bool) {

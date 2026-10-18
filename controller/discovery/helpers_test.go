@@ -12,6 +12,7 @@ import (
 
 	"github.com/miekg/dns"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/mdns"
 )
 
@@ -69,78 +70,28 @@ func (f *fakeConn) Close() error {
 	return nil
 }
 
-// fakeClock fires timers only when a test advances it.
-type fakeClock struct {
-	mu     sync.Mutex
-	now    time.Time
-	timers []*fakeTimer
-}
-
-type fakeTimer struct {
-	c       *fakeClock
-	at      time.Time
-	f       func()
-	stopped bool
-	fired   bool
-}
+// fakeClock is the test clock, a [clocktest.Fake]: timers fire only when a
+// test advances it.
+type fakeClock struct{ *clocktest.Fake }
 
 func newFakeClock() *fakeClock {
-	return &fakeClock{now: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
-}
-
-func (c *fakeClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *fakeClock) AfterFunc(d time.Duration, f func()) stopper {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	t := &fakeTimer{c: c, at: c.now.Add(d), f: f}
-	c.timers = append(c.timers, t)
-	return t
-}
-
-func (t *fakeTimer) Stop() bool {
-	t.c.mu.Lock()
-	defer t.c.mu.Unlock()
-	was := !t.stopped && !t.fired
-	t.stopped = true
-	return was
+	return &fakeClock{clocktest.New(time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC))}
 }
 
 // advance moves the clock forward by d, firing each due timer in time
 // order and letting the loop process what it posted before the next.
 func (c *fakeClock) advance(n *Names, d time.Duration) {
-	c.mu.Lock()
-	target := c.now.Add(d)
-	c.mu.Unlock()
+	target := c.Now().Add(d)
 	for {
-		c.mu.Lock()
-		var next *fakeTimer
-		for _, t := range c.timers {
-			if t.stopped || t.fired || t.at.After(target) {
-				continue
-			}
-			if next == nil || t.at.Before(next.at) {
-				next = t
-			}
+		at, ok := c.Next()
+		if !ok || at.After(target) {
+			break
 		}
-		if next == nil {
-			c.now = target
-			c.mu.Unlock()
-			_ = n.loop.call(func() {})
-			return
-		}
-		if next.at.After(c.now) {
-			c.now = next.at
-		}
-		next.fired = true
-		c.mu.Unlock()
-		next.f()
+		c.Advance(max(at.Sub(c.Now()), 0))
 		_ = n.loop.call(func() {})
 	}
+	c.Advance(max(target.Sub(c.Now()), 0))
+	_ = n.loop.call(func() {})
 }
 
 // testNames builds a cache on a fake connection and a fake clock.

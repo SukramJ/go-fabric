@@ -14,13 +14,12 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"sort"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/discovery"
-	"github.com/SukramJ/go-fabric/controller/exchange"
 )
 
 var (
@@ -33,69 +32,10 @@ const (
 	addrB = "bb:bb:bb:bb:bb:bb"
 )
 
-// fakeClock is a manual exchange.Clock.
-type fakeClock struct {
-	mu     sync.Mutex
-	now    time.Time
-	timers []*fakeTimer
-}
+// fakeClock is the test clock, a [clocktest.Fake].
+type fakeClock = clocktest.Fake
 
-type fakeTimer struct {
-	c         *fakeClock
-	at        time.Time
-	f         func()
-	done      bool
-	cancelled bool
-}
-
-func newFakeClock() *fakeClock { return &fakeClock{now: time.Unix(1_000_000, 0)} }
-
-func (c *fakeClock) Now() time.Time {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.now
-}
-
-func (c *fakeClock) AfterFunc(d time.Duration, f func()) exchange.Timer {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	t := &fakeTimer{c: c, at: c.now.Add(d), f: f}
-	c.timers = append(c.timers, t)
-	return t
-}
-
-func (t *fakeTimer) Stop() bool {
-	t.c.mu.Lock()
-	defer t.c.mu.Unlock()
-	was := !t.done && !t.cancelled
-	t.cancelled = true
-	return was
-}
-
-func (c *fakeClock) Advance(d time.Duration) {
-	c.mu.Lock()
-	target := c.now.Add(d)
-	for {
-		sort.SliceStable(c.timers, func(i, j int) bool { return c.timers[i].at.Before(c.timers[j].at) })
-		var next *fakeTimer
-		for _, t := range c.timers {
-			if !t.done && !t.cancelled && !t.at.After(target) {
-				next = t
-				break
-			}
-		}
-		if next == nil {
-			break
-		}
-		next.done = true
-		c.now = next.at
-		c.mu.Unlock()
-		next.f()
-		c.mu.Lock()
-	}
-	c.now = target
-	c.mu.Unlock()
-}
+func newFakeClock() *fakeClock { return clocktest.New(time.Unix(1_000_000, 0)) }
 
 // mockClient is MockOneShotBleScannerClient: no listening time.
 type mockClient struct {

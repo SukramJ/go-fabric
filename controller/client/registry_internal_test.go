@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SukramJ/go-fabric/clock/clocktest"
 	"github.com/SukramJ/go-fabric/controller/ca"
 	"github.com/SukramJ/go-fabric/controller/commissioner"
 	"github.com/SukramJ/go-fabric/controller/discovery"
@@ -53,7 +54,7 @@ const regFabricID uint64 = 0x0F0D
 
 func newRegHarness(t *testing.T) *regHarness {
 	t.Helper()
-	h := &regHarness{clock: &manualClock{now: time.UnixMilli(1_900_000_000_000)}, store: &MemoryStore{}, logs: &logRecorder{}}
+	h := &regHarness{clock: &manualClock{clocktest.New(time.UnixMilli(1_900_000_000_000))}, store: &MemoryStore{}, logs: &logRecorder{}}
 	mgr, err := exchange.NewManager(silentConn{}, exchange.Config{Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
