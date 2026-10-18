@@ -4021,25 +4021,15 @@
         "transport/mrp:TestWindowAcceptsFreshAndRejectsDuplicate",
         "transport/mrp:TestWindowAcceptsAdvancing",
         "transport/mrp:TestWindowAcceptsBackInWindow",
-        "transport/mrp:TestWindowEncryptedRollover"
+        "transport/mrp:TestWindowEncryptedRollover",
+        "transport/mrp:TestMessageReceptionStateEncryptedWithoutRollover",
+        "transport/mrp:TestMessageReceptionStateEncryptedWithRollover",
+        "transport/mrp:TestMessageReceptionStateUnencryptedWithRollover"
       ],
       "missing": [
-        "correct difference gets calculated and state gets updated after being initialized",
-        "duplicate counter value (value -1) within window is detected",
-        "value tests within counter window",
-        "value tests on counter window edges",
-        "value tests on range edges",
-        "accepts a peer counter of 0xFFFFFFFF (maximum valid value)",
-        "rejects out-of-range counter values",
-        "forward jump of exactly the window size clears stale bitmap bits",
-        "value tests on edges and duplicate values with low max-number and rollovers",
-        "value tests on edges and duplicate values with high max-number and rollovers",
-        "value tests on edges and new values with low max-number and rollovers",
-        "value tests on edges and new values with high max-number and rollovers",
-        "treats the exact counter rollover (MAX -> 0) as new and detects replays",
-        "accepts an in-window sub-max counter delivered right after the first counter"
+        "rejects out-of-range counter values"
       ],
-      "reason": "The reception window's duplicate detection is covered; the edge and range vectors per session type are not ported case by case.",
+      "reason": "Every diff and bitmap vector of the three reception states is ported against Window.diff and the bitmap after Window.Accept; the out-of-range case (-1, 0x100000000) is unrepresentable because the Go counter is a uint32 decoded from four wire bytes.",
       "snapshotSha": "abc287f99c416157f5e5fc930912f76917904101"
     },
     {
