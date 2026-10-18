@@ -2520,14 +2520,25 @@
     },
     {
       "path": "packages/protocol/test/advertisement/AdvertisementTest.ts",
-      "status": "planned",
-      "reason": "Privacy masking of a commissionable advertisement and the extended-announcement signal.",
+      "status": "partial",
+      "go": [
+        "mdns:TestAdvertisementPrivacyMasking"
+      ],
+      "missing": [
+        "masks private details but does not signal extended announcement when forced via omitPrivateDetails",
+        "masks and signals extended announcement once the extended-announcement period begins",
+        "signals extended announcement in the extended-announcement period even with omitPrivateDetails set"
+      ],
+      "reason": "The unmasked commissionable record (VP and _V vendor subtype present) is ported through BuildCommissionableService; the masked cases are the documented divergence BD-Matter-mDNS-VPAlwaysAdvertised (stateless record builders, no omitPrivateDetails option, no 15-minute extended-announcement timer), and the extended-announcement signal is BLE-only, which the device side does not have by design.",
       "snapshotSha": "265213350c880e665ae510dae3cb087ded2b0991"
     },
     {
       "path": "packages/protocol/test/advertisement/ServiceDescriptionTest.ts",
-      "status": "planned",
-      "reason": "ICD operating mode and session intervals carried on an operational service description.",
+      "status": "ported",
+      "go": [
+        "mdns:TestServiceDescriptionOperational"
+      ],
+      "reason": "Both cases run through BuildOperationalService: ICD Lit and the 30 s / 3 s / 5 s session intervals reach the operational TXT keys, and ICD Sit (0) stays present.",
       "snapshotSha": "c6e1ff1f1e3c2bc4f881d400ca02a9faeb5e7eaa"
     },
     {

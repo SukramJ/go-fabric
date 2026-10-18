@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | status | files |
 | --- | ---: |
-| ported | 13 |
-| partial | 100 |
-| planned | 124 |
+| ported | 14 |
+| partial | 101 |
+| planned | 122 |
 | excluded | 87 |
 | total | 324 |
 
@@ -92,7 +92,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | [protocol/test/action/client/subscription](#protocoltestactionclientsubscription) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/action/request](#protocoltestactionrequest) | 6 | 0 | 1 | 4 | 1 |
 | [protocol/test/action/response](#protocoltestactionresponse) | 4 | 0 | 0 | 0 | 4 |
-| [protocol/test/advertisement](#protocoltestadvertisement) | 2 | 0 | 0 | 2 | 0 |
+| [protocol/test/advertisement](#protocoltestadvertisement) | 2 | 1 | 1 | 0 | 0 |
 | [protocol/test/bdx](#protocoltestbdx) | 2 | 0 | 1 | 1 | 0 |
 | [protocol/test/ble](#protocoltestble) | 2 | 1 | 0 | 0 | 1 |
 | [protocol/test/certificate](#protocoltestcertificate) | 5 | 1 | 1 | 3 | 0 |
@@ -707,8 +707,8 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
-| AdvertisementTest.ts | 96 | planned | — | Privacy masking of a commissionable advertisement and the extended-announcement signal. |
-| ServiceDescriptionTest.ts | 34 | planned | — | ICD operating mode and session intervals carried on an operational service description. |
+| AdvertisementTest.ts | 96 | partial | `mdns:TestAdvertisementPrivacyMasking` | The unmasked commissionable record (VP and _V vendor subtype present) is ported through BuildCommissionableService; the masked cases are the documented divergence BD-Matter-mDNS-VPAlwaysAdvertised (stateless record builders, no omitPrivateDetails option, no 15-minute extended-announcement timer), and the extended-announcement signal is BLE-only, which the device side does not have by design. Missing: “masks private details but does not signal extended announcement when forced via omitPrivateDetails”; “masks and signals extended announcement once the extended-announcement period begins”; “signals extended announcement in the extended-announcement period even with omitPrivateDetails set”. |
+| ServiceDescriptionTest.ts | 34 | ported | `mdns:TestServiceDescriptionOperational` | Both cases run through BuildOperationalService: ICD Lit and the 30 s / 3 s / 5 s session intervals reach the operational TXT keys, and ICD Sit (0) stays present. |
 
 ## protocol/test/bdx
 
@@ -1137,11 +1137,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 - `ReadTest.ts` — Building a read request: attribute and event paths, wildcards, fabric filtering by default, data version filters.
 - `SubscribeTest.ts` — Building a subscribe request: keepSubscriptions default, intervals, event paths.
 - `WriteTest.ts` — Building a write request: timed writes, schema encoding, data versions.
-
-### protocol/test/advertisement
-
-- `AdvertisementTest.ts` — Privacy masking of a commissionable advertisement and the extended-announcement signal.
-- `ServiceDescriptionTest.ts` — ICD operating mode and session intervals carried on an operational service description.
 
 ### protocol/test/bdx
 
