@@ -84,7 +84,6 @@ func TestDiscoveryDataCaseInsensitiveKeys(t *testing.T) {
 
 // TestDiscoveryDataSessionIntervals covers DiscoveryDataTest.ts:29-70.
 func TestDiscoveryDataSessionIntervals(t *testing.T) {
-	t.Parallel()
 	t.Run("decodes valid values", func(t *testing.T) {
 		ddExpect(t, map[string]string{"SII": "5000", "SAI": "300", "SAT": "4000"},
 			dd{"SII": int64(5000), "SAI": int64(300), "SAT": int64(4000)})
@@ -116,7 +115,6 @@ func TestDiscoveryDataSessionIntervals(t *testing.T) {
 
 // TestDiscoveryDataIdentity covers DiscoveryDataTest.ts:72-110.
 func TestDiscoveryDataIdentity(t *testing.T) {
-	t.Parallel()
 	t.Run("decodes valid values", func(t *testing.T) {
 		ddExpect(t, map[string]string{"VP": "65521+32768", "DT": "4293984257", "PH": "33"},
 			dd{"VP": "65521+32768", "DT": uint64(0xfff10001), "PH": uint64(33)})
@@ -146,7 +144,6 @@ func TestDiscoveryDataIdentity(t *testing.T) {
 
 // TestDiscoveryDataTransports covers DiscoveryDataTest.ts:112-127.
 func TestDiscoveryDataTransports(t *testing.T) {
-	t.Parallel()
 	t.Run("decodes valid values", func(t *testing.T) {
 		ddExpect(t, map[string]string{"T": "4", "ICD": "1"},
 			dd{"T": SupportedTransports{TCPClient: false, TCPServer: true}, "ICD": uint64(1)})
