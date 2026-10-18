@@ -113,8 +113,10 @@ type Hooks struct {
 	// payload decoded through the event's definition, the raw [spec.Node]
 	// when there is none, nil without a payload.
 	Event func(endpoint uint16, cluster, event uint32, e interaction.EventData, value any)
-	// Seeded: the image holds BasicInformation and more than the root
-	// endpoint, once (ClientNodeLifecycle.ts:51-75).
+	// Seeded: the structure is known, once — BasicInformation is present
+	// and every endpoint the root's PartsList names is installed, more than
+	// the root when no PartsList was reported (Peers.ts:760-797,
+	// ClientNodeLifecycle.ts:51-75).
 	Seeded func()
 	// Decommissioned: a [Registry] removed the node from its fabric, or the
 	// peer left it — matter.js lifecycle.decommissioned

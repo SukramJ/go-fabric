@@ -2237,8 +2237,17 @@
     },
     {
       "path": "packages/node/test/node/NodeLifecycleSeededTest.ts",
-      "status": "planned",
-      "reason": "When the controller considers a peer's structure seeded, and its warnings for root-only nodes.",
+      "status": "partial",
+      "go": [
+        "controller/client:TestNodeLifecycleSeededParity",
+        "controller/client:TestNodeLifecycleSeededPairParity"
+      ],
+      "missing": [
+        "seeds a node built by hand once an endpoint beyond the root is added",
+        "seeds a node built by hand on BasicInformation install when endpoints are already present",
+        "uses ClientNodeLifecycle for a client node and plain NodeLifecycle for a server node"
+      ],
+      "reason": "When the client node is seeded — BasicInformation present and every endpoint the root's reported PartsList names installed, a root-only node included, more than the root without a PartsList — and the root-only warning (once, not for a node-scoped device type, not without a reported DeviceTypeList) run on Node.apply with Descriptor reports (controller/client:TestNodeLifecycleSeededParity) and on fabrictest for the commissioned pair and the restored peer (TestNodeLifecycleSeededPairParity); fix: the seeding rule of Peers.ts #evaluateSeeded (:760-797) at 862ad75f — the Go node seeded only with more than one endpoint. matter.js also reads an unreported mandatory list as empty; the Go image holds no value. Missing: nodes built by hand (endpoints.require, behaviors.require — the Go image is built from reports and its store only) and the ClientNodeLifecycle/NodeLifecycle class split (no lifecycle class hierarchy in Go).",
       "snapshotSha": "87a08ef46981063bb00f80dfaa949b2d2a2dd15b"
     },
     {
