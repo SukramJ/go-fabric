@@ -111,6 +111,23 @@ attribute. An uncommissioned pair returns `fabrictest.ErrNotCommissioned`.
 *Source: `fabrictest/wire.go`, `fabrictest/raw.go`, `fabrictest/access.go`,
 `fabrictest/pase.go`, `fabrictest/window.go`.*
 
+## Client nodes
+
+`Site.CommissionedPair` commissions with the commissioner alone; the
+controller's client node registry holds nothing until a test asks
+(`Pair.Node`). `Controller.CommissionNode(ctx, device, opts)` commissions as
+matter.js's `controller.peers.commission` does: the device is discovered by
+its long discriminator, the registry's node for it is commissioned with
+`client.CommissionOptions` and started. `Controller.Discover(ctx, id,
+timeout)` is the discovery alone, the timeout on the site's clock.
+`ControllerOptions.Registry` edits the registry's configuration — hooks,
+`AutoStart`, a store — before the registry is built, on every start;
+`ControllerOptions.Attestation` sets the commissioner's trust store and
+`NoAttestationStore` commissions without one. The registry itself is not
+started: a test that wants `AutoStart` calls `Registry().Start`.
+
+*Source: `fabrictest/node.go`, `fabrictest/controller.go`.*
+
 ## Time
 
 A site's default clock is a `clocktest.Fake` starting at
@@ -179,7 +196,15 @@ device re-establishing a persisted subscription opens CASE to the
 controller, which the site resolves for it, and the controller's CASE
 responder adopts the session.
 
+`Controller.Restart` stops the controller's stack and starts it again on its
+stores — the certificate authority, the fabric, the CASE resumption records
+and the client node registry's store — so the registry restores its nodes,
+as matter.js's controller restarted on its storage. A pair's `Peer` and
+`Interaction` belong to the stopped stack; after a restart a test uses the
+registry's nodes. On loopback sockets the controller gets a new port.
+
 *Source: `fabrictest/device.go` (`Restart`, `siteResolver`),
+`fabrictest/controller.go` (`Restart`),
 `controller/interaction/live_test.go` (`TestLiveSustainedSurvivesRestart`),
 `controller/client/live_test.go` (`TestLiveClientNode`).*
 
