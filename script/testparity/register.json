@@ -3429,8 +3429,14 @@
     },
     {
       "path": "packages/protocol/test/groups/GroupsTest.ts",
-      "status": "planned",
-      "reason": "The fabric's group state: multicast address, ID map replacement, subject resolution for a group message.",
+      "status": "ported",
+      "go": [
+        "groups:TestGroupsMulticastAddress",
+        "groups:TestGroupsIDMap",
+        "groups:TestGroupsSubjectForGroup",
+        "groups:TestGroupsCurrentKeyForID"
+      ],
+      "reason": "The per-group multicast address and its refusal of group id 0, the GroupKeyMap replacement (store change and Reload), the subject of a group message through Decode's HasValidMapping and Endpoints including the session-id collision peer, and the current key of a group with the matter.js error texts are ported.",
       "snapshotSha": "38bb4ef7a272061022e72e85bf211b9645c53e82"
     },
     {

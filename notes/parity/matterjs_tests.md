@@ -10,9 +10,9 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 | status | files |
 | --- | ---: |
-| ported | 19 |
+| ported | 20 |
 | partial | 99 |
-| planned | 119 |
+| planned | 118 |
 | excluded | 87 |
 | total | 324 |
 
@@ -101,7 +101,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | [protocol/test/dcl](#protocoltestdcl) | 10 | 0 | 6 | 4 | 0 |
 | [protocol/test/events](#protocoltestevents) | 3 | 0 | 2 | 0 | 1 |
 | [protocol/test/fabric](#protocoltestfabric) | 3 | 0 | 2 | 1 | 0 |
-| [protocol/test/groups](#protocoltestgroups) | 5 | 2 | 0 | 3 | 0 |
+| [protocol/test/groups](#protocoltestgroups) | 5 | 3 | 0 | 2 | 0 |
 | [protocol/test/icd](#protocoltesticd) | 8 | 0 | 0 | 6 | 2 |
 | [protocol/test/interaction](#protocoltestinteraction) | 1 | 0 | 1 | 0 | 0 |
 | [protocol/test/mdns](#protocoltestmdns) | 3 | 0 | 3 | 0 | 0 |
@@ -792,7 +792,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 | --- | ---: | --- | --- | --- |
 | FabricGroupsManagerTest.ts | 42 | ported | `groups:TestFabricGroupsManagerGroupIPv6AddressCalculation` | The group IPv6 multicast address of fabric 0x456789ABCDEF1234 and group 0x1234 is ported against the matter.js vector through Manager.MulticastAddressFor. |
 | GroupsMulticastPolicyTest.ts | 74 | ported | `groups:TestGroupcastPolicyMovesTheMulticastMembership`<br>`groups:TestGroupsMulticastPolicy` | The per-group default, the shared IANA address under IanaAddr, reverting after removal and independent per-group policies are ported on one shared fabric through SetGroupProperties and RemoveGroupProperties. |
-| GroupsTest.ts | 148 | planned | â€” | The fabric's group state: multicast address, ID map replacement, subject resolution for a group message. |
+| GroupsTest.ts | 148 | ported | `groups:TestGroupsMulticastAddress`<br>`groups:TestGroupsIDMap`<br>`groups:TestGroupsSubjectForGroup`<br>`groups:TestGroupsCurrentKeyForID` | The per-group multicast address and its refusal of group id 0, the GroupKeyMap replacement (store change and Reload), the subject of a group message through Decode's HasValidMapping and Endpoints including the session-id collision peer, and the current key of a group with the matter.js error texts are ported. |
 | KeySetsTest.ts | 174 | planned | â€” | The fabric's group key sets: lookup, replacement, current and all operational keys. |
 | MessagingStateTest.ts | 76 | planned | â€” | Group messaging state: storage, reception state per source and key, the legacy data-counter migration. |
 
@@ -1161,7 +1161,6 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` â
 
 ### protocol/test/groups
 
-- `GroupsTest.ts` â€” The fabric's group state: multicast address, ID map replacement, subject resolution for a group message.
 - `KeySetsTest.ts` â€” The fabric's group key sets: lookup, replacement, current and all operational keys.
 - `MessagingStateTest.ts` â€” Group messaging state: storage, reception state per source and key, the legacy data-counter migration.
 
