@@ -4197,23 +4197,17 @@
       "status": "partial",
       "go": [
         "secure/sessionparams:TestEffectiveTransportsGateOnMatter15",
-        "secure/sessionparams:TestMaxTCPMessageSizeOnlyWithTCP"
+        "secure/sessionparams:TestMaxTCPMessageSizeOnlyWithTCP",
+        "controller/exchange:TestSessionParameters",
+        "controller/exchange:TestSessionParametersMaxPathsPerInvoke",
+        "controller/exchange:TestSessionParametersTCPSpecVersionGate",
+        "controller/exchange:TestSessionParametersReported"
       ],
       "missing": [
-        "accepts idle/active intervals above one hour",
-        "honors a peer-reported limit above one",
-        "assumes one when the peer reports zero",
-        "assumes one when the peer reports no limit",
-        "honors the highest limit the wire can carry",
         "assumes one for a persisted limit the wire could not have carried",
-        "clears TCP support when the spec version is unknown",
-        "decodes a numeric supportedTransports bitmap before gating",
-        "keeps only the values the peer sent, without fallbacks",
-        "decodes supported transports sent as a bitmap",
-        "keeps supported transports given as an object",
-        "is undefined when the peer sent no parameters"
+        "keeps supported transports given as an object"
       ],
-      "reason": "The TCP spec-version gate is covered; the maxPathsPerInvoke assumptions and the interval cases are not.",
+      "reason": "The factory (exchange.PeerParameters: intervals over one hour, the maxPathsPerInvoke fallbacks, the TCP spec-version gate) and reported (the decoded sessionparams.Parameters) are ported; the untyped persisted values (NaN, 2.5, \"10\", null, …) and the object form of supportedTransports are JavaScript-only shapes a Go uint16 bitmap field cannot hold.",
       "snapshotSha": "4cc44d0f3f46b537da788fd5f7c61479a0266426"
     },
     {
