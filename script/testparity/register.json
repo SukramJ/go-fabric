@@ -4114,17 +4114,14 @@
       "path": "packages/protocol/test/protocol/interaction/AttributeDataEncoderTest.ts",
       "status": "partial",
       "go": [
-        "im:TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath"
+        "im:TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath",
+        "im:TestAttributeDataEncoderFieldGuarantees",
+        "bridge:TestAttributeDataEncoderChunkArray"
       ],
       "missing": [
-        "tag compress with dataVersion handling",
-        "chunk array",
-        "rejects an EventReport carrying both data and status (§8.9.3.5)",
-        "rejects an AttributeReport carrying both data and status (§8.9.2.9)",
-        "rejects an EventReport carrying neither data nor status (§8.9.3.5)",
-        "rejects an AttributeReport carrying neither data nor status (§8.9.2.9)"
+        "tag compress with dataVersion handling"
       ],
-      "reason": "Stripping isUrgent from event data paths is covered; tag compression, array chunking and the report data/status guarantees are not ported case by case.",
+      "reason": "The isUrgent strip, the exactly-one-of data/status guarantee (by construction of the Go report types, asserted on the wire) and list chunking through bridge's splitter are ported; tag compression is missing because matter.js does not use compressAttributeDataReportTags on its wire (AttributeDataEncoder.ts:196-201) and the Go encoder has no counterpart.",
       "snapshotSha": "f703ff2baa3301401d8ad308d7130072e91c3dff"
     },
     {

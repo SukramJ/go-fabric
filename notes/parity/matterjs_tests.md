@@ -868,7 +868,7 @@ matter.js pin `862ad75f4d3c7ab528b8a3954168146082cad8a6` (`parity/schema.json` �
 | file | lines | status | Go tests or class | note |
 | --- | ---: | --- | --- | --- |
 | AttributeDataDecoderTest.ts | 1234 | planned | — | Decoding attribute reports as chip-tool sends them: chunked arrays with indexed changes, unknown attributes. |
-| AttributeDataEncoderTest.ts | 362 | partial | `im:TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath` | Stripping isUrgent from event data paths is covered; tag compression, array chunking and the report data/status guarantees are not ported case by case. Missing: “tag compress with dataVersion handling”; “chunk array”; “rejects an EventReport carrying both data and status (§8.9.3.5)”; “rejects an AttributeReport carrying both data and status (§8.9.2.9)”; “rejects an EventReport carrying neither data nor status (§8.9.3.5)”; “rejects an AttributeReport carrying neither data nor status (§8.9.2.9)”. |
+| AttributeDataEncoderTest.ts | 362 | partial | `im:TestEventReport_Marshal_DataIB_IsUrgentNotInDataPath`<br>`im:TestAttributeDataEncoderFieldGuarantees`<br>`bridge:TestAttributeDataEncoderChunkArray` | The isUrgent strip, the exactly-one-of data/status guarantee (by construction of the Go report types, asserted on the wire) and list chunking through bridge's splitter are ported; tag compression is missing because matter.js does not use compressAttributeDataReportTags on its wire (AttributeDataEncoder.ts:196-201) and the Go encoder has no counterpart. Missing: “tag compress with dataVersion handling”. |
 | EventDataDecoderTest.ts | 362 | planned | — | Normalising and decoding event reports, including unknown events. |
 
 ## protocol/test/securechannel
